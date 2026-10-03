@@ -1,0 +1,221 @@
+.fc-tb__tablestyle-menu {
+  width: 515px;
+  max-width: min(515px, calc(100vw - 16px));
+  max-height: 336px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  border-color: #c8c8c8;
+  border-radius: 3px;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.15),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* The swatch body keeps its own height instead of shrinking to whatever the
+   capped menu leaves, so the "New Table Style" footer stays below the fold and
+   the menu is what scrolls to it. Scroll chaining is left on here and trapped
+   on the menu instead, otherwise the footer is unreachable by wheel. */
+.fc-tb__tablestyle-scroll {
+  flex: 0 0 auto;
+  max-height: min(496px, calc(100vh - 116px));
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.fc-tb__cellstyle-menu {
+  width: 566px;
+  max-width: min(566px, calc(100vw - 16px));
+  overflow: hidden;
+  border-color: #c8c8c8;
+  border-radius: 3px;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.15),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.fc-tb__cellstyle-scroll {
+  max-height: min(388px, calc(100vh - 244px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.fc-tb__currency-menu {
+  min-width: 190px;
+  max-width: min(220px, calc(100vw - 16px));
+  padding: 5px 0;
+  border-color: #c8c8c8;
+  border-radius: 3px;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.15),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.fc-tb__currency-menu .fc-tb__menu-item {
+  min-height: 25px;
+  gap: 8px;
+  padding: 3px 12px 3px 20px;
+}
+
+.fc-tb__currency-menu .fc-tb__menu-item__icon-spacer {
+  flex: 0 0 0;
+  width: 0;
+  height: 18px;
+}
+
+.fc-tb__currency-menu .fc-tb__menu-item:hover,
+.fc-tb__currency-menu .fc-tb__menu-item:focus-visible {
+  background: var(--fc-tb-ribbon-hover);
+}
+
+.fc-tb__currency-menu .fc-tb__menu-item--active {
+  background: var(--fc-tb-ribbon-hover);
+}
+
+.fc-tb__tablestyle-grid {
+  grid-template-columns: repeat(7, 62px);
+  gap: 8px 9px;
+  padding: 6px 14px 10px;
+}
+
+.fc-tb__cellstyle-grid {
+  grid-template-columns: repeat(6, 82px);
+  gap: 7px 11px;
+  padding: 3px 16px 8px;
+}
+
+.fc-tb__tablestyle-heading,
+.fc-tb__cellstyle-heading {
+  padding: 6px 10px 2px;
+  color: #605e5c;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fc-tb__tablestyle-heading {
+  padding: 5px 8px 4px;
+  background: #f3f2f1;
+  color: #323130;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.fc-tb__cellstyle-heading {
+  padding: 5px 8px 4px;
+  background: #f3f2f1;
+  color: #323130;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.fc-tb__tablestyle-swatch {
+  display: flex;
+  flex-direction: column;
+  width: 62px;
+  height: 47px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #222222;
+  border-radius: 0;
+  background: #fff;
+  cursor: pointer;
+}
+
+.fc-tb__tablestyle-swatch__head {
+  flex: 0 0 9px;
+}
+
+.fc-tb__tablestyle-swatch__row {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+.fc-tb__tablestyle-swatch__first-col {
+  flex: 0 0 10px;
+}
+
+.fc-tb__tablestyle-swatch__rest {
+  flex: 1 1 auto;
+}
+
+.fc-tb__cellstyle-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 82px;
+  height: 22px;
+  padding: 1px 6px;
+  overflow: hidden;
+  border: 1px solid #9a9a9a;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-tb__tablestyle-footer,
+.fc-tb__cellstyle-footer,
+.fc-tb__currency-footer {
+  padding: 6px 12px;
+}
+
+.fc-tb__tablestyle-footer:not(.fc-tb__menu-item--iconic)::before,
+.fc-tb__cellstyle-footer:not(.fc-tb__menu-item--iconic)::before {
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #8a8886;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--cell-style-merge::before,
+.fc-tb__menu-icon--cell-style-new::before,
+.fc-tb__menu-icon--pivot-style-new::before,
+.fc-tb__menu-icon--table-style-new::before {
+  inset: 2px;
+  border: 1px solid #8a8886;
+  background:
+    linear-gradient(#d0cfcd 0 0) 0 33% / 100% 1px no-repeat,
+    linear-gradient(#d0cfcd 0 0) 0 66% / 100% 1px no-repeat,
+    linear-gradient(90deg, #d0cfcd 0 0) 33% 0 / 1px 100% no-repeat,
+    linear-gradient(90deg, #d0cfcd 0 0) 66% 0 / 1px 100% no-repeat,
+    #ffffff;
+}
+
+.fc-tb__menu-icon--cell-style-merge::after,
+.fc-tb__menu-icon--cell-style-new::after,
+.fc-tb__menu-icon--pivot-style-new::after,
+.fc-tb__menu-icon--table-style-new::after {
+  right: -1px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background:
+    linear-gradient(#ffffff 0 0) 50% 50% / 5px 1px no-repeat,
+    linear-gradient(90deg, #ffffff 0 0) 50% 50% / 1px 5px no-repeat,
+    #107c41;
+}
+
+.fc-tb__menu-icon--pivot-style-new::before {
+  border-color: #605e5c;
+  background:
+    linear-gradient(#185abd 0 0) 0 0 / 100% 4px no-repeat,
+    linear-gradient(#d0cfcd 0 0) 0 50% / 100% 1px no-repeat,
+    linear-gradient(90deg, #d0cfcd 0 0) 50% 0 / 1px 100% no-repeat,
+    #ffffff;
+}
+
+.fc-tb__menu-icon--cell-style-merge::after {
+  border-radius: 1px;
+  background:
+    linear-gradient(90deg, #ffffff 0 0) 50% 50% / 6px 1px no-repeat,
+    #185abd;
+}

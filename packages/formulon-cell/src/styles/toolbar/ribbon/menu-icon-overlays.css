@@ -1,0 +1,151 @@
+.fc-tb__cellstyle-footer:not(.fc-tb__menu-item--iconic)::before,
+.fc-tb__menu-icon--addin-get::after,
+.fc-tb__menu-icon--break-col::after,
+.fc-tb__menu-icon--break-page::after,
+.fc-tb__menu-icon--break-row::after,
+.fc-tb__menu-icon--fill-series::after,
+.fc-tb__menu-icon--insert-cells::after,
+.fc-tb__menu-icon--insert-col::after,
+.fc-tb__menu-icon--insert-row::after,
+.fc-tb__menu-icon--insert-sheet::after,
+.fc-tb__menu-icon--insert-shift-down::after,
+.fc-tb__menu-icon--insert-shift-right::after,
+.fc-tb__menu-icon--pdf-create::after,
+.fc-tb__menu-icon--pivot-new-sheet::after,
+.fc-tb__menu-icon--print-area-add::after,
+.fc-tb__menu-icon--watch-add::after {
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(#107c41 0 0) 4px 1px / 2px 8px no-repeat,
+    linear-gradient(90deg, #107c41 0 0) 1px 4px / 8px 2px no-repeat;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__cellstyle-footer:not(.fc-tb__menu-item--iconic)::before {
+  background:
+    linear-gradient(#107c41 0 0) 7px 4px / 2px 8px no-repeat,
+    linear-gradient(90deg, #107c41 0 0) 4px 7px / 8px 2px no-repeat,
+    #ffffff;
+}
+
+.fc-tb__menu-icon--link-open::after,
+.fc-tb__menu-icon--pdf-share::after,
+.fc-tb__menu-icon--title-share::after,
+.fc-tb__menu-icon--trace-error::after {
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(#185abd 0 0) 6px 1px / 3px 2px no-repeat,
+    linear-gradient(90deg, #185abd 0 0) 7px 1px / 2px 6px no-repeat,
+    linear-gradient(45deg, transparent 0 42%, #185abd 43% 57%, transparent 58%);
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--addin-manage::after,
+.fc-tb__menu-icon--pdf-preferences::after {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #ffffff 0 2px, #605e5c 2.2px 4px, transparent 4.2px),
+    conic-gradient(
+      from 0deg,
+      #605e5c 0 12deg,
+      transparent 12deg 33deg,
+      #605e5c 33deg 45deg,
+      transparent 45deg 78deg,
+      #605e5c 78deg 90deg,
+      transparent 90deg 123deg,
+      #605e5c 123deg 135deg,
+      transparent 135deg 168deg,
+      #605e5c 168deg 180deg,
+      transparent 180deg 213deg,
+      #605e5c 213deg 225deg,
+      transparent 225deg 258deg,
+      #605e5c 258deg 270deg,
+      transparent 270deg 303deg,
+      #605e5c 303deg 315deg,
+      transparent 315deg 348deg,
+      #605e5c 348deg 360deg
+    );
+  color: transparent;
+  content: "";
+}
+
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-icon::before,
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-item__text::before,
+.fc-tb__menu-icon--find-validation::after,
+.fc-tb__menu-icon--format-unhide-sheet::after,
+.fc-tb__menu-icon--ignore-error::after,
+.fc-tb__menu-icon--validation-settings::after {
+  width: 9px;
+  height: 5px;
+  border: 0;
+  border-bottom: 2px solid #107c41;
+  border-left: 2px solid #107c41;
+  background: transparent;
+  color: transparent;
+  content: "";
+  transform: rotate(-45deg);
+}
+
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-icon::before {
+  top: 5px;
+  left: -15px;
+}
+
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-item__text::before {
+  vertical-align: 2px;
+}
+
+.fc-tb__menu-icon--filter-reapply::after,
+.fc-tb__menu-icon--calc-now::after {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #107c41;
+  border-left-color: transparent;
+  border-radius: 50%;
+  background:
+    linear-gradient(45deg, transparent 0 42%, #107c41 43% 57%, transparent 58%) 6px 0 / 6px 6px
+    no-repeat;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--error-checking::after {
+  width: 9px;
+  height: 12px;
+  background:
+    linear-gradient(#a4262c 0 0) 4px 1px / 2px 7px no-repeat,
+    radial-gradient(circle at 5px 11px, #a4262c 0 1.6px, transparent 1.8px);
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--go-to-special::after,
+.fc-tb__menu-icon--pivot-recommended::after {
+  width: 12px;
+  height: 12px;
+  background: #d83b01;
+  clip-path: polygon(
+    50% 0,
+    61% 35%,
+    98% 35%,
+    68% 56%,
+    79% 92%,
+    50% 70%,
+    21% 92%,
+    32% 56%,
+    2% 35%,
+    39% 35%
+  );
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--go-to-special::after {
+  background: #8764b8;
+}

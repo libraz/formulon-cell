@@ -1,0 +1,247 @@
+.fc-tb__menu--conditional {
+  width: 236px;
+}
+
+.fc-tb__submenu {
+  top: 0;
+  left: calc(100% - 1px);
+}
+
+.fc-tb__submenu--cf {
+  min-width: 246px;
+  max-width: min(460px, calc(100vw - 16px));
+  padding: 6px;
+}
+
+.fc-tb__submenu--cf-highlight,
+.fc-tb__submenu--cf-topBottom,
+.fc-tb__submenu--cf-clear {
+  min-width: 242px;
+  padding: 4px 0;
+}
+
+.fc-tb__cf-icon {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #185abd;
+}
+
+.fc-tb__cf-icon::before {
+  width: 12px;
+  height: 12px;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  content: "";
+}
+
+.fc-tb__cf-icon--top {
+  color: #107c41;
+}
+
+.fc-tb__cf-icon--bar {
+  color: #4472c4;
+}
+
+.fc-tb__cf-icon--scale {
+  color: #d83b01;
+}
+
+.fc-tb__cf-icon--icon {
+  color: #8764b8;
+}
+
+.fc-tb__cf-icon--new,
+.fc-tb__cf-icon--manage {
+  color: #605e5c;
+}
+
+.fc-tb__cf-icon--clear {
+  color: #a4262c;
+}
+
+.fc-tb__cf-choice-row,
+.fc-tb__cf-choice-grid-panel,
+.fc-tb__cf-icon-panel,
+.fc-tb__tablestyle-grid,
+.fc-tb__cellstyle-grid {
+  display: grid;
+  gap: 6px;
+  padding: 4px 8px 8px;
+}
+
+.fc-tb__cf-choice-row {
+  grid-template-columns: repeat(6, 40px);
+}
+
+.fc-tb__cf-choice-grid-panel {
+  grid-template-columns: repeat(4, 40px);
+}
+
+.fc-tb__cf-icon-panel {
+  grid-template-columns: repeat(3, minmax(54px, 1fr));
+}
+
+.fc-tb__cf-choice,
+.fc-tb__cf-icon-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 32px;
+  padding: 3px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fc-tb__cf-choice:hover,
+.fc-tb__cf-choice:focus-visible,
+.fc-tb__cf-icon-choice:hover,
+.fc-tb__cf-icon-choice:focus-visible,
+.fc-tb__tablestyle-swatch:hover,
+.fc-tb__tablestyle-swatch:focus-visible,
+.fc-tb__cellstyle-chip:hover,
+.fc-tb__cellstyle-chip:focus-visible {
+  border-color: var(--fc-tb-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+  outline: none;
+}
+
+.fc-tb__cf-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 32px;
+  height: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.fc-tb__cf-choice-grid span {
+  min-width: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.fc-tb__cf-choice-grid span:last-child {
+  border-right: 0;
+}
+
+.fc-tb__cf-icon-choice {
+  gap: 4px;
+  height: 28px;
+  min-width: 54px;
+}
+
+.fc-tb__cf-icon-choice span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 12px;
+  height: 16px;
+  color: #605e5c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.fc-tb__cf-icon-choice--icons-arrows3 span:first-child,
+.fc-tb__cf-icon-choice--icons-arrows5 span:first-child,
+.fc-tb__cf-icon-choice--icons-triangles3 span:first-child,
+.fc-tb__cf-icon-choice--icons-traffic3 span:first-child,
+.fc-tb__cf-icon-choice--icons-trafficRim3 span:first-child,
+.fc-tb__cf-icon-choice--icons-symbols3 span:first-child,
+.fc-tb__cf-icon-choice--icons-flags3 span:first-child,
+.fc-tb__cf-icon-choice--icons-stars3 span,
+.fc-tb__cf-icon-choice--icons-quarters5 span:nth-child(n + 4),
+.fc-tb__cf-icon-choice--icons-ratings5 span:nth-child(n + 4),
+.fc-tb__cf-icon-choice--icons-bars5 span:nth-child(n + 4),
+.fc-tb__cf-icon-choice--icons-boxes5 span:nth-child(n + 4) {
+  color: #107c41;
+}
+
+.fc-tb__cf-icon-choice--icons-arrows3 span:nth-child(2),
+.fc-tb__cf-icon-choice--icons-arrows5 span:nth-child(3),
+.fc-tb__cf-icon-choice--icons-triangles3 span:nth-child(2),
+.fc-tb__cf-icon-choice--icons-traffic3 span:nth-child(2),
+.fc-tb__cf-icon-choice--icons-trafficRim3 span:nth-child(2),
+.fc-tb__cf-icon-choice--icons-flags3 span:nth-child(2),
+.fc-tb__cf-icon-choice--icons-quarters5 span:nth-child(3),
+.fc-tb__cf-icon-choice--icons-ratings5 span:nth-child(3),
+.fc-tb__cf-icon-choice--icons-bars5 span:nth-child(3),
+.fc-tb__cf-icon-choice--icons-boxes5 span:nth-child(3) {
+  color: #d6a100;
+}
+
+.fc-tb__cf-icon-choice--icons-arrows3 span:last-child,
+.fc-tb__cf-icon-choice--icons-arrows5 span:last-child,
+.fc-tb__cf-icon-choice--icons-triangles3 span:last-child,
+.fc-tb__cf-icon-choice--icons-traffic3 span:last-child,
+.fc-tb__cf-icon-choice--icons-trafficRim3 span:last-child,
+.fc-tb__cf-icon-choice--icons-symbols3 span:last-child,
+.fc-tb__cf-icon-choice--icons-flags3 span:last-child,
+.fc-tb__cf-icon-choice--icons-quarters5 span:nth-child(-n + 2),
+.fc-tb__cf-icon-choice--icons-ratings5 span:nth-child(-n + 2),
+.fc-tb__cf-icon-choice--icons-bars5 span:nth-child(-n + 2),
+.fc-tb__cf-icon-choice--icons-boxes5 span:nth-child(-n + 2) {
+  color: #c00000;
+}
+
+.fc-tb__cf-icon-choice--icons-arrows5 span:nth-child(2) {
+  color: #63a95c;
+}
+
+.fc-tb__cf-icon-choice--icons-arrows5 span:nth-child(4) {
+  color: #ed7d31;
+}
+
+.fc-tb__cf-icon-choice--icons-trafficRim3 span,
+.fc-tb__cf-icon-choice--icons-ratings5 span {
+  width: 12px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.fc-tb__cf-icon-choice--icons-traffic3 span {
+  width: 12px;
+  border-radius: 50%;
+}
+
+.fc-tb__cf-icon-choice--icons-traffic3 span:first-child {
+  color: #107c41;
+  background: currentColor;
+}
+
+.fc-tb__cf-icon-choice--icons-traffic3 span:nth-child(2) {
+  background: currentColor;
+}
+
+.fc-tb__cf-icon-choice--icons-traffic3 span:last-child {
+  background: currentColor;
+}
+
+.fc-tb__cf-icon-choice--icons-traffic3 span,
+.fc-tb__cf-icon-choice--icons-trafficRim3 span,
+.fc-tb__cf-icon-choice--icons-ratings5 span {
+  overflow: hidden;
+  text-indent: 20px;
+}
+
+.fc-tb__cf-icon-choice--icons-flags3 span {
+  font-size: 15px;
+}
+
+.fc-tb__cf-icon-choice--icons-bars5 span,
+.fc-tb__cf-icon-choice--icons-boxes5 span {
+  font-size: 12px;
+}
+
+/* The gallery is a capped, scrollable panel rather than a "fill whatever the
+   viewport leaves" flyout: the dropdown positioner only narrows this cap when
+   the viewport is shorter, so the panel keeps a stable height on tall screens
+   and always leaves the sheet visible behind it. */

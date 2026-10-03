@@ -25,6 +25,7 @@ import {
   toolbarMenuText,
   viewToggleMenuText,
 } from '../../../src/index.js';
+import { readCssWithImports } from '../../helpers/css.js';
 
 describe('toolbar/ribbon-model', () => {
   const ribbonStylesDir = join(process.cwd(), 'src/styles/toolbar/ribbon');
@@ -310,7 +311,7 @@ describe('toolbar/ribbon-model', () => {
   });
 
   it('keeps ribbon menus on the Excel 365 neutral popup surface', () => {
-    const menusCss = readFileSync(join(ribbonStylesDir, 'menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(ribbonStylesDir, 'menus.css'));
     const dropdownsCss = readFileSync(join(ribbonStylesDir, 'dropdowns.css'), 'utf8');
     const colorControlsCss = readFileSync(join(ribbonStylesDir, 'color-controls.css'), 'utf8');
 

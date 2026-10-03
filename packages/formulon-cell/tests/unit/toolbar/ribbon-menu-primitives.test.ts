@@ -47,6 +47,7 @@ import {
 import { createHomeMenuFactories } from '../../../src/toolbar/ribbon/menus/home.js';
 import { createStylesMenuFactories } from '../../../src/toolbar/ribbon/menus/styles.js';
 import { createTextOrientationMenu } from '../../../src/toolbar/ribbon/menus/text-orientation.js';
+import { readCssWithImports } from '../../helpers/css.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const menusDir = join(root, 'src/toolbar/ribbon/menus');
@@ -154,6 +155,31 @@ describe('toolbar/ribbon menu primitives', () => {
   const sourcesOutsidePrimitives = (): { name: string; source: string }[] =>
     menuSources().filter(({ name }) => name !== 'general.ts');
 
+  it('expands ribbon menu CSS imports in their declared order', () => {
+    const menuCssFiles = [
+      'menu-shells.css',
+      'menu-command-icons.css',
+      'symbol-color-grids.css',
+      'paste-review-protection-name-icons.css',
+      'visual-galleries.css',
+      'conditional-presets.css',
+      'style-galleries.css',
+      'conditional-menu.css',
+      'ribbon-break.css',
+      'menu-icon-overlays.css',
+    ];
+    const menuStylesDir = join(root, 'src/styles/toolbar/ribbon');
+    const barrelPath = join(menuStylesDir, 'menus.css');
+    const expected = menuCssFiles
+      .map((file) => readFileSync(join(menuStylesDir, file), 'utf8'))
+      .join('');
+
+    expect(readCssWithImports(barrelPath)).toBe(expected);
+    expect(readFileSync(barrelPath, 'utf8')).toBe(
+      menuCssFiles.map((file) => `@import "./${file}";\n`).join(''),
+    );
+  });
+
   it('keeps preset menu row DOM centralized in menuPresetButton', () => {
     const directPresetRows = sourcesOutsidePrimitives()
       .filter(({ source }) => source.includes('fc-tb__menu-item fc-tb__menu-item--preset'))
@@ -256,7 +282,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps every real menuIconButton icon slug connected to an Excel-like SVG', () => {
     const slugs = collectStringLiteralArgs('menuIconButton', 3);
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(slugs.length).toBeGreaterThan(100);
     for (const iconSlug of slugs) {
@@ -276,7 +302,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps edit/save fallback menu glyphs as pencil overlays, not placeholder text', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--format-rename-sheet::after',
@@ -294,7 +320,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders delete and clear fallback menu glyphs as vector crosses, not lowercase text', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--clear::after',
@@ -316,7 +342,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders custom sort fallback glyph as fixed arrows, not a font symbol', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--sort-asc::after',
@@ -342,7 +368,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders fill direction fallback glyphs as fixed arrows, not font symbols', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--fill-down::after',
@@ -360,7 +386,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders sheet move fallback glyphs as fixed arrows, not font symbols', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--format-move-left::after,[\s\S]*?\.fc-tb__menu-icon--format-move-right::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
@@ -379,7 +405,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders Go To fallback glyph as a fixed arrow, not a font symbol', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--go-to::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23185abd'[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
@@ -388,7 +414,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders filter value and advanced glyphs as fixed marks, not font symbols', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--filter-by-value::after\s*\{[\s\S]*?width: 10px;[\s\S]*?height: 8px;[\s\S]*?linear-gradient\(#107c41 0 0\) 1px 2px \/ 8px 2px no-repeat,[\s\S]*?content: "";/,
@@ -401,7 +427,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders Text to Columns delimiter glyphs as fixed marks, not font text', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--text-column-comma::after',
@@ -426,7 +452,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders Remove Duplicates fallback glyph as overlapped records, not text', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--remove-duplicates::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(#ffffff 0 0\) 3px 1px \/ 7px 7px no-repeat,[\s\S]*?border: 1px solid #a4262c;[\s\S]*?content: "";/,
@@ -435,7 +461,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders formula and calculation fallback glyphs as fixed marks, not font symbols', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--find-formulas::after\s*\{[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?content: "";/,
@@ -468,7 +494,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders arrange front/back badges as vector plates, not numeric text', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--bring-front::after,[\s\S]*?\.fc-tb__menu-icon--send-back::after\s*\{[\s\S]*?width: 7px;[\s\S]*?height: 7px;[\s\S]*?border: 1px solid #0b5a2f;[\s\S]*?background: #107c41;[\s\S]*?content: "";/,
@@ -477,7 +503,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders conditional-formatting symbol icons as vector marks, not text glyphs', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__cf-icon--symbol\.fc-tb__cf-icon--check-green::before\s*\{[\s\S]*?border-bottom: 2px solid currentColor;[\s\S]*?border-left: 2px solid currentColor;[\s\S]*?transform: rotate\(-45deg\);/,
@@ -498,7 +524,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders script custom and symbol more glyphs as SVG marks, not font text', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--script-uppercase::after',
@@ -530,7 +556,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders Watch Window open glyph as an eye mark, not a W character', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--watch-open::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 9px;[\s\S]*?radial-gradient\(circle at 50% 50%, #185abd[\s\S]*?radial-gradient\(ellipse at 50% 50%[\s\S]*?content: "";/,
@@ -543,7 +569,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders name and formula-use badges as fixed marks, not N or fx text', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--name-manager::after',
@@ -594,7 +620,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders Format Cells dialog badge as an edit mark, not an A character', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--format-dialog::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 8px;[\s\S]*?background: #185abd;[\s\S]*?box-shadow: -2px 0 0 #f4b183;[\s\S]*?content: "";[\s\S]*?transform: rotate\(-35deg\);/,
@@ -607,7 +633,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders My Add-ins badge as add-in tiles, not an M character', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--addin-my::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(#185abd 0 0\)[\s\S]*?linear-gradient\(#8764b8 0 0\)[\s\S]*?content: "";/,
@@ -620,7 +646,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders PivotTable existing sheet badge as a target cell, not a D character', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--pivot-existing-sheet::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 11px;[\s\S]*?border: 2px solid #185abd;[\s\S]*?linear-gradient\(#185abd 0 0\) 3px 3px \/ 3px 3px no-repeat,[\s\S]*?content: "";/,
@@ -633,7 +659,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders add, launch, and settings fallback menu glyphs as vector overlays', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--insert-sheet::after',
@@ -681,7 +707,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders star fallback menu glyphs as filled star shapes, not font characters', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(
       /\.fc-tb__menu-icon--go-to-special::after,[\s\S]*?\.fc-tb__menu-icon--pivot-recommended::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background: #d83b01;[\s\S]*?clip-path: polygon\([\s\S]*?50% 0,[\s\S]*?content: "";/,
@@ -706,7 +732,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Underline dropdown compact and close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -733,7 +759,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Copy dropdown close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -760,7 +786,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Paste dropdown compact and close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     expect(menusCss).toMatch(/#menu-paste\s*\{[\s\S]*?min-width: 198px;/);
     expect(menusCss).toMatch(
@@ -772,7 +798,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Clear dropdown close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -819,7 +845,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Sort and Filter dropdown close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -870,7 +896,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Find and Select dropdown close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -924,7 +950,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Fill dropdown close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -990,7 +1016,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps AutoSum dropdown compact and close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const factories = createFormulasMenuFactories(ja.ribbonMenu, 'ja');
     const homeMenu = factories.createAutoSumMenu('autosum');
@@ -1032,7 +1058,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Currency dropdown compact and close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createStylesMenuFactories({
       ribbonLang: 'ja',
@@ -1075,7 +1101,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Cell Styles gallery geometry close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createStylesMenuFactories({
       ribbonLang: 'ja',
@@ -1120,7 +1146,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Format as Table gallery geometry close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createStylesMenuFactories({
       ribbonLang: 'ja',
@@ -1159,7 +1185,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Insert and Delete Cells dropdowns close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const factories = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -1229,7 +1255,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Format Cells dropdown section chrome close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -1326,7 +1352,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders checked, reapply, and warning fallback menu glyphs as vector overlays', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
 
     for (const selector of [
       '.fc-tb__menu-icon--format-unhide-sheet::after',
@@ -1362,7 +1388,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Merge Cells dropdown compact and close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -1399,7 +1425,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Wrap Text dropdown close to Japanese Excel 365 desktop', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const ja = dictionaries.ja;
     const menu = createHomeMenuFactories({
       ribbonLang: 'ja',
@@ -1557,7 +1583,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Borders dropdown close to Japanese Excel 365 desktop menu structure', () => {
-    const menuCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menuCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const menu = createBordersMenu({
       ribbonText: {
         bottomBorder: '下罫線',
@@ -2216,7 +2242,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('renders Text Orientation menu previews as colored semantic paths', () => {
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     const menu = createTextOrientationMenu({
       orientationAngleCounterclockwise: '左回りに回転',
       orientationAngleClockwise: '右回りに回転',
@@ -2944,7 +2970,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(caret?.textContent).toBe('');
     expect(caret?.getAttribute('aria-hidden')).toBe('true');
 
-    const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
+    const menusCss = readCssWithImports(join(root, 'src/styles/toolbar/ribbon/menus.css'));
     expect(menusCss).toMatch(
       /\.fc-tb__menu-item__caret\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--fc-tb-fg-soft\);/,
     );

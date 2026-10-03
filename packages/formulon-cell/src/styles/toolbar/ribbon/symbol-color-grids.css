@@ -1,0 +1,91 @@
+.fc-tb__menu--symbols {
+  width: 236px;
+  padding: 5px 8px 7px;
+}
+
+.fc-tb__symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 30px);
+  gap: 2px;
+  margin: 2px 0 6px;
+}
+
+.fc-tb__symbol-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fc-tb__symbol-tile:hover,
+.fc-tb__symbol-tile:focus-visible {
+  border-color: var(--fc-tb-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+  outline: none;
+}
+
+.fc-tb__symbol-tile__glyph {
+  font-family: "Cambria Math", "Segoe UI Symbol", "Yu Gothic UI", serif;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.fc-tb__color-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 22px);
+  gap: 3px;
+  padding: 3px 10px 6px;
+}
+
+.fc-tb__color-swatch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fc-tb__color-swatch:hover,
+.fc-tb__color-swatch:focus-visible {
+  border-color: var(--fc-tb-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+  outline: none;
+}
+
+.fc-tb__color-swatch--active,
+.fc-tb__color-swatch[aria-checked="true"] {
+  border-color: var(--fc-tb-accent);
+  background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
+  outline: none;
+}
+
+.fc-tb__color-swatch--active,
+.fc-tb__color-swatch[aria-checked="true"] {
+  box-shadow: inset 0 0 0 1px var(--fc-tb-accent);
+}
+
+.fc-tb__color-swatch__chip {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #8a8886;
+  border-radius: 2px;
+  background: var(--app-menu-swatch-color, transparent);
+}
+
+.fc-tb__color-swatch--none .fc-tb__color-swatch__chip {
+  background:
+    linear-gradient(135deg, transparent 0 43%, #a4262c 44% 56%, transparent 57% 100%), #ffffff;
+}
