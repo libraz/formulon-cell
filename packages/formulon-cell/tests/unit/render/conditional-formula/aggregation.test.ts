@@ -135,6 +135,47 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:2')?.fill).toBe('#median-odd');
   });
 
+  it('formula rules evaluate MIN over ranges and mixed arguments', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 12);
+    s = seedNumber(s, 1, 0, 8);
+    s = seedCell(s, 2, 0, { kind: 'text', value: 'ignored' });
+    s = seedNumber(s, 4, 0, 4);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+            formula: '=MIN($A$1:$A$5)=4',
+            apply: { fill: '#min-range' },
+          },
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+            formula: '=MIN($A$1:$A$2,10,-3)=-3',
+            apply: { fill: '#min-args' },
+          },
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+            formula: '=MIN($A$1:$A$2)=12',
+            apply: { fill: '#min-miss' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#min-range');
+    expect(overlay.get('0:0:2')?.fill).toBe('#min-args');
+    expect(overlay.get('0:0:3')?.fill).toBeUndefined();
+  });
+
   it('formula rules evaluate multi-argument aggregate operands', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
