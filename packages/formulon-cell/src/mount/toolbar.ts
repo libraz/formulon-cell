@@ -59,6 +59,11 @@ import {
   type RibbonMenus,
   type RibbonRenderHelpers,
 } from '../toolbar/ribbon/render-ribbon.js';
+import {
+  closeStaticRibbonMenus,
+  hasOpenStaticRibbonMenu,
+  toggleStaticRibbonSubmenu,
+} from '../toolbar/ribbon/static-menus.js';
 import { projectRibbonActiveState } from '../toolbar/ribbon-active-state.js';
 import {
   EXCEL365_MAC_RIBBON_TABS,
@@ -546,25 +551,6 @@ export function mountToolbar(
     return document.activeElement === tab;
   };
 
-  const closeStaticRibbonMenus = (except?: HTMLElement, restoreFocus = false): void => {
-    let restoreTarget: HTMLButtonElement | null = null;
-    for (const menu of host.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
-      if (menu === except || menu.hidden) continue;
-      menu.hidden = true;
-      const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-menu-id="${menu.id}"]`);
-      button?.setAttribute('aria-expanded', 'false');
-      restoreTarget ??= button;
-    }
-    for (const panel of host.querySelectorAll<HTMLElement>('[data-function-category-panel]')) {
-      panel.hidden = true;
-    }
-    for (const trigger of host.querySelectorAll<HTMLElement>('[data-function-category-submenu]')) {
-      trigger.classList.remove('fc-tb__menu-item--active');
-      trigger.setAttribute('aria-expanded', 'false');
-    }
-    if (restoreFocus) restoreTarget?.focus();
-  };
-
   const projectRibbonTabs = (): void => {
     const shell = host.querySelector<HTMLElement>('.fc-tb__ribbon-shell');
     if (!shell) return;
@@ -594,7 +580,7 @@ export function mountToolbar(
     if (!ribbonPeek) return;
     ribbonPeek = false;
     dropdownsApi?.closeAllDynamicRibbonDropdowns();
-    closeStaticRibbonMenus();
+    closeStaticRibbonMenus(host);
     projectRibbonTabs();
   };
 
@@ -602,7 +588,7 @@ export function mountToolbar(
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${tab}"]`);
     if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
     dropdownsApi?.closeAllDynamicRibbonDropdowns();
-    closeStaticRibbonMenus();
+    closeStaticRibbonMenus(host);
     const changed = tab !== activeTab;
     activeTab = tab;
     if (reveal && tab !== 'file' && isCollapsedMode()) ribbonPeek = true;
@@ -610,9 +596,7 @@ export function mountToolbar(
     if (changed) opts.onTabChange?.(tab);
   };
 
-  const hasOpenStaticRibbonMenu = (): boolean =>
-    !dropdownsApi &&
-    Array.from(host.querySelectorAll<HTMLDivElement>('.fc-tb__menu')).some((menu) => !menu.hidden);
+  const hasOpenStaticMenu = (): boolean => !dropdownsApi && hasOpenStaticRibbonMenu(host);
 
   const onClick = (e: MouseEvent): void => {
     const target = e.target;
@@ -687,13 +671,7 @@ export function mountToolbar(
           dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
           return;
         }
-        const submenu = cmdBtn.nextElementSibling;
-        if (submenu instanceof HTMLDivElement && submenu.classList.contains('fc-tb__menu')) {
-          const wasOpen = !submenu.hidden;
-          closeStaticRibbonMenus(submenu);
-          submenu.hidden = wasOpen;
-          cmdBtn.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
-        }
+        toggleStaticRibbonSubmenu(host, cmdBtn);
         return;
       }
       // Fallback dropdown behaviour: if the button has a sibling submenu
@@ -707,20 +685,13 @@ export function mountToolbar(
           dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
           return;
         }
-        const submenu = cmdBtn.nextElementSibling;
-        if (submenu instanceof HTMLDivElement && submenu.classList.contains('fc-tb__menu')) {
-          const wasOpen = !submenu.hidden;
-          closeStaticRibbonMenus(submenu);
-          submenu.hidden = wasOpen;
-          cmdBtn.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
-          return;
-        }
+        if (toggleStaticRibbonSubmenu(host, cmdBtn)) return;
       }
       if (cmdBtn.closest('.fc-tb__menu--mac')) {
         const menu = cmdBtn.closest<HTMLElement>('.fc-tb__menu--mac');
         const spec = menu ? dropdownsApi?.dynamicDropdownSpecForMenu(menu) : null;
         if (spec) dropdownsApi?.closeDynamicRibbonDropdown(spec, true);
-        closeStaticRibbonMenus();
+        closeStaticRibbonMenus(host);
       }
       applyCommand(id);
       dismissRibbonPeek();
@@ -831,9 +802,9 @@ export function mountToolbar(
   // location — Excel-style global shortcut. Attached at document so the
   // sheet (or any other focus target) doesn't need to route the key.
   const onGlobalKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && hasOpenStaticRibbonMenu()) {
+    if (e.key === 'Escape' && hasOpenStaticMenu()) {
       e.preventDefault();
-      closeStaticRibbonMenus(undefined, true);
+      closeStaticRibbonMenus(host, undefined, true);
       return;
     }
     // The display menu is reachable by click, and re-rendering the ribbon on
@@ -872,13 +843,13 @@ export function mountToolbar(
   // — Excel-style behaviour. Uses mousedown so the close happens before the
   // outside element's own click handler fires.
   const onDocumentMouseDown = (e: MouseEvent): void => {
-    const shouldCloseStaticMenus = hasOpenStaticRibbonMenu();
+    const shouldCloseStaticMenus = hasOpenStaticMenu();
     const shouldRenderDisplayState = displayMenuOpen || (isCollapsedMode() && ribbonPeek);
     if (!shouldRenderDisplayState && !shouldCloseStaticMenus) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
     if (host.contains(target)) return;
-    if (shouldCloseStaticMenus) closeStaticRibbonMenus();
+    if (shouldCloseStaticMenus) closeStaticRibbonMenus(host);
     if (displayMenuOpen) displayMenuOpen = false;
     if (isCollapsedMode()) ribbonPeek = false;
     if (shouldRenderDisplayState) renderToolbar();
