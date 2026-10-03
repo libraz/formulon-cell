@@ -5,10 +5,12 @@
 
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { formatWithPending, sameAddr } from '../store/pending-format.js';
+import { formatWithPending, sameFormatTarget } from '../store/pending-format.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { coerceInputForCell, validateCoercedInput, writeInputValidated } from './coerce-input.js';
 import { interactionControllerFor } from './interaction-controller.js';
+import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
+import { isCellWritable, warnProtected } from './protection.js';
 
 export type CellInputOperation = 'valueEdit' | 'formulaEdit';
 
@@ -50,17 +52,35 @@ export function commitCellInput({
   origin,
 }: CellInputCommit): CellInputCommitResult {
   const state = store.getState();
-  const fmt = formatWithPending(state, addr);
+  const anchor = mergeAnchorFor(state, addr);
+  const fmt = formatWithPending(state, anchor);
   const operation = inputOperation(raw, fmt?.numFmt?.kind === 'text');
   const controller = interactionControllerFor(store);
   let notice: CellInputAlert | null = null;
   try {
+    const mergeCells = mergeCellsFor(state, addr);
+    if (mergeCells === null) {
+      return {
+        status: 'rejected',
+        operation,
+        alert: { severity: 'stop', message: 'merged cell range exceeds the limit' },
+      };
+    }
+    const protectedCell = mergeCells.find((cell) => !isCellWritable(state, cell));
+    if (protectedCell) {
+      warnProtected(protectedCell);
+      return {
+        status: 'rejected',
+        operation,
+        alert: { severity: 'stop', message: 'cell is protected' },
+      };
+    }
     if (controller) {
       // The controller blocks `stop` rules itself but reports neither the
       // rule's title nor non-blocking outcomes, so validate up front.
       const validation = fmt?.validation;
       const outcome = validation
-        ? validateCoercedInput(wb, addr, coerceInputForCell(state, addr, raw), validation)
+        ? validateCoercedInput(wb, anchor, coerceInputForCell(state, anchor, raw), validation)
         : { ok: true as const };
       if (!outcome.ok) {
         const alert = {
@@ -87,11 +107,13 @@ export function commitCellInput({
         };
       }
       // The controller already applied the pending format to the written cell.
-      const pending = store.getState().ui.pendingFormat;
-      if (pending && sameAddr(pending.addr, addr)) mutators.setPendingFormat(store, null);
+      const currentState = store.getState();
+      const currentPending = currentState.ui.pendingFormat;
+      if (currentPending && sameFormatTarget(currentState, currentPending.addr, anchor))
+        mutators.setPendingFormat(store, null);
       return { status: 'applied', notice };
     }
-    const outcome = writeInputValidated(wb, addr, raw, fmt?.validation, store);
+    const outcome = writeInputValidated(wb, anchor, raw, fmt?.validation, store);
     if (!outcome.ok) {
       const alert = {
         severity: outcome.severity,
@@ -104,9 +126,10 @@ export function commitCellInput({
   } catch (error) {
     return { status: 'failed', operation, error };
   }
-  const pending = store.getState().ui.pendingFormat;
-  if (pending && sameAddr(pending.addr, addr)) {
-    mutators.setCellFormat(store, addr, pending.format);
+  const currentState = store.getState();
+  const currentPending = currentState.ui.pendingFormat;
+  if (currentPending && sameFormatTarget(currentState, currentPending.addr, anchor)) {
+    mutators.setCellFormat(store, anchor, currentPending.format);
     mutators.setPendingFormat(store, null);
   }
   return { status: 'applied', notice };
