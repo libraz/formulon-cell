@@ -241,8 +241,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     const shift = e.shiftKey;
     const a = s.selection.active;
     const controller = interactionControllerFor(store);
-    const restrictedController = controller?.policy !== undefined ? controller : undefined;
-    const restricted = restrictedController !== undefined;
+    const restricted = controller?.policy !== undefined;
     const selectionDisabled = controller?.policy?.selection === false;
     const navigation = navigationPolicyFor(store);
     const navigationOptions = navigation?.options;
@@ -540,11 +539,11 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       return;
     } else if (k === 'Backspace') {
       // Backspace clears only the active cell, then enters edit mode. Delete
-      // below deliberately retains its range-clear behavior.
-      if (restricted) {
-        if (!restrictedController) return;
+      // below deliberately retains its range-clear behavior. A registered
+      // controller always owns the mounted write.
+      if (controller) {
         e.preventDefault();
-        const result = restrictedController.execute({
+        const result = controller.execute({
           type: 'cellBatch',
           operation: 'clear',
           origin: 'keyboard',

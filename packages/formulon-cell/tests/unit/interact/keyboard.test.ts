@@ -794,6 +794,45 @@ describe('attachKeyboard', () => {
       expect(onBeginEdit).toHaveBeenCalledWith('');
     });
 
+    it('Backspace routes through a registered controller even without a policy', () => {
+      const history = new History();
+      const onChanged = vi.fn();
+      const controller = new InteractionController({
+        store,
+        getWb: () => wb,
+        history,
+        onChanged,
+      });
+      const unregister = registerInteractionController(store, controller);
+      setup(history);
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 1, col: 0, value: 2 },
+      ]);
+
+      try {
+        mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+        fire(host, 'Backspace');
+        expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+        expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'applied' }));
+        expect(onBeginEdit).toHaveBeenCalledWith('');
+        expect(history.undo()).toBe(true);
+        expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
+
+        onBeginEdit.mockClear();
+        onClearActive.mockClear();
+        mutators.setSheetProtected(store, 0, true);
+        mutators.setActive(store, { sheet: 0, row: 1, col: 0 });
+        fire(host, 'Backspace');
+        expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 2 });
+        expect(onClearActive).not.toHaveBeenCalled();
+        expect(onBeginEdit).not.toHaveBeenCalled();
+      } finally {
+        unregister();
+        controller.dispose();
+      }
+    });
+
     it('does not start editing while IME composition is active', () => {
       setup();
       fire(host, 'あ', { isComposing: true });
