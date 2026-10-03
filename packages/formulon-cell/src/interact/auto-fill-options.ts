@@ -1,6 +1,7 @@
 import type { FillFormattingMode } from '../commands/fill.js';
 import { fillRange } from '../commands/fill.js';
 import type { History } from '../commands/history.js';
+import { parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -46,16 +47,6 @@ export interface AutoFillOptionsDeps {
 }
 
 const VIEWPORT_PAD = 4;
-
-const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
-  const parts = key.split(':').map(Number);
-  if (parts.length !== 3) return null;
-  const [sheet, row, col] = parts as [number, number, number];
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) {
-    return null;
-  }
-  return { sheet, row, col };
-};
 
 export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOptionsHandle {
   const { host, store, wb } = deps;
@@ -108,7 +99,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     for (const [key, format] of state.format.formats) {
       const fmt = format.numFmt;
       if (fmt?.kind !== 'date' && fmt?.kind !== 'datetime') continue;
-      const addr = addrFromKey(key);
+      const addr = parseAddrKey(key);
       if (!addr || !rangeContainsAddr(detail.src, addr)) continue;
       if (state.data.cells.get(key)?.value.kind === 'number') return true;
     }

@@ -1,5 +1,5 @@
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -480,11 +480,9 @@ export class GridRenderer {
     for (const [key, cell] of data.cells) {
       if (!cell.formula || cell.value.kind !== 'error') continue;
       if (!looksLikeArrayFormula(cell.formula)) continue;
-      const [sStr, rStr, cStr] = key.split(':');
-      if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
-      if (Number.parseInt(sStr, 10) !== data.sheetIndex) continue;
-      const row = Number.parseInt(rStr, 10);
-      const col = Number.parseInt(cStr, 10);
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== data.sheetIndex) continue;
+      const { row, col } = addr;
       const info = wb.spillInfo(data.sheetIndex, row, col);
       if (!info) continue;
       const target: Range = {

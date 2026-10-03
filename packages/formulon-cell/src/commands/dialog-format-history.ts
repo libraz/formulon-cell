@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -80,7 +80,9 @@ const sameComment = (
 
 const writeComments = (workbook: WorkbookHandle, desired: CommentSnapshot): void => {
   for (const [key, comment] of desired) {
-    const [sheet, row, col] = key.split(':').map(Number) as [number, number, number];
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    const { sheet, row, col } = addr;
     const current = workbook.getComment(sheet, row, col);
     if (sameComment(current, comment)) continue;
     const ok = workbook.setCommentEntry(

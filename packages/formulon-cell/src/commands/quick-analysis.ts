@@ -1,4 +1,4 @@
-import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Range, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea, rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
@@ -100,14 +100,6 @@ export type QuickAnalysisExecuteResult =
 
 const MAX_QUICK_ANALYSIS_FORMULA_WRITES = 100_000;
 const MAX_EXACT_PROTECTION_SCAN_CELLS = 100_000;
-
-const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
-  const parts = key.split(':').map(Number);
-  if (parts.length !== 3) return null;
-  const [sheet, row, col] = parts as [number, number, number];
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
-};
 
 /** True when the range covers more than a single cell. */
 function isMulti(range: Range): boolean {
@@ -534,7 +526,7 @@ function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysi
       store.setState((s) => {
         const formats = new Map(s.format.formats);
         for (const key of s.format.formats.keys()) {
-          const addr = addrFromKey(key);
+          const addr = parseAddrKey(key);
           if (!addr || !rangeContainsAddr(range, addr)) continue;
           if (!isCellWritable(s, addr)) continue;
           formats.delete(key);

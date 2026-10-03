@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -84,24 +84,6 @@ export function clearIgnoredCellErrors(store: SpreadsheetStore): void {
   mutators.clearIgnoredErrors(store);
 }
 
-const addrFromKey = (key: string): Addr | null => {
-  const parts = key.split(':').map(Number);
-  const sheet = parts[0];
-  const row = parts[1];
-  const col = parts[2];
-  if (
-    typeof sheet !== 'number' ||
-    typeof row !== 'number' ||
-    typeof col !== 'number' ||
-    !Number.isInteger(sheet) ||
-    !Number.isInteger(row) ||
-    !Number.isInteger(col)
-  ) {
-    return null;
-  }
-  return { sheet, row, col };
-};
-
 const rowMajor = (left: Addr, right: Addr): number =>
   left.row - right.row || left.col - right.col || left.sheet - right.sheet;
 
@@ -112,7 +94,7 @@ export function formulaErrorCellsInRange(store: SpreadsheetStore, range?: Range)
   for (const [key, cell] of state.data.cells) {
     if (!cell.formula || !cellValueIsFormulaError(cell.value)) continue;
     if (state.errorIndicators.ignoredErrors.has(key)) continue;
-    const addr = addrFromKey(key);
+    const addr = parseAddrKey(key);
     if (addr && rangeContainsAddr(target, addr)) out.push(addr);
   }
   return out.sort(rowMajor);
@@ -149,13 +131,13 @@ export function circleInvalidValidationData(
   const candidates: Array<{ key: string; validation: CellValidation }> = [];
   for (const [key, format] of state.format.formats) {
     if (!format.validation) continue;
-    const addr = addrFromKey(key);
+    const addr = parseAddrKey(key);
     if (!addr || !rangeContainsAddr(range, addr)) continue;
     candidates.push({ key, validation: format.validation });
   }
   candidates.sort((left, right) => {
-    const leftAddr = addrFromKey(left.key);
-    const rightAddr = addrFromKey(right.key);
+    const leftAddr = parseAddrKey(left.key);
+    const rightAddr = parseAddrKey(right.key);
     return leftAddr && rightAddr ? rowMajor(leftAddr, rightAddr) : 0;
   });
   for (const { key, validation } of candidates) {
@@ -178,8 +160,8 @@ export function circleInvalidValidationDataInSheet(
   let marked = 0;
   for (const [key, format] of state.format.formats) {
     if (!format.validation) continue;
-    const [keySheet, row, col] = key.split(':').map(Number);
-    if (keySheet !== sheet || row === undefined || col === undefined) continue;
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
     const value = state.data.cells.get(key)?.value ?? { kind: 'blank' as const };
     if (!cellValueViolatesValidation(value, format.validation, resolveRange)) continue;
     keys.add(key);

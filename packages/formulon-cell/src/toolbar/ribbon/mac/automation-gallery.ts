@@ -5,7 +5,7 @@ import type {
 } from '../../../commands/interaction-policy.js';
 import { setFreezePanes, showCols, showRows } from '../../../commands/row-col-layout.js';
 import { recordTablesChange } from '../../../commands/slice-history.js';
-import { addrKey, MAX_COL, MAX_ROW } from '../../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../engine/address.js';
 import { parseRangeRef } from '../../../engine/range-resolver.js';
 import type { Addr, Range } from '../../../engine/types.js';
 import type { EngineHyperlinkRecord } from '../../../engine/workbook-handle.js';
@@ -145,13 +145,6 @@ const normalizedRange = (range: Range): Range => ({
 const isMeaningful = (cell: { value: { kind: string }; formula: string | null }): boolean =>
   cell.formula !== null || cell.value.kind !== 'blank';
 
-const storeAddress = (key: string): Addr | null => {
-  const parts = key.split(':').map(Number);
-  if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) return null;
-  const [sheet, row, col] = parts as [number, number, number];
-  return { sheet, row, col };
-};
-
 /** Derive a finite used range. Empty sheets fall back to the current selection
  *  so the scripts remain deterministic and never scan the full Excel grid. */
 export function usedRangeForMacAutomation(instance: SpreadsheetInstance): Range {
@@ -175,7 +168,7 @@ export function usedRangeForMacAutomation(instance: SpreadsheetInstance): Range 
     c1 = Math.max(c1, cell.addr.col);
   }
   for (const [key, cell] of state.data.cells) {
-    const addr = storeAddress(key);
+    const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet || !isMeaningful(cell)) continue;
     found = true;
     r0 = Math.min(r0, addr.row);
@@ -184,7 +177,7 @@ export function usedRangeForMacAutomation(instance: SpreadsheetInstance): Range 
     c1 = Math.max(c1, addr.col);
   }
   for (const key of state.format.formats.keys()) {
-    const addr = storeAddress(key);
+    const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) continue;
     found = true;
     r0 = Math.min(r0, addr.row);
@@ -482,9 +475,10 @@ const removeNativeHyperlinkAnchors = (
   anchorKeys: ReadonlySet<string>,
 ): void => {
   for (const key of anchorKeys) {
-    const [, row, col] = key.split(':').map(Number) as [number, number, number];
-    if (!instance.workbook.removeHyperlink(sheet, row, col))
-      throw new Error(`Could not remove hyperlink at ${row}:${col}.`);
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    if (!instance.workbook.removeHyperlink(sheet, addr.row, addr.col))
+      throw new Error(`Could not remove hyperlink at ${addr.row}:${addr.col}.`);
   }
 };
 
@@ -555,7 +549,7 @@ const planHyperlinkRemoval = (instance: SpreadsheetInstance): HyperlinkRemovalPl
 
   for (const [key, format] of state.format.formats) {
     if (!format.hyperlink) continue;
-    const addr = storeAddress(key);
+    const addr = parseAddrKey(key);
     if (!addr) return null;
     if (addr.sheet !== sheet) continue;
     if (!hyperlinkCellInGrid(addr)) return null;
@@ -658,7 +652,7 @@ const runCountEmptyRows = (instance: SpreadsheetInstance): void => {
   }
   const state = instance.store.getState();
   for (const [key, cell] of state.data.cells) {
-    const addr = storeAddress(key);
+    const addr = parseAddrKey(key);
     if (
       addr &&
       addr.sheet === range.sheet &&

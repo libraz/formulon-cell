@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { State, StatusAggKey } from '../store/store.js';
 
@@ -68,11 +69,9 @@ export function aggregateSelection(state: State): SelectionStats {
   // us a 17B-cell rectangle; the cell map is bounded by what the user actually
   // typed and stays cheap.
   for (const [key, cell] of state.data.cells) {
-    const parts = key.split(':');
-    if (parts.length !== 3) continue;
-    if (Number(parts[0]) !== sheet) continue;
-    const row = Number(parts[1]);
-    const col = Number(parts[2]);
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const { row, col } = addr;
     let inAny = false;
     for (const r of ranges) {
       if (row < r.r0 || row > r.r1 || col < r.c0 || col > r.c1) continue;

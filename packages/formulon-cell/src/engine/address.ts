@@ -2,6 +2,18 @@ import type { Addr } from './types.js';
 
 export const addrKey = (a: Addr): string => `${a.sheet}:${a.row}:${a.col}`;
 
+/** Inverse of `addrKey`. Returns null unless the key is exactly three
+ *  non-empty integer parts. */
+export const parseAddrKey = (key: string): Addr | null => {
+  const parts = key.split(':');
+  if (parts.length !== 3 || parts.some((part) => part === '')) return null;
+  const sheet = Number(parts[0]);
+  const row = Number(parts[1]);
+  const col = Number(parts[2]);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+};
+
 /** Last zero-based row index of a worksheet (row 1048576). */
 export const MAX_ROW = 1_048_575;
 /** Last zero-based column index of a worksheet (column XFD). */

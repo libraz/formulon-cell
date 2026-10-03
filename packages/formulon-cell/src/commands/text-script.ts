@@ -1,27 +1,10 @@
-import type { Addr, Range } from '../engine/types.js';
+import { parseAddrKey } from '../engine/address.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { State } from '../store/types.js';
 import { applyTextScript, type ScriptCommand } from '../toolbar/review-tools.js';
 import { isCellWritable } from './protection.js';
-
-const addrFromKey = (key: string): Addr | null => {
-  const parts = key.split(':').map(Number);
-  const sheet = parts[0];
-  const row = parts[1];
-  const col = parts[2];
-  if (
-    typeof sheet !== 'number' ||
-    typeof row !== 'number' ||
-    typeof col !== 'number' ||
-    !Number.isInteger(sheet) ||
-    !Number.isInteger(row) ||
-    !Number.isInteger(col)
-  ) {
-    return null;
-  }
-  return { sheet, row, col };
-};
 
 export function applyTextScriptToRange(
   state: State,
@@ -32,7 +15,7 @@ export function applyTextScriptToRange(
   return workbook.withBatchedRecalc(() => {
     let changed = 0;
     for (const [key, cell] of state.data.cells) {
-      const addr = addrFromKey(key);
+      const addr = parseAddrKey(key);
       if (!addr || !rangeContainsAddr(range, addr)) continue;
       if (!isCellWritable(state, addr)) continue;
       if (command === 'clear') {

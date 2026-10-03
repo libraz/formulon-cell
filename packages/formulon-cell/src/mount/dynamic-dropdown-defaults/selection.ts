@@ -15,12 +15,3 @@ export const hasActiveCopy = (instance: SpreadsheetInstance): boolean => {
   const { copyRange, copyRanges } = instance.store.getState().ui;
   return Boolean(copyRange || copyRanges?.length);
 };
-
-export const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
-  const [sheetRaw, rowRaw, colRaw] = key.split(':');
-  const sheet = Number(sheetRaw);
-  const row = Number(rowRaw);
-  const col = Number(colRaw);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
-};

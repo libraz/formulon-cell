@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -8,24 +8,6 @@ import { isCellWritable, warnProtected } from './protection.js';
 
 const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
   fmt ? { ...fmt } : undefined;
-
-const addrFromKey = (key: string): Addr | null => {
-  const parts = key.split(':').map(Number);
-  const sheet = parts[0];
-  const row = parts[1];
-  const col = parts[2];
-  if (
-    typeof sheet !== 'number' ||
-    typeof row !== 'number' ||
-    typeof col !== 'number' ||
-    !Number.isInteger(sheet) ||
-    !Number.isInteger(row) ||
-    !Number.isInteger(col)
-  ) {
-    return null;
-  }
-  return { sheet, row, col };
-};
 
 export interface TextToColumnsOptions {
   collapseConsecutiveDelimiters?: boolean;
@@ -64,7 +46,7 @@ export function textToColumns(
   let maxTokens = 0;
   const formatWrites: Array<{ key: string; format: CellFormat }> = [];
   const candidates = [...state.data.cells.entries()]
-    .map(([key, cell]) => ({ key, cell, addr: addrFromKey(key) }))
+    .map(([key, cell]) => ({ key, cell, addr: parseAddrKey(key) }))
     .filter((entry): entry is typeof entry & { addr: Addr } => !!entry.addr)
     .filter((entry) => rangeContainsAddr(range, entry.addr))
     .sort((left, right) => left.addr.col - right.addr.col || left.addr.row - right.addr.row);

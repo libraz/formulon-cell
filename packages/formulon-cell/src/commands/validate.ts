@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import type { CellValue, Range } from '../engine/types.js';
 import { syncValidationsToEngine } from '../engine/validation-sync.js';
@@ -23,9 +24,8 @@ export function clearValidationInRange(store: SpreadsheetStore, range: Range): n
     const formats = new Map(s.format.formats);
     for (const [key, current] of s.format.formats) {
       if (!current.validation) continue;
-      const [sheet, row, col] = key.split(':').map(Number);
-      if (sheet !== range.sheet || row === undefined || col === undefined) continue;
-      const addr = { sheet, row, col };
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== range.sheet) continue;
       if (!rangeContainsAddr(range, addr)) continue;
       if (!isCellWritable(s, addr)) continue;
       const { validation: _validation, ...next } = current;

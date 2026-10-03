@@ -3,7 +3,7 @@ import { interactionControllerFor } from '../commands/interaction-controller.js'
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -30,15 +30,6 @@ const clamp = (a: Addr, row: number, col: number): Addr => ({
 
 const formatHasContent = (format: object | undefined): boolean =>
   format !== undefined && Object.keys(format).length > 0;
-
-const addrFromKey = (key: string): Addr | null => {
-  const [sheetRaw, rowRaw, colRaw] = key.split(':');
-  const sheet = Number(sheetRaw);
-  const row = Number(rowRaw);
-  const col = Number(colRaw);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
-};
 
 const isPopulated = (s: State, sheet: number, row: number, col: number): boolean => {
   const key = addrKey({ sheet, row, col });
@@ -143,7 +134,7 @@ function lastUsedCell(s: State, sheet: number): { row: number; col: number } {
   let maxRow = 0;
   let maxCol = 0;
   const visit = (key: string): void => {
-    const addr = addrFromKey(key);
+    const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) return;
     if (addr.row > maxRow) maxRow = addr.row;
     if (addr.col > maxCol) maxCol = addr.col;

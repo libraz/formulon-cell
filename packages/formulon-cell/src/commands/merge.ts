@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -143,15 +143,6 @@ const rangeHeight = (range: Range): number => range.r1 - range.r0 + 1;
 const canMaterializeMergeRange = (range: Range): boolean =>
   isValidRangeCoordinates(range) && rangeArea(range) <= MAX_MERGE_CELLS;
 
-const addrFromKey = (key: string): Addr | null => {
-  const [sheetRaw, rowRaw, colRaw] = key.split(':');
-  const sheet = Number(sheetRaw);
-  const row = Number(rowRaw);
-  const col = Number(colRaw);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
-};
-
 const intersectingMerges = (state: State, range: Range): Range[] =>
   [...state.merges.byAnchor.values()].filter((merge) => rangesIntersect(merge, range));
 
@@ -166,7 +157,7 @@ const contentCellsInRange = (
 ): Array<{ addr: Addr; cell: StoredCell }> => {
   const cells: Array<{ addr: Addr; cell: StoredCell }> = [];
   for (const [key, cell] of state.data.cells) {
-    const addr = addrFromKey(key);
+    const addr = parseAddrKey(key);
     if (!addr || !rangeContainsAddr(range, addr) || !hasContent(cell)) continue;
     cells.push({ addr, cell });
   }

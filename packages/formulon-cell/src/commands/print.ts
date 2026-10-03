@@ -1,4 +1,4 @@
-import { colLetter, formatA1Cell } from '../engine/address.js';
+import { colLetter, formatA1Cell, parseAddrKey } from '../engine/address.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
 //
@@ -398,11 +398,9 @@ export function buildPrintDocument(
     if (e.addr.col > maxCol) maxCol = e.addr.col;
   }
   for (const [formatKey, fmt] of state.format.formats) {
-    const [sheetPart, rowPart, colPart] = formatKey.split(':');
-    if (Number(sheetPart) !== sheet) continue;
-    const row = Number(rowPart);
-    const col = Number(colPart);
-    if (!Number.isInteger(row) || !Number.isInteger(col)) continue;
+    const addr = parseAddrKey(formatKey);
+    if (!addr || addr.sheet !== sheet) continue;
+    const { row, col } = addr;
     const key = `${row}:${col}`;
     if (!cellMap.has(key)) {
       cellMap.set(key, { value: { kind: 'blank' }, formula: null, format: fmt });
@@ -470,11 +468,9 @@ export function buildPrintDocument(
       : [...state.format.formats.entries()]
           .map(([formatKey, fmt]): PrintCommentSnap | null => {
             if (typeof fmt.comment !== 'string' || fmt.comment.length === 0) return null;
-            const [sheetPart, rowPart, colPart] = formatKey.split(':');
-            if (Number(sheetPart) !== sheet) return null;
-            const row = Number(rowPart);
-            const col = Number(colPart);
-            if (!Number.isInteger(row) || !Number.isInteger(col)) return null;
+            const addr = parseAddrKey(formatKey);
+            if (!addr || addr.sheet !== sheet) return null;
+            const { row, col } = addr;
             if (!cellInPrintRegions(row, col)) return null;
             if (hiddenRows.has(row) || hiddenCols.has(col)) return null;
             return { row, col, text: fmt.comment };

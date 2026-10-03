@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -874,12 +874,10 @@ export function distinctFilterItems(
     }
   } else {
     for (const [key, cell] of state.data.cells) {
-      const [sheetRaw, rowRaw, colRaw] = key.split(':');
-      const sheet = Number(sheetRaw);
-      const row = Number(rowRaw);
-      const col = Number(colRaw);
-      if (sheet !== range.sheet || col !== byCol || !rowInRange(row, range)) continue;
-      visitValue(row, cell.value);
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== range.sheet || addr.col !== byCol || !rowInRange(addr.row, range))
+        continue;
+      visitValue(addr.row, cell.value);
     }
   }
   return Array.from(items, ([key, meta]) => ({ key, meta }))

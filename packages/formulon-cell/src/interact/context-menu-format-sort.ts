@@ -17,7 +17,7 @@ import {
 import type { History } from '../commands/history.js';
 import { phoneticReading, setPhoneticReading } from '../commands/phonetic.js';
 import { inferSortHasHeader, sortRange } from '../commands/sort.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -46,10 +46,9 @@ const boundRowsToData = (store: SpreadsheetStore, range: Range): Range => {
   let maxRow = range.r0;
   const state = store.getState();
   const visitKey = (key: string): void => {
-    const parts = key.split(':');
-    if (parts.length !== 3 || Number(parts[0]) !== range.sheet) return;
-    const row = Number(parts[1]);
-    const col = Number(parts[2]);
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== range.sheet) return;
+    const { row, col } = addr;
     if (row < range.r0 || row > range.r1) return;
     if (col < range.c0 || col > range.c1) return;
     if (row > maxRow) maxRow = row;

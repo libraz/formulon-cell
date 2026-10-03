@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -391,9 +391,8 @@ function shiftWouldOverflow(
     }
   }
   for (const key of store.getState().format.formats.keys()) {
-    const parts = key.split(':');
-    if (parts.length !== 3) continue;
-    const addr: Addr = { sheet: Number(parts[0]), row: Number(parts[1]), col: Number(parts[2]) };
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
     if (overflows(addr)) {
       // eslint-disable-next-line no-console
       console.warn('formulon-cell: cell shift blocked — format would leave the worksheet');
@@ -431,12 +430,11 @@ function shiftFormatMap(
 ): Map<string, CellFormat> {
   const next = new Map<string, CellFormat>();
   for (const [key, fmt] of formats) {
-    const parts = key.split(':');
-    if (parts.length !== 3) {
+    const addr = parseAddrKey(key);
+    if (!addr) {
       next.set(key, fmt);
       continue;
     }
-    const addr: Addr = { sheet: Number(parts[0]), row: Number(parts[1]), col: Number(parts[2]) };
     if (!rangeContainsAddr(affected, addr)) {
       next.set(key, fmt);
       continue;

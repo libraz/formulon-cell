@@ -1,6 +1,6 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
-import { addrKey } from '../../../engine/address.js';
+import { addrKey, parseAddrKey } from '../../../engine/address.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { projectDisabledState } from '../../menu-a11y.js';
@@ -69,15 +69,14 @@ const hasValidationInSelection = (instance: SpreadsheetInstance): boolean => {
   }
   for (const [key, cellFormat] of format.formats) {
     if (!cellFormat.validation) continue;
-    const [keySheet, row, col] = key.split(':').map(Number);
+    const addr = parseAddrKey(key);
     if (
-      keySheet === sheet &&
-      row !== undefined &&
-      col !== undefined &&
-      row >= r0 &&
-      row <= r1 &&
-      col >= c0 &&
-      col <= c1
+      addr &&
+      addr.sheet === sheet &&
+      addr.row >= r0 &&
+      addr.row <= r1 &&
+      addr.col >= c0 &&
+      addr.col <= c1
     ) {
       return true;
     }

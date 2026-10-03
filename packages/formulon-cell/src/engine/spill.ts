@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW } from './address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import type { Addr, CellValue, Range } from './types.js';
 
 /** Functions whose result is expected to spill. Anchor-cell formulas starting
@@ -146,11 +146,9 @@ export function findSpillRanges(
   const out: Range[] = [];
   for (const [key, cell] of cells) {
     if (!cell.formula || !looksLikeArrayFormula(cell.formula)) continue;
-    const [sStr, rStr, cStr] = key.split(':');
-    if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
-    if (Number.parseInt(sStr, 10) !== sheet) continue;
-    const row = Number.parseInt(rStr, 10);
-    const col = Number.parseInt(cStr, 10);
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const { row, col } = addr;
     const r = detectSpillRange(cells, sheet, row, col);
     if (r.r0 === r.r1 && r.c0 === r.c1) continue;
     out.push(r);

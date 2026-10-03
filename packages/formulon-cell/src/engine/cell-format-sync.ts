@@ -5,7 +5,7 @@ import {
   tableStyleSwatch,
 } from '../commands/format-as-table.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
-import { addrKey } from './address.js';
+import { addrKey, parseAddrKey } from './address.js';
 import {
   cellStyleKeysByXfId,
   type NamedStyleXfResolution,
@@ -177,11 +177,9 @@ export function syncCellFormatsToEngine(
   const previous = formattedKeySet(wb, sheet);
   const current = new Set<string>();
   for (const [key, fmt] of formats) {
-    const [sStr, rStr, cStr] = key.split(':');
-    if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
-    if (Number.parseInt(sStr, 10) !== sheet) continue;
-    const row = Number.parseInt(rStr, 10);
-    const col = Number.parseInt(cStr, 10);
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const { row, col } = addr;
     const xfIndex = resolveXfForFormat(
       wb,
       fmt,
@@ -228,14 +226,9 @@ export function syncCellFormatsToEngine(
   // format must not linger in the engine XF table.
   for (const key of previous) {
     if (current.has(key)) continue;
-    const [, rStr, cStr] = key.split(':');
-    if (rStr === undefined || cStr === undefined) continue;
-    const resetSucceeded = wb.setCellXfIndex(
-      sheet,
-      Number.parseInt(rStr, 10),
-      Number.parseInt(cStr, 10),
-      0,
-    );
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    const resetSucceeded = wb.setCellXfIndex(sheet, addr.row, addr.col, 0);
     if (strict && !resetSucceeded) {
       throw strictSyncError('resetCellXfIndex', key);
     }

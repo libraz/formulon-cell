@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -36,12 +36,9 @@ export function listComments(state: State, sheet = state.data.sheetIndex): Comme
   const out: CommentEntry[] = [];
   for (const [key, fmt] of state.format.formats) {
     if (typeof fmt.comment !== 'string' || fmt.comment.length === 0) continue;
-    const parts = key.split(':').map((n) => Number(n));
-    const s = parts[0] ?? -1;
-    const row = parts[1] ?? -1;
-    const col = parts[2] ?? -1;
-    if (s !== sheet) continue;
-    const entry: CommentEntry = { addr: { sheet: s, row, col }, text: fmt.comment };
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const entry: CommentEntry = { addr, text: fmt.comment };
     if (fmt.commentAuthor) entry.author = fmt.commentAuthor;
     out.push(entry);
   }

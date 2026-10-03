@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.js';
@@ -84,17 +84,3 @@ export function clearSparklinesInRange(
   });
   return writable.length;
 }
-
-const parseAddrKey = (key: string): Addr | null => {
-  const parts = key.split(':');
-  if (parts.length !== 3) return null;
-  const sheetPart = parts[0];
-  const rowPart = parts[1];
-  const colPart = parts[2];
-  if (sheetPart === undefined || rowPart === undefined || colPart === undefined) return null;
-  const sheet = Number(sheetPart);
-  const row = Number(rowPart);
-  const col = Number(colPart);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
-};

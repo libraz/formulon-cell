@@ -1,4 +1,4 @@
-import { formatA1Cell } from '../engine/address.js';
+import { formatA1Cell, parseAddrKey } from '../engine/address.js';
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import type { State } from '../store/types.js';
 
@@ -65,14 +65,6 @@ export function applyTextScript(value: string, command: Exclude<ScriptCommand, '
       return value.trim().replace(/\s+/g, ' ');
   }
 }
-
-const parseAddrKey = (key: string): { sheet: number; row: number; col: number } | null => {
-  const parts = key.split(':').map((part) => Number.parseInt(part, 10));
-  if (parts.length !== 3) return null;
-  const [sheet, row, col] = parts as [number, number, number];
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
-};
 
 export function reviewCellsFromState(
   state: State,

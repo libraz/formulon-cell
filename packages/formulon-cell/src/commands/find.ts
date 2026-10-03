@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -27,23 +28,13 @@ interface CellEntry {
   display: string;
 }
 
-function addrFromKey(key: string): Addr | null {
-  const parts = key.split(':');
-  if (parts.length !== 3) return null;
-  const sheet = Number(parts[0]);
-  const row = Number(parts[1]);
-  const col = Number(parts[2]);
-  if (!Number.isFinite(sheet) || !Number.isFinite(row) || !Number.isFinite(col)) return null;
-  return { sheet, row, col };
-}
-
 function cellsForSearch(state: State, opts: FindOptions): CellEntry[] {
   const sheet = state.data.sheetIndex;
   const out: CellEntry[] = [];
   const lookIn = opts.lookIn ?? 'values';
   if (lookIn === 'comments' || lookIn === 'notes') {
     for (const [key, fmt] of state.format.formats) {
-      const addr = addrFromKey(key);
+      const addr = parseAddrKey(key);
       if (!addr) continue;
       if ((opts.within ?? 'sheet') === 'sheet' && addr.sheet !== sheet) continue;
       if (!fmt.comment) continue;
@@ -53,7 +44,7 @@ function cellsForSearch(state: State, opts: FindOptions): CellEntry[] {
   }
 
   for (const [key, cell] of state.data.cells) {
-    const addr = addrFromKey(key);
+    const addr = parseAddrKey(key);
     if (!addr) continue;
     if ((opts.within ?? 'sheet') === 'sheet' && addr.sheet !== sheet) continue;
     const display =

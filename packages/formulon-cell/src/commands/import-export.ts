@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../engine/address.js';
 /**
  * High-level import/export commands for tabular text formats. The lower-level
  * encoders / parsers live next to clipboard so paste-as-CSV stays trivial.
@@ -140,7 +141,7 @@ function usedRangeInRange(state: State, range: Range): Range | null {
   let c1 = Number.NEGATIVE_INFINITY;
   let any = false;
   const visit = (key: string): void => {
-    const addr = addrFromKey(key);
+    const addr = parseAddrKey(key);
     if (!addr) return;
     if (addr.sheet !== sheet) return;
     if (addr.row < range.r0 || addr.row > range.r1) return;
@@ -162,16 +163,6 @@ function usedRangeInRange(state: State, range: Range): Range | null {
   }
   if (!any) return null;
   return { sheet, r0, c0, r1, c1 };
-}
-
-function addrFromKey(key: string): Addr | null {
-  const parts = key.split(':');
-  if (parts.length !== 3) return null;
-  const sheet = Number(parts[0]);
-  const row = Number(parts[1]);
-  const col = Number(parts[2]);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
 }
 
 function displayValue(state: State, sheet: number, row: number, col: number): string {

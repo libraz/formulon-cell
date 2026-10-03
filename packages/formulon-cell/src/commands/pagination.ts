@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../engine/address.js';
 // Page pagination for the Page Layout and Page Break Preview workbook views.
 //
 // `print.ts` owns the same split for the printed document; this module reuses
@@ -87,19 +88,17 @@ function usedExtent(state: State, sheet: number): { row: number; col: number } {
   const prefix = `${sheet}:`;
   for (const key of state.data.cells.keys()) {
     if (!key.startsWith(prefix)) continue;
-    const [, rowPart, colPart] = key.split(':');
-    const r = Number(rowPart);
-    const c = Number(colPart);
-    if (r > row) row = r;
-    if (c > col) col = c;
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    if (addr.row > row) row = addr.row;
+    if (addr.col > col) col = addr.col;
   }
   for (const key of state.format.formats.keys()) {
     if (!key.startsWith(prefix)) continue;
-    const [, rowPart, colPart] = key.split(':');
-    const r = Number(rowPart);
-    const c = Number(colPart);
-    if (r > row) row = r;
-    if (c > col) col = c;
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    if (addr.row > row) row = addr.row;
+    if (addr.col > col) col = addr.col;
   }
   for (const [, range] of state.merges.byAnchor) {
     if (range.sheet !== sheet) continue;

@@ -6,7 +6,7 @@ import {
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAt, mergeWillLoseData } from '../commands/merge.js';
-import { addrKey, formatA1Range } from '../engine/address.js';
+import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -95,14 +95,10 @@ const mergeSelectionState = (state: State, range: Range): MergeSelectionState =>
 const mergeHasNonAnchorContent = (state: State, range: Range): boolean => {
   const effective = expandRangeWithMerges(state, range);
   for (const [key, cell] of state.data.cells) {
-    const parts = key.split(':');
-    const sheet = Number(parts[0]);
-    const row = Number(parts[1]);
-    const col = Number(parts[2]);
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    const { sheet, row, col } = addr;
     if (
-      !Number.isInteger(sheet) ||
-      !Number.isInteger(row) ||
-      !Number.isInteger(col) ||
       sheet !== effective.sheet ||
       row < effective.r0 ||
       row > effective.r1 ||

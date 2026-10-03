@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../engine/address.js';
 /** Content-fit column widths and row heights. Every autofit entry point — header
  *  double-click, the structure commands, the ribbon AutoFit items and the
  *  public `autofitColWidth` / `autofitRowHeight` helpers — measures here.
@@ -59,7 +60,7 @@ export function computeAutofitColWidth(
   let max = 0;
 
   for (const [key, cell] of state.data.cells) {
-    const parsed = parseCellKey(key);
+    const parsed = parseAddrKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.col !== col) continue;
     if (!inSpan(parsed.row, opts.span)) continue;
     const text = autofitDisplayText(state, key, cell, locale);
@@ -87,7 +88,7 @@ export function computeAutofitRowHeight(
   let max = state.layout.defaultRowHeight;
 
   for (const [key, cell] of state.data.cells) {
-    const parsed = parseCellKey(key);
+    const parsed = parseAddrKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.row !== row) continue;
     if (!inSpan(parsed.col, opts.span)) continue;
     const text = autofitDisplayText(state, key, cell, locale);
@@ -137,16 +138,6 @@ export function autofitRowHeight(
 
 function inSpan(index: number, span: AutofitOptions['span']): boolean {
   return !span || (index >= span.from && index <= span.to);
-}
-
-function parseCellKey(key: string): { sheet: number; row: number; col: number } | null {
-  const parts = key.split(':');
-  if (parts.length !== 3) return null;
-  const sheet = Number(parts[0]);
-  const row = Number(parts[1]);
-  const col = Number(parts[2]);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
 }
 
 function autofitDisplayText(

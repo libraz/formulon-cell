@@ -1,4 +1,5 @@
 import type { CellFormat, PageSetup, SpreadsheetStore, State } from '../store/store.js';
+import { parseAddrKey } from './address.js';
 import { syncAutoFilterToEngine } from './auto-filter-sync.js';
 import { flushFormatToEngine } from './cell-format-sync.js';
 import { syncPageSetupToEngine } from './print-sync.js';
@@ -17,10 +18,8 @@ const autoFilterSignature = (state: State): string =>
   });
 
 const formatSheetFromKey = (key: string): number | null => {
-  const [sheetPart] = key.split(':');
-  if (sheetPart === undefined || sheetPart === '') return null;
-  const sheet = Number(sheetPart);
-  return Number.isInteger(sheet) && sheet >= 0 ? sheet : null;
+  const addr = parseAddrKey(key);
+  return addr && addr.sheet >= 0 ? addr.sheet : null;
 };
 
 const changedFormatSheets = (

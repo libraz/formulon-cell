@@ -1,4 +1,5 @@
 import { cellValueViolatesValidation } from '../../commands/validate.js';
+import { parseAddrKey } from '../../engine/address.js';
 import {
   clearValidationInRangeWithEngine,
   mutators,
@@ -9,7 +10,7 @@ import { rangeContainsAddr } from '../../store/selection-geometry.js';
 import { showTextToColumnsDialog } from '../../toolbar/dialogs/text-to-columns.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
-import { addrFromKey, normalizedSelectionRange } from './selection.js';
+import { normalizedSelectionRange } from './selection.js';
 
 const buildTextToColumnsAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['splitTextToColumns'] =>
@@ -117,7 +118,7 @@ const buildDataValidationAction =
     const invalid = new Set<string>();
     for (const [key, format] of state.format.formats) {
       if (!format.validation) continue;
-      const addr = addrFromKey(key);
+      const addr = parseAddrKey(key);
       if (!addr || !rangeContainsAddr(range, addr)) continue;
       const value = instance.workbook.getValue(addr);
       if (cellValueViolatesValidation(value, format.validation)) invalid.add(key);
@@ -134,7 +135,7 @@ const updateDataValidationMenu =
     let hasValidation = false;
     for (const [key, format] of state.format.formats) {
       if (!format.validation) continue;
-      const addr = addrFromKey(key);
+      const addr = parseAddrKey(key);
       if (addr && rangeContainsAddr(range, addr)) {
         hasValidation = true;
         break;

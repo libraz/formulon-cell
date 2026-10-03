@@ -1,5 +1,5 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
-import type { Addr, Range } from '../engine/types.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import type { Range } from '../engine/types.js';
 import type { CellFormat, ValueFilterCriteria } from '../store/store.js';
 
 export interface AxisEdit {
@@ -35,16 +35,6 @@ export function cloneInsertedFormat(format: CellFormat): CellFormat {
   if (format.numFmt) next.numFmt = { ...format.numFmt };
   if (format.phonetic) next.phonetic = format.phonetic.map((run) => ({ ...run }));
   return next;
-}
-
-export function parseFormatKey(key: string): Addr | null {
-  const parts = key.split(':');
-  if (parts.length !== 3) return null;
-  const sheet = Number(parts[0]);
-  const row = Number(parts[1]);
-  const col = Number(parts[2]);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
 }
 
 /** Shift indices in a sparse Map keyed by integer index. Indices >= split move
@@ -100,14 +90,12 @@ export function shiftFormatsByRow(
 ): Map<string, CellFormat> {
   const out = new Map<string, CellFormat>();
   for (const [key, fmt] of src) {
-    const parts = key.split(':');
-    if (parts.length !== 3) {
+    const addr = parseAddrKey(key);
+    if (!addr) {
       out.set(key, fmt);
       continue;
     }
-    const s = Number(parts[0]);
-    const r = Number(parts[1]);
-    const c = Number(parts[2]);
+    const { sheet: s, row: r, col: c } = addr;
     if (s !== sheet || r < splitRow) {
       out.set(key, fmt);
       continue;
@@ -130,7 +118,7 @@ export function inheritFormatsByRow(
   if (splitRow <= 0 || count <= 0) return shifted;
   const out = new Map(shifted);
   for (const [key, fmt] of src) {
-    const addr = parseFormatKey(key);
+    const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet || addr.row !== splitRow - 1) continue;
     for (let row = splitRow; row < splitRow + count && row <= MAX_ROW; row += 1) {
       out.set(addrKey({ sheet, row, col: addr.col }), cloneInsertedFormat(fmt));
@@ -147,14 +135,12 @@ export function shiftFormatsByCol(
 ): Map<string, CellFormat> {
   const out = new Map<string, CellFormat>();
   for (const [key, fmt] of src) {
-    const parts = key.split(':');
-    if (parts.length !== 3) {
+    const addr = parseAddrKey(key);
+    if (!addr) {
       out.set(key, fmt);
       continue;
     }
-    const s = Number(parts[0]);
-    const r = Number(parts[1]);
-    const c = Number(parts[2]);
+    const { sheet: s, row: r, col: c } = addr;
     if (s !== sheet || c < splitCol) {
       out.set(key, fmt);
       continue;
@@ -177,7 +163,7 @@ export function inheritFormatsByCol(
   if (splitCol <= 0 || count <= 0) return shifted;
   const out = new Map(shifted);
   for (const [key, fmt] of src) {
-    const addr = parseFormatKey(key);
+    const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet || addr.col !== splitCol - 1) continue;
     for (let col = splitCol; col < splitCol + count && col <= MAX_COL; col += 1) {
       out.set(addrKey({ sheet, row: addr.row, col }), cloneInsertedFormat(fmt));

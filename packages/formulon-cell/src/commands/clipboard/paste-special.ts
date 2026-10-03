@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import { writeCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
@@ -353,10 +353,9 @@ const clearSourceFormats = (store: SpreadsheetStore, source: Range): void => {
     };
     if (area > MAX_PASTE_CELLS) {
       for (const key of formats.keys()) {
-        const [sheetRaw, rowRaw, colRaw] = key.split(':');
-        const sheet = Number(sheetRaw);
-        const row = Number(rowRaw);
-        const col = Number(colRaw);
+        const addr = parseAddrKey(key);
+        if (!addr) continue;
+        const { sheet, row, col } = addr;
         if (
           sheet === source.sheet &&
           row >= source.r0 &&
@@ -514,10 +513,9 @@ export function pasteSpecial(
     }
     if (!opt.skipBlanks && wantsFormats(opt.what)) {
       for (const [key, format] of current.format.formats) {
-        const [formatSheetRaw, rowRaw, colRaw] = key.split(':');
-        const formatSheet = Number(formatSheetRaw);
-        const row = Number(rowRaw);
-        const col = Number(colRaw);
+        const addr = parseAddrKey(key);
+        if (!addr) continue;
+        const { sheet: formatSheet, row, col } = addr;
         if (
           formatSheet === sheet &&
           row >= destination.r0 &&
@@ -740,21 +738,18 @@ export function pasteSpecial(
     if (sourceCut) {
       if (bandAxisFor(sourceLogical)) {
         for (const [key, format] of current.format.formats) {
-          const [commentSheetRaw, rowRaw, colRaw] = key.split(':');
-          const commentSheet = Number(commentSheetRaw);
-          const row = Number(rowRaw);
-          const col = Number(colRaw);
+          const addr = parseAddrKey(key);
           if (
-            commentSheet !== sourceLogical.sheet ||
-            row < sourceLogical.r0 ||
-            row > sourceLogical.r1 ||
-            col < sourceLogical.c0 ||
-            col > sourceLogical.c1 ||
+            !addr ||
+            addr.sheet !== sourceLogical.sheet ||
+            addr.row < sourceLogical.r0 ||
+            addr.row > sourceLogical.r1 ||
+            addr.col < sourceLogical.c0 ||
+            addr.col > sourceLogical.c1 ||
             commentText(format) === null
           ) {
             continue;
           }
-          const addr = { sheet: commentSheet, row, col };
           sourceCommentsToClear.push(addr);
           tracked.set(addrKey(addr), addr);
         }

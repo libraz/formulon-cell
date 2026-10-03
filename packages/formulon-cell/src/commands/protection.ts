@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import { flushProtectionToEngine } from '../engine/protection-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -45,14 +45,6 @@ interface ProtectionSnapshot {
 }
 
 const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
-
-const addrFromKey = (key: string): Addr | null => {
-  const parts = key.split(':').map(Number);
-  if (parts.length !== 3) return null;
-  const [sheet, row, col] = parts as [number, number, number];
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
-};
 
 /** Whether `sheet` is currently flagged protected on the workbook. Mirrors
  *  the protection slice as a pure helper so call sites don't reach into the
@@ -475,15 +467,14 @@ export function gateProtection(state: State, range: Range): Range | null {
   if (!isSheetProtected(state, range.sheet)) return range;
   for (const [key, fmt] of state.format.formats) {
     if (fmt.locked !== false) continue;
-    const [sheet, row, col] = key.split(':').map(Number);
+    const addr = parseAddrKey(key);
     if (
-      sheet === range.sheet &&
-      row !== undefined &&
-      col !== undefined &&
-      row >= range.r0 &&
-      row <= range.r1 &&
-      col >= range.c0 &&
-      col <= range.c1
+      addr &&
+      addr.sheet === range.sheet &&
+      addr.row >= range.r0 &&
+      addr.row <= range.r1 &&
+      addr.col >= range.c0 &&
+      addr.col <= range.c1
     ) {
       return range;
     }
@@ -519,7 +510,7 @@ export function setCellLocked(store: SpreadsheetStore, range: Range, locked: boo
     store.setState((s) => {
       const formats = new Map(s.format.formats);
       for (const [key, current] of s.format.formats) {
-        const addr = addrFromKey(key);
+        const addr = parseAddrKey(key);
         if (!addr || !rangeContainsAddr(range, addr) || current.locked !== false) continue;
         const next: CellFormat = { ...current };
         delete next.locked;

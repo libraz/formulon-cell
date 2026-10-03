@@ -6,7 +6,7 @@ import type {
   ValidationMeta,
   ValidationOp,
 } from '../store/store.js';
-import { addrKey } from './address.js';
+import { addrKey, parseAddrKey } from './address.js';
 import type { EngineSyncOptions } from './cell-format-sync.js';
 import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
@@ -117,12 +117,9 @@ export function syncValidationsToEngine(
   const formats = store.getState().format.formats;
   for (const [key, fmt] of formats) {
     if (!fmt.validation) continue;
-    const [sStr, rStr, cStr] = key.split(':');
-    if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
-    const sIdx = Number.parseInt(sStr, 10);
-    if (sIdx !== sheet) continue;
-    const row = Number.parseInt(rStr, 10);
-    const col = Number.parseInt(cStr, 10);
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const { row, col } = addr;
     const sig = JSON.stringify(fmt.validation);
     let bucket = buckets.get(sig);
     if (!bucket) {

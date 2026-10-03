@@ -1,4 +1,4 @@
-import { addrKey } from '../../engine/address.js';
+import { addrKey, parseAddrKey } from '../../engine/address.js';
 import { flushFormatToEngine } from '../../engine/cell-format-sync.js';
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
@@ -102,7 +102,7 @@ function clearEngineXfsNotInStore(
 ): void {
   const formatKeys = new Set<string>();
   for (const key of store.getState().format.formats.keys()) {
-    if (Number(key.split(':')[0]) === sheet) formatKeys.add(key);
+    if (parseAddrKey(key)?.sheet === sheet) formatKeys.add(key);
   }
   for (const cell of wb.physicalCells(sheet)) {
     const key = addrKey(cell.addr);

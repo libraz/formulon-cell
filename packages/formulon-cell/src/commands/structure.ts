@@ -1,4 +1,4 @@
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -14,7 +14,6 @@ import {
   inheritFormatsByCol,
   inheritFormatsByRow,
   normalizeAxisEdit,
-  parseFormatKey,
   shiftFilterCriteria,
   shiftFormatsByCol,
   shiftFormatsByRow,
@@ -76,7 +75,7 @@ function insertionWouldOverflow(
 
   const state = store.getState();
   for (const key of state.format.formats.keys()) {
-    const addr = parseFormatKey(key);
+    const addr = parseAddrKey(key);
     if (addr && addr.sheet === sheet && indexOf(addr) > lastMovable) return true;
   }
 

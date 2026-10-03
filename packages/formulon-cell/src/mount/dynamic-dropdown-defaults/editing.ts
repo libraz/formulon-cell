@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../../engine/address.js';
 import {
   applyAdvancedFilter,
   colLetter,
@@ -31,7 +32,7 @@ import { type SortDialogColumn, showSortDialog } from '../../toolbar/dialogs/sor
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { fillSeriesSourceRange, showFillSeriesDialog } from '../../toolbar/ribbon/fill-series.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
-import { addrFromKey, normalizedSelectionRange } from './selection.js';
+import { normalizedSelectionRange } from './selection.js';
 
 const buildFillDirection =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillDirection'] =>
@@ -158,16 +159,9 @@ const hasContentsInSelection = (
 ): boolean => {
   const selection = state.selection;
   for (const [key, cell] of state.data.cells) {
-    const [sheetRaw, rowRaw, colRaw] = key.split(':');
-    const addr = {
-      sheet: Number(sheetRaw),
-      row: Number(rowRaw),
-      col: Number(colRaw),
-    };
+    const addr = parseAddrKey(key);
     if (
-      Number.isInteger(addr.sheet) &&
-      Number.isInteger(addr.row) &&
-      Number.isInteger(addr.col) &&
+      addr &&
       addr.sheet === selection.range.sheet &&
       (cell.formula !== null || cell.value.kind !== 'blank') &&
       selectionContainsAddr(selection, addr)
@@ -228,7 +222,7 @@ const updateClearMenu =
       hasFormats = true;
     }
     for (const [key, format] of state.format.formats) {
-      const addr = addrFromKey(key);
+      const addr = parseAddrKey(key);
       if (!addr || addr.sheet !== range.sheet || !selectionContainsAddr(state.selection, addr)) {
         continue;
       }

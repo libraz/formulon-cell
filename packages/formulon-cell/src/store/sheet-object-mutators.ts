@@ -4,7 +4,7 @@ import type {
   TableOverlay,
 } from '../commands/format-as-table.js';
 import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { rangesIntersect } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
@@ -17,15 +17,14 @@ import type {
 } from './types.js';
 
 function keyInRange(key: string, range: Range): boolean {
-  const [sheet, row, col] = key.split(':').map(Number);
+  const addr = parseAddrKey(key);
   return (
-    sheet === range.sheet &&
-    row !== undefined &&
-    col !== undefined &&
-    row >= range.r0 &&
-    row <= range.r1 &&
-    col >= range.c0 &&
-    col <= range.c1
+    addr !== null &&
+    addr.sheet === range.sheet &&
+    addr.row >= range.r0 &&
+    addr.row <= range.r1 &&
+    addr.col >= range.c0 &&
+    addr.col <= range.c1
   );
 }
 

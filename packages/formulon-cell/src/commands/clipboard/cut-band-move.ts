@@ -1,11 +1,10 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import { writeCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps.js';
 import { rangeContainsRange, rangesIntersect } from '../../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
-import { parseFormatKey } from '../axis-shift.js';
 import type { CellRecord } from '../cell-shift.js';
 import { collectAllFormulas, type FormulaRecord } from '../formula-records.js';
 import { type AxisBandMoveContext, adjustFormulaForAxisBandMove } from '../formula-refs.js';
@@ -108,7 +107,7 @@ function applyFormulaOwnerRecords(
 ): void {
   wb.withBatchedRecalc(() => {
     for (const [key, record] of records) {
-      const addr = parseFormatKey(key);
+      const addr = parseAddrKey(key);
       if (!addr) continue;
       if (!record) {
         wb.setBlank(addr);
@@ -231,7 +230,7 @@ function cutBandFitsAfterReorder(
     if (mappedIndex(index) > max) return false;
   }
   for (const key of state.format.formats.keys()) {
-    const addr = parseFormatKey(key);
+    const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== targetSheet) continue;
     const index = wholeRows ? addr.row : addr.col;
     if (mappedIndex(index) > max) return false;
@@ -326,7 +325,7 @@ function captureSourceCommentSnapshots(
     });
   }
   for (const [key, format] of store.getState().format.formats) {
-    const addr = parseFormatKey(key);
+    const addr = parseAddrKey(key);
     if (!addr) continue;
     if (
       addr.sheet !== source.sheet ||

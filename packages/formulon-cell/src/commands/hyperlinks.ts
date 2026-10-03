@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -38,12 +38,9 @@ export function listHyperlinks(state: State, sheet = state.data.sheetIndex): Hyp
   const out: HyperlinkEntry[] = [];
   for (const [key, fmt] of state.format.formats) {
     if (!fmt.hyperlink) continue;
-    const parts = key.split(':').map((n) => Number(n));
-    const s = parts[0] ?? -1;
-    const row = parts[1] ?? -1;
-    const col = parts[2] ?? -1;
-    if (s !== sheet) continue;
-    const entry: HyperlinkEntry = { addr: { sheet: s, row, col }, target: fmt.hyperlink };
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const entry: HyperlinkEntry = { addr, target: fmt.hyperlink };
     if (fmt.hyperlinkDisplay) entry.display = fmt.hyperlinkDisplay;
     if (fmt.hyperlinkTooltip) entry.tooltip = fmt.hyperlinkTooltip;
     out.push(entry);

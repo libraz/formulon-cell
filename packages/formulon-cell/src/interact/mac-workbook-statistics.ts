@@ -1,4 +1,4 @@
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -36,15 +36,6 @@ export interface MacWorkbookStatisticsHandle {
 
 const valueIsPopulated = (cell: { value: { kind: string }; formula: string | null }): boolean =>
   cell.value.kind !== 'blank' || cell.formula !== null;
-
-const parseStoreAddress = (key: string): { sheet: number; row: number; col: number } | null => {
-  const parts = key.split(':');
-  if (parts.length !== 3 || parts.some((part) => part.trim() === '')) return null;
-  const values = parts.map(Number);
-  if (values.some((part) => !Number.isSafeInteger(part) || part < 0)) return null;
-  const [sheet, row, col] = values as [number, number, number];
-  return { sheet, row, col };
-};
 
 /** Count real workbook data rather than the active selection. Physical cells
  *  are used where available so PivotTable projections do not inflate counts;
@@ -132,7 +123,7 @@ export function collectWorkbookStatistics(
     const seenComments = new Set<string>();
     const seenHyperlinks = new Set<string>();
     for (const [key, format] of store.getState().format.formats) {
-      const addr = parseStoreAddress(key);
+      const addr = parseAddrKey(key);
       if (!addr) continue;
       if (!addUsedAddress(addr.sheet, addr.row, addr.col)) continue;
       const canonicalKey = `${addr.sheet}:${addr.row}:${addr.col}`;

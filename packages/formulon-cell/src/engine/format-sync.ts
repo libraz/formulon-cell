@@ -1,5 +1,5 @@
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
-import { addrKey } from './address.js';
+import { addrKey, parseAddrKey } from './address.js';
 import type { EngineSyncOptions } from './cell-format-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -106,11 +106,9 @@ export function syncHyperlinksToEngine(
   const formats = store.getState().format.formats;
   for (const [key, fmt] of formats) {
     if (!fmt.hyperlink) continue;
-    const [sStr, rStr, cStr] = key.split(':');
-    if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
-    if (Number.parseInt(sStr, 10) !== sheet) continue;
-    const row = Number.parseInt(rStr, 10);
-    const col = Number.parseInt(cStr, 10);
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const { row, col } = addr;
     const addSucceeded = wb.addHyperlink(
       sheet,
       row,

@@ -1,3 +1,4 @@
+import { parseAddrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { isWholeColumnRange, isWholeRowRange, sameRange } from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
@@ -95,11 +96,9 @@ function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
   let min = Number.POSITIVE_INFINITY;
   let max = -1;
   const visitKey = (key: string): void => {
-    const [sheetRaw, rowRaw, colRaw] = key.split(':');
-    const sheet = Number(sheetRaw);
-    if (sheet !== state.data.sheetIndex) return;
-    const row = Number(rowRaw);
-    const col = Number(colRaw);
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== state.data.sheetIndex) return;
+    const { row, col } = addr;
     if (wholeRows && ranges.some((r) => row >= r.r0 && row <= r.r1)) {
       min = Math.min(min, col);
       max = Math.max(max, col);

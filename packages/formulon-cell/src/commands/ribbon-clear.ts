@@ -3,7 +3,7 @@
 // mutation, and the history boundary so all ribbon hosts have the same
 // behavior for disjoint selections.
 
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -111,12 +111,9 @@ const validRange = (range: Range, sheet: number): boolean =>
   range.r1 <= MAX_ROW &&
   range.c1 <= MAX_COL;
 
-const addrFromKey = (key: string): Addr | null => {
-  const parts = key.split(':').map(Number);
-  if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) return null;
-  const [sheet, row, col] = parts as [number, number, number];
-  if (sheet < 0 || row < 0 || col < 0) return null;
-  return { sheet, row, col };
+const parseNonNegativeAddrKey = (key: string): Addr | null => {
+  const addr = parseAddrKey(key);
+  return addr && addr.sheet >= 0 && addr.row >= 0 && addr.col >= 0 ? addr : null;
 };
 
 const uniqueAddrs = (addrs: readonly Addr[]): Addr[] => {
@@ -169,7 +166,7 @@ const buildPlan = (
   const hyperlinks: Addr[] = [];
   const validations: Addr[] = [];
   for (const [key, format] of state.format.formats) {
-    const addr = addrFromKey(key);
+    const addr = parseNonNegativeAddrKey(key);
     if (!addr || !selectionContainsAddr(selection, addr)) continue;
     formatEntries.push(addr);
     if (hasVisualFormat(format)) visualEntries.push(addr);
@@ -322,7 +319,7 @@ const clearPlannedFormats = (
     const formats = new Map(state.format.formats);
     for (const key of selected) {
       const current = formats.get(key);
-      const addr = addrFromKey(key);
+      const addr = parseNonNegativeAddrKey(key);
       if (!current || !addr || !isCellWritable(state, addr)) continue;
       if (!visualOnly) {
         formats.delete(key);
@@ -353,7 +350,7 @@ const clearPlannedHyperlinks = (store: SpreadsheetStore, plan: SelectionClearPla
     const formats = new Map(state.format.formats);
     for (const key of selected) {
       const current = formats.get(key);
-      const addr = addrFromKey(key);
+      const addr = parseNonNegativeAddrKey(key);
       if (!current || !addr || !isCellWritable(state, addr)) continue;
       const {
         hyperlink: _hyperlink,

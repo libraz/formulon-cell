@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { normalizeFormatLocale } from '../format/locale.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
@@ -167,24 +167,6 @@ const authorizeSelection = (
   return decision.allowed;
 };
 
-const addrFromKey = (key: string): Addr | null => {
-  const parts = key.split(':').map(Number);
-  const sheet = parts[0];
-  const row = parts[1];
-  const col = parts[2];
-  if (
-    typeof sheet !== 'number' ||
-    typeof row !== 'number' ||
-    typeof col !== 'number' ||
-    !Number.isInteger(sheet) ||
-    !Number.isInteger(row) ||
-    !Number.isInteger(col)
-  ) {
-    return null;
-  }
-  return { sheet, row, col };
-};
-
 const singleCellAddr = (range: Range): { sheet: number; row: number; col: number } | null =>
   range.r0 === range.r1 && range.c0 === range.c1
     ? { sheet: range.sheet, row: range.r0, col: range.c0 }
@@ -303,7 +285,7 @@ const sparseSelectionPlan = (
   const normalized = disjointRanges(ranges);
   const cells: Addr[] = [];
   for (const key of state.format.formats.keys()) {
-    const addr = addrFromKey(key);
+    const addr = parseAddrKey(key);
     if (addr && selectionIncludes(normalized, addr)) cells.push(addr);
   }
   const pending = state.ui.pendingFormat?.addr;
@@ -324,7 +306,7 @@ const clearSelectionFormat = (
   store.setState((current) => {
     const formats = new Map(current.format.formats);
     for (const [key, format] of current.format.formats) {
-      if (!selected.has(key) || !isCellWritable(current, addrFromKey(key) as Addr)) continue;
+      if (!selected.has(key) || !isCellWritable(current, parseAddrKey(key) as Addr)) continue;
       if (!visualOnly) formats.delete(key);
       else {
         const next = stripVisualFormat(format);

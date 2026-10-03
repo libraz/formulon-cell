@@ -9,6 +9,7 @@ import {
   MAX_COL,
   MAX_ROW,
   parseA1Atom,
+  parseAddrKey,
 } from '../../../src/engine/address.js';
 
 describe('engine/address', () => {
@@ -132,6 +133,19 @@ describe('engine/address', () => {
       const one = { r0: 4, c0: 2, r1: 4, c1: 2 };
       expect(formatA1Range(one, { collapse: false })).toBe('C5:C5');
       expect(formatA1Range(one, { absolute: true, collapse: false })).toBe('$C$5:$C$5');
+    });
+  });
+
+  describe('parseAddrKey', () => {
+    it('inverts addrKey', () => {
+      const addr = { sheet: 2, row: 14, col: 7 };
+      expect(parseAddrKey(addrKey(addr))).toEqual(addr);
+    });
+
+    it('rejects malformed keys', () => {
+      for (const key of ['', '1:2', '1:2:3:4', 'a:1:2', '0:1.5:2', '0::2', '0:1:', '0:NaN:1']) {
+        expect(parseAddrKey(key), key).toBeNull();
+      }
     });
   });
 });
