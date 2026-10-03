@@ -21,8 +21,9 @@ import { attachKeyboard } from '../interact/keyboard.js';
 import { attachPageBandEditor } from '../interact/page-band-editor.js';
 import { attachPasteOptions } from '../interact/paste-options.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
-import { attachPointer, type RangeInsertTarget } from '../interact/pointer.js';
+import { attachPointer } from '../interact/pointer.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
+import type { RangeInsertTarget } from '../interact/range-insert.js';
 import {
   attachValidationAlert,
   attachValidationList,

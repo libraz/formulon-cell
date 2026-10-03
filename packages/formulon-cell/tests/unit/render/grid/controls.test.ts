@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { isFillHandleHit } from '../../../../src/interact/pointer-targets.js';
 import { getFillHandleRect, setFillHandleRect } from '../../../../src/render/grid/hit-state.js';
 import {
   FILL_HANDLE_SIZE,
@@ -6,27 +7,6 @@ import {
   paintTableHeaderChevron,
 } from '../../../../src/render/painters.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
-
-/** Pointer-layer pad in pixels (interact/pointer.ts:isFillHandleHit). The
- *  visible handle is small (6×6), so the hit-zone gets a 3px halo to make
- *  the grab area comfortable. This constant is duplicated here so the test
- *  fails loudly if pointer.ts changes one without the other. */
-const FILL_HANDLE_HIT_PAD = 3;
-
-/** Reproduce the closure-scoped isFillHandleHit logic from interact/pointer.ts
- *  so this test can assert the contract without spinning up a real Spreadsheet
- *  mount. The two implementations must stay in sync. */
-function isFillHandleHit(x: number, y: number): boolean {
-  const rect = getFillHandleRect();
-  if (!rect) return false;
-  const pad = FILL_HANDLE_HIT_PAD;
-  return (
-    x >= rect.x - pad &&
-    x <= rect.x + rect.w + pad &&
-    y >= rect.y - pad &&
-    y <= rect.y + rect.h + pad
-  );
-}
 
 /** Minimal canvas spy with both fill + stroke. We don't care about the
  *  pixels — only what the painter returns to the cache layer. */

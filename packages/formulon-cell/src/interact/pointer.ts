@@ -1,6 +1,8 @@
 import type { AutofitOptions } from '../commands/autofit-measurement.js';
 import { fillDestFor, fillRange } from '../commands/fill.js';
+import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
 import type { History } from '../commands/history.js';
+import { hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import {
@@ -13,16 +15,15 @@ import {
 } from '../commands/outline.js';
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
-import { shiftFormulaRefs } from '../commands/refs.js';
 import { autofitColsWidth, autofitRowsHeight } from '../commands/row-col-layout.js';
 import {
   applyLayoutSnapshot,
   captureLayoutSnapshot,
   type LayoutSnapshot,
 } from '../commands/slice-history.js';
-import { formatA1Cell, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
-import type { Addr, CellValue, Range } from '../engine/types.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   colLeadingEdge,
@@ -30,19 +31,11 @@ import {
   hitTest,
   hitZone,
   layoutForView,
+  rowTopEdge,
   type ViewLayout,
 } from '../render/geometry.js';
-import {
-  getPageBandHits,
-  getPageBreakHandles,
-  getRulerHandles,
-  PAGE_BREAK_GRAB,
-  type PageBandHit,
-  type PageBreakHandle,
-  RULER_GRAB,
-  type RulerHandle,
-} from '../render/grid/page-view.js';
-import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
+import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
+import { getOutlineToggleHits } from '../render/grid.js';
 import {
   type SelectionGestureMode,
   selectionContainsAddr,
@@ -59,6 +52,16 @@ import {
   navigationBoundsFor,
   navigationSelectionBoundsFor,
 } from './navigation-policy.js';
+import {
+  indexAt,
+  isFillHandleHit,
+  marginInchesFor,
+  pageBandAt,
+  pageBreakHandleAt,
+  rulerHandleAt,
+  updateCursor,
+} from './pointer-targets.js';
+import { type RangeInsertTarget, rangeRefOf, refOf } from './range-insert.js';
 
 type DragMode =
   | { kind: 'none' }
@@ -99,30 +102,6 @@ type DragMode =
       base: { row: number; col: number };
       r1c1: boolean;
     };
-
-const r1c1Axis = (prefix: 'R' | 'C', target: number, base: number): string => {
-  const delta = target - base;
-  return delta === 0 ? prefix : `${prefix}[${delta}]`;
-};
-const r1c1RefOf = (row: number, col: number, base: { row: number; col: number }): string =>
-  `${r1c1Axis('R', row, base.row)}${r1c1Axis('C', col, base.col)}`;
-const refOf = (
-  row: number,
-  col: number,
-  mode: { r1c1: boolean; base: { row: number; col: number } },
-): string => (mode.r1c1 ? r1c1RefOf(row, col, mode.base) : formatA1Cell(row, col));
-const rangeRefOf = (
-  a: { row: number; col: number },
-  b: { row: number; col: number },
-  mode: { r1c1: boolean; base: { row: number; col: number } },
-): string => {
-  if (a.row === b.row && a.col === b.col) return refOf(a.row, a.col, mode);
-  const r0 = Math.min(a.row, b.row);
-  const r1 = Math.max(a.row, b.row);
-  const c0 = Math.min(a.col, b.col);
-  const c1 = Math.max(a.col, b.col);
-  return `${refOf(r0, c0, mode)}:${refOf(r1, c1, mode)}`;
-};
 
 const fullSheetRange = (sheet: number): Range => ({
   sheet,
@@ -177,94 +156,6 @@ const isNavigationRangeAllowed = (store: SpreadsheetStore, range: Range): boolea
   );
 };
 
-type RestrictedCellChange = {
-  addr: Addr;
-  value: CellValue;
-  formula?: string | null;
-};
-
-const cellAt = (state: State, addr: Addr): { value: CellValue; formula: string | null } => {
-  const cell = state.data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
-  return { value: cell?.value ?? { kind: 'blank' }, formula: cell?.formula ?? null };
-};
-
-/** Build a value/formula-only fill plan before touching the workbook. The
- * restricted path must authorize the complete destination as one batch; the
- * legacy fill command is intentionally left untouched for unrestricted mounts. */
-const restrictedFillChanges = (
-  state: State,
-  src: Range,
-  dest: Range,
-  copyOnly: boolean,
-): RestrictedCellChange[] => {
-  const srcRows = src.r1 - src.r0 + 1;
-  const srcCols = src.c1 - src.c0 + 1;
-  const down = dest.r1 !== src.r1 || dest.r0 !== src.r0;
-  const right = !down && (dest.c1 !== src.c1 || dest.c0 !== src.c0);
-  const changes: RestrictedCellChange[] = [];
-  const sourceAt = (
-    row: number,
-    col: number,
-  ): { addr: Addr; value: CellValue; formula: string | null } => {
-    const addr = { sheet: src.sheet, row, col };
-    const cell = cellAt(state, addr);
-    return { addr, ...cell };
-  };
-  const projectedNumber = (
-    target: Addr,
-    source: { addr: Addr; value: CellValue },
-  ): CellValue | null => {
-    if (copyOnly || source.value.kind !== 'number') return null;
-    if (down && srcRows >= 2) {
-      const first = sourceAt(src.r0, target.col).value;
-      const second = sourceAt(src.r0 + 1, target.col).value;
-      if (first.kind === 'number' && second.kind === 'number') {
-        const step = second.value - first.value;
-        const offset = target.row - src.r1;
-        const last = sourceAt(src.r1, target.col).value;
-        return last.kind === 'number'
-          ? { kind: 'number', value: last.value + step * offset }
-          : null;
-      }
-    }
-    if (right && srcCols >= 2) {
-      const first = sourceAt(target.row, src.c0).value;
-      const second = sourceAt(target.row, src.c0 + 1).value;
-      if (first.kind === 'number' && second.kind === 'number') {
-        const step = second.value - first.value;
-        const offset = target.col - src.c1;
-        const last = sourceAt(target.row, src.c1).value;
-        return last.kind === 'number'
-          ? { kind: 'number', value: last.value + step * offset }
-          : null;
-      }
-    }
-    return null;
-  };
-  for (let row = dest.r0; row <= dest.r1; row += 1) {
-    for (let col = dest.c0; col <= dest.c1; col += 1) {
-      if (row >= src.r0 && row <= src.r1 && col >= src.c0 && col <= src.c1) continue;
-      const sr = src.r0 + ((((row - src.r0) % srcRows) + srcRows) % srcRows);
-      const sc = src.c0 + ((((col - src.c0) % srcCols) + srcCols) % srcCols);
-      const source = sourceAt(sr, sc);
-      const addr = { sheet: dest.sheet, row, col };
-      const projected = projectedNumber(addr, source);
-      if (projected) {
-        changes.push({ addr, value: projected, formula: null });
-      } else if (source.formula) {
-        changes.push({
-          addr,
-          value: source.value,
-          formula: shiftFormulaRefs(source.formula, row - source.addr.row, col - source.addr.col),
-        });
-      } else {
-        changes.push({ addr, value: source.value, formula: null });
-      }
-    }
-  }
-  return changes;
-};
-
 export interface PointerDeps {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
@@ -273,13 +164,6 @@ export interface PointerDeps {
   /** Shared history. When provided, col/row resizes and fill drags push one
    *  entry per drag-end (not per intermediate frame). */
   history?: History | null;
-}
-
-/** Capability surfaced by the inline editor used by the pointer layer to
- *  detect a live formula edit and inject clicked cell references. */
-export interface RangeInsertTarget {
-  isFormulaEdit: () => boolean;
-  insertRefAtCaret: (ref: string) => void;
 }
 
 export function attachPointer(
@@ -302,70 +186,6 @@ export function attachPointer(
   const localXY = (e: PointerEvent | MouseEvent): { x: number; y: number } => {
     const rect = host.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
-
-  /** The page boundary under the pointer, if Page Break Preview is showing one
-   *  there. A manual break wins over an automatic one at the same position so
-   *  a stack of coincident lines still drags the one the user can move. */
-  const pageBreakHandleAt = (s: State, x: number, y: number): PageBreakHandle | null => {
-    if (s.ui.workbookView !== 'pageBreakPreview') return null;
-    let best: PageBreakHandle | null = null;
-    for (const handle of getPageBreakHandles()) {
-      const distance =
-        handle.axis === 'row' ? Math.abs(y - handle.position) : Math.abs(x - handle.position);
-      if (distance > PAGE_BREAK_GRAB) continue;
-      if (!best || (handle.kind === 'break' && best.kind === 'printArea')) best = handle;
-    }
-    return best;
-  };
-
-  /** The ruler margin boundary under the pointer in Page Layout view. Only
-   *  the ruler bands themselves are live; the same coordinate further into the
-   *  sheet belongs to a cell. */
-  const rulerHandleAt = (s: State, x: number, y: number): RulerHandle | null => {
-    if (s.ui.workbookView !== 'pageLayout') return null;
-    for (const handle of getRulerHandles()) {
-      const horizontal = handle.side === 'left' || handle.side === 'right';
-      const across = horizontal ? y : x;
-      if (across < handle.bandStart || across > handle.bandEnd) continue;
-      const distance = horizontal ? Math.abs(x - handle.position) : Math.abs(y - handle.position);
-      if (distance <= RULER_GRAB) return handle;
-    }
-    return null;
-  };
-
-  /** Margin width, in inches, implied by dropping `handle` at (x, y). The
-   *  ruler's paper origin is the page edge, so the distance from there to the
-   *  pointer is the margin — mirrored on a right-to-left sheet, where the
-   *  leading edge is physically on the right. */
-  const marginInchesFor = (handle: RulerHandle, x: number, y: number): number => {
-    const horizontal = handle.side === 'left' || handle.side === 'right';
-    const at = horizontal ? x : y;
-    const raw = Math.abs(at - handle.paperOrigin) / Math.max(1, handle.pxPerInch);
-    return Math.max(0, Math.round(raw * 100) / 100);
-  };
-
-  /** The header / footer slot under the pointer in Page Layout view. */
-  const pageBandAt = (s: State, x: number, y: number): PageBandHit | null => {
-    if (s.ui.workbookView !== 'pageLayout') return null;
-    for (const band of getPageBandHits()) {
-      if (x < band.rect.x || x > band.rect.x + band.rect.w) continue;
-      if (y < band.rect.y || y > band.rect.y + band.rect.h) continue;
-      return band;
-    }
-    return null;
-  };
-
-  /** Row / column the pointer is over, ignoring which zone it lands in — a
-   *  break dragged across the header rail still has a target. */
-  const indexAt = (s: State, x: number, y: number): { row: number; col: number } | null => {
-    const layout = geometryLayout(s);
-    const zone = hitZone(layout, s.viewport, x, y, null, { resizeHandles: false });
-    if (!zone) return null;
-    if (zone.kind === 'cell') return { row: zone.row, col: zone.col };
-    if (zone.kind === 'row-header') return { row: zone.row, col: s.selection.active.col };
-    if (zone.kind === 'col-header') return { row: s.selection.active.row, col: zone.col };
-    return null;
   };
 
   const applySelectionMarquee = (marquee: SelectionMarqueeDrag, x: number, y: number): void => {
@@ -434,17 +254,96 @@ export function attachPointer(
     );
   };
 
-  const isFillHandleHit = (x: number, y: number): boolean => {
-    const rect = getFillHandleRect();
-    if (!rect) return false;
-    // Pad by a couple of pixels so the handle is comfortable to grab.
-    const pad = 3;
-    return (
-      x >= rect.x - pad &&
-      x <= rect.x + rect.w + pad &&
-      y >= rect.y - pad &&
-      y <= rect.y + rect.h + pad
+  /** Grow the selection to `addr`, then widen it over any merges it now cuts. */
+  const extendSelectionTo = (addr: Addr): void => {
+    mutators.extendRangeTo(store, addr);
+    const after = store.getState();
+    const grown = expandRangeWithMerges(after, after.selection.range);
+    if (
+      grown.r0 !== after.selection.range.r0 ||
+      grown.r1 !== after.selection.range.r1 ||
+      grown.c0 !== after.selection.range.c0 ||
+      grown.c1 !== after.selection.range.c1
+    ) {
+      mutators.setRange(store, grown);
+    }
+  };
+
+  /** Ctrl/Cmd-click on a row or column header: begin a marquee that adds the
+   *  band to the selection, or subtracts it when it is already covered. */
+  const startHeaderMarquee = (
+    s: State,
+    axis: 'row' | 'col',
+    index: number,
+    x: number,
+    y: number,
+  ): void => {
+    const base = cloneSelection(s.selection);
+    const bounds = navigationSelectionBoundsFor(store) ?? fullSheetRange(s.data.sheetIndex);
+    const initial = axisSelectionRange(bounds, axis, index, index);
+    const start = mergeAnchorOf(
+      s,
+      axis === 'row'
+        ? { sheet: bounds.sheet, row: index, col: bounds.c0 }
+        : { sheet: bounds.sheet, row: bounds.r0, col: index },
     );
+    const marquee: SelectionMarqueeDrag = {
+      kind: 'selection-marquee',
+      axis,
+      base,
+      mode: selectionCoversRange(base, initial) ? 'subtract' : 'add',
+      startIndex: index,
+      start,
+      bounds: { ...bounds },
+    };
+    drag = marquee;
+    applySelectionMarquee(marquee, x, y);
+  };
+
+  /** Write a fill of `src` into `dest` and promote `dest` to the selection.
+   *  Restricted mounts authorize the whole destination as one batch through the
+   *  interaction controller; others write straight to the workbook in one undo
+   *  step. `stripMerges` unmerges anything the destination cuts first. */
+  const commitFill = (
+    s: State,
+    src: Range,
+    dest: Range,
+    opts: { copyOnly: boolean; stripMerges: boolean },
+  ): { applied: boolean; restricted: boolean } => {
+    const controller = interactionControllerFor(store);
+    const restricted = controller?.policy !== undefined;
+    let applied: boolean;
+    if (controller?.policy) {
+      const result = controller.execute({
+        type: 'cellBatch',
+        operation: 'fill',
+        origin: 'fillHandle',
+        changes: restrictedFillChanges(s, src, dest, opts.copyOnly),
+        denied: controller.policy.batchDenied,
+      });
+      applied = result.status === 'applied';
+    } else {
+      // Bundle every per-cell write into a single undoable transaction.
+      if (history) history.begin();
+      applied = false;
+      try {
+        // Fill cannot tear merged rectangles apart silently.
+        if (opts.stripMerges) applyUnmerge(store, wb, history, dest);
+        applied = fillRange(s, wb, src, dest, {
+          copyOnly: opts.copyOnly,
+          formatting: 'with',
+          store,
+        });
+      } finally {
+        if (history) history.end();
+      }
+    }
+    if (applied) {
+      onAfterCommit?.();
+      mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
+      mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
+    }
+    return { applied, restricted };
   };
 
   const onDown = (e: PointerEvent): void => {
@@ -630,25 +529,7 @@ export function attachPointer(
           return;
         }
         if (e.ctrlKey || e.metaKey) {
-          const base = cloneSelection(s.selection);
-          const bounds = navigationSelectionBoundsFor(store) ?? fullSheetRange(s.data.sheetIndex);
-          const initial = axisSelectionRange(bounds, 'col', zone.col, zone.col);
-          const start = mergeAnchorOf(s, {
-            sheet: bounds.sheet,
-            row: bounds.r0,
-            col: zone.col,
-          });
-          const marquee: SelectionMarqueeDrag = {
-            kind: 'selection-marquee',
-            axis: 'col',
-            base,
-            mode: selectionCoversRange(base, initial) ? 'subtract' : 'add',
-            startIndex: zone.col,
-            start,
-            bounds: { ...bounds },
-          };
-          drag = marquee;
-          applySelectionMarquee(marquee, x, y);
+          startHeaderMarquee(s, 'col', zone.col, x, y);
           return;
         }
         mutators.selectCol(store, zone.col);
@@ -696,25 +577,7 @@ export function attachPointer(
           return;
         }
         if (e.ctrlKey || e.metaKey) {
-          const base = cloneSelection(s.selection);
-          const bounds = navigationSelectionBoundsFor(store) ?? fullSheetRange(s.data.sheetIndex);
-          const initial = axisSelectionRange(bounds, 'row', zone.row, zone.row);
-          const start = mergeAnchorOf(s, {
-            sheet: bounds.sheet,
-            row: zone.row,
-            col: bounds.c0,
-          });
-          const marquee: SelectionMarqueeDrag = {
-            kind: 'selection-marquee',
-            axis: 'row',
-            base,
-            mode: selectionCoversRange(base, initial) ? 'subtract' : 'add',
-            startIndex: zone.row,
-            start,
-            bounds: { ...bounds },
-          };
-          drag = marquee;
-          applySelectionMarquee(marquee, x, y);
+          startHeaderMarquee(s, 'row', zone.row, x, y);
           return;
         }
         mutators.selectRow(store, zone.row);
@@ -747,14 +610,7 @@ export function attachPointer(
           drag = { kind: 'none' };
           return;
         }
-        const topEdge =
-          gridOriginY(geometryLayout(s)) +
-          rowYFromState(
-            s.layout.rowHeights,
-            s.layout.defaultRowHeight,
-            s.viewport.rowStart,
-            zone.row,
-          );
+        const topEdge = rowTopEdge(geometryLayout(s), s.viewport, zone.row);
         drag = {
           kind: 'row-resize',
           row: zone.row,
@@ -798,17 +654,7 @@ export function attachPointer(
           return;
         }
         if (e.shiftKey) {
-          mutators.extendRangeTo(store, addr);
-          const after = store.getState();
-          const grown = expandRangeWithMerges(after, after.selection.range);
-          if (
-            grown.r0 !== after.selection.range.r0 ||
-            grown.r1 !== after.selection.range.r1 ||
-            grown.c0 !== after.selection.range.c0 ||
-            grown.c1 !== after.selection.range.c1
-          ) {
-            mutators.setRange(store, grown);
-          }
+          extendSelectionTo(addr);
         } else mutators.setActive(store, addr);
         drag = { kind: 'cell' };
         return;
@@ -873,21 +719,7 @@ export function attachPointer(
         const layout = geometryLayout(s);
         const zone = hitZone(layout, s.viewport, x, y);
         if (zone && zone.kind === 'cell') {
-          mutators.extendRangeTo(store, {
-            sheet: s.data.sheetIndex,
-            row: zone.row,
-            col: zone.col,
-          });
-          const after = store.getState();
-          const grown = expandRangeWithMerges(after, after.selection.range);
-          if (
-            grown.r0 !== after.selection.range.r0 ||
-            grown.r1 !== after.selection.range.r1 ||
-            grown.c0 !== after.selection.range.c0 ||
-            grown.c1 !== after.selection.range.c1
-          ) {
-            mutators.setRange(store, grown);
-          }
+          extendSelectionTo({ sheet: s.data.sheetIndex, row: zone.row, col: zone.col });
         }
         return;
       }
@@ -1041,42 +873,11 @@ export function attachPointer(
         }
         // Spreadsheet parity: holding Ctrl/⌘ on release toggles series → tile copy.
         const copyOnly = e.ctrlKey || e.metaKey;
-        const controller = interactionControllerFor(store);
-        if (controller && controller.policy !== undefined) {
-          const changes = restrictedFillChanges(s, drag.src, dest, copyOnly);
-          const result = controller.execute({
-            type: 'cellBatch',
-            operation: 'fill',
-            origin: 'fillHandle',
-            changes,
-            denied: controller.policy.batchDenied,
-          });
-          if (result.status === 'applied') {
-            onAfterCommit?.();
-            mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
-            mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
-          }
-          drag = { kind: 'none' };
-          const { x, y } = localXY(e);
-          updateCursor(host, store, x, y);
-          return;
-        }
-        // Bundle every per-cell write into a single undoable transaction.
-        if (history) history.begin();
-        let wrote = false;
-        try {
-          // Strip any merges that intersect the fill destination — fill cannot
-          // tear merged rectangles apart silently.
-          applyUnmerge(store, wb, history, dest);
-          wrote = fillRange(s, wb, drag.src, dest, { copyOnly, formatting: 'with', store });
-        } finally {
-          if (history) history.end();
-        }
-        if (wrote) {
-          onAfterCommit?.();
-          // Promote dest as the new selection.
-          mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
-          mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
+        const { applied, restricted } = commitFill(s, drag.src, dest, {
+          copyOnly,
+          stripMerges: true,
+        });
+        if (applied && !restricted) {
           host.dispatchEvent(
             new CustomEvent('fc:autofilloptions', {
               bubbles: true,
@@ -1134,34 +935,7 @@ export function attachPointer(
       const dest = autoFillDownExtent(s, src);
       if (!dest) return;
       if (!isNavigationRangeAllowed(store, dest)) return;
-      const controller = interactionControllerFor(store);
-      if (controller && controller.policy !== undefined) {
-        const result = controller.execute({
-          type: 'cellBatch',
-          operation: 'fill',
-          origin: 'fillHandle',
-          changes: restrictedFillChanges(s, src, dest, false),
-          denied: controller.policy.batchDenied,
-        });
-        if (result.status === 'applied') {
-          onAfterCommit?.();
-          mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
-          mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
-        }
-        return;
-      }
-      if (history) history.begin();
-      let wrote = false;
-      try {
-        wrote = fillRange(s, wb, src, dest, { formatting: 'with', store });
-      } finally {
-        if (history) history.end();
-      }
-      if (wrote) {
-        onAfterCommit?.();
-        mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
-        mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
-      }
+      commitFill(s, src, dest, { copyOnly: false, stripMerges: false });
       return;
     }
 
@@ -1203,119 +977,6 @@ export function attachPointer(
   };
 }
 
-function updateCursor(host: HTMLElement, store: SpreadsheetStore, x: number, y: number): void {
-  const s0 = store.getState();
-  if (s0.ui.workbookView === 'pageBreakPreview') {
-    for (const line of getPageBreakHandles()) {
-      const distance =
-        line.axis === 'row' ? Math.abs(y - line.position) : Math.abs(x - line.position);
-      if (distance > PAGE_BREAK_GRAB) continue;
-      host.style.cursor = line.axis === 'row' ? 'row-resize' : 'col-resize';
-      return;
-    }
-  }
-  if (s0.ui.workbookView === 'pageLayout') {
-    for (const handle of getRulerHandles()) {
-      const horizontal = handle.side === 'left' || handle.side === 'right';
-      const across = horizontal ? y : x;
-      if (across < handle.bandStart || across > handle.bandEnd) continue;
-      const distance = horizontal ? Math.abs(x - handle.position) : Math.abs(y - handle.position);
-      if (distance > RULER_GRAB) continue;
-      host.style.cursor = horizontal ? 'col-resize' : 'row-resize';
-      return;
-    }
-    for (const band of getPageBandHits()) {
-      if (x < band.rect.x || x > band.rect.x + band.rect.w) continue;
-      if (y < band.rect.y || y > band.rect.y + band.rect.h) continue;
-      host.style.cursor = 'text';
-      return;
-    }
-  }
-  const handle = getFillHandleRect();
-  if (handle) {
-    const pad = 3;
-    if (
-      x >= handle.x - pad &&
-      x <= handle.x + handle.w + pad &&
-      y >= handle.y - pad &&
-      y <= handle.y + handle.h + pad
-    ) {
-      host.style.cursor = 'crosshair';
-      return;
-    }
-  }
-  const s = store.getState();
-  const zone = hitZone(geometryLayout(s), s.viewport, x, y, s.ui.filterRange);
-  if (!zone) {
-    host.style.cursor = '';
-    return;
-  }
-  if (zone.kind === 'col-resize') host.style.cursor = 'col-resize';
-  else if (zone.kind === 'row-resize') host.style.cursor = 'row-resize';
-  else if (zone.kind === 'col-filter-btn') host.style.cursor = 'pointer';
-  else host.style.cursor = '';
-}
-
-function rowYFromState(
-  heights: Map<number, number>,
-  def: number,
-  rowStart: number,
-  row: number,
-): number {
-  let y = 0;
-  for (let r = rowStart; r < row; r += 1) y += heights.get(r) ?? def;
-  return y;
-}
-
-/**
- * Desktop spreadsheets "double-click the fill handle" rule: extend the source range downward
- * by the contiguous-data run of the immediate left-then-right neighbour
- * column. Returns null when neither neighbour has a usable run (so we don't
- * flash a no-op fill).
- *
- * The neighbour run starts at the row just below the source bottom edge
- * (src.r1 + 1) and ends at the last non-blank row in that column. We require
- * at least one non-blank cell at row src.r1 + 1 — without it, spreadsheets don't
- * expand either, so a stray cell ten rows down won't trigger an unexpected
- * fill.
- */
-function autoFillDownExtent(state: State, src: Range): Range | null {
-  const sheet = src.sheet;
-  const start = src.r1 + 1;
-  if (start > MAX_ROW) return null;
-  const probeCols: number[] = [];
-  if (src.c0 > 0) probeCols.push(src.c0 - 1); // left first (desktop spreadsheets preference)
-  if (src.c1 < MAX_COL) probeCols.push(src.c1 + 1);
-
-  let endRow = -1;
-  for (const col of probeCols) {
-    if (!hasCellAt(state, sheet, start, col)) continue;
-    let r = start;
-    while (r <= MAX_ROW && hasCellAt(state, sheet, r, col)) r += 1;
-    const last = r - 1;
-    if (last > endRow) endRow = last;
-  }
-  if (endRow < start) return null;
-  return { sheet, r0: src.r0, c0: src.c0, r1: endRow, c1: src.c1 };
-}
-
-function hasCellAt(state: State, sheet: number, row: number, col: number): boolean {
-  const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
-  if (!cell) return false;
-  if (cell.formula) return true;
-  return cell.value.kind !== 'blank';
-}
-
-function hyperlinkAt(
-  state: State,
-  addr: { sheet: number; row: number; col: number },
-): string | null {
-  const fmt = state.format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`);
-  const url = fmt?.hyperlink;
-  if (typeof url !== 'string' || url.length === 0) return null;
-  return url;
-}
-
 /**
  * Opens a hyperlink in a new tab. Restricted to safe protocols (http(s)://,
  * mailto:, tel:) so a hostile cell value can't smuggle a `javascript:` URL.
@@ -1323,13 +984,7 @@ function hyperlinkAt(
 function openHyperlink(url: string): void {
   const trimmed = url.trim();
   if (trimmed.length === 0) return;
-  const lower = trimmed.toLowerCase();
-  const ok =
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.startsWith('mailto:') ||
-    lower.startsWith('tel:');
-  if (!ok) return;
+  if (!isSafeHyperlinkTarget(trimmed)) return;
   if (typeof window === 'undefined' || typeof window.open !== 'function') return;
   window.open(trimmed, '_blank', 'noopener,noreferrer');
 }

@@ -29,7 +29,7 @@ import {
 } from './fx-dialog.js';
 import { assembledFormula, canonicalName, parseOuterCall } from './mac-formula-call.js';
 import { makeButton, makeIconButton } from './mac-formula-palette-buttons.js';
-import type { RangeInsertTarget } from './pointer.js';
+import type { RangeInsertTarget } from './range-insert.js';
 
 type MacPaletteStrings = Strings['fxDialog']['macPalette'];
 

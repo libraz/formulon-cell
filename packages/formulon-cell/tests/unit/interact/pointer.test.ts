@@ -419,6 +419,31 @@ describe('attachPointer', () => {
       fireUp(host, 10, 100);
     });
 
+    it('row-resize drag measures from the top edge when rows above are hidden', () => {
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenRows: new Set([0]) },
+      }));
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 10, 56); // row 1 bottom-edge; row 0 is hidden so row 1 spans y=30..58
+      fireMove(host, 10, 100); // row 1 top edge is 30, so height = 100-30 = 70.
+      expect(store.getState().layout.rowHeights.get(1)).toBe(70);
+      fireUp(host, 10, 100);
+    });
+
+    it('row-resize drag on a frozen row measures from its own top edge when scrolled', () => {
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, freezeRows: 2 },
+        viewport: { ...s.viewport, rowStart: 6 },
+      }));
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 10, 84); // frozen row 1 bottom-edge (y=86 - slack 4 = 82)
+      fireMove(host, 10, 100); // row 1 top edge is 58, so height = 100-58 = 42.
+      expect(store.getState().layout.rowHeights.get(1)).toBe(42);
+      fireUp(host, 10, 100);
+    });
+
     it('col-resize push a single history entry on pointerup', () => {
       const history = new History();
       detach = attachPointer(host, store, wb, undefined, history);

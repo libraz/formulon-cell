@@ -1,4 +1,3 @@
-import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import {
   clearSelectedContents,
   collectSelectedContentAddresses,
@@ -8,24 +7,19 @@ import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment } from '../commands/comment.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
 import type { History } from '../commands/history.js';
-import { hyperlinkAt } from '../commands/hyperlinks.js';
+import { hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import type {
   CellBatchCommand,
   CellChangeInput,
-  InteractionOperation,
-  OperationEffect,
   OperationIntent,
-  PermissionCode,
   PermissionDecision,
 } from '../commands/interaction-policy.js';
 import { hiddenInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
-import type { Addr, Range } from '../engine/types.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { hitZone, layoutForView } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { canReadClipboard, createContextMenuClipboard } from './context-menu-clipboard.js';
@@ -54,6 +48,7 @@ import type {
   ContextMenuItem,
   ContextMenuOptions,
 } from './context-menu-options.js';
+import { createContextMenuPermissions } from './context-menu-permissions.js';
 import {
   buildCellEntries,
   buildColEntries,
@@ -70,7 +65,7 @@ import {
   type ContextMenuStructureContext,
   runContextMenuStructureItem,
 } from './context-menu-structure.js';
-import { navigationBoundsFor } from './navigation-policy.js';
+import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
 
@@ -124,8 +119,6 @@ export interface ContextMenuDeps {
 }
 
 const VIEWPORT_PAD = 4;
-
-type MenuTarget = { kind: MenuKind; cell: Addr };
 
 const itemIdSet = new Set<ItemId>([
   'bold',
@@ -204,6 +197,12 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   let visible = false;
   let menuKind: MenuKind = 'cell';
+  const permissions = createContextMenuPermissions({
+    store,
+    interactionController,
+    menuKind: () => menuKind,
+  });
+  const { decisionForItem, decisionReason, hasExplicitPolicy, canPasteToRange } = permissions;
   let pasteBtnRef: HTMLButtonElement | null = null;
   let activeIndex = -1;
   let focusPanel: 'root' | 'sub' = 'root';
@@ -267,198 +266,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     Array.from(panel.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item')).filter(
       (btn) => !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
     );
-
-  const restrictedMenuSafeIds = new Set<ItemId>(['copy', 'paste', 'clear']);
-  const navigationUnsupportedIds = new Set<ItemId>([
-    'insertCopiedCells',
-    'insertCells',
-    'deleteCells',
-    'rowInsertAbove',
-    'rowInsertBelow',
-    'rowDelete',
-    'colInsertLeft',
-    'colInsertRight',
-    'colDelete',
-  ]);
-
-  const navigationBounded = (): boolean => navigationBoundsFor(store) !== undefined;
-
-  const canPasteToRange = (range: Range | null): boolean => {
-    const bounds = navigationBoundsFor(store);
-    if (!bounds) return true;
-    if (
-      !range ||
-      range.sheet !== bounds.sheet ||
-      range.r0 < bounds.r0 ||
-      range.c0 < bounds.c0 ||
-      range.r1 > bounds.r1 ||
-      range.c1 > bounds.c1
-    ) {
-      return false;
-    }
-    if (!interactionController) return true;
-    return interactionController.canExecute({
-      operation: 'paste',
-      origin: 'contextMenu',
-      commandId: 'paste',
-      effects: [{ kind: 'range', range }],
-    }).allowed;
-  };
-
-  const hasExplicitPolicy = (): boolean => {
-    const policy = interactionController?.policy;
-    return (
-      interactionController?.restricted === true ||
-      (policy !== undefined && Object.keys(policy).length > 0)
-    );
-  };
-
-  const operationForItem = (id: string): InteractionOperation | null => {
-    if (id === 'copy' || id === 'selectAll' || id === 'rowHeight' || id === 'colWidth') {
-      return null;
-    }
-    if (
-      id === 'paste' ||
-      id === 'pasteSpecial' ||
-      id === 'pasteAll' ||
-      id === 'pasteFormulas' ||
-      id === 'pasteFormulasNumFmt' ||
-      id === 'pasteValues' ||
-      id === 'pasteValuesNumFmt' ||
-      id === 'pasteFormatsOnly' ||
-      id === 'pasteTranspose'
-    ) {
-      return 'paste';
-    }
-    if (id === 'clear') return 'clear';
-    if (
-      id === 'cut' ||
-      id === 'insertCopiedCells' ||
-      id === 'insertCells' ||
-      id === 'deleteCells'
-    ) {
-      return 'moveCells';
-    }
-    if (id === 'rowInsertAbove' || id === 'rowInsertBelow') return 'insertRows';
-    if (id === 'rowDelete') return 'deleteRows';
-    if (id === 'colInsertLeft' || id === 'colInsertRight') return 'insertColumns';
-    if (id === 'colDelete') return 'deleteColumns';
-    if (
-      id === 'bold' ||
-      id === 'italic' ||
-      id === 'underline' ||
-      id === 'alignLeft' ||
-      id === 'alignCenter' ||
-      id === 'alignRight' ||
-      id === 'borders' ||
-      id === 'formatCells' ||
-      id === 'editPhonetic'
-    ) {
-      return 'format';
-    }
-    if (id === 'filterClear' || id === 'filterReapply' || id === 'filterByValue') {
-      return 'filter';
-    }
-    if (id === 'sortAsc' || id === 'sortDesc') return 'sort';
-    if (id === 'rowHide' || id === 'rowUnhide') return 'resizeRows';
-    if (id === 'colHide' || id === 'colUnhide') return 'resizeColumns';
-    if (id === 'rowGroup' || id === 'rowUngroup') return 'insertRows';
-    if (id === 'colGroup' || id === 'colUngroup') return 'insertColumns';
-    if (id === 'insertComment' || id === 'deleteComment') return 'comment';
-    if (id === 'insertHyperlink' || id === 'openHyperlink') return 'hyperlink';
-    if (id === 'defineName') return 'namedRange';
-    if (id === 'toggleWatch') return 'object';
-    return 'object';
-  };
-
-  const operationEffect = (id: string): OperationEffect => {
-    // Row/column structure commands operate on the worksheet axis. Feeding a
-    // full row or column range into the authorization materializer would
-    // exceed its bounded cell budget before the command's own protection and
-    // overflow checks run. Treat these as workbook-structure effects; the
-    // navigation gate above still applies to embedded bounded views.
-    const structural =
-      (id === 'insertCopiedCells' && menuKind !== 'cell') ||
-      id === 'rowInsertAbove' ||
-      id === 'rowInsertBelow' ||
-      id === 'rowDelete' ||
-      id === 'colInsertLeft' ||
-      id === 'colInsertRight' ||
-      id === 'colDelete';
-    return structural
-      ? { kind: 'workbook' }
-      : { kind: 'range', range: { ...store.getState().selection.range } };
-  };
-
-  const intentForBuiltIn = (id: string): OperationIntent | null => {
-    const operation = operationForItem(id);
-    if (!operation) return null;
-    return {
-      operation,
-      origin: 'contextMenu',
-      commandId: id,
-      effects: [operationEffect(id)],
-    };
-  };
-
-  const deniedDecision = (code: PermissionCode, reason?: string): PermissionDecision => ({
-    allowed: false,
-    code,
-    ...(reason ? { reason } : {}),
-  });
-
-  const decisionForIntent = (intent: OperationIntent): PermissionDecision => {
-    if (!interactionController) return { allowed: true };
-    return interactionController.canExecute(intent);
-  };
-
-  const decisionReason = (decision: PermissionDecision): string | null =>
-    decision.allowed ? null : (decision.reason ?? null);
-
-  const decisionForItem = (
-    item: ItemId | ContextMenuItem | OperationIntent,
-  ): PermissionDecision => {
-    if (typeof item === 'object' && 'operation' in item && 'origin' in item) {
-      return decisionForIntent(item);
-    }
-    const itemId = typeof item === 'string' ? item : item.builtIn;
-    if (!itemId) {
-      const command = typeof item === 'string' ? undefined : item.command;
-      if (!command) return { allowed: true };
-      return decisionForIntent({
-        operation: command.operation,
-        origin: 'contextMenu',
-        commandId: command.commandId ?? command.type,
-        effects: [
-          {
-            kind: 'cells',
-            cells: command.changes.map((change) => change.addr),
-            includesFormula: command.changes.some(
-              (change) => 'formula' in change && change.formula != null,
-            ),
-          },
-        ],
-      });
-    }
-    if (itemId === 'copy' && interactionController?.policy?.copy === false) {
-      return deniedDecision('operationDenied', 'Copy is disabled by the host policy.');
-    }
-    if (navigationBounded() && navigationUnsupportedIds.has(itemId)) {
-      return deniedDecision(
-        'unsupported',
-        'This structural operation is unavailable with a bounded viewport.',
-      );
-    }
-    if (hasExplicitPolicy() && !restrictedMenuSafeIds.has(itemId)) {
-      return deniedDecision(
-        'unsupported',
-        'This context-menu operation is unavailable in restricted mode.',
-      );
-    }
-    if (hasExplicitPolicy()) return canExecuteBuiltIn(store, itemId, 'contextMenu');
-    const intent = intentForBuiltIn(itemId);
-    return intent ? decisionForIntent(intent) : { allowed: true };
-  };
 
   const createContext = (
     target: MenuTarget,
@@ -774,7 +581,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       const target = hyperlinkAt(s, s.selection.active);
       setContextMenuItemDisabled(
         openHyperlink,
-        target === null || !isSafeHyperlink(target),
+        target === null || !isSafeHyperlinkTarget(target),
         strings.ribbonMenu.linkNoHyperlink,
       );
     }
@@ -832,82 +639,21 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     focusMenuItem(0);
   };
 
-  /** Resolve which menu flavour to show based on the click target. Header
-   *  clicks promote the selection to the whole row/column so the action
-   *  inherits a sensible band. */
-  const resolveMenuTarget = (e: MouseEvent, updateCellSelection: boolean): MenuTarget => {
-    const rect = hitHost.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const s = store.getState();
-    const zone = hitZone(layoutForView(s), s.viewport, x, y, null, { resizeHandles: false });
-    const fallback = { kind: 'cell' as const, cell: { ...s.selection.active } };
-    if (!zone) return fallback;
-    const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
-    if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
-      const inSel = selectedRanges.some(
-        (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= MAX_COL,
-      );
-      if (!inSel && canChangeSelection()) mutators.selectRow(store, zone.row);
-      return {
-        kind: 'row',
-        cell: { ...store.getState().selection.active },
-      };
-    }
-    if (zone.kind === 'col-header' || zone.kind === 'col-resize') {
-      const inSel = selectedRanges.some(
-        (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= MAX_ROW,
-      );
-      if (!inSel && canChangeSelection()) mutators.selectCol(store, zone.col);
-      return {
-        kind: 'col',
-        cell: { ...store.getState().selection.active },
-      };
-    }
-    if (zone.kind === 'cell') {
-      const selected = selectedRanges.find(
-        (sel) =>
-          zone.row >= sel.r0 && zone.row <= sel.r1 && zone.col >= sel.c0 && zone.col <= sel.c1,
-      );
-      if (selected?.c0 === 0 && selected.c1 >= MAX_COL) {
-        return {
-          kind: 'row',
-          cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
-        };
-      }
-      if (selected?.r0 === 0 && selected.r1 >= MAX_ROW) {
-        return {
-          kind: 'col',
-          cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
-        };
-      }
-      if (!selected && updateCellSelection && canChangeSelection()) {
-        const cell = { sheet: s.selection.active.sheet, row: zone.row, col: zone.col };
-        mutators.setActive(store, cell);
-        return { kind: 'cell', cell };
-      }
-      return {
-        kind: 'cell',
-        cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
-      };
-    }
-    return fallback;
-  };
-
   const isOwnChromeContextTarget = (target: EventTarget | null): boolean =>
     target instanceof OwnerElement &&
     !!target.closest('.fc-host__formulabar, .fc-host__sheetbar, .fc-sheetmenu');
-
-  const canChangeSelection = (): boolean => {
-    if (interactionController?.canSelect) return interactionController.canSelect().allowed;
-    return interactionController?.policy?.selection !== false;
-  };
 
   const onContextMenu = (e: MouseEvent): void => {
     if (isOwnChromeContextTarget(e.target)) return;
     if (options?.mode === 'disabled') return;
     e.preventDefault();
-    const target = resolveMenuTarget(e, options !== undefined);
+    const target = resolveContextMenuTarget(
+      store,
+      hitHost,
+      e,
+      options !== undefined,
+      permissions.canChangeSelection,
+    );
     show(e.clientX, e.clientY, target, e);
   };
 
@@ -1126,7 +872,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   function run(id: string): void {
     if (!isBuiltinItemId(id)) return;
     if (!decisionForItem(id).allowed) return;
-    if (navigationBounded() && navigationUnsupportedIds.has(id)) return;
+    if (permissions.navigationBlocks(id)) return;
     const state = store.getState();
     if (clipboard.run(id, state)) return;
     if (runContextMenuStructureItem(structureContext, id, state)) return;
@@ -1199,7 +945,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'openHyperlink': {
         const target = hyperlinkAt(state, state.selection.active);
-        if (!target || !isSafeHyperlink(target)) return;
+        if (!target || !isSafeHyperlinkTarget(target)) return;
         deps.onOpenHyperlink?.(target);
         return;
       }
@@ -1240,16 +986,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     hide();
   };
   return detach;
-}
-
-function isSafeHyperlink(url: string): boolean {
-  const lower = url.trim().toLowerCase();
-  return (
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.startsWith('mailto:') ||
-    lower.startsWith('tel:')
-  );
 }
 
 function setContextMenuItemDisabled(
