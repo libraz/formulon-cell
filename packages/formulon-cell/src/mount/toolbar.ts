@@ -50,7 +50,6 @@ import {
 } from '../toolbar/ribbon/border-menu.js';
 import type { RibbonFormatMutator } from '../toolbar/ribbon/command-tables.js';
 import {
-  createDynamicDropdowns,
   type DynamicDropdownsApi,
   type DynamicDropdownsCtx,
   ribbonDropdownMenuIdForCommand,
@@ -72,12 +71,15 @@ import {
   type ToolbarText,
   toolbarText,
 } from '../toolbar/ribbon-model.js';
-import { createDefaultDynamicDropdownsCtx } from './dynamic-dropdowns-defaults.js';
 import {
   createDefaultRibbonHelpers,
   createDefaultRibbonHooks,
   createDefaultRibbonMenus,
 } from './toolbar-defaults.js';
+import {
+  attachDynamicDropdownDelegation,
+  type DynamicDropdownDelegation,
+} from './toolbar-dropdown-delegation.js';
 import type { SpreadsheetInstance } from './types.js';
 
 type UiTheme = 'paper' | 'ink' | 'contrast';
@@ -451,100 +453,23 @@ export function mountToolbar(
     }
   }
 
-  // Auto-wire the default dynamic-dropdowns click delegator when the host
-  // opts in. The handler is attached to `document` (matching the playground
-  // wiring) so clicks anywhere inside an open `.fc-tb__menu` reach the
-  // dispatcher. We capture the unsubscribe and undo it in dispose so the
-  // listener does not leak after re-mounts.
-  let dynamicDropdownClickHandler: ((event: MouseEvent) => void) | null = null;
-  let dynamicDropdownPointerDownHandler: ((event: MouseEvent) => void) | null = null;
-  let dynamicDropdownFocusHandler: ((event: FocusEvent) => void) | null = null;
-  let dynamicDropdownHoverHandler: ((event: MouseEvent) => void) | null = null;
-  let dynamicDropdownKeyHandler: ((event: KeyboardEvent) => void) | null = null;
+  // Auto-wire the default dynamic-dropdowns delegation when the host opts in;
+  // dispose detaches its document listeners so they do not leak across re-mounts.
+  let dropdownsDelegation: DynamicDropdownDelegation | null = null;
   let dropdownsApi: DynamicDropdownsApi | null = null;
   if (opts.dynamicDropdowns) {
-    const hostOverrides: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
-      opts.dynamicDropdowns === true ? {} : opts.dynamicDropdowns;
-    const withToolbarDropdownOverrides = (
-      overrides: Partial<DynamicDropdownsCtx>,
-    ): Partial<DynamicDropdownsCtx> => ({
+    dropdownsDelegation = attachDynamicDropdownDelegation(opts.dynamicDropdowns, {
+      defaultsInstance,
+      getInstance,
+      focusSheet,
+      projectFormatToolbar,
+      refreshCells,
       closeBorderMenu: (restoreFocus?: boolean) => {
         borderMenuApi?.closeBorderMenu(restoreFocus);
       },
-      ...overrides,
+      onMenuClosedByCommand: () => dismissRibbonPeek(),
     });
-    const overridesOpt: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
-      typeof hostOverrides === 'function'
-        ? () => withToolbarDropdownOverrides(hostOverrides())
-        : withToolbarDropdownOverrides(hostOverrides);
-    // `createDefaultDynamicDropdownsCtx` uses the `@libraz/formulon-cell`
-    // self-import for `SpreadsheetInstance` (matching `dynamic-dropdowns.ts`)
-    // so its parameter type resolves to dist. This file imports the
-    // src-side declaration via `./types.js`, so the two structurally
-    // identical declarations need one bridge cast.
-    //
-    // When `defaultsInstance` is null (deferred-mount hosts like the
-    // playground), the built-in base handlers stay unreachable as long as
-    // the host overrides every handler it dispatches. The override getter
-    // (recommended for deferred hosts) captures the live instance via its
-    // own closure so it can hand back the real `inst` once mounted.
-    const dropdownsCtx = createDefaultDynamicDropdownsCtx(
-      (defaultsInstance ?? ({} as SpreadsheetInstance)) as unknown as Parameters<
-        typeof createDefaultDynamicDropdownsCtx
-      >[0],
-      {
-        focusSheet,
-        projectFormatToolbar,
-        refreshCells,
-        overrides: overridesOpt,
-      },
-    );
-    dropdownsApi = createDynamicDropdowns(dropdownsCtx);
-    dynamicDropdownClickHandler = (event: MouseEvent): void => {
-      const current = getInstance();
-      const target = event.target instanceof Element ? event.target : null;
-      const menu = target?.closest<HTMLElement>('.fc-tb__menu') ?? null;
-      if (
-        current &&
-        interactionControllerFor(current.store)?.policy !== undefined &&
-        !target?.closest<HTMLElement>(
-          `#${MAC_FORMULAS_MORE_MENU_ID} [data-function-category-submenu]`,
-        )
-      )
-        return;
-      if (dropdownsApi?.dynamicRibbonDropdownClick(event) && menu?.hidden) dismissRibbonPeek();
-    };
-    dynamicDropdownPointerDownHandler = (event: MouseEvent): void => {
-      dropdownsApi?.dynamicRibbonDropdownPointerDown(event);
-    };
-    dynamicDropdownFocusHandler = (event: FocusEvent): void => {
-      dropdownsApi?.dynamicRibbonDropdownFocusIn(event);
-    };
-    dynamicDropdownHoverHandler = (event: MouseEvent): void => {
-      dropdownsApi?.dynamicRibbonDropdownHover(event);
-    };
-    dynamicDropdownKeyHandler = (event: KeyboardEvent): void => {
-      const current = getInstance();
-      const target = event.target instanceof Element ? event.target : null;
-      const menu = target?.closest<HTMLElement>('.fc-tb__menu') ?? null;
-      if (
-        current &&
-        interactionControllerFor(current.store)?.policy !== undefined &&
-        !target?.closest<HTMLElement>(`#${MAC_FORMULAS_MORE_MENU_ID}`)
-      )
-        return;
-      if (
-        dropdownsApi?.dynamicRibbonDropdownKeydown(event) &&
-        menu?.hidden &&
-        (event.key === 'Enter' || event.key === ' ')
-      )
-        dismissRibbonPeek();
-    };
-    document.addEventListener('click', dynamicDropdownClickHandler);
-    document.addEventListener('mousedown', dynamicDropdownPointerDownHandler, true);
-    document.addEventListener('focusin', dynamicDropdownFocusHandler);
-    document.addEventListener('mouseover', dynamicDropdownHoverHandler);
-    document.addEventListener('keydown', dynamicDropdownKeyHandler);
+    dropdownsApi = dropdownsDelegation.api;
   }
 
   const renderApi = createRenderRibbon({
@@ -1176,26 +1101,8 @@ export function mountToolbar(
       host.removeEventListener('keydown', onDisplayKey);
       document.removeEventListener('keydown', onGlobalKey);
       document.removeEventListener('mousedown', onDocumentMouseDown);
-      if (dynamicDropdownClickHandler) {
-        document.removeEventListener('click', dynamicDropdownClickHandler);
-        dynamicDropdownClickHandler = null;
-      }
-      if (dynamicDropdownPointerDownHandler) {
-        document.removeEventListener('mousedown', dynamicDropdownPointerDownHandler, true);
-        dynamicDropdownPointerDownHandler = null;
-      }
-      if (dynamicDropdownFocusHandler) {
-        document.removeEventListener('focusin', dynamicDropdownFocusHandler);
-        dynamicDropdownFocusHandler = null;
-      }
-      if (dynamicDropdownHoverHandler) {
-        document.removeEventListener('mouseover', dynamicDropdownHoverHandler);
-        dynamicDropdownHoverHandler = null;
-      }
-      if (dynamicDropdownKeyHandler) {
-        document.removeEventListener('keydown', dynamicDropdownKeyHandler);
-        dynamicDropdownKeyHandler = null;
-      }
+      dropdownsDelegation?.detach();
+      dropdownsDelegation = null;
       borderMenuApi?.detach();
       borderMenuApi = null;
       dropdownsApi = null;
