@@ -6,13 +6,14 @@ import {
   toggleBold,
   toggleItalic,
 } from '../../../../src/commands/format.js';
-import { History, recordRepeatableFormatChange } from '../../../../src/commands/history.js';
+import { History } from '../../../../src/commands/history.js';
 import {
   InteractionController,
   registerInteractionController,
 } from '../../../../src/commands/interaction-controller.js';
 import { fixedFormPolicy } from '../../../../src/commands/interaction-policy.js';
 import { setCellLocked, setProtectedSheet } from '../../../../src/commands/protection.js';
+import { recordRepeatableFormatChange } from '../../../../src/commands/slice-history.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,

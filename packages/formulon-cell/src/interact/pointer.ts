@@ -1,11 +1,6 @@
 import type { AutofitOptions } from '../commands/autofit-measurement.js';
 import { fillDestFor, fillRange } from '../commands/fill.js';
-import {
-  applyLayoutSnapshot,
-  captureLayoutSnapshot,
-  type History,
-  type LayoutSnapshot,
-} from '../commands/history.js';
+import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import {
@@ -19,7 +14,12 @@ import {
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
 import { shiftFormulaRefs } from '../commands/refs.js';
-import { autofitColsWidth, autofitRowsHeight } from '../commands/structure.js';
+import { autofitColsWidth, autofitRowsHeight } from '../commands/row-col-layout.js';
+import {
+  applyLayoutSnapshot,
+  captureLayoutSnapshot,
+  type LayoutSnapshot,
+} from '../commands/slice-history.js';
 import { formatA1Cell, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';

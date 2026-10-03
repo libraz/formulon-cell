@@ -36,7 +36,7 @@ import {
   ungroupRows,
 } from '../commands/outline.js';
 import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
-import { setSheetZoom } from '../commands/structure.js';
+import { setSheetZoom } from '../commands/view.js';
 import { formatA1Range, MAX_COL } from '../engine/address.js';
 import { dictionaries } from '../i18n/strings.js';
 import { isNavigationAddrAllowed } from '../interact/navigation-policy.js';

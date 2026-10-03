@@ -61,6 +61,17 @@ export function isSheetProtected(state: State, sheet: number): boolean {
   return state.protection.protectedSheets.has(sheet);
 }
 
+/** Spreadsheet-parity gate for row/col structure changes. When `sheet` is
+ *  protected the operation is rejected (no-op + warning) regardless of
+ *  per-cell locks — spreadsheets disable the insert/delete row/col commands
+ *  wholesale on protected sheets. */
+export function blockedByProtection(store: SpreadsheetStore, sheet: number, op: string): boolean {
+  if (!isSheetProtected(store.getState(), sheet)) return false;
+  // eslint-disable-next-line no-console
+  console.warn(`formulon-cell: ${op} blocked — sheet ${sheet} is protected`);
+  return true;
+}
+
 export function setProtectedSheet(
   store: SpreadsheetStore,
   sheet: number,

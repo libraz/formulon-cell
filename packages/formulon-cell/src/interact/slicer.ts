@@ -1,4 +1,5 @@
-import { type History, recordSlicersChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
+import { recordSlicersChange } from '../commands/slice-history.js';
 import {
   createSlicer,
   listSlicerValues,

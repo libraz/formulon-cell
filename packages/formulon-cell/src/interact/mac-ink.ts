@@ -1,6 +1,7 @@
-import { type History, recordIllustrationsChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
 import type { OperationIntent } from '../commands/interaction-policy.js';
 import { clearSessionIllustration, createSessionImage } from '../commands/session-illustration.js';
+import { recordIllustrationsChange } from '../commands/slice-history.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   bodyBandOrigin,

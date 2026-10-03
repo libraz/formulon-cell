@@ -1,7 +1,8 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
-import { type History, recordLayoutChangeWithEngine } from './history.js';
-import { isSheetProtected } from './protection.js';
+import type { History } from './history.js';
+import { blockedByProtection } from './protection.js';
+import { recordLayoutChangeWithEngine } from './slice-history.js';
 
 /** Spreadsheets cap outline depth at 7 — beyond that the gutter would be unreadable. */
 export const MAX_OUTLINE_LEVEL = 7;
@@ -47,14 +48,6 @@ const setColOutline = (store: SpreadsheetStore, next: Map<number, number>): void
   }));
 };
 
-const blockedByProtection = (store: SpreadsheetStore, op: string): boolean => {
-  const sheet = store.getState().data.sheetIndex;
-  if (!isSheetProtected(store.getState(), sheet)) return false;
-  // eslint-disable-next-line no-console
-  console.warn(`formulon-cell: ${op} blocked — sheet ${sheet} is protected`);
-  return true;
-};
-
 /** Increase outline level by 1 for rows in `[r0, r1]`. Caps at level 7. */
 export function groupRows(
   store: SpreadsheetStore,
@@ -64,7 +57,7 @@ export function groupRows(
   wb?: WorkbookHandle,
 ): void {
   if (r0 > r1) return;
-  if (blockedByProtection(store, 'groupRows')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'groupRows')) return;
   if (spanSize(r0, r1) > MAX_MATERIALIZED_OUTLINE_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const cur = store.getState().layout.outlineRows;
@@ -87,7 +80,7 @@ export function ungroupRows(
   wb?: WorkbookHandle,
 ): void {
   if (r0 > r1) return;
-  if (blockedByProtection(store, 'ungroupRows')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'ungroupRows')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const cur = store.getState().layout.outlineRows;
     const next = new Map(cur);
@@ -108,7 +101,7 @@ export function groupCols(
   wb?: WorkbookHandle,
 ): void {
   if (c0 > c1) return;
-  if (blockedByProtection(store, 'groupCols')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'groupCols')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const cur = store.getState().layout.outlineCols;
     const next = new Map(cur);
@@ -128,7 +121,7 @@ export function ungroupCols(
   wb?: WorkbookHandle,
 ): void {
   if (c0 > c1) return;
-  if (blockedByProtection(store, 'ungroupCols')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'ungroupCols')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const cur = store.getState().layout.outlineCols;
     const next = new Map(cur);
@@ -181,7 +174,7 @@ export function collapseRowGroup(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, 'collapseRowGroup')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'collapseRowGroup')) return;
   if (spanSize(r0, r1) > MAX_MATERIALIZED_OUTLINE_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
@@ -199,7 +192,7 @@ export function expandRowGroup(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, 'expandRowGroup')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'expandRowGroup')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
@@ -218,7 +211,7 @@ export function collapseColGroup(
   c1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, 'collapseColGroup')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'collapseColGroup')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
@@ -235,7 +228,7 @@ export function expandColGroup(
   c1: number,
   wb?: WorkbookHandle,
 ): void {
-  if (blockedByProtection(store, 'expandColGroup')) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'expandColGroup')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);

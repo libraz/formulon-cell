@@ -6,8 +6,8 @@ import {
   duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
-import { setSheetZoom } from '../commands/structure.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
+import { setSheetZoom } from '../commands/view.js';
 import { formatA1Range } from '../engine/address.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';

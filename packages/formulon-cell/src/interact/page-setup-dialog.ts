@@ -3,7 +3,7 @@
 // titles, scale, gridlines / headings toggles. OK pushes the resulting patch
 // through `mutators.setPageSetup` wrapped in a single history entry so undo
 // reverts the whole apply atomically.
-import { type History, recordPageSetupChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
 import {
   parsePrintAreas,
   parsePrintTitleCols,
@@ -16,6 +16,7 @@ import {
   normalizePrinterProfiles,
   type PrinterProfile,
 } from '../commands/printer-profile.js';
+import { recordPageSetupChange } from '../commands/slice-history.js';
 import { colLetter, formatA1Range } from '../engine/address.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {

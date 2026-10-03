@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { History, recordFormatChange } from '../../../src/commands/history.js';
+import { History } from '../../../src/commands/history.js';
+import { recordFormatChange } from '../../../src/commands/slice-history.js';
 import {
   hydrateCellFormatsFromEngine,
   syncCellFormatsToEngine,

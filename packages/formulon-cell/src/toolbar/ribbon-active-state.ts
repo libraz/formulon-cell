@@ -5,7 +5,7 @@ import { tableForCell } from '../commands/format-as-table.js';
 import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
-import { hiddenInSelection } from '../commands/structure.js';
+import { hiddenInSelection } from '../commands/row-col-layout.js';
 import type { Strings } from '../i18n/strings/types.js';
 import type { SpreadsheetInstance } from '../mount.js';
 import { formatWithPending } from '../store/pending-format.js';

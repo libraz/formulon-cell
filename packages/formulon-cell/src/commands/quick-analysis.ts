@@ -5,16 +5,16 @@ import { rangeArea, rangeContainsAddr, rangeContainsRange } from '../store/selec
 import { mutators, type SparklineKind, type SpreadsheetStore } from '../store/store.js';
 import type { SelectionStats } from './aggregate.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
+import type { History } from './history.js';
+import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
+import { createSessionChart } from './session-chart.js';
 import {
-  type History,
   recordChartsChange,
   recordConditionalRulesChange,
   recordFormatChange,
   recordSparklineChange,
   recordTablesChange,
-} from './history.js';
-import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
-import { createSessionChart } from './session-chart.js';
+} from './slice-history.js';
 
 /**
  * Quick Analysis — a context-aware action sheet that appears anchored at the

@@ -7,7 +7,8 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { clearComment, commentAt, listComments } from './comment.js';
-import { type History, recordFormatChange } from './history.js';
+import type { History } from './history.js';
+import { recordFormatChange } from './slice-history.js';
 
 export type RibbonCommentAction = 'delete-active' | 'delete-all';
 

@@ -15,20 +15,14 @@ import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
 import { phoneticReadingAt, setPhoneticReading } from '../../commands/phonetic.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
-import {
-  deleteCols,
-  deleteRows,
-  hideCols,
-  hideRows,
-  insertCols,
-  insertRows,
-  setSheetZoom,
-} from '../../commands/structure.js';
+import { hideCols, hideRows } from '../../commands/row-col-layout.js';
+import { deleteCols, deleteRows, insertCols, insertRows } from '../../commands/structure.js';
 import {
   setGridlinesVisible,
   setHeadingsVisible,
   setR1C1ReferenceStyle,
   setSheetRightToLeft,
+  setSheetZoom,
   setShowFormulas,
   setWorkbookView,
   setZerosVisible,

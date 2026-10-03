@@ -1,10 +1,10 @@
 import { formatAsTable, inferTableHasHeaders } from '../../../commands/format-as-table.js';
-import { recordTablesChange } from '../../../commands/history.js';
 import type {
   InteractionOperation,
   OperationIntent,
 } from '../../../commands/interaction-policy.js';
-import { setFreezePanes, showCols, showRows } from '../../../commands/structure.js';
+import { setFreezePanes, showCols, showRows } from '../../../commands/row-col-layout.js';
+import { recordTablesChange } from '../../../commands/slice-history.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import { parseRangeRef } from '../../../engine/range-resolver.js';
 import type { Addr, Range } from '../../../engine/types.js';

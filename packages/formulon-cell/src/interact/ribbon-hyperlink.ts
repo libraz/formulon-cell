@@ -4,8 +4,8 @@
 // clear the hyperlink on the active cell, or surface a "no link here" report.
 
 import type { History } from '../commands/history.js';
-import { recordFormatChange } from '../commands/history.js';
 import { clearHyperlink, hyperlinkAt } from '../commands/hyperlinks.js';
+import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';

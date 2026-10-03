@@ -7,8 +7,9 @@ import { rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { listComments, recordCommentChange } from './comment.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
-import { type History, recordFormatChange, recordMergesChangeWithEngine } from './history.js';
+import type { History } from './history.js';
 import { isSheetProtected } from './protection.js';
+import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
 
 export type InsertCellsDirection = 'down' | 'right';
 export type DeleteCellsDirection = 'up' | 'left';

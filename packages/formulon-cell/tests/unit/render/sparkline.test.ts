@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import {
   applySparklineSnapshot,
   captureSparklineSnapshot,
-  History,
   recordSparklineChange,
-} from '../../../src/commands/history.js';
+} from '../../../src/commands/slice-history.js';
 import { resolveNumericRangeFromCells } from '../../../src/engine/range-resolver.js';
 import { paintSparkline } from '../../../src/render/painters.js';
 import {

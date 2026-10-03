@@ -124,6 +124,20 @@ export function setZoomPercent(store: SpreadsheetStore, percent: number): void {
   mutators.setZoom(store, percent / 100);
 }
 
+/** Set the per-sheet zoom level. `zoom` is a multiplier (1.0 = 100%) and is
+ *  clamped by the store mutator to [0.5, 4]. When `wb` is supplied the
+ *  engine receives the equivalent percentage so the value round-trips
+ *  through .xlsx. Not journaled — spreadsheets treat zoom as a view setting
+ *  outside the undo stack. */
+export function setSheetZoom(store: SpreadsheetStore, zoom: number, wb?: WorkbookHandle): void {
+  mutators.setZoom(store, zoom);
+  if (wb) {
+    const sheet = store.getState().data.sheetIndex;
+    const pct = Math.round(store.getState().viewport.zoom * 100);
+    wb.setSheetZoom(sheet, pct);
+  }
+}
+
 /** Configure which status-bar aggregates are visible. */
 export function setStatusAggregates(store: SpreadsheetStore, keys: StatusAggKey[]): void {
   mutators.setStatusAggs(store, keys);

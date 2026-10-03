@@ -30,8 +30,8 @@ import {
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
 import type { FunctionCatalogReader } from '../commands/function-categories.js';
-import { recordRepeatableFormatChange } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensions/ui-options.js';
 import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-ink.js';
 import type { CellBorderStyle } from '../store/types.js';

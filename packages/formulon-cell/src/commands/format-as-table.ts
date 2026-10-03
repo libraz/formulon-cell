@@ -3,8 +3,9 @@ import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { type History, recordTablesChange } from './history.js';
-import { isSheetProtected } from './protection.js';
+import type { History } from './history.js';
+import { blockedByProtection } from './protection.js';
+import { recordTablesChange } from './slice-history.js';
 
 /** UI-only "Format As Table" overlay. Native workbook tables have a full
  * engine model, but this layer can decorate a plain range while writable
@@ -290,13 +291,6 @@ export type TableOverlayPatch = Partial<
     'range' | 'style' | 'color' | 'showHeader' | 'showTotal' | 'banded' | 'firstCol' | 'lastCol'
   >
 >;
-
-const blockedByProtection = (store: SpreadsheetStore, sheet: number, op: string): boolean => {
-  if (!isSheetProtected(store.getState(), sheet)) return false;
-  // eslint-disable-next-line no-console
-  console.warn(`formulon-cell: ${op} blocked — sheet ${sheet} is protected`);
-  return true;
-};
 
 /** Default factory — keeps the construction site small. */
 export function defaultTableOverlay(id: string, range: Range): TableOverlay {

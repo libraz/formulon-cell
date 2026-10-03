@@ -5,8 +5,9 @@ import {
   type SessionShapeKind,
   type SpreadsheetStore,
 } from '../store/store.js';
-import { type History, recordIllustrationsChange } from './history.js';
+import type { History } from './history.js';
 import { isSheetProtected } from './protection.js';
+import { recordIllustrationsChange } from './slice-history.js';
 
 export interface CreateSessionShapeOptions {
   id?: string;

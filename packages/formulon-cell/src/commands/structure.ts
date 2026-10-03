@@ -1,78 +1,46 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
 import {
-  type CellFormat,
   type ConditionalRule,
   type LayoutSlice,
   mutators,
   type SpreadsheetStore,
   type State,
-  type ValueFilterCriteria,
 } from '../store/store.js';
 import {
-  type AutofitOptions,
-  computeAutofitColWidth,
-  computeAutofitRowHeight,
-  createAutofitMeasureContext,
-} from './autofit-measurement.js';
+  inheritFormatsByCol,
+  inheritFormatsByRow,
+  normalizeAxisEdit,
+  parseFormatKey,
+  shiftFilterCriteria,
+  shiftFormatsByCol,
+  shiftFormatsByRow,
+  shiftIndexedMap,
+  shiftIndexedMapWithInheritance,
+  shiftIndexedSet,
+  shiftRangeAxis,
+} from './axis-shift.js';
 import { recordFilterChange } from './filter.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
+import type { History } from './history.js';
+import { blockedByProtection } from './protection.js';
 import {
   captureLayoutSnapshot,
-  type History,
   recordConditionalRulesChange,
   recordFormatChange,
   recordLayoutChange,
-  recordLayoutChangeWithEngine,
   recordMergesChange,
   recordMergesChangeWithEngine,
-} from './history.js';
-import { isSheetProtected } from './protection.js';
-
-/** Spreadsheet-parity gate for row/col structure changes. When `sheet` is
- *  protected the operation is rejected (no-op + warning) regardless of
- *  per-cell locks — spreadsheets disable the insert/delete row/col commands
- *  wholesale on protected sheets. */
-function blockedByProtection(store: SpreadsheetStore, sheet: number, op: string): boolean {
-  if (!isSheetProtected(store.getState(), sheet)) return false;
-  // eslint-disable-next-line no-console
-  console.warn(`formulon-cell: ${op} blocked — sheet ${sheet} is protected`);
-  return true;
-}
+} from './slice-history.js';
 
 interface CellRecord {
   addr: Addr;
   value: CellValue;
   formula: string | null;
 }
-
-const MAX_MATERIALIZED_LAYOUT_ROWS = 100_000;
-
-interface AxisEdit {
-  at: number;
-  count: number;
-}
-
-function normalizeAxisEdit(
-  at: number,
-  count: number,
-  max: number,
-  kind: 'insert' | 'delete',
-): AxisEdit | null {
-  if (!Number.isInteger(at) || !Number.isInteger(count)) return null;
-  if (!Number.isFinite(at) || !Number.isFinite(count)) return null;
-  if (at < 0 || at > max || count <= 0) return null;
-  // A row/column insertion must leave room for every cell that is moved
-  // right/down. Deletions may consume the final row/column.
-  const remaining = kind === 'insert' ? max - at : max + 1 - at;
-  const normalizedCount = Math.min(count, remaining);
-  return normalizedCount > 0 ? { at, count: normalizedCount } : null;
-}
-
-const spanSize = (start: number, end: number): number => (end >= start ? end - start + 1 : 0);
 
 function collectAllCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
   const out: CellRecord[] = [];
@@ -95,30 +63,6 @@ function collectAllFormulas(wb: WorkbookHandle): FormulaRecord[] {
     }
   }
   return out;
-}
-
-function cloneInsertedFormat(format: CellFormat): CellFormat {
-  const next: CellFormat = { ...format };
-  delete next.hyperlink;
-  delete next.hyperlinkDisplay;
-  delete next.hyperlinkTooltip;
-  delete next.comment;
-  delete next.commentAuthor;
-  delete next.validation;
-  if (format.borders) next.borders = { ...format.borders };
-  if (format.numFmt) next.numFmt = { ...format.numFmt };
-  if (format.phonetic) next.phonetic = format.phonetic.map((run) => ({ ...run }));
-  return next;
-}
-
-function parseFormatKey(key: string): Addr | null {
-  const parts = key.split(':');
-  if (parts.length !== 3) return null;
-  const sheet = Number(parts[0]);
-  const row = Number(parts[1]);
-  const col = Number(parts[2]);
-  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
-  return { sheet, row, col };
 }
 
 /** Reject an insertion that would move persisted content past the worksheet
@@ -226,229 +170,8 @@ function writeAxisShiftedCells(
   }
 }
 
-/** Shift indices in a sparse Map keyed by integer index. Indices >= split move
- *  by `delta` (delta>0 = shift right/down, delta<0 = shift left/up). For
- *  delete (delta<0), keys in [split, split+|delta|) are removed. */
-function shiftIndexedMap(
-  src: Map<number, number>,
-  split: number,
-  delta: number,
-  max = Number.POSITIVE_INFINITY,
-): Map<number, number> {
-  const out = new Map<number, number>();
-  for (const [k, v] of src) {
-    if (k < split) {
-      out.set(k, v);
-      continue;
-    }
-    if (delta < 0 && k < split - delta) continue; // dropped
-    const next = k + delta;
-    if (next < 0 || next > max) continue;
-    out.set(next, v);
-  }
-  return out;
-}
-
-function shiftIndexedSet(
-  src: Set<number>,
-  split: number,
-  delta: number,
-  max = Number.POSITIVE_INFINITY,
-): Set<number> {
-  const out = new Set<number>();
-  for (const k of src) {
-    if (k < split) {
-      out.add(k);
-      continue;
-    }
-    if (delta < 0 && k < split - delta) continue;
-    const next = k + delta;
-    if (next < 0 || next > max) continue;
-    out.add(next);
-  }
-  return out;
-}
-
-/** Shift addrKey-keyed formats so any key with row >= splitRow moves by deltaRow.
- *  When deltaRow < 0, formats in the deleted band are dropped. */
-function shiftFormatsByRow(
-  src: Map<string, CellFormat>,
-  sheet: number,
-  splitRow: number,
-  deltaRow: number,
-): Map<string, CellFormat> {
-  const out = new Map<string, CellFormat>();
-  for (const [key, fmt] of src) {
-    const parts = key.split(':');
-    if (parts.length !== 3) {
-      out.set(key, fmt);
-      continue;
-    }
-    const s = Number(parts[0]);
-    const r = Number(parts[1]);
-    const c = Number(parts[2]);
-    if (s !== sheet || r < splitRow) {
-      out.set(key, fmt);
-      continue;
-    }
-    if (deltaRow < 0 && r < splitRow - deltaRow) continue; // in deleted band
-    const nextRow = r + deltaRow;
-    if (nextRow < 0 || nextRow > MAX_ROW) continue;
-    out.set(addrKey({ sheet: s, row: nextRow, col: c }), fmt);
-  }
-  return out;
-}
-
-function inheritFormatsByRow(
-  src: Map<string, CellFormat>,
-  shifted: Map<string, CellFormat>,
-  sheet: number,
-  splitRow: number,
-  count: number,
-): Map<string, CellFormat> {
-  if (splitRow <= 0 || count <= 0) return shifted;
-  const out = new Map(shifted);
-  for (const [key, fmt] of src) {
-    const addr = parseFormatKey(key);
-    if (!addr || addr.sheet !== sheet || addr.row !== splitRow - 1) continue;
-    for (let row = splitRow; row < splitRow + count && row <= MAX_ROW; row += 1) {
-      out.set(addrKey({ sheet, row, col: addr.col }), cloneInsertedFormat(fmt));
-    }
-  }
-  return out;
-}
-
-function shiftFormatsByCol(
-  src: Map<string, CellFormat>,
-  sheet: number,
-  splitCol: number,
-  deltaCol: number,
-): Map<string, CellFormat> {
-  const out = new Map<string, CellFormat>();
-  for (const [key, fmt] of src) {
-    const parts = key.split(':');
-    if (parts.length !== 3) {
-      out.set(key, fmt);
-      continue;
-    }
-    const s = Number(parts[0]);
-    const r = Number(parts[1]);
-    const c = Number(parts[2]);
-    if (s !== sheet || c < splitCol) {
-      out.set(key, fmt);
-      continue;
-    }
-    if (deltaCol < 0 && c < splitCol - deltaCol) continue;
-    const nextCol = c + deltaCol;
-    if (nextCol < 0 || nextCol > MAX_COL) continue;
-    out.set(addrKey({ sheet: s, row: r, col: nextCol }), fmt);
-  }
-  return out;
-}
-
-function inheritFormatsByCol(
-  src: Map<string, CellFormat>,
-  shifted: Map<string, CellFormat>,
-  sheet: number,
-  splitCol: number,
-  count: number,
-): Map<string, CellFormat> {
-  if (splitCol <= 0 || count <= 0) return shifted;
-  const out = new Map(shifted);
-  for (const [key, fmt] of src) {
-    const addr = parseFormatKey(key);
-    if (!addr || addr.sheet !== sheet || addr.col !== splitCol - 1) continue;
-    for (let col = splitCol; col < splitCol + count && col <= MAX_COL; col += 1) {
-      out.set(addrKey({ sheet, row: addr.row, col }), cloneInsertedFormat(fmt));
-    }
-  }
-  return out;
-}
-
 function applyLayoutPatch(store: SpreadsheetStore, patch: Partial<LayoutSlice>): void {
   store.setState((s) => ({ ...s, layout: { ...s.layout, ...patch } }));
-}
-
-function shiftIndexedMapWithInheritance(
-  src: Map<number, number>,
-  split: number,
-  delta: number,
-  count: number,
-  max = Number.POSITIVE_INFINITY,
-): Map<number, number> {
-  const out = shiftIndexedMap(src, split, delta, max);
-  if (split <= 0 || count <= 0) return out;
-  const inherited = src.get(split - 1);
-  if (inherited === undefined) return out;
-  for (let index = split; index < split + count && index <= max; index += 1) {
-    out.set(index, inherited);
-  }
-  return out;
-}
-
-/** Map a 1-D interval [lo,hi] through a row/col insert (delta>0) or delete
- *  (delta<0) at `split`. Returns null when a deletion consumes the whole
- *  interval. Inserting inside a span widens it — matching how spreadsheets grow
- *  a merge / conditional-format / filter region when rows or cols are added
- *  within it. */
-function adjustInterval(
-  lo: number,
-  hi: number,
-  split: number,
-  delta: number,
-): [number, number] | null {
-  if (delta > 0) {
-    return [lo >= split ? lo + delta : lo, hi >= split ? hi + delta : hi];
-  }
-  const count = -delta;
-  const bandHi = split + count - 1;
-  const nlo = lo < split ? lo : lo > bandHi ? lo - count : split;
-  const nhi = hi < split ? hi : hi > bandHi ? hi - count : split - 1;
-  return nlo > nhi ? null : [nlo, nhi];
-}
-
-/** Shift a range's row or col span for a structure edit. Returns null when a
- *  deletion removes the whole span. */
-function shiftRangeAxis(
-  range: Range,
-  axis: 'row' | 'col',
-  split: number,
-  delta: number,
-): Range | null {
-  const lo = axis === 'row' ? range.r0 : range.c0;
-  const hi = axis === 'row' ? range.r1 : range.c1;
-  const res = adjustInterval(lo, hi, split, delta);
-  if (!res) return null;
-  const [a, b] = res;
-  const max = axis === 'row' ? MAX_ROW : MAX_COL;
-  if (a < 0 || b > max) return null;
-  return axis === 'row' ? { ...range, r0: a, r1: b } : { ...range, c0: a, c1: b };
-}
-
-function shiftFilterCriteria(
-  criteria: readonly ValueFilterCriteria[],
-  sheet: number,
-  axis: 'row' | 'col',
-  split: number,
-  delta: number,
-): ValueFilterCriteria[] {
-  const out: ValueFilterCriteria[] = [];
-  for (const c of criteria) {
-    if (c.range.sheet !== sheet) {
-      out.push(c);
-      continue;
-    }
-    const shifted = shiftRangeAxis(c.range, axis, split, delta);
-    if (!shifted) continue; // filtered column removed
-    let byCol = c.byCol;
-    if (axis === 'col') {
-      const mapped = adjustInterval(byCol, byCol, split, delta);
-      if (!mapped) continue; // this column was deleted
-      byCol = mapped[0];
-    }
-    out.push({ ...c, range: shifted, byCol });
-  }
-  return out;
 }
 
 function mergeRangesForSheet(state: State, sheet: number): Range[] {
@@ -691,6 +414,96 @@ function applyAxisShiftViaEngine(
   return true;
 }
 
+/** Shared body of the four insert/delete verbs. Cells, formats, sizes, hidden
+ *  and outline sets, freeze panes and anchored ranges all shift along `axis`
+ *  inside one history transaction. */
+function editAxis(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  axis: 'row' | 'col',
+  kind: 'insert' | 'delete',
+  at: number,
+  count: number,
+): boolean {
+  const max = axis === 'row' ? MAX_ROW : MAX_COL;
+  const edit = normalizeAxisEdit(at, count, max, kind);
+  if (!edit) return false;
+  const split = edit.at;
+  const n = edit.count;
+  const delta = kind === 'insert' ? n : -n;
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, `${kind}${axis === 'row' ? 'Rows' : 'Cols'}`)) {
+    return false;
+  }
+  if (kind === 'insert' && insertionWouldOverflow(store, wb, sheet, axis, split, n)) return false;
+  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
+
+  if (history) history.begin();
+  try {
+    // 1. shift cells & rewrite formula refs.
+    if (nativeAxisOp) {
+      if (!applyAxisShiftViaEngine(wb, history, sheet, axis, split, delta)) return false;
+    } else {
+      applyAxisShiftToCells(wb, sheet, axis, split, delta);
+    }
+
+    // 2. shift formats; an insertion inherits the format of the band above/left.
+    recordFormatChange(history, store, () => {
+      store.setState((s) => {
+        const shift = axis === 'row' ? shiftFormatsByRow : shiftFormatsByCol;
+        const inherit = axis === 'row' ? inheritFormatsByRow : inheritFormatsByCol;
+        const shifted = shift(s.format.formats, sheet, split, delta);
+        const formats =
+          kind === 'insert' ? inherit(s.format.formats, shifted, sheet, split, n) : shifted;
+        return { ...s, format: { ...s.format, formats } };
+      });
+    });
+
+    // 3. shift layout (sizes, hidden set, outline levels, freeze count).
+    recordLayoutChange(history, store, () => {
+      const before = captureLayoutSnapshot(store.getState());
+      const row = axis === 'row';
+      const sizes = row ? before.rowHeights : before.colWidths;
+      const hidden = row ? before.hiddenRows : before.hiddenCols;
+      const outline = row ? before.outlineRows : before.outlineCols;
+      const freeze = row ? before.freezeRows : before.freezeCols;
+      const nextSizes =
+        kind === 'insert'
+          ? shiftIndexedMapWithInheritance(sizes, split, delta, n, max)
+          : shiftIndexedMap(sizes, split, delta, max);
+      const nextHidden = shiftIndexedSet(hidden, split, delta, max);
+      const nextOutline = shiftIndexedMap(outline, split, delta, max);
+      let nextFreeze = freeze;
+      if (freeze > split) {
+        nextFreeze = kind === 'insert' ? freeze + n : Math.max(split, freeze - n);
+      }
+      applyLayoutPatch(
+        store,
+        row
+          ? {
+              rowHeights: nextSizes,
+              hiddenRows: nextHidden,
+              outlineRows: nextOutline,
+              freezeRows: nextFreeze,
+            }
+          : {
+              colWidths: nextSizes,
+              hiddenCols: nextHidden,
+              outlineCols: nextOutline,
+              freezeCols: nextFreeze,
+            },
+      );
+    });
+
+    // 4. re-point merges, conditional formats, and the autofilter region.
+    shiftAnchoredRanges(store, wb, history, sheet, axis, split, delta, nativeAxisOp);
+    return true;
+  } finally {
+    if (history) history.end();
+  }
+}
+
 /** Insert `count` blank rows at `atRow` on the active sheet. Cells, formats,
  *  row heights, freeze pane, and hidden-row set all shift down. Wrapped in a
  *  single history transaction. When the engine exposes
@@ -704,59 +517,7 @@ export function insertRows(
   atRow: number,
   count = 1,
 ): boolean {
-  const edit = normalizeAxisEdit(atRow, count, MAX_ROW, 'insert');
-  if (!edit) return false;
-  const row = edit.at;
-  const n = edit.count;
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'insertRows')) return false;
-  if (insertionWouldOverflow(store, wb, sheet, 'row', row, n)) return false;
-  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
-
-  if (history) history.begin();
-  try {
-    // 1. shift cells & rewrite formula refs.
-    if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, n)) return false;
-    } else {
-      applyAxisShiftToCells(wb, sheet, 'row', row, n);
-    }
-
-    // 2. shift formats.
-    recordFormatChange(history, store, () => {
-      store.setState((s) => ({
-        ...s,
-        format: {
-          ...s.format,
-          formats: inheritFormatsByRow(
-            s.format.formats,
-            shiftFormatsByRow(s.format.formats, sheet, row, n),
-            sheet,
-            row,
-            n,
-          ),
-        },
-      }));
-    });
-
-    // 3. shift layout (rowHeights map, hiddenRows set, freezeRows count).
-    recordLayoutChange(history, store, () => {
-      const before = captureLayoutSnapshot(store.getState());
-      const fr = before.freezeRows > row ? before.freezeRows + n : before.freezeRows;
-      applyLayoutPatch(store, {
-        rowHeights: shiftIndexedMapWithInheritance(before.rowHeights, row, n, n, MAX_ROW),
-        hiddenRows: shiftIndexedSet(before.hiddenRows, row, n, MAX_ROW),
-        outlineRows: shiftIndexedMap(before.outlineRows, row, n, MAX_ROW),
-        freezeRows: fr,
-      });
-    });
-
-    // 4. re-point merges, conditional formats, and the autofilter region.
-    shiftAnchoredRanges(store, wb, history, sheet, 'row', row, n, nativeAxisOp);
-    return true;
-  } finally {
-    if (history) history.end();
-  }
+  return editAxis(store, wb, history, 'row', 'insert', atRow, count);
 }
 
 export function deleteRows(
@@ -766,46 +527,7 @@ export function deleteRows(
   atRow: number,
   count = 1,
 ): boolean {
-  const edit = normalizeAxisEdit(atRow, count, MAX_ROW, 'delete');
-  if (!edit) return false;
-  const row = edit.at;
-  const n = edit.count;
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'deleteRows')) return false;
-  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
-
-  if (history) history.begin();
-  try {
-    if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, -n)) return false;
-    } else {
-      applyAxisShiftToCells(wb, sheet, 'row', row, -n);
-    }
-
-    recordFormatChange(history, store, () => {
-      store.setState((s) => ({
-        ...s,
-        format: { ...s.format, formats: shiftFormatsByRow(s.format.formats, sheet, row, -n) },
-      }));
-    });
-
-    recordLayoutChange(history, store, () => {
-      const before = captureLayoutSnapshot(store.getState());
-      let fr = before.freezeRows;
-      if (fr > row) fr = Math.max(row, fr - n);
-      applyLayoutPatch(store, {
-        rowHeights: shiftIndexedMap(before.rowHeights, row, -n, MAX_ROW),
-        hiddenRows: shiftIndexedSet(before.hiddenRows, row, -n, MAX_ROW),
-        outlineRows: shiftIndexedMap(before.outlineRows, row, -n, MAX_ROW),
-        freezeRows: fr,
-      });
-    });
-
-    shiftAnchoredRanges(store, wb, history, sheet, 'row', row, -n, nativeAxisOp);
-    return true;
-  } finally {
-    if (history) history.end();
-  }
+  return editAxis(store, wb, history, 'row', 'delete', atRow, count);
 }
 
 export function insertCols(
@@ -815,55 +537,7 @@ export function insertCols(
   atCol: number,
   count = 1,
 ): boolean {
-  const edit = normalizeAxisEdit(atCol, count, MAX_COL, 'insert');
-  if (!edit) return false;
-  const col = edit.at;
-  const n = edit.count;
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'insertCols')) return false;
-  if (insertionWouldOverflow(store, wb, sheet, 'col', col, n)) return false;
-  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
-
-  if (history) history.begin();
-  try {
-    if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, n)) return false;
-    } else {
-      applyAxisShiftToCells(wb, sheet, 'col', col, n);
-    }
-
-    recordFormatChange(history, store, () => {
-      store.setState((s) => ({
-        ...s,
-        format: {
-          ...s.format,
-          formats: inheritFormatsByCol(
-            s.format.formats,
-            shiftFormatsByCol(s.format.formats, sheet, col, n),
-            sheet,
-            col,
-            n,
-          ),
-        },
-      }));
-    });
-
-    recordLayoutChange(history, store, () => {
-      const before = captureLayoutSnapshot(store.getState());
-      const fc = before.freezeCols > col ? before.freezeCols + n : before.freezeCols;
-      applyLayoutPatch(store, {
-        colWidths: shiftIndexedMapWithInheritance(before.colWidths, col, n, n, MAX_COL),
-        hiddenCols: shiftIndexedSet(before.hiddenCols, col, n, MAX_COL),
-        outlineCols: shiftIndexedMap(before.outlineCols, col, n, MAX_COL),
-        freezeCols: fc,
-      });
-    });
-
-    shiftAnchoredRanges(store, wb, history, sheet, 'col', col, n, nativeAxisOp);
-    return true;
-  } finally {
-    if (history) history.end();
-  }
+  return editAxis(store, wb, history, 'col', 'insert', atCol, count);
 }
 
 export function deleteCols(
@@ -873,273 +547,5 @@ export function deleteCols(
   atCol: number,
   count = 1,
 ): boolean {
-  const edit = normalizeAxisEdit(atCol, count, MAX_COL, 'delete');
-  if (!edit) return false;
-  const col = edit.at;
-  const n = edit.count;
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'deleteCols')) return false;
-  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
-
-  if (history) history.begin();
-  try {
-    if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, -n)) return false;
-    } else {
-      applyAxisShiftToCells(wb, sheet, 'col', col, -n);
-    }
-
-    recordFormatChange(history, store, () => {
-      store.setState((s) => ({
-        ...s,
-        format: { ...s.format, formats: shiftFormatsByCol(s.format.formats, sheet, col, -n) },
-      }));
-    });
-
-    recordLayoutChange(history, store, () => {
-      const before = captureLayoutSnapshot(store.getState());
-      let fc = before.freezeCols;
-      if (fc > col) fc = Math.max(col, fc - n);
-      applyLayoutPatch(store, {
-        colWidths: shiftIndexedMap(before.colWidths, col, -n, MAX_COL),
-        hiddenCols: shiftIndexedSet(before.hiddenCols, col, -n, MAX_COL),
-        outlineCols: shiftIndexedMap(before.outlineCols, col, -n, MAX_COL),
-        freezeCols: fc,
-      });
-    });
-
-    shiftAnchoredRanges(store, wb, history, sheet, 'col', col, -n, nativeAxisOp);
-    return true;
-  } finally {
-    if (history) history.end();
-  }
+  return editAxis(store, wb, history, 'col', 'delete', atCol, count);
 }
-
-/** Mark rows [r0, r1] hidden. Wrapped in a single layout history entry.
- *  When `wb` is supplied the engine receives `setRowHidden` for each row so
- *  the change round-trips through .xlsx. */
-export function hideRows(
-  store: SpreadsheetStore,
-  history: History | null,
-  r0: number,
-  r1: number,
-  wb?: WorkbookHandle,
-): void {
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'hideRows')) return;
-  if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    store.setState((s) => {
-      const next = new Set(s.layout.hiddenRows);
-      for (let r = r0; r <= r1; r += 1) next.add(r);
-      return { ...s, layout: { ...s.layout, hiddenRows: next } };
-    });
-  });
-}
-
-export function showRows(
-  store: SpreadsheetStore,
-  history: History | null,
-  r0: number,
-  r1: number,
-  wb?: WorkbookHandle,
-): void {
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'showRows')) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    store.setState((s) => {
-      const next = new Set(s.layout.hiddenRows);
-      for (const row of s.layout.hiddenRows) {
-        if (row >= r0 && row <= r1) next.delete(row);
-      }
-      return { ...s, layout: { ...s.layout, hiddenRows: next } };
-    });
-  });
-}
-
-export function showRowsAroundSelection(
-  store: SpreadsheetStore,
-  history: History | null,
-  r0: number,
-  r1: number,
-  wb?: WorkbookHandle,
-): void {
-  const hidden = store.getState().layout.hiddenRows;
-  let start = r0;
-  let end = r1;
-  while (start > 0 && hidden.has(start - 1)) start -= 1;
-  while (end < MAX_ROW && hidden.has(end + 1)) end += 1;
-  showRows(store, history, start, end, wb);
-}
-
-export function hideCols(
-  store: SpreadsheetStore,
-  history: History | null,
-  c0: number,
-  c1: number,
-  wb?: WorkbookHandle,
-): void {
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'hideCols')) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    store.setState((s) => {
-      const next = new Set(s.layout.hiddenCols);
-      for (let c = c0; c <= c1; c += 1) next.add(c);
-      return { ...s, layout: { ...s.layout, hiddenCols: next } };
-    });
-  });
-}
-
-export function showCols(
-  store: SpreadsheetStore,
-  history: History | null,
-  c0: number,
-  c1: number,
-  wb?: WorkbookHandle,
-): void {
-  const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'showCols')) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    store.setState((s) => {
-      const next = new Set(s.layout.hiddenCols);
-      for (let c = c0; c <= c1; c += 1) next.delete(c);
-      return { ...s, layout: { ...s.layout, hiddenCols: next } };
-    });
-  });
-}
-
-export function showColsAroundSelection(
-  store: SpreadsheetStore,
-  history: History | null,
-  c0: number,
-  c1: number,
-  wb?: WorkbookHandle,
-): void {
-  const hidden = store.getState().layout.hiddenCols;
-  let start = c0;
-  let end = c1;
-  while (start > 0 && hidden.has(start - 1)) start -= 1;
-  while (end < MAX_COL && hidden.has(end + 1)) end += 1;
-  showCols(store, history, start, end, wb);
-}
-
-export function setRowsHeight(
-  store: SpreadsheetStore,
-  history: History | null,
-  r0: number,
-  r1: number,
-  px: number,
-  wb?: WorkbookHandle,
-): void {
-  if (!Number.isFinite(px)) return;
-  if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    for (let row = r0; row <= r1; row += 1) mutators.setRowHeight(store, row, px);
-  });
-}
-
-export function setColsWidth(
-  store: SpreadsheetStore,
-  history: History | null,
-  c0: number,
-  c1: number,
-  px: number,
-  wb?: WorkbookHandle,
-): void {
-  if (!Number.isFinite(px)) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    for (let col = c0; col <= c1; col += 1) mutators.setColWidth(store, col, px);
-  });
-}
-
-export function autofitRowsHeight(
-  store: SpreadsheetStore,
-  history: History | null,
-  r0: number,
-  r1: number,
-  wb?: WorkbookHandle,
-  opts?: AutofitOptions,
-): void {
-  if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    const ctx = createAutofitMeasureContext();
-    for (let row = r0; row <= r1; row += 1) {
-      mutators.setRowHeight(store, row, computeAutofitRowHeight(store.getState(), row, ctx, opts));
-    }
-  });
-}
-
-export function autofitColsWidth(
-  store: SpreadsheetStore,
-  history: History | null,
-  c0: number,
-  c1: number,
-  wb?: WorkbookHandle,
-  opts?: AutofitOptions,
-): void {
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    const ctx = createAutofitMeasureContext();
-    for (let col = c0; col <= c1; col += 1) {
-      mutators.setColWidth(store, col, computeAutofitColWidth(store.getState(), col, ctx, opts));
-    }
-  });
-}
-
-/** Resolve which row/col indices to show again from the current selection.
- *  Spreadsheets return visible rows that flank a hidden band; we emulate by
- *  reporting every hidden row inside the selection. */
-export function hiddenInSelection(
-  layout: LayoutSlice,
-  axis: 'row' | 'col',
-  a: number,
-  b: number,
-): number[] {
-  const lo = Math.min(a, b);
-  const hi = Math.max(a, b);
-  const set = axis === 'row' ? layout.hiddenRows : layout.hiddenCols;
-  const out: number[] = [];
-  for (const index of set) {
-    if (index >= lo && index <= hi) out.push(index);
-  }
-  return out.sort((left, right) => left - right);
-}
-
-/** Pin `rows` rows / `cols` cols. One Cmd+Z reverts the freeze change.
- *  Pass `null` for `history` to skip recording. When `wb` is supplied and
- *  `capabilities.freeze` is on, the change is also pushed to the engine so
- *  it round-trips through .xlsx save/load. Store + engine writes share one
- *  history entry so undo/redo moves both sides in lockstep. */
-export function setFreezePanes(
-  store: SpreadsheetStore,
-  history: History | null,
-  rows: number,
-  cols: number,
-  wb?: WorkbookHandle,
-): void {
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    mutators.setFreezePanes(store, rows, cols);
-  });
-}
-
-/** Set the per-sheet zoom level. `zoom` is a multiplier (1.0 = 100%) and is
- *  clamped by the store mutator to [0.5, 4]. When `wb` is supplied the
- *  engine receives the equivalent percentage so the value round-trips
- *  through .xlsx. Not journaled — spreadsheets treat zoom as a view setting
- *  outside the undo stack. */
-export function setSheetZoom(store: SpreadsheetStore, zoom: number, wb?: WorkbookHandle): void {
-  mutators.setZoom(store, zoom);
-  if (wb) {
-    const sheet = store.getState().data.sheetIndex;
-    const pct = Math.round(store.getState().viewport.zoom * 100);
-    wb.setSheetZoom(sheet, pct);
-  }
-}
-
-/** Internal exports — kept narrow so the API is just the eight verbs above. */
-export const __testing = {
-  shiftIndexedMap,
-  shiftIndexedSet,
-  shiftFormatsByRow,
-  shiftFormatsByCol,
-  shiftFormulaRefs: adjustFormulaForRowColEdit,
-};

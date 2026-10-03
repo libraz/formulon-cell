@@ -8,13 +8,13 @@ import { type CellFormat, mutators, type SpreadsheetStore, type State } from '..
 import { recordCommentChange } from '../comment.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
+import { isCellWritable } from '../protection.js';
+import { shiftFormulaRefs } from '../refs.js';
 import {
   recordFormatChange,
   recordLayoutChangeWithEngine,
   recordMergesChangeWithEngine,
-} from '../history.js';
-import { isCellWritable } from '../protection.js';
-import { shiftFormulaRefs } from '../refs.js';
+} from '../slice-history.js';
 import {
   bandAxisFor,
   logicalRangeFor,

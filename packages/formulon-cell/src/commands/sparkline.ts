@@ -2,8 +2,9 @@ import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.js';
-import { type History, recordSparklineChange } from './history.js';
+import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
+import { recordSparklineChange } from './slice-history.js';
 
 export interface SparklineEntry {
   addr: Addr;

@@ -9,7 +9,7 @@ import {
 } from '../../../src/commands/autofit-measurement.js';
 import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
-import { autofitColsWidth, autofitRowsHeight } from '../../../src/commands/structure.js';
+import { autofitColsWidth, autofitRowsHeight } from '../../../src/commands/row-col-layout.js';
 import type { CellValue } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';

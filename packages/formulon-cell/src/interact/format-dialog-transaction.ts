@@ -10,8 +10,9 @@ import {
   type SelectionFormatAction,
   type SelectionFormatPlan,
 } from '../commands/format.js';
-import { History, recordMergesChangeWithEngine } from '../commands/history.js';
+import { History } from '../commands/history.js';
 import { applyMerge, applyUnmerge } from '../commands/merge.js';
+import { recordMergesChangeWithEngine } from '../commands/slice-history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';

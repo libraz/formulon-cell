@@ -1,4 +1,5 @@
-import { type History, recordFormatChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
+import { recordFormatChange } from '../commands/slice-history.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { hitTest, layoutForView } from '../render/geometry.js';

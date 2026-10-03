@@ -12,7 +12,7 @@ import {
   showColsAroundSelection,
   showRows,
   showRowsAroundSelection,
-} from '../../../../src/commands/structure.js';
+} from '../../../../src/commands/row-col-layout.js';
 import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
 

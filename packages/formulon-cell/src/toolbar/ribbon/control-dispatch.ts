@@ -12,7 +12,6 @@ import {
   setNumFmt,
   withSelectionFormatOrigin,
 } from '../../commands/format.js';
-import { recordPageSetupChange, recordRepeatableFormatChange } from '../../commands/history.js';
 import {
   type MarginPreset,
   marginPresetOf,
@@ -21,6 +20,10 @@ import {
   setPaperSize,
 } from '../../commands/page-setup.js';
 import { activateSheetView } from '../../commands/sheet-views.js';
+import {
+  recordPageSetupChange,
+  recordRepeatableFormatChange,
+} from '../../commands/slice-history.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup, mutators } from '../../store/store.js';
 import type { NumFmt, PageOrientation, PaperSize } from '../../store/types.js';

@@ -25,7 +25,8 @@ import {
   verifySheetProtectionPasswordHash,
   workbookStructurePassword,
 } from '../../../src/commands/protection.js';
-import { deleteRows, hideRows, insertRows, showRows } from '../../../src/commands/structure.js';
+import { hideRows, showRows } from '../../../src/commands/row-col-layout.js';
+import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import type { Addr, Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {

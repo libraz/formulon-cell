@@ -8,8 +8,9 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
-import { type History, recordChartsChange } from './history.js';
+import type { History } from './history.js';
 import { isSheetProtected } from './protection.js';
+import { recordChartsChange } from './slice-history.js';
 
 export interface CreateSessionChartOptions {
   id?: string;

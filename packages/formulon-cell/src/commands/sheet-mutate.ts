@@ -1,8 +1,9 @@
 import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
-import { type History, recordLayoutChangeWithEngine } from './history.js';
+import type { History } from './history.js';
 import { isWorkbookStructureProtected } from './protection.js';
+import { recordLayoutChangeWithEngine } from './slice-history.js';
 
 const shiftedAfterRemove = (idx: number, removed: number): number | null => {
   if (idx === removed) return null;

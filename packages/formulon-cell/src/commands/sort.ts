@@ -8,8 +8,9 @@ import { recordCommentChange } from './comment.js';
 import { CUSTOM_LISTS } from './fill.js';
 import { inferAutoFilterRange } from './filter.js';
 import { shiftFormulaRefs } from './formula-refs.js';
-import { type History, recordFormatChange } from './history.js';
+import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
+import { recordFormatChange } from './slice-history.js';
 
 /** Spreadsheet parity: refuse to sort when the range intersects any merge —
  *  rearranging rows would tear the merged rectangle apart. */

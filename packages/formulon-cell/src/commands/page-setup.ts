@@ -10,13 +10,14 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
-import { type History, recordPageSetupChange } from './history.js';
+import type { History } from './history.js';
 import { parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
 import {
   normalizePrintableBounds,
   type PrinterProfile,
   resolvePrinterProfileBounds,
 } from './printer-profile.js';
+import { recordPageSetupChange } from './slice-history.js';
 
 export type {
   HostPrinterDevice,

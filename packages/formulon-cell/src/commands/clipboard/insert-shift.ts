@@ -4,9 +4,10 @@ import { writeCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps.js';
 import type { CellFormat, SpreadsheetStore } from '../../store/store.js';
-import { type History, recordFormatChange, recordMergesChangeWithEngine } from '../history.js';
+import type { History } from '../history.js';
 import { isCellWritable } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
+import { recordFormatChange, recordMergesChangeWithEngine } from '../slice-history.js';
 import type { ClipboardSnapshot } from './snapshot.js';
 
 export function writeSnapshotIntoInsertedRange(

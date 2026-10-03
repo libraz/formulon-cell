@@ -5,8 +5,9 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellValidation, SpreadsheetStore, ValidationOp } from '../store/store.js';
 import type { CoercedInput } from './coerce-input.js';
-import { applyFormatSnapshot, captureFormatSnapshot, type History } from './history.js';
+import type { History } from './history.js';
 import { isCellWritable } from './protection.js';
+import { applyFormatSnapshot, captureFormatSnapshot } from './slice-history.js';
 
 export type ValidationOutcome =
   | { ok: true }

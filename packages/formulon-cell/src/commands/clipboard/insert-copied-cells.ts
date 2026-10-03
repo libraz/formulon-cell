@@ -14,8 +14,9 @@ import {
 } from '../cell-shift.js';
 import { coerceInputForCell, writeCoerced } from '../coerce-input.js';
 import { type AxisBandMoveContext, adjustFormulaForAxisBandMove } from '../formula-refs.js';
-import { type History, recordMergesChangeWithEngine } from '../history.js';
+import type { History } from '../history.js';
 import { isCellWritable, isSheetProtected } from '../protection.js';
+import { recordMergesChangeWithEngine } from '../slice-history.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../structure.js';
 import { copy } from './copy.js';
 import {

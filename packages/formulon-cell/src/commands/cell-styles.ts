@@ -19,9 +19,9 @@ import {
 import { recordDialogFormatChange } from './dialog-format-history.js';
 import { applyFormatPatch, applySelectionFormatAction, planSelectionFormat } from './format.js';
 import type { History } from './history.js';
-import { recordFormatChange, recordFormatChangeWithRepeat } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 import { mergeAnchorOf } from './merge.js';
+import { recordFormatChange, recordFormatChangeWithRepeat } from './slice-history.js';
 
 export type {
   CellStyleDef,

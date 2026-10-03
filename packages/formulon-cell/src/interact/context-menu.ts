@@ -7,7 +7,7 @@ import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment } from '../commands/comment.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
-import { type History, recordRepeatableFormatChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
 import { hyperlinkAt } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import type {
@@ -19,7 +19,8 @@ import type {
   PermissionCode,
   PermissionDecision,
 } from '../commands/interaction-policy.js';
-import { hiddenInSelection } from '../commands/structure.js';
+import { hiddenInSelection } from '../commands/row-col-layout.js';
+import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';

@@ -1,6 +1,5 @@
 import { applyFormatPatch } from '../commands/format.js';
 import type { History } from '../commands/history.js';
-import { recordFormatChange } from '../commands/history.js';
 import {
   applyMerge,
   applyMergeAcross,
@@ -9,6 +8,7 @@ import {
   mergeAcrossWillLoseData,
   mergeWillLoseData,
 } from '../commands/merge.js';
+import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';

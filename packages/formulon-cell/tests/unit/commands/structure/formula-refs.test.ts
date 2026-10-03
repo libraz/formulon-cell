@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { adjustFormulaForRowColEdit } from '../../../../src/commands/formula-refs.js';
 import {
-  __testing,
   deleteCols,
   deleteRows,
   insertCols,
@@ -10,7 +10,7 @@ import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import { newWb } from './fixtures.js';
 
 describe('shiftFormulaRefs', () => {
-  const shift = __testing.shiftFormulaRefs;
+  const shift = adjustFormulaForRowColEdit;
 
   it('shifts plain row refs forward on insert', () => {
     expect(shift('=A1+B5', 'row', 0, 1)).toBe('=A2+B6');

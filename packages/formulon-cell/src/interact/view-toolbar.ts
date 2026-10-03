@@ -1,11 +1,12 @@
 import type { History } from '../commands/history.js';
+import { setFreezePanes } from '../commands/row-col-layout.js';
 import { activateSheetView, deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
-import { setFreezePanes, setSheetZoom } from '../commands/structure.js';
 import {
   setGridlinesVisible,
   setHeadingsVisible,
   setR1C1ReferenceStyle,
   setSheetRightToLeft,
+  setSheetZoom,
   setShowFormulas,
   setWorkbookView,
   setZerosVisible,

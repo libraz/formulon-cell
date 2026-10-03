@@ -13,18 +13,16 @@ import {
   withSelectionFormatOrigin,
 } from '../commands/format.js';
 import { formatAsTable } from '../commands/format-as-table.js';
-import { type History, recordFormatChange, recordTablesChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
-  deleteCols,
-  deleteRows,
   hideCols,
   hideRows,
-  insertCols,
-  insertRows,
   showColsAroundSelection,
   showRowsAroundSelection,
-} from '../commands/structure.js';
+} from '../commands/row-col-layout.js';
+import { recordFormatChange, recordTablesChange } from '../commands/slice-history.js';
+import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';

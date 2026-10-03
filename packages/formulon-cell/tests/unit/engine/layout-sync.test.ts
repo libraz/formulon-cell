@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureLayoutSnapshot } from '../../../src/commands/history.js';
+import { captureLayoutSnapshot } from '../../../src/commands/slice-history.js';
 import {
   hydrateLayoutFromEngine,
   syncLayoutSizesToEngine,

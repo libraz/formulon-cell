@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
-import { setFreezePanes, setSheetZoom } from '../../../../src/commands/structure.js';
+import { setFreezePanes } from '../../../../src/commands/row-col-layout.js';
+import { setSheetZoom } from '../../../../src/commands/view.js';
 import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
 

@@ -2,16 +2,13 @@ import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
-  deleteCols,
-  deleteRows,
   hiddenInSelection,
   hideCols,
   hideRows,
-  insertCols,
-  insertRows,
   showCols,
   showRows,
-} from '../commands/structure.js';
+} from '../commands/row-col-layout.js';
+import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore, State } from '../store/store.js';

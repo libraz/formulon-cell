@@ -1,4 +1,5 @@
-import { type History, recordConditionalRulesChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
+import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { formatA1Range } from '../engine/address.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {

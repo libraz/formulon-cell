@@ -19,7 +19,7 @@ import {
   setPrintGridlines,
   setPrintHeadings,
 } from '../../../src/commands/page-setup.js';
-import { setFreezePanes } from '../../../src/commands/structure.js';
+import { setFreezePanes } from '../../../src/commands/row-col-layout.js';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import { mutators } from '../../../src/store/store.js';
 import {

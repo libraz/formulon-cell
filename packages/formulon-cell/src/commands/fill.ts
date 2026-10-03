@@ -4,9 +4,10 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
-import { type History, recordFormatChange } from './history.js';
+import type { History } from './history.js';
 import { isCellWritable } from './protection.js';
 import { shiftFormulaRefs } from './refs.js';
+import { recordFormatChange } from './slice-history.js';
 
 /**
  * Fill direction inferred from the relationship between source and dest.

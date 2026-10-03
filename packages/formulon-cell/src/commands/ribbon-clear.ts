@@ -20,7 +20,7 @@ import {
 } from './clear-contents.js';
 import { clearComments, recordCommentChange } from './comment.js';
 import { withSelectionFormatOrigin } from './format.js';
-import { type History, type HistoryEntry, recordConditionalRulesChange } from './history.js';
+import type { History, HistoryEntry } from './history.js';
 import type { InteractionController } from './interaction-controller.js';
 import {
   InteractionController as FullInteractionController,
@@ -28,6 +28,7 @@ import {
 } from './interaction-controller.js';
 import type { InteractionOperation, OperationEffect } from './interaction-policy.js';
 import { isCellWritable, isSheetProtected } from './protection.js';
+import { recordConditionalRulesChange } from './slice-history.js';
 
 export type RibbonClearAction =
   | 'all'

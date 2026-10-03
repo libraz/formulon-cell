@@ -1,5 +1,6 @@
-import { type History, recordFormatChange } from '../commands/history.js';
+import type { History } from '../commands/history.js';
 import { clearHyperlink, hyperlinkAt, setHyperlink } from '../commands/hyperlinks.js';
+import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';

@@ -1,4 +1,4 @@
-import type { LayoutSnapshot } from '../commands/history.js';
+import type { LayoutSnapshot } from '../commands/slice-history.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';

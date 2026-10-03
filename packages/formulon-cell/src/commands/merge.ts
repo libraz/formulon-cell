@@ -11,8 +11,9 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
-import { type History, recordFormatChange, recordMergesChangeWithEngine } from './history.js';
+import type { History } from './history.js';
 import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
+import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
 
 /** Look up the merge that covers `addr`, if any. Returns the full merge range
  *  (anchor on top-left, opposite corner on bottom-right). */

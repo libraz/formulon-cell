@@ -23,7 +23,7 @@ import {
   duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
-import { setSheetZoom } from '../commands/structure.js';
+import { setSheetZoom } from '../commands/view.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
