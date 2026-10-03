@@ -25,10 +25,10 @@ import {
   createDialogButton,
   createDialogShell,
 } from './dialog-shell.js';
-import { FUNCTION_DESCRIPTIONS } from './function-catalog-text.js';
+import { catalogLocaleOrdinal, functionDescription } from './function-catalog-text.js';
 
-/** Heuristic locale detector — we don't get a `Locale` flag through deps so
- *  we sniff the active dictionary's title against the canonical English one.
+/** Heuristic locale detector for hosts that supply no `getLocale`: sniff the
+ *  active dictionary's title against the canonical English one.
  *  Cheap, and correct for the two built-in locales. Custom locales fall back
  *  to English descriptions, which is the standard desktop spreadsheets behaviour for
  *  unsupported tongues. */
@@ -53,7 +53,7 @@ export interface FxDialogDeps {
   getInitialArguments?: (functionName: string) => readonly string[] | null;
   /** Read the live recognized function catalog at each open/refresh. */
   getWb?: () => FunctionCatalogReader | null;
-  /** Current host locale, used for engine-provided function metadata. */
+  /** Current host locale, used for function metadata and descriptions. */
   getLocale?: () => string;
   /** Called with the assembled formula text (including leading '='). */
   onInsert: (formula: string) => void | boolean;
@@ -82,9 +82,12 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const { host, onInsert } = deps;
   let strings = deps.strings ?? defaultStrings;
   let t = strings.fxDialog;
-  let locale: 'en' | 'ja' = detectLocale(strings);
-  const localeOrdinal = (): 0 | 1 =>
-    (deps.getLocale?.().toLowerCase().startsWith('ja') ?? locale === 'ja') ? 1 : 0;
+  // Engine metadata and built-in descriptions share one locale: the host's when
+  // supplied, else the one sniffed from the active dictionary.
+  const localeOrdinal = (): 0 | 1 => {
+    if (deps.getLocale) return catalogLocaleOrdinal(deps.getLocale());
+    return detectLocale(strings) === 'ja' ? 1 : 0;
+  };
 
   // ── Overlay + panel ─────────────────────────────────────────────────────
   const shell = createDialogShell({
@@ -210,7 +213,6 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   let selectedEntry: FunctionCatalogEntry | null = null;
 
   const refreshCatalog = (): void => {
-    locale = deps.getLocale?.().toLowerCase().startsWith('ja') ? 'ja' : detectLocale(strings);
     catalog = buildFunctionCatalog(deps.getWb?.() ?? null, localeOrdinal());
   };
 
@@ -224,13 +226,8 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const catalogEntry = (name: string): FunctionCatalogEntry | null =>
     catalog.entries.get(name) ?? null;
 
-  const localizedDescription = (name: string): string => {
-    const metadataDescription = catalogEntry(name)?.description;
-    if (metadataDescription !== undefined) return metadataDescription;
-    const entry = FUNCTION_DESCRIPTIONS[name];
-    if (!entry) return '';
-    return locale === 'ja' ? entry.ja : entry.en;
-  };
+  const localizedDescription = (name: string): string =>
+    functionDescription(catalogEntry(name) ?? { canonicalName: name }, localeOrdinal());
 
   const unavailableReason = (): string => t.functionUnavailable;
 
@@ -712,7 +709,6 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       // Re-snapshot strings from the original deps reference. The caller
       // ferries the latest dictionary in via setStrings-style updates.
       strings = deps.strings ?? defaultStrings;
-      locale = detectLocale(strings);
       refreshLabels();
     },
     detach(): void {

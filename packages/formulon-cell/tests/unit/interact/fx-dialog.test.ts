@@ -900,6 +900,25 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it('takes built-in descriptions from the host locale rather than the dictionary', () => {
+    const descriptionFor = (strings: typeof en, locale: string): string => {
+      const handle = attachFxDialog({
+        host,
+        store: createSpreadsheetStore(),
+        strings,
+        getLocale: () => locale,
+        onInsert: () => {},
+      });
+      handle.open('IF');
+      const text = document.querySelector<HTMLElement>('.fc-fxdialog__args-desc')?.textContent;
+      handle.detach();
+      return text ?? '';
+    };
+
+    expect(descriptionFor(ja, 'en-US')).toBe(FUNCTION_DESCRIPTIONS.IF?.en);
+    expect(descriptionFor(en, 'ja-JP')).toBe(FUNCTION_DESCRIPTIONS.IF?.ja);
+  });
+
   it('clicks on rendered picker items via event delegation (no per-item listeners)', () => {
     // Pre-refactor regression check: each render of the picker used to attach
     // a fresh `click` listener to every item, leaving 9 add / 7 remove pairs

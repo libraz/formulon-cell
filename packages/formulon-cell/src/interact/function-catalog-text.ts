@@ -121,7 +121,10 @@ export const catalogLocaleOrdinal = (locale: string): 0 | 1 =>
   locale.trim().toLowerCase().startsWith('ja') ? 1 : 0;
 
 /** Engine-supplied description, else the built-in blurb, else empty. */
-export const functionDescription = (entry: FunctionCatalogEntry, ordinal: 0 | 1): string =>
+export const functionDescription = (
+  entry: Pick<FunctionCatalogEntry, 'canonicalName' | 'description'>,
+  ordinal: 0 | 1,
+): string =>
   entry.description ??
   (ordinal === 1
     ? FUNCTION_DESCRIPTIONS[entry.canonicalName]?.ja
