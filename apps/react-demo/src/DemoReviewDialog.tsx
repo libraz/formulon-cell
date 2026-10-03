@@ -32,8 +32,10 @@ export const DemoReviewDialog = ({ dialog, ui, onClose }: DemoReviewDialogProps)
             <p className="fc-tb__modal-empty">{ui.noIssuesFound}</p>
           ) : (
             <ul className="fc-tb__modal-list">
-              {dialog.items.map((item) => (
-                <li key={`${item.label}-${item.detail}`}>
+              {dialog.items.map((item, index) => (
+                // Findings may share label and detail; the index keeps keys unique.
+                // biome-ignore lint/suspicious/noArrayIndexKey: static list, never reordered
+                <li key={`${item.label}-${item.detail}-${index}`}>
                   <strong>{item.label}</strong>
                   <span>{item.detail}</span>
                 </li>

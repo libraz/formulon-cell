@@ -46,7 +46,7 @@ onBeforeUnmount(() => {
           {{ ui.noIssuesFound }}
         </p>
         <ul v-else class="fc-tb__modal-list">
-          <li v-for="(item, index) in dialog.items" :key="`${item.label}-${index}`">
+          <li v-for="(item, index) in dialog.items" :key="`${item.label}-${item.detail}-${index}`">
             <strong>{{ item.label }}</strong>
             <span>{{ item.detail }}</span>
           </li>

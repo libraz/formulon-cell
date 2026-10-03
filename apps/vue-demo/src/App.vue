@@ -344,6 +344,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   disposeF6Navigation?.();
   disposeF6Navigation = undefined;
+  delete (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst;
 });
 </script>
 
