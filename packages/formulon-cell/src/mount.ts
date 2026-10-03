@@ -63,6 +63,7 @@ import {
   type EngineBinding,
   WB_REGISTRY_IDS,
 } from './mount/engine-binding.js';
+import { createErrorIndicatorClickHandler } from './mount/error-indicator-click.js';
 import { resolveMountFlags } from './mount/feature-flags.js';
 import { attachFormulaBarController } from './mount/formula-bar.js';
 import { attachFormulaDraftMirror } from './mount/formula-draft-mirror.js';
@@ -87,6 +88,7 @@ import {
   hydrateWorkbookMetadataFromEngine,
   validateViewportAgainstWorkbook,
 } from './mount/hydration.js';
+import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
 import {
   attachSheetTabsController,
   type SheetTabsController,
@@ -98,7 +100,7 @@ import {
   type ToolbarInstanceRef,
 } from './mount/toolbar.js';
 import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
-import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
+import { GridRenderer } from './render/grid.js';
 import { isWholeColumnRange, isWholeRowRange } from './store/selection-geometry.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
@@ -379,23 +381,10 @@ export const Spreadsheet = {
     };
     const captureScreenClip = async (): Promise<ScreenClipResult | null> =>
       normalizeScreenClipResult(await captureScreenClipHook?.());
-    const unsubPivotFieldListSelection = store.subscribe((state, prevState) => {
-      const workbookObjects = featureState.workbookObjects;
-      if (!workbookObjects) return;
-      const prev = prevState.selection.active;
-      const next = state.selection.active;
-      if (prev.sheet === next.sheet && prev.row === next.row && prev.col === next.col) return;
-      const nextPivot = findPivotTableAtCell(wb, next);
-      if (!nextPivot) {
-        if (workbookObjects.isPivotFieldListOpen()) workbookObjects.close();
-        return;
-      }
-      const prevPivot = findPivotTableAtCell(wb, prev);
-      const samePivot =
-        prevPivot?.sheetIndex === nextPivot.sheetIndex &&
-        prevPivot?.pivotIndex === nextPivot.pivotIndex;
-      if (samePivot && workbookObjects.isPivotFieldListOpen()) return;
-      workbookObjects.openPivotFieldList(nextPivot.sheetIndex, nextPivot.pivotIndex);
+    const pivotFieldListFollow = attachPivotFieldListFollow({
+      store,
+      getWb: () => wb,
+      getWorkbookObjects: () => featureState.workbookObjects,
     });
 
     const syncBindingFeatures = (current: EngineBinding): void => {
@@ -494,31 +483,10 @@ export const Spreadsheet = {
       wb: () => wb,
     });
 
-    // Error / validation triangle clicks. Bound on the canvas by the
-    // `errorIndicators` attacher above. We use `click` (not `pointerdown`)
-    // so the existing pointer handler gets to set the active cell first —
-    // that way the menu and the cell select agree on the addr the user
-    // just clicked.
-    const onCanvasClick = (e: MouseEvent): void => {
-      if (!featureState.errorMenu) return;
-      if (e.button !== 0) return;
-      const rect = canvas.getBoundingClientRect();
-      const lx = e.clientX - rect.left;
-      const ly = e.clientY - rect.top;
-      // Pad by 2px on each side so the 6px corner triangle is comfortable to
-      // hit on touch / coarse-pointer devices.
-      const pad = 2;
-      for (const hit of getErrorTriangleHits()) {
-        const r = hit.rect;
-        if (lx < r.x - pad || lx > r.x + r.w + pad || ly < r.y - pad || ly > r.y + r.h + pad) {
-          continue;
-        }
-        e.stopPropagation();
-        e.preventDefault();
-        featureState.errorMenu.open(hit.addr, e.clientX, e.clientY, hit.kind);
-        return;
-      }
-    };
+    const onCanvasClick = createErrorIndicatorClickHandler({
+      canvas,
+      getErrorMenu: () => featureState.errorMenu,
+    });
 
     const formulaBar = attachFormulaBarController({
       cancelBindingEditor: () => {
@@ -1317,7 +1285,7 @@ export const Spreadsheet = {
         alwaysOnDialogs.detach();
         unsubCellRegistry();
         formulaDraftMirror.detach();
-        unsubPivotFieldListSelection();
+        pivotFieldListFollow.detach();
         unsubI18n();
         i18n.dispose();
         renderer.dispose();
