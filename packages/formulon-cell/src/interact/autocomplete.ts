@@ -1,4 +1,5 @@
 import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
+import type { Addr, CellValue } from '../engine/types.js';
 import { createInteractionButton } from './chip-button.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
@@ -307,6 +308,40 @@ function computeContext(
     insertSuffix: '(',
     kind: 'function',
   };
+}
+
+/** Plain-text values above `beforeRow` in column `col` for the "pick from
+ *  list" popover: text-only (formulas, numbers, blanks all skip), deduped,
+ *  nearest-first, at most ten. Takes the sheet's populated cells in one pass
+ *  rather than probing each row — per-row `cellFormula` lookups are O(n) and
+ *  would run on every keystroke. */
+export function pickListValues(
+  cells: Iterable<{ addr: Addr; value: CellValue; formula: string | null }>,
+  col: number,
+  beforeRow: number,
+): string[] {
+  const hits: { row: number; text: string }[] = [];
+  for (const e of cells) {
+    if (e.addr.col !== col) continue;
+    if (e.addr.row >= beforeRow) continue;
+    // Formulas don't contribute — the pick-list is verbatim text only.
+    if (e.formula !== null) continue;
+    if (e.value.kind !== 'text') continue;
+    const text = e.value.value;
+    if (text.length === 0) continue;
+    hits.push({ row: e.addr.row, text });
+  }
+  // Nearest-first: highest row index wins.
+  hits.sort((a, b) => b.row - a.row);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const h of hits) {
+    if (seen.has(h.text)) continue;
+    seen.add(h.text);
+    out.push(h.text);
+    if (out.length >= 10) break;
+  }
+  return out;
 }
 
 /** column-history autocomplete: when editing a plain-text cell, match

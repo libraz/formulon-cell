@@ -1,19 +1,19 @@
-import { coerceInput, writeCoerced, writeInputValidated } from '../commands/coerce-input.js';
+import { coerceInput, writeInputValidated } from '../commands/coerce-input.js';
 import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
+import { dblClickRange, extractRefs, rotateRefAt } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
-import { rangeArea } from '../store/selection-geometry.js';
-import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
 import {
   type AutocompleteHandle,
   type AutocompleteLabels,
   attachAutocomplete,
+  pickListValues,
 } from './autocomplete.js';
 import {
   createFormulaEditLease,
@@ -22,10 +22,12 @@ import {
   type FormulaEditLeaseSnapshot,
 } from './formula-edit-lease.js';
 import { navigationPolicyFor, nextTabStop } from './navigation-policy.js';
-import { buildSelectionInputBatch, SELECTION_INPUT_LIMIT_MESSAGE } from './selection-input.js';
+import {
+  buildSelectionInputBatch,
+  SELECTION_INPUT_LIMIT_MESSAGE,
+  writeSelectionInput,
+} from './selection-input.js';
 import { advanceAfterCommit } from './selection-navigation.js';
-
-const MAX_MULTI_COMMIT_CELLS = 100_000;
 
 const syncEditorRefs = (store: SpreadsheetStore, text: string): void => {
   const refs = extractRefs(text).map((r) => ({
@@ -220,64 +222,16 @@ export class InlineEditor {
     }
     mutators.setEditor(this.deps.store, { kind: 'enter', raw: seed });
 
-    const input = document.createElement('textarea');
-    input.className = 'fc-host__editor';
-    input.spellcheck = false;
-    input.autocapitalize = 'off';
-    input.autocomplete = 'off';
-    input.rows = 1;
-    input.wrap = 'soft';
-    input.value = seed;
-    this.input = input;
-    this.applyTextAlignment(seed);
-    this.applyCellAppearance();
-    this.position(a);
-    this.deps.grid.appendChild(input);
-    this.refreshSize();
-
-    // Focus synchronously so the *next* keystroke (post-seed) lands on the
-    // editor input, not on the host. Deferring this via requestAnimationFrame
-    // creates a race: rapid typing (Playwright, real-world fast typists) sends
-    // subsequent keystrokes before raf fires; the host's keydown handler then
-    // sees `editor.kind !== 'idle'` and silently drops them.
-    input.focus();
-    input.setSelectionRange(seed.length, seed.length);
-
-    input.addEventListener('keydown', this.onKey);
-    input.addEventListener('keyup', this.onKeyUp);
-    input.addEventListener('input', this.onInput);
-    input.addEventListener('compositionstart', this.onCompositionStart);
-    input.addEventListener('compositionend', this.onCompositionEnd);
-    input.addEventListener('blur', this.onBlur);
-    input.addEventListener('dblclick', this.onDblClick);
-    input.addEventListener('click', this.onClick);
-    this.autocomplete = attachAutocomplete({
-      input,
-      onAfterInsert: () => syncEditorRefs(this.deps.store, input.value),
-      getTables: () => this.deps.wb.getTables(),
-      editingAddr: a,
-      getColumnValues: (sheet, col, beforeRow) => this.collectColumnHistory(sheet, col, beforeRow),
-      getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
-      getFunctionNames: () => this.deps.wb.functionNames(),
-      labels: this.deps.getLabels?.().autocomplete,
+    this.mountInput(a, seed, (input) => {
+      // Focus synchronously so the *next* keystroke (post-seed) lands on the
+      // editor input, not on the host. Deferring this via requestAnimationFrame
+      // creates a race: rapid typing (Playwright, real-world fast typists) sends
+      // subsequent keystrokes before raf fires; the host's keydown handler then
+      // sees `editor.kind !== 'idle'` and silently drops them.
+      input.focus();
+      input.setSelectionRange(seed.length, seed.length);
     });
-    this.argHelper = attachArgHelper({ input, labels: this.deps.getLabels?.().argHelper });
-    this.argHelper.refresh();
     syncEditorRefs(this.deps.store, seed);
-    // Scrolling / resizing / freezing moves the cell under the editor. Track
-    // the slices that decide the cell rect so the editor stays welded to its
-    // cell instead of hanging over whatever scrolled into that spot, and the
-    // format slices so a ribbon click mid-edit repaints the editor too.
-    this.unsubscribeStore = this.deps.store.subscribe((state, prev) => {
-      if (this.editingAddr && (state.viewport !== prev.viewport || state.layout !== prev.layout)) {
-        this.position(this.editingAddr);
-        this.refreshSize();
-      }
-      if (state.format !== prev.format || state.ui.pendingFormat !== prev.ui.pendingFormat) {
-        this.applyCellAppearance();
-        if (this.input) this.applyTextAlignment(this.input.value);
-      }
-    });
   }
 
   cancel(): void {
@@ -398,7 +352,6 @@ export class InlineEditor {
     const raw = input.value;
     const anchor = this.editingAddr;
     const s = this.deps.store.getState();
-    const ranges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
     const controller = interactionControllerFor(this.deps.store);
     if (controller) {
       const batch = buildSelectionInputBatch(s, raw, anchor);
@@ -434,78 +387,16 @@ export class InlineEditor {
       this.cancel();
       return;
     }
-    const totalCells = ranges.reduce((sum, r) => sum + rangeArea(r), 0);
-    if (totalCells > MAX_MULTI_COMMIT_CELLS) {
+    const written = writeSelectionInput(this.deps.wb, this.deps.store, s, raw, anchor);
+    if (written.status === 'limitExceeded') {
       this.deps.onValidation?.({ severity: 'stop', message: SELECTION_INPUT_LIMIT_MESSAGE });
       return;
     }
-    const sheet = s.data.sheetIndex;
-    const isFormula = raw.startsWith('=');
-    // Validated write that mirrors the anchor's stop-rejection handling. Returns
-    // true when a `stop` rule blocked the entry (the whole fill aborts) so DV
-    // bites on every filled cell, not just the anchor.
-    const writeValidatedOrAbort = (
-      target: Addr,
-      text: string,
-      fmt: CellFormat | undefined,
-    ): boolean => {
-      const outcome = writeInputValidated(
-        this.deps.wb,
-        target,
-        text,
-        fmt?.validation,
-        this.deps.store,
-      );
-      if (!outcome.ok && outcome.severity === 'stop') {
-        this.deps.onValidation?.({
-          severity: outcome.severity,
-          title: fmt?.validation?.errorTitle,
-          message: outcome.message,
-        });
-        input.focus();
-        input.select();
-        return true;
-      }
-      return false;
-    };
-    // One recalc for the whole fill instead of one per written cell.
-    const aborted = this.deps.wb.withBatchedRecalc(() => {
-      for (const r of ranges) {
-        for (let row = r.r0; row <= r.r1; row += 1) {
-          for (let col = r.c0; col <= r.c1; col += 1) {
-            const target = { sheet, row, col };
-            const fmt =
-              target.sheet === anchor.sheet &&
-              target.row === anchor.row &&
-              target.col === anchor.col
-                ? formatWithPending(this.deps.store.getState(), target)
-                : s.format.formats.get(addrKey(target));
-            const forceText = fmt?.numFmt?.kind === 'text';
-            if (isFormula && !forceText) {
-              // Formula fill: relative refs shift by the paste offset. Formula
-              // results aren't run through DV here (Excel validates the typed
-              // entry, not the recomputed result).
-              const shifted = shiftFormulaRefs(raw, row - anchor.row, col - anchor.col);
-              try {
-                writeCoerced(this.deps.wb, target, { kind: 'formula', text: shifted });
-              } catch (err) {
-                console.warn('formulon-cell: writeCoerced failed', err);
-              }
-            } else {
-              // Value fill (including text-formatted cells): every target validates
-              // against its own rule via the store-aware coercion path.
-              if (writeValidatedOrAbort(target, raw, fmt)) return true;
-            }
-          }
-        }
-      }
-      return false;
-    });
-    if (aborted) return;
-    const pending = this.deps.store.getState().ui.pendingFormat;
-    if (pending && sameAddr(pending.addr, anchor)) {
-      mutators.setCellFormat(this.deps.store, anchor, pending.format);
-      mutators.setPendingFormat(this.deps.store, null);
+    if (written.status === 'rejected') {
+      this.deps.onValidation?.(written.outcome);
+      input.focus();
+      input.select();
+      return;
     }
     this.deps.onAfterCommit();
     this.cancel();
@@ -552,8 +443,7 @@ export class InlineEditor {
       !e.altKey &&
       !e.shiftKey &&
       e.key.toLowerCase() === 't' &&
-      (this.deps.host.closest<HTMLElement>('.fc-host') ?? this.deps.host).dataset.fcPlatform ===
-        'mac'
+      this.isMacPlatform()
     ) {
       e.preventDefault();
       e.stopPropagation();
@@ -793,14 +683,9 @@ export class InlineEditor {
       if (focusHost) this.deps.host.focus({ preventScroll: true });
       return;
     }
-    input.removeEventListener('keydown', this.onKey);
-    input.removeEventListener('keyup', this.onKeyUp);
-    input.removeEventListener('input', this.onInput);
-    input.removeEventListener('compositionstart', this.onCompositionStart);
-    input.removeEventListener('compositionend', this.onCompositionEnd);
-    input.removeEventListener('blur', this.onBlur);
-    input.removeEventListener('dblclick', this.onDblClick);
-    input.removeEventListener('click', this.onClick);
+    for (const [type, listener] of this.inputListeners()) {
+      input.removeEventListener(type, listener as EventListener);
+    }
     input.remove();
     this.input = null;
     if (focusHost) this.deps.host.focus({ preventScroll: true });
@@ -842,6 +727,23 @@ export class InlineEditor {
       },
     }));
 
+    const input = this.mountInput(snapshot.anchor, snapshot.raw, (el) => {
+      const max = snapshot.raw.length;
+      const start = Math.max(0, Math.min(snapshot.caret.start, max));
+      const end = Math.max(start, Math.min(snapshot.caret.end, max));
+      el.setSelectionRange(start, end, snapshot.caret.direction);
+    });
+    mutators.setEditorRefs(this.deps.store, [...snapshot.editorRefs]);
+    return input;
+  }
+
+  /** Create the editor textarea over `addr`, place its caret, and wire its
+   *  listeners, popovers and store tracking. */
+  private mountInput(
+    addr: Addr,
+    raw: string,
+    placeCaret: (input: HTMLTextAreaElement) => void,
+  ): HTMLTextAreaElement {
     const input = document.createElement('textarea');
     input.className = 'fc-host__editor';
     input.spellcheck = false;
@@ -849,50 +751,60 @@ export class InlineEditor {
     input.autocomplete = 'off';
     input.rows = 1;
     input.wrap = 'soft';
-    input.value = snapshot.raw;
+    input.value = raw;
     this.input = input;
-    this.applyTextAlignment(snapshot.raw);
+    this.applyTextAlignment(raw);
     this.applyCellAppearance();
-    this.position(snapshot.anchor);
+    this.position(addr);
     this.deps.grid.appendChild(input);
     this.refreshSize();
-    const max = snapshot.raw.length;
-    const start = Math.max(0, Math.min(snapshot.caret.start, max));
-    const end = Math.max(start, Math.min(snapshot.caret.end, max));
-    input.setSelectionRange(start, end, snapshot.caret.direction);
+    placeCaret(input);
 
-    input.addEventListener('keydown', this.onKey);
-    input.addEventListener('keyup', this.onKeyUp);
-    input.addEventListener('input', this.onInput);
-    input.addEventListener('compositionstart', this.onCompositionStart);
-    input.addEventListener('compositionend', this.onCompositionEnd);
-    input.addEventListener('blur', this.onBlur);
-    input.addEventListener('dblclick', this.onDblClick);
-    input.addEventListener('click', this.onClick);
+    for (const [type, listener] of this.inputListeners()) {
+      input.addEventListener(type, listener as EventListener);
+    }
     this.autocomplete = attachAutocomplete({
       input,
       onAfterInsert: () => syncEditorRefs(this.deps.store, input.value),
       getTables: () => this.deps.wb.getTables(),
-      editingAddr: snapshot.anchor,
-      getColumnValues: (sheet, col, beforeRow) => this.collectColumnHistory(sheet, col, beforeRow),
+      editingAddr: addr,
+      getColumnValues: (sheet, col, beforeRow) =>
+        pickListValues(this.deps.wb.cells(sheet), col, beforeRow),
       getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
       getFunctionNames: () => this.deps.wb.functionNames(),
       labels: this.deps.getLabels?.().autocomplete,
     });
     this.argHelper = attachArgHelper({ input, labels: this.deps.getLabels?.().argHelper });
     this.argHelper.refresh();
-    mutators.setEditorRefs(this.deps.store, [...snapshot.editorRefs]);
-    this.unsubscribeStore = this.deps.store.subscribe((next, prev) => {
-      if (this.editingAddr && (next.viewport !== prev.viewport || next.layout !== prev.layout)) {
+    // Scrolling / resizing / freezing moves the cell under the editor. Track
+    // the slices that decide the cell rect so the editor stays welded to its
+    // cell instead of hanging over whatever scrolled into that spot, and the
+    // format slices so a ribbon click mid-edit repaints the editor too.
+    this.unsubscribeStore = this.deps.store.subscribe((state, prev) => {
+      if (this.editingAddr && (state.viewport !== prev.viewport || state.layout !== prev.layout)) {
         this.position(this.editingAddr);
         this.refreshSize();
       }
-      if (next.format !== prev.format || next.ui.pendingFormat !== prev.ui.pendingFormat) {
+      if (state.format !== prev.format || state.ui.pendingFormat !== prev.ui.pendingFormat) {
         this.applyCellAppearance();
         if (this.input) this.applyTextAlignment(this.input.value);
       }
     });
     return input;
+  }
+
+  /** DOM listeners the editor textarea carries for its whole lifetime. */
+  private inputListeners(): readonly (readonly [string, (event: never) => void])[] {
+    return [
+      ['keydown', this.onKey],
+      ['keyup', this.onKeyUp],
+      ['input', this.onInput],
+      ['compositionstart', this.onCompositionStart],
+      ['compositionend', this.onCompositionEnd],
+      ['blur', this.onBlur],
+      ['dblclick', this.onDblClick],
+      ['click', this.onClick],
+    ];
   }
 
   /** Grow the editor rightward to fit content wider than the cell — desktop
@@ -948,37 +860,6 @@ export class InlineEditor {
     if (coerced.kind === 'number') this.input.style.textAlign = 'right';
     else if (coerced.kind === 'bool') this.input.style.textAlign = 'center';
     else this.input.style.textAlign = 'left';
-  }
-
-  /** Walk the column upward from `beforeRow - 1` collecting plain-text values
-   *  for the autocomplete popover. Mirrors the "pick from list" rules:
-   *  text-only (formulas, numbers, blanks all skip), deduped, nearest-first.
-   *  Iterates the engine's populated-cells list once rather than probing each
-   *  row — we'd otherwise call `cellFormula` (O(n)) per row, blowing up at
-   *  every keystroke. */
-  private collectColumnHistory(sheet: number, col: number, beforeRow: number): string[] {
-    const hits: { row: number; text: string }[] = [];
-    for (const e of this.deps.wb.cells(sheet)) {
-      if (e.addr.col !== col) continue;
-      if (e.addr.row >= beforeRow) continue;
-      // Formulas don't contribute — the pick-list is verbatim text only.
-      if (e.formula !== null) continue;
-      if (e.value.kind !== 'text') continue;
-      const text = e.value.value;
-      if (text.length === 0) continue;
-      hits.push({ row: e.addr.row, text });
-    }
-    // Nearest-first: highest row index wins.
-    hits.sort((a, b) => b.row - a.row);
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const h of hits) {
-      if (seen.has(h.text)) continue;
-      seen.add(h.text);
-      out.push(h.text);
-      if (out.length >= 10) break;
-    }
-    return out;
   }
 
   /** Give the editor the cell's own fill and text color. Without this the

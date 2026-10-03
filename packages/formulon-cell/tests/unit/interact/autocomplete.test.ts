@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   attachAutocomplete,
+  pickListValues,
   suggestColumnHistory,
   suggestStructuredRef,
 } from '../../../src/interact/autocomplete.js';
@@ -14,6 +15,43 @@ const sales = {
   name: 'Sales',
   columns: ['Region', 'Revenue', 'Quarter'],
 };
+
+describe('pickListValues', () => {
+  const cell = (
+    row: number,
+    col: number,
+    value: string | number,
+    formula: string | null = null,
+  ) => ({
+    addr: { sheet: 0, row, col },
+    value:
+      typeof value === 'string'
+        ? { kind: 'text' as const, value }
+        : { kind: 'number' as const, value },
+    formula,
+  });
+
+  it('collects deduped text above the row in the column, nearest first', () => {
+    const cells = [
+      cell(0, 0, 'East'),
+      cell(1, 0, 'West'),
+      cell(2, 0, 'East'),
+      cell(3, 0, 42),
+      cell(4, 0, 'Total', '="Total"'),
+      cell(5, 0, ''),
+      cell(1, 1, 'Other column'),
+      cell(9, 0, 'Below'),
+    ];
+    expect(pickListValues(cells, 0, 6)).toEqual(['East', 'West']);
+  });
+
+  it('caps the list at ten values', () => {
+    const cells = Array.from({ length: 12 }, (_, row) => cell(row, 0, `v${row}`));
+    expect(pickListValues(cells, 0, 12)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `v${11 - i}`),
+    );
+  });
+});
 
 describe('suggestStructuredRef', () => {
   it('suggests all columns just inside an empty bracket', () => {
