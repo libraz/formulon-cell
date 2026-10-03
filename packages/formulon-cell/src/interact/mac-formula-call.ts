@@ -29,3 +29,11 @@ export const assembledFormula = (name: string, args: readonly string[]): string 
   const end = trailingBlankIndex(args);
   return `=${name}(${end < 0 ? '' : args.slice(0, end + 1).join(',')})`;
 };
+
+/** `=NAME(...)` keeping exactly `count` arguments, or trimming trailing blanks when `count` is null. */
+export const formulaWithArgumentCount = (
+  name: string,
+  args: readonly string[],
+  count: number | null,
+): string =>
+  count === null ? assembledFormula(name, args) : `=${name}(${args.slice(0, count).join(',')})`;

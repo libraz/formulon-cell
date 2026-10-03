@@ -978,13 +978,14 @@ export type { FormatDialogDeps, FormatDialogHandle } from './interact/format-dia
 export { attachFormatDialog } from './interact/format-dialog.js';
 export type { FormatPainterDeps, FormatPainterHandle } from './interact/format-painter.js';
 export { attachFormatPainter } from './interact/format-painter.js';
+export { FUNCTION_DESCRIPTIONS } from './interact/function-catalog-text.js';
 export type {
   FunctionCategory,
   FxDialogDeps,
   FxDialogHandle,
   FxDialogOpenOptions,
 } from './interact/fx-dialog.js';
-export { attachFxDialog, FUNCTION_DESCRIPTIONS } from './interact/fx-dialog.js';
+export { attachFxDialog } from './interact/fx-dialog.js';
 export type { GoToDialogDeps, GoToDialogHandle } from './interact/goto-dialog.js';
 export { attachGoToDialog } from './interact/goto-dialog.js';
 export type { HoverDeps, HoverHandle } from './interact/hover.js';

@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getRecentFunctions } from '../../../src/commands/function-history.js';
 import { en, ja } from '../../../src/i18n/strings.js';
-import { attachFxDialog, FUNCTION_DESCRIPTIONS } from '../../../src/interact/fx-dialog.js';
+import { FUNCTION_DESCRIPTIONS } from '../../../src/interact/function-catalog-text.js';
+import { attachFxDialog } from '../../../src/interact/fx-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');

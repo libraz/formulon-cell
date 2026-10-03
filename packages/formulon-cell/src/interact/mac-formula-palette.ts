@@ -23,11 +23,17 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import type { FormulaEditLease, FormulaEditLeaseContext } from './formula-edit-lease.js';
 import {
-  FUNCTION_DESCRIPTIONS,
-  type FxDialogHandle,
-  type FxDialogOpenOptions,
-} from './fx-dialog.js';
-import { assembledFormula, canonicalName, parseOuterCall } from './mac-formula-call.js';
+  CATEGORY_LABEL_KEY,
+  catalogLocaleOrdinal,
+  functionDescription,
+} from './function-catalog-text.js';
+import type { FxDialogHandle, FxDialogOpenOptions } from './fx-dialog.js';
+import {
+  assembledFormula,
+  canonicalName,
+  formulaWithArgumentCount,
+  parseOuterCall,
+} from './mac-formula-call.js';
 import { makeButton, makeIconButton } from './mac-formula-palette-buttons.js';
 import type { RangeInsertTarget } from './range-insert.js';
 
@@ -74,22 +80,6 @@ export interface MacFormulaPaletteHandle extends FxDialogHandle {
 
 type PaletteMode = 'closed' | 'picker' | 'arguments-editing' | 'arguments-committed';
 
-type CategoryLabelKey =
-  | 'categoryLogical'
-  | 'categoryLookup'
-  | 'categoryText'
-  | 'categoryDateTime'
-  | 'categoryMath'
-  | 'categoryFinancial'
-  | 'categoryDynamicArray'
-  | 'categoryStatistical'
-  | 'categoryEngineering'
-  | 'categoryInformation'
-  | 'categoryDatabase'
-  | 'categoryCompatibility'
-  | 'categoryCube'
-  | 'categoryWeb';
-
 interface CommitSnapshot {
   name: string;
   args: string[];
@@ -117,9 +107,6 @@ interface ArgumentsRefs {
 
 const paletteStrings = (strings: Strings): MacPaletteStrings => strings.fxDialog.macPalette;
 
-const localeOrdinal = (locale: string): 0 | 1 =>
-  locale.trim().toLowerCase().startsWith('ja') ? 1 : 0;
-
 const sameAvailability = (a: FunctionCatalogEntry, b: FunctionCatalogEntry): boolean =>
   Object.is(a.availability, b.availability);
 
@@ -144,7 +131,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   let restoredFocusTarget: HTMLElement | null = null;
   let anchor: Addr | null = null;
   let sessionWb: WorkbookHandle | null = null;
-  let catalog = buildFunctionCatalog(null, localeOrdinal(deps.getLocale()));
+  let catalog = buildFunctionCatalog(null, catalogLocaleOrdinal(deps.getLocale()));
   let pickerCategory: FunctionCategory = 'all';
   let pickerSelectionName: string | null = null;
   let pickerSelectionEntry: FunctionCatalogEntry | null = null;
@@ -187,18 +174,14 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     let reader: FunctionCatalogReader | null = null;
     try {
       reader = deps.getWb();
-      return buildFunctionCatalog(reader, localeOrdinal(deps.getLocale()));
+      return buildFunctionCatalog(reader, catalogLocaleOrdinal(deps.getLocale()));
     } catch {
-      return buildFunctionCatalog(null, localeOrdinal(deps.getLocale()));
+      return buildFunctionCatalog(null, catalogLocaleOrdinal(deps.getLocale()));
     }
   };
 
   const textForEntry = (entry: FunctionCatalogEntry): string =>
-    entry.description ??
-    (localeOrdinal(deps.getLocale()) === 1
-      ? FUNCTION_DESCRIPTIONS[entry.canonicalName]?.ja
-      : FUNCTION_DESCRIPTIONS[entry.canonicalName]?.en) ??
-    '';
+    functionDescription(entry, catalogLocaleOrdinal(deps.getLocale()));
 
   const argumentHelp = (entry: FunctionCatalogEntry, index: number): FunctionArgumentHelp => {
     const provided = deps.getFunctionArgumentHelp?.(entry.canonicalName, index, deps.getLocale());
@@ -230,26 +213,38 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
 
   const selectedSyntax = (): string => (selectedEntry ? functionSyntax(selectedEntry) : '');
 
-  const categoryTitle = (category: CatalogFunctionCategory): string => {
-    const fx = strings.fxDialog;
-    const keyByCategory: Record<CatalogFunctionCategory, CategoryLabelKey> = {
-      logical: 'categoryLogical',
-      lookup: 'categoryLookup',
-      text: 'categoryText',
-      datetime: 'categoryDateTime',
-      math: 'categoryMath',
-      financial: 'categoryFinancial',
-      dynamicArray: 'categoryDynamicArray',
-      statistical: 'categoryStatistical',
-      engineering: 'categoryEngineering',
-      information: 'categoryInformation',
-      database: 'categoryDatabase',
-      compatibility: 'categoryCompatibility',
-      cube: 'categoryCube',
-      web: 'categoryWeb',
-    };
-    const key = keyByCategory[category];
-    return fx[key];
+  const categoryTitle = (category: CatalogFunctionCategory): string =>
+    strings.fxDialog[CATEGORY_LABEL_KEY[category]];
+
+  const resetDraftProjection = (): void => {
+    explicitArgumentCount = null;
+    preserveExplicitArgumentCount = false;
+    synchronized = true;
+    currentRaw = '';
+  };
+
+  const resetFunctionSelection = (): void => {
+    selectedName = null;
+    selectedEntry = null;
+    args = [];
+    resetDraftProjection();
+  };
+
+  const resetPickerSelection = (): void => {
+    pickerCategory = 'all';
+    pickerSelectionName = null;
+    pickerSelectionEntry = null;
+  };
+
+  /** True when the selected function left the catalog or became unavailable. */
+  const selectedEntryWithdrawn = (): boolean => {
+    if (!selectedName) return false;
+    const entry = catalog.entries.get(selectedName);
+    return (
+      !catalog.knownNames.has(selectedName) ||
+      !entry ||
+      isFunctionUnavailableForInsertion(entry.availability)
+    );
   };
 
   const reconcilePickerSelection = (): void => {
@@ -439,15 +434,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     sessionWb = live;
     catalog = readCatalog();
     selectedEntry = selectedName ? (catalog.entries.get(selectedName) ?? null) : null;
-    pickerCategory = 'all';
-    pickerSelectionName = null;
-    pickerSelectionEntry = null;
+    resetPickerSelection();
     mode = 'picker';
     guardMessage = message;
-    currentRaw = '';
-    explicitArgumentCount = null;
-    preserveExplicitArgumentCount = false;
-    synchronized = true;
+    resetDraftProjection();
     notifyMirror(null);
     render();
   };
@@ -487,11 +477,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     currentRaw = raw;
   };
 
-  const assembledCurrentFormula = (name: string): string => {
-    if (!preserveExplicitArgumentCount || explicitArgumentCount === null)
-      return assembledFormula(name, args);
-    return `=${name}(${args.slice(0, explicitArgumentCount).join(',')})`;
-  };
+  const assembledCurrentFormula = (name: string): string =>
+    formulaWithArgumentCount(
+      name,
+      args,
+      preserveExplicitArgumentCount ? explicitArgumentCount : null,
+    );
 
   const handleRawUpdate = (binding: DraftBinding, raw: string): void => {
     if (activeDraft !== binding) return;
@@ -531,9 +522,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       outcome === 'committed' && committedName ? parseOuterCall(committedRaw, committedName) : null;
     const assembled =
       parsed && committedName
-        ? committedPreservesCount && committedCount !== null
-          ? `=${committedName}(${parsed.args.slice(0, committedCount).join(',')})`
-          : assembledFormula(committedName, parsed.args)
+        ? formulaWithArgumentCount(
+            committedName,
+            parsed.args,
+            committedPreservesCount ? committedCount : null,
+          )
         : null;
     const shouldRecord = parsed !== null && assembled === committedRaw.trim();
     activeDraft = null;
@@ -559,13 +552,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     notifyMirror(null);
     if (outcome === 'cancelled' && !closing && !guarding && !committing && mode !== 'closed') {
       mode = 'picker';
-      selectedName = null;
-      selectedEntry = null;
-      args = [];
-      explicitArgumentCount = null;
-      preserveExplicitArgumentCount = false;
-      synchronized = true;
-      currentRaw = '';
+      resetFunctionSelection();
       render();
     }
   };
@@ -807,17 +794,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     );
     insert.className = 'fc-mac-formula-palette__insert';
     const pickerEntry = pickerSelectionEntry ?? selectedEntry;
-    projectDisabledState(
-      insert,
+    const insertDisabled =
       (pickerSelectionName ?? selectedName) === null ||
-        pickerEntry === null ||
-        isFunctionUnavailableForInsertion(pickerEntry.availability),
-      (pickerSelectionName ?? selectedName) === null ||
-        pickerEntry === null ||
-        isFunctionUnavailableForInsertion(pickerEntry.availability)
-        ? labels.unavailable
-        : null,
-    );
+      pickerEntry === null ||
+      isFunctionUnavailableForInsertion(pickerEntry.availability);
+    projectDisabledState(insert, insertDisabled, insertDisabled ? labels.unavailable : null);
     content.appendChild(insert);
     if (guardMessage) {
       const guard = document.createElement('p');
@@ -853,16 +834,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       activeDraft.handle.cancel();
       closing = false;
     }
-    selectedName = null;
-    selectedEntry = null;
-    args = [];
-    explicitArgumentCount = null;
-    preserveExplicitArgumentCount = false;
-    pickerCategory = 'all';
-    pickerSelectionName = null;
-    pickerSelectionEntry = null;
-    synchronized = true;
-    currentRaw = '';
+    resetFunctionSelection();
+    resetPickerSelection();
     guardMessage = '';
     mode = 'picker';
     if (keptDraft) setDraftRaw('=');
@@ -954,13 +927,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       showGuardedPicker(labels.unavailable);
       return false;
     }
-    if (
-      mode !== 'picker' &&
-      selectedName &&
-      (!catalog.knownNames.has(selectedName) ||
-        !catalog.entries.has(selectedName) ||
-        isFunctionUnavailableForInsertion(catalog.entries.get(selectedName)?.availability))
-    ) {
+    if (mode !== 'picker' && selectedEntryWithdrawn()) {
       showGuardedPicker(labels.unavailable);
       return false;
     }
@@ -1050,17 +1017,9 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if (activeDraft) activeDraft.handle.cancel();
     closing = false;
     mode = 'closed';
-    selectedName = null;
-    selectedEntry = null;
-    args = [];
-    explicitArgumentCount = null;
-    preserveExplicitArgumentCount = false;
-    pickerCategory = 'all';
-    pickerSelectionName = null;
-    pickerSelectionEntry = null;
-    currentRaw = '';
+    resetFunctionSelection();
+    resetPickerSelection();
     postCommit = null;
-    synchronized = true;
     notifyMirror(null);
     render();
     const target = connectedElement(restoredFocusTarget) ?? connectedElement(opener) ?? deps.host;
@@ -1080,16 +1039,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     opener = connectedElement(document.activeElement);
     anchor = { ...deps.getAnchor() };
     sessionWb = safeWorkbook();
-    selectedName = null;
-    selectedEntry = null;
-    args = [];
-    explicitArgumentCount = null;
-    preserveExplicitArgumentCount = false;
-    pickerCategory = 'all';
-    pickerSelectionName = null;
-    pickerSelectionEntry = null;
-    synchronized = true;
-    currentRaw = '';
+    resetFunctionSelection();
+    resetPickerSelection();
     searchQuery = '';
     guardMessage = '';
     postCommit = null;
@@ -1113,13 +1064,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     labels = paletteStrings(strings);
     catalog = readCatalog();
     reconcilePickerSelection();
-    if (
-      mode !== 'picker' &&
-      selectedName &&
-      (!catalog.knownNames.has(selectedName) ||
-        !catalog.entries.has(selectedName) ||
-        isFunctionUnavailableForInsertion(catalog.entries.get(selectedName)?.availability))
-    ) {
+    if (mode !== 'picker' && selectedEntryWithdrawn()) {
       showGuardedPicker(labels.unavailable);
       return;
     }
