@@ -6,8 +6,8 @@ import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
 import {
   EMBEDDED_UNSUPPORTED,
   type Label,
+  labelFor,
   labels,
-  MENU_LABELS,
   NOT_IMPLEMENTED,
   OFFICE_REQUIRED,
 } from './labels.js';
@@ -69,7 +69,7 @@ export const MAC_RIBBON_MENU_COMMAND_SET: ReadonlySet<string> = new Set(MAC_RIBB
 
 const menu = (items: readonly MacRibbonMenuItem[]): readonly MacRibbonMenuItem[] =>
   items.map((item) => {
-    const label = MENU_LABELS[item.id] ?? labels[item.id.split('.').at(-1) ?? ''];
+    const label = labelFor(item.id);
     return label ? { ...item, label: label.en, labelJa: label.ja } : item;
   });
 const leaf = (

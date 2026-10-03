@@ -278,14 +278,18 @@ export const macRibbonDisabledReason = (
   return reason;
 };
 
+/** Label for a command id: an explicit menu override, else the entry keyed by
+ *  the id's last segment. */
+export const labelFor = (id: string): Label | undefined =>
+  MENU_LABELS[id] ?? labels[id.split('.').at(-1) ?? id];
+
 /** Localized label lookup used by both the model and the static Mac menus. */
 export const macRibbonLabelForCommand = (id: string, lang: ToolbarLang): string => {
-  const key = id.split('.').at(-1) ?? id;
-  const label = MENU_LABELS[id] ?? labels[key];
+  const label = labelFor(id);
   return label ? label[lang] : id;
 };
 
-export const MENU_LABELS: Readonly<Record<string, Label>> = {
+const MENU_LABELS: Readonly<Record<string, Label>> = {
   'mac.formulas.removeArrows.all': { ja: '矢印の削除', en: 'Remove Arrows' },
   'mac.formulas.removeArrows.precedents': {
     ja: '参照元の矢印の削除',
