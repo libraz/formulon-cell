@@ -8,7 +8,7 @@ import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../en
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import type { CellBorderSide, CellFormat, State } from '../store/store.js';
+import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { evaluateConditional } from './conditional.js';
@@ -49,12 +49,14 @@ import {
   VALIDATION_TRIANGLE_COLOR,
 } from './grid/hit-state.js';
 import { paintFreezeDividers, paintGridLines } from './grid/lines.js';
+import { mergedDiagonalBorders, mergeRangeAt } from './grid/merged-cells.js';
 import {
   paintPageBreakPreview,
   paintPageLayoutBackground,
   paintPageLayoutChrome,
   paintPageRulers,
 } from './grid/page-view.js';
+import { connectedRects, sameRectList, trailingRect } from './grid/range-rects.js';
 import { tableCellFormat } from './grid/table-format.js';
 import { paintTraces } from './grid/traces.js';
 import {
@@ -83,128 +85,6 @@ import { paintCellSparkline } from './sparkline.js';
 
 const inRange = (a: Addr, r: Range): boolean =>
   a.row >= r.r0 && a.row <= r.r1 && a.col >= r.c0 && a.col <= r.c1;
-
-const mergeRangeAt = (state: State, addr: Addr): Range | null => {
-  const key = addrKey(addr);
-  const anchorKey = state.merges.byCell.get(key) ?? key;
-  return state.merges.byAnchor.get(anchorKey) ?? null;
-};
-
-const borderSideSignature = (side: CellBorderSide | undefined): string => {
-  if (side === undefined) return 'absent';
-  if (typeof side === 'boolean') return `boolean:${side}`;
-  return `style:${side.style};color:${side.color ?? ''}`;
-};
-
-/** Excel stores a uniform diagonal border on every cell covered by a merge,
- *  but renders that border once across the merged surface. Mixed diagonal
- *  metadata is discarded by Excel at merge time; suppress it here as well so
- *  stale per-cell data cannot produce crossing lines inside a merge. */
-const mergedDiagonalBorders = (
-  formats: ReadonlyMap<string, CellFormat>,
-  merge: Range,
-): CellFormat['borders'] => {
-  let down: CellBorderSide | undefined;
-  let downSignature: string | null = null;
-  let up: CellBorderSide | undefined;
-  let upSignature: string | null = null;
-  for (let row = merge.r0; row <= merge.r1; row += 1) {
-    for (let col = merge.c0; col <= merge.c1; col += 1) {
-      const borders = formats.get(addrKey({ sheet: merge.sheet, row, col }))?.borders;
-      const nextDown = borders?.diagonalDown;
-      const nextUp = borders?.diagonalUp;
-      const nextDownSignature = borderSideSignature(nextDown);
-      const nextUpSignature = borderSideSignature(nextUp);
-      if (downSignature === null) {
-        down = nextDown;
-        downSignature = nextDownSignature;
-      } else if (downSignature !== 'mixed' && downSignature !== nextDownSignature) {
-        downSignature = 'mixed';
-      }
-      if (upSignature === null) {
-        up = nextUp;
-        upSignature = nextUpSignature;
-      } else if (upSignature !== 'mixed' && upSignature !== nextUpSignature) {
-        upSignature = 'mixed';
-      }
-    }
-  }
-  const result: NonNullable<CellFormat['borders']> = {};
-  if (downSignature !== null && downSignature !== 'mixed' && downSignature !== 'absent') {
-    result.diagonalDown = down;
-  }
-  if (upSignature !== null && upSignature !== 'mixed' && upSignature !== 'absent') {
-    result.diagonalUp = up;
-  }
-  return Object.keys(result).length > 0 ? result : undefined;
-};
-
-const sameRect = (a: Rect, b: Rect): boolean =>
-  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-
-const sameRectList = (a: readonly Rect[], b: readonly Rect[]): boolean =>
-  a.length === b.length &&
-  a.every((rect, index) => {
-    const other = b[index];
-    return other !== undefined && sameRect(rect, other);
-  });
-
-const rectsTouch = (a: Rect, b: Rect): boolean => {
-  const eps = 1e-6;
-  const overlapY = a.y < b.y + b.h - eps && b.y < a.y + a.h - eps;
-  const overlapX = a.x < b.x + b.w - eps && b.x < a.x + a.w - eps;
-  const sideBySide =
-    (Math.abs(a.x + a.w - b.x) < eps || Math.abs(b.x + b.w - a.x) < eps) && overlapY;
-  const stacked = (Math.abs(a.y + a.h - b.y) < eps || Math.abs(b.y + b.h - a.y) < eps) && overlapX;
-  return (overlapX && overlapY) || sideBySide || stacked;
-};
-
-/** Join visible range rects that share an edge. Freeze quadrants are separate
- *  for fills and outlines, but their screen coordinates are contiguous, so a
- *  single text clip must span their union. Page-layout gutters remain
- *  separate components and therefore do not make text cross a paper gap. */
-const connectedRects = (rects: readonly Rect[]): Rect[] => {
-  const pending = rects.map((rect) => ({ ...rect }));
-  let changed = true;
-  while (changed) {
-    changed = false;
-    outer: for (let i = 0; i < pending.length; i += 1) {
-      const first = pending[i];
-      if (!first) continue;
-      for (let j = i + 1; j < pending.length; j += 1) {
-        const second = pending[j];
-        if (!second || !rectsTouch(first, second)) continue;
-        pending[i] = {
-          x: Math.min(first.x, second.x),
-          y: Math.min(first.y, second.y),
-          w: Math.max(first.x + first.w, second.x + second.w) - Math.min(first.x, second.x),
-          h: Math.max(first.y + first.h, second.y + second.h) - Math.min(first.y, second.y),
-        };
-        pending.splice(j, 1);
-        changed = true;
-        break outer;
-      }
-    }
-  }
-  return pending;
-};
-
-/** Pick the visible rectangle at a range's logical bottom/trailing corner.
- *  `rangeRects` returns freeze quadrants in logical row/column order, but the
- *  physical trailing edge moves to the left on a right-to-left sheet. */
-const trailingRect = (rects: readonly Rect[], rtl: boolean): Rect | null => {
-  if (rects.length === 0) return null;
-  const bottom = Math.max(...rects.map((rect) => rect.y + rect.h));
-  const bottomRects = rects.filter((rect) => rect.y + rect.h === bottom);
-  return bottomRects.reduce(
-    (best, rect) => {
-      if (!best) return rect;
-      if (rtl) return rect.x < best.x ? rect : best;
-      return rect.x + rect.w > best.x + best.w ? rect : best;
-    },
-    null as Rect | null,
-  );
-};
 
 const visibleCount = (
   pixels: number,
