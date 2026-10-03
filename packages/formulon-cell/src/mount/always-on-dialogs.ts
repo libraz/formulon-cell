@@ -40,8 +40,6 @@ export interface AlwaysOnDialogs {
   openCfRules: () => void;
   openCellStyles: () => void;
   openEvaluateFormula: () => void;
-  /** Open the filter dropdown for `col` of `range`, anchored at viewport coords. */
-  openFilter: (range: Range, col: number, anchor: { x: number; y: number; h: number }) => void;
   /** Open the filter dropdown under the header chevron of `col` (default: active column). */
   openFilterAtHeader: (range?: Range, col?: number) => void;
   setStrings: (next: Strings) => void;
@@ -104,7 +102,6 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
     openCfRules: () => cfRulesDialog.open(),
     openCellStyles: () => cellStylesGallery.open(),
     openEvaluateFormula: () => evaluateFormulaDialog.open(),
-    openFilter: (range, col, anchor) => filterDropdown.open(range, col, anchor),
     openFilterAtHeader(range, col) {
       const s = store.getState();
       const layout = layoutForView(s);
