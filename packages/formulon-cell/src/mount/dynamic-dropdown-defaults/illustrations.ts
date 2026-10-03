@@ -3,19 +3,11 @@ import {
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
 } from '../../commands/session-illustration.js';
-import type { Range, SpreadsheetInstance } from '../../index.js';
+import type { SpreadsheetInstance } from '../../index.js';
 import { pickImageFileDataUrl } from '../../toolbar/dialogs/image-file.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
-
-type IllustrationDropdownDefaultsDeps = {
-  normalizedSelectionRange: (instance: SpreadsheetInstance) => Range;
-  setMenuControlDisabled: (button: HTMLButtonElement, disabled: boolean, reason?: string) => void;
-  showInstanceReport: (
-    instance: SpreadsheetInstance,
-    title: string,
-    items: { severity: 'info' | 'warning'; label: string; detail: string }[],
-  ) => Promise<void>;
-};
+import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
+import { normalizedSelectionRange } from './selection.js';
 
 type IllustrationDropdownDefaults = Pick<
   DynamicDropdownsCtx,
@@ -28,10 +20,7 @@ type IllustrationDropdownDefaults = Pick<
 
 export function createIllustrationDropdownDefaults(
   instance: SpreadsheetInstance,
-  deps: IllustrationDropdownDefaultsDeps,
 ): IllustrationDropdownDefaults {
-  const { normalizedSelectionRange, setMenuControlDisabled, showInstanceReport } = deps;
-
   const buildPictureAction =
     (instance: SpreadsheetInstance): DynamicDropdownsCtx['insertPictureFromRibbon'] =>
     async (action) => {

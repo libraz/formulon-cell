@@ -44,6 +44,15 @@ export const sourceFilesUnder = (path: string): string[] => {
   return files.sort();
 };
 
+/** Root defaults module plus every group module under `dynamic-dropdown-defaults/`. */
+export const dynamicDropdownDefaultsSource = (): string =>
+  [
+    'src/mount/dynamic-dropdowns-defaults.ts',
+    ...sourceFilesUnder('src/mount/dynamic-dropdown-defaults'),
+  ]
+    .map((file) => readFileSync(join(root, file), 'utf8'))
+    .join('\n');
+
 export const collectStringLiteralArgs = (callName: string, argIndex: number): string[] => {
   const values = new Set<string>();
   for (const { name, source } of menuConsumerSources()) {

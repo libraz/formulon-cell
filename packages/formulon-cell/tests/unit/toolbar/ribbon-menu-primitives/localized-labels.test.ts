@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { menusDir, mountDir, ribbonDir, root, sourcesOutsidePrimitives } from './fixtures.js';
+import {
+  dynamicDropdownDefaultsSource,
+  menusDir,
+  mountDir,
+  ribbonDir,
+  root,
+  sourcesOutsidePrimitives,
+} from './fixtures.js';
 
 describe('toolbar/ribbon menu primitives', () => {
   it('keeps Paste menu labels backed by shared i18n dictionaries', () => {
@@ -97,7 +104,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Cell Styles merge report text backed by required ribbonMenu strings', () => {
-    const defaultsSource = readFileSync(join(mountDir, 'dynamic-dropdowns-defaults.ts'), 'utf8');
+    const defaultsSource = dynamicDropdownDefaultsSource();
 
     expect(defaultsSource).toContain('strings.ribbonMenu.cellStyleMergeImported.replace');
     expect(defaultsSource).not.toContain('cellStyleMergeImported?:');
@@ -105,7 +112,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('keeps Create Table dialog labels backed by shared dialog strings', () => {
-    const defaultsSource = readFileSync(join(mountDir, 'dynamic-dropdowns-defaults.ts'), 'utf8');
+    const defaultsSource = dynamicDropdownDefaultsSource();
 
     expect(defaultsSource).toContain('pivotDialogStrings.createTableTitle');
     expect(defaultsSource).toContain('pivotDialogStrings.createTableRangeLabel');
@@ -118,7 +125,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps Fill Series dialog labels backed by shared dialog strings', () => {
     const fillSeriesSource = readFileSync(join(ribbonDir, 'fill-series.ts'), 'utf8');
-    const defaultsSource = readFileSync(join(mountDir, 'dynamic-dropdowns-defaults.ts'), 'utf8');
+    const defaultsSource = dynamicDropdownDefaultsSource();
 
     expect(fillSeriesSource).toContain("Strings['fillSeriesDialog']");
     expect(fillSeriesSource).toContain('createDialogShell({ title })');
@@ -143,10 +150,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps Home Format action prompt labels backed by ribbonMenu strings', () => {
     const cellFormatSource = readFileSync(join(ribbonDir, 'cell-format-action.ts'), 'utf8');
-    const dynamicDefaultsSource = readFileSync(
-      join(mountDir, 'dynamic-dropdowns-defaults.ts'),
-      'utf8',
-    );
+    const dynamicDefaultsSource = dynamicDropdownDefaultsSource();
 
     expect(cellFormatSource).toContain('type CellFormatMenuText');
     expect(cellFormatSource).toContain('showRenameSheetDialog');
@@ -234,10 +238,7 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('uses shared localized labels for report dialogs from default toolbar glue', () => {
-    const dynamicDefaultsSource = readFileSync(
-      join(mountDir, 'dynamic-dropdowns-defaults.ts'),
-      'utf8',
-    );
+    const dynamicDefaultsSource = dynamicDropdownDefaultsSource();
     const toolbarDefaultsSource = readFileSync(join(mountDir, 'toolbar-defaults.ts'), 'utf8');
     const reportSource = readFileSync(join(root, 'src/toolbar/dialogs/report.ts'), 'utf8');
     const dialogsIndexSource = readFileSync(join(root, 'src/toolbar/dialogs/index.ts'), 'utf8');
@@ -273,10 +274,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps default dialog prompt labels backed by shared strings', () => {
     const controlDispatchSource = readFileSync(join(ribbonDir, 'control-dispatch.ts'), 'utf8');
-    const dynamicDefaultsSource = readFileSync(
-      join(mountDir, 'dynamic-dropdowns-defaults.ts'),
-      'utf8',
-    );
+    const dynamicDefaultsSource = dynamicDropdownDefaultsSource();
     const toolbarDefaultsSource = readFileSync(join(mountDir, 'toolbar-defaults.ts'), 'utf8');
     const dialogSources = [
       'advanced-filter.ts',

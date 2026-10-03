@@ -9,11 +9,16 @@ import {
   projectDisabledState,
 } from '../../../../src/toolbar/menu-a11y.js';
 import { createMenu, menuIconButton } from '../../../../src/toolbar/ribbon/menus/general.js';
-import { disabledStateAuditDirs, mountDir, root, sourceFilesUnder } from './fixtures.js';
+import {
+  disabledStateAuditDirs,
+  dynamicDropdownDefaultsSource,
+  root,
+  sourceFilesUnder,
+} from './fixtures.js';
 
 describe('toolbar/ribbon menu primitives', () => {
   it('keeps menu disabled state projection centralized in dropdown defaults', () => {
-    const defaultsSource = readFileSync(join(mountDir, 'dynamic-dropdowns-defaults.ts'), 'utf8');
+    const defaultsSource = dynamicDropdownDefaultsSource();
 
     expect(defaultsSource).toContain('const setMenuControlDisabled');
     expect(defaultsSource).toContain('projectDisabledState(button, disabled');

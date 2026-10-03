@@ -69,10 +69,8 @@ import type { RibbonMenus, RibbonRenderHelpers } from '../toolbar/ribbon/render-
 import { createSelectColorRibbon } from '../toolbar/ribbon/select-color.js';
 import { toolbarText } from '../toolbar/ribbon-model.js';
 import { dispatchHostClipboard, handleAutoSum } from '../wrappers/toolbar-actions.js';
-import {
-  createDefaultDynamicDropdownsCtx,
-  showCreateTableDialog,
-} from './dynamic-dropdowns-defaults.js';
+import { showCreateTableDialog } from './dynamic-dropdown-defaults/styles.js';
+import { createDefaultDynamicDropdownsCtx } from './dynamic-dropdowns-defaults.js';
 import type { SpreadsheetInstance } from './types.js';
 
 /** Options shared by every default factory. */
