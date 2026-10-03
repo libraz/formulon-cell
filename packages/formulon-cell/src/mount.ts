@@ -68,6 +68,7 @@ import {
 import { createInsertCopiedCellsOpener } from './mount/insert-copied-cells.js';
 import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
 import { createPrinterProfiles } from './mount/printer-profiles.js';
+import { createRibbonHost } from './mount/ribbon-host.js';
 import {
   attachSheetTabsController,
   type SheetTabsController,
@@ -580,8 +581,12 @@ export const Spreadsheet = {
 
     host.dataset.fcEngineState = wb.isStub ? 'ready-stub' : 'ready';
 
-    let toolbarHandle: ToolbarInstance | null = null;
-    let ribbonHost: HTMLElement | null = null;
+    const ribbon = createRibbonHost({
+      host,
+      getInstance: () => instance,
+      getLocale: () => i18n.locale,
+      isRestricted: () => commands.policy !== undefined,
+    });
     let requestedToolbar = opts.toolbar ?? (opts.ui ? ui.ribbon : false);
 
     const openInsertCopiedCells = createInsertCopiedCellsOpener({
@@ -681,26 +686,12 @@ export const Spreadsheet = {
         if (disposed) return;
         requestedToolbar = next;
         disposeMacRibbonActions(instance);
-        toolbarHandle?.dispose();
-        toolbarHandle = null;
-        ribbonHost?.remove();
-        ribbonHost = null;
-        if (!next) return;
-        ribbonHost = host.ownerDocument.createElement('div');
-        ribbonHost.className = 'fc-host__ribbon';
-        ribbonHost.style.display = 'contents';
-        host.insertBefore(ribbonHost, host.firstChild);
-        const toolbarOpts = next === true ? {} : next;
-        toolbarHandle = mountToolbar(ribbonHost, instance, {
-          lang: i18n.locale === 'en' ? 'en' : 'ja',
-          ...(commands.policy === undefined ? { dynamicDropdowns: true as const } : {}),
-          ...toolbarOpts,
-        });
+        ribbon.setToolbar(next);
       },
       i18n,
       features: featuresView,
       get toolbar() {
-        return toolbarHandle;
+        return ribbon.getToolbar();
       },
       get clipboard() {
         return binding.clipboardH;
@@ -1073,10 +1064,7 @@ export const Spreadsheet = {
         wb.detachStore(store);
         disposeMacRibbonActions(instance);
         disposeMacInk(instance);
-        toolbarHandle?.dispose();
-        toolbarHandle = null;
-        ribbonHost?.remove();
-        ribbonHost = null;
+        ribbon.dispose();
         emitter.dispose();
         ro.disconnect();
         binding.unbind();
