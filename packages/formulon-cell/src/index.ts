@@ -724,6 +724,8 @@ export { canonicalizeFormula, localizeFormula } from './engine/function-locale.j
 export { LOCALE_TAGS, localeTag, mergeFunctionMetadata } from './engine/function-metadata.js';
 export type { LoadOptions } from './engine/loader.js';
 export { isUsingStub } from './engine/loader.js';
+export type { EnginePageSetupExtrasInput } from './engine/page-setup-xml.js';
+export { mergePageSetupFragment } from './engine/page-setup-xml.js';
 export type {
   PassthroughSummary,
   PivotTableSummary,
@@ -812,11 +814,9 @@ export type {
 export { WorkbookHandle } from './engine/workbook-handle.js';
 export type {
   EngineHeaderFooterInput,
-  EnginePageSetupExtrasInput,
   EnginePageSetupInput,
   WorkbookHandleFeatureMethods,
 } from './engine/workbook-handle-features.js';
-export { mergePageSetupFragment } from './engine/workbook-handle-features.js';
 export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
 // Public event surface — adapter packages and direct consumers wire to
 // these via `inst.on(...)`.

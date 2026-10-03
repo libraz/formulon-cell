@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { mergePageSetupFragment } from '../../../src/engine/page-setup-xml.js';
 import {
   hydratePageSetupFromEngine,
   joinHeaderFooter,
@@ -6,7 +7,6 @@ import {
   syncPageSetupToEngine,
 } from '../../../src/engine/print-sync.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { mergePageSetupFragment } from '../../../src/engine/workbook-handle-features.js';
 import { createSpreadsheetStore, getPageSetup } from '../../../src/store/store.js';
 
 interface RecordedWrites {
