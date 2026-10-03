@@ -44,7 +44,6 @@ export function createInsertCopiedCellsOpener(deps: InsertCopiedCellsDeps): () =
       const target = store.getState().selection.range;
       const result = insertCopiedBand(store, wb, history, copied, target);
       if (result) {
-        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
         mutators.setRange(store, result.writtenRange);
         deps.refreshCells();
         deps.updateChrome();
