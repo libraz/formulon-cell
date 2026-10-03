@@ -702,6 +702,8 @@ export interface FunctionCallSpan {
   argumentSpans: readonly FormulaSelectionRange[];
   activeArgumentIndex: number;
   complete: boolean;
+  /** Whether an EOF-incomplete call can be safely closed by an editor. */
+  safeToComplete: boolean;
 }
 
 type FormulaDelimiterKind = 'paren' | 'brace' | 'bracket';
@@ -892,6 +894,9 @@ export function findFunctionCallAtCaret(
       argumentSpans: argumentSpansFor(call, closeParen ?? text.length),
       activeArgumentIndex: activeArgumentFor(call.separators, caret),
       complete: closeParen !== null,
+      safeToComplete:
+        closeParen !== null ||
+        (!inDoubleQuote && !inSingleQuote && stack[stack.length - 1]?.call === call),
     });
   }
 

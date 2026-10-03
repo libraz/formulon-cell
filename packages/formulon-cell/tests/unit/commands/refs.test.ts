@@ -133,6 +133,15 @@ describe('findActiveSignature', () => {
     expect(sig?.activeArgIndex).toBe(0);
   });
 
+  it('keeps the legacy signature for an unsafe incomplete call', () => {
+    const text = '=SUM({1,2';
+    expect(findActiveSignature(text, text.length)).toEqual({
+      name: 'SUM',
+      args: FUNCTION_SIGNATURES.SUM,
+      activeArgIndex: 0,
+    });
+  });
+
   it('bumps activeArgIndex once per top-level comma', () => {
     const text = '=IF(A1>0, B1,';
     const sig = findActiveSignature(text, text.length);
@@ -311,12 +320,32 @@ describe('findFunctionCallAtCaret', () => {
     expect(span?.canonicalName).toBe('SUM');
     expect(span?.closeParen).toBeNull();
     expect(span?.complete).toBe(false);
+    expect(span?.safeToComplete).toBe(true);
     expect(span?.argumentSpans.map(({ start, end }) => incomplete.slice(start, end))).toEqual([
       'IF(1,2)',
       '',
     ]);
     expect(findFunctionCallAtCaret('=SUM({1,2],3)', 8, resolve)).toBeNull();
-    expect(findFunctionCallAtCaret('=SUM("unterminated)', 8, resolve)?.complete).toBe(false);
+    expect(findFunctionCallAtCaret('=SUM("unterminated)', 8, resolve)).toMatchObject({
+      complete: false,
+      safeToComplete: false,
+    });
+  });
+
+  it('marks only structurally closable EOF calls as safe to complete', () => {
+    const cases: readonly [string, boolean][] = [
+      ['=SUM(1,2', true],
+      ['=SUM({1,2', false],
+      ['=SUM(Table1[[#Headers],[Amount]', false],
+      ['=SUM((1+2', false],
+      ['=SUM("unterminated', false],
+      ["=SUM('unterminated", false],
+      ['=SUM(UNKNOWN(1,2', false],
+    ];
+
+    for (const [text, expected] of cases) {
+      expect(findFunctionCallAtCaret(text, text.length, resolve)?.safeToComplete).toBe(expected);
+    }
   });
 
   it('rejects nonformulas and invalid caret positions', () => {
