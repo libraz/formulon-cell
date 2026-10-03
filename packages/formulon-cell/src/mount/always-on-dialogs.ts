@@ -25,6 +25,14 @@ export interface AlwaysOnDialogsDeps {
   /** Called after the CF rules dialog changed the rule set. */
   onConditionalRulesChanged: () => void;
   openConditionalDialog: (options: ConditionalDialogOpenOptions) => void;
+  /** True while an interaction policy blocks the filter dropdown. */
+  isRestricted: () => boolean;
+}
+
+interface OpenFilterDetail {
+  range: Range;
+  col: number;
+  anchor: { x: number; y: number; h: number; clientX: number; clientY: number };
 }
 
 export interface AlwaysOnDialogs {
@@ -74,6 +82,23 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
   });
   let filterDropdown = attachFilter();
 
+  // Filter dropdown — opens when the pointer dispatches `fc:openfilter`
+  // from a clicked column-filter chevron; no public toggle.
+  const onOpenFilter = (e: Event): void => {
+    if (deps.isRestricted()) return;
+    const detail = (e as CustomEvent<OpenFilterDetail>).detail;
+    if (!detail) return;
+    // The dropdown is positioned with `position: fixed`, so it expects
+    // viewport-relative coords. The pointer payload's `x/y` are host-relative;
+    // use `clientX/clientY` instead. `- 4` matches the chevron offset.
+    filterDropdown.open(detail.range, detail.col, {
+      x: detail.anchor.clientX,
+      y: detail.anchor.clientY - 4,
+      h: detail.anchor.h,
+    });
+  };
+  host.addEventListener('fc:openfilter', onOpenFilter);
+
   return {
     openExternalLinks: () => externalLinksDialog.open(),
     openCfRules: () => cfRulesDialog.open(),
@@ -108,6 +133,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
       filterDropdown = attachFilter();
     },
     detach() {
+      host.removeEventListener('fc:openfilter', onOpenFilter);
       evaluateFormulaDialog.detach();
       externalLinksDialog.detach();
       cfRulesDialog.detach();

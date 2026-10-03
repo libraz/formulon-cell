@@ -337,28 +337,8 @@ export const Spreadsheet = {
         renderer.invalidate();
       },
       openConditionalDialog: (options) => featureState.conditionalDialog?.open(options),
+      isRestricted: () => commands.policy !== undefined,
     });
-    // Filter dropdown — opens when the pointer dispatches `fc:openfilter`
-    // from a clicked column-filter chevron; no public toggle.
-    interface OpenFilterDetail {
-      range: import('./engine/types.js').Range;
-      col: number;
-      anchor: { x: number; y: number; h: number; clientX: number; clientY: number };
-    }
-    const onOpenFilter = (e: Event): void => {
-      if (commands.policy !== undefined) return;
-      const detail = (e as CustomEvent<OpenFilterDetail>).detail;
-      if (!detail) return;
-      // The dropdown is positioned with `position: fixed`, so it expects
-      // viewport-relative coords. The pointer payload's `x/y` are host-relative;
-      // use `clientX/clientY` instead. `- 4` matches the chevron offset.
-      alwaysOnDialogs.openFilter(detail.range, detail.col, {
-        x: detail.anchor.clientX,
-        y: detail.anchor.clientY - 4,
-        h: detail.anchor.h,
-      });
-    };
-    host.addEventListener('fc:openfilter', onOpenFilter);
 
     const featureRegistry = new Map<string, ExtensionHandle>();
     const wrapHandle = (raw: unknown, detach: () => void): ExtensionHandle => {
@@ -1261,7 +1241,6 @@ export const Spreadsheet = {
         formulaBar.detach();
         sheetTabsController?.detach();
         chromeSync?.detach();
-        host.removeEventListener('fc:openfilter', onOpenFilter);
         alwaysOnDialogs.detach();
         unsubCellRegistry();
         formulaDraftMirror.detach();
