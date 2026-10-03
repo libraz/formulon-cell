@@ -24,6 +24,7 @@ import {
   shiftRangeAxis,
 } from './axis-shift.js';
 import { recordFilterChange } from './filter.js';
+import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
@@ -46,21 +47,6 @@ function collectAllCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
   const out: CellRecord[] = [];
   for (const c of wb.cells(sheet)) {
     out.push({ addr: c.addr, value: c.value, formula: c.formula });
-  }
-  return out;
-}
-
-interface FormulaRecord {
-  addr: Addr;
-  formula: string;
-}
-
-function collectAllFormulas(wb: WorkbookHandle): FormulaRecord[] {
-  const out: FormulaRecord[] = [];
-  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-    for (const c of wb.cells(sheet)) {
-      if (c.formula !== null) out.push({ addr: c.addr, formula: c.formula });
-    }
   }
   return out;
 }

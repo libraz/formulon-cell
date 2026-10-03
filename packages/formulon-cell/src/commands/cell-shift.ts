@@ -8,7 +8,7 @@ import { type CellFormat, mutators, type SpreadsheetStore, type State } from '..
 import { listComments, recordCommentChange } from './comment.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import type { History } from './history.js';
-import { isSheetProtected } from './protection.js';
+import { blockedByProtection } from './protection.js';
 import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
 
 export type InsertCellsDirection = 'down' | 'right';
@@ -34,11 +34,7 @@ export function insertCells(
   direction: InsertCellsDirection,
 ): boolean {
   const sheet = range.sheet;
-  if (isSheetProtected(store.getState(), sheet)) {
-    // eslint-disable-next-line no-console
-    console.warn(`formulon-cell: insert cells blocked — sheet ${sheet} is protected`);
-    return false;
-  }
+  if (blockedByProtection(store, sheet, 'insert cells')) return false;
   const affected: Range =
     direction === 'down'
       ? { sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
@@ -56,11 +52,7 @@ export function deleteCells(
   direction: DeleteCellsDirection,
 ): boolean {
   const sheet = range.sheet;
-  if (isSheetProtected(store.getState(), sheet)) {
-    // eslint-disable-next-line no-console
-    console.warn(`formulon-cell: delete cells blocked — sheet ${sheet} is protected`);
-    return false;
-  }
+  if (blockedByProtection(store, sheet, 'delete cells')) return false;
   const affected: Range =
     direction === 'up'
       ? { sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
