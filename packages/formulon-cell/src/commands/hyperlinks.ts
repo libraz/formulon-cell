@@ -22,6 +22,18 @@ export function hyperlinkAt(state: State, addr: Addr): string | null {
   return target && target.length > 0 ? target : null;
 }
 
+/** Whether `url` may be followed from the UI: only http(s), mailto and tel,
+ *  so a hostile cell value cannot smuggle a `javascript:` URL. */
+export function isSafeHyperlinkTarget(url: string): boolean {
+  const lower = url.trim().toLowerCase();
+  return (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('mailto:') ||
+    lower.startsWith('tel:')
+  );
+}
+
 export function listHyperlinks(state: State, sheet = state.data.sheetIndex): HyperlinkEntry[] {
   const out: HyperlinkEntry[] = [];
   for (const [key, fmt] of state.format.formats) {

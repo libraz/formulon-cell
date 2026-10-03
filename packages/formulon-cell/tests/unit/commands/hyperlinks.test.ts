@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   clearHyperlink,
   hyperlinkAt,
+  isSafeHyperlinkTarget,
   listEngineHyperlinks,
   listHyperlinks,
   setHyperlink,
@@ -149,6 +150,26 @@ describe('hyperlink commands', () => {
       expect(warn).toHaveBeenCalledTimes(1);
     } finally {
       warn.mockRestore();
+    }
+  });
+});
+
+describe('isSafeHyperlinkTarget', () => {
+  it('allows http(s), mailto and tel regardless of case or surrounding whitespace', () => {
+    for (const url of ['http://a.example', ' HTTPS://a.example ', 'mailto:a@b.c', 'tel:+81']) {
+      expect(isSafeHyperlinkTarget(url)).toBe(true);
+    }
+  });
+
+  it('rejects script-bearing and unknown schemes', () => {
+    for (const url of [
+      'javascript:alert(1)',
+      'data:text/html,x',
+      'file:///etc/passwd',
+      '',
+      'a.example',
+    ]) {
+      expect(isSafeHyperlinkTarget(url)).toBe(false);
     }
   });
 });
