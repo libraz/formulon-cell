@@ -11,6 +11,7 @@ import {
   type ValueFilterCriteria,
 } from '../store/store.js';
 import {
+  type AutofitOptions,
   computeAutofitColWidth,
   computeAutofitRowHeight,
   createAutofitMeasureContext,
@@ -1087,12 +1088,13 @@ export function autofitRowsHeight(
   r0: number,
   r1: number,
   wb?: WorkbookHandle,
+  opts?: AutofitOptions,
 ): void {
   if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const ctx = createAutofitMeasureContext();
     for (let row = r0; row <= r1; row += 1) {
-      mutators.setRowHeight(store, row, computeAutofitRowHeight(store.getState(), row, ctx));
+      mutators.setRowHeight(store, row, computeAutofitRowHeight(store.getState(), row, ctx, opts));
     }
   });
 }
@@ -1103,15 +1105,19 @@ export function autofitColsWidth(
   c0: number,
   c1: number,
   wb?: WorkbookHandle,
+  opts?: AutofitOptions,
 ): void {
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const ctx = createAutofitMeasureContext();
     for (let col = c0; col <= c1; col += 1) {
-      mutators.setColWidth(store, col, computeAutofitColWidth(store.getState(), col, ctx));
+      mutators.setColWidth(store, col, computeAutofitColWidth(store.getState(), col, ctx, opts));
     }
   });
 }
 
+/** Resolve which row/col indices to show again from the current selection.
+ *  Spreadsheets return visible rows that flank a hidden band; we emulate by
+ *  reporting every hidden row inside the selection. */
 export function hiddenInSelection(
   layout: LayoutSlice,
   axis: 'row' | 'col',

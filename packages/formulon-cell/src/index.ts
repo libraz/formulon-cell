@@ -15,6 +15,8 @@ export {
   visibleStatusAggregates,
 } from './commands/aggregate.js';
 export { type AutoSumFunction, autoSum } from './commands/auto-sum.js';
+export type { AutofitCellFormat, AutofitOptions } from './commands/autofit-measurement.js';
+export { autofitColWidth, autofitRowHeight } from './commands/autofit-measurement.js';
 export type { DeleteCellsDirection, InsertCellsDirection } from './commands/cell-shift.js';
 export { deleteCells, insertCells } from './commands/cell-shift.js';
 export type {
@@ -1261,8 +1263,6 @@ export type {
   RibbonUiState,
 } from './toolbar/ribbon/apply-ribbon-command.js';
 export { applyRibbonCommand } from './toolbar/ribbon/apply-ribbon-command.js';
-export type { AutofitCellFormat } from './toolbar/ribbon/autofit.js';
-export { autofitColWidth, autofitRowHeight } from './toolbar/ribbon/autofit.js';
 export type {
   BackstageAction,
   BackstageDeps,

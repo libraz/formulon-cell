@@ -3,6 +3,8 @@
 // caller's side via the `deps` struct (status text, tab list refresh, etc).
 
 import {
+  autofitColsWidth,
+  autofitRowsHeight,
   hiddenInSelection,
   hideCols,
   hideRows,
@@ -19,7 +21,6 @@ import {
   showRows,
   type ToolbarMenuText,
 } from '../../index.js';
-import { autofitColWidth, autofitRowHeight } from './autofit.js';
 
 type CellFormatMenuText = ToolbarMenuText & {
   rowHeightLabel: string;
@@ -172,12 +173,9 @@ export const applyCellFormatAction = async (
     return;
   }
   if (action === 'row-autofit') {
-    recordLayoutChange(i.history, i.store, () => {
-      for (let row = range.r0; row <= range.r1; row += 1) {
-        const height = autofitRowHeight(i, row, range.c0, range.c1, ribbonLang);
-        mutators.setRowHeight(i.store, row, height);
-        i.workbook.setRowHeight(range.sheet, row, height);
-      }
+    autofitRowsHeight(i.store, i.history, range.r0, range.r1, i.workbook, {
+      span: { from: range.c0, to: range.c1 },
+      locale: ribbonLang,
     });
     return;
   }
@@ -199,12 +197,9 @@ export const applyCellFormatAction = async (
     // `col-autofit` here — preserved verbatim.
   }
   if (action === 'col-autofit') {
-    recordLayoutChange(i.history, i.store, () => {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const width = autofitColWidth(i, col, range.r0, range.r1, ribbonLang);
-        mutators.setColWidth(i.store, col, width);
-        i.workbook.setColumnWidth(range.sheet, col, col, width);
-      }
+    autofitColsWidth(i.store, i.history, range.c0, range.c1, i.workbook, {
+      span: { from: range.r0, to: range.r1 },
+      locale: ribbonLang,
     });
   }
 };

@@ -1,8 +1,34 @@
-/** Canvas text measurement behind the autofit row-height / column-width commands. */
+/** Content-fit column widths and row heights. Every autofit entry point — header
+ *  double-click, the structure commands, the ribbon AutoFit items and the
+ *  public `autofitColWidth` / `autofitRowHeight` helpers — measures here.
+ *  Results are unclamped; the store's size mutators own the min/max bounds. */
 import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
-import type { CellFormat, State } from '../store/store.js';
+import { normalizeFormatLocale } from '../format/locale.js';
+import { FILTER_BTN_INSET, FILTER_BTN_SIZE } from '../render/geometry.js';
+import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { formatNumber } from './format.js';
+
+/** Width the autofilter dropdown button occupies at a header's trailing edge. */
+export const FILTER_DROPDOWN_RESERVED_WIDTH = FILTER_BTN_INSET + FILTER_BTN_SIZE;
+
+const COL_PADDING = 16;
+const MIN_COL_WIDTH = 48;
+const DEFAULT_FONT_SIZE = 13;
+
+/** The cell-format fields autofit measurement reads. */
+export type AutofitCellFormat = Pick<
+  CellFormat,
+  'fontSize' | 'fontFamily' | 'bold' | 'italic' | 'numFmt' | 'wrap'
+>;
+
+export interface AutofitOptions {
+  /** Inclusive cross-axis bounds to scan: rows for a column fit, columns for a
+   *  row fit. The whole column / row when omitted. */
+  span?: { from: number; to: number };
+  /** Number-format locale (`ja`, `en-US`, ...); `en-US` when omitted. */
+  locale?: string;
+}
 
 export function createAutofitMeasureContext(): CanvasRenderingContext2D | null {
   const doc = globalThis.document;
@@ -14,44 +40,50 @@ export function computeAutofitColWidth(
   state: State,
   col: number,
   ctx: CanvasRenderingContext2D | null,
+  opts: AutofitOptions = {},
 ): number {
   const sheet = state.data.sheetIndex;
-  const padding = 16;
-  const minWidth = 48;
+  const locale = normalizeFormatLocale(opts.locale ?? '');
   let max = 0;
 
   for (const [key, cell] of state.data.cells) {
     const parsed = parseCellKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.col !== col) continue;
-    const text = autofitDisplayText(state, key, cell);
+    if (!inSpan(parsed.row, opts.span)) continue;
+    const text = autofitDisplayText(state, key, cell, locale);
     if (!text) continue;
     const fmt = state.format.formats.get(key);
-    const fontSize = fmt?.fontSize ?? 13;
+    const fontSize = fmt?.fontSize ?? DEFAULT_FONT_SIZE;
     if (ctx) ctx.font = autofitFont(fmt);
     const width =
       maxExplicitLineWidth(text, ctx, fontSize) +
-      (isFilterHeaderCell(state, parsed.sheet, parsed.row, parsed.col) ? 28 : 0);
+      (isFilterHeaderCell(state, parsed.sheet, parsed.row, parsed.col)
+        ? FILTER_DROPDOWN_RESERVED_WIDTH
+        : 0);
     if (width > max) max = width;
   }
 
-  return Math.max(minWidth, Math.ceil(max) + padding);
+  return Math.max(MIN_COL_WIDTH, Math.ceil(max) + COL_PADDING);
 }
 
 export function computeAutofitRowHeight(
   state: State,
   row: number,
   ctx: CanvasRenderingContext2D | null,
+  opts: AutofitOptions = {},
 ): number {
   const sheet = state.data.sheetIndex;
+  const locale = normalizeFormatLocale(opts.locale ?? '');
   let max = state.layout.defaultRowHeight;
 
   for (const [key, cell] of state.data.cells) {
     const parsed = parseCellKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.row !== row) continue;
-    const text = autofitDisplayText(state, key, cell);
+    if (!inSpan(parsed.col, opts.span)) continue;
+    const text = autofitDisplayText(state, key, cell, locale);
     if (!text) continue;
     const fmt = state.format.formats.get(key);
-    const fontSize = fmt?.fontSize ?? 13;
+    const fontSize = fmt?.fontSize ?? DEFAULT_FONT_SIZE;
     if (ctx) ctx.font = autofitFont(fmt);
     const lineHeight = Math.round(fontSize * 1.28);
     const colW = state.layout.colWidths.get(parsed.col) ?? state.layout.defaultColWidth;
@@ -61,6 +93,38 @@ export function computeAutofitRowHeight(
   }
 
   return max;
+}
+
+/** Fitted width of `col`, measuring only rows `r0..r1`. */
+export function autofitColWidth(
+  instance: { readonly store: SpreadsheetStore },
+  col: number,
+  r0: number,
+  r1: number,
+  locale: string,
+): number {
+  return computeAutofitColWidth(instance.store.getState(), col, createAutofitMeasureContext(), {
+    span: { from: r0, to: r1 },
+    locale,
+  });
+}
+
+/** Fitted height of `row`, measuring only columns `c0..c1`. */
+export function autofitRowHeight(
+  instance: { readonly store: SpreadsheetStore },
+  row: number,
+  c0: number,
+  c1: number,
+  locale: string,
+): number {
+  return computeAutofitRowHeight(instance.store.getState(), row, createAutofitMeasureContext(), {
+    span: { from: c0, to: c1 },
+    locale,
+  });
+}
+
+function inSpan(index: number, span: AutofitOptions['span']): boolean {
+  return !span || (index >= span.from && index <= span.to);
 }
 
 function parseCellKey(key: string): { sheet: number; row: number; col: number } | null {
@@ -77,12 +141,13 @@ function autofitDisplayText(
   state: State,
   key: string,
   cell: { value: CellValue; formula: string | null },
+  locale: string,
 ): string {
   if (state.ui.showFormulas && cell.formula) return cell.formula;
   const fmt = state.format.formats.get(key);
   if (cell.value.kind === 'number' && fmt?.numFmt)
-    return formatNumber(cell.value.value, fmt.numFmt);
-  return formatCell(cell.value);
+    return formatNumber(cell.value.value, fmt.numFmt, locale);
+  return formatCell(cell.value, locale);
 }
 
 function isFilterHeaderCell(state: State, sheet: number, row: number, col: number): boolean {
@@ -90,10 +155,10 @@ function isFilterHeaderCell(state: State, sheet: number, row: number, col: numbe
   return !!fr && fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1;
 }
 
-function autofitFont(format: CellFormat | undefined): string {
+function autofitFont(format: AutofitCellFormat | undefined): string {
   const styleSlant = format?.italic ? 'italic ' : '';
   const weight = format?.bold ? 700 : 400;
-  const size = format?.fontSize ?? 13;
+  const size = format?.fontSize ?? DEFAULT_FONT_SIZE;
   const family = format?.fontFamily ?? 'system-ui, sans-serif';
   return `${styleSlant}${weight} ${size}px ${fontFamilyCss(family)}`;
 }
@@ -116,8 +181,7 @@ function maxExplicitLineWidth(
 ): number {
   let max = 0;
   for (const line of text.split(/\r\n|\r|\n/)) {
-    const measured = ctx ? ctx.measureText(line).width : 0;
-    const width = measured > 0 ? measured : line.length * fontSize * 0.54;
+    const width = measureAutofitText(line, ctx, fontSize);
     if (width > max) max = width;
   }
   return max;
@@ -166,6 +230,7 @@ function wrapAutofitParagraph(
   return count + (line ? 1 : 0);
 }
 
+// Character-width estimate when no canvas is available (headless test DOMs).
 function measureAutofitText(
   text: string,
   ctx: CanvasRenderingContext2D | null,
@@ -174,7 +239,3 @@ function measureAutofitText(
   const measured = ctx ? ctx.measureText(text).width : 0;
   return measured > 0 ? measured : text.length * fontSize * 0.54;
 }
-
-/** Resolve which row/col indices to show again from the current selection.
- *  Spreadsheets return visible rows that flank a hidden band; we emulate by
- *  reporting every hidden row inside the selection. */

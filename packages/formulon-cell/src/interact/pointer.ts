@@ -18,6 +18,7 @@ import {
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
 import { shiftFormulaRefs } from '../commands/refs.js';
+import { autofitColsWidth, autofitRowsHeight } from '../commands/structure.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -51,7 +52,6 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
-import { autofitColWidth, autofitRowHeight } from './autofit.js';
 import {
   isNavigationAddrAllowed,
   navigationBoundsFor,
@@ -309,8 +309,6 @@ export function attachPointer(
       drag = { kind: 'none' };
     }
   });
-  const measureCanvas = document.createElement('canvas');
-  const measureCtx = measureCanvas.getContext('2d');
 
   const localXY = (e: PointerEvent | MouseEvent): { x: number; y: number } => {
     const rect = host.getBoundingClientRect();
@@ -1185,20 +1183,14 @@ export function attachPointer(
       e.preventDefault();
       e.stopPropagation();
       if (interactionControllerFor(store)?.policy !== undefined) return;
-      const before = captureLayoutSnapshot(s);
-      const w = autofitColWidth(store, zone.col, measureCtx);
-      mutators.setColWidth(store, zone.col, w);
-      pushLayoutDelta(history, store, wb, before);
+      autofitColsWidth(store, history, zone.col, zone.col, wb);
       return;
     }
     if (zone.kind === 'row-resize') {
       e.preventDefault();
       e.stopPropagation();
       if (interactionControllerFor(store)?.policy !== undefined) return;
-      const before = captureLayoutSnapshot(s);
-      const h = autofitRowHeight(store, zone.row, measureCtx);
-      mutators.setRowHeight(store, zone.row, h);
-      pushLayoutDelta(history, store, wb, before);
+      autofitRowsHeight(store, history, zone.row, zone.row, wb);
       return;
     }
   };
@@ -1220,29 +1212,6 @@ export function attachPointer(
     host.removeEventListener('dblclick', onDblClick);
     host.style.cursor = '';
   };
-}
-
-function pushLayoutDelta(
-  history: History | null,
-  store: SpreadsheetStore,
-  wb: WorkbookHandle,
-  before: LayoutSnapshot,
-): void {
-  const s = store.getState();
-  const after = captureLayoutSnapshot(s);
-  const sheet = s.data.sheetIndex;
-  syncLayoutSizesToEngine(wb, s.layout, sheet, before, after);
-  if (!history || history.isReplaying()) return;
-  history.push({
-    undo: () => {
-      applyLayoutSnapshot(store, before);
-      syncLayoutSizesToEngine(wb, store.getState().layout, sheet, after, before);
-    },
-    redo: () => {
-      applyLayoutSnapshot(store, after);
-      syncLayoutSizesToEngine(wb, store.getState().layout, sheet, before, after);
-    },
-  });
 }
 
 function updateCursor(host: HTMLElement, store: SpreadsheetStore, x: number, y: number): void {
