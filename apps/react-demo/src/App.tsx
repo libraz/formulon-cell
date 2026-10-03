@@ -18,10 +18,7 @@ import {
 } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildDemoBackstageCards,
-  buildDemoBackstageNav,
   buildDemoCommands,
-  buildDemoPrintPreviewModel,
   buildDemoReviewDialog,
   buildDemoReviewFindings,
   buildDemoSearchItems,
@@ -31,7 +28,6 @@ import {
   createInitialDemoWorkbook,
   DEMO_FUNCTIONS,
   DEMO_MAC_RIBBON_TABS,
-  DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
@@ -51,7 +47,6 @@ import {
   installDemoF6Navigation,
   installDemoScriptMenu,
   installDemoSearchShortcut,
-  isDemoBackstageActionDisabled,
   isDemoFeatureOn,
   LOCALES,
   loadDemoSearchUsagePrior,
@@ -72,6 +67,7 @@ import {
   saveDemoWorkbookToDownload,
   THEMES,
 } from '../../demo-shared/index.js';
+import { DemoBackstage } from './DemoBackstage.js';
 import { DemoIcon } from './DemoIcon.js';
 import { DemoReviewDialog } from './DemoReviewDialog.js';
 import { DemoScriptDialog } from './DemoScriptDialog.js';
@@ -271,19 +267,6 @@ export const App = (): ReactElement => {
     [commandText.openFailed, commandText.workbook, instance],
   );
 
-  const backstageNav = useMemo(
-    () => buildDemoBackstageNav(ui, backstageAction),
-    [backstageAction, ui],
-  );
-  const backstageCards = useMemo(() => buildDemoBackstageCards(ui), [ui]);
-  const printPreview = useMemo(() => {
-    void backstageAction;
-    return buildDemoPrintPreviewModel(ui, instance, bookName);
-  }, [backstageAction, bookName, instance, ui]);
-  const backstageActionDisabled = useCallback(
-    (action: DemoBackstageAction): boolean => isDemoBackstageActionDisabled(action, instance),
-    [instance],
-  );
   const runBackstageAction = useCallback(
     (action: DemoBackstageAction): void => {
       if (action === 'info' || action === 'print') {
@@ -596,110 +579,13 @@ export const App = (): ReactElement => {
             onCellChange={onCellChange}
           />
           {ribbonTab === 'file' ? (
-            <div className="fc-tb__backstage" role="dialog" aria-label={ui.file}>
-              <nav className="fc-tb__backstage-nav" aria-label={ui.file}>
-                <strong>{ui.file}</strong>
-                {backstageNav.map((item) => (
-                  <button
-                    key={item.action}
-                    type="button"
-                    className={`fc-tb__backstage-navitem${
-                      item.active ? ' fc-tb__backstage-navitem--active' : ''
-                    }`}
-                    onClick={() => runBackstageAction(item.action)}
-                    disabled={backstageActionDisabled(item.action)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-              <div className="fc-tb__backstage-main">
-                <div className="fc-tb__backstage-title">
-                  <span className="fc-tb__backstage-xl" aria-hidden="true">
-                    <DemoIcon name="app" />
-                  </span>
-                  <div>
-                    <h1>{bookName}</h1>
-                    <p>{ui.backstageSub}</p>
-                  </div>
-                </div>
-                {backstageAction === 'print' ? (
-                  <div className="fc-tb__print-preview" data-demo-print-preview>
-                    <section className="fc-tb__print-settings" aria-label={ui.printSettings}>
-                      <h2>{printPreview.title}</h2>
-                      <p>{printPreview.subtitle}</p>
-                      <button
-                        type="button"
-                        className="fc-tb__print-action fc-tb__print-action--primary"
-                        onClick={() => instance?.print('print')}
-                        disabled={!instance}
-                      >
-                        {printPreview.printLabel}
-                      </button>
-                      <button
-                        type="button"
-                        className="fc-tb__print-action"
-                        onClick={() => instance?.print('pdf')}
-                        disabled={!instance}
-                      >
-                        {printPreview.pdfLabel}
-                      </button>
-                      <button
-                        type="button"
-                        className="fc-tb__print-action"
-                        onClick={() => instance?.openPageSetup()}
-                        disabled={!instance}
-                      >
-                        {printPreview.pageSetupLabel}
-                      </button>
-                      <dl className="fc-tb__print-meta">
-                        {printPreview.settings.map((row) => (
-                          <div key={row.label}>
-                            <dt>{row.label}</dt>
-                            <dd>{row.value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </section>
-                    <section className="fc-tb__print-paper" aria-label={printPreview.previewTitle}>
-                      {printPreview.previewHtml ? (
-                        <iframe
-                          className="fc-tb__print-frame"
-                          title={printPreview.previewTitle}
-                          sandbox=""
-                          srcDoc={printPreview.previewHtml}
-                        />
-                      ) : (
-                        <div className="fc-tb__print-page">
-                          <strong>{printPreview.previewTitle}</strong>
-                          <div aria-hidden="true" className="fc-tb__print-sheet-lines">
-                            {DEMO_PRINT_PREVIEW_LINES.map((line) => (
-                              <span key={line} />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <p>{printPreview.previewHint}</p>
-                    </section>
-                  </div>
-                ) : (
-                  <div className="fc-tb__backstage-grid">
-                    {backstageCards.map((item) => (
-                      <button
-                        key={item.action}
-                        type="button"
-                        className="fc-tb__backstage-card"
-                        onClick={() => runBackstageAction(item.action)}
-                        disabled={backstageActionDisabled(item.action)}
-                      >
-                        <strong>{item.label}</strong>
-                        <span>{item.desc}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <DemoBackstage
+              ui={ui}
+              instance={instance}
+              bookName={bookName}
+              action={backstageAction}
+              onAction={runBackstageAction}
+            />
           ) : null}
         </div>
         <aside className="demo__panel" aria-label={ui.optionsPanel} hidden={!showPanel}>

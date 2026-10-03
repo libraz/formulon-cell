@@ -22,10 +22,7 @@ import {
   watch,
 } from 'vue';
 import {
-  buildDemoBackstageCards,
-  buildDemoBackstageNav,
   buildDemoCommands,
-  buildDemoPrintPreviewModel,
   buildDemoReviewDialog,
   buildDemoReviewFindings,
   buildDemoSearchItems,
@@ -36,7 +33,6 @@ import {
   DEMO_FUNCTIONS,
   demoFunctionArgumentHelp,
   DEMO_MAC_RIBBON_TABS,
-  DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
@@ -58,7 +54,6 @@ import {
   formatLoadError,
   FORMATTERS,
   installDemoF6Navigation,
-  isDemoBackstageActionDisabled,
   loadDemoSearchUsagePrior,
   LOCALES,
   type PresetKey,
@@ -76,6 +71,7 @@ import {
   saveDemoWorkbookToDownload,
   THEMES,
 } from '../../demo-shared/index.js';
+import DemoBackstage from './DemoBackstage.vue';
 import DemoIcon from './DemoIcon.vue';
 import DemoReviewDialog from './DemoReviewDialog.vue';
 import DemoScriptDialog from './DemoScriptDialog.vue';
@@ -132,12 +128,6 @@ const ribbonTabs = computed(() =>
 const features = computed<FeatureFlags>(() => resolvedUi.value.features);
 const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
 const commandText = computed(() => demoCommandText(locale.value));
-const backstageNav = computed(() => buildDemoBackstageNav(ui.value, backstageAction.value));
-const backstageCards = computed(() => buildDemoBackstageCards(ui.value));
-const printPreview = computed(() => {
-  void backstageAction.value;
-  return buildDemoPrintPreviewModel(ui.value, instance.value, bookName.value);
-});
 
 watch(
   locale,
@@ -269,9 +259,6 @@ const onNewWorkbook = async (): Promise<void> => {
   log.value = [];
   ribbonTab.value = 'home';
 };
-
-const backstageActionDisabled = (action: DemoBackstageAction): boolean =>
-  isDemoBackstageActionDisabled(action, instance.value);
 
 const runBackstageAction = (action: DemoBackstageAction): void => {
   if (action === 'info' || action === 'print') {
@@ -583,100 +570,14 @@ onBeforeUnmount(() => {
           @ready="onReady"
           @cell-change="onCellChange"
         />
-        <div v-if="ribbonTab === 'file'" class="fc-tb__backstage" role="dialog" :aria-label="ui.file">
-          <nav class="fc-tb__backstage-nav" :aria-label="ui.file">
-            <strong>{{ ui.file }}</strong>
-            <button
-              v-for="item in backstageNav"
-              :key="item.action"
-              type="button"
-              :class="[
-                'fc-tb__backstage-navitem',
-                item.active ? 'fc-tb__backstage-navitem--active' : '',
-              ]"
-              :disabled="backstageActionDisabled(item.action)"
-              @click="runBackstageAction(item.action)"
-            >
-              {{ item.label }}
-            </button>
-          </nav>
-          <div class="fc-tb__backstage-main">
-            <div class="fc-tb__backstage-title">
-              <span class="fc-tb__backstage-xl" aria-hidden="true">
-                <DemoIcon name="app" />
-              </span>
-              <div>
-                <h1>{{ bookName }}</h1>
-                <p>{{ ui.backstageSub }}</p>
-              </div>
-            </div>
-            <div v-if="backstageAction === 'print'" class="fc-tb__print-preview" data-demo-print-preview>
-              <section class="fc-tb__print-settings" :aria-label="ui.printSettings">
-                <h2>{{ printPreview.title }}</h2>
-                <p>{{ printPreview.subtitle }}</p>
-                <button
-                  type="button"
-                  class="fc-tb__print-action fc-tb__print-action--primary"
-                  :disabled="!instance"
-                  @click="instance?.print('print')"
-                >
-                  {{ printPreview.printLabel }}
-                </button>
-                <button
-                  type="button"
-                  class="fc-tb__print-action"
-                  :disabled="!instance"
-                  @click="instance?.print('pdf')"
-                >
-                  {{ printPreview.pdfLabel }}
-                </button>
-                <button
-                  type="button"
-                  class="fc-tb__print-action"
-                  :disabled="!instance"
-                  @click="instance?.openPageSetup()"
-                >
-                  {{ printPreview.pageSetupLabel }}
-                </button>
-                <dl class="fc-tb__print-meta">
-                  <div v-for="row in printPreview.settings" :key="row.label">
-                    <dt>{{ row.label }}</dt>
-                    <dd>{{ row.value }}</dd>
-                  </div>
-                </dl>
-              </section>
-              <section class="fc-tb__print-paper" :aria-label="printPreview.previewTitle">
-                <iframe
-                  v-if="printPreview.previewHtml"
-                  class="fc-tb__print-frame"
-                  :title="printPreview.previewTitle"
-                  sandbox=""
-                  :srcdoc="printPreview.previewHtml"
-                />
-                <div v-else class="fc-tb__print-page">
-                  <strong>{{ printPreview.previewTitle }}</strong>
-                  <div aria-hidden="true" class="fc-tb__print-sheet-lines">
-                    <span v-for="line in DEMO_PRINT_PREVIEW_LINES" :key="line" />
-                  </div>
-                </div>
-                <p>{{ printPreview.previewHint }}</p>
-              </section>
-            </div>
-            <div v-else class="fc-tb__backstage-grid">
-              <button
-                v-for="item in backstageCards"
-                :key="item.action"
-                type="button"
-                class="fc-tb__backstage-card"
-                :disabled="backstageActionDisabled(item.action)"
-                @click="runBackstageAction(item.action)"
-              >
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.desc }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <DemoBackstage
+          v-if="ribbonTab === 'file'"
+          :ui="ui"
+          :instance="instance"
+          :book-name="bookName"
+          :action="backstageAction"
+          @action="runBackstageAction"
+        />
       </div>
       <aside class="demo__panel" :aria-label="ui.optionsPanel" :hidden="!showPanel">
         <section class="demo__card">
