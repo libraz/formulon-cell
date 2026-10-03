@@ -52,6 +52,16 @@ const stubInstance = (): SpreadsheetInstance => {
 };
 
 describe('Mac ribbon dispatch coverage', () => {
+  it('surfaces a failing handler through the mocked report dialog', async () => {
+    const deps = {
+      inst: stubInstance(),
+      runtime: { projectFormatToolbar: () => undefined },
+    } as unknown as ApplyRibbonCommandDeps;
+    dispatchMacRibbonCommand('mac.draw.toggle', deps, () => true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(reported).toContain('Ink is unavailable for this spreadsheet.');
+  });
+
   it('routes every supported, enabled command to a handler', async () => {
     const instance = stubInstance();
     const deps = {
