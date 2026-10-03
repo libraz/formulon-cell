@@ -22,6 +22,7 @@ import type {
 import { formatCell, fromEngineValue } from './value.js';
 import { installWorkbookFeatureMethods } from './workbook-handle-features.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
+import { installPrintMethods } from './workbook-handle-print.js';
 
 export type ChangeListener = (e: ChangeEvent) => void;
 
@@ -1320,6 +1321,7 @@ export class WorkbookHandle {
 }
 
 installPivotMethods(WorkbookHandle);
+installPrintMethods(WorkbookHandle);
 installWorkbookFeatureMethods(WorkbookHandle);
 
 export { addrKey };

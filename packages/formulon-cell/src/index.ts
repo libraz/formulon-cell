@@ -818,12 +818,12 @@ export type {
   ChangeListener,
 } from './engine/workbook-handle.js';
 export { WorkbookHandle } from './engine/workbook-handle.js';
+export type { WorkbookHandleFeatureMethods } from './engine/workbook-handle-features.js';
+export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
 export type {
   EngineHeaderFooterInput,
   EnginePageSetupInput,
-  WorkbookHandleFeatureMethods,
-} from './engine/workbook-handle-features.js';
-export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
+} from './engine/workbook-handle-print.js';
 // Public event surface — adapter packages and direct consumers wire to
 // these via `inst.on(...)`.
 export type {
