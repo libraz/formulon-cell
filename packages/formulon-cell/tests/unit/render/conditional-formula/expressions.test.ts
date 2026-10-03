@@ -5,7 +5,12 @@ import {
   parseFormulaPredicate,
 } from '../../../../src/render/conditional.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
-import { seedCell, seedNumber } from '../conditional-fixtures.js';
+import {
+  formulaRule,
+  seedCell,
+  seedNumber,
+  withConditionalRules,
+} from '../conditional-fixtures.js';
 
 describe('evaluateConditional', () => {
   afterEach(() => {
@@ -31,20 +36,9 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, 1);
     s = seedNumber(s, 1, 0, -1);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
-            formula: '=A1>0',
-            apply: { fill: '#ref' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 }, '=A1>0', '#ref'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -56,20 +50,9 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 1);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
-            formula: '=$A$1>0',
-            apply: { fill: '#abs' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 }, '=$A$1>0', '#abs'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -86,20 +69,13 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 1, 1, 1);
     s = seedNumber(s, 2, 0, 7);
     s = seedNumber(s, 2, 1, 9);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
-            formula: '=AND(A1>5,OR(B1=1,NOT(A1<5)))',
-            apply: { fill: '#logic' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
+        '=AND(A1>5,OR(B1=1,NOT(A1<5)))',
+        '#logic',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -117,32 +93,19 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 1, 1, 9);
     s = seedNumber(s, 2, 0, 3);
     s = seedNumber(s, 2, 1, 9);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
-            formula: '=XOR(A1>5,B1>5,FALSE)',
-            apply: { fill: '#xor' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=AND(A1>5,B1>0)=TRUE()',
-            apply: { fill: '#logical-comparison' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=N(XOR(A1>5,B1>5,FALSE))=1',
-            apply: { fill: '#logical-coerce' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 }, '=XOR(A1>5,B1>5,FALSE)', '#xor'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=AND(A1>5,B1>0)=TRUE()',
+        '#logical-comparison',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=N(XOR(A1>5,B1>5,FALSE))=1',
+        '#logical-coerce',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -160,20 +123,9 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 1, 3);
     s = seedNumber(s, 1, 0, 2);
     s = seedNumber(s, 1, 1, 3);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
-            formula: '=A1+B1*2>8',
-            apply: { fill: '#math' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 }, '=A1+B1*2>8', '#math'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -187,20 +139,13 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 1);
     s = seedNumber(s, 1, 0, 2);
     s = seedNumber(s, 2, 0, 3);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=SUM($A$1:$A$3)/COUNT($A$1:$A$3)=2',
-            apply: { fill: '#math-agg' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=SUM($A$1:$A$3)/COUNT($A$1:$A$3)=2',
+        '#math-agg',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -211,20 +156,9 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 4);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=A1*-1=-4',
-            apply: { fill: '#negative' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, '=A1*-1=-4', '#negative'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -235,26 +169,10 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 3);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 2 },
-            formula: '=$A$1^2=9',
-            apply: { fill: '#pow' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 },
-            formula: '=2^3^2=512',
-            apply: { fill: '#pow-right' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 2 }, '=$A$1^2=9', '#pow'),
+      formulaRule({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 }, '=2^3^2=512', '#pow-right'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -270,20 +188,13 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 1);
     s = seedNumber(s, 1, 0, -1);
     s = seedNumber(s, 2, 0, 3);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
-            formula: "=AND(Sheet1!A1>0,SUM('Sheet1'!$A$1:$A$3)>2)",
-            apply: { fill: '#sheet' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+        "=AND(Sheet1!A1>0,SUM('Sheet1'!$A$1:$A$3)>2)",
+        '#sheet',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -300,32 +211,15 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 1, 1, 1);
     s = seedNumber(s, 2, 0, 2);
     s = seedNumber(s, 2, 1, 9);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
-            formula: '=IF(A1>5,B1>2,FALSE)',
-            apply: { fill: '#if' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=TRUE()',
-            apply: { fill: '#true-function' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=IF(A1>5,,TRUE)',
-            apply: { fill: '#if-omitted-boolean' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 }, '=IF(A1>5,B1>2,FALSE)', '#if'),
+      formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 }, '=TRUE()', '#true-function'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=IF(A1>5,,TRUE)',
+        '#if-omitted-boolean',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -342,20 +236,13 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'label' });
     s = seedNumber(s, 1, 0, 42);
     s = seedCell(s, 2, 0, { kind: 'error', code: 1, text: '#DIV/0!' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 3, c1: 1 },
-            formula: '=OR(ISTEXT(A1),ISNUMBER(A1),ISERROR(A1),ISBLANK(A1))',
-            apply: { fill: '#is' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 3, c1: 1 },
+        '=OR(ISTEXT(A1),ISNUMBER(A1),ISERROR(A1),ISBLANK(A1))',
+        '#is',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -369,20 +256,9 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 1);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=Sheet2!A1>0',
-            apply: { fill: '#sheet2' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, '=Sheet2!A1>0', '#sheet2'),
+    ]);
 
     const overlay = evaluateConditional(s);
 

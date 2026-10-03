@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { _resetConditionalCache, evaluateConditional } from '../../../../src/render/conditional.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
-import { seedCell, seedNumber } from '../conditional-fixtures.js';
+import {
+  formulaRule,
+  seedCell,
+  seedNumber,
+  withConditionalRules,
+} from '../conditional-fixtures.js';
 
 describe('evaluateConditional', () => {
   afterEach(() => {
@@ -19,50 +24,38 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 3, 10);
     s = seedNumber(s, 0, 4, 20);
     s = seedNumber(s, 0, 5, 30);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
-            formula: '=ISNUMBER(MATCH(A1,$A$1:$A$3,0))',
-            apply: { fill: '#match-col' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=MATCH(20,$D$1:$F$1,0)=2',
-            apply: { fill: '#match-row' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=ISNA(MATCH("West",$A$1:$A$3,0))',
-            apply: { fill: '#match-na' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=ISNA(MATCH("North",$A$1:$A$3,1))',
-            apply: { fill: '#match-unsupported' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=MATCH("No*",$A$1:$A$3,0)=1',
-            apply: { fill: '#match-wildcard' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 10, r1: 0, c1: 10 },
-            formula: '=MATCH("A~*B",$A$4:$A$4,0)=1',
-            apply: { fill: '#match-escaped-wildcard' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
+        '=ISNUMBER(MATCH(A1,$A$1:$A$3,0))',
+        '#match-col',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=MATCH(20,$D$1:$F$1,0)=2',
+        '#match-row',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=ISNA(MATCH("West",$A$1:$A$3,0))',
+        '#match-na',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=ISNA(MATCH("North",$A$1:$A$3,1))',
+        '#match-unsupported',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+        '=MATCH("No*",$A$1:$A$3,0)=1',
+        '#match-wildcard',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 10, r1: 0, c1: 10 },
+        '=MATCH("A~*B",$A$4:$A$4,0)=1',
+        '#match-escaped-wildcard',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -90,44 +83,33 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 3, { kind: 'text', value: 'East' });
     s = seedCell(s, 0, 4, { kind: 'text', value: 'North' });
     s = seedCell(s, 0, 5, { kind: 'text', value: 'South' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=MATCH(17,$A$1:$A$4,1)=2',
-            apply: { fill: '#match-ascending' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
-            formula: '=MATCH(17,$B$1:$B$4,-1)=2',
-            apply: { fill: '#match-descending' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=MATCH("Nor",$D$1:$F$1,1)=1',
-            apply: { fill: '#match-text-ascending' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 6, r1: 1, c1: 6 },
-            formula: '=MATCH(17,$A$1:$A$4)=2',
-            apply: { fill: '#match-omitted-approx' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
-            formula: '=ISNA(MATCH(17,$A$1:$B$2,1))',
-            apply: { fill: '#match-not-one-dimensional' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=MATCH(17,$A$1:$A$4,1)=2',
+        '#match-ascending',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
+        '=MATCH(17,$B$1:$B$4,-1)=2',
+        '#match-descending',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=MATCH("Nor",$D$1:$F$1,1)=1',
+        '#match-text-ascending',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 6, r1: 1, c1: 6 },
+        '=MATCH(17,$A$1:$A$4)=2',
+        '#match-omitted-approx',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
+        '=ISNA(MATCH(17,$A$1:$B$2,1))',
+        '#match-not-one-dimensional',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -152,56 +134,43 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 5, 0, { kind: 'text', value: 'North' });
     s = seedCell(s, 5, 1, { kind: 'text', value: 'South' });
     s = seedCell(s, 5, 2, { kind: 'text', value: 'East' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=XMATCH("South",$A$1:$A$4)=2',
-            apply: { fill: '#xmatch-exact' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=XMATCH("No*",$A$1:$A$4,2)=1',
-            apply: { fill: '#xmatch-wildcard' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=XMATCH("North",$A$1:$A$4,0,-1)=4',
-            apply: { fill: '#xmatch-reverse' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=INDEX($B$1:$B$4,XMATCH("North",$A$1:$A$4,0,-1))=14',
-            apply: { fill: '#xmatch-index' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=XMATCH("East",$A$6:$C$6)=3',
-            apply: { fill: '#xmatch-horizontal' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=ISNA(XMATCH("South",$A$1:$A$4,-1))',
-            apply: { fill: '#xmatch-unsupported' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=XMATCH("North",$A$1:$A$4,,-1)=4',
-            apply: { fill: '#xmatch-omitted-match-mode' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=XMATCH("South",$A$1:$A$4)=2',
+        '#xmatch-exact',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=XMATCH("No*",$A$1:$A$4,2)=1',
+        '#xmatch-wildcard',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=XMATCH("North",$A$1:$A$4,0,-1)=4',
+        '#xmatch-reverse',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=INDEX($B$1:$B$4,XMATCH("North",$A$1:$A$4,0,-1))=14',
+        '#xmatch-index',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=XMATCH("East",$A$6:$C$6)=3',
+        '#xmatch-horizontal',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=ISNA(XMATCH("South",$A$1:$A$4,-1))',
+        '#xmatch-unsupported',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+        '=XMATCH("North",$A$1:$A$4,,-1)=4',
+        '#xmatch-omitted-match-mode',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -224,38 +193,28 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 1, { kind: 'text', value: 'East' });
     s = seedCell(s, 1, 1, { kind: 'text', value: 'North' });
     s = seedCell(s, 2, 1, { kind: 'text', value: 'South' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=XMATCH(17,$A$1:$A$4,-1)=2',
-            apply: { fill: '#xmatch-next-smaller' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
-            formula: '=XMATCH(17,$A$1:$A$4,1)=3',
-            apply: { fill: '#xmatch-next-larger' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
-            formula: '=XMATCH("Nor",$B$1:$B$3,-1)=1',
-            apply: { fill: '#xmatch-text-next-smaller' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
-            formula: '=XMATCH("Nor",$B$1:$B$3,1)=2',
-            apply: { fill: '#xmatch-text-next-larger' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=XMATCH(17,$A$1:$A$4,-1)=2',
+        '#xmatch-next-smaller',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
+        '=XMATCH(17,$A$1:$A$4,1)=3',
+        '#xmatch-next-larger',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
+        '=XMATCH("Nor",$B$1:$B$3,-1)=1',
+        '#xmatch-text-next-smaller',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
+        '=XMATCH("Nor",$B$1:$B$3,1)=2',
+        '#xmatch-text-next-larger',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -276,56 +235,43 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 1, 1, 8);
     s = seedNumber(s, 2, 1, 4);
     s = seedNumber(s, 3, 1, 14);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=MATCH("South",OFFSET(A1,0,0,4,1),0)=2',
-            apply: { fill: '#match-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=XMATCH("West",INDIRECT("A1:A4"))=4',
-            apply: { fill: '#xmatch-indirect' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=INDEX(OFFSET(B1,0,0,4,1),XMATCH("West",A1:A4))=14',
-            apply: { fill: '#index-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=VLOOKUP("South",OFFSET(A1,0,0,4,2),2,FALSE)=8',
-            apply: { fill: '#vlookup-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=LARGE(INDIRECT("B1:B4"),2)=12',
-            apply: { fill: '#large-indirect' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=RANK(8,OFFSET(B1,0,0,4,1),0)=3',
-            apply: { fill: '#rank-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=MATCH("South",OFFSET(A1,0,0,2,2),0)=2',
-            apply: { fill: '#match-dynamic-not-one-dimensional' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=MATCH("South",OFFSET(A1,0,0,4,1),0)=2',
+        '#match-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=XMATCH("West",INDIRECT("A1:A4"))=4',
+        '#xmatch-indirect',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=INDEX(OFFSET(B1,0,0,4,1),XMATCH("West",A1:A4))=14',
+        '#index-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=VLOOKUP("South",OFFSET(A1,0,0,4,2),2,FALSE)=8',
+        '#vlookup-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=LARGE(INDIRECT("B1:B4"),2)=12',
+        '#large-indirect',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=RANK(8,OFFSET(B1,0,0,4,1),0)=3',
+        '#rank-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=MATCH("South",OFFSET(A1,0,0,2,2),0)=2',
+        '#match-dynamic-not-one-dimensional',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -347,38 +293,28 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 1, 12);
     s = seedNumber(s, 1, 1, 8);
     s = seedNumber(s, 2, 1, 4);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=CHOOSE(2,"North","South","East")="South"',
-            apply: { fill: '#choose-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=CHOOSE(XMATCH("South",$A$1:$A$3),$B$1,$B$2,$B$3)=8',
-            apply: { fill: '#choose-xmatch' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=CHOOSE(3,1+1,2+2,3+3)=6',
-            apply: { fill: '#choose-expression' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=ISERROR(CHOOSE(4,"North","South","East"))',
-            apply: { fill: '#choose-error' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=CHOOSE(2,"North","South","East")="South"',
+        '#choose-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=CHOOSE(XMATCH("South",$A$1:$A$3),$B$1,$B$2,$B$3)=8',
+        '#choose-xmatch',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=CHOOSE(3,1+1,2+2,3+3)=6',
+        '#choose-expression',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=ISERROR(CHOOSE(4,"North","South","East"))',
+        '#choose-error',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -397,38 +333,28 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 1, 12);
     s = seedNumber(s, 1, 1, 8);
     s = seedNumber(s, 2, 1, 4);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=SWITCH(A1,"North","Region N","South","Region S","Other")="Region N"',
-            apply: { fill: '#switch-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=SWITCH(XMATCH("South",$A$1:$A$3),1,$B$1,2,$B$2,3,$B$3)=8',
-            apply: { fill: '#switch-xmatch' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=SWITCH("West","North",1,"South",2,99)=99',
-            apply: { fill: '#switch-default' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=ISNA(SWITCH("West","North",1,"South",2))',
-            apply: { fill: '#switch-error' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=SWITCH(A1,"North","Region N","South","Region S","Other")="Region N"',
+        '#switch-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=SWITCH(XMATCH("South",$A$1:$A$3),1,$B$1,2,$B$2,3,$B$3)=8',
+        '#switch-xmatch',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=SWITCH("West","North",1,"South",2,99)=99',
+        '#switch-default',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=ISNA(SWITCH("West","North",1,"South",2))',
+        '#switch-error',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -447,38 +373,28 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 1, 12);
     s = seedNumber(s, 1, 1, 8);
     s = seedNumber(s, 2, 1, 4);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=IFS(A1="North","Region N",A1="South","Region S",TRUE,"Other")="Region N"',
-            apply: { fill: '#ifs-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=IFS(AND(A1="North",B1>10),B1,TRUE,0)=12',
-            apply: { fill: '#ifs-and' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 3, r1: 2, c1: 3 },
-            formula: '=IFS(B3>10,"High",TRUE,"Low")="Low"',
-            apply: { fill: '#ifs-fallback' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=ISNA(IFS(A1="West","Missing",A1="Central","Missing"))',
-            apply: { fill: '#ifs-error' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=IFS(A1="North","Region N",A1="South","Region S",TRUE,"Other")="Region N"',
+        '#ifs-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=IFS(AND(A1="North",B1>10),B1,TRUE,0)=12',
+        '#ifs-and',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 3, r1: 2, c1: 3 },
+        '=IFS(B3>10,"High",TRUE,"Low")="Low"',
+        '#ifs-fallback',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=ISNA(IFS(A1="West","Missing",A1="Central","Missing"))',
+        '#ifs-error',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -495,50 +411,38 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 1, 0, { kind: 'text', value: 'South' });
     s = seedNumber(s, 0, 1, 12);
     s = seedNumber(s, 1, 1, 8);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
-            formula: '=IF(A1="North","Region N","Other")="Region N"',
-            apply: { fill: '#if-text-result' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 3 },
-            formula: '=IF(AND(A1="North",B1>10),B1,0)=12',
-            apply: { fill: '#if-number-result' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=IF(TRUE(),42,1/0)=42',
-            apply: { fill: '#if-short-circuit-true' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=IF(FALSE(),1/0,"fallback")="fallback"',
-            apply: { fill: '#if-short-circuit-false' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=IF(A1="North",,99)=0',
-            apply: { fill: '#if-omitted-true' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 6, r1: 1, c1: 6 },
-            formula: '=IF(A2="North",99)=FALSE',
-            apply: { fill: '#if-omitted-false' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+        '=IF(A1="North","Region N","Other")="Region N"',
+        '#if-text-result',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 3 },
+        '=IF(AND(A1="North",B1>10),B1,0)=12',
+        '#if-number-result',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=IF(TRUE(),42,1/0)=42',
+        '#if-short-circuit-true',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=IF(FALSE(),1/0,"fallback")="fallback"',
+        '#if-short-circuit-false',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=IF(A1="North",,99)=0',
+        '#if-omitted-true',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 6, r1: 1, c1: 6 },
+        '=IF(A2="North",99)=FALSE',
+        '#if-omitted-false',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -565,38 +469,24 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 3, 4, { kind: 'text', value: 'Blue' });
     s = seedCell(s, 4, 3, { kind: 'text', value: 'Green' });
     s = seedCell(s, 4, 4, { kind: 'text', value: 'Gold' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=INDEX($A$1:$A$3,MATCH("South",$A$1:$A$3,0))="South"',
-            apply: { fill: '#index-column' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=INDEX($D$1:$F$1,2)=20',
-            apply: { fill: '#index-row' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=INDEX($D$4:$E$5,2,2)="Gold"',
-            apply: { fill: '#index-rect' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=ISERROR(INDEX($D$4:$E$5,3,1))',
-            apply: { fill: '#index-error' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=INDEX($A$1:$A$3,MATCH("South",$A$1:$A$3,0))="South"',
+        '#index-column',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 }, '=INDEX($D$1:$F$1,2)=20', '#index-row'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=INDEX($D$4:$E$5,2,2)="Gold"',
+        '#index-rect',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=ISERROR(INDEX($D$4:$E$5,3,1))',
+        '#index-error',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -613,50 +503,38 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 1, 0, { kind: 'text', value: 'South' });
     s = seedNumber(s, 0, 1, 12);
     s = seedNumber(s, 1, 1, 18);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=OFFSET(A1,1,0)="South"',
-            apply: { fill: '#offset-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 3 },
-            formula: '=OFFSET(A1,0,1)=12',
-            apply: { fill: '#offset-relative' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=OFFSET(A1,0,0,1,1)="North"',
-            apply: { fill: '#offset-sized' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=OFFSET(A1,0,0,2,1)="North"',
-            apply: { fill: '#offset-range' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=OFFSET(OFFSET(A1,1,0),0,0)="South"',
-            apply: { fill: '#offset-nested-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=OFFSET(INDIRECT("A1"),1,1)=18',
-            apply: { fill: '#offset-nested-indirect' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=OFFSET(A1,1,0)="South"',
+        '#offset-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 3 },
+        '=OFFSET(A1,0,1)=12',
+        '#offset-relative',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=OFFSET(A1,0,0,1,1)="North"',
+        '#offset-sized',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=OFFSET(A1,0,0,2,1)="North"',
+        '#offset-range',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=OFFSET(OFFSET(A1,1,0),0,0)="South"',
+        '#offset-nested-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=OFFSET(INDIRECT("A1"),1,1)=18',
+        '#offset-nested-indirect',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -675,68 +553,53 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 10);
     s = seedNumber(s, 1, 0, 20);
     s = seedCell(s, 2, 0, { kind: 'text', value: 'not numeric' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=SUM(OFFSET(A1,0,0,2,1))=30',
-            apply: { fill: '#offset-range-sum' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=COUNT(OFFSET(A1,0,0,3,1))=2',
-            apply: { fill: '#offset-range-count' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=SUM(INDIRECT("A1:A2"))=30',
-            apply: { fill: '#indirect-range-a1' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=SUM(INDIRECT("R1C1:R2C1",FALSE))=30',
-            apply: { fill: '#indirect-range-r1c1' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=SUM(INDIRECT("RC[-5]:R[1]C[-5]",FALSE))=30',
-            apply: { fill: '#indirect-range-relative-r1c1' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=SUM(OFFSET(A1,0,0,10001,1))=30',
-            apply: { fill: '#offset-range-too-large' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=SUM(INDIRECT("Sheet2!A1:A2"))=30',
-            apply: { fill: '#indirect-range-other-sheet' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=SUM(OFFSET(OFFSET(A1,0,0,2,1),0,0,2,1))=30',
-            apply: { fill: '#offset-range-nested-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=SUM(OFFSET(INDIRECT("A1:A2"),0,0,2,1))=30',
-            apply: { fill: '#offset-range-nested-indirect' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=SUM(OFFSET(A1,0,0,2,1))=30',
+        '#offset-range-sum',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=COUNT(OFFSET(A1,0,0,3,1))=2',
+        '#offset-range-count',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=SUM(INDIRECT("A1:A2"))=30',
+        '#indirect-range-a1',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=SUM(INDIRECT("R1C1:R2C1",FALSE))=30',
+        '#indirect-range-r1c1',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=SUM(INDIRECT("RC[-5]:R[1]C[-5]",FALSE))=30',
+        '#indirect-range-relative-r1c1',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=SUM(OFFSET(A1,0,0,10001,1))=30',
+        '#offset-range-too-large',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=SUM(INDIRECT("Sheet2!A1:A2"))=30',
+        '#indirect-range-other-sheet',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=SUM(OFFSET(OFFSET(A1,0,0,2,1),0,0,2,1))=30',
+        '#offset-range-nested-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+        '=SUM(OFFSET(INDIRECT("A1:A2"),0,0,2,1))=30',
+        '#offset-range-nested-indirect',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -757,92 +620,73 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'South' });
     s = seedCell(s, 0, 1, { kind: 'text', value: 'A1' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=INDIRECT("A1")="North"',
-            apply: { fill: '#indirect-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=INDIRECT(B1,TRUE)="North"',
-            apply: { fill: '#indirect-ref-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 1, c1: 4 },
-            formula: '=INDIRECT("A1")="North"',
-            apply: { fill: '#indirect-fixed' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=INDIRECT("R1C1",FALSE)="North"',
-            apply: { fill: '#indirect-r1c1' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=INDIRECT("Sheet2!A1")="North"',
-            apply: { fill: '#indirect-other-sheet' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=INDIRECT("$A$1")="North"',
-            apply: { fill: '#indirect-absolute' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=INDIRECT("Sheet1!A1")="North"',
-            apply: { fill: '#indirect-current-sheet' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=INDIRECT("\'Sheet1\'!A1")="North"',
-            apply: { fill: '#indirect-quoted-current-sheet' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 10, r1: 0, c1: 10 },
-            formula: '=INDIRECT("Sheet1!R1C1",FALSE)="North"',
-            apply: { fill: '#indirect-r1c1-current-sheet' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 11, r1: 0, c1: 11 },
-            formula: '=INDIRECT("RC[-11]",FALSE)="North"',
-            apply: { fill: '#indirect-r1c1-relative' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            formula: '=INDIRECT("RC",FALSE)="North"',
-            apply: { fill: '#indirect-r1c1-current-cell' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 12, r1: 0, c1: 12 },
-            formula: '=INDIRECT("R[-1]C",FALSE)="North"',
-            apply: { fill: '#indirect-r1c1-out-of-bounds' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 13, r1: 0, c1: 13 },
-            formula: '=INDIRECT("Sheet2!R1C1",FALSE)="North"',
-            apply: { fill: '#indirect-r1c1-other-sheet' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=INDIRECT("A1")="North"',
+        '#indirect-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=INDIRECT(B1,TRUE)="North"',
+        '#indirect-ref-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 1, c1: 4 },
+        '=INDIRECT("A1")="North"',
+        '#indirect-fixed',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=INDIRECT("R1C1",FALSE)="North"',
+        '#indirect-r1c1',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=INDIRECT("Sheet2!A1")="North"',
+        '#indirect-other-sheet',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=INDIRECT("$A$1")="North"',
+        '#indirect-absolute',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=INDIRECT("Sheet1!A1")="North"',
+        '#indirect-current-sheet',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+        '=INDIRECT("\'Sheet1\'!A1")="North"',
+        '#indirect-quoted-current-sheet',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 10, r1: 0, c1: 10 },
+        '=INDIRECT("Sheet1!R1C1",FALSE)="North"',
+        '#indirect-r1c1-current-sheet',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 11, r1: 0, c1: 11 },
+        '=INDIRECT("RC[-11]",FALSE)="North"',
+        '#indirect-r1c1-relative',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        '=INDIRECT("RC",FALSE)="North"',
+        '#indirect-r1c1-current-cell',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 12, r1: 0, c1: 12 },
+        '=INDIRECT("R[-1]C",FALSE)="North"',
+        '#indirect-r1c1-out-of-bounds',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 13, r1: 0, c1: 13 },
+        '=INDIRECT("Sheet2!R1C1",FALSE)="North"',
+        '#indirect-r1c1-other-sheet',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -877,38 +721,28 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 5, 0, 12);
     s = seedNumber(s, 5, 1, 8);
     s = seedNumber(s, 5, 2, 4);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=VLOOKUP("South",$A$1:$B$3,2,FALSE)=8',
-            apply: { fill: '#vlookup-exact' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=VLOOKUP("Nor*",$A$1:$B$3,2,0)=12',
-            apply: { fill: '#vlookup-wildcard' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=HLOOKUP("East",$A$5:$C$6,2,FALSE)=4',
-            apply: { fill: '#hlookup-exact' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=ISNA(VLOOKUP("South",$A$1:$B$3,2,TRUE))',
-            apply: { fill: '#vlookup-unsupported' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=VLOOKUP("South",$A$1:$B$3,2,FALSE)=8',
+        '#vlookup-exact',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=VLOOKUP("Nor*",$A$1:$B$3,2,0)=12',
+        '#vlookup-wildcard',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=HLOOKUP("East",$A$5:$C$6,2,FALSE)=4',
+        '#hlookup-exact',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=ISNA(VLOOKUP("South",$A$1:$B$3,2,TRUE))',
+        '#vlookup-unsupported',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -941,44 +775,33 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 1, 6, 50);
     s = seedNumber(s, 2, 5, 20);
     s = seedNumber(s, 2, 6, 200);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=VLOOKUP(17,$A$1:$B$4,2,TRUE)=100',
-            apply: { fill: '#vlookup-approx' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 3, r1: 1, c1: 3 },
-            formula: '=HLOOKUP("Nor",$A$6:$C$7,2,TRUE)=4',
-            apply: { fill: '#hlookup-approx-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 3, r1: 2, c1: 3 },
-            formula: '=ISNA(VLOOKUP(17,$F$1:$G$3,2,TRUE))',
-            apply: { fill: '#vlookup-approx-unsorted' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=VLOOKUP(17,$A$1:$B$4,2)=100',
-            apply: { fill: '#vlookup-omitted-approx' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 4, r1: 1, c1: 4 },
-            formula: '=HLOOKUP("Nor",$A$6:$C$7,2)=4',
-            apply: { fill: '#hlookup-omitted-approx' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=VLOOKUP(17,$A$1:$B$4,2,TRUE)=100',
+        '#vlookup-approx',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 3, r1: 1, c1: 3 },
+        '=HLOOKUP("Nor",$A$6:$C$7,2,TRUE)=4',
+        '#hlookup-approx-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 3, r1: 2, c1: 3 },
+        '=ISNA(VLOOKUP(17,$F$1:$G$3,2,TRUE))',
+        '#vlookup-approx-unsorted',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=VLOOKUP(17,$A$1:$B$4,2)=100',
+        '#vlookup-omitted-approx',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 4, r1: 1, c1: 4 },
+        '=HLOOKUP("Nor",$A$6:$C$7,2)=4',
+        '#hlookup-omitted-approx',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1006,56 +829,43 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 6, 0, 12);
     s = seedNumber(s, 6, 1, 8);
     s = seedNumber(s, 6, 2, 4);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=XLOOKUP("South",$A$1:$A$4,$B$1:$B$4)=8',
-            apply: { fill: '#xlookup-exact' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=XLOOKUP("No*",$A$1:$A$4,$B$1:$B$4,0,2)=12',
-            apply: { fill: '#xlookup-wildcard' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=XLOOKUP("West",$A$1:$A$4,$B$1:$B$4,99)=99',
-            apply: { fill: '#xlookup-fallback' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=XLOOKUP("North",$A$1:$A$4,$B$1:$B$4,0,0,-1)=14',
-            apply: { fill: '#xlookup-reverse' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=XLOOKUP("East",$A$6:$C$6,$A$7:$C$7)=4',
-            apply: { fill: '#xlookup-horizontal' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=ISNA(XLOOKUP("South",$A$1:$A$4,$B$1:$B$4,0,0,2))',
-            apply: { fill: '#xlookup-unsupported' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=XLOOKUP("North",$A$1:$A$4,$B$1:$B$4,,0,-1)=14',
-            apply: { fill: '#xlookup-omitted-if-not-found' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=XLOOKUP("South",$A$1:$A$4,$B$1:$B$4)=8',
+        '#xlookup-exact',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=XLOOKUP("No*",$A$1:$A$4,$B$1:$B$4,0,2)=12',
+        '#xlookup-wildcard',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=XLOOKUP("West",$A$1:$A$4,$B$1:$B$4,99)=99',
+        '#xlookup-fallback',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=XLOOKUP("North",$A$1:$A$4,$B$1:$B$4,0,0,-1)=14',
+        '#xlookup-reverse',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=XLOOKUP("East",$A$6:$C$6,$A$7:$C$7)=4',
+        '#xlookup-horizontal',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=ISNA(XLOOKUP("South",$A$1:$A$4,$B$1:$B$4,0,0,2))',
+        '#xlookup-unsupported',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+        '=XLOOKUP("North",$A$1:$A$4,$B$1:$B$4,,0,-1)=14',
+        '#xlookup-omitted-if-not-found',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1091,44 +901,33 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 6, 100);
     s = seedNumber(s, 1, 6, 50);
     s = seedNumber(s, 2, 6, 200);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=XLOOKUP(17,$A$1:$A$4,$B$1:$B$4,0,-1)=100',
-            apply: { fill: '#xlookup-next-smaller' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
-            formula: '=XLOOKUP(17,$A$1:$A$4,$B$1:$B$4,0,1)=200',
-            apply: { fill: '#xlookup-next-larger' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
-            formula: '=XLOOKUP("Nor",$A$6:$C$6,$A$7:$C$7,0,-1)=4',
-            apply: { fill: '#xlookup-text-next-smaller' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
-            formula: '=XLOOKUP("Nor",$A$6:$C$6,$A$7:$C$7,0,1)=12',
-            apply: { fill: '#xlookup-text-next-larger' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 },
-            formula: '=XLOOKUP(17,$F$1:$F$3,$G$1:$G$3,"missing",-1)="missing"',
-            apply: { fill: '#xlookup-next-smaller-unsorted' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=XLOOKUP(17,$A$1:$A$4,$B$1:$B$4,0,-1)=100',
+        '#xlookup-next-smaller',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
+        '=XLOOKUP(17,$A$1:$A$4,$B$1:$B$4,0,1)=200',
+        '#xlookup-next-larger',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
+        '=XLOOKUP("Nor",$A$6:$C$6,$A$7:$C$7,0,-1)=4',
+        '#xlookup-text-next-smaller',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
+        '=XLOOKUP("Nor",$A$6:$C$6,$A$7:$C$7,0,1)=12',
+        '#xlookup-text-next-larger',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 },
+        '=XLOOKUP(17,$F$1:$F$3,$G$1:$G$3,"missing",-1)="missing"',
+        '#xlookup-next-smaller-unsorted',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1159,50 +958,38 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 5, 10);
     s = seedNumber(s, 1, 5, 5);
     s = seedNumber(s, 2, 5, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=LOOKUP(17,$A$1:$A$4,$B$1:$B$4)=100',
-            apply: { fill: '#lookup-vector' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
-            formula: '=LOOKUP(17,$A$1:$A$4)=10',
-            apply: { fill: '#lookup-omitted-result' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
-            formula: '=LOOKUP("Nor",$A$6:$C$6,$A$7:$C$7)=4',
-            apply: { fill: '#lookup-horizontal-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
-            formula: '=LOOKUP(1,$A$1:$A$4,$B$1:$B$4)=50',
-            apply: { fill: '#lookup-too-small' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 },
-            formula: '=LOOKUP(17,$F$1:$F$3,$B$1:$B$3)=100',
-            apply: { fill: '#lookup-unsorted' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 5, c0: 2, r1: 5, c1: 2 },
-            formula: '=LOOKUP(17,$A$1:$A$4,$B$1:$B$3)=100',
-            apply: { fill: '#lookup-mismatch' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=LOOKUP(17,$A$1:$A$4,$B$1:$B$4)=100',
+        '#lookup-vector',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
+        '=LOOKUP(17,$A$1:$A$4)=10',
+        '#lookup-omitted-result',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
+        '=LOOKUP("Nor",$A$6:$C$6,$A$7:$C$7)=4',
+        '#lookup-horizontal-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 3, c0: 2, r1: 3, c1: 2 },
+        '=LOOKUP(1,$A$1:$A$4,$B$1:$B$4)=50',
+        '#lookup-too-small',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 },
+        '=LOOKUP(17,$F$1:$F$3,$B$1:$B$3)=100',
+        '#lookup-unsorted',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 5, c0: 2, r1: 5, c1: 2 },
+        '=LOOKUP(17,$A$1:$A$4,$B$1:$B$3)=100',
+        '#lookup-mismatch',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1233,50 +1020,38 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 1, 5, 100);
     s = seedNumber(s, 2, 5, 200);
     s = seedNumber(s, 3, 5, 400);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=XLOOKUP("South",OFFSET(A1,0,0,4,1),OFFSET(B1,0,0,4,1))=8',
-            apply: { fill: '#xlookup-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=XLOOKUP("North",INDIRECT("A1:A4"),INDIRECT("B1:B4"),0,0,-1)=14',
-            apply: { fill: '#xlookup-indirect-reverse' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=XLOOKUP(17,OFFSET(E1,0,0,4,1),INDIRECT("F1:F4"),0,-1)=100',
-            apply: { fill: '#xlookup-dynamic-approx' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=LOOKUP(17,OFFSET(E1,0,0,4,1),OFFSET(F1,0,0,4,1))=100',
-            apply: { fill: '#lookup-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=LOOKUP(17,INDIRECT("E1:E4"))=10',
-            apply: { fill: '#lookup-indirect-self' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=XLOOKUP("South",OFFSET(A1,0,0,4,1),OFFSET(B1,0,0,2,1),0)=8',
-            apply: { fill: '#xlookup-dynamic-size-mismatch' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=XLOOKUP("South",OFFSET(A1,0,0,4,1),OFFSET(B1,0,0,4,1))=8',
+        '#xlookup-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=XLOOKUP("North",INDIRECT("A1:A4"),INDIRECT("B1:B4"),0,0,-1)=14',
+        '#xlookup-indirect-reverse',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=XLOOKUP(17,OFFSET(E1,0,0,4,1),INDIRECT("F1:F4"),0,-1)=100',
+        '#xlookup-dynamic-approx',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=LOOKUP(17,OFFSET(E1,0,0,4,1),OFFSET(F1,0,0,4,1))=100',
+        '#lookup-offset',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=LOOKUP(17,INDIRECT("E1:E4"))=10',
+        '#lookup-indirect-self',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+        '=XLOOKUP("South",OFFSET(A1,0,0,4,1),OFFSET(B1,0,0,2,1),0)=8',
+        '#xlookup-dynamic-size-mismatch',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1291,57 +1066,33 @@ describe('evaluateConditional', () => {
   it('formula rules evaluate ROW/COLUMN position operands', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
-            formula: '=MOD(ROW(),2)=0',
-            apply: { fill: '#even-row' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 3 },
-            formula: '=COLUMN()=3',
-            apply: { fill: '#column-c' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 1, c1: 4 },
-            formula: '=ROW(A1)=2',
-            apply: { fill: '#relative-row-ref' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=AND(ROWS(A1:C5)=5,COLUMNS(A1:C5)=3,AREAS(A1:C5)=1,AREAS(A1)=1)',
-            apply: { fill: '#range-dimensions' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 5, r1: 1, c1: 5 },
-            formula:
-              '=AND(ROWS(OFFSET(A1,0,0,5,3))=5,COLUMNS(INDIRECT("A1:C5"))=3,AREAS(OFFSET(A1,0,0,5,3))=1)',
-            apply: { fill: '#range-dimensions-dynamic' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 5, r1: 2, c1: 5 },
-            formula: '=AND(ROW(OFFSET(A1,4,0))=5,COLUMN(INDIRECT("C1"))=3)',
-            apply: { fill: '#position-dynamic' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 3, c0: 5, r1: 3, c1: 5 },
-            formula: '=ROW(OFFSET(A1,0,0,2,1))=1',
-            apply: { fill: '#position-dynamic-multi' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }, '=MOD(ROW(),2)=0', '#even-row'),
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 3 }, '=COLUMN()=3', '#column-c'),
+      formulaRule({ sheet: 0, r0: 0, c0: 4, r1: 1, c1: 4 }, '=ROW(A1)=2', '#relative-row-ref'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=AND(ROWS(A1:C5)=5,COLUMNS(A1:C5)=3,AREAS(A1:C5)=1,AREAS(A1)=1)',
+        '#range-dimensions',
+      ),
+      {
+        kind: 'formula',
+        range: { sheet: 0, r0: 1, c0: 5, r1: 1, c1: 5 },
+        formula:
+          '=AND(ROWS(OFFSET(A1,0,0,5,3))=5,COLUMNS(INDIRECT("A1:C5"))=3,AREAS(OFFSET(A1,0,0,5,3))=1)',
+        apply: { fill: '#range-dimensions-dynamic' },
       },
-    };
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 5, r1: 2, c1: 5 },
+        '=AND(ROW(OFFSET(A1,4,0))=5,COLUMN(INDIRECT("C1"))=3)',
+        '#position-dynamic',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 3, c0: 5, r1: 3, c1: 5 },
+        '=ROW(OFFSET(A1,0,0,2,1))=1',
+        '#position-dynamic-multi',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 

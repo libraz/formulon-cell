@@ -8,7 +8,13 @@ import {
 } from '../../../src/render/conditional.js';
 import type { ConditionalRule, State } from '../../../src/store/store.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
-import { cellValueRule, dateSerial, seedCell, seedNumber } from './conditional-fixtures.js';
+import {
+  cellValueRule,
+  dateSerial,
+  seedCell,
+  seedNumber,
+  withConditionalRules,
+} from './conditional-fixtures.js';
 
 describe('evaluateConditional', () => {
   afterEach(() => {
@@ -27,13 +33,7 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     s = seedNumber(s, 0, 1, 3);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })],
-      },
-    };
+    s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('#ff0000');
     // Cells in the rule range that fail the predicate get no fill — the
@@ -47,22 +47,16 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'Alpha' });
     s = seedCell(s, 0, 1, { kind: 'text', value: 'Beta' });
     s = seedCell(s, 0, 2, { kind: 'text', value: 'Delta' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'cell-value',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            op: 'between',
-            a: 'b',
-            b: 'dzz',
-            apply: { fill: '#text' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'cell-value',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        op: 'between',
+        a: 'b',
+        b: 'dzz',
+        apply: { fill: '#text' },
       },
-    };
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBeUndefined();
     expect(overlay.get('0:0:1')?.fill).toBe('#text');
@@ -74,27 +68,21 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     s = seedNumber(s, 0, 1, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            color: '#63a95c',
-            gradient: true,
-            showValue: false,
-          },
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            color: '#70ad47',
-            gradient: false,
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        color: '#63a95c',
+        gradient: true,
+        showValue: false,
       },
-    };
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        color: '#70ad47',
+        gradient: false,
+      },
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')).toMatchObject({
       barColor: '#63a95c',
@@ -110,19 +98,13 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, -10);
     s = seedNumber(s, 0, 1, 0);
     s = seedNumber(s, 0, 2, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            color: '#70ad47',
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        color: '#70ad47',
       },
-    };
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -138,28 +120,22 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = seedNumber(store.getState(), 0, 0, -10);
     s = seedNumber(s, 0, 1, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            color: '#70ad47',
-          },
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-            color: '#0078d4',
-            negativeColor: '#c00000',
-            borderColor: '#1f1f1f',
-            negativeBorderColor: '#7f0000',
-            axisColor: '#404040',
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        color: '#70ad47',
       },
-    };
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        color: '#0078d4',
+        negativeColor: '#c00000',
+        borderColor: '#1f1f1f',
+        negativeBorderColor: '#7f0000',
+        axisColor: '#404040',
+      },
+    ]);
 
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')).toMatchObject({
@@ -181,20 +157,14 @@ describe('evaluateConditional', () => {
     let s = seedNumber(store.getState(), 0, 0, -10);
     s = seedNumber(s, 0, 1, -5);
     s = seedNumber(s, 0, 2, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            color: '#0078d4',
-            axisPosition: 'middle',
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        color: '#0078d4',
+        axisPosition: 'middle',
       },
-    };
+    ]);
 
     const middle = evaluateConditional(s);
     expect(middle.get('0:0:0')).toMatchObject({
@@ -342,20 +312,14 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, -10);
     s = seedNumber(s, 0, 1, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-            color: '#70ad47',
-            direction: 'right-to-left',
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        color: '#70ad47',
+        direction: 'right-to-left',
       },
-    };
+    ]);
 
     const ltrOverlay = evaluateConditional(s);
     expect(ltrOverlay.get('0:0:0')?.barAxis).toBeCloseTo(2 / 3);
@@ -416,21 +380,15 @@ describe('evaluateConditional', () => {
     [0, 20, 40, 60, 80].forEach((value, col) => {
       s = seedNumber(s, 0, col, value);
     });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'data-bar',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 4 },
-            color: '#70ad47',
-            min: { kind: 'percentile', value: 25 },
-            max: { kind: 'percentile', value: 75 },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'data-bar',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 4 },
+        color: '#70ad47',
+        min: { kind: 'percentile', value: 25 },
+        max: { kind: 'percentile', value: 75 },
       },
-    };
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -571,13 +529,7 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })],
-      },
-    };
+    s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
     const a = evaluateConditional(s);
     const b = evaluateConditional(s);
     expect(b).toBe(a);
@@ -587,13 +539,7 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })],
-      },
-    };
+    s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
     const a = evaluateConditional(s);
     // Mutate selection (and thus the top-level state object), but keep cells
     // and rules references untouched. Cache should still hit.
@@ -612,13 +558,7 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })],
-      },
-    };
+    s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
     const a = evaluateConditional(s);
     const sNext = seedNumber(s, 0, 0, 1); // value drops below 5 → no fill
     const b = evaluateConditional(sNext);
@@ -632,7 +572,7 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     const rule1 = cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
-    s = { ...s, conditional: { ...s.conditional, rules: [rule1] } };
+    s = withConditionalRules(s, [rule1]);
     const a = evaluateConditional(s);
     // Same rule shape, new array reference — must invalidate.
     const sNext: State = { ...s, conditional: { ...s.conditional, rules: [{ ...rule1 }] } };
@@ -644,13 +584,7 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })],
-      },
-    };
+    s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
     const a = evaluateConditional(s);
     const sNext: State = { ...s, data: { ...s.data, sheetIndex: 1 } };
     const b = evaluateConditional(sNext);
@@ -663,28 +597,22 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'cell-value',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            op: '>',
-            a: 0,
-            apply: { fill: '#high' },
-          },
-          {
-            kind: 'cell-value',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            op: '>',
-            a: 0,
-            apply: { fill: '#low', color: '#low-text' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'cell-value',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        op: '>',
+        a: 0,
+        apply: { fill: '#high' },
       },
-    };
+      {
+        kind: 'cell-value',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        op: '>',
+        a: 0,
+        apply: { fill: '#low', color: '#low-text' },
+      },
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -696,29 +624,23 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'cell-value',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            op: '>',
-            a: 0,
-            apply: { fill: '#stop' },
-            stopIfTrue: true,
-          },
-          {
-            kind: 'cell-value',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            op: '>',
-            a: 0,
-            apply: { color: '#blocked' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'cell-value',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        op: '>',
+        a: 0,
+        apply: { fill: '#stop' },
+        stopIfTrue: true,
       },
-    };
+      {
+        kind: 'cell-value',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        op: '>',
+        a: 0,
+        apply: { color: '#blocked' },
+      },
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -739,13 +661,7 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, dateSerial(2026, 7, 12)); // Sunday in the current Mon-Sun week.
     s = seedNumber(s, 1, 0, dateSerial(2026, 7, 5)); // Sunday in the previous Mon-Sun week.
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [rule],
-      },
-    };
+    s = withConditionalRules(s, [rule]);
     const thisWeek = evaluateConditional(s);
     expect(thisWeek.get('0:0:0')?.fill).toBe('#00ff00');
     expect(thisWeek.get('0:1:0')?.fill).toBeUndefined();
@@ -769,20 +685,14 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 0);
     s = seedNumber(s, 0, 1, 10);
     s = seedNumber(s, 0, 2, 100);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'color-scale',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            stops: ['#000000', '#ffffff'],
-            thresholds: [{ kind: 'number', value: 10 }, { kind: 'max' }],
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'color-scale',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        stops: ['#000000', '#ffffff'],
+        thresholds: [{ kind: 'number', value: 10 }, { kind: 'max' }],
       },
-    };
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('rgb(0, 0, 0)');
     expect(overlay.get('0:0:1')?.fill).toBe('rgb(0, 0, 0)');
@@ -811,20 +721,14 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, 5);
     s = seedNumber(s, 0, 1, 5);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'color-scale',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-            stops: ['#000000', '#808080', '#ffffff'],
-            thresholds: [{ kind: 'min' }, { kind: 'percentile', value: 50 }, { kind: 'max' }],
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'color-scale',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        stops: ['#000000', '#808080', '#ffffff'],
+        thresholds: [{ kind: 'min' }, { kind: 'percentile', value: 50 }, { kind: 'max' }],
       },
-    };
+    ]);
 
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('rgb(128, 128, 128)');
@@ -843,7 +747,7 @@ describe('evaluateConditional', () => {
       icons: 'arrows3',
       showValue: false,
     };
-    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    s = withConditionalRules(s, [rule]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.iconSlot).toBe(0);
     expect(overlay.get('0:0:0')?.showValue).toBe(false);
@@ -864,23 +768,17 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 10);
     s = seedNumber(s, 0, 1, 50);
     s = seedNumber(s, 0, 2, 90);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'icon-set',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            icons: 'traffic3',
-            thresholds: [
-              { kind: 'number', value: 30 },
-              { kind: 'number', value: 80 },
-            ],
-          },
+    s = withConditionalRules(s, [
+      {
+        kind: 'icon-set',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        icons: 'traffic3',
+        thresholds: [
+          { kind: 'number', value: 30 },
+          { kind: 'number', value: 80 },
         ],
       },
-    };
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.iconSlot).toBe(0);
     expect(overlay.get('0:0:1')?.iconSlot).toBe(1);
@@ -893,24 +791,18 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 5);
     s = seedNumber(s, 0, 1, 10);
     s = seedNumber(s, 0, 2, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'icon-set',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            icons: 'traffic3',
-            floor: { kind: 'number', value: 10 },
-            thresholds: [
-              { kind: 'number', value: 15 },
-              { kind: 'number', value: 25 },
-            ],
-          },
+    s = withConditionalRules(s, [
+      {
+        kind: 'icon-set',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        icons: 'traffic3',
+        floor: { kind: 'number', value: 10 },
+        thresholds: [
+          { kind: 'number', value: 15 },
+          { kind: 'number', value: 25 },
         ],
       },
-    };
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')).toBeUndefined();
     expect(overlay.get('0:0:1')?.iconSlot).toBe(0);
@@ -923,24 +815,18 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 14);
     s = seedNumber(s, 0, 1, 15);
     s = seedNumber(s, 0, 2, 20);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'icon-set',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            icons: 'traffic3',
-            floor: { kind: 'number', value: 15, gte: false },
-            thresholds: [
-              { kind: 'number', value: 20, gte: false },
-              { kind: 'number', value: 40, gte: false },
-            ],
-          },
+    s = withConditionalRules(s, [
+      {
+        kind: 'icon-set',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        icons: 'traffic3',
+        floor: { kind: 'number', value: 15, gte: false },
+        thresholds: [
+          { kind: 'number', value: 20, gte: false },
+          { kind: 'number', value: 40, gte: false },
         ],
       },
-    };
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')).toBeUndefined();
     expect(overlay.get('0:0:1')).toBeUndefined();
@@ -969,7 +855,7 @@ describe('evaluateConditional', () => {
       n: 3,
       apply: { fill: '#abc' },
     };
-    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    s = withConditionalRules(s, [rule]);
     const overlay = evaluateConditional(s);
     // Top 3 = 50, 40, 30 — both 30s tie at the cutoff so 4 cells qualify.
     expect(overlay.get('0:0:5')?.fill).toBe('#abc'); // 50
@@ -997,7 +883,7 @@ describe('evaluateConditional', () => {
       mode: 'above',
       apply: { fill: '#avg' },
     };
-    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    s = withConditionalRules(s, [rule]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBeUndefined();
     expect(overlay.get('0:0:1')?.fill).toBeUndefined();
@@ -1017,7 +903,7 @@ describe('evaluateConditional', () => {
       stdDev: 1,
       apply: { fill: '#std' },
     };
-    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    s = withConditionalRules(s, [rule]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBeUndefined();
     expect(overlay.get('0:0:1')?.fill).toBeUndefined();
@@ -1036,7 +922,7 @@ describe('evaluateConditional', () => {
       text: 'alp',
       apply: { fill: '#txt' },
     };
-    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    s = withConditionalRules(s, [rule]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('#txt');
     expect(overlay.get('0:0:1')?.fill).toBeUndefined();
@@ -1048,35 +934,29 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'Alpha' });
     s = seedCell(s, 0, 1, { kind: 'text', value: 'Beta' });
     s = seedCell(s, 0, 2, { kind: 'text', value: 'Gamma' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'text-contains',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            text: 'a',
-            mode: 'ends-with',
-            apply: { fill: '#end' },
-          },
-          {
-            kind: 'text-contains',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            text: 'g',
-            mode: 'begins-with',
-            apply: { color: '#begin' },
-          },
-          {
-            kind: 'text-contains',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
-            text: 'm',
-            mode: 'not-contains',
-            apply: { bold: true },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'text-contains',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        text: 'a',
+        mode: 'ends-with',
+        apply: { fill: '#end' },
       },
-    };
+      {
+        kind: 'text-contains',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        text: 'g',
+        mode: 'begins-with',
+        apply: { color: '#begin' },
+      },
+      {
+        kind: 'text-contains',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        text: 'm',
+        mode: 'not-contains',
+        apply: { bold: true },
+      },
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('#end');
     expect(overlay.get('0:0:1')?.bold).toBe(true);
@@ -1095,7 +975,7 @@ describe('evaluateConditional', () => {
       range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
       apply: { fill: '#dup' },
     };
-    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    s = withConditionalRules(s, [rule]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('#dup');
     expect(overlay.get('0:0:1')?.fill).toBeUndefined(); // unique 'b'
@@ -1113,7 +993,7 @@ describe('evaluateConditional', () => {
       range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
       apply: { fill: '#uni' },
     };
-    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    s = withConditionalRules(s, [rule]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBeUndefined();
     expect(overlay.get('0:0:1')?.fill).toBe('#uni');
@@ -1127,16 +1007,10 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 1, { kind: 'text', value: 'x' });
     s = seedCell(s, 0, 2, { kind: 'error', code: 1, text: '#DIV/0!' });
     const range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 };
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          { kind: 'blanks', range, apply: { fill: '#bla' } },
-          { kind: 'errors', range, apply: { fill: '#err' } },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      { kind: 'blanks', range, apply: { fill: '#bla' } },
+      { kind: 'errors', range, apply: { fill: '#err' } },
+    ]);
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('#bla');
     expect(overlay.get('0:0:1')?.fill).toBeUndefined();

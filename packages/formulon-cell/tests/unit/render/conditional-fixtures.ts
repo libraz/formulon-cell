@@ -24,4 +24,20 @@ const cellValueRule = (range: ConditionalRule['range']): ConditionalRule => ({
   apply: { fill: '#ff0000' },
 });
 
-export { cellValueRule, dateSerial, seedCell, seedNumber };
+const formulaRule = (
+  range: ConditionalRule['range'],
+  formula: string,
+  fill: string,
+): ConditionalRule => ({
+  kind: 'formula',
+  range,
+  formula,
+  apply: { fill },
+});
+
+const withConditionalRules = (state: State, rules: ConditionalRule[]): State => ({
+  ...state,
+  conditional: { ...state.conditional, rules },
+});
+
+export { cellValueRule, dateSerial, formulaRule, seedCell, seedNumber, withConditionalRules };

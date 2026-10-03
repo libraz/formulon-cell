@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { _resetConditionalCache, evaluateConditional } from '../../../../src/render/conditional.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
-import { seedCell, seedNumber } from '../conditional-fixtures.js';
+import {
+  formulaRule,
+  seedCell,
+  seedNumber,
+  withConditionalRules,
+} from '../conditional-fixtures.js';
 
 describe('evaluateConditional', () => {
   afterEach(() => {
@@ -15,26 +20,18 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North Region' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'south region' });
     s = seedCell(s, 2, 0, { kind: 'text', value: 'NE' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
-            formula: '=AND(ISNUMBER(SEARCH("region",A1)),LEN(A1)>5)',
-            apply: { fill: '#search' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
-            formula: '=ISNUMBER(FIND("Region",A1))',
-            apply: { fill: '#find' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
+        '=AND(ISNUMBER(SEARCH("region",A1)),LEN(A1)>5)',
+        '#search',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
+        '=ISNUMBER(FIND("Region",A1))',
+        '#find',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -50,26 +47,18 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'north north' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'north south' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
-            formula: '=SEARCH("north",A1,7)=7',
-            apply: { fill: '#search-start' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=SEARCH("north",A1,)=1',
-            apply: { fill: '#search-omitted-start' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
+        '=SEARCH("north",A1,7)=7',
+        '#search-start',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=SEARCH("north",A1,)=1',
+        '#search-omitted-start',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -83,38 +72,20 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North Region' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'Q1*Plan' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=AND(SEARCH("N*r",A1)=1,SEARCH("r?g",A1)=7)',
-            apply: { fill: '#search-wildcard' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
-            formula: '=SEARCH("~*",A2)=3',
-            apply: { fill: '#search-escape' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
-            formula: '=FIND("*",A2)=3',
-            apply: { fill: '#find-literal' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=FIND("Region",A1,)=7',
-            apply: { fill: '#find-omitted-start' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=AND(SEARCH("N*r",A1)=1,SEARCH("r?g",A1)=7)',
+        '#search-wildcard',
+      ),
+      formulaRule({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 }, '=SEARCH("~*",A2)=3', '#search-escape'),
+      formulaRule({ sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 }, '=FIND("*",A2)=3', '#find-literal'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=FIND("Region",A1,)=7',
+        '#find-omitted-start',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -127,27 +98,20 @@ describe('evaluateConditional', () => {
   it('formula rules evaluate scalar HYPERLINK display values', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            formula:
-              '=AND(HYPERLINK("https://example.test","Example")="Example",HYPERLINK("#A1")="#A1",HYPERLINK("#A1",42)=42)',
-            apply: { fill: '#hyperlink' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=HYPERLINK(NA())=""',
-            apply: { fill: '#hyperlink-invalid' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'formula',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        formula:
+          '=AND(HYPERLINK("https://example.test","Example")="Example",HYPERLINK("#A1")="#A1",HYPERLINK("#A1",42)=42)',
+        apply: { fill: '#hyperlink' },
       },
-    };
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=HYPERLINK(NA())=""',
+        '#hyperlink-invalid',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -160,52 +124,41 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
     s = seedNumber(s, 1, 0, 42);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula:
-              '=AND(CELL("address",A1)="$A$1",CELL("row",A1)=1,CELL("col",A1)=1,CELL("contents",A1)="North",CELL("type",A1)="l")',
-            apply: { fill: '#cell-info-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
-            formula: '=AND(CELL("contents",A2)=42,CELL("type",A2)="v")',
-            apply: { fill: '#cell-info-number' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 1 },
-            formula: '=AND(CELL("address")="$B$3",CELL("type")="b")',
-            apply: { fill: '#cell-info-current' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 3, c0: 1, r1: 3, c1: 1 },
-            formula: '=CELL("filename",A1)=""',
-            apply: { fill: '#cell-info-unsupported' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 4, c0: 1, r1: 4, c1: 1 },
-            formula:
-              '=AND(CELL("address",OFFSET(A1,1,0))="$A$2",CELL("contents",INDIRECT("A2"))=42)',
-            apply: { fill: '#cell-info-dynamic' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 5, c0: 1, r1: 5, c1: 1 },
-            formula: '=CELL("address",OFFSET(A1,0,0,2,1))="$A$1"',
-            apply: { fill: '#cell-info-dynamic-multi' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'formula',
+        range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        formula:
+          '=AND(CELL("address",A1)="$A$1",CELL("row",A1)=1,CELL("col",A1)=1,CELL("contents",A1)="North",CELL("type",A1)="l")',
+        apply: { fill: '#cell-info-text' },
       },
-    };
+      formulaRule(
+        { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+        '=AND(CELL("contents",A2)=42,CELL("type",A2)="v")',
+        '#cell-info-number',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 1 },
+        '=AND(CELL("address")="$B$3",CELL("type")="b")',
+        '#cell-info-current',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 3, c0: 1, r1: 3, c1: 1 },
+        '=CELL("filename",A1)=""',
+        '#cell-info-unsupported',
+      ),
+      {
+        kind: 'formula',
+        range: { sheet: 0, r0: 4, c0: 1, r1: 4, c1: 1 },
+        formula: '=AND(CELL("address",OFFSET(A1,1,0))="$A$2",CELL("contents",INDIRECT("A2"))=42)',
+        apply: { fill: '#cell-info-dynamic' },
+      },
+      formulaRule(
+        { sheet: 0, r0: 5, c0: 1, r1: 5, c1: 1 },
+        '=CELL("address",OFFSET(A1,0,0,2,1))="$A$1"',
+        '#cell-info-dynamic-multi',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -220,38 +173,20 @@ describe('evaluateConditional', () => {
   it('formula rules evaluate limited SHEET and SHEETS information operands', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            formula: '=AND(SHEET()=1,SHEET(A1)=1,SHEET(A1:B2)=1)',
-            apply: { fill: '#sheet-info' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=SHEETS(A1:B2)=1',
-            apply: { fill: '#sheets-info' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=SHEETS()=1',
-            apply: { fill: '#sheets-workbook-count' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=SHEET(Sheet2!A1)=2',
-            apply: { fill: '#sheet-other' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        '=AND(SHEET()=1,SHEET(A1)=1,SHEET(A1:B2)=1)',
+        '#sheet-info',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, '=SHEETS(A1:B2)=1', '#sheets-info'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=SHEETS()=1',
+        '#sheets-workbook-count',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 }, '=SHEET(Sheet2!A1)=2', '#sheet-other'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -264,26 +199,18 @@ describe('evaluateConditional', () => {
   it('formula rules evaluate limited SHEET and SHEETS over dynamic ranges', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            formula: '=AND(SHEET(OFFSET(A1,0,0,2,2))=1,SHEETS(INDIRECT("A1:B2"))=1)',
-            apply: { fill: '#sheet-info-dynamic' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=SHEET(INDIRECT("Sheet2!A1"))=2',
-            apply: { fill: '#sheet-info-dynamic-other' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        '=AND(SHEET(OFFSET(A1,0,0,2,2))=1,SHEETS(INDIRECT("A1:B2"))=1)',
+        '#sheet-info-dynamic',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=SHEET(INDIRECT("Sheet2!A1"))=2',
+        '#sheet-info-dynamic-other',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -304,72 +231,49 @@ describe('evaluateConditional', () => {
       conditional: {
         ...s.conditional,
         rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
-            formula: '=ISLOGICAL(A1)',
-            apply: { fill: '#logical' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
-            formula: '=ISNONTEXT(A1)',
-            apply: { fill: '#nontext' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 2, c1: 3 },
-            formula: '=ISFORMULA(A1)',
-            apply: { fill: '#formula' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 2, c1: 4 },
-            formula: '=EXACT(FORMULATEXT(A1),"=SUM(1,2)")',
-            apply: { fill: '#formulatext' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=AND(TYPE(A1)=4,TYPE(A2)=2,TYPE(A3)=1,TYPE(NA())=16)',
-            apply: { fill: '#type-codes' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 1, c0: 5, r1: 1, c1: 5 },
-            formula: '=EXACT(FORMULATEXT(OFFSET(A1,2,0)),"=SUM(1,2)")',
-            apply: { fill: '#formulatext-dynamic' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 5, r1: 2, c1: 5 },
-            formula: '=FORMULATEXT(OFFSET(A1,0,0,2,1))=""',
-            apply: { fill: '#formulatext-dynamic-multi' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=ISFORMULA(1)',
-            apply: { fill: '#formula-literal' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=ISFORMULA(OFFSET($A$1,2,0))',
-            apply: { fill: '#formula-dynamic-offset' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=ISFORMULA(INDIRECT("$A$3"))',
-            apply: { fill: '#formula-dynamic-indirect' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=ISFORMULA(OFFSET($A$1,0,0,2,1))',
-            apply: { fill: '#formula-dynamic-multi' },
-          },
+          formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 }, '=ISLOGICAL(A1)', '#logical'),
+          formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 }, '=ISNONTEXT(A1)', '#nontext'),
+          formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 2, c1: 3 }, '=ISFORMULA(A1)', '#formula'),
+          formulaRule(
+            { sheet: 0, r0: 0, c0: 4, r1: 2, c1: 4 },
+            '=EXACT(FORMULATEXT(A1),"=SUM(1,2)")',
+            '#formulatext',
+          ),
+          formulaRule(
+            { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+            '=AND(TYPE(A1)=4,TYPE(A2)=2,TYPE(A3)=1,TYPE(NA())=16)',
+            '#type-codes',
+          ),
+          formulaRule(
+            { sheet: 0, r0: 1, c0: 5, r1: 1, c1: 5 },
+            '=EXACT(FORMULATEXT(OFFSET(A1,2,0)),"=SUM(1,2)")',
+            '#formulatext-dynamic',
+          ),
+          formulaRule(
+            { sheet: 0, r0: 2, c0: 5, r1: 2, c1: 5 },
+            '=FORMULATEXT(OFFSET(A1,0,0,2,1))=""',
+            '#formulatext-dynamic-multi',
+          ),
+          formulaRule(
+            { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+            '=ISFORMULA(1)',
+            '#formula-literal',
+          ),
+          formulaRule(
+            { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+            '=ISFORMULA(OFFSET($A$1,2,0))',
+            '#formula-dynamic-offset',
+          ),
+          formulaRule(
+            { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+            '=ISFORMULA(INDIRECT("$A$3"))',
+            '#formula-dynamic-indirect',
+          ),
+          formulaRule(
+            { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+            '=ISFORMULA(OFFSET($A$1,0,0,2,1))',
+            '#formula-dynamic-multi',
+          ),
         ],
       },
     };
@@ -402,63 +306,33 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'error', code: 6, text: '#N/A' });
     s = seedCell(s, 1, 0, { kind: 'error', code: 1, text: '#DIV/0!' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=AND(ISREF(A1),ISREF(A1:B2),NOT(ISREF(1)))',
-            apply: { fill: '#isref' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=ISERROR(NA())',
-            apply: { fill: '#na-error' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=NA()=A1',
-            apply: { fill: '#na-equals' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 1, c1: 4 },
-            formula: '=ISNA(A1)',
-            apply: { fill: '#isna' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 1, c1: 5 },
-            formula: '=ISERR(A1)',
-            apply: { fill: '#iserr' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula:
-              '=AND(ERROR.TYPE(A1)=7,ERROR.TYPE(A2)=2,ERROR.TYPE(1/0)=2,ERROR.TYPE(SQRT(-1))=6)',
-            apply: { fill: '#error-type' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=ERROR.TYPE(1)=0',
-            apply: { fill: '#error-type-non-error' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=AND(ISREF(OFFSET(A1,0,0,1,1)),ISREF(INDIRECT("A1:B2")),NOT(ISREF(1)))',
-            apply: { fill: '#isref-dynamic' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=AND(ISREF(A1),ISREF(A1:B2),NOT(ISREF(1)))',
+        '#isref',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 }, '=ISERROR(NA())', '#na-error'),
+      formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 }, '=NA()=A1', '#na-equals'),
+      formulaRule({ sheet: 0, r0: 0, c0: 4, r1: 1, c1: 4 }, '=ISNA(A1)', '#isna'),
+      formulaRule({ sheet: 0, r0: 0, c0: 5, r1: 1, c1: 5 }, '=ISERR(A1)', '#iserr'),
+      {
+        kind: 'formula',
+        range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        formula: '=AND(ERROR.TYPE(A1)=7,ERROR.TYPE(A2)=2,ERROR.TYPE(1/0)=2,ERROR.TYPE(SQRT(-1))=6)',
+        apply: { fill: '#error-type' },
       },
-    };
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=ERROR.TYPE(1)=0',
+        '#error-type-non-error',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=AND(ISREF(OFFSET(A1,0,0,1,1)),ISREF(INDIRECT("A1:B2")),NOT(ISREF(1)))',
+        '#isref-dynamic',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -479,32 +353,19 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North Region' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'South Area' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
-            formula: '=IFERROR(SEARCH("region",A1),0)>0',
-            apply: { fill: '#iferror-search' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=IFNA(NA(),42)=42',
-            apply: { fill: '#ifna-na' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=ISERR(IFNA(1/0,42))',
-            apply: { fill: '#ifna-preserves-other-errors' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
+        '=IFERROR(SEARCH("region",A1),0)>0',
+        '#iferror-search',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 }, '=IFNA(NA(),42)=42', '#ifna-na'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=ISERR(IFNA(1/0,42))',
+        '#ifna-preserves-other-errors',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -520,32 +381,11 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North Region' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'South Region' });
     s = seedCell(s, 2, 0, { kind: 'text', value: 'North Area' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
-            formula: '=LEFT(A1,5)="North"',
-            apply: { fill: '#left' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
-            formula: '=RIGHT(A1,6)="Region"',
-            apply: { fill: '#right' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 2, c1: 3 },
-            formula: '=MID(A1,7,6)="Region"',
-            apply: { fill: '#mid' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 }, '=LEFT(A1,5)="North"', '#left'),
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 }, '=RIGHT(A1,6)="Region"', '#right'),
+      formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 2, c1: 3 }, '=MID(A1,7,6)="Region"', '#mid'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -564,38 +404,16 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=LEFT(A1)="N"',
-            apply: { fill: '#left-default' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=AND(LEFT(A1,)="N",RIGHT(A1,)="h")',
-            apply: { fill: '#slice-omitted-count' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=RIGHT(A1,-1)=""',
-            apply: { fill: '#right-invalid' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=MID(A1,0,1)="N"',
-            apply: { fill: '#mid-invalid' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, '=LEFT(A1)="N"', '#left-default'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=AND(LEFT(A1,)="N",RIGHT(A1,)="h")',
+        '#slice-omitted-count',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 }, '=RIGHT(A1,-1)=""', '#right-invalid'),
+      formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 }, '=MID(A1,0,1)="N"', '#mid-invalid'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -614,62 +432,40 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 3, 0, { kind: 'text', value: '12.5%' });
     s = seedCell(s, 4, 0, { kind: 'text', value: 'north' });
     s = seedCell(s, 5, 0, { kind: 'text', value: '1.234,5' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
-            formula: '=LOWER(TRIM(A1))="north region"',
-            apply: { fill: '#lower-trim' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
-            formula: '=UPPER(LEFT(TRIM(A1),5))="NORTH"',
-            apply: { fill: '#upper-left' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 1 },
-            formula: '=VALUE(A3)=1234.5',
-            apply: { fill: '#value-thousands' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 3, c0: 1, r1: 3, c1: 1 },
-            formula: '=VALUE(A4)=0.125',
-            apply: { fill: '#value-percent' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 4, c0: 1, r1: 4, c1: 1 },
-            formula: '=VALUE(A5)=0',
-            apply: { fill: '#value-invalid' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 5, c0: 1, r1: 5, c1: 1 },
-            formula: '=NUMBERVALUE(A6,",",".")=1234.5',
-            apply: { fill: '#numbervalue-separators' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
-            formula: '=NUMBERVALUE(A3,,)=1234.5',
-            apply: { fill: '#numbervalue-omitted-separators' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 5, c0: 2, r1: 5, c1: 2 },
-            formula: '=NUMBERVALUE(A6,",",",")=1234.5',
-            apply: { fill: '#numbervalue-invalid-separators' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
+        '=LOWER(TRIM(A1))="north region"',
+        '#lower-trim',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+        '=UPPER(LEFT(TRIM(A1),5))="NORTH"',
+        '#upper-left',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 1 },
+        '=VALUE(A3)=1234.5',
+        '#value-thousands',
+      ),
+      formulaRule({ sheet: 0, r0: 3, c0: 1, r1: 3, c1: 1 }, '=VALUE(A4)=0.125', '#value-percent'),
+      formulaRule({ sheet: 0, r0: 4, c0: 1, r1: 4, c1: 1 }, '=VALUE(A5)=0', '#value-invalid'),
+      formulaRule(
+        { sheet: 0, r0: 5, c0: 1, r1: 5, c1: 1 },
+        '=NUMBERVALUE(A6,",",".")=1234.5',
+        '#numbervalue-separators',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
+        '=NUMBERVALUE(A3,,)=1234.5',
+        '#numbervalue-omitted-separators',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 5, c0: 2, r1: 5, c1: 2 },
+        '=NUMBERVALUE(A6,",",",")=1234.5',
+        '#numbervalue-invalid-separators',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -691,38 +487,24 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North Region' });
     s = seedNumber(s, 0, 1, 12);
     s = seedCell(s, 0, 2, { kind: 'bool', value: true });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=LEFT(A1,5)&"-"&RIGHT(A1,6)="North-Region"',
-            apply: { fill: '#concat-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '="N"&"o"&"r"&"t"&"h"="North"',
-            apply: { fill: '#concat-left-assoc' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=A1&" "&B1&" "&C1="North Region 12 TRUE"',
-            apply: { fill: '#concat-coerce' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=D10&"x"="x"',
-            apply: { fill: '#concat-blank' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=LEFT(A1,5)&"-"&RIGHT(A1,6)="North-Region"',
+        '#concat-text',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '="N"&"o"&"r"&"t"&"h"="North"',
+        '#concat-left-assoc',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=A1&" "&B1&" "&C1="North Region 12 TRUE"',
+        '#concat-coerce',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 }, '=D10&"x"="x"', '#concat-blank'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -738,38 +520,28 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
     s = seedNumber(s, 0, 1, 12);
     s = seedCell(s, 0, 2, { kind: 'bool', value: true });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=CONCATENATE(A1,"-",B1,"-",C1)="North-12-TRUE"',
-            apply: { fill: '#concatenate' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=CONCAT(A1,"-",D10)="North-"',
-            apply: { fill: '#concat-function' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=CONCATENATE(A1,,"-",B1)="North-12"',
-            apply: { fill: '#concatenate-omitted' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=CONCAT(A1,,D10)="North"',
-            apply: { fill: '#concat-omitted' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=CONCATENATE(A1,"-",B1,"-",C1)="North-12-TRUE"',
+        '#concatenate',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=CONCAT(A1,"-",D10)="North-"',
+        '#concat-function',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=CONCATENATE(A1,,"-",B1)="North-12"',
+        '#concatenate-omitted',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=CONCAT(A1,,D10)="North"',
+        '#concat-omitted',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -785,62 +557,44 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North Region North' });
     s = seedCell(s, 0, 1, { kind: 'text', value: 'East' });
     s = seedNumber(s, 0, 2, 12);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=SUBSTITUTE(A1,"North","South",2)="North Region South"',
-            apply: { fill: '#substitute-instance' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=REPLACE(A1,7,6,"Area")="North Area North"',
-            apply: { fill: '#replace' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=REPT(LEFT(B1,1),3)="EEE"',
-            apply: { fill: '#rept' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=TEXTJOIN("-",TRUE,B1,D10,C1)="East-12"',
-            apply: { fill: '#textjoin-ignore-empty' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=TEXTJOIN("-",FALSE,B1,D10,C1)="East--12"',
-            apply: { fill: '#textjoin-keep-empty' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
-            formula: '=SUBSTITUTE(A1,"North","South",)="South Region South"',
-            apply: { fill: '#substitute-omitted-instance' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
-            formula: '=TEXTJOIN("-",TRUE,B1,,C1)="East-12"',
-            apply: { fill: '#textjoin-omitted-ignore-empty' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 10, r1: 0, c1: 10 },
-            formula: '=TEXTJOIN("-",FALSE,B1,,C1)="East--12"',
-            apply: { fill: '#textjoin-omitted-keep-empty' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=SUBSTITUTE(A1,"North","South",2)="North Region South"',
+        '#substitute-instance',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=REPLACE(A1,7,6,"Area")="North Area North"',
+        '#replace',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 }, '=REPT(LEFT(B1,1),3)="EEE"', '#rept'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=TEXTJOIN("-",TRUE,B1,D10,C1)="East-12"',
+        '#textjoin-ignore-empty',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=TEXTJOIN("-",FALSE,B1,D10,C1)="East--12"',
+        '#textjoin-keep-empty',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 8, r1: 0, c1: 8 },
+        '=SUBSTITUTE(A1,"North","South",)="South Region South"',
+        '#substitute-omitted-instance',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 9, r1: 0, c1: 9 },
+        '=TEXTJOIN("-",TRUE,B1,,C1)="East-12"',
+        '#textjoin-omitted-ignore-empty',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 10, r1: 0, c1: 10 },
+        '=TEXTJOIN("-",FALSE,B1,,C1)="East--12"',
+        '#textjoin-omitted-keep-empty',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -858,38 +612,28 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North-East-West' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=AND(TEXTBEFORE(A1,"-")="North",TEXTAFTER(A1,"-")="East-West")',
-            apply: { fill: '#text-before-after' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=AND(TEXTBEFORE(A1,"-",-1)="North-East",TEXTAFTER(A1,"-",-1)="West")',
-            apply: { fill: '#text-before-after-negative' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=AND(TEXTBEFORE(A1,"east",1,1)="North-",TEXTAFTER(A1,"east",1,1)="-West")',
-            apply: { fill: '#text-before-after-ignore-case' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=TEXTAFTER(A1,"/",1,0,0,"missing")="missing"',
-            apply: { fill: '#textafter-fallback' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=AND(TEXTBEFORE(A1,"-")="North",TEXTAFTER(A1,"-")="East-West")',
+        '#text-before-after',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=AND(TEXTBEFORE(A1,"-",-1)="North-East",TEXTAFTER(A1,"-",-1)="West")',
+        '#text-before-after-negative',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=AND(TEXTBEFORE(A1,"east",1,1)="North-",TEXTAFTER(A1,"east",1,1)="-West")',
+        '#text-before-after-ignore-case',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=TEXTAFTER(A1,"/",1,0,0,"missing")="missing"',
+        '#textafter-fallback',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -905,32 +649,23 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 1234.567);
     s = seedNumber(s, 0, 1, 0.25);
     s = seedNumber(s, 0, 2, 45651);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=AND(TEXT(A1,"#,##0.00")="1,234.57",TEXT(B1,"0%")="25%")',
-            apply: { fill: '#text-number-format' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=TEXT(C1,"yyyy-mm-dd")="2024-12-25"',
-            apply: { fill: '#text-date-format' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=TEXT("North","0")="North"',
-            apply: { fill: '#text-format-nonnumeric' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=AND(TEXT(A1,"#,##0.00")="1,234.57",TEXT(B1,"0%")="25%")',
+        '#text-number-format',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=TEXT(C1,"yyyy-mm-dd")="2024-12-25"',
+        '#text-date-format',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=TEXT("North","0")="North"',
+        '#text-format-nonnumeric',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -944,38 +679,28 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedNumber(s, 0, 0, 1234.567);
     s = seedNumber(s, 0, 1, -1234.567);
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=AND(DOLLAR(A1)="$1,234.57",DOLLAR(A1,0)="$1,235")',
-            apply: { fill: '#dollar' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=AND(FIXED(A1,1)="1,234.6",FIXED(A1,1,TRUE())="1234.6")',
-            apply: { fill: '#fixed' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=AND(DOLLAR(A1,-2)="$1,200",FIXED(B1,-2)="-1,200")',
-            apply: { fill: '#fixed-negative-decimals' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=DOLLAR("North")="$0.00"',
-            apply: { fill: '#dollar-nonnumeric' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=AND(DOLLAR(A1)="$1,234.57",DOLLAR(A1,0)="$1,235")',
+        '#dollar',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=AND(FIXED(A1,1)="1,234.6",FIXED(A1,1,TRUE())="1234.6")',
+        '#fixed',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=AND(DOLLAR(A1,-2)="$1,200",FIXED(B1,-2)="-1,200")',
+        '#fixed-negative-decimals',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=DOLLAR("North")="$0.00"',
+        '#dollar-nonnumeric',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -991,27 +716,20 @@ describe('evaluateConditional', () => {
     s = seedNumber(s, 0, 0, 12);
     s = seedCell(s, 0, 1, { kind: 'bool', value: true });
     s = seedCell(s, 0, 2, { kind: 'text', value: 'North' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula:
-              '=AND(VALUETOTEXT(A1)="12",VALUETOTEXT(B1)="TRUE",LEN(VALUETOTEXT(C1,1))=7,FIND("North",VALUETOTEXT(C1,1))=2,VALUETOTEXT(NA())="#N/A")',
-            apply: { fill: '#value-to-text' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=VALUETOTEXT(A1,2)="12"',
-            apply: { fill: '#value-to-text-invalid' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'formula',
+        range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        formula:
+          '=AND(VALUETOTEXT(A1)="12",VALUETOTEXT(B1)="TRUE",LEN(VALUETOTEXT(C1,1))=7,FIND("North",VALUETOTEXT(C1,1))=2,VALUETOTEXT(NA())="#N/A")',
+        apply: { fill: '#value-to-text' },
       },
-    };
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=VALUETOTEXT(A1,2)="12"',
+        '#value-to-text-invalid',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1023,56 +741,43 @@ describe('evaluateConditional', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=SUBSTITUTE(A1,"o","0",0)="N0rth"',
-            apply: { fill: '#substitute-invalid-instance' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=REPLACE(A1,0,1,"S")="Sorth"',
-            apply: { fill: '#replace-invalid-start' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=REPT(A1,-1)=""',
-            apply: { fill: '#rept-invalid-count' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=TEXTJOIN("-",A1,A1)="North"',
-            apply: { fill: '#textjoin-invalid-ignore-empty' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=TEXTBEFORE(A1,"",1)="North"',
-            apply: { fill: '#textbefore-empty-delimiter' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=TEXTAFTER(A1,"x")="North"',
-            apply: { fill: '#textafter-missing' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=TEXT(12,"")="12"',
-            apply: { fill: '#text-empty-pattern' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=SUBSTITUTE(A1,"o","0",0)="N0rth"',
+        '#substitute-invalid-instance',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        '=REPLACE(A1,0,1,"S")="Sorth"',
+        '#replace-invalid-start',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
+        '=REPT(A1,-1)=""',
+        '#rept-invalid-count',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=TEXTJOIN("-",A1,A1)="North"',
+        '#textjoin-invalid-ignore-empty',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=TEXTBEFORE(A1,"",1)="North"',
+        '#textbefore-empty-delimiter',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=TEXTAFTER(A1,"x")="North"',
+        '#textafter-missing',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
+        '=TEXT(12,"")="12"',
+        '#text-empty-pattern',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1090,26 +795,14 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'north' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
-            formula: '=EXACT(A1,"North")',
-            apply: { fill: '#exact' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
-            formula: '=NOT(EXACT(A1,"North"))',
-            apply: { fill: '#not-exact' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 }, '=EXACT(A1,"North")', '#exact'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+        '=NOT(EXACT(A1,"North"))',
+        '#not-exact',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1126,32 +819,19 @@ describe('evaluateConditional', () => {
     s = seedCell(s, 0, 1, { kind: 'bool', value: true });
     s = seedCell(s, 0, 2, { kind: 'text', value: 'North' });
     s = seedCell(s, 0, 4, { kind: 'error', code: 6, text: '#N/A' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=AND(N(A1)=12,N(B1)=1,N(C1)=0,N(D1)=0)',
-            apply: { fill: '#n-coerce' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
-            formula: '=AND(T(C1)="North",T(A1)="",T(D1)="")',
-            apply: { fill: '#t-coerce' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 },
-            formula: '=ISNA(N(E1))',
-            apply: { fill: '#n-error' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=AND(N(A1)=12,N(B1)=1,N(C1)=0,N(D1)=0)',
+        '#n-coerce',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 6, r1: 0, c1: 6 },
+        '=AND(T(C1)="North",T(A1)="",T(D1)="")',
+        '#t-coerce',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 7, r1: 0, c1: 7 }, '=ISNA(N(E1))', '#n-error'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1163,27 +843,16 @@ describe('evaluateConditional', () => {
   it('formula rules evaluate ADDRESS text references', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            formula:
-              '=AND(ADDRESS(3,2)="$B$3",ADDRESS(3,2,4)="B3",ADDRESS(3,2,2,FALSE())="R3C[2]",ADDRESS(3,2,,,"Sheet 1")="\'Sheet 1\'!$B$3")',
-            apply: { fill: '#address' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=ADDRESS(0,1)=""',
-            apply: { fill: '#invalid-address' },
-          },
-        ],
+    s = withConditionalRules(s, [
+      {
+        kind: 'formula',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        formula:
+          '=AND(ADDRESS(3,2)="$B$3",ADDRESS(3,2,4)="B3",ADDRESS(3,2,2,FALSE())="R3C[2]",ADDRESS(3,2,,,"Sheet 1")="\'Sheet 1\'!$B$3")',
+        apply: { fill: '#address' },
       },
-    };
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, '=ADDRESS(0,1)=""', '#invalid-address'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1196,32 +865,11 @@ describe('evaluateConditional', () => {
     let s = store.getState();
     s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
     s = seedCell(s, 1, 0, { kind: 'text', value: 'south' });
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
-            formula: '=A1="north"',
-            apply: { fill: '#case-insensitive-eq' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
-            formula: '=A1<>"NORTH"',
-            apply: { fill: '#case-insensitive-ne' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=EXACT(A1,"north")',
-            apply: { fill: '#exact-case' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule({ sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 }, '=A1="north"', '#case-insensitive-eq'),
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 }, '=A1<>"NORTH"', '#case-insensitive-ne'),
+      formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 }, '=EXACT(A1,"north")', '#exact-case'),
+    ]);
 
     const overlay = evaluateConditional(s);
 
@@ -1235,50 +883,30 @@ describe('evaluateConditional', () => {
   it('formula rules evaluate character and text cleanup functions', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
-    s = {
-      ...s,
-      conditional: {
-        ...s.conditional,
-        rules: [
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-            formula: '=AND(CHAR(65)="A",CODE("Apple")=65,UNICODE(UNICHAR(9731))=9731)',
-            apply: { fill: '#char-code' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
-            formula: '=AND(CLEAN("A"&CHAR(10)&"B")="AB",PROPER("north region")="North Region")',
-            apply: { fill: '#clean-proper' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
-            formula: '=CHAR(0)=""',
-            apply: { fill: '#char-zero' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 },
-            formula: '=UNICODE("")=0',
-            apply: { fill: '#unicode-empty' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
-            formula: '=ENCODEURL("North Region/東京")="North%20Region%2F%E6%9D%B1%E4%BA%AC"',
-            apply: { fill: '#encodeurl' },
-          },
-          {
-            kind: 'formula',
-            range: { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
-            formula: '=ENCODEURL(NA())=""',
-            apply: { fill: '#encodeurl-error' },
-          },
-        ],
-      },
-    };
+    s = withConditionalRules(s, [
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        '=AND(CHAR(65)="A",CODE("Apple")=65,UNICODE(UNICHAR(9731))=9731)',
+        '#char-code',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        '=AND(CLEAN("A"&CHAR(10)&"B")="AB",PROPER("north region")="North Region")',
+        '#clean-proper',
+      ),
+      formulaRule({ sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 }, '=CHAR(0)=""', '#char-zero'),
+      formulaRule({ sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 }, '=UNICODE("")=0', '#unicode-empty'),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+        '=ENCODEURL("North Region/東京")="North%20Region%2F%E6%9D%B1%E4%BA%AC"',
+        '#encodeurl',
+      ),
+      formulaRule(
+        { sheet: 0, r0: 0, c0: 5, r1: 0, c1: 5 },
+        '=ENCODEURL(NA())=""',
+        '#encodeurl-error',
+      ),
+    ]);
 
     const overlay = evaluateConditional(s);
 
