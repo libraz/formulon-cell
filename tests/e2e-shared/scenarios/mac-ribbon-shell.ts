@@ -325,6 +325,39 @@ export async function runMacRibbonSwitchingScenario(
             .map((command) => command.dataset.ribbonCommand);
         });
         expect(clipped, `${id} controls clipped in ${mode} mode at ${width}px`).toEqual([]);
+        const overflow = await page.locator(`[data-ribbon-panel="${id}"]`).evaluate((panel) => {
+          const scrollPanel = panel as HTMLElement;
+          const commands = Array.from(
+            panel.querySelectorAll<HTMLElement>('[data-ribbon-command], [data-ribbon-control]'),
+          ).filter((command) => command.getBoundingClientRect().width > 0);
+          const last = commands.at(-1);
+          if (!last) throw new Error('Ribbon panel has no visible commands.');
+          scrollPanel.scrollLeft = scrollPanel.scrollWidth;
+          const bounds = panel.getBoundingClientRect();
+          const lastBounds = last.getBoundingClientRect();
+          const groupPositions = Array.from(
+            panel.querySelectorAll<HTMLElement>(':scope > .fc-tb__ribbon-group'),
+          ).map((group) => group.getBoundingClientRect().left);
+          return {
+            command: last.dataset.ribbonCommand ?? last.dataset.ribbonControl,
+            reachable: lastBounds.left >= bounds.left - 1 && lastBounds.right <= bounds.right + 1,
+            pageOverflow: document.documentElement.scrollWidth > window.innerWidth,
+            groupOrderMatchesModel: groupPositions.every(
+              (left, index) => index === 0 || left >= (groupPositions[index - 1] ?? left) - 1,
+            ),
+          };
+        });
+        expect(
+          overflow.reachable,
+          `${id}/${overflow.command} unreachable in ${mode} at ${width}px`,
+        ).toBe(true);
+        expect(overflow.pageOverflow, `${id} moves the page horizontally at ${width}px`).toBe(
+          false,
+        );
+        expect(
+          overflow.groupOrderMatchesModel,
+          `${id} visual group order differs from the ribbon model in ${mode} mode`,
+        ).toBe(true);
       }
     }
   }
