@@ -20,6 +20,7 @@ import type {
   Workbook,
 } from './types.js';
 import { formatCell, fromEngineValue } from './value.js';
+import { installConditionalFormatMethods } from './workbook-handle-conditional-format.js';
 import { installWorkbookFeatureMethods } from './workbook-handle-features.js';
 import { installLayoutMethods } from './workbook-handle-layout.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
@@ -1303,6 +1304,7 @@ export class WorkbookHandle {
 }
 
 installPivotMethods(WorkbookHandle);
+installConditionalFormatMethods(WorkbookHandle);
 installStylesMethods(WorkbookHandle);
 installLayoutMethods(WorkbookHandle);
 installPrintMethods(WorkbookHandle);
