@@ -62,7 +62,11 @@ import {
   type RibbonMenus,
   type RibbonRenderHelpers,
 } from '../toolbar/ribbon/render-ribbon.js';
-import { projectActiveState, RIBBON_ACTIVE_COMMANDS } from '../toolbar/ribbon-active-state.js';
+import {
+  indexRibbonButtons,
+  projectActiveState,
+  RIBBON_ACTIVE_COMMANDS,
+} from '../toolbar/ribbon-active-state.js';
 import {
   EXCEL365_MAC_RIBBON_TABS,
   RIBBON_TABS,
@@ -95,8 +99,9 @@ const projectDefaultRibbonActiveState = (
 ): void => {
   if (!instance) return;
   const active = projectActiveState(instance);
+  const buttons = indexRibbonButtons(host);
   for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
-    const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+    const button = buttons.get(command)?.[0];
     if (!button) continue;
     let pressed = Boolean(active[key]);
     if (command === 'viewNormal') pressed = active.workbookView === 'normal';

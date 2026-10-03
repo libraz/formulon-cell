@@ -285,7 +285,7 @@ describe('toolbar/ribbon shared data', () => {
     const toolbarSource = source('src/mount/toolbar.ts');
 
     expect(toolbarSource).toContain(
-      "RIBBON_ACTIVE_COMMANDS } from '../toolbar/ribbon-active-state.js'",
+      "RIBBON_ACTIVE_COMMANDS,\n} from '../toolbar/ribbon-active-state.js'",
     );
     expect(toolbarSource).not.toContain('const RIBBON_ACTIVE_COMMANDS');
   });

@@ -4,7 +4,7 @@ import { addrKey, parseAddrKey } from '../../../engine/address.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { projectDisabledState } from '../../menu-a11y.js';
-import { projectActiveState } from '../../ribbon-active-state.js';
+import { indexRibbonButtons, projectActiveState } from '../../ribbon-active-state.js';
 import { type Label, macRibbonLabelForCommand, text } from './labels.js';
 import { toolbarLangForLocale } from './locale.js';
 
@@ -141,6 +141,7 @@ export const projectMacRibbonState = (
   const active = projectActiveState(instance);
   const ink = getMacInk(instance);
   const inkTool = ink?.getTool();
+  const buttons = indexRibbonButtons(host);
   const drawingStates: Readonly<Record<string, boolean>> = {
     'mac.draw.toggle': ink?.isActive() ?? false,
     'mac.draw.eraser': inkTool === 'eraser',
@@ -151,9 +152,7 @@ export const projectMacRibbonState = (
     'mac.draw.trackpad': ink?.isActive() === true && ink.getTrackpadMode(),
   };
   for (const [command, pressed] of Object.entries(drawingStates)) {
-    for (const button of host.querySelectorAll<HTMLButtonElement>(
-      `[data-ribbon-command="${command}"]`,
-    )) {
+    for (const button of buttons.get(command) ?? []) {
       button.classList.toggle('fc-tb__rb--active', pressed);
       button.setAttribute('aria-pressed', String(pressed));
     }
@@ -173,9 +172,7 @@ export const projectMacRibbonState = (
           : 'pageBreakPreview';
       pressed = active.workbookView === view;
     }
-    for (const button of host.querySelectorAll<HTMLButtonElement>(
-      `[data-ribbon-command="${command}"]`,
-    )) {
+    for (const button of buttons.get(command) ?? []) {
       button.classList.toggle('fc-tb__rb--active', pressed);
       button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
     }
@@ -188,9 +185,7 @@ export const projectMacRibbonState = (
     const reason = decision.allowed
       ? contextualReason
       : instance.i18n.strings.backstage.commandUnavailable;
-    for (const button of host.querySelectorAll<HTMLButtonElement>(
-      `[data-ribbon-command="${id}"]`,
-    )) {
+    for (const button of buttons.get(id) ?? []) {
       const titlePrefix =
         button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang);
       projectDisabledState(button, disabled, reason, {

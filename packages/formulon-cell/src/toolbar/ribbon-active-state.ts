@@ -139,6 +139,21 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   marginPreset: 'normal',
 };
 
+/** Groups every ribbon button under `host` by its `data-ribbon-command`, in
+ *  one DOM pass, so a projection over many commands does not rescan the host
+ *  per command. */
+export const indexRibbonButtons = (host: HTMLElement): Map<string, HTMLButtonElement[]> => {
+  const index = new Map<string, HTMLButtonElement[]>();
+  for (const button of host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
+    const command = button.dataset.ribbonCommand;
+    if (command === undefined) continue;
+    const group = index.get(command);
+    if (group) group.push(button);
+    else index.set(command, [button]);
+  }
+  return index;
+};
+
 export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = new Map([
   ['bold', 'bold'],
   ['italic', 'italic'],
