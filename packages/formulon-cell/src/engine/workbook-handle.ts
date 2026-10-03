@@ -24,6 +24,7 @@ import { installWorkbookFeatureMethods } from './workbook-handle-features.js';
 import { installLayoutMethods } from './workbook-handle-layout.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
 import { installPrintMethods } from './workbook-handle-print.js';
+import { installStylesMethods } from './workbook-handle-styles.js';
 
 export type ChangeListener = (e: ChangeEvent) => void;
 
@@ -1302,6 +1303,7 @@ export class WorkbookHandle {
 }
 
 installPivotMethods(WorkbookHandle);
+installStylesMethods(WorkbookHandle);
 installLayoutMethods(WorkbookHandle);
 installPrintMethods(WorkbookHandle);
 installWorkbookFeatureMethods(WorkbookHandle);
