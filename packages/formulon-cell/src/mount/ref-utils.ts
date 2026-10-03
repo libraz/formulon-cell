@@ -7,6 +7,7 @@ import {
   parseA1Atom,
 } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 
 function cellRef(row: number, col: number, r1c1: boolean): string {
   return r1c1 ? `R${row + 1}C${col + 1}` : formatA1Cell(row, col);
@@ -21,12 +22,12 @@ export function formatSelectionRef(
     return cellRef(active.row, active.col, r1c1);
   }
   if (!r1c1) {
-    if (range.r0 === 0 && range.r1 === MAX_ROW) {
+    if (isWholeColumnRange(range)) {
       return range.c0 === range.c1
         ? colLetter(range.c0)
         : `${colLetter(range.c0)}:${colLetter(range.c1)}`;
     }
-    if (range.c0 === 0 && range.c1 === MAX_COL) {
+    if (isWholeRowRange(range)) {
       return range.r0 === range.r1 ? `${range.r0 + 1}` : `${range.r0 + 1}:${range.r1 + 1}`;
     }
   }

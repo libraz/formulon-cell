@@ -39,6 +39,15 @@ describe('mount/ref-utils', () => {
       ).toBe('5:10');
     });
 
+    it('treats a band running past the sheet edge as a whole row/column ref', () => {
+      expect(
+        formatSelectionRef({ r0: 0, c0: 2, r1: 1048576, c1: 2 }, { row: 0, col: 2 }, false),
+      ).toBe('C');
+      expect(
+        formatSelectionRef({ r0: 4, c0: 0, r1: 4, c1: 16384 }, { row: 4, col: 0 }, false),
+      ).toBe('5');
+    });
+
     it('falls back to A1:B2 form for arbitrary ranges', () => {
       expect(formatSelectionRef({ r0: 0, c0: 0, r1: 1, c1: 1 }, active, false)).toBe('A1:B2');
       expect(formatSelectionRef({ r0: 0, c0: 0, r1: 1, c1: 1 }, active, true)).toBe('R1C1:R2C2');

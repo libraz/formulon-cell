@@ -16,6 +16,7 @@
  */
 
 import { colFromLetters, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import {
   type Atom,
   type CellRefToken,
@@ -746,12 +747,14 @@ function transformAxisMoveCellRange(
 type FullAxis = 'row' | 'col' | null;
 
 function fullAxisForCut(source: { r0: number; c0: number; r1: number; c1: number }): FullAxis {
-  const r0 = Math.min(source.r0, source.r1);
-  const r1 = Math.max(source.r0, source.r1);
-  const c0 = Math.min(source.c0, source.c1);
-  const c1 = Math.max(source.c0, source.c1);
-  if (c0 === 0 && c1 === MAX_COL) return 'row';
-  if (r0 === 0 && r1 === MAX_ROW) return 'col';
+  const normalized = {
+    r0: Math.min(source.r0, source.r1),
+    c0: Math.min(source.c0, source.c1),
+    r1: Math.max(source.r0, source.r1),
+    c1: Math.max(source.c0, source.c1),
+  };
+  if (isWholeRowRange(normalized)) return 'row';
+  if (isWholeColumnRange(normalized)) return 'col';
   return null;
 }
 
