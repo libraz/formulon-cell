@@ -89,6 +89,51 @@ describe('InlineEditor', () => {
     expect(input.style.height).toBe('28px');
   });
 
+  it('keeps the raw edit, caret and pending style when the workbook write fails', async () => {
+    const realWorkbook = await WorkbookHandle.createDefault();
+    expect(realWorkbook.isStub).toBe(false);
+    const localStore = createSpreadsheetStore();
+    const localHost = document.createElement('div');
+    const localGrid = document.createElement('div');
+    localHost.append(localGrid);
+    document.body.append(localHost);
+    const committed = vi.fn();
+    const validation = vi.fn();
+    const localEditor = new InlineEditor({
+      host: localHost,
+      grid: localGrid,
+      store: localStore,
+      wb: realWorkbook,
+      onAfterCommit: committed,
+      onValidation: validation,
+    });
+    const anchor = { sheet: 0, row: 2, col: 2 };
+    mutators.setActive(localStore, anchor);
+    localEditor.begin('17');
+    const input = localGrid.querySelector('textarea') as HTMLTextAreaElement;
+    input.setSelectionRange(1, 2, 'backward');
+    const pending = { addr: anchor, format: { bold: true } };
+    mutators.setPendingFormat(localStore, pending);
+    realWorkbook.dispose();
+    try {
+      localEditor.commit('down');
+      expect(localEditor.isActive()).toBe(true);
+      expect(input.isConnected).toBe(true);
+      expect(input.value).toBe('17');
+      expect(input.selectionStart).toBe(1);
+      expect(input.selectionEnd).toBe(2);
+      expect(input.selectionDirection).toBe('backward');
+      expect(document.activeElement).toBe(input);
+      expect(localStore.getState().selection.active).toEqual(anchor);
+      expect(localStore.getState().ui.pendingFormat).toEqual(pending);
+      expect(committed).not.toHaveBeenCalled();
+      expect(validation).toHaveBeenCalledWith(expect.objectContaining({ severity: 'stop' }));
+    } finally {
+      localEditor.cancel();
+      localHost.remove();
+    }
+  });
+
   it('follows its cell when the sheet scrolls mid-edit', () => {
     mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
     editor.begin('hi');
@@ -714,7 +759,7 @@ describe('InlineEditor', () => {
     expect(editor.isActive()).toBe(false);
   });
 
-  it('writeInput failures are swallowed (warning logged) and the editor still tears down', () => {
+  it('retains the editor after a write failure and commits successfully on retry', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     editor.begin('');
     const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
@@ -731,12 +776,18 @@ describe('InlineEditor', () => {
 
     editor.commit('none');
     expect(warn).toHaveBeenCalled();
-    expect(editor.isActive()).toBe(false);
+    expect(editor.isActive()).toBe(true);
+    expect(input.value).toBe('x');
+    expect(onAfterCommit).not.toHaveBeenCalled();
 
     warn.mockRestore();
     wb.setText = setText;
     wb.setNumber = setNumber;
     wb.setBool = setBool;
+    editor.commit('none');
+    expect(editor.isActive()).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'x' });
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
   });
 
   describe('single-cell commit write path', () => {

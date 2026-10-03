@@ -272,6 +272,12 @@ export class InlineEditor {
     }
     if (result.status === 'failed') {
       console.warn('formulon-cell: editor write failed', result.error);
+      this.input.focus();
+      this.deps.onValidation?.({
+        severity: 'stop',
+        message: 'The cell value could not be written.',
+      });
+      return;
     } else if (result.notice) {
       if (this.deps.onValidation) this.deps.onValidation(result.notice);
       else {
