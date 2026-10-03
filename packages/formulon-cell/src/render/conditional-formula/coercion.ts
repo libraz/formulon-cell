@@ -28,4 +28,15 @@ const readLogical = (value: CellValue): boolean | null => {
   return null;
 };
 
-export { booleanValue, nonNegativeInteger, positiveInteger, readLogical, readNumber, textValue };
+const numericResult = (value: number): CellValue =>
+  Number.isFinite(value) ? { kind: 'number', value } : { kind: 'error', code: 6, text: '#NUM!' };
+
+export {
+  booleanValue,
+  nonNegativeInteger,
+  numericResult,
+  positiveInteger,
+  readLogical,
+  readNumber,
+  textValue,
+};
