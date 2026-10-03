@@ -18,16 +18,16 @@ import { formatCell, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { ExternalFormulaDraftHandle, FormulaBarController } from '../mount/formula-bar.js';
-import { splitFormulaArgsAllowEmpty } from '../render/conditional-formula/parser.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { createInteractionButton } from './chip-button.js';
 import type { FormulaEditLease, FormulaEditLeaseContext } from './formula-edit-lease.js';
 import {
   FUNCTION_DESCRIPTIONS,
   type FxDialogHandle,
   type FxDialogOpenOptions,
 } from './fx-dialog.js';
+import { assembledFormula, canonicalName, parseOuterCall } from './mac-formula-call.js';
+import { makeButton, makeIconButton } from './mac-formula-palette-buttons.js';
 import type { RangeInsertTarget } from './pointer.js';
 
 type MacPaletteStrings = Strings['fxDialog']['macPalette'];
@@ -83,11 +83,6 @@ type CategoryLabelKey =
   | 'categoryCube'
   | 'categoryWeb';
 
-interface ParsedFormulaCall {
-  name: string;
-  args: string[];
-}
-
 interface CommitSnapshot {
   name: string;
   args: string[];
@@ -118,90 +113,11 @@ const paletteStrings = (strings: Strings): MacPaletteStrings => strings.fxDialog
 const localeOrdinal = (locale: string): 0 | 1 =>
   locale.trim().toLowerCase().startsWith('ja') ? 1 : 0;
 
-const canonicalName = (name: string): string => name.trim().toUpperCase();
-
 const sameAvailability = (a: FunctionCatalogEntry, b: FunctionCatalogEntry): boolean =>
   Object.is(a.availability, b.availability);
 
-const parseOuterCall = (raw: string, expectedName: string): ParsedFormulaCall | null => {
-  const match = raw.trim().match(/^=\s*([A-Za-z][A-Za-z0-9.]*)\s*\(([\s\S]*)\)\s*$/);
-  if (!match || canonicalName(match[1] ?? '') !== canonicalName(expectedName)) return null;
-  const body = match[2] ?? '';
-  const args = splitFormulaArgsAllowEmpty(body);
-  return args === null ? null : { name: canonicalName(match[1] ?? ''), args };
-};
-
-const trailingBlankIndex = (args: readonly string[]): number => {
-  for (let i = args.length - 1; i >= 0; i -= 1) {
-    if ((args[i] ?? '').trim() !== '') return i;
-  }
-  return -1;
-};
-
-const assembledFormula = (name: string, args: readonly string[]): string => {
-  const end = trailingBlankIndex(args);
-  return `=${name}(${end < 0 ? '' : args.slice(0, end + 1).join(',')})`;
-};
-
 const connectedElement = (value: Element | null): HTMLElement | null =>
   value instanceof HTMLElement && value.isConnected ? value : null;
-
-const makeButton = (label: string, action: string, onClick: () => void): HTMLButtonElement => {
-  const button = createInteractionButton({ className: '', text: label, dataset: { action } });
-  button.addEventListener('click', onClick);
-  return button;
-};
-
-type PaletteIcon = 'close' | 'range';
-
-const makeIcon = (kind: PaletteIcon): SVGSVGElement => {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 16 16');
-  svg.setAttribute('width', '14');
-  svg.setAttribute('height', '14');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('focusable', 'false');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '1.4');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
-  if (kind === 'close') {
-    const first = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    first.setAttribute('d', 'M4 4l8 8');
-    svg.appendChild(first);
-    const second = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    second.setAttribute('d', 'M12 4l-8 8');
-    svg.appendChild(second);
-  } else {
-    const grid = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    grid.setAttribute('x', '2');
-    grid.setAttribute('y', '2');
-    grid.setAttribute('width', '8');
-    grid.setAttribute('height', '8');
-    svg.appendChild(grid);
-    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    arrow.setAttribute('d', 'M8 13h5V8');
-    svg.appendChild(arrow);
-    const arrowHead = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    arrowHead.setAttribute('d', 'M13 8l-3 3');
-    svg.appendChild(arrowHead);
-  }
-  return svg;
-};
-
-const makeIconButton = (
-  label: string,
-  action: string,
-  kind: PaletteIcon,
-  onClick: () => void,
-): HTMLButtonElement => {
-  const button = createInteractionButton({ className: '', ariaLabel: label, dataset: { action } });
-  button.title = label;
-  button.appendChild(makeIcon(kind));
-  button.addEventListener('click', onClick);
-  return button;
-};
 
 export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormulaPaletteHandle {
   const root = document.createElement('aside');
