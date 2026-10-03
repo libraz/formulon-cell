@@ -5,6 +5,7 @@ import {
   type FeatureFlags,
   type FeatureId,
   parseScriptCommand,
+  type ScriptCommand,
   type SpreadsheetInstance,
   type ThemeName,
   type ToolbarInstance,
@@ -14,16 +15,13 @@ import { type RibbonTab, Spreadsheet, useSelection } from '@libraz/formulon-cell
 import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
 import {
   computed,
-  nextTick,
   onBeforeUnmount,
   onMounted,
-  onUnmounted,
   ref,
   shallowRef,
   watch,
 } from 'vue';
 import {
-  activateDemoModal,
   buildDemoBackstageCards,
   buildDemoBackstageNav,
   buildDemoCommands,
@@ -79,6 +77,8 @@ import {
   THEMES,
 } from '../../demo-shared/index.js';
 import DemoIcon from './DemoIcon.vue';
+import DemoReviewDialog from './DemoReviewDialog.vue';
+import DemoScriptDialog from './DemoScriptDialog.vue';
 
 const UI = createDemoStrings('Vue');
 
@@ -115,11 +115,7 @@ const bookName = ref('Book1');
 const loadError = ref<string | null>(null);
 const reviewDialog = ref<DemoReviewDialogState | null>(null);
 const scriptOpen = ref(false);
-const scriptCommand = ref('uppercase');
-const scriptError = ref<string | null>(null);
 const uploadStatus = ref<'saved' | 'saving' | 'error' | null>(null);
-const reviewModalEl = ref<HTMLElement | null>(null);
-const scriptModalEl = ref<HTMLElement | null>(null);
 
 const resolvedUi = computed(() =>
   composeDemoUiOptions({
@@ -219,8 +215,6 @@ const onAccessibilityCheck = (): void => {
 const onRunScript = (): void => {
   const inst = instance.value;
   if (!inst) return;
-  scriptCommand.value = 'uppercase';
-  scriptError.value = null;
   scriptOpen.value = true;
 };
 
@@ -232,24 +226,6 @@ const closeScriptDialog = (): void => {
   scriptOpen.value = false;
 };
 
-let demoModalCleanup: (() => void) | null = null;
-
-watch(
-  () => (reviewDialog.value ? 'review' : scriptOpen.value ? 'script' : null),
-  async (openModal) => {
-    demoModalCleanup?.();
-    demoModalCleanup = null;
-    if (!openModal) return;
-    await nextTick();
-    const root = openModal === 'review' ? reviewModalEl.value : scriptModalEl.value;
-    if (!root) return;
-    demoModalCleanup = activateDemoModal(
-      root,
-      openModal === 'review' ? closeReviewDialog : closeScriptDialog,
-    );
-  },
-);
-
 const showRibbonNotice = (title: string, detail: string): void => {
   reviewDialog.value = buildDemoReviewDialog(title, commandText.value.ribbonCommand, detail);
 };
@@ -260,12 +236,7 @@ const applyParsedScript = (command: ReturnType<typeof parseScriptCommand>): void
   reviewDialog.value = reportDemoScriptRun(inst, command, commandText.value);
 };
 
-const applyScriptCommand = (): void => {
-  const command = parseScriptCommand(scriptCommand.value);
-  if (!command) {
-    scriptError.value = commandText.value.scriptCommandError;
-    return;
-  }
+const onScriptSubmit = (command: ScriptCommand): void => {
   scriptOpen.value = false;
   applyParsedScript(command);
 };
@@ -440,11 +411,6 @@ watch([searchQuery, searchOpen], () => {
 });
 
 watch(searchUsagePrior, (prior) => saveDemoSearchUsagePrior(prior));
-
-onUnmounted(() => {
-  demoModalCleanup?.();
-  // The Spreadsheet component disposes itself; nothing extra to clean up.
-});
 
 onMounted(() => {
   disposeSearchShortcut = installDemoSearchShortcut(() => searchInput.value, platform.value);
@@ -850,77 +816,18 @@ onBeforeUnmount(() => {
         </section>
       </aside>
     </main>
-    <div
+    <DemoReviewDialog
       v-if="reviewDialog"
-      ref="reviewModalEl"
-      class="fc-tb__modal"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="reviewDialog.title"
-    >
-      <section class="fc-tb__modal-panel">
-        <header class="fc-tb__modal-header">
-          <h2>{{ reviewDialog.title }}</h2>
-          <button
-            type="button"
-            class="fc-tb__modal-x"
-            :aria-label="ui.close"
-            @click="closeReviewDialog"
-          >
-            ×
-          </button>
-        </header>
-        <div class="fc-tb__modal-body">
-          <p v-if="reviewDialog.items.length === 0" class="fc-tb__modal-empty">
-            {{ ui.noIssuesFound }}
-          </p>
-          <ul v-else class="fc-tb__modal-list">
-            <li v-for="(item, index) in reviewDialog.items" :key="`${item.label}-${index}`">
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.detail }}</span>
-            </li>
-          </ul>
-        </div>
-        <footer class="fc-tb__modal-footer">
-          <button type="button" class="fc-tb__btn" @click="closeReviewDialog">{{ ui.ok }}</button>
-        </footer>
-      </section>
-    </div>
-    <div
+      :dialog="reviewDialog"
+      :ui="ui"
+      @close="closeReviewDialog"
+    />
+    <DemoScriptDialog
       v-if="scriptOpen"
-      ref="scriptModalEl"
-      class="fc-tb__modal"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="commandText.script"
-    >
-      <form class="fc-tb__modal-panel fc-tb__modal-panel--narrow" @submit.prevent="applyScriptCommand">
-        <header class="fc-tb__modal-header">
-          <h2>{{ commandText.script }}</h2>
-          <button
-            type="button"
-            class="fc-tb__modal-x"
-            :aria-label="ui.close"
-            @click="closeScriptDialog"
-          >
-            ×
-          </button>
-        </header>
-        <div class="fc-tb__modal-body">
-          <label class="fc-tb__modal-field">
-            <span>{{ ui.command }}</span>
-            <!-- No `autofocus`: the modal's focus trap owns the initial focus,
-                 and WebKit applies autofocus after it, which breaks the
-                 Tab/Shift+Tab wrap contract (and the React demo's parity). -->
-            <input v-model="scriptCommand" @input="scriptError = null" />
-          </label>
-          <p v-if="scriptError" class="fc-tb__modal-error">{{ scriptError }}</p>
-        </div>
-        <footer class="fc-tb__modal-footer">
-          <button type="button" class="fc-tb__btn" @click="closeScriptDialog">{{ ui.cancel }}</button>
-          <button type="submit" class="fc-tb__btn fc-tb__btn--active">{{ ui.run }}</button>
-        </footer>
-      </form>
-    </div>
+      :ui="ui"
+      :command-text="commandText"
+      @submit="onScriptSubmit"
+      @close="closeScriptDialog"
+    />
   </div>
 </template>

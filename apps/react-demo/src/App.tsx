@@ -3,7 +3,8 @@ import {
   type CellValue,
   type FeatureFlags,
   type FeatureId,
-  parseScriptCommand,
+  type parseScriptCommand,
+  type ScriptCommand,
   type SpreadsheetInstance,
   type ThemeName,
   type ToolbarInstance,
@@ -15,17 +16,8 @@ import {
   SpreadsheetToolbar,
   useSelection,
 } from '@libraz/formulon-cell-react';
+import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  type ReactElement,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import {
-  activateDemoModal,
   buildDemoBackstageCards,
   buildDemoBackstageNav,
   buildDemoCommands,
@@ -81,24 +73,10 @@ import {
   THEMES,
 } from '../../demo-shared/index.js';
 import { DemoIcon } from './DemoIcon.js';
+import { DemoReviewDialog } from './DemoReviewDialog.js';
+import { DemoScriptDialog } from './DemoScriptDialog.js';
 
 const UI = createDemoStrings('React');
-
-// Modal focus trap + Esc-to-close. `activateDemoModal` lives in demo-shared
-// and is shared with the Vue demo; this hook adapts it to React's effect
-// model by attaching on mount/open and detaching on unmount/close.
-const useDemoModalFocus = (
-  rootRef: RefObject<HTMLElement | null>,
-  open: boolean,
-  onClose: () => void,
-): void => {
-  useEffect(() => {
-    if (!open) return;
-    const root = rootRef.current;
-    if (!root) return;
-    return activateDemoModal(root, onClose);
-  }, [rootRef, open, onClose]);
-};
 
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
@@ -124,8 +102,6 @@ export const App = (): ReactElement => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reviewDialog, setReviewDialog] = useState<DemoReviewDialogState | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false);
-  const [scriptCommand, setScriptCommand] = useState('uppercase');
-  const [scriptError, setScriptError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   // Workbook display name. Untitled until the user opens or saves a file —
   // mirrors the spreadsheet titlebar convention. Stripping the extension
@@ -136,8 +112,6 @@ export const App = (): ReactElement => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const quickAccessRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<ToolbarInstance | null>(null);
-  const reviewModalRef = useRef<HTMLDivElement | null>(null);
-  const scriptModalRef = useRef<HTMLDivElement | null>(null);
 
   const resolvedUi = useMemo(
     () => composeDemoUiOptions({ preset, overrides, showRibbon, theme, platform }),
@@ -149,9 +123,6 @@ export const App = (): ReactElement => {
   const commandText = useMemo(() => demoCommandText(locale), [locale]);
   const closeReviewDialog = useCallback(() => setReviewDialog(null), []);
   const closeScriptDialog = useCallback(() => setScriptOpen(false), []);
-
-  useDemoModalFocus(reviewModalRef, !!reviewDialog, closeReviewDialog);
-  useDemoModalFocus(scriptModalRef, scriptOpen, closeScriptDialog);
 
   useEffect(() => {
     let alive = true;
@@ -239,8 +210,6 @@ export const App = (): ReactElement => {
 
   const onRunScript = useCallback(() => {
     if (!instance) return;
-    setScriptCommand('uppercase');
-    setScriptError(null);
     setScriptOpen(true);
   }, [instance]);
 
@@ -259,15 +228,13 @@ export const App = (): ReactElement => {
     [commandText, instance],
   );
 
-  const applyScriptCommand = useCallback(() => {
-    const command = parseScriptCommand(scriptCommand);
-    if (!command) {
-      setScriptError(commandText.scriptCommandError);
-      return;
-    }
-    setScriptOpen(false);
-    applyParsedScript(command);
-  }, [applyParsedScript, commandText.scriptCommandError, scriptCommand]);
+  const onScriptSubmit = useCallback(
+    (command: ScriptCommand) => {
+      setScriptOpen(false);
+      applyParsedScript(command);
+    },
+    [applyParsedScript],
+  );
 
   // Runs the built-in script commands from `#menu-script`. The toolbar owns the
   // rest of that click: it closes the menu, moves focus back to the Script
@@ -900,96 +867,15 @@ export const App = (): ReactElement => {
         </aside>
       </main>
       {reviewDialog ? (
-        <div
-          ref={reviewModalRef}
-          className="fc-tb__modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label={reviewDialog.title}
-        >
-          <section className="fc-tb__modal-panel">
-            <header className="fc-tb__modal-header">
-              <h2>{reviewDialog.title}</h2>
-              <button
-                type="button"
-                className="fc-tb__modal-x"
-                aria-label={ui.close}
-                onClick={closeReviewDialog}
-              >
-                ×
-              </button>
-            </header>
-            <div className="fc-tb__modal-body">
-              {reviewDialog.items.length === 0 ? (
-                <p className="fc-tb__modal-empty">{ui.noIssuesFound}</p>
-              ) : (
-                <ul className="fc-tb__modal-list">
-                  {reviewDialog.items.map((item) => (
-                    <li key={`${item.label}-${item.detail}`}>
-                      <strong>{item.label}</strong>
-                      <span>{item.detail}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <footer className="fc-tb__modal-footer">
-              <button type="button" className="fc-tb__btn" onClick={closeReviewDialog}>
-                {ui.ok}
-              </button>
-            </footer>
-          </section>
-        </div>
+        <DemoReviewDialog dialog={reviewDialog} ui={ui} onClose={closeReviewDialog} />
       ) : null}
       {scriptOpen ? (
-        <div
-          ref={scriptModalRef}
-          className="fc-tb__modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label={commandText.script}
-        >
-          <form
-            className="fc-tb__modal-panel fc-tb__modal-panel--narrow"
-            onSubmit={(ev) => {
-              ev.preventDefault();
-              applyScriptCommand();
-            }}
-          >
-            <header className="fc-tb__modal-header">
-              <h2>{commandText.script}</h2>
-              <button
-                type="button"
-                className="fc-tb__modal-x"
-                aria-label={ui.close}
-                onClick={closeScriptDialog}
-              >
-                ×
-              </button>
-            </header>
-            <div className="fc-tb__modal-body">
-              <label className="fc-tb__modal-field">
-                <span>{ui.command}</span>
-                <input
-                  value={scriptCommand}
-                  onChange={(ev) => {
-                    setScriptCommand(ev.target.value);
-                    setScriptError(null);
-                  }}
-                />
-              </label>
-              {scriptError ? <p className="fc-tb__modal-error">{scriptError}</p> : null}
-            </div>
-            <footer className="fc-tb__modal-footer">
-              <button type="button" className="fc-tb__btn" onClick={closeScriptDialog}>
-                {ui.cancel}
-              </button>
-              <button type="submit" className="fc-tb__btn fc-tb__btn--active">
-                {ui.run}
-              </button>
-            </footer>
-          </form>
-        </div>
+        <DemoScriptDialog
+          ui={ui}
+          commandText={commandText}
+          onSubmit={onScriptSubmit}
+          onClose={closeScriptDialog}
+        />
       ) : null}
     </div>
   );
