@@ -83,7 +83,7 @@ export async function runExcelGeneralNotationScenario(
     ['123456789012', '1.23457E+11'],
     ['-0.0000000001234', '-1.23400E-10'],
     ['1234.5', '1234.5'],
-  ]) {
+  ] as const) {
     await sp.typeIntoActiveCell(input);
     await page.keyboard.press('ArrowUp');
     await sp.shortcut('1');

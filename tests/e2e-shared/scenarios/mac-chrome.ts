@@ -160,6 +160,8 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
   const widths = [390, 768] as const;
   type MacRibbonTab = (typeof tabIds)[number];
   type MacRibbonDisplayMode = (typeof modes)[number];
+  const lastTabId = tabIds[tabIds.length - 1];
+  if (!lastTabId) throw new Error('ribbon tab list is empty');
 
   const expectSelectedTab = async (tabId: MacRibbonTab): Promise<void> => {
     await expect(page.locator('[data-ribbon-tab][aria-selected="true"]')).toHaveCount(1);
@@ -304,7 +306,7 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
         await expectTabLabels();
 
         const firstTab = page.locator(`[data-ribbon-tab="${tabIds[0]}"]`);
-        const lastTab = page.locator(`[data-ribbon-tab="${tabIds[tabIds.length - 1]}"]`);
+        const lastTab = page.locator(`[data-ribbon-tab="${lastTabId}"]`);
         const collapsedGrid =
           mode === 'tabsOnly' ? await page.locator('.fc-host__grid').boundingBox() : null;
         const requireCollapsedGrid = (): NonNullable<typeof collapsedGrid> => {
@@ -336,22 +338,20 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
         await expect(lastTab).toBeFocused();
         await lastTab.click();
         await expect(lastTab).toBeFocused();
-        await expectTabInRail(tabIds[tabIds.length - 1]);
-        expectedActiveTab = tabIds[tabIds.length - 1];
+        await expectTabInRail(lastTabId);
+        expectedActiveTab = lastTabId;
 
         if (mode === 'tabsOnly') {
           await expect(page.locator('.fc-tb__ribbon-shell--peek')).toHaveCount(1);
-          await expectActiveTab(tabIds[tabIds.length - 1]);
+          await expectActiveTab(lastTabId);
           await expectGridStable(requireCollapsedGrid());
           await page.keyboard.press('Escape');
           await expect(page.locator('.fc-tb__ribbon-shell--peek')).toHaveCount(0);
-          await expect(
-            page.locator(`[data-ribbon-panel="${tabIds[tabIds.length - 1]}"]`),
-          ).toBeHidden();
-          await expectSelectedTab(tabIds[tabIds.length - 1]);
+          await expect(page.locator(`[data-ribbon-panel="${lastTabId}"]`)).toBeHidden();
+          await expectSelectedTab(lastTabId);
           await expectGridStable(requireCollapsedGrid());
         } else {
-          await expectActiveTab(tabIds[tabIds.length - 1]);
+          await expectActiveTab(lastTabId);
         }
       }
     }

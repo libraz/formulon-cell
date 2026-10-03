@@ -15,6 +15,7 @@ export interface CellValue {
 }
 
 export interface CellFormat {
+  borders?: Record<string, unknown>;
   [key: string]: unknown;
 }
 

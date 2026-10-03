@@ -52,7 +52,7 @@ export async function runMacRibbonSwitchingScenario(
     'view',
     'automate',
   ];
-  for (const id of [...tabs, ...tabs.toReversed()]) {
+  for (const id of [...tabs, ...[...tabs].reverse()]) {
     await page.locator(`[data-ribbon-tab="${id}"]`).click();
     await expect(page.locator('[data-ribbon-tab][aria-selected="true"]')).toHaveCount(1);
     await expect(page.locator(`[data-ribbon-tab="${id}"]`)).toHaveAttribute(
@@ -180,8 +180,8 @@ export async function runMacRibbonSwitchingScenario(
     labelsRequiringContainment.has(button.id ?? ''),
   );
   expect(containmentButtons).toHaveLength(3);
-  expect(containmentButtons.map((button) => button.id).toSorted()).toEqual(
-    [...labelsRequiringContainment].toSorted(),
+  expect(containmentButtons.map((button) => button.id).sort()).toEqual(
+    [...labelsRequiringContainment].sort(),
   );
   for (const button of containmentButtons) {
     expect(button.labelFragments.length, `${button.id} text fragments`).toBeGreaterThan(0);
