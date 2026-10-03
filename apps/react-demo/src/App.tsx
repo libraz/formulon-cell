@@ -123,9 +123,8 @@ export const App = (): ReactElement => {
   }, [instance, formatters.uppercase, formatters.arrows]);
 
   useEffect(() => {
-    instance?.i18n.setLocale(locale);
     document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
-  }, [instance, locale]);
+  }, [locale]);
 
   useEffect(
     () =>
