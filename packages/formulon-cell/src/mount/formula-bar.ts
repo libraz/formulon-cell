@@ -1,4 +1,4 @@
-import { writeInputValidated } from '../commands/coerce-input.js';
+import { commitCellInput } from '../commands/cell-input-commit.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
@@ -21,7 +21,7 @@ import {
   SELECTION_INPUT_LIMIT_MESSAGE,
 } from '../interact/selection-input.js';
 import { advanceAfterCommit } from '../interact/selection-navigation.js';
-import { formatWithPending, sameAddr } from '../store/pending-format.js';
+import { sameAddr } from '../store/pending-format.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -86,9 +86,6 @@ interface ExternalDraftState {
   cancelMode: 'restore' | 'discard' | null;
   lease: FormulaEditLease | null;
 }
-
-const inputOperation = (raw: string, forceText = false): 'valueEdit' | 'formulaEdit' =>
-  !forceText && raw.trimStart().startsWith('=') ? 'formulaEdit' : 'valueEdit';
 
 export interface FormulaBarController {
   acceptFx(): void;
@@ -473,64 +470,26 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const commitRawAt = (a: Addr, raw: string): boolean => {
     const currentWb = wb();
-    const s = store.getState();
-    const controller = interactionControllerFor(store);
-    if (controller) {
-      const operation = inputOperation(raw, formatWithPending(s, a)?.numFmt?.kind === 'text');
-      let result: ReturnType<typeof controller.execute>;
-      try {
-        result = controller.execute({
-          type: 'cellBatch',
-          operation,
-          origin: 'formulaBar',
-          changes: [{ addr: a, input: raw }],
-          denied: 'reject',
-        });
-      } catch (err) {
-        console.warn('formulon-cell: restricted formula-bar write failed', err);
-        result = { status: 'rejected', applied: [], rejected: [], revision: 0 };
-      }
-      if (result.status === 'rejected') {
-        showCommitFailure(result.rejected[0]?.reason ?? `The ${operation} operation was rejected.`);
-        return false;
-      }
-      const pending = store.getState().ui.pendingFormat;
-      if (pending && sameAddr(pending.addr, a)) mutators.setPendingFormat(store, null);
-      mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
-      return true;
-    }
-    let accepted = true;
-    try {
-      const fmt = formatWithPending(s, a);
-      const outcome = writeInputValidated(currentWb, a, raw, fmt?.validation, store);
-      if (!outcome.ok) {
-        if (outcome.severity === 'stop') {
-          showCommitFailure(outcome.message, fmt?.validation?.errorTitle);
-          return false;
-        }
-        if (onValidation) {
-          notifyValidation({
-            severity: outcome.severity,
-            title: fmt?.validation?.errorTitle,
-            message: outcome.message,
-          });
-        } else {
-          console.warn(`formulon-cell: validation ${outcome.severity}: ${outcome.message}`);
-        }
-      }
-    } catch (err) {
-      console.warn('formulon-cell: writeInput failed', err);
-      accepted = false;
-      showCommitFailure('The formula-bar value could not be written.');
-    }
-    if (!accepted) {
-      if (!detached && !externalDraft?.lease) fxInput.focus();
+    const result = commitCellInput({ store, wb: currentWb, addr: a, raw, origin: 'formulaBar' });
+    if (result.status === 'rejected') {
+      showCommitFailure(
+        result.alert?.message ?? `The ${result.operation} operation was rejected.`,
+        result.alert?.title,
+      );
       return false;
     }
-    const pending = store.getState().ui.pendingFormat;
-    if (pending && sameAddr(pending.addr, a)) {
-      mutators.setCellFormat(store, a, pending.format);
-      mutators.setPendingFormat(store, null);
+    if (result.status === 'failed') {
+      console.warn('formulon-cell: formula-bar write failed', result.error);
+      showCommitFailure('The formula-bar value could not be written.');
+      return false;
+    }
+    if (result.notice) {
+      if (onValidation) notifyValidation(result.notice);
+      else {
+        console.warn(
+          `formulon-cell: validation ${result.notice.severity}: ${result.notice.message}`,
+        );
+      }
     }
     mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
     return true;

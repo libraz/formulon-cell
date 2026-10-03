@@ -739,6 +739,91 @@ describe('InlineEditor', () => {
     wb.setBool = setBool;
   });
 
+  describe('single-cell commit write path', () => {
+    const withUnrestrictedController = () => {
+      const history = new History();
+      const onChanged = vi.fn();
+      const controller = new InteractionController({ store, getWb: () => wb, history, onChanged });
+      const unregister = registerInteractionController(store, controller);
+      const onValidation = vi.fn();
+      const surface = new InlineEditor({ host, grid, store, wb, onAfterCommit, onValidation });
+      const typeAndCommit = (raw: string): void => {
+        surface.begin('');
+        const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+        input.value = raw;
+        surface.commit('none');
+      };
+      return {
+        history,
+        onChanged,
+        onValidation,
+        surface,
+        typeAndCommit,
+        dispose: () => {
+          if (surface.isActive()) surface.cancel();
+          unregister();
+          controller.dispose();
+        },
+      };
+    };
+
+    it('routes through a registered controller even without a policy', () => {
+      const { history, onChanged, typeAndCommit, dispose } = withUnrestrictedController();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      typeAndCommit('5');
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+      expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'applied' }));
+      expect(history.canUndo()).toBe(true);
+      dispose();
+    });
+
+    it('keeps validation titles and warning notices on the controller path', () => {
+      const { onValidation, surface, typeAndCommit, dispose } = withUnrestrictedController();
+      const stopAddr = { sheet: 0, row: 0, col: 0 };
+      const warnAddr = { sheet: 0, row: 1, col: 0 };
+      mutators.setCellFormat(store, stopAddr, {
+        validation: {
+          kind: 'whole',
+          op: '=',
+          a: 5,
+          errorStyle: 'stop',
+          errorTitle: 'Five only',
+          errorMessage: 'Value must be five.',
+        },
+      });
+      mutators.setCellFormat(store, warnAddr, {
+        validation: {
+          kind: 'whole',
+          op: '=',
+          a: 5,
+          errorStyle: 'warning',
+          errorMessage: 'Value is not five.',
+        },
+      });
+
+      mutators.setActive(store, stopAddr);
+      typeAndCommit('4');
+      expect(surface.isActive()).toBe(true);
+      expect(wb.getValue(stopAddr)).toEqual({ kind: 'blank' });
+      expect(onValidation).toHaveBeenLastCalledWith({
+        severity: 'stop',
+        title: 'Five only',
+        message: 'Value must be five.',
+      });
+      surface.cancel();
+
+      mutators.setActive(store, warnAddr);
+      typeAndCommit('4');
+      expect(surface.isActive()).toBe(false);
+      expect(wb.getValue(warnAddr)).toEqual({ kind: 'number', value: 4 });
+      expect(onValidation).toHaveBeenLastCalledWith(
+        expect.objectContaining({ severity: 'warning', message: 'Value is not five.' }),
+      );
+      dispose();
+    });
+  });
+
   it('isActive reflects whether an input is mounted', async () => {
     expect(editor.isActive()).toBe(false);
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });

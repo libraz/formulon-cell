@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { interactionControllerFor } from '../../../../src/commands/interaction-controller.js';
 import { defaultStrings } from '../../../../src/i18n/strings.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/index.js';
@@ -366,6 +367,80 @@ describe('mount/formula-bar — edit lifecycle', () => {
       }),
     );
     setNumber.mockRestore();
+    harness.detach();
+  });
+
+  it('commitFx routes through the mounted controller even without a policy', () => {
+    const store = sheet.instance.store;
+    const controller = interactionControllerFor(store);
+    if (!controller) throw new Error('expected the mounted interaction controller');
+    expect(controller.policy).toBeUndefined();
+    const changed = vi.fn();
+    const unsubscribe = controller.subscribe(changed);
+    const onValidation = vi.fn();
+    const harness = attachFormulaBarHarness(sheet, onValidation, store);
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    harness.fxInput.value = '5';
+    harness.fxInput.dispatchEvent(new Event('input'));
+
+    expect(harness.controller.commitFx('none')).toBe(true);
+    expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 5 });
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ status: 'applied' }));
+    unsubscribe();
+    harness.detach();
+  });
+
+  it('commitFx keeps validation titles and warning notices under the mounted controller', () => {
+    const store = sheet.instance.store;
+    const onValidation = vi.fn();
+    const harness = attachFormulaBarHarness(sheet, onValidation, store);
+    const stopAddr = { sheet: 0, row: 0, col: 0 };
+    const warnAddr = { sheet: 0, row: 1, col: 0 };
+    mutators.setCellFormat(store, stopAddr, {
+      validation: {
+        kind: 'whole',
+        op: '=',
+        a: 5,
+        errorStyle: 'stop',
+        errorTitle: 'Five only',
+        errorMessage: 'Value must be five.',
+      },
+    });
+    mutators.setCellFormat(store, warnAddr, {
+      validation: {
+        kind: 'whole',
+        op: '=',
+        a: 5,
+        errorStyle: 'warning',
+        errorMessage: 'Value is not five.',
+      },
+    });
+    const typeAndCommit = (addr: typeof stopAddr, raw: string): boolean => {
+      mutators.setActive(store, addr);
+      harness.fxInput.focus();
+      harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+      harness.fxInput.value = raw;
+      harness.fxInput.dispatchEvent(new Event('input'));
+      return harness.controller.commitFx('none');
+    };
+
+    expect(typeAndCommit(stopAddr, '4')).toBe(false);
+    expect(sheet.workbook.getValue(stopAddr)).toEqual({ kind: 'blank' });
+    expect(onValidation).toHaveBeenLastCalledWith({
+      severity: 'stop',
+      title: 'Five only',
+      message: 'Value must be five.',
+    });
+    harness.controller.cancelFx();
+
+    expect(typeAndCommit(warnAddr, '4')).toBe(true);
+    expect(sheet.workbook.getValue(warnAddr)).toEqual({ kind: 'number', value: 4 });
+    expect(onValidation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ severity: 'warning', message: 'Value is not five.' }),
+    );
     harness.detach();
   });
 

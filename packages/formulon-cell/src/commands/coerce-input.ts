@@ -313,6 +313,22 @@ export function writeInputValidated(
     if (store) applyImplicitFormat(store, a, coerced);
     return { ok: true };
   }
+  const outcome = validateCoercedInput(wb, a, coerced, validation);
+  if (outcome.ok || outcome.severity !== 'stop') {
+    writeCoerced(wb, a, coerced);
+    if (store) applyImplicitFormat(store, a, coerced);
+  }
+  return outcome;
+}
+
+/** Validate `coerced` for `a` without writing. Only a `stop` outcome blocks
+ *  the entry; custom rules evaluate against `wb`. */
+export function validateCoercedInput(
+  wb: WorkbookHandle,
+  a: Addr,
+  coerced: CoercedInput,
+  validation: CellValidation,
+): ValidationOutcome {
   const evalCustom = validation.kind === 'custom' ? makeCustomEvaluator(wb, a, coerced) : undefined;
   const outcome = validateAgainst(validation, coerced, makeRangeResolver(wb, a.sheet), evalCustom);
   // A `stop` rule with the error alert disabled records the invalid value
@@ -320,10 +336,6 @@ export function writeInputValidated(
   // rather than a `stop` rejection that keeps the editor open.
   const silentStop =
     !outcome.ok && outcome.severity === 'stop' && validation.showErrorMessage === false;
-  if (outcome.ok || outcome.severity !== 'stop' || silentStop) {
-    writeCoerced(wb, a, coerced);
-    if (store) applyImplicitFormat(store, a, coerced);
-  }
   return silentStop ? { ok: true } : outcome;
 }
 
