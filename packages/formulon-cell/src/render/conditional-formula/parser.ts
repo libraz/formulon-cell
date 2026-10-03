@@ -1983,34 +1983,65 @@ function splitFormulaArgs(raw: string): string[] | null {
 
 function splitFormulaArgsAllowEmpty(raw: string): string[] | null {
   const args: string[] = [];
-  let depth = 0;
+  const stack: Array<')' | '}' | ']'> = [];
   let quote: '"' | "'" | null = null;
   let start = 0;
   for (let i = 0; i < raw.length; i += 1) {
     const ch = raw[i];
     if (quote) {
-      if (ch === quote) quote = null;
+      if (ch === quote) {
+        if (raw[i + 1] === quote) {
+          i += 1;
+          continue;
+        }
+        quote = null;
+      }
       continue;
     }
+
+    const top = stack[stack.length - 1];
+    if (top === ']') {
+      if (ch === '[') {
+        stack.push(']');
+        continue;
+      }
+      if (ch === ']') {
+        stack.pop();
+        continue;
+      }
+      if (ch === "'" && "[]#'@".includes(raw[i + 1] ?? '')) {
+        i += 1;
+      }
+      continue;
+    }
+
     if (ch === '"' || ch === "'") {
       quote = ch;
       continue;
     }
     if (ch === '(') {
-      depth += 1;
+      stack.push(')');
       continue;
     }
-    if (ch === ')') {
-      depth -= 1;
-      if (depth < 0) return null;
+    if (ch === '{') {
+      stack.push('}');
       continue;
     }
-    if (ch === ',' && depth === 0) {
+    if (ch === '[') {
+      stack.push(']');
+      continue;
+    }
+    if (ch === ')' || ch === '}' || ch === ']') {
+      if (top !== ch) return null;
+      stack.pop();
+      continue;
+    }
+    if (ch === ',' && stack.length === 0) {
       args.push(raw.slice(start, i).trim());
       start = i + 1;
     }
   }
-  if (quote || depth !== 0) return null;
+  if (quote || stack.length !== 0) return null;
   args.push(raw.slice(start).trim());
   return args;
 }
