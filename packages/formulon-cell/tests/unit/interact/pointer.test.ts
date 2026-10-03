@@ -665,6 +665,33 @@ describe('attachPointer', () => {
       stub.mockReturnValue(null);
     });
 
+    it('double-click fill unmerges a merged destination like a drag fill', async () => {
+      const grid = await import('../../../src/render/grid.js');
+      // Handle at the bottom-right of cell (0, 1): x∈[156,260), y∈[30,58).
+      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
+      stub.mockReturnValue({ x: 256, y: 54, w: 6, h: 6 });
+
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 1, col: 0, value: 2 },
+        { row: 2, col: 0, value: 3 },
+        { row: 0, col: 1, value: 5 },
+      ]);
+      mutators.mergeRange(store, { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 1 });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 1 });
+      detach = attachPointer(host, store, wb);
+
+      fireDblClick(host, 259, 57);
+
+      expect(store.getState().merges.byAnchor.size).toBe(0);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 5 });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'number', value: 5 });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 });
+
+      stub.mockReturnValue(null);
+    });
+
     it('pointercancel during a fill drag clears the preview and writes nothing', async () => {
       const grid = await import('../../../src/render/grid.js');
       const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;

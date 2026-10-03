@@ -37,6 +37,8 @@ import {
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
 import { getOutlineToggleHits } from '../render/grid.js';
 import {
+  isWholeColumnRange,
+  isWholeRowRange,
   type SelectionGestureMode,
   selectionContainsAddr,
   selectionCoversRange,
@@ -303,12 +305,12 @@ export function attachPointer(
   /** Write a fill of `src` into `dest` and promote `dest` to the selection.
    *  Restricted mounts authorize the whole destination as one batch through the
    *  interaction controller; others write straight to the workbook in one undo
-   *  step. `stripMerges` unmerges anything the destination cuts first. */
+   *  step. Merges the destination cuts are unmerged first. */
   const commitFill = (
     s: State,
     src: Range,
     dest: Range,
-    opts: { copyOnly: boolean; stripMerges: boolean },
+    opts: { copyOnly: boolean },
   ): { applied: boolean; restricted: boolean } => {
     const controller = interactionControllerFor(store);
     const restricted = controller?.policy !== undefined;
@@ -328,8 +330,9 @@ export function attachPointer(
       applied = false;
       try {
         // Fill cannot tear merged rectangles apart silently.
-        if (opts.stripMerges) applyUnmerge(store, wb, history, dest);
-        applied = fillRange(s, wb, src, dest, {
+        applyUnmerge(store, wb, history, dest);
+        // Re-read the state: the unmerge above changed the merge maps the fill checks.
+        applied = fillRange(store.getState(), wb, src, dest, {
           copyOnly: opts.copyOnly,
           formatting: 'with',
           store,
@@ -520,10 +523,9 @@ export function attachPointer(
 
       case 'col-header': {
         if (e.shiftKey) {
-          const anchorCol =
-            s.selection.range.r0 === 0 && s.selection.range.r1 >= MAX_ROW
-              ? s.selection.anchor.col
-              : s.selection.active.col;
+          const anchorCol = isWholeColumnRange(s.selection.range)
+            ? s.selection.anchor.col
+            : s.selection.active.col;
           mutators.selectCols(store, anchorCol, zone.col);
           drag = { kind: 'col-header', anchorCol };
           return;
@@ -568,10 +570,9 @@ export function attachPointer(
 
       case 'row-header': {
         if (e.shiftKey) {
-          const anchorRow =
-            s.selection.range.c0 === 0 && s.selection.range.c1 >= MAX_COL
-              ? s.selection.anchor.row
-              : s.selection.active.row;
+          const anchorRow = isWholeRowRange(s.selection.range)
+            ? s.selection.anchor.row
+            : s.selection.active.row;
           mutators.selectRows(store, anchorRow, zone.row);
           drag = { kind: 'row-header', anchorRow };
           return;
@@ -873,10 +874,7 @@ export function attachPointer(
         }
         // Spreadsheet parity: holding Ctrl/⌘ on release toggles series → tile copy.
         const copyOnly = e.ctrlKey || e.metaKey;
-        const { applied, restricted } = commitFill(s, drag.src, dest, {
-          copyOnly,
-          stripMerges: true,
-        });
+        const { applied, restricted } = commitFill(s, drag.src, dest, { copyOnly });
         if (applied && !restricted) {
           host.dispatchEvent(
             new CustomEvent('fc:autofilloptions', {
@@ -935,7 +933,7 @@ export function attachPointer(
       const dest = autoFillDownExtent(s, src);
       if (!dest) return;
       if (!isNavigationRangeAllowed(store, dest)) return;
-      commitFill(s, src, dest, { copyOnly: false, stripMerges: false });
+      commitFill(s, src, dest, { copyOnly: false });
       return;
     }
 
