@@ -1,4 +1,3 @@
-import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import { summarizeSpreadsheetCompatibility } from '../engine/compatibility.js';
 import {
   listWorkbookObjects,
@@ -8,28 +7,13 @@ import {
   WORKBOOK_OBJECT_KINDS,
   workbookObjectKindCounts,
 } from '../engine/passthrough-sync.js';
-import { pivotAggregationName } from '../engine/pivot-aggregation.js';
-import {
-  PivotAggregation,
-  PivotAxis,
-  type PivotDataFieldSpec,
-  type PivotFilterSpec,
-  PivotReportLayout,
-} from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration } from '../store/store.js';
-import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogIconButton, createDialogButton } from './dialog-shell.js';
-import {
-  createPivotFilterConditionControls,
-  type PivotFilterConditionState,
-  pivotFilterConditionToSpec,
-  pivotFilterSpecToCondition,
-  showPivotFilterDialog,
-} from './pivot-field-settings.js';
+import { appendDialogIconButton } from './dialog-shell.js';
 import { compatibilityLabelKey } from './spreadsheet-compatibility-report.js';
+import { createWorkbookObjectsActionButton, pivotEditField } from './workbook-objects-dom.js';
+import { type PivotEditorContext, renderPivotEditForm } from './workbook-objects-pivot-editor.js';
 
 export {
   buildSpreadsheetCompatibilityReport,
@@ -65,20 +49,6 @@ export interface WorkbookObjectsPanelHandle {
   setStrings(next: Strings): void;
   bindWorkbook(next: WorkbookHandle): void;
   detach(): void;
-}
-
-function createWorkbookObjectsActionButton(
-  label: string,
-  opts: { primary?: boolean; type?: 'button' | 'submit' } = {},
-): HTMLButtonElement {
-  const button = createDialogButton({
-    label,
-    baseClass: 'fc-objects__action',
-    variant: opts.primary ? 'primary' : undefined,
-    primaryClass: 'fc-objects__action--primary',
-  });
-  button.type = opts.type ?? 'button';
-  return button;
 }
 
 export function attachWorkbookObjectsPanel(
@@ -153,20 +123,28 @@ export function attachWorkbookObjectsPanel(
 
   const pivotKey = (sheet: number, index: number): string => `${sheet}:${index}`;
 
-  const pivotEditField = (label: string, control: HTMLElement): HTMLLabelElement => {
-    const row = document.createElement('label');
-    row.className = 'fc-objects__pivot-edit-field';
-    const text = document.createElement('span');
-    text.textContent = label;
-    row.append(text, control);
-    return row;
-  };
-
-  const pivotEditCheck = (label: string, control: HTMLInputElement): HTMLLabelElement => {
-    const row = document.createElement('label');
-    row.className = 'fc-objects__pivot-edit-check';
-    row.append(control, document.createTextNode(label));
-    return row;
+  const appendPivotEditButtons = (
+    actions: HTMLElement,
+    pivot: { sheetIndex: number; pivotIndex: number },
+  ): void => {
+    const t = strings.workbookObjects;
+    const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
+    const edit = createWorkbookObjectsActionButton(t.editPivotTable);
+    edit.addEventListener('click', () => {
+      activePivotEditKey = activePivotEditKey === key ? '' : key;
+      activePivotFieldListKey = '';
+      pivotEditError = '';
+      render();
+    });
+    actions.appendChild(edit);
+    const fieldList = createWorkbookObjectsActionButton(t.pivotFieldList);
+    fieldList.addEventListener('click', () => {
+      activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;
+      activePivotEditKey = '';
+      pivotEditError = '';
+      render();
+    });
+    actions.appendChild(fieldList);
   };
 
   const appendIllustrationActions = (
@@ -247,421 +225,25 @@ export function attachWorkbookObjectsPanel(
     return form;
   };
 
-  const renderPivotEditForm = (
-    pivot: {
-      sheetIndex: number;
-      pivotIndex: number;
-      top: number;
-      left: number;
-      rows: number;
-      cols: number;
-      fields: readonly string[];
-      fieldItems?: Record<string, readonly string[]>;
-      fieldItemIndexes?: Record<string, readonly number[]>;
+  const pivotEditorContext = (): PivotEditorContext => ({
+    host,
+    wb,
+    strings,
+    errorText: pivotEditError,
+    setError: (message) => {
+      pivotEditError = message;
     },
-    opts: { fieldListOnly?: boolean } = {},
-  ): HTMLFormElement => {
-    const t = strings.workbookObjects;
-    const fieldListOnly = opts.fieldListOnly === true;
-    const form = document.createElement('form');
-    form.className = 'fc-objects__pivot-edit';
-    form.setAttribute('aria-label', fieldListOnly ? t.pivotFieldList : t.editPivotTable);
-    const name = document.createElement('input');
-    name.className = 'fc-objects__input';
-    name.type = 'text';
-    name.value = `${t.pivot} ${pivot.pivotIndex + 1}`;
-    const anchor = document.createElement('input');
-    anchor.className = 'fc-objects__input';
-    anchor.type = 'text';
-    anchor.value = formatA1Cell(pivot.top, pivot.left);
-    const rowTotals = document.createElement('input');
-    rowTotals.type = 'checkbox';
-    rowTotals.checked = true;
-    const colTotals = document.createElement('input');
-    colTotals.type = 'checkbox';
-    colTotals.checked = true;
-    const layoutSelect = createDialogSelect(
-      [
-        { value: String(PivotReportLayout.Compact), label: t.pivotReportLayoutCompact },
-        { value: String(PivotReportLayout.Outline), label: t.pivotReportLayoutOutline },
-        { value: String(PivotReportLayout.Tabular), label: t.pivotReportLayoutTabular },
-      ],
-      String(
-        wb.getPivotReportLayout(pivot.sheetIndex, pivot.pivotIndex) ?? PivotReportLayout.Compact,
-      ),
-      { className: 'fc-objects__input' },
-    );
-    const fieldAreaSelects: HTMLSelectElement[] = [];
-    const fieldAreas = document.createElement('div');
-    fieldAreas.className = 'fc-objects__pivot-field-areas';
-    const fieldAreasTitle = document.createElement('span');
-    fieldAreasTitle.textContent = t.pivotFieldAreas;
-    fieldAreas.appendChild(fieldAreasTitle);
-    const fieldListTitle = document.createElement('div');
-    fieldListTitle.className = 'fc-objects__pivot-field-list-title';
-    fieldListTitle.textContent = t.pivotFieldList;
-    const availableFields = document.createElement('div');
-    availableFields.className = 'fc-objects__pivot-field-list';
-    const availableTitle = document.createElement('span');
-    availableTitle.textContent = t.pivotAvailableFields;
-    availableFields.appendChild(availableTitle);
-    const axisOptions = [
-      { value: String(PivotAxis.Row), label: t.pivotAreaRows },
-      { value: String(PivotAxis.Col), label: t.pivotAreaColumns },
-      { value: String(PivotAxis.Page), label: t.pivotAreaFilters },
-      { value: String(PivotAxis.Value), label: t.pivotAreaValues },
-    ];
-    const aggregationOptions = [
-      { value: String(PivotAggregation.Sum), label: t.pivotAggregateSum },
-      { value: String(PivotAggregation.Count), label: t.pivotAggregateCount },
-      { value: String(PivotAggregation.Average), label: t.pivotAggregateAverage },
-      { value: String(PivotAggregation.Max), label: t.pivotAggregateMax },
-      { value: String(PivotAggregation.Min), label: t.pivotAggregateMin },
-    ];
-    const filterConditions = new Map<number, PivotFilterConditionState>();
-    for (const spec of (pivot as { pivotFilters?: readonly PivotFilterSpec[] }).pivotFilters ??
-      []) {
-      const fieldIndex = pivot.fields.indexOf(spec.fieldName);
-      if (fieldIndex < 0 || filterConditions.has(fieldIndex)) continue;
-      const condition = pivotFilterSpecToCondition(spec);
-      if (condition) filterConditions.set(fieldIndex, condition);
-    }
-    const filterConditionDirty = new Set<number>();
-    const valueFieldSettings: {
-      fieldIndex: number;
-      axisSelect: HTMLSelectElement;
-      aggregationSelect: HTMLSelectElement;
-      numberFormatInput: HTMLInputElement;
-      filterItemsInput: HTMLTextAreaElement;
-      filterCondition(): PivotFilterConditionState | undefined;
-    }[] = [];
-    for (const [index, field] of pivot.fields.entries()) {
-      if (fieldListOnly) {
-        const item = document.createElement('label');
-        item.className = 'fc-objects__pivot-field-list-item';
-        const check = document.createElement('input');
-        check.type = 'checkbox';
-        check.checked = true;
-        projectDisabledState(check, true, t.pivotFieldListCheckboxReadOnly, {
-          datasetKey: 'disabledReason',
-        });
-        item.append(check, document.createTextNode(field));
-        availableFields.appendChild(item);
-      }
-      const select = createDialogSelect(
-        axisOptions,
-        filterConditions.has(index)
-          ? String(PivotAxis.Page)
-          : index === 0
-            ? String(PivotAxis.Row)
-            : String(PivotAxis.Value),
-        { className: 'fc-objects__input' },
-      );
-      select.dataset.pivotFieldIndex = String(index);
-      fieldAreaSelects.push(select);
-      const row = document.createElement('div');
-      row.className = 'fc-objects__pivot-field-row';
-      row.appendChild(pivotEditField(field, select));
-      const aggregation = createDialogSelect(aggregationOptions, String(PivotAggregation.Sum), {
-        className: 'fc-objects__input',
-      });
-      aggregation.dataset.pivotAggregationFieldIndex = String(index);
-      const numberFormat = document.createElement('input');
-      numberFormat.className = 'fc-objects__input';
-      numberFormat.type = 'text';
-      numberFormat.placeholder = t.pivotNumberFormatPlaceholder;
-      numberFormat.dataset.pivotNumberFormatFieldIndex = String(index);
-      const filterItems = document.createElement('textarea');
-      filterItems.className = 'fc-objects__input';
-      filterItems.rows = 3;
-      filterItems.placeholder = t.pivotFilterItemsPlaceholder;
-      filterItems.dataset.pivotFilterItemsFieldIndex = String(index);
-      const inferredItems = pivot.fieldItems?.[field] ?? [];
-      const inferredIndexes = pivot.fieldItemIndexes?.[field] ?? [];
-      if (fieldListOnly && inferredItems.length > 0) filterItems.value = inferredItems.join('\n');
-      const syncFilterCondition = (condition: PivotFilterConditionState): void => {
-        if (condition.kind === 'none' || !condition.value.trim()) filterConditions.delete(index);
-        else filterConditions.set(index, condition);
-      };
-      const filterConditionControls = createPivotFilterConditionControls({
-        strings: strings.pivotTableDialog,
-        condition: filterConditions.get(index),
-        selectClassName: 'fc-objects__input',
-        valueClassName: 'fc-objects__input',
-        valuesContainerClassName: 'fc-objects__pivot-filter-condition-values',
-        categoryDataset: { pivotFilterCategoryFieldIndex: String(index) },
-        conditionDataset: { pivotFilterConditionFieldIndex: String(index) },
-        fieldRow: pivotEditField,
-        onChange: syncFilterCondition,
-        onUserChange: () => filterConditionDirty.add(index),
-      });
-      const filterDialogButton = createWorkbookObjectsActionButton(
-        strings.pivotTableDialog.filterDialog,
-      );
-      filterDialogButton.addEventListener('click', () => {
-        void showPivotFilterDialog({
-          host,
-          strings: strings.pivotTableDialog,
-          fieldName: field,
-          condition: filterConditions.get(index),
-          okLabel: strings.pageSetup.ok,
-          cancelLabel: strings.pageSetup.cancel,
-        }).then((condition) => {
-          if (!condition) return;
-          syncFilterCondition(condition);
-          filterConditionDirty.add(index);
-          render();
-        });
-      });
-      const filterChecklist = document.createElement('div');
-      filterChecklist.className = 'fc-objects__pivot-filter-items';
-      filterChecklist.dataset.pivotFilterChecklistFieldIndex = String(index);
-      for (const [position, itemName] of inferredItems.entries()) {
-        const check = document.createElement('input');
-        check.type = 'checkbox';
-        check.checked = true;
-        check.value = itemName;
-        // The blank member has no label to be matched by, so the filter can
-        // only name it by its cache index. Carry the index for every item and
-        // the writeback never has to guess which form to use.
-        const cacheIndex = inferredIndexes[position];
-        if (cacheIndex !== undefined) check.dataset.pivotItemCacheIndex = String(cacheIndex);
-        const checkLabel = document.createElement('label');
-        checkLabel.className = 'fc-objects__pivot-field-list-item';
-        checkLabel.append(check, document.createTextNode(itemName || t.pivotBlankItem));
-        filterChecklist.appendChild(checkLabel);
-      }
-      const settings = document.createElement('div');
-      settings.className = 'fc-objects__pivot-value-settings';
-      settings.hidden = select.value !== String(PivotAxis.Value);
-      settings.append(
-        pivotEditField(t.pivotAggregation, aggregation),
-        pivotEditField(t.pivotNumberFormat, numberFormat),
-      );
-      const filterSettings = document.createElement('div');
-      filterSettings.className = 'fc-objects__pivot-value-settings';
-      filterSettings.hidden = select.value !== String(PivotAxis.Page);
-      filterSettings.appendChild(
-        inferredItems.length > 0
-          ? pivotEditField(t.pivotFilterItems, filterChecklist)
-          : pivotEditField(t.pivotFilterItems, filterItems),
-      );
-      filterSettings.append(...filterConditionControls);
-      filterSettings.appendChild(filterDialogButton);
-      select.addEventListener('change', () => {
-        settings.hidden = select.value !== String(PivotAxis.Value);
-        filterSettings.hidden = select.value !== String(PivotAxis.Page);
-      });
-      valueFieldSettings.push({
-        fieldIndex: index,
-        axisSelect: select,
-        aggregationSelect: aggregation,
-        numberFormatInput: numberFormat,
-        filterItemsInput: filterItems,
-        filterCondition: () => filterConditions.get(index),
-      });
-      row.appendChild(settings);
-      row.appendChild(filterSettings);
-      fieldAreas.appendChild(row);
-    }
-    const error = document.createElement('div');
-    error.className = 'fc-objects__error';
-    error.setAttribute('role', 'alert');
-    error.hidden = !pivotEditError;
-    error.textContent = pivotEditError;
-    const actions = document.createElement('div');
-    actions.className = 'fc-objects__actions';
-    const remove = createWorkbookObjectsActionButton(t.deletePivotTable);
-    const apply = createWorkbookObjectsActionButton(t.apply, { primary: true, type: 'submit' });
-    if (fieldListOnly) actions.append(apply);
-    else actions.append(remove, apply);
-    remove.addEventListener('click', () => {
-      pivotEditError = '';
-      if (!wb.removePivotTable(pivot.sheetIndex, pivot.pivotIndex)) {
-        pivotEditError = t.pivotEditFailed;
-        render();
-        return;
-      }
+    rerender: () => render(),
+    onRemoved: () => {
       activePivotEditKey = '';
       deps.onAfterPivotEdit?.();
-      render();
-    });
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      pivotEditError = '';
-      const nextAnchor = fieldListOnly
-        ? { row: pivot.top, col: pivot.left }
-        : parseA1Atom(anchor.value);
-      if (!nextAnchor) {
-        pivotEditError = t.invalidPivotAnchor;
-        render();
-        return;
-      }
-      const renamed =
-        fieldListOnly || wb.renamePivotTable(pivot.sheetIndex, pivot.pivotIndex, name.value.trim());
-      const moved =
-        fieldListOnly ||
-        wb.setPivotTableAnchor(pivot.sheetIndex, pivot.pivotIndex, {
-          row: nextAnchor.row,
-          col: nextAnchor.col,
-          rows: pivot.rows,
-          cols: pivot.cols,
-        });
-      const totaled =
-        fieldListOnly ||
-        wb.setPivotTableGrandTotals(
-          pivot.sheetIndex,
-          pivot.pivotIndex,
-          rowTotals.checked,
-          colTotals.checked,
-        );
-      const layoutUpdated =
-        fieldListOnly ||
-        wb.setPivotReportLayout(
-          pivot.sheetIndex,
-          pivot.pivotIndex,
-          Number(layoutSelect.value) as PivotReportLayout,
-        );
-      const fieldsUpdated = fieldAreaSelects.every((select) =>
-        wb.setPivotFieldAxis(
-          pivot.sheetIndex,
-          pivot.pivotIndex,
-          Number(select.dataset.pivotFieldIndex),
-          Number(select.value) as PivotAxis,
-        ),
-      );
-      const rowFieldOrder = fieldAreaSelects
-        .filter((select) => Number(select.value) === PivotAxis.Row)
-        .map((select) => Number(select.dataset.pivotFieldIndex));
-      const colFieldOrder = fieldAreaSelects
-        .filter((select) => Number(select.value) === PivotAxis.Col)
-        .map((select) => Number(select.dataset.pivotFieldIndex));
-      const axisOrdersUpdated =
-        fieldsUpdated &&
-        wb.setPivotRowFieldOrder(pivot.sheetIndex, pivot.pivotIndex, rowFieldOrder) &&
-        wb.setPivotColFieldOrder(pivot.sheetIndex, pivot.pivotIndex, colFieldOrder);
-      const dataFieldCount = wb.pivotDataFieldCount(pivot.sheetIndex, pivot.pivotIndex);
-      let nextDataFieldIndex = 0;
-      const valueFieldsUpdated = valueFieldSettings.every((field) => {
-        if (field.axisSelect.value !== String(PivotAxis.Value)) return true;
-        const format = field.numberFormatInput.value.trim();
-        const aggregation = Number(field.aggregationSelect.value) as PivotAggregation;
-        const spec: PivotDataFieldSpec = {
-          name: `${pivotAggregationName(aggregation)} of ${pivot.fields[field.fieldIndex] ?? `field ${field.fieldIndex}`}`,
-          fieldIndex: field.fieldIndex,
-          aggregation,
-          ...(format.length > 0 ? { numberFormat: format } : {}),
-        };
-        const dataFieldIndex = nextDataFieldIndex;
-        nextDataFieldIndex += 1;
-        if (dataFieldIndex < dataFieldCount) {
-          return wb.setPivotDataField(pivot.sheetIndex, pivot.pivotIndex, dataFieldIndex, spec);
-        }
-        return wb.addPivotDataField(pivot.sheetIndex, pivot.pivotIndex, spec) >= 0;
-      });
-      const filterItemsUpdated = valueFieldSettings.every((field) => {
-        if (field.axisSelect.value !== String(PivotAxis.Page)) return true;
-        if (!wb.clearPivotFieldItems(pivot.sheetIndex, pivot.pivotIndex, field.fieldIndex)) {
-          return false;
-        }
-        const items = field.filterItemsInput.value
-          .split(/\r?\n/)
-          .map((item) => item.trim())
-          .filter(Boolean);
-        const checklist = form.querySelector<HTMLElement>(
-          `[data-pivot-filter-checklist-field-index="${field.fieldIndex}"]`,
-        );
-        if (checklist) {
-          const checkedItems = Array.from(
-            checklist.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
-          );
-          return checkedItems.every((item) => {
-            // A cache index states the item exactly, including the blank
-            // member; without one — a field whose items were read off the
-            // projected layout — the label is all there is.
-            const cacheIndex = Number.parseInt(item.dataset.pivotItemCacheIndex ?? '', 10);
-            if (Number.isFinite(cacheIndex)) {
-              if (
-                wb.addPivotFieldItemAt(
-                  pivot.sheetIndex,
-                  pivot.pivotIndex,
-                  field.fieldIndex,
-                  cacheIndex,
-                  item.checked,
-                )
-              ) {
-                return true;
-              }
-              // An engine without the by-index form cannot express a blank
-              // member at all; skip it rather than adding an item that
-              // filters nothing.
-              if (!item.value) return true;
-            }
-            return wb.addPivotFieldItem(
-              pivot.sheetIndex,
-              pivot.pivotIndex,
-              field.fieldIndex,
-              item.value,
-              item.checked,
-            );
-          });
-        }
-        return items.every((item) =>
-          wb.addPivotFieldItem(pivot.sheetIndex, pivot.pivotIndex, field.fieldIndex, item, true),
-        );
-      });
-      const dirtyFilterSettings = valueFieldSettings.filter(
-        (field) =>
-          field.axisSelect.value === String(PivotAxis.Page) &&
-          filterConditionDirty.has(field.fieldIndex),
-      );
-      const nextPivotFilters = dirtyFilterSettings
-        .map((field) =>
-          pivotFilterConditionToSpec(pivot.fields[field.fieldIndex] ?? '', field.filterCondition()),
-        )
-        .filter((filter): filter is PivotFilterSpec => filter !== null);
-      const pivotFiltersUpdated =
-        dirtyFilterSettings.length === 0 ||
-        (wb.clearPivotFilters(pivot.sheetIndex, pivot.pivotIndex) &&
-          nextPivotFilters.every((filter) =>
-            wb.addPivotFilter(pivot.sheetIndex, pivot.pivotIndex, filter),
-          ));
-      if (
-        !renamed ||
-        !moved ||
-        !totaled ||
-        !layoutUpdated ||
-        !fieldsUpdated ||
-        !axisOrdersUpdated ||
-        !valueFieldsUpdated ||
-        !filterItemsUpdated ||
-        !pivotFiltersUpdated
-      ) {
-        pivotEditError = t.pivotEditFailed;
-        render();
-        return;
-      }
+    },
+    onApplied: () => {
       activePivotEditKey = '';
       activePivotFieldListKey = '';
       deps.onAfterPivotEdit?.();
-      render();
-    });
-    if (fieldListOnly) {
-      form.append(fieldListTitle, availableFields, fieldAreas, error, actions);
-    } else {
-      form.append(
-        pivotEditField(t.pivotName, name),
-        pivotEditField(t.pivotAnchorCell, anchor),
-        pivotEditField(t.pivotReportLayout, layoutSelect),
-        fieldAreas,
-        pivotEditCheck(t.rowGrandTotals, rowTotals),
-        pivotEditCheck(t.columnGrandTotals, colTotals),
-        error,
-        actions,
-      );
-    }
-    return form;
-  };
+    },
+  });
 
   const render = (): void => {
     const t = strings.workbookObjects;
@@ -718,7 +300,10 @@ export function attachWorkbookObjectsPanel(
         `${t.sheet} ${activeFieldListPivot.sheetIndex + 1}`,
         pivotAnchor(activeFieldListPivot),
       ].join(' · ');
-      section.append(heading, renderPivotEditForm(activeFieldListPivot, { fieldListOnly: true }));
+      section.append(
+        heading,
+        renderPivotEditForm(pivotEditorContext(), activeFieldListPivot, { fieldListOnly: true }),
+      );
       body.appendChild(section);
       root.appendChild(body);
       return;
@@ -840,66 +425,27 @@ export function attachWorkbookObjectsPanel(
         card.appendChild(titleRow);
         if (pivot.fields.length > 0) card.appendChild(fieldChips(pivot.fields));
         const canEditPivot = wb.capabilities.pivotTableMutate;
-        if (deps.onOpenPivotTableDialog) {
+        if (deps.onOpenPivotTableDialog || canEditPivot) {
           const actions = document.createElement('div');
           actions.className = 'fc-objects__actions';
-          if (canEditPivot) {
-            const edit = createWorkbookObjectsActionButton(t.editPivotTable);
-            edit.addEventListener('click', () => {
-              const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
-              activePivotEditKey = activePivotEditKey === key ? '' : key;
-              activePivotFieldListKey = '';
-              pivotEditError = '';
-              render();
-            });
-            actions.appendChild(edit);
+          if (canEditPivot) appendPivotEditButtons(actions, pivot);
+          if (deps.onOpenPivotTableDialog) {
+            const button = createWorkbookObjectsActionButton(t.createPivotTable);
+            button.addEventListener('click', () => deps.onOpenPivotTableDialog?.());
+            actions.appendChild(button);
           }
-          if (canEditPivot) {
-            const fieldList = createWorkbookObjectsActionButton(t.pivotFieldList);
-            fieldList.addEventListener('click', () => {
-              const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
-              activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;
-              activePivotEditKey = '';
-              pivotEditError = '';
-              render();
-            });
-            actions.appendChild(fieldList);
-          }
-          const button = createWorkbookObjectsActionButton(t.createPivotTable);
-          button.addEventListener('click', () => deps.onOpenPivotTableDialog?.());
-          actions.appendChild(button);
-          card.appendChild(actions);
-        } else if (canEditPivot) {
-          const actions = document.createElement('div');
-          actions.className = 'fc-objects__actions';
-          const edit = createWorkbookObjectsActionButton(t.editPivotTable);
-          edit.addEventListener('click', () => {
-            const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
-            activePivotEditKey = activePivotEditKey === key ? '' : key;
-            activePivotFieldListKey = '';
-            pivotEditError = '';
-            render();
-          });
-          actions.appendChild(edit);
-          const fieldList = createWorkbookObjectsActionButton(t.pivotFieldList);
-          fieldList.addEventListener('click', () => {
-            const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
-            activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;
-            activePivotEditKey = '';
-            pivotEditError = '';
-            render();
-          });
-          actions.appendChild(fieldList);
           card.appendChild(actions);
         }
         if (canEditPivot && activePivotEditKey === pivotKey(pivot.sheetIndex, pivot.pivotIndex)) {
-          card.appendChild(renderPivotEditForm(pivot));
+          card.appendChild(renderPivotEditForm(pivotEditorContext(), pivot));
         }
         if (
           canEditPivot &&
           activePivotFieldListKey === pivotKey(pivot.sheetIndex, pivot.pivotIndex)
         ) {
-          card.appendChild(renderPivotEditForm(pivot, { fieldListOnly: true }));
+          card.appendChild(
+            renderPivotEditForm(pivotEditorContext(), pivot, { fieldListOnly: true }),
+          );
         }
         section.appendChild(card);
       }

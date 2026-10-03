@@ -901,7 +901,7 @@ describe('attachWorkbookObjectsPanel', () => {
   });
 
   it('keeps workbook object action buttons on the shared dialog primitive', () => {
-    const source = readFileSync(join(root, 'src/interact/workbook-objects.ts'), 'utf8');
+    const source = readFileSync(join(root, 'src/interact/workbook-objects-dom.ts'), 'utf8');
     expect(source).toContain('function createWorkbookObjectsActionButton(');
     expect(source).toContain(
       "createDialogButton({\n    label,\n    baseClass: 'fc-objects__action'",
