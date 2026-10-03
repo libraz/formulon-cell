@@ -27,6 +27,7 @@ interface Setup {
   recalc: ReturnType<typeof vi.fn>;
   cells: ReturnType<typeof vi.fn>;
   invalidate: ReturnType<typeof vi.fn>;
+  host: HTMLElement;
   setNumber: ReturnType<typeof vi.fn>;
   hostTag: HTMLInputElement;
   feature: {
@@ -104,6 +105,7 @@ function makeSetup(
     recalc,
     cells,
     invalidate,
+    host,
     setNumber,
     hostTag,
     feature,
@@ -391,6 +393,42 @@ describe('mount/host-shortcuts', () => {
     s.handler(e);
     expect(s.feature.pasteSpecialDialog?.open).toHaveBeenCalledTimes(1);
     expect(e.defaultPrevented).toBe(true);
+  });
+
+  it('Control+U on Mac is reserved for starting cell editing', () => {
+    s.host.classList.add('fc-host');
+    s.host.dataset.fcPlatform = 'mac';
+    const e = key({ key: 'U', ctrlKey: true });
+
+    s.handler(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(s.store.getState().format.formats.size).toBe(0);
+    expect(s.feature.findReplace?.open).not.toHaveBeenCalled();
+  });
+
+  it('Cmd+Control+V opens Mac Paste Special exactly once', () => {
+    s.host.classList.add('fc-host');
+    s.host.dataset.fcPlatform = 'mac';
+    const e = key({ key: 'v', metaKey: true, ctrlKey: true });
+
+    s.handler(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(s.feature.pasteSpecialDialog?.open).toHaveBeenCalledTimes(1);
+  });
+
+  it('Cmd+Control+V stays in a text editor instead of opening Paste Special', () => {
+    s.host.classList.add('fc-host');
+    s.host.dataset.fcPlatform = 'mac';
+    const textarea = document.createElement('textarea');
+    s.host.appendChild(textarea);
+    textarea.addEventListener('keydown', s.handler);
+    textarea.focus();
+
+    textarea.dispatchEvent(key({ key: 'v', metaKey: true, ctrlKey: true }));
+
+    expect(s.feature.pasteSpecialDialog?.open).not.toHaveBeenCalled();
   });
 
   it('Ctrl+F3 opens Name Manager', () => {

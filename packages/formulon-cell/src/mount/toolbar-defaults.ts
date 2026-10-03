@@ -18,8 +18,14 @@
 //    that require app dialogs (sort/protect/review/automation) stay
 //    undefined — hosts opt in by passing their own implementation.
 
-import { listCustomCellStyles } from '../commands/cell-styles.js';
+import {
+  cellStyleFallbackProfileForPlatform,
+  listCustomCellStyles,
+} from '../commands/cell-styles.js';
+import { listComments } from '../commands/comment.js';
 import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
+import { MAX_COL_INDEX } from '../commands/formula-refs.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
   collapseColGroup,
   collapseRowGroup,
@@ -33,6 +39,8 @@ import {
 import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { dictionaries } from '../i18n/strings.js';
+import { isNavigationAddrAllowed } from '../interact/navigation-policy.js';
+import { mutators } from '../store/store.js';
 import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
 import { showZoomDialog } from '../toolbar/dialogs/zoom.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
@@ -46,6 +54,7 @@ import {
 import type { RibbonHooks } from '../toolbar/ribbon/apply-ribbon-command.js';
 import { createControlDispatch } from '../toolbar/ribbon/control-dispatch.js';
 import { shouldShowFontOption } from '../toolbar/ribbon/font-availability.js';
+import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { createBordersMenu } from '../toolbar/ribbon/menus/borders.js';
 import { createConditionalMenu } from '../toolbar/ribbon/menus/conditional.js';
 import { createFormulasMenuFactories } from '../toolbar/ribbon/menus/formulas.js';
@@ -69,7 +78,7 @@ import type { SpreadsheetInstance } from './types.js';
 
 /** Options shared by every default factory. */
 export interface ToolbarDefaultsOptions {
-  /** Language for built-in labels. Defaults to `instance.i18n.locale === 'en' ? 'en' : 'ja'`. */
+  /** Language for built-in labels. Defaults to the language derived from `instance.i18n.locale` (`ja*` is Japanese, otherwise English). */
   lang?: 'ja' | 'en';
   /** Called when a control-dispatch flow needs to push focus back to the
    *  sheet (after a font/page-setup change, e.g.). Defaults to focusing
@@ -97,7 +106,7 @@ export interface ToolbarDefaultsOptions {
 export type DefaultRibbonHelpers = RibbonRenderHelpers;
 
 const resolveLang = (instance: SpreadsheetInstance, opts: ToolbarDefaultsOptions): 'ja' | 'en' =>
-  opts.lang ?? (instance.i18n.locale === 'en' ? 'en' : 'ja');
+  opts.lang ?? toolbarLangForLocale(instance.i18n.locale);
 
 export function createDefaultRibbonHelpers(
   instance: SpreadsheetInstance,
@@ -170,6 +179,8 @@ export function createDefaultRibbonMenus(
     ribbonLang: lang,
     ribbonMenuText,
     ribbonText,
+    getWorkbook: () => instance.workbook,
+    getFallbackProfile: () => cellStyleFallbackProfileForPlatform(instance.host.dataset.fcPlatform),
     customCellStyles: () => listCustomCellStyles(instance.store.getState()),
     customTableStyles: () => listCustomTableStyles(instance.store.getState()),
     customPivotTableStyles: () => listCustomPivotTableStyles(instance.store.getState()),
@@ -246,6 +257,35 @@ export function createDefaultRibbonMenus(
 /** Hooks the toolbar can satisfy from instance methods alone — clipboard,
  *  drawing, autoSum. Hosts merge their own categories (review, protection,
  *  automation, …) on top because those involve app-specific dialogs. */
+/** Move to the next/previous note in sheet order, wrapping, and open its editor. */
+const selectAdjacentComment = (instance: SpreadsheetInstance, direction: 1 | -1): void => {
+  const state = instance.store.getState();
+  if (interactionControllerFor(instance.store)?.canSelect().allowed === false) return;
+  const notes = listComments(state).filter((note) =>
+    isNavigationAddrAllowed(instance.store, note.addr),
+  );
+  const active = state.selection.active;
+  const rank = (addr: { row: number; col: number }): number =>
+    addr.row * (MAX_COL_INDEX + 1) + addr.col;
+  const next =
+    direction === 1
+      ? (notes.find((note) => rank(note.addr) > rank(active)) ?? notes[0])
+      : (notes
+          .slice()
+          .reverse()
+          .find((note) => rank(note.addr) < rank(active)) ?? notes.at(-1));
+  if (!next) return;
+  mutators.setActive(instance.store, next.addr);
+  const selected = instance.store.getState().selection.active;
+  if (
+    selected.sheet !== next.addr.sheet ||
+    selected.row !== next.addr.row ||
+    selected.col !== next.addr.col
+  )
+    return;
+  instance.openCommentDialog();
+};
+
 export function createDefaultRibbonHooks(
   instance: SpreadsheetInstance,
   opts: ToolbarDefaultsOptions = {},
@@ -258,7 +298,7 @@ export function createDefaultRibbonHooks(
       refreshCells: opts.refreshCells,
     },
   );
-  const reportLang: RibbonReportLang = instance.i18n.locale === 'ja' ? 'ja' : 'en';
+  const reportLang: RibbonReportLang = toolbarLangForLocale(instance.i18n.locale);
   const showSharedReport = async (
     title: string,
     items: { severity: 'info' | 'warning'; label: string; detail: string }[],
@@ -392,7 +432,7 @@ export function createDefaultRibbonHooks(
       deleteComment: () => {
         dropdowns.applyReviewCommentAction('delete-active');
       },
-      selectComment: () => undefined,
+      selectComment: (direction) => selectAdjacentComment(instance, direction),
     },
     protection: {
       runSheet: () =>

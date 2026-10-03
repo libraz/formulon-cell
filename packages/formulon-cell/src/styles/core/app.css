@@ -24,6 +24,7 @@
 @import "./app/dialog-modules/advanced-filter.css";
 @import "./app/dialog-modules/goto-special.css";
 @import "./app/dialog-modules/fx-dialog.css";
+@import "./app/dialog-modules/mac-formula-palette.css";
 @import "./app/dialog-modules/paste-special.css";
 @import "./app/dialog-modules/insert-copied-cells.css";
 @import "./app/dialog-modules/custom-select.css";
@@ -38,3 +39,28 @@
 @import "./app/panels/slicer.css";
 @import "./app/panels/error-menu.css";
 @import "./app/panels/page-setup.css";
+@import "./app/mac-ink.css";
+
+@layer fc.surface {
+  .fc-host__grid {
+    position: relative;
+  }
+
+  .fc-host__formula-draft-mirror {
+    position: absolute;
+    z-index: 1;
+    box-sizing: border-box;
+    overflow: hidden;
+    pointer-events: none;
+    padding: 4px 1.5px;
+    margin: 0;
+    background: var(--fc-bg);
+    color: var(--fc-fg);
+    border: 1.5px solid var(--fc-accent);
+    font-family: var(--fc-font-ui);
+    font-size: var(--fc-text-cell);
+    line-height: 1.25;
+    white-space: pre;
+    user-select: none;
+  }
+}

@@ -57,6 +57,11 @@ export interface CellPatch {
   readonly formula?: string | null;
 }
 
+/** Lossless hyperlink record returned by the native engine. Kept module-local
+ * at the public package boundary; gallery commands use it without widening
+ * the root cell API. */
+export type EngineHyperlinkRecord = import('@libraz/formulon').HyperlinkEntry;
+
 export interface CellPatchAtomicResult {
   readonly before: readonly CellSnapshot[];
   readonly after: readonly CellSnapshot[];
@@ -1077,14 +1082,48 @@ export class WorkbookHandle {
     return s.ok;
   }
 
-  /** Snapshot of every hyperlink on `sheet`. Empty array under the stub. */
+  /** Full hyperlink snapshot, preserving rectangle and internal-link fields.
+   * `null` means the native enumeration failed; an empty array is a valid
+   * successful empty/capability-off result. */
+  getHyperlinksFull(sheet: number): EngineHyperlinkRecord[] | null {
+    this.assertAlive();
+    if (!this.capabilities.hyperlinks) return [];
+    const get = (
+      this.wb as unknown as {
+        getHyperlinks?: (sheet: number) => {
+          status: { ok: boolean };
+          map: (
+            mapper: (entry: EngineHyperlinkRecord) => EngineHyperlinkRecord,
+          ) => EngineHyperlinkRecord[];
+        };
+      }
+    ).getHyperlinks;
+    if (typeof get !== 'function') return null;
+    try {
+      const result = get.call(this.wb, sheet);
+      if (!result?.status?.ok || typeof result.map !== 'function') return null;
+      return result.map((h) => ({
+        row: h.row,
+        col: h.col,
+        lastRow: h.lastRow,
+        lastCol: h.lastCol,
+        target: h.target,
+        location: h.location,
+        display: h.display,
+        tooltip: h.tooltip,
+      }));
+    } catch {
+      return null;
+    }
+  }
+
+  /** Snapshot of every hyperlink on `sheet`. Empty array under the stub or
+   * native enumeration failure, preserving the historical narrow contract. */
   getHyperlinks(
     sheet: number,
   ): { row: number; col: number; target: string; display: string; tooltip: string }[] {
-    this.assertAlive();
-    if (!this.capabilities.hyperlinks) return [];
-    const arr = this.wb.getHyperlinks(sheet);
-    if (!arr.status.ok) return [];
+    const arr = this.getHyperlinksFull(sheet);
+    if (!arr) return [];
     return arr.map((h) => ({
       row: h.row,
       col: h.col,
@@ -1092,6 +1131,64 @@ export class WorkbookHandle {
       display: h.display,
       tooltip: h.tooltip,
     }));
+  }
+
+  /** Whether the native lossless range hyperlink writer is available. */
+  supportsHyperlinkRangeWrite(): boolean {
+    this.assertAlive();
+    return (
+      this.capabilities.hyperlinks &&
+      typeof (this.wb as unknown as { addHyperlinkRange?: unknown }).addHyperlinkRange ===
+        'function'
+    );
+  }
+
+  /** Append a lossless hyperlink rectangle, including internal locations. */
+  addHyperlinkRange(
+    sheet: number,
+    row: number,
+    col: number,
+    lastRow: number,
+    lastCol: number,
+    target: string,
+    display = '',
+    tooltip = '',
+    location = '',
+  ): boolean {
+    this.assertAlive();
+    if (!this.supportsHyperlinkRangeWrite()) return false;
+    const add = (
+      this.wb as unknown as {
+        addHyperlinkRange: (
+          sheet: number,
+          row: number,
+          col: number,
+          lastRow: number,
+          lastCol: number,
+          target: string,
+          display: string,
+          tooltip: string,
+          location: string,
+        ) => { ok: boolean };
+      }
+    ).addHyperlinkRange;
+    try {
+      const status = add.call(
+        this.wb,
+        sheet,
+        row,
+        col,
+        lastRow,
+        lastCol,
+        target,
+        display,
+        tooltip,
+        location,
+      );
+      return Boolean(status?.ok);
+    } catch {
+      return false;
+    }
   }
 
   /** Append a hyperlink at `(sheet, row, col)`. Empty `display` / `tooltip`

@@ -1,5 +1,11 @@
+import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import {
+  defaultFunctionUnavailableReason,
+  projectMacFunctionCategoryMenus,
+  projectMacRecentMenu,
+} from '../toolbar/ribbon/mac/menus.js';
 
 // `Spreadsheet.mountToolbar` — public entry that wires the ribbon into a host
 // element on top of an existing `SpreadsheetInstance`.
@@ -11,9 +17,9 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 //  - Caller owns: the renderer helpers (select/color/icon/svg), the submenu
 //    factories (`menus`), and the optional feature hooks (`hooks`). These
 //    still live outside core because they reach into framework-specific or
-//    app-specific glue (illustrations, custom dialog flows, …). Phase 2 will
-//    pull more of this inside, but the boundary at v0.1 keeps consumers in
-//    control of their own surface.
+//    app-specific glue (illustrations, custom dialog flows, …). Core ships
+//    defaults for these (see `toolbar-defaults.ts`); the caller's versions
+//    take precedence.
 //
 // The toolbar listens to `instance.store.subscribe()` so it can re-project
 // active-state (bold/italic/etc.) on every selection or format change. It
@@ -22,14 +28,16 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 // go through `renderRibbon()` once.
 
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import { withSelectionFormatOrigin } from '../commands/format.js';
+import type { FunctionCatalogReader } from '../commands/function-categories.js';
+import { recordRepeatableFormatChange } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensions/ui-options.js';
+import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-ink.js';
 import type { CellBorderStyle } from '../store/types.js';
 import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
-import {
-  RIBBON_BORDERS_MENU_ID,
-  RIBBON_MENU_FIRST_COMMANDS,
-} from '../toolbar/ribbon/activation.js';
+import { isRibbonMenuFirstCommand, RIBBON_BORDERS_MENU_ID } from '../toolbar/ribbon/activation.js';
 import {
   applyRibbonCommand,
   type RibbonHooks,
@@ -47,6 +55,8 @@ import {
   type DynamicDropdownsCtx,
   ribbonDropdownMenuIdForCommand,
 } from '../toolbar/ribbon/dynamic-dropdowns.js';
+import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
+import { MAC_FORMULAS_MORE_MENU_ID, projectMacRibbonState } from '../toolbar/ribbon/mac/model.js';
 import {
   createRenderRibbon,
   type RibbonDisplayMode,
@@ -55,6 +65,8 @@ import {
 } from '../toolbar/ribbon/render-ribbon.js';
 import { projectActiveState, RIBBON_ACTIVE_COMMANDS } from '../toolbar/ribbon-active-state.js';
 import {
+  EXCEL365_MAC_RIBBON_TABS,
+  RIBBON_TABS,
   type RibbonTab,
   type ToolbarLang,
   type ToolbarText,
@@ -110,6 +122,9 @@ const projectDefaultRibbonActiveState = (
 };
 
 export interface MountToolbarOptions {
+  /** Platform used for platform-specific ribbon defaults. Inherited from the
+   *  nearest `.fc-host` when omitted. */
+  platform?: SpreadsheetPlatform;
   /** Language for built-in ribbon labels. Defaults to the instance locale. */
   lang?: ToolbarLang;
   /** Override the auto-derived ToolbarText (button titles, group names). */
@@ -275,7 +290,9 @@ const defaultApplyRibbonFormat =
   (fn: RibbonFormatMutator): void => {
     const inst = getInstance();
     if (!inst) return;
-    fn(inst.store.getState(), inst.store);
+    recordRepeatableFormatChange(inst.history, inst.store, () =>
+      withSelectionFormatOrigin(inst.store, 'ribbon', () => fn(inst.store.getState(), inst.store)),
+    );
   };
 
 export function mountToolbar(
@@ -292,15 +309,30 @@ export function mountToolbar(
     typeof instance === 'function'
       ? (instance as () => SpreadsheetInstance | null)
       : () => instance;
+  const initialInstance = getInstance();
+  const previousPlatform = host.dataset.fcPlatform;
+  const inheritedPlatform =
+    host.dataset.fcPlatform ??
+    host.closest<HTMLElement>('.fc-host')?.dataset.fcPlatform ??
+    initialInstance?.host.dataset.fcPlatform;
+  const platformOverride = opts.platform !== undefined;
+  const ribbonTabsOverride = opts.ribbonTabs !== undefined;
+  let platform = resolveSpreadsheetPlatform(
+    opts.platform ??
+      (inheritedPlatform === 'mac' || inheritedPlatform === 'default' ? inheritedPlatform : 'auto'),
+  );
+  host.dataset.fcPlatform = platform;
+  let defaultRibbonTabs =
+    opts.ribbonTabs ?? (platform === 'mac' ? EXCEL365_MAC_RIBBON_TABS : undefined);
 
   // Probe once at mount-time for language inference and the initial subscribe.
   // The toolbar continues to work if the probe returns null (deferred mount);
   // in that case lang falls back to opts.lang or 'ja' and the store subscription
   // is attached lazily on the first call to `attachStoreSubscription`.
   const unregisterOverlayOwner = registerOverlayOwner(host, () => getInstance()?.host ?? null);
-  const initialInstance = getInstance();
 
-  const lang: ToolbarLang = opts.lang ?? (initialInstance?.i18n.locale === 'en' ? 'en' : 'ja');
+  const lang: ToolbarLang =
+    opts.lang ?? (initialInstance ? toolbarLangForLocale(initialInstance.i18n.locale) : 'ja');
   const text = opts.text ?? toolbarText(lang);
   const menuText = opts.menuText ?? toolbarMenuText(lang);
   const displayOptionsText = ribbonDisplayText(lang);
@@ -308,13 +340,20 @@ export function mountToolbar(
   let activeTab: RibbonTab = opts.activeTab ?? 'home';
   let displayMode: RibbonDisplayMode =
     opts.ribbonDisplayMode ?? (opts.collapsed ? 'tabsOnly' : 'full');
-  let autoHidePeek = false;
+  let ribbonPeek = false;
   let backstageOpen = false;
   let displayMenuOpen = false;
   let formulaBarVisible = opts.formulaBarVisible ?? true;
   let theme: UiTheme = opts.theme ?? 'paper';
   let borderStyle: CellBorderStyle = opts.borderStyle ?? DEFAULT_BORDER_STYLE;
   let borderColor = opts.borderColor ?? DEFAULT_BORDER_COLOR;
+
+  const rehomeActiveTabForPlatform = (): void => {
+    const available = opts.ribbonTabs ?? defaultRibbonTabs ?? RIBBON_TABS;
+    if (available.includes(activeTab)) return;
+    activeTab = available[0] ?? 'home';
+  };
+  rehomeActiveTabForPlatform();
 
   const focusSheet =
     opts.focusSheet ??
@@ -325,17 +364,41 @@ export function mountToolbar(
   const refreshZoom = opts.refreshZoom ?? ((): void => undefined);
   const projectFormatToolbar = (): void => {
     projectDefaultRibbonActiveState(host, getInstance());
+    const instance = getInstance();
+    if (instance && platform === 'mac') {
+      const reportedNames =
+        typeof instance.workbook.functionNames === 'function'
+          ? instance.workbook.functionNames()
+          : null;
+      const liveNames = reportedNames === null ? null : new Set(reportedNames);
+      const availabilityContext = {
+        reader:
+          reportedNames === null
+            ? undefined
+            : (instance.workbook as unknown as FunctionCatalogReader),
+        unavailableReason:
+          instance.i18n.strings.fxDialog.functionUnavailable ??
+          defaultFunctionUnavailableReason(lang),
+      };
+      projectMacRecentMenu(host, instance.store, lang, liveNames, availabilityContext);
+      projectMacFunctionCategoryMenus(host, instance.store, lang, liveNames, availabilityContext);
+      projectMacRibbonState(host, instance);
+    }
     opts.projectFormatToolbar?.();
   };
   const showMessage = opts.showMessage ?? ((): void => undefined);
-  const applyRibbonFormat = opts.applyRibbonFormat ?? defaultApplyRibbonFormat(getInstance);
+  const rawApplyRibbonFormat = opts.applyRibbonFormat ?? defaultApplyRibbonFormat(getInstance);
+  const applyRibbonFormat = (fn: RibbonFormatMutator): void =>
+    rawApplyRibbonFormat((state, store) =>
+      withSelectionFormatOrigin(store, 'ribbon', () => fn(state, store)),
+    );
   const isCollapsedMode = (): boolean => displayMode === 'tabsOnly' || displayMode === 'autoHide';
   let borderMenuApi: BorderMenuApi | null = null;
   const setDisplayMode = (next: RibbonDisplayMode): void => {
     if (next === displayMode) return;
     const wasCollapsed = isCollapsedMode();
     displayMode = next;
-    autoHidePeek = false;
+    ribbonPeek = false;
     opts.onDisplayModeChange?.(next);
     const collapsed = isCollapsedMode();
     if (collapsed !== wasCollapsed) opts.onCollapsedChange?.(collapsed);
@@ -439,8 +502,17 @@ export function mountToolbar(
     dropdownsApi = createDynamicDropdowns(dropdownsCtx);
     dynamicDropdownClickHandler = (event: MouseEvent): void => {
       const current = getInstance();
-      if (current && interactionControllerFor(current.store)?.policy !== undefined) return;
-      dropdownsApi?.dynamicRibbonDropdownClick(event);
+      const target = event.target instanceof Element ? event.target : null;
+      const menu = target?.closest<HTMLElement>('.fc-tb__menu') ?? null;
+      if (
+        current &&
+        interactionControllerFor(current.store)?.policy !== undefined &&
+        !target?.closest<HTMLElement>(
+          `#${MAC_FORMULAS_MORE_MENU_ID} [data-function-category-submenu]`,
+        )
+      )
+        return;
+      if (dropdownsApi?.dynamicRibbonDropdownClick(event) && menu?.hidden) dismissRibbonPeek();
     };
     dynamicDropdownPointerDownHandler = (event: MouseEvent): void => {
       dropdownsApi?.dynamicRibbonDropdownPointerDown(event);
@@ -453,8 +525,20 @@ export function mountToolbar(
     };
     dynamicDropdownKeyHandler = (event: KeyboardEvent): void => {
       const current = getInstance();
-      if (current && interactionControllerFor(current.store)?.policy !== undefined) return;
-      dropdownsApi?.dynamicRibbonDropdownKeydown(event);
+      const target = event.target instanceof Element ? event.target : null;
+      const menu = target?.closest<HTMLElement>('.fc-tb__menu') ?? null;
+      if (
+        current &&
+        interactionControllerFor(current.store)?.policy !== undefined &&
+        !target?.closest<HTMLElement>(`#${MAC_FORMULAS_MORE_MENU_ID}`)
+      )
+        return;
+      if (
+        dropdownsApi?.dynamicRibbonDropdownKeydown(event) &&
+        menu?.hidden &&
+        (event.key === 'Enter' || event.key === ' ')
+      )
+        dismissRibbonPeek();
     };
     document.addEventListener('click', dynamicDropdownClickHandler);
     document.addEventListener('mousedown', dynamicDropdownPointerDownHandler, true);
@@ -469,13 +553,16 @@ export function mountToolbar(
     ribbonText: text,
     ribbonMenuText: menuText,
     ribbonDisplayOptionsText: displayOptionsText,
-    ribbonTabs: opts.ribbonTabs,
+    getProfile: () => (platform === 'mac' ? 'excel365Mac' : 'default'),
+    get ribbonTabs() {
+      return defaultRibbonTabs;
+    },
     ribbonRoot: host,
     state: {
       getActiveTab: () => activeTab,
       getCollapsed: () => isCollapsedMode(),
       getDisplayMode: () => displayMode,
-      getAutoHidePeek: () => autoHidePeek,
+      getAutoHidePeek: () => ribbonPeek,
       getBackstageOpen: () => backstageOpen,
       getDisplayMenuOpen: () => displayMenuOpen,
       getFormulaBarVisible: () => formulaBarVisible,
@@ -514,11 +601,46 @@ export function mountToolbar(
     projectInteractionPolicy();
   };
 
+  const syncInheritedPlatform = (current: SpreadsheetInstance | null): boolean => {
+    if (platformOverride) return false;
+    const inherited = current?.host.dataset.fcPlatform;
+    const next = resolveSpreadsheetPlatform(
+      inherited === 'mac' || inherited === 'default' ? inherited : 'auto',
+    );
+    if (next === platform) return false;
+    platform = next;
+    host.dataset.fcPlatform = next;
+    if (!ribbonTabsOverride) {
+      defaultRibbonTabs = next === 'mac' ? EXCEL365_MAC_RIBBON_TABS : undefined;
+      rehomeActiveTabForPlatform();
+    }
+    return true;
+  };
+
+  // Mac Draw owns transient controller state outside the spreadsheet store.
+  // Bind its notifications only while this toolbar is on the Mac surface so
+  // active pen / trackpad buttons update without a synthetic store mutation.
+  let unsubMacInk: (() => void) | null = null;
+  let subscribedMacInk: MacInkController | null = null;
+  const syncMacInkSubscription = (current: SpreadsheetInstance | null): void => {
+    const next =
+      platform === 'mac' && current ? (getMacInk(current) ?? ensureMacInk(current) ?? null) : null;
+    if (next === subscribedMacInk) return;
+    unsubMacInk?.();
+    unsubMacInk = null;
+    subscribedMacInk = next;
+    if (next) unsubMacInk = next.subscribe(projectFormatToolbar);
+  };
+
   const projectInteractionPolicy = (): void => {
     const current = getInstance();
     if (!current || interactionControllerFor(current.store)?.policy === undefined) return;
     dropdownsApi?.closeAllDynamicRibbonDropdowns();
     for (const button of host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
+      // Intrinsic engine availability has priority over embedding policy. The
+      // menu projector already supplied its localized reason; a policy tick
+      // must not replace it with a generic denial message.
+      if (button.dataset.functionUnavailable === 'true') continue;
       const decision = canExecuteBuiltIn(
         current.store,
         button.dataset.ribbonCommand ?? '',
@@ -545,9 +667,13 @@ export function mountToolbar(
     const inMenu = target.closest('.fc-tb__menu');
     const isInput = target.closest('input, select, textarea');
     if (
+      event.type === 'click' &&
+      target.closest(`#${MAC_FORMULAS_MORE_MENU_ID} [data-function-category-submenu]`)
+    )
+      return;
+    if (
       command &&
       canExecuteBuiltIn(current.store, command.dataset.ribbonCommand ?? '', 'ribbon').allowed &&
-      !inMenu &&
       !isInput
     )
       return;
@@ -587,6 +713,7 @@ export function mountToolbar(
       hooks: mergedHooks,
     });
     opts.onCommand?.(id, applied);
+    dismissRibbonPeek();
     return applied;
   };
 
@@ -608,7 +735,59 @@ export function mountToolbar(
       button?.setAttribute('aria-expanded', 'false');
       restoreTarget ??= button;
     }
+    for (const panel of host.querySelectorAll<HTMLElement>('[data-function-category-panel]')) {
+      panel.hidden = true;
+    }
+    for (const trigger of host.querySelectorAll<HTMLElement>('[data-function-category-submenu]')) {
+      trigger.classList.remove('fc-tb__menu-item--active');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
     if (restoreFocus) restoreTarget?.focus();
+  };
+
+  const projectRibbonTabs = (): void => {
+    const shell = host.querySelector<HTMLElement>('.fc-tb__ribbon-shell');
+    if (!shell) return;
+    const peek = isCollapsedMode() && ribbonPeek;
+    const collapsed = isCollapsedMode() && !peek;
+    shell.classList.toggle('fc-tb__ribbon-shell--peek', peek);
+    shell.classList.toggle('fc-tb__ribbon-shell--autoHidePeek', displayMode === 'autoHide' && peek);
+    shell.classList.toggle('fc-tb__ribbon-shell--collapsed', collapsed);
+    if (peek) shell.dataset.ribbonPeek = 'true';
+    else delete shell.dataset.ribbonPeek;
+    if (displayMode === 'autoHide' && peek) shell.dataset.ribbonAutoHidePeek = 'true';
+    else delete shell.dataset.ribbonAutoHidePeek;
+    const tabs = shell.querySelector<HTMLElement>('.fc-tb__ribbon-tabs');
+    if (tabs) tabs.dataset.ribbonCollapsed = collapsed ? 'true' : 'false';
+    for (const button of shell.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')) {
+      const selected = button.dataset.ribbonTab === activeTab;
+      button.classList.toggle('fc-tb__ribbon-tab--active', selected);
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    for (const panel of shell.querySelectorAll<HTMLElement>('[data-ribbon-panel]')) {
+      panel.hidden = panel.dataset.ribbonPanel !== activeTab;
+    }
+  };
+
+  const dismissRibbonPeek = (): void => {
+    if (!ribbonPeek) return;
+    ribbonPeek = false;
+    dropdownsApi?.closeAllDynamicRibbonDropdowns();
+    closeStaticRibbonMenus();
+    projectRibbonTabs();
+  };
+
+  const activateRibbonTab = (tab: RibbonTab, reveal: boolean): void => {
+    const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${tab}"]`);
+    if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
+    dropdownsApi?.closeAllDynamicRibbonDropdowns();
+    closeStaticRibbonMenus();
+    const changed = tab !== activeTab;
+    activeTab = tab;
+    if (reveal && tab !== 'file' && isCollapsedMode()) ribbonPeek = true;
+    projectRibbonTabs();
+    if (changed) opts.onTabChange?.(tab);
   };
 
   const hasOpenStaticRibbonMenu = (): boolean =>
@@ -622,11 +801,7 @@ export function mountToolbar(
     const tabBtn = target.closest<HTMLButtonElement>('[data-ribbon-tab]');
     if (tabBtn) {
       const tab = tabBtn.dataset.ribbonTab as RibbonTab | undefined;
-      if (tab && tab !== activeTab) {
-        activeTab = tab;
-        opts.onTabChange?.(tab);
-        renderToolbar();
-      }
+      if (tab) activateRibbonTab(tab, true);
       return;
     }
 
@@ -654,7 +829,17 @@ export function mountToolbar(
       return;
     }
 
-    if (opts.commandDelegation === false) return;
+    if (opts.commandDelegation === false) {
+      const command = target.closest<HTMLButtonElement>('[data-ribbon-command]');
+      if (
+        command &&
+        !command.disabled &&
+        !isRibbonMenuFirstCommand(command.dataset.ribbonCommand ?? '') &&
+        !target.closest('.fc-tb__rb-split-chevron')
+      )
+        dismissRibbonPeek();
+      return;
+    }
     const cmdBtn = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (cmdBtn?.dataset.ribbonCommand) {
       const id = cmdBtn.dataset.ribbonCommand;
@@ -665,7 +850,13 @@ export function mountToolbar(
       // the active element, so normalize it here. Anything the command itself
       // focuses afterwards (menu item, dialog field, the sheet) still wins.
       if (document.activeElement !== cmdBtn) cmdBtn.focus({ preventScroll: true });
-      if (opts.interceptCommand?.(id, cmdBtn, e)) return;
+      if (opts.interceptCommand?.(id, cmdBtn, e)) {
+        const openMenu = host.querySelector(
+          '.fc-tb__menu:not([hidden]), .fc-tb__submenu:not([hidden]), .fc-tb__rb-dd--open',
+        );
+        if (!openMenu) dismissRibbonPeek();
+        return;
+      }
       // The chevron is part of the command button's DOM, so delegated clicks
       // otherwise look identical to primary-face clicks. Route it to the
       // attached menu before the primary action; SVG paths are covered by
@@ -690,7 +881,7 @@ export function mountToolbar(
       // it. Split buttons with a primary face action skip this so
       // applyRibbonCommand can fire their primary handler; their chevron
       // routing is handled by the branch above.
-      if (RIBBON_MENU_FIRST_COMMANDS.has(id)) {
+      if (isRibbonMenuFirstCommand(id) && !cmdBtn.closest('.fc-tb__menu--mac')) {
         const menuId = cmdBtn.dataset.ribbonMenuId;
         if (dropdownsApi && menuId) {
           dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
@@ -705,11 +896,14 @@ export function mountToolbar(
           return;
         }
       }
-      applyCommand(id);
-      if (displayMode === 'autoHide' && autoHidePeek) {
-        autoHidePeek = false;
-        renderToolbar();
+      if (cmdBtn.closest('.fc-tb__menu--mac')) {
+        const menu = cmdBtn.closest<HTMLElement>('.fc-tb__menu--mac');
+        const spec = menu ? dropdownsApi?.dynamicDropdownSpecForMenu(menu) : null;
+        if (spec) dropdownsApi?.closeDynamicRibbonDropdown(spec, true);
+        closeStaticRibbonMenus();
       }
+      applyCommand(id);
+      dismissRibbonPeek();
     }
   };
   host.addEventListener('click', onClick);
@@ -740,7 +934,8 @@ export function mountToolbar(
     // Hidden tabs are filtered so custom tab profiles can omit optional
     // add-in surfaces without leaving dead stops in the roving tabindex.
     const tabs = Array.from(host.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')).filter(
-      (btn) => btn.offsetParent !== null,
+      (btn) =>
+        btn.offsetParent !== null && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
     );
     if (tabs.length === 0) return;
     const currentIndex = tabs.indexOf(tabBtn);
@@ -755,14 +950,9 @@ export function mountToolbar(
     const nextTab = tabs[nextIndex];
     if (!nextTab) return;
     const nextId = nextTab.dataset.ribbonTab as RibbonTab | undefined;
-    if (nextId && nextId !== activeTab) {
-      activeTab = nextId;
-      opts.onTabChange?.(nextId);
-      renderToolbar();
-      // After re-render, refetch the tab from the freshly-rendered DOM and
-      // restore focus + roving-tabindex.
-      const focusTarget = host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${nextId}"]`);
-      focusTarget?.focus();
+    if (nextId) {
+      activateRibbonTab(nextId, true);
+      nextTab.focus();
     }
   };
   host.addEventListener('keydown', onKey);
@@ -843,17 +1033,17 @@ export function mountToolbar(
       setDisplayMode(isCollapsedMode() ? 'full' : 'tabsOnly');
       return;
     }
-    if (displayMode === 'autoHide' && e.key === 'Alt' && !autoHidePeek) {
+    if (displayMode === 'autoHide' && e.key === 'Alt' && !ribbonPeek) {
       e.preventDefault();
-      autoHidePeek = true;
+      ribbonPeek = true;
       renderToolbar();
       host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${activeTab}"]`)?.focus();
       return;
     }
-    if (displayMode === 'autoHide' && e.key === 'Escape' && autoHidePeek) {
+    if (isCollapsedMode() && e.key === 'Escape' && ribbonPeek) {
       e.preventDefault();
-      autoHidePeek = false;
-      renderToolbar();
+      dismissRibbonPeek();
+      focusActiveTab();
     }
   };
   document.addEventListener('keydown', onGlobalKey);
@@ -863,15 +1053,14 @@ export function mountToolbar(
   // outside element's own click handler fires.
   const onDocumentMouseDown = (e: MouseEvent): void => {
     const shouldCloseStaticMenus = hasOpenStaticRibbonMenu();
-    const shouldRenderDisplayState =
-      displayMenuOpen || (displayMode === 'autoHide' && autoHidePeek);
+    const shouldRenderDisplayState = displayMenuOpen || (isCollapsedMode() && ribbonPeek);
     if (!shouldRenderDisplayState && !shouldCloseStaticMenus) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
     if (host.contains(target)) return;
     if (shouldCloseStaticMenus) closeStaticRibbonMenus();
     if (displayMenuOpen) displayMenuOpen = false;
-    if (displayMode === 'autoHide') autoHidePeek = false;
+    if (isCollapsedMode()) ribbonPeek = false;
     if (shouldRenderDisplayState) renderToolbar();
   };
   document.addEventListener('mousedown', onDocumentMouseDown);
@@ -884,18 +1073,33 @@ export function mountToolbar(
   // attaches; in practice playground does this in its boot path.
   let unsubStore: (() => void) | null = null;
   let unsubPolicy: (() => void) | null = null;
+  let unsubFunctionHistory: (() => void) | null = null;
   let subscribedInstance: SpreadsheetInstance | null = null;
   const ensureStoreSubscription = (): void => {
     const current = getInstance();
-    if (current === subscribedInstance) return;
+    if (current === subscribedInstance) {
+      syncInheritedPlatform(current);
+      syncMacInkSubscription(current);
+      return;
+    }
     unsubStore?.();
     unsubPolicy?.();
+    unsubFunctionHistory?.();
     subscribedInstance = current;
+    syncInheritedPlatform(current);
+    syncMacInkSubscription(current);
     unsubStore =
       current?.store.subscribe(() => {
+        const nextInstance = getInstance();
+        const platformChanged = syncInheritedPlatform(nextInstance);
+        syncMacInkSubscription(nextInstance);
         projectFormatToolbar();
-        projectInteractionPolicy();
+        if (platformChanged) renderToolbar();
+        else projectInteractionPolicy();
       }) ?? null;
+    unsubFunctionHistory = current
+      ? subscribeRecentFunctions(current.store, projectFormatToolbar)
+      : null;
     unsubPolicy = current
       ? (interactionControllerFor(current.store)?.subscribe(() => renderToolbar()) ?? null)
       : null;
@@ -908,7 +1112,6 @@ export function mountToolbar(
   };
 
   rerender();
-  projectFormatToolbar();
 
   return {
     host,
@@ -918,12 +1121,7 @@ export function mountToolbar(
     rerender,
     applyCommand,
     focusActiveTab,
-    setActiveTab: (tab) => {
-      if (tab === activeTab) return;
-      activeTab = tab;
-      opts.onTabChange?.(tab);
-      renderToolbar();
-    },
+    setActiveTab: (tab) => activateRibbonTab(tab, false),
     getActiveTab: () => activeTab,
     setCollapsed: (next) => {
       setDisplayMode(next ? 'tabsOnly' : 'full');
@@ -967,6 +1165,8 @@ export function mountToolbar(
     },
     dispose: () => {
       unregisterOverlayOwner();
+      if (previousPlatform === undefined) delete host.dataset.fcPlatform;
+      else host.dataset.fcPlatform = previousPlatform;
       host.removeEventListener('click', guardInteraction, true);
       host.removeEventListener('change', guardInteraction, true);
       host.removeEventListener('input', guardInteraction, true);
@@ -999,9 +1199,14 @@ export function mountToolbar(
       borderMenuApi?.detach();
       borderMenuApi = null;
       dropdownsApi = null;
+      unsubMacInk?.();
+      unsubMacInk = null;
+      subscribedMacInk = null;
       unsubStore?.();
       unsubPolicy?.();
       unsubPolicy = null;
+      unsubFunctionHistory?.();
+      unsubFunctionHistory = null;
       unsubStore = null;
       subscribedInstance = null;
       cancelOpenAppDialogs();

@@ -1,0 +1,43 @@
+@layer fc.app {
+  /* The session-image record is kept for shared history and workbook-object
+   * discovery. Mac ink has its own viewport-aware renderer below, so the
+   * generic image overlay must stay out of the way. */
+  .fc-illustration[data-illustration-id^="mac-ink-"] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .fc-host--mac-ink .fc-host__grid {
+    cursor: crosshair;
+  }
+
+  .fc-host--mac-ink[data-fc-mac-ink-tool="eraser"] .fc-host__grid {
+    cursor: cell;
+  }
+
+  .fc-mac-ink__display,
+  .fc-mac-ink__input {
+    box-sizing: border-box;
+  }
+
+  .fc-mac-ink__display {
+    user-select: none;
+  }
+
+  .fc-mac-ink__display[hidden] {
+    display: none !important;
+  }
+
+  .fc-mac-ink__display [data-fc-mac-ink-id] {
+    pointer-events: none;
+  }
+
+  .fc-host--mac-ink[data-fc-mac-ink-tool="eraser"] .fc-mac-ink__display [data-fc-mac-ink-id] {
+    pointer-events: stroke;
+    cursor: cell;
+  }
+
+  .fc-mac-ink__input {
+    user-select: none;
+  }
+}

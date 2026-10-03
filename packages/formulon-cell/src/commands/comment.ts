@@ -12,6 +12,10 @@ export interface CommentEntry {
 }
 
 type CommentSnapshot = Array<{ addr: Addr; text: string | null; author: string | null }>;
+type PhysicalCommentSnapshot = Array<{
+  addr: Addr;
+  comment: { author: string; text: string } | null;
+}>;
 
 /** Read the comment text on a cell, or null when unset. */
 export function commentAt(state: State, addr: Addr): string | null {
@@ -105,27 +109,125 @@ const sameCommentSnapshot = (a: CommentSnapshot, b: CommentSnapshot): boolean =>
     );
   });
 
+const uniqueAddrs = (addrs: readonly Addr[]): Addr[] => {
+  const seen = new Set<string>();
+  const unique: Addr[] = [];
+  for (const addr of addrs) {
+    const key = addrKey(addr);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(cloneAddr(addr));
+  }
+  return unique;
+};
+
+const capturePhysicalCommentSnapshot = (
+  wb: WorkbookHandle | undefined,
+  addrs: readonly Addr[],
+): PhysicalCommentSnapshot => {
+  if (!wb?.capabilities.comments || typeof wb.getComment !== 'function') return [];
+  return addrs.map((addr) => ({
+    addr: cloneAddr(addr),
+    comment: wb.getComment(addr.sheet, addr.row, addr.col),
+  }));
+};
+
+const applyCommentStoreSnapshot = (store: SpreadsheetStore, snapshot: CommentSnapshot): void => {
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    for (const entry of snapshot) {
+      const key = addrKey(entry.addr);
+      const current = formats.get(key);
+      if (entry.text === null) {
+        if (!current) continue;
+        const { comment: _comment, commentAuthor: _author, ...rest } = current;
+        if (Object.keys(rest).length === 0) formats.delete(key);
+        else formats.set(key, rest);
+        continue;
+      }
+      const { comment: _comment, commentAuthor: _author, ...rest } = current ?? {};
+      formats.set(key, {
+        ...rest,
+        comment: entry.text,
+        ...(entry.author !== null ? { commentAuthor: entry.author } : {}),
+      });
+    }
+    return { ...s, format: { ...s.format, formats } };
+  });
+};
+
+const applyPhysicalCommentSnapshot = (
+  wb: WorkbookHandle | undefined,
+  snapshot: PhysicalCommentSnapshot,
+): void => {
+  if (!wb?.capabilities.comments) return;
+  for (const entry of snapshot) {
+    const comment = entry.comment;
+    if (
+      !wb.setCommentEntry(
+        entry.addr.sheet,
+        entry.addr.row,
+        entry.addr.col,
+        comment?.author ?? '',
+        comment?.text ?? '',
+      )
+    ) {
+      throw new Error('comment engine write failed');
+    }
+  }
+};
+
 const applyCommentSnapshot = (
   store: SpreadsheetStore,
   wb: WorkbookHandle | undefined,
   snapshot: CommentSnapshot,
 ): void => {
-  for (const entry of snapshot) {
-    mutators.setCellFormat(store, entry.addr, {
-      comment: entry.text ?? undefined,
-      commentAuthor: entry.text ? (entry.author ?? undefined) : undefined,
-    });
+  const tracked = uniqueAddrs(snapshot.map((entry) => entry.addr));
+  const beforeStore = captureCommentSnapshot(store.getState(), tracked);
+  const beforePhysical = capturePhysicalCommentSnapshot(wb, tracked);
+  try {
+    applyCommentStoreSnapshot(store, snapshot);
     if (wb?.capabilities.comments) {
-      wb.setCommentEntry(
-        entry.addr.sheet,
-        entry.addr.row,
-        entry.addr.col,
-        entry.author ?? '',
-        entry.text ?? '',
-      );
+      const physical = snapshot.map((entry) => ({
+        addr: entry.addr,
+        comment: entry.text === null ? null : { author: entry.author ?? '', text: entry.text },
+      }));
+      applyPhysicalCommentSnapshot(wb, physical);
     }
+  } catch (error) {
+    try {
+      applyCommentStoreSnapshot(store, beforeStore);
+    } catch {
+      // Preserve the original engine error when a state observer itself fails.
+    }
+    try {
+      applyPhysicalCommentSnapshot(wb, beforePhysical);
+    } catch {
+      // The engine may continue rejecting writes; the original error is primary.
+    }
+    throw error;
   }
 };
+
+/** Clear comments for a sparse address list in one store publication and one
+ * physical write per target. A failed engine write restores every target. */
+export function clearComments(
+  store: SpreadsheetStore,
+  addrs: readonly Addr[],
+  wb?: WorkbookHandle,
+): void {
+  const tracked = uniqueAddrs(addrs);
+  const state = store.getState();
+  const writable = tracked.filter(
+    (addr) => isCellWritable(state, addr) && commentAt(state, addr) !== null,
+  );
+  if (writable.length === 0) return;
+  applyCommentSnapshot(
+    store,
+    wb,
+    writable.map((addr) => ({ addr, text: null, author: null })),
+  );
+}
 
 export function recordCommentChange<T>(
   history: History | null,
@@ -135,14 +237,23 @@ export function recordCommentChange<T>(
   mutate: () => T,
 ): T {
   if (!history || history.isReplaying()) return mutate();
-  const tracked = addrs.map(cloneAddr);
+  const tracked = uniqueAddrs(addrs);
   const before = captureCommentSnapshot(store.getState(), tracked);
   const result = mutate();
   const after = captureCommentSnapshot(store.getState(), tracked);
-  if (!sameCommentSnapshot(before, after)) {
+  const changedBefore: CommentSnapshot = [];
+  const changedAfter: CommentSnapshot = [];
+  for (let index = 0; index < before.length; index += 1) {
+    const beforeEntry = before[index];
+    const afterEntry = after[index];
+    if (!beforeEntry || !afterEntry || sameCommentSnapshot([beforeEntry], [afterEntry])) continue;
+    changedBefore.push(beforeEntry);
+    changedAfter.push(afterEntry);
+  }
+  if (changedBefore.length > 0) {
     history.push({
-      undo: () => applyCommentSnapshot(store, wb, before),
-      redo: () => applyCommentSnapshot(store, wb, after),
+      undo: () => applyCommentSnapshot(store, wb, changedBefore),
+      redo: () => applyCommentSnapshot(store, wb, changedAfter),
     });
   }
   return result;

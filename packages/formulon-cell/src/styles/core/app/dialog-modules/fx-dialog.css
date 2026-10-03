@@ -77,10 +77,21 @@
   .fc-fxdialog__item:hover {
     background: var(--fc-bg-hover);
   }
+  .fc-fxdialog__item[data-function-unavailable="true"] {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 58%, transparent));
+    cursor: not-allowed;
+  }
+  .fc-fxdialog__item[data-function-unavailable="true"] .fc-fxdialog__item-name,
+  .fc-fxdialog__item[data-function-unavailable="true"] .fc-fxdialog__item-desc {
+    color: inherit;
+  }
   .fc-fxdialog__item--active {
     background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
     color: var(--fc-fg, CanvasText);
     box-shadow: inset 0 0 0 1px var(--fc-fmtdlg-list-focus-border, var(--fc-accent));
+  }
+  .fc-fxdialog__item--active[data-function-unavailable="true"] {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 58%, transparent));
   }
   .fc-fxdialog__item-name {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -215,5 +226,24 @@
   button.fc-host__formulabar-fx:focus-visible {
     outline: 2px solid var(--fc-accent);
     outline-offset: 1px;
+  }
+
+  /* Status line shared by the Data dialogs (Goal Seek, Subtotal, Consolidate). */
+  .fc-mac-goalseek__status,
+  .fc-mac-subtotal__status,
+  .fc-mac-consolidate__status {
+    min-height: 1.3em;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+  .fc-mac-goalseek__status[data-state="error"],
+  .fc-mac-subtotal__status[data-state="error"],
+  .fc-mac-consolidate__status[data-state="error"] {
+    color: var(--fc-danger, #a4262c);
+  }
+  .fc-mac-goalseek__status[data-state="success"],
+  .fc-mac-subtotal__status[data-state="success"],
+  .fc-mac-consolidate__status[data-state="success"] {
+    color: var(--fc-accent);
   }
 }

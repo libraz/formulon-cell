@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachKeyboard } from '../../../src/interact/keyboard.js';
+import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -79,6 +84,7 @@ describe('attachKeyboard', () => {
   let onAfterHistory: Mock<() => void>;
   let onGoTo: Mock<() => void>;
   let onSwitchSheet: Mock<(delta: 1 | -1) => void>;
+  let onPasteSpecial: Mock<() => void>;
   let detach: () => void;
 
   const setup = (history: History | null = null): void => {
@@ -92,8 +98,28 @@ describe('attachKeyboard', () => {
       onAfterHistory,
       onGoTo,
       onSwitchSheet,
+      onPasteSpecial,
     });
   };
+
+  it.each(['input', 'textarea', 'select', 'contenteditable'])(
+    'leaves keys in a nested %s to its own editor',
+    (kind) => {
+      setup();
+      const input = document.createElement(kind === 'contenteditable' ? 'div' : kind);
+      if (kind === 'contenteditable') input.setAttribute('contenteditable', 'true');
+      host.appendChild(input);
+      const before = store.getState().selection;
+      for (const key of [')', 'ArrowDown', 'Backspace', 'Enter', 'Tab']) {
+        const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+        input.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(false);
+      }
+      expect(onBeginEdit).not.toHaveBeenCalled();
+      expect(onClearActive).not.toHaveBeenCalled();
+      expect(store.getState().selection).toBe(before);
+    },
+  );
 
   beforeEach(async () => {
     host = document.createElement('div');
@@ -105,6 +131,7 @@ describe('attachKeyboard', () => {
     onAfterHistory = vi.fn<() => void>();
     onGoTo = vi.fn<() => void>();
     onSwitchSheet = vi.fn<(delta: 1 | -1) => void>();
+    onPasteSpecial = vi.fn<() => void>();
   });
 
   afterEach(() => {
@@ -113,6 +140,132 @@ describe('attachKeyboard', () => {
   });
 
   describe('navigation', () => {
+    it('Mac Return and Tab traverse the selected rectangle and retain it', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+
+      fire(host, 'Tab');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+      fire(host, 'Enter', { shiftKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 1 });
+      fire(host, 'Tab', { shiftKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    });
+
+    it('Mac Enter keeps one-shot paste priority while copy mode is active', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      const onClipboardShortcut = vi.fn<(kind: 'copy' | 'cut' | 'paste') => void>();
+      detach = attachKeyboard({
+        host,
+        store,
+        wb,
+        onBeginEdit,
+        onClearActive,
+        onClipboardShortcut,
+      });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+      mutators.setCopyRange(store, { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 });
+
+      const e = fire(host, 'Enter');
+
+      expect(e.defaultPrevented).toBe(true);
+      expect(onClipboardShortcut).toHaveBeenCalledTimes(1);
+      expect(onClipboardShortcut).toHaveBeenCalledWith('paste');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+    });
+
+    it('Mac Tab leaves a selected single merge when it has no internal next stop', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+
+      fire(host, 'Tab');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 2 });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 });
+    });
+
+    it('Mac Tab gives an explicit navigation policy priority over selection wrap', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+      const policy = attachNavigationPolicy(store, () => wb, {
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      });
+      setup();
+
+      fire(host, 'Tab');
+      const boundary = fire(host, 'Tab');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 1 });
+      expect(boundary.defaultPrevented).toBe(true);
+      policy.dispose();
+    });
+
+    it('Mac Shift+Backspace collapses to active without clearing or starting edit', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.addExtraCell(store, { sheet: 0, row: 3, col: 3 });
+
+      const e = fire(host, 'Backspace', { shiftKey: true });
+
+      expect(e.defaultPrevented).toBe(true);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 3 });
+      expect(store.getState().selection.extraRanges).toEqual([]);
+      expect(onClearActive).not.toHaveBeenCalled();
+      expect(onBeginEdit).not.toHaveBeenCalled();
+    });
+
+    it('Mac Option+Arrow switches sheets and respects selection-disabled hosts', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+
+      expect(fire(host, 'ArrowLeft', { altKey: true }).defaultPrevented).toBe(true);
+      expect(fire(host, 'ArrowRight', { altKey: true }).defaultPrevented).toBe(true);
+      expect(onSwitchSheet).toHaveBeenNthCalledWith(1, -1);
+      expect(onSwitchSheet).toHaveBeenNthCalledWith(2, 1);
+
+      detach();
+      const controller = new InteractionController({
+        store,
+        getWb: () => wb,
+        history: new History(),
+      });
+      controller.setPolicy({ readOnly: true, defaultOperation: 'deny', selection: false });
+      const unregister = registerInteractionController(store, controller);
+      setup();
+      const blocked = fire(host, 'ArrowLeft', { altKey: true });
+      expect(blocked.defaultPrevented).toBe(true);
+      expect(onSwitchSheet).toHaveBeenCalledTimes(2);
+
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.extendRangeTo(store, { sheet: 0, row: 2, col: 2 });
+      const before = store.getState().selection;
+      const blockedCollapse = fire(host, 'Backspace', { shiftKey: true });
+      expect(blockedCollapse.defaultPrevented).toBe(true);
+      expect(store.getState().selection).toEqual(before);
+
+      unregister();
+      controller.dispose();
+    });
+
     it('ArrowDown moves active down by one', () => {
       setup();
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
@@ -501,6 +654,49 @@ describe('attachKeyboard', () => {
       fire(host, 'F2');
       expect(onBeginEdit).toHaveBeenCalledWith('');
     });
+
+    it('Control+U on Mac begins editing the existing cell seed', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      seed(store, wb, [{ row: 0, col: 0, value: 'seed' }]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      setup();
+
+      const e = fire(host, 'U', { ctrlKey: true });
+
+      expect(e.defaultPrevented).toBe(true);
+      expect(onBeginEdit).toHaveBeenCalledWith('seed');
+    });
+
+    it('Cmd+Control+V routes to Paste Special on Mac exactly once', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+
+      const e = fire(host, 'v', { metaKey: true, ctrlKey: true });
+
+      expect(e.defaultPrevented).toBe(true);
+      expect(onPasteSpecial).toHaveBeenCalledTimes(1);
+    });
+
+    it('Cmd+Control+V keeps ordinary paste when Paste Special is unavailable', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      const onClipboardShortcut = vi.fn<(kind: 'copy' | 'cut' | 'paste') => void>();
+      detach = attachKeyboard({
+        host,
+        store,
+        wb,
+        onBeginEdit,
+        onClearActive,
+        onClipboardShortcut,
+      });
+
+      const e = fire(host, 'v', { metaKey: true, ctrlKey: true });
+
+      expect(e.defaultPrevented).toBe(true);
+      expect(onClipboardShortcut).toHaveBeenCalledWith('paste');
+    });
   });
 
   describe('Backspace / Delete', () => {
@@ -527,6 +723,53 @@ describe('attachKeyboard', () => {
       expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
       expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 99 });
       expect(onClearActive).toHaveBeenCalled();
+    });
+
+    it('Delete clears a sparse multi-selection once and keeps the hole untouched', () => {
+      const history = new History();
+      const controller = new InteractionController({
+        store,
+        getWb: () => wb,
+        history,
+      });
+      const unregister = registerInteractionController(store, controller);
+      setup(history);
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 0, col: 1, value: 2 },
+        { row: 0, col: 2, value: 3 },
+        { row: 1, col: 0, value: 4 },
+        { row: 1, col: 1, value: 5 }, // hole — outside the union below
+        { row: 1, col: 2, value: 6 },
+      ]);
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          ...s.selection,
+          active: { sheet: 0, row: 0, col: 0 },
+          anchor: { sheet: 0, row: 0, col: 0 },
+          range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+          extraRanges: [
+            { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 },
+            { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
+          ],
+        },
+      }));
+
+      try {
+        const e = fire(host, 'Delete');
+        expect(e.defaultPrevented).toBe(true);
+        expect(onClearActive).toHaveBeenCalledTimes(1);
+        expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 5 });
+        expect(history.canUndo()).toBe(true);
+        expect(history.undo()).toBe(true);
+        expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
+        expect(history.redo()).toBe(true);
+        expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+      } finally {
+        unregister();
+        controller.dispose();
+      }
     });
 
     it('Backspace clears only the active cell and enters edit mode', () => {

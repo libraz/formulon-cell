@@ -379,8 +379,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     }
     center.textContent = pieces.join(' · ');
 
-    const sel = s.selection.range;
-    const cells = (sel.r1 - sel.r0 + 1) * (sel.c1 - sel.c0 + 1);
+    const cells = stats.cells;
     const cellText =
       cells === 1 ? `1 ${strings.statusBar.cell}` : `${cells} ${strings.statusBar.cells}`;
     right.textContent = deps.showEngineLabel ? `${cellText} · ${getEngineLabel()}` : cellText;

@@ -1,13 +1,14 @@
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
+import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
 import { insertRows } from './structure.js';
 
-/** Data commands exposed by the Excel-for-Mac ribbon. The limits are
+/** Data commands exposed by the Mac ribbon. The limits are
  * deliberately finite because these commands materialize every output cell
  * before committing it. */
 export const MAX_CONSOLIDATE_CELLS = 100_000;
@@ -15,160 +16,6 @@ export const MAX_SUBTOTAL_ROWS = 100_000;
 export const MAX_SUBTOTAL_OUTPUT_CELLS = 100_000;
 export const MAX_SUBTOTAL_GROUPS = 1_000;
 export const MAX_GOAL_SEEK_ITERATIONS = 100;
-
-export interface MacDataStrings {
-  readonly goalSeek: {
-    readonly title: string;
-    readonly formulaCell: string;
-    readonly targetValue: string;
-    readonly changingCell: string;
-    readonly iterations: string;
-    readonly run: string;
-    readonly cancel: string;
-    readonly result: string;
-    readonly invalidCell: string;
-    readonly invalidTarget: string;
-    readonly calculating: string;
-    readonly converged: string;
-  };
-  readonly consolidate: {
-    readonly title: string;
-    readonly sources: string;
-    readonly sourcesHint: string;
-    readonly destination: string;
-    readonly function: string;
-    readonly replace: string;
-    readonly labels: string;
-    readonly links: string;
-    readonly unsupportedOption: string;
-    readonly run: string;
-    readonly cancel: string;
-  };
-  readonly subtotal: {
-    readonly title: string;
-    readonly range: string;
-    readonly groupBy: string;
-    readonly columns: string;
-    readonly function: string;
-    readonly replace: string;
-    readonly summaryBelow: string;
-    readonly unsupportedOption: string;
-    readonly run: string;
-    readonly cancel: string;
-  };
-  readonly functions: Readonly<Record<MacDataFunction, string>>;
-  readonly errors: {
-    readonly invalidRange: string;
-    readonly invalidColumn: string;
-    readonly unsupported: string;
-    readonly rejected: string;
-    readonly failed: string;
-  };
-}
-
-const EN_DATA_STRINGS: MacDataStrings = {
-  goalSeek: {
-    title: 'Goal Seek',
-    formulaCell: 'Set cell',
-    targetValue: 'To value',
-    changingCell: 'By changing cell',
-    iterations: 'Maximum iterations',
-    run: 'OK',
-    cancel: 'Cancel',
-    result: 'Result',
-    invalidCell: 'Select a single cell.',
-    invalidTarget: 'Enter a finite target value.',
-    calculating: 'Calculating…',
-    converged: 'Goal Seek converged.',
-  },
-  consolidate: {
-    title: 'Consolidate',
-    sources: 'References',
-    sourcesHint: 'One range per line',
-    destination: 'Copy results to',
-    function: 'Function',
-    replace: 'Replace current contents',
-    labels: 'Use labels in top row and left column',
-    links: 'Create links to source data',
-    unsupportedOption: 'This option is not supported yet.',
-    run: 'OK',
-    cancel: 'Cancel',
-  },
-  subtotal: {
-    title: 'Subtotal',
-    range: 'Range',
-    groupBy: 'At each change in',
-    columns: 'Add subtotal to',
-    function: 'Use function',
-    replace: 'Replace current subtotals',
-    summaryBelow: 'Summary below data',
-    unsupportedOption: 'This option is not supported yet.',
-    run: 'OK',
-    cancel: 'Cancel',
-  },
-  functions: { sum: 'Sum', average: 'Average', count: 'Count', min: 'Min', max: 'Max' },
-  errors: {
-    invalidRange: 'Enter a valid range.',
-    invalidColumn: 'Enter valid columns inside the range.',
-    unsupported: 'This operation is not supported by the workbook.',
-    rejected: 'The operation is blocked by workbook protection or host policy.',
-    failed: 'The operation could not be completed.',
-  },
-};
-
-const JA_DATA_STRINGS: MacDataStrings = {
-  goalSeek: {
-    title: 'ゴール シーク',
-    formulaCell: '数式セル',
-    targetValue: '目標値',
-    changingCell: '変化させるセル',
-    iterations: '最大反復回数',
-    run: 'OK',
-    cancel: 'キャンセル',
-    result: '結果',
-    invalidCell: '1 つのセルを指定してください。',
-    invalidTarget: '有限の目標値を入力してください。',
-    calculating: '計算中…',
-    converged: 'ゴール シークが収束しました。',
-  },
-  consolidate: {
-    title: '統合',
-    sources: '統合元範囲',
-    sourcesHint: '範囲を 1 行に 1 つ入力',
-    destination: '統合先',
-    function: '集計方法',
-    replace: '現在の内容を置き換える',
-    labels: '上端行と左端列をラベルとして使用',
-    links: '統合元データへのリンクを作成',
-    unsupportedOption: 'このオプションはまだサポートされていません。',
-    run: 'OK',
-    cancel: 'キャンセル',
-  },
-  subtotal: {
-    title: '小計',
-    range: '範囲',
-    groupBy: 'グループの基準',
-    columns: '小計を追加する列',
-    function: '集計方法',
-    replace: '現在の小計を置き換える',
-    summaryBelow: 'データの下に集計行を表示する',
-    unsupportedOption: 'このオプションはまだサポートされていません。',
-    run: 'OK',
-    cancel: 'キャンセル',
-  },
-  functions: { sum: '合計', average: '平均', count: 'データの個数', min: '最小値', max: '最大値' },
-  errors: {
-    invalidRange: '有効な範囲を入力してください。',
-    invalidColumn: '範囲内の有効な列を入力してください。',
-    unsupported: 'この操作はブックでサポートされていません。',
-    rejected: '保護またはホスト ポリシーにより操作がブロックされました。',
-    failed: '操作を完了できませんでした。',
-  },
-};
-
-export function macDataStrings(locale: string): MacDataStrings {
-  return locale.toLowerCase().startsWith('en') ? EN_DATA_STRINGS : JA_DATA_STRINGS;
-}
 
 export type MacDataFunction = 'sum' | 'average' | 'count' | 'min' | 'max';
 
@@ -180,10 +27,21 @@ const MAC_DATA_FUNCTIONS: ReadonlySet<MacDataFunction> = new Set([
   'max',
 ]);
 
+/** Keys of the localized `macData.errors` table. */
+export type MacDataErrorCode = keyof Strings['macData']['errors'];
+
 export interface MacDataError {
   readonly status: 'rejected' | 'invalid' | 'unsupported' | 'stale' | 'nonconverged';
-  readonly reason: string;
+  readonly code: MacDataErrorCode;
+  /** Detail supplied by the host policy, command pipeline, or a thrown error.
+   *  Absent when the code alone describes the failure. */
+  readonly reason?: string;
 }
+
+/** Localized text for a failure: the host-supplied detail when present,
+ *  otherwise the table entry for its code. */
+export const describeMacDataError = (strings: Strings, error: MacDataError): string =>
+  error.reason ?? strings.macData.errors[error.code];
 
 export type MacDataResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -252,10 +110,18 @@ export interface ParsedMacRange {
 const MAX_ROW = 1_048_575;
 const MAX_COL = 16_383;
 
-const failure = (status: MacDataError['status'], reason: string): MacDataResult<never> => ({
+const failure = (
+  status: MacDataError['status'],
+  code: MacDataErrorCode,
+  reason?: string,
+): MacDataResult<never> => ({
   ok: false,
-  error: { status, reason },
+  error: reason === undefined ? { status, code } : { status, code, reason },
 });
+
+/** The message of a thrown value, when it carries one. */
+const thrownReason = (error: unknown): string | undefined =>
+  error instanceof Error && error.message ? error.message : undefined;
 
 const success = <T>(value: T): MacDataResult<T> => ({ ok: true, value });
 
@@ -558,19 +424,18 @@ export async function solveMacGoalSeek(
   request: GoalSeekRequest,
 ): Promise<MacDataResult<GoalSeekSolution>> {
   const { workbook: wb } = instance;
-  if (!Number.isFinite(request.targetValue))
-    return failure('invalid', 'Target value must be finite.');
+  if (!Number.isFinite(request.targetValue)) return failure('invalid', 'targetNotFinite');
   if (sameAddr(request.formulaCell, request.changingCell)) {
-    return failure('invalid', 'The formula cell and changing cell must be different.');
+    return failure('invalid', 'sameCell');
   }
   const formula = wb.cellFormula(request.formulaCell);
-  if (!formula) return failure('invalid', 'The formula cell must contain a formula.');
+  if (!formula) return failure('invalid', 'noFormula');
   if (wb.cellFormula(request.changingCell) !== null) {
-    return failure('invalid', 'The changing cell must not contain a formula.');
+    return failure('invalid', 'changingHasFormula');
   }
   const changing = wb.getValue(request.changingCell);
   if (!(changing.kind === 'blank' || isFiniteNumber(changing))) {
-    return failure('invalid', 'The changing cell must be blank or contain a number.');
+    return failure('invalid', 'changingNotNumeric');
   }
   const authorization = dataIntent(
     instance,
@@ -578,11 +443,8 @@ export async function solveMacGoalSeek(
     [request.changingCell],
     'mac.data.goalSeek',
   );
-  if (!authorization.allowed)
-    return failure('rejected', authorization.reason ?? 'The changing cell is not editable.');
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
 
-  const originalFormulaSnapshot = cellSnapshot(wb, request.formulaCell);
-  const originalChangingSnapshot = cellSnapshot(wb, request.changingCell);
   let scratch: WorkbookHandle | null = null;
   let sourceBytes: Uint8Array | null = null;
   try {
@@ -593,15 +455,12 @@ export async function solveMacGoalSeek(
     // explicitly recalculates every trial for the same reason.
     scratch.recalc();
     if (scratch.cellFormula(request.formulaCell) !== formula) {
-      return failure(
-        'unsupported',
-        'The workbook could not preserve the formula in a scratch calculation.',
-      );
+      return failure('unsupported', 'scratchUnsupported');
     }
     const initial = changing.kind === 'number' ? changing.value : 0;
     const requestedTolerance = request.tolerance ?? 1e-8;
     if (!Number.isFinite(requestedTolerance) || requestedTolerance < 0) {
-      return failure('invalid', 'Tolerance must be a finite non-negative number.');
+      return failure('invalid', 'invalidTolerance');
     }
     const tolerance = Math.max(
       Number.EPSILON * Math.max(1, Math.abs(request.targetValue)),
@@ -609,7 +468,7 @@ export async function solveMacGoalSeek(
     );
     const requestedIterations = request.maxIterations ?? MAX_GOAL_SEEK_ITERATIONS;
     if (!Number.isFinite(requestedIterations) || requestedIterations < 1) {
-      return failure('invalid', 'Maximum iterations must be a finite positive number.');
+      return failure('invalid', 'invalidIterations');
     }
     const maxIterations = Math.max(
       1,
@@ -625,7 +484,7 @@ export async function solveMacGoalSeek(
       return formulaValue === null ? null : formulaValue - request.targetValue;
     };
     const f0 = evaluate(initial);
-    if (f0 === null) return failure('invalid', 'The formula did not produce a finite number.');
+    if (f0 === null) return failure('invalid', 'nonFiniteResult');
     if (Math.abs(f0) <= tolerance) {
       return registerGoalSeekSolution(request, sourceBytes, {
         changingValue: initial,
@@ -638,7 +497,7 @@ export async function solveMacGoalSeek(
     let x1 = initial === 0 ? 1 : initial + Math.max(1, Math.abs(initial) * 0.05);
     if (x1 === x0) x1 = x0 + 1;
     let f1 = evaluate(x1);
-    if (f1 === null) return failure('invalid', 'The formula did not produce a finite number.');
+    if (f1 === null) return failure('invalid', 'nonFiniteResult');
     if (Math.abs(f1) <= tolerance) {
       return registerGoalSeekSolution(request, sourceBytes, {
         changingValue: x1,
@@ -660,8 +519,6 @@ export async function solveMacGoalSeek(
       }
     }
 
-    let lastValue = x1;
-    let lastResidual = f1;
     for (let iteration = 2; iteration <= maxIterations; iteration += 1) {
       let candidate: number;
       const denominator = f1 - fPrev;
@@ -680,10 +537,7 @@ export async function solveMacGoalSeek(
         candidate = (bracketLow + bracketHigh) / 2;
       }
       const nextResidual = evaluate(candidate);
-      if (nextResidual === null)
-        return failure('invalid', 'The formula did not produce a finite number.');
-      lastValue = candidate;
-      lastResidual = nextResidual;
+      if (nextResidual === null) return failure('invalid', 'nonFiniteResult');
       if (Math.abs(nextResidual) <= tolerance) {
         return registerGoalSeekSolution(request, sourceBytes, {
           changingValue: candidate,
@@ -712,17 +566,10 @@ export async function solveMacGoalSeek(
       x1 = candidate;
       f1 = nextResidual;
     }
-    void lastValue;
-    void lastResidual;
-    return failure('nonconverged', 'Goal Seek did not converge within the iteration limit.');
+    return failure('nonconverged', 'notConverged');
   } catch (error) {
-    return failure('invalid', error instanceof Error ? error.message : 'Goal Seek failed.');
+    return failure('invalid', 'failed', thrownReason(error));
   } finally {
-    // The scratch is the only handle mutated by trials. These comparisons are
-    // deliberately kept here as an invariant guard for future refactors: an
-    // async save/load must never silently alter the live workbook.
-    void originalFormulaSnapshot;
-    void originalChangingSnapshot;
     scratch?.dispose();
   }
 }
@@ -743,7 +590,7 @@ export function commitMacGoalSeek(
     !sameSnapshot(currentFormula, formulaSnapshot) ||
     !sameSnapshot(currentChanging, changingSnapshot)
   ) {
-    return failure('stale', 'The workbook changed while Goal Seek was calculating.');
+    return failure('stale', 'stale');
   }
   const proof = goalSeekProofs.get(solution);
   if (
@@ -757,16 +604,16 @@ export function commitMacGoalSeek(
     !Object.is(proof.solution.formulaValue, solution.formulaValue) ||
     !Object.is(proof.solution.iterations, solution.iterations)
   ) {
-    return failure('stale', 'The Goal Seek solution is no longer valid.');
+    return failure('stale', 'stale');
   }
   let currentBytes: Uint8Array;
   try {
     currentBytes = instance.workbook.save();
   } catch {
-    return failure('stale', 'The workbook changed while Goal Seek was calculating.');
+    return failure('stale', 'stale');
   }
   if (!sameBytes(proof.sourceBytes, currentBytes)) {
-    return failure('stale', 'The workbook changed while Goal Seek was calculating.');
+    return failure('stale', 'stale');
   }
   const result = instance.commands.execute({
     type: 'cellBatch',
@@ -784,12 +631,11 @@ export function commitMacGoalSeek(
   });
   return result.status === 'applied' || (result.status === 'noop' && result.rejected.length === 0)
     ? success(undefined)
-    : failure('rejected', result.rejected[0]?.reason ?? 'The changing cell could not be updated.');
+    : failure('rejected', 'writeFailed', result.rejected[0]?.reason);
 }
 
-/** Position-based Consolidate. Every source value is captured before the
- * destination is authorized or written, so sources overlapping output remain
- * stable. Unsupported label/link/replace modes are intentionally absent from
+/** Position-based Consolidate. The destination must not overlap any source, so
+ * a run can never overwrite its own inputs. Unsupported label/link/replace modes are intentionally absent from
  * this operation; the dialog exposes them as disabled affordances. */
 export function planMacConsolidate(
   instance: SpreadsheetInstance,
@@ -797,18 +643,18 @@ export function planMacConsolidate(
 ): MacDataResult<ConsolidateSolution> {
   const wb = instance.workbook;
   const fallbackSheet = instance.store.getState().data.sheetIndex;
-  if (request.sources.length === 0) return failure('invalid', 'Add at least one source range.');
+  if (request.sources.length === 0) return failure('invalid', 'noSources');
   if (!MAC_DATA_FUNCTIONS.has(request.function)) {
-    return failure('invalid', 'Choose a supported Consolidate function.');
+    return failure('invalid', 'invalidFunction');
   }
   const parsedSources: Range[] = [];
   for (const raw of request.sources) {
     const parsed = parseMacRange(wb, raw, fallbackSheet);
-    if (!parsed) return failure('invalid', `Invalid source range: ${raw}`);
+    if (!parsed) return failure('invalid', 'invalidSource');
     parsedSources.push(parsed.range);
   }
   const first = parsedSources[0];
-  if (!first) return failure('invalid', 'Add at least one source range.');
+  if (!first) return failure('invalid', 'noSources');
   const rows = first.r1 - first.r0 + 1;
   const cols = first.c1 - first.c0 + 1;
   const area = rows * cols;
@@ -817,18 +663,20 @@ export function planMacConsolidate(
     area > MAX_CONSOLIDATE_CELLS ||
     area * parsedSources.length > MAX_CONSOLIDATE_CELLS
   ) {
-    return failure('unsupported', 'The source area exceeds the Consolidate limit.');
+    return failure('unsupported', 'areaLimit');
   }
   if (
     parsedSources.some(
       (range) => range.r1 - range.r0 + 1 !== rows || range.c1 - range.c0 + 1 !== cols,
     )
   ) {
-    return failure('invalid', 'All source ranges must have the same dimensions.');
+    return failure('invalid', 'dimensionMismatch');
   }
   const destination = parseDestination(wb, request.destination, fallbackSheet, rows, cols);
-  if (!destination)
-    return failure('invalid', 'Destination must be one cell or an equal-size range.');
+  if (!destination) return failure('invalid', 'invalidDestination');
+  if (parsedSources.some((source) => rangesOverlap(source, destination))) {
+    return failure('invalid', 'destinationOverlapsSource');
+  }
   const sourceValues = parsedSources.map((range) => {
     const values: CellValue[] = [];
     for (let row = range.r0; row <= range.r1; row += 1) {
@@ -849,8 +697,7 @@ export function planMacConsolidate(
   }
   const outputAddresses = cellAddresses(destination);
   const authorization = dataIntent(instance, 'valueEdit', outputAddresses, 'mac.data.consolidate');
-  if (!authorization.allowed)
-    return failure('rejected', authorization.reason ?? 'The destination is not editable.');
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
   return success({ destination, values: output });
 }
 
@@ -874,10 +721,7 @@ export function commitMacConsolidate(
   });
   return result.status === 'applied' || (result.status === 'noop' && result.rejected.length === 0)
     ? success(undefined)
-    : failure(
-        'rejected',
-        result.rejected[0]?.reason ?? 'Consolidate could not write the destination.',
-      );
+    : failure('rejected', 'writeFailed', result.rejected[0]?.reason);
 }
 
 const subtotalFunctionCode = (fn: MacDataFunction): number => {
@@ -954,11 +798,6 @@ const subtotalOutputCells = (
   return { outputCells, formulaCells };
 };
 
-const subtotalGroupLimitReason = (columns: readonly number[]): string =>
-  Math.floor(MAX_SUBTOTAL_OUTPUT_CELLS / (columns.length + 1)) < MAX_SUBTOTAL_GROUPS
-    ? 'Subtotal output exceeds the materialization limit.'
-    : 'Subtotal exceeds the row insertion work limit.';
-
 /** Analyze and authorize a Subtotal operation before it starts any row
  * insertion. The returned group positions are in original worksheet rows. */
 export function planMacSubtotal(
@@ -968,37 +807,30 @@ export function planMacSubtotal(
   const wb = instance.workbook;
   const state = instance.store.getState();
   if (!MAC_DATA_FUNCTIONS.has(request.function)) {
-    return failure('invalid', 'Choose a supported Subtotal function.');
+    return failure('invalid', 'invalidFunction');
   }
   const fallbackSheet = state.data.sheetIndex;
   const parsed = parseMacRange(wb, request.range, fallbackSheet);
-  if (!parsed) return failure('invalid', 'Invalid subtotal range.');
+  if (!parsed) return failure('invalid', 'invalidRange');
   const range = parsed.range;
   if (range.sheet !== state.data.sheetIndex) {
-    return failure('unsupported', 'Subtotal can only insert rows on the active sheet.');
+    return failure('unsupported', 'activeSheetOnly');
   }
   const rowCount = range.r1 - range.r0 + 1;
-  if (rowCount < 2 || rowCount > MAX_SUBTOTAL_ROWS)
-    return failure('invalid', 'Subtotal needs a header and at least one data row.');
-  if (!supportsSubtotal(wb))
-    return failure('unsupported', 'The workbook engine does not support SUBTOTAL.');
+  if (rowCount < 2 || rowCount > MAX_SUBTOTAL_ROWS) return failure('invalid', 'needsDataRow');
+  if (!supportsSubtotal(wb)) return failure('unsupported', 'engineUnsupported');
   if (hasUnsupportedSubtotalObject(instance, range))
-    return failure(
-      'unsupported',
-      'Subtotal does not support tables, PivotTables, or merged cells in the selected range.',
-    );
-  if (isSheetProtected(state, range.sheet))
-    return failure('rejected', 'Subtotal is unavailable on a protected sheet.');
+    return failure('unsupported', 'unsupportedObjects');
+  if (isSheetProtected(state, range.sheet)) return failure('rejected', 'protectedSheet');
   const dataStart = range.r0 + 1;
   const groupColumn = request.groupByColumn;
   if (!Number.isInteger(groupColumn) || groupColumn < range.c0 || groupColumn > range.c1)
-    return failure('invalid', 'The group column must be inside the selected range.');
+    return failure('invalid', 'groupOutsideRange');
   const columns = [...new Set(request.subtotalColumns)].filter(
     (col) => col >= range.c0 && col <= range.c1,
   );
-  if (columns.length === 0) return failure('invalid', 'Select at least one subtotal column.');
-  if (columns.some((col) => !Number.isInteger(col)))
-    return failure('invalid', 'Subtotal columns must be valid columns.');
+  if (columns.length === 0) return failure('invalid', 'invalidColumn');
+  if (columns.some((col) => !Number.isInteger(col))) return failure('invalid', 'invalidColumn');
   const maxGroupsByOutput = Math.floor(MAX_SUBTOTAL_OUTPUT_CELLS / (columns.length + 1));
   const maxGroups = Math.min(MAX_SUBTOTAL_GROUPS, maxGroupsByOutput);
   const groups: { start: number; end: number; insertAt: number; label: string }[] = [];
@@ -1020,7 +852,7 @@ export function planMacSubtotal(
     const nextKey = subtotalLabel(wb.getValue({ sheet: range.sheet, row, col: groupColumn }));
     if (nextKey === previousKey) continue;
     if (!appendGroup({ start: currentStart, end: row - 1, insertAt: row, label: previousKey })) {
-      return failure('unsupported', subtotalGroupLimitReason(columns));
+      return failure('unsupported', 'groupLimit');
     }
     currentStart = row;
     previousKey = nextKey;
@@ -1028,21 +860,20 @@ export function planMacSubtotal(
   if (
     !appendGroup({ start: currentStart, end: range.r1, insertAt: range.r1 + 1, label: previousKey })
   ) {
-    return failure('unsupported', subtotalGroupLimitReason(columns));
+    return failure('unsupported', 'groupLimit');
   }
-  if (groups.length === 0) return failure('invalid', 'No contiguous groups were found.');
+  if (groups.length === 0) return failure('invalid', 'noGroups');
   if (groups.some((group) => group.insertAt >= MAX_ROW)) {
-    return failure('unsupported', 'There is no room to insert a subtotal row.');
+    return failure('unsupported', 'noRoom');
   }
 
   // Future subtotal rows are shifted by insertions belonging to groups above.
   // Preflight every apply, undo, and redo intent at their eventual positions.
   const output = subtotalOutputCells(range, columns, groups);
-  if (!output) return failure('unsupported', subtotalGroupLimitReason(columns));
+  if (!output) return failure('unsupported', 'groupLimit');
   const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
   const authorization = firstDeniedSubtotalIntent(instance, intents);
-  if (!authorization.allowed)
-    return failure('rejected', authorization.reason ?? 'Subtotal output is not editable.');
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
   return success({ range: { ...range }, insertedRows: groups.length, groups });
 }
 
@@ -1056,16 +887,16 @@ export function commitMacSubtotal(
 ): MacDataResult<void> {
   const { store, workbook: wb, history } = instance;
   const parsed = parseMacRange(wb, request.range, store.getState().data.sheetIndex);
-  if (!parsed) return failure('stale', 'The subtotal range is no longer valid.');
+  if (!parsed) return failure('stale', 'stale');
   if (
     !solution.range ||
     !sameRange(parsed.range, solution.range) ||
     store.getState().data.sheetIndex !== solution.range.sheet
   ) {
-    return failure('stale', 'The workbook sheet changed while Subtotal was waiting to commit.');
+    return failure('stale', 'stale');
   }
   if (solution.insertedRows !== solution.groups.length) {
-    return failure('stale', 'The Subtotal plan is no longer valid.');
+    return failure('stale', 'stale');
   }
   const range = { ...solution.range };
   const sheetName = wb.sheetName(range.sheet);
@@ -1074,21 +905,20 @@ export function commitMacSubtotal(
     (col) => col >= range.c0 && col <= range.c1,
   );
   if (columns.length === 0 || columns.some((col) => !Number.isInteger(col))) {
-    return failure('stale', 'The Subtotal columns are no longer valid.');
+    return failure('stale', 'stale');
   }
   const output = subtotalOutputCells(range, columns, solution.groups);
-  if (!output) return failure('unsupported', subtotalGroupLimitReason(columns));
+  if (!output) return failure('unsupported', 'groupLimit');
   const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
   const authorization = firstDeniedSubtotalIntent(instance, intents);
-  if (!authorization.allowed)
-    return failure('rejected', authorization.reason ?? 'Subtotal output is not editable.');
+  if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
   let token: ReturnType<typeof history.begin>;
   try {
     token = history.begin({
       replayAuthorization: { undo: intents.undo, redo: intents.redo },
     });
   } catch (error) {
-    return failure('invalid', error instanceof Error ? error.message : 'Subtotal history failed.');
+    return failure('invalid', 'failed', thrownReason(error));
   }
   try {
     // Work bottom-up. Rows above the insertion point retain their original
@@ -1116,12 +946,9 @@ export function commitMacSubtotal(
     try {
       history.abort(token);
     } catch (abortError) {
-      return failure(
-        'invalid',
-        abortError instanceof Error ? abortError.message : 'Subtotal rollback failed.',
-      );
+      return failure('invalid', 'failed', thrownReason(abortError));
     }
-    return failure('invalid', error instanceof Error ? error.message : 'Subtotal failed.');
+    return failure('invalid', 'failed', thrownReason(error));
   }
 }
 

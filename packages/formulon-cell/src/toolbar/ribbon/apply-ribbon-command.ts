@@ -11,7 +11,7 @@
 //    minimal toolbar without every feature wired up.
 
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
-import { setFont } from '../../commands/format.js';
+import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
 import { phoneticReadingAt, setPhoneticReading } from '../../commands/phonetic.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
@@ -51,7 +51,10 @@ import {
   RIBBON_ZOOM_PRESETS,
   type RibbonFormatMutator,
 } from './command-tables.js';
+import { dispatchMacRibbonCommand } from './mac/dispatch.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
+
+export { isMacRibbonCommandSupported } from './mac/dispatch.js';
 
 type UiTheme = 'paper' | 'ink' | 'contrast';
 
@@ -165,6 +168,20 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
   const i = deps.inst;
   if (!i) return false;
   if (!canExecuteBuiltIn(i.store, id, 'ribbon').allowed) return true;
+  if (id.startsWith('mac.'))
+    return dispatchMacRibbonCommand(id, deps, (alias) =>
+      applyGenericRibbonCommand(alias, deps, id),
+    );
+  return applyGenericRibbonCommand(id, deps, id);
+};
+
+const applyGenericRibbonCommand = (
+  id: string,
+  deps: ApplyRibbonCommandDeps,
+  policyCommandId = id,
+): boolean => {
+  const i = deps.inst;
+  if (!i) return false;
   const { ui, runtime, hooks } = deps;
   const state = i.store.getState();
   const range = state.selection.range;
@@ -182,7 +199,14 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
   }
   const formatMutator = RIBBON_FORMAT_MUTATORS[id];
   if (formatMutator) {
-    runtime.applyRibbonFormat(formatMutator);
+    runtime.applyRibbonFormat((state, store) =>
+      withSelectionFormatOrigin(
+        store,
+        'ribbon',
+        () => formatMutator(state, store),
+        policyCommandId,
+      ),
+    );
     return true;
   }
   const zoomLevel = RIBBON_ZOOM_PRESETS[id];
@@ -244,18 +268,32 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       if (i.redo()) runtime.focusSheet();
       return true;
     case 'fontGrow':
-      runtime.applyRibbonFormat((s, store) => {
-        const a = s.selection.active;
-        const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-        setFont(s, store, { fontSize: (f?.fontSize ?? 11) + 1 });
-      });
+      runtime.applyRibbonFormat((s, store) =>
+        withSelectionFormatOrigin(
+          store,
+          'ribbon',
+          () => {
+            const a = s.selection.active;
+            const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
+            setFont(s, store, { fontSize: (f?.fontSize ?? 11) + 1 });
+          },
+          policyCommandId,
+        ),
+      );
       return true;
     case 'fontShrink':
-      runtime.applyRibbonFormat((s, store) => {
-        const a = s.selection.active;
-        const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-        setFont(s, store, { fontSize: Math.max(1, (f?.fontSize ?? 11) - 1) });
-      });
+      runtime.applyRibbonFormat((s, store) =>
+        withSelectionFormatOrigin(
+          store,
+          'ribbon',
+          () => {
+            const a = s.selection.active;
+            const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
+            setFont(s, store, { fontSize: Math.max(1, (f?.fontSize ?? 11) - 1) });
+          },
+          policyCommandId,
+        ),
+      );
       return true;
     case 'editPhonetic': {
       if (!i.workbook?.capabilities.phonetic) return true;

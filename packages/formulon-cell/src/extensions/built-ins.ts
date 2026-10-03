@@ -279,7 +279,8 @@ export const viewToolbar = (): Extension => ({
   priority: 50,
   setup(ctx) {
     const objects = ctx.resolve<ExtensionHandle & { open: () => void }>('workbookObjects');
-    if (ctx.viewbar.parentElement !== ctx.host) ctx.host.insertBefore(ctx.viewbar, ctx.grid);
+    const anchor = ctx.grid.closest<HTMLElement>('.fc-host__sheet-workspace') ?? ctx.grid;
+    ctx.host.insertBefore(ctx.viewbar, anchor);
     const handle = attachViewToolbar({
       toolbar: ctx.viewbar,
       store: ctx.store,

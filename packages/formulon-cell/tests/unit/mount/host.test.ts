@@ -26,6 +26,7 @@ describe('mount/host', () => {
       expect(host.getAttribute('aria-roledescription')).toBe('spreadsheet');
       expect(host.getAttribute('aria-label')).toBe((en as Strings).a11y.spreadsheet);
       expect(host.dataset.fcTheme).toBe('paper');
+      expect(host.dataset.fcPlatform).toBeDefined();
     });
 
     it('defaults theme to paper when undefined', () => {
@@ -36,6 +37,11 @@ describe('mount/host', () => {
     it('honours the requested theme', () => {
       prepareMountHost(host, en as Strings, 'ink');
       expect(host.dataset.fcTheme).toBe('ink');
+    });
+
+    it('stamps the resolved platform for keyboard and toolbar consumers', () => {
+      prepareMountHost(host, en as Strings, 'paper', 'mac');
+      expect(host.dataset.fcPlatform).toBe('mac');
     });
 
     it('clears any pre-existing children of the host', () => {
@@ -84,6 +90,7 @@ describe('mount/host', () => {
       expect(host.hasAttribute('aria-roledescription')).toBe(false);
       expect(host.hasAttribute('aria-label')).toBe(false);
       expect(host.dataset.fcTheme).toBeUndefined();
+      expect(host.dataset.fcPlatform).toBeUndefined();
     });
 
     it('is a no-op when the instance id no longer matches', () => {

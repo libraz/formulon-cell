@@ -1,0 +1,345 @@
+.fc-mac-formula-palette {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 300px;
+  flex-direction: column;
+  inline-size: 300px;
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  background: var(--fc-bg);
+  color: var(--fc-fg);
+  font-family: var(--fc-font-ui);
+  font-size: 12px;
+}
+
+.fc-mac-formula-palette[hidden] {
+  display: none;
+  flex-basis: 0;
+  inline-size: 0;
+}
+
+.fc-mac-formula-palette__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: 36px;
+  padding: 0 10px;
+  border-block-end: 1px solid var(--fc-rule);
+  background: var(--fc-fmtdlg-header-bg);
+  color: var(--fc-fmtdlg-panel-fg);
+}
+
+.fc-mac-formula-palette__header h2,
+.fc-mac-formula-palette__args-name,
+.fc-mac-formula-palette__section h3,
+.fc-mac-formula-palette__content h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.fc-mac-formula-palette__header h2 {
+  font-size: 13px;
+}
+
+.fc-mac-formula-palette__header button,
+.fc-mac-formula-palette__back,
+.fc-mac-formula-palette__range,
+.fc-mac-formula-palette__function,
+.fc-mac-formula-palette__insert,
+.fc-mac-formula-palette__done,
+.fc-mac-formula-palette__add-argument {
+  box-sizing: border-box;
+  border: 1px solid var(--fc-fmtdlg-btn-border);
+  border-radius: var(--fc-radius-sm);
+  background: var(--fc-fmtdlg-btn-bg);
+  color: var(--fc-fmtdlg-btn-fg);
+  font: inherit;
+}
+
+.fc-mac-formula-palette__header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 26px;
+  min-inline-size: 26px;
+  padding: 2px 8px;
+}
+
+.fc-mac-formula-palette__header button svg {
+  display: block;
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+.fc-mac-formula-palette__header button:hover,
+.fc-mac-formula-palette__function:hover,
+.fc-mac-formula-palette__back:hover,
+.fc-mac-formula-palette__range:hover,
+.fc-mac-formula-palette__add-argument:hover {
+  background: var(--fc-accent-soft);
+}
+
+.fc-mac-formula-palette__content {
+  display: flex;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding: 10px;
+}
+
+.fc-mac-formula-palette__search {
+  box-sizing: border-box;
+  min-block-size: 30px;
+  inline-size: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--fc-rule);
+  border-radius: var(--fc-radius-sm);
+  background: var(--fc-bg);
+  color: var(--fc-fg);
+}
+
+.fc-mac-formula-palette__search:focus,
+.fc-mac-formula-palette__argument input:focus {
+  border-color: var(--fc-accent);
+  outline: 2px solid var(--fc-accent-soft);
+  outline-offset: 0;
+}
+
+.fc-mac-formula-palette__sections {
+  display: flex;
+  min-block-size: 110px;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+}
+
+.fc-mac-formula-palette__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fc-mac-formula-palette__section h3 {
+  padding-block-end: 4px;
+  border-block-end: 1px solid var(--fc-rule);
+  font-size: 11px;
+  color: var(--fc-fg-mute);
+}
+
+.fc-mac-formula-palette__function-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.fc-mac-formula-palette__function {
+  display: flex;
+  min-block-size: 30px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 7px;
+  border-color: transparent;
+  border-radius: 0;
+  text-align: start;
+}
+
+.fc-mac-formula-palette__function[aria-selected="true"] {
+  border-color: var(--fc-fmtdlg-list-focus-border);
+  background: var(--fc-accent-soft);
+}
+
+.fc-mac-formula-palette__function.is-unavailable {
+  color: var(--fc-fg-mute);
+}
+
+.fc-mac-formula-palette__function[aria-disabled="true"] {
+  cursor: default;
+}
+
+.fc-mac-formula-palette__function-name {
+  font-family: var(--fc-font-mono);
+}
+
+.fc-mac-formula-palette__function-description,
+.fc-mac-formula-palette__description,
+.fc-mac-formula-palette__help,
+.fc-mac-formula-palette__guard,
+.fc-mac-formula-palette__empty {
+  color: var(--fc-fg-mute);
+}
+
+.fc-mac-formula-palette__function-description {
+  overflow: hidden;
+  max-inline-size: 100%;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-mac-formula-palette__summary {
+  display: flex;
+  min-block-size: 50px;
+  flex-direction: column;
+  gap: 3px;
+  padding-block-start: 4px;
+  border-block-start: 1px solid var(--fc-rule);
+}
+
+.fc-mac-formula-palette__summary code,
+.fc-mac-formula-palette__syntax {
+  font-family: var(--fc-font-mono);
+  color: var(--fc-fg-mute);
+}
+
+.fc-mac-formula-palette__insert,
+.fc-mac-formula-palette__done {
+  min-block-size: 30px;
+  padding: 4px 10px;
+  border-color: var(--fc-fmtdlg-btn-primary-border);
+  background: var(--fc-fmtdlg-btn-primary-bg);
+  color: var(--fc-fmtdlg-btn-primary-fg);
+}
+
+.fc-mac-formula-palette__insert:disabled,
+.fc-mac-formula-palette__done:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fc-mac-formula-palette__back {
+  align-self: flex-start;
+  padding: 4px 8px;
+}
+
+.fc-mac-formula-palette__args-name {
+  font-size: 14px;
+}
+
+.fc-mac-formula-palette__description,
+.fc-mac-formula-palette__guard,
+.fc-mac-formula-palette__empty {
+  margin: 0;
+}
+
+.fc-mac-formula-palette__fields {
+  display: flex;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+
+.fc-mac-formula-palette__argument {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px 0;
+}
+
+.fc-mac-formula-palette__argument > span {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--fc-fg-mute);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-mac-formula-palette__argument input {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  box-sizing: border-box;
+  min-inline-size: 0;
+  min-block-size: 28px;
+  inline-size: 100%;
+  padding: 4px 32px 4px 6px;
+  border: 1px solid var(--fc-fmtdlg-input-border);
+  border-radius: var(--fc-radius-sm);
+  background: var(--fc-fmtdlg-input-bg);
+  color: var(--fc-fmtdlg-input-fg);
+}
+
+.fc-mac-formula-palette__argument small {
+  grid-column: 1 / -1;
+  color: var(--fc-fg-mute);
+  font-size: 11px;
+}
+
+.fc-mac-formula-palette__range {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 24px;
+  min-inline-size: 24px;
+  margin-inline-end: 2px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+}
+
+.fc-mac-formula-palette__range::before,
+.fc-mac-formula-palette__range::after {
+  display: none;
+  content: none;
+}
+
+.fc-mac-formula-palette__add-argument {
+  align-self: flex-start;
+  padding: 4px 8px;
+}
+
+.fc-mac-formula-palette__preview {
+  min-block-size: 24px;
+  min-inline-size: 0;
+  overflow: hidden;
+  padding: 4px 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--fc-rule);
+  border-radius: var(--fc-radius-sm);
+  background: var(--fc-bg);
+  font-family: var(--fc-font-mono);
+}
+
+.fc-mac-formula-palette__result-row {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding-block-start: 6px;
+  border-block-start: 1px solid var(--fc-rule);
+}
+
+.fc-mac-formula-palette__result-row h4 {
+  white-space: nowrap;
+}
+
+.fc-mac-formula-palette__help {
+  display: flex;
+  flex: 0 0 auto;
+  max-block-size: 32%;
+  flex-direction: column;
+  gap: 3px;
+  overflow: auto;
+  margin-block-start: auto;
+  padding-block-start: 8px;
+  border-block-start: 1px solid var(--fc-rule);
+}
+
+.fc-mac-formula-palette__help h4,
+.fc-mac-formula-palette__help p {
+  margin: 0;
+}
+
+.fc-mac-formula-palette__help a {
+  color: var(--fc-accent);
+}

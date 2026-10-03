@@ -4,12 +4,13 @@ import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction } from '../commands/fill.js';
 import { clearFilter, recordFilterChange, setAutoFilter } from '../commands/filter.js';
 import {
-  applyFormatPatch,
+  applySelectionFormatPatch,
   setNumFmt,
   toggleBold,
   toggleItalic,
   toggleStrike,
   toggleUnderline,
+  withSelectionFormatOrigin,
 } from '../commands/format.js';
 import { formatAsTable } from '../commands/format-as-table.js';
 import { type History, recordFormatChange, recordTablesChange } from '../commands/history.js';
@@ -102,6 +103,41 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     const currentWb = input.wb();
     const restricted = interactionControllerFor(input.store)?.policy !== undefined;
     const meta = e.ctrlKey || e.metaKey;
+    const macPlatform =
+      (input.host.closest<HTMLElement>('.fc-host') ?? input.host).dataset.fcPlatform === 'mac';
+    const k = e.key.toLowerCase();
+    // Control-U starts cell editing on Excel for Mac. The sheet keyboard
+    // router owns the edit transition; keep this host-level format handler
+    // from treating the same key as the Windows underline shortcut.
+    if (macPlatform && e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && k === 'u') {
+      e.preventDefault();
+      return;
+    }
+    // Cmd+Control+V is Paste Special on Excel for Mac. Handling it here as
+    // well as in the grid router covers feature re-attachment order; the
+    // first listener to see the event stops the other route from firing.
+    const target = e.target;
+    const textEditingTarget =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      (target instanceof HTMLElement && target.isContentEditable);
+    if (
+      macPlatform &&
+      e.metaKey &&
+      e.ctrlKey &&
+      !e.shiftKey &&
+      !e.altKey &&
+      k === 'v' &&
+      !textEditingTarget &&
+      input.store.getState().ui.editor.kind === 'idle'
+    ) {
+      const dialog = input.pasteSpecialDialog();
+      if (!dialog) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!restricted) dialog.open();
+      return;
+    }
     const applyDirectNumberFormat = (action: NumberFormatAction): void => {
       const fmt = numberFormatForAction(action, input.locale);
       if (!fmt) return;
@@ -109,10 +145,16 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         input.history,
         input.store,
         () => {
-          setNumFmt(
-            input.store.getState(),
+          withSelectionFormatOrigin(
             input.store,
-            action === 'fixed' ? { kind: 'fixed', decimals: 2, thousands: true } : fmt,
+            'keyboard',
+            () =>
+              setNumFmt(
+                input.store.getState(),
+                input.store,
+                action === 'fixed' ? { kind: 'fixed', decimals: 2, thousands: true } : fmt,
+              ),
+            'numberFormat',
           );
         },
         { repeat: () => applyDirectNumberFormat(action) },
@@ -132,8 +174,23 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         input.store,
         () => {
           const state = input.store.getState();
-          if (value === undefined) toggle(state, input.store);
-          else applyFormatPatch(state, input.store, state.selection.range, { [key]: value });
+          if (value === undefined)
+            withSelectionFormatOrigin(
+              input.store,
+              'keyboard',
+              () => toggle(state, input.store),
+              key,
+            );
+          else
+            applySelectionFormatPatch(
+              state,
+              input.store,
+              { [key]: value },
+              {
+                origin: 'keyboard',
+                commandId: key,
+              },
+            );
           applied =
             formatWithPending(input.store.getState(), input.store.getState().selection.active)?.[
               key
@@ -183,7 +240,6 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       return;
     }
     if (!meta) return;
-    const k = e.key.toLowerCase();
     const insertCellsShortcut =
       (e.shiftKey && (e.key === '+' || e.code === 'Equal')) || e.code === 'NumpadAdd';
     const deleteCellsShortcut =

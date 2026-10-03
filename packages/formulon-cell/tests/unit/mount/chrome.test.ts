@@ -107,6 +107,87 @@ describe('mount/chrome — preset → DOM coverage', () => {
       }
     });
   });
+
+  it('keeps sheet workspace identity and slot order across toggle order', async () => {
+    const sheet = await mountStubSheet({
+      features: {
+        formulaBar: false,
+        viewToolbar: false,
+        sheetTabs: false,
+        statusBar: false,
+        watchWindow: false,
+      },
+    });
+    try {
+      const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
+      const workspace = sheet.host.querySelector<HTMLElement>('.fc-host__sheet-workspace');
+      const surface = sheet.host.querySelector<HTMLElement>('.fc-host__sheet-surface');
+      const dock = sheet.host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
+      const a11yLive = sheet.host.querySelector<HTMLElement>('.fc-host__a11y-live');
+      if (!grid || !workspace || !surface || !dock || !a11yLive) {
+        throw new Error('Missing sheet workspace chrome.');
+      }
+      const gridIdentity = grid;
+      expect(dock.hidden).toBe(true);
+      expect(grid.parentElement).toBe(surface);
+      expect(surface.parentElement).toBe(workspace);
+      expect(dock.parentElement).toBe(workspace);
+      expect(a11yLive.parentElement).toBe(sheet.host);
+
+      let features = {
+        formulaBar: false,
+        viewToolbar: false,
+        sheetTabs: false,
+        statusBar: false,
+        watchWindow: false,
+      };
+      const apply = (patch: Partial<typeof features>): void => {
+        features = { ...features, ...patch };
+        sheet.instance.setFeatures(features);
+      };
+      apply({ sheetTabs: true });
+      apply({ viewToolbar: true });
+      apply({ formulaBar: true });
+      apply({ statusBar: true });
+      apply({ watchWindow: true });
+      apply({ viewToolbar: false });
+      apply({ sheetTabs: false });
+      expect(sheet.host.querySelector('.fc-host__sheetbar')).toBeNull();
+      apply({ viewToolbar: true });
+      apply({ sheetTabs: true });
+
+      const formulabar = sheet.host.querySelector<HTMLElement>('.fc-host__formulabar');
+      const viewbar = sheet.host.querySelector<HTMLElement>('.fc-viewbar');
+      const sheetbar = sheet.host.querySelector<HTMLElement>('.fc-host__sheetbar');
+      const statusbar = sheet.host.querySelector<HTMLElement>('.fc-host__statusbar');
+      const watchDock = sheet.host.querySelector<HTMLElement>('.fc-host__watchdock');
+      const finalGrid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
+      if (!formulabar || !viewbar || !sheetbar || !statusbar || !watchDock || !finalGrid) {
+        throw new Error('Missing reattached chrome.');
+      }
+      expect(finalGrid).toBe(gridIdentity);
+      expect(finalGrid.parentElement).toBe(surface);
+      expect(formulabar.parentElement).toBe(sheet.host);
+      expect(viewbar.parentElement).toBe(sheet.host);
+      expect(sheetbar.parentElement).toBe(surface);
+      expect(statusbar.parentElement).toBe(sheet.host);
+      expect(watchDock.parentElement).toBe(sheet.host);
+      expect(formulabar.compareDocumentPosition(viewbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(viewbar.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(workspace.compareDocumentPosition(statusbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(statusbar.compareDocumentPosition(watchDock) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    } finally {
+      sheet.dispose();
+    }
+  });
 });
 
 describe('mount/chrome — Excel-like formula bar surface', () => {

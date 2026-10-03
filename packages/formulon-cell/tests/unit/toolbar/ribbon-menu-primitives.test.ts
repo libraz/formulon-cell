@@ -2457,7 +2457,10 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(dynamicDropdownsSource.match(/window\.innerHeight/g) ?? []).toHaveLength(0);
     expect(dynamicDropdownsSource.match(/style\.overflowY/g) ?? []).toHaveLength(2);
     expect(dynamicDropdownsSource.match(/style\.overscrollBehavior/g) ?? []).toHaveLength(2);
-    expect(dynamicDropdownsSource.match(/applyVerticalViewportLimit\(/g) ?? []).toHaveLength(2);
+    expect(dynamicDropdownsSource.match(/applyVerticalViewportLimit\(/g) ?? []).toHaveLength(3);
+    expect(dynamicDropdownsSource).toMatch(
+      /applyVerticalViewportLimit\(panel, null, 0\);\s+panel\.hidden = false;/,
+    );
   });
 
   it('keeps body-attached overlay viewport sizing centralized in overlay-position', () => {

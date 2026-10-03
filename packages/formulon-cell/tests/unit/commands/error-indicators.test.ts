@@ -273,4 +273,53 @@ describe('error indicator commands', () => {
     expect(formulaErrorCellsInRange(store)).toEqual([{ sheet: 0, row: 0, col: 1 }]);
     expect(selectNextFormulaError(store)).toEqual({ sheet: 0, row: 0, col: 1 });
   });
+
+  it('filters full-sheet formula-error candidates before advancing in row-major order', () => {
+    const store = createSpreadsheetStore();
+    const fullSheet = { sheet: 0, r0: 0, c0: 0, r1: 1_048_575, c1: 16_383 };
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { kind: 'error', code: 7, text: '#DIV/0!' },
+      '=1/0',
+    );
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      { kind: 'error', code: 4, text: '#REF!' },
+      '=Z99',
+    );
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 0, col: 2 },
+      { kind: 'error', code: 6, text: '#N/A' },
+      '=MissingName',
+    );
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 1, col: 0 },
+      { kind: 'error', code: 1, text: '#DIV/0!' },
+      '=2/0',
+    );
+    mutators.setCell(
+      store,
+      { sheet: 1, row: 0, col: 0 },
+      { kind: 'error', code: 1, text: '#DIV/0!' },
+      '=3/0',
+    );
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    ignoreCellError(store, { sheet: 0, row: 0, col: 0 });
+
+    expect(selectNextFormulaError(store, fullSheet, (addr) => addr.col !== 1)).toEqual({
+      sheet: 0,
+      row: 0,
+      col: 2,
+    });
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 2 });
+    expect(selectNextFormulaError(store, fullSheet, (addr) => addr.col !== 1)).toEqual({
+      sheet: 0,
+      row: 1,
+      col: 0,
+    });
+  });
 });

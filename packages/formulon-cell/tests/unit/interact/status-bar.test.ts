@@ -82,6 +82,41 @@ describe('attachStatusBar', () => {
     handle.detach();
   });
 
+  it.each([en, ja])(
+    'counts the complete selection union, including deselected holes',
+    (strings) => {
+      setRange(store, 0, 0, 2, 2);
+      const handle = attachStatusBar({ statusbar, store, strings, getEngineLabel: () => 'stub' });
+      const right = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-right');
+      expect(right?.textContent).toBe(`9 ${strings.statusBar.cells}`);
+      const center = { sheet: 0, row: 1, col: 1 };
+      mutators.applySelectionRectangle(
+        store,
+        store.getState().selection,
+        { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+        'subtract',
+        center,
+        center,
+      );
+      expect(right?.textContent).toBe(`8 ${strings.statusBar.cells}`);
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          ...s.selection,
+          extraRanges: [
+            ...(s.selection.extraRanges ?? []),
+            { ...s.selection.range },
+            { sheet: 1, r0: 0, c0: 0, r1: 10, c1: 10 },
+          ],
+        },
+      }));
+      expect(right?.textContent).toBe(`8 ${strings.statusBar.cells}`);
+      setRange(store, 0, 0, 0, 0);
+      expect(right?.textContent).toBe(`1 ${strings.statusBar.cell}`);
+      handle.detach();
+    },
+  );
+
   it('reflects sum/avg/count for a numeric selection', () => {
     seedNumber(store, 0, 0, 10);
     seedNumber(store, 1, 0, 20);

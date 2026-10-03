@@ -1,5 +1,6 @@
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import { pageScaleMenuText, toolbarMenuText, viewToggleMenuText } from './menu-text.js';
+import { buildMacRibbonModel } from './ribbon/mac/model.js';
 
 export type RibbonTab =
   | 'file'
@@ -17,6 +18,10 @@ export type RibbonTab =
 
 export type ToolbarLang = 'ja' | 'en';
 
+/** Built-in ribbon surfaces. Consumers can still pass an explicit `tabs`
+ *  list; the profile only selects the library-owned default surface. */
+export type RibbonProfile = 'default' | 'excel365Mac';
+
 export interface RibbonCommand {
   id: string;
   title: string;
@@ -25,6 +30,10 @@ export interface RibbonCommand {
   kind?: 'button' | 'large' | 'wide' | 'mono' | 'select' | 'color' | 'break';
   layout?: 'stacked';
   disabled?: boolean;
+  /** Human-readable explanation exposed through the shared disabled-state
+   *  projection. This is intentionally command-local because Mac Office
+   *  exposes unavailable cloud/Office features in place. */
+  disabledReason?: string;
   options?: readonly RibbonOption[];
   className?: string;
 }
@@ -60,6 +69,22 @@ export const EXCEL365_STANDARD_RIBBON_TABS: readonly RibbonTab[] = [
   'review',
   'view',
   'help',
+];
+
+/** The tab surface used by the macOS Microsoft 365 ribbon.  macOS exposes
+ *  the backstage entry from the title bar, so File is intentionally absent;
+ *  Help is folded into the compact desktop surface and Automate remains the
+ *  host-wired extension tab. */
+export const EXCEL365_MAC_RIBBON_TABS: readonly RibbonTab[] = [
+  'home',
+  'insert',
+  'draw',
+  'pageLayout',
+  'formulas',
+  'data',
+  'review',
+  'view',
+  'automate',
 ];
 
 export const OPTIONAL_RIBBON_TABS: readonly RibbonTab[] = ['draw', 'automate', 'acrobat'];
@@ -177,6 +202,8 @@ export interface BuildRibbonModelOptions {
    *  Microsoft 365 baseline and append `OPTIONAL_RIBBON_TABS` only when the
    *  host really exposes those add-in/automation surfaces. */
   tabs?: readonly RibbonTab[];
+  /** Selects the built-in tab and command surface when `tabs` is omitted. */
+  profile?: RibbonProfile;
 }
 
 const COMMAND_SURFACE_LANG: ToolbarLang = 'en';
@@ -717,8 +744,19 @@ export function buildRibbonModel(
       group(tr.pdf, [cmd('pdf', tr.pdf, tr.pdf, 'pdf', 'wide')]),
     ]),
   ];
-  const allowed = new Set(opts.tabs ?? RIBBON_TABS);
-  return allTabs.filter((tab) => allowed.has(tab.id));
+  const homeTab = allTabs.find((candidate) => candidate.id === 'home');
+  if (!homeTab) return [];
+  const profileLang: ToolbarLang =
+    typeof input === 'string' ? input : strings === dictionaries.en ? 'en' : 'ja';
+  const profileTabs =
+    opts.profile === 'excel365Mac' ? buildMacRibbonModel(profileLang, homeTab) : allTabs;
+  const requestedTabs =
+    opts.tabs ?? (opts.profile === 'excel365Mac' ? EXCEL365_MAC_RIBBON_TABS : RIBBON_TABS);
+  const tabsById = new Map(profileTabs.map((tab) => [tab.id, tab]));
+  return requestedTabs.flatMap((id) => {
+    const tab = tabsById.get(id);
+    return tab ? [tab] : [];
+  });
 }
 
 export const ribbonCommands = (

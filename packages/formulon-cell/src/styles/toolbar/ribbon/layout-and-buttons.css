@@ -79,7 +79,7 @@
   overflow: visible;
 }
 
-.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon,
+.fc-tb__ribbon-shell--tabsOnly:not(.fc-tb__ribbon-shell--peek) .fc-tb__ribbon,
 .fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) .fc-tb__ribbon {
   display: none;
 }
@@ -368,4 +368,14 @@
 }
 .fc-tb__rb--strike {
   text-decoration: line-through;
+}
+
+/* A collapsed ribbon opens over the worksheet without resizing its viewport. */
+.fc-tb__ribbon-shell--peek > .fc-tb__ribbon:not([hidden]) {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 90;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.13);
 }

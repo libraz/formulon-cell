@@ -64,29 +64,32 @@ describe('function history', () => {
 
   it('records engine-only functions when the current catalog authorizes them', () => {
     const store = createSpreadsheetStore();
-    const liveNames = new Set(['ACOS']);
+    const liveNames = new Set(['LIVE_ONLY_FN']);
 
-    expect(recordRecentFunction(store, 'ACOS')).toBe(false);
-    expect(recordRecentFunction(store, 'ACOS', liveNames)).toBe(true);
-    expect(getRecentFunctions(store, liveNames)).toEqual(['ACOS']);
+    expect(recordRecentFunction(store, 'LIVE_ONLY_FN')).toBe(false);
+    expect(recordRecentFunction(store, 'LIVE_ONLY_FN', liveNames)).toBe(true);
+    expect(getRecentFunctions(store, liveNames)).toEqual(['LIVE_ONLY_FN']);
     expect(getRecentFunctions(store, new Set(['SUM']))).toEqual([]);
-    expect(getRecentFunctions(store, liveNames)).toEqual(['ACOS']);
+    expect(getRecentFunctions(store, liveNames)).toEqual(['LIVE_ONLY_FN']);
   });
 
   it('keeps stale MRU entries for a later workbook catalog', () => {
     const store = createSpreadsheetStore();
-    expect(recordRecentFunction(store, 'ACOS', new Set(['ACOS']))).toBe(true);
+    expect(recordRecentFunction(store, 'LIVE_ONLY_FN', new Set(['LIVE_ONLY_FN']))).toBe(true);
     expect(recordRecentFunction(store, 'SUM', new Set(['SUM']))).toBe(true);
-    expect(getRecentFunctions(store, new Set(['ACOS', 'SUM']))).toEqual(['SUM', 'ACOS']);
-    expect(getRecentFunctions(store, new Set(['ACOS']))).toEqual(['ACOS']);
+    expect(getRecentFunctions(store, new Set(['LIVE_ONLY_FN', 'SUM']))).toEqual([
+      'SUM',
+      'LIVE_ONLY_FN',
+    ]);
+    expect(getRecentFunctions(store, new Set(['LIVE_ONLY_FN']))).toEqual(['LIVE_ONLY_FN']);
     expect(getRecentFunctions(store, new Set(['SUM']))).toEqual(['SUM']);
   });
 
   it('keeps engine-only entries out of the static fallback view', () => {
     const store = createSpreadsheetStore();
-    expect(recordRecentFunction(store, 'ACOS', new Set(['ACOS']))).toBe(true);
+    expect(recordRecentFunction(store, 'LIVE_ONLY_FN', new Set(['LIVE_ONLY_FN']))).toBe(true);
     expect(recordRecentFunction(store, 'SUM')).toBe(true);
     expect(getRecentFunctions(store)).toEqual(['SUM']);
-    expect(getRecentFunctions(store, new Set(['ACOS']))).toEqual(['ACOS']);
+    expect(getRecentFunctions(store, new Set(['LIVE_ONLY_FN']))).toEqual(['LIVE_ONLY_FN']);
   });
 });

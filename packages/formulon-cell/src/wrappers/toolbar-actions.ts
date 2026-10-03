@@ -6,6 +6,7 @@
 import type { AutoSumFunction } from '../commands/auto-sum.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { ConditionalPresetAction } from '../commands/conditional-format.js';
+import { recordRecentFunction } from '../commands/function-history.js';
 import {
   addSheet,
   applyConditionalPresetAction,
@@ -195,6 +196,7 @@ export const handleAutoSum = (
   if (!result) return false;
   mutators.replaceCells(instance.store, instance.workbook.cells(result.addr.sheet));
   mutators.setActive(instance.store, result.addr);
+  recordRecentFunction(instance.store, functionName);
   return true;
 };
 

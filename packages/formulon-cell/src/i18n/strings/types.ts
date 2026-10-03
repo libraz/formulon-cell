@@ -1199,6 +1199,13 @@ export interface Strings {
     categoryDateTime: string;
     categoryMath: string;
     categoryFinancial: string;
+    categoryStatistical: string;
+    categoryEngineering: string;
+    categoryInformation: string;
+    categoryDatabase: string;
+    categoryCompatibility: string;
+    categoryCube: string;
+    categoryWeb: string;
     categoryDynamicArray: string;
     /** Label above the live formula preview on the args step. */
     preview: string;
@@ -1207,21 +1214,164 @@ export interface Strings {
     /** Hint shown when the function signature includes a `...` repeat marker. */
     variadicHint: string;
     /** Generic label for an argument without a host-provided friendly name. */
-    argumentLabel?: string;
+    argumentLabel: string;
     /** Prefix for rows beyond the function's required arity. */
-    optionalArgumentLabel?: string;
+    optionalArgumentLabel: string;
     /** Button label for appending an argument row. */
-    addArgument?: string;
+    addArgument: string;
     /** Button label for removing the trailing optional argument row. */
-    removeArgument?: string;
+    removeArgument: string;
     /** "Back" button — returns to the picker from the args step. */
     back: string;
     cancel: string;
     insert: string;
     insertRequiresFunction: string;
+    /** Reason shown when the engine exposes a recognized but unavailable function. */
+    functionUnavailable: string;
+    /** Optional labels for the nonmodal Mac formula palette. */
+    macPalette: {
+      title: string;
+      recent: string;
+      all: string;
+      showAll: string;
+      insertFunction: string;
+      result: string;
+      done: string;
+      close: string;
+      rangePicker: string;
+      help: string;
+      searchPlaceholder: string;
+      empty: string;
+      unavailable: string;
+      description: string;
+      syntax: string;
+      argument: string;
+      pending: string;
+      draftConflict: string;
+    };
     /** aria-label for the formula-bar fx button that opens this dialog. */
     fxButtonLabel: string;
     fxButtonUnavailable: string;
+  };
+  macData: {
+    goalSeek: {
+      title: string;
+      formulaCell: string;
+      targetValue: string;
+      changingCell: string;
+      iterations: string;
+      run: string;
+      cancel: string;
+      result: string;
+      invalidCell: string;
+      invalidTarget: string;
+      calculating: string;
+      converged: string;
+    };
+    consolidate: {
+      title: string;
+      sources: string;
+      sourcesHint: string;
+      destination: string;
+      function: string;
+      replace: string;
+      labels: string;
+      links: string;
+      unsupportedOption: string;
+      run: string;
+      cancel: string;
+    };
+    subtotal: {
+      title: string;
+      range: string;
+      groupBy: string;
+      columns: string;
+      function: string;
+      replace: string;
+      summaryBelow: string;
+      unsupportedOption: string;
+      run: string;
+      cancel: string;
+    };
+    functions: { sum: string; average: string; count: string; min: string; max: string };
+    /** Keyed by the error codes returned from the Data command planners. */
+    errors: {
+      invalidRange: string;
+      invalidColumn: string;
+      targetNotFinite: string;
+      sameCell: string;
+      noFormula: string;
+      changingHasFormula: string;
+      changingNotNumeric: string;
+      scratchUnsupported: string;
+      invalidTolerance: string;
+      invalidIterations: string;
+      nonFiniteResult: string;
+      notConverged: string;
+      stale: string;
+      notEditable: string;
+      writeFailed: string;
+      failed: string;
+      noSources: string;
+      invalidFunction: string;
+      invalidSource: string;
+      areaLimit: string;
+      dimensionMismatch: string;
+      invalidDestination: string;
+      destinationOverlapsSource: string;
+      activeSheetOnly: string;
+      needsDataRow: string;
+      engineUnsupported: string;
+      unsupportedObjects: string;
+      protectedSheet: string;
+      groupOutsideRange: string;
+      groupLimit: string;
+      noGroups: string;
+      noRoom: string;
+    };
+  };
+  macSparkline: {
+    title: string;
+    dataRange: string;
+    location: string;
+    type: string;
+    ok: string;
+    cancel: string;
+    invalidSource: string;
+    locationOneCell: string;
+    outOfBounds: string;
+    chooseType: string;
+    unavailable: string;
+    protectedLocation: string;
+  };
+  macSlicer: {
+    table: string;
+    ok: string;
+    cancel: string;
+    noTable: string;
+    noColumns: string;
+    chooseTableAndColumn: string;
+    insertFailed: string;
+  };
+  macWorkbookStats: {
+    title: string;
+    close: string;
+    sheets: string;
+    populatedCells: string;
+    formulas: string;
+    numbers: string;
+    text: string;
+    booleans: string;
+    errors: string;
+    tables: string;
+    comments: string;
+    hyperlinks: string;
+    usedRows: string;
+    usedColumns: string;
+  };
+  macInk: {
+    strokeLabel: string;
+    drawLabel: string;
   };
   watchPanel: {
     title: string;

@@ -467,6 +467,7 @@ export const FUNCTION_SIGNATURES: Readonly<Record<string, readonly string[]>> = 
   INT: ['number'],
   MOD: ['number', 'divisor'],
   ABS: ['number'],
+  ACOS: ['number'],
   POWER: ['number', 'power'],
   SQRT: ['number'],
   EXP: ['number'],
@@ -660,60 +661,24 @@ export interface ActiveSignature {
 }
 
 export function findActiveSignature(text: string, caret: number): ActiveSignature | null {
-  if (!text.startsWith('=')) return null;
-  let depth = 0;
-  let inString = false;
-  let openParenAt = -1;
-  for (let i = caret - 1; i >= 0; i -= 1) {
-    const ch = text[i];
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === ')') {
-      depth += 1;
-    } else if (ch === '(') {
-      if (depth === 0) {
-        openParenAt = i;
-        break;
-      }
-      depth -= 1;
-    }
-  }
-  if (openParenAt <= 0) {
-    // The caret may be sitting on the function NAME itself (before its `(`) —
-    // e.g. just after a double-click selected the name. Treat that as the
-    // first argument so the ScreenTip still shows.
-    const onName = functionNameRangeAt(text, caret);
-    if (onName) {
-      const name = text.slice(onName.start, onName.end).toUpperCase();
-      const args = FUNCTION_SIGNATURES[name];
-      if (args) return { name, args, activeArgIndex: 0 };
-    }
+  // Resolve every syntactic name first so an unknown innermost call masks an
+  // enclosing known call, matching the historical helper. The static
+  // signature lookup below decides whether that selected call is supported.
+  const span = findFunctionCallAtCaret(text, caret, (rawName) => rawName.toUpperCase());
+  if (!span) return null;
+  // The legacy helper intentionally reports no signature once the caret has
+  // moved past a complete top-level call. The span API keeps that boundary
+  // eligible for editors that need to select the just-closed call.
+  if (span.complete && span.closeParen !== null && caret === span.closeParen + 1) {
     return null;
   }
-  const beforeParen = text.slice(0, openParenAt);
-  const m = /([A-Za-z_][A-Za-z0-9_]*)$/.exec(beforeParen);
-  if (!m) return null;
-  const name = (m[1] ?? '').toUpperCase();
-  const args = FUNCTION_SIGNATURES[name];
+  const args = FUNCTION_SIGNATURES[span.canonicalName];
   if (!args) return null;
-  let activeArgIndex = 0;
-  let d2 = 0;
-  let s2 = false;
-  for (let j = openParenAt + 1; j < caret; j += 1) {
-    const ch = text[j];
-    if (ch === '"') {
-      s2 = !s2;
-      continue;
-    }
-    if (s2) continue;
-    if (ch === '(') d2 += 1;
-    else if (ch === ')') d2 -= 1;
-    else if (ch === ',' && d2 === 0) activeArgIndex += 1;
-  }
-  return { name, args, activeArgIndex };
+  return {
+    name: span.canonicalName,
+    args,
+    activeArgIndex: span.activeArgumentIndex,
+  };
 }
 
 const isNameChar = (c: string | undefined): boolean => c != null && /[A-Za-z0-9_.]/.test(c);
@@ -751,6 +716,228 @@ const trimmedRange = (
 export interface FormulaSelectionRange {
   start: number;
   end: number;
+}
+
+/** The source spans belonging to the function call enclosing a formula caret. */
+export interface FunctionCallSpan {
+  rawName: string;
+  canonicalName: string;
+  name: FormulaSelectionRange;
+  call: FormulaSelectionRange;
+  openParen: number;
+  closeParen: number | null;
+  argumentSpans: readonly FormulaSelectionRange[];
+  activeArgumentIndex: number;
+  complete: boolean;
+}
+
+type FormulaDelimiterKind = 'paren' | 'brace' | 'bracket';
+
+interface FormulaDelimiter {
+  kind: FormulaDelimiterKind;
+  call: FunctionCallRecord | null;
+}
+
+interface FunctionCallRecord {
+  rawName: string;
+  name: FormulaSelectionRange;
+  openParen: number;
+  closeParen: number | null;
+  separators: number[];
+}
+
+const isFormulaIdentifierChar = (value: string | undefined): boolean =>
+  value !== undefined && /[A-Za-z0-9_.]/.test(value);
+
+const functionNameBeforeParen = (
+  formula: string,
+  openParen: number,
+): FormulaSelectionRange | null => {
+  let nameEnd = openParen;
+  while (nameEnd > 0 && /\s/.test(formula[nameEnd - 1] ?? '')) nameEnd -= 1;
+  let nameStart = nameEnd;
+  while (nameStart > 0 && isFormulaIdentifierChar(formula[nameStart - 1])) nameStart -= 1;
+  if (nameStart === nameEnd || !/[A-Za-z_]/.test(formula[nameStart] ?? '')) return null;
+  return { start: nameStart, end: nameEnd };
+};
+
+const delimiterKindFor = (value: string): FormulaDelimiterKind | null => {
+  if (value === '(' || value === ')') return 'paren';
+  if (value === '{' || value === '}') return 'brace';
+  if (value === '[' || value === ']') return 'bracket';
+  return null;
+};
+
+const isOpeningDelimiter = (value: string): boolean =>
+  value === '(' || value === '{' || value === '[';
+
+const isClosingDelimiter = (value: string): boolean =>
+  value === ')' || value === '}' || value === ']';
+
+const delimiterMatches = (kind: FormulaDelimiterKind, value: string): boolean =>
+  (kind === 'paren' && value === ')') ||
+  (kind === 'brace' && value === '}') ||
+  (kind === 'bracket' && value === ']');
+
+const argumentSpansFor = (call: FunctionCallRecord, end: number): FormulaSelectionRange[] => {
+  const spans: FormulaSelectionRange[] = [];
+  let start = call.openParen + 1;
+  for (const separator of call.separators) {
+    spans.push({ start, end: separator });
+    start = separator + 1;
+  }
+  spans.push({ start, end });
+  return spans;
+};
+
+const activeArgumentFor = (separators: readonly number[], caret: number): number => {
+  let index = 0;
+  for (const separator of separators) {
+    if (caret <= separator) break;
+    index += 1;
+  }
+  return index;
+};
+
+/**
+ * Find the live-known function call containing `caret` without rewriting the
+ * formula text. Every returned offset is a JavaScript UTF-16 offset and every
+ * range is half-open, so consumers can splice the original source verbatim.
+ */
+export function findFunctionCallAtCaret(
+  text: string,
+  caret: number,
+  resolveKnownName: (rawName: string) => string | null,
+): FunctionCallSpan | null {
+  if (!text.startsWith('=') || !Number.isInteger(caret) || caret < 0 || caret > text.length) {
+    return null;
+  }
+
+  const calls: FunctionCallRecord[] = [];
+  const stack: FormulaDelimiter[] = [];
+  let inDoubleQuote = false;
+  let inSingleQuote = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i] ?? '';
+    const next = text[i + 1] ?? '';
+
+    if (inDoubleQuote) {
+      if (ch === '"') {
+        if (next === '"') i += 1;
+        else inDoubleQuote = false;
+      }
+      continue;
+    }
+
+    if (inSingleQuote) {
+      if (ch === "'") {
+        if (next === "'") i += 1;
+        else inSingleQuote = false;
+      }
+      continue;
+    }
+
+    // Structured-reference headers are their own lexical mode. In that mode
+    // apostrophe escapes the following bracket/operator character rather than
+    // opening a sheet-name quote; this mirrors the formula argument scanner.
+    const top = stack[stack.length - 1];
+    if (top?.kind === 'bracket') {
+      if (ch === '[') {
+        stack.push({ kind: 'bracket', call: null });
+      } else if (ch === ']') {
+        stack.pop();
+      } else if (ch === "'" && "[]#'@".includes(next)) {
+        i += 1;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inDoubleQuote = true;
+      continue;
+    }
+    if (ch === "'") {
+      inSingleQuote = true;
+      continue;
+    }
+
+    if (isOpeningDelimiter(ch)) {
+      const kind = delimiterKindFor(ch);
+      if (!kind) continue;
+      let call: FunctionCallRecord | null = null;
+      if (kind === 'paren') {
+        const name = functionNameBeforeParen(text, i);
+        const inStructuredReference = stack.some((entry) => entry.kind === 'bracket');
+        if (name && !inStructuredReference) {
+          call = {
+            rawName: text.slice(name.start, name.end),
+            name,
+            openParen: i,
+            closeParen: null,
+            separators: [],
+          };
+          calls.push(call);
+        }
+      }
+      stack.push({ kind, call });
+      continue;
+    }
+
+    if (isClosingDelimiter(ch)) {
+      const kind = delimiterKindFor(ch);
+      const open = stack[stack.length - 1];
+      if (!kind || !open || !delimiterMatches(open.kind, ch)) return null;
+      stack.pop();
+      if (open.call) open.call.closeParen = i;
+      continue;
+    }
+
+    if (ch === ',' && top?.kind === 'paren' && top.call) {
+      top.call.separators.push(i);
+    }
+  }
+
+  const knownCalls: FunctionCallSpan[] = [];
+  for (const call of calls) {
+    let canonicalName: string | null = null;
+    try {
+      canonicalName = resolveKnownName(call.rawName);
+    } catch {
+      canonicalName = null;
+    }
+    if (!canonicalName) continue;
+    const closeParen = call.closeParen;
+    const callEnd = closeParen === null ? text.length : closeParen + 1;
+    knownCalls.push({
+      rawName: call.rawName,
+      canonicalName,
+      name: { ...call.name },
+      call: { start: call.name.start, end: callEnd },
+      openParen: call.openParen,
+      closeParen,
+      argumentSpans: argumentSpansFor(call, closeParen ?? text.length),
+      activeArgumentIndex: activeArgumentFor(call.separators, caret),
+      complete: closeParen !== null,
+    });
+  }
+
+  const containing = knownCalls.filter((call) => {
+    const end = call.closeParen ?? text.length;
+    return caret >= call.name.start && caret <= end;
+  });
+  if (containing.length > 0) {
+    containing.sort((a, b) => b.name.start - a.name.start || a.call.end - b.call.end);
+    return containing[0] ?? null;
+  }
+
+  // A just-closed top-level call remains selectable at its one-past-close
+  // boundary. If it is nested, the enclosing call was already selected above.
+  const justClosed = knownCalls.filter(
+    (call) => call.closeParen !== null && caret === call.closeParen + 1,
+  );
+  justClosed.sort((a, b) => b.name.start - a.name.start || a.call.end - b.call.end);
+  return justClosed[0] ?? null;
 }
 
 /**

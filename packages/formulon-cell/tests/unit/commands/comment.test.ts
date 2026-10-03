@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   clearComment,
+  clearComments,
   commentAt,
   commentAuthorAt,
   listComments,
@@ -280,5 +281,74 @@ describe('comment commands', () => {
       { row: 0, col: 0, text: '' },
       { row: 0, col: 0, text: 'note' },
     ]);
+  });
+
+  it('clears a deduplicated sparse comment batch with one store publication', () => {
+    const store = createSpreadsheetStore();
+    const first = { sheet: 0, row: 0, col: 0 };
+    const second = { sheet: 0, row: 2, col: 2 };
+    setComment(store, first, 'first');
+    setComment(store, second, 'second');
+    const calls: { row: number; col: number; text: string }[] = [];
+    const wb = {
+      capabilities: { comments: true },
+      getComment: (_sheet: number, row: number, col: number) =>
+        row === first.row && col === first.col
+          ? { author: '', text: 'first' }
+          : row === second.row && col === second.col
+            ? { author: '', text: 'second' }
+            : null,
+      setCommentEntry: (
+        _sheet: number,
+        row: number,
+        col: number,
+        _author: string,
+        text: string,
+      ) => {
+        calls.push({ row, col, text });
+        return true;
+      },
+    } as unknown as WorkbookHandle;
+    const setState = vi.spyOn(store, 'setState');
+
+    clearComments(store, [first, first, second], wb);
+
+    expect(setState).toHaveBeenCalledTimes(1);
+    expect(commentAt(store.getState(), first)).toBeNull();
+    expect(commentAt(store.getState(), second)).toBeNull();
+    expect(calls).toEqual([
+      { row: first.row, col: first.col, text: '' },
+      { row: second.row, col: second.col, text: '' },
+    ]);
+  });
+
+  it('restores the whole comment batch when one physical write is rejected', () => {
+    const store = createSpreadsheetStore();
+    const first = { sheet: 0, row: 0, col: 0 };
+    const second = { sheet: 0, row: 2, col: 2 };
+    setComment(store, first, 'first');
+    setComment(store, second, 'second');
+    const physical = new Map([
+      [`${first.row}:${first.col}`, { author: 'Alice', text: 'first' }],
+      [`${second.row}:${second.col}`, { author: 'Bob', text: 'second' }],
+    ]);
+    const wb = {
+      capabilities: { comments: true },
+      getComment: (_sheet: number, row: number, col: number) =>
+        physical.get(`${row}:${col}`) ?? null,
+      setCommentEntry: (_sheet: number, row: number, col: number, author: string, text: string) => {
+        if (row === second.row && col === second.col && text.length === 0) return false;
+        const key = `${row}:${col}`;
+        if (text.length === 0) physical.delete(key);
+        else physical.set(key, { author, text });
+        return true;
+      },
+    } as unknown as WorkbookHandle;
+
+    expect(() => clearComments(store, [first, second], wb)).toThrow('comment engine write failed');
+    expect(commentAt(store.getState(), first)).toBe('first');
+    expect(commentAt(store.getState(), second)).toBe('second');
+    expect(physical.get(`${first.row}:${first.col}`)).toEqual({ author: 'Alice', text: 'first' });
+    expect(physical.get(`${second.row}:${second.col}`)).toEqual({ author: 'Bob', text: 'second' });
   });
 });

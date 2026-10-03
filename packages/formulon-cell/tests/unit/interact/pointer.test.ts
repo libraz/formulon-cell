@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachPointer } from '../../../src/interact/pointer.js';
+import { selectionContainsAddr } from '../../../src/store/selection-geometry.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -91,6 +92,18 @@ const fireMove = (host: HTMLElement, x: number, y: number): PointerEvent => {
 
 const fireUp = (host: HTMLElement, x: number, y: number): PointerEvent => {
   const e = new PointerEvent('pointerup', {
+    clientX: x,
+    clientY: y,
+    bubbles: true,
+    cancelable: true,
+    pointerId: 1,
+  });
+  host.dispatchEvent(e);
+  return e;
+};
+
+const fireCancel = (host: HTMLElement, x: number, y: number): PointerEvent => {
+  const e = new PointerEvent('pointercancel', {
     clientX: x,
     clientY: y,
     bubbles: true,
@@ -278,6 +291,79 @@ describe('attachPointer', () => {
       ]);
     });
 
+    it('Ctrl/Cmd-click toggles a fully selected row while preserving another range', () => {
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 10, 40); // select row 0
+      fireDown(host, 10, 96, { metaKey: true }); // add row 2
+      fireUp(host, 10, 96);
+      fireDown(host, 10, 96, { ctrlKey: true }); // remove row 2
+      fireUp(host, 10, 96);
+
+      const selection = store.getState().selection;
+      expect(selectionContainsAddr(selection, { sheet: 0, row: 0, col: 16_383 })).toBe(true);
+      expect(selectionContainsAddr(selection, { sheet: 0, row: 2, col: 0 })).toBe(false);
+    });
+
+    it('uses a fixed header drag mode and restores rows when the marquee shrinks', () => {
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 10, 40); // select row 0
+      fireDown(host, 10, 460, { metaKey: true }); // add row 15
+      fireMove(host, 10, 516); // extend to row 17
+      expect(selectionContainsAddr(store.getState().selection, { sheet: 0, row: 17, col: 0 })).toBe(
+        true,
+      );
+      fireMove(host, 10, 488); // shrink to rows 15–16
+      const selection = store.getState().selection;
+      expect(selection.range).toEqual({ sheet: 0, r0: 15, c0: 0, r1: 16, c1: 16_383 });
+      expect(selectionContainsAddr(selection, { sheet: 0, row: 17, col: 0 })).toBe(false);
+      expect(selectionContainsAddr(selection, { sheet: 0, row: 0, col: 16_383 })).toBe(true);
+      fireUp(host, 10, 488);
+    });
+
+    it('adds a complete row when Ctrl/Cmd starts from a partial cell selection', () => {
+      detach = attachPointer(host, store, wb);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+
+      fireDown(host, 10, 40, { metaKey: true });
+
+      const selection = store.getState().selection;
+      expect(selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 16_383 });
+      expect(selection.extraRanges).toEqual([{ sheet: 0, r0: 1, c0: 0, r1: 1, c1: 1 }]);
+    });
+
+    it('toggles a column through the same selection geometry', () => {
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 100, 10); // select column 0
+      fireDown(host, 300, 10, { ctrlKey: true }); // add column 2
+      fireUp(host, 300, 10);
+      fireDown(host, 300, 10, { metaKey: true }); // remove column 2
+      fireUp(host, 300, 10);
+
+      const selection = store.getState().selection;
+      expect(selectionContainsAddr(selection, { sheet: 0, row: 1_048_575, col: 0 })).toBe(true);
+      expect(selectionContainsAddr(selection, { sheet: 0, row: 0, col: 2 })).toBe(false);
+    });
+
+    it('does not restore a captured header selection after the active sheet changes', () => {
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 10, 40); // select row 0
+      fireDown(host, 10, 68, { metaKey: true }); // begin adding row 1
+      const afterDown = store.getState().selection;
+      store.setState((state) => ({
+        ...state,
+        data: { ...state.data, sheetIndex: 1 },
+      }));
+      store.setState((state) => ({
+        ...state,
+        data: { ...state.data, sheetIndex: 0 },
+      }));
+      fireMove(host, 10, 96);
+      fireUp(host, 10, 96);
+
+      expect(store.getState().selection).toEqual(afterDown);
+    });
+
     it('Shift-click on row headers selects a contiguous row band', () => {
       detach = attachPointer(host, store, wb);
 
@@ -343,6 +429,17 @@ describe('attachPointer', () => {
       // Undo restores the original width (undefined → falls back to default).
       expect(history.undo()).toBe(true);
       expect(store.getState().layout.colWidths.get(0)).toBeUndefined();
+    });
+
+    it('pointercancel during col-resize restores the width without a history entry', () => {
+      const history = new History();
+      detach = attachPointer(host, store, wb, undefined, history);
+      fireDown(host, 154, 10);
+      fireMove(host, 200, 10);
+      expect(store.getState().layout.colWidths.get(0)).toBe(148);
+      fireCancel(host, 200, 10);
+      expect(store.getState().layout.colWidths.get(0)).toBeUndefined();
+      expect(history.canUndo()).toBe(false);
     });
 
     it('double-click on col-resize zone autofits to content', () => {
@@ -535,6 +632,29 @@ describe('attachPointer', () => {
       stub.mockReturnValue(null);
     });
 
+    it('pointercancel during a fill drag clears the preview and writes nothing', async () => {
+      const grid = await import('../../../src/render/grid.js');
+      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
+      stub.mockReturnValue({ x: 152, y: 54, w: 6, h: 6 });
+      seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const onAfterCommit = vi.fn();
+      detach = attachPointer(host, store, wb, onAfterCommit);
+
+      fireDown(host, 155, 57);
+      fireMove(host, 100, 100);
+      expect(store.getState().ui.fillPreview).not.toBeNull();
+      fireCancel(host, 100, 100);
+      fireUp(host, 100, 100);
+
+      expect(store.getState().ui.fillPreview).toBeNull();
+      expect(onAfterCommit).not.toHaveBeenCalled();
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+      stub.mockReturnValue(null);
+    });
+
     it('hovering over the fill handle sets the crosshair cursor', async () => {
       const grid = await import('../../../src/render/grid.js');
       const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
@@ -720,7 +840,7 @@ describe('attachPointer', () => {
     });
   });
 
-  describe('multi-range Ctrl/Cmd+click', () => {
+  describe('modifier selection marquee', () => {
     it('Cmd+click on a non-hyperlinked cell appends an extra range', () => {
       detach = attachPointer(host, store, wb);
       // First, plain click on (0,0).
@@ -738,16 +858,84 @@ describe('attachPointer', () => {
       expect(sel.extraRanges?.[0]).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     });
 
-    it('Cmd+click does not start a drag-extend on the primary range', () => {
+    it('Ctrl/Cmd+drag extends a stable marquee and restores cells when it shrinks', () => {
       detach = attachPointer(host, store, wb);
-      fireDown(host, 100, 40);
-      fireUp(host, 100, 40);
-      fireDown(host, 300, 100, { metaKey: true });
-      // Move without releasing — must not extend primary, since drag is none.
-      fireMove(host, 300, 70); // move to (1,2)
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+      fireDown(host, 200, 70, { metaKey: true }); // subtract B2 from immutable original base
+      fireMove(host, 300, 100); // rectangle B2:C3
       const sel = store.getState().selection;
-      expect(sel.range).toEqual({ sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 });
-      fireUp(host, 300, 70);
+      expect(selectionContainsAddr(sel, { sheet: 0, row: 2, col: 2 })).toBe(false);
+      expect(selectionContainsAddr(sel, { sheet: 0, row: 2, col: 1 })).toBe(false);
+      expect(selectionContainsAddr(sel, { sheet: 0, row: 1, col: 2 })).toBe(false);
+      fireMove(host, 200, 70); // shrink back to B2; C2, B3, and C3 return
+      const shrunk = store.getState().selection;
+      expect(selectionContainsAddr(shrunk, { sheet: 0, row: 1, col: 1 })).toBe(false);
+      expect(selectionContainsAddr(shrunk, { sheet: 0, row: 1, col: 2 })).toBe(true);
+      expect(selectionContainsAddr(shrunk, { sheet: 0, row: 2, col: 1 })).toBe(true);
+      expect(selectionContainsAddr(shrunk, { sheet: 0, row: 2, col: 2 })).toBe(true);
+      fireUp(host, 200, 70);
+    });
+
+    it('pointercancel restores the selection the marquee started from', () => {
+      detach = attachPointer(host, store, wb);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+      const before = store.getState().selection;
+      fireDown(host, 200, 70, { metaKey: true });
+      fireMove(host, 300, 100);
+      expect(store.getState().selection).not.toEqual(before);
+      fireCancel(host, 300, 100);
+
+      expect(store.getState().selection).toEqual(before);
+      fireMove(host, 100, 40);
+      expect(store.getState().selection).toEqual(before);
+    });
+
+    it('removes and re-adds selected cells, but keeps the last cell selected', () => {
+      detach = attachPointer(host, store, wb);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+
+      fireDown(host, 200, 70, { ctrlKey: true });
+      fireUp(host, 200, 70);
+      expect(selectionContainsAddr(store.getState().selection, { sheet: 0, row: 1, col: 1 })).toBe(
+        false,
+      );
+
+      fireDown(host, 200, 70, { ctrlKey: true });
+      fireUp(host, 200, 70);
+      expect(selectionContainsAddr(store.getState().selection, { sheet: 0, row: 1, col: 1 })).toBe(
+        true,
+      );
+
+      mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+      const before = store.getState().selection;
+      fireDown(host, 200, 70, { metaKey: true });
+      fireUp(host, 200, 70);
+      expect(store.getState().selection).toEqual(before);
+    });
+
+    it('expands modifier selection to whole merged cells', () => {
+      detach = attachPointer(host, store, wb);
+      mutators.mergeRange(store, { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+
+      fireDown(host, 300, 100, { metaKey: true }); // merged body C3
+      fireUp(host, 300, 100);
+      expect(selectionContainsAddr(store.getState().selection, { sheet: 0, row: 1, col: 1 })).toBe(
+        false,
+      );
+      expect(selectionContainsAddr(store.getState().selection, { sheet: 0, row: 2, col: 2 })).toBe(
+        false,
+      );
+
+      fireDown(host, 200, 70, { metaKey: true }); // add the complete merge again
+      fireUp(host, 200, 70);
+      expect(selectionContainsAddr(store.getState().selection, { sheet: 0, row: 2, col: 2 })).toBe(
+        true,
+      );
     });
 
     it('plain click after a multi-range clears extras', () => {

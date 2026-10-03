@@ -124,10 +124,16 @@ export function formulaErrorCellsInRange(store: SpreadsheetStore, range?: Range)
   return out.sort(rowMajor);
 }
 
-export function selectNextFormulaError(store: SpreadsheetStore, range?: Range): Addr | null {
+export function selectNextFormulaError(
+  store: SpreadsheetStore,
+  range?: Range,
+  accept?: (addr: Addr) => boolean,
+): Addr | null {
   const state = store.getState();
   const active = state.selection.active;
-  const errors = formulaErrorCellsInRange(store, range ?? state.selection.range);
+  const errors = formulaErrorCellsInRange(store, range ?? state.selection.range).filter(
+    (addr) => accept?.(addr) ?? true,
+  );
   if (errors.length === 0) return null;
   const afterActive =
     errors.find(

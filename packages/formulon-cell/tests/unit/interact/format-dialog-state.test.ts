@@ -1,16 +1,76 @@
 import { describe, expect, it } from 'vitest';
-
+import { planSelectionFormat } from '../../../src/commands/format.js';
 import {
+  buildTouchedDialogPatch,
   computeDialogNumFmt,
   computeDialogValidation,
   explicitDraftBorders,
   hydrateDraftFromFormat,
   makeEmptyDraft,
   setDraftSide,
+  summarizeDialogFormats,
 } from '../../../src/interact/format-dialog-state.js';
-import type { CellFormat } from '../../../src/store/store.js';
+import type { CellFormat, SpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('interact/format-dialog-state', () => {
+  it('summarizes mixed fields and emits only touched draft fields', () => {
+    const store: SpreadsheetStore = createSpreadsheetStore();
+    store.setState((state) => ({
+      ...state,
+      selection: {
+        ...state.selection,
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        extraRanges: [],
+      },
+    }));
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        bold: true,
+        hyperlink: 'https://active.test',
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      {
+        bold: false,
+        hyperlink: 'https://other.test',
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        validation: { kind: 'list', source: ['A', 'B'] },
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      {
+        validation: { source: ['A', 'B'], kind: 'list' },
+      },
+    );
+    const plan = planSelectionFormat(store.getState());
+    if (!plan) throw new Error('selection plan missing');
+    const summary = summarizeDialogFormats(store.getState(), plan);
+    expect(summary.activeFormat.bold).toBe(true);
+    expect(summary.mixed.has('bold')).toBe(true);
+    expect(summary.mixed.has('hyperlink')).toBe(true);
+    expect(summary.mixed.has('validation')).toBe(false);
+
+    const draft = makeEmptyDraft('en');
+    hydrateDraftFromFormat(draft, summary.activeFormat, 'en');
+    draft.align = 'center';
+    const touched = new Set(['align'] as const);
+    expect(buildTouchedDialogPatch(draft, touched)).toEqual({ align: 'center' });
+  });
+
   describe('makeEmptyDraft', () => {
     it('starts in the "general" number category with locale-aware currency', () => {
       const en = makeEmptyDraft('en');

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+
+const workbook = (): WorkbookHandle => ({ sheetCount: 1 }) as WorkbookHandle;
 
 /**
  * Unit: state-shape mutators on the store. The existing suites already cover
@@ -130,5 +134,40 @@ describe('store mutators — multi-range selection', () => {
 
     mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
     expect(store.getState().selection.extraRanges).toEqual([]);
+  });
+
+  it('setActivePreservingSelection moves only the active cell', () => {
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    mutators.extendRangeTo(store, { sheet: 0, row: 2, col: 3 });
+    mutators.addExtraRange(
+      store,
+      { sheet: 0, r0: 5, c0: 5, r1: 6, c1: 6 },
+      { sheet: 0, row: 5, col: 5 },
+    );
+    const before = store.getState().selection;
+
+    mutators.setActivePreservingSelection(store, { sheet: 0, row: 6, col: 6 });
+
+    const after = store.getState().selection;
+    expect(after.active).toEqual({ sheet: 0, row: 6, col: 6 });
+    expect(after.anchor).toEqual(before.anchor);
+    expect(after.range).toEqual(before.range);
+    expect(after.extraRanges).toEqual(before.extraRanges);
+  });
+
+  it('setActivePreservingSelection rejects a policy-clamped address', () => {
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    mutators.extendRangeTo(store, { sheet: 0, row: 2, col: 2 });
+    const before = store.getState().selection;
+    const allowed = { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 };
+    const handle = attachNavigationPolicy(store, workbook, { range: allowed });
+
+    mutators.setActivePreservingSelection(store, { sheet: 0, row: 4, col: 4 });
+
+    expect(store.getState().selection.active).toEqual(before.active);
+    expect(store.getState().selection.range).toEqual(before.range);
+    handle.dispose();
   });
 });

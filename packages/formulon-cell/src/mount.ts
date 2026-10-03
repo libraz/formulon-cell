@@ -30,6 +30,7 @@ import {
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
 import { findPivotTableAtCell } from './engine/passthrough-sync.js';
+import type { Addr } from './engine/types.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
 import { ALL_FEATURE_IDS } from './extensions/features.js';
@@ -51,7 +52,9 @@ import { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
 import { attachEvaluateFormulaDialog } from './interact/evaluate-formula-dialog.js';
 import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
 import { attachFilterDropdown, type FilterDropdownHandle } from './interact/filter-dropdown.js';
+import type { FxDialogOpenOptions } from './interact/fx-dialog.js';
 import { openInsertCopiedCellsDialog } from './interact/insert-copied-cells-dialog.js';
+import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
 import {
   attachNavigationPolicy,
   navigationBoundsFor,
@@ -97,10 +100,18 @@ import {
   type ToolbarInstanceRef,
 } from './mount/toolbar.js';
 import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
-import { cellRect, gridOriginY, layoutForView } from './render/geometry.js';
+import {
+  bodyBandOrigin,
+  cellRect,
+  cellRectUnclamped,
+  gridOriginY,
+  layoutForView,
+} from './render/geometry.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
+import { formatWithPending } from './store/pending-format.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
+import { disposeMacRibbonActions } from './toolbar/ribbon/mac/actions.js';
 
 export type {
   MountToolbarOptions,
@@ -113,6 +124,8 @@ export {
   RIBBON_HOST_MENU_FIRST_COMMANDS,
 } from './mount/toolbar.js';
 export type {
+  FunctionCategory,
+  FxDialogOpenOptions,
   MountOptions,
   ScreenClipCapture,
   ScreenClipCaptureResult,
@@ -168,6 +181,23 @@ function restrictedFlags(
   ) as ReturnType<typeof resolveFlags>;
 }
 
+function applyPlatformLayoutDefaults(
+  store: ReturnType<typeof createSpreadsheetStore>,
+  platform: ReturnType<typeof resolveSpreadsheetUiOptions>['platform'],
+): void {
+  const defaults =
+    platform === 'mac'
+      ? { defaultColWidth: 75, headerColWidth: 26 }
+      : {
+          defaultColWidth: 64,
+          headerColWidth: 32,
+        };
+  store.setState((state) => ({
+    ...state,
+    layout: { ...state.layout, ...defaults },
+  }));
+}
+
 /**
  * Mount a spreadsheet onto a DOM host. Returns an instance with imperative
  * controls. The host element is taken over — its existing children are
@@ -211,7 +241,7 @@ export const Spreadsheet = {
       }
     }
 
-    const instanceId = prepareMountHost(host, strings, initialTheme);
+    const instanceId = prepareMountHost(host, strings, initialTheme, ui.platform);
     ensureOverlayPortal(host, opts.overlays);
     host.dataset.fcEngineState = 'loading';
 
@@ -257,6 +287,7 @@ export const Spreadsheet = {
       fxAccept,
       fxInput,
       viewbar,
+      taskpaneDock,
       grid,
       canvas,
       a11y,
@@ -283,6 +314,7 @@ export const Spreadsheet = {
     const store = createSpreadsheetStore();
     if (opts.viewport?.range) mutators.setSheetIndex(store, opts.viewport.range.sheet);
     mutators.setTheme(store, initialTheme);
+    applyPlatformLayoutDefaults(store, ui.platform);
 
     // Upload status / macro recording start off in the status-bar chooser
     // because most hosts never drive them. The first value a host reports
@@ -515,6 +547,13 @@ export const Spreadsheet = {
         getCommentDialog: () => featureState.commentDialog,
         getFormatDialog: () => featureState.formatDialog,
         getFormatPainter: () => featureState.formatPainter,
+        getFormulaBarEditor: () => {
+          if (host.dataset.fcPlatform !== 'mac') return null;
+          if (featureState.macFormulaPalette?.isOpen()) {
+            return featureState.macFormulaPalette.rangeInsertTarget();
+          }
+          return formulaBar;
+        },
         getGoToDialog: () => featureState.goToDialog,
         getHyperlinkDialog: () => featureState.hyperlinkDialog,
         getNamedRangeDialog: () => featureState.namedRangeDialog,
@@ -616,8 +655,76 @@ export const Spreadsheet = {
       tag,
     });
 
+    const formulaDraftMirror = document.createElement('div');
+    formulaDraftMirror.className = 'fc-host__formula-draft-mirror';
+    formulaDraftMirror.setAttribute('aria-hidden', 'true');
+    formulaDraftMirror.hidden = true;
+    grid.appendChild(formulaDraftMirror);
+    let formulaDraftMirrorState: { anchor: Addr; raw: string } | null = null;
+    const hideFormulaDraftMirror = (): void => {
+      formulaDraftMirror.hidden = true;
+    };
+    const refreshFormulaDraftMirror = (): void => {
+      const mirrorState = formulaDraftMirrorState;
+      if (!mirrorState) {
+        hideFormulaDraftMirror();
+        return;
+      }
+      const state = store.getState();
+      if (mirrorState.anchor.sheet !== state.data.sheetIndex) {
+        hideFormulaDraftMirror();
+        return;
+      }
+      const layout = layoutForView(state);
+      const rect = cellRectUnclamped(
+        layout,
+        state.viewport,
+        mirrorState.anchor.row,
+        mirrorState.anchor.col,
+      );
+      const band = bodyBandOrigin(layout, state.viewport);
+      const behindFrozenBand =
+        (mirrorState.anchor.row >= state.layout.freezeRows && rect.y < band.y) ||
+        (mirrorState.anchor.col >= state.layout.freezeCols &&
+          (layout.rtl ? rect.x + rect.w > band.x : rect.x < band.x));
+      const gridRect = grid.getBoundingClientRect();
+      const width = grid.clientWidth || gridRect.width;
+      const height = grid.clientHeight || gridRect.height;
+      const outsideGrid =
+        (width > 0 && (rect.x + rect.w <= 0 || rect.x >= width)) ||
+        (height > 0 && (rect.y + rect.h <= 0 || rect.y >= height));
+      if (behindFrozenBand || outsideGrid || rect.w <= 0 || rect.h <= 0) {
+        hideFormulaDraftMirror();
+        return;
+      }
+      const format = formatWithPending(state, mirrorState.anchor);
+      formulaDraftMirror.textContent = mirrorState.raw;
+      formulaDraftMirror.style.left = `${rect.x}px`;
+      formulaDraftMirror.style.top = `${rect.y}px`;
+      formulaDraftMirror.style.width = `${rect.w}px`;
+      formulaDraftMirror.style.height = `${rect.h}px`;
+      formulaDraftMirror.style.background = format?.fill ?? '';
+      formulaDraftMirror.style.color = format?.color ?? '';
+      formulaDraftMirror.style.fontFamily = format?.fontFamily ?? '';
+      formulaDraftMirror.style.fontSize = format?.fontSize ? `${format.fontSize}px` : '';
+      formulaDraftMirror.style.fontWeight = format?.bold ? 'bold' : '';
+      formulaDraftMirror.style.fontStyle = format?.italic ? 'italic' : '';
+      formulaDraftMirror.style.textDecoration = format?.underline ? 'underline' : '';
+      formulaDraftMirror.style.textAlign = format?.align ?? '';
+      formulaDraftMirror.style.direction = layout.rtl ? 'rtl' : 'ltr';
+      formulaDraftMirror.hidden = false;
+    };
+    const projectFormulaDraftMirror = (anchor: Addr, raw: string | null): void => {
+      formulaDraftMirrorState = raw === null ? null : { anchor: { ...anchor }, raw };
+      refreshFormulaDraftMirror();
+    };
+    const unsubFormulaDraftMirror = store.subscribe(() => refreshFormulaDraftMirror());
+
     // Resize observer — we follow the host, not the window.
-    const ro = new ResizeObserver(() => renderer.resize());
+    const ro = new ResizeObserver(() => {
+      renderer.resize();
+      refreshFormulaDraftMirror();
+    });
     ro.observe(grid);
 
     let disposed = false;
@@ -687,6 +794,7 @@ export const Spreadsheet = {
       fx,
       fxInput,
       getFormulaBar: () => formulaBar,
+      getInlineEditor: () => binding.editor,
       getOnCanvasClick: () => onCanvasClick,
       getOnHostKey: () => onHostKey,
       getPrintableBoundsForPageSetup: (setup, _sheet, _previous, selectedPrinterProfileId) =>
@@ -708,9 +816,12 @@ export const Spreadsheet = {
       onConditionalRulesChanged: syncSessionConditionalRules,
       getSheetTabs: () => sheetTabsController,
       grid,
+      taskpaneDock,
       history,
       host,
       i18nLocale: () => i18n.locale,
+      isMacPlatform: () => host.dataset.fcPlatform === 'mac',
+      projectFormulaDraftMirror,
       refreshFeaturesView,
       renderer,
       setChromeAttached,
@@ -725,6 +836,9 @@ export const Spreadsheet = {
     });
     const attachHostFeature = hostFeatures.attach;
     const detachHostFeature = hostFeatures.detach;
+    const closeMacPalette = (): void => {
+      featureState.macFormulaPalette?.close();
+    };
     const ensureWatchWindow = (): void => {
       if (!featureState.watchPanel) attachHostFeature('watchWindow');
     };
@@ -831,6 +945,7 @@ export const Spreadsheet = {
       applyChanges: (changes, options) => commands.applyChanges(changes, options),
       setPolicy(next) {
         if (disposed) return;
+        closeMacPalette();
         binding.editor.cancel();
         formulaBar.cancelFx();
         commands.setPolicy(next);
@@ -839,6 +954,7 @@ export const Spreadsheet = {
       },
       setViewportOptions(next) {
         if (disposed) return;
+        closeMacPalette();
         const targetSheet = next?.range?.sheet;
         if (targetSheet !== undefined && targetSheet !== store.getState().data.sheetIndex) {
           validateViewportOptions(next, wb);
@@ -886,14 +1002,26 @@ export const Spreadsheet = {
       },
       setUi(next) {
         if (disposed) return;
-        ui = resolveSpreadsheetUiOptions(next);
+        const nextUi = resolveSpreadsheetUiOptions(next);
+        const platformChanged = nextUi.platform !== ui.platform;
+        if (platformChanged) {
+          closeMacPalette();
+          if (featureState.fxDialog) detachHostFeature('fxDialog');
+        }
+        ui = nextUi;
+        host.dataset.fcPlatform = ui.platform;
+        applyPlatformLayoutDefaults(store, ui.platform);
         instance.setFeatures({ ...ui.features, ...opts.features });
+        if (platformChanged && flags.fxDialog && !featureState.fxDialog) {
+          attachHostFeature('fxDialog');
+        }
         instance.setTheme(opts.theme ?? ui.theme);
         instance.setToolbar(opts.toolbar ?? (next ? ui.ribbon : false));
       },
       setToolbar(next) {
         if (disposed) return;
         requestedToolbar = next;
+        disposeMacRibbonActions(instance);
         toolbarHandle?.dispose();
         toolbarHandle = null;
         ribbonHost?.remove();
@@ -1011,8 +1139,8 @@ export const Spreadsheet = {
       openEvaluateFormulaDialog() {
         evaluateFormulaDialog.open();
       },
-      openFunctionArguments(seedName?: string) {
-        featureState.fxDialog?.open(seedName);
+      openFunctionArguments(seedName?: string, options?: FxDialogOpenOptions) {
+        featureState.fxDialog?.open(seedName, options);
       },
       openHyperlinkDialog() {
         featureState.hyperlinkDialog?.open();
@@ -1319,6 +1447,11 @@ export const Spreadsheet = {
           hydrateActiveSheetFromEngine(next, preview);
           validateViewportOptions(navigation.options, next, preview.getState());
         }
+        // A Draw stroke belongs to the current workbook. Cancel it before
+        // detaching the old engine so a late pointerup cannot commit points
+        // into the newly bound workbook.
+        deactivateMacInk(instance);
+        closeMacPalette();
         binding.editor.cancel();
         formulaBar.cancelFx();
         wb.detachStore(store);
@@ -1380,7 +1513,10 @@ export const Spreadsheet = {
         unregisterCommands();
         commands.dispose();
         navigation.dispose();
+        closeMacPalette();
         wb.detachStore(store);
+        disposeMacRibbonActions(instance);
+        disposeMacInk(instance);
         toolbarHandle?.dispose();
         toolbarHandle = null;
         ribbonHost?.remove();
@@ -1401,6 +1537,8 @@ export const Spreadsheet = {
         cellStylesGallery.detach();
         filterDropdown.detach();
         unsubCellRegistry();
+        unsubFormulaDraftMirror();
+        formulaDraftMirror.remove();
         unsubPivotFieldListSelection();
         unsubI18n();
         i18n.dispose();

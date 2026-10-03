@@ -3,7 +3,7 @@ import { FUNCTION_SIGNATURES } from './refs.js';
 /** Function families exposed by the function picker and the Mac ribbon.
  *
  * `all` and `recent` are picker views rather than catalog families. The
- * remaining names mirror the families shown by Excel's Function Library;
+ * remaining names follow the standard spreadsheet function-library families;
  * empty families are retained so hosts can add signatures without changing
  * the public category type.
  */
@@ -39,6 +39,8 @@ export interface FunctionCatalogMetadata {
   localizedName?: string;
   signatureTemplate?: string;
   description?: string;
+  /** Raw engine availability class. Only exactly 3 is unavailable. */
+  availability?: number;
 }
 
 export interface FunctionCatalogEntry {
@@ -49,7 +51,13 @@ export interface FunctionCatalogEntry {
   argumentLabels: readonly string[];
   signatureTemplate?: string;
   description?: string;
+  availability?: number;
 }
+
+/** Whether an engine function is a visible-but-non-insertable stub. */
+export const isFunctionUnavailableForInsertion = (
+  availability: number | null | undefined,
+): boolean => availability === 3;
 
 export interface FunctionCatalogSnapshot {
   names: readonly string[];
@@ -58,12 +66,11 @@ export interface FunctionCatalogSnapshot {
   source: 'engine' | 'fallback';
 }
 
-/** Stable family membership from the reconciled Microsoft Excel for Microsoft 365 for Mac
- * family map (native @libraz/formulon 0.12.0, artifact
- * ee048c8f48ec42f7b50489797dfc92f0e9be1fb8e338c29fe8b535073f53a52b). Each official
- * family is singular after reconciliation; `dynamicArray` remains an additional
- * convenience view and may overlap an official family. `all` and `recent` are
- * picker views rather than catalog families. */
+/** Stable family membership for the native engine's function catalog. Each
+ * function belongs to exactly one family; `dynamicArray` is an additional
+ * convenience view and may overlap one. `all` and `recent` are picker views
+ * rather than catalog families. Legacy names (e.g. NORMINV) live under
+ * `compatibility`, their current replacements (NORM.INV) under `statistical`. */
 export const FUNCTION_CATEGORY_NAMES: Readonly<Record<CatalogFunctionCategory, readonly string[]>> =
   {
     logical: [
@@ -449,6 +456,7 @@ export const FUNCTION_CATEGORY_NAMES: Readonly<Record<CatalogFunctionCategory, r
       'MODE.SNGL',
       'NEGBINOM.DIST',
       'NORM.DIST',
+      'NORM.INV',
       'NORM.S.DIST',
       'NORM.S.INV',
       'PEARSON',
@@ -608,6 +616,7 @@ export const FUNCTION_CATEGORY_NAMES: Readonly<Record<CatalogFunctionCategory, r
       'MODE',
       'NEGBINOMDIST',
       'NORMDIST',
+      'NORMINV',
       'NORMSDIST',
       'NORMSINV',
       'PERCENTILE',
@@ -696,6 +705,9 @@ export const buildFunctionCatalog = (
         ? {}
         : { signatureTemplate: metadata.signatureTemplate }),
       ...(metadata?.description === undefined ? {} : { description: metadata.description }),
+      ...(source === 'engine' && metadata?.availability !== undefined
+        ? { availability: metadata.availability }
+        : {}),
     });
   }
   return {

@@ -9,7 +9,7 @@ import {
 import { setSheetZoom } from '../commands/structure.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
-import type { Range } from '../engine/types.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
@@ -20,6 +20,7 @@ import { attachAutocomplete } from '../interact/autocomplete.js';
 import { attachBorderDraw, type BorderDrawHandle } from '../interact/border-draw.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
+import type { InlineEditor } from '../interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from '../interact/error-menu.js';
 import { attachFormatDialog } from '../interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from '../interact/format-painter.js';
@@ -28,6 +29,10 @@ import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
 import { attachHyperlinkDialog } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
+import {
+  attachMacFormulaPalette,
+  type MacFormulaPaletteHandle,
+} from '../interact/mac-formula-palette.js';
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
@@ -175,7 +180,11 @@ export interface HostFeatureState {
   iterativeDialog: ReturnType<typeof attachIterativeDialog> | null;
   goToDialog: ReturnType<typeof attachGoToDialog> | null;
   fxDialog: FxDialogHandle | null;
+  macFormulaPalette: MacFormulaPaletteHandle | null;
+  macFormulaPaletteAnchor: Addr | null;
+  unsubMacFormulaPaletteSelection: () => void;
   fxClickHandler: (() => void) | null;
+  fxMouseDownHandler: ((e: MouseEvent) => void) | null;
   namedRangeDialog: ReturnType<typeof attachNamedRangeDialog> | null;
   pageSetupDialog: ReturnType<typeof attachPageSetupDialog> | null;
   pivotTableDialog: ReturnType<typeof attachPivotTableDialog> | null;
@@ -210,6 +219,7 @@ interface HostFeatureControllerInput {
   fx: HTMLButtonElement;
   fxInput: HTMLTextAreaElement;
   getFormulaBar: () => FormulaBarController;
+  getInlineEditor: () => Pick<InlineEditor, 'suspendForFormulaPalette'>;
   getOnCanvasClick: () => (e: MouseEvent) => void;
   getOnHostKey: () => (e: KeyboardEvent) => void;
   getPrintableBoundsForPageSetup: (
@@ -227,9 +237,12 @@ interface HostFeatureControllerInput {
   onConditionalRulesChanged?: () => void;
   getSheetTabs: () => SheetTabsController | null;
   grid: HTMLElement;
+  taskpaneDock: HTMLElement;
   history: History;
   host: HTMLElement;
   i18nLocale: () => string;
+  isMacPlatform: () => boolean;
+  projectFormulaDraftMirror: (anchor: Addr, raw: string | null) => void;
   refreshFeaturesView: () => void;
   renderer: GridRenderer;
   setChromeAttached: (slot: ChromeSlot, attached: boolean) => void;
@@ -265,7 +278,11 @@ export function createHostFeatureState(autocompleteStub: AutocompleteHandle): Ho
     iterativeDialog: null,
     goToDialog: null,
     fxDialog: null,
+    macFormulaPalette: null,
+    macFormulaPaletteAnchor: null,
+    unsubMacFormulaPaletteSelection: (): void => {},
     fxClickHandler: null,
+    fxMouseDownHandler: null,
     namedRangeDialog: null,
     pageSetupDialog: null,
     pivotTableDialog: null,
@@ -382,34 +399,78 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           input.wrapHandle(s.goToDialog, () => s.goToDialog?.detach()),
         );
         break;
-      case 'fxDialog':
+      case 'fxDialog': {
         if (s.fxDialog) return;
-        s.fxDialog = attachFxDialog({
-          host: input.host,
-          store: input.store,
-          strings,
-          getWb: input.wb,
-          getLocale: input.i18nLocale,
-          getInitialArguments: (functionName) => {
-            if (!shouldSeedFunctionWithSelection(functionName)) return null;
-            const range = input.store.getState().selection.range;
-            if (range.r0 === range.r1 && range.c0 === range.c1) return null;
-            return [a1Range(range)];
-          },
-          onInsert: (formula) => {
-            input.fxInput.value = formula;
-            input.fxInput.focus();
-            return input.getFormulaBar().commitFx('none');
-          },
-        });
+        const getInitialArguments = (functionName: string): readonly string[] | null => {
+          if (!shouldSeedFunctionWithSelection(functionName)) return null;
+          const range = input.store.getState().selection.range;
+          if (range.r0 === range.r1 && range.c0 === range.c1) return null;
+          return [a1Range(range)];
+        };
+        if (input.isMacPlatform()) {
+          s.macFormulaPaletteAnchor = null;
+          s.macFormulaPalette = attachMacFormulaPalette({
+            host: input.host,
+            dock: input.taskpaneDock,
+            store: input.store,
+            getWb: input.wb,
+            getLocale: input.i18nLocale,
+            getStrings: input.strings,
+            getAnchor: () => {
+              const active = input.store.getState().selection.active;
+              s.macFormulaPaletteAnchor = { ...active };
+              return { ...active };
+            },
+            getInitialArguments,
+            beginDraft: input.getFormulaBar().beginExternalDraft,
+            suspendActiveEdit: (context) =>
+              input.getInlineEditor().suspendForFormulaPalette(context) ??
+              input.getFormulaBar().suspendForFormulaPalette(context),
+            projectMirror: input.projectFormulaDraftMirror,
+          });
+          // Keep focus in the active edit so pressing fx suspends it instead of blur-committing it.
+          s.fxMouseDownHandler = (e: MouseEvent): void => e.preventDefault();
+          input.fx.addEventListener('mousedown', s.fxMouseDownHandler);
+          s.fxDialog = s.macFormulaPalette;
+          s.unsubMacFormulaPaletteSelection = input.store.subscribe((state) => {
+            const palette = s.macFormulaPalette;
+            const anchor = s.macFormulaPaletteAnchor;
+            if (!palette?.isOpen() || !anchor) return;
+            const active = state.selection.active;
+            if (
+              state.data.sheetIndex !== anchor.sheet ||
+              active.sheet !== anchor.sheet ||
+              active.row !== anchor.row ||
+              active.col !== anchor.col
+            ) {
+              palette.close();
+            }
+          });
+        } else {
+          s.fxDialog = attachFxDialog({
+            host: input.host,
+            store: input.store,
+            strings,
+            getWb: input.wb,
+            getLocale: input.i18nLocale,
+            getInitialArguments,
+            onInsert: (formula) => {
+              input.fxInput.value = formula;
+              input.fxInput.focus();
+              return input.getFormulaBar().commitFx('none');
+            },
+          });
+        }
         s.fxClickHandler = (): void => s.fxDialog?.open();
         input.fx.addEventListener('click', s.fxClickHandler);
         setFxDialogButtonAvailable(input.fx, strings, true);
-        input.featureRegistry.set(
-          'fxDialog',
-          input.wrapHandle(s.fxDialog, () => s.fxDialog?.detach()),
-        );
+        const featureHandle = input.wrapHandle(s.fxDialog, () => s.fxDialog?.detach());
+        if (s.macFormulaPalette) {
+          featureHandle.setStrings = (): void => s.macFormulaPalette?.refresh();
+        }
+        input.featureRegistry.set('fxDialog', featureHandle);
         break;
+      }
       case 'namedRanges':
         if (s.namedRangeDialog) return;
         s.namedRangeDialog = attachNamedRangeDialog({
@@ -741,14 +802,23 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.goToDialog = null;
         input.featureRegistry.delete('gotoSpecial');
         break;
-      case 'fxDialog':
+      case 'fxDialog': {
         if (s.fxClickHandler) input.fx.removeEventListener('click', s.fxClickHandler);
         s.fxClickHandler = null;
-        s.fxDialog?.detach();
+        if (s.fxMouseDownHandler) input.fx.removeEventListener('mousedown', s.fxMouseDownHandler);
+        s.fxMouseDownHandler = null;
+        s.macFormulaPalette?.close();
+        s.unsubMacFormulaPaletteSelection();
+        s.unsubMacFormulaPaletteSelection = (): void => {};
+        const fxDialog = s.fxDialog;
         s.fxDialog = null;
+        s.macFormulaPalette = null;
+        s.macFormulaPaletteAnchor = null;
+        fxDialog?.detach();
         setFxDialogButtonAvailable(input.fx, input.strings(), false);
         input.featureRegistry.delete('fxDialog');
         break;
+      }
       case 'namedRanges':
         s.namedRangeDialog?.detach();
         s.namedRangeDialog = null;

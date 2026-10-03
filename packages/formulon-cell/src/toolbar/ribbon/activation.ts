@@ -6,6 +6,13 @@
 // dispatch the command directly, while keeping the secondary menu addressable
 // through the dropdown API.
 
+import {
+  MAC_RIBBON_COMMAND_IDS,
+  MAC_RIBBON_DISABLED_COMMAND_IDS,
+  MAC_RIBBON_MENU_COMMAND_SET,
+  macRibbonMenuIdForCommand,
+} from './mac/model.js';
+
 export type RibbonActivationKind =
   | 'primaryAction'
   | 'splitPrimary'
@@ -276,6 +283,12 @@ export const RIBBON_MENU_FIRST_COMMANDS: ReadonlySet<string> = new Set(
   ),
 );
 
+/** Mac profile menu roots are intentionally kept outside the generic menu
+ *  manifest. This predicate lets mount hosts apply the same menu-first click
+ *  behavior without widening the default profile's audited command sets. */
+export const isRibbonMenuFirstCommand = (commandId: string): boolean =>
+  RIBBON_MENU_FIRST_COMMANDS.has(commandId) || MAC_RIBBON_MENU_COMMAND_SET.has(commandId);
+
 export const RIBBON_DYNAMIC_MENU_FIRST_COMMANDS: ReadonlySet<string> = new Set(
   Object.keys(RIBBON_DROPDOWN_MENU_FOR_COMMAND).filter((command) =>
     RIBBON_MENU_FIRST_COMMANDS.has(command),
@@ -476,5 +489,11 @@ export const ribbonActivationForCommand = (commandId: string): RibbonActivationS
   if (RIBBON_DIALOG_COMMANDS.has(commandId)) return { kind: 'dialog' };
   if (RIBBON_TOGGLE_COMMANDS.has(commandId)) return { kind: 'toggle' };
   if (RIBBON_PRIMARY_ACTION_COMMANDS.has(commandId)) return { kind: 'primaryAction' };
+  if (MAC_RIBBON_DISABLED_COMMAND_IDS.has(commandId)) return { kind: 'disabled' };
+  if (MAC_RIBBON_MENU_COMMAND_SET.has(commandId)) {
+    const macMenuId = macRibbonMenuIdForCommand(commandId);
+    return macMenuId ? { kind: 'dropdown', menuId: macMenuId } : { kind: 'primaryAction' };
+  }
+  if (MAC_RIBBON_COMMAND_IDS.includes(commandId)) return { kind: 'primaryAction' };
   return { kind: 'disabled' };
 };

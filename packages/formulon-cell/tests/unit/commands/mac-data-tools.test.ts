@@ -241,7 +241,7 @@ describe('Mac Data command operations', () => {
     expect(history.canUndo()).toBe(false);
   });
 
-  it('captures overlapping consolidate sources before a single output commit', async () => {
+  it('rejects a consolidate destination that overlaps a source', async () => {
     const handle = await WorkbookHandle.createDefault();
     handles.push(handle);
     const store = createSpreadsheetStore();
@@ -252,25 +252,19 @@ describe('Mac Data command operations', () => {
     handle.recalc();
     const history = new History();
     const instance = makeControllerInstance(handle, store, history);
-    const request: ConsolidateRequest = {
-      sources: ['A1:A2', 'C1:C2'],
-      destination: 'A1:A2',
-      function: 'sum',
-    };
-    const plan = planMacConsolidate(instance, request);
-    expect(plan.ok).toBe(true);
-    if (!plan.ok) return;
-    expect(plan.value.values).toEqual([
-      { kind: 'number', value: 4 },
-      { kind: 'number', value: 6 },
-    ]);
-    expect(commitMacConsolidate(instance, request, plan.value).ok).toBe(true);
-    expect(handle.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 4 });
-    expect(handle.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 6 });
-    expect(history.undo()).toBe(true);
+    for (const destination of ['A1:A2', 'A2', 'C1']) {
+      const plan = planMacConsolidate(instance, {
+        sources: ['A1:A2', 'C1:C2'],
+        destination,
+        function: 'sum',
+      });
+      expect(plan).toEqual({
+        ok: false,
+        error: { status: 'invalid', code: 'destinationOverlapsSource' },
+      });
+    }
     expect(handle.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
-    expect(history.redo()).toBe(true);
-    expect(handle.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 6 });
+    expect(history.canUndo()).toBe(false);
   });
 
   it('refuses consolidate before writing when authorization denies the output', async () => {
@@ -290,7 +284,10 @@ describe('Mac Data command operations', () => {
       destination: 'C1',
       function: 'sum',
     });
-    expect(plan).toEqual({ ok: false, error: { status: 'rejected', reason: 'blocked' } });
+    expect(plan).toEqual({
+      ok: false,
+      error: { status: 'rejected', code: 'notEditable', reason: 'blocked' },
+    });
     expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'blank' });
   });
 

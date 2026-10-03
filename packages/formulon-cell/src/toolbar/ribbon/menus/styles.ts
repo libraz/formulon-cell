@@ -6,6 +6,11 @@
 // Home tab's Styles group.
 
 import {
+  type CellStyleFallbackProfile,
+  resolveCellStyleFormat,
+} from '../../../commands/cell-styles.js';
+import type { WorkbookHandle } from '../../../engine/workbook-handle.js';
+import {
   CELL_STYLE_GROUPS,
   CELL_STYLES,
   type CellStyleGroupId,
@@ -37,6 +42,8 @@ export interface StylesMenuDeps {
   ribbonLang: ToolbarLang;
   ribbonMenuText: ToolbarMenuText;
   ribbonText: ToolbarText;
+  getWorkbook?: () => WorkbookHandle | null;
+  getFallbackProfile?: () => CellStyleFallbackProfile;
   customCellStyles?: () => readonly {
     id: string;
     label: string;
@@ -220,7 +227,13 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     return createCellStyleChipFromDef({
       id,
       label: cellStyleGalleryLabel(id),
-      format: def?.format ?? {},
+      format: def
+        ? resolveCellStyleFormat(
+            id,
+            deps.getWorkbook?.() ?? null,
+            deps.getFallbackProfile?.() ?? 'default',
+          )
+        : {},
     });
   };
 

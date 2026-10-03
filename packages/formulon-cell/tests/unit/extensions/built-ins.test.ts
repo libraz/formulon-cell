@@ -31,6 +31,8 @@ import {
   workbookObjects,
 } from '../../../src/extensions/built-ins.js';
 import { ALL_FEATURE_IDS } from '../../../src/extensions/features.js';
+import type { ExtensionContext } from '../../../src/extensions/types.js';
+import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -142,5 +144,61 @@ describe('built-in extension factories', () => {
     expect(source).toContain('pictureLabel: ctx.i18n.strings.ribbon.pictures');
     expect(source).toContain('shapeLabel: ctx.i18n.strings.ribbon.shapes');
     expect(source).toContain('resizeLabel: ctx.i18n.strings.sessionCharts.resize');
+  });
+
+  it('anchors view toolbar before the workspace and falls back before an unwrapped grid', async () => {
+    const sheet: MountedStubSheet = await mountStubSheet({
+      features: { viewToolbar: false },
+    });
+    const makeContext = (
+      host: HTMLElement,
+      grid: HTMLElement,
+      viewbar: HTMLElement,
+    ): ExtensionContext =>
+      ({
+        host,
+        formulabar: document.createElement('div'),
+        viewbar,
+        grid,
+        statusbar: document.createElement('div'),
+        canvas: document.createElement('canvas'),
+        a11y: document.createElement('div'),
+        store: sheet.instance.store,
+        history: sheet.instance.history,
+        i18n: sheet.instance.i18n,
+        getWb: () => sheet.instance.workbook,
+        refreshCells: () => {},
+        invalidate: () => {},
+        resolve: () => undefined,
+        onWorkbookChange: () => () => {},
+      }) as ExtensionContext;
+
+    try {
+      const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
+      const workspace = sheet.host.querySelector<HTMLElement>('.fc-host__sheet-workspace');
+      if (!grid || !workspace) throw new Error('Missing sheet workspace chrome.');
+      const wrappedViewbar = document.createElement('div');
+      const wrappedHandle = viewToolbar().setup(makeContext(sheet.host, grid, wrappedViewbar));
+      expect(wrappedViewbar.parentElement).toBe(sheet.host);
+      expect(wrappedViewbar.nextElementSibling).toBe(workspace);
+      wrappedHandle?.dispose();
+      expect(wrappedViewbar.parentElement).toBeNull();
+      expect(wrappedViewbar.childElementCount).toBe(0);
+
+      const fallbackHost = document.createElement('div');
+      const fallbackGrid = document.createElement('div');
+      const fallbackViewbar = document.createElement('div');
+      fallbackHost.append(fallbackGrid);
+      const fallbackHandle = viewToolbar().setup(
+        makeContext(fallbackHost, fallbackGrid, fallbackViewbar),
+      );
+      expect(fallbackViewbar.parentElement).toBe(fallbackHost);
+      expect(fallbackViewbar.nextElementSibling).toBe(fallbackGrid);
+      fallbackHandle?.dispose();
+      expect(fallbackViewbar.parentElement).toBeNull();
+      expect(fallbackViewbar.childElementCount).toBe(0);
+    } finally {
+      sheet.dispose();
+    }
   });
 });

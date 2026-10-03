@@ -343,6 +343,103 @@ describe('InteractionController', () => {
     });
   });
 
+  it('keeps pending editor format out of foreign-origin writes', async () => {
+    const { store, controller: service, workbook: wb, history } = await createController();
+    const pending = {
+      addr: A1,
+      format: { bold: true, borders: { bottom: { style: 'thin' as const } } },
+    };
+    mutators.setPendingFormat(store, pending);
+
+    const result = service.execute({
+      type: 'cellBatch',
+      operation: 'valueEdit',
+      origin: 'keyboard',
+      changes: [{ addr: A1, input: '42' }],
+    });
+
+    expect(result.status).toBe('applied');
+    expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 42 });
+    expect(store.getState().format.formats.get(addrKey(A1))).toBeUndefined();
+    expect(store.getState().ui.pendingFormat).toEqual(pending);
+    expect(history.canUndo()).toBe(true);
+  });
+
+  it('denies a pending format before a value write when the format operation is restricted', async () => {
+    const { store, controller: service, workbook: wb, history } = await createController();
+    mutators.setPendingFormat(store, { addr: A1, format: { italic: true } });
+    service.setPolicy({
+      operations: { valueEdit: true, format: true },
+      restrict: ({ operation, addr }) => operation !== 'format' || addr === undefined,
+    });
+
+    const result = service.execute({
+      type: 'cellBatch',
+      operation: 'valueEdit',
+      origin: 'editor',
+      changes: [{ addr: A1, input: '42' }],
+    });
+
+    expect(result.status).toBe('rejected');
+    expect(result.rejected[0]?.code).toBe('operationDenied');
+    expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
+    expect(store.getState().format.formats.get(addrKey(A1))).toBeUndefined();
+    expect(store.getState().ui.pendingFormat).toEqual({ addr: A1, format: { italic: true } });
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it.each(['editor', 'formulaBar', 'keyboard'] as const)(
+    'keeps implicit percent coercion working for %s without pending format',
+    async (origin) => {
+      const { store, controller: service, workbook: wb, history } = await createController();
+      service.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }] }));
+
+      const result = service.execute({
+        type: 'cellBatch',
+        operation: 'valueEdit',
+        origin,
+        changes: [{ addr: A1, input: '5%' }],
+      });
+
+      expect(result.status).toBe('applied');
+      expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 0.05 });
+      expect(store.getState().format.formats.get(addrKey(A1))?.numFmt).toEqual({
+        kind: 'percent',
+        decimals: 0,
+      });
+      expect(history.undo()).toBe(true);
+      expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
+      expect(store.getState().format.formats.get(addrKey(A1))).toBeUndefined();
+      expect(history.redo()).toBe(true);
+      expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 0.05 });
+      expect(store.getState().format.formats.get(addrKey(A1))?.numFmt).toEqual({
+        kind: 'percent',
+        decimals: 0,
+      });
+    },
+  );
+
+  it('keeps implicit percent coercion working through the trusted API path', async () => {
+    const { store, controller: service, workbook: wb, history } = await createController();
+    service.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }] }));
+
+    const result = service.applyChanges([{ addr: A1, input: '5%' }], {
+      history: 'record',
+      origin: 'instanceApi',
+    });
+
+    expect(result.status).toBe('applied');
+    expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 0.05 });
+    expect(store.getState().format.formats.get(addrKey(A1))?.numFmt).toEqual({
+      kind: 'percent',
+      decimals: 0,
+    });
+    expect(history.undo()).toBe(true);
+    expect(wb.getValue(A1)).toEqual({ kind: 'blank' });
+    expect(history.redo()).toBe(true);
+    expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 0.05 });
+  });
+
   it('deduplicates every coordinate in a merged format authorization effect', async () => {
     const { store, controller: service } = await createController();
     mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });

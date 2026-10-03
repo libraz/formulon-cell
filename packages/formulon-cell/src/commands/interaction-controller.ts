@@ -52,6 +52,7 @@ const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
 const MAX_XLSX_ROW = 1_048_575;
 const MAX_XLSX_COL = 16_383;
 const MAC_SUBTOTAL_COMMAND_ID = 'mac.data.subtotal';
+const MAC_REMOVE_HYPERLINK_COMMAND_ID = 'mac.automate.removeHyperlinks';
 
 const macSubtotalStructuralOperation = (
   intent: OperationIntent,
@@ -78,6 +79,25 @@ const macSubtotalStructuralRange = (intent: OperationIntent): Range | null => {
   return workbookEffects === 1 && range ? range : null;
 };
 
+const ownsMacRemoveHyperlinkCommand = (intent: OperationIntent): boolean =>
+  intent.commandId === MAC_REMOVE_HYPERLINK_COMMAND_ID;
+
+const macRemoveHyperlinkCells = (intent: OperationIntent): readonly Addr[] | null => {
+  if (!ownsMacRemoveHyperlinkCommand(intent)) return null;
+  if (
+    intent.operation !== 'hyperlink' ||
+    (intent.origin !== 'ribbon' && intent.origin !== 'undo' && intent.origin !== 'redo') ||
+    intent.effects.length !== 1
+  )
+    return null;
+  const effect = intent.effects[0];
+  if (effect?.kind !== 'cells' || effect.includesFormula !== undefined || effect.cells.length === 0)
+    return null;
+  const sheet = effect.cells[0]?.sheet;
+  if (sheet === undefined || effect.cells.some((addr) => addr.sheet !== sheet)) return null;
+  return effect.cells;
+};
+
 export interface InteractionControllerOptions {
   readonly store: SpreadsheetStore;
   readonly getWb: () => WorkbookHandle;
@@ -101,11 +121,17 @@ type PreparedChange = {
   readonly patch: CellPatch;
   readonly implicitFormat?: CellFormat['numFmt'];
   readonly input?: CoercedInput;
+  /** A format staged by the editor/formula bar for this resolved anchor. */
+  readonly pendingFormat?: Partial<CellFormat>;
 };
 
 type HistoryIntents = {
   readonly redo: OperationIntent;
   readonly undo: OperationIntent;
+  readonly replayAuthorization?: {
+    readonly undo: readonly OperationIntent[];
+    readonly redo: readonly OperationIntent[];
+  };
 };
 
 type HistoryPlanResult =
@@ -133,6 +159,108 @@ const originFromHost = (origin: string | undefined): InteractionOrigin => {
     default:
       return 'instanceApi';
   }
+};
+
+const sameStructuredValue = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
+    return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => sameStructuredValue(value, right[index]));
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every(
+    (key, index) =>
+      key === rightKeys[index] && sameStructuredValue(leftRecord[key], rightRecord[key]),
+  );
+};
+
+const mergeFormatPatch = (
+  current: CellFormat | undefined,
+  patch: Partial<CellFormat> | undefined,
+): CellFormat | undefined => {
+  if (!patch) return current;
+  const next: CellFormat = { ...(current ?? {}), ...patch };
+  if (patch.borders) next.borders = { ...(current?.borders ?? {}), ...patch.borders };
+  return next;
+};
+
+const projectPreparedFormat = (
+  current: CellFormat | undefined,
+  change: PreparedChange,
+): CellFormat | undefined => {
+  let next = current;
+  if (change.implicitFormat && (next?.numFmt === undefined || next.numFmt.kind === 'general')) {
+    next = { ...(next ?? {}), numFmt: change.implicitFormat };
+  }
+  return mergeFormatPatch(next, change.pendingFormat);
+};
+
+const projectPreparedFormats = (
+  before: ReadonlyMap<string, CellFormat>,
+  prepared: readonly PreparedChange[],
+): Map<string, CellFormat> => {
+  const next = new Map(before);
+  for (const change of prepared) {
+    const key = addrKey(change.patch.addr);
+    const projected = projectPreparedFormat(next.get(key), change);
+    if (projected === undefined) next.delete(key);
+    else next.set(key, projected);
+  }
+  return next;
+};
+
+/** Return only addresses whose matching pending patch changes the format after
+ * implicit input coercion has been projected. Implicit formats alone retain
+ * the value-edit authorization path used before pending-format integration. */
+const effectivePendingFormatAddresses = (
+  before: ReadonlyMap<string, CellFormat>,
+  prepared: readonly PreparedChange[],
+): readonly Addr[] => {
+  const implicitBase = projectPreparedFormats(
+    before,
+    prepared.map((change) => ({ ...change, pendingFormat: undefined })),
+  );
+  const pendingPrepared = prepared
+    .filter((change) => change.pendingFormat !== undefined)
+    .map((change) => ({ ...change, implicitFormat: undefined }));
+  const pendingApplied = projectPreparedFormats(implicitBase, pendingPrepared);
+  return changedFormatAddresses(implicitBase, pendingApplied, pendingPrepared);
+};
+
+const changedFormatAddresses = (
+  before: ReadonlyMap<string, CellFormat>,
+  after: ReadonlyMap<string, CellFormat>,
+  prepared: readonly PreparedChange[],
+): readonly Addr[] => {
+  const changed: Addr[] = [];
+  const seen = new Set<string>();
+  for (const change of prepared) {
+    const key = addrKey(change.patch.addr);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!sameStructuredValue(before.get(key), after.get(key))) changed.push(change.patch.addr);
+  }
+  return changed;
+};
+
+const unionAddresses = (...groups: readonly (readonly Addr[])[]): readonly Addr[] => {
+  const result: Addr[] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    for (const addr of group) {
+      const key = addrKey(addr);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(addr);
+    }
+  }
+  return result;
 };
 
 const effectCells = (effect: OperationEffect): readonly Addr[] | null => {
@@ -273,6 +401,17 @@ export class InteractionController {
     try {
       const wb = this.getWb();
       if (!wb) return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
+      if (ownsMacRemoveHyperlinkCommand(intent)) {
+        if (!macRemoveHyperlinkCells(intent)) {
+          return {
+            allowed: false,
+            code: 'invalid',
+            reason: 'Remove hyperlinks authorization needs one nonempty same-sheet cell effect',
+          };
+        }
+        if (!policy) return this.legacyDecision(intent, wb);
+        return this.policyDecision(intent, policy, wb);
+      }
       if (macSubtotalStructuralOperation(intent) !== null)
         return this.macSubtotalStructuralDecision(intent, policy, wb);
       if (!policy) return this.legacyDecision(intent, wb);
@@ -381,7 +520,7 @@ export class InteractionController {
     policy: InteractionPolicy,
     wb: WorkbookHandle,
   ): PermissionDecision {
-    if (!IMPLEMENTED_OPERATIONS.has(intent.operation)) {
+    if (!IMPLEMENTED_OPERATIONS.has(intent.operation) && !macRemoveHyperlinkCells(intent)) {
       return {
         allowed: false,
         code: 'unsupported',
@@ -509,6 +648,12 @@ export class InteractionController {
     const prepared: PreparedChange[] = [];
     const globalRejections: BatchRejection[] = [];
     let includesFormula = false;
+    const pending = state.ui.pendingFormat;
+    const mayApplyPendingFormat =
+      (command.origin === 'editor' || command.origin === 'formulaBar') &&
+      (command.operation === 'valueEdit' || command.operation === 'formulaEdit');
+    const pendingAnchorKey =
+      mayApplyPendingFormat && pending ? addrKey(mergeAnchorFor(state, pending.addr)) : undefined;
     for (const change of command.changes) {
       const preparedChange = this.prepareChange(state, change, command.operation, wb, true);
       if ('rejection' in preparedChange) {
@@ -516,7 +661,14 @@ export class InteractionController {
         continue;
       }
       if (preparedChange.patch.formula !== null) includesFormula = true;
-      prepared.push(preparedChange);
+      if (pendingAnchorKey === addrKey(preparedChange.patch.addr) && pending) {
+        prepared.push({
+          ...preparedChange,
+          pendingFormat: structuredClone(pending.format),
+        });
+      } else {
+        prepared.push(preparedChange);
+      }
     }
     if (globalRejections.length > 0) return this.rejectResult(globalRejections);
 
@@ -543,17 +695,38 @@ export class InteractionController {
       if (!formulaDecision.allowed) return this.rejectResult([this.asRejection(formulaDecision)]);
     }
 
+    const beforeFormats = new Map(state.format.formats);
+    const pendingFormatAddresses = effectivePendingFormatAddresses(beforeFormats, prepared);
+    const pendingFormatAddressKeys = new Set(pendingFormatAddresses.map(addrKey));
+    if (pendingFormatAddresses.length > 0) {
+      const formatGlobal = this.canExecute({
+        operation: 'format',
+        origin: command.origin,
+        commandId: command.commandId,
+        effects: [{ kind: 'workbook' }],
+      });
+      if (!formatGlobal.allowed) return this.rejectResult([this.asRejection(formatGlobal)]);
+    }
+
     const denied = command.denied ?? this.policyValue?.batchDenied ?? 'reject';
     const eligible: PreparedChange[] = [];
     const rejected: BatchRejection[] = [];
     for (const change of prepared) {
-      const decision = this.canExecute({
+      let decision = this.canExecute({
         ...intent,
         effects: cellEffects(
           [change.patch.addr],
           change.patch.formula !== null ? [change.patch.addr] : [],
         ),
       });
+      if (decision.allowed && pendingFormatAddressKeys.has(addrKey(change.patch.addr))) {
+        decision = this.canExecute({
+          operation: 'format',
+          origin: command.origin,
+          commandId: command.commandId,
+          effects: [{ kind: 'cells', cells: [change.patch.addr] }],
+        });
+      }
       if (decision.allowed) {
         eligible.push(change);
         continue;
@@ -822,6 +995,31 @@ export class InteractionController {
       origin: 'undo',
       effects: cellEffects(cells, beforeFormulaCells),
     };
+    const beforeFormats = new Map(this.store.getState().format.formats);
+    const formatCells = effectivePendingFormatAddresses(beforeFormats, prepared);
+    const replayAuthorization =
+      formatCells.length > 0
+        ? {
+            undo: [
+              undo,
+              {
+                ...intent,
+                operation: 'format',
+                origin: 'undo',
+                effects: [{ kind: 'cells', cells: formatCells }],
+              } satisfies OperationIntent,
+            ],
+            redo: [
+              redo,
+              {
+                ...intent,
+                operation: 'format',
+                origin: 'redo',
+                effects: [{ kind: 'cells', cells: formatCells }],
+              } satisfies OperationIntent,
+            ],
+          }
+        : undefined;
     if (!forwardAlreadyAuthorized) {
       const forward = this.preflightIntent(requireInverseAuthorization ? redo : intent);
       if (!forward.allowed) return { decision: forward };
@@ -830,7 +1028,7 @@ export class InteractionController {
       const inverse = this.preflightIntent(undo);
       if (!inverse.allowed) return { decision: inverse };
     }
-    return { plan: { redo, undo } };
+    return { plan: { redo, undo, replayAuthorization } };
   }
 
   /** Authorize a complete intent, including every cell effect and any formula
@@ -884,11 +1082,13 @@ export class InteractionController {
       wb = this.getWb();
       const beforeFormats = new Map(this.store.getState().format.formats);
       const atomic = wb.applyCellPatchAtomic(prepared.map((change) => change.patch));
-      if (atomic.changed.length === 0) {
+      const afterFormats = this.applyPreparedFormats(beforeFormats, prepared);
+      const changedFormats = changedFormatAddresses(beforeFormats, afterFormats, prepared);
+      const applied = unionAddresses(atomic.changed, changedFormats);
+      if (applied.length === 0) {
         beforeNotify?.();
         return this.noopResult(rejected);
       }
-      const afterFormats = this.applyImplicitFormats(beforeFormats, prepared);
       if (recordHistory) {
         const intents = historyPlan;
         if (!intents) throw new Error('history plan missing');
@@ -905,12 +1105,13 @@ export class InteractionController {
           },
           intent: intents.redo,
           inverseIntent: intents.undo,
+          replayAuthorization: intents.replayAuthorization,
         });
       }
       this.revisionValue += 1;
       const result: ChangeBatchResult = {
         status: 'applied',
-        applied: atomic.changed,
+        applied,
         rejected,
         revision: this.revisionValue,
       };
@@ -923,20 +1124,15 @@ export class InteractionController {
     }
   }
 
-  private applyImplicitFormats(
+  private applyPreparedFormats(
     before: ReadonlyMap<string, CellFormat>,
     prepared: readonly PreparedChange[],
   ): ReadonlyMap<string, CellFormat> {
-    const next = new Map(before);
-    for (const change of prepared) {
-      const format = change.implicitFormat;
-      if (!format) continue;
-      const key = addrKey(change.patch.addr);
-      const current = next.get(key);
-      if (current?.numFmt && current.numFmt.kind !== 'general') continue;
-      next.set(key, { ...current, numFmt: format });
-    }
-    if (next.size !== before.size || [...next].some(([key, value]) => before.get(key) !== value)) {
+    const next = projectPreparedFormats(before, prepared);
+    if (
+      next.size !== before.size ||
+      [...next].some(([key, value]) => !sameStructuredValue(before.get(key), value))
+    ) {
       this.restoreFormats(next);
     }
     return next;
@@ -962,7 +1158,10 @@ export class InteractionController {
       if (intents.length === 0) return false;
       let allowed = true;
       for (const intent of intents) {
-        if (macSubtotalStructuralOperation(intent) !== null) {
+        if (
+          macSubtotalStructuralOperation(intent) !== null ||
+          ownsMacRemoveHyperlinkCommand(intent)
+        ) {
           if (!this.canExecute(intent).allowed) allowed = false;
         } else if (this.policyValue && !this.preflightIntent(intent).allowed) {
           allowed = false;
@@ -971,11 +1170,10 @@ export class InteractionController {
       return allowed;
     }
     const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
-    if (!this.policyValue)
-      return intent
-        ? macSubtotalStructuralOperation(intent) === null || this.canExecute(intent).allowed
-        : true;
-    if (!intent) return false;
+    if (!intent) return this.policyValue === undefined;
+    if (macSubtotalStructuralOperation(intent) !== null || ownsMacRemoveHyperlinkCommand(intent))
+      return this.canExecute(intent).allowed;
+    if (!this.policyValue) return true;
     return this.preflightIntent(intent).allowed;
   }
 

@@ -1,9 +1,12 @@
+import type { SelectionFormatPlan } from '../commands/format.js';
+import { formatWithPending } from '../store/pending-format.js';
 import type {
   CellBorderSide,
   CellBorders,
   CellFormat,
   CellValidation,
   NumFmt,
+  State,
 } from '../store/store.js';
 import {
   type BorderStyleKey,
@@ -13,6 +16,251 @@ import {
   type NumberCategory,
   type SideKey,
 } from './format-dialog-model.js';
+
+export type FormatDialogField =
+  | 'numFmt'
+  | 'align'
+  | 'vAlign'
+  | 'wrap'
+  | 'justifyLastLine'
+  | 'shrinkToFit'
+  | 'indent'
+  | 'rotation'
+  | 'textDirection'
+  | 'bold'
+  | 'italic'
+  | 'underline'
+  | 'strike'
+  | 'fontVertAlign'
+  | 'fontFamily'
+  | 'fontSize'
+  | 'color'
+  | 'fill'
+  | 'fillPattern'
+  | 'fillPatternColor'
+  | 'border.top'
+  | 'border.right'
+  | 'border.bottom'
+  | 'border.left'
+  | 'border.diagonalDown'
+  | 'border.diagonalUp'
+  | 'locked'
+  | 'formulaHidden'
+  | 'hyperlink'
+  | 'comment'
+  | 'validation';
+
+export interface DialogFormatSummary {
+  readonly activeFormat: CellFormat;
+  readonly mixed: Set<FormatDialogField>;
+}
+
+const cloneFormat = (format: CellFormat | undefined): CellFormat =>
+  format ? structuredClone(format) : {};
+
+const normalizedBorderSide = (side: CellBorderSide | undefined): unknown => {
+  if (!side) return false;
+  if (side === true) return { style: 'thin' };
+  return { style: side.style, color: side.color ?? undefined };
+};
+
+const normalizedFieldValue = (
+  format: CellFormat | undefined,
+  field: FormatDialogField,
+): unknown => {
+  const value = format ?? {};
+  switch (field) {
+    case 'numFmt':
+      return value.numFmt ?? { kind: 'general' };
+    case 'align':
+    case 'vAlign':
+      return value[field];
+    case 'wrap':
+    case 'justifyLastLine':
+    case 'shrinkToFit':
+    case 'bold':
+    case 'italic':
+    case 'strike':
+    case 'formulaHidden':
+      return value[field] === true;
+    case 'indent':
+    case 'rotation':
+      return value[field] ?? 0;
+    case 'textDirection':
+      return value.textDirection ?? 'context';
+    case 'underline':
+      return value.underline === true ? 'single' : (value.underline ?? false);
+    case 'fontVertAlign':
+    case 'fontSize':
+      return value[field];
+    case 'fontFamily':
+      return value.fontFamily ?? '';
+    case 'color':
+    case 'fill':
+    case 'fillPattern':
+    case 'fillPatternColor':
+      return value[field] ?? undefined;
+    case 'locked':
+      return value.locked !== false;
+    case 'hyperlink':
+      return value.hyperlink ?? '';
+    case 'comment':
+      return value.comment ?? '';
+    case 'validation':
+      return value.validation;
+    case 'border.top':
+    case 'border.right':
+    case 'border.bottom':
+    case 'border.left':
+    case 'border.diagonalDown':
+    case 'border.diagonalUp':
+      return normalizedBorderSide(value.borders?.[field.slice(7) as keyof CellBorders]);
+  }
+};
+
+const sameNormalized = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => sameNormalized(value, right[index]));
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every(
+    (key) => Object.hasOwn(rightRecord, key) && sameNormalized(leftRecord[key], rightRecord[key]),
+  );
+};
+
+export function summarizeDialogFormats(
+  state: State,
+  plan: SelectionFormatPlan | null,
+): DialogFormatSummary {
+  const activeFormat = cloneFormat(formatWithPending(state, state.selection.active));
+  const mixed = new Set<FormatDialogField>();
+  if (!plan || plan.cells.length === 0) return { activeFormat, mixed };
+  const fields: FormatDialogField[] = [
+    'numFmt',
+    'align',
+    'vAlign',
+    'wrap',
+    'justifyLastLine',
+    'shrinkToFit',
+    'indent',
+    'rotation',
+    'textDirection',
+    'bold',
+    'italic',
+    'underline',
+    'strike',
+    'fontVertAlign',
+    'fontFamily',
+    'fontSize',
+    'color',
+    'fill',
+    'fillPattern',
+    'fillPatternColor',
+    'border.top',
+    'border.right',
+    'border.bottom',
+    'border.left',
+    'border.diagonalDown',
+    'border.diagonalUp',
+    'locked',
+    'formulaHidden',
+    'hyperlink',
+    'comment',
+    'validation',
+  ];
+  for (const field of fields) {
+    const expected = normalizedFieldValue(activeFormat, field);
+    if (
+      plan.cells.some(
+        (addr) =>
+          !sameNormalized(normalizedFieldValue(formatWithPending(state, addr), field), expected),
+      )
+    ) {
+      mixed.add(field);
+    }
+  }
+  return { activeFormat, mixed };
+}
+
+const defaultPatternFor = (category: NumberCategory): string => {
+  switch (category) {
+    case 'date':
+      return 'yyyy-mm-dd';
+    case 'time':
+      return 'HH:MM:SS';
+    case 'fraction':
+      return '# ?/?';
+    case 'special':
+      return '000';
+    case 'custom':
+      return '0.00';
+    default:
+      return '';
+  }
+};
+
+export function buildTouchedDialogPatch(
+  draft: DraftState,
+  touched: ReadonlySet<FormatDialogField>,
+  defaultPattern: (category: NumberCategory) => string = defaultPatternFor,
+): Partial<CellFormat> {
+  const patch: Partial<CellFormat> = {};
+  const set = <K extends keyof CellFormat>(key: K, value: CellFormat[K]): void => {
+    if (touched.has(key as FormatDialogField)) patch[key] = value;
+  };
+  set('numFmt', computeDialogNumFmt(draft, defaultPattern));
+  set('align', draft.align);
+  set('vAlign', draft.vAlign);
+  set('wrap', draft.wrap);
+  set('justifyLastLine', draft.justifyLastLine);
+  set('shrinkToFit', draft.shrinkToFit);
+  set('indent', draft.indent > 0 ? draft.indent : undefined);
+  set('rotation', draft.rotation !== 0 ? draft.rotation : undefined);
+  set('textDirection', draft.textDirection === 'context' ? undefined : draft.textDirection);
+  set('bold', draft.bold);
+  set('italic', draft.italic);
+  set('underline', draft.underline);
+  set('strike', draft.strike);
+  set('fontVertAlign', draft.fontVertAlign);
+  set('fontFamily', draft.fontFamily || undefined);
+  set('fontSize', draft.fontSize);
+  set('color', draft.color);
+  set('fill', draft.fill);
+  set('fillPattern', draft.fillPattern);
+  set('fillPatternColor', draft.fillPatternColor);
+  set('locked', draft.locked);
+  set('formulaHidden', draft.formulaHidden);
+  if (touched.has('hyperlink')) patch.hyperlink = draft.hyperlink.trim() || undefined;
+  if (touched.has('comment')) {
+    patch.comment = draft.comment || undefined;
+    if (!draft.comment) patch.commentAuthor = undefined;
+  }
+  if (touched.has('validation')) {
+    const lines = draft.validationList
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    patch.validation = computeDialogValidation(draft, lines);
+  }
+  const border: CellBorders = {};
+  const sides: SideKey[] = ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'];
+  for (const side of sides) {
+    if (touched.has(`border.${side}` as FormatDialogField)) {
+      border[side] = draft.borders[side] ?? false;
+    }
+  }
+  if (Object.keys(border).length > 0) patch.borders = border;
+  return patch;
+}
 
 export function makeEmptyDraft(formatLocale: string): DraftState {
   return {

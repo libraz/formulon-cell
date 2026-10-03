@@ -5,7 +5,13 @@
 // the small `createRibbonIcon` SVG helper because both this module and the
 // select/color factory need it.
 
-import { setFillColor, setFont, setFontColor, setNumFmt } from '../../commands/format.js';
+import {
+  setFillColor,
+  setFont,
+  setFontColor,
+  setNumFmt,
+  withSelectionFormatOrigin,
+} from '../../commands/format.js';
 import { recordPageSetupChange, recordRepeatableFormatChange } from '../../commands/history.js';
 import {
   type MarginPreset,
@@ -49,7 +55,7 @@ export interface ControlDispatchCtx {
 export interface ControlDispatchApi {
   createRibbonIcon: (name: string) => SVGSVGElement | null;
   currentRibbonControlValue: (id: string) => string;
-  applyRibbonFormat: (fn: RibbonFormatMutator) => void;
+  applyRibbonFormat: (fn: RibbonFormatMutator, commandId?: string) => void;
   applyRibbonControl: (id: string, value: string) => void;
   applyMergeControl: (value: string) => void;
 }
@@ -139,11 +145,16 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
   const numberFormatForAction = (action: string): NumFmt | null =>
     toolbarNumberFormatForAction(action as NumberFormatAction, ribbonLang);
 
-  const applyRibbonFormat = (fn: RibbonFormatMutator): void => {
+  const applyRibbonFormat = (fn: RibbonFormatMutator, commandId?: string): void => {
     const i = getInst();
     if (!i) return;
     recordRepeatableFormatChange(i.history, i.store, () => {
-      fn(i.store.getState(), i.store);
+      withSelectionFormatOrigin(
+        i.store,
+        'ribbon',
+        () => fn(i.store.getState(), i.store),
+        commandId,
+      );
     });
     sheetEl.focus();
   };
@@ -221,20 +232,20 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
 
   const applyRibbonControl = (id: string, value: string): void => {
     if (id === 'fontFamily') {
-      applyRibbonFormat((state, store) => setFont(state, store, { fontFamily: value }));
+      applyRibbonFormat((state, store) => setFont(state, store, { fontFamily: value }), id);
     } else if (id === 'fontSize') {
-      applyRibbonFormat((state, store) => setFont(state, store, { fontSize: Number(value) }));
+      applyRibbonFormat((state, store) => setFont(state, store, { fontSize: Number(value) }), id);
     } else if (id === 'fontColor') {
-      applyRibbonFormat((state, store) => setFontColor(state, store, value));
+      applyRibbonFormat((state, store) => setFontColor(state, store, value), id);
     } else if (id === 'fillColor') {
-      applyRibbonFormat((state, store) => setFillColor(state, store, value));
+      applyRibbonFormat((state, store) => setFillColor(state, store, value), id);
     } else if (id === 'numberFormat') {
       if (value === 'more') {
         getInst()?.openFormatDialog();
         return;
       }
       const fmt = numberFormatForAction(value);
-      if (fmt) applyRibbonFormat((state, store) => setNumFmt(state, store, fmt));
+      if (fmt) applyRibbonFormat((state, store) => setNumFmt(state, store, fmt), id);
     } else if (id === 'merge') {
       void applyMergeControl(value);
     } else if (id === 'marginsPreset') {

@@ -2,6 +2,8 @@
 // purely presentational: it builds the navigation rail, properties panel, and
 // the command/card grid. Behaviour is wired by the parent through data-backstage-*
 // attributes on the produced buttons.
+
+import { createExcelRibbonSvg } from '../excel-ribbon-icons.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import { createRibbonButton } from './button.js';
 
@@ -227,6 +229,11 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     const mark = document.createElement('span');
     mark.className = `fc-tb__backstage-command-icon fc-tb__backstage-command-icon--${icon}`;
     mark.setAttribute('aria-hidden', 'true');
+    const svg = createExcelRibbonSvg(icon, 'fc-tb__backstage-command-svg');
+    if (svg) {
+      mark.classList.add('fc-tb__backstage-command-icon--svg');
+      mark.append(svg);
+    }
     const copy = document.createElement('span');
     const heading = document.createElement('strong');
     heading.textContent = title;

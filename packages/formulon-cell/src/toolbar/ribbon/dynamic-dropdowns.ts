@@ -8,9 +8,14 @@ import type { RibbonFillAction } from '../../commands/fill.js';
 import type { SessionChartKind, SpreadsheetInstance } from '../../index.js';
 import { clamp, viewportSize } from '../../interact/overlay-position.js';
 import type { SessionShapeKind } from '../illustration-types.js';
-import { focusMenuItem } from '../menu-a11y.js';
+import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import { RIBBON_DROPDOWN_MENU_FOR_COMMAND } from './activation.js';
 import type { RibbonFillSeriesMode } from './fill-series.js';
+import {
+  MAC_FORMULAS_MORE_MENU_ID,
+  MAC_RIBBON_MENU_COMMAND_SET,
+  macRibbonMenuIdForCommand,
+} from './mac/model.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 import type { TableVariantId } from './menus/styles.js';
 
@@ -212,11 +217,21 @@ const RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT = 80;
 
 const applyVerticalViewportLimit = (
   el: HTMLElement,
-  contentHeight: number,
+  contentHeight: number | null,
   maxHeight: number,
 ): void => {
+  if (contentHeight === null) {
+    el.style.maxHeight = '';
+    el.style.removeProperty('overflow-y');
+    el.style.removeProperty('overscroll-behavior');
+    return;
+  }
+  const cap = Math.max(0, maxHeight);
   const height = Math.round(
-    Math.max(RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT, Math.min(contentHeight, maxHeight)),
+    Math.min(
+      cap,
+      Math.max(Math.min(RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT, cap), Math.min(contentHeight, cap)),
+    ),
   );
   el.style.maxHeight = `${height}px`;
   if (contentHeight > height) {
@@ -272,17 +287,28 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-watch-view': 'updateWatchMenu',
 };
 
+const allDropdownMenus: Readonly<Record<string, string>> = {
+  ...RIBBON_DROPDOWN_MENU_FOR_COMMAND,
+  ...Object.fromEntries(
+    [...MAC_RIBBON_MENU_COMMAND_SET].flatMap((command) => {
+      const menuId = macRibbonMenuIdForCommand(command);
+      return menuId ? [[command, menuId]] : [];
+    }),
+  ),
+};
+
 const DYNAMIC_RIBBON_DROPDOWN_IDS: ReadonlySet<string> = new Set(
   Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND),
 );
+const ALL_DROPDOWN_IDS: ReadonlySet<string> = new Set(Object.values(allDropdownMenus));
 
 export { RIBBON_DROPDOWN_MENU_FOR_COMMAND } from './activation.js';
 
 export const ribbonDropdownMenuIdForCommand = (commandId: string): string | null =>
-  RIBBON_DROPDOWN_MENU_FOR_COMMAND[commandId] ?? null;
+  allDropdownMenus[commandId] ?? null;
 
 const RIBBON_DROPDOWN_COMMAND_FOR_MENU: Readonly<Record<string, string>> = Object.fromEntries(
-  Object.entries(RIBBON_DROPDOWN_MENU_FOR_COMMAND).map(([command, menuId]) => [menuId, command]),
+  Object.entries(allDropdownMenus).map(([command, menuId]) => [menuId, command]),
 );
 
 export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdownsApi => {
@@ -295,7 +321,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
 
   const dynamicDropdownSpecForButton = (button: HTMLButtonElement): RibbonDropdownSpec | null => {
     const command = button.dataset.ribbonCommand ?? '';
-    const menuId = RIBBON_DROPDOWN_MENU_FOR_COMMAND[command];
+    const menuId = allDropdownMenus[command];
     return menuId ? { command, menuId } : null;
   };
 
@@ -332,6 +358,34 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     closeDynamicSubmenus(menu, '[data-format-panel]', '[data-format-submenu]');
   };
 
+  const closeDynamicMoreSubmenus = (menu: HTMLElement): void => {
+    closeDynamicSubmenus(
+      menu,
+      '[data-function-category-panel]',
+      '[data-function-category-submenu]',
+    );
+  };
+
+  const visibleMoreSubmenuForKeyEvent = (
+    menu: HTMLElement,
+    target: Element | null,
+  ): HTMLElement | null => {
+    const targetPanel = target?.closest<HTMLElement>('[data-function-category-panel]');
+    if (targetPanel && !targetPanel.hidden) return targetPanel;
+
+    const targetTrigger = target?.closest<HTMLElement>('[data-function-category-submenu]');
+    if (targetTrigger?.getAttribute('aria-expanded') === 'true') {
+      const key = targetTrigger.dataset.functionCategorySubmenu ?? '';
+      const panel = menu.querySelector<HTMLElement>(`[data-function-category-panel="${key}"]`);
+      if (panel && !panel.hidden) return panel;
+    }
+
+    const visiblePanels = Array.from(
+      menu.querySelectorAll<HTMLElement>('[data-function-category-panel]'),
+    ).filter((panel) => !panel.hidden);
+    return visiblePanels.length === 1 ? (visiblePanels[0] ?? null) : null;
+  };
+
   const closeDynamicRibbonDropdown = (spec: RibbonDropdownSpec, restoreFocus = false): void => {
     const menu = document.getElementById(spec.menuId) as HTMLDivElement | null;
     const button = dynamicDropdownButtonForSpec(spec);
@@ -339,13 +393,14 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     menu.hidden = true;
     if (menu.id === 'menu-conditional') closeDynamicConditionalSubmenus(menu);
     if (menu.id === 'menu-format-cells') closeDynamicFormatSubmenus(menu);
+    if (menu.id === MAC_FORMULAS_MORE_MENU_ID) closeDynamicMoreSubmenus(menu);
     button?.setAttribute('aria-expanded', 'false');
     if (restoreFocus) button?.focus();
   };
 
   const closeAllDynamicRibbonDropdowns = (exceptMenuId?: string): void => {
     for (const menu of document.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
-      if (!DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id) || menu.id === exceptMenuId) continue;
+      if (!ALL_DROPDOWN_IDS.has(menu.id) || menu.id === exceptMenuId) continue;
       const spec = dynamicDropdownSpecForMenu(menu);
       if (spec) closeDynamicRibbonDropdown(spec);
     }
@@ -353,7 +408,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
 
   const firstOpenDynamicDropdownSpec = (): RibbonDropdownSpec | null => {
     for (const menu of document.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
-      if (menu.hidden || !DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) continue;
+      if (menu.hidden || !ALL_DROPDOWN_IDS.has(menu.id)) continue;
       const spec = dynamicDropdownSpecForMenu(menu);
       if (spec) return spec;
     }
@@ -415,24 +470,61 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     options.close(menu);
     const panel = menu.querySelector<HTMLElement>(`[data-${options.panelAttr}="${key}"]`);
     if (!panel) return;
+
+    // A submenu keeps the last viewport limit in inline styles after it is
+    // closed. Clear that state and make it measurable before reading its
+    // geometry; otherwise a hidden panel reports only the fallback height and
+    // its natural content can paint outside the viewport without scrolling.
+    panel.style.left = '';
+    panel.style.right = '';
+    panel.style.top = '';
+    panel.style.height = '';
+    applyVerticalViewportLimit(panel, null, 0);
+    panel.hidden = false;
+
     const menuRect = menu.getBoundingClientRect();
     const triggerRect = trigger.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
-    const panelWidth = panelRect.width || panel.offsetWidth || options.fallbackWidth;
-    const panelHeight = panelRect.height || panel.offsetHeight || options.fallbackHeight;
+    const panelWidth = Math.ceil(
+      panelRect.width || panel.offsetWidth || panel.scrollWidth || options.fallbackWidth,
+    );
+    // Once visible, getBoundingClientRect includes the panel's natural border
+    // box. Hidden panels report zero, so fall back to scrollHeight/offsetHeight
+    // for the first measurement instead of using a fixed height.
+    const panelHeight = Math.ceil(
+      panelRect.height || panel.offsetHeight || panel.scrollHeight || options.fallbackHeight,
+    );
     const { width, height } = viewportSize();
     const pad = RIBBON_DROPDOWN_VIEWPORT_PAD;
-    const fitsRight = menuRect.right + panelWidth <= width - pad;
-    const desiredTop = Math.max(0, triggerRect.top - menuRect.top - 4);
-    const maxTop = Math.max(0, height - pad - panelHeight - menuRect.top);
-    const top = Math.min(desiredTop, maxTop);
-    panel.style.left = fitsRight
-      ? `${Math.max(0, menuRect.width - 1)}px`
-      : `${-Math.max(panelWidth - 1, menuRect.width)}px`;
+    const rightX = menuRect.right - 1;
+    const leftX = menuRect.left - panelWidth + 1;
+    const fitsRight = rightX + panelWidth <= width - pad;
+    const fitsLeft = leftX >= pad;
+    let panelX: number;
+    let top: number;
+    let availableHeight: number;
+    if (fitsRight || fitsLeft) {
+      panelX = fitsRight ? rightX : leftX;
+      const desiredTop = Math.max(0, triggerRect.top - menuRect.top - 4);
+      const maxTop = Math.max(0, height - pad - panelHeight - menuRect.top);
+      top = Math.min(desiredTop, maxTop);
+      availableHeight = height - pad - menuRect.top - top;
+    } else {
+      panelX = clamp(menuRect.left, pad, width - panelWidth - pad);
+      const belowTop = menuRect.bottom + 3;
+      const belowAvailable = Math.max(0, height - pad - belowTop);
+      const aboveAvailable = Math.max(0, menuRect.top - pad - 3);
+      const opensBelow = belowAvailable >= aboveAvailable;
+      availableHeight = opensBelow ? belowAvailable : aboveAvailable;
+      const projectedHeight = Math.min(panelHeight, availableHeight);
+      top = opensBelow
+        ? belowTop - menuRect.top
+        : menuRect.top - 3 - projectedHeight - menuRect.top;
+    }
+    panel.style.left = `${Math.round(panelX - menuRect.left)}px`;
     panel.style.right = '';
     panel.style.top = `${Math.round(top)}px`;
-    applyVerticalViewportLimit(panel, panelHeight, height - pad - menuRect.top - top);
-    panel.hidden = false;
+    applyVerticalViewportLimit(panel, panelHeight, availableHeight);
     trigger.classList.add('fc-tb__menu-item--active');
     trigger.setAttribute('aria-expanded', 'true');
   };
@@ -456,6 +548,15 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       panelAttr: 'format-panel',
       fallbackWidth: 178,
       fallbackHeight: 180,
+    });
+  };
+
+  const openDynamicMoreSubmenu = (menu: HTMLElement, key: string, trigger: HTMLElement): void => {
+    openDynamicSubmenu(menu, key, trigger, {
+      close: closeDynamicMoreSubmenus,
+      panelAttr: 'function-category-panel',
+      fallbackWidth: 260,
+      fallbackHeight: 300,
     });
   };
 
@@ -557,9 +658,18 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   const dynamicRibbonDropdownClick = (event: MouseEvent): boolean => {
     const target = eventElement(event);
     const menu = target?.closest<HTMLElement>('.fc-tb__menu');
-    if (!menu || !DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
+    if (!menu || !ALL_DROPDOWN_IDS.has(menu.id)) return false;
     const spec = dynamicDropdownSpecForMenu(menu);
     if (!spec) return false;
+
+    const moreSubmenu = target?.closest<HTMLElement>('[data-function-category-submenu]');
+    if (moreSubmenu && menu.id === MAC_FORMULAS_MORE_MENU_ID) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (isDisabledMenuControl(moreSubmenu)) return true;
+      openDynamicMoreSubmenu(menu, moreSubmenu.dataset.functionCategorySubmenu ?? '', moreSubmenu);
+      return true;
+    }
 
     // CF submenus open another pane *without* closing the parent dropdown, so
     // they live outside the table-driven loop.
@@ -619,7 +729,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     const target = eventElement(event);
     if (!target) return false;
     const menu = target.closest<HTMLElement>('.fc-tb__menu');
-    if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
+    if (menu && ALL_DROPDOWN_IDS.has(menu.id)) return false;
     const button = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (button && dynamicDropdownSpecForButton(button)) return false;
     closeAllDynamicRibbonDropdowns();
@@ -632,7 +742,13 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     const target = eventElement(event);
     if (!target) return false;
     const menu = target.closest<HTMLElement>('.fc-tb__menu');
-    if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
+    if (menu && ALL_DROPDOWN_IDS.has(menu.id)) {
+      if (menu.id === MAC_FORMULAS_MORE_MENU_ID) {
+        const trigger = target.closest<HTMLElement>('[data-function-category-submenu]');
+        if (trigger) closeDynamicMoreSubmenus(menu);
+      }
+      return false;
+    }
     const button = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (button && dynamicDropdownSpecForButton(button)) return false;
     closeDynamicRibbonDropdown(openSpec);
@@ -643,6 +759,14 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   const dynamicRibbonDropdownHover = (event: MouseEvent): boolean => {
     const target = eventElement(event);
     const menu = target?.closest<HTMLElement>('.fc-tb__menu');
+    if (menu?.id === MAC_FORMULAS_MORE_MENU_ID) {
+      if (menu.hidden) return false;
+      const trigger = target?.closest<HTMLElement>('[data-function-category-submenu]');
+      if (!trigger) return false;
+      if (isDisabledMenuControl(trigger)) return true;
+      openDynamicMoreSubmenu(menu, trigger.dataset.functionCategorySubmenu ?? '', trigger);
+      return true;
+    }
     if (menu?.id !== 'menu-conditional' && menu?.id !== 'menu-format-cells') return false;
     if (menu.hidden) return false;
     if (menu.id === 'menu-format-cells') {
@@ -662,8 +786,46 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   const dynamicRibbonDropdownKeydown = (event: KeyboardEvent): boolean => {
     const target = eventElement(event);
     const menu = target?.closest<HTMLElement>('.fc-tb__menu');
+    if (menu?.id === MAC_FORMULAS_MORE_MENU_ID && !menu.hidden) {
+      const targetPanel = target?.closest<HTMLElement>('[data-function-category-panel]');
+      const panelForDismiss =
+        event.key === 'Escape' || event.key === 'ArrowLeft'
+          ? visibleMoreSubmenuForKeyEvent(menu, target)
+          : null;
+      if (panelForDismiss) {
+        event.preventDefault();
+        event.stopPropagation();
+        const trigger = menu.querySelector<HTMLElement>(
+          `[data-function-category-submenu="${panelForDismiss.dataset.functionCategoryPanel ?? ''}"]`,
+        );
+        closeDynamicMoreSubmenus(menu);
+        trigger?.focus();
+        return true;
+      }
+      const trigger = target?.closest<HTMLElement>('[data-function-category-submenu]');
+      if (trigger && (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (isDisabledMenuControl(trigger)) return true;
+        const key = trigger.dataset.functionCategorySubmenu ?? '';
+        openDynamicMoreSubmenu(menu, key, trigger);
+        const targetPanel = menu.querySelector<HTMLElement>(
+          `[data-function-category-panel="${key}"]`,
+        );
+        if (targetPanel) focusMenuItem(targetPanel);
+        return true;
+      }
+      if (targetPanel) {
+        handleMenuKeydown(event, targetPanel, {
+          close: () => {
+            closeDynamicMoreSubmenus(menu);
+          },
+        });
+        return event.defaultPrevented;
+      }
+    }
     if (event.key === 'Escape') {
-      if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id) && !menu.hidden) {
+      if (menu && ALL_DROPDOWN_IDS.has(menu.id) && !menu.hidden) {
         event.preventDefault();
         event.stopPropagation();
         const spec = dynamicDropdownSpecForMenu(menu);
@@ -690,6 +852,15 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
         closeAllDynamicRibbonDropdowns();
         return true;
       }
+    }
+    if (menu?.classList.contains('fc-tb__menu--mac') && !menu.hidden) {
+      const spec = dynamicDropdownSpecForMenu(menu);
+      handleMenuKeydown(event, menu, {
+        close: (restore) => {
+          if (spec) closeDynamicRibbonDropdown(spec, restore);
+        },
+      });
+      return event.defaultPrevented;
     }
     if ((menu?.id !== 'menu-conditional' && menu?.id !== 'menu-format-cells') || menu.hidden) {
       return false;

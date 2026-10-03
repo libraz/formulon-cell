@@ -838,8 +838,10 @@ export type {
   FeatureFlags,
   FeatureId,
   I18nController,
+  ResolvedSpreadsheetPlatform,
   ResolvedSpreadsheetUiOptions,
   SpreadsheetFeatureSwitches,
+  SpreadsheetPlatform,
   SpreadsheetUiOptions,
   SpreadsheetUiProfile,
   ThemeName,
@@ -871,6 +873,7 @@ export {
   presets,
   quickAnalysis,
   resolveFlags,
+  resolveSpreadsheetPlatform,
   resolveSpreadsheetUiOptions,
   slicer,
   sortByPriority,
@@ -967,7 +970,12 @@ export type { FormatDialogDeps, FormatDialogHandle } from './interact/format-dia
 export { attachFormatDialog } from './interact/format-dialog.js';
 export type { FormatPainterDeps, FormatPainterHandle } from './interact/format-painter.js';
 export { attachFormatPainter } from './interact/format-painter.js';
-export type { FxDialogDeps, FxDialogHandle } from './interact/fx-dialog.js';
+export type {
+  FunctionCategory,
+  FxDialogDeps,
+  FxDialogHandle,
+  FxDialogOpenOptions,
+} from './interact/fx-dialog.js';
 export { attachFxDialog, FUNCTION_DESCRIPTIONS } from './interact/fx-dialog.js';
 export type { GoToDialogDeps, GoToDialogHandle } from './interact/goto-dialog.js';
 export { attachGoToDialog } from './interact/goto-dialog.js';
@@ -1418,9 +1426,11 @@ export {
   RIBBON_ACTIVE_COMMANDS,
 } from './toolbar/ribbon-active-state.js';
 export type {
+  BuildRibbonModelOptions,
   RibbonCommand,
   RibbonGroupModel,
   RibbonOption,
+  RibbonProfile,
   RibbonTab,
   RibbonTabModel,
   ToolbarLang,
@@ -1428,6 +1438,7 @@ export type {
 } from './toolbar/ribbon-model.js';
 export {
   buildRibbonModel,
+  EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   FONT_FAMILIES,
   FONT_SIZES,

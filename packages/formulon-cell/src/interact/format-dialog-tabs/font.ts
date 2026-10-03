@@ -28,7 +28,7 @@ export interface FontTabRefs {
   fontSwatchesToggle: HTMLButtonElement;
   fontSwatchesFlyout: HTMLDivElement;
   fontPreviewBox: HTMLDivElement;
-  syncFontFamilyOptions: (current: string) => void;
+  syncFontFamilyOptions: (current: string, selectFirstWhenEmpty?: boolean) => void;
 }
 
 export function createFontTab(
@@ -104,19 +104,28 @@ export function createFontTab(
   familyList.setAttribute('aria-label', t.fontFamily);
   panel.appendChild(familyList);
 
-  const syncFontFamilyOptions = (current: string): void => {
+  const syncFontFamilyOptions = (current: string, selectFirstWhenEmpty = true): void => {
     const families = FONT_FAMILIES.filter((family) =>
       shouldShowFontOption(family, current, locale),
     );
     appendDialogDatalistOptions(familyDatalist, families);
     familyList.replaceChildren();
-    for (const [index, family] of families.slice(0, 8).entries()) {
+    const visibleFamilies = families.slice(0, 8);
+    const knownCurrent = current as (typeof FONT_FAMILIES)[number];
+    if (
+      current &&
+      families.some((family) => family === current) &&
+      !visibleFamilies.some((family) => family === current)
+    ) {
+      visibleFamilies.splice(-1, 1, knownCurrent);
+    }
+    for (const [index, family] of visibleFamilies.entries()) {
       const item = appendDialogOptionButton(familyList, {
         label: family,
         baseClass: 'fc-fmtdlg__font-list-item',
         datasetKey: 'fcFontFamily',
         value: family,
-        selected: family === current || (!current && index === 0),
+        selected: family === current || (selectFirstWhenEmpty && !current && index === 0),
       });
       item.addEventListener('click', () => {
         familyInput.value = family;
@@ -162,8 +171,8 @@ export function createFontTab(
   const sizeInput = document.createElement('input');
   sizeInput.type = 'number';
   sizeInput.setAttribute('aria-label', t.fontSize);
-  sizeInput.min = '8';
-  sizeInput.max = '72';
+  sizeInput.min = '1';
+  sizeInput.max = '409';
   sizeInput.step = '1';
   sizeRow.append(sizeLabel, sizeInput);
   panel.appendChild(sizeRow);
@@ -178,7 +187,7 @@ export function createFontTab(
       baseClass: 'fc-fmtdlg__font-list-item',
       datasetKey: 'fcFontSize',
       value: String(size),
-      selected: size === 12,
+      selected: false,
     });
     item.addEventListener('click', () => {
       sizeInput.value = String(size);

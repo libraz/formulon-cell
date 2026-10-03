@@ -1,10 +1,14 @@
 import { coerceInput } from '../commands/coerce-input.js';
-import { applyFormatPatch, formatNumber } from '../commands/format.js';
+import { recordDialogFormatChange } from '../commands/dialog-format-history.js';
 import {
-  type History,
-  recordFormatChangeWithRepeat,
-  recordMergesChangeWithEngine,
-} from '../commands/history.js';
+  applySelectionFormatAction,
+  formatNumber,
+  planSelectionFormat,
+  type SelectionFormatAction,
+  type SelectionFormatPlan,
+} from '../commands/format.js';
+import { History, recordMergesChangeWithEngine } from '../commands/history.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
   applyMerge,
   applyUnmerge,
@@ -13,7 +17,6 @@ import {
   mergeWillLoseData,
 } from '../commands/merge.js';
 import { addrKey } from '../engine/address.js';
-import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { CellValue, Range } from '../engine/types.js';
 import { formatCell, formatGeneralNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -36,6 +39,7 @@ import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatA1Range } from '../wrappers/toolbar-a1.js';
+import { syncCustomSelects } from './custom-select.js';
 import { appendDialogOptionButton } from './dialog-shell.js';
 import {
   type BorderStyleKey,
@@ -51,12 +55,15 @@ import {
 } from './format-dialog-model.js';
 import {
   activeDraftSide,
+  buildTouchedDialogPatch,
   computeDialogNumFmt,
   computeDialogValidation,
   explicitDraftBorders,
+  type FormatDialogField,
   hydrateDraftFromFormat,
   makeEmptyDraft,
   setDraftSide,
+  summarizeDialogFormats,
 } from './format-dialog-state.js';
 import { createFormatDialogView } from './format-dialog-view.js';
 import { clampPanelToViewport } from './overlay-position.js';
@@ -93,8 +100,6 @@ export interface FormatDialogHandle {
   close(): void;
   detach(): void;
 }
-
-const MAX_OUTLINE_BORDER_CELLS = 100_000;
 
 /** A swatch palette that hangs off a color control instead of sitting inline. */
 interface PaletteFlyout {
@@ -134,8 +139,6 @@ function createPaletteFlyout(
     owns: (node: Node) => flyout.contains(node) || toggle.contains(node),
   };
 }
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 type MergeSelectionState = 'none' | 'merged' | 'mixed';
 
@@ -395,7 +398,31 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   let submitting = false;
   let waitingForConfirmation = false;
   let previewValue: CellValue = { kind: 'blank' };
+  let selectionPlanForDialog: SelectionFormatPlan | null = null;
+  const mixedFields = new Set<FormatDialogField>();
+  const touchedFields = new Set<FormatDialogField>();
   const draft: DraftState = makeEmptyDraft(getFormatLocale());
+
+  const touch = (...fields: FormatDialogField[]): void => {
+    for (const field of fields) {
+      touchedFields.add(field);
+      for (const element of overlay.querySelectorAll<HTMLElement>('[data-fc-mixed-field]')) {
+        if (element.dataset.fcMixedField !== field) continue;
+        delete element.dataset.fcMixed;
+        if (element instanceof HTMLInputElement) element.indeterminate = false;
+      }
+    }
+  };
+  const isMixedField = (field: FormatDialogField): boolean =>
+    mixedFields.has(field) && !touchedFields.has(field);
+  const syncFontSizeOptions = (current: number | undefined): void => {
+    for (const item of overlay.querySelectorAll<HTMLButtonElement>('[data-fc-font-size]')) {
+      item.setAttribute(
+        'aria-selected',
+        current !== undefined && Number(item.dataset.fcFontSize) === current ? 'true' : 'false',
+      );
+    }
+  };
 
   // ── Color palette flyouts ──────────────────────────────────────────────
   const fontPalette = createPaletteFlyout(fontSwatchesToggle, fontSwatchesFlyout, fontSwatches);
@@ -415,7 +442,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const active = state.selection.active;
     const activeCell = state.data.cells.get(addrKey(active));
     previewValue = activeCell?.value ?? getWb()?.getValue(active) ?? { kind: 'blank' };
-    const fmt = initialFormat ?? state.format.formats.get(addrKey(active)) ?? {};
+    touchedFields.clear();
+    mixedFields.clear();
+    selectionPlanForDialog = applyDxf ? null : planSelectionFormat(state);
+    const summary = applyDxf
+      ? { activeFormat: initialFormat ?? {}, mixed: new Set<FormatDialogField>() }
+      : summarizeDialogFormats(state, selectionPlanForDialog);
+    for (const field of summary.mixed) mixedFields.add(field);
+    const fmt = summary.activeFormat;
     hydrateDraftFromFormat(draft, fmt, getFormatLocale());
     pendingBorderPreset = null;
 
@@ -430,7 +464,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     initialMergeChecked = mergeCk.input.checked;
     initialMergeIndeterminate = mergeCk.input.indeterminate;
     const mergeRange = expandRangeWithMerges(state, range);
+    const hasExtraRanges = (state.selection.extraRanges?.length ?? 0) > 0;
     const mergeDisabled =
+      hasExtraRanges ||
       (!multiCell && activeMerge === null) ||
       (!getWb() && mergeHasNonAnchorContent(state, mergeRange));
     const mergeReason = mergeDisabled ? strings.formatDialog.mergeCellsRequiresMultiCell : null;
@@ -445,6 +481,210 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     mergeCk.wrap.classList.toggle('fc-fmtdlg__check--muted', mergeCk.input.disabled);
     renderPreview();
     setActiveTab('number');
+  };
+
+  const underlineMixedOption = ((): HTMLOptionElement => {
+    const scratch = document.createElement('select');
+    appendDialogSelectOptions(scratch, [{ value: 'mixed', label: '' }]);
+    const option = scratch.options[0] as HTMLOptionElement;
+    projectDisabledState(option, true, null);
+    return option;
+  })();
+
+  const syncMixedControls = (): void => {
+    const isMixed = isMixedField;
+    const mark = (element: HTMLElement, mixed: boolean, field?: FormatDialogField): void => {
+      if (field !== undefined) element.dataset.fcMixedField = field;
+      if (mixed) element.dataset.fcMixed = 'true';
+      else delete element.dataset.fcMixed;
+    };
+    const setMixedCheck = (input: HTMLInputElement, field: FormatDialogField): void => {
+      input.indeterminate = isMixed(field);
+      mark(input, input.indeterminate, field);
+    };
+    setMixedCheck(thousandsCk.input, 'numFmt');
+    setMixedCheck(wrapCk.input, 'wrap');
+    setMixedCheck(justifyLastLineCk.input, 'justifyLastLine');
+    setMixedCheck(shrinkCk.input, 'shrinkToFit');
+    setMixedCheck(boldCk.input, 'bold');
+    setMixedCheck(italicCk.input, 'italic');
+    setMixedCheck(strikeCk.input, 'strike');
+    setMixedCheck(superscriptCk.input, 'fontVertAlign');
+    setMixedCheck(subscriptCk.input, 'fontVertAlign');
+    const normalFontMixed = [
+      'bold',
+      'italic',
+      'underline',
+      'strike',
+      'fontVertAlign',
+      'fontFamily',
+      'fontSize',
+      'color',
+    ].some((field) => isMixed(field as FormatDialogField));
+    normalFontCk.input.indeterminate = normalFontMixed;
+    mark(normalFontCk.input, normalFontMixed);
+    setMixedCheck(lockedCk.input, 'locked');
+    setMixedCheck(hiddenFormulaCk.input, 'formulaHidden');
+
+    if (isMixed('numFmt')) {
+      for (const button of catButtons.values()) button.setAttribute('aria-selected', 'false');
+      mark(catList, true, 'numFmt');
+      decimalsInput.value = '';
+      mark(decimalsInput, true, 'numFmt');
+      symbolSelect.value = '';
+      symbolSelect.selectedIndex = -1;
+      mark(symbolSelect, true, 'numFmt');
+      for (const button of negativeOptions.querySelectorAll<HTMLButtonElement>(
+        '[data-fc-negative-style]',
+      )) {
+        button.setAttribute('aria-selected', 'false');
+      }
+      mark(negativeOptions, true, 'numFmt');
+      patternInput.value = '';
+      patternPresetSelect.value = '';
+      for (const button of patternList.querySelectorAll<HTMLButtonElement>('[data-fc-pattern]')) {
+        button.setAttribute('aria-selected', 'false');
+      }
+      mark(patternList, true, 'numFmt');
+      mark(patternInput, true, 'numFmt');
+      mark(patternPresetSelect, true, 'numFmt');
+    }
+    if (isMixed('align')) {
+      for (const radio of hAlignRadios.values()) radio.checked = false;
+      hAlignSelect.value = '';
+      mark(hAlignSelect, true, 'align');
+    }
+    if (isMixed('vAlign')) {
+      for (const radio of vAlignRadios.values()) radio.checked = false;
+      vAlignSelect.value = '';
+      mark(vAlignSelect, true, 'vAlign');
+    }
+    if (isMixed('underline')) {
+      // A placeholder keeps the real "None" option distinct from the mixed state,
+      // so choosing None still reports a change.
+      underlineSelect.append(underlineMixedOption);
+      underlineSelect.value = underlineMixedOption.value;
+      mark(underlineSelect, true, 'underline');
+    }
+    if (isMixed('fontFamily')) {
+      familyInput.value = '';
+      mark(familyInput, true, 'fontFamily');
+    }
+    if (isMixed('fontSize')) {
+      sizeInput.value = '';
+      mark(sizeInput, true, 'fontSize');
+    }
+    syncFontStyleList();
+    syncFontFamilyOptions(isMixed('fontFamily') ? '' : draft.fontFamily, !isMixed('fontFamily'));
+    syncFontSizeOptions(isMixed('fontSize') ? undefined : draft.fontSize);
+    if (isMixed('color')) {
+      fontSwatches.setValue(null);
+      mark(colorInput, true, 'color');
+    }
+    if (isMixed('fill')) {
+      fillSwatches.setValue(null);
+      mark(fillInput, true, 'fill');
+    }
+    if (isMixed('fillPattern')) {
+      fillPatternSelect.value = '';
+      for (const button of fillPatternGallery.querySelectorAll<HTMLButtonElement>(
+        '[data-fc-fill-pattern]',
+      )) {
+        button.setAttribute('aria-pressed', 'false');
+      }
+      mark(fillPatternGallery, true, 'fillPattern');
+      mark(fillPatternSelect, true, 'fillPattern');
+    }
+    if (isMixed('fillPatternColor')) {
+      mark(fillPatternColorInput, true, 'fillPatternColor');
+    }
+    if (isMixed('hyperlink')) {
+      hlInput.value = '';
+      mark(hlInput, true, 'hyperlink');
+    }
+    if (isMixed('comment')) {
+      commentArea.value = '';
+      mark(commentArea, true, 'comment');
+    }
+    if (isMixed('validation')) {
+      validationKindSelect.value = '';
+      validationOpSelect.value = '';
+      validationAInput.value = '';
+      validationBInput.value = '';
+      validationFormulaInput.value = '';
+      validationListSourceKindRow.querySelectorAll<HTMLInputElement>('input').forEach((input) => {
+        input.checked = false;
+        input.indeterminate = false;
+      });
+      validationArea.value = '';
+      validationListRangeInput.value = '';
+      validationShowDropdownInput.checked = false;
+      validationShowDropdownInput.indeterminate = true;
+      validationAllowBlankInput.checked = false;
+      validationAllowBlankInput.indeterminate = true;
+      validationErrorStyleSelect.value = '';
+      validationShowInputMessageInput.checked = false;
+      validationShowInputMessageInput.indeterminate = true;
+      validationPromptTitleInput.value = '';
+      validationPromptMessageArea.value = '';
+      validationShowErrorMessageInput.checked = false;
+      validationShowErrorMessageInput.indeterminate = true;
+      validationErrorTitleInput.value = '';
+      validationErrorMessageArea.value = '';
+      for (const control of [
+        validationKindSelect,
+        validationOpSelect,
+        validationAInput,
+        validationBInput,
+        validationFormulaInput,
+        validationArea,
+        validationListRangeInput,
+        validationShowDropdownInput,
+        validationAllowBlankInput,
+        validationErrorStyleSelect,
+        validationShowInputMessageInput,
+        validationPromptTitleInput,
+        validationPromptMessageArea,
+        validationShowErrorMessageInput,
+        validationErrorTitleInput,
+        validationErrorMessageArea,
+      ]) {
+        mark(control, true, 'validation');
+      }
+      validationListSourceKindRow.querySelectorAll<HTMLInputElement>('input').forEach((input) => {
+        mark(input, true, 'validation');
+      });
+      mark(validationKindSelect, true, 'validation');
+    }
+    for (const [field, input] of [
+      ['indent', indentInput],
+      ['rotation', rotationInput],
+      ['textDirection', textDirectionSelect],
+    ] as const) {
+      if (isMixed(field)) {
+        input.value = '';
+        mark(input, true, field);
+      }
+    }
+    for (const side of ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'] as const) {
+      const field = `border.${side}` as FormatDialogField;
+      if (isMixed(field)) {
+        const control =
+          side === 'top'
+            ? topCk.input
+            : side === 'right'
+              ? rightCk.input
+              : side === 'bottom'
+                ? bottomCk.input
+                : side === 'left'
+                  ? leftCk.input
+                  : side === 'diagonalDown'
+                    ? diagDownCk.input
+                    : diagUpCk.input;
+        control.indeterminate = true;
+        mark(control, true, field);
+      }
+    }
   };
 
   const syncJustifyLastLineAvailability = (): void => {
@@ -500,6 +740,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     // Font
     boldCk.input.checked = draft.bold;
     italicCk.input.checked = draft.italic;
+    underlineMixedOption.remove();
     underlineSelect.value = draft.underline === true ? 'single' : draft.underline || '';
     strikeCk.input.checked = draft.strike;
     superscriptCk.input.checked = draft.fontVertAlign === 'superscript';
@@ -517,6 +758,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     familyInput.value = draft.fontFamily;
     syncFontFamilyOptions(draft.fontFamily);
     sizeInput.value = draft.fontSize !== undefined ? String(draft.fontSize) : '';
+    syncFontSizeOptions(draft.fontSize);
     colorInput.value = draft.color && isHexColor(draft.color) ? draft.color : '#000000';
     fontSwatches.setValue(draft.color && isHexColor(draft.color) ? draft.color : null);
 
@@ -581,6 +823,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationErrorTitleInput.value = draft.validationErrorTitle;
     validationErrorMessageArea.value = draft.validationErrorMessage;
     syncValidationVisibility();
+    syncMixedControls();
   };
 
   /** Switch the A/B bound inputs to a native date/time picker for date/time
@@ -679,9 +922,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const syncFontStyleList = (): void => {
-    const id = currentFontStyleId();
+    const id = isMixedField('bold') || isMixedField('italic') ? null : currentFontStyleId();
     for (const item of fontStyleList.querySelectorAll<HTMLButtonElement>('[data-fc-font-style]')) {
-      item.setAttribute('aria-selected', item.dataset.fcFontStyle === id ? 'true' : 'false');
+      item.setAttribute(
+        'aria-selected',
+        id !== null && item.dataset.fcFontStyle === id ? 'true' : 'false',
+      );
     }
   };
 
@@ -1112,8 +1358,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       .filter((s) => s.length > 0);
 
     const explicitBorders = explicitDraftBorders(draft);
-    const useRangeOutline =
-      pendingBorderPreset === 'outline' && (range.r0 !== range.r1 || range.c0 !== range.c1);
 
     const validation = computeDialogValidation(draft, validationLines);
     const hyperlink = draft.hyperlink.trim();
@@ -1140,7 +1384,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       fill: draft.fill,
       fillPattern: draft.fillPattern,
       fillPatternColor: draft.fillPattern ? draft.fillPatternColor : undefined,
-      ...(useRangeOutline ? {} : { borders: explicitBorders }),
+      borders: explicitBorders,
       hyperlink: hyperlink ? hyperlink : undefined,
       hyperlinkDisplay: preserveHyperlinkMetadata ? draft.hyperlinkDisplay : undefined,
       hyperlinkTooltip: preserveHyperlinkMetadata ? draft.hyperlinkTooltip : undefined,
@@ -1174,6 +1418,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
 
     const liveWb = getWb();
+    const plan = planSelectionFormat(state);
+    if (!plan) return;
+
     const mergeRange = expandRangeWithMerges(state, range);
     const mergeChanged =
       !mergeCk.input.disabled &&
@@ -1185,6 +1432,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         : 'unmerge'
       : null;
 
+    // A multi-area selection has no single merge result. The control is also
+    // disabled during hydration, but retain this guard for stale event state.
+    if ((state.selection.extraRanges?.length ?? 0) > 0 && mergeAction) return;
+    // Structural merge authorization has no safe dialog intent yet. A
+    // registered restricted controller must reject the complete composite
+    // action before formatting or confirmation can mutate anything.
+    if (mergeAction && interactionControllerFor(store)?.policy) return;
+
     // Ask before any format, value, or merge mutation. The no-loss path does
     // not await, preserving the synchronous behavior of existing callers.
     if (mergeAction === 'merge' && !liveWb && mergeHasNonAnchorContent(state, mergeRange)) return;
@@ -1192,32 +1447,32 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       waitingForConfirmation = true;
       if (!(await confirmMergeLoseData(strings, state, mergeRange))) return;
     }
-    const outlineSide = activeSide();
-    const applyOutlineToRange = (target: State, targetRange: Range): void => {
-      if (rangeArea(targetRange) > MAX_OUTLINE_BORDER_CELLS) return;
-      for (let row = targetRange.r0; row <= targetRange.r1; row += 1) {
-        for (let col = targetRange.c0; col <= targetRange.c1; col += 1) {
-          const borders: CellFormat['borders'] = {};
-          if (row === targetRange.r0) borders.top = outlineSide;
-          if (row === targetRange.r1) borders.bottom = outlineSide;
-          if (col === targetRange.c0) borders.left = outlineSide;
-          if (col === targetRange.c1) borders.right = outlineSide;
-          if (Object.keys(borders).length > 0) {
-            applyFormatPatch(
-              target,
-              store,
-              { sheet: targetRange.sheet, r0: row, c0: col, r1: row, c1: col },
-              { borders },
-              { allowPending: false },
-            );
-          }
-        }
-      }
+
+    const touchedPatch = buildTouchedDialogPatch(draft, touchedFields, defaultPatternFor);
+    let actionPatch: Partial<CellFormat> = touchedPatch;
+    let borderAction: SelectionFormatAction['border'];
+    if (pendingBorderPreset) {
+      const { borders: _borders, ...withoutBorders } = touchedPatch;
+      actionPatch = withoutBorders;
+      borderAction = {
+        preset: pendingBorderPreset,
+        style: draft.borderStyle,
+        ...(draft.borderColor !== undefined ? { color: draft.borderColor } : {}),
+      };
+    }
+    const hasFormatAction = Object.keys(actionPatch).length > 0 || borderAction !== undefined;
+    if (!hasFormatAction && !mergeAction) {
+      api.close();
+      return;
+    }
+
+    const action: SelectionFormatAction = {
+      patch: actionPatch,
+      ...(borderAction ? { border: borderAction } : {}),
     };
-    // F4 repeats the formatting the dialog produced, not the cell-identity
-    // fields it also edits: a hyperlink, comment or validation rule belongs to
-    // the cell it was authored on, and merging reshapes the range rather than
-    // formatting it.
+
+    // F4 repeats only formatting, never cell-identity metadata. It resolves a
+    // fresh selection, workbook, policy, and plan at invocation time.
     const {
       hyperlink: _hyperlink,
       hyperlinkDisplay: _hyperlinkDisplay,
@@ -1226,54 +1481,119 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       commentAuthor: _commentAuthor,
       validation: _validation,
       ...repeatablePatch
-    } = patch;
-    const repeatFormatting = (): void => {
-      const current = store.getState();
-      const target = current.selection.range;
-      const outline =
-        pendingBorderPreset === 'outline' && (target.r0 !== target.r1 || target.c0 !== target.c1);
-      recordFormatChangeWithRepeat(
-        history,
-        store,
-        () => {
-          const wrote = applyFormatPatch(current, store, target, repeatablePatch, {
-            allowPending: false,
-          });
-          if (wrote && outline) applyOutlineToRange(current, target);
-        },
-        repeatFormatting,
-      );
-      if (liveWb) flushFormatToEngine(liveWb, store, target.sheet);
+    } = actionPatch;
+    const repeatAction: SelectionFormatAction = {
+      patch: structuredClone(repeatablePatch),
+      ...(borderAction ? { border: structuredClone(borderAction) } : {}),
     };
-    if (history) history.begin();
+    const hasRepeatAction = Object.keys(repeatablePatch).length > 0 || borderAction !== undefined;
+    let repeatFormatting: (() => void) | undefined;
+    if (hasRepeatAction) {
+      repeatFormatting = (): void => {
+        const current = store.getState();
+        const currentPlan = planSelectionFormat(current);
+        if (!currentPlan) return;
+        const currentWb = getWb();
+        recordDialogFormatChange({
+          history,
+          store,
+          workbook: currentWb,
+          sheet: current.selection.range.sheet,
+          targets: currentPlan.cells,
+          pendingBefore: current.ui.pendingFormat,
+          mutate: () =>
+            applySelectionFormatAction(current, store, repeatAction, {
+              allowPending: false,
+              origin: 'instanceApi',
+              commandId: 'formatCells',
+            }),
+          repeat: repeatFormatting,
+        });
+      };
+    }
+
+    // A merge is a legacy multi-child history action. Use an ephemeral history
+    // when the caller did not provide one so a later merge failure can abort
+    // the already-applied format child atomically.
+    const actionHistory = mergeAction && !history ? new History() : history;
+    const transaction = mergeAction && actionHistory ? actionHistory.begin() : undefined;
+    let transactionOpen = transaction !== undefined;
+    const abortTransaction = (): void => {
+      if (!transaction || !actionHistory || !transactionOpen) return;
+      transactionOpen = false;
+      try {
+        actionHistory.abort(transaction);
+      } finally {
+        // Scoped material replay intentionally preserves a later pending
+        // format. A failed composite dialog action instead restores the exact
+        // pre-action pending snapshot.
+        mutators.setPendingFormat(store, state.ui.pendingFormat);
+      }
+    };
+    let completed = false;
     try {
-      recordFormatChangeWithRepeat(
-        history,
-        store,
-        () => {
-          const wroteFormat = applyFormatPatch(state, store, range, patch, { allowPending: false });
-          if (wroteFormat && useRangeOutline) applyOutlineToRange(state, range);
-        },
-        repeatFormatting,
-      );
+      if (hasFormatAction) {
+        const wrote = recordDialogFormatChange({
+          history: actionHistory,
+          store,
+          workbook: liveWb,
+          sheet: range.sheet,
+          targets: plan.cells,
+          pendingBefore: state.ui.pendingFormat,
+          mutate: () =>
+            applySelectionFormatAction(store.getState(), store, action, {
+              allowPending: false,
+              origin: 'instanceApi',
+              commandId: 'formatCells',
+            }),
+          repeat: repeatFormatting,
+          registerRepeat: !transaction,
+        });
+        if (!wrote) {
+          abortTransaction();
+          return;
+        }
+      }
       if (mergeAction === 'merge') {
         if (mergeRange.r0 !== mergeRange.r1 || mergeRange.c0 !== mergeRange.c1) {
-          if (liveWb) {
-            applyMerge(store, liveWb, history, mergeRange);
-          } else {
-            recordMergesChangeWithEngine(history, store, null, mergeRange.sheet, () => {
-              mutators.mergeRange(store, mergeRange);
-            });
+          const merged = liveWb
+            ? applyMerge(store, liveWb, actionHistory, mergeRange)
+            : (() => {
+                recordMergesChangeWithEngine(actionHistory, store, null, mergeRange.sheet, () => {
+                  mutators.mergeRange(store, mergeRange);
+                });
+                return true;
+              })();
+          if (!merged) {
+            abortTransaction();
+            return;
           }
         }
       } else if (mergeAction === 'unmerge') {
-        applyUnmerge(store, liveWb, history, range);
+        if (!applyUnmerge(store, liveWb, actionHistory, range)) {
+          abortTransaction();
+          return;
+        }
       }
-    } finally {
-      if (history) history.end();
+      if (transaction && actionHistory) {
+        actionHistory.end(transaction);
+        transactionOpen = false;
+        if (hasFormatAction && repeatFormatting) actionHistory.setRepeat(repeatFormatting);
+      }
+      completed = true;
+    } catch (error) {
+      try {
+        abortTransaction();
+      } catch (abortError) {
+        throw new AggregateError(
+          [error, abortError],
+          'Format dialog transaction failed and its rollback failed',
+          { cause: error },
+        );
+      }
+      throw error;
     }
-    if (liveWb) flushFormatToEngine(liveWb, store, range.sheet);
-    api.close();
+    if (completed) api.close();
   };
 
   // ── Event handlers ─────────────────────────────────────────────────────
@@ -1327,6 +1647,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const setNumberCategory = (id: NumberCategory): void => {
+    touch('numFmt');
     const previous = draft.numberCategory;
     draft.numberCategory = id;
     if (previous !== id) {
@@ -1375,14 +1696,18 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const onDecimalsInput = (): void => {
+    touch('numFmt');
     const n = Number.parseInt(decimalsInput.value, 10);
     if (Number.isFinite(n)) draft.decimals = Math.max(0, Math.min(10, n));
+    syncControlsFromDraft();
     syncNegativeSamples();
     renderPreview();
   };
 
   const onThousandsChange = (): void => {
+    touch('numFmt');
     draft.thousands = thousandsCk.input.checked;
+    syncControlsFromDraft();
     syncNegativeSamples();
     renderPreview();
   };
@@ -1391,26 +1716,33 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const item = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-fc-negative-style]');
     const style = item?.dataset.fcNegativeStyle as NegativeStyle | undefined;
     if (!style) return;
+    touch('numFmt');
     draft.negativeStyle = style;
     syncControlsFromDraft();
     renderPreview();
   };
 
   const onSymbolChange = (): void => {
+    touch('numFmt');
     draft.currencySymbol = symbolSelect.value;
+    syncControlsFromDraft();
     syncNegativeSamples();
     renderPreview();
   };
 
   const onPatternInput = (): void => {
+    touch('numFmt');
     draft.pattern = patternInput.value;
+    syncControlsFromDraft();
     syncPatternPresetOptions();
     renderPreview();
   };
 
   const onPatternPresetChange = (): void => {
+    touch('numFmt');
     draft.pattern = patternPresetSelect.value;
     patternInput.value = draft.pattern;
+    syncControlsFromDraft();
     renderPreview();
   };
 
@@ -1421,8 +1753,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (!target) return;
     const pattern = target.dataset.fcPattern;
     if (!pattern) return;
+    touch('numFmt');
     draft.pattern = pattern;
     patternInput.value = pattern;
+    syncControlsFromDraft();
     syncPatternPresetOptions();
     renderPreview();
   };
@@ -1430,6 +1764,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const onHAlignChange = (e: Event): void => {
     const r = e.target as HTMLInputElement;
     if (!r.checked) return;
+    touch('align');
+    if (draft.align === 'distributed' && r.value !== 'distributed') touch('justifyLastLine');
     draft.align = r.value === 'default' ? undefined : (r.value as CellAlign);
     if (draft.align !== 'distributed') draft.justifyLastLine = false;
     syncJustifyLastLineAvailability();
@@ -1439,12 +1775,15 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const onVAlignChange = (e: Event): void => {
     const r = e.target as HTMLInputElement;
     if (!r.checked) return;
+    touch('vAlign');
     draft.vAlign = r.value === 'default' ? undefined : (r.value as CellVAlign);
     vAlignSelect.value = r.value;
     renderPreview();
   };
   const onHAlignSelectChange = (): void => {
     const value = hAlignSelect.value as 'default' | CellAlign;
+    touch('align');
+    if (draft.align === 'distributed' && value !== 'distributed') touch('justifyLastLine');
     draft.align = value === 'default' ? undefined : value;
     if (draft.align !== 'distributed') draft.justifyLastLine = false;
     syncJustifyLastLineAvailability();
@@ -1453,32 +1792,39 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
   const onVAlignSelectChange = (): void => {
     const value = vAlignSelect.value as 'default' | CellVAlign;
+    touch('vAlign');
     draft.vAlign = value === 'default' ? undefined : value;
     for (const [id, r] of vAlignRadios) r.checked = id === value;
     renderPreview();
   };
   const onWrapChange = (): void => {
+    touch('wrap');
     draft.wrap = wrapCk.input.checked;
     renderPreview();
   };
   const onJustifyLastLineChange = (): void => {
+    touch('justifyLastLine');
     draft.justifyLastLine = justifyLastLineCk.input.checked;
     renderPreview();
   };
   const onShrinkToFitChange = (): void => {
+    touch('shrinkToFit');
     draft.shrinkToFit = shrinkCk.input.checked;
     renderPreview();
   };
   const onIndentInput = (): void => {
+    touch('indent');
     const n = Number.parseInt(indentInput.value, 10);
     if (Number.isFinite(n)) draft.indent = Math.max(0, Math.min(15, n));
     renderPreview();
   };
   const onTextDirectionChange = (): void => {
+    touch('textDirection');
     draft.textDirection = textDirectionSelect.value as TextDirection;
     renderPreview();
   };
   const onRotationInput = (): void => {
+    touch('rotation');
     const n = Number.parseInt(rotationInput.value, 10);
     if (Number.isFinite(n)) draft.rotation = Math.max(-90, Math.min(90, n));
     renderPreview();
@@ -1495,24 +1841,28 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (!dot) return;
     const angle = Number.parseInt(dot.dataset.fcAngle ?? '0', 10);
     if (!Number.isFinite(angle)) return;
+    touch('rotation');
     draft.rotation = Math.max(-90, Math.min(90, angle));
     rotationInput.value = String(draft.rotation);
     renderPreview();
   };
 
   const onBoldChange = (): void => {
+    touch('bold');
     draft.bold = boldCk.input.checked;
     normalFontCk.input.checked = false;
-    syncFontStyleList();
+    syncControlsFromDraft();
     renderPreview();
   };
   const onItalicChange = (): void => {
+    touch('italic');
     draft.italic = italicCk.input.checked;
     normalFontCk.input.checked = false;
-    syncFontStyleList();
+    syncControlsFromDraft();
     renderPreview();
   };
   const onUnderlineChange = (): void => {
+    touch('underline');
     switch (underlineSelect.value) {
       case 'single':
       case 'double':
@@ -1524,14 +1874,18 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         draft.underline = false;
     }
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
   };
   const onStrikeChange = (): void => {
+    touch('strike');
     draft.strike = strikeCk.input.checked;
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
   };
   const onSuperscriptChange = (): void => {
+    touch('fontVertAlign');
     if (superscriptCk.input.checked) {
       draft.fontVertAlign = 'superscript';
       subscriptCk.input.checked = false;
@@ -1539,9 +1893,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       draft.fontVertAlign = undefined;
     }
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
   };
   const onSubscriptChange = (): void => {
+    touch('fontVertAlign');
     if (subscriptCk.input.checked) {
       draft.fontVertAlign = 'subscript';
       superscriptCk.input.checked = false;
@@ -1549,10 +1905,21 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       draft.fontVertAlign = undefined;
     }
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
   };
   const onNormalFontChange = (): void => {
     if (!normalFontCk.input.checked) return;
+    touch(
+      'bold',
+      'italic',
+      'underline',
+      'strike',
+      'fontVertAlign',
+      'fontFamily',
+      'fontSize',
+      'color',
+    );
     draft.bold = false;
     draft.italic = false;
     draft.underline = false;
@@ -1569,40 +1936,49 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const item = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-fc-font-style]');
     const style = item?.dataset.fcFontStyle;
     if (!style) return;
+    touch('bold', 'italic');
     draft.bold = style === 'bold' || style === 'boldItalic';
     draft.italic = style === 'italic' || style === 'boldItalic';
     boldCk.input.checked = draft.bold;
     italicCk.input.checked = draft.italic;
     normalFontCk.input.checked = false;
-    syncFontStyleList();
+    syncControlsFromDraft();
     renderPreview();
   };
 
   const onFamilyInput = (): void => {
+    touch('fontFamily');
     draft.fontFamily = familyInput.value;
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
   };
 
   const onSizeInput = (): void => {
+    touch('fontSize');
     if (sizeInput.value === '') {
       draft.fontSize = undefined;
     } else {
       const n = Number.parseInt(sizeInput.value, 10);
-      if (Number.isFinite(n)) draft.fontSize = Math.max(8, Math.min(72, n));
+      if (Number.isFinite(n)) draft.fontSize = Math.max(1, Math.min(409, n));
     }
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
   };
 
   const onColorInput = (): void => {
+    touch('color');
     draft.color = colorInput.value;
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
   };
   const onColorReset = (): void => {
+    touch('color');
     draft.color = undefined;
     fontSwatches.setValue(null);
+    syncControlsFromDraft();
     renderPreview();
   };
 
@@ -1611,9 +1987,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
     const color = btn?.dataset.color;
     if (!color) return;
+    touch('color');
     draft.color = color;
     colorInput.value = color;
     normalFontCk.input.checked = false;
+    syncControlsFromDraft();
     renderPreview();
     fontPalette.setOpen(false);
     fontSwatchesToggle.focus();
@@ -1665,12 +2043,21 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const onPresetNone = (): void => {
+    touch(
+      'border.top',
+      'border.right',
+      'border.bottom',
+      'border.left',
+      'border.diagonalDown',
+      'border.diagonalUp',
+    );
     pendingBorderPreset = 'none';
     draft.borders = {};
     syncControlsFromDraft();
     renderPreview();
   };
   const onPresetOutline = (): void => {
+    touch('border.top', 'border.right', 'border.bottom', 'border.left');
     pendingBorderPreset = 'outline';
     draft.borders = {
       top: activeSide(),
@@ -1682,6 +2069,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     renderPreview();
   };
   const onPresetAll = (): void => {
+    touch('border.top', 'border.right', 'border.bottom', 'border.left');
     pendingBorderPreset = 'all';
     draft.borders = {
       top: activeSide(),
@@ -1694,31 +2082,37 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const onTopChange = (): void => {
+    touch('border.top');
     pendingBorderPreset = null;
     setSide('top', topCk.input.checked);
     renderPreview();
   };
   const onBottomChange = (): void => {
+    touch('border.bottom');
     pendingBorderPreset = null;
     setSide('bottom', bottomCk.input.checked);
     renderPreview();
   };
   const onLeftChange = (): void => {
+    touch('border.left');
     pendingBorderPreset = null;
     setSide('left', leftCk.input.checked);
     renderPreview();
   };
   const onRightChange = (): void => {
+    touch('border.right');
     pendingBorderPreset = null;
     setSide('right', rightCk.input.checked);
     renderPreview();
   };
   const onDiagDownChange = (): void => {
+    touch('border.diagonalDown');
     pendingBorderPreset = null;
     setSide('diagonalDown', diagDownCk.input.checked);
     renderPreview();
   };
   const onDiagUpChange = (): void => {
+    touch('border.diagonalUp');
     pendingBorderPreset = null;
     setSide('diagonalUp', diagUpCk.input.checked);
     renderPreview();
@@ -1727,6 +2121,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-border-side]');
     if (!btn) return;
     const key = btn.dataset.borderSide as SideKey;
+    touch(`border.${key}` as FormatDialogField);
     pendingBorderPreset = null;
     setSide(key, !draft.borders[key]);
     syncControlsFromDraft();
@@ -1734,15 +2129,20 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const onFillInput = (): void => {
+    touch('fill');
     draft.fill = fillInput.value;
+    syncControlsFromDraft();
     renderPreview();
   };
   const onFillReset = (): void => {
+    touch('fill');
     draft.fill = undefined;
     fillSwatches.setValue(null);
+    syncControlsFromDraft();
     renderPreview();
   };
   const onFillPatternChange = (): void => {
+    touch('fillPattern');
     draft.fillPattern = (fillPatternSelect.value || undefined) as FillPattern | undefined;
     syncControlsFromDraft();
     renderPreview();
@@ -1754,107 +2154,148 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     onFillPatternChange();
   };
   const onFillPatternColorInput = (): void => {
+    touch('fillPatternColor');
     draft.fillPatternColor = fillPatternColorInput.value;
+    syncControlsFromDraft();
     renderPreview();
   };
   const onFillSwatchClick = (e: Event): void => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
     const color = btn?.dataset.color;
     if (!color) return;
+    touch('fill');
     draft.fill = color;
     fillInput.value = color;
+    syncControlsFromDraft();
     renderPreview();
   };
 
   const onLockedChange = (): void => {
+    touch('locked');
     draft.locked = lockedCk.input.checked;
   };
   const onHiddenFormulaChange = (): void => {
+    touch('formulaHidden');
     draft.formulaHidden = hiddenFormulaCk.input.checked;
   };
 
   // More tab events
   const onHlInput = (): void => {
+    touch('hyperlink');
     draft.hyperlink = hlInput.value;
   };
   const onHlClear = (): void => {
+    touch('hyperlink');
     draft.hyperlink = '';
     hlInput.value = '';
   };
   const onCommentInput = (): void => {
+    touch('comment');
     draft.comment = commentArea.value;
   };
   const onCommentClear = (): void => {
+    touch('comment');
     draft.comment = '';
     commentArea.value = '';
   };
   const onValidationInput = (): void => {
+    touch('validation');
     draft.validationList = validationArea.value;
+    syncControlsFromDraft();
   };
   const onValidationClear = (): void => {
+    touch('validation');
     draft.validationList = '';
     validationArea.value = '';
+    syncControlsFromDraft();
   };
   const onValidationListRangeInput = (): void => {
+    touch('validation');
     draft.validationListRange = validationListRangeInput.value;
+    syncControlsFromDraft();
   };
   const onValidationListSourceKindChange = (): void => {
+    touch('validation');
     if (validationListLiteralRadio.input.checked) draft.validationListSourceKind = 'literal';
     else if (validationListRangeRadio.input.checked) draft.validationListSourceKind = 'range';
-    syncValidationVisibility();
+    syncControlsFromDraft();
   };
   const onValidationShowDropdownChange = (): void => {
+    touch('validation');
     draft.validationShowDropdown = validationShowDropdownInput.checked;
+    syncControlsFromDraft();
   };
   const onValidationKindChange = (): void => {
+    touch('validation');
     draft.validationKind = validationKindSelect.value as ValidationKind;
     // Switching between numeric / date / time kinds swaps the bound-input type,
     // so re-render the stored bounds in the new type's value format.
     applyBoundInputMode(draft.validationKind);
     validationAInput.value = boundInputValue(draft.validationKind, draft.validationA);
     validationBInput.value = boundInputValue(draft.validationKind, draft.validationB);
-    syncValidationVisibility();
+    syncControlsFromDraft();
   };
   const onValidationOpChange = (): void => {
+    touch('validation');
     draft.validationOp = validationOpSelect.value as ValidationOp;
-    syncValidationVisibility();
+    syncControlsFromDraft();
   };
   const onValidationAInput = (): void => {
+    touch('validation');
     const n = parseBoundInputValue(draft.validationKind, validationAInput.value);
     if (n !== null) draft.validationA = n;
+    syncControlsFromDraft();
   };
   const onValidationBInput = (): void => {
+    touch('validation');
     const n = parseBoundInputValue(draft.validationKind, validationBInput.value);
     if (n !== null) draft.validationB = n;
+    syncControlsFromDraft();
   };
   const onValidationFormulaInput = (): void => {
+    touch('validation');
     draft.validationFormula = validationFormulaInput.value;
+    syncControlsFromDraft();
   };
   const onValidationAllowBlankChange = (): void => {
+    touch('validation');
     draft.validationAllowBlank = validationAllowBlankInput.checked;
+    syncControlsFromDraft();
   };
   const onValidationErrorStyleChange = (): void => {
+    touch('validation');
     draft.validationErrorStyle = validationErrorStyleSelect.value as ValidationErrorStyle;
+    syncControlsFromDraft();
   };
   const onValidationShowInputMessageChange = (): void => {
+    touch('validation');
     draft.validationShowInputMessage = validationShowInputMessageInput.checked;
-    syncValidationVisibility();
+    syncControlsFromDraft();
   };
   const onValidationPromptTitleInput = (): void => {
+    touch('validation');
     draft.validationPromptTitle = validationPromptTitleInput.value;
+    syncControlsFromDraft();
   };
   const onValidationPromptMessageInput = (): void => {
+    touch('validation');
     draft.validationPromptMessage = validationPromptMessageArea.value;
+    syncControlsFromDraft();
   };
   const onValidationShowErrorMessageChange = (): void => {
+    touch('validation');
     draft.validationShowErrorMessage = validationShowErrorMessageInput.checked;
-    syncValidationVisibility();
+    syncControlsFromDraft();
   };
   const onValidationErrorTitleInput = (): void => {
+    touch('validation');
     draft.validationErrorTitle = validationErrorTitleInput.value;
+    syncControlsFromDraft();
   };
   const onValidationErrorMessageInput = (): void => {
+    touch('validation');
     draft.validationErrorMessage = validationErrorMessageArea.value;
+    syncControlsFromDraft();
   };
 
   const onOk = (): void => {
@@ -1999,6 +2440,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       if (tab && tabButtons.has(tab)) setActiveTab(tab);
       if (options?.mode === 'dataValidation') setActiveTab('more');
       shell.open();
+      if (mixedFields.size > 0) {
+        syncMixedControls();
+        syncCustomSelects(overlay);
+      }
       requestAnimationFrame(() => {
         if (options?.focus === 'validation' || options?.mode === 'dataValidation') {
           validationKindSelect.focus();

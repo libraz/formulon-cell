@@ -54,9 +54,11 @@ export type {
 } from './types.js';
 export { dedupeById, flattenExtensions, sortByPriority } from './types.js';
 export type {
+  ResolvedSpreadsheetPlatform,
   ResolvedSpreadsheetUiOptions,
   SpreadsheetFeatureSwitches,
+  SpreadsheetPlatform,
   SpreadsheetUiOptions,
   SpreadsheetUiProfile,
 } from './ui-options.js';
-export { resolveSpreadsheetUiOptions } from './ui-options.js';
+export { resolveSpreadsheetPlatform, resolveSpreadsheetUiOptions } from './ui-options.js';

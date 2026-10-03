@@ -4,6 +4,7 @@ import {
   FUNCTION_NAMES,
   FUNCTION_SIGNATURES,
   findActiveSignature,
+  findFunctionCallAtCaret,
   formatA1FormulaAsR1C1,
   normalizeR1C1Formula,
   shiftFormulaRefs,
@@ -114,6 +115,10 @@ describe('shiftFormulaRefs', () => {
 });
 
 describe('findActiveSignature', () => {
+  it('includes the ACOS argument label in the static help signature', () => {
+    expect(FUNCTION_SIGNATURES.ACOS).toEqual(['number']);
+  });
+
   it('returns null when caret is outside a function call', () => {
     expect(findActiveSignature('=A1+B2', 5)).toBeNull();
   });
@@ -162,6 +167,164 @@ describe('findActiveSignature', () => {
 
   it('does not resolve a bare name with no following paren', () => {
     expect(findActiveSignature('=SUM', 2)).toBeNull();
+  });
+
+  it('keeps the legacy null result just after a closed top-level call', () => {
+    const text = '=SUM(1)';
+    expect(findActiveSignature(text, text.length)).toBeNull();
+    const nested = '=SUM(IF(1))';
+    const innerClose = nested.indexOf(')', nested.indexOf('IF'));
+    expect(findActiveSignature(nested, innerClose + 1)?.name).toBe('SUM');
+  });
+
+  it('keeps an unknown innermost call from being masked by a known outer call', () => {
+    const text = '=SUM(UNKNOWN(1),2)';
+    const innerStart = text.indexOf('UNKNOWN');
+    expect(findActiveSignature(text, innerStart + 2)).toBeNull();
+    const innerClose = text.indexOf(')', innerStart);
+    expect(findActiveSignature(text, innerClose + 1)).toEqual({
+      name: 'SUM',
+      args: FUNCTION_SIGNATURES.SUM,
+      activeArgIndex: 0,
+    });
+  });
+});
+
+describe('findFunctionCallAtCaret', () => {
+  const resolve = (rawName: string): string | null => {
+    const canonical = rawName.toUpperCase();
+    return FUNCTION_SIGNATURES[canonical] ? canonical : null;
+  };
+
+  it('returns raw UTF-16 spans for an inner call in a compound formula', () => {
+    const text = '=1+SUM( A1 , IF(B1, "x,y", {2,3}) )*2';
+    const caret = text.indexOf('IF') + 4;
+    const span = findFunctionCallAtCaret(text, caret, resolve);
+    expect(span?.rawName).toBe('IF');
+    expect(span?.name).toEqual({ start: text.indexOf('IF'), end: text.indexOf('IF') + 2 });
+    expect(text.slice(span?.call.start, span?.call.end)).toBe('IF(B1, "x,y", {2,3})');
+    expect(span?.argumentSpans.map(({ start, end }) => text.slice(start, end))).toEqual([
+      'B1',
+      ' "x,y"',
+      ' {2,3}',
+    ]);
+    expect(span?.complete).toBe(true);
+    expect(span?.activeArgumentIndex).toBe(0);
+  });
+
+  it('uses the enclosing call exactly one position after an inner close', () => {
+    const text = '=SUM(IF(1,2),3)';
+    const innerClose = text.indexOf(')', text.indexOf('IF'));
+    const inner = findFunctionCallAtCaret(text, innerClose, resolve);
+    const outer = findFunctionCallAtCaret(text, innerClose + 1, resolve);
+    expect(inner?.canonicalName).toBe('IF');
+    expect(inner?.activeArgumentIndex).toBe(1);
+    expect(outer?.canonicalName).toBe('SUM');
+    expect(text.slice(outer?.call.start, outer?.call.end)).toBe(text.slice(1));
+    expect(outer?.activeArgumentIndex).toBe(0);
+    expect(findFunctionCallAtCaret(text, text.length, resolve)?.canonicalName).toBe('SUM');
+  });
+
+  it('falls through an unknown inner call to a live-resolved enclosing call', () => {
+    const text = '=LOCAL(UNKNOWN(1),2)';
+    const span = findFunctionCallAtCaret(text, text.indexOf('UNKNOWN') + 9, (rawName) =>
+      rawName === 'LOCAL' ? 'LOCAL.CANONICAL' : null,
+    );
+    expect(span?.rawName).toBe('LOCAL');
+    expect(span?.canonicalName).toBe('LOCAL.CANONICAL');
+    expect(span?.argumentSpans.map(({ start, end }) => text.slice(start, end))).toEqual([
+      'UNKNOWN(1)',
+      '2',
+    ]);
+  });
+
+  it('passes dotted and _xlfn names to the live resolver without normalizing raw spans', () => {
+    const text = '=_xlfn.BETA.DIST (1)';
+    const span = findFunctionCallAtCaret(text, text.indexOf('1'), (rawName) =>
+      rawName === '_xlfn.BETA.DIST' ? 'BETA.DIST' : null,
+    );
+    expect(span?.rawName).toBe('_xlfn.BETA.DIST');
+    expect(span?.canonicalName).toBe('BETA.DIST');
+    expect(text.slice(span?.name.start, span?.name.end)).toBe('_xlfn.BETA.DIST');
+    expect(text.slice(span?.call.start, span?.call.end)).toBe('=_xlfn.BETA.DIST (1)'.slice(1));
+  });
+
+  it('keeps emoji prefixes in UTF-16 offsets and preserves the source text', () => {
+    const text = '="😀"+SUM(A1)';
+    const span = findFunctionCallAtCaret(text, text.indexOf('A1') + 1, resolve);
+    expect(span?.name).toEqual({ start: text.indexOf('SUM'), end: text.indexOf('SUM') + 3 });
+    expect(span?.call).toEqual({ start: text.indexOf('SUM'), end: text.length });
+    expect(text.slice(span?.argumentSpans[0]?.start, span?.argumentSpans[0]?.end)).toBe('A1');
+  });
+
+  it('ignores commas in doubled quotes, arrays, and escaped structured references', () => {
+    const text = '=SUM("a,b","a""b",{1,2},Table1[[#This Row],[Col\'[x\']#\'@\'\'x]])';
+    const span = findFunctionCallAtCaret(text, text.indexOf('Col'), resolve);
+    expect(span?.argumentSpans.map(({ start, end }) => text.slice(start, end))).toEqual([
+      '"a,b"',
+      '"a""b"',
+      '{1,2}',
+      "Table1[[#This Row],[Col'[x']#'@''x]]",
+    ]);
+    expect(span?.activeArgumentIndex).toBe(3);
+  });
+
+  it('ignores commas in doubled apostrophe sheet quotes', () => {
+    const text = "=SUM('O''Brien, West'!A1,2)";
+    const span = findFunctionCallAtCaret(text, text.indexOf('Brien'), resolve);
+    expect(span?.argumentSpans.map(({ start, end }) => text.slice(start, end))).toEqual([
+      "'O''Brien, West'!A1",
+      '2',
+    ]);
+  });
+
+  it('keeps explicit and trailing blank argument spans zero-length', () => {
+    const text = '=SUM(1,,)';
+    const firstComma = text.indexOf(',');
+    const secondComma = text.indexOf(',', firstComma + 1);
+    const span = findFunctionCallAtCaret(text, secondComma, resolve);
+    expect(span?.argumentSpans.map(({ start, end }) => [start, end])).toEqual([
+      [5, 6],
+      [secondComma, secondComma],
+      [secondComma + 1, secondComma + 1],
+    ]);
+    expect(span?.activeArgumentIndex).toBe(1);
+    expect(findFunctionCallAtCaret(text, secondComma + 1, resolve)?.activeArgumentIndex).toBe(2);
+    const empty = '=SUM()';
+    expect(findFunctionCallAtCaret(empty, empty.length, resolve)?.argumentSpans).toEqual([
+      { start: 5, end: 5 },
+    ]);
+  });
+
+  it('preserves raw whitespace in nonblank argument ranges', () => {
+    const text = '=SUM(  A1  ,B1 )';
+    const span = findFunctionCallAtCaret(text, text.indexOf('B1'), resolve);
+    expect(span?.argumentSpans.map(({ start, end }) => text.slice(start, end))).toEqual([
+      '  A1  ',
+      'B1 ',
+    ]);
+  });
+
+  it('reports EOF-incomplete calls and rejects crossed delimiters', () => {
+    const incomplete = '=SUM(IF(1,2),';
+    const span = findFunctionCallAtCaret(incomplete, incomplete.length, resolve);
+    expect(span?.canonicalName).toBe('SUM');
+    expect(span?.closeParen).toBeNull();
+    expect(span?.complete).toBe(false);
+    expect(span?.argumentSpans.map(({ start, end }) => incomplete.slice(start, end))).toEqual([
+      'IF(1,2)',
+      '',
+    ]);
+    expect(findFunctionCallAtCaret('=SUM({1,2],3)', 8, resolve)).toBeNull();
+    expect(findFunctionCallAtCaret('=SUM("unterminated)', 8, resolve)?.complete).toBe(false);
+  });
+
+  it('rejects nonformulas and invalid caret positions', () => {
+    const text = '=SUM(1)';
+    expect(findFunctionCallAtCaret('SUM(1)', 4, resolve)).toBeNull();
+    expect(findFunctionCallAtCaret(text, -1, resolve)).toBeNull();
+    expect(findFunctionCallAtCaret(text, text.length + 1, resolve)).toBeNull();
+    expect(findFunctionCallAtCaret(text, 1.5, resolve)).toBeNull();
   });
 });
 

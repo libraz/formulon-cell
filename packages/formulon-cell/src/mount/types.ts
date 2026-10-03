@@ -25,6 +25,7 @@ import type { ClipboardHandle } from '../interact/clipboard.js';
 import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialog.js';
 import type { ContextMenuOptions } from '../interact/context-menu-options.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
+import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
 import type { ViewportOptions } from '../interact/navigation-policy.js';
 import type { OverlayOptions } from '../interact/overlay-portal.js';
 import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
@@ -32,6 +33,8 @@ import type { StatusBarUploadStatus } from '../interact/status-bar.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 import type { SheetProtectionPermissions } from '../store/types.js';
 import type { MountToolbarOptions, ToolbarInstance } from './toolbar.js';
+
+export type { FunctionCategory, FxDialogOpenOptions } from '../interact/fx-dialog.js';
 
 export interface MountOptions {
   workbook?: WorkbookHandle;
@@ -156,7 +159,7 @@ export interface SpreadsheetInstance {
   openCfRulesDialog(): void;
   openCellStylesGallery(): void;
   openEvaluateFormulaDialog(): void;
-  openFunctionArguments(seedName?: string): void;
+  openFunctionArguments(seedName?: string, options?: FxDialogOpenOptions): void;
   openHyperlinkDialog(): void;
   openCommentDialog(): void;
   openDefineNameDialog(): void;

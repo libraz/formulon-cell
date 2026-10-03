@@ -5,6 +5,7 @@ import {
   backstageMenuText,
   buildRibbonModel,
   conditionalMenuText,
+  EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   excelRibbonIconPaths,
   fluentIconPaths,
@@ -505,6 +506,23 @@ describe('toolbar/ribbon-model', () => {
       'help',
     ]);
     expect(tabs).not.toEqual(expect.arrayContaining([...OPTIONAL_RIBBON_TABS]));
+  });
+
+  it('defines the compact macOS Microsoft 365 tab surface without File or Help', () => {
+    expect(EXCEL365_MAC_RIBBON_TABS).toEqual([
+      'home',
+      'insert',
+      'draw',
+      'pageLayout',
+      'formulas',
+      'data',
+      'review',
+      'view',
+      'automate',
+    ]);
+    expect(buildRibbonModel('en', { tabs: EXCEL365_MAC_RIBBON_TABS }).map((tab) => tab.id)).toEqual(
+      [...EXCEL365_MAC_RIBBON_TABS],
+    );
   });
 
   it('keeps Excel 365 command placement for names, duplicates, and links', () => {

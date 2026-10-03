@@ -9,6 +9,8 @@ import {
 import { hyperlinkAt, setHyperlink } from '../../../src/commands/hyperlinks.js';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/address.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import type { MountToolbarOptions } from '../../../src/mount/toolbar.js';
 import { createDefaultRibbonMenus } from '../../../src/mount/toolbar-defaults.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { getPageSetup, mutators } from '../../../src/store/store.js';
@@ -208,6 +210,22 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(host.children.length).toBe(0);
   });
 
+  it('rehomes an omitted File/Help tab when the inherited platform changes to Mac', () => {
+    sheet.instance.host.dataset.fcPlatform = 'default';
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    tb.setActiveTab('file');
+    expect(tb.getActiveTab()).toBe('file');
+    expect(host.querySelector('[data-ribbon-tab="file"]')).not.toBeNull();
+
+    sheet.instance.host.dataset.fcPlatform = 'mac';
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 0 });
+
+    expect(host.dataset.fcPlatform).toBe('mac');
+    expect(tb.getActiveTab()).toBe('home');
+    expect(host.querySelector('[data-ribbon-tab="file"]')).toBeNull();
+    expect(host.querySelector('[data-ribbon-tab="home"]')).not.toBeNull();
+  });
+
   it('provides default menu factories for every shared ribbon menu slot', () => {
     const menus = createDefaultRibbonMenus(sheet.instance);
     const missing = RIBBON_MENU_FACTORY_KEYS.filter((key) => typeof menus[key] !== 'function');
@@ -262,6 +280,40 @@ describe('Spreadsheet.mountToolbar', () => {
     });
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
 
+    tb.dispose();
+  });
+
+  it('retains the logical command id through a deferred custom format callback', () => {
+    const seen: string[] = [];
+    const deferred: Parameters<NonNullable<MountToolbarOptions['applyRibbonFormat']>>[0][] = [];
+    sheet.instance.commands.setPolicy({
+      operations: { format: true },
+      editable: () => true,
+      restrict: ({ intent }) => {
+        seen.push(`${intent.origin}:${intent.commandId ?? ''}`);
+        return intent.origin === 'ribbon' && intent.commandId === 'bold';
+      },
+    });
+    sheet.instance.store.setState((state) => ({
+      ...state,
+      selection: {
+        ...state.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        extraRanges: [{ sheet: 0, r0: 0, c0: 3, r1: 0, c1: 3 }],
+      },
+    }));
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      applyRibbonFormat: (fn) => deferred.push(fn),
+    });
+
+    expect(tb.applyCommand('bold')).toBe(true);
+    expect(deferred).toHaveLength(1);
+    deferred[0]?.(sheet.instance.store.getState(), sheet.instance.store);
+
+    expect(seen.filter((entry) => entry === 'ribbon:bold').length).toBeGreaterThanOrEqual(2);
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
+    expect(sheet.instance.store.getState().format.formats.get('0:0:3')?.bold).toBe(true);
     tb.dispose();
   });
 
@@ -596,6 +648,83 @@ describe('Spreadsheet.mountToolbar', () => {
 
     tb.dispose();
   });
+
+  it('reveals collapsed tabs without replacing buttons or changing the saved display mode', () => {
+    const onTabChange = vi.fn();
+    const onDisplayModeChange = vi.fn();
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      platform: 'mac',
+      ribbonDisplayMode: 'tabsOnly',
+      onTabChange,
+      onDisplayModeChange,
+    });
+    const home = host.querySelector<HTMLButtonElement>('[data-ribbon-tab="home"]');
+    const insert = host.querySelector<HTMLButtonElement>('[data-ribbon-tab="insert"]');
+    if (!home || !insert) throw new Error('Missing ribbon tabs');
+    home.click();
+    expect(host.querySelector('.fc-tb__ribbon-shell--peek')).toBeTruthy();
+    expect(host.querySelector('[data-ribbon-tab="home"]')).toBe(home);
+    expect(tb.getDisplayMode()).toBe('tabsOnly');
+    expect(onDisplayModeChange).not.toHaveBeenCalled();
+    expect(onTabChange).not.toHaveBeenCalled();
+    insert.click();
+    expect(host.querySelector('[data-ribbon-tab="insert"]')).toBe(insert);
+    expect(tb.getActiveTab()).toBe('insert');
+    expect(onTabChange).toHaveBeenCalledExactlyOnceWith('insert');
+    expect(host.querySelector<HTMLElement>('[data-ribbon-panel="home"]')?.hidden).toBe(true);
+    expect(host.querySelector<HTMLElement>('[data-ribbon-panel="insert"]')?.hidden).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(host.querySelector('.fc-tb__ribbon-shell--peek')).toBeFalsy();
+    expect(document.activeElement).toBe(insert);
+    tb.setActiveTab('data');
+    expect(host.querySelector('.fc-tb__ribbon-shell--peek')).toBeFalsy();
+    expect(tb.getDisplayMode()).toBe('tabsOnly');
+    insert.disabled = true;
+    tb.setActiveTab('insert');
+    expect(tb.getActiveTab()).toBe('data');
+    home.click();
+    expect(host.querySelector('.fc-tb__ribbon-shell--peek')).toBeTruthy();
+    expect(tb.applyCommand('bold')).toBe(true);
+    expect(host.querySelector('.fc-tb__ribbon-shell--peek')).toBeFalsy();
+    tb.dispose();
+  });
+
+  it('chooses an available initial tab when a host limits the ribbon tabs', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      ribbonTabs: ['home'],
+      activeTab: 'data',
+    });
+    expect(tb.getActiveTab()).toBe('home');
+    expect(host.querySelectorAll('[data-ribbon-tab][aria-selected="true"]')).toHaveLength(1);
+    expect(host.querySelector<HTMLElement>('[data-ribbon-panel="home"]')?.hidden).toBe(false);
+    tb.dispose();
+  });
+
+  it.each([false, true])(
+    'dismisses an intercepted command unless it opens a menu (%s)',
+    (opensMenu) => {
+      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+        helpers: stubHelpers(),
+        platform: 'mac',
+        ribbonDisplayMode: 'tabsOnly',
+        interceptCommand: (id) => {
+          if (id !== 'bold') return false;
+          if (opensMenu) {
+            const menu = host.querySelector<HTMLElement>('#menu-paste');
+            if (!menu) throw new Error('Missing paste menu');
+            menu.hidden = false;
+          }
+          return true;
+        },
+      });
+      host.querySelector<HTMLButtonElement>('[data-ribbon-tab="home"]')?.click();
+      host.querySelector<HTMLButtonElement>('[data-ribbon-command="bold"]')?.click();
+      expect(!!host.querySelector('.fc-tb__ribbon-shell--peek')).toBe(opensMenu);
+      tb.dispose();
+    },
+  );
 
   it('supports Excel-style ribbon display modes', () => {
     const onDisplayModeChange = vi.fn();
@@ -1738,6 +1867,45 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('enables Clear Contents for materialized cells in an extra selection only', () => {
+    seedText(sheet, 0, 1, 'extra');
+    sheet.instance.store.setState((state) => ({
+      ...state,
+      selection: {
+        ...state.selection,
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        extraRanges: [{ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }],
+      },
+    }));
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    const clearButton = host.querySelector<HTMLButtonElement>(
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+    );
+    expect(clearButton).toBeTruthy();
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'clearFormat', menuId: 'menu-clear' },
+      clearButton,
+    );
+
+    const clearContents = host.querySelector<HTMLButtonElement>('[data-clear="contents"]');
+    const clearAll = host.querySelector<HTMLButtonElement>('[data-clear="all"]');
+    expect(clearContents?.disabled).toBe(false);
+    expect(clearAll?.disabled).toBe(false);
+
+    const event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: clearContents });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+
+    tb.dispose();
+  });
+
   it('opens the Fill Series dialog from the Fill dropdown and applies it', async () => {
     seedNumber(sheet, 0, 0, 7);
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 });
@@ -2395,6 +2563,508 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('opens the Mac More Functions hierarchy with pointer, hover, and two-stage Escape', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    const opener = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.more"]',
+    );
+    const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-more');
+    const statistical = menu?.querySelector<HTMLElement>(
+      '[data-function-category-submenu="statistical"]',
+    );
+    const engineering = menu?.querySelector<HTMLElement>(
+      '[data-function-category-submenu="engineering"]',
+    );
+    const statisticalPanel = menu?.querySelector<HTMLElement>(
+      '[data-function-category-panel="statistical"]',
+    );
+    const engineeringPanel = menu?.querySelector<HTMLElement>(
+      '[data-function-category-panel="engineering"]',
+    );
+    if (!opener || !menu || !statistical || !engineering || !statisticalPanel || !engineeringPanel)
+      throw new Error('Missing Mac More Functions hierarchy.');
+
+    opener.click();
+    expect(menu.hidden).toBe(false);
+
+    const hover = new MouseEvent('mouseover', { bubbles: true });
+    Object.defineProperty(hover, 'target', { value: engineering });
+    const beforeHoverFocus = document.activeElement;
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownHover(hover)).toBe(true);
+    expect(engineeringPanel.hidden).toBe(false);
+    expect(statisticalPanel.hidden).toBe(true);
+    expect(document.activeElement).toBe(beforeHoverFocus);
+
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    Object.defineProperty(click, 'target', { value: statistical });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(click)).toBe(true);
+    expect(statisticalPanel.hidden).toBe(false);
+    expect(engineeringPanel.hidden).toBe(true);
+    expect(statistical.getAttribute('aria-expanded')).toBe('true');
+
+    statistical.focus();
+    const open = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowRight',
+    });
+    Object.defineProperty(open, 'target', { value: statistical });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(open)).toBe(true);
+    expect(statisticalPanel.querySelector<HTMLButtonElement>('button')).toBe(
+      document.activeElement,
+    );
+
+    const closeChild = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowLeft',
+    });
+    Object.defineProperty(closeChild, 'target', { value: document.activeElement });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(closeChild)).toBe(true);
+    expect(statisticalPanel.hidden).toBe(true);
+    expect(document.activeElement).toBe(statistical);
+
+    const closeRoot = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape',
+    });
+    Object.defineProperty(closeRoot, 'target', { value: statistical });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(closeRoot)).toBe(true);
+    expect(menu.hidden).toBe(true);
+    expect(document.activeElement).toBe(opener);
+
+    tb.dispose();
+  });
+
+  it('dismisses an all-disabled More child before its parent for pointer and keyboard opens', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    Object.defineProperty(workbook, 'functionNames', {
+      configurable: true,
+      value: () => ['CUBESET', 'CUBEVALUE'],
+    });
+    await sheet.instance.setWorkbook(workbook);
+    sheet.instance.commands.setPolicy({
+      editable: () => true,
+      operations: { formulaEdit: true },
+      defaultOperation: 'deny',
+      restrict: ({ commandId }) => !commandId?.startsWith('mac.function.CUBE'),
+    });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    const opener = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.more"]',
+    );
+    const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-more');
+    const cubeTrigger = menu?.querySelector<HTMLElement>('[data-function-category-submenu="cube"]');
+    const cubePanel = menu?.querySelector<HTMLElement>('[data-function-category-panel="cube"]');
+    if (!opener || !menu || !cubeTrigger || !cubePanel)
+      throw new Error('Missing disabled More Functions hierarchy.');
+
+    const cubeLeaves = (): HTMLButtonElement[] =>
+      Array.from(
+        cubePanel.querySelectorAll<HTMLButtonElement>('[data-ribbon-command^="mac.function."]'),
+      );
+    expect(cubeLeaves().length).toBeGreaterThan(0);
+    expect(cubeLeaves().every((button) => button.disabled)).toBe(true);
+
+    opener.click();
+    const pointerOpen = new MouseEvent('click', { bubbles: true, cancelable: true });
+    Object.defineProperty(pointerOpen, 'target', { value: cubeTrigger });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(pointerOpen)).toBe(true);
+    expect(cubePanel.hidden).toBe(false);
+
+    // Pointer opening can leave focus on the parent trigger. Escape must
+    // therefore dismiss the visible child before the More root.
+    const pointerEscape = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape',
+    });
+    Object.defineProperty(pointerEscape, 'target', { value: cubeTrigger });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(pointerEscape)).toBe(true);
+    expect(cubePanel.hidden).toBe(true);
+    expect(menu.hidden).toBe(false);
+    expect(document.activeElement).toBe(cubeTrigger);
+
+    const rootEscape = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape',
+    });
+    Object.defineProperty(rootEscape, 'target', { value: cubeTrigger });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(rootEscape)).toBe(true);
+    expect(menu.hidden).toBe(true);
+    expect(document.activeElement).toBe(opener);
+
+    opener.click();
+    cubeTrigger.focus();
+    const keyboardOpen = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowRight',
+    });
+    Object.defineProperty(keyboardOpen, 'target', { value: cubeTrigger });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(keyboardOpen)).toBe(true);
+    expect(cubePanel.hidden).toBe(false);
+
+    const keyboardClose = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowLeft',
+    });
+    Object.defineProperty(keyboardClose, 'target', { value: cubePanel });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(keyboardClose)).toBe(true);
+    expect(cubePanel.hidden).toBe(true);
+    expect(menu.hidden).toBe(false);
+    expect(document.activeElement).toBe(cubeTrigger);
+
+    const keyboardRootEscape = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape',
+    });
+    Object.defineProperty(keyboardRootEscape, 'target', { value: cubeTrigger });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownKeydown(keyboardRootEscape)).toBe(true);
+    expect(menu.hidden).toBe(true);
+    expect(document.activeElement).toBe(opener);
+
+    tb.dispose();
+  });
+
+  it('scrolls and horizontally clamps a tall Mac More submenu in a narrow viewport', () => {
+    const previousWidth = window.innerWidth;
+    const previousHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 360 });
+    try {
+      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+        platform: 'mac',
+        activeTab: 'formulas',
+        dynamicDropdowns: true,
+        helpers: stubHelpers(),
+      });
+      const opener = host.querySelector<HTMLButtonElement>(
+        '[data-ribbon-command="mac.formulas.more"]',
+      );
+      const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-more');
+      const trigger = menu?.querySelector<HTMLElement>(
+        '[data-function-category-submenu="statistical"]',
+      );
+      const panel = menu?.querySelector<HTMLElement>(
+        '[data-function-category-panel="statistical"]',
+      );
+      if (!opener || !menu || !trigger || !panel) throw new Error('Missing More submenu geometry.');
+
+      opener.click();
+      panel.style.maxHeight = '300px';
+      panel.style.overflowY = 'visible';
+      panel.style.overscrollBehavior = 'none';
+      menu.getBoundingClientRect = vi.fn(
+        () => ({ left: 8, right: 224, top: 20, bottom: 194, width: 216, height: 174 }) as DOMRect,
+      );
+      trigger.getBoundingClientRect = vi.fn(
+        () => ({ left: 8, right: 224, top: 20, bottom: 48, width: 216, height: 28 }) as DOMRect,
+      );
+      const measurePanel = vi.fn(() => {
+        expect(panel.style.maxHeight).toBe('');
+        expect(panel.style.overflowY).toBe('');
+        expect(panel.style.overscrollBehavior).toBe('');
+        return { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 } as DOMRect;
+      });
+      panel.getBoundingClientRect = measurePanel;
+      Object.defineProperty(panel, 'offsetWidth', { configurable: true, value: 216 });
+      Object.defineProperty(panel, 'offsetHeight', { configurable: true, value: 0 });
+      Object.defineProperty(panel, 'scrollHeight', { configurable: true, value: 3083 });
+
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: trigger });
+      expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+      expect(panel.hidden).toBe(false);
+      expect(panel.style.overflowY).toBe('auto');
+      expect(panel.style.overscrollBehavior).toBe('contain');
+      expect(panel.style.maxHeight).toBe('155px');
+      expect(panel.style.left).toBe('0px');
+      expect(panel.style.top).toBe('177px');
+      expect(8 + Number.parseInt(panel.style.left, 10)).toBeGreaterThanOrEqual(8);
+      expect(8 + Number.parseInt(panel.style.left, 10) + 216).toBeLessThanOrEqual(382);
+      expect(20 + Number.parseInt(panel.style.top, 10)).toBe(197);
+      expect(20 + Number.parseInt(panel.style.top, 10)).toBeGreaterThanOrEqual(194 + 3);
+      expect(20 + Number.parseInt(panel.style.top, 10) + 155).toBeLessThanOrEqual(352);
+      expect(measurePanel).toHaveBeenCalledTimes(1);
+
+      tb.dispose();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: previousWidth });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: previousHeight });
+    }
+  });
+
+  it.each([
+    {
+      name: 'above when above space wins',
+      viewportHeight: 260,
+      menu: { top: 100, bottom: 220, height: 120 },
+      expectedTop: -92,
+      expectedHeight: 89,
+      expectedPageTop: 8,
+      expectedPageBottom: 97,
+    },
+    {
+      name: 'below with a sub-row viewport cap',
+      viewportHeight: 240,
+      menu: { top: 20, bottom: 194, height: 174 },
+      expectedTop: 177,
+      expectedHeight: 35,
+      expectedPageTop: 197,
+      expectedPageBottom: 232,
+    },
+  ])(
+    'stacks a narrow More submenu $name without overlapping its parent',
+    ({
+      viewportHeight,
+      menu: menuGeometry,
+      expectedTop,
+      expectedHeight,
+      expectedPageTop,
+      expectedPageBottom,
+    }) => {
+      const previousWidth = window.innerWidth;
+      const previousHeight = window.innerHeight;
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: viewportHeight });
+      try {
+        const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+          platform: 'mac',
+          activeTab: 'formulas',
+          dynamicDropdowns: true,
+          helpers: stubHelpers(),
+        });
+        const opener = host.querySelector<HTMLButtonElement>(
+          '[data-ribbon-command="mac.formulas.more"]',
+        );
+        const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-more');
+        const trigger = menu?.querySelector<HTMLElement>(
+          '[data-function-category-submenu="statistical"]',
+        );
+        const panel = menu?.querySelector<HTMLElement>(
+          '[data-function-category-panel="statistical"]',
+        );
+        if (!opener || !menu || !trigger || !panel)
+          throw new Error('Missing More submenu stacking geometry.');
+
+        opener.click();
+        menu.getBoundingClientRect = vi.fn(
+          () =>
+            ({
+              left: 8,
+              right: 224,
+              top: menuGeometry.top,
+              bottom: menuGeometry.bottom,
+              width: 216,
+              height: menuGeometry.height,
+            }) as DOMRect,
+        );
+        trigger.getBoundingClientRect = vi.fn(
+          () =>
+            ({
+              left: 8,
+              right: 224,
+              top: menuGeometry.top,
+              bottom: menuGeometry.top + 28,
+              width: 216,
+              height: 28,
+            }) as DOMRect,
+        );
+        panel.getBoundingClientRect = vi.fn(
+          () => ({ left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 }) as DOMRect,
+        );
+        Object.defineProperty(panel, 'offsetWidth', { configurable: true, value: 216 });
+        Object.defineProperty(panel, 'offsetHeight', { configurable: true, value: 0 });
+        Object.defineProperty(panel, 'scrollHeight', { configurable: true, value: 3083 });
+
+        const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+        Object.defineProperty(event, 'target', { value: trigger });
+        expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+        expect(panel.style.left).toBe('0px');
+        expect(panel.style.top).toBe(`${expectedTop}px`);
+        expect(panel.style.maxHeight).toBe(`${expectedHeight}px`);
+        expect(panel.style.overflowY).toBe('auto');
+        expect(panel.style.overscrollBehavior).toBe('contain');
+        expect(8 + Number.parseInt(panel.style.left, 10)).toBeGreaterThanOrEqual(8);
+        expect(8 + Number.parseInt(panel.style.left, 10) + 216).toBeLessThanOrEqual(382);
+        expect(menuGeometry.top + Number.parseInt(panel.style.top, 10)).toBe(expectedPageTop);
+        expect(expectedPageBottom).toBeLessThanOrEqual(viewportHeight - 8);
+        if (expectedPageTop < menuGeometry.top) {
+          expect(expectedPageBottom).toBeLessThanOrEqual(menuGeometry.top - 3);
+        } else {
+          expect(expectedPageTop).toBeGreaterThanOrEqual(menuGeometry.bottom + 3);
+        }
+
+        tb.dispose();
+      } finally {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: previousWidth });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, value: previousHeight });
+      }
+    },
+  );
+
+  it('keeps More navigation available under policy while denying a restricted function leaf', () => {
+    sheet.instance.commands.setPolicy({
+      editable: () => true,
+      operations: { formulaEdit: true },
+      defaultOperation: 'deny',
+      restrict: ({ commandId }) => commandId !== 'mac.function.COUNTIF',
+    });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    const opener = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.more"]',
+    );
+    const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-more');
+    const statistical = menu?.querySelector<HTMLButtonElement>(
+      '[data-function-category-submenu="statistical"]',
+    );
+    if (!opener || !menu || !statistical) throw new Error('Missing More Functions controls.');
+
+    opener.click();
+    expect(menu.hidden).toBe(false);
+    statistical.click();
+    const countIf = menu.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.function.COUNTIF"]',
+    );
+    expect(countIf?.getAttribute('aria-disabled')).toBe('true');
+
+    countIf?.click();
+    expect(host.querySelector('.fc-fxdialog')).toBeNull();
+    expect(menu.hidden).toBe(false);
+
+    tb.dispose();
+  });
+
+  it('projects the initial Mac function catalog once across all category menus', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    expect(workbook.isStub).toBe(false);
+    // Keep the workbook native for mount wiring, but use a tiny deterministic
+    // catalog fixture; this counts projector method calls, not raw WASM work.
+    const functionNames = vi.fn(() => ['COUNTIF', 'SUM'] as const);
+    Object.defineProperty(workbook, 'functionNames', {
+      configurable: true,
+      value: functionNames,
+    });
+    await sheet.instance.setWorkbook(workbook);
+
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      helpers: stubHelpers(),
+    });
+    try {
+      expect(functionNames).toHaveBeenCalledTimes(1);
+
+      const categoryLeaves = (menuId: string): string[] =>
+        Array.from(
+          host.querySelectorAll<HTMLButtonElement>(`#${menuId} [data-ribbon-command]`),
+        ).map((button) => button.dataset.ribbonCommand ?? '');
+      expect(categoryLeaves('menu-mac-formulas-financial')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-logical')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-text')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-date-time')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-lookup')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-math')).toEqual(['mac.function.SUM']);
+      expect(categoryLeaves('menu-mac-formulas-more-statistical')).toEqual([
+        'mac.function.COUNTIF',
+      ]);
+      expect(categoryLeaves('menu-mac-formulas-more-engineering')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-more-cube')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-more-information')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-more-compatibility')).toHaveLength(0);
+      expect(categoryLeaves('menu-mac-formulas-more-web')).toHaveLength(0);
+    } finally {
+      tb.dispose();
+    }
+  });
+
+  it('reprojects More Functions after an actual mounted workbook swap', async () => {
+    const first = await WorkbookHandle.createDefault();
+    const second = await WorkbookHandle.createDefault();
+    const empty = await WorkbookHandle.createDefault();
+    const staticFallback = await WorkbookHandle.createDefault();
+    expect(first.isStub).toBe(false);
+    expect(second.isStub).toBe(false);
+    expect(empty.isStub).toBe(false);
+    expect(staticFallback.isStub).toBe(false);
+
+    // Default native workbooks expose the same catalog. Keep the handles real
+    // and vary only their catalog response so the mounted setWorkbook path is
+    // exercised without replacing the projector directly.
+    const setCatalog = (workbook: WorkbookHandle, names: readonly string[] | null): void => {
+      Object.defineProperty(workbook, 'functionNames', {
+        configurable: true,
+        value: () => names,
+      });
+    };
+    setCatalog(first, ['COUNTIF']);
+    setCatalog(second, ['AVERAGE', 'CUBEVALUE']);
+    setCatalog(empty, []);
+    setCatalog(staticFallback, null);
+
+    await sheet.instance.setWorkbook(first);
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      helpers: stubHelpers(),
+    });
+    try {
+      const panelLeaves = (category: string): string[] =>
+        Array.from(
+          host.querySelectorAll<HTMLButtonElement>(
+            `#menu-mac-formulas-more [data-function-category-panel="${category}"] [data-ribbon-command]`,
+          ),
+        ).map((button) => button.dataset.ribbonCommand ?? '');
+
+      expect(panelLeaves('statistical')).toContain('mac.function.COUNTIF');
+      expect(panelLeaves('statistical')).not.toContain('mac.function.AVERAGE');
+
+      await sheet.instance.setWorkbook(second);
+      expect(panelLeaves('statistical')).toContain('mac.function.AVERAGE');
+      expect(panelLeaves('statistical')).not.toContain('mac.function.COUNTIF');
+      expect(panelLeaves('cube')).toContain('mac.function.CUBEVALUE');
+
+      await sheet.instance.setWorkbook(empty);
+      expect(
+        host.querySelectorAll('#menu-mac-formulas-more [data-function-category-panel]'),
+      ).toHaveLength(6);
+      expect(
+        host.querySelectorAll(
+          '#menu-mac-formulas-more [data-function-category-panel] [data-ribbon-command]',
+        ),
+      ).toHaveLength(0);
+
+      await sheet.instance.setWorkbook(staticFallback);
+      expect(panelLeaves('statistical')).toContain('mac.function.COUNTIF');
+      expect(panelLeaves('cube')).toHaveLength(0);
+    } finally {
+      tb.dispose();
+    }
+  });
+
   it('keeps the Conditional Formatting top-level menu order aligned with Excel 365', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
@@ -3002,6 +3672,76 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(goodButton?.getAttribute('aria-checked')).toBe('true');
     expect(goodButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
 
+    tb.dispose();
+  });
+
+  it('renders the Mac 40% accent palette in the Home Cell Styles menu', () => {
+    sheet.instance.host.dataset.fcPlatform = 'mac';
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const stylesButton = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="cellStyles"]',
+    );
+    stylesButton?.click();
+    const accent = host.querySelector<HTMLButtonElement>('[data-cell-style="accent1_40"]');
+    expect(accent).toBeTruthy();
+    expect(accent?.style.background).toBe('#83cceb');
+    expect(host.querySelectorAll('[data-cell-style]').length).toBe(47);
+    tb.dispose();
+  });
+
+  it('samples the owner platform again for the next ribbon style action', () => {
+    sheet.instance.host.dataset.fcPlatform = 'mac';
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const stylesButton = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="cellStyles"]',
+    );
+    stylesButton?.click();
+    let accent = host.querySelector<HTMLButtonElement>('[data-cell-style="accent1_40"]');
+    expect(accent?.style.background).toBe('#83cceb');
+    let event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: accent });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')?.fill).toBe('#83cceb');
+
+    sheet.instance.host.dataset.fcPlatform = 'default';
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 });
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 1 });
+    stylesButton?.click();
+    accent = host.querySelector<HTMLButtonElement>('[data-cell-style="accent1_40"]');
+    expect(accent?.style.background).toBe('#b4c7e7');
+    event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: accent });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    expect(sheet.instance.store.getState().format.formats.get('0:0:1')?.fill).toBe('#b4c7e7');
+    tb.dispose();
+  });
+
+  it('renders Mac non-accent fallback colors in the ribbon style menu', () => {
+    sheet.instance.host.dataset.fcPlatform = 'mac';
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const stylesButton = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="cellStyles"]',
+    );
+    stylesButton?.click();
+    expect(host.querySelector<HTMLButtonElement>('[data-cell-style="title"]')?.style.color).toBe(
+      '#0e2841',
+    );
+    expect(host.querySelector<HTMLButtonElement>('[data-cell-style="heading1"]')?.style.color).toBe(
+      '#0e2841',
+    );
+    const check = host.querySelector<HTMLButtonElement>('[data-cell-style="checkCell"]');
+    expect(check?.style.color).toBe('#ffffff');
+    expect(check?.style.background).toBe('#a5a5a5');
     tb.dispose();
   });
 

@@ -1,6 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_FEATURE_IDS, resolveFlags } from '../../src/extensions/features.js';
-import { resolveSpreadsheetUiOptions } from '../../src/extensions/ui-options.js';
+import {
+  resolveSpreadsheetPlatform,
+  resolveSpreadsheetUiOptions,
+} from '../../src/extensions/ui-options.js';
+
+describe('resolveSpreadsheetPlatform', () => {
+  it('honors explicit platform choices', () => {
+    expect(resolveSpreadsheetPlatform('mac', { platform: 'Win32' })).toBe('mac');
+    expect(resolveSpreadsheetPlatform('default', { platform: 'MacIntel' })).toBe('default');
+  });
+
+  it('does not switch to the Mac profile unless the host opts in', () => {
+    expect(resolveSpreadsheetPlatform(undefined, { platform: 'MacIntel' })).toBe('default');
+  });
+
+  it('detects desktop Mac while excluding touch iPad impersonation', () => {
+    expect(resolveSpreadsheetPlatform('auto', { platform: 'MacIntel', maxTouchPoints: 0 })).toBe(
+      'mac',
+    );
+    expect(resolveSpreadsheetPlatform('auto', { platform: 'MacIntel', maxTouchPoints: 1 })).toBe(
+      'default',
+    );
+    expect(
+      resolveSpreadsheetPlatform('auto', {
+        platform: 'MacIntel',
+        userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)',
+        maxTouchPoints: 5,
+      }),
+    ).toBe('default');
+    expect(resolveSpreadsheetPlatform('auto', { platform: 'iPhone', maxTouchPoints: 5 })).toBe(
+      'default',
+    );
+    expect(resolveSpreadsheetPlatform('auto', { platform: 'Win32' })).toBe('default');
+  });
+});
 
 describe('resolveSpreadsheetUiOptions', () => {
   it('makes embedded chrome opt-in without inheriting default-on features', () => {
@@ -24,6 +58,7 @@ describe('resolveSpreadsheetUiOptions', () => {
     expect(resolved.ribbon).toBe(true);
     expect(resolved.print).toBe(true);
     expect(resolved.features).toEqual({});
+    expect(resolved.platform).toBe('default');
   });
 
   it('maps user-facing switches to internal feature flags', () => {

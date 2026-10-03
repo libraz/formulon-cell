@@ -105,6 +105,10 @@
     white-space: nowrap;
   }
 
+  .fc-fmtdlg__font-underline .fc-select__option[data-value="mixed"] {
+    display: none;
+  }
+
   .fc-select__option:hover,
   .fc-select__option--active {
     background: var(--fc-fmtdlg-list-hover-bg);

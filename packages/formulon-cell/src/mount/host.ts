@@ -1,4 +1,8 @@
 import type { ThemeName } from '../extensions/index.js';
+import {
+  type ResolvedSpreadsheetPlatform,
+  resolveSpreadsheetPlatform,
+} from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 
 let mountCounter = 0;
@@ -7,6 +11,7 @@ export function prepareMountHost(
   host: HTMLElement,
   strings: Strings,
   theme: ThemeName | undefined,
+  platform?: ResolvedSpreadsheetPlatform,
 ): string {
   host.classList.add('fc-host');
   host.setAttribute('tabindex', '0');
@@ -14,6 +19,7 @@ export function prepareMountHost(
   host.setAttribute('aria-roledescription', 'spreadsheet');
   host.setAttribute('aria-label', strings.a11y.spreadsheet);
   host.dataset.fcTheme = theme ?? 'paper';
+  host.dataset.fcPlatform = platform ?? resolveSpreadsheetPlatform();
   host.replaceChildren();
 
   const instanceId = `fc-${++mountCounter}`;
@@ -32,4 +38,5 @@ export function releaseMountHost(host: HTMLElement, instanceId: string): void {
   delete host.dataset.fcInstId;
   delete host.dataset.fcEngineState;
   delete host.dataset.fcTheme;
+  delete host.dataset.fcPlatform;
 }

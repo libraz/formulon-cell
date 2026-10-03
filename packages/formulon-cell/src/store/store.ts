@@ -10,12 +10,19 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import {
   clampNavigationAddr,
   clampNavigationRange,
+  isNavigationAddrAllowed,
   navigationBoundsFor,
   navigationPolicyFor,
   navigationSelectionBoundsFor,
   syncNavigationViewport,
 } from '../interact/navigation-policy.js';
 import { sameAddr } from './pending-format.js';
+import {
+  applySelectionRectangle,
+  rangeContainsAddr,
+  type SelectionGestureMode,
+  sameRange,
+} from './selection-geometry.js';
 import type {
   CellFormat,
   ConditionalRule,
@@ -181,6 +188,48 @@ const selectionForAddr = (state: State, addr: Addr): { active: Addr; range: Rang
   };
 };
 
+const validSelectionRange = (range: Range): boolean =>
+  Number.isSafeInteger(range.sheet) &&
+  range.sheet >= 0 &&
+  Number.isSafeInteger(range.r0) &&
+  Number.isSafeInteger(range.c0) &&
+  Number.isSafeInteger(range.r1) &&
+  Number.isSafeInteger(range.c1) &&
+  range.r0 >= 0 &&
+  range.c0 >= 0 &&
+  range.r1 <= 1_048_575 &&
+  range.c1 <= 16_383 &&
+  range.r0 <= range.r1 &&
+  range.c0 <= range.c1;
+
+const rangeContainsRange = (outer: Range, inner: Range): boolean =>
+  outer.sheet === inner.sheet &&
+  outer.r0 <= inner.r0 &&
+  outer.c0 <= inner.c0 &&
+  outer.r1 >= inner.r1 &&
+  outer.c1 >= inner.c1;
+
+const hasPartialMerge = (state: State, range: Range): boolean =>
+  [...state.merges.byAnchor.values()].some(
+    (merge) => rangesIntersect(merge, range) && !rangeContainsRange(range, merge),
+  );
+
+const selectionRangeAllowed = (store: SpreadsheetStore, state: State, range: Range): boolean => {
+  if (!validSelectionRange(range) || hasPartialMerge(state, range)) return false;
+  const accepted = permittedRange(store, range);
+  return (
+    !!accepted &&
+    sameRange(accepted, range) &&
+    isNavigationAddrAllowed(store, { sheet: range.sheet, row: range.r0, col: range.c0 }) &&
+    isNavigationAddrAllowed(store, { sheet: range.sheet, row: range.r1, col: range.c1 })
+  );
+};
+
+const exactSelectionAddr = (store: SpreadsheetStore, addr: Addr): boolean => {
+  const accepted = permittedAddr(store, addr);
+  return !!accepted && sameAddr(accepted, addr) && isNavigationAddrAllowed(store, addr);
+};
+
 const fullSheetRange = (sheet: number): Range => ({
   sheet,
   r0: 0,
@@ -262,6 +311,36 @@ export const mutators = {
     });
   },
 
+  /** Move the active cell while retaining the current selection geometry. Used
+   *  for navigation through a selected rectangle. A policy that would clamp
+   *  the requested cell elsewhere is rejected so this mutation cannot escape
+   *  either the primary selection or the permitted navigation address. */
+  setActivePreservingSelection(store: SpreadsheetStore, addr: Addr): void {
+    const clicked = permittedAddr(store, addr);
+    if (!clicked || !sameAddr(clicked, addr)) return;
+    store.setState((s) => {
+      const resolved = selectionForAddr(s, clicked);
+      const active = permittedAddr(store, resolved.active);
+      const range = s.selection.range;
+      if (
+        !active ||
+        !sameAddr(active, resolved.active) ||
+        active.sheet !== range.sheet ||
+        active.row < range.r0 ||
+        active.row > range.r1 ||
+        active.col < range.c0 ||
+        active.col > range.c1
+      ) {
+        return s;
+      }
+      return {
+        ...s,
+        ui: clearPendingFormatOnMove(s, active),
+        selection: { ...s.selection, active },
+      };
+    });
+  },
+
   /** Append a single-cell range to the current multi-selection. The cell
    *  becomes the new active/anchor so a follow-up shift-click extends from it.
    *  No-op if `addr` is the same sheet/row/col as the current active cell. */
@@ -325,6 +404,72 @@ export const mutators = {
         },
       };
     });
+  },
+
+  /** Apply one fixed-mode rectangle gesture against its pointerdown snapshot.
+   *  Every range is checked as a unit before the single store publication so
+   *  navigation and merge restrictions cannot leave a partial marquee. */
+  applySelectionRectangle(
+    store: SpreadsheetStore,
+    base: State['selection'],
+    gesture: Range,
+    mode: SelectionGestureMode,
+    anchor: Addr,
+    tip: Addr,
+  ): boolean {
+    if (
+      !validSelectionRange(gesture) ||
+      !rangeContainsAddr(gesture, anchor) ||
+      !rangeContainsAddr(gesture, tip) ||
+      !exactSelectionAddr(store, anchor) ||
+      !exactSelectionAddr(store, tip)
+    ) {
+      return false;
+    }
+
+    let changed = false;
+    store.setState((s) => {
+      if (!selectionRangeAllowed(store, s, gesture)) return s;
+      const next = applySelectionRectangle(base, gesture, mode, anchor, tip);
+      if (!next) return s;
+
+      const active = selectionForAddr(s, next.active).active;
+      const anchorAddr = selectionForAddr(s, next.anchor).active;
+      const ranges = [next.range, ...(next.extraRanges ?? [])];
+      if (
+        !rangeContainsAddr(next.range, active) ||
+        !rangeContainsAddr(next.range, anchorAddr) ||
+        !exactSelectionAddr(store, active) ||
+        !exactSelectionAddr(store, anchorAddr) ||
+        ranges.some((range) => !selectionRangeAllowed(store, s, range))
+      ) {
+        return s;
+      }
+
+      const sameGeometry =
+        sameAddr(s.selection.active, active) &&
+        sameAddr(s.selection.anchor, anchorAddr) &&
+        sameRange(s.selection.range, next.range) &&
+        (s.selection.extraRanges ?? []).length === (next.extraRanges ?? []).length &&
+        (s.selection.extraRanges ?? []).every((range, index) => {
+          const candidate = next.extraRanges?.[index];
+          return !!candidate && sameRange(range, candidate);
+        });
+      if (sameGeometry) return s;
+
+      changed = true;
+      return {
+        ...s,
+        ui: sameAddr(s.selection.active, active) ? s.ui : clearPendingFormatOnMove(s, active),
+        selection: {
+          active,
+          anchor: anchorAddr,
+          range: { ...next.range },
+          extraRanges: (next.extraRanges ?? []).map((range) => ({ ...range })),
+        },
+      };
+    });
+    return changed;
   },
 
   extendRangeTo(store: SpreadsheetStore, to: Addr): void {

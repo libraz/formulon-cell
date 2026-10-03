@@ -1,4 +1,5 @@
 import type { SpreadsheetStore } from '../store/store.js';
+import { getRecentFunctions } from './function-history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type {
   InteractionOperation,
@@ -111,7 +112,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.insert.table': 'table',
   'mac.insert.forms': 'object',
   'mac.insert.photo': 'object',
-  'mac.insert.shapes': 'object',
   'mac.insert.shapeRectangle': 'object',
   'mac.insert.shapeArrow': 'object',
   'mac.insert.shapeLine': 'object',
@@ -125,7 +125,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.insert.smartArt': 'object',
   'mac.insert.screenshot': 'object',
   'mac.insert.checkBox': 'object',
-  'mac.insert.recommendedChart': 'object',
   'mac.insert.chartColumn': 'object',
   'mac.insert.chartBar': 'object',
   'mac.insert.chartLine': 'object',
@@ -150,21 +149,12 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.insert.pictureFromData': 'object',
   'mac.home.addins': 'object',
   'mac.draw.toggle': 'object',
-  'mac.draw.eraser': 'object',
   'mac.draw.lasso': 'object',
   'mac.draw.penBlack': 'object',
   'mac.draw.penRed': 'object',
   'mac.draw.pencil': 'object',
   'mac.draw.highlighter': 'object',
-  'mac.draw.add': 'object',
   'mac.draw.trackpad': 'object',
-  'mac.page.color': 'pageSetup',
-  'mac.page.font': 'pageSetup',
-  'mac.page.margins': 'pageSetup',
-  'mac.page.orientation': 'pageSetup',
-  'mac.page.size': 'pageSetup',
-  'mac.page.printArea': 'pageSetup',
-  'mac.page.pageBreaks': 'pageSetup',
   'mac.page.background': 'pageSetup',
   'mac.page.printTitles': 'pageSetup',
   'mac.page.pageSetup': 'pageSetup',
@@ -175,24 +165,11 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.page.showHeadings': 'pageSetup',
   'mac.page.printHeadings': 'pageSetup',
   'mac.formulas.insertFunction': 'formulaEdit',
-  'mac.formulas.autoSum': 'formulaEdit',
   'mac.autosum.SUM': 'formulaEdit',
   'mac.autosum.AVERAGE': 'formulaEdit',
   'mac.autosum.COUNT': 'formulaEdit',
   'mac.autosum.MAX': 'formulaEdit',
   'mac.autosum.MIN': 'formulaEdit',
-  'mac.formulas.recent': 'formulaEdit',
-  'mac.formulas.financial': 'formulaEdit',
-  'mac.formulas.logical': 'formulaEdit',
-  'mac.formulas.text': 'formulaEdit',
-  'mac.formulas.dateTime': 'formulaEdit',
-  'mac.formulas.lookup': 'formulaEdit',
-  'mac.formulas.math': 'formulaEdit',
-  'mac.formulas.more': 'formulaEdit',
-  'mac.formulas.category.recent': 'formulaEdit',
-  'mac.formulas.category.statistical': 'formulaEdit',
-  'mac.formulas.category.dynamicArray': 'formulaEdit',
-  'mac.formulas.category.all': 'formulaEdit',
   'mac.formulas.namesManager': 'namedRange',
   'mac.formulas.defineName': 'namedRange',
   'mac.formulas.useInFormula': 'formulaEdit',
@@ -204,11 +181,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.formulas.errorCheck.ignore': 'formulaEdit',
   'mac.formulas.precedents': 'formulaEdit',
   'mac.formulas.dependents': 'formulaEdit',
-  'mac.formulas.removeArrows': 'formulaEdit',
-  'mac.formulas.showFormulas': 'formulaEdit',
-  'mac.formulas.errorCheck': 'formulaEdit',
-  'mac.formulas.watch': 'formulaEdit',
-  'mac.formulas.calcOptions': 'formulaEdit',
   'mac.formulas.recalc': 'formulaEdit',
   'mac.formulas.sheetRecalc': 'formulaEdit',
   // Keep every function leaf in lockstep with the engine catalog. This is
@@ -248,8 +220,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.view.freeze.firstRow': 'format',
   'mac.view.freeze.firstColumn': 'format',
   'mac.data.refreshAll': 'valueEdit',
-  'mac.data.dataTypes': 'object',
-  'mac.data.sortFilter': 'filter',
   'mac.data.sortAsc': 'sort',
   'mac.data.sortDesc': 'sort',
   'mac.data.sortCustom': 'sort',
@@ -260,7 +230,6 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.data.textToColumns': 'valueEdit',
   'mac.data.flashFill': 'fill',
   'mac.data.removeDuplicates': 'valueEdit',
-  'mac.data.validation': 'validation',
   'mac.data.validation.settings': 'validation',
   'mac.data.validation.circleInvalid': 'validation',
   'mac.data.validation.clearCircles': 'validation',
@@ -274,26 +243,17 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.data.showDetail': 'format',
   'mac.data.hideDetail': 'format',
   'mac.data.analysis': 'object',
-  'mac.review.spelling': 'object',
-  'mac.review.stats': 'object',
-  'mac.review.accessibility': 'object',
-  'mac.review.translate': 'object',
   'mac.review.newComment': 'comment',
-  'mac.review.showComments': 'comment',
   'mac.review.newNote': 'comment',
   'mac.review.previousNote': 'comment',
   'mac.review.nextNote': 'comment',
-  'mac.review.showNotes': 'comment',
   'mac.review.protectSheet': 'protection',
   'mac.review.protectWorkbook': 'protection',
   'mac.view.freeze': 'format',
   'mac.view.split': 'format',
-  'mac.view.zoomSelection': 'format',
-  'mac.view.zoom100': 'format',
   'mac.view.sheetViewSave': 'format',
   'mac.view.sheetViewDelete': 'format',
   'mac.automate.showScripts': 'object',
-  'mac.automate.gallery': 'object',
   'mac.automate.allRowsColumns': 'format',
   'mac.automate.freezeSelection': 'format',
   'mac.automate.makeSubtable': 'table',
@@ -303,6 +263,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.automate.newPivotTable': 'table',
 };
 
+/** Ids that never mutate and so bypass the operation map; they are not listed there. */
 const SAFE_NAVIGATION_COMMANDS: ReadonlySet<string> = new Set([
   'copy',
   'selectAll',
@@ -343,12 +304,8 @@ const SAFE_NAVIGATION_COMMANDS: ReadonlySet<string> = new Set([
   'mac.formulas.removeArrows',
   'mac.formulas.errorCheck',
   'mac.formulas.category.recent',
-  'mac.formulas.category.statistical',
-  'mac.formulas.category.dynamicArray',
   'mac.formulas.category.all',
-  'mac.formulas.removeArrows',
   'mac.formulas.showFormulas',
-  'mac.formulas.errorCheck',
   'mac.formulas.watch',
   'mac.formulas.calcOptions',
   'mac.page.pageBreaks',
@@ -432,7 +389,14 @@ export function canExecuteBuiltIn(
   if (id === 'copy') return controller.canCopy();
   if (SELECTING_NAVIGATION_COMMANDS.has(id)) return controller.canSelect();
   if (SAFE_NAVIGATION_COMMANDS.has(id)) return { allowed: true };
-  const operation = BUILT_IN_COMMAND_OPERATION[id];
+  const dynamicFunctionName = id.startsWith('mac.function.')
+    ? id.slice('mac.function.'.length)
+    : null;
+  const dynamicFunctionRecorded =
+    dynamicFunctionName !== null &&
+    getRecentFunctions(store, new Set([dynamicFunctionName])).includes(dynamicFunctionName);
+  const operation =
+    BUILT_IN_COMMAND_OPERATION[id] ?? (dynamicFunctionRecorded ? 'formulaEdit' : undefined);
   if (!operation) return unsupported(id);
   if (operation === 'format' && !SELECTION_FORMAT_COMMANDS.has(id)) return unsupported(id);
   const state = store.getState();

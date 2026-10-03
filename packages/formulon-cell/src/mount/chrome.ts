@@ -15,6 +15,9 @@ export interface MountChrome {
   fxInput: HTMLTextAreaElement;
   fxExpand: HTMLButtonElement;
   viewbar: HTMLDivElement;
+  sheetWorkspace: HTMLDivElement;
+  sheetSurface: HTMLDivElement;
+  taskpaneDock: HTMLDivElement;
   grid: HTMLDivElement;
   canvas: HTMLCanvasElement;
   a11y: HTMLDivElement;
@@ -149,6 +152,15 @@ export function createMountChrome({
   const viewbar = document.createElement('div');
   viewbar.className = 'fc-viewbar';
 
+  const sheetWorkspace = document.createElement('div');
+  sheetWorkspace.className = 'fc-host__sheet-workspace';
+  const sheetSurface = document.createElement('div');
+  sheetSurface.className = 'fc-host__sheet-surface';
+  const taskpaneDock = document.createElement('div');
+  taskpaneDock.className = 'fc-host__taskpane-dock';
+  taskpaneDock.hidden = true;
+  sheetWorkspace.append(sheetSurface, taskpaneDock);
+
   const grid = document.createElement('div');
   grid.className = 'fc-host__grid';
   grid.setAttribute('role', 'grid');
@@ -246,25 +258,25 @@ export function createMountChrome({
               ? statusbar
               : watchDock;
     if (on) {
-      if (el.parentElement === host) return;
-      if (slot === 'formulabar' || slot === 'viewbar') {
-        host.insertBefore(el, grid);
+      if (slot === 'formulabar') {
+        host.insertBefore(el, viewbar.parentElement === host ? viewbar : sheetWorkspace);
+      } else if (slot === 'viewbar') {
+        host.insertBefore(el, sheetWorkspace);
       } else if (slot === 'sheetbar') {
-        if (statusbar.parentElement === host) host.insertBefore(el, statusbar);
-        else if (watchDock.parentElement === host) host.insertBefore(el, watchDock);
-        else host.appendChild(el);
+        sheetSurface.appendChild(el);
       } else if (slot === 'statusbar') {
         if (watchDock.parentElement === host) host.insertBefore(el, watchDock);
         else host.appendChild(el);
       } else {
         host.appendChild(el);
       }
-    } else if (el.parentElement === host) {
-      host.removeChild(el);
+    } else if (el.parentElement === host || el.parentElement === sheetSurface) {
+      el.parentElement.removeChild(el);
     }
   };
 
-  host.appendChild(grid);
+  sheetSurface.appendChild(grid);
+  host.appendChild(sheetWorkspace);
   host.appendChild(a11yLive);
   setChromeAttached('formulabar', flags.formulaBar === true);
   setChromeAttached('viewbar', flags.viewToolbar === true);
@@ -281,6 +293,9 @@ export function createMountChrome({
     fxInput,
     fxExpand,
     viewbar,
+    sheetWorkspace,
+    sheetSurface,
+    taskpaneDock,
     grid,
     canvas,
     a11y,

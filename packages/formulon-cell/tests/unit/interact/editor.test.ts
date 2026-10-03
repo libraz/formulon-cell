@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import type { InteractionPolicy } from '../../../src/commands/interaction-policy.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { InlineEditor } from '../../../src/interact/editor.js';
 import {
@@ -300,7 +306,7 @@ describe('InlineEditor', () => {
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 4, col: 5 });
   });
 
-  it('commit("none") does not move the active cell (Shift+Tab semantics)', () => {
+  it('commit("none") does not move the active cell', () => {
     mutators.setActive(store, { sheet: 0, row: 4, col: 4 });
     editor.begin('');
     editor.commit('none');
@@ -312,6 +318,126 @@ describe('InlineEditor', () => {
     editor.commit();
     expect(onAfterCommit).not.toHaveBeenCalled();
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+  });
+
+  it('suspends and restores the displayed raw edit without a workbook write or focus steal', async () => {
+    const realWorkbook = await WorkbookHandle.createDefault();
+    const localHost = document.createElement('div');
+    const localGrid = document.createElement('div');
+    localHost.appendChild(localGrid);
+    document.body.appendChild(localHost);
+    const localStore = createSpreadsheetStore();
+    const localEditor = new InlineEditor({
+      host: localHost,
+      grid: localGrid,
+      store: localStore,
+      wb: realWorkbook,
+      onAfterCommit: () => {},
+    });
+    try {
+      const anchor = { sheet: 0, row: 2, col: 3 };
+      mutators.setActive(localStore, anchor);
+      mutators.setRange(localStore, { sheet: 0, r0: 2, c0: 3, r1: 4, c1: 5 });
+      mutators.setPendingFormat(localStore, { addr: anchor, format: { bold: true } });
+      mutators.setR1C1(localStore, true);
+      localEditor.begin('=SUM(A1:B2)');
+      mutators.setCopyRanges(
+        localStore,
+        [
+          { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 },
+          { sheet: 0, r0: 7, c0: 0, r1: 7, c1: 0 },
+        ],
+        'cut',
+      );
+      const input = localGrid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      input.value = '=SUM(A1:B2)';
+      input.setSelectionRange(6, 10, 'backward');
+      input.dispatchEvent(new Event('input'));
+      const before = localStore.getState();
+      const lease = localEditor.suspendForFormulaPalette({
+        getLocale: () => 'ja',
+        contextCurrent: () => true,
+      });
+      expect(lease).not.toBeNull();
+      expect(localEditor.isActive()).toBe(true);
+      expect(localEditor.isFormulaEdit()).toBe(false);
+      expect(localGrid.querySelector('textarea.fc-host__editor')).toBeNull();
+      expect(localStore.getState().ui.editor.kind).toBe('idle');
+      expect(localStore.getState().ui.pendingFormat).toEqual(before.ui.pendingFormat);
+      expect(localStore.getState().ui.editorRefs).toEqual([]);
+      expect(realWorkbook.getValue(anchor)).toEqual({ kind: 'blank' });
+
+      // Palette navigation may alter the visible selection while it is open;
+      // the lease restores the captured grid selection rather than treating
+      // that navigation as an edit to the workbook.
+      localStore.setState((state) => ({
+        ...state,
+        selection: {
+          ...state.selection,
+          active: { sheet: 0, row: 9, col: 9 },
+          anchor: { sheet: 0, row: 9, col: 9 },
+          range: { sheet: 0, r0: 9, c0: 9, r1: 9, c1: 9 },
+        },
+      }));
+      const restored = lease?.userCancel() as HTMLTextAreaElement | null | undefined;
+      expect(restored).not.toBeNull();
+      expect(restored?.value).toBe('=SUM(A1:B2)');
+      expect(restored?.selectionStart).toBe(6);
+      expect(restored?.selectionEnd).toBe(10);
+      expect(restored?.selectionDirection).toBe('backward');
+      expect(localStore.getState().selection).toEqual(before.selection);
+      expect(localStore.getState().ui.pendingFormat).toEqual(before.ui.pendingFormat);
+      expect(localStore.getState().ui.copyRanges).toEqual(before.ui.copyRanges);
+      expect(localStore.getState().ui.copyMode).toBe(before.ui.copyMode);
+      expect(localStore.getState().ui.editor).toEqual(before.ui.editor);
+      expect(localStore.getState().ui.editorRefs).toEqual(before.ui.editorRefs);
+      expect(localStore.getState().ui.r1c1).toBe(true);
+      expect(realWorkbook.getValue(anchor)).toEqual({ kind: 'blank' });
+      expect(document.activeElement).not.toBe(restored);
+    } finally {
+      localEditor.cancel();
+      realWorkbook.dispose();
+      localHost.remove();
+    }
+  });
+
+  it('refuses suspension during IME composition and invalidates stale leases', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    editor.begin('=A1');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    expect(
+      editor.suspendForFormulaPalette({ getLocale: () => 'en', contextCurrent: () => true }),
+    ).toBeNull();
+    expect(editor.isActive()).toBe(true);
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    const lease = editor.suspendForFormulaPalette({
+      getLocale: () => 'en',
+      contextCurrent: () => true,
+    });
+    expect(lease).not.toBeNull();
+    mutators.setR1C1(store, true);
+    expect(lease?.userCancel()).toBeNull();
+    expect(editor.isActive()).toBe(false);
+    expect(grid.querySelector('textarea.fc-host__editor')).toBeNull();
+    editor.cancel();
+  });
+
+  it('reports a suspended edit as active and cancel releases its lease', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    editor.begin('=A1');
+    const lease = editor.suspendForFormulaPalette({
+      getLocale: () => 'en',
+      contextCurrent: () => true,
+    });
+    expect(lease?.valid()).toBe(true);
+    expect(editor.isActive()).toBe(true);
+    editor.cancel();
+    expect(editor.isActive()).toBe(false);
+    expect(lease?.valid()).toBe(false);
+    expect(lease?.userCancel()).toBeNull();
+    expect(grid.querySelector('textarea.fc-host__editor')).toBeNull();
   });
 
   it('Enter key commits and advances down', () => {
@@ -401,7 +527,7 @@ describe('InlineEditor', () => {
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
   });
 
-  it('Tab commits and advances right; Shift+Tab commits in place', () => {
+  it('Tab advances right; default Shift+Tab commits in place', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     editor.begin('');
     let input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
@@ -417,8 +543,164 @@ describe('InlineEditor', () => {
     input.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true, bubbles: true }),
     );
-    // Active stays where it was after the first commit (still at col 1).
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 1 });
+  });
+
+  it('Mac Tab commits and advances through the selected rectangle', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = 'entered';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }),
+    );
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'entered' });
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 1 });
+    expect(store.getState().selection.anchor).toEqual({ sheet: 0, row: 0, col: 0 });
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+  });
+
+  it('Mac Cmd+Enter fills the selection in one undoable controller batch', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    const history = new History();
+    const controller = new InteractionController({
+      store,
+      getWb: () => wb,
+      history,
+    });
+    const unregister = registerInteractionController(store, controller);
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = '9';
+    const e = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(editor.isActive()).toBe(false);
+    expect(history.canUndo()).toBe(true);
+    for (let row = 0; row <= 1; row += 1) {
+      for (let col = 0; col <= 1; col += 1) {
+        expect(wb.getValue({ sheet: 0, row, col })).toEqual({ kind: 'number', value: 9 });
+      }
+    }
+    expect(history.undo()).toBe(true);
+    for (let row = 0; row <= 1; row += 1) {
+      for (let col = 0; col <= 1; col += 1) {
+        expect(wb.getValue({ sheet: 0, row, col })).toEqual({ kind: 'blank' });
+      }
+    }
+    unregister();
+    controller.dispose();
+  });
+
+  it('Mac Shift+Enter commits upward without inserting a newline', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    mutators.setActive(store, { sheet: 0, row: 2, col: 0 });
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = 'up';
+    const e = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      shiftKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(input.isConnected).toBe(false);
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'up' });
+  });
+
+  it('default Shift+Enter inserts a newline without committing', () => {
+    mutators.setActive(store, { sheet: 0, row: 2, col: 0 });
+    editor.begin('before');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const e = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      shiftKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(editor.isActive()).toBe(true);
+    expect(input.value).toBe('before\n');
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 0 });
+    expect(onAfterCommit).not.toHaveBeenCalled();
+  });
+
+  it('Cmd+Enter keeps newline behavior on the default platform', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    editor.begin('a');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const e = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(editor.isActive()).toBe(true);
+    expect(input.value).toBe('a\n');
+    expect(onAfterCommit).not.toHaveBeenCalled();
+  });
+
+  it('Alt+Enter inserts a newline while editing', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    editor.begin('a');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.setSelectionRange(1, 1);
+    const e = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      altKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(editor.isActive()).toBe(true);
+    expect(input.value).toBe('a\n');
+  });
+
+  it('Cmd+T rotates a formula reference on Mac without committing', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    editor.begin('=A1');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const e = new KeyboardEvent('keydown', {
+      key: 't',
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(input.value).toBe('=$A$1');
+    expect(editor.isActive()).toBe(true);
+    expect(onAfterCommit).not.toHaveBeenCalled();
   });
 
   it('blur on the input commits as "none"', () => {
@@ -488,6 +770,85 @@ describe('InlineEditor', () => {
       for (let col = 0; col <= 2; col += 1) {
         expect(wb.getValue({ sheet: 0, row: 0, col })).toEqual({ kind: 'number', value: 7 });
       }
+    });
+
+    const withController = (
+      policy?: InteractionPolicy,
+    ): { history: History; onValidation: Mock; fillEditor: InlineEditor; dispose: () => void } => {
+      const history = new History();
+      const controller = new InteractionController({ store, getWb: () => wb, history });
+      if (policy) controller.setPolicy(policy);
+      const unregister = registerInteractionController(store, controller);
+      const onValidation = vi.fn();
+      const fillEditor = new InlineEditor({ host, grid, store, wb, onAfterCommit, onValidation });
+      return {
+        history,
+        onValidation,
+        fillEditor,
+        dispose: () => {
+          if (fillEditor.isActive()) fillEditor.cancel();
+          unregister();
+          controller.dispose();
+        },
+      };
+    };
+
+    it('Ctrl+Enter off Mac fills through the controller, once per cell and never into merge bodies', () => {
+      const { history, fillEditor, dispose } = withController();
+      mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 2 });
+      selectRange(0, 0, 0, 3);
+      store.setState((s) => ({
+        ...s,
+        selection: { ...s.selection, extraRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }] },
+      }));
+      fillEditor.begin('5');
+      const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      const e = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        cancelable: true,
+        bubbles: true,
+      });
+      input.dispatchEvent(e);
+
+      expect(fillEditor.isActive()).toBe(false);
+      expect(history.canUndo()).toBe(true);
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 5 });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 3 })).toEqual({ kind: 'number', value: 5 });
+      dispose();
+    });
+
+    it('reports the controller rejection reason and keeps the editor open', () => {
+      const { onValidation, fillEditor, dispose } = withController({
+        defaultOperation: 'allow',
+        editable: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }],
+      });
+      selectRange(0, 0, 0, 1);
+      fillEditor.begin('5');
+      fillEditor.commitMulti();
+
+      expect(fillEditor.isActive()).toBe(true);
+      expect(onValidation).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'stop', message: 'cell is outside editable cells' }),
+      );
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      dispose();
+    });
+
+    it('reports an over-limit controller fill instead of silently ignoring it', () => {
+      const { onValidation, fillEditor, dispose } = withController();
+      selectRange(0, 0, 100_000, 0);
+      fillEditor.begin('7');
+      fillEditor.commitMulti();
+
+      expect(fillEditor.isActive()).toBe(true);
+      expect(onValidation).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'stop', message: expect.stringContaining('100,000') }),
+      );
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+      dispose();
     });
 
     it('does not materialize huge selections', () => {

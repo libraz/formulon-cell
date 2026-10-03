@@ -6,9 +6,20 @@ import { Spreadsheet } from '../../src/mount.js';
 import { mutators } from '../../src/store/store.js';
 
 class TestResizeObserver {
+  static callbacks: ResizeObserverCallback[] = [];
+
+  constructor(callback: ResizeObserverCallback) {
+    TestResizeObserver.callbacks.push(callback);
+  }
+
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
+
+  static triggerLast(): void {
+    const callback = TestResizeObserver.callbacks.at(-1);
+    callback?.([], {} as ResizeObserver);
+  }
 }
 
 const makeCanvasContext = (): CanvasRenderingContext2D =>
@@ -31,6 +42,7 @@ const makeCanvasContext = (): CanvasRenderingContext2D =>
 
 describe('Spreadsheet feature registry', () => {
   beforeEach(() => {
+    TestResizeObserver.callbacks = [];
     vi.stubGlobal('ResizeObserver', TestResizeObserver);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(makeCanvasContext());
   });
@@ -279,6 +291,186 @@ describe('Spreadsheet feature registry', () => {
     expect(grid?.getAttribute('aria-label')).toBe('ワークシート グリッド');
 
     instance.dispose();
+  });
+
+  it('keeps the Mac draft mirror anchored through format, freeze, scroll, RTL, and resize changes', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const instance = await Spreadsheet.mount(host, {
+      workbook,
+      ui: { platform: 'mac' },
+      features: { fxDialog: true },
+    });
+    const grid = host.querySelector<HTMLElement>('.fc-host__grid');
+    const mirror = host.querySelector<HTMLElement>('.fc-host__formula-draft-mirror');
+    if (!grid || !mirror) throw new Error('expected Mac grid mirror');
+    Object.defineProperty(grid, 'clientWidth', { configurable: true, value: 500 });
+    Object.defineProperty(grid, 'clientHeight', { configurable: true, value: 400 });
+    vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 500,
+      bottom: 400,
+      width: 500,
+      height: 400,
+      toJSON: () => ({}),
+    } as DOMRect);
+    mutators.setViewportSize(instance.store, 20, 12, 500);
+    const anchor = { sheet: 0, row: 2, col: 2 };
+    mutators.setActive(instance.store, anchor);
+    mutators.setFreezePanes(instance.store, 1, 1);
+    mutators.setCellFormat(instance.store, anchor, {
+      fill: '#123456',
+      color: '#abcdef',
+      bold: true,
+    });
+    instance.openFunctionArguments('SUM');
+
+    const state = instance.store.getState();
+    expect(mirror.getAttribute('aria-hidden')).toBe('true');
+    expect(mirror.hidden).toBe(false);
+    expect(mirror.textContent?.startsWith('=')).toBe(true);
+    expect(mirror.style.left).toBe(
+      `${state.layout.headerColWidth + state.layout.defaultColWidth * 2}px`,
+    );
+    expect(mirror.style.top).toBe(
+      `${state.layout.headerRowHeight + state.layout.defaultRowHeight * 2}px`,
+    );
+    expect(mirror.style.background).not.toBe('');
+    expect(mirror.style.color).not.toBe('');
+
+    mutators.scrollBy(instance.store, 2, 2);
+    expect(mirror.hidden).toBe(true);
+    mutators.scrollBy(instance.store, -2, -2);
+    expect(mirror.hidden).toBe(false);
+    mutators.setRightToLeft(instance.store, true);
+    expect(mirror.style.direction).toBe('rtl');
+    expect(mirror.hidden).toBe(false);
+    TestResizeObserver.triggerLast();
+    expect(mirror.hidden).toBe(false);
+    expect(workbook.cellFormula(anchor)).toBeNull();
+    expect(instance.history.canUndo()).toBe(false);
+
+    instance.dispose();
+  });
+
+  it('routes Mac picker clicks to selection, argument clicks to the palette target, and keeps inline editing first', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const instance = await Spreadsheet.mount(host, {
+      workbook,
+      ui: { platform: 'mac' },
+      features: { fxDialog: true },
+    });
+    const grid = host.querySelector<HTMLElement>('.fc-host__grid');
+    if (!grid) throw new Error('expected grid');
+    mutators.setViewportSize(instance.store, 20, 12, 500);
+    const cell = (row: number, col: number): { clientX: number; clientY: number } => ({
+      clientX: 26 + 75 * col + 10,
+      clientY: 20 + 20 * row + 10,
+    });
+    const fireDown = (row: number, col: number): PointerEvent => {
+      const event = new PointerEvent('pointerdown', {
+        ...cell(row, col),
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+      });
+      grid.dispatchEvent(event);
+      return event;
+    };
+
+    instance.openFunctionArguments();
+    fireDown(1, 1);
+    expect(instance.store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+
+    mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
+    instance.openFunctionArguments('SUM');
+    const argumentPointer = fireDown(1, 1);
+    expect(argumentPointer.defaultPrevented).toBe(true);
+    expect(instance.store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+    expect(host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input')?.value).toContain(
+      'B2',
+    );
+
+    workbook.setFormula({ sheet: 0, row: 0, col: 0 }, '=A2');
+    mutators.replaceCells(instance.store, workbook.cells(0));
+    mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
+    grid.dispatchEvent(
+      new MouseEvent('dblclick', {
+        ...cell(0, 0),
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    const inlineEditor = host.querySelector<HTMLTextAreaElement>('.fc-host__editor');
+    expect(inlineEditor).not.toBeNull();
+    const beforeInlineValue = inlineEditor?.value;
+    instance.openFunctionArguments();
+    const inlinePointer = fireDown(1, 1);
+    expect(inlinePointer.defaultPrevented).toBe(true);
+    expect(inlineEditor?.value).not.toBe(beforeInlineValue);
+    expect(inlineEditor?.value).toContain('B2');
+    expect(instance.store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+
+    instance.dispose();
+  });
+
+  it('cancels the Mac pane across sheet, platform, workbook, and dispose transitions', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const oldWorkbook = await WorkbookHandle.createDefault();
+    expect(oldWorkbook.isStub).toBe(false);
+    const anchor = { sheet: 0, row: 0, col: 0 };
+    oldWorkbook.setNumber(anchor, 9);
+    const instance = await Spreadsheet.mount(host, {
+      workbook: oldWorkbook,
+      ui: { platform: 'mac' },
+    });
+    mutators.replaceCells(instance.store, oldWorkbook.cells(0));
+    mutators.setActive(instance.store, anchor);
+    instance.history.clear();
+    instance.openFunctionArguments('SUM');
+    const macRoot = host.querySelector<HTMLElement>('.fc-mac-formula-palette');
+    const dock = host.querySelector<HTMLElement>('.fc-host__taskpane-dock');
+    expect(macRoot?.hidden).toBe(false);
+    expect(oldWorkbook.cellFormula(anchor)).toBeNull();
+    expect(instance.history.canUndo()).toBe(false);
+
+    mutators.setSheetIndex(instance.store, 1);
+    expect(macRoot?.hidden).toBe(true);
+    expect(oldWorkbook.getValue(anchor)).toEqual({ kind: 'number', value: 9 });
+    expect(instance.history.canUndo()).toBe(false);
+
+    instance.setUi({ platform: 'default' });
+    expect(host.querySelector('.fc-mac-formula-palette')).toBeNull();
+    expect(document.querySelector('.fc-fxdialog')).toBeTruthy();
+    instance.setUi({ platform: 'mac' });
+    expect(host.querySelector('.fc-mac-formula-palette')).toBeTruthy();
+    mutators.setSheetIndex(instance.store, 0);
+    mutators.replaceCells(instance.store, oldWorkbook.cells(0));
+    mutators.setActive(instance.store, anchor);
+    instance.openFunctionArguments('SUM');
+
+    const nextWorkbook = await WorkbookHandle.createDefault();
+    expect(nextWorkbook.isStub).toBe(false);
+    await instance.setWorkbook(nextWorkbook);
+    expect(host.querySelector<HTMLElement>('.fc-mac-formula-palette')?.hidden).toBe(true);
+    expect(oldWorkbook.getValue(anchor)).toEqual({ kind: 'number', value: 9 });
+    expect(nextWorkbook.cellFormula(anchor)).toBeNull();
+    expect(instance.history.canUndo()).toBe(false);
+
+    instance.openFunctionArguments('SUM');
+    expect(nextWorkbook.cellFormula(anchor)).toBeNull();
+    expect(instance.history.canUndo()).toBe(false);
+    instance.dispose();
+    expect(dock?.hidden).toBe(true);
   });
 
   it('setTheme updates host theme state, store state, and emits themeChange', async () => {

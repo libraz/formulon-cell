@@ -1,3 +1,4 @@
+import { clearSelectedContents } from '../commands/clear-contents.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
@@ -13,6 +14,7 @@ import {
   navigationPolicyFor,
   nextTabStop,
 } from './navigation-policy.js';
+import { nextAdvanceTarget } from './selection-navigation.js';
 
 const MAX_ROW = 1_048_575; // spreadsheet limit; clamp navigation.
 const MAX_COL = 16_383;
@@ -213,11 +215,18 @@ export interface KeyboardDeps {
    *  `user-select: none`). The host wires this to the clipboard module so the
    *  shortcuts still work without an invisible focus-sink. */
   onClipboardShortcut?: (kind: 'copy' | 'cut' | 'paste') => void | Promise<void>;
+  /** Mac Excel's Cmd+Ctrl+V opens Paste Special instead of pasting. */
+  onPasteSpecial?: () => void;
 }
 
 export function attachKeyboard(deps: KeyboardDeps): () => void {
   const { host, store } = deps;
   let pendingEnterPaste: { revision: number; promise: Promise<void> } | null = null;
+
+  // Read the host attribute for every event. `Spreadsheet.setUi()` can change
+  // the platform while the binding remains attached.
+  const isMacPlatform = (): boolean =>
+    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
 
   const clearCopySessionIfUnchanged = (revision: number): void => {
     if ((store.getState().ui.copyRevision ?? 0) !== revision) return;
@@ -227,10 +236,19 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
 
   const onKey = (e: KeyboardEvent): void => {
     if (e.isComposing || e.key === 'Process') return;
+    const eventTarget = e.target;
+    if (
+      eventTarget instanceof Element &&
+      eventTarget.closest(
+        'input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]',
+      )
+    )
+      return;
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return; // editor handles its own keys.
 
     const k = e.key;
+    const lowerKey = k.toLowerCase();
     const meta = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;
     const a = s.selection.active;
@@ -241,6 +259,40 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     const navigation = navigationPolicyFor(store);
     const navigationOptions = navigation?.options;
     const hasNavigationPolicy = navigationOptions !== undefined;
+
+    if (
+      isMacPlatform() &&
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !shift &&
+      (k === 'ArrowLeft' || k === 'ArrowRight')
+    ) {
+      e.preventDefault();
+      if (!selectionDisabled) deps.onSwitchSheet?.(k === 'ArrowRight' ? 1 : -1);
+      return;
+    }
+
+    if (isMacPlatform() && k === 'Backspace' && shift && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      if (!selectionDisabled) mutators.setActive(store, a);
+      return;
+    }
+
+    // Mac Control+U edits the cell with its content as seed, not the underline shortcut.
+    if (
+      isMacPlatform() &&
+      e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey &&
+      !e.altKey &&
+      lowerKey === 'u'
+    ) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      deps.onBeginEdit(formatExisting(s, a, deps.wb));
+      return;
+    }
 
     // A host may expose one fixed active cell while suppressing all user
     // navigation. Keep the keyboard route from changing the selection before
@@ -325,6 +377,20 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       }
       return;
     }
+    if (
+      isMacPlatform() &&
+      e.metaKey &&
+      e.ctrlKey &&
+      !e.altKey &&
+      !shift &&
+      lowerKey === 'v' &&
+      deps.onPasteSpecial
+    ) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      deps.onPasteSpecial?.();
+      return;
+    }
     if (meta && !e.altKey && (k === 'v' || k === 'V') && !shift) {
       if (deps.onClipboardShortcut) {
         e.preventDefault();
@@ -384,6 +450,13 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     // Compute the target address, then commit either as set-active or
     // extend-range based on Shift state.
     let target: Addr | null = null;
+    let preserveSelection = false;
+    const macShiftReturn =
+      isMacPlatform() && k === 'Enter' && shift && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const selectionTraversalEnabled =
+      isMacPlatform() && !restricted && !hasNavigationPolicy && !selectionDisabled;
+    const selectionTabTraversalEnabled =
+      selectionTraversalEnabled && !e.ctrlKey && !e.metaKey && !e.altKey;
     const colDir = s.ui.rightToLeft === true ? -1 : 1;
 
     if (k === 'ArrowUp')
@@ -418,8 +491,11 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       target = e.altKey
         ? move(a, 0, -colDir * Math.max(1, s.viewport.colCount - 1))
         : move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
-    else if (k === 'Tab') target = stepWithMerge(s, a, 0, shift ? -1 : 1, MAX_ROW, MAX_COL);
-    else if (
+    else if (k === 'Tab') {
+      const next = nextAdvanceTarget(s, shift ? 'left' : 'right', selectionTabTraversalEnabled);
+      target = next.addr;
+      preserveSelection = next.preserveSelection;
+    } else if (
       k === 'Enter' &&
       !meta &&
       !shift &&
@@ -453,7 +529,18 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       });
       return;
     } else if (k === 'Enter' && !meta) {
-      target = stepWithMerge(s, a, shift ? -1 : 1, 0, MAX_ROW, MAX_COL);
+      const macReturn = isMacPlatform() && !e.altKey;
+      if (macReturn && selectionDisabled) {
+        e.preventDefault();
+        return;
+      }
+      const next = nextAdvanceTarget(
+        s,
+        shift ? 'up' : 'down',
+        macReturn && selectionTraversalEnabled,
+      );
+      target = next.addr;
+      preserveSelection = next.preserveSelection;
     } else if (meta && k === 'Enter') {
       deps.onBeginEdit('');
       e.preventDefault();
@@ -488,45 +575,17 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       e.preventDefault();
       return;
     } else if (k === 'Delete') {
-      // Delete clears the entire selection range — spreadsheet parity.
-      const range = s.selection.range;
-      const sheet = range.sheet;
-      if (restricted) {
-        if (!restrictedController) return;
-        e.preventDefault();
-        const cells: Addr[] = [];
-        for (const key of s.data.cells.keys()) {
-          const parts = key.split(':');
-          if (parts.length !== 3) continue;
-          if (Number(parts[0]) !== sheet) continue;
-          const row = Number(parts[1]);
-          const col = Number(parts[2]);
-          if (row < range.r0 || row > range.r1 || col < range.c0 || col > range.c1) continue;
-          cells.push({ sheet, row, col });
-        }
-        const result = restrictedController.execute({
-          type: 'cellBatch',
-          operation: 'clear',
-          origin: 'keyboard',
-          changes: cells.map((addr) => ({ addr, value: { kind: 'blank' as const } })),
-          denied: 'reject',
-        });
-        if (result.status !== 'rejected') deps.onClearActive();
-        return;
-      }
-      // Iterate populated cells only; full-sheet selection would otherwise loop 17B times.
-      for (const key of s.data.cells.keys()) {
-        const parts = key.split(':');
-        if (parts.length !== 3) continue;
-        if (Number(parts[0]) !== sheet) continue;
-        const row = Number(parts[1]);
-        const col = Number(parts[2]);
-        if (row < range.r0 || row > range.r1) continue;
-        if (col < range.c0 || col > range.c1) continue;
-        deps.wb.setBlank({ sheet, row, col });
-      }
-      deps.onClearActive();
+      // Delete uses the same sparse union collector as Home > Clear Contents.
+      // A registered controller always owns the mounted write; standalone
+      // consumers receive the helper's ephemeral atomic controller.
       e.preventDefault();
+      const result = clearSelectedContents({
+        store,
+        workbook: deps.wb,
+        history: deps.history,
+        origin: 'keyboard',
+      });
+      if (result.status !== 'rejected') deps.onClearActive();
       return;
     } else if (k === 'Escape') {
       // No editor active, so Escape cancels the copy marquee — the only way
@@ -581,7 +640,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     // Merge-aware: snap the active cell to the anchor and grow shift-extends so
     //  the selection always covers full merge rectangles.
     target = mergeAnchorOf(s, target);
-    if (shift && k !== 'Tab') {
+    if (shift && k !== 'Tab' && !macShiftReturn) {
       mutators.extendRangeTo(store, target);
       const after = store.getState();
       const grown = expandRangeWithMerges(after, after.selection.range);
@@ -593,6 +652,9 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       ) {
         mutators.setRange(store, grown);
       }
+      scrollActiveIntoView(store, target);
+    } else if (preserveSelection) {
+      mutators.setActivePreservingSelection(store, target);
       scrollActiveIntoView(store, target);
     } else {
       mutators.setActive(store, target);

@@ -13,12 +13,14 @@
 //      hosts plug in their own UI without re-wiring the click delegator.
 
 import {
-  applyCellStyleByName,
+  activeCellStyleId,
+  applyCellStyleToSelection,
+  cellStyleFallbackProfileForPlatform,
   createCellStyleFromActiveFormat,
   mergeCellStylesFromWorkbook,
 } from '../commands/cell-styles.js';
 import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
-import { applyFormatPatch } from '../commands/format.js';
+import { applySelectionFormatPatch, withSelectionFormatOrigin } from '../commands/format.js';
 import {
   applyPivotTableStyleById,
   type CustomTableStyle,
@@ -31,6 +33,7 @@ import {
   tableOverlayAt,
   tableVariantFromOptions,
 } from '../commands/format-as-table.js';
+import { recordRecentFunction } from '../commands/function-history.js';
 import { hyperlinkAt } from '../commands/hyperlinks.js';
 import {
   addAllowedEditRange,
@@ -138,6 +141,7 @@ import {
 import { openCellShiftDialog } from '../interact/cell-shift-dialog.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../sheet-tab-colors.js';
 import { formatWithPending } from '../store/pending-format.js';
+import { selectionContainsAddr } from '../store/selection-geometry.js';
 import { showAdvancedFilterDialog } from '../toolbar/dialogs/advanced-filter.js';
 import { showCellStyleDialog } from '../toolbar/dialogs/cell-style.js';
 import { showChoiceDialog } from '../toolbar/dialogs/choice.js';
@@ -360,6 +364,31 @@ const visualClearFormatKeys = new Set([
 const hasClearableVisualFormat = (format: object): boolean =>
   Object.keys(format).some((key) => visualClearFormatKeys.has(key));
 
+const hasContentsInSelection = (
+  state: ReturnType<SpreadsheetInstance['store']['getState']>,
+): boolean => {
+  const selection = state.selection;
+  for (const [key, cell] of state.data.cells) {
+    const [sheetRaw, rowRaw, colRaw] = key.split(':');
+    const addr = {
+      sheet: Number(sheetRaw),
+      row: Number(rowRaw),
+      col: Number(colRaw),
+    };
+    if (
+      Number.isInteger(addr.sheet) &&
+      Number.isInteger(addr.row) &&
+      Number.isInteger(addr.col) &&
+      addr.sheet === selection.range.sheet &&
+      (cell.formula !== null || cell.value.kind !== 'blank') &&
+      selectionContainsAddr(selection, addr)
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const buildClearAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyClearAction'] =>
   (action) => {
@@ -379,6 +408,7 @@ const buildClearAction =
       workbook: instance.workbook,
       history: instance.history,
       action: clearAction,
+      commands: instance.commands,
     });
     instance.host.focus();
   };
@@ -388,7 +418,7 @@ const updateClearMenu =
   (menu) => {
     const state = instance.store.getState();
     const range = state.selection.range;
-    let hasContents = false;
+    const hasContentsSelection = hasContentsInSelection(state);
     let hasFormats = false;
     let hasComments = false;
     let hasHyperlinks = false;
@@ -403,24 +433,16 @@ const updateClearMenu =
     if (
       pending &&
       pending.addr.sheet === range.sheet &&
-      pending.addr.row >= range.r0 &&
-      pending.addr.row <= range.r1 &&
-      pending.addr.col >= range.c0 &&
-      pending.addr.col <= range.c1 &&
+      selectionContainsAddr(state.selection, pending.addr) &&
       Object.keys(pending.format).length > 0
     ) {
       hasFormats = true;
     }
-    for (const key of state.data.cells.keys()) {
-      const addr = addrFromKey(key);
-      if (addr && addrInRange(addr, range)) {
-        hasContents = true;
-        break;
-      }
-    }
     for (const [key, format] of state.format.formats) {
       const addr = addrFromKey(key);
-      if (!addr || !addrInRange(addr, range)) continue;
+      if (!addr || addr.sheet !== range.sheet || !selectionContainsAddr(state.selection, addr)) {
+        continue;
+      }
       if (typeof format.comment === 'string' && format.comment.length > 0) hasComments = true;
       if (typeof format.hyperlink === 'string' && format.hyperlink.length > 0) {
         hasHyperlinks = true;
@@ -428,14 +450,17 @@ const updateClearMenu =
       if (hasClearableVisualFormat(format)) hasFormats = true;
       if (hasFormats && hasComments && hasHyperlinks) break;
     }
-    const hasConditional = conditionalRulesForRange(state, range).length > 0;
-    const hasAny = hasContents || hasFormats || hasComments || hasHyperlinks || hasConditional;
+    const hasConditional = [range, ...(state.selection.extraRanges ?? [])]
+      .filter((selected) => selected.sheet === range.sheet)
+      .some((selected) => conditionalRulesForRange(state, selected).length > 0);
+    const hasAny =
+      hasContentsSelection || hasFormats || hasComments || hasHyperlinks || hasConditional;
     const disabledReason = instance.i18n.strings.ribbon.clearRequiresTarget;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-clear]')) {
       const action = button.dataset.clear;
       const disabled =
         (action === 'all' && !hasAny) ||
-        (action === 'contents' && !hasContents) ||
+        (action === 'contents' && !hasContentsSelection) ||
         (action === 'formats' && !hasFormats) ||
         (action === 'comments' && !hasComments) ||
         ((action === 'hyperlinks' || action === 'remove-hyperlinks') && !hasHyperlinks) ||
@@ -494,11 +519,11 @@ const buildUnderlineAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyUnderlineAction'] =>
   async (action) => {
     recordRepeatableFormatChange(instance.history, instance.store, () => {
-      applyFormatPatch(
+      applySelectionFormatPatch(
         instance.store.getState(),
         instance.store,
-        instance.store.getState().selection.range,
         { underline: action === 'single' ? true : 'double' },
+        { origin: 'ribbon', commandId: 'underline' },
       );
     });
     instance.host.focus();
@@ -535,12 +560,10 @@ const buildWrapAction =
         ? { shrinkToFit: true, wrap: false }
         : { wrap: true, shrinkToFit: false };
     recordRepeatableFormatChange(instance.history, instance.store, () => {
-      applyFormatPatch(
-        instance.store.getState(),
-        instance.store,
-        instance.store.getState().selection.range,
-        patch,
-      );
+      applySelectionFormatPatch(instance.store.getState(), instance.store, patch, {
+        origin: 'ribbon',
+        commandId: 'wrap',
+      });
     });
     instance.host.focus();
   };
@@ -563,7 +586,12 @@ const buildTextOrientation =
     const rotation = rotations[action];
     if (typeof rotation !== 'number') return;
     recordRepeatableFormatChange(instance.history, instance.store, () => {
-      setRotation(instance.store.getState(), instance.store, rotation);
+      withSelectionFormatOrigin(
+        instance.store,
+        'ribbon',
+        () => setRotation(instance.store.getState(), instance.store, rotation),
+        'textOrientation',
+      );
     });
     instance.host.focus();
   };
@@ -632,7 +660,10 @@ const buildAutoSumFormula =
     } finally {
       instance.history.end();
     }
-    if (result) mutators.setActive(instance.store, result.addr);
+    if (result) {
+      mutators.setActive(instance.store, result.addr);
+      recordRecentFunction(instance.store, fn);
+    }
     instance.host.focus();
   };
 
@@ -2361,12 +2392,13 @@ export const showCreateTableDialog = async (
 const buildCellStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellStyleFromRibbon'] =>
   (id) => {
-    applyCellStyleByName(
-      instance.store as unknown as Parameters<typeof applyCellStyleByName>[0],
-      instance.history as unknown as Parameters<typeof applyCellStyleByName>[1],
-      normalizedSelectionRange(instance),
-      id,
-    );
+    applyCellStyleToSelection(instance.store, instance.history, id, {
+      origin: 'ribbon',
+      commandId: 'cellStyles',
+      getWorkbook: () => instance.workbook,
+      getFallbackProfile: () =>
+        cellStyleFallbackProfileForPlatform(instance.host.dataset.fcPlatform),
+    });
     instance.host.focus();
   };
 
@@ -2374,7 +2406,7 @@ const updateCellStylesMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCellStylesMenu'] =>
   (menu) => {
     const state = instance.store.getState();
-    const current = formatWithPending(state, state.selection.active)?.cellStyle ?? null;
+    const current = activeCellStyleId(state);
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-style]')) {
       const active = button.dataset.cellStyle === current;
       button.setAttribute('role', 'menuitemradio');
@@ -2387,11 +2419,17 @@ const buildCurrencyPresetAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCurrencyPreset'] =>
   (symbol) => {
     recordRepeatableFormatChange(instance.history, instance.store, () => {
-      setNumFmt(instance.store.getState(), instance.store, {
-        kind: 'currency',
-        decimals: 2,
-        symbol,
-      });
+      withSelectionFormatOrigin(
+        instance.store,
+        'ribbon',
+        () =>
+          setNumFmt(instance.store.getState(), instance.store, {
+            kind: 'currency',
+            decimals: 2,
+            symbol,
+          }),
+        'currency',
+      );
     });
     instance.host.focus();
   };

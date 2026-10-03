@@ -12,6 +12,26 @@ const ribbonText = dictionaries.en.ribbon;
 const backstageText = dictionaries.en.backstage;
 
 describe('toolbar/ribbon/backstage', () => {
+  it('renders shared SVG artwork for protection, inspection and workbook management', () => {
+    const { createBackstageView } = createBackstageFactories({
+      backstageText,
+      ribbonText,
+      shellSavedText: 'Ready',
+      docName: () => 'Book1',
+      docState: null,
+    });
+    const view = createBackstageView();
+    for (const name of ['protect', 'inspect', 'manage']) {
+      const mark = view.querySelector(`.fc-tb__backstage-command-icon--${name}`);
+      const svg = mark?.querySelector('svg');
+      expect(svg, name).toBeTruthy();
+      expect(mark?.classList.contains('fc-tb__backstage-command-icon--svg'), name).toBe(true);
+      expect(svg?.getAttribute('viewBox'), name).toBe('0 0 24 24');
+      expect(svg?.getAttribute('aria-hidden'), name).toBe('true');
+      expect(svg?.querySelectorAll('path').length, name).toBeGreaterThan(1);
+    }
+  });
+
   it('models the Excel-style File navigation and card actions in one shared list', () => {
     expect(backstageNavItems(backstageText, ribbonText).map((item) => item.action)).toEqual([
       'info',
@@ -107,9 +127,9 @@ describe('toolbar/ribbon/backstage', () => {
       'true',
     ]);
     expect(commandIcons.map((icon) => icon.className)).toEqual([
-      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--protect',
-      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--inspect',
-      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--manage',
+      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--protect fc-tb__backstage-command-icon--svg',
+      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--inspect fc-tb__backstage-command-icon--svg',
+      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--manage fc-tb__backstage-command-icon--svg',
     ]);
   });
 

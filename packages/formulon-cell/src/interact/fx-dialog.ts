@@ -4,6 +4,7 @@ import {
   type FunctionCatalogReader,
   type FunctionCatalogSnapshot,
   type FunctionCategory,
+  isFunctionUnavailableForInsertion,
   supportedFunctionNames,
 } from '../commands/function-categories.js';
 import {
@@ -72,6 +73,10 @@ export interface FxDialogHandle {
  *  exhaustive coverage isn't a goal. */
 export const FUNCTION_DESCRIPTIONS: Readonly<Record<string, { en: string; ja: string }>> = {
   SUM: { en: 'Adds its arguments.', ja: '引数の合計を返します。' },
+  ACOS: {
+    en: 'Returns the arccosine of a number from -1 to 1, in radians.',
+    ja: '-1 ～ 1 の数値のアークコサインをラジアンで返します。',
+  },
   IF: {
     en: 'Returns one value when a condition is true and another when false.',
     ja: '条件が真のときと偽のときで異なる値を返します。',
@@ -301,6 +306,11 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     return locale === 'ja' ? entry.ja : entry.en;
   };
 
+  const unavailableReason = (): string => t.functionUnavailable;
+
+  const functionUnavailable = (name: string): boolean =>
+    isFunctionUnavailableForInsertion(catalogEntry(name)?.availability);
+
   const functionSyntax = (name: string): string => {
     const entry = catalogEntry(name);
     if (entry?.signatureTemplate) return entry.signatureTemplate;
@@ -317,28 +327,13 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     }
     functionSummary.hidden = false;
     functionSummaryName.textContent = functionSyntax(name);
-    functionSummaryDesc.textContent = localizedDescription(name);
+    const description = localizedDescription(name);
+    functionSummaryDesc.textContent = functionUnavailable(name)
+      ? [description, unavailableReason()].filter(Boolean).join(' ')
+      : description;
   };
 
   const categoryOptions = (): Array<{ value: FunctionCategory; label: string }> => {
-    // The base dictionaries predate the native Excel family expansion. Keep
-    // those dictionaries source-compatible and use stable labels until a
-    // host supplies localized overrides for the newer families.
-    const extended = t as typeof t &
-      Partial<
-        Record<
-          | 'categoryStatistical'
-          | 'categoryEngineering'
-          | 'categoryInformation'
-          | 'categoryDatabase'
-          | 'categoryCompatibility'
-          | 'categoryCube'
-          | 'categoryWeb',
-          string
-        >
-      >;
-    const label = (key: keyof typeof extended, fallback: string): string =>
-      extended[key] ?? fallback;
     const options: Array<{ value: FunctionCategory; label: string }> = [
       { value: 'all', label: t.categoryAll },
       { value: 'recent', label: t.categoryRecent },
@@ -348,16 +343,13 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       { value: 'datetime', label: t.categoryDateTime },
       { value: 'lookup', label: t.categoryLookup },
       { value: 'math', label: t.categoryMath },
-      {
-        value: 'statistical',
-        label: label('categoryStatistical', locale === 'ja' ? '統計' : 'Statistical'),
-      },
-      { value: 'engineering', label: label('categoryEngineering', 'Engineering') },
-      { value: 'information', label: label('categoryInformation', 'Information') },
-      { value: 'database', label: label('categoryDatabase', 'Database') },
-      { value: 'compatibility', label: label('categoryCompatibility', 'Compatibility') },
-      { value: 'cube', label: label('categoryCube', 'Cube') },
-      { value: 'web', label: label('categoryWeb', 'Web') },
+      { value: 'statistical', label: t.categoryStatistical },
+      { value: 'engineering', label: t.categoryEngineering },
+      { value: 'information', label: t.categoryInformation },
+      { value: 'database', label: t.categoryDatabase },
+      { value: 'compatibility', label: t.categoryCompatibility },
+      { value: 'cube', label: t.categoryCube },
+      { value: 'web', label: t.categoryWeb },
       { value: 'dynamicArray', label: t.categoryDynamicArray },
     ];
     return options.filter((option) => {
@@ -422,6 +414,16 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       nameEl.className = 'fc-fxdialog__item-name';
       nameEl.textContent = catalogEntry(name)?.displayName ?? name;
       item.appendChild(nameEl);
+      const unavailable = functionUnavailable(name);
+      projectDisabledState(item, unavailable, unavailable ? unavailableReason() : null, {
+        datasetKey: 'functionUnavailableReason',
+        titlePrefix: name,
+      });
+      if (unavailable) {
+        item.dataset.functionUnavailable = 'true';
+      } else {
+        delete item.dataset.functionUnavailable;
+      }
       const desc = localizedDescription(name);
       if (desc) {
         const descEl = document.createElement('span');
@@ -472,10 +474,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     const label = entry?.argumentLabels[index];
     if (label) return label;
     const minArity = entry?.minArity ?? 0;
-    const prefix =
-      index < minArity
-        ? (t.argumentLabel ?? 'Argument')
-        : (t.optionalArgumentLabel ?? 'Optional argument');
+    const prefix = index < minArity ? t.argumentLabel : t.optionalArgumentLabel;
     return `${prefix} ${index + 1}`;
   };
 
@@ -509,7 +508,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     }
     if (maxArity === null || argCount < maxArity) {
       const add = createDialogButton({
-        label: t.addArgument ?? 'Add argument',
+        label: t.addArgument,
         baseClass: 'fc-fxdialog__arg-action',
       });
       add.dataset.fxAction = 'add-argument';
@@ -517,7 +516,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     }
     if (argCount > minArity) {
       const remove = createDialogButton({
-        label: t.removeArgument ?? 'Remove argument',
+        label: t.removeArgument,
         baseClass: 'fc-fxdialog__arg-action',
       });
       remove.dataset.fxAction = 'remove-argument';
@@ -525,7 +524,34 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     }
   };
 
+  const keepSelectionInPicker = (name: string, reason: string, showSummary: boolean): void => {
+    selectedName = null;
+    selectedEntry = null;
+    pickerWrap.hidden = false;
+    argsWrap.hidden = true;
+    backBtn.hidden = true;
+    argInputs = [];
+    argCount = 0;
+    setInsertDisabled(true, reason);
+    const names = filteredNames();
+    const nextIndex = names.indexOf(name);
+    if (nextIndex >= 0) highlightIndex = nextIndex;
+    renderList();
+    if (showSummary) updateFunctionSummary(name);
+    if (shell.isOpen()) searchInput.focus();
+  };
+
+  const keepUnavailableInPicker = (name: string): void =>
+    keepSelectionInPicker(name, unavailableReason(), true);
+
+  const keepMissingInPicker = (name: string): void =>
+    keepSelectionInPicker(name, t.insertRequiresFunction, false);
+
   const choose = (name: string, initialArgs: readonly string[] = []): void => {
+    if (functionUnavailable(name)) {
+      keepUnavailableInPicker(name);
+      return;
+    }
     selectedName = name;
     selectedEntry = catalogEntry(name);
     pickerWrap.hidden = true;
@@ -599,6 +625,20 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
 
   const onInsertClick = (): void => {
     if (!selectedName) return;
+    // A host may swap the workbook while the argument step is open. Re-read
+    // the live catalog at the final side-effect boundary so a newly surfaced
+    // engine stub cannot be inserted through a stale dialog selection.
+    const name = selectedName;
+    refreshCatalog();
+    selectedEntry = catalogEntry(name);
+    if (!catalog.knownNames.has(name)) {
+      keepMissingInPicker(name);
+      return;
+    }
+    if (functionUnavailable(name)) {
+      keepUnavailableInPicker(name);
+      return;
+    }
     const formula = assembleFormula();
     let accepted: void | boolean;
     try {
@@ -695,10 +735,17 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     insertBtn.textContent = t.insert;
     setInsertDisabled(insertBtn.disabled, insertBtn.disabled ? t.insertRequiresFunction : null);
     if (selectedName) {
-      selectedEntry = catalogEntry(selectedName);
-      argsName.textContent = functionSyntax(selectedName);
-      argsDesc.textContent = localizedDescription(selectedName);
-      renderArgumentFields();
+      const currentName = selectedName;
+      selectedEntry = catalogEntry(currentName);
+      if (!catalog.knownNames.has(currentName)) {
+        keepMissingInPicker(currentName);
+      } else if (functionUnavailable(currentName)) {
+        keepUnavailableInPicker(currentName);
+      } else {
+        argsName.textContent = functionSyntax(currentName);
+        argsDesc.textContent = localizedDescription(currentName);
+        renderArgumentFields();
+      }
     }
     renderList();
   };
@@ -732,8 +779,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       else argInputs[0]?.focus();
     },
     close(): void {
+      const wasOpen = shell.isOpen();
       shell.close();
-      host.focus();
+      if (wasOpen && document.activeElement === document.body) host.focus();
     },
     refresh(): void {
       // Re-snapshot strings from the original deps reference. The caller

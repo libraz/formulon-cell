@@ -28,6 +28,16 @@ const liveFunctionReader = (names: readonly string[]) => ({
   },
 });
 
+const availabilityReader = (availability: Readonly<Record<string, number | undefined>>) => ({
+  functionNames: () => Object.keys(availability),
+  functionMetadata: (name: string) => ({
+    name,
+    minArity: 1,
+    maxArity: 1,
+    ...(availability[name] === undefined ? {} : { availability: availability[name] }),
+  }),
+});
+
 describe('attachFxDialog', () => {
   let host: HTMLElement;
 
@@ -256,6 +266,101 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it('restores the connected More ribbon opener after Escape, cancel, and insertion', () => {
+    const opener = document.createElement('button');
+    opener.type = 'button';
+    opener.dataset.ribbonCommand = 'mac.formulas.more';
+    host.appendChild(opener);
+    const inserted: string[] = [];
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+
+    opener.focus();
+    handle.open('COUNTIF');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.activeElement).toBe(opener);
+
+    opener.focus();
+    handle.open('COUNTIF');
+    const footerButtons = document.querySelectorAll<HTMLButtonElement>(
+      '.fc-fmtdlg__footer > button',
+    );
+    footerButtons[1]?.click();
+    expect(document.activeElement).toBe(opener);
+
+    opener.focus();
+    handle.open('COUNTIF');
+    const inputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    const first = inputs[0];
+    const second = inputs[1];
+    if (!first || !second) throw new Error('expected COUNTIF argument inputs');
+    first.value = 'A1:A3';
+    first.dispatchEvent(new Event('input', { bubbles: true }));
+    second.value = '1';
+    second.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted).toEqual(['=COUNTIF(A1:A3, 1)']);
+    expect(document.activeElement).toBe(opener);
+
+    handle.detach();
+  });
+
+  it('preserves outside focus and falls back to the host when the opener is removed', () => {
+    const opener = document.createElement('button');
+    opener.type = 'button';
+    opener.dataset.ribbonCommand = 'mac.formulas.more';
+    host.appendChild(opener);
+    const outside = document.createElement('button');
+    outside.type = 'button';
+    document.body.appendChild(outside);
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
+
+    outside.focus();
+    handle.open('COUNTIF');
+    outside.focus();
+    handle.close();
+    expect(document.activeElement).toBe(outside);
+
+    opener.focus();
+    handle.open('COUNTIF');
+    opener.remove();
+    document.body.focus();
+    handle.close();
+    expect(document.activeElement).toBe(host);
+
+    handle.detach();
+    outside.remove();
+  });
+
+  it('does not steal body focus when close is called before open or twice', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
+
+    document.body.focus();
+    handle.close();
+    expect(document.activeElement).toBe(document.body);
+
+    handle.open('COUNTIF');
+    handle.close();
+    document.body.focus();
+    handle.close();
+    expect(document.activeElement).toBe(document.body);
+
+    handle.detach();
+  });
+
   it('keeps the dialog open and does not record when insertion is rejected', () => {
     const store = createSpreadsheetStore();
     const handle = attachFxDialog({
@@ -462,6 +567,152 @@ describe('attachFxDialog', () => {
 
     expect(inserted).toEqual(['=ACOS(0)']);
     expect(getRecentFunctions(store, new Set(liveNames))).toEqual(['ACOS']);
+    handle.detach();
+  });
+
+  it('keeps class-3 functions visible but guards seeded, clicked, and Enter insertion', () => {
+    const store = createSpreadsheetStore();
+    const inserted: string[] = [];
+    const availability: Record<string, number | undefined> = {
+      ACOS: 3,
+      AVERAGE: 0,
+      ACCRINT: 1,
+      INFO: 2,
+      SUM: 99,
+      IF: undefined,
+    };
+    const handle = attachFxDialog({
+      host,
+      store,
+      getWb: () => availabilityReader(availability),
+      strings: en,
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+
+    handle.open('ACOS');
+    const picker = document.querySelector<HTMLElement>('.fc-fxdialog__picker');
+    const args = document.querySelector<HTMLElement>('.fc-fxdialog__args');
+    const blocked = document.querySelector<HTMLElement>('[data-fx-name="ACOS"]');
+    const insert = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    expect(picker?.hidden).toBe(false);
+    expect(args?.hidden).toBe(true);
+    expect(blocked?.getAttribute('aria-disabled')).toBe('true');
+    expect(blocked?.getAttribute('aria-description')).toContain(
+      'unavailable in the current calculation engine',
+    );
+    expect(blocked?.dataset.functionUnavailable).toBe('true');
+    expect(document.querySelector('.fc-fxdialog__summary-desc')?.textContent).toContain(
+      'unavailable in the current calculation engine',
+    );
+    expect(insert?.disabled).toBe(true);
+
+    blocked?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(picker?.hidden).toBe(false);
+    expect(args?.hidden).toBe(true);
+    expect(getRecentFunctions(store)).toEqual([]);
+
+    const search = document.querySelector<HTMLInputElement>('.fc-fxdialog__search');
+    if (!search) throw new Error('expected function search');
+    search.value = 'ACOS';
+    search.dispatchEvent(new Event('input'));
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(picker?.hidden).toBe(false);
+    expect(args?.hidden).toBe(true);
+    expect(inserted).toEqual([]);
+
+    for (const name of ['AVERAGE', 'ACCRINT', 'INFO', 'SUM', 'IF']) {
+      handle.open(name);
+      expect(document.querySelector<HTMLElement>('.fc-fxdialog__args')?.hidden).toBe(false);
+      document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    }
+    expect(inserted).toEqual(['=AVERAGE()', '=ACCRINT()', '=INFO()', '=SUM()', '=IF()']);
+    expect(getRecentFunctions(store, new Set(Object.keys(availability)))).toEqual([
+      'IF',
+      'SUM',
+      'INFO',
+      'ACCRINT',
+      'AVERAGE',
+    ]);
+    handle.detach();
+  });
+
+  it('returns an already selected function to the guarded picker after refresh', () => {
+    const availability: Record<string, number | undefined> = { SUM: 0 };
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      getWb: () => availabilityReader(availability),
+      onInsert: () => {},
+    });
+
+    handle.open('SUM');
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__args')?.hidden).toBe(false);
+    availability.SUM = 3;
+    handle.refresh();
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__picker')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__args')?.hidden).toBe(true);
+    expect(
+      document.querySelector<HTMLElement>('[data-fx-name="SUM"]')?.dataset.functionUnavailable,
+    ).toBe('true');
+    expect(document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.disabled).toBe(
+      true,
+    );
+    handle.detach();
+  });
+
+  it('rechecks the current workbook before inserting after an identical-name workbook swap', () => {
+    const inserted: string[] = [];
+    const availableReader = availabilityReader({ SUM: 0 });
+    const unavailableReader = availabilityReader({ SUM: 3 });
+    let reader = availableReader;
+    const store = createSpreadsheetStore();
+    const handle = attachFxDialog({
+      host,
+      store,
+      getWb: () => reader,
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+
+    handle.open('SUM');
+    reader = unavailableReader;
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted).toEqual([]);
+    expect(getRecentFunctions(store)).toEqual([]);
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__picker')?.hidden).toBe(false);
+    expect(document.querySelector('.fc-fxdialog__summary-desc')?.textContent).toMatch(
+      /unavailable|使用できません/,
+    );
+    handle.detach();
+  });
+
+  it('returns to the picker when a workbook swap removes the selected function', () => {
+    const inserted: string[] = [];
+    let reader = availabilityReader({ SUM: 0 });
+    const store = createSpreadsheetStore();
+    const handle = attachFxDialog({
+      host,
+      store,
+      getWb: () => reader,
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+
+    handle.open('SUM');
+    reader = availabilityReader({ IF: 0 });
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted).toEqual([]);
+    expect(getRecentFunctions(store)).toEqual([]);
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__picker')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__args')?.hidden).toBe(true);
+    expect(document.querySelector('[data-fx-name="SUM"]')).toBeNull();
+    expect(document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.disabled).toBe(
+      true,
+    );
     handle.detach();
   });
 

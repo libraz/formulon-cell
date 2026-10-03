@@ -42,14 +42,45 @@ import {
   type RulerHandle,
 } from '../render/grid/page-view.js';
 import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
-import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
-import { isNavigationAddrAllowed, navigationBoundsFor } from './navigation-policy.js';
+import {
+  type SelectionGestureMode,
+  selectionContainsAddr,
+  selectionCoversRange,
+} from '../store/selection-geometry.js';
+import {
+  type CellFormat,
+  mutators,
+  type SelectionSlice,
+  type SpreadsheetStore,
+  type State,
+} from '../store/store.js';
+import {
+  isNavigationAddrAllowed,
+  navigationBoundsFor,
+  navigationSelectionBoundsFor,
+} from './navigation-policy.js';
 
 type StoreCellEntry = State['data']['cells'] extends Map<string, infer Cell> ? Cell : never;
 
 type DragMode =
   | { kind: 'none' }
   | { kind: 'cell' }
+  | {
+      kind: 'selection-marquee';
+      axis: 'cell';
+      base: SelectionSlice;
+      mode: SelectionGestureMode;
+      start: Addr;
+    }
+  | {
+      kind: 'selection-marquee';
+      axis: 'row' | 'col';
+      base: SelectionSlice;
+      mode: SelectionGestureMode;
+      startIndex: number;
+      start: Addr;
+      bounds: Range;
+    }
   | { kind: 'col-header'; anchorCol: number }
   | { kind: 'row-header'; anchorRow: number }
   | {
@@ -110,6 +141,45 @@ const rangeRefOf = (
 const MAX_ROW = 1048575;
 const MAX_COL = 16383;
 const FILTER_DROPDOWN_RESERVED_WIDTH = 20;
+
+const fullSheetRange = (sheet: number): Range => ({
+  sheet,
+  r0: 0,
+  c0: 0,
+  r1: MAX_ROW,
+  c1: MAX_COL,
+});
+
+const cloneSelection = (selection: SelectionSlice): SelectionSlice => ({
+  active: { ...selection.active },
+  anchor: { ...selection.anchor },
+  range: { ...selection.range },
+  extraRanges: (selection.extraRanges ?? []).map((range) => ({ ...range })),
+});
+
+const axisSelectionRange = (
+  bounds: Range,
+  axis: 'row' | 'col',
+  start: number,
+  tip: number,
+): Range =>
+  axis === 'row'
+    ? {
+        sheet: bounds.sheet,
+        r0: Math.min(start, tip),
+        c0: bounds.c0,
+        r1: Math.max(start, tip),
+        c1: bounds.c1,
+      }
+    : {
+        sheet: bounds.sheet,
+        r0: bounds.r0,
+        c0: Math.min(start, tip),
+        r1: bounds.r1,
+        c1: Math.max(start, tip),
+      };
+
+type SelectionMarqueeDrag = Extract<DragMode, { kind: 'selection-marquee' }>;
 
 const geometryLayout = (state: State): ViewLayout => layoutForView(state);
 
@@ -239,6 +309,11 @@ export function attachPointer(
   getEditor: () => RangeInsertTarget | null = () => null,
 ): () => void {
   let drag: DragMode = { kind: 'none' };
+  const unsubscribeSheetChange = store.subscribe((state) => {
+    if (drag.kind === 'selection-marquee' && state.data.sheetIndex !== drag.base.range.sheet) {
+      drag = { kind: 'none' };
+    }
+  });
   const measureCanvas = document.createElement('canvas');
   const measureCtx = measureCanvas.getContext('2d');
 
@@ -309,6 +384,72 @@ export function attachPointer(
     if (zone.kind === 'row-header') return { row: zone.row, col: s.selection.active.col };
     if (zone.kind === 'col-header') return { row: s.selection.active.row, col: zone.col };
     return null;
+  };
+
+  const applySelectionMarquee = (marquee: SelectionMarqueeDrag, x: number, y: number): void => {
+    const s = store.getState();
+    if (s.data.sheetIndex !== marquee.base.range.sheet) {
+      drag = { kind: 'none' };
+      return;
+    }
+    const zone = hitZone(geometryLayout(s), s.viewport, x, y, s.ui.filterRange);
+    if (!zone) return;
+
+    if (marquee.axis === 'cell') {
+      if (zone.kind !== 'cell') return;
+      const tip = mergeAnchorOf(s, { sheet: s.data.sheetIndex, row: zone.row, col: zone.col });
+      const requested: Range = {
+        sheet: marquee.start.sheet,
+        r0: Math.min(marquee.start.row, tip.row),
+        c0: Math.min(marquee.start.col, tip.col),
+        r1: Math.max(marquee.start.row, tip.row),
+        c1: Math.max(marquee.start.col, tip.col),
+      };
+      mutators.applySelectionRectangle(
+        store,
+        marquee.base,
+        expandRangeWithMerges(s, requested),
+        marquee.mode,
+        marquee.start,
+        tip,
+      );
+      return;
+    }
+
+    if (marquee.axis === 'row') {
+      if (zone.kind !== 'row-header' && zone.kind !== 'row-resize') return;
+      const requested = axisSelectionRange(marquee.bounds, 'row', marquee.startIndex, zone.row);
+      const tip = mergeAnchorOf(s, {
+        sheet: marquee.bounds.sheet,
+        row: zone.row,
+        col: marquee.bounds.c0,
+      });
+      mutators.applySelectionRectangle(
+        store,
+        marquee.base,
+        expandRangeWithMerges(s, requested),
+        marquee.mode,
+        marquee.start,
+        tip,
+      );
+      return;
+    }
+
+    if (zone.kind !== 'col-header' && zone.kind !== 'col-resize') return;
+    const requested = axisSelectionRange(marquee.bounds, 'col', marquee.startIndex, zone.col);
+    const tip = mergeAnchorOf(s, {
+      sheet: marquee.bounds.sheet,
+      row: marquee.bounds.r0,
+      col: zone.col,
+    });
+    mutators.applySelectionRectangle(
+      store,
+      marquee.base,
+      expandRangeWithMerges(s, requested),
+      marquee.mode,
+      marquee.start,
+      tip,
+    );
   };
 
   const isFillHandleHit = (x: number, y: number): boolean => {
@@ -507,12 +648,25 @@ export function attachPointer(
           return;
         }
         if (e.ctrlKey || e.metaKey) {
-          mutators.addExtraRange(
-            store,
-            { sheet: s.data.sheetIndex, r0: 0, c0: zone.col, r1: MAX_ROW, c1: zone.col },
-            { sheet: s.data.sheetIndex, row: 0, col: zone.col },
-          );
-          drag = { kind: 'none' };
+          const base = cloneSelection(s.selection);
+          const bounds = navigationSelectionBoundsFor(store) ?? fullSheetRange(s.data.sheetIndex);
+          const initial = axisSelectionRange(bounds, 'col', zone.col, zone.col);
+          const start = mergeAnchorOf(s, {
+            sheet: bounds.sheet,
+            row: bounds.r0,
+            col: zone.col,
+          });
+          const marquee: SelectionMarqueeDrag = {
+            kind: 'selection-marquee',
+            axis: 'col',
+            base,
+            mode: selectionCoversRange(base, initial) ? 'subtract' : 'add',
+            startIndex: zone.col,
+            start,
+            bounds: { ...bounds },
+          };
+          drag = marquee;
+          applySelectionMarquee(marquee, x, y);
           return;
         }
         mutators.selectCol(store, zone.col);
@@ -560,12 +714,25 @@ export function attachPointer(
           return;
         }
         if (e.ctrlKey || e.metaKey) {
-          mutators.addExtraRange(
-            store,
-            { sheet: s.data.sheetIndex, r0: zone.row, c0: 0, r1: zone.row, c1: MAX_COL },
-            { sheet: s.data.sheetIndex, row: zone.row, col: 0 },
-          );
-          drag = { kind: 'none' };
+          const base = cloneSelection(s.selection);
+          const bounds = navigationSelectionBoundsFor(store) ?? fullSheetRange(s.data.sheetIndex);
+          const initial = axisSelectionRange(bounds, 'row', zone.row, zone.row);
+          const start = mergeAnchorOf(s, {
+            sheet: bounds.sheet,
+            row: zone.row,
+            col: bounds.c0,
+          });
+          const marquee: SelectionMarqueeDrag = {
+            kind: 'selection-marquee',
+            axis: 'row',
+            base,
+            mode: selectionCoversRange(base, initial) ? 'subtract' : 'add',
+            startIndex: zone.row,
+            start,
+            bounds: { ...bounds },
+          };
+          drag = marquee;
+          applySelectionMarquee(marquee, x, y);
           return;
         }
         mutators.selectRow(store, zone.row);
@@ -636,10 +803,16 @@ export function attachPointer(
             drag = { kind: 'none' };
             return;
           }
-          // Disjoint additive selection. Drag is suppressed so the user
-          // doesn't accidentally turn a click into a multi-range marquee.
-          mutators.addExtraCell(store, addr);
-          drag = { kind: 'none' };
+          const base = cloneSelection(s.selection);
+          const marquee: SelectionMarqueeDrag = {
+            kind: 'selection-marquee',
+            axis: 'cell',
+            base,
+            mode: selectionContainsAddr(base, rawAddr) ? 'subtract' : 'add',
+            start: addr,
+          };
+          drag = marquee;
+          applySelectionMarquee(marquee, x, y);
           return;
         }
         if (e.shiftKey) {
@@ -682,6 +855,10 @@ export function attachPointer(
     const s = store.getState();
 
     switch (drag.kind) {
+      case 'selection-marquee': {
+        applySelectionMarquee(drag, x, y);
+        return;
+      }
       case 'col-resize': {
         const w = drag.rtl ? drag.leadingEdge - x : x - drag.leadingEdge;
         mutators.setColWidth(store, drag.col, w);
@@ -823,6 +1000,13 @@ export function attachPointer(
       mutators.setFillPreview(store, null);
       return;
     }
+    if (drag.kind === 'selection-marquee') {
+      const { x, y } = localXY(e);
+      applySelectionMarquee(drag, x, y);
+      drag = { kind: 'none' };
+      updateCursor(host, store, x, y);
+      return;
+    }
     if (drag.kind === 'col-resize' || drag.kind === 'row-resize') {
       // One undo entry per drag, not per pixel: capture pre at drag-start and
       // post here, push the closure pair. Engine-side sync rides on the same
@@ -931,6 +1115,21 @@ export function attachPointer(
     updateCursor(host, store, x, y);
   };
 
+  /** An interrupted gesture is abandoned: live previews revert and nothing is committed. */
+  const onCancel = (e: PointerEvent): void => {
+    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    if (drag.kind === 'selection-marquee') {
+      const base = drag.base;
+      store.setState((s) => ({ ...s, selection: base }));
+    } else if (drag.kind === 'col-resize' || drag.kind === 'row-resize') {
+      applyLayoutSnapshot(store, drag.preLayout);
+    }
+    drag = { kind: 'none' };
+    mutators.setPageBreakDrag(store, null);
+    mutators.setFillPreview(store, null);
+    host.style.cursor = '';
+  };
+
   const onLeave = (): void => {
     if (drag.kind === 'none') host.style.cursor = '';
   };
@@ -1012,15 +1211,16 @@ export function attachPointer(
   host.addEventListener('pointerdown', onDown);
   host.addEventListener('pointermove', onMove);
   host.addEventListener('pointerup', onUp);
-  host.addEventListener('pointercancel', onUp);
+  host.addEventListener('pointercancel', onCancel);
   host.addEventListener('pointerleave', onLeave);
   host.addEventListener('dblclick', onDblClick);
 
   return () => {
+    unsubscribeSheetChange();
     host.removeEventListener('pointerdown', onDown);
     host.removeEventListener('pointermove', onMove);
     host.removeEventListener('pointerup', onUp);
-    host.removeEventListener('pointercancel', onUp);
+    host.removeEventListener('pointercancel', onCancel);
     host.removeEventListener('pointerleave', onLeave);
     host.removeEventListener('dblclick', onDblClick);
     host.style.cursor = '';

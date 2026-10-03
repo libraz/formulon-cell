@@ -2,8 +2,9 @@ import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
+import type { Addr, CellValue } from '../engine/types.js';
 import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
-import type { SpreadsheetEmitter } from '../events.js';
+import type { CellChangeEvent, SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
@@ -20,7 +21,7 @@ import { attachKeyboard } from '../interact/keyboard.js';
 import { attachPageBandEditor } from '../interact/page-band-editor.js';
 import { attachPasteOptions } from '../interact/paste-options.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
-import { attachPointer } from '../interact/pointer.js';
+import { attachPointer, type RangeInsertTarget } from '../interact/pointer.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
 import {
   attachValidationAlert,
@@ -55,6 +56,7 @@ interface AttachEngineBindingInput {
   getCommentDialog: () => { open(): void } | null;
   getFormatDialog: () => { open(): void } | null;
   getFormatPainter: () => { isActive(): boolean } | null;
+  getFormulaBarEditor?: () => RangeInsertTarget | null;
   getGoToDialog: () => { open(mode?: 'go-to' | 'special'): void } | null;
   getHyperlinkDialog: () => { open(): void } | null;
   getNamedRangeDialog: () => { open(): void } | null;
@@ -70,6 +72,19 @@ interface AttachEngineBindingInput {
   tag: HTMLInputElement;
   updateChrome: () => void;
   wb: WorkbookHandle;
+}
+
+interface BufferedAtomicValue {
+  readonly addr: Addr;
+  readonly value: CellValue;
+  readonly formula: string | null;
+  readonly publicPayload: CellChangeEvent;
+}
+
+interface PendingAtomicBatch {
+  readonly size: number;
+  readonly slots: Array<BufferedAtomicValue | undefined>;
+  count: number;
 }
 
 export const WB_REGISTRY_IDS = [
@@ -90,6 +105,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     getCommentDialog,
     getFormatDialog,
     getFormatPainter,
+    getFormulaBarEditor,
     getGoToDialog,
     getHyperlinkDialog,
     getNamedRangeDialog,
@@ -106,6 +122,8 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     updateChrome,
     wb,
   } = input;
+
+  const pendingAtomic = new Map<number, PendingAtomicBatch>();
 
   const refreshCells = (): void => {
     mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
@@ -142,7 +160,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
           isFormulaEdit: () => editor.isFormulaEdit(),
           insertRefAtCaret: (ref) => editor.insertRefAtCaret(ref),
         }
-      : null,
+      : (getFormulaBarEditor?.() ?? null),
   );
   // Header / footer slots are only reachable in Page Layout view, but the
   // listener is cheap and stateless until one is clicked.
@@ -177,6 +195,18 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         onPasteOptions: pasteOptions.show,
       })
     : null;
+  const pasteSpecialDialog =
+    flags.pasteSpecial && clipboardH
+      ? attachPasteSpecial({
+          host,
+          store,
+          wb,
+          strings,
+          history,
+          getSnapshot: () => clipboardH.getSnapshot(),
+          onAfterCommit: refreshCells,
+        })
+      : null;
   const detachKey = flags.shortcuts
     ? attachKeyboard({
         host,
@@ -201,20 +231,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         onSwitchSheet: (delta) => getSheetTabs()?.switchRelative(delta),
         onEditComment: () => getCommentDialog()?.open(),
         onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
+        onPasteSpecial: pasteSpecialDialog ? () => pasteSpecialDialog.open() : undefined,
       })
     : (): void => {};
-  const pasteSpecialDialog =
-    flags.pasteSpecial && clipboardH
-      ? attachPasteSpecial({
-          host,
-          store,
-          wb,
-          strings,
-          history,
-          getSnapshot: () => clipboardH.getSnapshot(),
-          onAfterCommit: refreshCells,
-        })
-      : null;
   const detachContextMenu = flags.contextMenu
     ? attachContextMenu({
         host,
@@ -317,16 +336,84 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   };
   grid.addEventListener('dblclick', onDblClick);
 
+  const publishAuthoritativeCells = (events: readonly BufferedAtomicValue[]): void => {
+    const addresses = events.map((event) => event.addr);
+    const formulas = wb.cellFormulas(addresses);
+    const current = events.map((event) => ({
+      key: `${event.addr.sheet}:${event.addr.row}:${event.addr.col}`,
+      value: { ...wb.getValue(event.addr) },
+      formula: formulas.get(`${event.addr.sheet}:${event.addr.row}:${event.addr.col}`) ?? null,
+    }));
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      for (const entry of current)
+        cells.set(entry.key, { value: entry.value, formula: entry.formula });
+      return { ...s, data: { ...s.data, cells } };
+    });
+  };
+
+  const publishOrdinaryValue = (e: Extract<ChangeEvent, { kind: 'value' }>): void => {
+    const formula = wb.cellFormula(e.addr);
+    const cell = { value: e.next, formula };
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(`${e.addr.sheet}:${e.addr.row}:${e.addr.col}`, cell);
+      return { ...s, data: { ...s.data, cells } };
+    });
+    emitter.emit('cellChange', { addr: e.addr, value: e.next, formula });
+  };
+
+  const publishAtomicValue = (e: Extract<ChangeEvent, { kind: 'value' }>): void => {
+    const meta = e.atomicBatch;
+    if (
+      !meta ||
+      !Number.isSafeInteger(meta.id) ||
+      meta.id < 1 ||
+      !Number.isSafeInteger(meta.index) ||
+      !Number.isSafeInteger(meta.size) ||
+      meta.size < 1 ||
+      meta.index < 0 ||
+      meta.index >= meta.size
+    ) {
+      if (meta) pendingAtomic.delete(meta.id);
+      publishOrdinaryValue(e);
+      return;
+    }
+
+    const existing = pendingAtomic.get(meta.id);
+    const batch = existing ?? { size: meta.size, slots: [], count: 0 };
+    if (batch.size !== meta.size || batch.slots[meta.index]) {
+      pendingAtomic.delete(meta.id);
+      publishOrdinaryValue(e);
+      return;
+    }
+    if (!existing) {
+      batch.slots.length = meta.size;
+      pendingAtomic.set(meta.id, batch);
+    }
+    batch.slots[meta.index] = {
+      addr: e.addr,
+      value: e.next,
+      formula: meta.formula,
+      publicPayload: { addr: e.addr, value: e.next, formula: meta.formula },
+    };
+    batch.count += 1;
+    if (batch.count !== batch.size) return;
+
+    pendingAtomic.delete(meta.id);
+    const complete = batch.slots;
+    if (complete.some((event) => event === undefined)) {
+      publishOrdinaryValue(e);
+      return;
+    }
+    const buffered = complete as BufferedAtomicValue[];
+    publishAuthoritativeCells(buffered);
+    for (const event of buffered) emitter.emit('cellChange', event.publicPayload);
+  };
+
   const unsubWb = wb.subscribe((e: ChangeEvent) => {
     if (e.kind === 'value') {
-      const formula = wb.cellFormula(e.addr);
-      const cell = { value: e.next, formula };
-      store.setState((s) => {
-        const cells = new Map(s.data.cells);
-        cells.set(`${e.addr.sheet}:${e.addr.row}:${e.addr.col}`, cell);
-        return { ...s, data: { ...s.data, cells } };
-      });
-      emitter.emit('cellChange', { addr: e.addr, value: e.next, formula });
+      publishAtomicValue(e);
     } else if (e.kind === 'recalc') {
       emitter.emit('recalc', { dirty: e.dirty });
     } else if (
@@ -365,6 +452,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       quickAnalysis?.detach();
       grid.removeEventListener('dblclick', onDblClick);
       unsubWb();
+      pendingAtomic.clear();
       if (editor.isActive()) editor.cancel();
     },
   };

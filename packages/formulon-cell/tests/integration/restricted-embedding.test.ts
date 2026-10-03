@@ -222,4 +222,79 @@ describe('restricted embedding public API', () => {
       value: 'Replacement',
     });
   });
+
+  it('commits real ACOS through the mounted Mac dialog and projects it into Recent', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    expect(workbook.isStub).toBe(false);
+    const editable = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    sheet = await mountStubSheet({
+      workbook,
+      locale: 'en',
+      ui: { profile: 'minimal' },
+      features: { fxDialog: true },
+    });
+    let toolbarHost: HTMLDivElement | undefined;
+    let toolbar: ReturnType<typeof mountToolbar> | undefined;
+    try {
+      sheet.instance.openFunctionArguments('ACOS');
+      const input = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
+      if (!input) throw new Error('expected ACOS argument input');
+      input.value = '0';
+      input.dispatchEvent(new Event('input'));
+      document.querySelector<HTMLButtonElement>('.fc-fxdialog .fc-fmtdlg__btn--primary')?.click();
+      expect(workbook.cellFormula(a1)).toBe('=ACOS(0)');
+      sheet.instance.setPolicy({
+        editable: [editable],
+        operations: { formulaEdit: true },
+        defaultOperation: 'deny',
+        selection: true,
+      });
+      toolbarHost = document.createElement('div');
+      document.body.append(toolbarHost);
+      toolbar = mountToolbar(toolbarHost, sheet.instance, { platform: 'mac', lang: 'en' });
+      expect(toolbarHost.querySelector('[data-ribbon-command="mac.function.ACOS"]')).not.toBeNull();
+      expect(toolbar.applyCommand('mac.function.NOT_A_FUNCTION')).toBe(true);
+    } finally {
+      toolbar?.dispose();
+      toolbarHost?.remove();
+    }
+  });
+
+  it('removes an engine-only Recent leaf after swapping to a static-catalog workbook', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    expect(workbook.isStub).toBe(false);
+    expect(workbook.functionNames()).toContain('ACCRINT');
+    sheet = await mountStubSheet({
+      workbook,
+      locale: 'en',
+      ui: { profile: 'minimal' },
+      features: { fxDialog: true },
+    });
+    let toolbarHost: HTMLDivElement | undefined;
+    let toolbar: ReturnType<typeof mountToolbar> | undefined;
+    try {
+      sheet.instance.openFunctionArguments('ACCRINT');
+      const input = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
+      if (!input) throw new Error('expected ACCRINT argument input');
+      input.value = '0';
+      input.dispatchEvent(new Event('input'));
+      document.querySelector<HTMLButtonElement>('.fc-fxdialog .fc-fmtdlg__btn--primary')?.click();
+      expect(workbook.cellFormula(a1)).toBe('=ACCRINT(0)');
+      toolbarHost = document.createElement('div');
+      document.body.append(toolbarHost);
+      toolbar = mountToolbar(toolbarHost, sheet.instance, { platform: 'mac', lang: 'en' });
+      expect(
+        toolbarHost.querySelector('[data-ribbon-command="mac.function.ACCRINT"]'),
+      ).not.toBeNull();
+
+      const fallback = await WorkbookHandle.createDefault({ preferStub: true });
+      await sheet.instance.setWorkbook(fallback);
+      toolbar.rerender();
+      expect(fallback.functionNames()).toBeNull();
+      expect(toolbarHost.querySelector('[data-ribbon-command="mac.function.ACCRINT"]')).toBeNull();
+    } finally {
+      toolbar?.dispose();
+      toolbarHost?.remove();
+    }
+  });
 });

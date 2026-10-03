@@ -1,7 +1,6 @@
 import { coerceInput, writeCoerced, writeInputValidated } from '../commands/coerce-input.js';
 import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { stepWithMerge } from '../commands/merge.js';
 import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -15,10 +14,16 @@ import {
   type AutocompleteLabels,
   attachAutocomplete,
 } from './autocomplete.js';
-import { nextTabStop } from './navigation-policy.js';
+import {
+  createFormulaEditLease,
+  type FormulaEditLease,
+  type FormulaEditLeaseContext,
+  type FormulaEditLeaseSnapshot,
+} from './formula-edit-lease.js';
+import { navigationPolicyFor, nextTabStop } from './navigation-policy.js';
+import { buildSelectionInputBatch, SELECTION_INPUT_LIMIT_MESSAGE } from './selection-input.js';
+import { advanceAfterCommit } from './selection-navigation.js';
 
-const MAX_ROW = 1_048_575;
-const MAX_COL = 16_383;
 const MAX_MULTI_COMMIT_CELLS = 100_000;
 
 const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
@@ -83,6 +88,12 @@ export class InlineEditor {
 
   private composing = false;
 
+  private editBaseline = '';
+
+  private leaseGeneration = 0;
+
+  private currentLease: FormulaEditLease | null = null;
+
   private unsubscribeStore: (() => void) | null = null;
 
   constructor(deps: EditorDeps) {
@@ -123,7 +134,68 @@ export class InlineEditor {
     this.argHelper?.refresh();
   }
 
+  suspendForFormulaPalette(context: FormulaEditLeaseContext): FormulaEditLease | null {
+    const input = this.input;
+    const anchor = this.editingAddr;
+    if (!input || !anchor || this.composing || this.currentLease) return null;
+    const state = this.deps.store.getState();
+    const generation = ++this.leaseGeneration;
+    const sheetCount = this.deps.wb.sheetCount;
+    const snapshot: FormulaEditLeaseSnapshot = {
+      source: 'inline',
+      workbook: this.deps.wb,
+      anchor: { ...anchor },
+      raw: input.value,
+      baseline: this.editBaseline,
+      caret: {
+        start: input.selectionStart ?? input.value.length,
+        end: input.selectionEnd ?? input.value.length,
+        direction: input.selectionDirection,
+      },
+      selection: state.selection,
+      editorMode: state.ui.editor,
+      pendingFormat: state.ui.pendingFormat ?? null,
+      editorRefs: state.ui.editorRefs,
+      copy: {
+        copyRange: state.ui.copyRange ?? null,
+        copyRanges: state.ui.copyRanges ?? null,
+        copyMode: state.ui.copyMode ?? null,
+        copyRevision: state.ui.copyRevision ?? 0,
+      },
+      r1c1: state.ui.r1c1,
+      locale: context.getLocale(),
+    };
+
+    this.detachInput(false);
+    this.editingAddr = null;
+    this.composing = false;
+    mutators.setEditor(this.deps.store, { kind: 'idle' });
+    mutators.setEditorRefs(this.deps.store, []);
+
+    let lease: FormulaEditLease | null = null;
+    lease = createFormulaEditLease(snapshot, {
+      context,
+      isOwnerCurrent: () => {
+        if (this.currentLease !== lease || this.leaseGeneration !== generation) return false;
+        const current = this.deps.store.getState();
+        return (
+          this.deps.wb === snapshot.workbook &&
+          this.deps.wb.sheetCount === sheetCount &&
+          current.data.sheetIndex === snapshot.anchor.sheet &&
+          current.ui.r1c1 === snapshot.r1c1
+        );
+      },
+      restore: (captured) => this.restoreFromLease(captured),
+      release: () => {
+        if (this.currentLease === lease) this.currentLease = null;
+      },
+    });
+    this.currentLease = lease;
+    return lease;
+  }
+
   begin(seed: string): void {
+    this.invalidateLease();
     const s = this.deps.store.getState();
     const a = s.selection.active;
     const controller = interactionControllerFor(this.deps.store);
@@ -140,6 +212,7 @@ export class InlineEditor {
       }
     }
     this.editingAddr = a;
+    this.editBaseline = seed;
     // Putting a cell into edit mode cancels copy mode — the marquee only
     // survives navigation and paste-family commands.
     if (s.ui.copyRange || s.ui.copyRanges) {
@@ -209,23 +282,16 @@ export class InlineEditor {
   }
 
   cancel(): void {
-    if (!this.input) return;
-    this.unsubscribeStore?.();
-    this.unsubscribeStore = null;
-    this.autocomplete?.detach();
-    this.autocomplete = null;
-    this.argHelper?.detach();
-    this.argHelper = null;
-    this.input.removeEventListener('keydown', this.onKey);
-    this.input.removeEventListener('keyup', this.onKeyUp);
-    this.input.removeEventListener('input', this.onInput);
-    this.input.removeEventListener('compositionstart', this.onCompositionStart);
-    this.input.removeEventListener('compositionend', this.onCompositionEnd);
-    this.input.removeEventListener('blur', this.onBlur);
-    this.input.removeEventListener('dblclick', this.onDblClick);
-    this.input.removeEventListener('click', this.onClick);
-    this.input.remove();
-    this.input = null;
+    this.invalidateLease();
+    if (!this.input) {
+      this.editingAddr = null;
+      this.composing = false;
+      mutators.setEditor(this.deps.store, { kind: 'idle' });
+      mutators.setPendingFormat(this.deps.store, null);
+      mutators.setEditorRefs(this.deps.store, []);
+      return;
+    }
+    this.detachInput(true);
     this.editingAddr = null;
     this.composing = false;
     mutators.setEditor(this.deps.store, { kind: 'idle' });
@@ -237,7 +303,7 @@ export class InlineEditor {
     this.deps.host.focus({ preventScroll: true });
   }
 
-  commit(advance: 'down' | 'right' | 'none' = 'down'): void {
+  commit(advance: 'down' | 'right' | 'up' | 'left' | 'none' = 'down'): void {
     if (!this.input || !this.editingAddr) return;
     const raw = this.input.value;
     const a = this.editingAddr;
@@ -267,19 +333,7 @@ export class InlineEditor {
       mutators.setPendingFormat(this.deps.store, null);
       this.deps.onAfterCommit();
       this.cancel();
-      const s = this.deps.store.getState();
-      const selectionDisabled = controller.policy?.selection === false;
-      if (!selectionDisabled && advance === 'down') {
-        mutators.setActive(
-          this.deps.store,
-          stepWithMerge(s, s.selection.active, 1, 0, MAX_ROW, MAX_COL),
-        );
-      } else if (!selectionDisabled && advance === 'right') {
-        mutators.setActive(
-          this.deps.store,
-          stepWithMerge(s, s.selection.active, 0, 1, MAX_ROW, MAX_COL),
-        );
-      }
+      this.advanceAfterCommit(advance);
       return;
     }
     let rejected = false;
@@ -321,18 +375,18 @@ export class InlineEditor {
     }
     this.deps.onAfterCommit();
     this.cancel();
-    const s = this.deps.store.getState();
-    if (advance === 'down') {
-      mutators.setActive(
-        this.deps.store,
-        stepWithMerge(s, s.selection.active, 1, 0, MAX_ROW, MAX_COL),
-      );
-    } else if (advance === 'right') {
-      mutators.setActive(
-        this.deps.store,
-        stepWithMerge(s, s.selection.active, 0, 1, MAX_ROW, MAX_COL),
-      );
-    }
+    this.advanceAfterCommit(advance);
+  }
+
+  private isMacPlatform(): boolean {
+    return (
+      (this.deps.host.closest<HTMLElement>('.fc-host') ?? this.deps.host).dataset.fcPlatform ===
+      'mac'
+    );
+  }
+
+  private advanceAfterCommit(advance: 'down' | 'right' | 'up' | 'left' | 'none'): void {
+    if (advance !== 'none') advanceAfterCommit(this.deps.store, advance, this.isMacPlatform());
   }
 
   /** the spreadsheet's Ctrl+Enter behavior: write the current editor content to every
@@ -346,35 +400,14 @@ export class InlineEditor {
     const anchor = this.editingAddr;
     const s = this.deps.store.getState();
     const ranges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
-    const totalCells = ranges.reduce((sum, r) => sum + rangeArea(r), 0);
-    if (totalCells > MAX_MULTI_COMMIT_CELLS) return;
-    const sheet = s.data.sheetIndex;
-    const isFormula = raw.startsWith('=');
     const controller = interactionControllerFor(this.deps.store);
-    if (controller && controller.policy !== undefined) {
-      const changes: { addr: Addr; input: string }[] = [];
-      let hasFormula = false;
-      for (const r of ranges) {
-        for (let row = r.r0; row <= r.r1; row += 1) {
-          for (let col = r.c0; col <= r.c1; col += 1) {
-            const target = { sheet, row, col };
-            const fmt =
-              target.sheet === anchor.sheet &&
-              target.row === anchor.row &&
-              target.col === anchor.col
-                ? formatWithPending(this.deps.store.getState(), target)
-                : s.format.formats.get(addrKey(target));
-            const forceText = fmt?.numFmt?.kind === 'text';
-            const input =
-              isFormula && !forceText
-                ? shiftFormulaRefs(raw, row - anchor.row, col - anchor.col)
-                : raw;
-            hasFormula ||= isFormula && !forceText;
-            changes.push({ addr: target, input });
-          }
-        }
+    if (controller) {
+      const batch = buildSelectionInputBatch(s, raw, anchor);
+      if (!batch) {
+        this.deps.onValidation?.({ severity: 'stop', message: SELECTION_INPUT_LIMIT_MESSAGE });
+        return;
       }
-      const operation = hasFormula ? 'formulaEdit' : 'valueEdit';
+      const { changes, operation } = batch;
       let result: ReturnType<typeof controller.execute>;
       try {
         result = controller.execute({
@@ -391,7 +424,10 @@ export class InlineEditor {
       if (result.status === 'rejected') {
         input.focus();
         input.select();
-        this.deps.onValidation?.(policyRejection(operation));
+        this.deps.onValidation?.({
+          severity: 'stop',
+          message: result.rejected[0]?.reason ?? policyRejection(operation).message,
+        });
         return;
       }
       mutators.setPendingFormat(this.deps.store, null);
@@ -399,6 +435,13 @@ export class InlineEditor {
       this.cancel();
       return;
     }
+    const totalCells = ranges.reduce((sum, r) => sum + rangeArea(r), 0);
+    if (totalCells > MAX_MULTI_COMMIT_CELLS) {
+      this.deps.onValidation?.({ severity: 'stop', message: SELECTION_INPUT_LIMIT_MESSAGE });
+      return;
+    }
+    const sheet = s.data.sheetIndex;
+    const isFormula = raw.startsWith('=');
     // Validated write that mirrors the anchor's stop-rejection handling. Returns
     // true when a `stop` rule blocked the entry (the whole fill aborts) so DV
     // bites on every filled cell, not just the anchor.
@@ -469,8 +512,10 @@ export class InlineEditor {
     this.cancel();
   }
 
+  /** True while editing or while a formula palette holds the suspended edit;
+   *  cancel() releases that lease, so teardown paths may call it either way. */
   isActive(): boolean {
-    return this.input != null;
+    return this.input != null || this.currentLease != null;
   }
 
   private readonly onKey = (e: KeyboardEvent): void => {
@@ -502,11 +547,39 @@ export class InlineEditor {
         return;
       }
     }
+    if (
+      e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      e.key.toLowerCase() === 't' &&
+      (this.deps.host.closest<HTMLElement>('.fc-host') ?? this.deps.host).dataset.fcPlatform ===
+        'mac'
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      const caret = this.input?.selectionStart ?? this.input?.value.length ?? 0;
+      if (this.input) {
+        const r = rotateRefAt(this.input.value, caret);
+        if (r.text !== this.input.value) {
+          this.input.value = r.text;
+          this.input.setSelectionRange(r.caret, r.caret);
+          syncEditorRefs(this.deps.store, this.input.value);
+          this.autocomplete?.refresh();
+          this.argHelper?.refresh();
+        }
+      }
+      return;
+    }
     if (e.key === 'Enter') {
+      if (this.isMacPlatform() && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.commitMulti();
+        return;
+      }
       // Ctrl+Enter writes the same value/formula to every cell in the active
-      //  selection (spreadsheet parity). On Mac spreadsheets use Control too, not Cmd, so
-      //  metaKey keeps the legacy "newline" behavior to avoid surprising Mac
-      //  users typing ⌘⏎.
+      // selection on every platform. Mac Cmd+Enter is handled above.
       if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
         e.preventDefault();
         // stopPropagation: once commitMulti() flips editor.kind back to idle,
@@ -515,11 +588,21 @@ export class InlineEditor {
         this.commitMulti();
         return;
       }
-      // Alt+Enter / Shift+Enter / Cmd+Enter inserts a literal newline (desktop spreadsheets
-      //  Alt+Enter behavior). Plain Enter commits and advances down.
-      if (e.altKey || e.shiftKey || e.metaKey) {
+      // Alt+Enter (and Meta+Enter off Mac) inserts a literal newline.
+      if (e.altKey || e.metaKey) {
         e.preventDefault();
         this.insertNewline();
+        return;
+      }
+      // Mac Shift+Enter commits upward; elsewhere it inserts a newline.
+      if (e.shiftKey) {
+        e.preventDefault();
+        if (this.isMacPlatform()) {
+          e.stopPropagation();
+          this.commit('up');
+        } else {
+          this.insertNewline();
+        }
         return;
       }
       e.preventDefault();
@@ -536,24 +619,32 @@ export class InlineEditor {
       e.stopPropagation();
       const controller = interactionControllerFor(this.deps.store);
       const restricted = controller?.policy !== undefined;
+      const navigation = navigationPolicyFor(this.deps.store);
+      const hasNavigationPolicy = navigation?.options !== undefined;
+      const tabRestricted = restricted || hasNavigationPolicy;
       const selectionDisabled = controller?.policy?.selection === false;
       if (selectionDisabled) {
         this.commit('none');
         return;
       }
       const next =
-        restricted && this.editingAddr
+        tabRestricted && this.editingAddr
           ? nextTabStop(this.deps.store, this.editingAddr, e.shiftKey)
           : null;
       // At the configured boundary, commit the current cell and let the
       // browser continue focus traversal. A component must not trap Tab.
-      if (restricted && next === null) {
+      if (tabRestricted && next === null) {
         this.commit('none');
+        if (hasNavigationPolicy && navigation?.options?.tabBoundary !== 'leave') {
+          e.preventDefault();
+        }
         return;
       }
       e.preventDefault();
-      this.commit(restricted ? 'none' : e.shiftKey ? 'none' : 'right');
-      if (restricted && next && !this.isActive()) mutators.setActive(this.deps.store, next);
+      this.commit(
+        tabRestricted ? 'none' : e.shiftKey ? (this.isMacPlatform() ? 'left' : 'none') : 'right',
+      );
+      if (tabRestricted && next && !this.isActive()) mutators.setActive(this.deps.store, next);
     } else if (e.key === 'F4' && this.input) {
       // Rotate the cell ref under the cursor: A1 → $A$1 → A$1 → $A1 → A1
       e.preventDefault();
@@ -685,6 +776,124 @@ export class InlineEditor {
       this.input.style.minHeight = `${baseRow * lines}px`;
     }
     this.refreshWidth();
+  }
+
+  /** Remove the transient editor DOM and its subscriptions without changing
+   *  the editor slices. A palette lease uses this boundary before blur can
+   *  turn a suspended edit into a workbook write; ordinary cancel asks for
+   *  host focus after the same teardown. */
+  private detachInput(focusHost: boolean): void {
+    this.unsubscribeStore?.();
+    this.unsubscribeStore = null;
+    this.autocomplete?.detach();
+    this.autocomplete = null;
+    this.argHelper?.detach();
+    this.argHelper = null;
+    const input = this.input;
+    if (!input) {
+      if (focusHost) this.deps.host.focus({ preventScroll: true });
+      return;
+    }
+    input.removeEventListener('keydown', this.onKey);
+    input.removeEventListener('keyup', this.onKeyUp);
+    input.removeEventListener('input', this.onInput);
+    input.removeEventListener('compositionstart', this.onCompositionStart);
+    input.removeEventListener('compositionend', this.onCompositionEnd);
+    input.removeEventListener('blur', this.onBlur);
+    input.removeEventListener('dblclick', this.onDblClick);
+    input.removeEventListener('click', this.onClick);
+    input.remove();
+    this.input = null;
+    if (focusHost) this.deps.host.focus({ preventScroll: true });
+  }
+
+  private invalidateLease(): void {
+    this.leaseGeneration += 1;
+    const lease = this.currentLease;
+    this.currentLease = null;
+    lease?.discard();
+  }
+
+  /** Rebuild an inline editor from a lease snapshot. This deliberately does
+   * not call begin(): begin() clears clipboard state, runs policy checks, and
+   * focuses a new edit. Palette Cancel owns focus and chooses when to focus
+   * this returned element instead. */
+  private restoreFromLease(snapshot: Readonly<FormulaEditLeaseSnapshot>): HTMLElement | null {
+    if (this.input || this.deps.wb !== snapshot.workbook) return null;
+    const state = this.deps.store.getState();
+    if (state.data.sheetIndex !== snapshot.anchor.sheet || state.ui.r1c1 !== snapshot.r1c1) {
+      return null;
+    }
+    this.editingAddr = { ...snapshot.anchor };
+    this.editBaseline = snapshot.baseline;
+    this.composing = false;
+    this.deps.store.setState((current) => ({
+      ...current,
+      selection: snapshot.selection,
+      ui: {
+        ...current.ui,
+        editor: snapshot.editorMode,
+        pendingFormat: snapshot.pendingFormat,
+        editorRefs: [...snapshot.editorRefs],
+        copyRange: snapshot.copy.copyRange,
+        copyRanges: snapshot.copy.copyRanges,
+        copyMode: snapshot.copy.copyMode,
+        copyRevision: snapshot.copy.copyRevision,
+        r1c1: snapshot.r1c1,
+      },
+    }));
+
+    const input = document.createElement('textarea');
+    input.className = 'fc-host__editor';
+    input.spellcheck = false;
+    input.autocapitalize = 'off';
+    input.autocomplete = 'off';
+    input.rows = 1;
+    input.wrap = 'soft';
+    input.value = snapshot.raw;
+    this.input = input;
+    this.applyTextAlignment(snapshot.raw);
+    this.applyCellAppearance();
+    this.position(snapshot.anchor);
+    this.deps.grid.appendChild(input);
+    this.refreshSize();
+    const max = snapshot.raw.length;
+    const start = Math.max(0, Math.min(snapshot.caret.start, max));
+    const end = Math.max(start, Math.min(snapshot.caret.end, max));
+    input.setSelectionRange(start, end, snapshot.caret.direction);
+
+    input.addEventListener('keydown', this.onKey);
+    input.addEventListener('keyup', this.onKeyUp);
+    input.addEventListener('input', this.onInput);
+    input.addEventListener('compositionstart', this.onCompositionStart);
+    input.addEventListener('compositionend', this.onCompositionEnd);
+    input.addEventListener('blur', this.onBlur);
+    input.addEventListener('dblclick', this.onDblClick);
+    input.addEventListener('click', this.onClick);
+    this.autocomplete = attachAutocomplete({
+      input,
+      onAfterInsert: () => syncEditorRefs(this.deps.store, input.value),
+      getTables: () => this.deps.wb.getTables(),
+      editingAddr: snapshot.anchor,
+      getColumnValues: (sheet, col, beforeRow) => this.collectColumnHistory(sheet, col, beforeRow),
+      getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
+      getFunctionNames: () => this.deps.wb.functionNames(),
+      labels: this.deps.getLabels?.().autocomplete,
+    });
+    this.argHelper = attachArgHelper({ input, labels: this.deps.getLabels?.().argHelper });
+    this.argHelper.refresh();
+    mutators.setEditorRefs(this.deps.store, [...snapshot.editorRefs]);
+    this.unsubscribeStore = this.deps.store.subscribe((next, prev) => {
+      if (this.editingAddr && (next.viewport !== prev.viewport || next.layout !== prev.layout)) {
+        this.position(this.editingAddr);
+        this.refreshSize();
+      }
+      if (next.format !== prev.format || next.ui.pendingFormat !== prev.ui.pendingFormat) {
+        this.applyCellAppearance();
+        if (this.input) this.applyTextAlignment(this.input.value);
+      }
+    });
+    return input;
   }
 
   /** Grow the editor rightward to fit content wider than the cell — desktop

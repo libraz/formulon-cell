@@ -9,3 +9,4 @@
 @import "./toolbar/ribbon/menus.css";
 @import "./toolbar/ribbon/groups.css";
 @import "./toolbar/panels.css";
+@import "./platform-mac.css";

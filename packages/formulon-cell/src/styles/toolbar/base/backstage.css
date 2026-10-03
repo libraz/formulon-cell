@@ -264,6 +264,17 @@
     var(--fc-tb-accent);
 }
 
+.fc-tb__backstage-command-icon--svg::before,
+.fc-tb__backstage-command-icon--svg::after {
+  content: none;
+}
+
+.fc-tb__backstage-command-svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+
 .fc-tb__backstage-command strong {
   display: block;
   margin-bottom: 2px;

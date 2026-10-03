@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSessionShape } from '../../../src/commands/session-illustration.js';
-import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { type ChangeEvent, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { presets } from '../../../src/extensions/presets.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
@@ -131,6 +131,202 @@ describe('mount/engine-binding — workbook subscribe forwards events', () => {
     // Last call is the formula write — wb echoes the source formula in the payload.
     const last = onChange.mock.calls.at(-1)?.[0];
     expect(last?.formula).toBe('=A1*2');
+  });
+});
+
+describe('mount/engine-binding — atomic value batches', () => {
+  let sheet: MountedStubSheet;
+
+  beforeEach(async () => {
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    sheet = await mountStubSheet({ workbook });
+  });
+
+  afterEach(() => sheet.dispose());
+
+  it('publishes a mounted atomic batch once before its callbacks', () => {
+    const formulaCalls = vi.spyOn(sheet.workbook, 'cellFormula');
+    const bulkFormulaCalls = vi.spyOn(sheet.workbook, 'cellFormulas');
+    const setState = vi.spyOn(sheet.instance.store, 'setState');
+    const callbacks: ReadonlyMap<string, { value: unknown }>[] = [];
+    const changes: unknown[] = [];
+    sheet.instance.on('cellChange', (event) => {
+      changes.push(event);
+      callbacks.push(new Map(sheet.instance.store.getState().data.cells));
+    });
+
+    sheet.workbook.applyCellPatchAtomic([
+      { addr: { sheet: 0, row: 0, col: 0 }, value: { kind: 'number', value: 1 }, formula: null },
+      { addr: { sheet: 0, row: 1, col: 0 }, value: { kind: 'number', value: 2 }, formula: null },
+    ]);
+
+    const cells = sheet.instance.store.getState().data.cells;
+    expect(changes).toHaveLength(2);
+    expect(callbacks).toHaveLength(2);
+    for (const snapshot of callbacks) {
+      expect(snapshot.get('0:0:0')?.value).toEqual({ kind: 'number', value: 1 });
+      expect(snapshot.get('0:1:0')?.value).toEqual({ kind: 'number', value: 2 });
+    }
+    expect(cells.get('0:0:0')?.value).toEqual({ kind: 'number', value: 1 });
+    expect(cells.get('0:1:0')?.value).toEqual({ kind: 'number', value: 2 });
+    expect(setState).toHaveBeenCalledTimes(1);
+    expect(formulaCalls).toHaveBeenCalledTimes(0);
+    // The mounted binding reads once; atomic before/after snapshots use strict readers.
+    expect(bulkFormulaCalls).toHaveBeenCalledTimes(1);
+  });
+
+  it('rereads the outer batch after a reentrant ordinary write', async () => {
+    sheet.dispose();
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    let nested = false;
+    workbook.subscribe((event) => {
+      if (
+        event.kind === 'value' &&
+        event.atomicBatch?.index === 1 &&
+        event.addr.row === 1 &&
+        !nested
+      ) {
+        nested = true;
+        workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 9);
+      }
+    });
+    sheet = await mountStubSheet({ workbook });
+    const setState = vi.spyOn(sheet.instance.store, 'setState');
+    const changes: Array<{ value: unknown }> = [];
+    sheet.instance.on('cellChange', (event) => changes.push({ value: event.value }));
+
+    workbook.applyCellPatchAtomic([
+      { addr: { sheet: 0, row: 0, col: 0 }, value: { kind: 'number', value: 1 }, formula: null },
+      { addr: { sheet: 0, row: 1, col: 0 }, value: { kind: 'number', value: 2 }, formula: null },
+    ]);
+
+    expect(workbook.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 9 });
+    expect(workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 2 });
+    expect(sheet.instance.store.getState().data.cells.get('0:0:0')?.value).toEqual({
+      kind: 'number',
+      value: 9,
+    });
+    expect(sheet.instance.store.getState().data.cells.get('0:1:0')?.value).toEqual({
+      kind: 'number',
+      value: 2,
+    });
+    expect(changes.map((event) => event.value)).toEqual([
+      { kind: 'number', value: 9 },
+      { kind: 'number', value: 1 },
+      { kind: 'number', value: 2 },
+    ]);
+    expect(setState).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps nested atomic overlap authoritative for both completed batches', async () => {
+    sheet.dispose();
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    let nested = false;
+    workbook.subscribe((event) => {
+      if (
+        event.kind === 'value' &&
+        event.atomicBatch?.index === 1 &&
+        event.addr.row === 1 &&
+        !nested
+      ) {
+        nested = true;
+        workbook.applyCellPatchAtomic([
+          {
+            addr: { sheet: 0, row: 0, col: 0 },
+            value: { kind: 'number', value: 9 },
+            formula: null,
+          },
+          {
+            addr: { sheet: 0, row: 2, col: 0 },
+            value: { kind: 'number', value: 3 },
+            formula: null,
+          },
+        ]);
+      }
+    });
+    sheet = await mountStubSheet({ workbook });
+    const setState = vi.spyOn(sheet.instance.store, 'setState');
+    const changes: number[] = [];
+    sheet.instance.on('cellChange', (event) => {
+      if (event.value.kind === 'number') changes.push(event.value.value);
+    });
+
+    workbook.applyCellPatchAtomic([
+      { addr: { sheet: 0, row: 0, col: 0 }, value: { kind: 'number', value: 1 }, formula: null },
+      { addr: { sheet: 0, row: 1, col: 0 }, value: { kind: 'number', value: 2 }, formula: null },
+    ]);
+
+    expect(changes).toEqual([9, 3, 1, 2]);
+    expect(sheet.instance.store.getState().data.cells.get('0:0:0')?.value).toEqual({
+      kind: 'number',
+      value: 9,
+    });
+    expect(sheet.instance.store.getState().data.cells.get('0:1:0')?.value).toEqual({
+      kind: 'number',
+      value: 2,
+    });
+    expect(sheet.instance.store.getState().data.cells.get('0:2:0')?.value).toEqual({
+      kind: 'number',
+      value: 3,
+    });
+    expect(setState).toHaveBeenCalledTimes(2);
+  });
+
+  it('rereads an outer address when a nested write arrives before its event', async () => {
+    sheet.dispose();
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    let nested = false;
+    workbook.subscribe((event) => {
+      if (event.kind === 'value' && event.atomicBatch?.index === 0 && !nested) {
+        nested = true;
+        workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 9);
+      }
+    });
+    sheet = await mountStubSheet({ workbook });
+    const changes: number[] = [];
+    sheet.instance.on('cellChange', (event) => {
+      if (event.value.kind === 'number') changes.push(event.value.value);
+    });
+
+    workbook.applyCellPatchAtomic([
+      { addr: { sheet: 0, row: 0, col: 0 }, value: { kind: 'number', value: 1 }, formula: null },
+      { addr: { sheet: 0, row: 1, col: 0 }, value: { kind: 'number', value: 2 }, formula: null },
+    ]);
+
+    expect(changes).toEqual([9, 1, 2]);
+    expect(sheet.instance.store.getState().data.cells.get('0:1:0')?.value).toEqual({
+      kind: 'number',
+      value: 9,
+    });
+  });
+
+  it('drops incomplete tagged batches on unbind without a deferred flush', async () => {
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    let listener: ((event: ChangeEvent) => void) | undefined;
+    const subscribe = vi.spyOn(workbook, 'subscribe');
+    subscribe.mockImplementation((callback) => {
+      listener = callback;
+      return () => {};
+    });
+    sheet.dispose();
+    sheet = await mountStubSheet({ workbook });
+    const setState = vi.spyOn(sheet.instance.store, 'setState');
+    const first: ChangeEvent = {
+      kind: 'value',
+      addr: { sheet: 0, row: 0, col: 0 },
+      next: { kind: 'number', value: 1 },
+      atomicBatch: { id: 100, index: 0, size: 2, formula: null },
+    };
+    listener?.(first);
+    expect(setState).toHaveBeenCalledTimes(0);
+    sheet.dispose();
+    listener?.({
+      kind: 'value',
+      addr: { sheet: 0, row: 1, col: 0 },
+      next: { kind: 'number', value: 2 },
+      atomicBatch: { id: 100, index: 1, size: 2, formula: null },
+    });
+    expect(setState).toHaveBeenCalledTimes(0);
   });
 });
 

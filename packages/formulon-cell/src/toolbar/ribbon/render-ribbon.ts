@@ -11,6 +11,7 @@
 // can branch without needing dedicated wrapper props.
 
 import type { FeatureFlags } from '../../extensions/index.js';
+import { clampPanelToViewport, panelSize, viewportSize } from '../../interact/overlay-position.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import type { RibbonDisplayText, ToolbarMenuText } from '../menu-text.js';
@@ -21,6 +22,7 @@ import {
   HOME_TILE_LAYOUT_GROUP_VARIANTS,
   RIBBON_KEYSHORTCUTS,
   type RibbonCommand,
+  type RibbonProfile,
   type RibbonTab,
   type ToolbarText,
 } from '../ribbon-model.js';
@@ -30,6 +32,7 @@ import {
   ribbonActivationForCommand,
 } from './activation.js';
 import { createRibbonButton } from './button.js';
+import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/menus.js';
 
 export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
 
@@ -114,10 +117,15 @@ export interface RenderRibbonCtx {
   ribbonMenuText: ToolbarMenuText;
   ribbonDisplayOptionsText: RibbonDisplayText;
   ribbonTabs?: readonly RibbonTab[];
+  /** Built-in profile selected by the mount. `getProfile` wins when the host
+   *  changes platform after deferred instance attachment. */
+  profile?: RibbonProfile;
+  getProfile?: () => RibbonProfile;
   ribbonRoot: HTMLElement | null;
   state: RibbonRenderState;
   helpers: RibbonRenderHelpers;
   menus?: RibbonMenus;
+  macMenus?: MacRibbonMenuFactory;
   createBackstageView: () => HTMLElement;
   projectFormatToolbar: () => void;
 }
@@ -221,7 +229,7 @@ const createRibbonCommandButton = (
   });
   const disabled = !!command.disabled || activation.kind === 'disabled';
   if (disabled) {
-    const disabledReason = ctx.ribbonText.disabled;
+    const disabledReason = command.disabledReason ?? ctx.ribbonText.disabled;
     projectDisabledState(button, disabled, disabledReason, {
       datasetKey: 'ribbonDisabledReason',
       titlePrefix: command.title,
@@ -272,7 +280,90 @@ const createRibbonDisplayOptionButton = (
   });
 };
 
+const RIBBON_DISPLAY_MENU_GAP = 4;
+const RIBBON_DISPLAY_MENU_PAD = 4;
+const RIBBON_DISPLAY_MENU_FALLBACK_WIDTH = 168;
+const RIBBON_DISPLAY_MENU_FALLBACK_HEIGHT = 128;
+
+const effectiveAxisScale = (renderedSize: number, layoutSize: number): number => {
+  if (renderedSize > 0 && layoutSize > 0) {
+    const scale = renderedSize / layoutSize;
+    if (Number.isFinite(scale) && scale > 0) return scale;
+  }
+  return 1;
+};
+
+/** Position the display menu after it enters the document so its actual size
+ * and the toggle's viewport rect determine the side and final fixed position. */
+const positionRibbonDisplayMenu = (toggle: HTMLElement, menu: HTMLElement): void => {
+  const ownerDocument = toggle.ownerDocument;
+  const computed = ownerDocument.defaultView?.getComputedStyle(menu);
+  const preferredBelow = computed?.top !== 'auto' && computed?.bottom === 'auto';
+  const viewport = viewportSize(ownerDocument);
+  const pad = RIBBON_DISPLAY_MENU_PAD;
+  const gap = RIBBON_DISPLAY_MENU_GAP;
+  const toggleRect = toggle.getBoundingClientRect();
+
+  // The stylesheet anchors this menu with `top`/`bottom` and `right`. Fixed
+  // positioning makes the final coordinates viewport-relative; the shared
+  // clamp helper converts them when a transformed ancestor owns fixed layout.
+  menu.style.position = 'fixed';
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  menu.style.right = 'auto';
+  menu.style.bottom = 'auto';
+  menu.style.maxHeight = '';
+  menu.style.maxWidth = '';
+  menu.style.overflowY = '';
+  menu.style.overscrollBehavior = '';
+  menu.style.width = '';
+  menu.style.minWidth = '';
+  menu.style.boxSizing = 'border-box';
+
+  const naturalSize = panelSize(
+    menu,
+    RIBBON_DISPLAY_MENU_FALLBACK_WIDTH,
+    RIBBON_DISPLAY_MENU_FALLBACK_HEIGHT,
+  );
+  const naturalRect = menu.getBoundingClientRect();
+  const scaleX = effectiveAxisScale(naturalRect.width, menu.offsetWidth);
+  const scaleY = effectiveAxisScale(naturalRect.height, menu.offsetHeight);
+  const availableWidth = Math.max(0, viewport.width - pad * 2);
+  if (naturalSize.width > availableWidth) {
+    menu.style.minWidth = '0px';
+    menu.style.width = `${availableWidth / scaleX}px`;
+    menu.style.maxWidth = `${availableWidth / scaleX}px`;
+  }
+
+  const contentSize = panelSize(menu, naturalSize.width, naturalSize.height);
+  const aboveSpace = Math.max(0, toggleRect.top - pad - gap);
+  const belowSpace = Math.max(0, viewport.height - pad - toggleRect.bottom - gap);
+  const preferredSpace = preferredBelow ? belowSpace : aboveSpace;
+  const alternateSpace = preferredBelow ? aboveSpace : belowSpace;
+  const preferredFits = contentSize.height <= preferredSpace;
+  const alternateFits = contentSize.height <= alternateSpace;
+  const opensBelow = preferredFits
+    ? preferredBelow
+    : alternateFits
+      ? !preferredBelow
+      : belowSpace >= aboveSpace;
+  const availableHeight = opensBelow ? belowSpace : aboveSpace;
+  if (contentSize.height > availableHeight) {
+    menu.style.maxHeight = `${Math.max(0, Math.floor(availableHeight / scaleY))}px`;
+    menu.style.overflowY = 'auto';
+    menu.style.overscrollBehavior = 'contain';
+  }
+
+  const size = panelSize(menu, contentSize.width, contentSize.height);
+  const desiredX = toggleRect.right - size.width;
+  const desiredY = opensBelow ? toggleRect.bottom + gap : toggleRect.top - size.height - gap;
+  const position = clampPanelToViewport(menu, desiredX, desiredY, { pad });
+  menu.style.left = `${Math.round(position.x)}px`;
+  menu.style.top = `${Math.round(position.y)}px`;
+};
+
 export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
+  const defaultMacMenus = createMacRibbonMenuFactory(ctx.ribbonLang);
   const playgroundFeatureFlags = (): FeatureFlags => ({
     viewToolbar: false,
     watchWindow: true,
@@ -280,7 +371,14 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     formulaBar: ctx.state.getFormulaBarVisible(),
   });
 
-  const ribbonSubmenuFactoryFor = (commandId: string): (() => HTMLDivElement) | null => {
+  const ribbonSubmenuFactoryFor = (
+    commandId: string,
+    profile: RibbonProfile,
+  ): (() => HTMLDivElement | null) | null => {
+    if (profile === 'excel365Mac' && commandId.startsWith('mac.')) {
+      const factory = ctx.macMenus ?? defaultMacMenus;
+      return () => factory(commandId);
+    }
     const menus = ctx.menus;
     if (!menus) return null;
     const routeKey = RIBBON_MENU_FACTORY_FOR_COMMAND[commandId] as keyof RibbonMenus | undefined;
@@ -295,19 +393,30 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     const ribbonText = ctx.ribbonText;
     const activeRibbonTab = ctx.state.getActiveTab();
     const ribbonDisplayMode = ctx.state.getDisplayMode();
-    const ribbonAutoHidePeek = ribbonDisplayMode === 'autoHide' && ctx.state.getAutoHidePeek();
+    const ribbonPeek =
+      (ribbonDisplayMode === 'tabsOnly' || ribbonDisplayMode === 'autoHide') &&
+      ctx.state.getAutoHidePeek();
+    const ribbonAutoHidePeek = ribbonDisplayMode === 'autoHide' && ribbonPeek;
     const ribbonCollapsed =
-      ribbonDisplayMode === 'tabsOnly' || (ribbonDisplayMode === 'autoHide' && !ribbonAutoHidePeek);
+      (ribbonDisplayMode === 'tabsOnly' || ribbonDisplayMode === 'autoHide') && !ribbonPeek;
     const backstageOpen = ctx.state.getBackstageOpen();
     const ribbonDisplayMenuOpen = ctx.state.getDisplayMenuOpen();
     const ribbonDisplayOptionsText = ctx.ribbonDisplayOptionsText;
     const { createSelect, createColor, createIcon, makeSvg, chevronPath } = ctx.helpers;
-    const model = buildRibbonModel(ctx.ribbonLang, { tabs: ctx.ribbonTabs });
+    const profile = ctx.getProfile?.() ?? ctx.profile ?? 'default';
+    const model = buildRibbonModel(ctx.ribbonLang, { tabs: ctx.ribbonTabs, profile });
     const shell = document.createElement('div');
-    shell.className = `fc-tb__ribbon-shell fc-tb__ribbon-shell--${ribbonDisplayMode}${
-      ribbonAutoHidePeek ? ' fc-tb__ribbon-shell--autoHidePeek' : ''
-    }${ribbonCollapsed ? ' fc-tb__ribbon-shell--collapsed' : ''}`;
+    shell.className = [
+      'fc-tb__ribbon-shell',
+      `fc-tb__ribbon-shell--${ribbonDisplayMode}`,
+      ribbonPeek && 'fc-tb__ribbon-shell--peek',
+      ribbonAutoHidePeek && 'fc-tb__ribbon-shell--autoHidePeek',
+      ribbonCollapsed && 'fc-tb__ribbon-shell--collapsed',
+    ]
+      .filter(Boolean)
+      .join(' ');
     shell.dataset.ribbonDisplayMode = ribbonDisplayMode;
+    if (ribbonPeek) shell.dataset.ribbonPeek = 'true';
     if (ribbonAutoHidePeek) shell.dataset.ribbonAutoHidePeek = 'true';
 
     const tabs = document.createElement('div');
@@ -371,8 +480,11 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             chevronPath,
           });
           tools.appendChild(b);
-          const submenu = ribbonSubmenuFactoryFor(c.id);
-          if (submenu) tools.appendChild(submenu());
+          const submenu = ribbonSubmenuFactoryFor(c.id, profile);
+          if (submenu) {
+            const menu = submenu();
+            if (menu) tools.appendChild(menu);
+          }
         }
 
         const label = document.createElement('div');
@@ -386,6 +498,8 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
       shell.appendChild(panel);
     }
 
+    let displayToggle: HTMLButtonElement | null = null;
+    let displayMenu: HTMLDivElement | null = null;
     if (!backstageOpen) {
       const display = document.createElement('div');
       display.className = 'fc-tb__ribbon-display';
@@ -393,6 +507,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
         ribbonDisplayOptionsText,
         ribbonDisplayMenuOpen,
       );
+      displayToggle = toggle;
       display.appendChild(toggle);
       if (ribbonDisplayMenuOpen) {
         const menu = document.createElement('div');
@@ -408,6 +523,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
           const item = createRibbonDisplayOptionButton(label, checked, option);
           menu.appendChild(item);
         }
+        displayMenu = menu;
         display.appendChild(menu);
       }
       shell.appendChild(display);
@@ -415,6 +531,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
     ribbonRoot.replaceChildren(shell);
     if (backstageOpen) ribbonRoot.appendChild(ctx.createBackstageView());
+    if (displayToggle && displayMenu) positionRibbonDisplayMenu(displayToggle, displayMenu);
     ctx.projectFormatToolbar();
   };
 
