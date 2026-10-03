@@ -2,6 +2,92 @@ import { expect, type Page } from '@playwright/test';
 
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
+export async function runMacEditingPaletteScenario(
+  page: Page,
+  locale: 'en' | 'ja' = 'en',
+): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount({ platform: 'mac', locale });
+  await sp.expectNoStub();
+  await page.locator('[data-ribbon-tab="formulas"]').click();
+  const palette = page.locator('.fc-mac-formula-palette[role=complementary]');
+  const raw = '=1+SUM(2,3)*4';
+  for (const source of ['inline', 'formulaBar'] as const) {
+    await sp.enter('A1', '9');
+    await sp.goTo('A1');
+    await page.evaluate(() => {
+      const inst = (window as Window & { __fcInst?: { history: { clear(): void } } }).__fcInst;
+      if (!inst) throw new Error('Missing mounted instance.');
+      inst.history.clear();
+    });
+    const edit =
+      source === 'inline'
+        ? page.locator('.fc-host__editor')
+        : page.locator('.fc-host__formulabar-input');
+    if (source === 'inline') await page.keyboard.press('Control+u');
+    await edit.fill(raw);
+    await edit.evaluate((element) => {
+      (element as HTMLTextAreaElement).setSelectionRange(7, 10, 'backward');
+    });
+    const opener =
+      source === 'inline'
+        ? page.locator('[data-ribbon-command="mac.formulas.insertFunction"]')
+        : page.locator('.fc-host__formulabar-fx');
+    await opener.click();
+    await expect(palette).toBeVisible();
+    await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 9 });
+    await expect.poll(() => sp.readFormula('A1')).toBeNull();
+    await palette.locator('[data-action="close"]').click();
+    await expect(palette).toBeHidden();
+    await expect(edit).toBeFocused();
+    await expect(edit).toHaveValue(raw);
+    expect(
+      await edit.evaluate((element) => {
+        const input = element as HTMLTextAreaElement;
+        return [input.selectionStart, input.selectionEnd, input.selectionDirection];
+      }),
+    ).toEqual([7, 10, 'backward']);
+    await opener.click();
+    const fields = palette.locator('.fc-mac-formula-palette__argument input');
+    await expect(fields).toHaveCount(2);
+    await expect(fields.nth(0)).toHaveValue('2');
+    await expect(fields.nth(1)).toHaveValue('3');
+    await fields.nth(0).fill('5');
+    await expect.poll(() => sp.formulaBarValue()).toBe('=1+SUM(5,3)*4');
+    await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 9 });
+    await palette.locator('[data-action="done"]').click();
+    await expect.poll(() => sp.readFormula('A1')).toBe('=1+SUM(5,3)*4');
+    await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 33 });
+    await palette.locator('[data-action="close"]').click();
+    await page.locator('.fc-host').focus();
+    await page.keyboard.press('Meta+z');
+    await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 9 });
+    await expect.poll(() => sp.readFormula('A1')).toBeNull();
+    expect(
+      await page.evaluate(() => {
+        const inst = (window as Window & { __fcInst?: { history: { canUndo(): boolean } } })
+          .__fcInst;
+        if (!inst) throw new Error('Missing mounted instance.');
+        return inst.history.canUndo();
+      }),
+    ).toBe(false);
+    await page.keyboard.press('Meta+Shift+z');
+    await expect.poll(() => sp.readFormula('A1')).toBe('=1+SUM(5,3)*4');
+
+    await sp.goTo('A1');
+    if (source === 'inline') await page.keyboard.press('Control+u');
+    await edit.fill(raw);
+    await opener.click();
+    await expect(palette).toBeVisible();
+    await sp.goTo('B2');
+    await expect(palette).toBeHidden();
+    await expect(page.locator('.fc-host__editor')).toHaveCount(0);
+    await expect(page.locator('.fc-host__formulabar-tag')).toHaveValue('B2');
+    await expect.poll(() => sp.readFormula('A1')).toBe('=1+SUM(5,3)*4');
+  }
+  await sp.expectNoConsoleErrors();
+}
+
 export async function runMacFormulaPaletteScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
@@ -110,15 +196,8 @@ export async function runMacFormulaPaletteScenario(page: Page): Promise<void> {
   await expect
     .poll(async () => (await grid.boundingBox())?.width)
     .toBeCloseTo(originalGrid.width, 0);
-  // Committing can redraw the ribbon and disconnect the original button.
-  // Close returns to that exact opener when present, otherwise to the sheet.
-  if (await originalOpener.evaluate((element) => element.isConnected)) {
-    await expect
-      .poll(() => originalOpener.evaluate((element) => element === document.activeElement))
-      .toBe(true);
-  } else {
-    await expect(page.locator('.fc-host')).toBeFocused();
-  }
+  // The new draft came from More Functions; Close restores its visible trigger.
+  await expect(page.locator('[data-ribbon-command="mac.formulas.more"]')).toBeFocused();
   await page.locator('.fc-host').focus();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 1 });

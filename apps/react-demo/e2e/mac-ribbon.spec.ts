@@ -8,6 +8,7 @@ import {
   runMacConsolidateScenario,
   runMacDirectAutomationScenario,
   runMacDirectDataControlsScenario,
+  runMacEditingPaletteScenario,
   runMacFormulaAndAutomationScenario,
   runMacFormulaPaletteScenario,
   runMacFunctionCatalogScenario,
@@ -25,6 +26,14 @@ import {
   runMacValidationMenuScenario,
   runMacViewShowScenario,
 } from '../../../tests/e2e-shared/scenarios/mac-ribbon.js';
+
+for (const locale of ['en', 'ja'] as const) {
+  test(`Mac: ${locale} editing palette preserves drafts and edits a compound formula in one undo`, async ({
+    page,
+  }) => {
+    await runMacEditingPaletteScenario(page, locale);
+  });
+}
 
 test('Mac: all ribbon tabs switch their command groups with mouse and keyboard', async ({
   page,

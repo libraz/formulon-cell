@@ -93,6 +93,14 @@ export type { RibbonDisplayMode } from '../toolbar/ribbon/render-ribbon.js';
 const DEFAULT_BORDER_STYLE: CellBorderStyle = 'thin';
 const DEFAULT_BORDER_COLOR = '#000000';
 
+const isImmediateMacFormulaOpener = (commandId: string): boolean =>
+  commandId === 'mac.formulas.insertFunction' || commandId.startsWith('mac.function.');
+
+const isImmediateMacFormulaPrimary = (target: Element, commandId: string): boolean =>
+  isImmediateMacFormulaOpener(commandId) &&
+  !target.closest('.fc-tb__rb-split-chevron') &&
+  !isRibbonMenuFirstCommand(commandId);
+
 export interface MountToolbarOptions {
   /** Platform used for platform-specific ribbon defaults. Inherited from the
    *  nearest `.fc-host` when omitted. */
@@ -577,6 +585,24 @@ export function mountToolbar(
 
   const hasOpenStaticMenu = (): boolean => !dropdownsApi && hasOpenStaticRibbonMenu(host);
 
+  const onMouseDown = (e: MouseEvent): void => {
+    if (e.button !== 0) return;
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const cmdBtn = target.closest<HTMLButtonElement>('[data-ribbon-command]');
+    const id = cmdBtn?.dataset.ribbonCommand;
+    if (
+      !cmdBtn ||
+      !id ||
+      cmdBtn.disabled ||
+      cmdBtn.getAttribute('aria-disabled') === 'true' ||
+      !isImmediateMacFormulaPrimary(target, id)
+    )
+      return;
+    // Preserve the active formula edit until the palette has captured it.
+    e.preventDefault();
+  };
+
   const onClick = (e: MouseEvent): void => {
     const target = e.target;
     if (!(target instanceof Element)) return;
@@ -632,7 +658,9 @@ export function mountToolbar(
       // to the command that opened them both rely on the invoked command being
       // the active element, so normalize it here. Anything the command itself
       // focuses afterwards (menu item, dialog field, the sheet) still wins.
-      if (document.activeElement !== cmdBtn) cmdBtn.focus({ preventScroll: true });
+      if (document.activeElement !== cmdBtn && !isImmediateMacFormulaPrimary(target, id)) {
+        cmdBtn.focus({ preventScroll: true });
+      }
       if (opts.interceptCommand?.(id, cmdBtn, e)) {
         const openMenu = host.querySelector(
           '.fc-tb__menu:not([hidden]), .fc-tb__submenu:not([hidden]), .fc-tb__rb-dd--open',
@@ -666,16 +694,30 @@ export function mountToolbar(
         }
         if (toggleStaticRibbonSubmenu(host, cmdBtn)) return;
       }
+      const immediateFunctionLeaf =
+        id.startsWith('mac.function.') && isImmediateMacFormulaPrimary(target, id);
+      let returnFocusTarget: HTMLElement | null = null;
       if (cmdBtn.closest('.fc-tb__menu--mac')) {
         const menu = cmdBtn.closest<HTMLElement>('.fc-tb__menu--mac');
         const spec = menu ? dropdownsApi?.dynamicDropdownSpecForMenu(menu) : null;
-        if (spec) dropdownsApi?.closeDynamicRibbonDropdown(spec, true);
+        returnFocusTarget =
+          immediateFunctionLeaf && spec
+            ? (dropdownsApi?.dynamicDropdownButtonForSpec(spec) ?? null)
+            : null;
+        if (spec) dropdownsApi?.closeDynamicRibbonDropdown(spec, !immediateFunctionLeaf);
         closeStaticRibbonMenus(host);
       }
-      applyCommand(id);
+      const applied = applyCommand(id);
+      if (applied && immediateFunctionLeaf && returnFocusTarget) {
+        const dialog = getInstance()?.features.fxDialog as
+          | { setReturnFocusTarget?: (target: HTMLElement | null) => void }
+          | undefined;
+        dialog?.setReturnFocusTarget?.(returnFocusTarget);
+      }
       dismissRibbonPeek();
     }
   };
+  host.addEventListener('mousedown', onMouseDown);
   host.addEventListener('click', onClick);
 
   // Double-clicking an active ribbon tab toggles the collapsed-tabs-only
@@ -938,6 +980,7 @@ export function mountToolbar(
       if (previousPlatform === undefined) delete host.dataset.fcPlatform;
       else host.dataset.fcPlatform = previousPlatform;
       interactionPolicy.detach();
+      host.removeEventListener('mousedown', onMouseDown);
       host.removeEventListener('click', onClick);
       host.removeEventListener('dblclick', onDoubleClick);
       host.removeEventListener('keydown', onKey);

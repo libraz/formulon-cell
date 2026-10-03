@@ -31,7 +31,10 @@ import {
   assembledFormula,
   canonicalName,
   formulaWithArgumentCount,
+  type ProjectedFormulaCall,
   parseOuterCall,
+  projectFormulaCallAtCaret,
+  replaceProjectedFormulaCall,
 } from './mac-formula-call.js';
 import {
   argumentFieldCount,
@@ -74,9 +77,11 @@ export interface MacFormulaPaletteDeps {
 }
 
 export interface MacFormulaPaletteHandle extends FxDialogHandle {
+  discard(): void;
   isOpen(): boolean;
   rangeInsertTarget(): RangeInsertTarget | null;
   setStrings(next: Strings): void;
+  setReturnFocusTarget(target: HTMLElement | null): void;
 }
 
 type PaletteMode = 'closed' | 'picker' | 'arguments-editing' | 'arguments-committed';
@@ -86,6 +91,7 @@ interface CommitSnapshot {
   args: string[];
   raw: string;
   result: string;
+  caret: number;
 }
 
 interface DraftBinding {
@@ -94,6 +100,14 @@ interface DraftBinding {
   leased: boolean;
 }
 
+interface DraftView {
+  raw: string;
+  caret: {
+    start: number;
+    end: number;
+    direction: HTMLTextAreaElement['selectionDirection'];
+  };
+}
 const connectedElement = (value: Element | null): HTMLElement | null =>
   value instanceof HTMLElement && value.isConnected ? value : null;
 
@@ -113,6 +127,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   let detached = false;
   let opener: HTMLElement | null = null;
   let restoredFocusTarget: HTMLElement | null = null;
+  let returnFocusTarget: HTMLElement | null = null;
   let anchor: Addr | null = null;
   let sessionWb: WorkbookHandle | null = null;
   let catalog = buildFunctionCatalog(null, catalogLocaleOrdinal(deps.getLocale()));
@@ -128,6 +143,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   let writingDraftRaw = false;
   let focusedArgument = 0;
   let currentRaw = '';
+  let currentCaret = 0;
+  let callProjection: ProjectedFormulaCall | null = null;
+  let guardedUnavailable = false;
+  let paletteWriteFocusIndex: number | null = null;
   let searchQuery = '';
   let guardMessage = '';
   let postCommit: CommitSnapshot | null = null;
@@ -138,6 +157,9 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   let closing = false;
   let guarding = false;
   let committing = false;
+  let staleProjectionWrite = false;
+
+  const currentDraftBinding = (): DraftBinding | null => activeDraft;
 
   const view = createMacFormulaPaletteView(root, {
     labels: () => labels,
@@ -155,7 +177,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     argumentFocus: (index) => {
       focusedArgument = index;
     },
-    argumentInput: (index, value) => onArgumentInput(index, value),
+    argumentInput: (index, value, sourceField) => onArgumentInput(index, value, sourceField),
     addArgument: () => addArgument(),
     done: () => commitSelected(),
   });
@@ -175,6 +197,13 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
   };
 
+  const isClosed = (): boolean => mode === 'closed';
+
+  const setReturnFocusTarget = (target: HTMLElement | null): void => {
+    if (detached || isClosed() || !(target instanceof HTMLElement) || !target.isConnected) return;
+    returnFocusTarget = target;
+  };
+
   const readCatalog = (): FunctionCatalogSnapshot => {
     let reader: FunctionCatalogReader | null = null;
     try {
@@ -183,6 +212,38 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     } catch {
       return buildFunctionCatalog(null, catalogLocaleOrdinal(deps.getLocale()));
     }
+  };
+
+  const resolveProjectedName = (rawName: string): string | null => {
+    const name = canonicalName(rawName);
+    return catalog.knownNames.has(name) ? name : null;
+  };
+
+  const activeEndpoint = (view: DraftView): number =>
+    view.caret.direction === 'backward' ? view.caret.start : view.caret.end;
+
+  const reprojectDraft = (view: DraftView): ProjectedFormulaCall | null => {
+    currentCaret = activeEndpoint(view);
+    callProjection = projectFormulaCallAtCaret(view.raw, currentCaret, resolveProjectedName);
+    return callProjection;
+  };
+
+  const sameProjectedCall = (
+    left: ProjectedFormulaCall | null,
+    right: ProjectedFormulaCall | null,
+  ): boolean => {
+    if (left === null || right === null) return left === right;
+    return (
+      left.source === right.source &&
+      left.span.canonicalName === right.span.canonicalName &&
+      left.span.name.start === right.span.name.start &&
+      left.span.name.end === right.span.name.end &&
+      left.span.call.start === right.span.call.start &&
+      left.span.call.end === right.span.call.end &&
+      left.span.openParen === right.span.openParen &&
+      left.span.closeParen === right.span.closeParen &&
+      left.span.complete === right.span.complete
+    );
   };
 
   const textForEntry = (entry: FunctionCatalogEntry): string =>
@@ -225,6 +286,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     preserveExplicitArgumentCount = false;
     synchronized = true;
     currentRaw = '';
+    currentCaret = 0;
+    callProjection = null;
+    guardedUnavailable = false;
+    staleProjectionWrite = false;
   };
 
   const resetFunctionSelection = (): void => {
@@ -305,6 +370,62 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
   };
 
+  const sameArgs = (left: readonly string[], right: readonly string[]): boolean =>
+    left.length === right.length && left.every((value, index) => value === right[index]);
+
+  /** Adopt one authoritative draft snapshot without causing a render loop. */
+  const adoptDraftView = (view: DraftView, preserveArgument?: number | null): boolean => {
+    const previousName = selectedName;
+    const previousArgs = args;
+    const previousProjection = callProjection;
+    const previousSynchronized = synchronized;
+    currentRaw = view.raw;
+    const projection = reprojectDraft(view);
+
+    if (selectedName) {
+      if (projection) {
+        const nextEntry = catalog.entries.get(projection.span.canonicalName) ?? null;
+        selectedName = projection.span.canonicalName;
+        selectedEntry = nextEntry;
+        args = [...projection.args];
+        explicitArgumentCount = projection.args.length;
+        if (!writingDraftRaw) preserveExplicitArgumentCount = true;
+        guardedUnavailable =
+          nextEntry === null || isFunctionUnavailableForInsertion(nextEntry.availability);
+        synchronized = !guardedUnavailable;
+        if (guardedUnavailable) {
+          explicitArgumentCount = null;
+          preserveExplicitArgumentCount = false;
+        }
+      } else {
+        const nextEntry = catalog.entries.get(selectedName) ?? null;
+        guardedUnavailable =
+          nextEntry === null || isFunctionUnavailableForInsertion(nextEntry.availability);
+        synchronized = false;
+        explicitArgumentCount = null;
+        preserveExplicitArgumentCount = false;
+      }
+    } else {
+      guardedUnavailable = false;
+      synchronized = projection !== null || view.raw.trim() === '=';
+    }
+
+    if (preserveArgument !== null && preserveArgument !== undefined) {
+      focusedArgument = preserveArgument;
+    } else if (projection) {
+      focusedArgument = projection.span.activeArgumentIndex;
+    }
+
+    return (
+      previousName !== selectedName ||
+      !sameArgs(previousArgs, args) ||
+      previousSynchronized !== synchronized ||
+      previousProjection?.span.canonicalName !== projection?.span.canonicalName ||
+      previousProjection?.span.call.start !== projection?.span.call.start ||
+      previousProjection?.span.call.end !== projection?.span.call.end
+    );
+  };
+
   const sectionTitle = (key: string): string =>
     key === 'recent'
       ? labels.recent
@@ -370,7 +491,13 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       title: entry?.displayName ?? selectedName ?? '',
       fields,
       canAddArgument: entry?.maxArity === null,
-      doneDisabled: selectedUnavailable() || mode === 'arguments-committed',
+      doneDisabled:
+        selectedUnavailable() ||
+        mode === 'arguments-committed' ||
+        !synchronized ||
+        callProjection === null ||
+        !callProjection.span.complete,
+      doneDisabledReason: selectedUnavailable() ? labels.unavailable : labels.draftConflict,
       guardMessage,
       description: selectedDescription(),
       syntax: selectedSyntax(),
@@ -379,21 +506,51 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   };
 
   const selectedUnavailable = (): boolean =>
-    selectedEntry !== null && isFunctionUnavailableForInsertion(selectedEntry.availability);
+    guardedUnavailable ||
+    (selectedEntry !== null && isFunctionUnavailableForInsertion(selectedEntry.availability));
 
+  /** Drop a stale workbook/context without running the user cancel/restore path. */
+  const discardSessionInertly = (): void => {
+    const binding = activeDraft;
+    if (binding) {
+      guarding = true;
+      try {
+        binding.handle.discard();
+      } finally {
+        guarding = false;
+      }
+      return;
+    }
+    mode = 'closed';
+    resetFunctionSelection();
+    resetPickerSelection();
+    postCommit = null;
+    notifyMirror(null);
+    recentUnsubscribe?.();
+    recentUnsubscribe = null;
+    pickerRefs = null;
+    argumentsRefs = null;
+    clearRoot();
+    updateDataset();
+    opener = null;
+    restoredFocusTarget = null;
+    returnFocusTarget = null;
+    anchor = null;
+    sessionWb = null;
+  };
+
+  /** Keep the authoritative draft alive while a same-workbook catalog entry is withdrawn. */
   const showGuardedPicker = (message: string): void => {
-    guarding = true;
-    if (activeDraft) activeDraft.handle.cancel();
-    guarding = false;
     const live = safeWorkbook();
     sessionWb = live;
     catalog = readCatalog();
-    selectedEntry = selectedName ? (catalog.entries.get(selectedName) ?? null) : null;
+    const nextEntry = selectedName ? (catalog.entries.get(selectedName) ?? null) : null;
+    if (nextEntry) selectedEntry = nextEntry;
+    guardedUnavailable = true;
+    synchronized = false;
     resetPickerSelection();
-    mode = 'picker';
     guardMessage = message;
-    resetDraftProjection();
-    notifyMirror(null);
+    notifyMirror(activeDraft ? currentRaw : null);
     render();
   };
 
@@ -402,9 +559,9 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     const live = safeWorkbook();
     const nextCatalog = readCatalog();
     const nextEntry = nextCatalog.entries.get(selectedName) ?? null;
+    const workbookChanged = live === null || live !== sessionWb;
     const mismatch =
-      live === null ||
-      live !== sessionWb ||
+      workbookChanged ||
       !nextCatalog.knownNames.has(selectedName) ||
       nextEntry === null ||
       selectedEntry === null ||
@@ -412,64 +569,94 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     catalog = nextCatalog;
     reconcilePickerSelection();
     if (mismatch) {
+      if (workbookChanged) {
+        discardSessionInertly();
+        return null;
+      }
       showGuardedPicker(labels.unavailable);
       return null;
     }
     sessionWb = live;
     selectedEntry = nextEntry;
+    guardedUnavailable = false;
     return nextEntry;
   };
 
-  const setDraftRaw = (raw: string, preserveExplicit = preserveExplicitArgumentCount): void => {
-    if (!activeDraft) return;
+  const setDraftRaw = (
+    raw: string,
+    preserveExplicit = preserveExplicitArgumentCount,
+    caret?: number,
+  ): void => {
+    const binding = activeDraft;
+    if (!binding) return;
     preserveExplicitArgumentCount = preserveExplicit;
     writingDraftRaw = true;
     try {
-      activeDraft.handle.setValue(raw);
+      binding.handle.setValue(raw, caret);
     } finally {
       writingDraftRaw = false;
     }
-    currentRaw = raw;
+    if (activeDraft === binding) currentRaw = raw;
   };
 
-  const assembledCurrentFormula = (name: string): string =>
-    formulaWithArgumentCount(
-      name,
-      args,
-      preserveExplicitArgumentCount ? explicitArgumentCount : null,
-    );
-
-  const handleRawUpdate = (binding: DraftBinding, raw: string): void => {
+  const handleRawUpdate = (binding: DraftBinding, view: DraftView): void => {
     if (activeDraft !== binding) return;
-    currentRaw = raw;
-    notifyMirror(raw);
-    if (selectedName) {
-      const parsed = parseOuterCall(raw, selectedName);
-      if (parsed) {
-        const changedCount = args.length !== parsed.args.length;
-        args = parsed.args;
-        explicitArgumentCount = parsed.args.length;
-        if (!writingDraftRaw) preserveExplicitArgumentCount = true;
-        synchronized = true;
-        if (changedCount && mode !== 'picker') render();
-        updateFieldValues();
-      } else {
-        synchronized = false;
-        explicitArgumentCount = null;
-        preserveExplicitArgumentCount = false;
-      }
-    } else {
-      synchronized = true;
+    const viewCaret = activeEndpoint(view);
+    const preserveArgument = paletteWriteFocusIndex;
+    if (currentRaw === view.raw && currentCaret === viewCaret) {
+      notifyMirror(view.raw);
+      updateDataset();
+      updateFieldValues();
+      renderPreview();
+      return;
     }
+    const projectionChanged = adoptDraftView(view, preserveArgument);
+    notifyMirror(view.raw);
     updateDataset();
+    if (mode !== 'picker' && projectionChanged && preserveArgument === null) {
+      render();
+      return;
+    }
+    updateFieldValues();
     renderPreview();
   };
 
-  const finishDraft = (binding: DraftBinding, outcome: 'committed' | 'cancelled'): void => {
+  const finishDraft = (
+    binding: DraftBinding,
+    outcome: 'committed' | 'cancelled' | 'discarded',
+  ): void => {
     if (activeDraft !== binding) return;
+    if (outcome === 'discarded') {
+      activeDraft = null;
+      binding.unsubscribe();
+      recentUnsubscribe?.();
+      recentUnsubscribe = null;
+      notifyMirror(null);
+      mode = 'closed';
+      resetFunctionSelection();
+      resetPickerSelection();
+      postCommit = null;
+      restoredFocusTarget = null;
+      opener = null;
+      returnFocusTarget = null;
+      sessionWb = null;
+      anchor = null;
+      pickerRefs = null;
+      argumentsRefs = null;
+      clearRoot();
+      updateDataset();
+      return;
+    }
     const committedName = selectedName;
     const committedRaw = currentRaw;
-    const committedArgs = [...args];
+    const committedProjection =
+      callProjection &&
+      committedName &&
+      callProjection.source === committedRaw &&
+      callProjection.span.canonicalName === committedName
+        ? callProjection
+        : null;
+    const committedArgs = [...(committedProjection?.args ?? args)];
     const committedResult = argumentsRefs?.preview.textContent ?? labels.pending;
     const committedCount = explicitArgumentCount;
     const committedPreservesCount = preserveExplicitArgumentCount;
@@ -483,7 +670,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
             committedPreservesCount ? committedCount : null,
           )
         : null;
-    const shouldRecord = parsed !== null && assembled === committedRaw.trim();
+    const committedValid =
+      outcome === 'committed' &&
+      committedName !== null &&
+      (committedProjection?.span.complete || parsed !== null);
+    const shouldRecord =
+      committedValid && (committedProjection !== null || assembled === committedRaw.trim());
     activeDraft = null;
     binding.unsubscribe();
     if (outcome === 'committed' && committedName) {
@@ -492,11 +684,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         args: committedArgs,
         raw: committedRaw,
         result: committedResult,
+        caret: committedProjection?.span.call.end ?? currentCaret,
       };
       mode = 'arguments-committed';
-      synchronized = parsed !== null;
-      explicitArgumentCount = parsed?.args.length ?? null;
-      preserveExplicitArgumentCount = parsed !== null;
+      synchronized = committedValid;
+      explicitArgumentCount = committedProjection?.args.length ?? parsed?.args.length ?? null;
+      preserveExplicitArgumentCount = committedProjection !== null || parsed !== null;
       guardMessage = '';
       if (shouldRecord) recordRecentFunction(deps.store, committedName, catalog.knownNames);
       notifyMirror(null);
@@ -512,7 +705,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
   };
 
-  const startDraft = (seed: string, lease?: FormulaEditLease): boolean => {
+  const startDraft = (seed: string, lease?: FormulaEditLease, initialCaret?: number): boolean => {
     if (detached || activeDraft || !anchor) return activeDraft !== null;
     const handle = deps.beginDraft(
       { ...anchor },
@@ -536,32 +729,56 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       leased: lease !== undefined,
     };
     activeDraft = binding;
-    currentRaw = handle.value();
-    binding.unsubscribe = handle.subscribe((raw) => handleRawUpdate(binding, raw));
-    notifyMirror(currentRaw);
+    const initialView = handle.snapshot();
+    if (!initialView) {
+      if (activeDraft === binding) activeDraft = null;
+      return false;
+    }
+    binding.unsubscribe = handle.subscribe((view) => handleRawUpdate(binding, view));
+    handleRawUpdate(binding, initialView);
+    if (initialCaret !== undefined && initialCaret !== activeEndpoint(initialView)) {
+      handle.setValue(seed, initialCaret);
+    }
     return true;
   };
 
   const ensurePostCommitDraft = (): boolean => {
     if (activeDraft) return true;
     if ((mode !== 'arguments-committed' && mode !== 'picker') || !postCommit) return false;
-    if (!startDraft(postCommit.raw)) {
+    if (!startDraft(postCommit.raw, undefined, postCommit.caret)) {
       args = [...postCommit.args];
       currentRaw = postCommit.raw;
+      callProjection = projectFormulaCallAtCaret(
+        postCommit.raw,
+        postCommit.caret,
+        resolveProjectedName,
+      );
       const parsed = selectedName ? parseOuterCall(currentRaw, selectedName) : null;
-      explicitArgumentCount = parsed?.args.length ?? null;
-      preserveExplicitArgumentCount = parsed !== null;
-      synchronized = parsed !== null;
+      explicitArgumentCount = callProjection?.args.length ?? parsed?.args.length ?? null;
+      preserveExplicitArgumentCount = callProjection !== null || parsed !== null;
+      synchronized =
+        (callProjection?.span.canonicalName === selectedName && callProjection.span.complete) ||
+        parsed !== null;
       guardMessage = labels.draftConflict;
       notifyMirror(null);
       render();
       return false;
     }
     mode = 'arguments-editing';
+    const binding = currentDraftBinding();
+    if (!binding) return false;
+    const view = binding.handle.snapshot();
+    const projection = view ? reprojectDraft(view) : null;
     const parsed = parseOuterCall(currentRaw, postCommit.name);
-    synchronized = parsed !== null;
-    explicitArgumentCount = parsed?.args.length ?? null;
-    preserveExplicitArgumentCount = parsed !== null;
+    synchronized =
+      (projection?.span.canonicalName === postCommit.name && projection.span.complete) ||
+      parsed !== null;
+    explicitArgumentCount = projection?.args.length ?? parsed?.args.length ?? null;
+    preserveExplicitArgumentCount = projection !== null || parsed !== null;
+    if (projection?.span.canonicalName === postCommit.name) {
+      args = [...projection.args];
+      focusedArgument = projection.span.activeArgumentIndex;
+    }
     guardMessage = '';
     updateDataset();
     if (argumentsRefs) {
@@ -574,15 +791,96 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     return true;
   };
 
-  const onArgumentInput = (index: number, value: string): void => {
+  const projectionForWrite = (): ProjectedFormulaCall | null => {
+    staleProjectionWrite = false;
+    const binding = activeDraft;
+    if (!binding) return null;
+    const view = binding.handle.snapshot();
+    if (!view) return null;
+    const snapshotCaret = activeEndpoint(view);
+    const snapshotProjection = projectFormulaCallAtCaret(
+      view.raw,
+      snapshotCaret,
+      resolveProjectedName,
+    );
+    if (
+      currentRaw !== view.raw ||
+      currentCaret !== snapshotCaret ||
+      !sameProjectedCall(callProjection, snapshotProjection)
+    ) {
+      staleProjectionWrite = true;
+      adoptDraftView(view);
+      if (!isClosed() && mode !== 'picker') render();
+      return null;
+    }
+    adoptDraftView(view, focusedArgument);
+    const projection = callProjection;
+    if (!projection || !selectedName || projection.span.canonicalName !== selectedName) {
+      synchronized = false;
+      return null;
+    }
+    return projection;
+  };
+
+  /** Rewrite the projected call with `nextArgs`; false when the draft refused the write. */
+  const writeProjectedArgs = (
+    build: (projected: readonly string[]) => { args: string[]; focus: number },
+  ): boolean => {
+    const projection = projectionForWrite();
+    if (!projection || !selectedName) {
+      if (staleProjectionWrite) return false;
+      guardMessage = labels.draftConflict;
+      render();
+      return false;
+    }
+    const next = build(projection.args);
+    const replaced = replaceProjectedFormulaCall(
+      currentRaw,
+      projection,
+      selectedName,
+      next.args,
+      next.args.length,
+    );
+    if (!replaced) {
+      synchronized = false;
+      guardMessage = labels.draftConflict;
+      render();
+      return false;
+    }
+    args = next.args;
+    explicitArgumentCount = next.args.length;
+    preserveExplicitArgumentCount = true;
+    focusedArgument = next.focus;
+    paletteWriteFocusIndex = next.focus;
+    try {
+      setDraftRaw(replaced.raw, true, replaced.caret);
+    } finally {
+      paletteWriteFocusIndex = null;
+    }
+    return true;
+  };
+
+  const withArgument = (projected: readonly string[], index: number, value: string) => {
+    const nextArgs = [...projected];
+    while (nextArgs.length <= index) nextArgs.push('');
+    nextArgs[index] = value;
+    return { args: nextArgs, focus: index };
+  };
+
+  const onArgumentInput = (index: number, value: string, sourceField?: HTMLInputElement): void => {
+    if (
+      sourceField &&
+      argumentsRefs?.fields.querySelector<HTMLInputElement>(
+        `input[data-argument-index="${index}"]`,
+      ) !== sourceField
+    ) {
+      return;
+    }
     focusedArgument = index;
     if (mode === 'arguments-committed' && !ensurePostCommitDraft()) return;
     if (mode !== 'arguments-editing' || !activeDraft || !synchronized) return;
-    args[index] = value;
-    if (preserveExplicitArgumentCount) {
-      explicitArgumentCount = Math.max(explicitArgumentCount ?? 0, index + 1);
-    }
-    setDraftRaw(assembledCurrentFormula(selectedName ?? ''));
+    if (!liveEntryGuard() || !activeDraft) return;
+    if (!writeProjectedArgs((projected) => withArgument(projected, index, value))) return;
     renderPreview();
   };
 
@@ -607,12 +905,16 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const addArgument = (): void => {
     if (mode === 'arguments-committed' && !ensurePostCommitDraft()) return;
     if (!synchronized || !activeDraft || !selectedName) return;
-    args.push('');
-    preserveExplicitArgumentCount = true;
-    explicitArgumentCount = Math.max(explicitArgumentCount ?? 0, args.length);
-    const raw = assembledCurrentFormula(selectedName);
-    setDraftRaw(raw, true);
+    if (!liveEntryGuard() || !activeDraft || !selectedName) return;
+    const appended = writeProjectedArgs((projected) => ({
+      args: [...projected, ''],
+      focus: projected.length,
+    }));
+    if (!appended) return;
     renderArguments();
+    argumentsRefs?.fields
+      .querySelector<HTMLInputElement>(`input[data-argument-index="${focusedArgument}"]`)
+      ?.focus();
   };
 
   const renderArguments = (): void => {
@@ -633,6 +935,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   };
 
   const render = (): void => {
+    const view = activeDraft?.handle.snapshot();
+    if (view) adoptDraftView(view);
     updateDataset();
     if (mode === 'closed') {
       clearRoot();
@@ -645,19 +949,17 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   };
 
   const returnToPicker = (): void => {
-    // A leased draft stays open so Close can still restore the suspended edit.
-    const keptDraft = activeDraft?.leased ? activeDraft : null;
-    if (activeDraft && !keptDraft) {
-      closing = true;
-      activeDraft.handle.cancel();
-      closing = false;
-    }
-    resetFunctionSelection();
+    if (!activeDraft && postCommit && !ensurePostCommitDraft()) return;
+    if (!activeDraft && !startDraft('=')) return;
+    // Show All changes only the palette selection. The live draft, raw source,
+    // caret projection, and lease remain authoritative for the next choice.
+    selectedName = null;
+    selectedEntry = null;
+    args = [];
+    postCommit = null;
     resetPickerSelection();
     guardMessage = '';
     mode = 'picker';
-    if (keptDraft) setDraftRaw('=');
-    else startDraft('=');
     render();
     pickerRefs?.search.focus();
   };
@@ -676,12 +978,14 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       return;
     }
 
+    let raw = currentRaw;
+    let projection = callProjection;
     if (mode === 'picker' && activeDraft) {
-      const raw = activeDraft.handle.value();
+      const view = activeDraft.handle.snapshot();
+      raw = view?.raw ?? activeDraft.handle.value();
+      projection = view ? reprojectDraft(view) : null;
       const initialDraft = selectedName === null && raw.trim() === '=';
-      const completeDraft =
-        selectedName !== null && synchronized && parseOuterCall(raw, selectedName) !== null;
-      if (!initialDraft && !completeDraft) {
+      if (!initialDraft && !projection) {
         guardMessage = labels.draftConflict;
         synchronized = false;
         render();
@@ -693,6 +997,62 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         render();
         return;
       }
+      const binding = currentDraftBinding();
+      if (!binding) {
+        guardMessage = labels.draftConflict;
+        render();
+        return;
+      }
+      const view = binding.handle.snapshot();
+      raw = view?.raw ?? currentRaw;
+      projection = view ? reprojectDraft(view) : callProjection;
+    }
+
+    if (projection && activeDraft && raw !== '=') {
+      selectedName = requestedName;
+      selectedEntry = requestedEntry;
+      pickerSelectionName = null;
+      pickerSelectionEntry = null;
+      if (!liveEntryGuard() || !activeDraft) return;
+      if (projection.span.canonicalName === requestedName) {
+        adoptProjectedCall(projection, requestedEntry);
+        return;
+      }
+
+      const initial = deps.getInitialArguments?.(requestedName) ?? [];
+      const count = Math.max(
+        requestedEntry.minArity,
+        requestedEntry.argumentLabels.length,
+        initial.length,
+      );
+      const initialArgs = Array.from({ length: count }, (_, index) => initial[index] ?? '');
+      const replaced = replaceProjectedFormulaCall(
+        raw,
+        projection,
+        requestedName,
+        initialArgs,
+        null,
+      );
+      if (!replaced) {
+        synchronized = false;
+        guardMessage = labels.draftConflict;
+        render();
+        return;
+      }
+      args = initialArgs;
+      explicitArgumentCount = null;
+      preserveExplicitArgumentCount = false;
+      synchronized = true;
+      guardMessage = '';
+      mode = 'arguments-editing';
+      postCommit = null;
+      setDraftRaw(replaced.raw, false, replaced.caret);
+      render();
+      const first = argumentsRefs?.fields.querySelector<HTMLInputElement>(
+        'input[data-argument-index="0"]',
+      );
+      first?.focus();
+      return;
     }
 
     selectedName = requestedName;
@@ -742,7 +1102,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     catalog = readCatalog();
     reconcilePickerSelection();
     if (live !== sessionWb) {
-      showGuardedPicker(labels.unavailable);
+      discardSessionInertly();
       return false;
     }
     if (mode !== 'picker' && selectedEntryWithdrawn()) {
@@ -750,6 +1110,37 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       return false;
     }
     selectedEntry = selectedName ? (catalog.entries.get(selectedName) ?? null) : null;
+    guardedUnavailable = false;
+    const binding = activeDraft;
+    const view = binding?.handle.snapshot();
+    if (binding && view) handleRawUpdate(binding, view);
+    return true;
+  };
+
+  const adoptProjectedCall = (
+    projection: ProjectedFormulaCall,
+    entry: FunctionCatalogEntry,
+  ): boolean => {
+    selectedName = entry.canonicalName;
+    selectedEntry = entry;
+    if (!liveEntryGuard()) return false;
+    args = [...projection.args];
+    explicitArgumentCount = projection.args.length;
+    preserveExplicitArgumentCount = true;
+    synchronized = true;
+    focusedArgument = projection.span.activeArgumentIndex;
+    pickerSelectionName = null;
+    pickerSelectionEntry = null;
+    guardMessage = '';
+    mode = 'arguments-editing';
+    postCommit = null;
+    render();
+    const field = argumentsRefs?.fields.querySelector<HTMLInputElement>(
+      `input[data-argument-index="${focusedArgument}"]`,
+    );
+    (
+      field ?? argumentsRefs?.fields.querySelector<HTMLInputElement>('input[data-argument-index]')
+    )?.focus();
     return true;
   };
 
@@ -761,6 +1152,17 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       return;
     }
     if (!seedName) {
+      if (mode === 'picker' && options?.category === undefined && activeDraft) {
+        const view = activeDraft.handle.snapshot();
+        const projection = view ? reprojectDraft(view) : null;
+        const entry = projection
+          ? (catalog.entries.get(projection.span.canonicalName) ?? null)
+          : null;
+        if (projection && entry && !isFunctionUnavailableForInsertion(entry.availability)) {
+          adoptProjectedCall(projection, entry);
+          return;
+        }
+      }
       if (options?.category !== undefined) {
         pickerCategory = options.category;
         pickerSelectionName = null;
@@ -782,13 +1184,9 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
 
     if (mode === 'arguments-editing') {
-      const raw = activeDraft?.handle.value() ?? currentRaw;
-      if (
-        !activeDraft ||
-        !selectedName ||
-        !synchronized ||
-        parseOuterCall(raw, selectedName) === null
-      ) {
+      const view = activeDraft?.handle.snapshot();
+      const projection = view ? reprojectDraft(view) : callProjection;
+      if (!activeDraft || !selectedName || !projection) {
         guardMessage = labels.unavailable;
         render();
         focusCurrentSurface();
@@ -818,6 +1216,14 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
     const entry = liveEntryGuard();
     if (!entry || !activeDraft) return;
+    const projection = projectionForWrite();
+    if (!projection && staleProjectionWrite) return;
+    if (!projection?.span.complete) {
+      synchronized = false;
+      guardMessage = labels.draftConflict;
+      render();
+      return;
+    }
     const binding = activeDraft;
     committing = true;
     let committed = false;
@@ -832,17 +1238,48 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const close = (): void => {
     if (detached || mode === 'closed') return;
     closing = true;
-    if (activeDraft) activeDraft.handle.cancel();
+    const binding = activeDraft;
+    if (binding) binding.handle.cancel();
     closing = false;
+    // An invalid or already-discarded session closes inertly and must not
+    // return focus to the opener.
+    if (binding && activeDraft !== binding && isClosed()) return;
     mode = 'closed';
     resetFunctionSelection();
     resetPickerSelection();
     postCommit = null;
     notifyMirror(null);
     render();
-    const target = connectedElement(restoredFocusTarget) ?? connectedElement(opener) ?? deps.host;
+    const target =
+      connectedElement(restoredFocusTarget) ??
+      connectedElement(returnFocusTarget) ??
+      connectedElement(opener) ??
+      deps.host;
     target.focus();
     restoredFocusTarget = null;
+    returnFocusTarget = null;
+    opener = null;
+    sessionWb = null;
+    anchor = null;
+  };
+
+  const discard = (): void => {
+    if (detached || mode === 'closed') return;
+    closing = true;
+    const binding = activeDraft;
+    if (binding) binding.handle.discard();
+    closing = false;
+    if (isClosed() && activeDraft !== binding) return;
+    mode = 'closed';
+    resetFunctionSelection();
+    resetPickerSelection();
+    postCommit = null;
+    notifyMirror(null);
+    recentUnsubscribe?.();
+    recentUnsubscribe = null;
+    render();
+    restoredFocusTarget = null;
+    returnFocusTarget = null;
     opener = null;
     sessionWb = null;
     anchor = null;
@@ -863,11 +1300,13 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     guardMessage = '';
     postCommit = null;
     restoredFocusTarget = null;
+    returnFocusTarget = null;
     mode = 'picker';
     const lease = deps.suspendActiveEdit?.(leaseContext) ?? undefined;
     if (!startDraft('=', lease) && lease) {
       // The draft refused the lease; hand the edit straight back to its owner.
       lease.userCancel()?.focus();
+      if (isClosed()) return;
     }
     recentUnsubscribe?.();
     recentUnsubscribe = subscribeRecentFunctions(deps.store, () => {
@@ -880,6 +1319,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if (detached) return;
     strings = deps.getStrings();
     labels = paletteStrings(strings);
+    if (safeWorkbook() !== sessionWb) {
+      discardSessionInertly();
+      return;
+    }
     catalog = readCatalog();
     reconcilePickerSelection();
     if (mode !== 'picker' && selectedEntryWithdrawn()) {
@@ -887,6 +1330,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       return;
     }
     selectedEntry = selectedName ? (catalog.entries.get(selectedName) ?? null) : null;
+    guardedUnavailable = false;
+    const binding = activeDraft;
+    const view = binding?.handle.snapshot();
+    if (binding && view) handleRawUpdate(binding, view);
     render();
   };
 
@@ -900,16 +1347,13 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if ((mode !== 'arguments-editing' && mode !== 'arguments-committed') || !selectedName)
       return null;
     return {
-      isFormulaEdit: () => Boolean((activeDraft || postCommit) && synchronized),
+      isFormulaEdit: () => Boolean((activeDraft || postCommit) && synchronized && callProjection),
       insertRefAtCaret: (ref: string) => {
         if (mode === 'arguments-committed' && !ensurePostCommitDraft()) return;
         if (!activeDraft || !synchronized) return;
-        args[focusedArgument] = ref;
-        if (preserveExplicitArgumentCount) {
-          explicitArgumentCount = Math.max(explicitArgumentCount ?? 0, focusedArgument + 1);
-        }
-        updateFieldValues();
-        setDraftRaw(assembledCurrentFormula(selectedName ?? ''));
+        if (!liveEntryGuard() || !activeDraft || !selectedName) return;
+        const index = focusedArgument;
+        if (!writeProjectedArgs((projected) => withArgument(projected, index, ref))) return;
         renderPreview();
       },
     };
@@ -919,7 +1363,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if (detached) return;
     detached = true;
     closing = true;
-    if (activeDraft) activeDraft.handle.cancel();
+    if (activeDraft) activeDraft.handle.discard();
     closing = false;
     recentUnsubscribe?.();
     recentUnsubscribe = null;
@@ -929,6 +1373,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     mode = 'closed';
     opener = null;
     restoredFocusTarget = null;
+    returnFocusTarget = null;
     anchor = null;
     sessionWb = null;
   };
@@ -936,11 +1381,13 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const api: MacFormulaPaletteHandle = {
     open,
     close,
+    discard,
     refresh,
     detach,
     isOpen: () => mode !== 'closed',
     rangeInsertTarget,
     setStrings,
+    setReturnFocusTarget,
   };
   return api;
 }

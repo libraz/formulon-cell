@@ -101,6 +101,130 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('captures active formula edits before direct Mac function opener mousedown', () => {
+    const input = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    if (!input) throw new Error('Missing formula-bar input.');
+    input.focus();
+
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      helpers: stubHelpers(),
+    });
+    const insert = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.insertFunction"]',
+    );
+    if (!insert) throw new Error('Missing Insert Function command.');
+    const openFunctionArguments = vi
+      .spyOn(sheet.instance, 'openFunctionArguments')
+      .mockImplementation(() => {});
+    const mousedown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+    insert.dispatchEvent(mousedown);
+    expect(mousedown.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+    insert.click();
+    expect(document.activeElement).toBe(input);
+    expect(openFunctionArguments).toHaveBeenCalledWith();
+    openFunctionArguments.mockRestore();
+    tb.dispose();
+  });
+
+  it('keeps formula-bar focus while dispatching an enabled Mac function leaf', () => {
+    const input = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    if (!input) throw new Error('Missing formula-bar input.');
+
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const category = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.math"]',
+    );
+    const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-math');
+    if (!category || !menu) throw new Error('Missing Mac math menu.');
+
+    category.click();
+    expect(menu.hidden).toBe(false);
+    const leaf = menu.querySelector<HTMLButtonElement>('[data-ribbon-command="mac.function.SUM"]');
+    if (!leaf) throw new Error('Missing enabled Mac function leaf.');
+
+    input.focus();
+    input.value = '=1+SUM(2,3)';
+    input.setSelectionRange(7, 7);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const openFunctionArguments = vi
+      .spyOn(sheet.instance, 'openFunctionArguments')
+      .mockImplementation(() => {});
+    const mousedown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+    leaf.dispatchEvent(mousedown);
+    expect(mousedown.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+
+    leaf.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(menu.hidden).toBe(true);
+    expect(document.activeElement).toBe(input);
+    expect(openFunctionArguments).toHaveBeenCalledWith('SUM');
+
+    openFunctionArguments.mockRestore();
+    tb.dispose();
+  });
+
+  it('records the visible function-menu trigger after the Mac palette opens', () => {
+    sheet.instance.setUi({ platform: 'mac', features: { ribbon: false } });
+    const input = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    const fxDialog = sheet.instance.features.fxDialog as
+      | { setReturnFocusTarget?: (target: HTMLElement | null) => void }
+      | undefined;
+    if (!input || !fxDialog?.setReturnFocusTarget)
+      throw new Error('Missing Mac formula-bar controls.');
+
+    const observed: { target: HTMLElement | null; active: Element | null }[] = [];
+    const originalSetReturnFocusTarget = fxDialog.setReturnFocusTarget.bind(fxDialog);
+    const setReturnFocusTarget = vi
+      .spyOn(fxDialog, 'setReturnFocusTarget')
+      .mockImplementation((target) => {
+        observed.push({ target, active: document.activeElement });
+        originalSetReturnFocusTarget(target);
+      });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const category = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.math"]',
+    );
+    const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-math');
+    if (!category || !menu) throw new Error('Missing Mac math menu.');
+    category.click();
+    const leaf = menu.querySelector<HTMLButtonElement>('[data-ribbon-command="mac.function.SUM"]');
+    if (!leaf) throw new Error('Missing enabled Mac function leaf.');
+
+    input.focus();
+    input.value = '=1+SUM(2,3)';
+    input.setSelectionRange(7, 7);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const mousedown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+    leaf.dispatchEvent(mousedown);
+    expect(mousedown.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+
+    leaf.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    const firstArgument = sheet.host.querySelector<HTMLElement>(
+      '.fc-mac-formula-palette [data-argument-index="0"]',
+    );
+    expect(menu.hidden).toBe(true);
+    expect(setReturnFocusTarget).toHaveBeenCalledOnce();
+    expect(observed).toEqual([{ target: category, active: firstArgument }]);
+    expect(document.activeElement).toBe(firstArgument);
+    setReturnFocusTarget.mockRestore();
+    tb.dispose();
+  });
+
   it('dismisses an all-disabled More child before its parent for pointer and keyboard opens', async () => {
     const workbook = await WorkbookHandle.createDefault();
     Object.defineProperty(workbook, 'functionNames', {

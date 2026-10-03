@@ -123,7 +123,9 @@ describe('mount/host-features — individual feature flags', () => {
     root?.querySelector<HTMLButtonElement>('[data-action="close"]')?.click();
     expect(root?.hidden).toBe(true);
     expect(dock?.hidden).toBe(true);
-    expect(document.activeElement).toBe(fx);
+    // Locale replacement is a context discard; it must not restore focus to
+    // the opener that belonged to the discarded palette session.
+    expect(document.activeElement).not.toBe(fx);
   });
 
   it('suspends a mid-edit formula bar while the Mac palette is open and restores it on close', async () => {
@@ -156,6 +158,93 @@ describe('mount/host-features — individual feature flags', () => {
     expect(fxInput?.value).toBe('=2*');
     expect(document.activeElement).toBe(fxInput);
     expect(workbook.cellFormula(anchor)).toBeNull();
+  });
+
+  it('reprojects the current cell into the formula bar after a selection discards a Mac draft', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    expect(workbook.isStub).toBe(false);
+    sheet = await mountStubSheet({
+      workbook,
+      ui: { platform: 'mac' },
+      features: { fxDialog: true },
+    });
+    const anchor = { sheet: 0, row: 0, col: 0 };
+    const next = { sheet: 0, row: 1, col: 0 };
+    workbook.setNumber(anchor, 7);
+    workbook.setNumber(next, 9);
+    mutators.replaceCells(sheet.instance.store, workbook.cells(0));
+    mutators.setActive(sheet.instance.store, anchor);
+    sheet.instance.history.clear();
+
+    const fxInput = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    const root = sheet.host.querySelector<HTMLElement>('.fc-mac-formula-palette');
+    if (!fxInput || !root) throw new Error('Missing Mac formula-bar controls.');
+    sheet.instance.openFunctionArguments('SUM');
+    expect(root.hidden).toBe(false);
+    expect(fxInput.value).toBe('=SUM()');
+    fxInput.value = '=SUM(A1)';
+    fxInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(sheet.instance.store.getState().ui.editorRefs).toEqual([
+      { r0: 0, c0: 0, r1: 0, c1: 0, colorIndex: 0 },
+    ]);
+
+    mutators.setActive(sheet.instance.store, next);
+    expect(root.hidden).toBe(true);
+    expect(fxInput.value).toBe('9');
+    expect(document.activeElement).not.toBe(fxInput);
+    expect(sheet.instance.store.getState().ui.editorRefs).toEqual([]);
+    expect(workbook.cellFormula(anchor)).toBeNull();
+    expect(sheet.instance.history.canUndo()).toBe(false);
+  });
+
+  it('discards a focused formula edit on policy changes and accepts a fresh input afterward', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    expect(workbook.isStub).toBe(false);
+    sheet = await mountStubSheet({ workbook });
+    const addr = { sheet: 0, row: 0, col: 0 };
+    workbook.setNumber(addr, 7);
+    mutators.replaceCells(sheet.instance.store, workbook.cells(0));
+    mutators.setActive(sheet.instance.store, addr);
+    sheet.instance.history.clear();
+
+    const fxInput = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    const fxCancel = sheet.host.querySelector<HTMLButtonElement>(
+      '.fc-host__formulabar-action--cancel',
+    );
+    const fxAccept = sheet.host.querySelector<HTMLButtonElement>(
+      '.fc-host__formulabar-action--accept',
+    );
+    const formulabar = sheet.host.querySelector<HTMLElement>('.fc-host__formulabar');
+    if (!fxInput || !fxCancel || !fxAccept || !formulabar)
+      throw new Error('Missing formula-bar controls.');
+
+    fxInput.focus();
+    fxInput.value = '=A1';
+    fxInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(formulabar.dataset.fcEditing).toBe('1');
+    expect(fxAccept.disabled).toBe(false);
+    expect(sheet.instance.store.getState().ui.editorRefs).toHaveLength(1);
+
+    sheet.instance.setPolicy({ readOnly: true });
+    expect(workbook.getValue(addr)).toEqual({ kind: 'number', value: 7 });
+    expect(workbook.cellFormula(addr)).toBeNull();
+    expect(sheet.instance.history.canUndo()).toBe(false);
+    expect(document.activeElement).toBe(fxInput);
+    expect(fxInput.value).toBe('7');
+    expect(sheet.instance.store.getState().ui.editorRefs).toEqual([]);
+    expect(formulabar.dataset.fcEditing).toBe('0');
+    expect(fxCancel.disabled).toBe(true);
+    expect(fxAccept.disabled).toBe(true);
+
+    sheet.instance.setPolicy();
+    fxInput.value = '9';
+    fxInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(formulabar.dataset.fcEditing).toBe('1');
+    expect(fxCancel.disabled).toBe(false);
+    expect(fxAccept.disabled).toBe(false);
+    fxInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    expect(workbook.getValue(addr)).toEqual({ kind: 'number', value: 9 });
+    expect(sheet.instance.history.canUndo()).toBe(true);
   });
 
   it('cancels an anchored Mac draft on selection, policy, and feature teardown without a write', async () => {

@@ -69,14 +69,24 @@ export const attachFormulaBarHarness = (
   return { controller, fxInput, detach: controller.detach };
 };
 
+export interface ExternalDraftTestView {
+  raw: string;
+  caret: {
+    start: number;
+    end: number;
+    direction: HTMLTextAreaElement['selectionDirection'];
+  };
+}
+
 export interface ExternalDraftTestHandle {
   readonly anchor: Addr;
   value(): string;
+  snapshot(): ExternalDraftTestView | null;
   setValue(raw: string, caret?: number): void;
   commit(): boolean;
   cancel(): void;
   discard(): void;
-  subscribe(fn: (raw: string) => void): () => void;
+  subscribe(fn: (view: ExternalDraftTestView) => void): () => void;
 }
 
 export type ExternalDraftTestController = FormulaBarController & {
@@ -84,7 +94,10 @@ export type ExternalDraftTestController = FormulaBarController & {
     anchor: Addr,
     seed: string,
     hooks: {
-      onFinish(outcome: 'committed' | 'cancelled', restoredFocusTarget?: HTMLElement | null): void;
+      onFinish(
+        outcome: 'committed' | 'cancelled' | 'discarded',
+        restoredFocusTarget?: HTMLElement | null,
+      ): void;
     },
     options?: { lease?: FormulaEditLease },
   ): ExternalDraftTestHandle | null;

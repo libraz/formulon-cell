@@ -183,7 +183,7 @@ describe('mount/formula-bar — native commit result', () => {
 
     expect(draft.commit()).toBe(false);
     expect(detached).toBe(true);
-    expect(outcomes).toEqual(['cancelled']);
+    expect(outcomes).toEqual(['discarded']);
     expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 1 });
     expect(sheet.instance.history.canUndo()).toBe(false);
     expect(document.activeElement).not.toBe(harness.fxInput);
@@ -222,7 +222,7 @@ describe('mount/formula-bar — native commit result', () => {
     });
 
     expect(draft.commit()).toBe(true);
-    expect(outcomes).toEqual(['committed']);
+    expect(outcomes).toEqual(['discarded']);
     expect(sheet.workbook.cellFormula(addr)).toBe('=ACOS(1)');
     expect(sheet.instance.history.canUndo()).toBe(true);
     expect(draft.commit()).toBe(false);
@@ -326,7 +326,7 @@ describe('mount/formula-bar — native commit result', () => {
     warn.mockRestore();
   });
 
-  it('contains cancellation finish throws and keeps terminal ownership until cleanup', () => {
+  it('contains cancellation finish throws after clearing terminal ownership for reentry', () => {
     const harness = attachFormulaBarHarness(
       sheet,
       vi.fn(),
@@ -335,9 +335,9 @@ describe('mount/formula-bar — native commit result', () => {
     );
     const addr = { sheet: 0, row: 0, col: 0 };
     let draft: ExternalDraftTestHandle;
-    let reentrant: ExternalDraftTestHandle | null = null;
+    const reentrant: { handle: ExternalDraftTestHandle | null } = { handle: null };
     const finish = vi.fn(() => {
-      reentrant = asExternalDraftController(harness.controller).beginExternalDraft(
+      reentrant.handle = asExternalDraftController(harness.controller).beginExternalDraft(
         addr,
         '=ACOS(1)',
         { onFinish: vi.fn() },
@@ -353,8 +353,9 @@ describe('mount/formula-bar — native commit result', () => {
 
     expect(() => draft.cancel()).not.toThrow();
     expect(finish).toHaveBeenCalledTimes(1);
-    expect(reentrant).toBeNull();
+    expect(reentrant.handle).not.toBeNull();
     expect(draft.commit()).toBe(false);
+    reentrant.handle?.cancel();
     const next = asExternalDraftController(harness.controller).beginExternalDraft(addr, '=', {
       onFinish: vi.fn(),
     });
@@ -383,7 +384,7 @@ describe('mount/formula-bar — native commit result', () => {
     draft.setValue('=ACOS(1)');
 
     harness.controller.detach();
-    expect(outcomes).toEqual(['cancelled']);
+    expect(outcomes).toEqual(['discarded']);
     expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 1 });
     expect(sheet.instance.history.canUndo()).toBe(false);
     draft.setValue('stale');
@@ -432,6 +433,10 @@ describe('mount/formula-bar — native commit result', () => {
     if (!swapped) throw new Error('External draft did not restart.');
     swapped.setValue('77');
     await sheet.instance.setWorkbook(second);
+    // This standalone controller is not the mounted formula-bar owner, so
+    // probe the stale handle to trigger its own guarded discard first.
+    expect(swapped.snapshot()).toBeNull();
+    expect(cancelled).toEqual(['cancelled', 'discarded']);
     expect(swapped.commit()).toBe(false);
     expect(second.getValue(addr)).toEqual({ kind: 'blank' });
     expect(sheet.instance.history.canUndo()).toBe(false);

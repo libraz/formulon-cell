@@ -71,6 +71,45 @@ describe('interact/mac-formula-palette picker', () => {
     expect(document.activeElement).toBe(outside);
   });
 
+  it('uses the connected return-focus target after a palette close', () => {
+    const { opener, palette } = setup();
+    const trigger = document.createElement('button');
+    trigger.textContent = 'trigger';
+    sheet.host.appendChild(trigger);
+    palette.open();
+    palette.setReturnFocusTarget(trigger);
+    palette.close();
+    expect(document.activeElement).toBe(trigger);
+    expect(opener).not.toBe(document.activeElement);
+  });
+
+  it('falls back when the return-focus target is disconnected and ignores closed-session setters', () => {
+    const { opener, palette } = setup();
+    const disconnected = document.createElement('button');
+    palette.setReturnFocusTarget(disconnected);
+    palette.open();
+    const trigger = document.createElement('button');
+    sheet.host.appendChild(trigger);
+    palette.setReturnFocusTarget(trigger);
+    trigger.remove();
+    palette.close();
+    expect(document.activeElement).toBe(opener);
+    palette.setReturnFocusTarget(disconnected);
+  });
+
+  it('does not focus or consume a return target on discard', () => {
+    const { palette } = setup();
+    const trigger = document.createElement('button');
+    sheet.host.appendChild(trigger);
+    palette.open();
+    palette.setReturnFocusTarget(trigger);
+    palette.discard();
+    expect(document.activeElement).not.toBe(trigger);
+    palette.open();
+    palette.close();
+    expect(document.activeElement).not.toBe(trigger);
+  });
+
   it('projects default, recent, and family picker categories without a selector', () => {
     const { palette } = setup();
 

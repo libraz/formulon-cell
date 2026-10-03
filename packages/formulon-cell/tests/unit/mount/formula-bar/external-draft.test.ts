@@ -42,12 +42,20 @@ describe('mount/formula-bar — native commit result', () => {
     if (!draft) throw new Error('External draft did not start.');
 
     const values: string[] = [];
-    const unsubscribe = draft.subscribe((raw) => values.push(raw));
+    const unsubscribe = draft.subscribe((view) => values.push(view.raw));
     expect(draft.anchor).toEqual(addr);
     expect(draft.value()).toBe('=');
+    expect(draft.snapshot()).toMatchObject({
+      raw: '=',
+      caret: { start: 1, end: 1 },
+    });
     draft.setValue('42', 2);
     expect(draft.value()).toBe('42');
     expect(harness.fxInput.selectionStart).toBe(2);
+    expect(draft.snapshot()).toMatchObject({
+      raw: '42',
+      caret: { start: 2, end: 2 },
+    });
     expect(values).toEqual(['42']);
 
     mutators.setActive(sheet.instance.store, moved);
@@ -140,11 +148,40 @@ describe('mount/formula-bar — native commit result', () => {
     expect(onValidation).toHaveBeenCalledOnce();
     expect(sheet.instance.store.getState().ui.pendingFormat).toEqual(newerPending);
     expect(sheet.instance.store.getState().ui.editorRefs).toEqual(newerRefs);
+    expect(sheet.instance.store.getState().ui.editorRefs).toBe(newerRefs);
     expect(harness.controller.isEditing()).toBe(false);
-    expect(onFinish).not.toHaveBeenCalled();
+    expect(onFinish).toHaveBeenCalledOnce();
+    expect(onFinish).toHaveBeenCalledWith('discarded');
+    expect(draft.value()).toBe('');
+    expect(draft.snapshot()).toBeNull();
+    draft.setValue('stale');
+    expect(draft.commit()).toBe(false);
+    expect(draft.subscribe(() => {})).toEqual(expect.any(Function));
     harness.fxInput.dispatchEvent(new FocusEvent('blur'));
     harness.fxInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
     expect(sheet.workbook.cellFormula(anchor)).toBeNull();
+    expect(sheet.instance.history.canUndo()).toBe(false);
+    harness.detach();
+  });
+
+  it('clears refs owned by a regular discard without writing the workbook', () => {
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const addr = { sheet: 0, row: 0, col: 0 };
+    sheet.workbook.setNumber(addr, 7);
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    mutators.setActive(sheet.instance.store, addr);
+    sheet.instance.history.clear();
+
+    harness.fxInput.value = '=A1';
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new Event('input'));
+    expect(sheet.instance.store.getState().ui.editorRefs).toHaveLength(1);
+
+    harness.controller.discardFx();
+
+    expect(sheet.instance.store.getState().ui.editorRefs).toEqual([]);
+    expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 7 });
+    expect(sheet.workbook.cellFormula(addr)).toBeNull();
     expect(sheet.instance.history.canUndo()).toBe(false);
     harness.detach();
   });
@@ -346,7 +383,7 @@ describe('mount/formula-bar — native commit result', () => {
     if (!draft) throw new Error('External draft did not start.');
 
     const updates: string[] = [];
-    draft.subscribe((raw) => updates.push(raw));
+    draft.subscribe((view) => updates.push(view.raw));
     harness.controller.insertRefAtCaret('A1');
     expect(draft.value()).toBe('=SUM(A1');
 
@@ -365,6 +402,95 @@ describe('mount/formula-bar — native commit result', () => {
     draft.cancel();
     expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'number', value: 1 });
     harness.detach();
+  });
+
+  it('does not deliver an older snapshot after a subscriber edits the draft again', () => {
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const draft = asExternalDraftController(harness.controller).beginExternalDraft(
+      { sheet: 0, row: 0, col: 0 },
+      '=SUM(0,0)',
+      { onFinish: vi.fn() },
+    );
+    if (!draft) throw new Error('External draft did not start.');
+    const first: string[] = [];
+    const second: string[] = [];
+    draft.subscribe((view) => {
+      first.push(view.raw);
+      if (view.raw === '=SUM(1,2)') draft.setValue('=SUM(3,4)', 7);
+    });
+    draft.subscribe((view) => second.push(view.raw));
+
+    draft.setValue('=SUM(1,2)', 7);
+
+    expect(first).toEqual(['=SUM(1,2)', '=SUM(3,4)']);
+    expect(second).toEqual(['=SUM(3,4)']);
+    expect(draft.value()).toBe('=SUM(3,4)');
+    harness.detach();
+  });
+
+  it('publishes passive caret movement and stays silent for stale or detached drafts', () => {
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const addr = { sheet: 0, row: 0, col: 0 };
+    const draft = asExternalDraftController(harness.controller).beginExternalDraft(
+      addr,
+      '=SUM(A1)',
+      { onFinish: vi.fn() },
+    );
+    if (!draft) throw new Error('External draft did not start.');
+
+    const views: { raw: string; caret: number }[] = [];
+    draft.subscribe((view) => views.push({ raw: view.raw, caret: view.caret.start }));
+    harness.fxInput.setSelectionRange(2, 2);
+    harness.fxInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft' }));
+    harness.fxInput.setSelectionRange(4, 4);
+    harness.fxInput.dispatchEvent(new Event('select'));
+    harness.fxInput.setSelectionRange(6, 6);
+    harness.fxInput.dispatchEvent(new MouseEvent('mouseup'));
+
+    expect(views).toEqual(
+      expect.arrayContaining([
+        { raw: '=SUM(A1)', caret: 2 },
+        { raw: '=SUM(A1)', caret: 4 },
+        { raw: '=SUM(A1)', caret: 6 },
+      ]),
+    );
+    const activeViewCount = views.length;
+    expect(activeViewCount).toBeGreaterThanOrEqual(3);
+
+    harness.detach();
+    harness.fxInput.setSelectionRange(1, 1);
+    harness.fxInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft' }));
+    harness.fxInput.dispatchEvent(new Event('select'));
+    harness.fxInput.dispatchEvent(new MouseEvent('mouseup'));
+    expect(views).toHaveLength(activeViewCount);
+
+    const staleHarness = attachFormulaBarHarness(sheet, vi.fn());
+    let contextCurrent = true;
+    staleHarness.fxInput.value = '=SUM(A1)';
+    staleHarness.fxInput.focus();
+    const lease = staleHarness.controller.suspendForFormulaPalette({
+      getLocale: () => 'en',
+      contextCurrent: () => contextCurrent,
+    });
+    expect(lease).not.toBeNull();
+    const staleFinish = vi.fn();
+    const staleDraft = asExternalDraftController(staleHarness.controller).beginExternalDraft(
+      addr,
+      '=',
+      { onFinish: staleFinish },
+      { lease: lease ?? undefined },
+    );
+    if (!staleDraft) throw new Error('Stale external draft did not start.');
+    const staleViews: unknown[] = [];
+    staleDraft.subscribe((view) => staleViews.push(view));
+    contextCurrent = false;
+    staleHarness.fxInput.setSelectionRange(3, 3);
+    staleHarness.fxInput.dispatchEvent(new Event('select'));
+    staleHarness.fxInput.dispatchEvent(new MouseEvent('mouseup'));
+    staleHarness.fxInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft' }));
+    expect(staleViews).toEqual([]);
+    expect(staleFinish).toHaveBeenCalledWith('discarded');
+    staleHarness.detach();
   });
 
   it('fails closed when committed or cancelled handles target a newer draft', () => {
@@ -402,7 +528,7 @@ describe('mount/formula-bar — native commit result', () => {
     });
     if (!active) throw new Error('Active draft did not start.');
     const updates: string[] = [];
-    active.subscribe((raw) => updates.push(raw));
+    active.subscribe((view) => updates.push(view.raw));
 
     committed.setValue('stale committed', 4);
     cancelled.setValue('stale cancelled', 4);

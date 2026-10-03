@@ -48,6 +48,7 @@ export interface ArgumentsViewState {
   fields: ArgumentFieldView[];
   canAddArgument: boolean;
   doneDisabled: boolean;
+  doneDisabledReason: string;
   guardMessage: string;
   description: string;
   syntax: string;
@@ -64,7 +65,7 @@ export interface MacFormulaPaletteViewContext {
   pick(name: string): void;
   insert(): void;
   argumentFocus(index: number): void;
-  argumentInput(index: number, value: string): void;
+  argumentInput(index: number, value: string, sourceField?: HTMLInputElement): void;
   addArgument(): void;
   done(): void;
 }
@@ -240,7 +241,7 @@ export function createMacFormulaPaletteView(root: HTMLElement, ctx: MacFormulaPa
       input.dataset.argumentIndex = String(index);
       input.value = help.value;
       input.addEventListener('focus', () => ctx.argumentFocus(index));
-      input.addEventListener('input', () => ctx.argumentInput(index, input.value));
+      input.addEventListener('input', () => ctx.argumentInput(index, input.value, input));
       row.appendChild(input);
       const range = makeIconButton(labels.rangePicker, 'range-picker', 'range', () => {
         ctx.argumentFocus(index);
@@ -273,7 +274,7 @@ export function createMacFormulaPaletteView(root: HTMLElement, ctx: MacFormulaPa
     resultRow.appendChild(preview);
     const done = makeButton(labels.done, 'done', () => ctx.done());
     done.className = 'fc-mac-formula-palette__done';
-    projectDisabledState(done, state.doneDisabled, state.doneDisabled ? labels.unavailable : null);
+    projectDisabledState(done, state.doneDisabled, state.doneDisabledReason);
     resultRow.appendChild(done);
     content.appendChild(resultRow);
     appendGuard(content, state.guardMessage, 'draft-conflict');

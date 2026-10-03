@@ -524,8 +524,8 @@ export const Spreadsheet = {
     });
     const attachHostFeature = hostFeatures.attach;
     const detachHostFeature = hostFeatures.detach;
-    const closeMacPalette = (): void => {
-      featureState.macFormulaPalette?.close();
+    const discardMacPalette = (): void => {
+      featureState.macFormulaPalette?.discard();
     };
     const ensureWatchWindow = (): void => {
       if (!featureState.watchPanel) attachHostFeature('watchWindow');
@@ -545,6 +545,7 @@ export const Spreadsheet = {
     // `setStrings` hook live-update labels in place; the rest are rebuilt by
     // detaching and re-attaching with the new dictionary in their closure.
     const unsubI18n = i18n.subscribe((next) => {
+      discardMacPalette();
       strings = next;
       host.setAttribute('aria-label', strings.a11y.spreadsheet);
       tag.setAttribute('aria-label', strings.a11y.nameBox);
@@ -624,23 +625,23 @@ export const Spreadsheet = {
       applyChanges: (changes, options) => commands.applyChanges(changes, options),
       setPolicy(next) {
         if (disposed) return;
-        closeMacPalette();
+        discardMacPalette();
         binding.editor.cancel();
-        formulaBar.cancelFx();
+        formulaBar.discardFx();
         commands.setPolicy(next);
         instance.setFeatures(requestedFeatures);
         instance.setToolbar(requestedToolbar);
       },
       setViewportOptions(next) {
         if (disposed) return;
-        closeMacPalette();
+        discardMacPalette();
         const targetSheet = next?.range?.sheet;
         if (targetSheet !== undefined && targetSheet !== store.getState().data.sheetIndex) {
           validateViewportAgainstWorkbook(next, wb, targetSheet);
           const previousState = store.getState();
           const previousOptions = navigation.options;
           binding.editor.cancel();
-          formulaBar.cancelFx();
+          formulaBar.discardFx();
           wb.detachStore(store);
           try {
             navigation.setOptions(undefined);
@@ -678,7 +679,7 @@ export const Spreadsheet = {
         const nextUi = resolveSpreadsheetUiOptions(next);
         const platformChanged = nextUi.platform !== ui.platform;
         if (platformChanged) {
-          closeMacPalette();
+          discardMacPalette();
           if (featureState.fxDialog) detachHostFeature('fxDialog');
         }
         ui = nextUi;
@@ -865,13 +866,13 @@ export const Spreadsheet = {
               Math.min(store.getState().data.sheetIndex, Math.max(0, next.sheetCount - 1)),
           );
         }
+        discardMacPalette();
         // A Draw stroke belongs to the current workbook. Cancel it before
         // detaching the old engine so a late pointerup cannot commit points
         // into the newly bound workbook.
         deactivateMacInk(instance);
-        closeMacPalette();
         binding.editor.cancel();
-        formulaBar.cancelFx();
+        formulaBar.discardFx();
         wb.detachStore(store);
         binding.unbind();
         if (ownsWb) wb.dispose();
@@ -911,10 +912,11 @@ export const Spreadsheet = {
       dispose() {
         if (disposed) return;
         disposed = true;
+        discardMacPalette();
+        formulaBar.discardFx();
         unregisterCommands();
         commands.dispose();
         navigation.dispose();
-        closeMacPalette();
         wb.detachStore(store);
         disposeMacRibbonActions(instance);
         disposeMacInk(instance);

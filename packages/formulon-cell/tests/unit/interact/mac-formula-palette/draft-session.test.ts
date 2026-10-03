@@ -21,17 +21,17 @@ describe('interact/mac-formula-palette draft session', () => {
   it('keeps unsynchronized raw authoritative across a visible category request and picker insert', () => {
     const { formulaBar, palette } = setup();
     palette.open('ACOS');
-    formulaBar.input.value = '=ACOS(';
+    formulaBar.input.value = '=MISSING_FUNCTION(';
     formulaBar.input.dispatchEvent(new Event('input', { bubbles: true }));
 
     palette.open(undefined, { category: 'logical' });
     const root = paletteRoot(palette);
     expect(root.dataset.state).toBe('picker');
     expect(root.dataset.rawSynchronized).toBe('false');
-    expect(formulaBar.input.value).toBe('=ACOS(');
+    expect(formulaBar.input.value).toBe('=MISSING_FUNCTION(');
     root.querySelector<HTMLElement>('[data-function-name="IF"]')?.click();
     root.querySelector<HTMLButtonElement>('[data-action="insert-function"]')?.click();
-    expect(formulaBar.input.value).toBe('=ACOS(');
+    expect(formulaBar.input.value).toBe('=MISSING_FUNCTION(');
     expect(root.dataset.rawSynchronized).toBe('false');
     expect(root.querySelector('.fc-mac-formula-palette__guard')?.textContent).toBe(
       defaultStrings.fxDialog.macPalette?.draftConflict,
@@ -151,7 +151,7 @@ describe('interact/mac-formula-palette draft session', () => {
 
   it('does not let picker insertion overwrite compound or malformed initial raw drafts', () => {
     const { formulaBar, palette } = setup();
-    for (const raw of ['=SUM(1)+2', '=SUM(']) {
+    for (const raw of ['=SUM(1)+2', '=SUM({1,2]']) {
       palette.open();
       formulaBar.input.value = raw;
       formulaBar.input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -171,6 +171,49 @@ describe('interact/mac-formula-palette draft session', () => {
       expect(sheet.instance.history.canUndo()).toBe(false);
       palette.close();
     }
+  });
+
+  it('keeps the compound source when Show All switches to a different function', () => {
+    const { formulaBar, palette } = setup();
+    palette.open('SUM');
+    const raw = '=1+SUM(2,3)*4';
+    formulaBar.input.value = raw;
+    formulaBar.input.setSelectionRange(raw.indexOf('2') + 1, raw.indexOf('2') + 1);
+    formulaBar.input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(paletteRoot(palette).dataset.state).toBe('arguments-editing');
+
+    paletteRoot(palette).querySelector<HTMLButtonElement>('[data-action="show-all"]')?.click();
+    const root = paletteRoot(palette);
+    expect(root.dataset.state).toBe('picker');
+    expect(formulaBar.input.value).toBe(raw);
+    root.querySelector<HTMLElement>('[data-function-name="AVERAGE"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-action="insert-function"]')?.click();
+
+    expect(formulaBar.input.value).toBe('=1+AVERAGE()*4');
+    expect(paletteRoot(palette).dataset.state).toBe('arguments-editing');
+  });
+
+  it('rebuilds a known incomplete call only after an explicit function request', () => {
+    const { formulaBar, palette } = setup();
+    palette.open();
+    formulaBar.input.value = '=SUM(';
+    formulaBar.input.setSelectionRange(
+      formulaBar.input.value.length,
+      formulaBar.input.value.length,
+    );
+    formulaBar.input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const root = paletteRoot(palette);
+    expect(root.dataset.rawSynchronized).toBe('true');
+    expect(root.dataset.state).toBe('picker');
+    root.querySelector<HTMLElement>('[data-function-name="IF"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-action="insert-function"]')?.click();
+
+    expect(formulaBar.input.value).toBe('=IF()');
+    expect(paletteRoot(palette).dataset.state).toBe('arguments-editing');
+    expect(
+      paletteRoot(palette).querySelector<HTMLButtonElement>('[data-action="done"]'),
+    ).not.toBeNull();
   });
 
   it('reopens the existing picker without reanchoring or starting another draft', () => {
@@ -212,14 +255,14 @@ describe('interact/mac-formula-palette draft session', () => {
   it('keeps unsynchronized raw input authoritative and guards missing repeat seeds', () => {
     const { formulaBar, palette } = setup();
     palette.open('ACOS');
-    formulaBar.input.value = '=ACOS(';
+    formulaBar.input.value = '=MISSING_FUNCTION(';
     formulaBar.input.dispatchEvent(new Event('input', { bubbles: true }));
     palette.open('COUNTIF');
-    expect(formulaBar.input.value).toBe('=ACOS(');
+    expect(formulaBar.input.value).toBe('=MISSING_FUNCTION(');
     expect(paletteRoot(palette).dataset.rawSynchronized).toBe('false');
 
     palette.open('MISSING_FUNCTION');
-    expect(formulaBar.input.value).toBe('=ACOS(');
+    expect(formulaBar.input.value).toBe('=MISSING_FUNCTION(');
     expect(paletteRoot(palette).dataset.rawSynchronized).toBe('false');
     palette.close();
     expect(sheet.workbook.cellFormula({ sheet: 0, row: 0, col: 0 })).toBeNull();
@@ -279,11 +322,40 @@ describe('interact/mac-formula-palette draft session', () => {
       .mockReturnValue(names?.filter((name) => name !== 'ACOS') ?? []);
 
     palette.open();
-    expect(paletteRoot(palette).dataset.state).toBe('picker');
-    expect(formulaBar.input.value).toBe('');
+    expect(paletteRoot(palette).dataset.state).toBe('arguments-editing');
+    expect(formulaBar.input.value).toBe('=ACOS()');
+    expect(paletteRoot(palette).dataset.rawSynchronized).toBe('false');
     expect(paletteRoot(palette).querySelector('.fc-mac-formula-palette__guard')?.textContent).toBe(
       defaultStrings.fxDialog.macPalette?.unavailable,
     );
+    namesSpy.mockRestore();
+  });
+
+  it('retains the latest raw draft and blocks writes when the same-workbook catalog withdraws it', () => {
+    const { beginDraft, formulaBar, palette } = setup();
+    palette.open('SUM');
+    const first = paletteRoot(palette).querySelector<HTMLInputElement>('[data-argument-index="0"]');
+    expect(first).not.toBeNull();
+    if (first) {
+      first.value = '9';
+      first.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    const names = sheet.workbook.functionNames();
+    const namesSpy = vi
+      .spyOn(sheet.workbook, 'functionNames')
+      .mockReturnValue(names?.filter((name) => name !== 'SUM') ?? []);
+
+    palette.open();
+    const root = paletteRoot(palette);
+    expect(root.dataset.state).toBe('arguments-editing');
+    expect(root.dataset.rawSynchronized).toBe('false');
+    expect(formulaBar.input.value).toBe('=SUM(9)');
+    expect(beginDraft).toHaveBeenCalledTimes(1);
+    expect(root.querySelector<HTMLButtonElement>('[data-action="done"]')?.disabled).toBe(true);
+    palette.rangeInsertTarget()?.insertRefAtCaret('A1');
+    expect(formulaBar.input.value).toBe('=SUM(9)');
+    expect(sheet.workbook.cellFormula({ sheet: 0, row: 0, col: 0 })).toBeNull();
+
     namesSpy.mockRestore();
   });
 
@@ -364,7 +436,7 @@ describe('interact/mac-formula-palette draft session', () => {
     ).toHaveLength(1);
   });
 
-  it('does not record the selected function when an authoritative raw commit changes function', () => {
+  it('records the authoritative function when formula-bar input changes the selected call', () => {
     const { formulaBar, palette } = setup();
     palette.open('ACOS');
     formulaBar.input.value = '=SUM(1)';
@@ -378,8 +450,8 @@ describe('interact/mac-formula-palette draft session', () => {
     palette.close();
     palette.open();
     expect(
-      paletteRoot(palette).querySelectorAll('[data-section="recent"] [data-function-name]'),
-    ).toHaveLength(0);
+      paletteRoot(palette).querySelectorAll('[data-section="recent"] [data-function-name="SUM"]'),
+    ).toHaveLength(1);
     palette.close();
     expect(sheet.instance.undo()).toBe(true);
     expect(sheet.workbook.cellFormula({ sheet: 0, row: 0, col: 0 })).toBeNull();
@@ -391,7 +463,7 @@ describe('interact/mac-formula-palette draft session', () => {
     });
   });
 
-  it('cancels the stale draft and returns to a guarded picker when the live workbook changes', async () => {
+  it('discards a stale draft inertly when the live workbook changes', async () => {
     const anchor = { sheet: 0, row: 0, col: 0 };
     sheet.workbook.setNumber(anchor, 1);
     mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
@@ -410,8 +482,8 @@ describe('interact/mac-formula-palette draft session', () => {
     expect(nextWorkbook.isStub).toBe(false);
     liveWorkbook = nextWorkbook;
     paletteRoot(palette).querySelector<HTMLButtonElement>('[data-action="done"]')?.click();
-    expect(paletteRoot(palette).dataset.state).toBe('picker');
-    expect(formulaBar.input.value).toBe('');
+    expect(palette.isOpen()).toBe(false);
+    expect(formulaBar.input.value).toBe('=ACOS(1)');
     expect(sheet.workbook.cellFormula(anchor)).toBeNull();
     expect(nextWorkbook.cellFormula(anchor)).toBeNull();
     expect(sheet.instance.history.canUndo()).toBe(false);

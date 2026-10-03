@@ -432,7 +432,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
               active.row !== anchor.row ||
               active.col !== anchor.col
             ) {
-              palette.close();
+              palette.discard();
             }
           });
         } else {
@@ -809,7 +809,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.fxClickHandler = null;
         if (s.fxMouseDownHandler) input.fx.removeEventListener('mousedown', s.fxMouseDownHandler);
         s.fxMouseDownHandler = null;
-        s.macFormulaPalette?.close();
+        s.macFormulaPalette?.discard();
         s.unsubMacFormulaPaletteSelection();
         s.unsubMacFormulaPaletteSelection = (): void => {};
         const fxDialog = s.fxDialog;

@@ -25,6 +25,7 @@ import { advanceAfterCommit } from '../interact/selection-navigation.js';
 import { sameAddr } from '../store/pending-format.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import type { EditorRefHighlight } from '../store/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 
 interface FormulaBarAutocomplete {
@@ -60,28 +61,41 @@ interface AttachFormulaBarInput {
   wb: () => WorkbookHandle;
 }
 
+interface ExternalFormulaDraftView {
+  raw: string;
+  caret: {
+    start: number;
+    end: number;
+    direction: HTMLTextAreaElement['selectionDirection'];
+  };
+}
+
+type ExternalFormulaDraftOutcome = 'committed' | 'cancelled' | 'discarded';
+
 export interface ExternalFormulaDraftHooks {
-  onFinish(outcome: 'committed' | 'cancelled', restoredFocusTarget?: HTMLElement | null): void;
+  onFinish(outcome: ExternalFormulaDraftOutcome, restoredFocusTarget?: HTMLElement | null): void;
 }
 
 export interface ExternalFormulaDraftHandle {
   readonly anchor: Addr;
   value(): string;
+  snapshot(): ExternalFormulaDraftView | null;
   setValue(raw: string, caret?: number): void;
   commit(): boolean;
   cancel(): void;
   discard(): void;
-  subscribe(fn: (raw: string) => void): () => void;
+  subscribe(fn: (view: ExternalFormulaDraftView) => void): () => void;
 }
 
-type ExternalDraftStatus = 'open' | 'committing' | 'committed' | 'cancelled';
+type ExternalDraftStatus = 'open' | 'committing' | 'committed' | 'cancelled' | 'discarded';
 
 interface ExternalDraftState {
   anchor: Addr;
   workbook: WorkbookHandle;
   restoreValue: string;
   hooks: ExternalFormulaDraftHooks;
-  listeners: Set<(raw: string) => void>;
+  listeners: Set<(view: ExternalFormulaDraftView) => void>;
+  lastNotifiedView: ExternalFormulaDraftView | null;
   status: ExternalDraftStatus;
   cancelRequested: boolean;
   cancelMode: 'restore' | 'discard' | null;
@@ -98,6 +112,7 @@ export interface FormulaBarController {
   ): ExternalFormulaDraftHandle | null;
   suspendForFormulaPalette(context: FormulaEditLeaseContext): FormulaEditLease | null;
   cancelFx(): void;
+  discardFx(): void;
   commitFx(advance: 'down' | 'right' | 'up' | 'left' | 'none'): boolean;
   detach(): void;
   insertRefAtCaret(ref: string): void;
@@ -133,6 +148,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   let commitRejected = false;
   let externalDraft: ExternalDraftState | null = null;
   let detached = false;
+  let ownedEditorRefs: EditorRefHighlight[] | null = null;
 
   const isMacPlatform = (): boolean =>
     (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
@@ -166,10 +182,18 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       c1: r.c1,
       colorIndex: r.colorIndex,
     }));
+    ownedEditorRefs = refs;
     mutators.setEditorRefs(store, refs);
   };
 
-  const clearFxRefs = (): void => mutators.setEditorRefs(store, []);
+  const clearFxRefs = (): void => {
+    const owned = ownedEditorRefs;
+    // Relinquish before the mutator so a synchronous subscriber can establish
+    // a newer owner without a trailing cleanup clobbering its refs.
+    ownedEditorRefs = null;
+    if (!owned || store.getState().ui.editorRefs !== owned) return;
+    mutators.setEditorRefs(store, []);
+  };
 
   const closeFormulaHelpers = (): void => {
     getAutocomplete().close();
@@ -192,6 +216,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (state.data.sheetIndex !== snapshot.anchor.sheet || state.ui.r1c1 !== snapshot.r1c1) {
       return null;
     }
+    const restoredRefs = [...snapshot.editorRefs];
+    ownedEditorRefs = restoredRefs;
     store.setState((current) => ({
       ...current,
       selection: snapshot.selection,
@@ -199,7 +225,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         ...current.ui,
         editor: snapshot.editorMode,
         pendingFormat: snapshot.pendingFormat,
-        editorRefs: [...snapshot.editorRefs],
+        editorRefs: restoredRefs,
         copyRange: snapshot.copy.copyRange,
         copyRanges: snapshot.copy.copyRanges,
         copyMode: snapshot.copy.copyMode,
@@ -219,7 +245,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     suspended = false;
     commitRejected = false;
     refreshActions();
-    mutators.setEditorRefs(store, [...snapshot.editorRefs]);
+    mutators.setEditorRefs(store, restoredRefs);
     getAutocomplete().refresh();
     getArgHelper()?.refresh();
     return fxInput;
@@ -298,76 +324,114 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     return lease;
   };
 
-  const notifyExternalInput = (): void => {
-    const draft = externalDraft;
-    if (detached || draft?.status !== 'open') return;
-    for (const listener of [...draft.listeners]) listener(fxInput.value);
+  const externalDraftWorkbookCurrent = (draft: ExternalDraftState): boolean => {
+    try {
+      const current = wb();
+      return (
+        current === draft.workbook &&
+        Number.isInteger(current.sheetCount) &&
+        current.sheetCount >= 0
+      );
+    } catch {
+      return false;
+    }
   };
 
-  const discardStaleLeaseDraft = (draft: ExternalDraftState): void => {
-    draft.status = 'cancelled';
-    draft.lease?.discard();
-    // Go inert without finishEditing so a later Enter/blur cannot write stale text.
+  const externalDraftStale = (draft: ExternalDraftState): boolean =>
+    !externalDraftWorkbookCurrent(draft) || (draft.lease !== null && !draft.lease.valid());
+
+  const currentExternalDraftView = (draft: ExternalDraftState): ExternalFormulaDraftView | null => {
+    if (detached || externalDraft !== draft || draft.status !== 'open') return null;
+    if (externalDraftStale(draft)) {
+      finishExternalDraft(draft, 'discarded', false, false);
+      return null;
+    }
+    return {
+      raw: fxInput.value,
+      caret: {
+        start: fxInput.selectionStart ?? fxInput.value.length,
+        end: fxInput.selectionEnd ?? fxInput.value.length,
+        direction: fxInput.selectionDirection,
+      },
+    };
+  };
+
+  const makeExternalDraftInert = (): void => {
+    // Drop only the discarded draft's local ownership markers. Clear its refs
+    // by identity so a newer owner survives a synchronous discard re-entry.
     fxEditing = false;
     editingAnchor = null;
     commitRejected = false;
     fxBaseline = fxInput.value;
     suspended = false;
-    if (externalDraft === draft) externalDraft = null;
+    clearFxRefs();
   };
 
-  const currentDraftValue = (draft: ExternalDraftState): string => {
-    if (detached || externalDraft !== draft || draft.status !== 'open') return '';
-    if (draft.lease && (!draft.lease.valid() || wb() !== draft.workbook)) {
-      discardStaleLeaseDraft(draft);
-      return '';
+  const refreshDiscardedChrome = (): void => {
+    // Discard is a system boundary: clear only this controller's local chrome
+    // state, then project the context that is current now. Ref ownership was
+    // handled before entering this helper, so newer editor refs survive.
+    try {
+      closeFormulaHelpers();
+    } catch {
+      // A helper may already be detached while the host is being torn down.
     }
-    return fxInput.value;
-  };
-
-  const syncExternalInput = (draft: ExternalDraftState, raw: string, caret?: number): void => {
-    if (detached || externalDraft !== draft || draft.status !== 'open') return;
-    if (draft.lease && (!draft.lease.valid() || wb() !== draft.workbook)) {
-      discardStaleLeaseDraft(draft);
-      return;
+    if (!detached) {
+      try {
+        const current = wb();
+        if (Number.isInteger(current.sheetCount) && current.sheetCount >= 0) {
+          updateChrome();
+          fxBaseline = fxInput.value;
+        }
+      } catch {
+        // Workbook teardown can race a stale draft; leave the callback path live.
+      }
     }
-    if (wb() !== draft.workbook) return;
-    fxInput.value = raw;
-    const nextCaret = Math.max(0, Math.min(caret ?? raw.length, raw.length));
-    fxInput.setSelectionRange(nextCaret, nextCaret);
-    commitRejected = false;
-    refreshActions();
-    syncFxRefs();
-    getAutocomplete().refresh();
-    getArgHelper()?.refresh();
-    notifyExternalInput();
+    try {
+      refreshActions();
+    } catch {
+      // Keep terminal callbacks reachable if local chrome has already detached.
+    }
   };
 
   function finishExternalDraft(
     draft: ExternalDraftState,
-    outcome: 'committed' | 'cancelled',
+    requestedOutcome: ExternalFormulaDraftOutcome,
     restore: boolean,
     focusHost: boolean,
   ): void {
     if (draft.status !== 'open' && draft.status !== 'committing') return;
+
+    let outcome = requestedOutcome;
+    // Invalidity takes precedence over a user-style restore, including when a
+    // synchronous callback invalidates the lease while the write is settling.
+    if (outcome === 'cancelled' && restore && draft.lease && !draft.lease.valid()) {
+      outcome = 'discarded';
+      restore = false;
+      focusHost = false;
+    }
+
     draft.status = outcome;
+    // Clear the binding and subscribers before releasing the lease or invoking
+    // hooks so synchronous re-entry can only observe a terminal draft.
+    if (externalDraft === draft) externalDraft = null;
+    draft.listeners.clear();
+
     let restoredFocusTarget: HTMLElement | null = null;
-    if (draft.lease) {
-      // An invalid lease discards without touching the current store.
-      if (restore) {
-        if (!draft.lease.valid()) {
-          draft.lease.discard();
-        } else {
-          finishEditing();
-          restoredFocusTarget = draft.lease.userCancel();
-        }
+    if (outcome === 'discarded') {
+      makeExternalDraftInert();
+      draft.lease?.discard();
+      refreshDiscardedChrome();
+    } else if (draft.lease) {
+      finishEditing();
+      if (outcome === 'cancelled' && restore) {
+        restoredFocusTarget = draft.lease.userCancel();
       } else {
-        finishEditing();
         draft.lease.finalize();
       }
       suspended = false;
     } else {
-      if (restore) {
+      if (outcome === 'cancelled' && restore) {
         fxInput.value = draft.restoreValue;
         mutators.setPendingFormat(store, null);
       }
@@ -378,14 +442,61 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       }
     }
     try {
-      if (draft.lease && restore) draft.hooks.onFinish(outcome, restoredFocusTarget);
-      else draft.hooks.onFinish(outcome);
+      if (draft.lease && outcome === 'cancelled' && restore) {
+        draft.hooks.onFinish(outcome, restoredFocusTarget);
+      } else {
+        draft.hooks.onFinish(outcome);
+      }
     } catch (err) {
       console.warn('formulon-cell: external formula draft finish callback failed', err);
-    } finally {
-      if (externalDraft === draft) externalDraft = null;
     }
   }
+
+  const notifyExternalInput = (): void => {
+    const draft = externalDraft;
+    if (detached || draft?.status !== 'open') return;
+    const view = currentExternalDraftView(draft);
+    if (!view || draft.listeners.size === 0) return;
+    const last = draft.lastNotifiedView;
+    if (
+      last &&
+      last.raw === view.raw &&
+      last.caret.start === view.caret.start &&
+      last.caret.end === view.caret.end &&
+      last.caret.direction === view.caret.direction
+    )
+      return;
+    draft.lastNotifiedView = view;
+    for (const listener of [...draft.listeners]) {
+      if (draft.status !== 'open' || externalDraft !== draft || draft.lastNotifiedView !== view)
+        break;
+      listener(view);
+    }
+  };
+
+  const discardStaleLeaseDraft = (draft: ExternalDraftState): void => {
+    finishExternalDraft(draft, 'discarded', false, false);
+  };
+
+  const currentDraftValue = (draft: ExternalDraftState): string =>
+    currentExternalDraftView(draft)?.raw ?? '';
+
+  const syncExternalInput = (draft: ExternalDraftState, raw: string, caret?: number): void => {
+    if (detached || externalDraft !== draft || draft.status !== 'open') return;
+    if (externalDraftStale(draft)) {
+      discardStaleLeaseDraft(draft);
+      return;
+    }
+    fxInput.value = raw;
+    const nextCaret = Math.max(0, Math.min(caret ?? raw.length, raw.length));
+    fxInput.setSelectionRange(nextCaret, nextCaret);
+    commitRejected = false;
+    refreshActions();
+    syncFxRefs();
+    getAutocomplete().refresh();
+    getArgHelper()?.refresh();
+    notifyExternalInput();
+  };
 
   const notifyValidation = (outcome: {
     severity: 'stop' | 'warning' | 'information';
@@ -481,7 +592,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     host.focus();
   };
 
-  const commitRawAt = (a: Addr, raw: string): boolean => {
+  const commitRawAt = (a: Addr, raw: string, draft?: ExternalDraftState): boolean => {
     const currentWb = wb();
     const result = commitCellInput({ store, wb: currentWb, addr: a, raw, origin: 'formulaBar' });
     if (result.status === 'rejected') {
@@ -504,30 +615,41 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         );
       }
     }
+    if (
+      draft &&
+      (detached ||
+        externalDraft !== draft ||
+        draft.cancelMode === 'discard' ||
+        !externalDraftWorkbookCurrent(draft))
+    ) {
+      return true;
+    }
     mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
     return true;
   };
 
   function commitExternalDraft(draft: ExternalDraftState): boolean {
     if (detached || externalDraft !== draft || draft.status !== 'open') return false;
-    if (draft.lease && (!draft.lease.valid() || wb() !== draft.workbook)) {
+    if (externalDraftStale(draft)) {
       discardStaleLeaseDraft(draft);
-      return false;
-    }
-    if (wb() !== draft.workbook) {
-      finishExternalDraft(draft, 'cancelled', true, !detached);
       return false;
     }
     const raw = fxInput.value;
     draft.status = 'committing';
     let committed = false;
     try {
-      committed = commitRawAt(draft.anchor, raw);
+      committed = commitRawAt(draft.anchor, raw, draft);
     } catch (err) {
       console.warn('formulon-cell: external formula-bar commit failed', err);
     }
-    // Subscribers may have replaced the context during execute(); leave a newer owner alone.
-    if (draft.lease && (!draft.lease.valid() || detached || draft.cancelMode === 'discard')) {
+    // Context discard or invalidity wins over a write that completed while a
+    // controller subscriber synchronously re-entered the session.
+    const contextDiscarded =
+      detached ||
+      externalDraft !== draft ||
+      draft.cancelMode === 'discard' ||
+      externalDraftStale(draft);
+    if (contextDiscarded) {
       discardStaleLeaseDraft(draft);
       return committed;
     }
@@ -536,7 +658,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       return true;
     }
     if (draft.cancelRequested || detached) {
-      finishExternalDraft(draft, 'cancelled', draft.cancelMode !== 'discard', false);
+      finishExternalDraft(draft, 'cancelled', true, false);
       return false;
     }
     if (draft.status === 'committing') {
@@ -554,7 +676,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       return;
     }
     if (draft.status !== 'open') return;
-    if (draft.lease && (!draft.lease.valid() || wb() !== draft.workbook)) {
+    if (externalDraftStale(draft)) {
       discardStaleLeaseDraft(draft);
       return;
     }
@@ -571,19 +693,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       return;
     }
     if (draft.status !== 'open') return;
-    if (draft.lease) {
-      if (!draft.lease.valid() || wb() !== draft.workbook) {
-        discardStaleLeaseDraft(draft);
-        return;
-      }
-      draft.status = 'cancelled';
-      finishEditing();
-      draft.lease.discard();
-      suspended = false;
-      if (externalDraft === draft) externalDraft = null;
-      return;
-    }
-    finishExternalDraft(draft, 'cancelled', true, false);
+    finishExternalDraft(draft, 'discarded', false, false);
   }
 
   const commitFx = (advance: 'down' | 'right' | 'up' | 'left' | 'none'): boolean => {
@@ -619,6 +729,25 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     updateChrome();
   };
 
+  const discardFx = (): void => {
+    if (externalDraft) {
+      discardExternalDraft();
+      return;
+    }
+    if (!fxEditing && !suspended) return;
+    invalidateLease();
+    // System boundaries abandon a regular formula-bar edit in place. Do not
+    // restore the old pending format or move focus while the host replaces the
+    // context; clear only refs still owned by this edit.
+    fxEditing = false;
+    editingAnchor = null;
+    commitRejected = false;
+    fxBaseline = fxInput.value;
+    suspended = false;
+    clearFxRefs();
+    refreshDiscardedChrome();
+  };
+
   const acceptFx = (): void => {
     if (externalDraft) {
       if (externalDraft.status === 'open') commitExternalDraft(externalDraft);
@@ -628,19 +757,26 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (fxInput.value !== fxBaseline) commitFx('none');
   };
 
-  const onFxFocus = (): void => {
+  const beginFormulaBarEdit = (baseline = fxInput.value): void => {
     if (detached || externalDraft || suspended) return;
     if (fxEditing) return;
     cancelBindingEditor();
     fxEditing = true;
-    fxBaseline = fxInput.value;
+    fxBaseline = baseline;
     editingAnchor = { ...store.getState().selection.active };
     refreshActions();
     syncFxRefs();
   };
 
+  const onFxFocus = (): void => {
+    beginFormulaBarEdit();
+  };
+
   const onFxInput = (): void => {
     if (detached || (externalDraft && externalDraft.status !== 'open')) return;
+    // A system discard has already cached the current display in fxBaseline;
+    // preserve it because the browser updates textarea.value before input.
+    if (!fxEditing) beginFormulaBarEdit(fxBaseline);
     commitRejected = false;
     refreshActions();
     if (fxEditing) syncFxRefs();
@@ -661,6 +797,11 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const onFxKeyUp = (): void => {
     if (detached || (externalDraft && externalDraft.status !== 'open')) return;
     if (fxEditing) getArgHelper()?.refresh();
+    notifyExternalInput();
+  };
+
+  const onFxSelection = (): void => {
+    notifyExternalInput();
   };
 
   const onFxKey = (e: KeyboardEvent): void => {
@@ -882,6 +1023,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       restoreValue: fxInput.value,
       hooks,
       listeners: new Set(),
+      lastNotifiedView: null,
       status: 'open',
       cancelRequested: false,
       cancelMode: null,
@@ -908,13 +1050,14 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     return {
       anchor: exposedAnchor,
       value: () => currentDraftValue(draft),
+      snapshot: () => currentExternalDraftView(draft),
       setValue: (raw, caret) => syncExternalInput(draft, raw, caret),
       commit: () => commitExternalDraft(draft),
       cancel: () => cancelExternalDraft(true, draft),
       discard: () => discardExternalDraft(draft),
       subscribe: (listener) => {
         if (detached || externalDraft !== draft || draft.status !== 'open') return () => {};
-        if (draft.lease && (!draft.lease.valid() || wb() !== draft.workbook)) {
+        if (externalDraftStale(draft)) {
           discardStaleLeaseDraft(draft);
           return () => {};
         }
@@ -931,6 +1074,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   fxInput.addEventListener('compositionstart', onFxCompositionStart);
   fxInput.addEventListener('compositionend', onFxCompositionEnd);
   fxInput.addEventListener('keyup', onFxKeyUp);
+  fxInput.addEventListener('select', onFxSelection);
+  fxInput.addEventListener('mouseup', onFxSelection);
   fxInput.addEventListener('keydown', onFxKey);
   fxInput.addEventListener('blur', onFxBlur);
   fxCancel.addEventListener('mousedown', keepFxFocus);
@@ -943,6 +1088,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     acceptFx,
     beginExternalDraft,
     cancelFx,
+    discardFx,
     commitFx,
     detach(): void {
       if (detached) return;
@@ -952,6 +1098,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       fxInput.removeEventListener('compositionstart', onFxCompositionStart);
       fxInput.removeEventListener('compositionend', onFxCompositionEnd);
       fxInput.removeEventListener('keyup', onFxKeyUp);
+      fxInput.removeEventListener('select', onFxSelection);
+      fxInput.removeEventListener('mouseup', onFxSelection);
       fxInput.removeEventListener('keydown', onFxKey);
       fxInput.removeEventListener('blur', onFxBlur);
       fxCancel.removeEventListener('mousedown', keepFxFocus);
