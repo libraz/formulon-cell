@@ -29,6 +29,7 @@ export interface FontTabRefs {
   fontSwatchesFlyout: HTMLDivElement;
   fontPreviewBox: HTMLDivElement;
   syncFontFamilyOptions: (current: string, selectFirstWhenEmpty?: boolean) => void;
+  syncFontSizeOptions: (current: number | undefined) => void;
 }
 
 export function createFontTab(
@@ -195,6 +196,14 @@ export function createFontTab(
     });
   }
   panel.appendChild(sizeList);
+  const syncFontSizeOptions = (current: number | undefined): void => {
+    for (const item of sizeList.querySelectorAll<HTMLButtonElement>('[data-fc-font-size]')) {
+      item.setAttribute(
+        'aria-selected',
+        current !== undefined && Number(item.dataset.fcFontSize) === current ? 'true' : 'false',
+      );
+    }
+  };
 
   // Font color. The swatch palette is taller than the space this tab has left,
   // so it hangs off the color control as a flyout instead of sitting inline the
@@ -259,5 +268,6 @@ export function createFontTab(
     fontSwatchesFlyout,
     fontPreviewBox,
     syncFontFamilyOptions,
+    syncFontSizeOptions,
   };
 }

@@ -262,6 +262,32 @@ export function buildTouchedDialogPatch(
   return patch;
 }
 
+/** The dimensions a differential format (conditional-format rule) carries.
+ *  Borders are included only when at least one side is set. */
+export function buildDialogDxf(
+  draft: DraftState,
+  defaultPattern: (category: NumberCategory) => string,
+): Partial<CellFormat> {
+  const explicitBorders = explicitDraftBorders(draft);
+  return {
+    numFmt: computeDialogNumFmt(draft, defaultPattern),
+    bold: draft.bold,
+    italic: draft.italic,
+    underline: draft.underline,
+    strike: draft.strike,
+    fontVertAlign: draft.fontVertAlign,
+    fontFamily: draft.fontFamily ? draft.fontFamily : undefined,
+    fontSize: draft.fontSize,
+    color: draft.color,
+    fill: draft.fill,
+    fillPattern: draft.fillPattern,
+    fillPatternColor: draft.fillPattern ? draft.fillPatternColor : undefined,
+    ...(Object.values(explicitBorders).some((side) => side !== false)
+      ? { borders: explicitBorders }
+      : {}),
+  };
+}
+
 export function makeEmptyDraft(formatLocale: string): DraftState {
   return {
     numFmt: undefined,

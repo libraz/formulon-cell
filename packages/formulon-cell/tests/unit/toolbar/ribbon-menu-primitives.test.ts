@@ -1828,7 +1828,8 @@ describe('toolbar/ribbon menu primitives', () => {
       'src/interact/format-dialog-tabs/border.ts',
       'src/interact/format-dialog-tabs/font.ts',
       'src/interact/format-dialog-view.ts',
-      'src/interact/format-dialog.ts',
+      'src/interact/format-dialog-tabs/number-controller.ts',
+      'src/interact/format-dialog-tabs/font-controller.ts',
       'src/interact/format-dialog-tabs/more.ts',
     ].map((path) => readFileSync(join(root, path), 'utf8'));
     const interactSurfaceSources = [
@@ -1838,7 +1839,7 @@ describe('toolbar/ribbon menu primitives', () => {
       'src/interact/pivot-table-dialog.ts',
       'src/interact/workbook-objects.ts',
       'src/interact/page-setup-dialog.ts',
-      'src/interact/conditional-dialog.ts',
+      'src/interact/conditional-form-controls.ts',
       'src/interact/cf-rules-dialog.ts',
       'src/interact/named-range-dialog.ts',
       'src/interact/find-replace.ts',

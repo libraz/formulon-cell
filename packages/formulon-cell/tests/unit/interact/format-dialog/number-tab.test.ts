@@ -318,7 +318,10 @@ describe('attachFormatDialog', () => {
   });
 
   it('keeps number pattern list buttons on the shared dialog option primitive', () => {
-    const source = readFileSync(join(root, 'src/interact/format-dialog.ts'), 'utf8');
+    const source = readFileSync(
+      join(root, 'src/interact/format-dialog-tabs/number-controller.ts'),
+      'utf8',
+    );
     expect(source).toContain('appendDialogOptionButton(patternList');
     expect(source).not.toContain("const item = document.createElement('button')");
   });

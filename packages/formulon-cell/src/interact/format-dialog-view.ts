@@ -333,6 +333,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fontSwatchesFlyout,
     fontPreviewBox,
     syncFontFamilyOptions,
+    syncFontSizeOptions,
   } = fontTab;
 
   // ── Border tab ─────────────────────────────────────────────────────────
@@ -510,6 +511,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fontSwatchesFlyout,
     fontPreviewBox,
     syncFontFamilyOptions,
+    syncFontSizeOptions,
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,

@@ -154,6 +154,34 @@ export const patternPresetsFor = (
   };
 };
 
+/** First locale preset for a pattern-driven category, or a fixed fallback;
+ *  '' for categories whose number format carries no pattern. */
+export const defaultPatternForLocale = (category: NumberCategory, locale: string): string => {
+  const presets =
+    category === 'date' ||
+    category === 'time' ||
+    category === 'fraction' ||
+    category === 'special' ||
+    category === 'custom'
+      ? patternPresetsFor(locale)[category]
+      : [];
+  if (presets[0]) return presets[0];
+  switch (category) {
+    case 'date':
+      return 'yyyy-mm-dd';
+    case 'time':
+      return 'HH:MM:SS';
+    case 'fraction':
+      return '# ?/?';
+    case 'special':
+      return '000';
+    case 'custom':
+      return '0.00';
+    default:
+      return '';
+  }
+};
+
 export function isHexColor(s: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(s);
 }
