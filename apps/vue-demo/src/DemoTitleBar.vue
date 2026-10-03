@@ -5,12 +5,16 @@ import {
   type DemoPlatform,
   type DemoSearchItem,
   type DemoSearchUsagePrior,
+  type DemoSearchEvent,
+  type DemoSearchState,
   type DemoUiStrings,
   demoSearchOptionId,
+  INITIAL_DEMO_SEARCH_STATE,
   installDemoSearchShortcut,
   loadDemoSearchUsagePrior,
   queryDemoSearchItems,
   recordDemoSearchUsage,
+  reduceDemoSearch,
   resolveDemoSearchKey,
   saveDemoSearchUsagePrior,
 } from '../../demo-shared/index.js';
@@ -32,9 +36,13 @@ const emit = defineEmits<{
   tabChange: [tab: RibbonTab];
 }>();
 
-const searchQuery = ref('');
-const searchOpen = ref(false);
-const searchActiveIndex = ref(-1);
+const search = ref<DemoSearchState>(INITIAL_DEMO_SEARCH_STATE);
+const dispatchSearch = (event: DemoSearchEvent): void => {
+  search.value = reduceDemoSearch(search.value, event);
+};
+const searchQuery = computed(() => search.value.query);
+const searchOpen = computed(() => search.value.open);
+const searchActiveIndex = computed(() => search.value.activeIndex);
 const searchUsagePrior = ref<DemoSearchUsagePrior>(loadDemoSearchUsagePrior());
 const searchInput = ref<HTMLInputElement | null>(null);
 /** Quick Access toolbar element, exposed so the host can route F6 into it. */
@@ -51,31 +59,28 @@ const runCommand = (cmd: DemoSearchItem): void => {
   searchUsagePrior.value = recordDemoSearchUsage(searchUsagePrior.value, cmd);
   if (cmd.tab) emit('tabChange', cmd.tab);
   cmd.run();
-  searchQuery.value = '';
-  searchOpen.value = false;
-  searchActiveIndex.value = -1;
+  dispatchSearch({ type: 'reset' });
+};
+
+const onSearchInput = (ev: Event): void => {
+  const input = ev.currentTarget as HTMLInputElement;
+  dispatchSearch({ type: 'input', value: input.value, focused: document.activeElement === input });
 };
 
 const onSearchKeydown = (ev: KeyboardEvent): void => {
   const action = resolveDemoSearchKey(ev.key, searchActiveIndex.value, filteredCommands.value.length);
   if (action?.kind === 'close') {
-    searchOpen.value = false;
-    searchActiveIndex.value = -1;
+    dispatchSearch({ type: 'key', action });
     (ev.currentTarget as HTMLInputElement).blur();
   } else if (action?.kind === 'move') {
     ev.preventDefault();
-    searchOpen.value = true;
-    searchActiveIndex.value = action.index;
+    dispatchSearch({ type: 'key', action });
   } else if (action?.kind === 'run') {
     ev.preventDefault();
     const command = filteredCommands.value[action.index];
     if (command) runCommand(command);
   }
 };
-
-watch([searchQuery, searchOpen], () => {
-  searchActiveIndex.value = -1;
-});
 
 watch(searchUsagePrior, (prior) => saveDemoSearchUsagePrior(prior));
 
@@ -128,7 +133,7 @@ onBeforeUnmount(() => {
         <DemoIcon name="search" />
         <input
           ref="searchInput"
-          v-model="searchQuery"
+          :value="searchQuery"
           type="search"
           role="combobox"
           :placeholder="ui.search"
@@ -136,10 +141,10 @@ onBeforeUnmount(() => {
           aria-controls="demo-search-results"
           :aria-expanded="searchOpen"
           :aria-activedescendant="searchOpen && searchActiveIndex >= 0 ? demoSearchOptionId(searchActiveIndex) : undefined"
-          @focus="searchOpen = true; searchActiveIndex = -1"
-          @input="searchOpen = true; searchActiveIndex = -1"
+          @focus="dispatchSearch({ type: 'focus' })"
+          @input="onSearchInput"
           @keydown="onSearchKeydown"
-          @blur="searchOpen = false"
+          @blur="dispatchSearch({ type: 'blur' })"
         />
         <div v-if="searchOpen" id="demo-search-results" class="fc-tb__command-menu" role="listbox">
           <div v-if="filteredCommands.length === 0" class="fc-tb__command-empty">
@@ -163,7 +168,7 @@ onBeforeUnmount(() => {
               },
             ]"
             @mousedown.prevent
-            @mouseenter="searchActiveIndex = index"
+            @mouseenter="dispatchSearch({ type: 'hover', index })"
             @click="runCommand(cmd)"
           >
             <strong>{{ cmd.label }}</strong>

@@ -782,3 +782,51 @@ export const resolveDemoSearchKey = (
   }
   return null;
 };
+
+export interface DemoSearchState {
+  query: string;
+  open: boolean;
+  activeIndex: number;
+}
+
+export type DemoSearchEvent =
+  | { type: 'focus' }
+  | { type: 'blur' }
+  /** `focused` is whether the input still owns focus; Escape clears a search
+   *  input natively and that change must not reopen the list. */
+  | { type: 'input'; value: string; focused: boolean }
+  | { type: 'hover'; index: number }
+  | { type: 'key'; action: NonNullable<DemoSearchKeyAction> }
+  /** A command ran: clear the query and close the list. */
+  | { type: 'reset' };
+
+export const INITIAL_DEMO_SEARCH_STATE: DemoSearchState = {
+  query: '',
+  open: false,
+  activeIndex: -1,
+};
+
+/** Pure transition for the demo search box, shared by the React and Vue title bars. */
+export const reduceDemoSearch = (
+  state: DemoSearchState,
+  event: DemoSearchEvent,
+): DemoSearchState => {
+  switch (event.type) {
+    case 'focus':
+      return { ...state, open: true, activeIndex: -1 };
+    case 'blur':
+      return { ...state, open: false };
+    case 'input':
+      return { query: event.value, open: event.focused, activeIndex: -1 };
+    case 'hover':
+      return { ...state, activeIndex: event.index };
+    case 'key':
+      if (event.action.kind === 'move') {
+        return { ...state, open: true, activeIndex: event.action.index };
+      }
+      if (event.action.kind === 'close') return { ...state, open: false, activeIndex: -1 };
+      return state;
+    case 'reset':
+      return INITIAL_DEMO_SEARCH_STATE;
+  }
+};

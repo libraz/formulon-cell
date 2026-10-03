@@ -13,10 +13,12 @@ import {
   demoCommandText,
   demoSelectionLabel,
   evaluateDemoProbe,
+  INITIAL_DEMO_SEARCH_STATE,
   isDemoFeatureOn,
   nextDemoFeatureOverrides,
   pushDemoChangeLog,
   queryDemoSearchItems,
+  reduceDemoSearch,
   refreshDemoPrinterProfiles,
   resolveDemoSearchKey,
   runDemoScript,
@@ -447,6 +449,48 @@ describe('demo-shared Search/Tell me items', () => {
     expect(resolveDemoSearchKey('Enter', 2, 3)).toEqual({ kind: 'run', index: 2 });
     expect(resolveDemoSearchKey('Enter', -1, 0)).toBeNull();
     expect(resolveDemoSearchKey('a', 0, 3)).toBeNull();
+  });
+
+  it('keeps the first ArrowDown move when it opens a closed search list', () => {
+    const closed = { query: 'sum', open: false, activeIndex: -1 };
+    const action = resolveDemoSearchKey('ArrowDown', closed.activeIndex, 3);
+    expect(reduceDemoSearch(closed, { type: 'key', action })).toEqual({
+      query: 'sum',
+      open: true,
+      activeIndex: 0,
+    });
+  });
+
+  it('resets the active index on focus and typing, and reopens only while focused', () => {
+    const moved = { query: 'a', open: true, activeIndex: 2 };
+    expect(reduceDemoSearch(moved, { type: 'focus' })).toEqual({
+      query: 'a',
+      open: true,
+      activeIndex: -1,
+    });
+    expect(reduceDemoSearch(moved, { type: 'input', value: 'ab', focused: true })).toEqual({
+      query: 'ab',
+      open: true,
+      activeIndex: -1,
+    });
+    // Escape clears the input natively after blur; that change must not reopen the list.
+    expect(reduceDemoSearch(moved, { type: 'input', value: '', focused: false })).toEqual({
+      query: '',
+      open: false,
+      activeIndex: -1,
+    });
+  });
+
+  it('closes on Escape, keeps the index on blur, tracks hover and resets after a run', () => {
+    const open = { query: 'a', open: true, activeIndex: 1 };
+    expect(reduceDemoSearch(open, { type: 'key', action: { kind: 'close' } })).toEqual({
+      query: 'a',
+      open: false,
+      activeIndex: -1,
+    });
+    expect(reduceDemoSearch(open, { type: 'blur' })).toEqual({ ...open, open: false });
+    expect(reduceDemoSearch(open, { type: 'hover', index: 2 }).activeIndex).toBe(2);
+    expect(reduceDemoSearch(open, { type: 'reset' })).toEqual(INITIAL_DEMO_SEARCH_STATE);
   });
 
   it('evaluates probes and reports evaluation errors as text', () => {

@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from 'react';
@@ -14,10 +15,12 @@ import {
   type DemoSearchUsagePrior,
   type DemoUiStrings,
   demoSearchOptionId,
+  INITIAL_DEMO_SEARCH_STATE,
   installDemoSearchShortcut,
   loadDemoSearchUsagePrior,
   queryDemoSearchItems,
   recordDemoSearchUsage,
+  reduceDemoSearch,
   resolveDemoSearchKey,
   saveDemoSearchUsagePrior,
 } from '../../demo-shared/index.js';
@@ -53,9 +56,8 @@ export const DemoTitleBar = ({
   onTogglePanel,
   onTabChange,
 }: DemoTitleBarProps): ReactElement => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
+  const [search, dispatchSearch] = useReducer(reduceDemoSearch, INITIAL_DEMO_SEARCH_STATE);
+  const { query: searchQuery, open: searchOpen, activeIndex: searchActiveIndex } = search;
   const [searchUsagePrior, setSearchUsagePrior] = useState<DemoSearchUsagePrior>(() =>
     loadDemoSearchUsagePrior(),
   );
@@ -73,9 +75,7 @@ export const DemoTitleBar = ({
       setSearchUsagePrior((prior) => recordDemoSearchUsage(prior, cmd));
       if (cmd.tab) onTabChange(cmd.tab);
       cmd.run();
-      setSearchQuery('');
-      setSearchOpen(false);
-      setSearchActiveIndex(-1);
+      dispatchSearch({ type: 'reset' });
     },
     [onTabChange],
   );
@@ -146,18 +146,14 @@ export const DemoTitleBar = ({
                 : undefined
             }
             value={searchQuery}
-            onFocus={() => {
-              setSearchOpen(true);
-              setSearchActiveIndex(-1);
-            }}
+            onFocus={() => dispatchSearch({ type: 'focus' })}
             onChange={(e) => {
               const input = e.currentTarget;
-              setSearchQuery(input.value);
-              // Escape clears a search input natively, and that clear lands
-              // as a change on an input we just blurred. Only a change the
-              // user typed reopens the list.
-              setSearchOpen(document.activeElement === input);
-              setSearchActiveIndex(-1);
+              dispatchSearch({
+                type: 'input',
+                value: input.value,
+                focused: document.activeElement === input,
+              });
             }}
             onKeyDown={(e) => {
               const action = resolveDemoSearchKey(
@@ -166,20 +162,18 @@ export const DemoTitleBar = ({
                 filteredCommands.length,
               );
               if (action?.kind === 'close') {
-                setSearchOpen(false);
-                setSearchActiveIndex(-1);
+                dispatchSearch({ type: 'key', action });
                 e.currentTarget.blur();
               } else if (action?.kind === 'move') {
                 e.preventDefault();
-                setSearchOpen(true);
-                setSearchActiveIndex(action.index);
+                dispatchSearch({ type: 'key', action });
               } else if (action?.kind === 'run') {
                 e.preventDefault();
                 const command = filteredCommands[action.index];
                 if (command) runCommand(command);
               }
             }}
-            onBlur={() => setSearchOpen(false)}
+            onBlur={() => dispatchSearch({ type: 'blur' })}
           />
           {searchOpen ? (
             <div id="demo-search-results" className="fc-tb__command-menu" role="listbox">
@@ -199,7 +193,7 @@ export const DemoTitleBar = ({
                       index === searchActiveIndex ? ' fc-tb__command-item--active' : ''
                     }${cmd.disabled ? ' fc-tb__command-item--disabled' : ''}`}
                     onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setSearchActiveIndex(index)}
+                    onMouseEnter={() => dispatchSearch({ type: 'hover', index })}
                     onClick={() => runCommand(cmd)}
                   >
                     <strong>{cmd.label}</strong>
