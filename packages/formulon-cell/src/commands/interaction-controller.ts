@@ -1,45 +1,43 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { addrKey } from '../engine/address.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
-import type { CellPatch, CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, State } from '../store/types.js';
 import { type CoercedInput, coerceInputForCell } from './coerce-input.js';
-import type { History, HistoryDirection, HistoryEntry } from './history.js';
+import type { History } from './history.js';
+import { InteractionAuthorizer } from './interaction-authorizer.js';
 import {
-  type BatchRejection,
-  type CellBatchCommand,
-  type CellBatchOperation,
-  type CellChangeInput,
-  type ChangeBatchResult,
-  type InteractionOperation,
-  type InteractionOrigin,
-  type InteractionPolicy,
-  isMutatingInteraction,
-  isPolicyCellEligible,
-  type OperationEffect,
-  type OperationIntent,
-  operationPermission,
-  type PermissionDecision,
+  cellEffects,
+  isWorkbookAddress,
+  mergeAnchorFor,
+  mergeCellsFor,
+} from './interaction-effects.js';
+import type {
+  BatchRejection,
+  CellBatchCommand,
+  CellBatchOperation,
+  CellChangeInput,
+  ChangeBatchResult,
+  InteractionOrigin,
+  InteractionPolicy,
+  OperationIntent,
+  PermissionDecision,
 } from './interaction-policy.js';
-import { isCellWritable, isSheetProtected } from './protection.js';
+import {
+  changedFormatAddresses,
+  effectivePendingFormatAddresses,
+  type PreparedChange,
+  projectPreparedFormats,
+  sameStructuredValue,
+  snapshotToPatch,
+  unionAddresses,
+} from './prepared-change.js';
 import { normalizeR1C1Formula } from './refs.js';
 import { cellValueViolatesValidation, validateAgainst } from './validate.js';
 
-const MAX_MATERIALIZED_CELLS = 100_000;
-const IMPLEMENTED_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
-  'valueEdit',
-  'formulaEdit',
-  'clear',
-  'format',
-  'paste',
-  'fill',
-  'moveCells',
-  'print',
-  'export',
-]);
 const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
   'valueEdit',
   'formulaEdit',
@@ -48,53 +46,6 @@ const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
   'fill',
   'moveCells',
 ]);
-
-const MAC_SUBTOTAL_COMMAND_ID = 'mac.data.subtotal';
-const MAC_REMOVE_HYPERLINK_COMMAND_ID = 'mac.automate.removeHyperlinks';
-
-const macSubtotalStructuralOperation = (
-  intent: OperationIntent,
-): 'insertRows' | 'deleteRows' | null => {
-  if (intent.commandId !== MAC_SUBTOTAL_COMMAND_ID) return null;
-  if (intent.operation === 'insertRows' && (intent.origin === 'ribbon' || intent.origin === 'redo'))
-    return 'insertRows';
-  if (intent.operation === 'deleteRows' && intent.origin === 'undo') return 'deleteRows';
-  return null;
-};
-
-const macSubtotalStructuralRange = (intent: OperationIntent): Range | null => {
-  if (macSubtotalStructuralOperation(intent) === null || intent.effects.length !== 2) return null;
-  let workbookEffects = 0;
-  let range: Range | undefined;
-  for (const effect of intent.effects) {
-    if (effect.kind === 'workbook') {
-      workbookEffects += 1;
-      continue;
-    }
-    if (effect.kind !== 'range' || effect.includesFormula !== undefined || range) return null;
-    range = effect.range;
-  }
-  return workbookEffects === 1 && range ? range : null;
-};
-
-const ownsMacRemoveHyperlinkCommand = (intent: OperationIntent): boolean =>
-  intent.commandId === MAC_REMOVE_HYPERLINK_COMMAND_ID;
-
-const macRemoveHyperlinkCells = (intent: OperationIntent): readonly Addr[] | null => {
-  if (!ownsMacRemoveHyperlinkCommand(intent)) return null;
-  if (
-    intent.operation !== 'hyperlink' ||
-    (intent.origin !== 'ribbon' && intent.origin !== 'undo' && intent.origin !== 'redo') ||
-    intent.effects.length !== 1
-  )
-    return null;
-  const effect = intent.effects[0];
-  if (effect?.kind !== 'cells' || effect.includesFormula !== undefined || effect.cells.length === 0)
-    return null;
-  const sheet = effect.cells[0]?.sheet;
-  if (sheet === undefined || effect.cells.some((addr) => addr.sheet !== sheet)) return null;
-  return effect.cells;
-};
 
 export interface InteractionControllerOptions {
   readonly store: SpreadsheetStore;
@@ -115,14 +66,6 @@ export interface ApplyChangesOptions {
   readonly origin?: string;
 }
 
-type PreparedChange = {
-  readonly patch: CellPatch;
-  readonly implicitFormat?: CellFormat['numFmt'];
-  readonly input?: CoercedInput;
-  /** A format staged by the editor/formula bar for this resolved anchor. */
-  readonly pendingFormat?: Partial<CellFormat>;
-};
-
 type HistoryIntents = {
   readonly redo: OperationIntent;
   readonly undo: OperationIntent;
@@ -135,12 +78,6 @@ type HistoryIntents = {
 type HistoryPlanResult =
   | { readonly plan: HistoryIntents }
   | { readonly decision: PermissionDecision };
-
-const snapshotToPatch = (snapshot: CellSnapshot): CellPatch => ({
-  addr: snapshot.addr,
-  value: snapshot.value,
-  formula: snapshot.formula,
-});
 
 const originFromHost = (origin: string | undefined): InteractionOrigin => {
   switch (origin) {
@@ -159,178 +96,8 @@ const originFromHost = (origin: string | undefined): InteractionOrigin => {
   }
 };
 
-const sameStructuredValue = (left: unknown, right: unknown): boolean => {
-  if (Object.is(left, right)) return true;
-  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
-    return false;
-  if (Array.isArray(left) || Array.isArray(right)) {
-    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-    return left.every((value, index) => sameStructuredValue(value, right[index]));
-  }
-  const leftRecord = left as Record<string, unknown>;
-  const rightRecord = right as Record<string, unknown>;
-  const leftKeys = Object.keys(leftRecord).sort();
-  const rightKeys = Object.keys(rightRecord).sort();
-  if (leftKeys.length !== rightKeys.length) return false;
-  return leftKeys.every(
-    (key, index) =>
-      key === rightKeys[index] && sameStructuredValue(leftRecord[key], rightRecord[key]),
-  );
-};
-
-const mergeFormatPatch = (
-  current: CellFormat | undefined,
-  patch: Partial<CellFormat> | undefined,
-): CellFormat | undefined => {
-  if (!patch) return current;
-  const next: CellFormat = { ...(current ?? {}), ...patch };
-  if (patch.borders) next.borders = { ...(current?.borders ?? {}), ...patch.borders };
-  return next;
-};
-
-const projectPreparedFormat = (
-  current: CellFormat | undefined,
-  change: PreparedChange,
-): CellFormat | undefined => {
-  let next = current;
-  if (change.implicitFormat && (next?.numFmt === undefined || next.numFmt.kind === 'general')) {
-    next = { ...(next ?? {}), numFmt: change.implicitFormat };
-  }
-  return mergeFormatPatch(next, change.pendingFormat);
-};
-
-const projectPreparedFormats = (
-  before: ReadonlyMap<string, CellFormat>,
-  prepared: readonly PreparedChange[],
-): Map<string, CellFormat> => {
-  const next = new Map(before);
-  for (const change of prepared) {
-    const key = addrKey(change.patch.addr);
-    const projected = projectPreparedFormat(next.get(key), change);
-    if (projected === undefined) next.delete(key);
-    else next.set(key, projected);
-  }
-  return next;
-};
-
-/** Return only addresses whose matching pending patch changes the format after
- * implicit input coercion has been projected. Implicit formats alone retain
- * the value-edit authorization path used before pending-format integration. */
-const effectivePendingFormatAddresses = (
-  before: ReadonlyMap<string, CellFormat>,
-  prepared: readonly PreparedChange[],
-): readonly Addr[] => {
-  const implicitBase = projectPreparedFormats(
-    before,
-    prepared.map((change) => ({ ...change, pendingFormat: undefined })),
-  );
-  const pendingPrepared = prepared
-    .filter((change) => change.pendingFormat !== undefined)
-    .map((change) => ({ ...change, implicitFormat: undefined }));
-  const pendingApplied = projectPreparedFormats(implicitBase, pendingPrepared);
-  return changedFormatAddresses(implicitBase, pendingApplied, pendingPrepared);
-};
-
-const changedFormatAddresses = (
-  before: ReadonlyMap<string, CellFormat>,
-  after: ReadonlyMap<string, CellFormat>,
-  prepared: readonly PreparedChange[],
-): readonly Addr[] => {
-  const changed: Addr[] = [];
-  const seen = new Set<string>();
-  for (const change of prepared) {
-    const key = addrKey(change.patch.addr);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (!sameStructuredValue(before.get(key), after.get(key))) changed.push(change.patch.addr);
-  }
-  return changed;
-};
-
-const unionAddresses = (...groups: readonly (readonly Addr[])[]): readonly Addr[] => {
-  const result: Addr[] = [];
-  const seen = new Set<string>();
-  for (const group of groups) {
-    for (const addr of group) {
-      const key = addrKey(addr);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push(addr);
-    }
-  }
-  return result;
-};
-
-const effectCells = (effect: OperationEffect): readonly Addr[] | null => {
-  if (effect.kind === 'cells')
-    return effect.cells.length <= MAX_MATERIALIZED_CELLS ? effect.cells : null;
-  if (effect.kind === 'workbook') return [];
-  const { range } = effect;
-  if (
-    !Number.isInteger(range.sheet) ||
-    !Number.isInteger(range.r0) ||
-    !Number.isInteger(range.c0) ||
-    !Number.isInteger(range.r1) ||
-    !Number.isInteger(range.c1) ||
-    range.sheet < 0 ||
-    range.r0 < 0 ||
-    range.c0 < 0 ||
-    range.r1 < range.r0 ||
-    range.c1 < range.c0
-  )
-    return null;
-  const area = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-  if (!Number.isSafeInteger(area) || area < 0 || area > MAX_MATERIALIZED_CELLS) return null;
-  const cells: Addr[] = [];
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1)
-      cells.push({ sheet: range.sheet, row, col });
-  }
-  return cells;
-};
-
-/** Return the merge covering a cell without importing the merge command module
- * (the command module itself records history and would create a needless
- * dependency cycle at this policy boundary). */
-const mergeRangeAt = (state: State, addr: Addr): Range | null => {
-  const key = addrKey(addr);
-  const anchorKey = state.merges.byCell.get(key) ?? key;
-  return state.merges.byAnchor.get(anchorKey) ?? null;
-};
-
-const mergeCellsFor = (state: State, addr: Addr): readonly Addr[] | null => {
-  const merge = mergeRangeAt(state, addr);
-  if (!merge) return [addr];
-  const height = merge.r1 - merge.r0 + 1;
-  const width = merge.c1 - merge.c0 + 1;
-  const area = height * width;
-  if (!Number.isSafeInteger(area) || height <= 0 || width <= 0 || area > MAX_MATERIALIZED_CELLS)
-    return null;
-  const cells: Addr[] = [];
-  for (let row = merge.r0; row <= merge.r1; row += 1) {
-    for (let col = merge.c0; col <= merge.c1; col += 1)
-      cells.push({ sheet: merge.sheet, row, col });
-  }
-  return cells;
-};
-
-const mergeAnchorFor = (state: State, addr: Addr): Addr => {
-  const merge = mergeRangeAt(state, addr);
-  return merge ? { sheet: merge.sheet, row: merge.r0, col: merge.c0 } : addr;
-};
-
-const cellEffects = (
-  cells: readonly Addr[],
-  formulaCells: readonly Addr[] = [],
-): readonly OperationEffect[] => {
-  const effects: OperationEffect[] = [{ kind: 'cells', cells }];
-  if (formulaCells.length > 0)
-    effects.push({ kind: 'cells', cells: formulaCells, includesFormula: true });
-  return effects;
-};
-
 export class InteractionController {
-  private policyValue: InteractionPolicy | undefined;
+  private readonly authorizer: InteractionAuthorizer;
   private readonly store: SpreadsheetStore;
   private readonly getWb: () => WorkbookHandle;
   private readonly history: History;
@@ -348,28 +115,42 @@ export class InteractionController {
     this.manageHistoryGuard = options.manageHistoryGuard !== false;
     this.getBounds = options.getBounds;
     this.onChanged = options.onChanged;
-    if (this.manageHistoryGuard) {
-      this.history.setGuard((entry, direction) => this.guardHistory(entry, direction));
-    }
+    this.authorizer = new InteractionAuthorizer({
+      store: options.store,
+      getWb: options.getWb,
+      getBounds: options.getBounds,
+      isDisposed: () => this.disposed,
+    });
+    if (this.manageHistoryGuard) this.installHistoryGuard();
   }
 
   get policy(): InteractionPolicy | undefined {
-    return this.policyValue;
+    return this.authorizer.policy;
   }
 
   get restricted(): boolean {
-    return this.policyValue !== undefined;
+    return this.authorizer.policy !== undefined;
   }
 
   get revision(): number {
     return this.revisionValue;
   }
 
+  canSelect(): PermissionDecision {
+    return this.authorizer.canSelect();
+  }
+
+  canCopy(): PermissionDecision {
+    return this.authorizer.canCopy();
+  }
+
+  canExecute(intent: OperationIntent): PermissionDecision {
+    return this.authorizer.canExecute(intent);
+  }
+
   setPolicy(next?: InteractionPolicy): void {
-    this.policyValue = next;
-    if (this.manageHistoryGuard) {
-      this.history.setGuard((entry, direction) => this.guardHistory(entry, direction));
-    }
+    this.authorizer.policy = next;
+    if (this.manageHistoryGuard) this.installHistoryGuard();
     // Policy changes invalidate any host-held plan/request that was based on
     // the previous authorization. Notify renderer subscribers without sending
     // a mutation result through the host's onChanged callback.
@@ -381,245 +162,6 @@ export class InteractionController {
       revision: this.revisionValue,
     };
     this.notifySubscribers(update);
-  }
-
-  canSelect(): PermissionDecision {
-    if (this.policyValue?.selection !== false) return { allowed: true };
-    return { allowed: false, code: 'operationDenied', reason: 'selection is disabled' };
-  }
-
-  canCopy(): PermissionDecision {
-    if (this.policyValue?.copy !== false) return { allowed: true };
-    return { allowed: false, code: 'operationDenied', reason: 'copy is disabled' };
-  }
-
-  canExecute(intent: OperationIntent): PermissionDecision {
-    if (this.disposed) return { allowed: false, code: 'invalid', reason: 'controller is disposed' };
-    const policy = this.policyValue;
-    try {
-      const wb = this.getWb();
-      if (!wb) return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
-      if (ownsMacRemoveHyperlinkCommand(intent)) {
-        if (!macRemoveHyperlinkCells(intent)) {
-          return {
-            allowed: false,
-            code: 'invalid',
-            reason: 'Remove hyperlinks authorization needs one nonempty same-sheet cell effect',
-          };
-        }
-        if (!policy) return this.legacyDecision(intent, wb);
-        return this.policyDecision(intent, policy, wb);
-      }
-      if (macSubtotalStructuralOperation(intent) !== null)
-        return this.macSubtotalStructuralDecision(intent, policy, wb);
-      if (!policy) return this.legacyDecision(intent, wb);
-      return this.policyDecision(intent, policy, wb);
-    } catch {
-      return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
-    }
-  }
-
-  private macSubtotalStructuralDecision(
-    intent: OperationIntent,
-    policy: InteractionPolicy | undefined,
-    wb: WorkbookHandle,
-  ): PermissionDecision {
-    const range = macSubtotalStructuralRange(intent);
-    if (!range) {
-      return {
-        allowed: false,
-        code: 'invalid',
-        reason: 'Subtotal structural authorization needs one workbook and one range effect',
-      };
-    }
-    const state = this.store.getState();
-    if (range.sheet !== state.data.sheetIndex) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        reason: 'Subtotal structural authorization must target the active sheet',
-      };
-    }
-    if (
-      !Number.isInteger(range.sheet) ||
-      !Number.isInteger(range.r0) ||
-      !Number.isInteger(range.c0) ||
-      !Number.isInteger(range.r1) ||
-      !Number.isInteger(range.c1) ||
-      range.r0 < 0 ||
-      range.c0 < 0 ||
-      range.r1 < range.r0 ||
-      range.c1 < range.c0 ||
-      !this.isValidAddress(wb, { sheet: range.sheet, row: range.r0, col: range.c0 }) ||
-      !this.isValidAddress(wb, { sheet: range.sheet, row: range.r1, col: range.c1 })
-    ) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        reason: 'Subtotal structural authorization range is outside the worksheet',
-      };
-    }
-    if (isSheetProtected(state, range.sheet)) {
-      return {
-        allowed: false,
-        code: 'protected',
-        reason: 'Subtotal structural authorization targets a protected sheet',
-      };
-    }
-
-    if (!policy) return { allowed: true };
-    if (!operationPermission(policy, intent.operation)) {
-      return {
-        allowed: false,
-        code:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'readOnly'
-            : 'operationDenied',
-        reason:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'instance policy is read-only'
-            : `operation ${intent.operation} is denied`,
-      };
-    }
-    if (policy.operations?.[intent.operation] !== true) {
-      return {
-        allowed: false,
-        code: 'operationDenied',
-        reason: `operation ${intent.operation} needs explicit structural permission`,
-      };
-    }
-    if (policy.editable !== undefined) {
-      return {
-        allowed: false,
-        code: 'operationDenied',
-        reason: 'editable cell policy cannot authorize workbook row structure',
-      };
-    }
-    const bounds = this.getBounds?.();
-    if (
-      bounds &&
-      (bounds.sheet !== range.sheet ||
-        bounds.r0 !== 0 ||
-        bounds.c0 !== 0 ||
-        bounds.r1 !== MAX_ROW ||
-        bounds.c1 !== MAX_COL)
-    ) {
-      return {
-        allowed: false,
-        code: 'outOfBounds',
-        reason: 'Subtotal structural authorization needs the full target worksheet bound',
-      };
-    }
-    return this.applyRestriction(policy, intent, { allowed: true });
-  }
-
-  private policyDecision(
-    intent: OperationIntent,
-    policy: InteractionPolicy,
-    wb: WorkbookHandle,
-  ): PermissionDecision {
-    if (!IMPLEMENTED_OPERATIONS.has(intent.operation) && !macRemoveHyperlinkCells(intent)) {
-      return {
-        allowed: false,
-        code: 'unsupported',
-        reason: `operation ${intent.operation} is not routed yet`,
-      };
-    }
-    if (!operationPermission(policy, intent.operation)) {
-      return {
-        allowed: false,
-        code:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'readOnly'
-            : 'operationDenied',
-        reason:
-          policy.readOnly && isMutatingInteraction(intent.operation)
-            ? 'instance policy is read-only'
-            : `operation ${intent.operation} is denied`,
-      };
-    }
-
-    const cells: Addr[] = [];
-    const formulaCells: Addr[] = [];
-    for (const effect of intent.effects) {
-      const addresses = effectCells(effect);
-      if (addresses === null) {
-        return {
-          allowed: false,
-          code: 'unsupported',
-          reason: 'affected range exceeds the authorization bound',
-        };
-      }
-      cells.push(...addresses);
-      if (effect.kind !== 'workbook' && effect.includesFormula) formulaCells.push(...addresses);
-    }
-    const state = this.store.getState();
-    const authorizedCells: Addr[] = [];
-    const authorizedKeys = new Set<string>();
-    for (const requestedAddr of cells) {
-      if (authorizedKeys.has(addrKey(requestedAddr))) continue;
-      const merged = mergeCellsFor(state, requestedAddr);
-      if (merged === null) {
-        return {
-          allowed: false,
-          code: 'unsupported',
-          addr: requestedAddr,
-          reason: 'merged cell range exceeds the authorization bound',
-        };
-      }
-      for (const expandedAddr of merged) {
-        const key = addrKey(expandedAddr);
-        if (authorizedKeys.has(key)) continue;
-        authorizedKeys.add(key);
-        authorizedCells.push(expandedAddr);
-      }
-    }
-    for (const addr of authorizedCells) {
-      const bounds = this.getBounds?.();
-      if (bounds && !rangeContainsAddr(bounds, addr)) {
-        return {
-          allowed: false,
-          code: 'outOfBounds',
-          addr,
-          reason: 'cell is outside the configured bounds',
-        };
-      }
-      if (!this.isValidAddress(wb, addr)) {
-        return {
-          allowed: false,
-          code: 'outOfBounds',
-          addr,
-          reason: 'cell address is outside the workbook',
-        };
-      }
-      if (isMutatingInteraction(intent.operation)) {
-        if (!isPolicyCellEligible(policy, addr, intent.operation, intent.origin)) {
-          return {
-            allowed: false,
-            code: 'cellIneligible',
-            addr,
-            reason: 'cell is outside editable cells',
-          };
-        }
-        if (!isCellWritable(state, addr)) {
-          return { allowed: false, code: 'protected', addr, reason: 'cell is protected' };
-        }
-      }
-    }
-    if (formulaCells.length > 0 && intent.operation !== 'formulaEdit') {
-      const formulaDecision = this.policyDecision(
-        {
-          ...intent,
-          operation: 'formulaEdit',
-          effects: [{ kind: 'cells', cells: formulaCells, includesFormula: true }],
-        },
-        policy,
-        wb,
-      );
-      if (!formulaDecision.allowed) return formulaDecision;
-    }
-    const allowed: PermissionDecision = { allowed: true };
-    return this.applyRestriction(policy, intent, allowed, authorizedCells[0] ?? cells[0]);
   }
 
   execute(command: CellBatchCommand): ChangeBatchResult {
@@ -706,7 +248,7 @@ export class InteractionController {
       if (!formatGlobal.allowed) return this.rejectResult([this.asRejection(formatGlobal)]);
     }
 
-    const denied = command.denied ?? this.policyValue?.batchDenied ?? 'reject';
+    const denied = command.denied ?? this.authorizer.policy?.batchDenied ?? 'reject';
     const eligible: PreparedChange[] = [];
     const rejected: BatchRejection[] = [];
     for (const change of prepared) {
@@ -751,7 +293,7 @@ export class InteractionController {
       eligible,
       wb,
       false,
-      this.policyValue === undefined && command.operation === 'clear',
+      this.authorizer.policy === undefined && command.operation === 'clear',
     );
     if ('decision' in historyPlan)
       return this.rejectResult([this.asRejection(historyPlan.decision)]);
@@ -844,7 +386,7 @@ export class InteractionController {
     if (addr.sheet < 0 || addr.row < 0 || addr.col < 0) {
       return { rejection: { addr, code: 'outOfBounds', reason: 'cell address is negative' } };
     }
-    if (!this.isValidAddress(wb, addr)) {
+    if (!isWorkbookAddress(wb, addr)) {
       return { rejection: { addr, code: 'outOfBounds', reason: 'cell is outside the workbook' } };
     }
     const merged = mergeCellsFor(state, addr);
@@ -854,7 +396,7 @@ export class InteractionController {
       };
     }
     const target = mergeAnchorFor(state, addr);
-    if (!this.isValidAddress(wb, target)) {
+    if (!isWorkbookAddress(wb, target)) {
       return {
         rejection: { addr, code: 'outOfBounds', reason: 'merge anchor is outside the workbook' },
       };
@@ -1019,53 +561,28 @@ export class InteractionController {
           }
         : undefined;
     if (!forwardAlreadyAuthorized) {
-      const forward = this.preflightIntent(requireInverseAuthorization ? redo : intent);
+      const forward = this.authorizer.preflightIntent(
+        requireInverseAuthorization ? redo : intent,
+        this.routeCanExecute,
+      );
       if (!forward.allowed) return { decision: forward };
     }
     if (requireInverseAuthorization) {
-      const inverse = this.preflightIntent(undo);
+      const inverse = this.authorizer.preflightIntent(undo, this.routeCanExecute);
       if (!inverse.allowed) return { decision: inverse };
     }
     return { plan: { redo, undo, replayAuthorization } };
   }
 
-  /** Authorize a complete intent, including every cell effect and any formula
-   * capability implied by a value/paste/fill command. */
-  private preflightIntent(intent: OperationIntent): PermissionDecision {
-    if (macSubtotalStructuralOperation(intent) !== null) return this.canExecute(intent);
-    const global = this.canExecute({ ...intent, effects: [{ kind: 'workbook' }] });
-    if (!global.allowed) return global;
-    const cells: Addr[] = [];
-    const formulaCells: Addr[] = [];
-    for (const effect of intent.effects) {
-      const addresses = effectCells(effect);
-      if (addresses === null)
-        return { allowed: false, code: 'unsupported', reason: 'invalid affected range' };
-      cells.push(...addresses);
-      if (effect.kind !== 'workbook' && effect.includesFormula) formulaCells.push(...addresses);
-    }
-    const formulaKeys = new Set(formulaCells.map(addrKey));
-    for (const addr of cells) {
-      const decision = this.canExecute({
-        ...intent,
-        effects: [
-          {
-            kind: 'cells',
-            cells: [addr],
-            includesFormula: formulaKeys.has(addrKey(addr)),
-          },
-        ],
-      });
-      if (!decision.allowed) return decision;
-    }
-    if (formulaCells.length > 0 && intent.operation !== 'formulaEdit') {
-      return this.preflightIntent({
-        ...intent,
-        operation: 'formulaEdit',
-        effects: [{ kind: 'cells', cells: formulaCells, includesFormula: true }],
-      });
-    }
-    return { allowed: true };
+  // Authorizer-internal checks re-enter through the controller so a host that
+  // overrides `canExecute` on the instance observes every authorization.
+  private readonly routeCanExecute = (intent: OperationIntent): PermissionDecision =>
+    this.canExecute(intent);
+
+  private installHistoryGuard(): void {
+    this.history.setGuard((entry, direction) =>
+      this.authorizer.guardHistory(entry, direction, this.routeCanExecute),
+    );
   }
 
   private commitPrepared(
@@ -1146,106 +663,6 @@ export class InteractionController {
       // Zustand commits the state before notifying subscribers. A throwing
       // renderer observer must not turn an already committed engine patch
       // into a rejected batch or prevent history/revision publication.
-    }
-  }
-
-  private guardHistory(entry: HistoryEntry, direction: HistoryDirection): boolean {
-    const replayAuthorization = entry.replayAuthorization;
-    if (replayAuthorization) {
-      const intents = direction === 'undo' ? replayAuthorization.undo : replayAuthorization.redo;
-      if (intents.length === 0) return false;
-      let allowed = true;
-      for (const intent of intents) {
-        if (
-          macSubtotalStructuralOperation(intent) !== null ||
-          ownsMacRemoveHyperlinkCommand(intent)
-        ) {
-          if (!this.canExecute(intent).allowed) allowed = false;
-        } else if (this.policyValue && !this.preflightIntent(intent).allowed) {
-          allowed = false;
-        }
-      }
-      return allowed;
-    }
-    const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
-    if (!intent) return this.policyValue === undefined;
-    if (macSubtotalStructuralOperation(intent) !== null || ownsMacRemoveHyperlinkCommand(intent))
-      return this.canExecute(intent).allowed;
-    if (!this.policyValue) return true;
-    return this.preflightIntent(intent).allowed;
-  }
-
-  private legacyDecision(intent: OperationIntent, wb: WorkbookHandle): PermissionDecision {
-    for (const effect of intent.effects) {
-      const addresses = effectCells(effect);
-      if (addresses === null) return { allowed: false, code: 'unsupported' };
-      for (const addr of addresses) {
-        if (!this.isValidAddress(wb, addr)) return { allowed: false, code: 'outOfBounds', addr };
-        if (
-          isMutatingInteraction(intent.operation) &&
-          !isCellWritable(this.store.getState(), addr)
-        ) {
-          return { allowed: false, code: 'protected', addr };
-        }
-      }
-    }
-    return { allowed: true };
-  }
-
-  private applyRestriction(
-    policy: InteractionPolicy,
-    intent: OperationIntent,
-    decision: PermissionDecision,
-    addr?: Addr,
-  ): PermissionDecision {
-    if (!policy.restrict) return decision;
-    try {
-      const restricted = policy.restrict({
-        intent,
-        decision,
-        addr,
-        operation: intent.operation,
-        origin: intent.origin,
-        commandId: intent.commandId,
-      });
-      if (
-        restricted &&
-        typeof restricted === 'object' &&
-        'then' in restricted &&
-        typeof restricted.then === 'function'
-      ) {
-        void Promise.resolve(restricted).catch(() => {});
-        return { allowed: false, code: 'invalid', reason: 'restriction hook must be synchronous' };
-      }
-      if (restricted === false)
-        return { allowed: false, code: 'operationDenied', reason: 'restricted by host' };
-      if (restricted && typeof restricted === 'object' && restricted.allowed === false)
-        return restricted;
-    } catch (error) {
-      return {
-        allowed: false,
-        code: 'invalid',
-        reason: error instanceof Error ? error.message : 'restriction callback failed',
-      };
-    }
-    return decision;
-  }
-
-  private isValidAddress(wb: WorkbookHandle, addr: Addr): boolean {
-    try {
-      return (
-        Number.isInteger(addr.sheet) &&
-        Number.isInteger(addr.row) &&
-        Number.isInteger(addr.col) &&
-        addr.sheet >= 0 &&
-        addr.row >= 0 &&
-        addr.col >= 0 &&
-        addr.row <= MAX_ROW &&
-        addr.col <= MAX_COL &&
-        addr.sheet < wb.sheetCount
-      );
-    } catch {
-      return false;
     }
   }
 
