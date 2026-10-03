@@ -1,6 +1,5 @@
 import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
-import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
 
 // `Spreadsheet.mountToolbar` — public entry that wires the ribbon into a host
@@ -23,7 +22,6 @@ import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
 // projection runs in the hot path. Tab switches and similar topology changes
 // go through `renderRibbon()` once.
 
-import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
@@ -54,7 +52,7 @@ import {
   ribbonDropdownMenuIdForCommand,
 } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
-import { MAC_FORMULAS_MORE_MENU_ID, projectMacRibbonState } from '../toolbar/ribbon/mac/model.js';
+import { projectMacRibbonState } from '../toolbar/ribbon/mac/model.js';
 import {
   createRenderRibbon,
   type RibbonDisplayMode,
@@ -79,6 +77,7 @@ import {
   attachDynamicDropdownDelegation,
   type DynamicDropdownDelegation,
 } from './toolbar-dropdown-delegation.js';
+import { attachRibbonInteractionPolicy } from './toolbar-interaction-policy.js';
 import type { SpreadsheetInstance } from './types.js';
 
 type UiTheme = 'paper' | 'ink' | 'contrast';
@@ -468,7 +467,7 @@ export function mountToolbar(
     borderMenuApi = null;
     renderApi.renderRibbon();
     wireBorderMenu();
-    projectInteractionPolicy();
+    interactionPolicy.project();
   };
 
   const syncInheritedPlatform = (current: SpreadsheetInstance | null): boolean => {
@@ -502,59 +501,10 @@ export function mountToolbar(
     if (next) unsubMacInk = next.subscribe(projectFormatToolbar);
   };
 
-  const projectInteractionPolicy = (): void => {
-    const current = getInstance();
-    if (!current || interactionControllerFor(current.store)?.policy === undefined) return;
-    dropdownsApi?.closeAllDynamicRibbonDropdowns();
-    for (const button of host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
-      // Intrinsic engine availability has priority over embedding policy. The
-      // menu projector already supplied its localized reason; a policy tick
-      // must not replace it with a generic denial message.
-      if (button.dataset.functionUnavailable === 'true') continue;
-      const decision = canExecuteBuiltIn(
-        current.store,
-        button.dataset.ribbonCommand ?? '',
-        'ribbon',
-      );
-      if (decision.allowed) continue;
-      projectDisabledState(button, true, decision.reason ?? decision.code);
-    }
-    for (const input of host.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
-      'input, select',
-    )) {
-      projectDisabledState(input, true, 'Unavailable in restricted embedding');
-    }
-  };
-
-  // Capture before directly-bound control/dropdown handlers, including hosts
-  // using a separately mounted toolbar. Unknown restricted routes fail closed.
-  const guardInteraction = (event: Event): void => {
-    const current = getInstance();
-    if (!current || interactionControllerFor(current.store)?.policy === undefined) return;
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const command = target.closest<HTMLElement>('[data-ribbon-command]');
-    const inMenu = target.closest('.fc-tb__menu');
-    const isInput = target.closest('input, select, textarea');
-    if (
-      event.type === 'click' &&
-      target.closest(`#${MAC_FORMULAS_MORE_MENU_ID} [data-function-category-submenu]`)
-    )
-      return;
-    if (
-      command &&
-      canExecuteBuiltIn(current.store, command.dataset.ribbonCommand ?? '', 'ribbon').allowed &&
-      !isInput
-    )
-      return;
-    if (!command && !inMenu && !isInput) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-
-  host.addEventListener('click', guardInteraction, true);
-  host.addEventListener('change', guardInteraction, true);
-  host.addEventListener('input', guardInteraction, true);
+  const interactionPolicy = attachRibbonInteractionPolicy(host, {
+    getInstance,
+    closeDynamicDropdowns: () => dropdownsApi?.closeAllDynamicRibbonDropdowns(),
+  });
 
   const applyCommand = (id: string): boolean => {
     const applied = applyRibbonCommand(id, {
@@ -965,7 +915,7 @@ export function mountToolbar(
         syncMacInkSubscription(nextInstance);
         projectFormatToolbar();
         if (platformChanged) renderToolbar();
-        else projectInteractionPolicy();
+        else interactionPolicy.project();
       }) ?? null;
     unsubFunctionHistory = current
       ? subscribeRecentFunctions(current.store, projectFormatToolbar)
@@ -1037,9 +987,7 @@ export function mountToolbar(
       unregisterOverlayOwner();
       if (previousPlatform === undefined) delete host.dataset.fcPlatform;
       else host.dataset.fcPlatform = previousPlatform;
-      host.removeEventListener('click', guardInteraction, true);
-      host.removeEventListener('change', guardInteraction, true);
-      host.removeEventListener('input', guardInteraction, true);
+      interactionPolicy.detach();
       host.removeEventListener('click', onClick);
       host.removeEventListener('dblclick', onDoubleClick);
       host.removeEventListener('keydown', onKey);
