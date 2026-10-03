@@ -70,7 +70,13 @@ describe('store/selection — mutators', () => {
     expect(s.selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
   });
 
-  it('range mutators reject off-sheet and inverted ranges without a navigation policy', () => {
+  it('range mutators store inverted ranges normalized', () => {
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 3, c0: 2, r1: 1, c1: 0 });
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 1, c0: 0, r1: 3, c1: 2 });
+  });
+
+  it('range mutators reject off-sheet ranges without a navigation policy', () => {
     const store = createSpreadsheetStore();
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     const before = store.getState().selection;
@@ -78,7 +84,7 @@ describe('store/selection — mutators', () => {
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1048576, c1: 2 });
     mutators.setRange(store, { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16384 });
     mutators.setRange(store, { sheet: 0, r0: -1, c0: 0, r1: 2, c1: 2 });
-    mutators.setRange(store, { sheet: 0, r0: 3, c0: 0, r1: 1, c1: 2 });
+    mutators.setRange(store, { sheet: 0, r0: 0.5, c0: 0, r1: 2, c1: 2 });
     mutators.addExtraRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1048576, c1: 0 });
     mutators.setActive(store, { sheet: 0, row: 1048576, col: 0 });
     mutators.extendRangeTo(store, { sheet: 0, row: 2, col: 16384 });

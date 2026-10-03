@@ -43,10 +43,18 @@ const validSelectionRange = (range: Range): boolean =>
   range.r0 <= range.r1 &&
   range.c0 <= range.c1;
 
-/** Off-sheet or inverted ranges are rejected before any navigation clamp. */
-const permittedRange = (store: SpreadsheetStore, range: Range): Range | null => {
+/** Inverted ranges are stored normalized; off-sheet ranges are rejected before
+ *  any navigation clamp. */
+const permittedRange = (store: SpreadsheetStore, requested: Range): Range | null => {
+  const range = {
+    sheet: requested.sheet,
+    r0: Math.min(requested.r0, requested.r1),
+    c0: Math.min(requested.c0, requested.c1),
+    r1: Math.max(requested.r0, requested.r1),
+    c1: Math.max(requested.c0, requested.c1),
+  };
   if (!validSelectionRange(range)) return null;
-  return navigationPolicyFor(store) ? clampNavigationRange(store, range) : { ...range };
+  return navigationPolicyFor(store) ? clampNavigationRange(store, range) : range;
 };
 
 const mergeRangeAt = (state: State, addr: Addr): Range | null => {
