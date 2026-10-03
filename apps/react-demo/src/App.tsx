@@ -1,6 +1,4 @@
 import {
-  analyzeAccessibilityCells,
-  analyzeSpellingCells,
   type CellChangeEvent,
   type CellValue,
   type FeatureFlags,
@@ -33,6 +31,7 @@ import {
   buildDemoCommands,
   buildDemoPrintPreviewModel,
   buildDemoReviewDialog,
+  buildDemoReviewFindings,
   buildDemoSearchItems,
   type ChangeLogEntry,
   composeDemoUiOptions,
@@ -74,12 +73,11 @@ import {
   queryDemoSearchItems,
   recordDemoSearchUsage,
   refreshDemoPrinterProfiles,
+  reportDemoScriptRun,
   resolveDemoSearchKey,
   resolveInitialLocale,
   resolveInitialPlatform,
-  reviewCellsForInstance,
   runDemoBackstageAction,
-  runDemoScript,
   saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
   THEMES,
@@ -252,22 +250,13 @@ export const App = (): ReactElement => {
 
   const onSpellingReview = useCallback(() => {
     if (!instance) return;
-    setReviewDialog({
-      title: commandText.spellingReview,
-      items: analyzeSpellingCells(reviewCellsForInstance(instance), locale === 'ja' ? 'ja' : 'en'),
-    });
-  }, [commandText.spellingReview, instance, locale]);
+    setReviewDialog(buildDemoReviewFindings('spelling', instance, locale, commandText));
+  }, [commandText, instance, locale]);
 
   const onAccessibilityCheck = useCallback(() => {
     if (!instance) return;
-    setReviewDialog({
-      title: commandText.accessibilityCheck,
-      items: analyzeAccessibilityCells(
-        reviewCellsForInstance(instance),
-        locale === 'ja' ? 'ja' : 'en',
-      ),
-    });
-  }, [commandText.accessibilityCheck, instance, locale]);
+    setReviewDialog(buildDemoReviewFindings('accessibility', instance, locale, commandText));
+  }, [commandText, instance, locale]);
 
   const onRunScript = useCallback(() => {
     if (!instance) return;
@@ -286,16 +275,9 @@ export const App = (): ReactElement => {
   const applyParsedScript = useCallback(
     (command: ReturnType<typeof parseScriptCommand>) => {
       if (!instance || !command) return;
-      const changed = runDemoScript(instance, command);
-      setReviewDialog(
-        buildDemoReviewDialog(
-          commandText.script,
-          commandText.selection,
-          commandText.cellsUpdated.replace('{count}', String(changed)),
-        ),
-      );
+      setReviewDialog(reportDemoScriptRun(instance, command, commandText));
     },
-    [commandText.cellsUpdated, commandText.script, commandText.selection, instance],
+    [commandText, instance],
   );
 
   const applyScriptCommand = useCallback(() => {

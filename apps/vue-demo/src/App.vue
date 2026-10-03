@@ -4,8 +4,6 @@ import {
   type CellValue,
   type FeatureFlags,
   type FeatureId,
-  analyzeAccessibilityCells,
-  analyzeSpellingCells,
   parseScriptCommand,
   type SpreadsheetInstance,
   type ThemeName,
@@ -31,6 +29,7 @@ import {
   buildDemoCommands,
   buildDemoPrintPreviewModel,
   buildDemoReviewDialog,
+  buildDemoReviewFindings,
   buildDemoSearchItems,
   composeDemoUiOptions,
   createDemoStrings,
@@ -51,7 +50,6 @@ import {
   nextDemoFeatureOverrides,
   openDemoWorkbookFile,
   installDemoScriptMenu,
-  runDemoScript,
   isDemoFeatureOn,
   type ChangeLogEntry,
   type DemoReviewDialogState,
@@ -75,7 +73,7 @@ import {
   resolveInitialLocale,
   resolveInitialPlatform,
   type DemoPlatform,
-  reviewCellsForInstance,
+  reportDemoScriptRun,
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
@@ -204,22 +202,18 @@ const runProbe = (name: string, args: CellValue[]): void => {
 const onSpellingReview = (): void => {
   const inst = instance.value;
   if (!inst) return;
-  reviewDialog.value = {
-    title: commandText.value.spellingReview,
-    items: analyzeSpellingCells(reviewCellsForInstance(inst), locale.value === 'ja' ? 'ja' : 'en'),
-  };
+  reviewDialog.value = buildDemoReviewFindings('spelling', inst, locale.value, commandText.value);
 };
 
 const onAccessibilityCheck = (): void => {
   const inst = instance.value;
   if (!inst) return;
-  reviewDialog.value = {
-    title: commandText.value.accessibilityCheck,
-    items: analyzeAccessibilityCells(
-      reviewCellsForInstance(inst),
-      locale.value === 'ja' ? 'ja' : 'en',
-    ),
-  };
+  reviewDialog.value = buildDemoReviewFindings(
+    'accessibility',
+    inst,
+    locale.value,
+    commandText.value,
+  );
 };
 
 const onRunScript = (): void => {
@@ -263,12 +257,7 @@ const showRibbonNotice = (title: string, detail: string): void => {
 const applyParsedScript = (command: ReturnType<typeof parseScriptCommand>): void => {
   const inst = instance.value;
   if (!inst || !command) return;
-  const changed = runDemoScript(inst, command);
-  reviewDialog.value = buildDemoReviewDialog(
-    commandText.value.script,
-    commandText.value.selection,
-    commandText.value.cellsUpdated.replace('{count}', String(changed)),
-  );
+  reviewDialog.value = reportDemoScriptRun(inst, command, commandText.value);
 };
 
 const applyScriptCommand = (): void => {

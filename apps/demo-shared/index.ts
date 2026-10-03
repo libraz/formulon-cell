@@ -28,6 +28,8 @@ import type {
   ToolbarInstance,
 } from '@libraz/formulon-cell';
 import {
+  analyzeAccessibilityCells,
+  analyzeSpellingCells,
   applyTextScriptToRange,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
@@ -40,6 +42,7 @@ import {
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 import { nextDemoSearchIndex } from './demo-search.js';
+import type { DemoCommandStrings } from './demo-strings.js';
 
 export * from './demo-backstage.js';
 export * from './demo-function-help.js';
@@ -704,6 +707,33 @@ export const buildDemoReviewDialog = (
   label: string,
   detail: string,
 ): DemoReviewDialogState => ({ title, items: [{ label, detail }] });
+
+/** Review dialog state for the ribbon's spelling / accessibility checks. */
+export const buildDemoReviewFindings = (
+  kind: 'spelling' | 'accessibility',
+  inst: SpreadsheetInstance,
+  locale: string,
+  commandText: DemoCommandStrings,
+): DemoReviewDialogState => {
+  const cells = reviewCellsForInstance(inst);
+  const lang = locale === 'ja' ? 'ja' : 'en';
+  return kind === 'spelling'
+    ? { title: commandText.spellingReview, items: analyzeSpellingCells(cells, lang) }
+    : { title: commandText.accessibilityCheck, items: analyzeAccessibilityCells(cells, lang) };
+};
+
+/** Runs a script command on the selection and reports the changed-cell count
+ *  as a review dialog. */
+export const reportDemoScriptRun = (
+  inst: SpreadsheetInstance,
+  command: ScriptCommand,
+  commandText: DemoCommandStrings,
+): DemoReviewDialogState =>
+  buildDemoReviewDialog(
+    commandText.script,
+    commandText.selection,
+    commandText.cellsUpdated.replace('{count}', String(runDemoScript(inst, command))),
+  );
 
 export interface ChangeLogEntry {
   readonly id: number;
