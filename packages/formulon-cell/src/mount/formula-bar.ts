@@ -19,6 +19,7 @@ import {
 import {
   buildSelectionInputBatch,
   SELECTION_INPUT_LIMIT_MESSAGE,
+  writeSelectionInput,
 } from '../interact/selection-input.js';
 import { advanceAfterCommit } from '../interact/selection-navigation.js';
 import { sameAddr } from '../store/pending-format.js';
@@ -435,7 +436,19 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     }
     const controller = interactionControllerFor(store);
     if (!controller) {
-      showCommitFailure('Multi-cell fill requires an interaction controller.');
+      // The direct path serves only hosts without a registered controller.
+      const written = writeSelectionInput(wb(), store, state, fxInput.value, anchor);
+      if (written.status === 'limitExceeded') {
+        showCommitFailure(SELECTION_INPUT_LIMIT_MESSAGE);
+        return;
+      }
+      if (written.status === 'rejected') {
+        showCommitFailure(written.outcome.message, written.outcome.title);
+        return;
+      }
+      mutators.replaceCells(store, wb().cells(store.getState().data.sheetIndex));
+      finishEditing();
+      host.focus();
       return;
     }
 

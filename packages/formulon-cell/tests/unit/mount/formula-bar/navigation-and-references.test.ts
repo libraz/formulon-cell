@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultStrings } from '../../../../src/i18n/strings.js';
 import { attachFormulaBarController } from '../../../../src/mount/formula-bar.js';
-import { mutators } from '../../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/index.js';
 import { attachFormulaBarHarness, selectRange } from './fixtures.js';
 
@@ -345,6 +345,31 @@ describe('mount/formula-bar — edit lifecycle', () => {
       }),
     );
     expect(sheet.workbook.getValue(active)).toEqual({ kind: 'blank' });
+    harness.detach();
+  });
+
+  it('Control+Return fills the selection directly when no controller is registered', () => {
+    const store = createSpreadsheetStore();
+    const onValidation = vi.fn();
+    const harness = attachFormulaBarHarness(sheet, onValidation, store);
+    const active = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, active);
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    harness.fxInput.value = 'both';
+    harness.fxInput.dispatchEvent(new Event('input'));
+    harness.fxInput.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, cancelable: true }),
+    );
+
+    expect(onValidation).not.toHaveBeenCalled();
+    expect(sheet.workbook.getValue(active)).toEqual({ kind: 'text', value: 'both' });
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+      kind: 'text',
+      value: 'both',
+    });
+    expect(harness.controller.isEditing()).toBe(false);
     harness.detach();
   });
 
