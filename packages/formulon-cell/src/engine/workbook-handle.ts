@@ -27,6 +27,7 @@ import { installFormulasMethods } from './workbook-handle-formulas.js';
 import { installLayoutMethods } from './workbook-handle-layout.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
 import { installPrintMethods } from './workbook-handle-print.js';
+import { installProtectionMethods } from './workbook-handle-protection.js';
 import { installStylesMethods } from './workbook-handle-styles.js';
 
 export type ChangeListener = (e: ChangeEvent) => void;
@@ -1076,6 +1077,7 @@ export class WorkbookHandle {
 }
 
 installPivotMethods(WorkbookHandle);
+installProtectionMethods(WorkbookHandle);
 installAnnotationsMethods(WorkbookHandle);
 installFormulasMethods(WorkbookHandle);
 installConditionalFormatMethods(WorkbookHandle);
