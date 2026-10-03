@@ -21,6 +21,7 @@ import type {
 } from './types.js';
 import { formatCell, fromEngineValue } from './value.js';
 import { installWorkbookFeatureMethods } from './workbook-handle-features.js';
+import { installLayoutMethods } from './workbook-handle-layout.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
 import { installPrintMethods } from './workbook-handle-print.js';
 
@@ -1103,26 +1104,6 @@ export class WorkbookHandle {
     return s.ok;
   }
 
-  /** Snapshot of row overrides on `sheet`. See `getColumnLayouts`. */
-  getRowLayouts(
-    sheet: number,
-  ): { row: number; height: number; hidden: boolean; outlineLevel: number }[] {
-    this.assertAlive();
-    if (!this.capabilities.colRowSize) return [];
-    const r = this.wb.getSheetRowOverrides(sheet);
-    const out: { row: number; height: number; hidden: boolean; outlineLevel: number }[] = [];
-    if (!r.status.ok) return out;
-    for (const e of r.rows) {
-      out.push({
-        row: e.row,
-        height: e.height,
-        hidden: e.hidden !== 0,
-        outlineLevel: e.outlineLevel,
-      });
-    }
-    return out;
-  }
-
   /** Snapshot of every spreadsheet Table on the workbook. Read-only in the engine —
    *  we surface it as a badge count + listing for the status bar. Empty array
    *  on the stub. */
@@ -1321,6 +1302,7 @@ export class WorkbookHandle {
 }
 
 installPivotMethods(WorkbookHandle);
+installLayoutMethods(WorkbookHandle);
 installPrintMethods(WorkbookHandle);
 installWorkbookFeatureMethods(WorkbookHandle);
 
