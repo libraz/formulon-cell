@@ -55,6 +55,7 @@ import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { projectMacRibbonState } from '../toolbar/ribbon/mac/model.js';
 import {
   createRenderRibbon,
+  projectRibbonShell,
   type RibbonDisplayMode,
   type RibbonMenus,
   type RibbonRenderHelpers,
@@ -551,30 +552,8 @@ export function mountToolbar(
     return document.activeElement === tab;
   };
 
-  const projectRibbonTabs = (): void => {
-    const shell = host.querySelector<HTMLElement>('.fc-tb__ribbon-shell');
-    if (!shell) return;
-    const peek = isCollapsedMode() && ribbonPeek;
-    const collapsed = isCollapsedMode() && !peek;
-    shell.classList.toggle('fc-tb__ribbon-shell--peek', peek);
-    shell.classList.toggle('fc-tb__ribbon-shell--autoHidePeek', displayMode === 'autoHide' && peek);
-    shell.classList.toggle('fc-tb__ribbon-shell--collapsed', collapsed);
-    if (peek) shell.dataset.ribbonPeek = 'true';
-    else delete shell.dataset.ribbonPeek;
-    if (displayMode === 'autoHide' && peek) shell.dataset.ribbonAutoHidePeek = 'true';
-    else delete shell.dataset.ribbonAutoHidePeek;
-    const tabs = shell.querySelector<HTMLElement>('.fc-tb__ribbon-tabs');
-    if (tabs) tabs.dataset.ribbonCollapsed = collapsed ? 'true' : 'false';
-    for (const button of shell.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')) {
-      const selected = button.dataset.ribbonTab === activeTab;
-      button.classList.toggle('fc-tb__ribbon-tab--active', selected);
-      button.setAttribute('aria-selected', String(selected));
-      button.tabIndex = selected ? 0 : -1;
-    }
-    for (const panel of shell.querySelectorAll<HTMLElement>('[data-ribbon-panel]')) {
-      panel.hidden = panel.dataset.ribbonPanel !== activeTab;
-    }
-  };
+  const projectRibbonTabs = (): void =>
+    projectRibbonShell(host, { activeTab, displayMode, peekRequested: ribbonPeek });
 
   const dismissRibbonPeek = (): void => {
     if (!ribbonPeek) return;

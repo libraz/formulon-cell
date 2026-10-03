@@ -36,6 +36,45 @@ import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/men
 
 export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
 
+/** Peek/collapse flags for a display mode; a peek only exists in a collapsing mode. */
+export const ribbonShellDisplayState = (
+  mode: RibbonDisplayMode,
+  peekRequested: boolean,
+): { peek: boolean; autoHidePeek: boolean; collapsed: boolean } => {
+  const collapsing = mode === 'tabsOnly' || mode === 'autoHide';
+  const peek = collapsing && peekRequested;
+  return { peek, autoHidePeek: mode === 'autoHide' && peek, collapsed: collapsing && !peek };
+};
+
+/** Re-projects tab selection, panel visibility and display-state flags onto a rendered ribbon shell. */
+export const projectRibbonShell = (
+  root: HTMLElement,
+  state: { activeTab: string; displayMode: RibbonDisplayMode; peekRequested: boolean },
+): void => {
+  const shell = root.querySelector<HTMLElement>('.fc-tb__ribbon-shell');
+  if (!shell) return;
+  const { activeTab, displayMode, peekRequested } = state;
+  const { peek, autoHidePeek, collapsed } = ribbonShellDisplayState(displayMode, peekRequested);
+  shell.classList.toggle('fc-tb__ribbon-shell--peek', peek);
+  shell.classList.toggle('fc-tb__ribbon-shell--autoHidePeek', autoHidePeek);
+  shell.classList.toggle('fc-tb__ribbon-shell--collapsed', collapsed);
+  if (peek) shell.dataset.ribbonPeek = 'true';
+  else delete shell.dataset.ribbonPeek;
+  if (autoHidePeek) shell.dataset.ribbonAutoHidePeek = 'true';
+  else delete shell.dataset.ribbonAutoHidePeek;
+  const tabs = shell.querySelector<HTMLElement>('.fc-tb__ribbon-tabs');
+  if (tabs) tabs.dataset.ribbonCollapsed = collapsed ? 'true' : 'false';
+  for (const button of shell.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')) {
+    const selected = button.dataset.ribbonTab === activeTab;
+    button.classList.toggle('fc-tb__ribbon-tab--active', selected);
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+  }
+  for (const panel of shell.querySelectorAll<HTMLElement>('[data-ribbon-panel]')) {
+    panel.hidden = panel.dataset.ribbonPanel !== activeTab;
+  }
+};
+
 /** Submenu factory invoked when the user clicks a split-button. Receives the
  *  ribbon command id so a single factory can serve multiple panels (e.g.
  *  `menu-autosum-home` vs. `menu-autosum-formulas`). */
@@ -393,12 +432,11 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     const ribbonText = ctx.ribbonText;
     const activeRibbonTab = ctx.state.getActiveTab();
     const ribbonDisplayMode = ctx.state.getDisplayMode();
-    const ribbonPeek =
-      (ribbonDisplayMode === 'tabsOnly' || ribbonDisplayMode === 'autoHide') &&
-      ctx.state.getAutoHidePeek();
-    const ribbonAutoHidePeek = ribbonDisplayMode === 'autoHide' && ribbonPeek;
-    const ribbonCollapsed =
-      (ribbonDisplayMode === 'tabsOnly' || ribbonDisplayMode === 'autoHide') && !ribbonPeek;
+    const {
+      peek: ribbonPeek,
+      autoHidePeek: ribbonAutoHidePeek,
+      collapsed: ribbonCollapsed,
+    } = ribbonShellDisplayState(ribbonDisplayMode, ctx.state.getAutoHidePeek());
     const backstageOpen = ctx.state.getBackstageOpen();
     const ribbonDisplayMenuOpen = ctx.state.getDisplayMenuOpen();
     const ribbonDisplayOptionsText = ctx.ribbonDisplayOptionsText;
