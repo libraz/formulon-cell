@@ -1,4 +1,4 @@
-import type { Strings } from '../../i18n/strings/types.js';
+import type { Strings } from '../../i18n/strings.js';
 import {
   appendDialogButton,
   createDialogShell,
