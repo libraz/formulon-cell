@@ -22,6 +22,9 @@ export default defineConfig({
       '../../tests/e2e-shared/unit/**/*.test.ts',
     ],
     globals: false,
+    // Full-mount tests take ~1s locally but exceed 5s on contended CI runners
+    // under coverage; the timeout only has to catch hangs.
+    testTimeout: 15_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
