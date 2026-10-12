@@ -23,6 +23,7 @@ import { sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { syncCustomSelects } from './custom-select.js';
+import { deferInitialFocus } from './dialog-shell.js';
 import {
   type DraftState,
   defaultPatternForLocale,
@@ -594,7 +595,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         syncMixedControls();
         syncCustomSelects(overlay);
       }
-      requestAnimationFrame(() => {
+      deferInitialFocus(overlay, () => {
         if (options?.focus === 'validation' || options?.mode === 'dataValidation') {
           validationKindSelect.focus();
           validationKindSelect.scrollIntoView({ block: 'nearest' });

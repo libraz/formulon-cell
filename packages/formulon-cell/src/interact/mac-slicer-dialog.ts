@@ -3,7 +3,12 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogShell,
+  deferInitialFocus,
+} from './dialog-shell.js';
 
 export interface MacSlicerDialogInput {
   tableName: string;
@@ -169,7 +174,7 @@ export function attachMacSlicerDialog(deps: MacSlicerDialogDeps): MacSlicerDialo
     open(): void {
       renderTables();
       shell.open();
-      requestAnimationFrame(() => tableSelect.focus());
+      deferInitialFocus(shell.overlay, () => tableSelect.focus());
     },
     close(): void {
       shell.close();

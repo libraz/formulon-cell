@@ -8,7 +8,12 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SparklineKind, SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogShell,
+  deferInitialFocus,
+} from './dialog-shell.js';
 
 /** A small Insert Sparkline chooser. The source may be any
  *  rectangular A1 range; the destination is one cell because the engine's
@@ -283,7 +288,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       refreshLabels();
       validate();
       shell.open();
-      requestAnimationFrame(() => sourceInput.focus());
+      deferInitialFocus(shell.overlay, () => sourceInput.focus());
     },
     close(): void {
       shell.close();

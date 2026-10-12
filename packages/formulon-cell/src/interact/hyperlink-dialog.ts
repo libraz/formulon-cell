@@ -10,6 +10,7 @@ import {
   appendDialogFrame,
   clearDialogError,
   createDialogShell,
+  deferInitialFocus,
   focusAndSelectInput,
   showDialogError,
 } from './dialog-shell.js';
@@ -148,7 +149,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
       removeBtn.hidden = !current;
       clearError();
       shell.open();
-      requestAnimationFrame(() => {
+      deferInitialFocus(overlay, () => {
         focusAndSelectInput(urlInput);
       });
     },

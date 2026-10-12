@@ -15,7 +15,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat } from '../store/types.js';
 import { createInteractionChipButton } from './chip-button.js';
-import { createDialogShell } from './dialog-shell.js';
+import { createDialogShell, deferInitialFocus } from './dialog-shell.js';
 
 export interface CellStylesGalleryDeps {
   host: HTMLElement;
@@ -240,7 +240,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     open(): void {
       renderGroups();
       shell.open();
-      requestAnimationFrame(() => {
+      deferInitialFocus(overlay, () => {
         focusChip(activeChipIndex);
       });
     },

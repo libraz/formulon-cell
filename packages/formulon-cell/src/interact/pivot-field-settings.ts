@@ -15,6 +15,7 @@ import {
   appendDialogFrame,
   createDialogButton,
   createDialogShell,
+  deferInitialFocus,
 } from './dialog-shell.js';
 
 export type PivotAreaKind = 'filters' | 'columns' | 'rows' | 'values';
@@ -523,7 +524,7 @@ export const showPivotFilterDialog = (
     shell.on(cancel, 'click', () => finish(null));
     shell.on(ok, 'click', () => finish(draft));
     shell.open();
-    requestAnimationFrame(() => {
+    deferInitialFocus(shell.overlay, () => {
       const category = grid.querySelector<HTMLSelectElement>(
         'select[data-pivot-filter-category="true"]',
       );

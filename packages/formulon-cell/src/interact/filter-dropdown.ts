@@ -17,6 +17,7 @@ import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createInteractionButton } from './chip-button.js';
+import { deferInitialFocus } from './dialog-shell.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
@@ -377,7 +378,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.style.left = `${position.x}px`;
     r.style.top = `${position.y}px`;
 
-    frame(() => search.focus());
+    deferInitialFocus(r, () => search.focus());
 
     ownerDocument.addEventListener('mousedown', onDocMouseDown, true);
     ownerDocument.addEventListener('keydown', onDocKey, true);

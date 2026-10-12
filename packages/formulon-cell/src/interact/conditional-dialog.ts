@@ -33,7 +33,7 @@ import {
 } from './conditional-dialog-spec.js';
 import { conditionalSelect } from './conditional-form-controls.js';
 import { appendIconSetForm } from './conditional-icon-set-form.js';
-import { appendDialogButton, createDialogShell } from './dialog-shell.js';
+import { appendDialogButton, createDialogShell, deferInitialFocus } from './dialog-shell.js';
 import { attachFormatDialog, type FormatDialogHandle } from './format-dialog.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
@@ -976,7 +976,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       syncDialogMode();
       renderRules();
       shell.open();
-      requestAnimationFrame(() => {
+      deferInitialFocus(overlay, () => {
         rangeInput.focus();
       });
     },

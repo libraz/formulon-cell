@@ -17,7 +17,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
-import { createDialogButton } from './dialog-shell.js';
+import { createDialogButton, deferInitialFocus } from './dialog-shell.js';
 import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
 
 export interface FindReplaceDeps {
@@ -589,7 +589,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       syncOptions();
       syncTab();
       updateSummary();
-      requestAnimationFrame(() => {
+      deferInitialFocus(overlay, () => {
         findInput.focus();
         findInput.select();
       });

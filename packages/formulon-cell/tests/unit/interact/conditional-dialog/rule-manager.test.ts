@@ -53,6 +53,23 @@ describe('attachConditionalDialog', () => {
     }
   });
 
+  it('keeps focus in a field the user moved to before the initial focus frame', async () => {
+    const handle = attachConditionalDialog({ host, store });
+    try {
+      handle.open({ mode: 'new', kind: 'cell-value' });
+      const threshold = document.querySelector<HTMLInputElement>(
+        '.fc-conddlg__sub input[type="text"]',
+      ) as HTMLInputElement;
+      threshold.focus();
+      threshold.value = '1.5';
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      expect(document.activeElement).toBe(threshold);
+      expect(threshold.value).toBe('1.5');
+    } finally {
+      handle.detach();
+    }
+  });
+
   it('mounts a hidden overlay and pre-fills selection range on open', () => {
     setRange(store, 0, 0, 4, 2);
     const handle = attachConditionalDialog({ host, store });

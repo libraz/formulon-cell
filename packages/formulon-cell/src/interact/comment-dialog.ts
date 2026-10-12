@@ -15,7 +15,12 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { appendDialogActions, appendDialogButton, appendDialogIconButton } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogButton,
+  appendDialogIconButton,
+  deferInitialFocus,
+} from './dialog-shell.js';
 
 export interface CommentDialogDeps {
   host: HTMLElement;
@@ -486,7 +491,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
         window.addEventListener('resize', onScrollOrResize);
         attached = true;
       }
-      requestAnimationFrame(() => {
+      deferInitialFocus(wrap, () => {
         textarea.focus();
         textarea.select();
       });

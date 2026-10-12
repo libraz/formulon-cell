@@ -3,7 +3,12 @@ import { formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogShell,
+  deferInitialFocus,
+} from './dialog-shell.js';
 
 export interface IterativeDialogDeps {
   host: HTMLElement;
@@ -222,7 +227,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
       refreshFromWorkbook();
       syncControls();
       shell.open();
-      requestAnimationFrame(() => enableInput.focus());
+      deferInitialFocus(shell.overlay, () => enableInput.focus());
     },
     close(): void {
       shell.close();

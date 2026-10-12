@@ -16,6 +16,7 @@ import {
   clearDialogError,
   createDialogButton,
   createDialogShell,
+  deferInitialFocus,
   focusAndSelectInput,
   showDialogError,
 } from './dialog-shell.js';
@@ -806,7 +807,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       refreshFormState();
       renderList();
       shell.open();
-      requestAnimationFrame(() => {
+      deferInitialFocus(overlay, () => {
         if (wb.capabilities.definedNameMutate) nameInput.focus();
         else closeBtn.focus();
       });

@@ -2,7 +2,12 @@ import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogButton,
+  appendDialogFrame,
+  createDialogShell,
+  deferInitialFocus,
+} from './dialog-shell.js';
 
 export interface WorkbookStatistics {
   sheets: number;
@@ -222,7 +227,7 @@ export function attachMacWorkbookStatistics(
     open(): void {
       render();
       shell.open();
-      requestAnimationFrame(() => closeBtn.focus());
+      deferInitialFocus(shell.overlay, () => closeBtn.focus());
     },
     close(): void {
       shell.close();

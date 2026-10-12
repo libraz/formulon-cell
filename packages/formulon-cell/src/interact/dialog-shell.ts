@@ -118,6 +118,24 @@ export function focusAndSelectInput(input: HTMLInputElement | HTMLTextAreaElemen
   input.select();
 }
 
+/**
+ * Run a dialog's initial focus on the next frame, unless focus has already
+ * moved to another element inside `container` since the call — the user is
+ * typing there and must not be interrupted.
+ */
+export function deferInitialFocus(container: HTMLElement, focus: () => void): void {
+  const doc = container.ownerDocument;
+  const before = doc.activeElement;
+  const frame =
+    doc.defaultView?.requestAnimationFrame.bind(doc.defaultView) ?? requestAnimationFrame;
+  frame(() => {
+    if (container.hidden || !container.isConnected) return;
+    const now = doc.activeElement;
+    if (now !== before && now && container.contains(now)) return;
+    focus();
+  });
+}
+
 export function showDialogError(errorRow: HTMLElement, message: string): void {
   errorRow.textContent = message;
   errorRow.hidden = false;

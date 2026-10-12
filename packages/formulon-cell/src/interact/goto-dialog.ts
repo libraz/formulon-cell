@@ -11,7 +11,12 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogShell,
+  deferInitialFocus,
+} from './dialog-shell.js';
 import {
   clampNavigationAddr,
   clampNavigationRange,
@@ -365,7 +370,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       syncScopeAvailability();
       if (!normal && isSelectionMulti()) scopeSelection.checked = true;
       shell.open();
-      requestAnimationFrame(() => {
+      deferInitialFocus(shell.overlay, () => {
         if (normal) {
           referenceInput.focus();
           return;

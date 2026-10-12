@@ -12,6 +12,7 @@ import {
   createDialogButton,
   createDialogShell,
   createDialogToggleButton,
+  deferInitialFocus,
   focusAndSelectInput,
   showDialogError,
 } from '../../../src/interact/dialog-shell.js';
@@ -570,5 +571,51 @@ describe('interact/dialog-shell', () => {
     }
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  describe('deferInitialFocus', () => {
+    let frame: FrameRequestCallback | null;
+    let container: HTMLElement;
+    let first: HTMLInputElement;
+    let second: HTMLInputElement;
+
+    beforeEach(() => {
+      frame = null;
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        frame = cb;
+        return 1;
+      });
+      container = document.createElement('div');
+      first = document.createElement('input');
+      second = document.createElement('input');
+      container.append(first, second);
+      document.body.appendChild(container);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      container.remove();
+    });
+
+    it('focuses the target when focus has not moved', () => {
+      deferInitialFocus(container, () => first.focus());
+      frame?.(0);
+      expect(document.activeElement).toBe(first);
+    });
+
+    it('does not steal focus from another element inside the container', () => {
+      deferInitialFocus(container, () => first.focus());
+      second.focus();
+      frame?.(0);
+      expect(document.activeElement).toBe(second);
+    });
+
+    it('is a no-op when the container is hidden', () => {
+      const focus = vi.fn();
+      deferInitialFocus(container, focus);
+      container.hidden = true;
+      frame?.(0);
+      expect(focus).not.toHaveBeenCalled();
+    });
   });
 });

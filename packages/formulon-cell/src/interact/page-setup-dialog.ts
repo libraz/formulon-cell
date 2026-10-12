@@ -28,6 +28,7 @@ import {
   appendDialogIconButton,
   appendDialogTabPair,
   createDialogShell,
+  deferInitialFocus,
 } from './dialog-shell.js';
 import { createHeaderFooterTab } from './page-setup-dialog-tabs/header-footer.js';
 import { createMarginsTab } from './page-setup-dialog-tabs/margins.js';
@@ -324,7 +325,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
       setActiveTab(tab);
       updatePrintableWarning();
       shell.open();
-      requestAnimationFrame(() => {
+      deferInitialFocus(overlay, () => {
         tabButtons.get(activeTab)?.focus();
       });
     },

@@ -58,6 +58,18 @@ describe('attachFilterDropdown', () => {
     handle.detach();
   });
 
+  it('keeps focus in the condition input when it is focused before the search focus frame', async () => {
+    const handle = attachFilterDropdown({ store, strings: en });
+    handle.open({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+    const condition = document.querySelector<HTMLInputElement>(
+      '.fc-filter-dropdown__condition-value',
+    );
+    condition?.focus();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    expect(document.activeElement).toBe(condition);
+    handle.detach();
+  });
+
   it('accepts an English dictionary override', () => {
     const handle = attachFilterDropdown({ store, strings: en });
     handle.open({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
