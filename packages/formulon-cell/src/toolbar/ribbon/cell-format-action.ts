@@ -1,11 +1,13 @@
+import {
+  autofitColsWidthForRanges,
+  autofitRowsHeightForRanges,
+} from '../../commands/row-col-layout.js';
 import type { Locale } from '../../i18n/strings.js';
 // Cell Format ribbon dispatcher. Extracted from main.ts so the playground
 // doesn't carry the dispatch table in module scope. Side effects live on the
 // caller's side via the `deps` struct (status text, tab list refresh, etc).
 
 import {
-  autofitColsWidth,
-  autofitRowsHeight,
   hiddenInSelection,
   hideCols,
   hideRows,
@@ -175,11 +177,16 @@ export const applyCellFormatAction = async (
     return;
   }
   if (action === 'row-autofit') {
-    autofitRowsHeight(i.store, i.history, range.r0, range.r1, i.workbook, {
-      span: { from: range.c0, to: range.c1 },
-      locale: ribbonLang,
-      theme: resolveTheme(i.host),
-    });
+    autofitRowsHeightForRanges(
+      i.store,
+      i.history,
+      [range, ...(i.store.getState().selection.extraRanges ?? [])],
+      i.workbook,
+      {
+        locale: ribbonLang,
+        theme: resolveTheme(i.host),
+      },
+    );
     return;
   }
   if (action === 'col-width') {
@@ -200,10 +207,15 @@ export const applyCellFormatAction = async (
     // `col-autofit` here — preserved verbatim.
   }
   if (action === 'col-autofit') {
-    autofitColsWidth(i.store, i.history, range.c0, range.c1, i.workbook, {
-      span: { from: range.r0, to: range.r1 },
-      locale: ribbonLang,
-      theme: resolveTheme(i.host),
-    });
+    autofitColsWidthForRanges(
+      i.store,
+      i.history,
+      [range, ...(i.store.getState().selection.extraRanges ?? [])],
+      i.workbook,
+      {
+        locale: ribbonLang,
+        theme: resolveTheme(i.host),
+      },
+    );
   }
 };

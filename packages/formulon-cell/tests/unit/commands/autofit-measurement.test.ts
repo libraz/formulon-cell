@@ -9,7 +9,12 @@ import {
 } from '../../../src/commands/autofit-measurement.js';
 import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
-import { autofitColsWidth, autofitRowsHeight } from '../../../src/commands/row-col-layout.js';
+import {
+  autofitColsWidth,
+  autofitColsWidthForRanges,
+  autofitRowsHeight,
+  autofitRowsHeightForRanges,
+} from '../../../src/commands/row-col-layout.js';
 import type { CellValue } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
@@ -22,6 +27,7 @@ import {
 } from '../../../src/render/geometry.js';
 import { paintHeaders } from '../../../src/render/grid/headers.js';
 import { paintTableHeaderChevron } from '../../../src/render/painters/markers.js';
+import { availableTextWidth } from '../../../src/render/text-wrap.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -187,6 +193,18 @@ describe('computeAutofitRowHeight', () => {
     autofitRowsHeight(tall, null, 0, 0);
     expect(tall.getState().layout.rowHeights.get(0)).toBe(400);
   });
+
+  it('uses the renderer padding and indent width contract for wrapped AutoFit', () => {
+    const wrapped = storeWith([[0, 0, 'abcdefghi']]);
+    mutators.setColWidth(wrapped, 0, 76);
+    mutators.setCellFormat(wrapped, { sheet: 0, row: 0, col: 0 }, { wrap: true, indent: 1 });
+    const { ctx } = fakeMeasureCtx();
+
+    // 63px of text fits the old 64px (width - 12) calculation, but not the
+    // shared renderer contract: 76 - 6px padding - 8px indent = 62px.
+    expect(availableTextWidth(76, 8)).toBe(62);
+    expect(computeAutofitRowHeight(wrapped.getState(), 0, ctx)).toBe(42);
+  });
 });
 
 describe('public autofitColWidth / autofitRowHeight', () => {
@@ -224,10 +242,19 @@ describe('ribbon Format > AutoFit', () => {
     action: 'col-autofit' | 'row-autofit',
     store: SpreadsheetStore,
     range: { r0: number; c0: number; r1: number; c1: number },
+    extraRanges: Array<{ sheet: number; r0: number; c0: number; r1: number; c1: number }> = [],
   ): Promise<{ wb: WorkbookHandle; history: History }> => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     const history = new History();
     const host = document.createElement('div');
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, ...range },
+        extraRanges: extraRanges.map((selected) => ({ ...selected })),
+      },
+    }));
     const inst = { store, history, workbook: wb, host } as unknown as SpreadsheetInstance;
     await applyCellFormatAction(action, {
       inst,
@@ -264,6 +291,183 @@ describe('ribbon Format > AutoFit', () => {
     await run('row-autofit', store, { r0: 0, c0: 0, r1: 1, c1: 2 });
     expect(store.getState().layout.rowHeights.get(0)).toBe(400);
     expect(store.getState().layout.rowHeights.get(1)).toBe(20);
+  });
+
+  it('fits every disjoint row and leaves the unselected row unchanged', async () => {
+    const store = storeWith([
+      [0, 0, 'a\n'.repeat(20)],
+      [0, 1, 'this cell is outside the first selected span'],
+      [1, 0, 'gap row'],
+      [2, 2, 'b\n'.repeat(30)],
+      [2, 0, 'this cell is outside the second selected span'],
+    ]);
+    const workbookDisplayFont = { name: 'Calibri', size: 11 } as const;
+    // Measurement is intentionally unclamped (the raw value is 407px here);
+    // the layout mutator's 400px Excel-compatible ceiling is the stored value.
+    const expectedFirst = Math.min(
+      400,
+      computeAutofitRowHeight(store.getState(), 0, null, {
+        span: { from: 0, to: 0 },
+        workbookDisplayFont,
+      }),
+    );
+    const expectedSecond = Math.min(
+      400,
+      computeAutofitRowHeight(store.getState(), 2, null, {
+        span: { from: 2, to: 2 },
+        workbookDisplayFont,
+      }),
+    );
+
+    await run('row-autofit', store, { r0: 0, c0: 0, r1: 0, c1: 0 }, [
+      { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
+    ]);
+
+    expect(store.getState().layout.rowHeights.get(0)).toBe(expectedFirst);
+    expect(store.getState().layout.rowHeights.get(2)).toBe(expectedSecond);
+    expect(store.getState().layout.rowHeights.has(1)).toBe(false);
+  });
+
+  it('takes the maximum for an overlapping row without merging its spans', async () => {
+    const store = storeWith([
+      [0, 0, 'short'],
+      [0, 1, 'unselected gap\n'.repeat(40)],
+      [0, 2, 'also short'],
+    ]);
+    const workbookDisplayFont = { name: 'Calibri', size: 11 } as const;
+    const expected = Math.max(
+      computeAutofitRowHeight(store.getState(), 0, null, {
+        span: { from: 0, to: 0 },
+        workbookDisplayFont,
+      }),
+      computeAutofitRowHeight(store.getState(), 0, null, {
+        span: { from: 2, to: 2 },
+        workbookDisplayFont,
+      }),
+    );
+
+    await run('row-autofit', store, { r0: 0, c0: 0, r1: 0, c1: 0 }, [
+      { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+    ]);
+
+    expect(store.getState().layout.rowHeights.get(0)).toBe(expected);
+  });
+
+  it('dedupes duplicate ranges and gives the same max after permutation', () => {
+    const ranges = [
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 2 },
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+    ];
+    const cells: Seed[] = [
+      [0, 0, 'short'],
+      [0, 1, 'tall\n'.repeat(8)],
+      [0, 2, 'also short'],
+    ];
+    const first = storeWith(cells);
+    const second = storeWith(cells);
+    autofitRowsHeightForRanges(first, new History(), ranges);
+    autofitRowsHeightForRanges(second, new History(), [...ranges].reverse());
+
+    expect(first.getState().layout.rowHeights.get(0)).toBeGreaterThan(20);
+    expect(first.getState().layout.rowHeights).toEqual(second.getState().layout.rowHeights);
+  });
+
+  it('fits disjoint columns with their own row spans and one Undo restores all', async () => {
+    const store = storeWith([
+      [0, 0, 'first selected column has a long value'],
+      [1, 1, 'gap column'],
+      [2, 2, 'second selected column has another long value'],
+      [4, 0, 'outside first column span '.repeat(10)],
+      [0, 2, 'outside second column span '.repeat(10)],
+    ]);
+    const workbookDisplayFont = { name: 'Calibri', size: 11 } as const;
+    const expectedFirst = computeAutofitColWidth(store.getState(), 0, null, {
+      span: { from: 0, to: 0 },
+      workbookDisplayFont,
+    });
+    const expectedSecond = computeAutofitColWidth(store.getState(), 2, null, {
+      span: { from: 2, to: 2 },
+      workbookDisplayFont,
+    });
+
+    const { history } = await run('col-autofit', store, { r0: 0, c0: 0, r1: 0, c1: 0 }, [
+      { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
+    ]);
+
+    expect(store.getState().layout.colWidths.get(0)).toBe(expectedFirst);
+    expect(store.getState().layout.colWidths.get(2)).toBe(expectedSecond);
+    expect(store.getState().layout.colWidths.has(1)).toBe(false);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().layout.colWidths.size).toBe(0);
+    expect(history.redo()).toBe(true);
+    expect(store.getState().layout.colWidths.get(0)).toBe(expectedFirst);
+    expect(store.getState().layout.colWidths.get(2)).toBe(expectedSecond);
+  });
+
+  it('rejects an over-budget multi-range row autofit before mutating layout', () => {
+    const store = storeWith([[0, 0, 'value']]);
+    const history = new History();
+    autofitRowsHeightForRanges(store, history, [{ sheet: 0, r0: 0, c0: 0, r1: 100_000, c1: 0 }]);
+
+    expect(store.getState().layout.rowHeights.size).toBe(0);
+    expect(history.undo()).toBe(false);
+  });
+
+  it('rejects over-budget unique axis-span pairs before measuring or mutating', () => {
+    const store = storeWith([[0, 0, 'value']]);
+    const history = new History();
+    const ranges: Array<{ sheet: number; r0: number; c0: number; r1: number; c1: number }> = [];
+    for (let row = 0; row < 50_001; row += 1) {
+      ranges.push(
+        { sheet: 0, r0: row, c0: 0, r1: row, c1: 0 },
+        { sheet: 0, r0: row, c0: 2, r1: row, c1: 2 },
+      );
+    }
+
+    autofitRowsHeightForRanges(store, history, ranges);
+
+    expect(store.getState().layout.rowHeights.size).toBe(0);
+    expect(history.undo()).toBe(false);
+  });
+
+  it('rejects a large overlapping plan before materializing spans or measuring', () => {
+    const store = storeWith([]);
+    const history = new History();
+    const ranges: Array<{ sheet: number; r0: number; c0: number; r1: number; c1: number }> = [];
+    for (let col = 0; col <= 2_000; col += 1) {
+      ranges.push({ sheet: 0, r0: 0, c0: col, r1: 50, c1: 2_000 });
+    }
+
+    // Every range is distinct, but the 51-row plans overlap almost entirely.
+    // Make measurement observable: if the preflight guard is bypassed, the
+    // first row scan attempts to iterate this map and fails the test.
+    const cells = new Map<string, { value: CellValue; formula: string | null }>();
+    Object.defineProperty(cells, Symbol.iterator, {
+      value: () => {
+        throw new Error('autofit measurement should not run after budget rejection');
+      },
+    });
+    store.setState((state) => ({ ...state, data: { ...state.data, cells } }));
+
+    expect(() => autofitRowsHeightForRanges(store, history, ranges)).not.toThrow();
+    expect(store.getState().layout.rowHeights.size).toBe(0);
+    expect(history.undo()).toBe(false);
+  });
+
+  it('rejects a mixed current-sheet and foreign-sheet selection atomically', () => {
+    const store = storeWith([
+      [0, 0, 'current sheet value'],
+      [0, 2, 'foreign sheet value'],
+    ]);
+    const history = new History();
+    autofitColsWidthForRanges(store, history, [
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      { sheet: 1, r0: 0, c0: 2, r1: 0, c1: 2 },
+    ]);
+
+    expect(store.getState().layout.colWidths.size).toBe(0);
+    expect(history.undo()).toBe(false);
   });
 });
 

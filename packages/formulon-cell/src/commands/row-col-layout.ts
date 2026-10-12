@@ -1,4 +1,5 @@
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import {
@@ -12,6 +13,7 @@ import { blockedByProtection } from './protection.js';
 import { recordLayoutChangeWithEngine } from './slice-history.js';
 
 const MAX_MATERIALIZED_LAYOUT_ROWS = 100_000;
+const MAX_AUTOFIT_AXIS_SPAN_PAIRS = 100_000;
 
 const spanSize = (start: number, end: number): number => (end >= start ? end - start + 1 : 0);
 
@@ -194,6 +196,192 @@ export function autofitColsWidth(
     }
   });
 }
+
+/**
+ * AutoFit every row represented by a multi-range selection.
+ *
+ * A row can occur in more than one selected range.  Each occurrence keeps its
+ * range's column span, and the largest measured height wins.  This is the
+ * behaviour users expect from Ctrl/Cmd-disjoint row selections: cells in a
+ * selected band affect that band only, while an overlapping row is still fit
+ * for all of its selected cells.  All measurements happen before the layout
+ * history mutation so a rejected materialization budget cannot leave a
+ * partial result.
+ */
+export function autofitRowsHeightForRanges(
+  store: SpreadsheetStore,
+  history: History | null,
+  ranges: readonly Range[],
+  wb?: WorkbookHandle,
+  opts?: AutofitOptions,
+): void {
+  const sheet = store.getState().data.sheetIndex;
+  const normalized = normalizeAutofitRanges(ranges, sheet);
+  if (!normalized || normalized.length === 0) return;
+  // Count the raw axis/span planning work before allocating per-axis span
+  // arrays. Overlap may collapse later, but accepting it here would still
+  // allow a hostile selection to materialize unbounded duplicate entries.
+  if (!withinAutofitPlanningBudget(normalized, 'row')) return;
+
+  const spansByRow = new Map<number, Array<{ from: number; to: number }>>();
+  for (const range of normalized) {
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      const spans = spansByRow.get(row);
+      if (spans) {
+        spans.push({ from: range.c0, to: range.c1 });
+      } else {
+        spansByRow.set(row, [{ from: range.c0, to: range.c1 }]);
+      }
+      if (spansByRow.size > MAX_MATERIALIZED_LAYOUT_ROWS) return;
+    }
+  }
+  const mergedSpansByRow = mergeAutofitSpans(spansByRow);
+  if (countAutofitSpanPairs(mergedSpansByRow) > MAX_AUTOFIT_AXIS_SPAN_PAIRS) return;
+
+  const state = store.getState();
+  const measurementOptions = withWorkbookDisplayFont(opts, wb);
+  const ctx = createAutofitMeasureContext();
+  const heights = new Map<number, number>();
+  for (const [row, spans] of mergedSpansByRow) {
+    let max = state.layout.defaultRowHeight;
+    for (const span of spans) {
+      max = Math.max(
+        max,
+        computeAutofitRowHeight(state, row, ctx, {
+          ...measurementOptions,
+          span,
+        }),
+      );
+    }
+    heights.set(row, max);
+  }
+
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+    for (const [row, height] of heights) mutators.setRowHeight(store, row, height);
+  });
+}
+
+/**
+ * AutoFit every column represented by a multi-range selection.
+ *
+ * The cross-axis row span is retained for each selected range.  If the same
+ * column is selected more than once, its width is the maximum over those
+ * independent measurements.  The entire change is recorded as one layout
+ * history entry so one Undo restores every selected column together.
+ */
+export function autofitColsWidthForRanges(
+  store: SpreadsheetStore,
+  history: History | null,
+  ranges: readonly Range[],
+  wb?: WorkbookHandle,
+  opts?: AutofitOptions,
+): void {
+  const sheet = store.getState().data.sheetIndex;
+  const normalized = normalizeAutofitRanges(ranges, sheet);
+  if (!normalized || normalized.length === 0) return;
+  if (!withinAutofitPlanningBudget(normalized, 'col')) return;
+
+  const spansByCol = new Map<number, Array<{ from: number; to: number }>>();
+  for (const range of normalized) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      const spans = spansByCol.get(col);
+      if (spans) {
+        spans.push({ from: range.r0, to: range.r1 });
+      } else {
+        spansByCol.set(col, [{ from: range.r0, to: range.r1 }]);
+      }
+    }
+  }
+  const mergedSpansByCol = mergeAutofitSpans(spansByCol);
+  if (countAutofitSpanPairs(mergedSpansByCol) > MAX_AUTOFIT_AXIS_SPAN_PAIRS) return;
+
+  const state = store.getState();
+  const measurementOptions = withWorkbookDisplayFont(opts, wb);
+  const ctx = createAutofitMeasureContext();
+  const widths = new Map<number, number>();
+  for (const [col, spans] of mergedSpansByCol) {
+    let max = 0;
+    for (const span of spans) {
+      max = Math.max(
+        max,
+        computeAutofitColWidth(state, col, ctx, {
+          ...measurementOptions,
+          span,
+        }),
+      );
+    }
+    widths.set(col, max);
+  }
+
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+    for (const [col, width] of widths) mutators.setColWidth(store, col, width);
+  });
+}
+
+function normalizeAutofitRanges(ranges: readonly Range[], sheet: number): Range[] | null {
+  const normalized: Range[] = [];
+  const seen = new Set<string>();
+  for (const range of ranges) {
+    // A selection containing a stale/foreign range is invalid as a whole.
+    // Silently fitting only the valid subset would make one Ribbon command
+    // produce a partial layout update after a sheet switch.
+    if (range.sheet !== sheet) return null;
+    const coordinates = [range.r0, range.r1, range.c0, range.c1];
+    if (!coordinates.every(Number.isInteger)) return null;
+    const r0 = Math.min(range.r0, range.r1);
+    const r1 = Math.max(range.r0, range.r1);
+    const c0 = Math.min(range.c0, range.c1);
+    const c1 = Math.max(range.c0, range.c1);
+    if (r0 < 0 || r1 > MAX_ROW || c0 < 0 || c1 > MAX_COL) return null;
+    const key = `${sheet}:${r0}:${c0}:${r1}:${c1}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push({ sheet, r0, c0, r1, c1 });
+  }
+  return normalized;
+}
+
+/**
+ * Conservative preflight budget: overlapping ranges count independently.
+ * This bounds planning allocations before their spans can be merged.
+ */
+function withinAutofitPlanningBudget(ranges: readonly Range[], axis: 'row' | 'col'): boolean {
+  let planned = 0;
+  for (const range of ranges) {
+    const axisSpan = axis === 'row' ? spanSize(range.r0, range.r1) : spanSize(range.c0, range.c1);
+    if (axisSpan > MAX_AUTOFIT_AXIS_SPAN_PAIRS - planned) return false;
+    planned += axisSpan;
+  }
+  return true;
+}
+
+function mergeAutofitSpans(
+  spansByAxis: Map<number, Array<{ from: number; to: number }>>,
+): Map<number, Array<{ from: number; to: number }>> {
+  const merged = new Map<number, Array<{ from: number; to: number }>>();
+  for (const [axis, spans] of spansByAxis) {
+    const ordered = [...spans].sort((a, b) => a.from - b.from || a.to - b.to);
+    const result: Array<{ from: number; to: number }> = [];
+    for (const span of ordered) {
+      const previous = result.at(-1);
+      if (previous && span.from <= previous.to + 1) {
+        previous.to = Math.max(previous.to, span.to);
+      } else {
+        result.push({ ...span });
+      }
+    }
+    merged.set(axis, result);
+  }
+  return merged;
+}
+
+const countAutofitSpanPairs = (
+  spansByAxis: Map<number, Array<{ from: number; to: number }>>,
+): number => {
+  let count = 0;
+  for (const spans of spansByAxis.values()) count += spans.length;
+  return count;
+};
 
 function withWorkbookDisplayFont(
   options: AutofitOptions | undefined,
