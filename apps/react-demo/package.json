@@ -15,7 +15,7 @@
     "test:e2e:install": "../../node_modules/.bin/playwright install --with-deps chromium webkit"
   },
   "dependencies": {
-    "@fluentui/react-icons": "^2.0.337",
+    "@fluentui/react-icons": "^2.0.344",
     "@libraz/formulon-cell": "workspace:*",
     "@libraz/formulon-cell-react": "workspace:*",
     "react": "^19",
@@ -25,8 +25,8 @@
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "6.0.5",
+    "@vitejs/plugin-react": "6.1.2",
     "typescript": "6.0.3",
-    "vite": "8.2.1"
+    "vite": "8.3.4"
   }
 }

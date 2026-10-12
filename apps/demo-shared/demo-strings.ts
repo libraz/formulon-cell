@@ -1,4 +1,9 @@
 import type { FeatureId, ThemeName } from '@libraz/formulon-cell';
+import { deCommands, deUi } from './demo-strings-de.js';
+import { frCommands, frUi } from './demo-strings-fr.js';
+import { koCommands, koUi } from './demo-strings-ko.js';
+import { thCommands, thUi } from './demo-strings-th.js';
+import { zhCommands, zhUi } from './demo-strings-zh.js';
 import type { DemoFramework, PresetKey } from './index.js';
 
 export interface DemoUiStrings {
@@ -132,6 +137,11 @@ export interface DemoCommandStrings {
 export interface DemoStrings {
   en: DemoUiStrings;
   ja: DemoUiStrings;
+  de: DemoUiStrings;
+  fr: DemoUiStrings;
+  zh: DemoUiStrings;
+  ko: DemoUiStrings;
+  th: DemoUiStrings;
 }
 
 /** Build the UI string table for a demo. The visible workbook chrome is kept
@@ -163,7 +173,7 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
         ink: 'Dark',
         contrast: 'Contrast',
       },
-      locale: 'Locale',
+      locale: 'Language',
       signedInUser: 'Signed in user',
       close: 'Close',
       ok: 'OK',
@@ -187,6 +197,7 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
         'Dialogs & overlays': 'Dialogs & overlays',
       },
       featureLabels: {
+        localeSwitcher: 'Language selector',
         formulaBar: 'Formula bar',
         viewToolbar: 'View toolbar',
         sheetTabs: 'Sheet tabs',
@@ -316,6 +327,7 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
         'Dialogs & overlays': 'ダイアログとオーバーレイ',
       },
       featureLabels: {
+        localeSwitcher: '言語選択',
         formulaBar: '数式バー',
         viewToolbar: '表示ツール バー',
         sheetTabs: 'シート タブ',
@@ -398,11 +410,27 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       engineSetup:
         'WebAssemblyの対応状況と、エンジンのWASMアセットを読み込めるかを確認してください。',
     },
+    de: deUi,
+    fr: frUi,
+    zh: zhUi,
+    ko: koUi,
+    th: thUi,
   };
 }
 
-export const demoCommandText = (locale: string): DemoCommandStrings =>
-  locale === 'ja'
+const demoCommandTextDe = deCommands;
+const demoCommandTextFr = frCommands;
+const demoCommandTextZh = zhCommands;
+const demoCommandTextKo = koCommands;
+const demoCommandTextTh = thCommands;
+
+export const demoCommandText = (locale: string): DemoCommandStrings => {
+  if (locale === 'de') return demoCommandTextDe;
+  if (locale === 'fr') return demoCommandTextFr;
+  if (locale === 'zh') return demoCommandTextZh;
+  if (locale === 'ko') return demoCommandTextKo;
+  if (locale === 'th') return demoCommandTextTh;
+  return locale === 'ja'
     ? {
         ribbonCommand: 'リボン コマンド',
         selection: '選択範囲',
@@ -489,3 +517,4 @@ export const demoCommandText = (locale: string): DemoCommandStrings =>
           englishLocale: { label: 'English Locale', hint: 'Switch labels to EN' },
         },
       };
+};

@@ -21,6 +21,7 @@ import {
   type PresetKey,
   THEMES,
 } from '../../demo-shared/index.js';
+import DemoSelect from './DemoSelect.vue';
 
 const props = defineProps<{
   ui: DemoUiStrings;
@@ -61,7 +62,8 @@ const runProbe = (name: string, args: CellValue[]): void => {
   <aside class="demo__panel" :aria-label="ui.optionsPanel" :hidden="hidden">
     <section class="demo__card">
       <h2>{{ ui.demoChrome }}</h2>
-      <div class="demo__controls demo__controls--panel">
+      <div class="demo__fields">
+        <span class="demo__field-label" aria-hidden="true">{{ ui.theme }}</span>
         <div class="demo__seg" role="group" :aria-label="ui.theme">
           <button
             v-for="t in THEMES"
@@ -74,18 +76,13 @@ const runProbe = (name: string, args: CellValue[]): void => {
             {{ ui.themeLabels[t.value] ?? t.label }}
           </button>
         </div>
-        <div class="demo__seg" role="group" :aria-label="ui.locale">
-          <button
-            v-for="l in LOCALES"
-            :key="l.value"
-            type="button"
-            :class="['demo__seg-btn', { 'demo__seg-btn--active': locale === l.value }]"
-            :aria-pressed="locale === l.value"
-            @click="emit('localeChange', l.value)"
-          >
-            {{ l.label }}
-          </button>
-        </div>
+        <span id="demo-locale-label" class="demo__field-label">{{ ui.locale }}</span>
+        <DemoSelect
+          label-id="demo-locale-label"
+          :value="locale"
+          :options="LOCALES"
+          @change="emit('localeChange', $event)"
+        />
       </div>
     </section>
 

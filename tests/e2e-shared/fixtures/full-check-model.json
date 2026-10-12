@@ -1,0 +1,25 @@
+{
+  "parameters": [
+    {
+      "name": "locale",
+      "values": ["en", "ja", "de", "fr", "zh", "ko", "th"]
+    },
+    {
+      "name": "platform",
+      "values": ["default", "mac"]
+    },
+    {
+      "name": "theme",
+      "values": ["paper", "ink", "contrast"]
+    },
+    {
+      "name": "width",
+      "values": ["640", "1440"]
+    },
+    {
+      "name": "flow",
+      "values": ["objects", "clipboard", "filter", "formula", "analysis", "menus"]
+    }
+  ],
+  "strength": 2
+}

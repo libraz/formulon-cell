@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "locale": "de",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "1440",
+      "flow": "analysis"
+    },
+    { "locale": "fr", "platform": "mac", "theme": "ink", "width": "1440", "flow": "clipboard" },
+    { "locale": "ko", "platform": "default", "theme": "paper", "width": "640", "flow": "menus" },
+    { "locale": "en", "platform": "default", "theme": "paper", "width": "1440", "flow": "formula" },
+    { "locale": "ja", "platform": "default", "theme": "ink", "width": "1440", "flow": "objects" },
+    { "locale": "de", "platform": "mac", "theme": "ink", "width": "640", "flow": "filter" },
+    { "locale": "th", "platform": "mac", "theme": "ink", "width": "1440", "flow": "menus" },
+    { "locale": "zh", "platform": "default", "theme": "ink", "width": "1440", "flow": "filter" },
+    {
+      "locale": "th",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "640",
+      "flow": "clipboard"
+    },
+    { "locale": "en", "platform": "mac", "theme": "ink", "width": "640", "flow": "formula" },
+    { "locale": "zh", "platform": "mac", "theme": "contrast", "width": "640", "flow": "objects" },
+    { "locale": "th", "platform": "default", "theme": "paper", "width": "1440", "flow": "objects" },
+    { "locale": "fr", "platform": "default", "theme": "contrast", "width": "640", "flow": "menus" },
+    { "locale": "ko", "platform": "mac", "theme": "contrast", "width": "1440", "flow": "analysis" },
+    {
+      "locale": "ja",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "640",
+      "flow": "analysis"
+    },
+    { "locale": "ja", "platform": "mac", "theme": "paper", "width": "640", "flow": "clipboard" },
+    { "locale": "fr", "platform": "mac", "theme": "paper", "width": "640", "flow": "filter" },
+    {
+      "locale": "en",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "1440",
+      "flow": "filter"
+    },
+    { "locale": "zh", "platform": "default", "theme": "paper", "width": "640", "flow": "analysis" },
+    { "locale": "ja", "platform": "default", "theme": "paper", "width": "640", "flow": "menus" },
+    {
+      "locale": "ko",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "640",
+      "flow": "formula"
+    },
+    { "locale": "ko", "platform": "mac", "theme": "ink", "width": "1440", "flow": "filter" },
+    { "locale": "zh", "platform": "default", "theme": "ink", "width": "640", "flow": "clipboard" },
+    { "locale": "ja", "platform": "mac", "theme": "ink", "width": "1440", "flow": "filter" },
+    { "locale": "zh", "platform": "default", "theme": "ink", "width": "1440", "flow": "formula" },
+    { "locale": "fr", "platform": "mac", "theme": "ink", "width": "640", "flow": "objects" },
+    {
+      "locale": "de",
+      "platform": "default",
+      "theme": "paper",
+      "width": "640",
+      "flow": "clipboard"
+    },
+    { "locale": "ko", "platform": "mac", "theme": "ink", "width": "640", "flow": "analysis" },
+    { "locale": "ko", "platform": "mac", "theme": "contrast", "width": "640", "flow": "objects" },
+    { "locale": "fr", "platform": "mac", "theme": "ink", "width": "640", "flow": "formula" },
+    { "locale": "de", "platform": "default", "theme": "paper", "width": "1440", "flow": "menus" },
+    {
+      "locale": "fr",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "1440",
+      "flow": "analysis"
+    },
+    { "locale": "en", "platform": "mac", "theme": "contrast", "width": "1440", "flow": "menus" },
+    {
+      "locale": "ko",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "1440",
+      "flow": "clipboard"
+    },
+    { "locale": "th", "platform": "mac", "theme": "contrast", "width": "640", "flow": "filter" },
+    { "locale": "zh", "platform": "mac", "theme": "paper", "width": "1440", "flow": "menus" },
+    {
+      "locale": "th",
+      "platform": "default",
+      "theme": "contrast",
+      "width": "640",
+      "flow": "analysis"
+    },
+    {
+      "locale": "en",
+      "platform": "default",
+      "theme": "paper",
+      "width": "640",
+      "flow": "clipboard"
+    },
+    { "locale": "en", "platform": "mac", "theme": "paper", "width": "1440", "flow": "analysis" },
+    { "locale": "th", "platform": "default", "theme": "ink", "width": "1440", "flow": "formula" },
+    { "locale": "de", "platform": "mac", "theme": "contrast", "width": "1440", "flow": "formula" },
+    { "locale": "en", "platform": "default", "theme": "paper", "width": "640", "flow": "objects" },
+    { "locale": "ja", "platform": "mac", "theme": "ink", "width": "1440", "flow": "formula" },
+    { "locale": "de", "platform": "default", "theme": "ink", "width": "640", "flow": "objects" }
+  ],
+  "uncoveredCount": 0,
+  "omittedUncovered": 0,
+  "negativeTests": [],
+  "coverage": 1,
+  "uncovered": [],
+  "stats": { "totalTuples": 149, "coveredTuples": 149, "testCount": 44 },
+  "suggestions": [],
+  "warnings": [],
+  "strength": 2
+}

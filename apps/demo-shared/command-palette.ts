@@ -5,11 +5,16 @@
 
 import {
   buildRibbonSearchIndex,
+  type Locale,
   projectDisabledReason,
   queryRibbonSearchIndex,
   type RibbonSearchItem,
   type RibbonTab,
 } from '@libraz/formulon-cell';
+
+import { createDemoStrings } from './demo-strings.js';
+
+const paletteStrings = createDemoStrings('React');
 
 export interface CommandPaletteItem {
   id: string;
@@ -20,13 +25,12 @@ export interface CommandPaletteItem {
 export interface CommandPaletteOptions {
   input: HTMLInputElement;
   container: HTMLElement;
-  ribbonLang: 'ja' | 'en';
+  ribbonLang: Locale;
   applyCommand: (id: string) => boolean;
   selectTab?: (tab: RibbonTab) => void;
 }
 
-const noCommandsLabel = (lang: 'ja' | 'en'): string =>
-  lang === 'ja' ? '一致するコマンドはありません' : 'No matching commands';
+const noCommandsLabel = (lang: Locale): string => paletteStrings[lang].noCommands;
 
 const toPaletteItem = (item: RibbonSearchItem): CommandPaletteItem => ({
   id: item.commandId ?? item.id,

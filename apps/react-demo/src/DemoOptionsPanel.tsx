@@ -20,6 +20,7 @@ import {
   type PresetKey,
   THEMES,
 } from '../../demo-shared/index.js';
+import { DemoSelect } from './DemoSelect.js';
 
 interface DemoOptionsPanelProps {
   ui: DemoUiStrings;
@@ -76,7 +77,10 @@ export const DemoOptionsPanel = ({
     <aside className="demo__panel" aria-label={ui.optionsPanel} hidden={hidden}>
       <section className="demo__card">
         <h2>{ui.demoChrome}</h2>
-        <div className="demo__controls demo__controls--panel">
+        <div className="demo__fields">
+          <span className="demo__field-label" aria-hidden="true">
+            {ui.theme}
+          </span>
           <div className="demo__seg" role="group" aria-label={ui.theme}>
             {THEMES.map((t) => (
               <button
@@ -90,19 +94,15 @@ export const DemoOptionsPanel = ({
               </button>
             ))}
           </div>
-          <div className="demo__seg" role="group" aria-label={ui.locale}>
-            {LOCALES.map((l) => (
-              <button
-                key={l.value}
-                type="button"
-                className={`demo__seg-btn${l.value === locale ? ' demo__seg-btn--active' : ''}`}
-                onClick={() => onLocaleChange(l.value)}
-                aria-pressed={l.value === locale}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
+          <span className="demo__field-label" id="demo-locale-label">
+            {ui.locale}
+          </span>
+          <DemoSelect
+            labelId="demo-locale-label"
+            value={locale}
+            options={LOCALES}
+            onChange={onLocaleChange}
+          />
         </div>
       </section>
 

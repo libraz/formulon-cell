@@ -195,7 +195,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     '折り返して全体を表示',
     'インデントを減らす',
     'インデントを増やす',
-    'セルの結合',
+    'セルを結合して中央揃え',
     '通貨',
     'パーセント',
     '桁区切りスタイル',

@@ -7,6 +7,7 @@ import type {
 } from '@libraz/formulon-cell';
 import {
   buildRibbonSearchIndex,
+  dictionaryLocaleFor,
   EXCEL365_STANDARD_RIBBON_TABS,
   queryRibbonSearchIndex,
 } from '@libraz/formulon-cell';
@@ -253,7 +254,7 @@ export const buildDemoSearchItems = (
   ribbonTabs: readonly RibbonTab[] = EXCEL365_STANDARD_RIBBON_TABS,
 ): readonly DemoSearchItem[] => {
   const commandKeys = new Set(commandItems.flatMap((item) => [item.id, item.label]));
-  const ribbonItems = buildRibbonSearchIndex(locale === 'en' ? 'en' : 'ja', {
+  const ribbonItems = buildRibbonSearchIndex(dictionaryLocaleFor(locale), {
     includeDisabled: true,
     tabs: ribbonTabs,
   })

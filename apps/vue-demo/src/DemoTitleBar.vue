@@ -23,7 +23,6 @@ import DemoIcon from './DemoIcon.vue';
 const props = defineProps<{
   ui: DemoUiStrings;
   platform: DemoPlatform;
-  locale: string;
   bookName: string;
   instance: SpreadsheetInstance | null;
   showPanel: boolean;
@@ -115,13 +114,13 @@ onBeforeUnmount(() => {
         <span v-else class="demo__brand-mark" aria-hidden="true">
           <DemoIcon name="app" />
         </span>
-        <button type="button" class="demo__title-icon" :aria-label="ui.save" @click="emit('save')">
+        <button type="button" class="demo__title-icon" :aria-label="ui.save" :title="ui.save" @click="emit('save')">
           <DemoIcon name="save" />
         </button>
-        <button type="button" class="demo__title-icon" :aria-label="ui.undo" @click="instance?.undo()">
+        <button type="button" class="demo__title-icon" :aria-label="ui.undo" :title="ui.undo" @click="instance?.undo()">
           <DemoIcon name="undo" />
         </button>
-        <button type="button" class="demo__title-icon" :aria-label="ui.redo" @click="instance?.redo()">
+        <button type="button" class="demo__title-icon" :aria-label="ui.redo" :title="ui.redo" @click="instance?.redo()">
           <DemoIcon name="redo" />
         </button>
       </div>
@@ -137,7 +136,7 @@ onBeforeUnmount(() => {
           type="search"
           role="combobox"
           :placeholder="ui.search"
-          :aria-label="platform === 'mac' ? (locale === 'ja' ? '検索' : 'Search') : ui.searchCommands"
+          :aria-label="platform === 'mac' ? ui.search : ui.searchCommands"
           aria-controls="demo-search-results"
           :aria-expanded="searchOpen"
           :aria-activedescendant="searchOpen && searchActiveIndex >= 0 ? demoSearchOptionId(searchActiveIndex) : undefined"

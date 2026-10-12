@@ -209,7 +209,12 @@ export async function runReportHeaderScenario(page: Page): Promise<void> {
     await expect
       .poll(() => sp.readFormat('A1'), { timeout: 2_000 })
       .toEqual(
-        expect.objectContaining({ bold: true, fontFamily: 'Arial', fontSize: 16, align: 'center' }),
+        expect.objectContaining({
+          bold: true,
+          fontFamily: 'Arial',
+          fontSize: 16 * (96 / 72),
+          align: 'center',
+        }),
       );
     await expect
       .poll(() => sp.readMerge('A1'), { timeout: 2_000 })

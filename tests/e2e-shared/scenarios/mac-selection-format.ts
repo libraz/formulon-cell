@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { a1Address, UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const targets = ['A1', 'B1', 'C1', 'A2', 'C2', 'A3', 'B3', 'C3', 'E5'];
@@ -25,10 +26,9 @@ const engineBold = (page: Page, ref: string): Promise<boolean> =>
   }, a1Address(ref));
 
 async function commandClick(page: Page, row: number, col: number): Promise<void> {
-  const box = await page.locator('.fc-host__grid').boundingBox();
-  if (!box) throw new Error('Missing grid');
+  const cell = await gridCellCenter(page, row, col);
   await page.keyboard.down('Meta');
-  await page.mouse.click(box.x + 26 + 75 * (col + 0.5), box.y + 20 + 20 * (row + 0.5));
+  await page.mouse.click(cell.x, cell.y);
   await page.keyboard.up('Meta');
 }
 
@@ -448,9 +448,8 @@ export async function runMacSelectionContextClearWithHole(page: Page): Promise<v
   await sp.goTo('A1:C3');
   await sp.clickRibbon('bold');
   await selectWithHole(sp, page);
-  const box = await page.locator('.fc-host__grid').boundingBox();
-  if (!box) throw new Error('Missing grid');
-  await page.mouse.click(box.x + 26 + 75 / 2, box.y + 20 + 20 / 2, { button: 'right' });
+  const cell = await gridCellCenter(page, 0, 0);
+  await page.mouse.click(cell.x, cell.y, { button: 'right' });
   const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
   await expect(menu).toBeVisible();
   await menu.locator('[data-fc-action="clear"]').click();

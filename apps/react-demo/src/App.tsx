@@ -26,15 +26,18 @@ import {
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
   type DemoBackstageAction,
+  type DemoLocale,
   type DemoPlatform,
   type DemoReviewDialogState,
   demoCommandText,
   demoFunctionArgumentHelp,
+  demoUiStringsForLocale,
   FORMATTERS,
   formatLoadError,
   installDemoF6Navigation,
   installDemoScriptMenu,
   nextDemoFeatureOverrides,
+  normalizeDemoLocale,
   openDemoWorkbookFile,
   type PresetKey,
   pushDemoChangeLog,
@@ -55,7 +58,7 @@ const UI = createDemoStrings('React');
 
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
-  const [locale, setLocale] = useState<string>(() => resolveInitialLocale());
+  const [locale, setLocale] = useState<DemoLocale>(() => resolveInitialLocale());
   const [platform] = useState<DemoPlatform>(() => resolveInitialPlatform());
   const [workbook, setWorkbook] = useState<WorkbookHandle | null>(null);
   const [instance, setInstance] = useState<SpreadsheetInstance | null>(null);
@@ -79,6 +82,9 @@ export const App = (): ReactElement => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const quickAccessRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<ToolbarInstance | null>(null);
+  const workbookOwnerRef = useRef<WorkbookHandle | null>(null);
+  const instanceRef = useRef<SpreadsheetInstance | null>(null);
+  const aliveRef = useRef(true);
 
   const resolvedUi = useMemo(
     () => composeDemoUiOptions({ preset, overrides, showRibbon, theme, platform }),
@@ -86,16 +92,23 @@ export const App = (): ReactElement => {
   );
   const ribbonTabs = platform === 'mac' ? DEMO_MAC_RIBBON_TABS : DEMO_RIBBON_TABS;
   const features = resolvedUi.features;
-  const ui = UI[locale === 'ja' ? 'ja' : 'en'];
+  const ui = demoUiStringsForLocale(UI, locale);
   const commandText = useMemo(() => demoCommandText(locale), [locale]);
   const closeReviewDialog = useCallback(() => setReviewDialog(null), []);
   const closeScriptDialog = useCallback(() => setScriptOpen(false), []);
 
   useEffect(() => {
     let alive = true;
+    aliveRef.current = true;
     void createInitialDemoWorkbook()
       .then((wb) => {
-        if (!alive) return;
+        if (!alive || !aliveRef.current) {
+          // The demo created this borrowed handle, so a late completion must
+          // release it instead of leaving the engine workbook orphaned.
+          wb.dispose();
+          return;
+        }
+        workbookOwnerRef.current = wb;
         setLoadError(null);
         setWorkbook(wb);
       })
@@ -105,6 +118,19 @@ export const App = (): ReactElement => {
       });
     return () => {
       alive = false;
+      aliveRef.current = false;
+      // The binding borrows the initial workbook. Dispose the core instance
+      // first so a workbook adopted during a New action is released by core;
+      // the explicit handle cleanup then covers the borrowed initial handle.
+      try {
+        instanceRef.current?.dispose();
+      } catch (error) {
+        console.error('formulon demo: spreadsheet cleanup failed', error);
+      } finally {
+        instanceRef.current = null;
+        workbookOwnerRef.current?.dispose();
+        workbookOwnerRef.current = null;
+      }
     };
   }, []);
 
@@ -123,7 +149,7 @@ export const App = (): ReactElement => {
   }, [instance, formatters.uppercase, formatters.arrows]);
 
   useEffect(() => {
-    document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
+    document.documentElement.lang = locale;
   }, [locale]);
 
   useEffect(
@@ -200,21 +226,60 @@ export const App = (): ReactElement => {
   }, [bookName, instance]);
 
   const onNewWorkbook = useCallback(async () => {
-    const wb = await WorkbookHandle.createDefault();
+    const wb = await WorkbookHandle.createDefault({ locale });
+    if (!aliveRef.current) {
+      wb.dispose();
+      return;
+    }
+    const previous = workbookOwnerRef.current;
+    const live = instanceRef.current ?? instance;
+    try {
+      if (live) await live.setWorkbook(wb);
+    } catch (error) {
+      if (!aliveRef.current) {
+        wb.dispose();
+        return;
+      }
+      wb.dispose();
+      setReviewDialog(
+        buildDemoReviewDialog(commandText.openFailed, commandText.workbook, formatLoadError(error)),
+      );
+      return;
+    }
+    if (!aliveRef.current) {
+      // The host may have unmounted while setWorkbook was pending. The core
+      // instance has already been disposed by the owner cleanup; close this
+      // late-created handle and avoid reviving React state.
+      wb.dispose();
+      return;
+    }
+    workbookOwnerRef.current = wb;
     setWorkbook(wb);
-    await instance?.setWorkbook(wb);
+    previous?.dispose();
     setBookName('Book1');
     setLog([]);
     setRibbonTab('home');
-  }, [instance]);
+  }, [commandText.openFailed, commandText.workbook, instance, locale]);
 
   const onOpen = useCallback(
     async (file: File) => {
-      if (!instance) return;
+      const live = instanceRef.current ?? instance;
+      if (!live || !aliveRef.current) return;
+      const previous = workbookOwnerRef.current;
       try {
-        setBookName(await openDemoWorkbookFile(instance, file));
+        const name = await openDemoWorkbookFile(live, file);
+        if (!aliveRef.current || instanceRef.current !== live) return;
+        const next = live.workbook;
+        workbookOwnerRef.current = next;
+        setWorkbook(next);
+        // `openDemoWorkbookFile` has already detached the previous workbook
+        // from the core instance. Only now release the demo-owned borrowed
+        // handle and publish the adopted handle as the controlled prop.
+        previous?.dispose();
+        setBookName(name);
         setLoadError(null);
       } catch (err) {
+        if (!aliveRef.current) return;
         setReviewDialog(
           buildDemoReviewDialog(commandText.openFailed, commandText.workbook, formatLoadError(err)),
         );
@@ -278,7 +343,10 @@ export const App = (): ReactElement => {
         setRibbonTab,
         togglePanel: () => setShowPanel((v) => !v),
         setTheme,
-        setLocale,
+        setLocale: (next) => {
+          const resolved = normalizeDemoLocale(next);
+          if (resolved) setLocale(resolved);
+        },
       }),
     [commandText, instance, onSave],
   );
@@ -320,7 +388,6 @@ export const App = (): ReactElement => {
       <DemoTitleBar
         ui={ui}
         platform={platform}
-        locale={locale}
         bookName={bookName}
         instance={instance}
         showPanel={showPanel}
@@ -382,10 +449,18 @@ export const App = (): ReactElement => {
             printerProfileId={DEMO_PRINTER_PROFILE_ID}
             refreshPrinterProfiles={refreshDemoPrinterProfiles}
             getFunctionArgumentHelp={demoFunctionArgumentHelp}
+            getWorkbookName={() => bookName}
             uploadStatus={uploadStatus}
             macroRecording={scriptOpen}
-            onReady={setInstance}
+            onReady={(next) => {
+              instanceRef.current = next;
+              setInstance(next);
+            }}
             onCellChange={onCellChange}
+            onLocaleChange={(event) => {
+              const resolved = normalizeDemoLocale(event.locale);
+              if (resolved) setLocale(resolved);
+            }}
           />
           {ribbonTab === 'file' ? (
             <DemoBackstage
@@ -410,7 +485,10 @@ export const App = (): ReactElement => {
           formatters={formatters}
           log={log}
           onThemeChange={setTheme}
-          onLocaleChange={setLocale}
+          onLocaleChange={(next) => {
+            const resolved = normalizeDemoLocale(next);
+            if (resolved) setLocale(resolved);
+          }}
           onPresetChange={onPresetChange}
           onFeatureToggle={onFeatureToggle}
           onRibbonChange={setShowRibbon}

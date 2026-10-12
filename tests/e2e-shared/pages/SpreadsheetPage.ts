@@ -1,5 +1,26 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
+
+/** Absolute pointer position from the live sheet layout, including its zoom. */
+export async function gridCellCenter(page: Page, row: number, col: number) {
+  const box = await page.locator('.fc-host__grid').first().boundingBox();
+  if (!box) throw new Error('Missing grid');
+  const moduleUrl = `/@fs${
+    new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname
+  }`;
+  const point = await page.evaluate(
+    async ({ row, col, moduleUrl }) => {
+      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const { layout, viewport } = instance.store.getState();
+      const { cellRectUnclamped } = await import(moduleUrl);
+      const rect = cellRectUnclamped(layout, viewport, row, col);
+      return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+    },
+    { row, col, moduleUrl },
+  );
+  return { x: box.x + point.x, y: box.y + point.y };
+}
 
 /**
  * App-agnostic page object that hides the demo-app shell so the same

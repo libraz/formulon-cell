@@ -6,10 +6,10 @@ import { baseConfig } from '../vite.base.js';
 // `baseConfig` aliases `@libraz/formulon-cell` to source; we layer the Vue
 // adapter aliases on top (including the .vue and toolbar.css subpaths that
 // the Vue package publishes alongside its main entry).
-const vuePkg = resolve(__dirname, '../../packages/formulon-cell-vue');
+const vuePkg = resolve(import.meta.dirname, '../../packages/formulon-cell-vue');
 
 export default defineConfig(
-  mergeConfig(baseConfig(__dirname), {
+  mergeConfig(baseConfig(import.meta.dirname), {
     plugins: [vue()],
     resolve: {
       // Prepend Vue-specific subpath aliases so they win over the broad

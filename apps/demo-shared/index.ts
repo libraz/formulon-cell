@@ -42,11 +42,12 @@ import {
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 import { nextDemoSearchIndex } from './demo-search.js';
-import type { DemoCommandStrings } from './demo-strings.js';
+import type { DemoCommandStrings, DemoStrings, DemoUiStrings } from './demo-strings.js';
 
 export * from './demo-backstage.js';
 export * from './demo-function-help.js';
 export * from './demo-search.js';
+export * from './demo-select.js';
 export * from './demo-strings.js';
 
 export type DemoFramework = 'React' | 'Vue';
@@ -61,8 +62,13 @@ export const THEMES: { value: ThemeName; label: string }[] = [
 ];
 
 export const LOCALES = [
-  { value: 'en', label: 'EN' },
-  { value: 'ja', label: 'JA' },
+  { value: 'en', label: 'English' },
+  { value: 'ja', label: '日本語' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'fr', label: 'Français' },
+  { value: 'zh', label: '中文' },
+  { value: 'ko', label: '한국어' },
+  { value: 'th', label: 'ไทย' },
 ] as const;
 
 /** The Microsoft 365 baseline plus the optional tabs this demo actually
@@ -170,16 +176,29 @@ export const DEMO_ICONS: Record<DemoIconName, readonly DemoIconSegment[]> = {
 export type DemoLocale = (typeof LOCALES)[number]['value'];
 
 const isDemoLocale = (value: string | null | undefined): value is DemoLocale =>
-  value === 'en' || value === 'ja';
+  LOCALES.some((locale) => locale.value === value);
+
+export const normalizeDemoLocale = (value: string | null | undefined): DemoLocale | undefined => {
+  if (!value) return undefined;
+  const language = value.trim().toLowerCase().replaceAll('_', '-').split('-')[0];
+  return isDemoLocale(language) ? language : undefined;
+};
+
+/** Resolve the demo chrome dictionary for a locale already accepted by the
+ *  selector, while keeping invalid external values deterministic. */
+export const demoUiStringsForLocale = (strings: DemoStrings, locale: string): DemoUiStrings =>
+  strings[normalizeDemoLocale(locale) ?? 'ja'];
 
 export const resolveInitialLocale = (
   search = globalThis.location?.search ?? '',
   languages = globalThis.navigator?.languages ?? [globalThis.navigator?.language ?? ''],
 ): DemoLocale => {
-  const param = new URLSearchParams(search).get('locale');
-  if (isDemoLocale(param)) return param;
-  const first = languages.find((lang): lang is string => typeof lang === 'string' && lang !== '');
-  if (first?.toLowerCase().startsWith('en')) return 'en';
+  const param = normalizeDemoLocale(new URLSearchParams(search).get('locale'));
+  if (param) return param;
+  for (const lang of languages) {
+    const resolved = normalizeDemoLocale(lang);
+    if (resolved) return resolved;
+  }
   return 'ja';
 };
 
@@ -335,6 +354,7 @@ export const FEATURE_GROUPS: {
   {
     title: 'Chrome',
     features: [
+      { id: 'localeSwitcher', label: 'Language selector' },
       { id: 'formulaBar', label: 'Formula bar' },
       { id: 'viewToolbar', label: 'View toolbar' },
       { id: 'sheetTabs', label: 'Sheet tabs' },
@@ -574,8 +594,14 @@ export const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] 
 export const createInitialDemoWorkbook = async (
   search = globalThis.location?.search ?? '',
 ): Promise<WorkbookHandle> => {
-  const wb = await WorkbookHandle.createDefault();
-  if (new URLSearchParams(search).get('fixture') !== 'empty') seedDemoWorkbook(wb);
+  const wb = await WorkbookHandle.createDefault({ locale: resolveInitialLocale(search) });
+  if (new URLSearchParams(search).get('fixture') !== 'empty') {
+    seedDemoWorkbook(wb);
+    const seededColumnWidths = [112, 80, 104, 128];
+    for (const [col, width] of seededColumnWidths.entries()) {
+      wb.setColumnWidth(0, col, col, width);
+    }
+  }
   return wb;
 };
 
@@ -587,7 +613,12 @@ export const openDemoWorkbookFile = async (
 ): Promise<string> => {
   const buf = await file.arrayBuffer();
   const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
-  await inst.setWorkbook(next);
+  try {
+    await inst.setWorkbook(next);
+  } catch (error) {
+    next.dispose();
+    throw error;
+  }
   return file.name.replace(/\.(xlsx|xlsm)$/i, '');
 };
 
@@ -716,7 +747,7 @@ export const buildDemoReviewFindings = (
   commandText: DemoCommandStrings,
 ): DemoReviewDialogState => {
   const cells = reviewCellsForInstance(inst);
-  const lang = locale === 'ja' ? 'ja' : 'en';
+  const lang = normalizeDemoLocale(locale) ?? 'ja';
   return kind === 'spelling'
     ? { title: commandText.spellingReview, items: analyzeSpellingCells(cells, lang) }
     : { title: commandText.accessibilityCheck, items: analyzeAccessibilityCells(cells, lang) };

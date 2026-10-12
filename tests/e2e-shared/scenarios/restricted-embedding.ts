@@ -91,6 +91,14 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
     fullscreen.style.cssText = 'width:100%;height:100%';
     const button = document.createElement('button');
     button.textContent = 'Enter embedded fullscreen';
+    fullscreen.dataset.transitionComplete = 'false';
+    document.addEventListener(
+      'fullscreenchange',
+      () => {
+        fullscreen.dataset.transitionComplete = 'true';
+      },
+      { once: true },
+    );
     button.addEventListener('click', () => {
       void fullscreen.requestFullscreen();
     });
@@ -99,6 +107,10 @@ export async function runRestrictedEmbeddingScenario(page: Page): Promise<void> 
     instance.setOverlayOptions(undefined);
   });
   await page.getByRole('button', { name: 'Enter embedded fullscreen' }).click();
+  await expect(page.locator('#embedded-fullscreen')).toHaveAttribute(
+    'data-transition-complete',
+    'true',
+  );
   await expect
     .poll(() => page.evaluate(() => document.fullscreenElement?.id))
     .toBe('embedded-fullscreen');

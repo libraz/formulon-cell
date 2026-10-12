@@ -5,7 +5,7 @@ export const DemoIcon = ({ name }: { name: DemoIconName }): ReactElement => (
   <svg
     className="fc-tb__rb-icon"
     viewBox="0 0 20 20"
-    strokeWidth="1.45"
+    strokeWidth="0.95"
     strokeLinecap="round"
     strokeLinejoin="round"
     aria-hidden="true"

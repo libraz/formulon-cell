@@ -29,7 +29,6 @@ import { DemoIcon } from './DemoIcon.js';
 interface DemoTitleBarProps {
   ui: DemoUiStrings;
   platform: DemoPlatform;
-  locale: string;
   bookName: string;
   instance: SpreadsheetInstance | null;
   showPanel: boolean;
@@ -45,7 +44,6 @@ interface DemoTitleBarProps {
 export const DemoTitleBar = ({
   ui,
   platform,
-  locale,
   bookName,
   instance,
   showPanel,
@@ -104,13 +102,20 @@ export const DemoTitleBar = ({
               <DemoIcon name="app" />
             </span>
           )}
-          <button type="button" className="demo__title-icon" aria-label={ui.save} onClick={onSave}>
+          <button
+            type="button"
+            className="demo__title-icon"
+            aria-label={ui.save}
+            title={ui.save}
+            onClick={onSave}
+          >
             <DemoIcon name="save" />
           </button>
           <button
             type="button"
             className="demo__title-icon"
             aria-label={ui.undo}
+            title={ui.undo}
             onClick={() => instance?.undo()}
           >
             <DemoIcon name="undo" />
@@ -119,6 +124,7 @@ export const DemoTitleBar = ({
             type="button"
             className="demo__title-icon"
             aria-label={ui.redo}
+            title={ui.redo}
             onClick={() => instance?.redo()}
           >
             <DemoIcon name="redo" />
@@ -135,9 +141,7 @@ export const DemoTitleBar = ({
             type="search"
             role="combobox"
             placeholder={ui.search}
-            aria-label={
-              platform === 'mac' ? (locale === 'ja' ? '検索' : 'Search') : ui.searchCommands
-            }
+            aria-label={platform === 'mac' ? ui.search : ui.searchCommands}
             aria-controls="demo-search-results"
             aria-expanded={searchOpen}
             aria-activedescendant={

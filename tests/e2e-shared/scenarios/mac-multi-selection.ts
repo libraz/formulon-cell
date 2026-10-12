@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const selectedCells = (page: Page): Promise<string[]> =>
@@ -32,9 +33,7 @@ const square = (size: number): string[] =>
     (_, index) => `${Math.floor(index / size)}:${index % size}`,
   ).sort();
 const point = async (page: Page, row: number, col: number): Promise<{ x: number; y: number }> => {
-  const box = await page.locator('.fc-host__grid').boundingBox();
-  if (!box) throw new Error('Missing grid');
-  return { x: box.x + 26 + 75 * (col + 0.5), y: box.y + 20 + 20 * (row + 0.5) };
+  return gridCellCenter(page, row, col);
 };
 const commandClick = async (page: Page, row: number, col: number): Promise<void> => {
   const cell = await point(page, row, col);
@@ -152,9 +151,8 @@ export async function runMacHeaderSelectionToggle(page: Page): Promise<void> {
   const headerPoint = async (axis: 'row' | 'col', index: number) => {
     const box = await page.locator('.fc-host__grid').boundingBox();
     if (!box) throw new Error('Missing grid');
-    return axis === 'row'
-      ? { x: box.x + 12, y: box.y + 20 + 20 * (index + 0.5) }
-      : { x: box.x + 26 + 75 * (index + 0.5), y: box.y + 10 };
+    const cell = await gridCellCenter(page, axis === 'row' ? index : 0, axis === 'col' ? index : 0);
+    return axis === 'row' ? { x: box.x + 12, y: cell.y } : { x: cell.x, y: box.y + 10 };
   };
   const bands = (axis: 'row' | 'col') =>
     page.evaluate((direction) => {

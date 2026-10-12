@@ -6,10 +6,10 @@ import { baseConfig } from '../vite.base.js';
 // `baseConfig` aliases `@libraz/formulon-cell` to source; we layer the
 // React adapter's source alias on top, plus React-specific dedupe so two
 // copies of `react` from hoisting can't end up bundled.
-const reactPkg = resolve(__dirname, '../../packages/formulon-cell-react');
+const reactPkg = resolve(import.meta.dirname, '../../packages/formulon-cell-react');
 
 export default defineConfig(
-  mergeConfig(baseConfig(__dirname), {
+  mergeConfig(baseConfig(import.meta.dirname), {
     plugins: [react()],
     resolve: {
       dedupe: ['react', 'react-dom'],

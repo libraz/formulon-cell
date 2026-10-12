@@ -6,6 +6,50 @@ export async function runMacHomeMenusScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
+
+  const alignment = page.locator('[data-ribbon-panel="home"] .fc-tb__ribbon-group--alignment');
+  await expect(alignment).toBeVisible();
+  await expect(alignment.locator('[data-ribbon-command="wrap"]')).toHaveClass(/fc-tb__rb--wide/);
+  await expect(alignment.locator('[data-ribbon-command="wrap"]')).toHaveClass(/fc-tb__rb--stacked/);
+  await expect(alignment.locator('[data-ribbon-command="merge"]')).toHaveClass(/fc-tb__rb--wide/);
+  await expect(alignment.locator('[data-ribbon-command="merge"]')).toHaveClass(
+    /fc-tb__rb--stacked/,
+  );
+  await expect(alignment.locator('[data-ribbon-command="wrap"]')).toContainText('Wrap text');
+  await expect(alignment.locator('[data-ribbon-command="merge"]')).toContainText('Merge & Center');
+  const alignmentLayout = await alignment.locator('.fc-tb__ribbon-tools').evaluate((tools) => {
+    const style = getComputedStyle(tools);
+    const command = (id: string): DOMRect =>
+      tools.querySelector<HTMLElement>(`[data-ribbon-command="${id}"]`)?.getBoundingClientRect() ??
+      new DOMRect();
+    const wrap = command('wrap');
+    const merge = command('merge');
+    return {
+      display: style.display,
+      rows: style.gridTemplateRows,
+      breakDisplay: getComputedStyle(
+        tools.querySelector<HTMLElement>('[data-ribbon-command="alignment-row-2"]') as HTMLElement,
+      ).display,
+      wrapMergeColumn: Math.round(wrap.left),
+      mergeColumn: Math.round(merge.left),
+      wrapRow: Math.round(wrap.top),
+      mergeRow: Math.round(merge.top),
+      wrapLabelFits:
+        (tools.querySelector<HTMLElement>('[data-ribbon-command="wrap"]')?.scrollWidth ?? 0) <=
+        (tools.querySelector<HTMLElement>('[data-ribbon-command="wrap"]')?.clientWidth ?? 0),
+      mergeLabelFits:
+        (tools.querySelector<HTMLElement>('[data-ribbon-command="merge"]')?.scrollWidth ?? 0) <=
+        (tools.querySelector<HTMLElement>('[data-ribbon-command="merge"]')?.clientWidth ?? 0),
+    };
+  });
+  expect(alignmentLayout.display).toBe('grid');
+  expect(alignmentLayout.rows).toBe('26px 26px');
+  expect(alignmentLayout.breakDisplay).toBe('none');
+  expect(alignmentLayout.wrapMergeColumn).toBe(alignmentLayout.mergeColumn);
+  expect(alignmentLayout.mergeRow).toBeGreaterThan(alignmentLayout.wrapRow);
+  expect(alignmentLayout.wrapLabelFits).toBe(true);
+  expect(alignmentLayout.mergeLabelFits).toBe(true);
+
   await sp.enter('A1', 'Formatted');
   await sp.goTo('A1');
   const underline = page.locator('.fc-tb__rb[data-ribbon-command="underline"]');

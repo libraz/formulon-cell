@@ -3,6 +3,7 @@ import {
   type CellChangeEvent,
   type FeatureFlags,
   type FeatureId,
+  type LocaleChangeEvent,
   parseScriptCommand,
   type ScriptCommand,
   type SpreadsheetInstance,
@@ -42,9 +43,12 @@ import {
   type DemoReviewDialogState,
   demoCommandText,
   type DemoBackstageAction,
+  type DemoLocale,
+  demoUiStringsForLocale,
   formatLoadError,
   FORMATTERS,
   installDemoF6Navigation,
+  normalizeDemoLocale,
   type PresetKey,
   refreshDemoPrinterProfiles,
   resolveInitialLocale,
@@ -67,7 +71,7 @@ const UI = createDemoStrings('Vue');
 let disposeF6Navigation: (() => void) | undefined;
 
 const theme = ref<ThemeName>('paper');
-const locale = ref<string>(resolveInitialLocale());
+const locale = ref<DemoLocale>(resolveInitialLocale());
 const platform = ref<DemoPlatform>(resolveInitialPlatform());
 const workbook = shallowRef<WorkbookHandle | null>(null);
 // Vue's reactive proxy walks deeply by default; the spreadsheet instance
@@ -89,6 +93,8 @@ const loadError = ref<string | null>(null);
 const reviewDialog = ref<DemoReviewDialogState | null>(null);
 const scriptOpen = ref(false);
 const uploadStatus = ref<'saved' | 'saving' | 'error' | null>(null);
+let demoAlive = true;
+let workbookOwner: WorkbookHandle | null = null;
 
 const resolvedUi = computed(() =>
   composeDemoUiOptions({
@@ -103,23 +109,31 @@ const ribbonTabs = computed(() =>
   platform.value === 'mac' ? DEMO_MAC_RIBBON_TABS : DEMO_RIBBON_TABS,
 );
 const features = computed<FeatureFlags>(() => resolvedUi.value.features);
-const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
+const ui = computed(() => demoUiStringsForLocale(UI, locale.value));
 const commandText = computed(() => demoCommandText(locale.value));
 
 watch(
   locale,
   (next) => {
-    document.documentElement.lang = next === 'ja' ? 'ja' : 'en';
+    document.documentElement.lang = next;
   },
   { immediate: true },
 );
 
 void createInitialDemoWorkbook()
   .then((wb) => {
+    if (!demoAlive) {
+      // A late-created demo workbook is still owned by this app and must be
+      // released when the component has already unmounted.
+      wb.dispose();
+      return;
+    }
+    workbookOwner = wb;
     loadError.value = null;
     workbook.value = wb;
   })
   .catch((err: unknown) => {
+    if (!demoAlive) return;
     loadError.value = formatLoadError(err);
   });
 
@@ -220,9 +234,36 @@ const onSave = (): void => {
 };
 
 const onNewWorkbook = async (): Promise<void> => {
-  const wb = await WorkbookHandle.createDefault();
+  const wb = await WorkbookHandle.createDefault({ locale: locale.value });
+  if (!demoAlive) {
+    wb.dispose();
+    return;
+  }
+  const previous = workbookOwner;
+  try {
+    await instance.value?.setWorkbook(wb);
+  } catch (error) {
+    if (!demoAlive) {
+      wb.dispose();
+      return;
+    }
+    wb.dispose();
+    reviewDialog.value = buildDemoReviewDialog(
+      commandText.value.openFailed,
+      commandText.value.workbook,
+      formatLoadError(error),
+    );
+    return;
+  }
+  if (!demoAlive) {
+    // The host may have unmounted while setWorkbook was pending. The core
+    // instance cleanup already ran; do not revive Vue state from this result.
+    wb.dispose();
+    return;
+  }
+  workbookOwner = wb;
   workbook.value = wb;
-  await instance.value?.setWorkbook(wb);
+  previous?.dispose();
   bookName.value = 'Book1';
   log.value = [];
   ribbonTab.value = 'home';
@@ -258,11 +299,21 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   if (!file) return;
   target.value = '';
   const inst = instance.value;
-  if (!inst) return;
+  if (!inst || !demoAlive) return;
+  const previous = workbookOwner;
   try {
-    bookName.value = await openDemoWorkbookFile(inst, file);
+    const name = await openDemoWorkbookFile(inst, file);
+    if (!demoAlive || instance.value !== inst) return;
+    const next = inst.workbook;
+    workbookOwner = next;
+    workbook.value = next;
+    // The helper has detached the previous workbook before resolving. Release
+    // the app-owned borrowed handle only after that successful handoff.
+    previous?.dispose();
+    bookName.value = name;
     loadError.value = null;
   } catch (err) {
+    if (!demoAlive) return;
     reviewDialog.value = buildDemoReviewDialog(
       commandText.value.openFailed,
       commandText.value.workbook,
@@ -290,6 +341,15 @@ const onFeatureToggle = (id: FeatureId): void => {
   });
 };
 
+const setLocale = (next: string): void => {
+  const resolved = normalizeDemoLocale(next);
+  if (resolved) locale.value = resolved;
+};
+
+const onCoreLocaleChange = (event: LocaleChangeEvent): void => {
+  setLocale(event.locale);
+};
+
 const commands = computed(() =>
   buildDemoCommands({
     commandText: commandText.value,
@@ -305,9 +365,7 @@ const commands = computed(() =>
     setTheme: (next) => {
       theme.value = next;
     },
-    setLocale: (next) => {
-      locale.value = next;
-    },
+    setLocale,
   }),
 );
 const searchItems = computed(() =>
@@ -342,6 +400,19 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  demoAlive = false;
+  // The binding borrows the initial workbook. Dispose the core instance first
+  // so a workbook adopted during a New action is released by core, then close
+  // the app-owned borrowed handle as well.
+  try {
+    instance.value?.dispose();
+  } catch (error) {
+    console.error('formulon demo: spreadsheet cleanup failed', error);
+  } finally {
+    instance.value = null;
+    workbookOwner?.dispose();
+    workbookOwner = null;
+  }
   disposeF6Navigation?.();
   disposeF6Navigation = undefined;
   delete (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst;
@@ -362,7 +433,6 @@ onBeforeUnmount(() => {
       ref="titleBar"
       :ui="ui"
       :platform="platform"
-      :locale="locale"
       :book-name="bookName"
       :instance="instance"
       :show-panel="showPanel"
@@ -413,10 +483,12 @@ onBeforeUnmount(() => {
           :printer-profile-id="DEMO_PRINTER_PROFILE_ID"
           :refresh-printer-profiles="refreshDemoPrinterProfiles"
           :get-function-argument-help="demoFunctionArgumentHelp"
+          :get-workbook-name="() => bookName"
           :upload-status="uploadStatus"
           :macro-recording="scriptOpen"
           @ready="onReady"
           @cell-change="onCellChange"
+          @locale-change="onCoreLocaleChange"
         />
         <DemoBackstage
           v-if="ribbonTab === 'file'"
@@ -441,7 +513,7 @@ onBeforeUnmount(() => {
         :formatters="formatters"
         :log="log"
         @theme-change="theme = $event"
-        @locale-change="locale = $event"
+        @locale-change="setLocale"
         @preset-change="onPresetChange"
         @feature-toggle="onFeatureToggle"
         @ribbon-change="showRibbon = $event"

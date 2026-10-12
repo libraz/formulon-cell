@@ -102,8 +102,19 @@ export async function runMacRibbonLayoutScenario(page: Page): Promise<void> {
               'button > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron)',
             )) {
               if (!label.textContent?.trim() || !label.getBoundingClientRect().height) continue;
+              const fullText = label.textContent.trim();
+              const button = label.closest('button');
+              // Excel-sized font fields intentionally elide long families.
+              // Accept only horizontal ellipsis backed by the complete value
+              // in both title and ARIA; vertical clipping remains a failure.
+              const accessibleFontEllipsis =
+                label.matches('.fc-tb__rb-dd__value') &&
+                label.closest('[data-ribbon-select="fontFamily"]') !== null &&
+                getComputedStyle(label).textOverflow === 'ellipsis' &&
+                Boolean(button?.title.includes(fullText)) &&
+                Boolean(button?.getAttribute('aria-label')?.includes(fullText));
               if (
-                label.scrollWidth > label.clientWidth + 1 ||
+                (label.scrollWidth > label.clientWidth + 1 && !accessibleFontEllipsis) ||
                 label.scrollHeight > label.clientHeight + 1
               )
                 errors.push(`clipped label: ${label.textContent}`);
