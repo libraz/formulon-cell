@@ -4,6 +4,7 @@ import { normalizeFormatLocale } from '../../format/locale.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
+import { cellTextHorizontalMetrics, wrapText } from '../text-wrap.js';
 import type { CellPaintCtx, TextMetricsBox, TextVAlign } from './types.js';
 
 function canvasTextAlign(align: CellFormat['align'] | undefined): CanvasTextAlign | null {
@@ -312,7 +313,6 @@ export function paintCellText({
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
   if (showZeros === false && value.kind === 'number' && value.value === 0 && !showFormulas) return;
 
-  const padX = 3;
   const padY = 3;
   let text: string;
   if (displayOverride != null) {
@@ -340,12 +340,17 @@ export function paintCellText({
     (format.numFmt.negativeStyle === 'red' || format.numFmt.negativeStyle === 'red-parens');
   const fontVertAlign = format?.fontVertAlign;
   const baseFont = cellFont(format, theme, isFormulaDisplay === true);
+  const zoomScale = visualZoom(zoom);
   const font = {
     ...baseFont,
-    size: baseFont.size * visualZoom(zoom),
+    size: baseFont.size * zoomScale,
   };
+  const horizontal = cellTextHorizontalMetrics(bounds.w, format?.indent ?? 0, zoomScale);
+  const padX = horizontal.padX;
+  const indentPx = horizontal.indentPx;
   const fontSize = font.size;
-  ctx.font = cellFontCss(font);
+  const paintFontCss = cellFontCss(font);
+  ctx.font = paintFontCss;
   const isHyperlink = !!format?.hyperlink;
   ctx.fillStyle = format?.color
     ? format.color
@@ -377,7 +382,6 @@ export function paintCellText({
           : 'left';
     align = rtl && general === 'left' ? 'right' : rtl && general === 'right' ? 'left' : general;
   }
-  const indentPx = (format?.indent ?? 0) * 8;
   const rotation = format?.rotation ?? 0;
   const wrap = !!format?.wrap;
   ctx.direction =
@@ -402,8 +406,19 @@ export function paintCellText({
 
   // Word-wrap path — split into lines, paint each.
   if (wrap) {
-    const lines = wrapText(ctx, text, bounds.w - padX * 2 - indentPx);
-    const lineH = Math.round(fontSize * 1.28);
+    const logicalHorizontal = cellTextHorizontalMetrics(
+      bounds.w / zoomScale,
+      format?.indent ?? 0,
+      1,
+    );
+    ctx.font = cellFontCss(baseFont);
+    const lines = wrapText(text, {
+      maxWidth: logicalHorizontal.availableWidth,
+      measureText: (value) => ctx.measureText(value).width,
+      locale,
+    });
+    ctx.font = paintFontCss;
+    const lineH = Math.round(baseFont.size * 1.28) * zoomScale;
     const totalH = lineH * lines.length;
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = stableTextMetricsBox(fontSize);
@@ -438,26 +453,26 @@ export function paintCellText({
   else tx = bounds.x + padX + indentPx;
 
   const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
-  const availableTextWidth = Math.max(0, bounds.w - padX * 2 - indentPx);
+  const availableTextWidthForCell = horizontal.availableWidth;
   let drawFontSize = fontSize;
   if (format?.shrinkToFit) {
     const measuredWidth = ctx.measureText(text).width;
-    if (measuredWidth > availableTextWidth && availableTextWidth > 0) {
+    if (measuredWidth > availableTextWidthForCell && availableTextWidthForCell > 0) {
       drawFontSize = shrinkFontSizeToFit(
         fontSize,
         measuredWidth,
-        availableTextWidth,
-        8 * visualZoom(zoom),
+        availableTextWidthForCell,
+        8 * zoomScale,
       );
       ctx.font = cellFontCss(font, drawFontSize);
     }
   }
-  if (isNumeric && ctx.measureText(text).width > availableTextWidth) {
+  if (isNumeric && ctx.measureText(text).width > availableTextWidthForCell) {
     if (format?.numFmt && format.numFmt.kind !== 'general') {
       // Explicit number format: Excel shows #### when the formatted value
       // can't shrink without losing the user's chosen presentation.
       const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
-      text = '#'.repeat(Math.max(1, Math.floor(availableTextWidth / hashWidth)));
+      text = '#'.repeat(Math.max(1, Math.floor(availableTextWidthForCell / hashWidth)));
     } else if (!isFormulaDisplay && value.kind === 'number') {
       // General number: Excel progressively trims fractional digits before
       // falling back to scientific notation and finally ####. Without this,
@@ -466,7 +481,7 @@ export function paintCellText({
       text = fitGeneralNumberToWidth(
         ctx,
         value.value,
-        availableTextWidth,
+        availableTextWidthForCell,
         locale ?? 'en-US',
         drawFontSize,
       );
@@ -509,30 +524,4 @@ export function paintCellText({
     align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
   paintTextDecorations(ctx, format, isHyperlink, lineX0, metrics.width, ty, box);
   ctx.restore();
-}
-
-/** Greedy word-wrap. Splits on whitespace, packs as many words per line as
- *  fit within `maxWidth`. Long un-breakable words are emitted as a single
- *  overflowing line rather than mid-word breaking. */
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  if (maxWidth <= 0) return [text];
-  // Honor explicit \n line breaks (Alt+Enter in a desktop spreadsheet).
-  const paragraphs = text.split('\n');
-  const out: string[] = [];
-  for (const para of paragraphs) {
-    const words = para.split(/(\s+)/);
-    let line = '';
-    for (const word of words) {
-      const candidate = line + word;
-      if (ctx.measureText(candidate).width <= maxWidth || line === '') {
-        line = candidate;
-      } else {
-        out.push(line.trimEnd());
-        line = word.trimStart();
-      }
-    }
-    if (line) out.push(line);
-    if (para === '') out.push('');
-  }
-  return out.length > 0 ? out : [''];
 }

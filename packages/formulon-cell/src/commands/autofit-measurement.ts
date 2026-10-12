@@ -15,6 +15,7 @@ import {
   TABLE_HEADER_CHEVRON_SIZE,
 } from '../render/painters/markers.js';
 import { type CellFontTheme, cellFont, cellFontCss } from '../render/painters/text.js';
+import { cellTextHorizontalMetrics, wrapText } from '../render/text-wrap.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { DEFAULT_CELL_FONT_THEME, resolveTheme } from '../theme/resolve.js';
 import { formatNumber } from './format.js';
@@ -32,7 +33,7 @@ const MIN_COL_WIDTH = 48;
 /** The cell-format fields autofit measurement reads. */
 export type AutofitCellFormat = Pick<
   CellFormat,
-  'fontSize' | 'fontFamily' | 'fontVertAlign' | 'bold' | 'italic' | 'numFmt' | 'wrap'
+  'fontSize' | 'fontFamily' | 'fontVertAlign' | 'bold' | 'italic' | 'numFmt' | 'wrap' | 'indent'
 >;
 
 export interface AutofitOptions {
@@ -112,7 +113,15 @@ export function computeAutofitRowHeight(
     if (ctx) ctx.font = cellFontCss(font);
     const lineHeight = Math.round(font.size * 1.28);
     const colW = state.layout.colWidths.get(parsed.col) ?? state.layout.defaultColWidth;
-    const lines = autofitLineCount(text, format?.wrap === true, colW, ctx, font.size);
+    const lines = autofitLineCount(
+      text,
+      format?.wrap === true,
+      colW,
+      ctx,
+      font.size,
+      locale,
+      format?.indent,
+    );
     const height = Math.ceil(lines * lineHeight + 8);
     if (height > max) max = height;
   }
@@ -216,7 +225,7 @@ function formatForMeasurement(
   formulaDisplay: boolean,
 ): Pick<
   CellFormat,
-  'fontFamily' | 'fontSize' | 'fontVertAlign' | 'bold' | 'italic' | 'numFmt' | 'wrap'
+  'fontFamily' | 'fontSize' | 'fontVertAlign' | 'bold' | 'italic' | 'numFmt' | 'wrap' | 'indent'
 > {
   if (!workbookDisplayFont) return format ?? {};
   return {
@@ -263,41 +272,15 @@ function autofitLineCount(
   colWidth: number,
   ctx: CanvasRenderingContext2D | null,
   fontSize: number,
+  locale: string,
+  indent = 0,
 ): number {
-  const paragraphs = text.split(/\r\n|\r|\n/);
-  if (!wrap) return Math.max(1, paragraphs.length);
-
-  const available = Math.max(1, colWidth - 12);
-  let lines = 0;
-  for (const paragraph of paragraphs) {
-    if (paragraph.length === 0) {
-      lines += 1;
-      continue;
-    }
-    lines += wrapAutofitParagraph(paragraph, available, ctx, fontSize);
-  }
-  return Math.max(1, lines);
-}
-
-function wrapAutofitParagraph(
-  paragraph: string,
-  maxWidth: number,
-  ctx: CanvasRenderingContext2D | null,
-  fontSize: number,
-): number {
-  const words = paragraph.split(/(\s+)/);
-  let line = '';
-  let count = 0;
-  for (const word of words) {
-    const candidate = line + word;
-    if (measureAutofitText(candidate, ctx, fontSize) <= maxWidth || line === '') {
-      line = candidate;
-    } else {
-      count += 1;
-      line = word.trimStart();
-    }
-  }
-  return count + (line ? 1 : 0);
+  const horizontal = cellTextHorizontalMetrics(colWidth, indent, 1);
+  return wrapText(text, {
+    maxWidth: wrap ? horizontal.availableWidth : Infinity,
+    measureText: (value) => measureAutofitText(value, ctx, fontSize),
+    locale,
+  }).length;
 }
 
 // Character-width estimate when no canvas is available (headless test DOMs).
