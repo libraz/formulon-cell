@@ -90,7 +90,10 @@ export async function runStartupFont(
   await options.click();
   const panel = page.locator('.demo__panel').first();
   await expect(panel).toBeVisible();
-  await panel.locator('.demo__locale-select select').selectOption(nextLocale);
+  await panel.getByRole('combobox').click();
+  await panel
+    .getByRole('option', { name: nextLocale === 'ja' ? '日本語' : 'English', exact: true })
+    .click();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as FontProbeWindow).__fcInst.locale))
     .toBe(nextLocale);
