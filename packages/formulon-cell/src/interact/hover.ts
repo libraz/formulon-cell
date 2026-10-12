@@ -48,7 +48,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   const cellFormatAt = (
     row: number,
     col: number,
-  ): { hyperlink?: string; comment?: string } | null => {
+  ): { hyperlink?: string; hyperlinkTooltip?: string; comment?: string } | null => {
     const s = store.getState();
     const fmt = s.format.formats.get(addrKey({ sheet: s.data.sheetIndex, row, col }));
     return fmt ?? null;
@@ -57,8 +57,9 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   const onMove = (e: PointerEvent): void => {
     const at = cellAt(e);
     const fmt = at ? cellFormatAt(at.row, at.col) : null;
-    if (fmt?.comment) {
-      tip.textContent = fmt.comment;
+    const tooltip = fmt?.comment || fmt?.hyperlinkTooltip;
+    if (tooltip) {
+      tip.textContent = tooltip;
       tip.hidden = false;
       const position = clampPanelToViewport(tip, e.clientX + 12, e.clientY + 14, {
         pad: 8,

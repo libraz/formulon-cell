@@ -71,6 +71,54 @@ describe('attachHover', () => {
     handle.detach();
   });
 
+  it('pointermove over a hyperlink cell uses its authored tooltip when no comment exists', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { hyperlink: 'https://example.test/', hyperlinkTooltip: 'Open documentation' },
+    );
+    const handle = attachHover({ grid, store });
+    const { x, y } = cellPoint(store, 0, 0);
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, pointerId: 1 }));
+
+    expect(tip()?.hidden).toBe(false);
+    expect(tip()?.textContent).toBe('Open documentation');
+    handle.detach();
+  });
+
+  it('gives a cell comment priority over its hyperlink tooltip', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        comment: 'Review this cell',
+        hyperlink: 'https://example.test/',
+        hyperlinkTooltip: 'Open documentation',
+      },
+    );
+    const handle = attachHover({ grid, store });
+    const { x, y } = cellPoint(store, 0, 0);
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, pointerId: 1 }));
+
+    expect(tip()?.textContent).toBe('Review this cell');
+    handle.detach();
+  });
+
+  it('does not fall back to displaying the hyperlink URL as a tooltip', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { hyperlink: 'https://example.test/' },
+    );
+    const handle = attachHover({ grid, store });
+    const { x, y } = cellPoint(store, 0, 0);
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, pointerId: 1 }));
+
+    expect(tip()?.hidden).toBe(true);
+    expect(tip()?.textContent).toBe('');
+    handle.detach();
+  });
+
   it('pointerleave hides the tooltip', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { comment: 'note' });
     const handle = attachHover({ grid, store });
