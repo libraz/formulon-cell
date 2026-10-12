@@ -68,6 +68,62 @@ describe('InlineEditor', () => {
     expect(mode.kind === 'enter' && mode.raw).toBe('hi');
   });
 
+  it('uses the live workbook profile to display a localized function name in the inline helper', () => {
+    const profile = vi.spyOn(wb, 'spreadsheetProfileId').mockReturnValue('windows-de_DE');
+    const canonicalize = vi
+      .spyOn(wb, 'canonicalizeFunctionName')
+      .mockImplementation((rawName) => (rawName === 'SUMME' ? 'SUM' : rawName));
+    const localize = vi
+      .spyOn(wb, 'localizeFunctionName')
+      .mockImplementation((canonicalName) => (canonicalName === 'SUM' ? 'SUMME' : canonicalName));
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    editor.begin('=SUMME(A1;');
+
+    expect(document.querySelector('.fc-arghelper__name')?.textContent).toBe('SUMME(');
+    expect(profile).toHaveBeenCalled();
+    expect(canonicalize).toHaveBeenCalledWith('SUMME', 2);
+    expect(localize).toHaveBeenCalledWith('SUM', 2);
+  });
+
+  it('prefers live BCP-47 function metadata for inline display without changing the draft', async () => {
+    const realWorkbook = await WorkbookHandle.createDefault();
+    expect(realWorkbook.isStub).toBe(false);
+    const realStore = createSpreadsheetStore();
+    const realHost = document.createElement('div');
+    const realGrid = document.createElement('div');
+    realHost.appendChild(realGrid);
+    document.body.appendChild(realHost);
+    const realEditor = new InlineEditor({
+      host: realHost,
+      grid: realGrid,
+      store: realStore,
+      wb: realWorkbook,
+      onAfterCommit: vi.fn(),
+    });
+    const profile = vi.spyOn(realWorkbook, 'spreadsheetProfileId').mockReturnValue('windows-zh_CN');
+    realWorkbook.setFunctionMetadataProvider({ SUM: { aliases: { 'zh-CN': '求和' } } });
+    const metadata = vi.spyOn(realWorkbook, 'functionMetadataForLocale');
+    const localize = vi
+      .spyOn(realWorkbook, 'localizeFunctionName')
+      .mockImplementation((canonicalName) => canonicalName);
+
+    try {
+      mutators.setActive(realStore, { sheet: 0, row: 0, col: 0 });
+      realEditor.begin('=SUM(');
+
+      expect(document.querySelector('.fc-arghelper__name')?.textContent).toBe('求和(');
+      expect(realGrid.querySelector<HTMLTextAreaElement>('.fc-host__editor')?.value).toBe('=SUM(');
+      expect(profile).toHaveBeenCalled();
+      expect(metadata).toHaveBeenCalledWith('SUM', 'zh-CN');
+      expect(localize).not.toHaveBeenCalled();
+    } finally {
+      realEditor.cancel();
+      realWorkbook.dispose();
+      realHost.remove();
+    }
+  });
+
   it('begin cancels copy mode so the marquee does not survive a cell edit', () => {
     mutators.setActive(store, { sheet: 0, row: 2, col: 3 });
     mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });

@@ -23,6 +23,8 @@ export interface ArgHelperDeps {
   getListSeparator?: () => string;
   /** Resolve a localized function alias to its canonical catalog name. */
   resolveFunctionName?: (rawName: string) => string | null;
+  /** Resolve a canonical catalog name to the workbook's live display name. */
+  getFunctionDisplayName?: (canonicalName: string) => string | null;
   labels?: Partial<ArgHelperLabels>;
 }
 
@@ -123,7 +125,8 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       return;
     }
     const implicit = caretInsideImplicitIntersection(text, caret);
-    render(sig.name, sig.args, sig.activeArgIndex, implicit);
+    const displayName = deps.getFunctionDisplayName?.(sig.name) ?? sig.name;
+    render(displayName, sig.args, sig.activeArgIndex, implicit);
   };
 
   return {

@@ -69,6 +69,21 @@ describe('attachArgHelper', () => {
     handle.detach();
   });
 
+  it('renders the live localized display name while resolving through the canonical name', () => {
+    setText(input, '=SUMME(A1;');
+    const handle = attachArgHelper({
+      input,
+      getListSeparator: () => ';',
+      resolveFunctionName: (rawName) => (rawName === 'SUMME' ? 'SUM' : rawName.toUpperCase()),
+      getFunctionDisplayName: (canonicalName) => (canonicalName === 'SUM' ? 'SUMME' : null),
+    });
+    handle.refresh();
+
+    expect(tooltip()?.querySelector('.fc-arghelper__name')?.textContent).toBe('SUMME(');
+    expect(activeArg()?.textContent).toBe('[number2]');
+    handle.detach();
+  });
+
   it('uses the innermost function when the caret is inside a nested call', () => {
     setText(input, '=IF(SUM(');
     const handle = attachArgHelper({ input });

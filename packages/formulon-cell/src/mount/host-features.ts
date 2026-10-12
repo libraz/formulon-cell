@@ -26,7 +26,7 @@ import type { InlineEditor } from '../interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from '../interact/error-menu.js';
 import { attachFormatDialog } from '../interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from '../interact/format-painter.js';
-import { catalogLocaleOrdinal } from '../interact/function-catalog-text.js';
+import { catalogLocaleOrdinal, catalogLocaleTag } from '../interact/function-catalog-text.js';
 import { attachFxDialog, type FxDialogHandle } from '../interact/fx-dialog.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
@@ -818,6 +818,19 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.fxArgHelper = attachArgHelper({
           input: input.fxInput,
           getListSeparator: () => input.wb().localeFacts()?.listSeparator ?? ',',
+          getFunctionDisplayName: (canonicalName) => {
+            const wb = input.wb();
+            const localeTag = catalogLocaleTag(inputLocaleForWorkbook(wb) ?? 'en-US');
+            const metadataName = wb.functionMetadataForLocale(
+              canonicalName,
+              localeTag,
+            )?.localizedName;
+            return (
+              metadataName ||
+              wb.localizeFunctionName(canonicalName, catalogLocaleOrdinal(localeTag)) ||
+              canonicalName
+            );
+          },
           resolveFunctionName: (rawName) => {
             const wb = input.wb();
             const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');

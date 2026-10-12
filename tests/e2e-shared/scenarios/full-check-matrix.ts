@@ -1192,8 +1192,7 @@ const runFormulaFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await page.keyboard.type(localizedSum);
   const argHelper = page.locator('.fc-arghelper').first();
   await expect(argHelper).toBeVisible();
-  const canonicalSumName = canonicalFormula.slice(1, canonicalFormula.indexOf('('));
-  await expect(argHelper.locator('.fc-arghelper__name').first()).toHaveText(`${canonicalSumName}(`);
+  await expect(argHelper.locator('.fc-arghelper__name').first()).toHaveText(`${localizedSumName}(`);
   await expect(argHelper.locator('.fc-arghelper__sep').first()).toHaveText(
     row.locale === 'de' || row.locale === 'fr' ? '; ' : ', ',
   );
@@ -1236,7 +1235,7 @@ const runFormulaFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   const nextArgHelper = page.locator('.fc-arghelper:visible').first();
   await expect(nextArgHelper).toBeVisible();
   await expect(nextArgHelper.locator('.fc-arghelper__name').first()).toHaveText(
-    `${canonicalSumName}(`,
+    `${nextLocalizedSumName}(`,
   );
   await expect(nextArgHelper.locator('.fc-arghelper__sep').first()).toHaveText('; ');
   await expect(nextArgHelper.locator('.fc-arghelper__arg[aria-current="true"]')).toHaveText(

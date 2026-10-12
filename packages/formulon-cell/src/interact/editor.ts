@@ -28,7 +28,7 @@ import {
   type FormulaEditLeaseContext,
   type FormulaEditLeaseSnapshot,
 } from './formula-edit-lease.js';
-import { catalogLocaleOrdinal } from './function-catalog-text.js';
+import { catalogLocaleOrdinal, catalogLocaleTag } from './function-catalog-text.js';
 import { navigationPolicyFor, nextTabStop } from './navigation-policy.js';
 import {
   buildSelectionInputBatch,
@@ -772,6 +772,16 @@ export class InlineEditor {
     this.argHelper = attachArgHelper({
       input,
       getListSeparator: () => this.deps.wb.localeFacts()?.listSeparator ?? ',',
+      getFunctionDisplayName: (canonicalName) => {
+        const wb = this.deps.wb;
+        const localeTag = catalogLocaleTag(inputLocaleForWorkbook(wb) ?? 'en-US');
+        const metadataName = wb.functionMetadataForLocale(canonicalName, localeTag)?.localizedName;
+        return (
+          metadataName ||
+          wb.localizeFunctionName(canonicalName, catalogLocaleOrdinal(localeTag)) ||
+          canonicalName
+        );
+      },
       resolveFunctionName: (rawName) => {
         const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US');
         return (

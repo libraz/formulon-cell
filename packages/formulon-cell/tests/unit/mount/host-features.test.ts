@@ -360,6 +360,50 @@ describe('mount/host-features — individual feature flags', () => {
     expect(document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input')).toHaveLength(1);
   });
 
+  it('routes the live localized function name into the formula-bar argument helper', async () => {
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const profile = vi.spyOn(workbook, 'spreadsheetProfileId').mockReturnValue('windows-de_DE');
+    const canonicalize = vi
+      .spyOn(workbook, 'canonicalizeFunctionName')
+      .mockImplementation((rawName) => (rawName === 'SUMME' ? 'SUM' : rawName));
+    const localize = vi
+      .spyOn(workbook, 'localizeFunctionName')
+      .mockImplementation((canonicalName) => (canonicalName === 'SUM' ? 'SUMME' : canonicalName));
+    sheet = await mountStubSheet({ workbook, locale: 'de' });
+
+    const input = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    if (!input) throw new Error('formula-bar input missing');
+    input.value = '=SUMME(A1;';
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(document.querySelector('.fc-arghelper__name')?.textContent).toBe('SUMME(');
+    expect(profile).toHaveBeenCalled();
+    expect(canonicalize).toHaveBeenCalledWith('SUMME', 2);
+    expect(localize).toHaveBeenCalledWith('SUM', 2);
+  });
+
+  it('prefers live BCP-47 function metadata for formula-bar display without changing the draft', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    const profile = vi.spyOn(workbook, 'spreadsheetProfileId').mockReturnValue('windows-zh_CN');
+    workbook.setFunctionMetadataProvider({ SUM: { aliases: { 'zh-CN': '求和' } } });
+    const metadata = vi.spyOn(workbook, 'functionMetadataForLocale');
+    sheet = await mountStubSheet({ workbook, locale: 'zh' });
+
+    const input = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    if (!input) throw new Error('formula-bar input missing');
+    input.value = '=SUM(';
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(document.querySelector('.fc-arghelper__name')?.textContent).toBe('求和(');
+    expect(input.value).toBe('=SUM(');
+    expect(profile).toHaveBeenCalled();
+    expect(metadata).toHaveBeenCalledWith('SUM', 'zh-CN');
+  });
+
   it('viewToolbar: false omits the .fc-viewbar chrome', async () => {
     sheet = await mountStubSheet({ features: { viewToolbar: false } });
     expect(sheet.host.querySelector('.fc-viewbar')).toBeNull();
