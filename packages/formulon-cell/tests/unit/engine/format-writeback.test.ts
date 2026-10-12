@@ -108,7 +108,7 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(rec.underline).toBe(1);
     expect(rec.strike).toBe(true);
     expect(rec.name).toBe('Arial');
-    expect(rec.size).toBe(14);
+    expect(rec.size).toBe(10.5);
     expect(rec.colorArgb).toBe(0xffff0000);
   });
 
@@ -138,6 +138,44 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(fmt.bold).toBe(true);
     expect(fmt.fontSize).toBe(16);
     expect(fmt.color).toBe('#0000ff');
+  });
+
+  it('converts CSS pixels to native points and compares defaults before conversion', () => {
+    expect(fontRecordFromFormat({ fontSize: 16 }).size).toBe(12);
+    expect(
+      fontRecordToFormat(
+        {
+          name: 'Aptos',
+          size: 12,
+          bold: false,
+          italic: false,
+          strike: false,
+          underline: 0,
+          colorArgb: 0xff000000,
+        },
+        { name: 'Aptos', size: 12 },
+      ).fontSize,
+    ).toBeUndefined();
+    expect(
+      fontRecordToFormat({
+        name: 'Aptos',
+        size: 10.5,
+        bold: false,
+        italic: false,
+        strike: false,
+        underline: 0,
+        colorArgb: 0xff000000,
+      }).fontSize,
+    ).toBeCloseTo(14, 10);
+  });
+
+  it('preserves a fractional CSS size through ten real boundary cycles', () => {
+    let cssPixels = 14;
+    for (let cycle = 0; cycle < 10; cycle += 1) {
+      const record = fontRecordFromFormat({ fontSize: cssPixels });
+      cssPixels = fontRecordToFormat(record).fontSize as number;
+    }
+    expect(cssPixels).toBeCloseTo(14, 10);
   });
 
   it.each([
@@ -405,6 +443,7 @@ describe('buildXfRecord', () => {
       fillIndex: 2,
       borderIndex: 3,
       numFmtId: 4,
+      applyAlignment: true,
       horizontalAlign: 2,
       verticalAlign: 1,
       wrapText: true,
@@ -473,6 +512,28 @@ describe('buildXfRecord', () => {
     expect(xf).not.toHaveProperty('indent');
     expect(xf).not.toHaveProperty('shrinkToFit');
     expect(xf).not.toHaveProperty('readingOrder');
+  });
+
+  it('marks authored format groups as applied', () => {
+    expect(
+      buildXfRecord(0, 0, 0, 0, {
+        numFmt: { kind: 'general' },
+        bold: true,
+        fill: '#fefefe',
+        borders: { top: true },
+        locked: false,
+        formulaHidden: true,
+      }),
+    ).toMatchObject({
+      applyNumberFormat: true,
+      applyFont: true,
+      applyFill: true,
+      applyBorder: true,
+      applyProtection: true,
+      hasProtection: true,
+      locked: false,
+      hidden: true,
+    });
   });
 
   it.each([

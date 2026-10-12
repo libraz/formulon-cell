@@ -10,6 +10,7 @@ import {
   bindScalePointValueVisibility,
   collectScalePoint,
   conditionalSelect,
+  localizedScalePointValue,
   scaleTypeOptions,
 } from './conditional-form-controls.js';
 
@@ -35,6 +36,7 @@ export function appendIconSetForm(
   form: HTMLElement,
   t: Strings['conditionalDialog'],
   isEditing: () => boolean,
+  getLocale: () => string = () => 'en-US',
 ): IconSetForm {
   const group = document.createElement('div');
   group.className = 'fc-conddlg__sub';
@@ -162,14 +164,16 @@ export function appendIconSetForm(
       if (!control) continue;
       control.operator.value = point.gte === false ? '>' : '>=';
       control.type.value = point.kind;
-      control.value.value = 'value' in point ? String(point.value) : '';
+      control.value.value =
+        'value' in point ? localizedScalePointValue(point.value, getLocale()) : '';
     }
   };
 
   const collect = (range: Range): IconSetRule | null => {
+    const locale = getLocale();
     const iconThresholds = iconThresholdControls
       .filter((control) => !control.row.hidden)
-      .map((control) => collectScalePoint(control));
+      .map((control) => collectScalePoint(control, locale));
     if (iconThresholds.some((point) => point === null)) return null;
     return {
       kind: 'icon-set',

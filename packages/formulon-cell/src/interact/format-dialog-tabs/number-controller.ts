@@ -3,7 +3,7 @@
 // presets/listbox. The tab's DOM is built inline by `format-dialog-view.ts`.
 
 import { formatNumber } from '../../commands/format.js';
-import type { Strings } from '../../i18n/strings.js';
+import { dictionaryLocaleFor, type Strings } from '../../i18n/strings.js';
 import type { NegativeStyle } from '../../store/store.js';
 import { appendDialogSelectOptions } from '../../toolbar/dialogs/form-controls.js';
 import { appendDialogOptionButton } from '../dialog-shell.js';
@@ -11,7 +11,6 @@ import {
   defaultCurrencySymbolFor,
   defaultPatternForLocale,
   type NumberCategory,
-  normalizeFormatLocale,
   patternPresetsFor,
 } from '../format-dialog-model.js';
 import { computeDialogNumFmt } from '../format-dialog-state.js';
@@ -235,7 +234,7 @@ export function attachNumberTab(
     patternListWrap.hidden = !listboxCats.has(cat);
     patternRow.hidden = cat !== 'custom';
     localeRow.hidden = cat !== 'date' && cat !== 'time' && cat !== 'special';
-    localeSelect.value = normalizeFormatLocale(ctx.getLocale()).startsWith('ja') ? 'ja' : 'en';
+    localeSelect.value = dictionaryLocaleFor(ctx.getLocale());
     calendarRow.hidden = cat !== 'date';
     negativeList.hidden = cat !== 'fixed' && cat !== 'currency';
     const active = catDefs.find((c) => c.id === cat);

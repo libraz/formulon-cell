@@ -34,7 +34,9 @@ const flush = async (): Promise<void> => {
 
 const makeInstance = () => ({
   workbook: {},
-  i18n: { locale: 'ja', setLocale: vi.fn(), extend: vi.fn() },
+  locale: 'ja',
+  i18n: { locale: 'ja', strings: {}, setLocale: vi.fn(), extend: vi.fn() },
+  setLocale: vi.fn(() => true),
   on: vi.fn(() => vi.fn()),
   dispose: vi.fn(),
   setWorkbook: vi.fn(async () => undefined),
@@ -177,6 +179,102 @@ describe('Vue Spreadsheet embedding props', () => {
     expect(instance.setToolbar).toHaveBeenCalledWith(false);
   });
 
+  it('keeps the original workbook usable after a pending controlled replacement rejects', async () => {
+    const original = {
+      getValue: vi.fn(() => ({ kind: 'text', value: 'original' })),
+      dispose: vi.fn(),
+    };
+    const next = { getValue: vi.fn(() => ({ kind: 'text', value: 'next' })), dispose: vi.fn() };
+    const instance = makeInstance();
+    instance.workbook = original;
+    const failure = new Error('controlled workbook rejected');
+    instance.setWorkbook.mockRejectedValueOnce(failure);
+    let resolveMount: ((value: typeof instance) => void) | undefined;
+    mountCore.mockImplementation(
+      () =>
+        new Promise<typeof instance>((resolve) => {
+          resolveMount = resolve;
+        }),
+    );
+    const onError = vi.fn();
+
+    await render({ workbook: original, onError });
+    await update({ workbook: next, onError });
+    await flush();
+    resolveMount?.(instance);
+    await flush();
+
+    expect(instance.setWorkbook).toHaveBeenCalledTimes(1);
+    expect(instance.setWorkbook).toHaveBeenCalledWith(next);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(failure);
+    expect(instance.workbook).toBe(original);
+    expect(original.getValue()).toEqual({ kind: 'text', value: 'original' });
+    expect(original.dispose).not.toHaveBeenCalled();
+    expect(next.dispose).not.toHaveBeenCalled();
+
+    app?.unmount();
+    await flush();
+    app = undefined;
+    expect(original.dispose).not.toHaveBeenCalled();
+    expect(next.dispose).not.toHaveBeenCalled();
+  });
+
+  it('continues pending controlled prop reconciliation after workbook rejection', async () => {
+    const original = {
+      getValue: vi.fn(() => ({ kind: 'text', value: 'original' })),
+      dispose: vi.fn(),
+    };
+    const next = { getValue: vi.fn(() => ({ kind: 'text', value: 'next' })), dispose: vi.fn() };
+    const instance = makeInstance();
+    instance.workbook = original;
+    const failure = new Error('controlled workbook rejected');
+    instance.setWorkbook.mockRejectedValueOnce(failure);
+    instance.setLocale.mockImplementation((nextLocale) => {
+      instance.locale = nextLocale;
+      instance.i18n.locale = nextLocale;
+      return true;
+    });
+    let resolveMount: ((value: typeof instance) => void) | undefined;
+    mountCore.mockImplementation(
+      () =>
+        new Promise<typeof instance>((resolve) => {
+          resolveMount = resolve;
+        }),
+    );
+    const onError = vi.fn();
+    const initialPolicy = { readOnly: true };
+    const latestPolicy = { defaultOperation: 'allow' };
+    const strings = { ribbon: { bold: 'Stable bold' } };
+    const features = { ribbon: false };
+
+    await render({ workbook: original, policy: initialPolicy, locale: 'ja', onError });
+    await update({
+      workbook: next,
+      policy: latestPolicy,
+      locale: 'en',
+      strings,
+      features,
+      onError,
+    });
+    await flush();
+    resolveMount?.(instance);
+    await flush();
+
+    expect(instance.setWorkbook).toHaveBeenCalledTimes(1);
+    expect(instance.setWorkbook).toHaveBeenCalledWith(next);
+    expect(instance.setPolicy).toHaveBeenCalledWith(latestPolicy);
+    expect(instance.setLocale).toHaveBeenCalledWith('en');
+    expect(instance.i18n.extend).toHaveBeenCalledWith('en', strings);
+    expect(instance.setFeatures).toHaveBeenCalledWith(expect.objectContaining(features));
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(failure);
+    expect(instance.workbook).toBe(original);
+    expect(original.getValue()).toEqual({ kind: 'text', value: 'original' });
+    expect(original.dispose).not.toHaveBeenCalled();
+    expect(next.dispose).not.toHaveBeenCalled();
+  });
+
   it('uses the ui ribbon default only when toolbar is omitted', async () => {
     const instance = makeInstance();
     mountCore.mockResolvedValue(instance);
@@ -188,5 +286,111 @@ describe('Vue Spreadsheet embedding props', () => {
 
     await update({ ui: { profile: 'standard' }, toolbar: true });
     expect(instance.setToolbar).toHaveBeenLastCalledWith(true);
+  });
+
+  it('uses the public locale setter and reconciles a rejected controlled update', async () => {
+    const instance = makeInstance();
+    mountCore.mockResolvedValue(instance);
+    const onLocaleChange = vi.fn();
+    const onError = vi.fn();
+
+    await render({ locale: 'en', onLocaleChange, onError });
+    instance.setLocale.mockReturnValue(false);
+    await update({ locale: 'fr', onLocaleChange, onError });
+
+    expect(instance.setLocale).toHaveBeenCalledWith('fr');
+    expect(onLocaleChange).toHaveBeenCalledWith({ locale: 'ja', strings: instance.i18n.strings });
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it('delivers a rollback event after a prior successful switch to the same locale', async () => {
+    const instance = makeInstance();
+    mountCore.mockResolvedValue(instance);
+    let localeHandler: ((event: { locale: string; strings: object }) => void) | undefined;
+    instance.on.mockImplementation((name, handler) => {
+      if (name === 'localeChange') {
+        localeHandler = handler as (event: { locale: string; strings: object }) => void;
+      }
+      return vi.fn();
+    });
+    instance.setLocale.mockImplementation((next) => {
+      if (next === 'ja') {
+        localeHandler?.({ locale: 'ja', strings: instance.i18n.strings });
+      }
+      return next !== 'fr';
+    });
+    const onLocaleChange = vi.fn();
+
+    await render({ locale: 'en', onLocaleChange });
+    onLocaleChange.mockClear();
+    await update({ locale: 'ja', onLocaleChange });
+    expect(onLocaleChange).toHaveBeenCalledTimes(1);
+
+    onLocaleChange.mockClear();
+    await update({ locale: 'fr', onLocaleChange });
+
+    expect(onLocaleChange).toHaveBeenCalledTimes(1);
+    expect(onLocaleChange).toHaveBeenCalledWith({
+      locale: 'ja',
+      strings: instance.i18n.strings,
+    });
+  });
+
+  it('reapplies a stable strings overlay after each accepted locale switch', async () => {
+    const instance = makeInstance();
+    mountCore.mockResolvedValue(instance);
+    const strings = { ribbon: { bold: 'Stable bold' } };
+    instance.setLocale.mockImplementation((next) => {
+      instance.locale = next;
+      instance.i18n.locale = next;
+      return true;
+    });
+
+    await render({ locale: 'en', strings });
+    instance.setLocale.mockClear();
+    instance.i18n.extend.mockClear();
+
+    for (const locale of ['ja', 'de', 'fr', 'zh', 'ko', 'th', 'en']) {
+      await update({ locale, strings });
+    }
+
+    expect(instance.setLocale.mock.calls.map(([locale]) => locale)).toEqual([
+      'ja',
+      'de',
+      'fr',
+      'zh',
+      'ko',
+      'th',
+      'en',
+    ]);
+    expect(instance.i18n.extend.mock.calls).toEqual(
+      ['ja', 'de', 'fr', 'zh', 'ko', 'th', 'en'].map((locale) => [locale, strings]),
+    );
+  });
+
+  it('does not reapply a stable strings overlay after a rejected locale switch', async () => {
+    const instance = makeInstance();
+    mountCore.mockResolvedValue(instance);
+    const strings = { ribbon: { bold: 'Stable bold' } };
+    const failure = new Error('locale rejected');
+    const onError = vi.fn();
+    instance.setLocale.mockImplementation((next) => {
+      if (next === 'fr') return false;
+      instance.locale = next;
+      instance.i18n.locale = next;
+      return true;
+    });
+
+    await render({ locale: 'en', strings, onError });
+    instance.i18n.extend.mockClear();
+    instance.setLocale.mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    await update({ locale: 'fr', strings, onError });
+
+    expect(instance.i18n.extend).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(failure);
   });
 });

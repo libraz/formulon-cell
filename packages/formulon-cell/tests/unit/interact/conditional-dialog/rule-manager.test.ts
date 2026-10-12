@@ -98,6 +98,45 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('lets Escape dismiss the dialog when the range picker is inactive', () => {
+    const handle = attachConditionalDialog({ host, store, strings: en });
+    handle.open();
+
+    const overlay = document.querySelector<HTMLElement>('.fc-conddlg');
+    const rangeInput = document.querySelector<HTMLInputElement>(
+      '.fc-conddlg__form input[type="text"]',
+    );
+    if (!overlay || !rangeInput) throw new Error('missing conditional range picker input');
+
+    rangeInput.focus();
+    rangeInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(overlay.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('keeps Escape scoped to the active range picker', () => {
+    const handle = attachConditionalDialog({ host, store, strings: en });
+    handle.open();
+
+    const overlay = document.querySelector<HTMLElement>('.fc-conddlg');
+    const rangeInput = document.querySelector<HTMLInputElement>(
+      '.fc-conddlg__form input[type="text"]',
+    );
+    const picker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="conditional-format-range"]',
+    );
+    if (!overlay || !rangeInput || !picker) throw new Error('missing conditional range picker');
+
+    picker.click();
+    expect(picker.dataset.rangePickerActive).toBe('true');
+    rangeInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(overlay.hidden).toBe(false);
+    expect(picker.dataset.rangePickerActive).toBe('false');
+    handle.detach();
+  });
+
   it('exposes shared range picker controls through the public entrypoint', () => {
     const input = document.createElement('input');
     host.appendChild(input);

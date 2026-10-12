@@ -4,7 +4,13 @@ import { overlayPortalFor } from '../interact/overlay-portal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendHostIcon, createHostButton } from './chrome-buttons.js';
 
-export type ChromeSlot = 'formulabar' | 'viewbar' | 'sheetbar' | 'statusbar' | 'watchDock';
+export type ChromeSlot =
+  | 'formulabar'
+  | 'viewbar'
+  | 'localeSwitcher'
+  | 'sheetbar'
+  | 'statusbar'
+  | 'watchDock';
 
 export interface MountChrome {
   formulabar: HTMLDivElement;
@@ -15,6 +21,7 @@ export interface MountChrome {
   fxInput: HTMLTextAreaElement;
   fxExpand: HTMLButtonElement;
   viewbar: HTMLDivElement;
+  localeSwitcher: HTMLDivElement;
   sheetWorkspace: HTMLDivElement;
   sheetSurface: HTMLDivElement;
   taskpaneDock: HTMLDivElement;
@@ -152,6 +159,9 @@ export function createMountChrome({
   const viewbar = document.createElement('div');
   viewbar.className = 'fc-viewbar';
 
+  const localeSwitcher = document.createElement('div');
+  localeSwitcher.className = 'fc-host__locale-switcher';
+
   const sheetWorkspace = document.createElement('div');
   sheetWorkspace.className = 'fc-host__sheet-workspace';
   const sheetSurface = document.createElement('div');
@@ -252,15 +262,28 @@ export function createMountChrome({
         ? formulabar
         : slot === 'viewbar'
           ? viewbar
-          : slot === 'sheetbar'
-            ? sheetbar
-            : slot === 'statusbar'
-              ? statusbar
-              : watchDock;
+          : slot === 'localeSwitcher'
+            ? localeSwitcher
+            : slot === 'sheetbar'
+              ? sheetbar
+              : slot === 'statusbar'
+                ? statusbar
+                : watchDock;
     if (on) {
       if (slot === 'formulabar') {
-        host.insertBefore(el, viewbar.parentElement === host ? viewbar : sheetWorkspace);
+        const anchor =
+          viewbar.parentElement === host
+            ? viewbar
+            : localeSwitcher.parentElement === host
+              ? localeSwitcher
+              : sheetWorkspace;
+        host.insertBefore(el, anchor);
       } else if (slot === 'viewbar') {
+        host.insertBefore(
+          el,
+          localeSwitcher.parentElement === host ? localeSwitcher : sheetWorkspace,
+        );
+      } else if (slot === 'localeSwitcher') {
         host.insertBefore(el, sheetWorkspace);
       } else if (slot === 'sheetbar') {
         sheetSurface.appendChild(el);
@@ -280,6 +303,7 @@ export function createMountChrome({
   host.appendChild(a11yLive);
   setChromeAttached('formulabar', flags.formulaBar === true);
   setChromeAttached('viewbar', flags.viewToolbar === true);
+  setChromeAttached('localeSwitcher', flags.localeSwitcher === true);
   setChromeAttached('sheetbar', flags.sheetTabs === true);
   setChromeAttached('statusbar', flags.statusBar === true);
   setChromeAttached('watchDock', flags.watchWindow === true);
@@ -293,6 +317,7 @@ export function createMountChrome({
     fxInput,
     fxExpand,
     viewbar,
+    localeSwitcher,
     sheetWorkspace,
     sheetSurface,
     taskpaneDock,

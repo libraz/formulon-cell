@@ -26,15 +26,16 @@
     "test:e2e:visual": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e:visual",
     "test:e2e:visual:update": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e:visual:update",
     "test:e2e:install": "yarn workspace @formulon-cell/react-demo test:e2e:install",
-    "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true"
+    "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true",
+    "engine:build-local": "node scripts/build-local-formulon.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@biomejs/biome": "2.5.9",
-    "@playwright/test": "^1.62.1",
-    "playwright-core": "^1.62.1",
+    "@biomejs/biome": "2.5.15",
+    "@playwright/test": "^1.64.0",
+    "playwright-core": "^1.64.0",
     "typescript": "6.0.3",
-    "vite": "8.2.1",
-    "vitest": "^4.1.11"
+    "vite": "8.3.4",
+    "vitest": "^5.0.3"
   }
 }

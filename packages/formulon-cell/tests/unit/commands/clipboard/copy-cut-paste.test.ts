@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { copy } from '../../../../src/commands/clipboard/copy.js';
 import { cut } from '../../../../src/commands/clipboard/cut.js';
 import { pasteTSV } from '../../../../src/commands/clipboard/paste.js';
+import { captureSnapshotFromCopyResult } from '../../../../src/commands/clipboard/snapshot.js';
+import {
+  inputLocaleForWorkbook,
+  localizeFormulaForClipboard,
+} from '../../../../src/commands/coerce-input.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -91,6 +96,85 @@ describe('copy', () => {
     expect(got?.tsv).toBe('1\ttwo\r\nTRUE\tFALSE');
     expect(got?.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
   });
+
+  it.each([
+    ['windows-de_DE', '1,5\tWAHR\tFALSCH'],
+    ['windows-fr_FR', '1,5\tVRAI\tFAUX'],
+  ] as const)('round-trips copy text through the live %s profile', async (profile, expectedTsv) => {
+    const localizedWb = await WorkbookHandle.createDefault();
+    const localizedStore = createSpreadsheetStore();
+    try {
+      expect(localizedWb.setSpreadsheetProfileId(profile)).toBe(true);
+      seedAndMirror(localizedStore, localizedWb, [
+        { row: 0, col: 0, value: 1.5 },
+        { row: 0, col: 1, value: true },
+        { row: 0, col: 2, value: false },
+      ]);
+      setRange(localizedStore, 0, 0, 0, 2);
+
+      const copied = copy(localizedStore.getState(), inputLocaleForWorkbook(localizedWb));
+      expect(copied?.tsv).toBe(expectedTsv);
+
+      setRange(localizedStore, 1, 0, 1, 2);
+      pasteTSV(localizedStore.getState(), localizedWb, copied?.tsv ?? '');
+      expect(localizedWb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+        kind: 'number',
+        value: 1.5,
+      });
+      expect(localizedWb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({
+        kind: 'bool',
+        value: true,
+      });
+      expect(localizedWb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({
+        kind: 'bool',
+        value: false,
+      });
+    } finally {
+      localizedWb.dispose();
+    }
+  });
+
+  it.each([
+    ['windows-de_DE', '=SUMME(1,5;2)'],
+    ['windows-fr_FR', '=SOMME(1,5;2)'],
+  ] as const)(
+    'localizes external formula TSV while retaining canonical snapshot formulas (%s)',
+    async (profile, expectedTsv) => {
+      const localizedWb = await WorkbookHandle.createDefault();
+      const localizedStore = createSpreadsheetStore();
+      try {
+        expect(localizedWb.isStub).toBe(false);
+        expect(localizedWb.capabilities.formulaLocale).toBe(true);
+        expect(localizedWb.capabilities.localeFacts).toBe(true);
+        expect(localizedWb.setSpreadsheetProfileId(profile)).toBe(true);
+        const formulaAddr = { sheet: 0, row: 0, col: 0 };
+        localizedWb.setFormula(formulaAddr, '=SUM(1.5,2)');
+        localizedWb.recalc();
+        localizedStore.setState((state) => {
+          const cells = new Map(state.data.cells);
+          cells.set(addrKey(formulaAddr), {
+            value: localizedWb.getValue(formulaAddr),
+            formula: localizedWb.cellFormula(formulaAddr),
+          });
+          return { ...state, data: { ...state.data, cells } };
+        });
+        setRange(localizedStore, 0, 0, 0, 0);
+
+        const copied = copy(
+          localizedStore.getState(),
+          inputLocaleForWorkbook(localizedWb),
+          localizeFormulaForClipboard(localizedWb),
+        );
+        expect(copied?.tsv).toBe(expectedTsv);
+        const snapshot = copied
+          ? captureSnapshotFromCopyResult(localizedStore.getState(), copied)
+          : null;
+        expect(snapshot?.cells[0]?.[0]?.formula).toBe('=SUM(1.5,2)');
+      } finally {
+        localizedWb.dispose();
+      }
+    },
+  );
 
   it('emits empty cells for missing source positions', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'x' }]);
@@ -229,6 +313,31 @@ describe('cut', () => {
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
   });
 
+  it.each([
+    ['windows-de_DE', '1,5\tWAHR\tFALSCH'],
+    ['windows-fr_FR', '1,5\tVRAI\tFAUX'],
+  ] as const)('uses the live %s profile for direct cut TSV output', async (profile, expected) => {
+    const localizedWb = await WorkbookHandle.createDefault();
+    const localizedStore = createSpreadsheetStore();
+    try {
+      expect(localizedWb.setSpreadsheetProfileId(profile)).toBe(true);
+      seedAndMirror(localizedStore, localizedWb, [
+        { row: 0, col: 0, value: 1.5 },
+        { row: 0, col: 1, value: true },
+        { row: 0, col: 2, value: false },
+      ]);
+      setRange(localizedStore, 0, 0, 0, 2);
+
+      expect(cut(localizedStore.getState(), localizedWb)?.tsv).toBe(expected);
+      expect(localizedWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+        kind: 'number',
+        value: 1.5,
+      });
+    } finally {
+      localizedWb.dispose();
+    }
+  });
+
   it('cuts whole-column selections through the trimmed payload instead of the full sheet height', () => {
     seedAndMirror(store, wb, [
       { row: 4, col: 2, value: 'top' },
@@ -283,6 +392,27 @@ describe('pasteTSV', () => {
     expect(v10.kind === 'bool' && v10.value).toBe(true);
     // Formula cell.
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 3 })).toBe('=A1');
+  });
+
+  it('uses the live workbook profile when coercing pasted numbers', async () => {
+    const localizedWb = await WorkbookHandle.createDefault();
+    try {
+      expect(localizedWb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
+      setRange(store, 0, 0, 0, 1);
+
+      pasteTSV(store.getState(), localizedWb, '1,25\t1.234');
+
+      expect(localizedWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+        kind: 'number',
+        value: 1.25,
+      });
+      expect(localizedWb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+        kind: 'number',
+        value: 1234,
+      });
+    } finally {
+      localizedWb.dispose();
+    }
   });
 
   it('respects Text-formatted destination cells when coercing pasted values', () => {

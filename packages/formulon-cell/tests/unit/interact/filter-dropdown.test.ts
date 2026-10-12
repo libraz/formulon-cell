@@ -279,6 +279,30 @@ describe('attachFilterDropdown', () => {
     handle.detach();
   });
 
+  it('formats canonical numeric criteria in the active locale', () => {
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        filterCriteria: [
+          {
+            range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+            byCol: 0,
+            hiddenValues: [],
+            condition: { op: 'greaterThan', value: '1.5' },
+          },
+        ],
+      },
+    }));
+    const handle = attachFilterDropdown({ store, strings: en, locale: 'de-DE' });
+    handle.open({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+
+    expect(
+      document.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value')?.value,
+    ).toBe('1,5');
+    handle.detach();
+  });
+
   it('restores focus to the opener when dismissed with Escape', () => {
     const opener = document.createElement('button');
     document.body.appendChild(opener);

@@ -1,8 +1,15 @@
 // Font tab behaviour for the Format Cells dialog: style checkboxes and list,
 // underline, family/size pickers and the font color with its palette flyout.
 
+import { parseLocalizedNumericInput } from '../../commands/coerce-input.js';
+import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../../engine/font-units.js';
+import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import { appendDialogSelectOptions } from '../../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../../toolbar/menu-a11y.js';
+import {
+  fontFamilyLabel,
+  fontFamilyValueFromLabel,
+} from '../../toolbar/ribbon/font-family-options.js';
 import { isHexColor } from '../format-dialog-model.js';
 import { createPaletteFlyout, type PaletteFlyout } from '../format-dialog-palette-flyout.js';
 import type { FormatDialogField } from '../format-dialog-state.js';
@@ -30,7 +37,7 @@ const NORMAL_FONT_FIELDS: readonly FormatDialogField[] = [
 ];
 
 export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTabController {
-  const { draft, on, touch, isMixed, syncControls, renderPreview } = ctx;
+  const { draft, getLocale, on, touch, isMixed, syncControls, renderPreview } = ctx;
   const {
     boldCk,
     italicCk,
@@ -47,10 +54,41 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     fontSwatches,
     fontSwatchesToggle,
     fontSwatchesFlyout,
+    fontLocale,
     syncFontFamilyOptions,
     syncFontSizeOptions,
   } = refs;
   const palette = createPaletteFlyout(fontSwatchesToggle, fontSwatchesFlyout, fontSwatches);
+  const currentFontLocale = (): import('../../i18n/strings.js').Locale =>
+    fontLocale ?? dictionaryLocaleFor(getLocale());
+
+  // A number input is always parsed with the browser's locale-independent
+  // grammar. Excel's font-size box follows the active workbook/UI locale. Keep
+  // the existing number control for dot-decimal locales, and use a text
+  // decimal control where a comma is part of the locale grammar.
+  const language = getLocale().replace('_', '-').split('-', 1)[0]?.toLowerCase();
+  if (language === 'de' || language === 'fr') {
+    sizeInput.type = 'text';
+    sizeInput.inputMode = 'decimal';
+  }
+
+  const displayPointSize = (px: number | undefined): string => {
+    if (px === undefined) return '';
+    const points = fontCssPxToDisplayPoints(px);
+    try {
+      return new Intl.NumberFormat(getLocale(), {
+        useGrouping: false,
+        maximumFractionDigits: 6,
+      }).format(points);
+    } catch {
+      // Host integrations may expose a BCP-47-like profile identifier that
+      // is not accepted by Intl. Keep the dialog usable with the base locale.
+      return new Intl.NumberFormat('en-US', {
+        useGrouping: false,
+        maximumFractionDigits: 6,
+      }).format(points);
+    }
+  };
 
   const underlineMixedOption = ((): HTMLOptionElement => {
     const scratch = document.createElement('select');
@@ -95,10 +133,12 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
       draft.fontSize === undefined &&
       draft.color === undefined;
     syncFontStyleList();
-    familyInput.value = draft.fontFamily;
+    familyInput.value = fontFamilyLabel(currentFontLocale(), draft.fontFamily);
     syncFontFamilyOptions(draft.fontFamily);
-    sizeInput.value = draft.fontSize !== undefined ? String(draft.fontSize) : '';
-    syncFontSizeOptions(draft.fontSize);
+    sizeInput.value = displayPointSize(draft.fontSize);
+    syncFontSizeOptions(
+      draft.fontSize !== undefined ? fontCssPxToDisplayPoints(draft.fontSize) : undefined,
+    );
     colorInput.value = draft.color && isHexColor(draft.color) ? draft.color : '#000000';
     fontSwatches.setValue(draft.color && isHexColor(draft.color) ? draft.color : null);
   };
@@ -129,7 +169,11 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     }
     syncFontStyleList();
     syncFontFamilyOptions(isMixed('fontFamily') ? '' : draft.fontFamily, !isMixed('fontFamily'));
-    syncFontSizeOptions(isMixed('fontSize') ? undefined : draft.fontSize);
+    syncFontSizeOptions(
+      isMixed('fontSize') || draft.fontSize === undefined
+        ? undefined
+        : fontCssPxToDisplayPoints(draft.fontSize),
+    );
     if (isMixed('color')) {
       fontSwatches.setValue(null);
       markMixed(colorInput, true, 'color');
@@ -225,20 +269,33 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     syncControls();
     renderPreview();
   };
-  const onFamilyInput = (): void => {
+  const applyFamilyValue = (value: string): void => {
     touch('fontFamily');
-    draft.fontFamily = familyInput.value;
+    draft.fontFamily = value;
     normalFontCk.input.checked = false;
     syncControls();
     renderPreview();
+  };
+  const onFamilyInput = (): void => {
+    applyFamilyValue(fontFamilyValueFromLabel(currentFontLocale(), familyInput.value));
+  };
+  const onFamilyOption = (event: Event): void => {
+    const value = (event as CustomEvent<{ value?: unknown }>).detail?.value;
+    if (typeof value !== 'string') return;
+    // Picker rows carry their persisted value explicitly.  This matters for
+    // imported `游ゴシック Regular`, whose visible label also names the
+    // canonical `游ゴシック` body theme option.
+    applyFamilyValue(value);
   };
   const onSizeInput = (): void => {
     touch('fontSize');
     if (sizeInput.value === '') {
       draft.fontSize = undefined;
     } else {
-      const n = Number.parseInt(sizeInput.value, 10);
-      if (Number.isFinite(n)) draft.fontSize = Math.max(1, Math.min(409, n));
+      const points = parseLocalizedNumericInput(sizeInput.value, getLocale());
+      if (points !== null) {
+        draft.fontSize = fontPointsToCssPx(Math.max(1, Math.min(409, points)));
+      }
     }
     normalFontCk.input.checked = false;
     syncControls();
@@ -282,6 +339,7 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
   on(normalFontCk.input, 'change', onNormalFontChange);
   on(fontStyleList, 'click', onFontStyleListClick as EventListener);
   on(familyInput, 'input', onFamilyInput);
+  on(familyInput, 'fc-font-family-option', onFamilyOption);
   on(sizeInput, 'input', onSizeInput);
   on(colorInput, 'input', onColorInput);
   on(colorReset, 'click', onColorReset);

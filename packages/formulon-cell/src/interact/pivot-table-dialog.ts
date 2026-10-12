@@ -4,6 +4,8 @@ import {
   inferPivotSourceFields,
   type PivotSourceField,
 } from '../commands/pivot-table.js';
+import { isWorkbookStructureProtected } from '../commands/protection.js';
+import { addSheet } from '../commands/sheet-mutate.js';
 import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import { PivotAggregation } from '../engine/types.js';
@@ -410,7 +412,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     }
     let destinationSheet = range.sheet;
     if (useNewWorksheet) {
-      const added = wb.addSheet();
+      if (isWorkbookStructureProtected(store.getState())) {
+        showError(strings.ribbonMenu.workbookStructureProtectedBlocked);
+        return;
+      }
+      const added = addSheet(store, wb);
       if (added < 0) {
         showError(strings.pivotTableDialog.engineFailed);
         return;

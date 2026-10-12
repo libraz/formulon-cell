@@ -64,9 +64,16 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
       strings: getStrings(),
     });
   const attachEvaluateFormula = () =>
-    attachEvaluateFormulaDialog({ host, store, getWb, strings: getStrings() });
+    attachEvaluateFormulaDialog({ host, store, getWb, getLocale, strings: getStrings() });
   const attachFilter = () =>
-    attachFilterDropdown({ host, store, history, strings: getStrings(), locale: getLocale() });
+    attachFilterDropdown({
+      host,
+      store,
+      history,
+      getWb,
+      strings: getStrings(),
+      locale: getLocale(),
+    });
 
   let externalLinksDialog = attachExternalLinks();
   let cfRulesDialog = attachCfRules();

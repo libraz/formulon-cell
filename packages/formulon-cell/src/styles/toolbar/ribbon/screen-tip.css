@@ -1,0 +1,40 @@
+@layer fc.app {
+  /* Ribbon screen tips are deliberately light-DOM overlays. Keeping the
+   * dimensions here as well as in the positioning helper prevents long
+   * translated labels from pushing a tip beyond a small viewport before the
+   * first layout pass completes. */
+  .fc-tb__screen-tip {
+    position: fixed;
+    z-index: var(--fc-z-tooltip, 2147483030);
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 16px));
+    max-height: min(240px, calc(100vh - 16px));
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 7px 10px;
+    border: 1px solid var(--fc-tb-line, #b7b7b7);
+    border-radius: 2px;
+    background: var(--fc-tb-ribbon-bg, #f3f2f1);
+    color: var(--fc-tb-fg, #201f1e);
+    box-shadow:
+      0 5px 14px rgba(0, 0, 0, 0.16),
+      0 1px 3px rgba(0, 0, 0, 0.12);
+    font-family: var(--fc-tb-font, var(--fc-font-ui, system-ui, sans-serif));
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    /* A screen tip explains the hovered control; it must never become the
+     * hit target for the command underneath it. */
+    pointer-events: none;
+    cursor: default;
+    user-select: text;
+    white-space: pre-wrap;
+    word-break: normal;
+  }
+
+  .fc-tb__screen-tip[aria-hidden="true"] {
+    display: none;
+  }
+}

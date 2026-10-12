@@ -1,4 +1,7 @@
+import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
+import { localeOrdinalForSpreadsheetProfile, localizeFormula } from './function-locale.js';
 import type { Addr, CellValue } from './types.js';
+import { formatBoolean, formatEditableNumber } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 export interface FormatCellForEditOptions {
@@ -6,6 +9,42 @@ export interface FormatCellForEditOptions {
   sheetProtected?: boolean;
   formulaOverride?: string | null;
   formatFormula?: (formula: string) => string;
+  locale?: string;
+}
+
+/** Resolve a stored A1 formula to the text shown by an editor. Native R1C1
+ * output is selected before function aliases are localized so references keep
+ * the engine's exact relative-address semantics. */
+export function formulaForEdit(
+  wb: WorkbookHandle,
+  addr: Addr,
+  formula: string | null,
+  r1c1 = false,
+): string | null {
+  if (!formula) return null;
+  if (!r1c1) {
+    return typeof wb.getFormulaForDisplay === 'function'
+      ? wb.getFormulaForDisplay(formula)
+      : formula;
+  }
+  let native: string | null = null;
+  if (wb.capabilities.formulaR1C1 && addr.sheet >= 0 && addr.sheet < wb.sheetCount) {
+    try {
+      native = wb.cellFormulaR1C1(addr);
+    } catch {
+      // A transient workbook/sheet transition can invalidate the native read;
+      // the A1 formula below remains a safe source for conversion.
+    }
+  }
+  const resolved = native ?? formatA1FormulaAsR1C1(formula, addr);
+  // Native R1C1 output already resolved the exact relative references. Apply
+  // full profile conversion only after that resolution so separators and
+  // localized literals are displayed consistently with A1 editing.
+  if (typeof wb.getFormulaForDisplay === 'function') {
+    return wb.getFormulaForDisplay(resolved);
+  }
+  const profile = typeof wb.spreadsheetProfileId === 'function' ? wb.spreadsheetProfileId() : null;
+  return localizeFormula(wb, resolved, localeOrdinalForSpreadsheetProfile(profile));
 }
 
 /**
@@ -39,14 +78,20 @@ export function formatCellForEdit(
   if (formula) return hideFormula ? '' : displayFormula(formula);
   if (wb && addr) {
     const lambda = wb.getLambdaText(addr);
-    if (lambda) return hideFormula ? '' : displayFormula(`=${lambda}`);
+    if (lambda) {
+      const localized =
+        typeof wb.getFormulaForDisplay === 'function'
+          ? wb.getFormulaForDisplay(`=${lambda}`)
+          : `=${lambda}`;
+      return hideFormula ? '' : displayFormula(localized);
+    }
   }
   const v = cell.value;
   switch (v.kind) {
     case 'number':
-      return String(v.value);
+      return formatEditableNumber(v.value, options?.locale);
     case 'bool':
-      return v.value ? 'TRUE' : 'FALSE';
+      return formatBoolean(v.value, options?.locale);
     case 'text':
       return v.value;
     case 'error':

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { pasteTSV } from '../../../src/commands/clipboard/paste.js';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -20,7 +21,7 @@ const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ pref
 const seedAndMirror = (
   store: SpreadsheetStore,
   wb: WorkbookHandle,
-  cells: Array<{ row: number; col: number; value: number | string; formula?: string }>,
+  cells: Array<{ row: number; col: number; value: number | string | boolean; formula?: string }>,
 ): void => {
   store.setState((s) => {
     const map = new Map(s.data.cells);
@@ -32,12 +33,17 @@ const seedAndMirror = (
           value:
             typeof c.value === 'number'
               ? { kind: 'number', value: c.value }
-              : { kind: 'text', value: c.value },
+              : typeof c.value === 'boolean'
+                ? { kind: 'bool', value: c.value }
+                : { kind: 'text', value: c.value },
           formula: c.formula,
         });
       } else if (typeof c.value === 'number') {
         wb.setNumber(addr, c.value);
         map.set(addrKey(addr), { value: { kind: 'number', value: c.value }, formula: null });
+      } else if (typeof c.value === 'boolean') {
+        wb.setBool(addr, c.value);
+        map.set(addrKey(addr), { value: { kind: 'bool', value: c.value }, formula: null });
       } else {
         wb.setText(addr, c.value);
         map.set(addrKey(addr), { value: { kind: 'text', value: c.value }, formula: null });
@@ -132,6 +138,56 @@ describe('attachClipboard', () => {
     expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     expect(onAfterCommit).not.toHaveBeenCalled();
     handle.detach();
+  });
+
+  it.each([
+    ['windows-de_DE', '1,5\tWAHR\tFALSCH'],
+    ['windows-fr_FR', '1,5\tVRAI\tFAUX'],
+  ] as const)('copies edit-input text for the live %s profile', async (profile, expectedTsv) => {
+    const localizedHost = document.createElement('div');
+    document.body.appendChild(localizedHost);
+    const localizedStore = createSpreadsheetStore();
+    const localizedWb = await WorkbookHandle.createDefault();
+    const localizedAfterCommit = vi.fn<() => void>();
+    try {
+      expect(localizedWb.setSpreadsheetProfileId(profile)).toBe(true);
+      seedAndMirror(localizedStore, localizedWb, [
+        { row: 0, col: 0, value: 1.5 },
+        { row: 0, col: 1, value: true },
+        { row: 0, col: 2, value: false },
+      ]);
+      setRange(localizedStore, 0, 0, 0, 2);
+      const localizedHandle = attachClipboard({
+        host: localizedHost,
+        store: localizedStore,
+        wb: localizedWb,
+        onAfterCommit: localizedAfterCommit,
+      });
+
+      const { transfer } = fireClipboard(localizedHost, 'copy');
+      expect(transfer.getData('text/plain')).toBe(expectedTsv);
+      expect(transfer.getData('text/html')).toContain(expectedTsv.split('\t')[0]);
+      expect(transfer.getData('text/html')).toContain(expectedTsv.split('\t')[1] ?? '');
+
+      setRange(localizedStore, 1, 0, 1, 2);
+      pasteTSV(localizedStore.getState(), localizedWb, transfer.getData('text/plain'));
+      expect(localizedWb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+        kind: 'number',
+        value: 1.5,
+      });
+      expect(localizedWb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({
+        kind: 'bool',
+        value: true,
+      });
+      expect(localizedWb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({
+        kind: 'bool',
+        value: false,
+      });
+      localizedHandle.detach();
+    } finally {
+      localizedWb.dispose();
+      localizedHost.remove();
+    }
   });
 
   it('copy is a no-op while the editor is active', () => {

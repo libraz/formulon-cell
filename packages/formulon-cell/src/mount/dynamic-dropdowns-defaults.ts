@@ -207,6 +207,7 @@ export function createDefaultDynamicDropdownsCtx(
     applyDataValidationAction: dataDefaults.applyDataValidationAction,
     applyConditionalMenuAction: styleDefaults.applyConditionalMenuAction,
     applyUiTheme: pageLayoutDefaults.applyUiTheme,
+    applyWorkbookTheme: pageLayoutDefaults.applyWorkbookTheme,
     applySymbolAction: insertDefaults.applySymbolAction,
 
     // Dialog / host-glue — host opts in via `overrides`. Defaults are no-op

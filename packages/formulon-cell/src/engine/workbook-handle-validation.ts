@@ -1,10 +1,32 @@
+import type { CellsInRangeResult } from '@libraz/formulon';
 import type { DataValidationInput, EngineCapabilities, Range, Workbook } from './types.js';
+import { type CellValue, type Value, ValueKind } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
   wb: Workbook;
   assertAlive(): void;
+};
+
+type ValidationWorkbook = Workbook & {
+  validateValue?: (
+    sheet: number,
+    row: number,
+    col: number,
+    value: Value,
+  ) => {
+    status: { ok: boolean };
+    hasRule: boolean;
+    valid: boolean;
+    ruleIndex: number;
+    errorStyle: number;
+  };
+  listInvalidCells?: (
+    sheet: number,
+    cursor?: number | null,
+    limit?: number | null,
+  ) => CellsInRangeResult;
 };
 
 declare module './workbook-handle.js' {
@@ -23,8 +45,83 @@ function wb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
+function toEngineValue(value: CellValue): Value {
+  switch (value.kind) {
+    case 'number':
+      return { kind: ValueKind.Number, number: value.value, boolean: 0, text: '', errorCode: 0 };
+    case 'bool':
+      return {
+        kind: ValueKind.Bool,
+        number: 0,
+        boolean: value.value ? 1 : 0,
+        text: '',
+        errorCode: 0,
+      };
+    case 'text':
+      return { kind: ValueKind.Text, number: 0, boolean: 0, text: value.value, errorCode: 0 };
+    case 'error':
+      return {
+        kind: ValueKind.Error,
+        number: 0,
+        boolean: 0,
+        text: '',
+        errorCode: value.code,
+      };
+    default:
+      return { kind: ValueKind.Blank, number: 0, boolean: 0, text: '', errorCode: 0 };
+  }
+}
+
 export abstract class WorkbookHandleValidationMethods {
   declare readonly capabilities: EngineCapabilities;
+
+  /** Check a proposed cell value against the engine's first covering rule.
+   * Returns `null` when the 0.13 validation-evaluation surface is absent or
+   * the call fails, allowing the cell layer's evaluator to remain the fallback. */
+  validateValue(
+    sheet: number,
+    row: number,
+    col: number,
+    value: CellValue,
+  ): {
+    hasRule: boolean;
+    valid: boolean;
+    ruleIndex: number;
+    errorStyle: number;
+  } | null {
+    assertAlive(this);
+    if (!this.capabilities.validationEvaluation) return null;
+    const result = (wb(this) as ValidationWorkbook).validateValue?.(
+      sheet,
+      row,
+      col,
+      toEngineValue(value),
+    );
+    if (!result?.status.ok) return null;
+    return {
+      hasRule: result.hasRule,
+      valid: result.valid,
+      ruleIndex: result.ruleIndex,
+      errorStyle: result.errorStyle,
+    };
+  }
+
+  /** Enumerate populated cells that fail a stored validation rule. Results
+   * are paged by the native engine; callers can resume with `nextCursor`. */
+  listInvalidCells(
+    sheet: number,
+    cursor: number | null = null,
+    limit: number | null = null,
+  ): { cells: { sheet: number; row: number; col: number }[]; nextCursor: number | null } | null {
+    assertAlive(this);
+    if (!this.capabilities.validationEvaluation) return null;
+    const result = (wb(this) as ValidationWorkbook).listInvalidCells?.(sheet, cursor, limit);
+    if (!result?.status.ok) return null;
+    return {
+      cells: result.cells.map((cell) => ({ sheet, row: cell.row, col: cell.col })),
+      nextCursor: result.nextCursor,
+    };
+  }
 
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to
    *  multiple ranges (`ranges`) and carries an spreadsheet-style descriptor: numeric

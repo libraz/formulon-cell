@@ -40,6 +40,7 @@ export const MENU_ICON_GLYPHS = {
   'clear-formats': 'clearFormats',
   'clear-hyperlinks': 'clearHyperlinks',
   'clear-comments': 'clearComments',
+  'comment-add': 'commentAdd',
   'comment-delete': 'commentAdd',
   'comment-delete-all': 'commentAdd',
   conditional: 'conditional',

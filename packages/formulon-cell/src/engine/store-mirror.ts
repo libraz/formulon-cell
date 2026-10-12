@@ -1,8 +1,23 @@
+import { associatePaginationEngine } from '../commands/pagination.js';
 import type { CellFormat, PageSetup, SpreadsheetStore, State } from '../store/store.js';
 import { parseAddrKey } from './address.js';
-import { syncAutoFilterToEngine } from './auto-filter-sync.js';
-import { flushFormatToEngine } from './cell-format-sync.js';
+import { syncAutoFilterToEngine, syncHiddenRowsToEngine } from './auto-filter-sync.js';
+import { remapActiveAxisFormatOverrides, remapAxisFormatOverrides } from './axis-format-sync.js';
+import {
+  captureSyncedFormatKeyMembership,
+  flushFormatToEngine,
+  remapSyncedFormatKeys,
+  restoreSyncedFormatKeyMembership,
+} from './cell-format-sync.js';
+import {
+  createFormatHistoryBridge,
+  type FormatHistoryBridge,
+  registerFormatHistoryBridge,
+  unregisterFormatHistoryBridge,
+} from './format-history-bridge.js';
 import { syncPageSetupToEngine } from './print-sync.js';
+import type { SheetAxisFormatOverride, SheetFontOverride } from './types.js';
+import { bindWholeSheetFontStore } from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 const autoFilterSignature = (state: State): string =>
@@ -59,6 +74,64 @@ const sheetsWithCellStyles = (formats: ReadonlyMap<string, CellFormat>): Set<num
   return sheets;
 };
 
+const sameSheetFontOverride = (
+  before: SheetFontOverride | undefined,
+  after: SheetFontOverride | undefined,
+): boolean => JSON.stringify(before) === JSON.stringify(after);
+
+const changedSheetFontOverrideSheets = (
+  previous: ReadonlyMap<number, SheetFontOverride> | null,
+  next: ReadonlyMap<number, SheetFontOverride>,
+): Set<number> => {
+  const changed = new Set<number>();
+  if (previous === next) return changed;
+  if (previous === null) {
+    for (const sheet of next.keys()) changed.add(sheet);
+    return changed;
+  }
+  for (const [sheet, override] of next) {
+    if (!sameSheetFontOverride(previous.get(sheet), override)) changed.add(sheet);
+  }
+  for (const sheet of previous.keys()) {
+    if (!next.has(sheet)) changed.add(sheet);
+  }
+  return changed;
+};
+
+const sameAxisFormatOverride = (
+  before: SheetAxisFormatOverride | undefined,
+  after: SheetAxisFormatOverride | undefined,
+): boolean => JSON.stringify(before) === JSON.stringify(after);
+
+const changedAxisFormatOverrideSheets = (
+  previous: ReadonlyMap<number, SheetAxisFormatOverride> | null,
+  next: ReadonlyMap<number, SheetAxisFormatOverride>,
+): Set<number> => {
+  const changed = new Set<number>();
+  if (previous === next) return changed;
+  if (previous === null) {
+    for (const sheet of next.keys()) changed.add(sheet);
+    return changed;
+  }
+  for (const [sheet, override] of next) {
+    if (!sameAxisFormatOverride(previous.get(sheet), override)) changed.add(sheet);
+  }
+  for (const sheet of previous.keys()) if (!next.has(sheet)) changed.add(sheet);
+  return changed;
+};
+
+const sameHiddenRows = (
+  before: ReadonlySet<number> | null,
+  after: ReadonlySet<number>,
+): boolean => {
+  if (before === after) return true;
+  if (!before || before.size !== after.size) return false;
+  for (const row of before) {
+    if (!after.has(row)) return false;
+  }
+  return true;
+};
+
 /** Mirrors a bound mount store's formats, AutoFilter and page-setup slices
  *  into the engine as they change. */
 export class StoreMirror {
@@ -70,9 +143,27 @@ export class StoreMirror {
    * print settings without duplicating writeback calls. */
   private boundStore: SpreadsheetStore | null = null;
 
+  /** Bridge owned by this mirror while `boundStore` is attached. The
+   * registry removes it conditionally so an older mirror cannot detach a
+   * newer mirror that borrowed the same workbook/store pair. */
+  private formatHistoryBridge: FormatHistoryBridge | null = null;
+
   private unsubscribeBoundStore: (() => void) | null = null;
 
+  /** Keep worksheet-indexed store state aligned when callers mutate the
+   *  WorkbookHandle directly. Structure commands deliberately do not remap
+   *  this map themselves: the handle event is the one source of truth for
+   *  both direct and command-mediated mutations. */
+  private unsubscribeWorkbook: (() => void) | null = null;
+
   private lastAutoFilterSignature = '';
+
+  /** Hidden rows are part of the UI-owned filter result. Track their content
+   * separately because advanced filters, slicers and reapply can change the
+   * result while the AutoFilter definition stays byte-for-byte identical. */
+  private lastHiddenRows: ReadonlySet<number> | null = null;
+
+  private lastHiddenRowsSheet: number | null = null;
 
   /** Identity of the page-setup map the engine already carries. The store
    *  replaces the map on every page-setup write and preserves it otherwise, so
@@ -86,6 +177,13 @@ export class StoreMirror {
    *  deep-comparing every CellFormat on every store notification. */
   private lastFormatEntries: ReadonlyMap<string, CellFormat> | null = null;
 
+  /** Whole-sheet font overrides are a separate sparse map from cell formats.
+   *  Track it independently so applying, undoing, or clearing an override
+   *  flushes the native column/row styles even when no physical cell changed. */
+  private lastSheetFontOverrides: ReadonlyMap<number, SheetFontOverride> | null = null;
+
+  private lastSheetAxisOverrides: ReadonlyMap<number, SheetAxisFormatOverride> | null = null;
+
   /** Named styles are session metadata; changing the array can affect every
    *  cell that references one, so its identity is tracked independently. */
   private lastCustomCellStyles: State['format']['customCellStyles'] | null = null;
@@ -93,14 +191,49 @@ export class StoreMirror {
   private storeSyncMuted = 0;
 
   attach(store: SpreadsheetStore | null): void {
+    if (this.boundStore && this.formatHistoryBridge) {
+      unregisterFormatHistoryBridge(this.boundStore, this.formatHistoryBridge);
+    }
+    this.formatHistoryBridge = null;
     this.unsubscribeBoundStore?.();
     this.unsubscribeBoundStore = null;
+    this.unsubscribeWorkbook?.();
+    this.unsubscribeWorkbook = null;
+    if (this.boundStore) associatePaginationEngine(this.boundStore.getState(), null);
     this.boundStore = store;
     this.rebase();
     if (!store) return;
+    this.formatHistoryBridge = createFormatHistoryBridge(
+      this.handle,
+      (sheet) => flushFormatToEngine(this.handle, store, sheet, { strict: true }),
+      (keys) => captureSyncedFormatKeyMembership(this.handle, keys),
+      (snapshot) => restoreSyncedFormatKeyMembership(this.handle, snapshot),
+    );
+    registerFormatHistoryBridge(store, this.formatHistoryBridge);
+    associatePaginationEngine(store.getState(), this.handle);
+    this.unsubscribeWorkbook = bindWholeSheetFontStore(this.handle, store, (mapIndex) => {
+      remapSyncedFormatKeys(this.handle, mapIndex);
+      remapActiveAxisFormatOverrides(this.handle, mapIndex);
+      remapAxisFormatOverrides(store, mapIndex);
+    });
     this.unsubscribeBoundStore = store.subscribe((state) => {
+      associatePaginationEngine(state, this.handle);
       const nextFormats = state.format.formats;
       const formatSheets = changedFormatSheets(this.lastFormatEntries, nextFormats);
+      const nextSheetFontOverrides = state.format.sheetFontOverrides ?? new Map();
+      for (const sheet of changedSheetFontOverrideSheets(
+        this.lastSheetFontOverrides,
+        nextSheetFontOverrides,
+      )) {
+        formatSheets.add(sheet);
+      }
+      const nextSheetAxisOverrides = state.format.sheetAxisOverrides ?? new Map();
+      for (const sheet of changedAxisFormatOverrideSheets(
+        this.lastSheetAxisOverrides,
+        nextSheetAxisOverrides,
+      )) {
+        formatSheets.add(sheet);
+      }
       const stylesChanged = (state.format.customCellStyles ?? null) !== this.lastCustomCellStyles;
       if (stylesChanged) {
         for (const sheet of sheetsWithCellStyles(nextFormats)) formatSheets.add(sheet);
@@ -108,10 +241,18 @@ export class StoreMirror {
       // Advance all baselines even while hydration is muted. The state that
       // hydration imports is the new engine baseline, not a pending UI edit.
       this.lastFormatEntries = nextFormats;
+      this.lastSheetFontOverrides = nextSheetFontOverrides;
+      this.lastSheetAxisOverrides = nextSheetAxisOverrides;
       this.lastCustomCellStyles = state.format.customCellStyles ?? null;
       const nextFilter = autoFilterSignature(state);
       const filterChanged = nextFilter !== this.lastAutoFilterSignature;
       if (filterChanged) this.lastAutoFilterSignature = nextFilter;
+      const hiddenRowsSheetChanged = this.lastHiddenRowsSheet !== state.data.sheetIndex;
+      const hiddenRowsChanged =
+        !hiddenRowsSheetChanged && !sameHiddenRows(this.lastHiddenRows, state.layout.hiddenRows);
+      const previousHiddenRows = this.lastHiddenRows;
+      this.lastHiddenRows = state.layout.hiddenRows;
+      this.lastHiddenRowsSheet = state.data.sheetIndex;
       const nextPageSetup = state.pageSetup.setupBySheet;
       const pageSetupChanged = nextPageSetup !== this.lastPageSetupMap;
       if (pageSetupChanged) this.lastPageSetupMap = nextPageSetup;
@@ -119,7 +260,15 @@ export class StoreMirror {
       for (const sheet of formatSheets) {
         if (sheet < this.handle.sheetCount) flushFormatToEngine(this.handle, store, sheet);
       }
-      if (filterChanged) syncAutoFilterToEngine(this.handle, state, state.data.sheetIndex);
+      if (filterChanged) syncAutoFilterToEngine(this.handle, state, state.data.sheetIndex, store);
+      if (hiddenRowsChanged && previousHiddenRows && !filterChanged) {
+        syncHiddenRowsToEngine(
+          this.handle,
+          state.data.sheetIndex,
+          previousHiddenRows,
+          state.layout.hiddenRows,
+        );
+      }
       if (pageSetupChanged) syncPageSetupToEngine(this.handle, store, state.data.sheetIndex);
     });
   }
@@ -144,8 +293,12 @@ export class StoreMirror {
   private rebase(): void {
     const state = this.boundStore?.getState();
     this.lastFormatEntries = state?.format.formats ?? null;
+    this.lastSheetFontOverrides = state?.format.sheetFontOverrides ?? null;
+    this.lastSheetAxisOverrides = state?.format.sheetAxisOverrides ?? null;
     this.lastCustomCellStyles = state?.format.customCellStyles ?? null;
     this.lastAutoFilterSignature = state ? autoFilterSignature(state) : '';
+    this.lastHiddenRows = state?.layout.hiddenRows ?? null;
+    this.lastHiddenRowsSheet = state?.data.sheetIndex ?? null;
     this.lastPageSetupMap = state?.pageSetup.setupBySheet ?? null;
   }
 }

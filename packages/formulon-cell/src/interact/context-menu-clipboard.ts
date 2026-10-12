@@ -11,8 +11,10 @@ import {
   captureSnapshotFromCopyResult,
 } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
+import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -102,9 +104,20 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         },
         selection: { ...state.selection, range: ui.copyRange, extraRanges: [] },
       };
-      const materialized = copy(sourceState);
+      const materialized = copy(
+        sourceState,
+        inputLocaleForWorkbook(wb),
+        localizeFormulaForClipboard(wb),
+      );
       localSnapshot = materialized
-        ? captureSnapshotFromCopyResult(sourceState, materialized, 'copy')
+        ? captureSnapshotFromCopyResult(
+            sourceState,
+            materialized,
+            'copy',
+            wb.capabilities.effectiveStyle && !wb.isStub
+              ? (addr) => effectiveCellFormatWithPending(wb, sourceState, addr)
+              : (addr) => sourceState.format.formats.get(addrKey(addr)),
+          )
         : null;
     }
     return localSnapshot;
@@ -147,9 +160,16 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
           deps.onClipboardShortcut('copy');
           return true;
         }
-        const r = copy(state);
+        const r = copy(state, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
         if (r) {
-          localSnapshot = captureSnapshotFromCopyResult(state, r, 'copy');
+          localSnapshot = captureSnapshotFromCopyResult(
+            state,
+            r,
+            'copy',
+            wb.capabilities.effectiveStyle && !wb.isStub
+              ? (addr) => effectiveCellFormatWithPending(wb, state, addr)
+              : (addr) => state.format.formats.get(addrKey(addr)),
+          );
           localSnapshotText = r.tsv;
           if (r.ranges) mutators.setCopyRanges(store, r.ranges);
           else mutators.setCopyRange(store, r.range);
@@ -168,7 +188,14 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         }
         const r = cut(state, wb);
         if (r) {
-          localSnapshot = captureSnapshotFromCopyResult(state, r, 'cut');
+          localSnapshot = captureSnapshotFromCopyResult(
+            state,
+            r,
+            'cut',
+            wb.capabilities.effectiveStyle && !wb.isStub
+              ? (addr) => effectiveCellFormatWithPending(wb, state, addr)
+              : (addr) => state.format.formats.get(addrKey(addr)),
+          );
           if (!localSnapshot) return true;
           localSnapshotText = r.tsv;
           mutators.setCopyRange(store, r.range, 'cut');

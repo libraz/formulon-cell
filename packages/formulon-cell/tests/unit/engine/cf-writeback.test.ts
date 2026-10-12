@@ -5,8 +5,9 @@ import {
   syncConditionalRulesToEngine,
   syncTrackedConditionalRulesToEngine,
 } from '../../../src/engine/cf-writeback.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { ConditionalRule } from '../../../src/store/types.js';
+import { canLoadWasm } from './xlsx-roundtrip/fixtures.js';
 
 const range = { sheet: 0, r0: 1, c0: 2, r1: 3, c1: 4 };
 const sqref = [{ firstRow: 1, firstCol: 2, lastRow: 3, lastCol: 4 }];
@@ -116,6 +117,73 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       sqref,
       type: 17,
     });
+  });
+
+  it('translates case-sensitive text predicates into anchored expressions', () => {
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: 'a"b',
+        apply: {},
+        caseSensitive: true,
+      }),
+    ).toEqual({
+      sqref,
+      type: 0,
+      formula1: 'ISNUMBER(FIND("a""b",C2))',
+    });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: 'Ab',
+        mode: 'not-contains',
+        apply: {},
+        caseSensitive: true,
+      }),
+    ).toEqual({
+      sqref,
+      type: 0,
+      formula1: 'NOT(ISNUMBER(FIND("Ab",C2)))',
+    });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: 'Ab',
+        mode: 'begins-with',
+        apply: {},
+        caseSensitive: true,
+      }),
+    ).toEqual({
+      sqref,
+      type: 0,
+      formula1: 'EXACT(LEFT(C2,LEN("Ab")),"Ab")',
+    });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: 'Ab',
+        mode: 'ends-with',
+        apply: {},
+        caseSensitive: true,
+      }),
+    ).toEqual({
+      sqref,
+      type: 0,
+      formula1: 'EXACT(RIGHT(C2,LEN("Ab")),"Ab")',
+    });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: '',
+        apply: {},
+        caseSensitive: true,
+      }),
+    ).toBeNull();
   });
 
   it('translates top-bottom and average rules', () => {
@@ -447,6 +515,95 @@ describe('syncConditionalRulesToEngine (H-13)', () => {
   });
 });
 
+describe.skipIf(!canLoadWasm())('case-sensitive text writeback (native)', () => {
+  const targetRange = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+
+  const matchingRows = (wb: WorkbookHandle, priority: number): number[] =>
+    wb
+      .evaluateCfRange(0, targetRange.r0, targetRange.c0, targetRange.r1, targetRange.c1)
+      .filter((cell) => cell.matches.some((match) => match.priority === priority))
+      .map((cell) => cell.row);
+
+  it.each([
+    {
+      name: 'contains',
+      text: 'A',
+      values: ['Alpha', 'alpha', 'beta'],
+      expectedRows: [0],
+    },
+    {
+      name: 'not-contains',
+      mode: 'not-contains' as const,
+      text: 'A',
+      values: ['Alpha', 'alpha', 'beta'],
+      expectedRows: [1, 2],
+    },
+    {
+      name: 'begins-with',
+      mode: 'begins-with' as const,
+      text: 'Ab',
+      values: ['Abacus', 'abacus', 'xAbacus'],
+      expectedRows: [0],
+    },
+    {
+      name: 'ends-with',
+      mode: 'ends-with' as const,
+      text: 'Ab',
+      values: ['Ab', 'ab', 'xAb'],
+      expectedRows: [0, 2],
+    },
+    {
+      name: 'quoted contains',
+      text: 'a"b',
+      values: ['a"b', 'A"b', 'a""b'],
+      expectedRows: [0],
+    },
+  ])(
+    'preserves $name semantics through save/load',
+    async ({ mode, text, values, expectedRows }) => {
+      const wb = await WorkbookHandle.createDefault();
+      try {
+        expect(wb.isStub).toBe(false);
+        expect(wb.capabilities.conditionalFormatMutate).toBe(true);
+        for (const [row, value] of values.entries()) {
+          wb.setText({ sheet: 0, row, col: 0 }, value);
+        }
+        const rule: ConditionalRule = {
+          kind: 'text-contains',
+          range: targetRange,
+          text,
+          ...(mode ? { mode } : {}),
+          caseSensitive: true,
+          apply: {},
+        };
+        const input = conditionalRuleToEngineInput(rule);
+        expect(input).toMatchObject({ type: 0 });
+        if (!input) throw new Error('Expected a case-sensitive expression input.');
+        expect(wb.addConditionalFormat(0, input)).toBeGreaterThanOrEqual(0);
+        const before = wb.getConditionalFormats(0);
+        const beforeEntry = before.find((entry) => entry.type === 0);
+        expect(beforeEntry?.formula1).toBe(input.formula1);
+        if (!beforeEntry) throw new Error('Expected a native expression rule.');
+        expect(matchingRows(wb, beforeEntry.priority)).toEqual(expectedRows);
+
+        const loaded = await WorkbookHandle.loadBytes(wb.save());
+        try {
+          expect(loaded.isStub).toBe(false);
+          const after = loaded.getConditionalFormats(0);
+          const afterEntry = after.find((entry) => entry.type === 0);
+          expect(afterEntry?.formula1).toBe(input.formula1);
+          if (!afterEntry) throw new Error('Expected the expression rule after reload.');
+          expect(matchingRows(loaded, afterEntry.priority)).toEqual(expectedRows);
+        } finally {
+          loaded.dispose();
+        }
+      } finally {
+        wb.dispose();
+      }
+    },
+  );
+});
+
 describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
   const trackedWb = () => {
     const formats: Array<{
@@ -706,5 +863,28 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
       removed: 0,
     });
     expect(wb.addDxf).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the dxf writeback path for case-sensitive expression rules', () => {
+    const { wb, formats } = trackedWb();
+    const tracked: SyncedConditionalRuleMap = new Map();
+    const rule: ConditionalRule = {
+      kind: 'text-contains',
+      range,
+      text: 'Ab',
+      caseSensitive: true,
+      apply: { fill: '#e2f0d9' },
+    };
+
+    expect(syncTrackedConditionalRulesToEngine(wb, [rule], 0, { tracked })).toEqual({
+      written: 1,
+      skipped: 0,
+      removed: 0,
+    });
+    expect(formats[1]).toMatchObject({
+      type: 0,
+      formula1: 'ISNUMBER(FIND("Ab",C2))',
+      dxfId: 11,
+    });
   });
 });

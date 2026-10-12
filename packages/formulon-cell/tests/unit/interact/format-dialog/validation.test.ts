@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { coerceInput } from '../../../../src/commands/coerce-input.js';
 import { addrKey } from '../../../../src/engine/workbook-handle.js';
+import { de } from '../../../../src/i18n/strings.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import {
   createSpreadsheetStore,
@@ -222,6 +223,64 @@ describe('attachFormatDialog', () => {
     }
   });
 
+  it('parses localized decimal bounds and blocks an invalid bound from confirming', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        validation: {
+          kind: 'decimal',
+          op: 'between',
+          a: 7,
+          b: 9,
+        },
+      },
+    );
+    const handle = attachFormatDialog({ host, store, strings: de, getLocale: () => 'de-DE' });
+    try {
+      handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+
+      const kind = Array.from(document.querySelectorAll<HTMLSelectElement>('select')).find((s) =>
+        Array.from(s.options).some((option) => option.value === 'textLength'),
+      );
+      if (!kind) throw new Error('validation kind select missing');
+      kind.value = 'decimal';
+      kind.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const aInput = document.querySelector<HTMLInputElement>(
+        `input[aria-label="${de.formatDialog.validationValueA}"]`,
+      );
+      const bInput = document.querySelector<HTMLInputElement>(
+        `input[aria-label="${de.formatDialog.validationValueB}"]`,
+      );
+      if (!aInput || !bInput) throw new Error('decimal bound inputs missing');
+      expect(aInput.type).toBe('text');
+      expect(aInput.inputMode).toBe('decimal');
+      expect(aInput.value).toBe('7');
+      expect(bInput.value).toBe('9');
+
+      aInput.value = '1,2,3';
+      aInput.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+      expect(aInput.dataset.fcInvalid).toBe('true');
+      expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(false);
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.validation,
+      ).toMatchObject({ a: 7, b: 9 });
+
+      aInput.value = '1,5';
+      aInput.dispatchEvent(new Event('input', { bubbles: true }));
+      bInput.value = '2,5';
+      bInput.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.validation,
+      ).toMatchObject({ a: 1.5, b: 2.5 });
+    } finally {
+      handle.detach();
+    }
+  });
+
   it('hydrates date validation bounds back into the date picker', () => {
     mutators.setCellFormat(
       store,
@@ -243,6 +302,31 @@ describe('attachFormatDialog', () => {
       expect(aInput?.type).toBe('date');
       expect(aInput?.value).toBe('2026-03-10');
       expect(bInput?.value).toBe('2026-03-20');
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('keeps the Excel serial-60 placeholder out of the native date picker', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        validation: {
+          kind: 'date',
+          op: 'between',
+          a: 1,
+          b: 60,
+        },
+      },
+    );
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+      const aInput = document.querySelector<HTMLInputElement>('input[aria-label="値"]');
+      const bInput = document.querySelector<HTMLInputElement>('input[aria-label="上限値"]');
+      expect(aInput?.value).toBe('1900-01-01');
+      expect(bInput?.value).toBe('');
     } finally {
       handle.detach();
     }

@@ -1,13 +1,17 @@
+import { parseLocalizedNumericInput } from '../commands/coerce-input.js';
 import {
   applyConditionFilter,
   applyValueFilter,
   type ConditionFilterOp,
   clearFilter,
-  distinctFilterItems,
+  type DistinctFilterFailureReason,
+  distinctFilterItemsResult,
   recordFilterChange,
 } from '../commands/filter.js';
 import type { History } from '../commands/history.js';
+import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { Range } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
@@ -21,10 +25,16 @@ export interface FilterDropdownDeps {
   /** Host whose themed overlay portal owns the dropdown. */
   host?: HTMLElement;
   history?: History | null;
+  /** Optional engine used to apply typed AutoFilter criteria and native row
+   * visibility as the dropdown commits a change. */
+  getWb?: () => WorkbookHandle;
   strings?: Strings;
   /** Locale used to format the checklist labels (dates, currency). Defaults to
    *  `en-US`. */
   locale?: string;
+  /** Receives an explicit native checklist refusal/failure. The result still
+   *  contains a safe locale-aware approximation for rendering. */
+  onDistinctFailure?: (reason: DistinctFilterFailureReason) => void;
   /** Where to anchor the popover. When omitted the popover is centred. */
   anchorRect?: { x: number; y: number; w: number; h: number };
 }
@@ -101,26 +111,40 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
   const applyActiveFilter = (): void => {
     if (!activeRange || !root) return;
+    const wb = deps.getWb?.();
     const condition = root.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
     const conditionValue = root.querySelector<HTMLInputElement>(
       '.fc-filter-dropdown__condition-value',
     );
-    recordFilterChange(deps.history ?? null, deps.store, () => {
-      if (condition?.value && conditionValue?.value.trim()) {
-        applyConditionFilter(deps.store.getState(), deps.store, activeRange as Range, activeCol, {
-          op: condition.value as ConditionFilterOp,
-          value: conditionValue.value,
-        });
-      } else {
-        applyValueFilter(
-          deps.store.getState(),
-          deps.store,
-          activeRange as Range,
-          activeCol,
-          Array.from(activeHidden),
-        );
-      }
-    });
+    recordFilterChange(
+      deps.history ?? null,
+      deps.store,
+      () => {
+        if (condition?.value && conditionValue?.value.trim()) {
+          applyConditionFilter(
+            deps.store.getState(),
+            deps.store,
+            activeRange as Range,
+            activeCol,
+            {
+              op: condition.value as ConditionFilterOp,
+              value: conditionValue.value,
+            },
+            wb,
+          );
+        } else {
+          applyValueFilter(
+            deps.store.getState(),
+            deps.store,
+            activeRange as Range,
+            activeCol,
+            Array.from(activeHidden),
+            wb,
+          );
+        }
+      },
+      wb,
+    );
     close();
   };
 
@@ -135,7 +159,12 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     activeCol = col;
 
     const state = deps.store.getState();
-    const distinct = distinctFilterItems(state, range, col, deps.locale ?? 'en-US');
+    const wb = deps.getWb?.();
+    const activeLocale = deps.locale ?? localeForWorkbook(wb);
+    const semantics = createProfileTextSemantics(activeLocale);
+    const distinctResult = distinctFilterItemsResult(state, range, col, activeLocale, wb);
+    if (distinctResult.failure) deps.onDistinctFailure?.(distinctResult.failure);
+    const distinct = distinctResult.items;
     const activeCriteria = findColumnCriteria(state.ui.filterCriteria, range, col);
     const hidden = new Set<string>(
       activeCriteria && !activeCriteria.condition && !activeCriteria.color
@@ -186,7 +215,28 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     conditionInput.className = 'fc-filter-dropdown__condition-value';
     conditionInput.placeholder = t.conditionValue;
     conditionInput.setAttribute('aria-label', t.conditionValue);
-    if (activeCriteria?.condition) conditionInput.value = activeCriteria.condition.value;
+    if (activeCriteria?.condition) {
+      const activeValue = activeCriteria.condition.value;
+      if (
+        activeCriteria.condition.op === 'equals' ||
+        activeCriteria.condition.op === 'notEquals' ||
+        activeCriteria.condition.op === 'greaterThan' ||
+        activeCriteria.condition.op === 'greaterThanOrEqual' ||
+        activeCriteria.condition.op === 'lessThan' ||
+        activeCriteria.condition.op === 'lessThanOrEqual'
+      ) {
+        // Criteria are stored in the engine's canonical decimal grammar;
+        // accept the active locale first, then decode that canonical form so
+        // a reopened German/French dropdown displays `1,5` again.
+        const numeric =
+          parseLocalizedNumericInput(activeValue, activeLocale) ??
+          parseLocalizedNumericInput(activeValue, 'en-US');
+        conditionInput.value =
+          numeric !== null ? new Intl.NumberFormat(activeLocale).format(numeric) : activeValue;
+      } else {
+        conditionInput.value = activeValue;
+      }
+    }
     conditionLabel.appendChild(conditionSelect);
     conditionPanel.append(conditionLabel, conditionInput);
 
@@ -225,14 +275,27 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
     const renderRows = (filter: string): void => {
       list.innerHTML = '';
-      const f = filter.toLowerCase();
+      const f = filter.toLocaleLowerCase(activeLocale);
+      const hiddenHas = (value: string): boolean => {
+        const key = semantics.key(value);
+        for (const hiddenValue of hidden) {
+          if (semantics.key(hiddenValue) === key) return true;
+        }
+        return false;
+      };
+      const hiddenDelete = (value: string): void => {
+        const key = semantics.key(value);
+        for (const hiddenValue of hidden) {
+          if (semantics.key(hiddenValue) === key) hidden.delete(hiddenValue);
+        }
+      };
       // (Select All) header
       const allRow = ownerDocument.createElement('label');
       allRow.className = 'fc-filter-dropdown__row fc-filter-dropdown__row--all';
       const allCb = ownerDocument.createElement('input');
       allCb.type = 'checkbox';
-      allCb.checked = distinct.every((v) => !hidden.has(v.key));
-      allCb.indeterminate = !allCb.checked && distinct.some((v) => !hidden.has(v.key));
+      allCb.checked = distinct.every((v) => !hiddenHas(v.key));
+      allCb.indeterminate = !allCb.checked && distinct.some((v) => !hiddenHas(v.key));
       allCb.addEventListener('keydown', handleRowKey);
       allCb.addEventListener('change', () => {
         if (allCb.checked) {
@@ -250,20 +313,20 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
       for (const item of distinct) {
         const display = item.key === '' ? t.blanks : item.label;
-        if (f && !display.toLowerCase().includes(f)) continue;
+        if (f && !display.toLocaleLowerCase(activeLocale).includes(f)) continue;
         const row = ownerDocument.createElement('label');
         row.className = 'fc-filter-dropdown__row';
         const cb = ownerDocument.createElement('input');
         cb.type = 'checkbox';
         cb.value = item.key;
-        cb.checked = !hidden.has(item.key);
+        cb.checked = !hiddenHas(item.key);
         cb.addEventListener('keydown', handleRowKey);
         cb.addEventListener('change', () => {
-          if (cb.checked) hidden.delete(item.key);
+          if (cb.checked) hiddenDelete(item.key);
           else hidden.add(item.key);
           // Refresh select-all indeterminate state without rebuilding rows.
-          allCb.checked = distinct.every((vv) => !hidden.has(vv.key));
-          allCb.indeterminate = !allCb.checked && distinct.some((vv) => !hidden.has(vv.key));
+          allCb.checked = distinct.every((vv) => !hiddenHas(vv.key));
+          allCb.indeterminate = !allCb.checked && distinct.some((vv) => !hiddenHas(vv.key));
         });
         const text = ownerDocument.createElement('span');
         text.textContent = display;
@@ -290,9 +353,15 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const clear = createFilterDropdownActionButton('fc-filter-dropdown__clear', t.clear);
     clear.addEventListener('click', () => {
       if (!activeRange) return;
-      recordFilterChange(deps.history ?? null, deps.store, () => {
-        clearFilter(deps.store.getState(), deps.store, activeRange as Range);
-      });
+      const wb = deps.getWb?.();
+      recordFilterChange(
+        deps.history ?? null,
+        deps.store,
+        () => {
+          clearFilter(deps.store.getState(), deps.store, activeRange as Range, wb);
+        },
+        wb,
+      );
       close();
     });
     actions.append(clear, apply);

@@ -2,6 +2,8 @@
 // the plain select factory and the scale-point (type + value) rows used by
 // color scales, data bars and icon-set thresholds.
 
+import { parseLocalizedNumericInput } from '../commands/coerce-input.js';
+import { formatEditableNumber } from '../engine/value.js';
 import type { Strings } from '../i18n/strings.js';
 import type { ConditionalScalePoint } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
@@ -61,7 +63,11 @@ export function appendScalePointRow(
   );
   type.setAttribute('aria-label', `${label} ${t.scaleType}`);
   const value = document.createElement('input');
-  value.type = 'number';
+  // Native number controls expose only the browser's canonical dot grammar.
+  // Scale thresholds follow the workbook input profile instead, so keep the
+  // edit surface textual and parse it at collection time.
+  value.type = 'text';
+  value.inputMode = 'decimal';
   value.value = defaultValue;
   value.setAttribute('aria-label', `${label} ${t.scaleValue}`);
   bindScalePointValueVisibility(type, value);
@@ -70,12 +76,18 @@ export function appendScalePointRow(
   return { row, type, value };
 }
 
-export const collectScalePoint = (input: ScalePointControl): ConditionalScalePoint | null => {
+export const localizedScalePointValue = (value: number, locale?: string): string =>
+  formatEditableNumber(value, locale);
+
+export const collectScalePoint = (
+  input: ScalePointControl,
+  locale?: string,
+): ConditionalScalePoint | null => {
   const kind = input.type.value as ConditionalScalePoint['kind'];
   const comparison = input.operator?.value === '>' ? { gte: false } : {};
   if (kind === 'min' || kind === 'max') return { kind, ...comparison };
-  const value = Number.parseFloat(input.value.value);
-  if (!Number.isFinite(value)) return null;
+  const value = parseLocalizedNumericInput(input.value.value, locale);
+  if (value === null) return null;
   return { kind, value, ...comparison };
 };
 
@@ -84,10 +96,12 @@ export const applyScalePoint = (
   point: ConditionalScalePoint | undefined,
   fallback: ConditionalScalePoint,
   fallbackValue = '0',
+  locale?: string,
 ): void => {
   const next = point ?? fallback;
   control.type.value = next.kind;
-  control.value.value = 'value' in next ? String(next.value) : fallbackValue;
+  control.value.value =
+    'value' in next ? localizedScalePointValue(next.value, locale) : fallbackValue;
   if (control.operator) control.operator.value = next.gte === false ? '>' : '>=';
   control.type.dispatchEvent(new Event('change'));
 };

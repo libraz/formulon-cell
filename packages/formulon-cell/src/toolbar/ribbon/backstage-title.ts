@@ -237,7 +237,14 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     const state = inst.store.getState();
     const match = findNext(
       state,
-      { query, within: 'sheet', searchBy: 'rows', lookIn: 'values' },
+      {
+        query,
+        within: 'sheet',
+        searchBy: 'rows',
+        lookIn: 'values',
+        workbook: inst.workbook,
+        locale: inst.locale,
+      },
       state.selection.active,
       'next',
     );

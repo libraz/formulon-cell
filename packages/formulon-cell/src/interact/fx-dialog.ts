@@ -14,7 +14,8 @@ import {
   subscribeRecentFunctions,
 } from '../commands/function-history.js';
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
-import { defaultStrings, en as enStrings, type Strings } from '../i18n/strings.js';
+import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -25,15 +26,21 @@ import {
   createDialogButton,
   createDialogShell,
 } from './dialog-shell.js';
-import { catalogLocaleOrdinal, functionDescription } from './function-catalog-text.js';
+import {
+  catalogLocaleOrdinal,
+  catalogLocaleTag,
+  functionDescription,
+} from './function-catalog-text.js';
 
-/** Heuristic locale detector for hosts that supply no `getLocale`: sniff the
- *  active dictionary's title against the canonical English one.
- *  Cheap, and correct for the two built-in locales. Custom locales fall back
- *  to English descriptions, which is the standard desktop spreadsheets behaviour for
- *  unsupported tongues. */
-const detectLocale = (s: Strings): 'en' | 'ja' =>
-  s.fxDialog.title === enStrings.fxDialog.title ? 'en' : 'ja';
+/** Heuristic locale detector for hosts that supply no `getLocale`. Built-in
+ * dictionaries use stable translated titles; custom overlays fall back to
+ * English metadata rather than guessing from arbitrary copy. */
+const detectLocaleOrdinal = (s: Strings): 0 | 1 | 2 | 3 => {
+  const locale = bundledLocaleForStrings(s);
+  if (locale) return catalogLocaleOrdinal(locale);
+  // Custom overlays and unknown dictionaries use canonical English names.
+  return 0;
+};
 
 /** Keep the picker-facing type exported from its historic module for hosts
  * that import it from `interact/fx-dialog`. */
@@ -44,6 +51,24 @@ export interface FxDialogOpenOptions {
   category?: FunctionCategory;
 }
 
+type FxWorkbookReader = FunctionCatalogReader & {
+  localeFacts?: () => { listSeparator?: string } | null;
+  functionMetadataForLocale?: (
+    name: string,
+    locale: string,
+  ) => {
+    name?: string;
+    minArity: number;
+    maxArity: number | null;
+    localizedName?: string;
+    signatureTemplate?: string;
+    description?: string;
+    availability?: number;
+  } | null;
+  localizeFunctionName?: (name: string, locale?: 0 | 1 | 2 | 3) => string | null;
+  canonicalizeFunctionName?: (name: string, locale?: 0 | 1 | 2 | 3) => string | null;
+};
+
 export interface FxDialogDeps {
   host: HTMLElement;
   store: SpreadsheetStore;
@@ -52,7 +77,7 @@ export interface FxDialogDeps {
    *  currently selected range when a seeded ribbon function opens. */
   getInitialArguments?: (functionName: string) => readonly string[] | null;
   /** Read the live recognized function catalog at each open/refresh. */
-  getWb?: () => FunctionCatalogReader | null;
+  getWb?: () => FxWorkbookReader | null;
   /** Current host locale, used for function metadata and descriptions. */
   getLocale?: () => string;
   /** Called with the assembled formula text (including leading '='). */
@@ -84,10 +109,12 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   let t = strings.fxDialog;
   // Engine metadata and built-in descriptions share one locale: the host's when
   // supplied, else the one sniffed from the active dictionary.
-  const localeOrdinal = (): 0 | 1 => {
+  const localeOrdinal = (): 0 | 1 | 2 | 3 => {
     if (deps.getLocale) return catalogLocaleOrdinal(deps.getLocale());
-    return detectLocale(strings) === 'ja' ? 1 : 0;
+    return detectLocaleOrdinal(strings);
   };
+  const localeTag = (): string =>
+    catalogLocaleTag(deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US');
 
   // ── Overlay + panel ─────────────────────────────────────────────────────
   const shell = createDialogShell({
@@ -204,6 +231,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   let catalog: FunctionCatalogSnapshot = buildFunctionCatalog(
     deps.getWb?.() ?? null,
     localeOrdinal(),
+    localeTag(),
   );
   let selectedCategory: FunctionCategory = 'all';
   let selectedName: string | null = null;
@@ -213,7 +241,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   let selectedEntry: FunctionCatalogEntry | null = null;
 
   const refreshCatalog = (): void => {
-    catalog = buildFunctionCatalog(deps.getWb?.() ?? null, localeOrdinal());
+    catalog = buildFunctionCatalog(deps.getWb?.() ?? null, localeOrdinal(), localeTag());
   };
 
   const setInsertDisabled = (disabled: boolean, reason: string | null): void => {
@@ -226,8 +254,50 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const catalogEntry = (name: string): FunctionCatalogEntry | null =>
     catalog.entries.get(name) ?? null;
 
+  const activeListSeparator = (): ',' | ';' => {
+    const wb = deps.getWb?.();
+    return typeof wb?.localeFacts === 'function' && wb.localeFacts()?.listSeparator === ';'
+      ? ';'
+      : ',';
+  };
+
+  const nativeFunctionName = (canonicalName: string): string => {
+    try {
+      const wb = deps.getWb?.();
+      const localized =
+        typeof wb?.localizeFunctionName === 'function'
+          ? wb.localizeFunctionName(canonicalName, localeOrdinal())
+          : null;
+      return localized || canonicalName;
+    } catch {
+      return canonicalName;
+    }
+  };
+
+  const resolveCatalogName = (rawName: string): string | null => {
+    const upper = rawName.trim().toLocaleUpperCase();
+    if (catalog.knownNames.has(upper)) return upper;
+    try {
+      const wb = deps.getWb?.();
+      if (wb) {
+        const canonical =
+          typeof wb.canonicalizeFunctionName === 'function'
+            ? wb.canonicalizeFunctionName(rawName, localeOrdinal())
+            : null;
+        if (canonical && catalog.knownNames.has(canonical)) return canonical;
+      }
+    } catch {
+      // A stale/disposing workbook leaves the current catalog usable.
+    }
+    const nativeMatch = [...catalog.entries.values()].find(
+      (entry) => nativeFunctionName(entry.canonicalName).toLocaleUpperCase() === upper,
+    );
+    if (nativeMatch) return nativeMatch.canonicalName;
+    return null;
+  };
+
   const localizedDescription = (name: string): string =>
-    functionDescription(catalogEntry(name) ?? { canonicalName: name }, localeOrdinal());
+    functionDescription(catalogEntry(name) ?? { canonicalName: name }, localeTag());
 
   const unavailableReason = (): string => t.functionUnavailable;
 
@@ -236,8 +306,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
 
   const syntaxFor = (name: string): string => {
     const entry = catalogEntry(name);
-    if (entry) return functionSyntax(entry);
-    return `${name}(${(FUNCTION_SIGNATURES[name] ?? []).join(', ')})`;
+    if (entry) return functionSyntax(entry, activeListSeparator());
+    const separator = activeListSeparator();
+    return `${name}(${(FUNCTION_SIGNATURES[name] ?? []).join(`${separator} `)})`;
   };
 
   const updateFunctionSummary = (name: string | null): void => {
@@ -301,7 +372,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       const entry = catalogEntry(name);
       return [name, entry?.displayName, entry?.signatureTemplate, entry?.description]
         .filter((value): value is string => value !== undefined)
-        .some((value) => value.toUpperCase().includes(q));
+        .some((value) => value.toLocaleUpperCase().includes(q));
     });
   };
 
@@ -375,7 +446,12 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     // the first slot was filled. Internal blanks are preserved as positional
     // placeholders.
     while (args.length > 0 && args[args.length - 1] === '') args.pop();
-    return `=${selectedName}(${args.join(', ')})`;
+    // The native parser stores canonical names for the default comma locale.
+    // German/French formula entry uses the localized function alias alongside
+    // its semicolon separator; the commit boundary canonicalizes that text.
+    const separator = activeListSeparator();
+    const formulaName = nativeFunctionName(selectedName);
+    return `=${formulaName}(${args.join(`${separator} `)})`;
   };
 
   const updatePreview = (): void => {
@@ -684,7 +760,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       // argument step, but the picker remains mounted and must reflect a
       // workbook or locale change before the next back/open cycle.
       renderList();
-      const seed = seedName ? seedName.toUpperCase() : null;
+      const seed = seedName ? resolveCatalogName(seedName) : null;
       if (seed && catalog.knownNames.has(seed)) {
         // Skip the picker — jump straight to argument entry.
         choose(seed, deps.getInitialArguments?.(seed) ?? []);

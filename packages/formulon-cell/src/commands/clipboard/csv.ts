@@ -1,17 +1,22 @@
 /**
- * Comma-separated parsing/encoding compatible with desktop spreadsheets.
- * RFC 4180 — fields containing commas, newlines or quotes are wrapped in
- * double quotes; embedded quotes are doubled.
- *
- * Mirrors `tsv.ts` with `,` as the delimiter. Kept as a sibling rather than a
- * shared parameterised parser because the encoding edge cases (locale-style
- * decimal commas in non-US desktop spreadsheets exports) are CSV-specific and we'd rather
- * iterate on them in one file.
+ * CSV parsing/encoding with an explicit comma or semicolon separator.
+ * Fields containing the selected separator, newlines or quotes are wrapped
+ * in double quotes; embedded quotes are doubled. Comma is the default.
  */
 
 const BOM = '﻿';
 
+/** Separators supported by the CSV document format. */
+export type CSVDelimiter = ',' | ';';
+
+export interface CSVParseOptions {
+  /** Field separator. Comma remains the default for backwards compatibility. */
+  delimiter?: CSVDelimiter;
+}
+
 export interface CSVEncodeOptions {
+  /** Field separator. Comma remains the default for backwards compatibility. */
+  delimiter?: CSVDelimiter;
   /** Use \n instead of \r\n. Spreadsheets write \r\n; reading is robust to either. */
   eol?: '\r\n' | '\n';
   /** Prepend a UTF-8 BOM. Desktop spreadsheets on Windows expects this for correct UTF-8
@@ -19,26 +24,40 @@ export interface CSVEncodeOptions {
   bom?: boolean;
 }
 
+const resolveDelimiter = (delimiter: CSVDelimiter | undefined): CSVDelimiter => {
+  if (delimiter === undefined || delimiter === ',' || delimiter === ';') {
+    return delimiter ?? ',';
+  }
+  // The public type protects TypeScript callers, but the runtime check keeps
+  // JavaScript callers from silently producing a file with an unsupported
+  // separator.
+  throw new TypeError('CSV delimiter must be "," or ";"');
+};
+
 export function encodeCSV(
   rows: readonly (readonly string[])[],
   opts: CSVEncodeOptions = {},
 ): string {
+  const delimiter = resolveDelimiter(opts.delimiter);
   const eol = opts.eol ?? '\r\n';
-  const body = rows.map((row) => row.map(escapeCell).join(',')).join(eol);
+  const body = rows
+    .map((row) => row.map((cell) => escapeCell(cell, delimiter)).join(delimiter))
+    .join(eol);
   return opts.bom ? BOM + body : body;
 }
 
-function escapeCell(cell: string): string {
-  // Quote whenever the cell would be ambiguous — commas, line breaks, quote
+function escapeCell(cell: string, delimiter: CSVDelimiter): string {
+  // Quote whenever the cell would be ambiguous — separators, line breaks, quote
   // chars, or leading/trailing whitespace (spreadsheets preserve whitespace inside
   // quoted fields but trims unquoted ones on read).
-  if (/[,\r\n"]|^\s|\s$/.test(cell)) {
+  if (cell.includes(delimiter) || /[\r\n"]|^\s|\s$/.test(cell)) {
     return `"${cell.replace(/"/g, '""')}"`;
   }
   return cell;
 }
 
-export function parseCSV(text: string): string[][] {
+export function parseCSV(text: string, opts: CSVParseOptions = {}): string[][] {
+  const delimiter = resolveDelimiter(opts.delimiter);
   let src = text;
   // Strip optional UTF-8 BOM.
   if (src.charCodeAt(0) === 0xfeff) src = src.slice(1);
@@ -73,7 +92,7 @@ export function parseCSV(text: string): string[][] {
       i += 1;
       continue;
     }
-    if (ch === ',') {
+    if (ch === delimiter) {
       row.push(cell);
       cell = '';
       i += 1;

@@ -8,6 +8,7 @@ export interface PageScaleDialogOptions {
   okLabel: string;
   cancelLabel: string;
   invalidMessage: string;
+  locale?: string | (() => string);
 }
 
 export const showPageScaleDialog = (opts: PageScaleDialogOptions): Promise<number | null> =>
@@ -18,7 +19,9 @@ export const showPageScaleDialog = (opts: PageScaleDialogOptions): Promise<numbe
     min: opts.kind === 'scale' ? 10 : 1,
     max: opts.kind === 'scale' ? 400 : 99,
     step: 1,
+    integer: true,
     okLabel: opts.okLabel,
     cancelLabel: opts.cancelLabel,
     invalidMessage: opts.invalidMessage,
+    locale: opts.locale,
   });

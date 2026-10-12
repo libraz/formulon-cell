@@ -109,7 +109,7 @@
     gap: 4px;
   }
 
-  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has(input[type="number"]) {
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has([data-fc-input="size"]) {
     grid-column: 3;
     grid-row: 1;
     display: grid;
@@ -137,7 +137,7 @@
     border-radius: 7px;
   }
 
-  .fc-fmtdlg__font-size-row input[type="number"] {
+  .fc-fmtdlg__font-size-row [data-fc-input="size"] {
     width: 104px;
     border-radius: 7px;
   }
@@ -229,7 +229,8 @@
     border: 1px solid var(--fc-fmtdlg-list-border);
     background: var(--fc-fmtdlg-list-bg);
     color: var(--fc-fmtdlg-list-fg, inherit);
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     transition:
       border-color 80ms ease,
       box-shadow 80ms ease;

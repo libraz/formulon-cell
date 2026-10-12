@@ -15,16 +15,19 @@ const CAPPED = 13.6;
 export const FORMAT_ICONS = {
   bold: [letter('B', { height: 17.6 })],
   italic: [letter('I', { height: 17.6 })],
-  underline: [letter('U', { height: CAPPED, cy: 9.8 }), swatch(PALETTE.ink)],
-  underlineSingle: [letter('U', { height: CAPPED, cy: 9.8 }), swatch(PALETTE.ink)],
+  underline: [letter('U', { height: CAPPED, cy: 9.8 }), filled(rect(3, 19.6, 18, 1), PALETTE.ink)],
+  underlineSingle: [
+    letter('U', { height: CAPPED, cy: 9.8 }),
+    filled(rect(3, 19.6, 18, 1), PALETTE.ink),
+  ],
   underlineDouble: [
     letter('U', { height: 12.4, cy: 9 }),
-    filled(rect(3, 17, 18, 1.9), PALETTE.ink),
-    filled(rect(3, 20, 18, 1.9), PALETTE.ink),
+    filled(rect(3, 17.5, 18, 1), PALETTE.ink),
+    filled(rect(3, 20.5, 18, 1), PALETTE.ink),
   ],
   strike: [
     letter('S', { height: 15.4, cy: 11.6 }),
-    filled(rect(2.6, 10.4, 18.8, 2.6), PALETTE.danger),
+    filled(rect(2.6, 11.2, 18.8, 1), PALETTE.danger),
   ],
 
   fontColor: [letter('A', { height: CAPPED, cy: 9.8 }), swatch(PALETTE.danger)],

@@ -87,6 +87,82 @@ describe('mount/engine-binding — feature gating against preset.minimal()', () 
   });
 });
 
+describe('mount/engine-binding — workbook-scoped find activates and hydrates its sheet', () => {
+  let sheet: MountedStubSheet;
+  let otherSheet: number;
+
+  beforeEach(async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    expect(workbook.isStub).toBe(false);
+    otherSheet = workbook.addSheet('Other');
+    const addr = { sheet: otherSheet, row: 2, col: 1 };
+    workbook.setText({ sheet: 0, row: 4, col: 3 }, 'home match');
+    workbook.setNumber(addr, 42);
+    const baseXf = workbook.getCellXf(0);
+    const numFmtId = workbook.addNumFmtCode('0.00');
+    if (baseXf && numFmtId >= 0) {
+      const xfIndex = workbook.addXfRecord({ ...baseXf, numFmtId });
+      expect(xfIndex).toBeGreaterThanOrEqual(0);
+      expect(workbook.setCellXfIndex(otherSheet, addr.row, addr.col, xfIndex)).toBe(true);
+    }
+    workbook.recalc();
+    sheet = await mountStubSheet({ workbook });
+  });
+
+  afterEach(() => {
+    const workbook = sheet.workbook;
+    sheet.dispose();
+    workbook.dispose();
+  });
+
+  it('switches and hydrates sheets through result selection and Find Next', () => {
+    const addr = { sheet: otherSheet, row: 2, col: 1 };
+    const displayed = sheet.workbook.getDisplayText(addr.sheet, addr.row, addr.col) ?? '42';
+    sheet.instance.openFindReplace();
+    const options = sheet.host.querySelector<HTMLButtonElement>('.fc-find__options-btn');
+    options?.click();
+    const within = sheet.host.querySelector<HTMLSelectElement>('#fc-find-within');
+    expect(within).not.toBeNull();
+    if (!within) throw new Error('Find/Replace Within control is missing');
+    within.value = 'workbook';
+    within.dispatchEvent(new Event('change', { bubbles: true }));
+    const findInput = sheet.host.querySelector<HTMLInputElement>('#fc-find-find-input');
+    expect(findInput).not.toBeNull();
+    if (!findInput) throw new Error('Find/Replace query control is missing');
+    findInput.value = displayed;
+    findInput.dispatchEvent(new Event('input', { bubbles: true }));
+    sheet.host.querySelector<HTMLButtonElement>('.fc-find__btn--find-all')?.click();
+
+    const rows = sheet.host.querySelectorAll<HTMLTableRowElement>('.fc-find__results tbody tr');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain(displayed);
+    rows[0]?.click();
+
+    const state = sheet.instance.store.getState();
+    expect(state.data.sheetIndex).toBe(otherSheet);
+    expect(state.selection.active).toEqual(addr);
+    expect(state.data.cells.get(`${otherSheet}:${addr.row}:${addr.col}`)?.value).toEqual({
+      kind: 'number',
+      value: 42,
+    });
+    expect(state.format.formats.has(`${otherSheet}:${addr.row}:${addr.col}`)).toBe(true);
+
+    sheet.instance.openFindReplace();
+    const findInputAgain = sheet.host.querySelector<HTMLInputElement>('#fc-find-find-input');
+    expect(findInputAgain).not.toBeNull();
+    if (!findInputAgain) throw new Error('Find/Replace query control is missing after reopen');
+    findInputAgain.value = 'home match';
+    findInputAgain.dispatchEvent(new Event('input', { bubbles: true }));
+    sheet.host.querySelector<HTMLButtonElement>('.fc-find__btn--next')?.click();
+    expect(sheet.instance.store.getState().data.sheetIndex).toBe(0);
+    expect(sheet.instance.store.getState().selection.active).toEqual({
+      sheet: 0,
+      row: 4,
+      col: 3,
+    });
+  });
+});
+
 describe('mount/engine-binding — workbook subscribe forwards events', () => {
   let sheet: MountedStubSheet;
 

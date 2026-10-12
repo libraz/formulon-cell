@@ -190,7 +190,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('Number category persists and rehydrates Special formats as Special', () => {
-    const handle = attachFormatDialog({ host, store });
+    const handle = attachFormatDialog({ host, store, getLocale: () => 'en' });
     handle.open();
 
     document

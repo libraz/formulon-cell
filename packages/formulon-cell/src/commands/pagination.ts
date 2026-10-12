@@ -1,4 +1,6 @@
+import type { PaginationResult } from '@libraz/formulon';
 import { parseAddrKey } from '../engine/address.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 // Page pagination for the Page Layout and Page Break Preview workbook views.
 //
 // `print.ts` owns the same split for the printed document; this module reuses
@@ -46,6 +48,17 @@ export interface SheetPagination {
   pxPerInch: number;
   /** Number of pages that actually carry content. */
   pageCount: number;
+  /** Centering is kept beside native geometry because `PaginationResult`
+   *  intentionally reports the uncentered cell-block origin. Page Layout
+   *  adds the setting when placing the physical paper. */
+  centerHorizontally?: boolean;
+  centerVertically?: boolean;
+  /** Detailed native page geometry when formulon exposes `paginate`. Preview
+   *  leaves this unset for multiple print areas or overlapping repeated-title
+   *  spans because the interactive grid can only draw a rectangular band
+   *  product; print requests still consume every native page directly. The
+   *  fallback fields above remain populated for those cases and older engines. */
+  native?: PaginationResult;
 }
 
 /** Zero-based band index containing `index`, or -1 when it sits before the
@@ -72,6 +85,19 @@ export function pageNumberOf(
 ): number {
   const rows = pagination.rowBands;
   const cols = pagination.colBands;
+  const row = rows[rowBand];
+  const col = cols[colBand];
+  if (pagination.native && row && col) {
+    const nativeIndex = pagination.native.pages.findIndex(
+      (page) =>
+        page.firstRow === row.start &&
+        page.lastRow === row.end &&
+        page.firstCol === col.start &&
+        page.lastCol === col.end,
+    );
+    if (nativeIndex >= 0) return nativeIndex + 1;
+    return 0;
+  }
   const liveRows = rows.filter((b) => b.start <= pagination.content.row).length;
   const liveCols = cols.filter((b) => b.start <= pagination.content.col).length;
   if (rowBand < 0 || colBand < 0 || rowBand >= liveRows || colBand >= liveCols) return 0;
@@ -113,18 +139,194 @@ export interface PaginateOptions {
    *  Rounded up internally, so scrolling one row does not invalidate the cache. */
   throughRow?: number;
   throughCol?: number;
+  /** Workbook handle used to opt into formulon's detailed print geometry. */
+  engine?: WorkbookHandle;
+  /** Print consumes every native page directly; preview requires a
+   *  rectangular Cartesian band model and falls back for layouts it cannot
+   *  represent without inventing pages. */
+  purpose?: 'preview' | 'print';
 }
 
 /** Reach is rounded to this many indices so a one-row scroll reuses the cache. */
 const REACH_CHUNK = 64;
+
+const paginationEngines = new WeakMap<object, WorkbookHandle>();
+
+/** Associate the immutable store state object with its live workbook handle.
+ * StoreMirror calls this for each replacement state so page-view callers can
+ * opt into native geometry without threading the handle through every paint
+ * helper. */
+export function associatePaginationEngine(state: State, engine: WorkbookHandle | null): void {
+  if (engine) paginationEngines.set(state, engine);
+  else paginationEngines.delete(state);
+  resetPaginationCache();
+}
 
 function reach(through: number | undefined, content: number): number {
   const wanted = Math.max(through ?? 0, content, 0);
   return (Math.floor(wanted / REACH_CHUNK) + 1) * REACH_CHUNK;
 }
 
+const CSS_PX_PER_POINT = 96 / 72;
+
+function finitePositive(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function nativeBands(native: PaginationResult, axis: 'row' | 'col'): AxisBand[] {
+  const spans = new Map<string, { start: number; end: number }>();
+  for (const page of native.pages) {
+    const start = axis === 'row' ? page.firstRow : page.firstCol;
+    const end = axis === 'row' ? page.lastRow : page.lastCol;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) continue;
+    spans.set(`${start}:${end}`, { start, end });
+  }
+  const manualBreaks = new Map<number, boolean>();
+  const breaks = axis === 'row' ? native.horizontalBreaks : native.verticalBreaks;
+  const manual = axis === 'row' ? native.horizontalBreakManual : native.verticalBreakManual;
+  for (let i = 0; i < breaks.length; i += 1) {
+    const at = breaks[i];
+    if (typeof at === 'number') manualBreaks.set(at, manual[i] === true);
+  }
+  return [...spans.values()]
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+    .map(({ start, end }) => ({
+      start,
+      end,
+      manual: manualBreaks.get(start) === true,
+    }));
+}
+
+function hasOverlappingNativeSpans(native: PaginationResult, axis: 'row' | 'col'): boolean {
+  const spans = new Map<string, [number, number]>();
+  for (const page of native.pages) {
+    const first = axis === 'row' ? page.firstRow : page.firstCol;
+    const last = axis === 'row' ? page.lastRow : page.lastCol;
+    spans.set(`${first}:${last}`, [first, last]);
+  }
+  const sorted = [...spans.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  for (let i = 1; i < sorted.length; i += 1) {
+    const previous = sorted[i - 1];
+    const current = sorted[i];
+    if (previous && current && current[0] <= previous[1]) return true;
+  }
+  return false;
+}
+
+function nativePreviewCompatible(native: PaginationResult): boolean {
+  return (
+    native.printArea.length <= 1 &&
+    !hasOverlappingNativeSpans(native, 'row') &&
+    !hasOverlappingNativeSpans(native, 'col')
+  );
+}
+
+function extendNativeBands(
+  bands: AxisBand[],
+  axis: 'row' | 'col',
+  state: State,
+  setup: PageSetup,
+  content: number,
+  through: number | undefined,
+  pageBudget: number,
+): AxisBand[] {
+  const target = reach(through, content);
+  if (bands.length === 0) return bands;
+  const last = bands[bands.length - 1];
+  if (!last || last.end >= target) return bands;
+  const from = last.end + 1;
+  const hidden = axis === 'row' ? state.layout.hiddenRows : state.layout.hiddenCols;
+  const defaultSize = axis === 'row' ? state.layout.defaultRowHeight : state.layout.defaultColWidth;
+  const sizes = axis === 'row' ? state.layout.rowHeights : state.layout.colWidths;
+  const manual = axis === 'row' ? setup.manualPageBreakRows : setup.manualPageBreakCols;
+  const tail = splitAxisIntoBands({
+    from,
+    to: target,
+    budget: Math.max(defaultSize, pageBudget),
+    manualBreaks: manual,
+    sizeOf: (index) => (hidden.has(index) ? 0 : (sizes.get(index) ?? defaultSize)),
+  });
+  return bands.concat(tail);
+}
+
+function nativePagination(
+  state: State,
+  sheet: number,
+  setup: PageSetup,
+  opts: PaginateOptions,
+  native: PaginationResult,
+): SheetPagination | null {
+  const rowBands = nativeBands(native, 'row');
+  const colBands = nativeBands(native, 'col');
+  if (rowBands.length === 0 || colBands.length === 0) return null;
+
+  const firstPage = native.pages[0];
+  const origin = {
+    row: firstPage?.firstRow ?? native.printArea[0]?.firstRow ?? 0,
+    col: firstPage?.firstCol ?? native.printArea[0]?.firstCol ?? 0,
+  };
+  const content = {
+    row: Math.max(...rowBands.map((band) => band.end)),
+    col: Math.max(...colBands.map((band) => band.end)),
+  };
+  const scale = finitePositive(native.scale, 1);
+  const pagePx = {
+    width: finitePositive((native.printable.width * CSS_PX_PER_POINT) / scale, 1),
+    height: finitePositive((native.printable.height * CSS_PX_PER_POINT) / scale, 1),
+  };
+  const marginPx = {
+    top: Math.max(0, (native.margins.top * CSS_PX_PER_POINT) / scale),
+    right: Math.max(0, (native.margins.right * CSS_PX_PER_POINT) / scale),
+    bottom: Math.max(0, (native.margins.bottom * CSS_PX_PER_POINT) / scale),
+    left: Math.max(0, (native.margins.left * CSS_PX_PER_POINT) / scale),
+  };
+  const rows = extendNativeBands(
+    rowBands,
+    'row',
+    state,
+    setup,
+    content.row,
+    opts.throughRow,
+    pagePx.height,
+  );
+  const cols = extendNativeBands(
+    colBands,
+    'col',
+    state,
+    setup,
+    content.col,
+    opts.throughCol,
+    pagePx.width,
+  );
+  return {
+    sheet,
+    rowBands: rows,
+    colBands: cols,
+    origin,
+    content,
+    scale,
+    pagePx,
+    marginPx,
+    pxPerInch: PRINT_PX_PER_INCH / scale,
+    pageCount: native.pageCount,
+    centerHorizontally: setup.centerHorizontally === true,
+    centerVertically: setup.centerVertically === true,
+    native,
+  };
+}
+
 function paginate(state: State, sheet: number, opts: PaginateOptions): SheetPagination {
   const setup = getPageSetup(state, sheet);
+  const engine = opts.engine ?? paginationEngines.get(state);
+  if (engine?.capabilities.detailedPagination === true) {
+    const native = engine.paginateSheet(sheet);
+    if (native) {
+      const detailed =
+        (opts.purpose === 'print' || nativePreviewCompatible(native)) &&
+        nativePagination(state, sheet, setup, opts, native);
+      if (detailed) return detailed;
+    }
+  }
   const layout: LayoutSlice = state.layout;
   const used = usedExtent(state, sheet);
   const area = parsePrintArea(setup.printArea);
@@ -182,6 +384,8 @@ function paginate(state: State, sheet: number, opts: PaginateOptions): SheetPagi
     },
     pxPerInch: perInch,
     pageCount: liveRows * liveCols,
+    centerHorizontally: setup.centerHorizontally === true,
+    centerVertically: setup.centerVertically === true,
   };
 }
 
@@ -193,6 +397,14 @@ export function pageBoxPx(
   width: number;
   height: number;
 } {
+  if (pagination.native) {
+    const paper = pagination.native.paper;
+    const scale = Math.max(pagination.scale, 0.01);
+    return {
+      width: (paper.widthPt * CSS_PX_PER_POINT) / scale,
+      height: (paper.heightPt * CSS_PX_PER_POINT) / scale,
+    };
+  }
   const inches = paperInches(setup);
   const perInch = PRINT_PX_PER_INCH / Math.max(pagination.scale, 0.1);
   return { width: inches.w * perInch, height: inches.h * perInch };
@@ -219,12 +431,21 @@ export function paginationFor(
   sheet: number,
   opts: PaginateOptions = {},
 ): SheetPagination {
+  // The native workbook can change independently of the store (for example
+  // a host may write through the handle while calculation is manual). There
+  // is no public native revision counter, so do not memoise this path and
+  // risk reusing stale page placements.
+  const engine = opts.engine ?? paginationEngines.get(state);
+  if (engine?.capabilities.detailedPagination === true) {
+    return paginate(state, sheet, opts);
+  }
   const key = [
     sheet,
     state.layout,
     state.data.cells,
     state.format.formats,
     state.merges.byAnchor,
+    engine,
     state.pageSetup,
     reach(opts.throughRow, 0),
     reach(opts.throughCol, 0),
@@ -264,16 +485,101 @@ export function pageLayoutGaps(
   opts: PaginateOptions = {},
 ): PageLayoutGaps {
   const pagination = paginationFor(state, sheet, opts);
+  const setup = getPageSetup(state, sheet);
   const zoom = state.viewport.zoom > 0 ? state.viewport.zoom : 1;
   const m = pagination.marginPx;
   const pageGapRows = new Map<number, number>();
   const pageGapCols = new Map<number, number>();
+  const nativePaper = pagination.native ? pageBoxPx(pagination, setup) : null;
+  const centeredNativeOrigin = (
+    page: NonNullable<SheetPagination['native']>['pages'][number],
+    axis: 'row' | 'col',
+  ): number => {
+    const native = pagination.native;
+    if (!native) return axis === 'row' ? page.originYPt : page.originXPt;
+    const origin = axis === 'row' ? page.originYPt : page.originXPt;
+    const printableOrigin = axis === 'row' ? native.printable.y : native.printable.x;
+    const pageExtent = axis === 'row' ? page.heightPt : page.widthPt;
+    const printableExtent = axis === 'row' ? native.printable.height : native.printable.width;
+    const centered = axis === 'row' ? pagination.centerVertically : pagination.centerHorizontally;
+    if (!centered) return origin;
+    const titleOffset = Math.max(0, origin - printableOrigin);
+    return origin + Math.max(0, (printableExtent - titleOffset - pageExtent) / 2);
+  };
+  const nativeOrigin = (axis: 'row' | 'col', band: AxisBand): number | null => {
+    if (!pagination.native) return null;
+    const page = pagination.native.pages.find((candidate) =>
+      axis === 'row'
+        ? candidate.firstRow === band.start && candidate.lastRow === band.end
+        : candidate.firstCol === band.start && candidate.lastCol === band.end,
+    );
+    const printableOrigin =
+      axis === 'row' ? pagination.native.printable.y : pagination.native.printable.x;
+    if (page) return centeredNativeOrigin(page, axis);
+    // A native pagination result only covers the printed content. Preview
+    // still extends bands to keep scrolling continuous; place those blank
+    // bands after the last physical page by carrying forward that page's
+    // effective cell-block origin. Using the printable origin here loses the
+    // prior page's centering offset and makes the blank paper jump backward.
+    const previous = pagination.native.pages
+      .filter((candidate) =>
+        axis === 'row' ? candidate.lastRow < band.start : candidate.lastCol < band.start,
+      )
+      .sort((a, b) => (axis === 'row' ? b.lastRow - a.lastRow : b.lastCol - a.lastCol))[0];
+    return previous ? centeredNativeOrigin(previous, axis) : printableOrigin;
+  };
+  const axisExtent = (axis: 'row' | 'col', band: AxisBand): number => {
+    const hidden = axis === 'row' ? state.layout.hiddenRows : state.layout.hiddenCols;
+    const sizes = axis === 'row' ? state.layout.rowHeights : state.layout.colWidths;
+    const fallback = axis === 'row' ? state.layout.defaultRowHeight : state.layout.defaultColWidth;
+    let extent = 0;
+    for (let index = band.start; index <= band.end; index += 1) {
+      if (!hidden.has(index)) extent += sizes.get(index) ?? fallback;
+    }
+    return extent;
+  };
   pagination.rowBands.forEach((band, i) => {
-    const lead = i === 0 ? m.top : m.bottom + m.top;
+    const previous = pagination.rowBands[i - 1];
+    const previousOrigin = previous ? nativeOrigin('row', previous) : null;
+    const currentOrigin = nativeOrigin('row', band);
+    const lead =
+      i === 0
+        ? m.top +
+          ((currentOrigin === null ? 0 : currentOrigin - (pagination.native?.printable.y ?? 0)) *
+            (96 / 72)) /
+            pagination.scale
+        : nativePaper && previous
+          ? Math.max(
+              0,
+              nativePaper.height +
+                (previousOrigin !== null && currentOrigin !== null
+                  ? ((currentOrigin - previousOrigin) * (96 / 72)) / pagination.scale
+                  : 0) -
+                axisExtent('row', previous),
+            )
+          : m.bottom + m.top;
     pageGapRows.set(band.start, lead * zoom + (i === 0 ? 0 : PAGE_GUTTER_PX));
   });
   pagination.colBands.forEach((band, i) => {
-    const lead = i === 0 ? m.left : m.right + m.left;
+    const previous = pagination.colBands[i - 1];
+    const previousOrigin = previous ? nativeOrigin('col', previous) : null;
+    const currentOrigin = nativeOrigin('col', band);
+    const lead =
+      i === 0
+        ? m.left +
+          ((currentOrigin === null ? 0 : currentOrigin - (pagination.native?.printable.x ?? 0)) *
+            (96 / 72)) /
+            pagination.scale
+        : nativePaper && previous
+          ? Math.max(
+              0,
+              nativePaper.width +
+                (previousOrigin !== null && currentOrigin !== null
+                  ? ((currentOrigin - previousOrigin) * (96 / 72)) / pagination.scale
+                  : 0) -
+                axisExtent('col', previous),
+            )
+          : m.right + m.left;
     pageGapCols.set(band.start, lead * zoom + (i === 0 ? 0 : PAGE_GUTTER_PX));
   });
   return { pageGapRows, pageGapCols };

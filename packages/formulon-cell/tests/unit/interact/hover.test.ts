@@ -123,6 +123,35 @@ describe('attachHover', () => {
     handle.detach();
   });
 
+  it('does not open unsafe hyperlink targets or advertise them as clickable', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 1 },
+      { hyperlink: 'javascript:alert(1)' },
+    );
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const handle = attachHover({ grid, store });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control', ctrlKey: true }));
+    const { x, y } = cellPoint(store, 1, 1);
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y }));
+    expect(grid.style.cursor).toBe('');
+    for (const target of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>']) {
+      mutators.setCellFormat(store, { sheet: 0, row: 1, col: 1 }, { hyperlink: target });
+      const evt = new MouseEvent('click', {
+        clientX: x,
+        clientY: y,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      grid.dispatchEvent(evt);
+      expect(evt.defaultPrevented).toBe(false);
+    }
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+    handle.detach();
+  });
+
   it('plain click without modifier on a hyperlink cell does NOT open the link', () => {
     mutators.setCellFormat(
       store,
@@ -145,6 +174,27 @@ describe('attachHover', () => {
     expect(tip()).not.toBeNull();
     handle.detach();
     expect(tip()).toBeNull();
+  });
+
+  it('restores the cursor when leaving a link or releasing its modifier', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { hyperlink: 'https://example.test/' },
+    );
+    const handle = attachHover({ grid, store });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control', ctrlKey: true }));
+    const link = cellPoint(store, 0, 0);
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: link.x, clientY: link.y }));
+    expect(grid.style.cursor).toBe('pointer');
+    const plain = cellPoint(store, 0, 1);
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: plain.x, clientY: plain.y }));
+    expect(grid.style.cursor).toBe('');
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: link.x, clientY: link.y }));
+    expect(grid.style.cursor).toBe('pointer');
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control' }));
+    expect(grid.style.cursor).toBe('');
+    handle.detach();
   });
 
   it('keeps cell hover notes as compact rectangular Excel-style tips', () => {

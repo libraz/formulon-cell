@@ -55,6 +55,8 @@ export interface DialogFormatSummary {
   readonly mixed: Set<FormatDialogField>;
 }
 
+type FormulaTransform = (formula: string) => string;
+
 const cloneFormat = (format: CellFormat | undefined): CellFormat =>
   format ? structuredClone(format) : {};
 
@@ -212,6 +214,7 @@ export function buildTouchedDialogPatch(
   draft: DraftState,
   touched: ReadonlySet<FormatDialogField>,
   defaultPattern: (category: NumberCategory) => string = defaultPatternFor,
+  canonicalizeFormula?: FormulaTransform,
 ): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};
   const set = <K extends keyof CellFormat>(key: K, value: CellFormat[K]): void => {
@@ -249,7 +252,7 @@ export function buildTouchedDialogPatch(
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
-    patch.validation = computeDialogValidation(draft, lines);
+    patch.validation = computeDialogValidation(draft, lines, canonicalizeFormula);
   }
   const border: CellBorders = {};
   const sides: SideKey[] = ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'];
@@ -350,6 +353,7 @@ export function hydrateDraftFromFormat(
   draft: DraftState,
   fmt: CellFormat,
   formatLocale: string,
+  localizeFormula?: FormulaTransform,
 ): void {
   if (fmt.numFmt) {
     draft.numFmt = fmt.numFmt;
@@ -458,7 +462,7 @@ export function hydrateDraftFromFormat(
   draft.hyperlinkDisplay = fmt.hyperlinkDisplay;
   draft.hyperlinkTooltip = fmt.hyperlinkTooltip;
   draft.comment = fmt.comment ?? '';
-  hydrateValidationDraft(draft, fmt.validation);
+  hydrateValidationDraft(draft, fmt.validation, localizeFormula);
   draft.locked = fmt.locked !== false;
   draft.formulaHidden = fmt.formulaHidden === true;
 }
@@ -545,6 +549,7 @@ export function computeDialogNumFmt(
 export function computeDialogValidation(
   draft: DraftState,
   lines: string[],
+  canonicalizeFormula?: FormulaTransform,
 ): CellValidation | undefined {
   const k = draft.validationKind;
   if (k === 'none') return undefined;
@@ -577,7 +582,17 @@ export function computeDialogValidation(
     case 'custom': {
       const formula = draft.validationFormula.trim();
       if (!formula) return undefined;
-      return { kind: 'custom', formula, ...meta };
+      let canonical = formula;
+      if (canonicalizeFormula) {
+        try {
+          canonical = canonicalizeFormula(formula);
+        } catch {
+          // Formula fields are edited incrementally. A partially typed or
+          // invalid expression must remain a draft until the user commits it.
+          canonical = formula;
+        }
+      }
+      return { kind: 'custom', formula: canonical, ...meta };
     }
     case 'whole':
     case 'decimal':
@@ -594,7 +609,11 @@ export function computeDialogValidation(
   }
 }
 
-function hydrateValidationDraft(draft: DraftState, validation: CellValidation | undefined): void {
+function hydrateValidationDraft(
+  draft: DraftState,
+  validation: CellValidation | undefined,
+  localizeFormula?: FormulaTransform,
+): void {
   const v = validation;
   if (!v) {
     draft.validationKind = 'none';
@@ -642,7 +661,15 @@ function hydrateValidationDraft(draft: DraftState, validation: CellValidation | 
     draft.validationListRange = '';
     draft.validationListSourceKind = 'literal';
   }
-  draft.validationFormula = v.kind === 'custom' ? v.formula : '';
+  if (v.kind === 'custom') {
+    try {
+      draft.validationFormula = localizeFormula ? localizeFormula(v.formula) : v.formula;
+    } catch {
+      draft.validationFormula = v.formula;
+    }
+  } else {
+    draft.validationFormula = '';
+  }
   if (
     v.kind === 'whole' ||
     v.kind === 'decimal' ||

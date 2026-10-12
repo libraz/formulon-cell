@@ -1,7 +1,10 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { extractRefs, type FormulaRef } from '../commands/refs.js';
 import { formatA1Cell } from '../engine/address.js';
+import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -12,6 +15,9 @@ export interface EvaluateFormulaDialogDeps {
   store: SpreadsheetStore;
   getWb: () => WorkbookHandle | null;
   strings?: Strings;
+  /** Current UI locale for display fallbacks when the workbook adapter does
+   * not expose native display text. */
+  getLocale?: () => string;
 }
 
 export interface EvaluateFormulaDialogHandle {
@@ -20,14 +26,59 @@ export interface EvaluateFormulaDialogHandle {
   detach(): void;
 }
 
-const formulaRefKey = (ref: FormulaRef): string => `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}`;
+const formulaRefKey = (ref: FormulaRef, formula = ''): string =>
+  `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}:${formula.slice(ref.start, ref.end)}`;
 
-const formulaRefValueText = (wb: WorkbookHandle | null, sheet: number, ref: FormulaRef): string => {
-  if (!wb) return '';
+const canonicalValueText = (value: CellValue): string => {
+  switch (value.kind) {
+    case 'blank':
+      return '0';
+    case 'number':
+      return String(value.value);
+    case 'bool':
+      return value.value ? 'TRUE' : 'FALSE';
+    case 'error':
+      return value.text || '#ERROR!';
+    case 'text':
+      return `"${value.value.replaceAll('"', '""')}"`;
+  }
+};
+
+const formulaRefSheet = (
+  formula: string,
+  ref: FormulaRef,
+  wb: WorkbookHandle,
+  activeSheet: number,
+): number | null => {
+  const raw = formula.slice(ref.start, ref.end);
+  const prefix = /^(?:'((?:[^']|'')+)'|([A-Za-z_][A-Za-z0-9_]*))!/.exec(raw);
+  const before = formula.slice(0, ref.start);
+  // The reference lexer can see the local-looking suffix of an external
+  // reference. Leave those references untouched rather than reading a cell
+  // from the active workbook by accident.
+  if (before.endsWith(']') || raw.includes('[') || raw.includes(']')) return null;
+  if (!prefix) return activeSheet;
+  const requested = (prefix[1] ?? prefix[2] ?? '').replaceAll("''", "'");
+  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+    if (wb.sheetName(sheet).toLocaleLowerCase() === requested.toLocaleLowerCase()) return sheet;
+  }
+  return null;
+};
+
+const formulaRefValueText = (
+  wb: WorkbookHandle | null,
+  formula: string,
+  activeSheet: number,
+  ref: FormulaRef,
+): string | null => {
+  if (!wb) return null;
+  const sheet = formulaRefSheet(formula, ref, wb, activeSheet);
+  if (sheet === null) return null;
   const value = wb.getValue({ sheet, row: ref.r0, col: ref.c0 });
-  if (value.kind === 'text') return `"${value.value.replaceAll('"', '""')}"`;
-  if (value.kind === 'blank') return '0';
-  return formatCell(value);
+  // Reference substitution is structural work on the canonical formula. A
+  // localized decimal separator, boolean spelling, or function alias is
+  // applied only after all offsets have been consumed for display.
+  return canonicalValueText(value);
 };
 
 const evaluatedFormulaText = (
@@ -38,19 +89,23 @@ const evaluatedFormulaText = (
   sheet: number,
 ): string => {
   if (steps <= 0 || refs.length === 0) return formula;
-  const replacedKeys = new Set<string>();
-  const replacements: Array<{ start: number; end: number; text: string }> = [];
+  const groups = new Map<string, { text: string; refs: FormulaRef[] }>();
   for (const ref of refs) {
-    if (replacements.length >= steps) break;
-    const key = formulaRefKey(ref);
-    if (replacedKeys.has(key)) continue;
-    replacedKeys.add(key);
-    replacements.push({
-      start: ref.start,
-      end: ref.end,
-      text: formulaRefValueText(wb, sheet, ref),
-    });
+    const key = formulaRefKey(ref, formula);
+    let group = groups.get(key);
+    if (!group) {
+      if (groups.size >= steps) continue;
+      group = {
+        text: formulaRefValueText(wb, formula, sheet, ref) ?? formula.slice(ref.start, ref.end),
+        refs: [],
+      };
+      groups.set(key, group);
+    }
+    group.refs.push(ref);
   }
+  const replacements = [...groups.values()].flatMap((group) =>
+    group.refs.map((ref) => ({ start: ref.start, end: ref.end, text: group.text })),
+  );
   let out = formula;
   for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
     out = `${out.slice(0, replacement.start)}${replacement.text}${out.slice(replacement.end)}`;
@@ -124,7 +179,43 @@ export function attachEvaluateFormulaDialog(
   let currentRefs: FormulaRef[] = [];
   let stepIndex = 0;
 
-  const uniqueRefCount = (refs: FormulaRef[]): number => new Set(refs.map(formulaRefKey)).size;
+  const displayLocale = (): string => {
+    const wb = getWb();
+    return (
+      deps.getLocale?.() ??
+      (wb ? inputLocaleForWorkbook(wb) : undefined) ??
+      bundledLocaleForStrings(strings) ??
+      'en-US'
+    );
+  };
+
+  const formulaForDisplay = (formula: string, wb: WorkbookHandle | null): string => {
+    if (!wb || typeof wb.getFormulaForDisplay !== 'function') return formula;
+    try {
+      return wb.getFormulaForDisplay(formula);
+    } catch {
+      return formula;
+    }
+  };
+
+  const valueForDisplay = (
+    wb: WorkbookHandle | null,
+    addr: { sheet: number; row: number; col: number },
+  ): string => {
+    if (!wb) return formatCell({ kind: 'blank' }, displayLocale());
+    try {
+      if (typeof wb.getDisplayText === 'function') {
+        const native = wb.getDisplayText(addr.sheet, addr.row, addr.col);
+        if (native !== null) return native;
+      }
+      return formatCell(wb.getValue(addr), displayLocale());
+    } catch {
+      return '';
+    }
+  };
+
+  const uniqueRefCount = (formula: string, refs: FormulaRef[]): number =>
+    new Set(refs.map((ref) => formulaRefKey(ref, formula))).size;
 
   const setEvaluateDisabled = (disabled: boolean, reason: string | null): void => {
     projectDisabledState(evalBtn, disabled, reason, {
@@ -136,14 +227,15 @@ export function attachEvaluateFormulaDialog(
   const syncEvaluation = (): void => {
     const wb = getWb();
     const active = store.getState().selection.active;
-    evaluationBox.textContent = evaluatedFormulaText(
+    const canonicalEvaluation = evaluatedFormulaText(
       currentFormula,
       currentRefs,
       stepIndex,
       wb,
       active.sheet,
     );
-    const uniqueRefs = uniqueRefCount(currentRefs);
+    evaluationBox.textContent = formulaForDisplay(canonicalEvaluation, wb);
+    const uniqueRefs = uniqueRefCount(currentFormula, currentRefs);
     const reason =
       currentRefs.length === 0
         ? t.evaluateRequiresReference
@@ -171,13 +263,13 @@ export function attachEvaluateFormulaDialog(
     currentFormula = formula;
     currentRefs = extractRefs(formula);
     stepIndex = 0;
-    formulaBox.textContent = formula;
+    formulaBox.textContent = formulaForDisplay(formula, wb);
     syncEvaluation();
-    resultBox.textContent = formatCell(wb?.getValue(active) ?? { kind: 'blank' });
+    resultBox.textContent = valueForDisplay(wb, active);
   };
 
   shell.on(evalBtn, 'click', () => {
-    if (stepIndex < uniqueRefCount(currentRefs)) stepIndex += 1;
+    if (stepIndex < uniqueRefCount(currentFormula, currentRefs)) stepIndex += 1;
     syncEvaluation();
   });
   shell.on(closeBtn, 'click', () => api.close());

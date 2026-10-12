@@ -6,7 +6,9 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const key = (addr: Addr): string => `${addr.sheet}:${addr.row}:${addr.col}`;
 
-const fakeWorkbook = (): WorkbookHandle & {
+const fakeWorkbook = (
+  profile: string | null = null,
+): WorkbookHandle & {
   recalcAuto: ReturnType<typeof vi.fn>;
   writes: Map<string, unknown>;
 } => {
@@ -22,6 +24,7 @@ const fakeWorkbook = (): WorkbookHandle & {
       writes.set(key(addr), { kind: 'number', value }),
     ),
     setText: vi.fn((addr: Addr, value: string) => writes.set(key(addr), { kind: 'text', value })),
+    spreadsheetProfileId: vi.fn(() => profile),
     withBatchedRecalc: vi.fn(<T>(fn: () => T): T => fn()),
     recalcAuto: vi.fn(),
   } as unknown as WorkbookHandle & {
@@ -66,5 +69,26 @@ describe('textToColumns', () => {
     expect(store.getState().format.formats.get('0:8:2')).toEqual({ bold: true });
     expect(store.getState().format.formats.get('0:8:3')).toEqual({ bold: true });
     expect(wb.recalcAuto).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the workbook profile when coercing localized tokens', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { kind: 'text', value: '1,25;2,50' },
+      null,
+    );
+    const wb = fakeWorkbook('windows-de_DE');
+
+    expect(
+      textToColumns(store.getState(), store, wb, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, ';'),
+    ).toBe(2);
+    expect(wb.writes).toEqual(
+      new Map([
+        ['0:0:0', { kind: 'number', value: 1.25 }],
+        ['0:0:1', { kind: 'number', value: 2.5 }],
+      ]),
+    );
   });
 });

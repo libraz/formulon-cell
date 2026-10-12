@@ -1,3 +1,4 @@
+import type { Locale } from '../i18n/strings.js';
 // Default factories the toolbar uses when the host doesn't supply its own.
 //
 // `Spreadsheet.mountToolbar(host, instance, opts)` only requires `helpers`,
@@ -54,6 +55,7 @@ import {
 import type { RibbonHooks } from '../toolbar/ribbon/apply-ribbon-command.js';
 import { createControlDispatch } from '../toolbar/ribbon/control-dispatch.js';
 import { shouldShowFontOption } from '../toolbar/ribbon/font-availability.js';
+import { localizedFormatIcon } from '../toolbar/ribbon/localized-format-icons.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { createBordersMenu } from '../toolbar/ribbon/menus/borders.js';
 import { createConditionalMenu } from '../toolbar/ribbon/menus/conditional.js';
@@ -76,7 +78,7 @@ import type { SpreadsheetInstance } from './types.js';
 /** Options shared by every default factory. */
 export interface ToolbarDefaultsOptions {
   /** Language for built-in labels. Defaults to the language derived from `instance.i18n.locale` (`ja*` is Japanese, otherwise English). */
-  lang?: 'ja' | 'en';
+  lang?: Locale;
   /** Called when a control-dispatch flow needs to push focus back to the
    *  sheet (after a font/page-setup change, e.g.). Defaults to focusing
    *  `instance.host`. */
@@ -102,7 +104,7 @@ export interface ToolbarDefaultsOptions {
  *  `RibbonRenderHelpers` so callers can ship a partial helper bundle. */
 export type DefaultRibbonHelpers = RibbonRenderHelpers;
 
-const resolveLang = (instance: SpreadsheetInstance, opts: ToolbarDefaultsOptions): 'ja' | 'en' =>
+const resolveLang = (instance: SpreadsheetInstance, opts: ToolbarDefaultsOptions): Locale =>
   opts.lang ?? toolbarLangForLocale(instance.i18n.locale);
 
 export function createDefaultRibbonHelpers(
@@ -141,7 +143,9 @@ export function createDefaultRibbonHelpers(
   return {
     createSelect: sc.createRibbonSelect,
     createColor: sc.createRibbonColor,
-    createIcon: dispatch.createRibbonIcon,
+    createIcon: (name) =>
+      localizedFormatIcon(name, lang, instance.host.ownerDocument) ??
+      dispatch.createRibbonIcon(name),
     makeSvg: sc.makeSvg,
     chevronPath: sc.RIBBON_CHEVRON_PATH,
   };
@@ -230,7 +234,8 @@ export function createDefaultRibbonMenus(
 
     // Review tab
     watch: reviewFactories.createWatchMenu,
-    reviewComments: reviewFactories.createReviewCommentsMenu,
+    reviewComments: () => reviewFactories.createReviewCommentsMenu(),
+    reviewNewComment: () => reviewFactories.createReviewCommentsMenu('menu-review-new-comment'),
     protect: reviewFactories.createProtectMenu,
 
     // Home tab
@@ -254,13 +259,29 @@ export function createDefaultRibbonMenus(
 /** Hooks the toolbar can satisfy from instance methods alone — clipboard,
  *  drawing, autoSum. Hosts merge their own categories (review, protection,
  *  automation, …) on top because those involve app-specific dialogs. */
-/** Move to the next/previous note in sheet order, wrapping, and open its editor. */
-const selectAdjacentComment = (instance: SpreadsheetInstance, direction: 1 | -1): void => {
+/** Move to an adjacent note or thread in sheet order and open its editor. */
+export const selectAdjacentComment = (
+  instance: SpreadsheetInstance,
+  direction: 1 | -1,
+  mode: 'note' | 'thread' | 'all' = 'all',
+): void => {
   const state = instance.store.getState();
   if (interactionControllerFor(instance.store)?.canSelect().allowed === false) return;
-  const notes = listComments(state).filter((note) =>
-    isNavigationAddrAllowed(instance.store, note.addr),
-  );
+  const notes = [
+    ...(mode === 'thread'
+      ? []
+      : listComments(state).map((entry) => ({ ...entry, mode: 'note' as const }))),
+    ...(mode === 'note'
+      ? []
+      : (state.threadedComments.bySheet.get(state.data.sheetIndex) ?? [])
+          .filter((entry) => !entry.parentId)
+          .map((entry) => ({
+            addr: { sheet: state.data.sheetIndex, row: entry.row, col: entry.col },
+            mode: 'thread' as const,
+          }))),
+  ]
+    .filter((entry) => isNavigationAddrAllowed(instance.store, entry.addr))
+    .sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
   const active = state.selection.active;
   const rank = (addr: { row: number; col: number }): number => addr.row * (MAX_COL + 1) + addr.col;
   const next =
@@ -279,7 +300,7 @@ const selectAdjacentComment = (instance: SpreadsheetInstance, direction: 1 | -1)
     selected.col !== next.addr.col
   )
     return;
-  instance.openCommentDialog();
+  instance.openCommentDialog({ mode: next.mode });
 };
 
 export function createDefaultRibbonHooks(
@@ -428,7 +449,7 @@ export function createDefaultRibbonHooks(
       deleteComment: () => {
         dropdowns.applyReviewCommentAction('delete-active');
       },
-      selectComment: (direction) => selectAdjacentComment(instance, direction),
+      selectComment: (direction, mode) => selectAdjacentComment(instance, direction, mode),
     },
     protection: {
       runSheet: () =>
@@ -494,6 +515,7 @@ export function createDefaultRibbonHooks(
         const strings = instance.i18n.strings.ribbon;
         const current = Math.round(instance.store.getState().viewport.zoom * 100);
         const next = await showZoomDialog({
+          locale: () => instance.locale,
           title: strings.zoomDialogTitle,
           label: strings.zoomDialogPercent,
           initial: current,

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { commentAt, setComment } from '../../../src/commands/comment.js';
 import { History } from '../../../src/commands/history.js';
 import { executeRibbonCommentAction } from '../../../src/commands/ribbon-comment.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const commentWorkbook = (): WorkbookHandle & {
@@ -15,6 +15,32 @@ const commentWorkbook = (): WorkbookHandle & {
   }) as unknown as WorkbookHandle & { setCommentEntry: ReturnType<typeof vi.fn> };
 
 describe('executeRibbonCommentAction', () => {
+  it('restores deleted native notes through undo, redo and XLSX save/load', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    try {
+      expect(wb.isStub).toBe(false);
+      setComment(store, addr, 'native note', wb);
+      executeRibbonCommentAction({ store, workbook: wb, history, action: 'delete-active' });
+      expect(wb.getComment(0, 0, 0)).toBeNull();
+      expect(history.undo()).toBe(true);
+      expect(commentAt(store.getState(), addr)).toBe('native note');
+      expect(wb.getComment(0, 0, 0)?.text).toBe('native note');
+      const loaded = await WorkbookHandle.loadBytes(wb.save());
+      try {
+        expect(loaded.getComment(0, 0, 0)?.text).toBe('native note');
+      } finally {
+        loaded.dispose();
+      }
+      expect(history.redo()).toBe(true);
+      expect(wb.getComment(0, 0, 0)).toBeNull();
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('deletes only the active cell comment and records a single undoable change', () => {
     const store = createSpreadsheetStore();
     const wb = commentWorkbook();

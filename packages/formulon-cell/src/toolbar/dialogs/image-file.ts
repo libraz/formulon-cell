@@ -1,6 +1,9 @@
 export interface PickImageFileResult {
   src: string;
   alt: string;
+  /** Original bytes for native drawing insertion. Keeping this alongside the
+   * data URL avoids a lossy decode/re-encode before save. */
+  bytes: Uint8Array;
 }
 
 export interface PickImageFileOptions {
@@ -40,13 +43,39 @@ export function pickImageFileDataUrl(
         finish(null);
         return;
       }
-      const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        const src = typeof reader.result === 'string' ? reader.result : '';
-        finish(src ? { src, alt: file.name } : null);
+      const dataReader = new FileReader();
+      const bytesReader = new FileReader();
+      let src = '';
+      let bytes: Uint8Array | null = null;
+      let failed = false;
+      const canReadBytes =
+        typeof (bytesReader as FileReader & { readAsArrayBuffer?: unknown }).readAsArrayBuffer ===
+        'function';
+      const complete = (): void => {
+        if (failed) return;
+        if (src && (bytes || !canReadBytes)) {
+          finish({ src, alt: file.name, bytes: bytes ?? new Uint8Array() });
+        }
+      };
+      dataReader.addEventListener('load', () => {
+        src = typeof dataReader.result === 'string' ? dataReader.result : '';
+        complete();
       });
-      reader.addEventListener('error', () => finish(null));
-      reader.readAsDataURL(file);
+      if (canReadBytes) {
+        bytesReader.addEventListener('load', () => {
+          bytes =
+            bytesReader.result instanceof ArrayBuffer ? new Uint8Array(bytesReader.result) : null;
+          complete();
+        });
+      }
+      const onError = (): void => {
+        failed = true;
+        finish(null);
+      };
+      dataReader.addEventListener('error', onError);
+      if (canReadBytes) bytesReader.addEventListener('error', onError);
+      dataReader.readAsDataURL(file);
+      if (canReadBytes) bytesReader.readAsArrayBuffer(file);
     };
 
     input.addEventListener('change', onChange);

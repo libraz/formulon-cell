@@ -1,6 +1,7 @@
 import { insertCopiedBand } from '../../commands/clipboard/insert-copied-cells.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { addrKey } from '../../engine/address.js';
+import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import {
   handleDeleteCellsAction,
   handleInsertCellsAction,
@@ -146,7 +147,7 @@ const buildCellFormatAction =
     const strings = instance.i18n.strings;
     await applyCellFormatAction(action, {
       inst: instance,
-      ribbonLang: instance.i18n.locale === 'ja' ? 'ja' : 'en',
+      ribbonLang: dictionaryLocaleFor(instance.i18n.locale),
       range: normalizedSelectionRange(instance),
       statusMetric: null,
       ribbonMenuText: strings.ribbonMenu,
@@ -163,6 +164,7 @@ const buildCellFormatAction =
       promptDimension: (title, label, initial, max) =>
         showDimensionDialog({
           title,
+          locale: () => instance.locale,
           label,
           initial,
           max,

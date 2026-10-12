@@ -229,4 +229,47 @@ describe('attachIterativeDialog', () => {
     expect(numberInput()?.value).toBe('100');
     handle.detach();
   });
+
+  it('parses maximum change with the live locale and keeps full input precision', () => {
+    const fake = makeFakeWb();
+    const handle = attachIterativeDialog({
+      host,
+      getWb: () => fake.handle,
+      getLocale: () => 'de-DE',
+    });
+    handle.open();
+    const cb = enableInput();
+    const input = textInput();
+    if (!cb || !input) throw new Error('controls missing');
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+    input.value = '0,00000000000000012';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    okBtn()?.click();
+
+    expect(fake.setIterative).toHaveBeenCalledWith(true, 100, 1.2e-16);
+    handle.detach();
+  });
+
+  it('does not confirm while maximum change is invalid', () => {
+    const fake = makeFakeWb();
+    const handle = attachIterativeDialog({
+      host,
+      getWb: () => fake.handle,
+      getLocale: () => 'fr-FR',
+    });
+    handle.open();
+    const cb = enableInput();
+    const input = textInput();
+    if (!cb || !input) throw new Error('controls missing');
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+    input.value = '0,1,2';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    okBtn()?.click();
+
+    expect(fake.setIterative).not.toHaveBeenCalled();
+    expect(input.validationMessage).not.toBe('');
+    handle.detach();
+  });
 });

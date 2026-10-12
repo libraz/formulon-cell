@@ -3,6 +3,13 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { commentAt, setComment } from '../../../src/commands/comment.js';
+import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachCommentDialog } from '../../../src/interact/comment-dialog.js';
 import {
   createSpreadsheetStore,
@@ -22,6 +29,10 @@ const cancelBtn = (): HTMLButtonElement | null =>
   ) ?? null;
 const removeBtn = (): HTMLButtonElement | null =>
   document.querySelector<HTMLButtonElement>('.fc-cmtnote__icon');
+const threadMeta = (): HTMLElement | null =>
+  document.querySelector<HTMLElement>('.fc-cmtnote__thread-meta');
+const dialogError = (): HTMLElement | null =>
+  document.querySelector<HTMLElement>('.fc-cmtnote__error');
 
 describe('attachCommentDialog', () => {
   let host: HTMLElement;
@@ -78,6 +89,94 @@ describe('attachCommentDialog', () => {
     expect(commentAt(store.getState(), { sheet: 0, row: 1, col: 1 })).toBeNull();
     expect(wrap()?.hidden).toBe(true);
     handle.detach();
+  });
+
+  it('opens native threads with localized labels and person display names', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.isStub).toBe(false);
+      expect(wb.capabilities.threadedComments).toBe(true);
+      const personId = '{AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA}';
+      const threadId = '{BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB}';
+      expect(
+        wb.addPerson({ id: personId, displayName: 'Alice', userId: '', providerId: 'None' }),
+      ).toBe(true);
+      expect(
+        wb.addThreadedComment(0, {
+          id: threadId,
+          row: 1,
+          col: 1,
+          personId,
+          created: '2026-01-01T10:00:00.00',
+          text: 'Please review',
+        }),
+      ).toBe(true);
+      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      handle.open({ mode: 'thread' });
+      expect(document.querySelector('.fc-cmtnote__title')?.textContent).toBe('コメント');
+      expect(textarea()?.placeholder).toBe('コメントを入力');
+      expect(threadMeta()?.textContent).toBe('Alice');
+      expect(document.querySelector('.fc-cmtnote__reply')?.textContent).toBe('返信');
+      expect(document.querySelector('.fc-cmtnote__resolve')?.textContent).toBe('解決');
+      handle.detach();
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('keeps the native thread editor open when a note blocks creation', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.isStub).toBe(false);
+      expect(wb.capabilities.threadedComments).toBe(true);
+      setComment(store, { sheet: 0, row: 1, col: 1 }, 'existing note');
+      const handle = attachCommentDialog({ host, store, getWb: () => wb });
+      handle.open({ mode: 'thread' });
+      const ta = textarea();
+      if (!ta) throw new Error('textarea missing');
+      ta.value = 'new thread';
+      document.querySelector<HTMLButtonElement>('.fc-cmtnote__btn--primary')?.click();
+      expect(wrap()?.hidden).toBe(false);
+      expect(dialogError()?.hidden).toBe(false);
+      expect(dialogError()?.textContent).toContain('メモ');
+      expect(commentAt(store.getState(), { sheet: 0, row: 1, col: 1 })).toBe('existing note');
+      expect(wb.getThreadedComments(0)).toHaveLength(0);
+      handle.detach();
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('rechecks note authorization when the policy changes after opening', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const history = new History();
+    const controller = new InteractionController({
+      store,
+      getWb: () => wb,
+      history,
+    });
+    const unregister = registerInteractionController(store, controller);
+    try {
+      expect(wb.isStub).toBe(false);
+      expect(setComment(store, { sheet: 0, row: 1, col: 1 }, 'before', wb)).toBe(true);
+      const handle = attachCommentDialog({ host, store, history, getWb: () => wb });
+      handle.open({ mode: 'note' });
+      controller.setPolicy(viewerPolicy());
+      const ta = textarea();
+      if (!ta) throw new Error('textarea missing');
+      ta.value = 'must stay before';
+      okBtn()?.click();
+      expect(wrap()?.hidden).toBe(false);
+      expect(dialogError()?.hidden).toBe(false);
+      expect(commentAt(store.getState(), { sheet: 0, row: 1, col: 1 })).toBe('before');
+      expect(wb.getComment(0, 1, 1)).toEqual({ author: '', text: 'before' });
+      expect(history.canUndo()).toBe(false);
+      handle.detach();
+    } finally {
+      unregister();
+      controller.dispose();
+      wb.dispose();
+    }
   });
 
   it('Escape closes without writing the typed text', () => {

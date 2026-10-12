@@ -29,6 +29,7 @@ import {
   localizeBorderPresets,
   localizeBorderStyles,
   projectActiveState,
+  projectRibbonActiveState,
 } from '../../../src/toolbar/ribbon-active-state.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
@@ -86,6 +87,28 @@ describe('toolbar/ribbon-active-state', () => {
     expect(fresh.textOrientation).toBe(EMPTY_ACTIVE_STATE.textOrientation);
     expect(fresh.commaStyle).toBe(EMPTY_ACTIVE_STATE.commaStyle);
     expect(fresh.marginPreset).toBe(EMPTY_ACTIVE_STATE.marginPreset);
+  });
+
+  it('keeps the complete font family available when the ribbon field truncates it', () => {
+    const host = document.createElement('div');
+    const control = document.createElement('div');
+    control.dataset.ribbonSelect = 'fontFamily';
+    const button = document.createElement('button');
+    button.title = 'フォント';
+    button.setAttribute('aria-label', 'フォント');
+    button.className = 'fc-tb__rb-dd__btn';
+    const value = document.createElement('span');
+    value.className = 'fc-tb__rb-dd__value';
+    value.textContent = '游ゴシック Regular (本文)';
+    button.appendChild(value);
+    control.appendChild(button);
+    host.appendChild(control);
+
+    projectRibbonActiveState(host, sheet.instance);
+
+    expect(button.title).toBe('フォント: 游ゴシック Regular (本文)');
+    expect(button.getAttribute('aria-label')).toBe('フォント: 游ゴシック Regular (本文)');
+    expect(value.title).toBe('游ゴシック Regular (本文)');
   });
 
   it('reflects toggleBold / toggleItalic on the active cell', () => {
@@ -224,6 +247,33 @@ describe('toolbar/ribbon-active-state', () => {
     expect(state.merged).toBe(true);
     expect(state.mergeCenter).toBe(true);
     expect(state.alignCenter).toBe(true);
+  });
+
+  it('projects effective colors from the merged anchor and matching pending format', () => {
+    const { instance } = sheet;
+    const anchor = { sheet: 0, row: 1, col: 1 };
+    const member = { sheet: 0, row: 1, col: 2 };
+
+    mutators.setCellFormat(instance.store, anchor, {
+      color: '#123456',
+      fill: '#abcdef',
+    });
+    mutators.mergeRange(instance.store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
+    mutators.setActive(instance.store, member);
+
+    expect(projectActiveState(instance)).toMatchObject({
+      fontColor: '#123456',
+      fillColor: '#abcdef',
+    });
+
+    mutators.setPendingFormat(instance.store, {
+      addr: member,
+      format: { color: '#fedcba', fill: '#654321' },
+    });
+    expect(projectActiveState(instance)).toMatchObject({
+      fontColor: '#fedcba',
+      fillColor: '#654321',
+    });
   });
 
   it('marks conditional formatting active when the selected range intersects a rule', () => {

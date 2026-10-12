@@ -11,7 +11,7 @@ import type { CellBatchCommand } from '../../../../src/commands/interaction-poli
 import { fixedFormPolicy } from '../../../../src/commands/interaction-policy.js';
 import { insertRows } from '../../../../src/commands/structure.js';
 import type { Range } from '../../../../src/engine/types.js';
-import { addrKey, type WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings/en.js';
 import {
   attachContextMenu,
@@ -104,6 +104,40 @@ describe('attachContextMenu', () => {
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
       expect(store.getState().ui.copyMode).toBe('cut');
       expect(onAfterCommit).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['windows-de_DE', '1,5\tWAHR\tFALSCH'],
+      ['windows-fr_FR', '1,5\tVRAI\tFAUX'],
+    ] as const)('fallback copy and cut use the live %s profile', async (profile, expected) => {
+      const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+      const localizedWb = await WorkbookHandle.createDefault();
+      const localizedStore = createSpreadsheetStore();
+      try {
+        expect(localizedWb.setSpreadsheetProfileId(profile)).toBe(true);
+        localizedWb.setNumber({ sheet: 0, row: 0, col: 0 }, 1.5);
+        localizedWb.setBool({ sheet: 0, row: 0, col: 1 }, true);
+        localizedWb.setBool({ sheet: 0, row: 0, col: 2 }, false);
+        localizedWb.recalc();
+        mutators.replaceCells(localizedStore, localizedWb.cells(0));
+        setRange(localizedStore, 0, 0, 0, 2);
+        detach = attachContextMenu({
+          host,
+          store: localizedStore,
+          wb: localizedWb,
+          onAfterCommit,
+        });
+
+        fireContextMenu(host, 200, 70);
+        item('copy')?.click();
+        expect(writeText).toHaveBeenNthCalledWith(1, expected);
+
+        fireContextMenu(host, 200, 70);
+        item('cut')?.click();
+        expect(writeText).toHaveBeenNthCalledWith(2, expected);
+      } finally {
+        localizedWb.dispose();
+      }
     });
 
     it('Paste reads from navigator.clipboard and writes via pasteTSV', async () => {

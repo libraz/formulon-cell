@@ -4,6 +4,7 @@ import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import type { CellValue, Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { excelSerialFromParts } from '../../../src/format/date-serial.js';
 import {
   type CellFormat,
   createSpreadsheetStore,
@@ -674,6 +675,20 @@ describe('fillRange', () => {
 
     expect(num(wb, 0, 1, 0)).toBe(dateSerial(2024, 1, 6));
     expect(num(wb, 0, 2, 0)).toBe(dateSerial(2024, 1, 7));
+  });
+
+  it('keeps the Excel serial-60 placeholder in a day series', () => {
+    const feb28 = excelSerialFromParts(1900, 2, 28);
+    if (feb28 === null) throw new Error('missing historical date serial');
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: feb28 }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+
+    fillRange(store.getState(), wb, src, dest, { dateUnit: 'days' });
+    wb.recalc();
+
+    expect(num(wb, 0, 1, 0)).toBe(60);
+    expect(num(wb, 0, 2, 0)).toBe(61);
   });
 
   it('fills weekdays by skipping Saturday and Sunday', () => {

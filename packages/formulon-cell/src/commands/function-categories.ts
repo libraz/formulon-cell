@@ -27,9 +27,15 @@ export type FunctionCategory =
 
 export type CatalogFunctionCategory = Exclude<FunctionCategory, 'all' | 'recent'>;
 
+/** Formulon function-catalog locale ordinals. */
+export type CatalogLocaleOrdinal = 0 | 1 | 2 | 3;
+
 export interface FunctionCatalogReader {
   functionNames?: () => readonly string[] | null;
-  functionMetadata?: (name: string, locale: 0 | 1) => FunctionCatalogMetadata | null;
+  functionMetadata?: (name: string, locale: CatalogLocaleOrdinal) => FunctionCatalogMetadata | null;
+  /** Locale-tagged metadata path used by seven-language hosts. The legacy
+   * ordinal method remains the fallback for readers that predate it. */
+  functionMetadataForLocale?: (name: string, locale: string) => FunctionCatalogMetadata | null;
 }
 
 export interface FunctionCatalogMetadata {
@@ -57,11 +63,38 @@ export interface FunctionCatalogEntry {
 /** Display syntax for a catalog entry: the metadata template when present,
  * otherwise `NAME(labels)` with a trailing `...` for unbounded variadics —
  * `NAME(a, [b], ...)` when labelled, `NAME(...)` when not. */
-export const functionSyntax = (entry: FunctionCatalogEntry): string => {
-  if (entry.signatureTemplate) return entry.signatureTemplate;
+const replaceSignatureSeparators = (template: string, separator: ',' | ';'): string => {
+  let out = '';
+  let inString = false;
+  let bracketDepth = 0;
+  for (const ch of template) {
+    if (ch === '"') {
+      inString = !inString;
+      out += ch;
+      continue;
+    }
+    if (!inString) {
+      if (ch === '[' || ch === '{') bracketDepth += 1;
+      else if (ch === ']' || ch === '}') bracketDepth = Math.max(0, bracketDepth - 1);
+      if (ch === ',' && bracketDepth === 0) {
+        out += separator;
+        continue;
+      }
+    }
+    out += ch;
+  }
+  return out;
+};
+
+/** Display syntax for a catalog entry using the active formula list
+ * separator. The entry remains canonical; this affects presentation only. */
+export const functionSyntax = (entry: FunctionCatalogEntry, listSeparator = ','): string => {
+  const separator = listSeparator === ';' ? ';' : ',';
+  if (entry.signatureTemplate)
+    return replaceSignatureSeparators(entry.signatureTemplate, separator);
   const parts = [...entry.argumentLabels];
   if (entry.maxArity === null) parts.push('...');
-  return `${entry.displayName}(${parts.join(', ')})`;
+  return `${entry.displayName}(${parts.join(`${separator} `)})`;
 };
 
 /** Whether an engine function is a visible-but-non-insertable stub. */
@@ -690,7 +723,8 @@ const staticArity = (
  * when the reader is absent or reports that the capability is unavailable. */
 export const buildFunctionCatalog = (
   reader: FunctionCatalogReader | null,
-  locale: 0 | 1,
+  locale: CatalogLocaleOrdinal,
+  localeTag?: string,
 ): FunctionCatalogSnapshot => {
   const live = reader?.functionNames?.() ?? null;
   const source = live === null ? 'fallback' : 'engine';
@@ -701,7 +735,12 @@ export const buildFunctionCatalog = (
   const entries = new Map<string, FunctionCatalogEntry>();
   for (const canonicalName of uniqueNames) {
     const fallback = staticArity(FUNCTION_SIGNATURES[canonicalName]);
-    const metadata = reader?.functionMetadata?.(canonicalName, locale) ?? null;
+    const metadata =
+      (localeTag !== undefined
+        ? reader?.functionMetadataForLocale?.(canonicalName, localeTag)
+        : null) ??
+      reader?.functionMetadata?.(canonicalName, locale) ??
+      null;
     const minArity = metadata === null ? fallback.minArity : metadata.minArity;
     const maxArity = metadata === null ? fallback.maxArity : metadata.maxArity;
     const displayName = metadata?.localizedName ?? canonicalName;

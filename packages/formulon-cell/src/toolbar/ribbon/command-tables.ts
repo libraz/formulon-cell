@@ -37,8 +37,8 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   gotoSpecial: (i) => i.openGoToSpecial(),
   gotoSpecialHome: (i) => i.openGoToSpecial(),
   hyperlinkInsert: (i) => i.openHyperlinkDialog(),
-  commentInsert: (i) => i.openCommentDialog(),
-  newCommentReview: (i) => i.openCommentDialog(),
+  commentInsert: (i) => i.openCommentDialog({ mode: 'note' }),
+  newCommentReview: (i) => i.openCommentDialog({ mode: 'note' }),
   dataValidation: (i) => i.openDataValidationDialog(),
   namedRanges: (i) => i.openNamedRangeDialog(),
   links: (i) => i.openExternalLinksDialog(),
@@ -59,6 +59,7 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
  *  primary face opens the dialog, while the secondary face keeps the related
  *  Excel-style menu available. */
 export const RIBBON_PRIMARY_SPLIT_DIALOG_COMMANDS: ReadonlySet<string> = new Set([
+  'newCommentReview',
   'dataValidation',
   'linksData',
   'namedRanges',

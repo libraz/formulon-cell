@@ -50,6 +50,27 @@ describe('interact/selection-input — writeSelectionInput', () => {
     expect(sheet.workbook.getValue(A2)).toEqual({ kind: 'number', value: 5 });
   });
 
+  it.each([
+    ['windows-de_DE', '=SUMME(1,5;A1)'],
+    ['windows-fr_FR', '=SOMME(1,5;A1)'],
+  ] as const)(
+    'canonicalizes localized formulas before shifting a multi-cell fill (%s)',
+    (profile, raw) => {
+      expect(sheet.workbook.isStub).toBe(false);
+      expect(sheet.workbook.capabilities.formulaLocale).toBe(true);
+      expect(sheet.workbook.capabilities.localeFacts).toBe(true);
+      expect(sheet.workbook.setSpreadsheetProfileId(profile)).toBe(true);
+      const store = sheet.instance.store;
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
+
+      expect(writeSelectionInput(sheet.workbook, store, store.getState(), raw, A1)).toEqual({
+        status: 'applied',
+      });
+      expect(sheet.workbook.cellFormula(A1)).toBe('=SUM(1.5,A1)');
+      expect(sheet.workbook.cellFormula(A2)).toBe('=SUM(1.5,A2)');
+    },
+  );
+
   it('skips a protected cell instead of rejecting the fill', () => {
     const store = sheet.instance.store;
     mutators.setCellFormat(store, A1, { locked: false });

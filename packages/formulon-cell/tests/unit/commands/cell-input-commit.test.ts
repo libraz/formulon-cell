@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commitCellInput, inputOperation } from '../../../src/commands/cell-input-commit.js';
+import { setFont } from '../../../src/commands/format.js';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
   registerInteractionController,
 } from '../../../src/commands/interaction-controller.js';
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
-import { addrKey } from '../../../src/engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../../../src/engine/address.js';
 import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -83,6 +84,60 @@ describe('commands/cell-input-commit', () => {
     expect(store.getState().ui.pendingFormat).toBeNull();
   });
 
+  it('keeps a saved worksheet font on controller-less input after reload', async () => {
+    const source = await createRealWorkbook();
+    const sourceStore = createSpreadsheetStore();
+    source.attachStore(sourceStore);
+    sourceStore.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL },
+      },
+    }));
+    expect(setFont(sourceStore.getState(), sourceStore, { fontSize: 24 })).toBe(true);
+    const bytes = source.save();
+    source.detachStore(sourceStore);
+    source.dispose();
+
+    const loaded = await WorkbookHandle.loadBytes(bytes);
+    const loadedStore = createSpreadsheetStore();
+    loaded.attachStore(loadedStore);
+    const target = { sheet: 0, row: 0, col: 2 } as const;
+    const result = commitCellInput({
+      store: loadedStore,
+      wb: loaded,
+      addr: target,
+      raw: 'after reload',
+      origin: 'editor',
+    });
+    expect(result).toEqual({ status: 'applied', notice: null });
+    expect(loadedStore.getState().format.formats.has(addrKey(target))).toBe(false);
+    const effective = loaded.getEffectiveStyle(target.sheet, target.row, target.col);
+    expect(effective?.source).toBe(0);
+    const xf = effective ? loaded.getCellXf(effective.xfIndex) : null;
+    const font = xf ? loaded.getFontRecord(xf.fontIndex) : null;
+    expect(font?.size).toBeCloseTo(18, 10);
+
+    const roundTripped = await WorkbookHandle.loadBytes(loaded.save());
+    try {
+      const roundTripEffective = roundTripped.getEffectiveStyle(
+        target.sheet,
+        target.row,
+        target.col,
+      );
+      const roundTripXf = roundTripEffective
+        ? roundTripped.getCellXf(roundTripEffective.xfIndex)
+        : null;
+      const roundTripFont = roundTripXf ? roundTripped.getFontRecord(roundTripXf.fontIndex) : null;
+      expect(roundTripFont?.size).toBeCloseTo(18, 10);
+    } finally {
+      loaded.detachStore(loadedStore);
+      loaded.dispose();
+      roundTripped.dispose();
+    }
+  });
+
   it('hands the write and pending format to a registered controller without a policy', () => {
     const controller = withController();
     dispose = controller.dispose;
@@ -96,6 +151,84 @@ describe('commands/cell-input-commit', () => {
     expect(wb.getValue(addr)).toEqual({ kind: 'number', value: 7 });
     expect(store.getState().format.formats.get(addrKey(addr))?.bold).toBe(true);
     expect(store.getState().ui.pendingFormat).toBeNull();
+  });
+
+  it('uses the live workbook profile when committing localized input', async () => {
+    const realWb = await createRealWorkbook();
+    try {
+      expect(realWb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
+
+      const result = commitCellInput({ store, wb: realWb, addr, raw: '1,25', origin: 'editor' });
+
+      expect(result).toEqual({ status: 'applied', notice: null });
+      expect(realWb.getValue(addr)).toEqual({ kind: 'number', value: 1.25 });
+    } finally {
+      realWb.dispose();
+    }
+  });
+
+  it('classifies inherited native Text number formats before committing input', async () => {
+    const realWb = await createRealWorkbook();
+    try {
+      const baseXf = realWb.getCellXf(0);
+      if (!baseXf) throw new Error('missing workbook default XF');
+      const textNumFmt = realWb.addNumFmtCode('@');
+      const inheritedTextXf = realWb.addXfRecord({
+        ...baseXf,
+        numFmtId: textNumFmt,
+        applyNumberFormat: true,
+      });
+      expect(realWb.setColumnStyle(0, 0, MAX_COL, inheritedTextXf)).toBe(true);
+
+      expect(commitCellInput({ store, wb: realWb, addr, raw: '00123', origin: 'editor' })).toEqual({
+        status: 'applied',
+        notice: null,
+      });
+      expect(realWb.getValue(addr)).toEqual({ kind: 'text', value: '00123' });
+
+      expect(
+        commitCellInput({
+          store,
+          wb: realWb,
+          addr: { ...addr, col: 1 },
+          raw: '=1+1',
+          origin: 'editor',
+        }),
+      ).toEqual({ status: 'applied', notice: null });
+      expect(realWb.getValue({ ...addr, col: 1 })).toEqual({ kind: 'text', value: '=1+1' });
+
+      const explicitGeneral = { ...addr, col: 2 };
+      mutators.setCellFormat(store, explicitGeneral, { numFmt: { kind: 'general' } });
+      expect(
+        commitCellInput({
+          store,
+          wb: realWb,
+          addr: explicitGeneral,
+          raw: '00123',
+          origin: 'editor',
+        }),
+      ).toEqual({ status: 'applied', notice: null });
+      expect(realWb.getValue(explicitGeneral)).toEqual({ kind: 'number', value: 123 });
+
+      const pendingText = { ...addr, col: 3 };
+      mutators.setCellFormat(store, pendingText, { numFmt: { kind: 'general' } });
+      mutators.setPendingFormat(store, {
+        addr: pendingText,
+        format: { numFmt: { kind: 'text' } },
+      });
+      expect(
+        commitCellInput({
+          store,
+          wb: realWb,
+          addr: pendingText,
+          raw: '00123',
+          origin: 'editor',
+        }),
+      ).toEqual({ status: 'applied', notice: null });
+      expect(realWb.getValue(pendingText)).toEqual({ kind: 'text', value: '00123' });
+    } finally {
+      realWb.dispose();
+    }
   });
 
   it('reports a throwing write as failed', () => {

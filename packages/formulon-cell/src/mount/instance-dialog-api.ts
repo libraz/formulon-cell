@@ -95,8 +95,8 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
     openHyperlinkDialog() {
       featureState.hyperlinkDialog?.open();
     },
-    openCommentDialog() {
-      featureState.commentDialog?.open();
+    openCommentDialog(options) {
+      featureState.commentDialog?.open(options);
     },
     openFindReplace(tab?: 'find' | 'replace') {
       getBinding().findReplace?.open(tab);

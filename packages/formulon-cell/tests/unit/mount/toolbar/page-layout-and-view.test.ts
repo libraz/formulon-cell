@@ -163,6 +163,14 @@ describe('Spreadsheet.mountToolbar', () => {
     const menu = host.querySelector<HTMLElement>('#menu-page-theme');
     expect(menu?.classList.contains('fc-tb__menu--visual')).toBe(true);
     expect(menu?.querySelectorAll('.fc-tb__visual-tile')).toHaveLength(3);
+    const workbookOfficeButton = host.querySelector<HTMLButtonElement>(
+      '[data-workbook-theme-action="office"]',
+    );
+    const workbookGrayButton = host.querySelector<HTMLButtonElement>(
+      '[data-workbook-theme-action="gray"]',
+    );
+    expect(workbookOfficeButton?.disabled).toBe(true);
+    expect(workbookGrayButton?.disabled).toBe(true);
 
     const paperButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="paper"]');
     const inkButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="ink"]');

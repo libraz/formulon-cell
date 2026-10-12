@@ -92,6 +92,25 @@ describe('React <Spreadsheet>', () => {
     expect(mounted.instance.workbook).toBe(next);
   });
 
+  it('reports a rejected controlled workbook replacement without losing the old instance', async () => {
+    const onError = vi.fn();
+    mounted = await mountReactSpreadsheet({ onError });
+    const original = mounted.instance.workbook;
+    const next = await Core.WorkbookHandle.createDefault({ preferStub: true });
+    const failure = new Error('viewport rejected');
+    const setWorkbook = vi.spyOn(mounted.instance, 'setWorkbook').mockRejectedValueOnce(failure);
+
+    try {
+      await mounted.rerender({ workbook: next, onError });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(failure);
+      expect(mounted.instance.workbook).toBe(original);
+    } finally {
+      setWorkbook.mockRestore();
+      next.dispose();
+    }
+  });
+
   it('forwards a theme prop change to instance.setTheme without remounting', async () => {
     const onThemeChange = vi.fn();
     mounted = await mountReactSpreadsheet({ theme: 'paper', onThemeChange });
@@ -108,7 +127,7 @@ describe('React <Spreadsheet>', () => {
     expect(mounted.host.querySelector<HTMLElement>('[data-fc-theme]')?.dataset.fcTheme).toBe('ink');
   });
 
-  it('forwards a locale prop change to instance.i18n.setLocale without remounting', async () => {
+  it('forwards a locale prop change to instance.setLocale without remounting', async () => {
     const onLocaleChange = vi.fn();
     mounted = await mountReactSpreadsheet({ locale: 'en', onLocaleChange });
     const original = mounted.instance;

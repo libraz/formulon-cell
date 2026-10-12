@@ -54,7 +54,7 @@ describe('conditional-format rule dialogs', () => {
     expect(dialog?.textContent).toContain('Yellow Fill with Dark Yellow Text');
     expect(dialog?.textContent).toContain('Red Text and Red Fill');
 
-    const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
+    const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     const select = dialog?.querySelector<HTMLSelectElement>('select.fc-tb__dlg__select');
     const preview = dialog?.querySelector<HTMLElement>('[data-conditional-format-preview]');
     expect(select?.options).toHaveLength(9);
@@ -118,7 +118,7 @@ describe('conditional-format rule dialogs', () => {
     });
 
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
-    const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
+    const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     const select = dialog?.querySelector<HTMLSelectElement>('select.fc-tb__dlg__select');
     const preview = dialog?.querySelector<HTMLElement>('[data-conditional-format-preview]');
     if (!input || !select || !preview) {
@@ -135,6 +135,57 @@ describe('conditional-format rule dialogs', () => {
       values: [7],
       style: { fill: '#ff0000', color: '#ffffff' },
     });
+  });
+
+  it('parses locale decimal input and hydrates the initial value without grouping', async () => {
+    const pending = showConditionalFormatNumberDialog({
+      title: 'Größer als...',
+      label: 'Werte größer als:',
+      initial: 1234.5,
+      locale: 'de-DE',
+      strings,
+    });
+
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!input) throw new Error('Expected localized decimal input.');
+    expect(input.value).toBe('1234,5');
+    expect(input.inputMode).toBe('decimal');
+    input.value = '1,5';
+
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await expect(pending).resolves.toEqual({
+      values: [1.5],
+      style: { fill: '#ffc7ce', color: '#9c0006' },
+    });
+  });
+
+  it('rejects an empty numeric criterion instead of coercing it to zero', async () => {
+    const pending = showConditionalFormatNumberDialog({
+      title: 'Greater Than...',
+      label: 'Format cells that are GREATER THAN:',
+      initial: 1,
+      strings,
+    });
+    let resolved = false;
+    void pending.then(() => {
+      resolved = true;
+    });
+
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
+    const submit = dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    if (!input || !submit) throw new Error('Expected numeric input and submit button.');
+    input.value = '';
+    submit.click();
+    expect(input.value).toBe('');
+    expect(dialog?.querySelector<HTMLElement>('[role="alert"]')?.hidden).toBe(false);
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+    dialog
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
+    await expect(pending).resolves.toBeNull();
   });
 
   it('returns text criteria with a text-only format preset', async () => {

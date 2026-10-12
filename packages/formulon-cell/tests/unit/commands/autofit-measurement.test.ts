@@ -130,6 +130,15 @@ describe('computeAutofitColWidth', () => {
     ).toBe(46);
   });
 
+  it('measures a missing cell font with the workbook Normal font in CSS pixels', () => {
+    const store = storeWith([[0, 0, 'HeaderName']]);
+    const { ctx } = fakeMeasureCtx();
+    computeAutofitColWidth(store.getState(), 0, ctx, {
+      workbookDisplayFont: { name: 'Aptos Narrow', size: 12 },
+    });
+    expect(ctx.font).toBe('400 16px "Aptos Narrow", system-ui, sans-serif');
+  });
+
   it('measures formula text when formulas are shown', () => {
     const store = storeWith([[0, 0, 'v', '=REPT("abcdefgh",3)']]);
     expect(computeAutofitColWidth(store.getState(), 0, null)).toBe(48);
@@ -201,6 +210,13 @@ describe('public autofitColWidth / autofitRowHeight', () => {
     expect(autofitColWidth({ store, host }, 0, 0, 0, 'en')).toBe(157);
     host.remove();
   });
+
+  it('uses the optional workbook display font for public helper calls', () => {
+    const store = storeWith([[0, 0, 'HeaderName']]);
+    const host = document.createElement('div');
+    const workbook = { workbookDisplayFont: { name: 'Aptos Narrow', size: 12 } };
+    expect(autofitColWidth({ store, host, workbook }, 0, 0, 0, 'en')).toBe(103);
+  });
 });
 
 describe('ribbon Format > AutoFit', () => {
@@ -235,7 +251,7 @@ describe('ribbon Format > AutoFit', () => {
     }));
     const { history } = await run('col-autofit', store, { r0: 0, c0: 0, r1: 2, c1: 1 });
     expect(store.getState().layout.colWidths.get(0)).toBe(48);
-    expect(store.getState().layout.colWidths.get(1)).toBe(105);
+    expect(store.getState().layout.colWidths.get(1)).toBe(114);
     expect(history.undo()).toBe(true);
     expect(store.getState().layout.colWidths.size).toBe(0);
   });

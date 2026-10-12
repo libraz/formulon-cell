@@ -87,13 +87,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   header.className = 'fc-fmtdlg__header';
   const headerTitle = document.createElement('span');
   headerTitle.textContent = t.title;
-  // Distinct from the footer Cancel button — otherwise Playwright's strict
-  // `getByRole('button', { name: 'Cancel' })` finds both and throws.
-  // Heuristic: if t.cancel is non-ASCII (likely Japanese) use the Japanese
-  // "Close" — otherwise English.
-  const closeLabel = Array.from(t.cancel).some((ch) => ch.charCodeAt(0) > 0x7f)
-    ? '閉じる'
-    : 'Close';
+  const closeLabel = strings.backstage.close;
   header.appendChild(headerTitle);
   const headerCloseBtn = appendDialogIconButton(header, {
     label: '',

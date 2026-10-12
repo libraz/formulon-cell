@@ -56,6 +56,19 @@ describe('attachArgHelper', () => {
     handle.detach();
   });
 
+  it('uses a localized alias and semicolon separator for the live tooltip', () => {
+    setText(input, '=SUMME(A1;');
+    const handle = attachArgHelper({
+      input,
+      getListSeparator: () => ';',
+      resolveFunctionName: (rawName) => (rawName === 'SUMME' ? 'SUM' : rawName.toUpperCase()),
+    });
+    handle.refresh();
+    expect(tooltip()?.textContent).toContain('; ');
+    expect(activeArg()?.textContent).toBe('[number2]');
+    handle.detach();
+  });
+
   it('uses the innermost function when the caret is inside a nested call', () => {
     setText(input, '=IF(SUM(');
     const handle = attachArgHelper({ input });

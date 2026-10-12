@@ -7,6 +7,7 @@ import type {
   NumFmt,
   TextDirection,
 } from '../store/store.js';
+import { fontCssPxToPoints, fontPointsToCssPx } from './font-units.js';
 import type { BorderRecord, BorderSide, CellXf, FillRecord, FontRecord } from './types.js';
 
 /** Default font name + size used when a CellFormat omits these. Mirrors the
@@ -137,9 +138,12 @@ export function fontRecordFromFormat(
   workbookDefault?: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
 ): FontRecord {
   const name = fmt.fontFamily ?? workbookDefault?.name ?? DEFAULT_FONT_NAME;
+  const size = Number.isFinite(fmt.fontSize)
+    ? fontCssPxToPoints(fmt.fontSize as number)
+    : (workbookDefault?.size ?? DEFAULT_FONT_SIZE);
   return {
     name,
-    size: fmt.fontSize ?? workbookDefault?.size ?? DEFAULT_FONT_SIZE,
+    size,
     // A theme link belongs to the typeface, so it carries only while the cell
     // is still on the workbook's body font. Naming a family picks a literal
     // font, which is what unlinks it — bolding or resizing does not.
@@ -380,6 +384,22 @@ export function buildXfRecord(
   numFmtId: number,
   fmt: CellFormat,
 ): CellXf {
+  const hasNumberFormat = Object.hasOwn(fmt, 'numFmt');
+  const hasFont = [
+    'fontFamily',
+    'fontSize',
+    'bold',
+    'italic',
+    'underline',
+    'strike',
+    'fontVertAlign',
+    'color',
+  ].some((field) => Object.hasOwn(fmt, field));
+  const hasFill = ['fill', 'fillPattern', 'fillPatternColor'].some((field) =>
+    Object.hasOwn(fmt, field),
+  );
+  const hasBorder = Object.hasOwn(fmt, 'borders');
+  const hasProtection = ['locked', 'formulaHidden'].some((field) => Object.hasOwn(fmt, field));
   const textRotation = cellRotationToTextRotation(fmt.rotation);
   const indent = authoredIndent(fmt.indent);
   const readingOrder = textDirectionToReadingOrder(fmt.textDirection);
@@ -410,6 +430,19 @@ export function buildXfRecord(
     hasVerticalAlign,
     hasWrapText,
     hasJustifyLastLine,
+    ...(hasNumberFormat ? { applyNumberFormat: true } : {}),
+    ...(hasFont ? { applyFont: true } : {}),
+    ...(hasFill ? { applyFill: true } : {}),
+    ...(hasBorder ? { applyBorder: true } : {}),
+    ...(hasAlignment ? { applyAlignment: true } : {}),
+    ...(hasProtection ? { applyProtection: true } : {}),
+    ...(hasProtection
+      ? {
+          hasProtection: true,
+          locked: fmt.locked !== false,
+          hidden: fmt.formulaHidden === true,
+        }
+      : {}),
     ...(textRotation === undefined ? {} : { textRotation }),
     ...(indent === undefined ? {} : { indent }),
     ...(fmt.shrinkToFit === undefined ? {} : { shrinkToFit: fmt.shrinkToFit }),
@@ -422,13 +455,26 @@ export function buildXfRecord(
 /** Translate an engine FontRecord back into the CellFormat font fields. */
 export function fontRecordToFormat(
   rec: FontRecord,
-  workbookDefault: Pick<FontRecord, 'name' | 'size'> | null = null,
+  workbookDefault: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null = null,
 ): Partial<CellFormat> {
   const out: Partial<CellFormat> = {};
   const defaultName = workbookDefault?.name ?? DEFAULT_FONT_NAME;
   const defaultSize = workbookDefault?.size ?? DEFAULT_FONT_SIZE;
-  if (rec.name !== defaultName) out.fontFamily = rec.name;
-  if (rec.size !== defaultSize) out.fontSize = rec.size;
+  // A resolved theme record may expose a different family name while keeping
+  // the same raw scheme as the workbook default. It still means "inherit the
+  // workbook body font" in the sparse CellFormat representation.
+  // The engine uses 0 for a literal/unset scheme on some records. Only the
+  // OOXML theme links are inheritance markers; treating 0 as a match would
+  // erase an explicitly authored family such as Arial during hydrate.
+  const isThemeScheme = (scheme: number | undefined): boolean => scheme === 1 || scheme === 2;
+  const sameThemeBodyFont =
+    isThemeScheme(rec.scheme) &&
+    isThemeScheme(workbookDefault?.scheme) &&
+    rec.scheme === workbookDefault?.scheme;
+  if (rec.name !== defaultName && !sameThemeBodyFont) out.fontFamily = rec.name;
+  // Compare in native units before converting. A default 12 pt font must be
+  // stripped even though its paint value is 16 CSS px.
+  if (rec.size !== defaultSize) out.fontSize = fontPointsToCssPx(rec.size);
   if (rec.bold) out.bold = true;
   if (rec.italic) out.italic = true;
   if (rec.strike) out.strike = true;

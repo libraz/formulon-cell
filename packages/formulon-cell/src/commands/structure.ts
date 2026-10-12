@@ -1,6 +1,41 @@
-import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
-import type { Addr, CellValue, Range } from '../engine/types.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import {
+  type ActiveAxisFormatSnapshot,
+  captureActiveAxisFormatOverrideForStructure,
+  remapActiveAxisFormatOverridesForStructure,
+  restoreActiveAxisFormatOverrideForStructure,
+  restoreNativeAxisSnapshot,
+} from '../engine/axis-format-sync.js';
+import {
+  type AxisStructureShift,
+  mapAxisAddress,
+  remapAxisFormatOverride,
+  remapSheetFontOverride,
+} from '../engine/axis-structure-remap.js';
+import {
+  captureSyncedFormatKeysForStructure,
+  remapSyncedFormatKeysForStructure,
+  restoreSyncedFormatKeysForStructure,
+} from '../engine/cell-format-sync.js';
+import {
+  type FormatHistoryTrackingSnapshot,
+  formatHistoryBridgeFor,
+  type NativeFormatSnapshot,
+} from '../engine/format-history-bridge.js';
+import type {
+  Addr,
+  CellValue,
+  Range,
+  SheetAxisFormatOverride,
+  SheetFontOverride,
+} from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
+import {
+  type ActiveWholeSheetFontSnapshot,
+  captureActiveWholeSheetFontOverrideForStructure,
+  remapActiveWholeSheetFontOverridesForStructure,
+  restoreActiveWholeSheetFontOverrideForStructure,
+} from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
 import {
@@ -301,6 +336,196 @@ function shiftAnchoredRanges(
   });
 }
 
+const cloneAxisOverride = (
+  override: SheetAxisFormatOverride | undefined,
+): SheetAxisFormatOverride | undefined =>
+  override
+    ? {
+        baseline: {
+          columns: override.baseline.columns.map((entry) => ({ ...entry })),
+          rows: override.baseline.rows.map((entry) => ({ ...entry })),
+        },
+        desired: {
+          columns: override.desired.columns.map((entry) => ({ ...entry })),
+          rows: override.desired.rows.map((entry) => ({ ...entry })),
+        },
+        ...(override.directXfs
+          ? {
+              directXfs: override.directXfs.map((entry) => ({
+                key: entry.key,
+                before: { ...entry.before },
+                afterXfIndex: entry.afterXfIndex,
+              })),
+            }
+          : {}),
+        ...(override.fontPatch ? { fontPatch: { ...override.fontPatch } } : {}),
+      }
+    : undefined;
+
+const cloneSheetFontOverride = (
+  override: SheetFontOverride | undefined,
+): SheetFontOverride | undefined =>
+  override
+    ? {
+        ...override,
+        ...(override.patch ? { patch: { ...override.patch } } : {}),
+        ...(override.baseline
+          ? {
+              baseline: {
+                columns: override.baseline.columns.map((entry) => ({ ...entry })),
+                rows: override.baseline.rows.map((entry) => ({ ...entry })),
+              },
+            }
+          : {}),
+      }
+    : undefined;
+
+interface StructureCacheSnapshot {
+  readonly activeAxis: ActiveAxisFormatSnapshot | null;
+  readonly activeWholeSheetFont: ActiveWholeSheetFontSnapshot | null;
+  readonly syncedFormatKeys: ReadonlySet<string> | null;
+}
+
+/** The native structure child is the first entry in a composite history
+ * transaction. Later entries can already have restored their own before
+ * snapshots when the native replay fails, so keep an isolated full store
+ * checkpoint for putting those children back at the committed after-state. */
+type StructureStoreSnapshot = State;
+
+export interface StructureReplayCheckpoint {
+  readonly store: StructureStoreSnapshot;
+  readonly caches: StructureCacheSnapshot;
+}
+
+export interface StructureReplayCheckpointRef {
+  readonly capture?: () => StructureReplayCheckpoint;
+  before?: StructureReplayCheckpoint;
+  after?: StructureReplayCheckpoint;
+}
+
+const captureStructureStoreSnapshot = (store: SpreadsheetStore): StructureStoreSnapshot =>
+  structuredClone(store.getState()) as StructureStoreSnapshot;
+
+const restoreStructureStoreSnapshot = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  snapshot: StructureStoreSnapshot,
+  caches: StructureCacheSnapshot | undefined,
+): void => {
+  withEngineSyncMuted(wb, () => {
+    store.setState(() => structuredClone(snapshot) as State);
+    if (!caches) return;
+    restoreActiveAxisFormatOverrideForStructure(wb, sheet, caches.activeAxis);
+    restoreActiveWholeSheetFontOverrideForStructure(wb, sheet, caches.activeWholeSheetFont);
+    restoreSyncedFormatKeysForStructure(wb, sheet, caches.syncedFormatKeys);
+  });
+};
+
+export const captureStructureReplayCheckpoint = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+): StructureReplayCheckpoint => ({
+  store: captureStructureStoreSnapshot(store),
+  caches: {
+    activeAxis: captureActiveAxisFormatOverrideForStructure(wb, sheet),
+    activeWholeSheetFont: captureActiveWholeSheetFontOverrideForStructure(wb, sheet),
+    syncedFormatKeys: captureSyncedFormatKeysForStructure(wb, sheet),
+  },
+});
+
+/** Create a replay checkpoint handle for a composite command that invokes a
+ * structural edit and appends more history children afterwards. The caller
+ * owns the final marker; the structure child uses the same handle so native
+ * failure recovery sees the committed outer transaction state. */
+export const createStructureReplayCheckpointRef = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+): StructureReplayCheckpointRef => ({
+  capture: () => captureStructureReplayCheckpoint(store, wb, sheet),
+});
+
+const structureStyleRange = (sheet: number, axis: 'row' | 'col', split: number): Range => ({
+  sheet,
+  r0: axis === 'row' ? split : 0,
+  c0: axis === 'col' ? split : 0,
+  r1: MAX_ROW,
+  c1: MAX_COL,
+});
+
+const withEngineSyncMuted = <T>(wb: WorkbookHandle, fn: () => T): T => {
+  const candidate = wb as WorkbookHandle & {
+    withEngineSyncMuted?: <R>(callback: () => R) => R;
+  };
+  return typeof candidate.withEngineSyncMuted === 'function'
+    ? candidate.withEngineSyncMuted(fn)
+    : fn();
+};
+
+const axisSnapshotFor = (
+  wb: WorkbookHandle,
+  sheet: number,
+): ReturnType<WorkbookHandle['getSheetFontAxisSnapshot']> => {
+  const candidate = wb as WorkbookHandle & {
+    getSheetFontAxisSnapshot?: WorkbookHandle['getSheetFontAxisSnapshot'];
+  };
+  return typeof candidate.getSheetFontAxisSnapshot === 'function'
+    ? candidate.getSheetFontAxisSnapshot(sheet)
+    : null;
+};
+
+/** Publish a structural axis remap while the store mirror is muted. The
+ * native operation has already shifted its records; this keeps all compact
+ * JS/native caches in the same coordinate space before an ordinary store
+ * subscriber can flush stale keys. */
+function applyStructureFormatRemap(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  shift: AxisStructureShift,
+  axisOverride: SheetAxisFormatOverride | undefined,
+  sheetFontOverride: SheetFontOverride | undefined,
+  cacheSnapshot?: StructureCacheSnapshot,
+): void {
+  withEngineSyncMuted(wb, () => {
+    store.setState((state) => {
+      const currentAxes = state.format.sheetAxisOverrides;
+      const nextAxes = currentAxes ? new Map(currentAxes) : new Map();
+      const nextAxisOverride = cloneAxisOverride(axisOverride);
+      if (nextAxisOverride) nextAxes.set(sheet, nextAxisOverride);
+      else nextAxes.delete(sheet);
+      const currentFonts = state.format.sheetFontOverrides;
+      const nextFonts = currentFonts ? new Map(currentFonts) : new Map();
+      const nextSheetFontOverride = cloneSheetFontOverride(sheetFontOverride);
+      if (nextSheetFontOverride) nextFonts.set(sheet, nextSheetFontOverride);
+      else nextFonts.delete(sheet);
+      return {
+        ...state,
+        format: {
+          ...state.format,
+          sheetAxisOverrides: nextAxes,
+          sheetFontOverrides: nextFonts,
+        },
+      };
+    });
+    if (cacheSnapshot) {
+      restoreActiveAxisFormatOverrideForStructure(wb, sheet, cacheSnapshot.activeAxis);
+      restoreActiveWholeSheetFontOverrideForStructure(
+        wb,
+        sheet,
+        cacheSnapshot.activeWholeSheetFont,
+      );
+      restoreSyncedFormatKeysForStructure(wb, sheet, cacheSnapshot.syncedFormatKeys);
+    } else {
+      remapActiveAxisFormatOverridesForStructure(wb, sheet, shift);
+      remapActiveWholeSheetFontOverridesForStructure(wb, sheet, shift);
+      remapSyncedFormatKeysForStructure(wb, sheet, shift);
+    }
+  });
+}
+
 /**
  * Apply a row/col shift using the engine's native `insertRows/deleteRows/
  * insertCols/deleteCols` ops. Pushes one history entry that inverts via the
@@ -310,16 +535,55 @@ function shiftAnchoredRanges(
  */
 function applyAxisShiftViaEngine(
   wb: WorkbookHandle,
+  store: SpreadsheetStore,
   history: History | null,
   sheet: number,
   axis: 'row' | 'col',
   split: number,
   delta: number,
+  restoreAfterFailedReplay?: (phase: 'redo' | 'undo') => void,
+  replayCheckpoint?: StructureReplayCheckpointRef,
 ): boolean {
   if (delta === 0) return true;
   const positive = delta > 0;
   const count = Math.abs(delta);
   const record = history !== null && !history.isReplaying();
+  const shift: AxisStructureShift = { axis, split, delta };
+  const bridge = record ? formatHistoryBridgeFor(store) : undefined;
+  const styleRange = structureStyleRange(sheet, axis, split);
+  const rangeStyleCapable = record && wb.capabilities.rangeStyleSnapshot === true;
+  const beforeRangeStyle = rangeStyleCapable ? wb.snapshotRangeStyle(styleRange) : null;
+  // A capable native module must produce the opaque checkpoint before any
+  // structural mutation. Falling back to the manual sparse checkpoint here
+  // would silently lose blank-cell XFs and axis metadata on Undo.
+  if (rangeStyleCapable && beforeRangeStyle === null) return false;
+  const useRangeStyleCheckpoint = rangeStyleCapable;
+
+  // A structure edit moves sparse direct XFs even when the store has no
+  // projected CellFormat for them. Capture the source keys before native
+  // mutation and their mapped destinations after it. Deleted-band keys stay in
+  // the before checkpoint so Undo can recreate them after the native inverse.
+  const sourceKeys = new Set<string>();
+  if (record) {
+    for (const key of store.getState().format.formats.keys()) {
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== sheet) continue;
+      const index = axis === 'row' ? addr.row : addr.col;
+      if (index >= split) sourceKeys.add(key);
+    }
+    for (const entry of store.getState().format.sheetAxisOverrides?.get(sheet)?.directXfs ?? []) {
+      sourceKeys.add(entry.key);
+    }
+  }
+  const beforeNative: NativeFormatSnapshot =
+    record && bridge && !useRangeStyleCheckpoint ? bridge.capture(sourceKeys) : new Map();
+  const beforeTracking: FormatHistoryTrackingSnapshot =
+    record && bridge ? bridge.captureTracking(sourceKeys) : new Map();
+  const beforeAxes = record && !useRangeStyleCheckpoint ? axisSnapshotFor(wb, sheet) : null;
+  let afterNative: NativeFormatSnapshot = new Map();
+  let afterTracking: FormatHistoryTrackingSnapshot = new Map();
+  let afterAxes = beforeAxes;
+  let afterRangeStyle: Uint8Array | null = null;
 
   // For delete (delta < 0), capture cells in the band so undo can rewrite
   // them. Insert is fully invertible by the opposite engine op alone.
@@ -366,32 +630,328 @@ function applyAxisShiftViaEngine(
     }
   };
 
-  const apply = (): void => {
-    if (!runNativeOp(positive)) throw new Error('structure: native axis edit failed');
-    if (canRestoreMerges) {
-      if (initialApply) afterMerges = wb.getMerges(sheet);
-      else restoreMerges(afterMerges);
+  const afterKeys = (): Set<string> => {
+    const keys = new Set<string>();
+    for (const key of sourceKeys) {
+      const addr = parseAddrKey(key);
+      if (!addr) continue;
+      const mapped = mapAxisAddress(addr, shift);
+      if (mapped) keys.add(addrKey(mapped));
     }
-    initialApply = false;
+    return keys;
   };
-  const invert = (): void => {
-    if (!runNativeOp(!positive)) throw new Error('structure: native axis undo failed');
-    if (canRestoreMerges) restoreMerges(beforeMerges);
 
-    if (!positive) {
-      // Restore the deleted band and every original formula. The native
-      // inverse recreates the row/column slots, but #REF! replacements made
-      // by the delete cannot be reconstructed by that inverse alone.
-      wb.withBatchedRecalc(() => {
-        for (const c of captured) writeCell(wb, c.addr, c.value, c.formula);
-        for (const entry of originalFormulas) wb.setFormula(entry.addr, entry.formula);
+  const restoreCheckpoint = (
+    axes: ReturnType<WorkbookHandle['getSheetFontAxisSnapshot']>,
+    native: NativeFormatSnapshot,
+    tracking: FormatHistoryTrackingSnapshot,
+    rangeStyle: Uint8Array | null = null,
+  ): void => {
+    const errors: unknown[] = [];
+    const currentAxes = axes !== null ? axisSnapshotFor(wb, sheet) : null;
+    let currentRangeStyle: Uint8Array | null = null;
+    if (rangeStyle !== null) {
+      if (wb.capabilities.rangeStyleSnapshot !== true) {
+        errors.push(new Error('structure: native range style snapshot capability unavailable'));
+      } else {
+        try {
+          currentRangeStyle = wb.snapshotRangeStyle(styleRange);
+          if (currentRangeStyle === null)
+            throw new Error('structure: native range style rollback snapshot failed');
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+    }
+    let currentNative: NativeFormatSnapshot | null = null;
+    let currentTracking: FormatHistoryTrackingSnapshot | null = null;
+    if (bridge) {
+      try {
+        currentNative = bridge.capture(native.keys());
+        currentTracking = bridge.captureTracking(native.keys());
+      } catch (error) {
+        // Continue with the requested restore. If it fails too, the capture
+        // error is retained alongside the setter error for the caller.
+        errors.push(error);
+      }
+    }
+    let axisFailed = false;
+    let directFailed = false;
+    let rangeFailed = false;
+    const restore = (): void => {
+      // A null range checkpoint means this is the legacy/manual path. Keep
+      // the axis/direct-XF restore active for older native bundles instead of
+      // treating the absence of a range snapshot as a successful restore.
+      let rangeRestored = false;
+      if (rangeStyle !== null) {
+        try {
+          if (
+            wb.capabilities.rangeStyleSnapshot !== true ||
+            !wb.restoreRangeStyle(sheet, rangeStyle)
+          )
+            throw new Error('structure: failed to restore native range styles');
+          rangeRestored = true;
+        } catch (error) {
+          rangeFailed = true;
+          errors.push(error);
+        }
+      }
+      if (!rangeRestored) {
+        // Axis and direct-XF recovery are independent. A failed axis setter
+        // must not short-circuit a direct checkpoint restore (and vice versa).
+        if (axes !== null) {
+          try {
+            if (!restoreNativeAxisSnapshot(wb, sheet, axes))
+              throw new Error('structure: failed to restore native axis styles');
+          } catch (error) {
+            axisFailed = true;
+            errors.push(error);
+          }
+        }
+        if (bridge) {
+          try {
+            bridge.restore(native);
+          } catch (error) {
+            directFailed = true;
+            errors.push(error);
+          }
+          if (!axisFailed && !directFailed) {
+            try {
+              bridge.restoreTracking(tracking);
+            } catch (error) {
+              errors.push(error);
+            }
+          }
+        }
+      } else if (bridge) {
+        try {
+          bridge.restoreTracking(tracking);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+    };
+    if (bridge) bridge.withSyncMuted(restore);
+    else withEngineSyncMuted(wb, restore);
+    if (axisFailed || directFailed) {
+      const rollback = (): void => {
+        if ((rangeFailed || errors.length > 0) && currentRangeStyle !== null) {
+          try {
+            if (!wb.restoreRangeStyle(sheet, currentRangeStyle))
+              throw new Error('structure: failed to roll back native range styles');
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+        if (axisFailed && currentAxes !== null) {
+          try {
+            if (!restoreNativeAxisSnapshot(wb, sheet, currentAxes))
+              throw new Error('structure: failed to roll back native axis styles');
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+        if (directFailed && bridge && currentNative !== null) {
+          try {
+            bridge.restore(currentNative);
+            if (currentTracking !== null) bridge.restoreTracking(currentTracking);
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+      };
+      if (bridge) bridge.withSyncMuted(rollback);
+      else withEngineSyncMuted(wb, rollback);
+    } else if (errors.length > 0 && currentRangeStyle !== null) {
+      const rollbackRange = (): void => {
+        try {
+          if (!wb.restoreRangeStyle(sheet, currentRangeStyle as Uint8Array))
+            throw new Error('structure: failed to roll back native range styles');
+        } catch (error) {
+          errors.push(error);
+        }
+        if (bridge && currentTracking !== null) {
+          try {
+            bridge.restoreTracking(currentTracking);
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+      };
+      if (bridge) bridge.withSyncMuted(rollbackRange);
+      else withEngineSyncMuted(wb, rollbackRange);
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'structure: native format checkpoint restore failed', {
+        cause: errors[0],
       });
     }
+  };
+
+  const restoreDeletedBand = (): void => {
+    if (positive) return;
+    wb.withBatchedRecalc(() => {
+      for (const c of captured) writeCell(wb, c.addr, c.value, c.formula);
+      for (const entry of originalFormulas) wb.setFormula(entry.addr, entry.formula);
+    });
+  };
+
+  const rollbackRedo = (): void => {
+    if (!runNativeOp(!positive)) throw new Error('structure: native redo rollback failed');
+    if (canRestoreMerges) restoreMerges(beforeMerges);
+    restoreDeletedBand();
+    restoreCheckpoint(beforeAxes, beforeNative, beforeTracking, beforeRangeStyle);
     wb.recalcAuto();
   };
 
-  if (!runNativeOp(positive)) return false;
-  if (canRestoreMerges) afterMerges = wb.getMerges(sheet);
+  const rollbackUndo = (): void => {
+    if (!runNativeOp(positive)) throw new Error('structure: native undo rollback failed');
+    if (canRestoreMerges) restoreMerges(afterMerges);
+    restoreCheckpoint(afterAxes, afterNative, afterTracking, afterRangeStyle);
+    wb.recalcAuto();
+  };
+
+  const apply = (): void => {
+    let applied = false;
+    try {
+      if (!initialApply && replayCheckpoint) {
+        replayCheckpoint.before =
+          replayCheckpoint.capture?.() ?? captureStructureReplayCheckpoint(store, wb, sheet);
+      }
+      if (!runNativeOp(positive)) throw new Error('structure: native axis edit failed');
+      applied = true;
+      if (canRestoreMerges) {
+        if (initialApply) afterMerges = wb.getMerges(sheet);
+        else restoreMerges(afterMerges);
+      }
+      if (!initialApply) {
+        restoreCheckpoint(afterAxes, afterNative, afterTracking, afterRangeStyle);
+        wb.recalcAuto();
+      }
+      initialApply = false;
+    } catch (error) {
+      if (!applied) {
+        const recoveryErrors: unknown[] = [];
+        try {
+          restoreAfterFailedReplay?.('redo');
+        } catch (rollbackError) {
+          recoveryErrors.push(rollbackError);
+        }
+        if (recoveryErrors.length > 0)
+          throw new AggregateError([error, ...recoveryErrors], 'structure: redo recovery failed', {
+            cause: error,
+          });
+        throw error;
+      }
+      const recoveryErrors: unknown[] = [];
+      try {
+        rollbackRedo();
+      } catch (rollbackError) {
+        recoveryErrors.push(rollbackError);
+      }
+      try {
+        restoreAfterFailedReplay?.('redo');
+      } catch (restoreError) {
+        recoveryErrors.push(restoreError);
+      }
+      if (recoveryErrors.length > 0)
+        throw new AggregateError([error, ...recoveryErrors], 'structure: redo rollback failed', {
+          cause: error,
+        });
+      throw error;
+    }
+  };
+  const invert = (): void => {
+    let applied = false;
+    try {
+      if (replayCheckpoint?.after === undefined) {
+        if (replayCheckpoint) {
+          replayCheckpoint.after =
+            replayCheckpoint.capture?.() ?? captureStructureReplayCheckpoint(store, wb, sheet);
+        }
+      }
+      if (!runNativeOp(!positive)) throw new Error('structure: native axis undo failed');
+      applied = true;
+      if (canRestoreMerges) restoreMerges(beforeMerges);
+      restoreDeletedBand();
+      wb.recalcAuto();
+      restoreCheckpoint(beforeAxes, beforeNative, beforeTracking, beforeRangeStyle);
+      wb.recalcAuto();
+    } catch (error) {
+      if (!applied) {
+        const recoveryErrors: unknown[] = [];
+        try {
+          restoreAfterFailedReplay?.('undo');
+        } catch (rollbackError) {
+          recoveryErrors.push(rollbackError);
+        }
+        if (recoveryErrors.length > 0)
+          throw new AggregateError([error, ...recoveryErrors], 'structure: undo recovery failed', {
+            cause: error,
+          });
+        throw error;
+      }
+      const recoveryErrors: unknown[] = [];
+      try {
+        rollbackUndo();
+      } catch (rollbackError) {
+        recoveryErrors.push(rollbackError);
+      }
+      try {
+        restoreAfterFailedReplay?.('undo');
+      } catch (restoreError) {
+        recoveryErrors.push(restoreError);
+      }
+      if (recoveryErrors.length > 0)
+        throw new AggregateError([error, ...recoveryErrors], 'structure: undo rollback failed', {
+          cause: error,
+        });
+      throw error;
+    }
+  };
+
+  let initialApplied = false;
+  try {
+    if (!runNativeOp(positive)) return false;
+    initialApplied = true;
+    if (canRestoreMerges) afterMerges = wb.getMerges(sheet);
+    if (record) {
+      afterAxes = !useRangeStyleCheckpoint ? axisSnapshotFor(wb, sheet) : null;
+      if (useRangeStyleCheckpoint) {
+        afterRangeStyle = wb.snapshotRangeStyle(styleRange);
+        if (afterRangeStyle === null)
+          throw new Error('structure: native range style after-snapshot failed');
+      }
+      if (bridge) {
+        const keys = afterKeys();
+        if (!useRangeStyleCheckpoint) afterNative = bridge.capture(keys);
+        afterTracking = bridge.captureTracking(keys);
+      }
+    }
+  } catch (error) {
+    if (!initialApplied) throw error;
+    const rollbackErrors: unknown[] = [];
+    try {
+      if (!runNativeOp(!positive)) throw new Error('structure: native axis rollback failed');
+      if (canRestoreMerges) restoreMerges(beforeMerges);
+      restoreDeletedBand();
+      restoreCheckpoint(beforeAxes, beforeNative, beforeTracking, beforeRangeStyle);
+      wb.recalcAuto();
+    } catch (rollbackError) {
+      rollbackErrors.push(rollbackError);
+    }
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...rollbackErrors],
+        'structure: native axis edit rollback failed',
+        {
+          cause: error,
+        },
+      );
+    }
+    throw error;
+  }
   initialApply = false;
   if (record) {
     history.push({ undo: invert, redo: apply });
@@ -410,6 +970,7 @@ function editAxis(
   kind: 'insert' | 'delete',
   at: number,
   count: number,
+  outerReplayCheckpoint?: StructureReplayCheckpointRef,
 ): boolean {
   const max = axis === 'row' ? MAX_ROW : MAX_COL;
   const edit = normalizeAxisEdit(at, count, max, kind);
@@ -423,17 +984,119 @@ function editAxis(
   }
   if (kind === 'insert' && insertionWouldOverflow(store, wb, sheet, axis, split, n)) return false;
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
+  const structureShift: AxisStructureShift = { axis, split, delta };
+  const inverseStructureShift: AxisStructureShift = { axis, split, delta: -delta };
+  const beforeAxisOverride = cloneAxisOverride(
+    store.getState().format.sheetAxisOverrides?.get(sheet),
+  );
+  const beforeSheetFontOverride = cloneSheetFontOverride(
+    store.getState().format.sheetFontOverrides?.get(sheet),
+  );
+  const afterAxisOverride = beforeAxisOverride
+    ? remapAxisFormatOverride(beforeAxisOverride, structureShift)
+    : undefined;
+  const afterSheetFontOverride = beforeSheetFontOverride
+    ? remapSheetFontOverride(beforeSheetFontOverride, structureShift)
+    : undefined;
+  const captureStructureCaches = history !== null && !history.isReplaying();
+  const beforeStructureCaches: StructureCacheSnapshot | undefined = captureStructureCaches
+    ? {
+        activeAxis: captureActiveAxisFormatOverrideForStructure(wb, sheet),
+        activeWholeSheetFont: captureActiveWholeSheetFontOverrideForStructure(wb, sheet),
+        syncedFormatKeys: captureSyncedFormatKeysForStructure(wb, sheet),
+      }
+    : undefined;
+
+  // Native structure history is the first child in a transaction so redo
+  // applies the engine mutation before the muted JS cache remap. Undo runs
+  // those later children first; if the native restore then rejects, put the
+  // committed after-cache back before propagating the failure.
+  let restoreAfterFailedReplay: ((phase: 'redo' | 'undo') => void) | undefined;
+  const replayCheckpoint = outerReplayCheckpoint ?? {};
 
   if (history) history.begin();
   try {
     // 1. shift cells & rewrite formula refs.
     if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, axis, split, delta)) return false;
+      if (
+        !applyAxisShiftViaEngine(
+          wb,
+          store,
+          history,
+          sheet,
+          axis,
+          split,
+          delta,
+          (phase) => restoreAfterFailedReplay?.(phase),
+          replayCheckpoint,
+        )
+      )
+        return false;
     } else {
       applyAxisShiftToCells(wb, sheet, axis, split, delta);
     }
 
-    // 2. shift formats; an insertion inherits the format of the band above/left.
+    // 2. Shift compact axis state and its workbook-local caches before any
+    // ordinary store subscriber can flush the old coordinate keys. This is a
+    // separate history child because native structure history is first and
+    // format-map history is recorded below it.
+    applyStructureFormatRemap(
+      store,
+      wb,
+      sheet,
+      structureShift,
+      afterAxisOverride,
+      afterSheetFontOverride,
+    );
+    const afterStructureCaches: StructureCacheSnapshot | undefined = captureStructureCaches
+      ? {
+          activeAxis: captureActiveAxisFormatOverrideForStructure(wb, sheet),
+          activeWholeSheetFont: captureActiveWholeSheetFontOverrideForStructure(wb, sheet),
+          syncedFormatKeys: captureSyncedFormatKeysForStructure(wb, sheet),
+        }
+      : undefined;
+    restoreAfterFailedReplay = (phase) => {
+      const checkpoint = phase === 'redo' ? replayCheckpoint.before : replayCheckpoint.after;
+      if (checkpoint) {
+        restoreStructureStoreSnapshot(store, wb, sheet, checkpoint.store, checkpoint.caches);
+        return;
+      }
+      applyStructureFormatRemap(
+        store,
+        wb,
+        sheet,
+        structureShift,
+        afterAxisOverride,
+        afterSheetFontOverride,
+        afterStructureCaches,
+      );
+    };
+    if (history) {
+      history.push({
+        undo: () =>
+          applyStructureFormatRemap(
+            store,
+            wb,
+            sheet,
+            inverseStructureShift,
+            beforeAxisOverride,
+            beforeSheetFontOverride,
+            beforeStructureCaches,
+          ),
+        redo: () =>
+          applyStructureFormatRemap(
+            store,
+            wb,
+            sheet,
+            structureShift,
+            afterAxisOverride,
+            afterSheetFontOverride,
+            afterStructureCaches,
+          ),
+      });
+    }
+
+    // 3. shift sparse cell formats; an insertion inherits the format of the band above/left.
     recordFormatChange(history, store, () => {
       store.setState((s) => {
         const shift = axis === 'row' ? shiftFormatsByRow : shiftFormatsByCol;
@@ -445,7 +1108,7 @@ function editAxis(
       });
     });
 
-    // 3. shift layout (sizes, hidden set, outline levels, freeze count).
+    // 4. shift layout (sizes, hidden set, outline levels, freeze count).
     recordLayoutChange(history, store, () => {
       const before = captureLayoutSnapshot(store.getState());
       const row = axis === 'row';
@@ -481,8 +1144,24 @@ function editAxis(
       );
     });
 
-    // 4. re-point merges, conditional formats, and the autofilter region.
+    // 5. re-point merges, conditional formats, and the autofilter region.
     shiftAnchoredRanges(store, wb, history, sheet, axis, split, delta, nativeAxisOp);
+    if (history && captureStructureCaches && outerReplayCheckpoint === undefined) {
+      // Undo visits children in reverse order. This final marker therefore
+      // arms the committed after-state immediately before the other children
+      // begin undoing; redo captures its before-state at the native child so
+      // selections or unrelated edits made after this command are not rolled
+      // back by a failed replay.
+      history.push({
+        undo: () => {
+          replayCheckpoint.after = captureStructureReplayCheckpoint(store, wb, sheet);
+        },
+        redo: () => {
+          replayCheckpoint.before = undefined;
+          replayCheckpoint.after = undefined;
+        },
+      });
+    }
     return true;
   } finally {
     if (history) history.end();
@@ -501,8 +1180,9 @@ export function insertRows(
   history: History | null,
   atRow: number,
   count = 1,
+  replayCheckpoint?: StructureReplayCheckpointRef,
 ): boolean {
-  return editAxis(store, wb, history, 'row', 'insert', atRow, count);
+  return editAxis(store, wb, history, 'row', 'insert', atRow, count, replayCheckpoint);
 }
 
 export function deleteRows(
@@ -511,8 +1191,9 @@ export function deleteRows(
   history: History | null,
   atRow: number,
   count = 1,
+  replayCheckpoint?: StructureReplayCheckpointRef,
 ): boolean {
-  return editAxis(store, wb, history, 'row', 'delete', atRow, count);
+  return editAxis(store, wb, history, 'row', 'delete', atRow, count, replayCheckpoint);
 }
 
 export function insertCols(
@@ -521,8 +1202,9 @@ export function insertCols(
   history: History | null,
   atCol: number,
   count = 1,
+  replayCheckpoint?: StructureReplayCheckpointRef,
 ): boolean {
-  return editAxis(store, wb, history, 'col', 'insert', atCol, count);
+  return editAxis(store, wb, history, 'col', 'insert', atCol, count, replayCheckpoint);
 }
 
 export function deleteCols(
@@ -531,6 +1213,7 @@ export function deleteCols(
   history: History | null,
   atCol: number,
   count = 1,
+  replayCheckpoint?: StructureReplayCheckpointRef,
 ): boolean {
-  return editAxis(store, wb, history, 'col', 'delete', atCol, count);
+  return editAxis(store, wb, history, 'col', 'delete', atCol, count, replayCheckpoint);
 }

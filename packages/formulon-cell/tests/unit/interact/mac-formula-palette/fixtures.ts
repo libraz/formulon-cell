@@ -8,6 +8,7 @@ import type {
 import {
   attachMacFormulaPalette,
   type FunctionArgumentHelpProvider,
+  type MacFormulaPaletteDeps,
 } from '../../../../src/interact/mac-formula-palette.js';
 import {
   attachFormulaBarController,
@@ -65,6 +66,16 @@ export type PaletteSetupArgs = [
   ) => FormulaEditLease | null,
 ];
 
+export interface PaletteHarness {
+  anchor: { sheet: number; row: number; col: number };
+  beginDraft: ReturnType<typeof vi.fn>;
+  dock: HTMLDivElement;
+  formulaBar: ReturnType<typeof attachFormulaBarHarness>;
+  mirror: ReturnType<typeof vi.fn>;
+  opener: HTMLButtonElement;
+  palette: ReturnType<typeof attachMacFormulaPalette>;
+}
+
 /** Mounts a palette docked in `sheet` with a live formula bar behind it. */
 export const setupPalette = (
   sheet: MountedStubSheet,
@@ -75,7 +86,7 @@ export const setupPalette = (
     getFunctionArgumentHelp,
     suspend,
   ]: PaletteSetupArgs
-) => {
+): PaletteHarness => {
   const opener = document.createElement('button');
   opener.textContent = 'open';
   sheet.host.appendChild(opener);
@@ -87,7 +98,7 @@ export const setupPalette = (
   const beginDraft = vi.fn((...args: Parameters<FormulaBarController['beginExternalDraft']>) =>
     formulaBar.controller.beginExternalDraft(...args),
   );
-  const mirror = vi.fn();
+  const mirror = vi.fn<MacFormulaPaletteDeps['projectMirror']>();
   const anchor = { sheet: 0, row: 0, col: 0 };
   const palette = attachMacFormulaPalette({
     host: sheet.host,

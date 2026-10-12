@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { attachSessionCharts } from '../../../src/interact/session-charts.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -91,6 +92,93 @@ describe('attachSessionCharts', () => {
     expect(host.querySelector('.fc-chart__title')?.textContent).toBe('線グラフ');
     expect(host.querySelector('.fc-chart__resize')?.getAttribute('aria-label')).toBe('サイズ変更');
 
+    handle.detach();
+  });
+
+  it('keeps bar and column marks inside padded slots for sparse and dense series', () => {
+    for (const kind of ['bar', 'column'] as const) {
+      for (const count of [1, 2, 16, 100]) {
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        const store = createSpreadsheetStore();
+        for (let index = 0; index < count; index += 1) {
+          const row = kind === 'bar' ? index : 0;
+          const col = kind === 'bar' ? 0 : index;
+          mutators.setCell(store, { sheet: 0, row, col }, { kind: 'number', value: index + 1 });
+        }
+        mutators.upsertChart(store, {
+          id: `${kind}-chart-${count}`,
+          kind,
+          source: {
+            sheet: 0,
+            r0: 0,
+            c0: 0,
+            r1: kind === 'bar' ? count - 1 : 0,
+            c1: kind === 'bar' ? 0 : count - 1,
+          },
+        });
+
+        const handle = attachSessionCharts({ host, store });
+        const marks = Array.from(
+          host.querySelectorAll<SVGRectElement>('.fc-chart__plot rect[fill="#0f6cbd"]'),
+        )
+          .map((mark) => ({
+            start: Number(mark.getAttribute(kind === 'bar' ? 'y' : 'x')),
+            size: Number(mark.getAttribute(kind === 'bar' ? 'height' : 'width')),
+          }))
+          .sort((a, b) => a.start - b.start);
+        expect(marks).toHaveLength(count);
+        for (const mark of marks) {
+          expect(mark.start).toBeGreaterThanOrEqual(20);
+          expect(mark.start + mark.size).toBeLessThanOrEqual(kind === 'bar' ? 112 : 300);
+          expect(mark.size).toBeGreaterThan(0);
+        }
+        for (let index = 1; index < marks.length; index += 1) {
+          const previous = marks[index - 1];
+          const current = marks[index];
+          if (!previous || !current) throw new Error('chart mark missing from measured series');
+          expect(current.start).toBeGreaterThanOrEqual(previous.start + previous.size - 1e-9);
+        }
+        handle.detach();
+        host.remove();
+      }
+    }
+  });
+
+  it('routes chart object edits through the protection guard', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    mutators.upsertChart(store, {
+      id: 'protected-chart',
+      kind: 'line',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      x: 20,
+      y: 30,
+      w: 320,
+      h: 180,
+    });
+
+    const handle = attachSessionCharts({ host, store });
+    const chart = host.querySelector<HTMLElement>('.fc-chart');
+    const header = host.querySelector<HTMLElement>('.fc-chart__header');
+    const close = host.querySelector<HTMLButtonElement>('.fc-chart__close');
+    if (!chart || !header || !close) throw new Error('missing chart controls');
+    setProtectedSheet(store, 0, true);
+    const before = structuredClone(store.getState().charts.charts[0]);
+
+    firePointer(header, 'pointerdown', { clientX: 10, clientY: 10 });
+    firePointer(window, 'pointermove', { clientX: 45, clientY: 60 });
+    firePointer(window, 'pointerup', { clientX: 45, clientY: 60 });
+    fireKey(chart, 'ArrowRight');
+    fireKey(chart, 'Delete');
+    close.click();
+
+    expect(store.getState().charts.charts).toHaveLength(1);
+    expect(store.getState().charts.charts[0]).toEqual(before);
+    setProtectedSheet(store, 0, false);
+    fireKey(chart, 'ArrowRight');
+    expect(store.getState().charts.charts[0]?.x).toBe(28);
     handle.detach();
   });
 

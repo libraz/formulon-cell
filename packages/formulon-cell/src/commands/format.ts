@@ -1,8 +1,18 @@
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import {
+  type AxisFormatBand,
+  type AxisFormatPatchResolver,
+  prepareAxisFormatOverrideWithWorkbook,
+} from '../engine/axis-format-sync.js';
+import { cellFormatFromXf, effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import type { Addr, Range } from '../engine/types.js';
-import { normalizeFormatLocale } from '../format/locale.js';
+import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
+import { currencySymbolForLocale } from '../format/locale.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import {
+  isWholeColumnRange,
+  isWholeRowRange,
   rangeContainsAddr,
   rangesIntersect,
   selectionCoversRange,
@@ -20,9 +30,10 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import { planAxisSelection } from './axis-selection-plan.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOperation, InteractionOrigin } from './interaction-policy.js';
-import { gateProtection, isCellWritable } from './protection.js';
+import { gateProtection, isCellWritable, isSheetProtected } from './protection.js';
 
 export { formatNumber } from '../format/number-format.js';
 
@@ -123,17 +134,61 @@ const materializeSelection = (ranges: readonly Range[]): Addr[] | null => {
   return [...cells.values()];
 };
 
-const selectionPlan = (state: State): { ranges: Range[]; cells: Addr[] } | null => {
+const selectionPlan = (
+  state: State,
+): {
+  ranges: Range[];
+  cells: Addr[];
+  exceptionCells: Addr[];
+  axisBands: AxisFormatBand[];
+} | null => {
   const ranges = selectionRanges(state);
   if (!ranges || !mergeCoverageValid(state, ranges)) return null;
   const normalized = disjointRanges(ranges);
-  const cells = materializeSelection(normalized);
-  return cells ? { ranges: normalized, cells } : null;
+  const geometry = planAxisSelection(ranges, MAX_MATERIALIZED_FORMAT_CELLS);
+  if (!geometry) return null;
+  const cells = materializeSelection(geometry.ordinaryRanges);
+  const exceptionCells = materializeSelection(geometry.exceptionRanges);
+  if (
+    !cells ||
+    !exceptionCells ||
+    cells.length + exceptionCells.length > MAX_MATERIALIZED_FORMAT_CELLS
+  )
+    return null;
+  const sparse = new Map<string, Addr>();
+  for (const addr of cells) sparse.set(addrKey(addr), addr);
+  const exceptions = new Set(exceptionCells.map(addrKey));
+  // Axis selections modify the compact native style and only materialise
+  // already-authored cells in the store. Blank/future cells remain implicit.
+  if (geometry.axisBands.length > 0) {
+    for (const key of state.format.formats.keys()) {
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== normalized[0]?.sheet) continue;
+      if (
+        !exceptions.has(key) &&
+        geometry.axisBands.some(
+          (band) =>
+            (band.axis === 'column' && addr.col >= band.first && addr.col <= band.last) ||
+            (band.axis === 'row' && addr.row >= band.first && addr.row <= band.last),
+        )
+      )
+        sparse.set(key, addr);
+    }
+  }
+  if (sparse.size + exceptions.size > MAX_MATERIALIZED_FORMAT_CELLS) return null;
+  return {
+    ranges: normalized,
+    cells: [...sparse.values()],
+    exceptionCells,
+    axisBands: geometry.axisBands.map((band) => ({ ...band })),
+  };
 };
 
 export interface SelectionFormatPlan {
   readonly ranges: readonly Range[];
   readonly cells: readonly Addr[];
+  readonly exceptionCells: readonly Addr[];
+  readonly axisBands: readonly AxisFormatBand[];
 }
 
 /** Plan the complete primary-plus-extra selection for dialog-style actions. */
@@ -143,6 +198,8 @@ export function planSelectionFormat(state: State): SelectionFormatPlan | null {
   return {
     ranges: plan.ranges.map((range) => ({ ...range })),
     cells: plan.cells.map((addr) => ({ ...addr })),
+    exceptionCells: plan.exceptionCells.map((addr) => ({ ...addr })),
+    axisBands: plan.axisBands.map((band) => ({ ...band })),
   };
 }
 
@@ -257,6 +314,124 @@ const commitSelectionFormatEntries = (
   return true;
 };
 
+const axisSafeFormatKeys = new Set<keyof CellFormat>([
+  'numFmt',
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'align',
+  'vAlign',
+  'wrap',
+  'justifyLastLine',
+  'shrinkToFit',
+  'indent',
+  'rotation',
+  'textDirection',
+  'fontVertAlign',
+  'borders',
+  'color',
+  'fill',
+  'fillPattern',
+  'fillPatternColor',
+  'fontFamily',
+  'fontSize',
+  'locked',
+  'formulaHidden',
+  // Named styles carry visual fields in the payload. The native row/column
+  // XF cannot retain the style id itself, but sparse authored cells still do;
+  // allowing the route keeps Cell Styles on axis selections from silently
+  // falling back to MAX_ROW/MAX_COL materialization.
+  'cellStyle',
+]);
+
+const axisPatchSupported = (patch: Partial<CellFormat>): boolean =>
+  Object.keys(patch).every((key) => axisSafeFormatKeys.has(key as keyof CellFormat));
+
+/** Apply one style patch to row/column bands plus the bounded sparse cells in
+ *  the same selection. The axis portion remains a compact native override;
+ *  ordinary cells retain the existing CellFormat representation. */
+const applyAxisFormatPatch = (
+  state: State,
+  store: SpreadsheetStore,
+  plan: {
+    ranges: readonly Range[];
+    cells: readonly Addr[];
+    exceptionCells: readonly Addr[];
+    axisBands: readonly AxisFormatBand[];
+  },
+  patch: Partial<CellFormat>,
+  options: SelectionFormatOptions = {},
+  resolvePatch?: AxisFormatPatchResolver,
+): boolean => {
+  if (plan.axisBands.length === 0 || !axisPatchSupported(patch)) return false;
+  const sheet = plan.ranges[0]?.sheet;
+  if (sheet === undefined || isSheetProtected(state, sheet)) return false;
+  if (!authorizeSelection(store, plan.ranges, plan.cells, options)) return false;
+  const controller = interactionControllerFor(store);
+  if (controller?.policy?.editable !== undefined) return false;
+  const bridge = formatHistoryBridgeFor(store);
+  const workbook = bridge?.workbook;
+  if (
+    workbook?.capabilities.cellFormatting !== true ||
+    workbook?.capabilities.sheetFontStyles !== true
+  )
+    return false;
+  const budgetKeys = new Set([...plan.cells, ...plan.exceptionCells].map(addrKey));
+  const preparation = prepareAxisFormatOverrideWithWorkbook(
+    state,
+    store,
+    plan.ranges,
+    plan.axisBands,
+    patch,
+    workbook,
+    plan.exceptionCells,
+    resolvePatch,
+    budgetKeys.size,
+    budgetKeys,
+  );
+  if (!preparation) return false;
+  const writable = plan.cells.filter((addr) => isCellWritable(state, addr));
+  if (writable.length > MAX_MATERIALIZED_FORMAT_CELLS) return false;
+  store.setState((current) => {
+    const formats = new Map(current.format.formats);
+    for (const addr of writable) {
+      const key = addrKey(addr);
+      const resolvedPatch = resolvePatch
+        ? (() => {
+            const effective = workbook.getEffectiveStyle(addr.sheet, addr.row, addr.col);
+            const base =
+              effective?.xfIndex ?? workbook.getCellXfIndex(addr.sheet, addr.row, addr.col);
+            return base === null || base === undefined
+              ? patch
+              : (resolvePatch(workbook, base, addr) ?? patch);
+          })()
+        : patch;
+      const next = mergeCellFormat(formats.get(key), resolvedPatch);
+      if (next) formats.set(key, next);
+      else formats.delete(key);
+    }
+    const axisOverrides = new Map(current.format.sheetAxisOverrides ?? []);
+    axisOverrides.set(sheet, preparation.override);
+    // A compact axis override becomes the sole authority after a user starts
+    // editing a selected row/column. Keeping the old worksheet-wide entry
+    // would make the two native sync paths race on every publication.
+    const sheetFonts = new Map(current.format.sheetFontOverrides ?? []);
+    sheetFonts.delete(sheet);
+    return {
+      ...current,
+      format: {
+        ...current.format,
+        formats,
+        sheetAxisOverrides: axisOverrides,
+        sheetFontOverrides: sheetFonts,
+      },
+      ui: { ...current.ui, pendingFormat: null },
+    };
+  });
+  return true;
+};
+
 export function applySelectionFormatPatch(
   state: State,
   store: SpreadsheetStore,
@@ -265,6 +440,9 @@ export function applySelectionFormatPatch(
 ): boolean {
   const plan = selectionPlan(state);
   if (!plan) return false;
+  if (plan.axisBands.length > 0) {
+    return applyAxisFormatPatch(state, store, plan, patch ?? {}, options);
+  }
   return commitSelectionFormatEntries(
     state,
     store,
@@ -300,6 +478,97 @@ const clearSelectionFormat = (
   visualOnly: boolean,
   options: SelectionFormatOptions = {},
 ): boolean => {
+  const wholeRanges = selectionRanges(state);
+  const axisPlan = selectionPlan(state);
+  const axisSheet = axisPlan?.ranges[0]?.sheet;
+  const axisWorkbook = formatHistoryBridgeFor(store)?.workbook;
+  const axisNativeAvailable =
+    axisWorkbook?.capabilities.cellFormatting === true &&
+    axisWorkbook.capabilities.sheetFontStyles === true;
+  // Clearing a row/column must also clear its compact native XF. Reusing the
+  // regular axis patch keeps the operation sparse and lets the native flush
+  // journal the same before/after state as toolbar/dialog formatting. A
+  // worksheet-wide selection continues through the legacy whole-sheet path
+  // unless it already has an axis override, where that override is the sole
+  // native authority.
+  const axisClear =
+    axisPlan &&
+    axisPlan.axisBands.length > 0 &&
+    axisSheet !== undefined &&
+    axisNativeAvailable &&
+    (!wholeRanges ||
+      !isWholeSheetSelection(wholeRanges) ||
+      state.format.sheetAxisOverrides?.has(axisSheet));
+  if (axisClear) {
+    const clearPatch = Object.fromEntries(
+      visualFormatKeys.map((key) => [key, undefined]),
+    ) as Partial<CellFormat>;
+    if (!applyAxisFormatPatch(state, store, axisPlan, clearPatch, options)) return false;
+    const selected = new Set(axisPlan.cells.map(addrKey));
+    store.setState((current) => {
+      const formats = new Map(current.format.formats);
+      for (const key of selected) {
+        const addr = parseAddrKey(key);
+        if (!addr || !isCellWritable(current, addr)) continue;
+        if (!visualOnly) formats.delete(key);
+        else {
+          const previous = formats.get(key);
+          if (!previous) continue;
+          const next = stripVisualFormat(previous);
+          if (next) formats.set(key, next);
+          else formats.delete(key);
+        }
+      }
+      return {
+        ...current,
+        format: { ...current.format, formats },
+        ui: { ...current.ui, pendingFormat: null },
+      };
+    });
+    return true;
+  }
+  if (wholeRanges && isWholeSheetSelection(wholeRanges)) {
+    const sheet = wholeRanges[0]?.sheet;
+    if (sheet === undefined || isSheetProtected(state, sheet)) return false;
+    const controller = interactionControllerFor(store);
+    if (controller) {
+      if (!controller.hasWholeSheetFontStyles()) return false;
+      const ambient = selectionFormatOrigin.get(store);
+      const decision = controller.canExecute({
+        operation: 'format',
+        origin: options.origin ?? ambient?.origin ?? 'instanceApi',
+        commandId: options.commandId ?? ambient?.commandId,
+        effects: [{ kind: 'workbook' }],
+      });
+      if (!decision.allowed || controller.policy?.editable !== undefined) return false;
+    }
+    store.setState((current) => {
+      const formats = new Map(current.format.formats);
+      for (const [key, previous] of formats) {
+        const addr = parseAddrKey(key);
+        if (addr?.sheet !== sheet) continue;
+        if (!visualOnly) formats.delete(key);
+        else {
+          const next = stripVisualFormat(previous);
+          if (next) formats.set(key, next);
+          else formats.delete(key);
+        }
+      }
+      const overrides = new Map(current.format.sheetFontOverrides ?? []);
+      const previousOverride = overrides.get(sheet);
+      overrides.set(sheet, {
+        patch: {},
+        clearAxes: true,
+        ...(previousOverride?.baseline ? { baseline: previousOverride.baseline } : {}),
+      });
+      return {
+        ...current,
+        format: { ...current.format, formats, sheetFontOverrides: overrides },
+        ui: { ...current.ui, pendingFormat: null },
+      };
+    });
+    return true;
+  }
   const plan = sparseSelectionPlan(state, store, options);
   if (!plan) return false;
   const selected = new Set(plan.cells.map(addrKey));
@@ -345,6 +614,29 @@ export function applyFormatPatch(
 ): boolean {
   const allowed = gateProtection(state, range);
   if (allowed === null) return false;
+  if (isWholeColumnRange(range) || isWholeRowRange(range)) {
+    const axisBands: AxisFormatBand[] = [
+      isWholeColumnRange(range)
+        ? { axis: 'column', first: range.c0, last: range.c1 }
+        : { axis: 'row', first: range.r0, last: range.r1 },
+    ];
+    const cells: Addr[] = [];
+    for (const key of state.format.formats.keys()) {
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== range.sheet) continue;
+      if (
+        (axisBands[0]?.axis === 'column' && addr.col >= range.c0 && addr.col <= range.c1) ||
+        (axisBands[0]?.axis === 'row' && addr.row >= range.r0 && addr.row <= range.r1)
+      )
+        cells.push(addr);
+    }
+    return applyAxisFormatPatch(
+      state,
+      store,
+      { ranges: [range], cells, exceptionCells: [], axisBands },
+      patch ?? {},
+    );
+  }
   if (patch !== null && opts.allowPending !== false && canStagePendingFormat(state, range)) {
     stagePendingFormat(state, store, range, patch);
     return true;
@@ -402,11 +694,56 @@ const selectionAnyHave = (
     return predicate(format);
   });
 
+const effectiveSelectionFormat = (
+  state: State,
+  store: SpreadsheetStore,
+  addr: Addr,
+): Partial<CellFormat> | undefined => {
+  const workbook = formatHistoryBridgeFor(store)?.workbook;
+  if (workbook) return effectiveCellFormatWithPending(workbook, state, addr) ?? undefined;
+  return formatWithPending(state, addr);
+};
+
+const selectionAllHaveEffective = (
+  state: State,
+  store: SpreadsheetStore,
+  plan: { cells: readonly Addr[]; axisBands: readonly AxisFormatBand[] },
+  predicate: (format: Partial<CellFormat> | undefined) => boolean,
+): boolean => {
+  if (
+    plan.cells.length > 0 &&
+    !plan.cells.every((addr) => predicate(effectiveSelectionFormat(state, store, addr)))
+  ) {
+    return false;
+  }
+  if (plan.axisBands.length === 0)
+    return plan.cells.every((addr) => predicate(effectiveSelectionFormat(state, store, addr)));
+  const active = effectiveSelectionFormat(state, store, state.selection.active);
+  return predicate(active);
+};
+
+const selectionAnyHaveEffective = (
+  state: State,
+  store: SpreadsheetStore,
+  plan: { cells: readonly Addr[]; axisBands: readonly AxisFormatBand[] },
+  predicate: (format: Partial<CellFormat> | undefined) => boolean,
+): boolean => {
+  if (plan.cells.some((addr) => predicate(effectiveSelectionFormat(state, store, addr))))
+    return true;
+  return plan.axisBands.length > 0
+    ? predicate(effectiveSelectionFormat(state, store, state.selection.active))
+    : false;
+};
+
 function toggleFlag(state: State, store: SpreadsheetStore, key: ToggleKey): void {
   const plan = selectionPlan(state);
   if (!plan) return;
-  const allOn = selectionAllHave(state, plan.cells, (f) => f?.[key] === true);
+  const allOn = selectionAllHaveEffective(state, store, plan, (f) => f?.[key] === true);
   const patch = { [key]: !allOn } as Partial<CellFormat>;
+  if (plan.axisBands.length > 0) {
+    applyAxisFormatPatch(state, store, plan, patch);
+    return;
+  }
   commitSelectionFormatEntries(
     state,
     store,
@@ -444,7 +781,11 @@ export function setVAlign(state: State, store: SpreadsheetStore, vAlign: CellVAl
 export function toggleWrap(state: State, store: SpreadsheetStore): void {
   const plan = selectionPlan(state);
   if (!plan) return;
-  const allOn = selectionAllHave(state, plan.cells, (f) => f?.wrap === true);
+  const allOn = selectionAllHaveEffective(state, store, plan, (f) => f?.wrap === true);
+  if (plan.axisBands.length > 0) {
+    applyAxisFormatPatch(state, store, plan, { wrap: !allOn });
+    return;
+  }
   commitSelectionFormatEntries(
     state,
     store,
@@ -458,6 +799,20 @@ export function toggleWrap(state: State, store: SpreadsheetStore): void {
 export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const plan = selectionPlan(state);
   if (!plan) return;
+  if (plan.axisBands.length > 0) {
+    const resolveIndent: AxisFormatPatchResolver = (wb, baseXfIndex, addr) => {
+      const current = addr
+        ? effectiveCellFormatWithPending(wb, state, addr)
+        : (() => {
+            const xf = wb.getCellXf(baseXfIndex);
+            return xf ? cellFormatFromXf(wb, xf, wb.workbookDefaultFont) : null;
+          })();
+      const indent = current?.indent ?? 0;
+      return { indent: Math.max(0, Math.min(15, indent + delta)) };
+    };
+    applyAxisFormatPatch(state, store, plan, {}, {}, resolveIndent);
+    return;
+  }
   const entries = plan.cells.map((addr) => {
     const cur = formatWithPending(state, addr)?.indent ?? 0;
     return {
@@ -477,16 +832,24 @@ export function setNumFmt(state: State, store: SpreadsheetStore, fmt: NumFmt): v
   applySelectionFormatPatch(state, store, { numFmt: fmt });
 }
 
-const defaultCurrencySymbol = (locale: string): string =>
-  normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';
+const defaultCurrencySymbol = currencySymbolForLocale;
 
 export function cycleCurrency(state: State, store: SpreadsheetStore, locale = 'en-US'): void {
   const plan = selectionPlan(state);
   if (!plan) return;
-  const hasCurrency = selectionAnyHave(state, plan.cells, (f) => f?.numFmt?.kind === 'currency');
+  const hasCurrency = selectionAnyHaveEffective(
+    state,
+    store,
+    plan,
+    (f) => f?.numFmt?.kind === 'currency',
+  );
   const next: NumFmt = hasCurrency
     ? { kind: 'general' }
     : { kind: 'currency', decimals: 2, symbol: defaultCurrencySymbol(locale) };
+  if (plan.axisBands.length > 0) {
+    applyAxisFormatPatch(state, store, plan, { numFmt: next });
+    return;
+  }
   commitSelectionFormatEntries(
     state,
     store,
@@ -500,8 +863,17 @@ export function cycleCurrency(state: State, store: SpreadsheetStore, locale = 'e
 export function cyclePercent(state: State, store: SpreadsheetStore): void {
   const plan = selectionPlan(state);
   if (!plan) return;
-  const hasPercent = selectionAnyHave(state, plan.cells, (f) => f?.numFmt?.kind === 'percent');
+  const hasPercent = selectionAnyHaveEffective(
+    state,
+    store,
+    plan,
+    (f) => f?.numFmt?.kind === 'percent',
+  );
   const next: NumFmt = hasPercent ? { kind: 'general' } : { kind: 'percent', decimals: 0 };
+  if (plan.axisBands.length > 0) {
+    applyAxisFormatPatch(state, store, plan, { numFmt: next });
+    return;
+  }
   commitSelectionFormatEntries(
     state,
     store,
@@ -517,6 +889,38 @@ const clampDecimals = (n: number): number => Math.max(0, Math.min(10, n));
 export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const plan = selectionPlan(state);
   if (!plan) return;
+  if (plan.axisBands.length > 0) {
+    const resolveDecimals: AxisFormatPatchResolver = (wb, baseXfIndex, addr) => {
+      const current = addr
+        ? effectiveCellFormatWithPending(wb, state, addr)
+        : (() => {
+            const xf = wb.getCellXf(baseXfIndex);
+            return xf ? cellFormatFromXf(wb, xf, wb.workbookDefaultFont) : null;
+          })();
+      const cur = current?.numFmt;
+      if (!cur || cur.kind === 'general') {
+        return delta === 1 ? { numFmt: { kind: 'fixed', decimals: 2 } } : {};
+      }
+      if (cur.kind === 'fixed') {
+        return { numFmt: { kind: 'fixed', decimals: clampDecimals(cur.decimals + delta) } };
+      }
+      if (cur.kind === 'currency') {
+        return {
+          numFmt: {
+            kind: 'currency',
+            decimals: clampDecimals(cur.decimals + delta),
+            ...(cur.symbol !== undefined ? { symbol: cur.symbol } : {}),
+          },
+        };
+      }
+      if (cur.kind === 'percent') {
+        return { numFmt: { kind: 'percent', decimals: clampDecimals(cur.decimals + delta) } };
+      }
+      return {};
+    };
+    applyAxisFormatPatch(state, store, plan, {}, {}, resolveDecimals);
+    return;
+  }
   const entries: SelectionFormatEntry[] = [];
   for (const addr of plan.cells) {
     const cur = formatWithPending(state, addr)?.numFmt;
@@ -751,6 +1155,15 @@ export function applySelectionFormatAction(
   if (operations.size === 0) return false;
   if (!authorizeSelectionOperations(store, plan.ranges, operations, options)) return false;
 
+  if (plan.axisBands.length > 0) {
+    // Presets such as Outline/Inside describe rectangle topology and cannot
+    // be represented by a compact row/column style. Constant style fields
+    // from the dialog are safe and follow the same sparse/native path as the
+    // toolbar commands.
+    if (action.border || !axisPatchSupported(action.patch)) return false;
+    return applyAxisFormatPatch(state, store, plan, action.patch, options);
+  }
+
   if (
     !action.border &&
     options.allowPending !== false &&
@@ -824,6 +1237,10 @@ export function setBorderPreset(
 ): void {
   const plan = selectionPlan(state);
   if (!plan) return;
+  // Border presets describe rectangle topology. A compact row/column XF can
+  // carry a constant border, but cannot encode an edge/inside geometry over a
+  // full axis without expanding every cell.
+  if (plan.axisBands.length > 0) return;
   const side: CellBorderSide = color === undefined ? { style } : { style, color };
   const thickSide: CellBorderSide =
     color === undefined ? { style: 'thick' } : { style: 'thick', color };
@@ -839,6 +1256,17 @@ export function setBorderPreset(
 export function cycleBorders(state: State, store: SpreadsheetStore): void {
   const plan = selectionPlan(state);
   if (!plan) return;
+  if (plan.axisBands.length > 0) {
+    const active = effectiveSelectionFormat(state, store, state.selection.active);
+    const borders = active?.borders;
+    const allFour = !!(borders?.top && borders.right && borders.bottom && borders.left);
+    applyAxisFormatPatch(state, store, plan, {
+      borders: allFour
+        ? { top: false, right: false, bottom: false, left: false }
+        : { top: true, right: true, bottom: true, left: true },
+    });
+    return;
+  }
   const hasAny = selectionAnyHave(state, plan.cells, (f) => {
     const b = f?.borders;
     return !!(b && (b.top || b.right || b.bottom || b.left));
@@ -920,7 +1348,7 @@ export function setFont(
   state: State,
   store: SpreadsheetStore,
   patch: { fontFamily?: string | null; fontSize?: number | null },
-): void {
+): boolean {
   const next: Partial<CellFormat> = {};
   if (patch.fontFamily !== undefined) {
     next.fontFamily = patch.fontFamily ?? undefined;
@@ -928,5 +1356,152 @@ export function setFont(
   if (patch.fontSize !== undefined) {
     next.fontSize = patch.fontSize ?? undefined;
   }
-  applySelectionFormatPatch(state, store, next);
+  if (Object.keys(next).length === 0) return false;
+  const ranges = selectionRanges(state);
+  if (ranges && isWholeSheetSelection(ranges)) {
+    const sheet = ranges[0]?.sheet;
+    // Once a workbook has a compact row/column override, keep that override
+    // as the single native authority. Applying a worksheet-wide font through
+    // the legacy map would be overwritten by the axis flush on the next
+    // publication (and would make the subsequent undo chain ambiguous).
+    if (sheet !== undefined && state.format.sheetAxisOverrides?.has(sheet)) {
+      const plan = selectionPlan(state);
+      if (!plan) return false;
+      const axisPlan = {
+        ...plan,
+        cells: [...state.format.formats.keys()]
+          .map(parseAddrKey)
+          .filter((addr): addr is Addr => addr?.sheet === sheet),
+        exceptionCells: [],
+        // A full-width column band covers every unstyled row. Existing row
+        // styles are handled as sparse precedence intersections by the axis
+        // planner; adding a MAX_ROW row band would require million-row native
+        // writes for an otherwise compact worksheet-wide font update.
+        axisBands: [{ axis: 'column' as const, first: 0, last: MAX_COL }],
+      };
+      return applyAxisFormatPatch(state, store, axisPlan, next);
+    }
+    return applyWholeSheetFontPatch(state, store, ranges, next);
+  }
+  const plan = selectionPlan(state);
+  if (plan?.axisBands.length) return applyAxisFormatPatch(state, store, plan, next);
+  return applySelectionFormatPatch(state, store, next);
+}
+
+const hasOwn = (value: object, key: PropertyKey): boolean => Object.hasOwn(value, key);
+
+/**
+ * The ordinary format planner intentionally refuses to materialise a whole
+ * worksheet. Font family and size are the two dimensions for which the
+ * engine has compact row/column style storage, so keep this branch narrow and
+ * atomic. Existing store/data entries receive the same patch; blank grid
+ * addresses remain implicit in `sheetFontOverrides`.
+ */
+function applyWholeSheetFontPatch(
+  state: State,
+  store: SpreadsheetStore,
+  ranges: readonly Range[],
+  patch: Partial<CellFormat>,
+): boolean {
+  const sheet = ranges[0]?.sheet;
+  if (sheet === undefined || ranges.some((range) => range.sheet !== sheet)) return false;
+  // A protected worksheet cannot safely be represented by one axis style:
+  // locked and unlocked cells would need a per-cell authorization pass over
+  // the entire grid. Keep the operation atomic and reject it instead.
+  if (isSheetProtected(state, sheet)) return false;
+
+  const controller = interactionControllerFor(store);
+  if (controller) {
+    if (!controller.hasWholeSheetFontStyles()) return false;
+    const ambient = selectionFormatOrigin.get(store);
+    const decision = controller.canExecute({
+      operation: 'format',
+      origin: ambient?.origin ?? 'instanceApi',
+      commandId: ambient?.commandId,
+      effects: [{ kind: 'workbook' }],
+    });
+    if (!decision.allowed) return false;
+    // A host editable predicate/range cannot be proven over a 17-billion-cell
+    // effect without defeating the sparse guarantee. Reject conservatively.
+    if (controller.policy?.editable !== undefined) return false;
+  }
+
+  const hasFamily = hasOwn(patch, 'fontFamily');
+  const hasSize = hasOwn(patch, 'fontSize');
+  if (!hasFamily && !hasSize) return false;
+  if (
+    (hasFamily && patch.fontFamily !== undefined && patch.fontFamily.trim().length === 0) ||
+    (hasSize &&
+      patch.fontSize !== undefined &&
+      (!Number.isFinite(patch.fontSize) || patch.fontSize <= 0))
+  ) {
+    return false;
+  }
+
+  store.setState((current) => {
+    const formats = new Map(current.format.formats);
+    const selectedKeys = new Set<string>();
+    for (const key of current.data.cells.keys()) {
+      const addr = parseAddrKey(key);
+      if (addr?.sheet === sheet) selectedKeys.add(key);
+    }
+    for (const key of current.format.formats.keys()) {
+      const addr = parseAddrKey(key);
+      if (addr?.sheet === sheet) selectedKeys.add(key);
+    }
+    for (const key of selectedKeys) {
+      const previous = formats.get(key);
+      const next: CellFormat = { ...(previous ?? {}) };
+      if (hasFamily) {
+        if (patch.fontFamily === undefined) delete next.fontFamily;
+        else next.fontFamily = patch.fontFamily;
+      }
+      if (hasSize) {
+        if (patch.fontSize === undefined) delete next.fontSize;
+        else next.fontSize = patch.fontSize;
+      }
+      if (Object.keys(next).length === 0) formats.delete(key);
+      else formats.set(key, next);
+    }
+
+    const overrides = new Map(current.format.sheetFontOverrides ?? []);
+    const previous = overrides.get(sheet);
+    const nextPatch = { ...(previous?.patch ?? {}) };
+    if (hasFamily) {
+      if (patch.fontFamily === undefined) delete nextPatch.fontFamily;
+      else nextPatch.fontFamily = patch.fontFamily;
+    }
+    if (hasSize) {
+      if (patch.fontSize === undefined) delete nextPatch.fontSize;
+      else nextPatch.fontSize = patch.fontSize;
+    }
+    if (Object.keys(nextPatch).length === 0) {
+      if (previous?.clearAxes) {
+        overrides.set(sheet, {
+          patch: {},
+          clearAxes: true,
+          ...(previous.baseline ? { baseline: previous.baseline } : {}),
+        });
+      } else {
+        overrides.delete(sheet);
+      }
+    } else {
+      overrides.set(sheet, {
+        patch: nextPatch,
+        ...(previous?.clearAxes ? { clearAxes: true } : {}),
+        ...(previous?.baseline ? { baseline: previous.baseline } : {}),
+      });
+    }
+
+    return {
+      ...current,
+      format: {
+        ...current.format,
+        formats,
+        sheetFontOverrides: overrides,
+      },
+      ui: { ...current.ui, pendingFormat: null },
+    };
+  });
+  return true;
 }

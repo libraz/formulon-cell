@@ -10,11 +10,33 @@ import {
 } from '../../../../src/commands/interaction-controller.js';
 import { fixedFormPolicy } from '../../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../../src/commands/protection.js';
+import { MAX_COL, MAX_ROW } from '../../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import { fmtAt, setSelection } from './fixtures.js';
 
 describe('selection format actions', () => {
+  it('plans a mixed full-row/full-column union as compact axis bands', () => {
+    const store = createSpreadsheetStore();
+    setSelection(store, { sheet: 0, r0: 0, c0: 1, r1: MAX_ROW, c1: 1 }, [
+      { sheet: 0, r0: 3, c0: 0, r1: 3, c1: MAX_COL },
+    ]);
+
+    const plan = planSelectionFormat(store.getState());
+    expect(plan?.axisBands).toEqual([
+      { axis: 'column', first: 1, last: 1 },
+      { axis: 'row', first: 3, last: 3 },
+    ]);
+    expect(plan?.cells).toEqual([]);
+    // Compact axis publication requires a real workbook bridge. Geometry is
+    // still available to callers without one, but the command must not claim
+    // that a store-only axis edit reached the native workbook.
+    expect(applySelectionFormatAction(store.getState(), store, { patch: { fontSize: 24 } })).toBe(
+      false,
+    );
+    expect(store.getState().format.sheetAxisOverrides).toBeUndefined();
+  });
+
   it('does not stage a locked blank cell and only stages an unlocked blank cell', () => {
     const locked = createSpreadsheetStore();
     setSelection(locked, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });

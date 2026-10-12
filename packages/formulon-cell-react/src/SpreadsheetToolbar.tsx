@@ -10,6 +10,7 @@
 // core's `data-ribbon-*` attributes for selection.
 import {
   type DynamicDropdownsCtx,
+  dictionaryLocaleFor,
   openHostMenuFirstDropdown,
   Spreadsheet,
   type SpreadsheetInstance,
@@ -105,7 +106,7 @@ export const SpreadsheetToolbar = ({
     let tb: ToolbarInstance;
     try {
       tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
-        lang: locale === 'en' ? 'en' : 'ja',
+        lang: dictionaryLocaleFor(locale),
         activeTab,
         ribbonTabs,
         onTabChange: (tab) => callbacksRef.current.onTabChange(tab),

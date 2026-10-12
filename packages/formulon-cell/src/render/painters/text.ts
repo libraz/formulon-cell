@@ -1,5 +1,6 @@
 import { formatNumber } from '../../commands/format.js';
-import { formatCell } from '../../engine/value.js';
+import { formatCell, formatScientificNumber } from '../../engine/value.js';
+import { normalizeFormatLocale } from '../../format/locale.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
@@ -45,11 +46,7 @@ function fitGeneralNumberToWidth(
   fontSize: number,
 ): string {
   if (!Number.isFinite(value)) return String(value);
-  const toSci = (prec: number): string =>
-    value.toExponential(prec).replace(/e([+-]?)(\d+)$/i, (_m, sign: string, exp: string) => {
-      const s = sign === '-' ? '-' : '+';
-      return `E${s}${exp.padStart(2, '0')}`;
-    });
+  const toSci = (prec: number): string => formatScientificNumber(value, prec, locale);
   const abs = Math.abs(value);
   // Already in scientific range (matches formatGeneralNumber's threshold) —
   // only the exponent precision can be reduced.
@@ -60,7 +57,9 @@ function fitGeneralNumberToWidth(
     }
   } else {
     for (let digits = 12; digits >= 0; digits -= 1) {
-      const t = new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
+      const t = new Intl.NumberFormat(normalizeFormatLocale(locale), {
+        maximumFractionDigits: digits,
+      }).format(value);
       if (ctx.measureText(t).width <= availableWidth) return t;
     }
     for (let prec = 5; prec >= 0; prec -= 1) {
@@ -88,6 +87,65 @@ export const stableTextMetricsBox = (fontSize: number): TextMetricsBox => ({
   descent: fontSize * 0.22,
 });
 
+/** Normalize the view multiplier at the painter/DOM boundary. A malformed or
+ * missing view value must not make a cell disappear by producing a zero-sized
+ * font. */
+export const visualZoom = (zoom: number | undefined): number =>
+  zoom !== undefined && Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+
+/** The size reduction used by Excel for whole-cell superscript/subscript. */
+export const fontSizeWithVerticalAlign = (
+  size: number,
+  verticalAlign: CellFormat['fontVertAlign'] | undefined,
+): number => (verticalAlign ? size * 0.7 : size);
+
+/** Baseline displacement matching the stable metrics used by the canvas
+ * painter. Positive values move the run down (subscript). */
+export const cellTextVerticalOffset = (
+  fontSize: number,
+  verticalAlign: CellFormat['fontVertAlign'] | undefined,
+): number => {
+  if (verticalAlign === 'superscript') return -fontSize * 0.72 * 0.35;
+  if (verticalAlign === 'subscript') return fontSize * 0.22 * 0.65;
+  return 0;
+};
+
+/** Return a CSS font-size suitable for a DOM cell surface. The variable
+ * fallback keeps an inherited workbook/default font zoomable when the native
+ * effective style has not yet been projected into the store. */
+export const cssCellFontSize = (
+  size: number | undefined,
+  verticalAlign: CellFormat['fontVertAlign'] | undefined,
+  zoom = 1,
+  fallback = 'var(--fc-text-cell)',
+): string => {
+  const factor = visualZoom(zoom) * (verticalAlign ? 0.7 : 1);
+  if (size !== undefined && Number.isFinite(size)) return `${size * factor}px`;
+  return factor === 1 ? '' : `calc(${fallback} * ${factor})`;
+};
+
+/** Shared shrink-to-fit calculation for DOM previews and canvas painting. */
+export const shrinkFontSizeToFit = (
+  fontSize: number,
+  measuredWidth: number,
+  availableWidth: number,
+  minimum = 8,
+): number => {
+  if (
+    !Number.isFinite(fontSize) ||
+    !Number.isFinite(measuredWidth) ||
+    !Number.isFinite(availableWidth) ||
+    measuredWidth <= availableWidth ||
+    availableWidth <= 0
+  ) {
+    return fontSize;
+  }
+  return Math.max(
+    Math.min(fontSize, minimum),
+    Math.floor(fontSize * (availableWidth / measuredWidth)),
+  );
+};
+
 export const textBaselineY = (
   bounds: Rect,
   box: TextMetricsBox,
@@ -99,9 +157,68 @@ export const textBaselineY = (
   return bounds.y + bounds.h - padY - box.descent;
 };
 
+const splitFontFamily = (family: string): string[] => {
+  const parts: string[] = [];
+  let start = 0;
+  let depth = 0;
+  let quote = '';
+  for (let i = 0; i < family.length; i += 1) {
+    const char = family[i];
+    if (quote) {
+      if (char === quote && family[i - 1] !== '\\') quote = '';
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === '(') depth += 1;
+    else if (char === ')' && depth > 0) depth -= 1;
+    else if (char === ',' && depth === 0) {
+      parts.push(family.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(family.slice(start).trim());
+  return parts.filter(Boolean);
+};
+
+const normalizedFontFamily = (family: string): string => {
+  const trimmed = family.trim();
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1).trim().toLocaleLowerCase();
+  }
+  return trimmed.toLocaleLowerCase();
+};
+
+/**
+ * Return the raw CSS font-family stack used for cell text. An authored cell
+ * family stays first so an installed workbook font wins; the UI stack then
+ * supplies a deterministic fallback when that named font is unavailable.
+ * Missing cell families deliberately return the supplied theme stack unchanged
+ * so formula-display mode can continue using its monospace theme.
+ */
+export const cellFontFamily = (explicitFamily: string | undefined, themeUi: string): string => {
+  const explicit = explicitFamily?.trim() ?? '';
+  if (!explicit) return themeUi.trim();
+  const fallback = themeUi.trim();
+  if (!fallback) return explicit;
+  const seen = new Set(splitFontFamily(explicit).map(normalizedFontFamily));
+  const additions = splitFontFamily(fallback).filter((family) => {
+    const normalized = normalizedFontFamily(family);
+    if (seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+  return additions.length > 0 ? `${explicit}, ${additions.join(', ')}` : explicit;
+};
+
 const fontCss = (family: string): string =>
-  family
-    .split(',')
+  splitFontFamily(family)
     .map((part) => {
       const name = part.trim();
       if (!name) return name;
@@ -132,8 +249,12 @@ export const cellFont = (
 ): CellFont => ({
   slant: format?.italic ? 'italic ' : '',
   weight: format?.bold ? 700 : 400,
-  size: (format?.fontSize ?? theme.textCell) * (format?.fontVertAlign ? 0.7 : 1),
-  family: format?.fontFamily ?? (formulaDisplay ? theme.fontMono : theme.fontUi),
+  size: fontSizeWithVerticalAlign(format?.fontSize ?? theme.textCell, format?.fontVertAlign),
+  family: format?.fontFamily
+    ? cellFontFamily(format.fontFamily, theme.fontUi)
+    : formulaDisplay
+      ? theme.fontMono
+      : theme.fontUi,
 });
 
 export const cellFontCss = (font: CellFont, size = font.size): string =>
@@ -185,6 +306,7 @@ export function paintCellText({
   displayOverride,
   locale,
   rtl = false,
+  zoom,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
@@ -217,7 +339,11 @@ export function paintCellText({
     (format?.numFmt?.kind === 'fixed' || format?.numFmt?.kind === 'currency') &&
     (format.numFmt.negativeStyle === 'red' || format.numFmt.negativeStyle === 'red-parens');
   const fontVertAlign = format?.fontVertAlign;
-  const font = cellFont(format, theme, isFormulaDisplay === true);
+  const baseFont = cellFont(format, theme, isFormulaDisplay === true);
+  const font = {
+    ...baseFont,
+    size: baseFont.size * visualZoom(zoom),
+  };
   const fontSize = font.size;
   ctx.font = cellFontCss(font);
   const isHyperlink = !!format?.hyperlink;
@@ -282,8 +408,7 @@ export function paintCellText({
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = stableTextMetricsBox(fontSize);
     let startY = textBaselineY(bounds, measured, vAlign, padY);
-    if (fontVertAlign === 'superscript') startY -= measured.ascent * 0.35;
-    else if (fontVertAlign === 'subscript') startY += measured.descent * 0.65;
+    startY += cellTextVerticalOffset(fontSize, fontVertAlign);
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
     else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
     ctx.textBaseline = 'alphabetic';
@@ -318,12 +443,17 @@ export function paintCellText({
   if (format?.shrinkToFit) {
     const measuredWidth = ctx.measureText(text).width;
     if (measuredWidth > availableTextWidth && availableTextWidth > 0) {
-      drawFontSize = Math.max(8, Math.floor(fontSize * (availableTextWidth / measuredWidth)));
+      drawFontSize = shrinkFontSizeToFit(
+        fontSize,
+        measuredWidth,
+        availableTextWidth,
+        8 * visualZoom(zoom),
+      );
       ctx.font = cellFontCss(font, drawFontSize);
     }
   }
   if (isNumeric && ctx.measureText(text).width > availableTextWidth) {
-    if (format?.numFmt) {
+    if (format?.numFmt && format.numFmt.kind !== 'general') {
       // Explicit number format: Excel shows #### when the formatted value
       // can't shrink without losing the user's chosen presentation.
       const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
@@ -345,8 +475,7 @@ export function paintCellText({
   const metrics = ctx.measureText(text);
   const box = stableTextMetricsBox(drawFontSize);
   let ty = textBaselineY(bounds, box, vAlign, padY);
-  if (fontVertAlign === 'superscript') ty -= box.ascent * 0.35;
-  else if (fontVertAlign === 'subscript') ty += box.descent * 0.65;
+  ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
 
   // A phonetic guide (Japanese furigana/ruby) is stored separately from the
   // cell value by OOXML, one run per annotated span. Each reading is centred

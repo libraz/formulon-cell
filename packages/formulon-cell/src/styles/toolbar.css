@@ -8,5 +8,6 @@
 @import "./toolbar/ribbon/color-controls.css";
 @import "./toolbar/ribbon/menus.css";
 @import "./toolbar/ribbon/groups.css";
+@import "./toolbar/ribbon/screen-tip.css";
 @import "./toolbar/panels.css";
 @import "./platform-mac.css";

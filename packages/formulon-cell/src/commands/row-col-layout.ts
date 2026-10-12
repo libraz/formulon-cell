@@ -161,10 +161,15 @@ export function autofitRowsHeight(
   opts?: AutofitOptions,
 ): void {
   if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
+  const measurementOptions = withWorkbookDisplayFont(opts, wb);
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const ctx = createAutofitMeasureContext();
     for (let row = r0; row <= r1; row += 1) {
-      mutators.setRowHeight(store, row, computeAutofitRowHeight(store.getState(), row, ctx, opts));
+      mutators.setRowHeight(
+        store,
+        row,
+        computeAutofitRowHeight(store.getState(), row, ctx, measurementOptions),
+      );
     }
   });
 }
@@ -177,12 +182,31 @@ export function autofitColsWidth(
   wb?: WorkbookHandle,
   opts?: AutofitOptions,
 ): void {
+  const measurementOptions = withWorkbookDisplayFont(opts, wb);
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const ctx = createAutofitMeasureContext();
     for (let col = c0; col <= c1; col += 1) {
-      mutators.setColWidth(store, col, computeAutofitColWidth(store.getState(), col, ctx, opts));
+      mutators.setColWidth(
+        store,
+        col,
+        computeAutofitColWidth(store.getState(), col, ctx, measurementOptions),
+      );
     }
   });
+}
+
+function withWorkbookDisplayFont(
+  options: AutofitOptions | undefined,
+  wb: WorkbookHandle | undefined,
+): AutofitOptions | undefined {
+  if (!wb) return options;
+  return {
+    ...(options ?? {}),
+    workbook: wb,
+    ...(options?.workbookDisplayFont !== undefined
+      ? {}
+      : { workbookDisplayFont: wb.workbookDisplayFont }),
+  };
 }
 
 /** Resolve which row/col indices to show again from the current selection.

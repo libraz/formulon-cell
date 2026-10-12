@@ -1,7 +1,14 @@
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import {
+  canonicalizeFormula,
+  localeOrdinalForSpreadsheetProfile,
+} from '../engine/function-locale.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
-import type { Addr, CellValue } from '../engine/types.js';
+import type { Addr, CellValue, SpreadsheetProfileId } from '../engine/types.js';
 import { fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { excelSerialFromParts } from '../format/date-serial.js';
+import { spreadsheetProfileForLocale } from '../mount/locale-profile.js';
 import { formatWithPending } from '../store/pending-format.js';
 import {
   type CellValidation,
@@ -14,6 +21,7 @@ import { isCellWritable, warnProtected } from './protection.js';
 import { extractRefs, normalizeR1C1Formula } from './refs.js';
 import {
   type CustomValidationEvaluator,
+  nativeValidationOutcome,
   type ValidationOutcome,
   validateAgainst,
 } from './validate.js';
@@ -27,11 +35,128 @@ export type CoercedInput =
 
 export interface CoerceInputOptions {
   forceText?: boolean;
+  /** BCP47 input locale. When omitted, the input grammar uses en-US. */
+  locale?: string;
 }
 
-const NUMERIC = /^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
-const CURRENCY = /^[¥$€£]\s*/;
+const CURRENCY_SYMBOL = /[¥$€£₩฿]/;
+const CURRENCY_PREFIX = /^([¥$€£₩฿])\s*/;
+const CURRENCY_SUFFIX = /([¥$€£₩฿])$/;
 const TIME = /^([+-]?)(\d+):([0-5]\d)(?::([0-5]\d))?(?:\s*([AP]M))?$/i;
+
+type InputDateOrder = 'mdy' | 'dmy' | 'ymd';
+
+interface InputLocaleRules {
+  readonly decimal: string;
+  readonly groupSeparators: readonly string[];
+  readonly dateOrder: InputDateOrder;
+  readonly dateSeparator: string;
+}
+
+const INPUT_LOCALE_RULES: Readonly<Record<string, InputLocaleRules>> = {
+  en: { decimal: '.', groupSeparators: [','], dateOrder: 'mdy', dateSeparator: '/' },
+  ja: { decimal: '.', groupSeparators: [','], dateOrder: 'ymd', dateSeparator: '/' },
+  zh: { decimal: '.', groupSeparators: [','], dateOrder: 'ymd', dateSeparator: '/' },
+  ko: { decimal: '.', groupSeparators: [','], dateOrder: 'ymd', dateSeparator: '/' },
+  th: { decimal: '.', groupSeparators: [','], dateOrder: 'dmy', dateSeparator: '/' },
+  de: { decimal: ',', groupSeparators: ['.'], dateOrder: 'dmy', dateSeparator: '.' },
+  fr: {
+    decimal: ',',
+    groupSeparators: ['\u202f', '\u00a0', ' '],
+    dateOrder: 'dmy',
+    dateSeparator: '/',
+  },
+};
+
+const EN_INPUT_LOCALE_RULES: InputLocaleRules = {
+  decimal: '.',
+  groupSeparators: [','],
+  dateOrder: 'mdy',
+  dateSeparator: '/',
+};
+
+const inputLanguage = (locale: string | undefined): string =>
+  (locale?.replace('_', '-').split('-', 1)[0] ?? 'en').toLowerCase();
+
+const inputLocaleRules = (locale: string | undefined): InputLocaleRules =>
+  INPUT_LOCALE_RULES[inputLanguage(locale)] ?? EN_INPUT_LOCALE_RULES;
+
+// The engine's seven profile definitions use TRUE/FALSE for en, ja, zh, ko,
+// and th. German and French are the only profiles with localized boolean text.
+// Keep these spellings scoped to their matching language; TRUE/FALSE remains
+// accepted for every locale for formula and workbook compatibility.
+const LOCALIZED_BOOLEAN_TEXT: Readonly<Record<string, readonly [string, string]>> = {
+  de: ['WAHR', 'FALSCH'],
+  fr: ['VRAI', 'FAUX'],
+};
+
+const PROFILE_LOCALE_TO_INPUT_LOCALE: Readonly<Record<string, string>> = {
+  '-ja_JP': 'ja-JP',
+  '-en_US': 'en-US',
+  '-de_DE': 'de-DE',
+  '-fr_FR': 'fr-FR',
+  '-zh_CN': 'zh-CN',
+  '-ko_KR': 'ko-KR',
+  '-th_TH': 'th-TH',
+};
+
+/** Resolve an explicit input locale to the public profile used by the live
+ * workbook, keeping its current Windows/Mac platform. CSV import and paste
+ * can request a locale without mutating the workbook profile. */
+function publicProfileForInputLocale(
+  wb: WorkbookHandle,
+  locale: string | undefined,
+): SpreadsheetProfileId | null | undefined {
+  const current = typeof wb.spreadsheetProfileId === 'function' ? wb.spreadsheetProfileId() : null;
+  if (locale === undefined) return current ?? undefined;
+  return spreadsheetProfileForLocale(locale, current?.startsWith('mac-') ? 'mac' : 'default');
+}
+
+/** Convert user-facing localized function names to formulon's canonical
+ * storage grammar. The optional adapter method is used when available; the
+ * fallback keeps compatibility with the first profile API. */
+export function canonicalizeLocalizedFormulaForInput(
+  wb: WorkbookHandle,
+  formula: string,
+  locale?: string,
+): string {
+  const profile = publicProfileForInputLocale(wb, locale);
+  if (profile === null) return formula;
+  if (typeof wb.canonicalizeLocalizedFormula === 'function') {
+    return wb.canonicalizeLocalizedFormula(formula, profile);
+  }
+  if (!profile || !wb.capabilities?.functionLocale) return formula;
+  const ordinal = localeOrdinalForSpreadsheetProfile(profile);
+  return canonicalizeFormula(wb, formula, ordinal);
+}
+
+/** Callback used by external clipboard payloads. Internal snapshots continue
+ * to read formulas directly from the store and therefore remain canonical. */
+export function localizeFormulaForClipboard(wb: WorkbookHandle): (formula: string) => string {
+  if (typeof wb.localizeFormulaText === 'function') {
+    return (formula) => wb.localizeFormulaText(formula);
+  }
+  if (typeof wb.getFormulaForDisplay === 'function') {
+    return (formula) => wb.getFormulaForDisplay(formula);
+  }
+  return (formula) => formula;
+}
+
+/** Resolve the live workbook profile into the locale used by input coercion.
+ * Older formulon builds do not expose the profile API, in which case the
+ * parser intentionally keeps its en-US-compatible default. */
+export function inputLocaleForWorkbook(wb: WorkbookHandle): string | undefined {
+  try {
+    const profile = wb.spreadsheetProfileId();
+    if (!profile) return undefined;
+    for (const [suffix, locale] of Object.entries(PROFILE_LOCALE_TO_INPUT_LOCALE)) {
+      if (profile.endsWith(suffix)) return locale;
+    }
+  } catch {
+    // A standalone/older workbook handle may not implement profile probing.
+  }
+  return undefined;
+}
 
 const normalizeNumericText = (raw: string): string =>
   [...raw]
@@ -52,36 +177,127 @@ interface ParsedNumber {
   format?: NumFmt;
 }
 
-const countDecimals = (digits: string): number => {
-  const dot = digits.indexOf('.');
-  return dot < 0 ? 0 : digits.length - dot - 1;
+interface ParsedLocalizedNumber {
+  readonly canonical: string;
+  readonly decimals: number;
+}
+
+const DIGITS = /^\d+$/;
+
+/** Parse a locale's decimal/grouping grammar without accepting malformed
+ * grouping by simply deleting punctuation. For example, `1.23,5` is text in
+ * de-DE because the period would have to separate three-digit groups. */
+const parseLocalizedNumber = (
+  raw: string,
+  rules: InputLocaleRules,
+): ParsedLocalizedNumber | null => {
+  const exponentMatch = /^(.+?)([eE][+-]?\d+)$/.exec(raw);
+  const mantissa = exponentMatch?.[1] ?? raw;
+  const exponent = exponentMatch?.[2] ?? '';
+  let sign = '';
+  let unsigned = mantissa;
+  if (unsigned.startsWith('+') || unsigned.startsWith('-')) {
+    sign = unsigned[0] ?? '';
+    unsigned = unsigned.slice(1);
+  }
+  if (unsigned === '') return null;
+
+  const decimalIndex = unsigned.indexOf(rules.decimal);
+  if (decimalIndex !== unsigned.lastIndexOf(rules.decimal)) return null;
+  const integerPart = decimalIndex < 0 ? unsigned : unsigned.slice(0, decimalIndex);
+  const fractionPart = decimalIndex < 0 ? '' : unsigned.slice(decimalIndex + 1);
+  if (fractionPart !== '' && !DIGITS.test(fractionPart)) return null;
+
+  let integerDigits = integerPart;
+  if (integerPart === '') {
+    if (fractionPart === '') return null;
+    integerDigits = '0';
+  } else if (!DIGITS.test(integerPart)) {
+    const presentSeparators = rules.groupSeparators.filter((separator) =>
+      integerPart.includes(separator),
+    );
+    // French accepts three kinds of space as a group separator, but a single
+    // number must use one kind consistently.
+    if (presentSeparators.length !== 1) return null;
+    const separator = presentSeparators[0] ?? '';
+    const groups = integerPart.split(separator);
+    if (
+      groups.length < 2 ||
+      !DIGITS.test(groups[0] ?? '') ||
+      (groups[0]?.length ?? 0) > 3 ||
+      groups.slice(1).some((group) => group.length !== 3 || !DIGITS.test(group))
+    ) {
+      return null;
+    }
+    integerDigits = groups.join('');
+  }
+
+  return {
+    canonical: `${sign}${integerDigits}${decimalIndex < 0 ? '' : `.${fractionPart}`}${exponent}`,
+    decimals: decimalIndex < 0 ? 0 : fractionPart.length,
+  };
 };
 
-const parseNumericValue = (raw: string): ParsedNumber | null => {
+const parseNumericValue = (raw: string, locale?: string): ParsedNumber | null => {
   let text = raw.trim();
   let negative = false;
   if (text.startsWith('(') && text.endsWith(')')) {
     negative = true;
     text = text.slice(1, -1).trim();
   }
-  const symbol = CURRENCY.exec(text)?.[0]?.trim() ?? null;
-  text = text.replace(CURRENCY, '');
+  const rules = inputLocaleRules(locale);
+  const language = inputLanguage(locale);
+  let symbol: string | null = null;
+  const prefix = CURRENCY_PREFIX.exec(text);
+  if (prefix) {
+    symbol = prefix[1] ?? null;
+    text = text.slice(prefix[0].length);
+  }
+  const suffix = CURRENCY_SUFFIX.exec(text);
+  if (suffix) {
+    // Native German/French currency formatting commonly places the symbol
+    // after the number, separated by a regular, NBSP, or narrow NBSP space.
+    // Keep the accepted suffix locale-scoped so an English trailing symbol
+    // remains ordinary text, as it did before locale-aware parsing.
+    if (language !== 'de' && language !== 'fr') return null;
+    if (symbol !== null) return null;
+    symbol = suffix[1] ?? null;
+    text = text.slice(0, suffix.index).trimEnd();
+  }
+  if (CURRENCY_SYMBOL.test(text)) return null;
   const isPercent = text.endsWith('%');
   if (isPercent) text = text.slice(0, -1);
   text = text.trim();
-  if (!NUMERIC.test(text)) return null;
-  const digits = text.replaceAll(',', '');
-  const n = Number(digits);
-  if (Number.isNaN(n)) return null;
+  const parsed = parseLocalizedNumber(text, rules);
+  if (!parsed) return null;
+  const n = Number(parsed.canonical);
+  if (!Number.isFinite(n)) return null;
   const signed = negative ? -Math.abs(n) : n;
   if (isPercent) {
-    return { value: signed / 100, format: { kind: 'percent', decimals: countDecimals(digits) } };
+    return {
+      value: signed / 100,
+      format: { kind: 'percent', decimals: parsed.decimals },
+    };
   }
   if (symbol) {
     return { value: signed, format: { kind: 'currency', decimals: 2, symbol } };
   }
   return { value: signed };
 };
+
+/**
+ * Parse only the numeric grammar used by cell input, without applying any of
+ * the other spreadsheet coercions. Dialog criteria use this boundary because
+ * a date, boolean, formula, blank, or malformed numeric string is a textual
+ * criterion rather than a number. The return value is always a finite number
+ * so callers can safely pass it to native comparison APIs.
+ */
+export function parseLocalizedNumericInput(raw: string, locale?: string): number | null {
+  const text = normalizeNumericText(raw.trim());
+  if (text === '' || text.startsWith('=') || text.startsWith("'")) return null;
+  const parsed = parseNumericValue(text, locale);
+  return parsed && Number.isFinite(parsed.value) ? parsed.value : null;
+}
 
 const parseTimeValue = (raw: string): ParsedNumber | null => {
   const m = TIME.exec(raw.trim());
@@ -135,15 +351,10 @@ const normalizeYear = (y: number): number => (y < 100 ? (y < 30 ? 2000 + y : 190
  *  date. Returns null for impossible dates (e.g. 13/45) so the caller falls
  *  back to text. */
 const ymdToSerial = (year: number, month: number, day: number): number | null => {
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  const ms = Date.UTC(year, month - 1, day);
-  const d = new Date(ms);
-  // Reject overflow (e.g. Feb 30 rolls into March).
-  if (d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null;
-  return ms / 86_400_000 + 25569;
+  return excelSerialFromParts(year, month, day);
 };
 
-const parseDateValue = (raw: string): ParsedNumber | null => {
+const parseDateValue = (raw: string, locale?: string): ParsedNumber | null => {
   const text = raw.trim();
   // ISO / dash-first: 2024-12-25 or 2024/12/25.
   let m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(text);
@@ -153,16 +364,44 @@ const parseDateValue = (raw: string): ParsedNumber | null => {
       ? null
       : { value: serial, format: { kind: 'date', pattern: 'yyyy-mm-dd' } };
   }
-  // US numeric: 12/25/2024, 12-25-2024, or 12/25 (current year).
-  m = /^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?$/.exec(text);
+
+  const rules = inputLocaleRules(locale);
+  const numericPattern =
+    rules.dateOrder === 'ymd'
+      ? /^(\d{2,4})[-/](\d{1,2})[-/](\d{1,2})$/
+      : rules.dateOrder === 'mdy'
+        ? /^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?$/
+        : rules.dateOrder === 'dmy' && rules.dateSeparator === '.'
+          ? /^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$/
+          : new RegExp(
+              `^(\\d{1,2})${rules.dateSeparator}(\\d{1,2})(?:${rules.dateSeparator}(\\d{2,4}))?$`,
+            );
+  m = numericPattern.exec(text);
   if (m) {
-    const month = Number(m[1]);
-    const day = Number(m[2]);
+    const first = Number(m[1]);
+    const second = Number(m[2]);
     const yearGiven = m[3] !== undefined;
+    if (rules.dateOrder === 'ymd') {
+      const year = normalizeYear(first);
+      const serial = ymdToSerial(year, second, Number(m[3]));
+      if (serial === null) return null;
+      return { value: serial, format: { kind: 'date', pattern: 'yyyy/m/d' } };
+    }
+    const month = rules.dateOrder === 'mdy' ? first : second;
+    const day = rules.dateOrder === 'mdy' ? second : first;
     const year = yearGiven ? normalizeYear(Number(m[3])) : new Date().getUTCFullYear();
+    const pattern =
+      rules.dateOrder === 'mdy'
+        ? 'm/d/yyyy'
+        : rules.dateSeparator === '.'
+          ? 'd.m.yyyy'
+          : 'd/m/yyyy';
     const serial = ymdToSerial(year, month, day);
     if (serial === null) return null;
-    return { value: serial, format: { kind: 'date', pattern: yearGiven ? 'm/d/yyyy' : 'm/d' } };
+    return {
+      value: serial,
+      format: { kind: 'date', pattern: yearGiven ? pattern : pattern.slice(0, -5) },
+    };
   }
   // Textual month: 25-Dec-2024, 25 Dec 2024, Dec 25 2024, Dec 25, 2024.
   m = /^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/.exec(text);
@@ -202,11 +441,16 @@ export function coerceInput(raw: string, options?: CoerceInputOptions): CoercedI
   if (boolText === 'TRUE' || boolText === 'FALSE') {
     return { kind: 'bool', value: boolText === 'TRUE' };
   }
+  const localizedBooleanText = LOCALIZED_BOOLEAN_TEXT[inputLanguage(options?.locale)];
+  if (localizedBooleanText) {
+    if (boolText === localizedBooleanText[0]) return { kind: 'bool', value: true };
+    if (boolText === localizedBooleanText[1]) return { kind: 'bool', value: false };
+  }
   const time = parseTimeValue(numericTrimmed);
   if (time !== null) return numberInput(time);
-  const n = parseNumericValue(numericTrimmed);
+  const n = parseNumericValue(numericTrimmed, options?.locale);
   if (n !== null) return numberInput(n);
-  const date = parseDateValue(numericTrimmed);
+  const date = parseDateValue(numericTrimmed, options?.locale);
   if (date !== null) return numberInput(date);
   return { kind: 'text', value: raw };
 }
@@ -218,11 +462,25 @@ function numberInput(parsed: ParsedNumber): CoercedInput {
     : { kind: 'number', value: parsed.value };
 }
 
-export function coerceInputForCell(state: State, a: Addr, raw: string): CoercedInput {
-  const format = formatWithPending(state, a);
-  return coerceInput(raw, {
+export function coerceInputForCell(
+  state: State,
+  a: Addr,
+  raw: string,
+  locale?: string,
+  wb?: WorkbookHandle,
+): CoercedInput {
+  const format = wb ? effectiveCellFormatWithPending(wb, state, a) : formatWithPending(state, a);
+  const coerced = coerceInput(raw, {
     forceText: format?.numFmt?.kind === 'text',
+    locale,
   });
+  if (wb && coerced.kind === 'formula') {
+    return {
+      ...coerced,
+      text: canonicalizeLocalizedFormulaForInput(wb, coerced.text, locale),
+    };
+  }
+  return coerced;
 }
 
 /**
@@ -267,7 +525,9 @@ export function writeInput(
   a: Addr,
   raw: string,
   store?: SpreadsheetStore,
+  locale?: string,
 ): void {
+  const inputLocale = locale ?? inputLocaleForWorkbook(wb);
   let coerced: CoercedInput | null = null;
   if (store) {
     const state = store.getState();
@@ -275,9 +535,16 @@ export function writeInput(
       warnProtected(a);
       return;
     }
-    coerced = coerceInputForCell(state, a, raw);
+    coerced = coerceInputForCell(state, a, raw, inputLocale, wb);
   }
-  const finalCoerced = coerced ?? coerceInput(raw);
+  const finalCoerced =
+    coerced ??
+    (() => {
+      const input = coerceInput(raw, { locale: inputLocale });
+      return input.kind === 'formula'
+        ? { ...input, text: canonicalizeLocalizedFormulaForInput(wb, input.text, inputLocale) }
+        : input;
+    })();
   writeCoerced(wb, a, finalCoerced);
   if (store) applyImplicitFormat(store, a, finalCoerced);
 }
@@ -297,7 +564,9 @@ export function writeInputValidated(
   raw: string,
   validation: CellValidation | undefined,
   store?: SpreadsheetStore,
+  locale?: string,
 ): ValidationOutcome {
+  const inputLocale = locale ?? inputLocaleForWorkbook(wb);
   let coerced: CoercedInput | null = null;
   if (store) {
     const state = store.getState();
@@ -305,9 +574,15 @@ export function writeInputValidated(
       warnProtected(a);
       return { ok: true };
     }
-    coerced = coerceInputForCell(state, a, raw);
+    coerced = coerceInputForCell(state, a, raw, inputLocale, wb);
   }
-  coerced ??= coerceInput(raw);
+  if (!coerced) {
+    const input = coerceInput(raw, { locale: inputLocale });
+    coerced =
+      input.kind === 'formula'
+        ? { ...input, text: canonicalizeLocalizedFormulaForInput(wb, input.text, inputLocale) }
+        : input;
+  }
   if (!validation) {
     writeCoerced(wb, a, coerced);
     if (store) applyImplicitFormat(store, a, coerced);
@@ -329,6 +604,14 @@ export function validateCoercedInput(
   coerced: CoercedInput,
   validation: CellValidation,
 ): ValidationOutcome {
+  const nativeOutcome = nativeValidationOutcome(wb, a, coerced, validation);
+  if (nativeOutcome) {
+    const silentStop =
+      !nativeOutcome.ok &&
+      nativeOutcome.severity === 'stop' &&
+      validation.showErrorMessage === false;
+    return silentStop ? { ok: true } : nativeOutcome;
+  }
   const evalCustom = validation.kind === 'custom' ? makeCustomEvaluator(wb, a, coerced) : undefined;
   const outcome = validateAgainst(validation, coerced, makeRangeResolver(wb, a.sheet), evalCustom);
   // A `stop` rule with the error alert disabled records the invalid value

@@ -19,6 +19,10 @@ export interface ArgHelperLabels {
 export interface ArgHelperDeps {
   /** The textarea/input being edited. */
   input: HTMLInputElement | HTMLTextAreaElement;
+  /** Read the workbook's live formula list separator. */
+  getListSeparator?: () => string;
+  /** Resolve a localized function alias to its canonical catalog name. */
+  resolveFunctionName?: (rawName: string) => string | null;
   labels?: Partial<ArgHelperLabels>;
 }
 
@@ -85,7 +89,7 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       if (i > 0) {
         const sep = document.createElement('span');
         sep.className = 'fc-arghelper__sep';
-        sep.textContent = ', ';
+        sep.textContent = `${deps.getListSeparator?.() === ';' ? ';' : ','} `;
         el.appendChild(sep);
       }
       const span = document.createElement('span');
@@ -110,7 +114,10 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
   const refresh = (): void => {
     const text = input.value;
     const caret = input.selectionStart ?? text.length;
-    const sig = findActiveSignature(text, caret);
+    const sig = findActiveSignature(text, caret, {
+      listSeparator: deps.getListSeparator?.(),
+      resolveKnownName: deps.resolveFunctionName,
+    });
     if (!sig || sig.args.length === 0) {
       close();
       return;

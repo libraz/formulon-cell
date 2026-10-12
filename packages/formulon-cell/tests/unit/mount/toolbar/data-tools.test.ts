@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addrKey } from '../../../../src/engine/address.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
@@ -300,6 +301,121 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     tb.dispose();
+  });
+
+  it('reapplies native filters through the mounted Sort menu and saves undo visibility', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    try {
+      for (const [row, text] of ['Region', 'East', 'West'].entries()) {
+        workbook.setText({ sheet: 0, row, col: 0 }, text);
+      }
+      expect(
+        workbook.setSheetAutoFilterXml(
+          0,
+          '<autoFilter ref="A1:A3"><filterColumn colId="0"><filters><filter val="East"/></filters></filterColumn></autoFilter>',
+        ),
+      ).toBe(true);
+      expect(workbook.applyAutoFilter(0)).toBe(true);
+      await sheet.instance.setWorkbook(workbook);
+      mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 });
+      workbook.setText({ sheet: 0, row: 1, col: 0 }, 'West');
+      mutators.replaceCells(sheet.instance.store, workbook.cells(0));
+      const nativeApply = vi.spyOn(workbook, 'applyAutoFilter');
+      const toolbar = Spreadsheet.mountToolbar(host, sheet.instance, {
+        dynamicDropdowns: true,
+        helpers: stubHelpers(),
+      });
+      try {
+        host.querySelector<HTMLButtonElement>('[data-ribbon-command="sortFilterHome"]')?.click();
+        const button = host.querySelector<HTMLButtonElement>('[data-sort="filter-reapply"]');
+        expect(button?.disabled).toBe(false);
+        const event = new MouseEvent('click', { bubbles: true });
+        Object.defineProperty(event, 'target', { value: button });
+        expect(toolbar.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+        expect(nativeApply).toHaveBeenCalled();
+        expect(sheet.instance.store.getState().layout.hiddenRows).toEqual(new Set([1, 2]));
+        sheet.instance.history.undo();
+        expect(sheet.instance.store.getState().layout.hiddenRows).toEqual(new Set([2]));
+        const restored = await WorkbookHandle.loadBytes(workbook.save());
+        try {
+          expect(
+            restored
+              .getRowLayouts(0)
+              .filter((row) => row.hidden)
+              .map((row) => row.row)
+              .sort((a, b) => a - b),
+          ).toEqual([2]);
+        } finally {
+          restored.dispose();
+        }
+        sheet.instance.history.redo();
+        expect(
+          workbook
+            .getRowLayouts(0)
+            .filter((row) => row.hidden)
+            .map((row) => row.row)
+            .sort((a, b) => a - b),
+        ).toEqual([1, 2]);
+      } finally {
+        toolbar.dispose();
+      }
+    } finally {
+      sheet.instance.dispose();
+      workbook.dispose();
+    }
+  });
+
+  it('circles native invalid values and required blanks through the mounted dropdown with undo', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    try {
+      workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 5);
+      workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 20);
+      expect(
+        workbook.addValidationEntry(0, {
+          ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }],
+          type: 1,
+          op: 7,
+          formula1: '10',
+          allowBlank: false,
+        }),
+      ).toBe(true);
+      await sheet.instance.setWorkbook(workbook);
+      mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 });
+      const nativeRead = vi.spyOn(workbook, 'listInvalidCells');
+      const toolbar = Spreadsheet.mountToolbar(host, sheet.instance, {
+        dynamicDropdowns: true,
+        helpers: stubHelpers(),
+      });
+      try {
+        toolbar.setActiveTab('data');
+        toolbar.dropdownsApi?.openDynamicRibbonDropdown({
+          command: 'dataValidation',
+          menuId: 'menu-data-validation',
+        });
+        const button = host.querySelector<HTMLButtonElement>(
+          '[data-validation-action="circle-invalid"]',
+        );
+        expect(button?.disabled).toBe(false);
+        const event = new MouseEvent('click', { bubbles: true });
+        Object.defineProperty(event, 'target', { value: button });
+        expect(toolbar.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+        expect(nativeRead).toHaveBeenCalled();
+        expect(sheet.instance.store.getState().errorIndicators.validationCircles).toEqual(
+          new Set(['0:1:0', '0:2:0']),
+        );
+        sheet.instance.history.undo();
+        expect(sheet.instance.store.getState().errorIndicators.validationCircles.size).toBe(0);
+        sheet.instance.history.redo();
+        expect(sheet.instance.store.getState().errorIndicators.validationCircles).toEqual(
+          new Set(['0:1:0', '0:2:0']),
+        );
+      } finally {
+        toolbar.dispose();
+      }
+    } finally {
+      sheet.instance.dispose();
+      workbook.dispose();
+    }
   });
 
   it('opens Data Validation from primary click and keeps circle actions secondary', () => {

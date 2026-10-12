@@ -4,6 +4,7 @@ import {
   computeFitToPagesScale,
   effectivePrintMargins,
   orderPrintRegionsForPageOrder,
+  PrintResourceLimitError,
   parsePrintArea,
   parsePrintAreas,
   parsePrintTitleCols,
@@ -11,6 +12,7 @@ import {
   printableMarginAdjustments,
   printSheet,
 } from '../../../src/commands/print.js';
+import { MAX_COL } from '../../../src/engine/address.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -793,6 +795,94 @@ describe('buildPrintDocument', () => {
     expect(doc.html).not.toContain('&amp;P');
     // No legacy body-flow header strip that duplicated the header.
     expect(doc.html).not.toContain('class="fc-print__header"');
+    wb.dispose();
+  });
+
+  it('escapes dynamic print CSS and keeps superscript/subscript as runs', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'x');
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        fontFamily: 'x"><img src=x onerror="parent.__probe=1">',
+        fontSize: 24,
+        fontVertAlign: 'superscript',
+      },
+    );
+    mutators.setPageSetup(store, 0, {
+      headerCenter: '</style><img src=x onerror="parent.__probe=1">',
+    });
+
+    const doc = buildPrintDocument(wb, store, 0);
+    const parsed = document.implementation.createHTMLDocument('print-probe');
+    parsed.documentElement.innerHTML = doc.html;
+    expect(parsed.querySelector('img')).toBeNull();
+    expect(parsed.querySelector('[onerror]')).toBeNull();
+    expect(doc.html).toContain('vertical-align:super');
+    expect(doc.html).toContain(`font-size:${24 * 0.7}px`);
+    wb.dispose();
+  });
+
+  it('rejects sparse far-corner print ranges before table materialization', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 2000, 600, 'far');
+
+    expect(() => buildPrintDocument(wb, store, 0)).toThrow(PrintResourceLimitError);
+    wb.dispose();
+  });
+
+  it('includes inherited real-WASM column fonts in printer-profile output', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    expect(wb.isStub).toBe(false);
+    try {
+      const baseFont = wb.getFontRecord(0);
+      const baseXf = wb.getCellXf(0);
+      expect(baseFont).not.toBeNull();
+      expect(baseXf).not.toBeNull();
+      if (!baseFont || !baseXf) throw new Error('missing workbook defaults');
+
+      const inheritedXf = wb.addXfRecord({
+        ...baseXf,
+        fontIndex: wb.addFontRecord({
+          ...baseFont,
+          name: 'Aptos Display',
+          size: 24,
+        }),
+      });
+      expect(wb.setColumnStyle(0, 0, MAX_COL, inheritedXf)).toBe(true);
+
+      const store = createSpreadsheetStore();
+      setText(store, wb, 0, 0, 'inherited text');
+      const doc = buildPrintDocument(wb, store, 0, 'Print', { printableBounds: null });
+
+      expect(doc.html).toContain('font-family:&quot;Aptos Display&quot;, system-ui');
+      expect(doc.html).toContain('font-size:32px');
+      expect(store.getState().format.formats.size).toBe(0);
+
+      mutators.setPendingFormat(store, {
+        addr: { sheet: 0, row: 0, col: 0 },
+        format: { fontSize: 8 },
+      });
+      const pendingDoc = buildPrintDocument(wb, store, 0, 'Print', { printableBounds: null });
+      expect(pendingDoc.html).toContain('font-size:8px');
+      expect(store.getState().format.formats.size).toBe(0);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('bounds repeated print-title rows before local table generation', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'title');
+    mutators.setPageSetup(store, 0, { printTitleRows: '1:1048576' });
+
+    expect(() => buildPrintDocument(wb, store, 0, 'Print', { printableBounds: null })).toThrow(
+      PrintResourceLimitError,
+    );
     wb.dispose();
   });
 

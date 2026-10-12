@@ -3,6 +3,8 @@ import {
   STATUS_AGGREGATE_KEYS,
   statusAggregateValue,
 } from '../commands/aggregate.js';
+import { normalizeFormatLocale } from '../format/locale.js';
+import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   mutators,
@@ -22,6 +24,7 @@ export interface StatusBarDeps {
   statusbar: HTMLElement;
   store: SpreadsheetStore;
   strings?: Strings;
+  getLocale?: () => string;
   /** Engine label for host/debug chrome. Excel profile hides this by default;
    *  pass `showEngineLabel: true` from a dev surface to expose it. */
   getEngineLabel: () => string;
@@ -115,11 +118,11 @@ const createStatusBarChooserRow = (
   return { row, check };
 };
 
-const fmt = (n: number): string => {
+const fmt = (n: number, locale: string): string => {
   if (!Number.isFinite(n)) return '—';
   const abs = Math.abs(n);
   if (abs !== 0 && (abs < 0.01 || abs >= 1e9)) return n.toExponential(3);
-  return n.toLocaleString('en-US', { maximumFractionDigits: 4 });
+  return n.toLocaleString(normalizeFormatLocale(locale), { maximumFractionDigits: 4 });
 };
 
 const clampZoom = (zoom: number): number => Math.max(0.5, Math.min(4, zoom));
@@ -375,7 +378,10 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const pieces: string[] = [];
     for (const key of keys) {
       const v = statusAggregateValue(key, stats);
-      if (v != null) pieces.push(`${labelFor(key)}: ${fmt(v)}`);
+      if (v != null)
+        pieces.push(
+          `${labelFor(key)}: ${fmt(v, deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US')}`,
+        );
     }
     center.textContent = pieces.join(' · ');
 

@@ -1,3 +1,4 @@
+import type { PaginationResult } from '@libraz/formulon';
 import {
   type EnginePageSetupExtrasInput,
   mergePageSetupFragment,
@@ -64,8 +65,43 @@ function wb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
+function copyPaginationResult(result: PaginationResult): PaginationResult {
+  return {
+    status: { ...result.status },
+    printArea: result.printArea.map((area) => ({ ...area })),
+    horizontalBreaks: [...result.horizontalBreaks],
+    verticalBreaks: [...result.verticalBreaks],
+    pageCount: result.pageCount,
+    paper: { ...result.paper },
+    margins: { ...result.margins },
+    printable: { ...result.printable },
+    scale: result.scale,
+    pageOrder: result.pageOrder,
+    printTitles: { ...result.printTitles },
+    pages: result.pages.map((page) => ({ ...page })),
+    horizontalBreakManual: [...result.horizontalBreakManual],
+    verticalBreakManual: [...result.verticalBreakManual],
+  };
+}
+
 export abstract class WorkbookHandlePrintMethods {
   declare readonly capabilities: EngineCapabilities;
+
+  /**
+   * Native print geometry for `sheet`, including the physical page placements
+   * and the provenance of automatic versus manual breaks.  The result is
+   * deliberately nullable: older formulon bundles and the development stub
+   * do not expose the paginator, so callers retain their existing layout
+   * splitter in that case.
+   */
+  paginateSheet(sheet: number): PaginationResult | null {
+    assertAlive(this);
+    if (this.capabilities.detailedPagination !== true) return null;
+    const paginate = wb(this).paginate;
+    if (typeof paginate !== 'function') return null;
+    const result = paginate.call(wb(this), sheet);
+    return result.status.ok ? copyPaginationResult(result) : null;
+  }
 
   /** Effective page setup for `sheet`, or null when the engine carries no
    *  print-settings surface. */

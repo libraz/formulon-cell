@@ -7,6 +7,7 @@ export interface ZoomDialogOptions {
   okLabel: string;
   cancelLabel: string;
   invalidMessage: string;
+  locale?: string | (() => string);
 }
 
 export const showZoomDialog = (opts: ZoomDialogOptions): Promise<number | null> =>
@@ -17,7 +18,9 @@ export const showZoomDialog = (opts: ZoomDialogOptions): Promise<number | null> 
     min: 50,
     max: 400,
     step: 1,
+    integer: true,
     okLabel: opts.okLabel,
     cancelLabel: opts.cancelLabel,
     invalidMessage: opts.invalidMessage,
+    locale: opts.locale,
   });

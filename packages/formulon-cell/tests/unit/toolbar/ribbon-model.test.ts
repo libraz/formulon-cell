@@ -183,17 +183,14 @@ describe('toolbar/ribbon-model', () => {
   it('keeps Home wide-button groups on the shared tile layout CSS', () => {
     const groupsCss = readFileSync(join(ribbonStylesDir, 'groups.css'), 'utf8');
 
-    for (const variant of HOME_TILE_LAYOUT_GROUP_VARIANTS) {
-      expect(groupsCss).toContain(`.fc-tb__ribbon-group--${variant} .fc-tb__ribbon-tools`);
-    }
     expect(groupsCss).toContain('.fc-tb__ribbon-group--tiles .fc-tb__rb--wide');
     expect(groupsCss).toContain('.fc-tb__ribbon-group--tiles .fc-tb__rb-icon');
     expect(groupsCss).toContain('flex-wrap: nowrap;');
     expect(groupsCss).toContain('height: 66px;');
     expect(groupsCss).toContain('grid-template-columns: 58px repeat(2, 30px);');
-    expect(groupsCss).toContain('.fc-tb__ribbon-group--tiles .fc-tb__rb .fc-tb__rb-split-chevron');
-    expect(groupsCss).toContain('position: absolute;');
-    expect(groupsCss).toContain('bottom: 5px;');
+    expect(groupsCss).toMatch(
+      /\.fc-tb__ribbon-group--tiles \.fc-tb__rb \.fc-tb__rb-split-chevron\s*\{\s*position: static;/,
+    );
     expect(groupsCss).toMatch(
       /\.fc-tb__ribbon-group--stacked \.fc-tb__rb--stacked \.fc-tb__rb-icon,[\s\S]*?width: 17px;[\s\S]*?height: 17px;/,
     );
@@ -239,7 +236,7 @@ describe('toolbar/ribbon-model', () => {
     expect(layoutCss).toContain('.fc-tb__ribbon-tabs');
     expect(layoutCss).toContain('background: var(--fc-tb-ribbon-bg);');
     expect(layoutCss).toMatch(
-      /\.fc-tb__ribbon:not\(\[hidden\]\)\s*\{[\s\S]*?min-height: 96px;[\s\S]*?padding: 3px 6px 2px;/,
+      /\.fc-tb__ribbon:not\(\[hidden\]\)\s*\{[\s\S]*?min-height: 96px;[\s\S]*?padding: 3px 36px 2px 6px;/,
     );
     expect(layoutCss).toMatch(
       /\.fc-tb__ribbon-tab\s*\{[\s\S]*?font-weight: 400;[\s\S]*?line-height: 31px;/,
@@ -401,9 +398,6 @@ describe('toolbar/ribbon-model', () => {
 
   it('keeps Home dense layout widths large enough to avoid hidden row wraps', () => {
     const groupsCss = readFileSync(join(ribbonStylesDir, 'groups.css'), 'utf8');
-    const home = buildRibbonModel('en').find((tab) => tab.id === 'home');
-    const tileWidth = 74;
-    const tileGap = 4;
     const widthFor = (variant: string): number => {
       const match = new RegExp(
         String.raw`\.fc-tb__ribbon-group--${variant} \.fc-tb__ribbon-tools\s*\{\s*width:\s*(\d+)px;`,
@@ -413,14 +407,20 @@ describe('toolbar/ribbon-model', () => {
       return Number(match[1]);
     };
 
-    for (const variant of HOME_TILE_LAYOUT_GROUP_VARIANTS) {
-      const commandCount =
-        home?.groups.find((group) => group.variant === variant)?.commands.length ?? 0;
-      const requiredWidth = commandCount * tileWidth + Math.max(0, commandCount - 1) * tileGap;
-      expect(widthFor(variant)).toBeGreaterThanOrEqual(requiredWidth);
+    // Tile and stacked groups size to their labels; only the wrapping toolbars are fixed.
+    for (const variant of [
+      ...HOME_TILE_LAYOUT_GROUP_VARIANTS,
+      ...HOME_STACKED_LAYOUT_GROUP_VARIANTS,
+      ...HOME_MIXED_LAYOUT_GROUP_VARIANTS,
+    ]) {
+      expect(() => widthFor(variant)).toThrow();
     }
-    expect(widthFor('cells')).toBeGreaterThanOrEqual(92);
-    expect(widthFor('editing')).toBeGreaterThanOrEqual(238);
+    expect(groupsCss).toMatch(
+      /\.fc-tb__ribbon-group--tiles \.fc-tb__rb,[\s\S]*?width: auto;[\s\S]*?min-width: 52px;[\s\S]*?max-width: 112px;/,
+    );
+    expect(groupsCss).toMatch(
+      /\.fc-tb__ribbon-group--mixed \.fc-tb__rb--stacked\s*\{[\s\S]*?width: auto;[\s\S]*?min-width: 84px;/,
+    );
     expect(widthFor('alignment')).toBeGreaterThanOrEqual(190);
     expect(groupsCss).toMatch(
       /\.fc-tb__ribbon-group--alignment \.fc-tb__rb-icon\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,

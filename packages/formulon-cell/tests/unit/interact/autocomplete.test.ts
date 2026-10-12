@@ -210,6 +210,26 @@ describe('attachAutocomplete labels', () => {
     input.remove();
   });
 
+  it('suggests localized Unicode aliases and resolves their canonical signature', () => {
+    const input = document.createElement('textarea');
+    input.value = '=合';
+    document.body.appendChild(input);
+    input.setSelectionRange(input.value.length, input.value.length);
+    const handle = attachAutocomplete({
+      input,
+      getFunctionNames: () => ['SUM'],
+      getFunctionDisplayNames: () => ['合計'],
+      resolveFunctionName: (rawName) => (rawName === '合計' ? 'SUM' : rawName.toUpperCase()),
+      getListSeparator: () => ';',
+    });
+    handle.refresh();
+    expect(document.body.textContent).toContain('合計(number1; [number2]; ...)');
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=合計(');
+    handle.detach();
+    input.remove();
+  });
+
   it('keeps option buttons on the autocomplete item helper', () => {
     const source = readFileSync(join(root, 'src/interact/autocomplete.ts'), 'utf8');
     expect(source).toContain("import { createInteractionButton } from './chip-button.js'");

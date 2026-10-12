@@ -1,13 +1,19 @@
 import { commitCellInput, inputOperation } from '../commands/cell-input-commit.js';
-import { coerceInput } from '../commands/coerce-input.js';
+import { coerceInput, inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { dblClickRange, extractRefs, rotateRefAt } from '../commands/refs.js';
-import { addrKey } from '../engine/address.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
-import { formatWithPending } from '../store/pending-format.js';
+import {
+  cellFontFamily,
+  cellTextVerticalOffset,
+  cssCellFontSize,
+  fontSizeWithVerticalAlign,
+  visualZoom,
+} from '../render/painters/text.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
 import {
@@ -22,6 +28,7 @@ import {
   type FormulaEditLeaseContext,
   type FormulaEditLeaseSnapshot,
 } from './formula-edit-lease.js';
+import { catalogLocaleOrdinal } from './function-catalog-text.js';
 import { navigationPolicyFor, nextTabStop } from './navigation-policy.js';
 import {
   buildSelectionInputBatch,
@@ -521,9 +528,23 @@ export class InlineEditor {
         this.deps.store.getState().data.sheetIndex,
         this.deps.store.getState().data.cells,
         sheetByName,
-        (formula) => this.deps.wb.evaluateFormulaText(active, formula),
+        (formula) =>
+          this.deps.wb.evaluateFormulaText(
+            active,
+            this.deps.wb.canonicalizeLocalizedFormula(formula),
+          ),
         true,
-        (formula) => this.deps.wb.evaluateFormulaArray(active, formula),
+        (formula) =>
+          this.deps.wb.evaluateFormulaArray(
+            active,
+            this.deps.wb.canonicalizeLocalizedFormula(formula),
+          ),
+        {
+          localizeLiteral: (literal) => {
+            const localized = this.deps.wb.localizeFormulaText(`=${literal}`);
+            return localized.startsWith('=') ? localized.slice(1) : literal;
+          },
+        },
       );
       if (result) {
         e.preventDefault();
@@ -584,7 +605,7 @@ export class InlineEditor {
     const a = el.selectionStart ?? 0;
     const b = el.selectionEnd ?? a;
     const probe = a === b ? a : Math.floor((a + b) / 2);
-    const range = dblClickRange(el.value, probe);
+    const range = dblClickRange(el.value, probe, this.deps.wb.localeFacts()?.listSeparator);
     if (range) {
       e.preventDefault();
       el.setSelectionRange(range.start, range.end);
@@ -732,9 +753,33 @@ export class InlineEditor {
         pickListValues(this.deps.wb.cells(sheet), col, beforeRow),
       getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
       getFunctionNames: () => this.deps.wb.functionNames(),
+      getFunctionDisplayNames: () => {
+        const wb = this.deps.wb;
+        const names = wb.functionNames();
+        if (!names) return null;
+        const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
+        return names.map((name) => wb.localizeFunctionName(name, locale) || name);
+      },
+      resolveFunctionName: (rawName) => {
+        const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US');
+        return (
+          this.deps.wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase()
+        );
+      },
+      getListSeparator: () => this.deps.wb.localeFacts()?.listSeparator ?? ',',
       labels: this.deps.getLabels?.().autocomplete,
     });
-    this.argHelper = attachArgHelper({ input, labels: this.deps.getLabels?.().argHelper });
+    this.argHelper = attachArgHelper({
+      input,
+      getListSeparator: () => this.deps.wb.localeFacts()?.listSeparator ?? ',',
+      resolveFunctionName: (rawName) => {
+        const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US');
+        return (
+          this.deps.wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase()
+        );
+      },
+      labels: this.deps.getLabels?.().argHelper,
+    });
     this.argHelper.refresh();
     // Scrolling / resizing / freezing moves the cell under the editor. Track
     // the slices that decide the cell rect so the editor stays welded to its
@@ -744,6 +789,7 @@ export class InlineEditor {
       if (this.editingAddr && (state.viewport !== prev.viewport || state.layout !== prev.layout)) {
         this.position(this.editingAddr);
         this.refreshSize();
+        this.applyCellAppearance();
       }
       if (state.format !== prev.format || state.ui.pendingFormat !== prev.ui.pendingFormat) {
         this.applyCellAppearance();
@@ -805,7 +851,11 @@ export class InlineEditor {
     // Explicit cell alignment wins over the type-based defaults below — once
     // a user sets center/right/justify on a cell, the editor honors it even
     // for formula edits so the visual position stays anchored.
-    const fmt = this.deps.store.getState().format.formats.get(addrKey(this.editingAddr));
+    const fmt = effectiveCellFormatWithPending(
+      this.deps.wb,
+      this.deps.store.getState(),
+      this.editingAddr,
+    );
     if (fmt?.align) {
       this.input.style.textAlign = fmt.align;
       return;
@@ -816,7 +866,7 @@ export class InlineEditor {
       this.input.style.textAlign = 'left';
       return;
     }
-    const coerced = coerceInput(raw);
+    const coerced = coerceInput(raw, { locale: inputLocaleForWorkbook(this.deps.wb) });
     if (coerced.kind === 'number') this.input.style.textAlign = 'right';
     else if (coerced.kind === 'bool') this.input.style.textAlign = 'center';
     else this.input.style.textAlign = 'left';
@@ -827,11 +877,43 @@ export class InlineEditor {
    *  carries a fill; with it, the edit happens visually inside the cell. */
   private applyCellAppearance(): void {
     if (!this.input || !this.editingAddr) return;
-    const fmt = formatWithPending(this.deps.store.getState(), this.editingAddr);
-    // Empty string clears the inline style, falling back to the stylesheet's
-    // sheet-background / foreground tokens.
+    const state = this.deps.store.getState();
+    const fmt = effectiveCellFormatWithPending(this.deps.wb, state, this.editingAddr);
+    const zoom = visualZoom(state.viewport.zoom);
+    // Cell colors stay explicit when authored; a missing family falls through
+    // to the host UI stack so an unavailable workbook font cannot switch the
+    // editor to the browser's default serif face.
     this.input.style.background = fmt?.fill ?? '';
     this.input.style.color = fmt?.color ?? '';
+    this.input.style.fontFamily = cellFontFamily(
+      fmt?.fontFamily,
+      'var(--fc-font-ui, system-ui, sans-serif)',
+    );
+    this.input.style.fontSize = cssCellFontSize(fmt?.fontSize, fmt?.fontVertAlign, zoom);
+    const visualSize =
+      fmt?.fontSize !== undefined && Number.isFinite(fmt.fontSize)
+        ? fontSizeWithVerticalAlign(fmt.fontSize, fmt.fontVertAlign) * zoom
+        : undefined;
+    this.input.style.lineHeight = visualSize ? `${visualSize * 1.25}px` : '';
+    if (visualSize && fmt?.fontVertAlign) {
+      // A textarea ignores `vertical-align` for its text run. Keep the input
+      // box welded to the cell and move only the run by balancing its top and
+      // bottom padding around the same baseline offset as the canvas painter.
+      const offset = cellTextVerticalOffset(visualSize, fmt.fontVertAlign);
+      this.input.style.paddingTop = `${Math.max(0, 4 + offset)}px`;
+      this.input.style.paddingBottom = `${Math.max(0, 4 - offset)}px`;
+    } else {
+      this.input.style.paddingTop = '';
+      this.input.style.paddingBottom = '';
+    }
+    this.input.style.fontWeight = fmt?.bold ? 'bold' : '';
+    this.input.style.fontStyle = fmt?.italic ? 'italic' : '';
+    this.input.style.textDecoration = [
+      fmt?.underline ? 'underline' : '',
+      fmt?.strike ? 'line-through' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
 
   private position(a: Addr): void {

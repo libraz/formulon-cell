@@ -1,10 +1,21 @@
-import { clearComment, commentAt, recordCommentChange, setComment } from '../commands/comment.js';
+import {
+  addThreadedComment,
+  commentAt,
+  editThreadedComment,
+  type listThreadedComments,
+  recordCommentChange,
+  recordThreadedChange,
+  removeThreadedComment,
+  resolveThread,
+  setComment,
+  threadedCommentsAt,
+} from '../commands/comment.js';
 import type { History } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { appendDialogActions, appendDialogIconButton } from './dialog-shell.js';
+import { appendDialogActions, appendDialogButton, appendDialogIconButton } from './dialog-shell.js';
 
 export interface CommentDialogDeps {
   host: HTMLElement;
@@ -18,7 +29,7 @@ export interface CommentDialogDeps {
 }
 
 export interface CommentDialogHandle {
-  open(): void;
+  open(options?: { mode?: 'note' | 'thread' }): void;
   close(): void;
   detach(): void;
 }
@@ -77,6 +88,15 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   textarea.spellcheck = true;
   wrap.appendChild(textarea);
 
+  const thread = document.createElement('div');
+  thread.className = 'fc-cmtnote__thread';
+  thread.hidden = true;
+  wrap.insertBefore(thread, textarea);
+  const error = document.createElement('p');
+  error.className = 'fc-cmtnote__error';
+  error.hidden = true;
+  wrap.insertBefore(error, textarea);
+
   const footer = document.createElement('div');
   footer.className = 'fc-cmtnote__footer';
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
@@ -84,27 +104,259 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     okLabel: t.ok,
     buttonBaseClass: 'fc-cmtnote__btn',
   });
+  const replyBtn = appendDialogButton(footer, {
+    label: '',
+    baseClass: 'fc-cmtnote__btn fc-cmtnote__reply',
+  });
+  const resolveBtn = appendDialogButton(footer, {
+    label: '',
+    baseClass: 'fc-cmtnote__btn fc-cmtnote__resolve',
+  });
   wrap.appendChild(footer);
 
   host.appendChild(wrap);
 
-  const writeComment = (next: string | undefined): void => {
+  let threadedMode = false;
+  let editingThreadId: string | null = null;
+  let replyingTo: string | null = null;
+  const labels = {
+    threadTitle: t.threadTitle ?? 'Comments',
+    threadPlaceholder: t.threadPlaceholder ?? 'Enter a comment',
+    reply: t.reply ?? 'Reply',
+    resolve: t.resolve ?? 'Resolve',
+    reopen: t.reopen ?? 'Reopen',
+    edit: t.edit ?? 'Edit',
+    noReplies: t.noReplies ?? 'No replies',
+    authorFallback: t.authorFallback ?? 'Unknown author',
+    noteConflict:
+      t.noteConflict ?? 'This cell has a note. Remove it before adding a threaded comment.',
+    threadConflict:
+      t.threadConflict ?? 'This cell has a threaded comment. Remove it before adding a note.',
+    writeFailed: t.writeFailed ?? 'The comment could not be saved.',
+  };
+  const mutationAuthorization = { origin: 'instanceApi' as const, commandId: 'commentDialog' };
+  replyBtn.textContent = labels.reply;
+  resolveBtn.textContent = labels.resolve;
+
+  const renderThread = (entries: ReturnType<typeof listThreadedComments>): void => {
+    thread.replaceChildren();
+    const opening = entries.find((entry) => entry.parentId === '');
+    if (!opening) {
+      thread.hidden = true;
+      return;
+    }
+    thread.hidden = false;
+    for (const entry of entries) {
+      const item = document.createElement('article');
+      item.className =
+        entry.parentId === '' ? 'fc-cmtnote__thread-opening' : 'fc-cmtnote__thread-reply';
+      const body = document.createElement('p');
+      body.className = 'fc-cmtnote__thread-text';
+      body.textContent = entry.text;
+      item.appendChild(body);
+      const meta = document.createElement('small');
+      meta.className = 'fc-cmtnote__thread-meta';
+      meta.textContent =
+        store.getState().threadedComments.persons.find((person) => person.id === entry.personId)
+          ?.displayName ?? labels.authorFallback;
+      item.appendChild(meta);
+      if (entry.id !== editingThreadId) {
+        const edit = appendDialogButton(item, {
+          label: labels.edit,
+          baseClass: 'fc-cmtnote__thread-edit',
+        });
+        edit.addEventListener('click', () => {
+          editingThreadId = entry.id;
+          replyingTo = null;
+          textarea.value = entry.text;
+          renderThread(entries);
+          textarea.focus();
+          textarea.select();
+        });
+      }
+      thread.appendChild(item);
+    }
+    if (entries.length === 1) {
+      const empty = document.createElement('small');
+      empty.className = 'fc-cmtnote__thread-empty';
+      empty.textContent = labels.noReplies;
+      thread.appendChild(empty);
+    }
+    textarea.value = editingThreadId
+      ? (entries.find((entry) => entry.id === editingThreadId)?.text ?? '')
+      : replyingTo
+        ? ''
+        : opening.text;
+    resolveBtn.textContent = opening.done ? labels.reopen : labels.resolve;
+    resolveBtn.hidden = false;
+    replyBtn.hidden = false;
+    title.textContent = labels.threadTitle;
+    textarea.placeholder = labels.threadPlaceholder;
+  };
+
+  const writeComment = (next: string | undefined): boolean => {
     const state = store.getState();
     const addr = state.selection.active;
     const wb = getWb() ?? undefined;
-    recordCommentChange(history, store, wb, [addr], () => {
-      if (next != null && next !== '') setComment(store, addr, next, wb);
-      else clearComment(store, addr, wb);
-    });
+    if (
+      wb?.capabilities.threadedComments &&
+      threadedCommentsAt(store, addr, wb).length > 0 &&
+      (next ?? '').length > 0
+    ) {
+      error.textContent = labels.threadConflict;
+      error.hidden = false;
+      return false;
+    }
+    let saved = true;
+    recordCommentChange(
+      history,
+      store,
+      wb,
+      [addr],
+      () => {
+        saved = setComment(
+          store,
+          addr,
+          next != null && next !== '' ? next : '',
+          wb,
+          mutationAuthorization,
+        );
+      },
+      mutationAuthorization,
+    );
+    if (!saved) {
+      error.textContent = labels.writeFailed;
+      error.hidden = false;
+      return false;
+    }
+    error.hidden = true;
+    return true;
+  };
+
+  const writeThread = (): boolean => {
+    const state = store.getState();
+    const addr = state.selection.active;
+    const wb = getWb() ?? undefined;
+    if (!wb?.capabilities.threadedComments || textarea.value.length === 0) {
+      error.textContent = labels.writeFailed;
+      error.hidden = false;
+      return false;
+    }
+    const hasNote = commentAt(state, addr) !== null;
+    let result: ReturnType<typeof addThreadedComment> | boolean;
+    try {
+      result = recordThreadedChange(
+        history,
+        store,
+        wb,
+        addr.sheet,
+        () => {
+          if (editingThreadId) {
+            return editThreadedComment(
+              store,
+              addr.sheet,
+              editingThreadId,
+              textarea.value,
+              wb,
+              [],
+              mutationAuthorization,
+            );
+          }
+          return addThreadedComment(store, addr, textarea.value, wb, {
+            replyToThread: replyingTo ?? undefined,
+            authorization: mutationAuthorization,
+          });
+        },
+        mutationAuthorization,
+      );
+    } catch {
+      result = false;
+    }
+    if (result === null || result === false) {
+      error.textContent = hasNote && !editingThreadId ? labels.noteConflict : labels.writeFailed;
+      error.hidden = false;
+      return false;
+    }
+    error.hidden = true;
+    editingThreadId = null;
+    replyingTo = null;
+    return true;
   };
 
   const onOk = (): void => {
-    writeComment(textarea.value);
+    if (threadedMode) {
+      if (!writeThread()) return;
+    } else if (!writeComment(textarea.value)) return;
     api.close();
   };
 
   const onRemove = (): void => {
-    writeComment(undefined);
+    if (threadedMode) {
+      const state = store.getState();
+      const addr = state.selection.active;
+      const wb = getWb() ?? undefined;
+      const opening = threadedCommentsAt(store, addr, wb)[0];
+      if (opening && wb) {
+        const removed = recordThreadedChange(
+          history,
+          store,
+          wb,
+          addr.sheet,
+          () => removeThreadedComment(store, addr.sheet, opening.id, wb, mutationAuthorization),
+          mutationAuthorization,
+        );
+        if (!removed) {
+          error.textContent = labels.writeFailed;
+          error.hidden = false;
+          return;
+        }
+      } else {
+        error.textContent = labels.writeFailed;
+        error.hidden = false;
+        return;
+      }
+    } else if (!writeComment(undefined)) return;
+    api.close();
+  };
+
+  const onReply = (): void => {
+    if (!threadedMode) return;
+    const state = store.getState();
+    const addr = state.selection.active;
+    const opening = threadedCommentsAt(store, addr, getWb() ?? undefined)[0];
+    if (!opening) return;
+    editingThreadId = null;
+    replyingTo = opening.id;
+    textarea.value = '';
+    textarea.focus();
+  };
+
+  const onResolve = (): void => {
+    if (!threadedMode) return;
+    const state = store.getState();
+    const addr = state.selection.active;
+    const wb = getWb() ?? undefined;
+    const opening = threadedCommentsAt(store, addr, wb)[0];
+    if (opening && wb) {
+      const resolved = recordThreadedChange(
+        history,
+        store,
+        wb,
+        addr.sheet,
+        () =>
+          resolveThread(store, addr.sheet, opening.id, !opening.done, wb, mutationAuthorization),
+        mutationAuthorization,
+      );
+      if (!resolved) {
+        error.textContent = labels.writeFailed;
+        error.hidden = false;
+        return;
+      }
+    } else {
+      error.textContent = labels.writeFailed;
+      error.hidden = false;
+      return;
+    }
     api.close();
   };
 
@@ -190,6 +442,8 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   okBtn.addEventListener('click', onOk);
   removeBtn.addEventListener('click', onRemove);
+  replyBtn.addEventListener('click', onReply);
+  resolveBtn.addEventListener('click', onResolve);
   cancelBtn.addEventListener('click', onCancel);
   wrap.addEventListener('keydown', onKey);
 
@@ -197,15 +451,33 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   const onScrollOrResize = (): void => place();
 
   const api: CommentDialogHandle = {
-    open(): void {
+    open(options: { mode?: 'note' | 'thread' } = {}): void {
       const state = store.getState();
       const addr = state.selection.active;
+      const wb = getWb() ?? undefined;
       const current = commentAt(state, addr) ?? '';
-      textarea.value = current;
-      removeBtn.hidden = !current;
-      title.textContent = current ? t.titleEdit : t.title;
-      wrap.setAttribute('aria-label', current ? t.titleEdit : t.title);
-      textarea.setAttribute('aria-label', t.placeholder);
+      const threads = wb?.capabilities.threadedComments ? threadedCommentsAt(store, addr, wb) : [];
+      threadedMode = Boolean(
+        wb?.capabilities.threadedComments &&
+          options.mode !== 'note' &&
+          (options.mode === 'thread' || threads.length > 0 || !current),
+      );
+      editingThreadId = null;
+      replyingTo = null;
+      removeBtn.hidden = threadedMode ? threads.length === 0 : !current;
+      replyBtn.hidden = !threadedMode || threads.length === 0;
+      resolveBtn.hidden = !threadedMode || threads.length === 0;
+      title.textContent = threadedMode ? labels.threadTitle : current ? t.titleEdit : t.title;
+      wrap.setAttribute('aria-label', title.textContent ?? t.title);
+      textarea.placeholder = threadedMode ? labels.threadPlaceholder : t.placeholder;
+      textarea.setAttribute('aria-label', threadedMode ? labels.threadPlaceholder : t.placeholder);
+      error.hidden = true;
+      if (threadedMode && threads.length > 0) renderThread(threads);
+      else {
+        thread.hidden = true;
+        thread.replaceChildren();
+        textarea.value = current;
+      }
       wrap.hidden = false;
       place();
       if (!attached) {
@@ -232,6 +504,8 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     detach(): void {
       okBtn.removeEventListener('click', onOk);
       removeBtn.removeEventListener('click', onRemove);
+      replyBtn.removeEventListener('click', onReply);
+      resolveBtn.removeEventListener('click', onResolve);
       cancelBtn.removeEventListener('click', onCancel);
       wrap.removeEventListener('keydown', onKey);
       if (attached) {

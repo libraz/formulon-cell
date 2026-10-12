@@ -9,6 +9,39 @@ const makeWb = (methods: string[]): Workbook => {
 };
 
 describe('detectCapabilities', () => {
+  it('requires the paired native range-style operations independently', () => {
+    expect(detectCapabilities(makeWb(['rangeStyleBases'])).rangeStylePatch).toBe(false);
+    expect(detectCapabilities(makeWb(['rangeStyleBases', 'remapRangeStyle'])).rangeStylePatch).toBe(
+      true,
+    );
+    expect(detectCapabilities(makeWb(['snapshotRangeStyle'])).rangeStyleSnapshot).toBe(false);
+    expect(
+      detectCapabilities(makeWb(['snapshotRangeStyle', 'restoreRangeStyle'])).rangeStyleSnapshot,
+    ).toBe(true);
+    expect(detectCapabilities(makeWb(['setRowStyle', 'clearRowStyle'])).rowStyleRanges).toBe(false);
+    expect(
+      detectCapabilities(makeWb(['rangeStyleBases', 'setRowStyle', 'clearRowStyle']))
+        .rowStyleRanges,
+    ).toBe(true);
+  });
+  it('detects clearing direct XF independently for older engine bundles', () => {
+    expect(detectCapabilities(makeWb(['setCellXfIndex'])).cellFormattingClear).toBe(false);
+    expect(detectCapabilities(makeWb(['clearCellXfIndex'])).cellFormattingClear).toBe(true);
+  });
+  it('requires both conversion directions and sheet defaults for pixel geometry', () => {
+    const methods = ['getSheetFormatDefaults', 'columnCharsToPt', 'columnPtToChars'];
+    expect(detectCapabilities(makeWb(methods)).geometry).toBe(true);
+    for (const omitted of methods) {
+      expect(
+        detectCapabilities(makeWb(methods.filter((method) => method !== omitted))).geometry,
+      ).toBe(false);
+    }
+    const caps = detectCapabilities(makeWb(['clearRowHeight', 'resolveColor']));
+    expect(caps.geometry).toBe(false);
+    expect(caps.rowHeightClear).toBe(true);
+    expect(caps.colorResolution).toBe(true);
+  });
+
   it('cellFormatting requires the full XF resolver/dedup surface', () => {
     const partial = makeWb(['getCellXfIndex', 'setCellXfIndex', 'getCellXf']);
     expect(detectCapabilities(partial).cellFormatting).toBe(false);
@@ -82,6 +115,8 @@ describe('detectCapabilities', () => {
     expect(caps.traceArrows).toBe(false);
     expect(caps.functionMetadata).toBe(false);
     expect(caps.functionLocale).toBe(false);
+    expect(caps.formulaLocale).toBe(false);
+    expect(caps.localeFacts).toBe(false);
     expect(caps.arrayFormulaEvaluation).toBe(false);
     expect(caps.calcMode).toBe(false);
     expect(caps.spreadsheetProfile).toBe(false);
@@ -92,6 +127,27 @@ describe('detectCapabilities', () => {
     expect(caps.conditionalFormatMutate).toBe(false);
     expect(caps.pivotTables).toBe(false);
     expect(caps.pivotTableMutate).toBe(false);
+  });
+
+  it('keeps full formula localization separate from function aliases', () => {
+    const aliasesOnly = makeWb(['localizeFunctionName', 'canonicalizeFunctionName']);
+    expect(detectCapabilities(aliasesOnly).functionLocale).toBe(true);
+    expect(detectCapabilities(aliasesOnly).formulaLocale).toBe(false);
+    expect(detectCapabilities(aliasesOnly).localeFacts).toBe(false);
+
+    const formulaOnly = makeWb(['localizeFormula', 'canonicalizeFormula']);
+    expect(detectCapabilities(formulaOnly).formulaLocale).toBe(true);
+    expect(detectCapabilities(formulaOnly).localeFacts).toBe(false);
+
+    const full = makeWb([
+      'localizeFunctionName',
+      'canonicalizeFunctionName',
+      'localizeFormula',
+      'canonicalizeFormula',
+      'localeFacts',
+    ]);
+    expect(detectCapabilities(full).formulaLocale).toBe(true);
+    expect(detectCapabilities(full).localeFacts).toBe(true);
   });
 
   it('sheet view readback is independent from zoom writeback', () => {

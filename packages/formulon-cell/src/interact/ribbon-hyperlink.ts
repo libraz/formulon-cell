@@ -4,13 +4,14 @@
 // clear the hyperlink on the active cell, or surface a "no link here" report.
 
 import type { History } from '../commands/history.js';
-import { clearHyperlink, hyperlinkAt } from '../commands/hyperlinks.js';
+import { clearHyperlink, hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
-type HyperlinkStrings = Pick<Strings['ribbonMenu'], 'linkOpen' | 'linkNoHyperlink'>;
+type HyperlinkStrings = Pick<Strings['ribbonMenu'], 'linkOpen' | 'linkNoHyperlink'> &
+  Partial<Pick<Strings['ribbonMenu'], 'linkUnsupportedTarget'>>;
 
 export type RibbonHyperlinkAction = 'edit' | 'external' | 'open' | 'clear';
 
@@ -56,7 +57,25 @@ export const executeRibbonHyperlinkAction = (
       },
     };
   }
-  if (action === 'open') return { kind: 'open-url', url: target };
+  if (action === 'open') {
+    const url = target.trim();
+    if (!isSafeHyperlinkTarget(url)) {
+      return {
+        kind: 'report',
+        report: {
+          title: strings.linkOpen,
+          items: [
+            {
+              severity: 'warning',
+              label: strings.linkUnsupportedTarget ?? strings.linkNoHyperlink,
+              detail: '',
+            },
+          ],
+        },
+      };
+    }
+    return { kind: 'open-url', url };
+  }
   recordFormatChange(history, store, () => {
     clearHyperlink(store, state.selection.active, workbook);
   });

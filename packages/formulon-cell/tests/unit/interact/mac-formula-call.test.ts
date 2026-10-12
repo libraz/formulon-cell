@@ -63,6 +63,27 @@ describe('interact/mac-formula-call', () => {
     expect(projection?.span.complete).toBe(true);
   });
 
+  it('uses a localized semicolon separator while preserving commas in arrays and strings', () => {
+    const source = '=SUMME("a,b";{1,2;3,4};R[1]C[-1])';
+    const resolve = (rawName: string): string | null => (rawName === 'SUMME' ? 'SUM' : null);
+    const projection = projectFormulaCallAtCaret(source, source.indexOf('3'), resolve, ';');
+    expect(projection?.span.rawName).toBe('SUMME');
+    expect(projection?.args).toEqual(['"a,b"', '{1,2;3,4}', 'R[1]C[-1]']);
+    expect(parseOuterCall(source, 'SUM', ';', resolve)).toEqual({
+      name: 'SUMME',
+      args: ['"a,b"', '{1,2;3,4}', 'R[1]C[-1]'],
+    });
+  });
+
+  it('keeps structured-reference apostrophe escapes inside semicolon calls', () => {
+    const source = "=SUMME(Table1[[#Headers],[O''Brien;@]];2)";
+    const resolve = (rawName: string): string | null => (rawName === 'SUMME' ? 'SUM' : null);
+    expect(parseOuterCall(source, 'SUM', ';', resolve)).toEqual({
+      name: 'SUMME',
+      args: ["Table1[[#Headers],[O''Brien;@]]", '2'],
+    });
+  });
+
   it('keeps untouched argument slices verbatim when one field changes', () => {
     const source = '=SUM( 1 ,  2  )';
     const projection = projectFormulaCallAtCaret(source, source.indexOf('1') + 1, resolveKnownName);
@@ -80,6 +101,16 @@ describe('interact/mac-formula-call', () => {
     );
 
     expect(replaced?.raw).toBe('=SUM(5,  2  )');
+  });
+
+  it('rebuilds only the projected call with a localized alias and separator', () => {
+    const source = '=1+SUMME(1;  2  )*4';
+    const resolve = (rawName: string): string | null => (rawName === 'SUMME' ? 'SUM' : null);
+    const projection = projectFormulaCallAtCaret(source, source.indexOf('2') + 1, resolve, ';');
+    if (!projection) throw new Error('expected a localized SUM projection');
+    expect(
+      replaceProjectedFormulaCall(source, projection, 'SUMME', ['3', '  2  '], 2, ';'),
+    ).toEqual({ raw: '=1+SUMME(3;  2  )*4', caret: '=1+SUMME(3;  2  )'.length });
   });
 
   it('replaces only the projected call and preserves prefix and suffix', () => {

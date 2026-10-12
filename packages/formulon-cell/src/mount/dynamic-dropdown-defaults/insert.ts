@@ -1,4 +1,4 @@
-import { hyperlinkAt } from '../../commands/hyperlinks.js';
+import { hyperlinkAt, isSafeHyperlinkTarget } from '../../commands/hyperlinks.js';
 import {
   createRibbonChartFromSelection,
   executeRibbonHyperlinkAction,
@@ -32,6 +32,7 @@ const buildLinksAction =
       strings: {
         linkOpen: strings.ribbonMenu.linkOpen,
         linkNoHyperlink: strings.ribbonMenu.linkNoHyperlink,
+        linkUnsupportedTarget: strings.ribbonMenu.linkUnsupportedTarget,
       },
     });
     if (result.kind === 'open-hyperlink-dialog') {
@@ -58,12 +59,21 @@ const updateLinksMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateLinksMenu'] =>
   (menu) => {
     const state = instance.store.getState();
-    const hasHyperlink = hyperlinkAt(state, state.selection.active) !== null;
+    const target = hyperlinkAt(state, state.selection.active);
+    const hasHyperlink = target !== null;
+    const canOpenHyperlink = hasHyperlink && isSafeHyperlinkTarget(target);
     const disabledReason = instance.i18n.strings.ribbonMenu.linkNoHyperlink;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-link-action]')) {
       const action = button.dataset.linkAction;
-      const disabled = (action === 'open' || action === 'clear') && !hasHyperlink;
-      setMenuControlDisabled(button, disabled, disabledReason);
+      const disabled =
+        (action === 'open' && !canOpenHyperlink) || (action === 'clear' && !hasHyperlink);
+      setMenuControlDisabled(
+        button,
+        disabled,
+        action === 'open' && hasHyperlink && !canOpenHyperlink
+          ? instance.i18n.strings.ribbonMenu.linkUnsupportedTarget
+          : disabledReason,
+      );
     }
   };
 

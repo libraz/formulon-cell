@@ -79,11 +79,21 @@ const applyRuntimeProps = async (
     uploadStatus?: MountOptions['uploadStatus'];
     macroRecording?: MountOptions['macroRecording'];
   } = {},
+  onLocaleChange?: (event: LocaleChangeEvent) => void,
+  onError?: (error: unknown) => void,
+  getLocaleEventGeneration?: () => number,
 ): Promise<void> => {
   const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
   const ui = props.ui ? resolvedUi : null;
   if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
-    await inst.setWorkbook(props.workbook);
+    try {
+      await inst.setWorkbook(props.workbook);
+    } catch (error) {
+      // Core keeps the previous workbook active when a controlled replacement
+      // fails. Report the original cause, then continue reconciling the
+      // independent controlled props captured while the async mount was pending.
+      onError?.(error);
+    }
   }
   if (props.policy !== baseline.policy) inst.setPolicy(props.policy);
   if (props.viewport !== baseline.viewport) inst.setViewportOptions(props.viewport);
@@ -94,8 +104,11 @@ const applyRuntimeProps = async (
   const baselineTheme =
     baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
   if (nextTheme && nextTheme !== baselineTheme) inst.setTheme(nextTheme);
-  if (props.locale && props.locale !== baseline.locale) inst.i18n.setLocale(props.locale);
-  if (props.strings && props.strings !== baseline.strings) {
+  const localeAccepted =
+    props.locale && props.locale !== baseline.locale
+      ? applyLocale(inst, props.locale, onLocaleChange, onError, getLocaleEventGeneration)
+      : undefined;
+  if (props.strings && (props.strings !== baseline.strings || localeAccepted === true)) {
     inst.i18n.extend(inst.i18n.locale, props.strings);
   }
   if (props.features !== baseline.features || props.ui !== baseline.ui) {
@@ -119,11 +132,47 @@ const applyRuntimeProps = async (
   }
 };
 
+const applyLocale = (
+  inst: SpreadsheetInstance,
+  requested: string,
+  onLocaleChange?: (event: LocaleChangeEvent) => void,
+  onError?: (error: unknown) => void,
+  getLocaleEventGeneration?: () => number,
+): boolean => {
+  const generationBefore = getLocaleEventGeneration?.();
+  let accepted = false;
+  let failure: unknown;
+  try {
+    accepted = inst.setLocale(requested);
+  } catch (error) {
+    failure = error;
+  }
+  if (accepted) return true;
+
+  // Core emits this during its normal rollback. Keep the explicit fallback
+  // so a host instance that rejects without emitting still reconciles the
+  // controlled prop with the active locale.
+  if (generationBefore === undefined || getLocaleEventGeneration?.() === generationBefore) {
+    onLocaleChange?.({ locale: inst.locale, strings: inst.i18n.strings });
+  }
+  onError?.(
+    failure ??
+      new Error(
+        `formulon-cell: locale change to "${requested}" was rejected; active locale is "${inst.locale}"`,
+      ),
+  );
+  return false;
+};
+
 export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
   name: 'Spreadsheet',
   props: {
     ui: { type: Object as PropType<SpreadsheetUiOptions>, default: undefined },
     workbook: { type: Object as PropType<WorkbookHandle>, default: undefined },
+    getWorkbookName: {
+      type: Function as PropType<MountOptions['getWorkbookName']>,
+      default: undefined,
+    },
     policy: { type: Object as PropType<MountOptions['policy']>, default: undefined },
     viewport: { type: Object as PropType<MountOptions['viewport']>, default: undefined },
     contextMenu: { type: Object as PropType<MountOptions['contextMenu']>, default: undefined },
@@ -183,6 +232,12 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
     const mountError = shallowRef<unknown>(null);
     const eventDisposers: (() => void)[] = [];
     let disposed = false;
+    let localeEventGeneration = 0;
+    const notifyLocaleChange = (event: LocaleChangeEvent): void => {
+      localeEventGeneration += 1;
+      emit('localeChange', event);
+    };
+    const getLocaleEventGeneration = (): number => localeEventGeneration;
 
     onMounted(async () => {
       const host = hostEl.value;
@@ -203,6 +258,7 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       if (props.printerProfiles) opts.printerProfiles = props.printerProfiles;
       if (props.printerProfileId) opts.printerProfileId = props.printerProfileId;
       opts.refreshPrinterProfiles = () => props.refreshPrinterProfiles?.();
+      opts.getWorkbookName = () => props.getWorkbookName?.();
       opts.captureScreenClip = () => props.captureScreenClip?.();
       opts.getFunctionArgumentHelp = (name, index, locale) =>
         props.getFunctionArgumentHelp?.(name, index, locale);
@@ -252,11 +308,25 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
         inst.on('cellChange', (e) => emit('cellChange', e)),
         inst.on('selectionChange', (e) => emit('selectionChange', e)),
         inst.on('workbookChange', (e) => emit('workbookChange', e)),
-        inst.on('localeChange', (e) => emit('localeChange', e)),
+        inst.on('localeChange', notifyLocaleChange),
         inst.on('themeChange', (e) => emit('themeChange', e)),
         inst.on('recalc', (e) => emit('recalc', e)),
       );
-      await applyRuntimeProps(inst, props, mountedWith);
+      try {
+        await applyRuntimeProps(
+          inst,
+          props,
+          mountedWith,
+          notifyLocaleChange,
+          (error) => emit('error', error),
+          getLocaleEventGeneration,
+        );
+      } catch (error) {
+        // Runtime prop reconciliation can fail while the already-mounted
+        // instance remains usable. Keep it live and let the specific
+        // reconciliation path report its cause through `error`.
+        if (!disposed) emit('error', error);
+      }
       if (disposed) return;
       emit('ready', inst);
     });
@@ -274,7 +344,18 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
     watch(
       () => props.locale,
       (next) => {
-        if (next && instance.value) instance.value.i18n.setLocale(next);
+        if (next && instance.value) {
+          const accepted = applyLocale(
+            instance.value,
+            next,
+            notifyLocaleChange,
+            (error) => emit('error', error),
+            getLocaleEventGeneration,
+          );
+          if (accepted && props.strings) {
+            instance.value.i18n.extend(instance.value.i18n.locale, props.strings);
+          }
+        }
       },
     );
     watch(
@@ -287,8 +368,11 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
     watch(
       () => props.workbook,
       (next) => {
-        if (next && instance.value && next !== instance.value.workbook) {
-          void instance.value.setWorkbook(next);
+        const inst = instance.value;
+        if (next && inst && next !== inst.workbook) {
+          void inst.setWorkbook(next).catch((error: unknown) => {
+            if (!disposed && instance.value === inst) emit('error', error);
+          });
         }
       },
     );

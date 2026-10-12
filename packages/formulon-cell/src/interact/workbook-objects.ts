@@ -10,6 +10,7 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogIconButton } from './dialog-shell.js';
 import { compatibilityLabelKey } from './spreadsheet-compatibility-report.js';
 import { createWorkbookObjectsActionButton, pivotEditField } from './workbook-objects-dom.js';
@@ -151,6 +152,8 @@ export function attachWorkbookObjectsPanel(
     li: HTMLLIElement,
     illustration: SessionIllustration,
   ): void => {
+    const readOnly =
+      illustration.nativeObjectId !== undefined && illustration.nativeGeometryEditable !== true;
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions fc-objects__illustration-actions';
     const select = createWorkbookObjectsActionButton(strings.workbookObjects.objectSelect);
@@ -158,6 +161,11 @@ export function attachWorkbookObjectsPanel(
     actions.appendChild(select);
     if (deps.onDuplicateSessionIllustration) {
       const duplicate = createWorkbookObjectsActionButton(strings.workbookObjects.objectDuplicate);
+      projectDisabledState(
+        duplicate,
+        readOnly,
+        strings.workbookObjects.compatibilityDetails.images,
+      );
       duplicate.addEventListener('click', () =>
         deps.onDuplicateSessionIllustration?.(illustration.id),
       );
@@ -165,6 +173,7 @@ export function attachWorkbookObjectsPanel(
     }
     if (deps.onClearSessionIllustration) {
       const remove = createWorkbookObjectsActionButton(strings.workbookObjects.objectDelete);
+      projectDisabledState(remove, readOnly, strings.workbookObjects.compatibilityDetails.images);
       remove.addEventListener('click', () => deps.onClearSessionIllustration?.(illustration.id));
       actions.appendChild(remove);
     }

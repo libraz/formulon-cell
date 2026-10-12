@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { executeRibbonFormulaAuditingAction } from '../../../src/commands/ribbon-formula-auditing.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const strings = { errorChecking: 'Error Checking' };
@@ -139,5 +139,55 @@ describe('executeRibbonFormulaAuditingAction', () => {
 
     expect(history.undo()).toBe(true);
     expect([...store.getState().errorIndicators.validationCircles]).toEqual(['0:0:0', '0:1:0']);
+  });
+
+  it('uses the native invalid-cell pager for the selected range when available', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const store = createSpreadsheetStore();
+    const history = new History();
+    try {
+      expect(wb.capabilities.validationEvaluation).toBe(true);
+      expect(
+        wb.addValidationEntry(0, {
+          ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }],
+          type: 1,
+          op: 0,
+          formula1: '1',
+          formula2: '10',
+        }),
+      ).toBe(true);
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 99);
+      wb.setNumber({ sheet: 0, row: 0, col: 1 }, 5);
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        {
+          validation: { kind: 'whole', op: 'between', a: 1, b: 10 },
+        },
+      );
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 1 },
+        {
+          validation: { kind: 'whole', op: 'between', a: 1, b: 10 },
+        },
+      );
+      mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 99 });
+      mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'number', value: 5 });
+
+      expect(
+        executeRibbonFormulaAuditingAction({
+          store,
+          workbook: wb,
+          history,
+          action: 'circleInvalid',
+          strings,
+        }),
+      ).toEqual({ kind: 'mutated' });
+      expect([...store.getState().errorIndicators.validationCircles]).toEqual(['0:0:0']);
+    } finally {
+      wb.dispose();
+    }
   });
 });

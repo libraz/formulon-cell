@@ -6,9 +6,10 @@ import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
 import { hiddenInSelection } from '../commands/row-col-layout.js';
-import type { Strings } from '../i18n/strings.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../engine/font-units.js';
+import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount.js';
-import { formatWithPending } from '../store/pending-format.js';
 import { rangesIntersect } from '../store/selection-geometry.js';
 import type {
   CellBorderStyle,
@@ -152,6 +153,30 @@ export const indexRibbonButtons = (host: HTMLElement): Map<string, HTMLButtonEle
     else index.set(command, [button]);
   }
   return index;
+};
+
+/**
+ * Labels resolved by the toolbar owner.  The optional form keeps the
+ * projection usable by existing embedders while allowing a toolbar with an
+ * explicit `lang`/`text`/menu-text override to provide the exact strings it
+ * rendered.  In the absence of these values, the current button metadata is
+ * used before falling back to the instance dictionary.
+ */
+export interface RibbonActiveStateText {
+  background?: string;
+  sheetBackgroundClear?: string;
+}
+
+const builtInLocaleForBackground = (label: string): Locale | undefined => {
+  for (const [locale, strings] of Object.entries(dictionaries) as [Locale, Strings][]) {
+    if (strings.ribbon.background === label) return locale;
+  }
+  return undefined;
+};
+
+const localeFromHostLang = (host: HTMLElement): Locale | undefined => {
+  const language = host.lang.trim().toLowerCase().split('-', 1)[0] ?? '';
+  return Object.hasOwn(dictionaries, language) ? (language as Locale) : undefined;
 };
 
 export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = new Map([
@@ -327,7 +352,10 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
   const formatAddr = activeMerge
     ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
     : a;
-  const f = formatWithPending(s, formatAddr);
+  const f = effectiveCellFormatWithPending(inst.workbook, s, formatAddr);
+  const displayFont = inst.workbook.workbookDisplayFont;
+  const displayFamily = displayFont?.name ?? 'Aptos';
+  const displaySize = displayFont ? fontPointsToCssPx(displayFont.size) : 11;
   const hasConditionalFormatting = s.conditional.rules.some((rule) =>
     rangesIntersect(r, rule.range),
   );
@@ -372,8 +400,9 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     zoom: s.viewport.zoom,
     formatPainterArmed: !!inst.formatPainter?.isActive(),
     hasComment: commentAt(s, a) != null,
-    fontFamily: f?.fontFamily ?? 'Aptos',
-    fontSize: f?.fontSize ?? 11,
+    fontFamily: f?.fontFamily ?? displayFamily,
+    // CellFormat stores CSS pixels for paint; Excel's ribbon exposes points.
+    fontSize: fontCssPxToDisplayPoints(f?.fontSize ?? displaySize),
     fontColor: f?.color ?? '#201f1e',
     fillColor: f?.fill ?? '#ffffff',
     pageOrientation: setup.orientation,
@@ -399,9 +428,35 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
 export const projectRibbonActiveState = (
   host: HTMLElement,
   instance: SpreadsheetInstance | null,
+  text: RibbonActiveStateText = {},
 ): void => {
   if (!instance) return;
   const active = projectActiveState(instance);
+  for (const control of host.querySelectorAll<HTMLElement>('[data-ribbon-select]')) {
+    const EventCtor = host.ownerDocument.defaultView?.Event ?? Event;
+    control.dispatchEvent(new EventCtor('fc-ribbon-control-refresh'));
+
+    // The font family field intentionally truncates inside its Excel-sized
+    // input. Keep the complete rendered family available to assistive tech
+    // and the native hover tooltip even when the visible value is ellipsized.
+    if (control.dataset.ribbonSelect === 'fontFamily') {
+      const button = control.querySelector<HTMLButtonElement>('.fc-tb__rb-dd__btn');
+      const value = control.querySelector<HTMLElement>('.fc-tb__rb-dd__value');
+      const renderedValue = value?.textContent?.trim();
+      if (button && renderedValue) {
+        const baseLabel =
+          button.dataset.fcRibbonControlLabel ??
+          button.getAttribute('aria-label') ??
+          button.getAttribute('title') ??
+          '';
+        button.dataset.fcRibbonControlLabel = baseLabel;
+        const fullLabel = baseLabel ? `${baseLabel}: ${renderedValue}` : renderedValue;
+        button.setAttribute('title', fullLabel);
+        button.setAttribute('aria-label', fullLabel);
+        value?.setAttribute('title', renderedValue);
+      }
+    }
+  }
   const buttons = indexRibbonButtons(host);
   for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
     const button = buttons.get(command)?.[0];
@@ -421,9 +476,25 @@ export const projectRibbonActiveState = (
   if (sheetBackground) {
     const state = instance.store.getState();
     const hasBackground = state.ui.sheetBackgroundImages.has(state.data.sheetIndex);
-    const label = hasBackground
-      ? instance.i18n.strings.ribbonMenu.sheetBackgroundClear
-      : instance.i18n.strings.ribbon.background;
+    // Use the resolved toolbar text first. This keeps an explicit toolbar
+    // language/text override intact even when the instance locale differs.
+    // Otherwise use the label produced by the current ribbon render.
+    const renderedLabel =
+      sheetBackground.querySelector('span')?.textContent?.trim() ||
+      sheetBackground.getAttribute('aria-label')?.trim() ||
+      sheetBackground.title.trim();
+    const baseLabel =
+      text.background?.trim() ||
+      (!hasBackground ? renderedLabel : '') ||
+      instance.i18n.strings.ribbon.background;
+    const inferredLocale = builtInLocaleForBackground(baseLabel);
+    const hostLocale = localeFromHostLang(host);
+    const resolvedClearLabel =
+      text.sheetBackgroundClear?.trim() ||
+      (inferredLocale ? dictionaries[inferredLocale].ribbonMenu.sheetBackgroundClear : '') ||
+      (hostLocale ? dictionaries[hostLocale].ribbonMenu.sheetBackgroundClear : '') ||
+      instance.i18n.strings.ribbonMenu.sheetBackgroundClear;
+    const label = hasBackground ? resolvedClearLabel : baseLabel;
     sheetBackground.title = label;
     sheetBackground.setAttribute('aria-label', label);
     const labelEl = sheetBackground.querySelector('span');

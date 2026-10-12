@@ -1,3 +1,4 @@
+import type { Locale } from '../../i18n/strings.js';
 // Ribbon control dispatch extracted from main.ts. Owns the read/write side of
 // the ribbon: reading the current value of a control from the active cell or
 // page setup, and applying a control change (font, fill, number format,
@@ -24,6 +25,7 @@ import {
   recordPageSetupChange,
   recordRepeatableFormatChange,
 } from '../../commands/slice-history.js';
+import { fontPointsToCssPx } from '../../engine/font-units.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup, mutators } from '../../store/store.js';
 import type { NumFmt, PageOrientation, PaperSize } from '../../store/types.js';
@@ -46,7 +48,7 @@ export type RibbonFormatMutator = (
 
 export interface ControlDispatchCtx {
   getInst: () => SpreadsheetInstance | null;
-  ribbonLang: 'ja' | 'en';
+  ribbonLang: Locale;
   ribbonText: ToolbarText;
   pageScaleText: PageScaleMenuText;
   sheetEl: HTMLElement;
@@ -94,17 +96,9 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     return svg;
   };
 
-  const activeCellFormat = () => {
-    const inst = getInst();
-    if (!inst) return null;
-    const s = inst.store.getState();
-    const a = s.selection.active;
-    return s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`) ?? null;
-  };
-
   const currentRibbonControlValue = (id: string): string => {
     const inst = getInst();
-    const f = activeCellFormat();
+    const active = inst ? projectActiveState(inst) : null;
     const pageSetup =
       inst &&
       (id === 'marginsPreset' ||
@@ -115,10 +109,10 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
         id === 'scalePercent')
         ? getPageSetup(inst.store.getState(), inst.store.getState().data.sheetIndex)
         : null;
-    if (id === 'fontFamily') return f?.fontFamily ?? ribbonText.defaultFontFamily;
-    if (id === 'fontSize') return String(f?.fontSize ?? ribbonText.defaultFontSize);
-    if (id === 'fontColor') return f?.color ?? '#201f1e';
-    if (id === 'fillColor') return f?.fill ?? '#ffffff';
+    if (id === 'fontFamily') return active?.fontFamily ?? ribbonText.defaultFontFamily;
+    if (id === 'fontSize') return String(active?.fontSize ?? ribbonText.defaultFontSize);
+    if (id === 'fontColor') return active?.fontColor ?? '#201f1e';
+    if (id === 'fillColor') return active?.fillColor ?? '#ffffff';
     if (id === 'numberFormat') return inst ? projectActiveState(inst).numberFormat : 'general';
     if (id === 'merge') {
       if (!inst) return 'mergeCenter';
@@ -176,6 +170,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
         ? (setup.fitWidth ?? 1)
         : (setup.fitHeight ?? 1);
     const n = await showPageScaleDialog({
+      locale: () => i.locale,
       title: isScale
         ? ribbonText.scale
         : id === 'scaleWidth'
@@ -237,7 +232,12 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     if (id === 'fontFamily') {
       applyRibbonFormat((state, store) => setFont(state, store, { fontFamily: value }), id);
     } else if (id === 'fontSize') {
-      applyRibbonFormat((state, store) => setFont(state, store, { fontSize: Number(value) }), id);
+      const points = Number(value);
+      if (!Number.isFinite(points) || points <= 0) return;
+      applyRibbonFormat(
+        (state, store) => setFont(state, store, { fontSize: fontPointsToCssPx(points) }),
+        id,
+      );
     } else if (id === 'fontColor') {
       applyRibbonFormat((state, store) => setFontColor(state, store, value), id);
     } else if (id === 'fillColor') {

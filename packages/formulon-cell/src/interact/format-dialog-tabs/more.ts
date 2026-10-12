@@ -138,7 +138,10 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   const validationALabel = document.createElement('span');
   validationALabel.textContent = t.validationValueA;
   const validationAInput = document.createElement('input');
-  validationAInput.type = 'number';
+  // Numeric bounds use the workbook input grammar; the controller switches
+  // date/time kinds to their invariant native controls when needed.
+  validationAInput.type = 'text';
+  validationAInput.inputMode = 'numeric';
   validationAInput.setAttribute('aria-label', t.validationValueA);
   validationAInput.step = 'any';
   validationARow.append(validationALabel, validationAInput);
@@ -149,7 +152,8 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   const validationBLabel = document.createElement('span');
   validationBLabel.textContent = t.validationValueB;
   const validationBInput = document.createElement('input');
-  validationBInput.type = 'number';
+  validationBInput.type = 'text';
+  validationBInput.inputMode = 'numeric';
   validationBInput.setAttribute('aria-label', t.validationValueB);
   validationBInput.step = 'any';
   validationBRow.append(validationBLabel, validationBInput);

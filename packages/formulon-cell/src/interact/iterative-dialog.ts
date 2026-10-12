@@ -1,3 +1,5 @@
+import { inputLocaleForWorkbook, parseLocalizedNumericInput } from '../commands/coerce-input.js';
+import { formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -8,6 +10,8 @@ export interface IterativeDialogDeps {
   /** Lazy workbook accessor — keeps the dialog in lockstep with `setWorkbook`
    *  swaps so flipping the iterative mode always targets the live engine. */
   getWb: () => WorkbookHandle | null;
+  /** Live input locale. Defaults to the canonical English grammar. */
+  getLocale?: () => string;
   strings?: Strings;
 }
 
@@ -34,6 +38,12 @@ const DEFAULTS: IterativeSettings = { enabled: false, maxIterations: 100, maxCha
  */
 export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialogHandle {
   const { host, getWb } = deps;
+  const getLocale = (): string => {
+    const workbook = getWb();
+    return (
+      deps.getLocale?.() ?? (workbook ? inputLocaleForWorkbook(workbook) : undefined) ?? 'en-US'
+    );
+  };
   const strings = deps.strings ?? defaultStrings;
   const t = strings.iterativeDialog;
 
@@ -83,6 +93,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   maxChangeLabel.textContent = t.maxChange;
   const maxChangeInput = document.createElement('input');
   maxChangeInput.type = 'text';
+  maxChangeInput.inputMode = 'decimal';
   maxChangeInput.spellcheck = false;
   maxChangeInput.autocomplete = 'off';
   maxChangeRow.append(maxChangeLabel, maxChangeInput);
@@ -99,11 +110,14 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   });
 
   const draft: IterativeSettings = { ...DEFAULTS };
+  let invalidMaxIterations = false;
+  let invalidMaxChange = false;
 
   const syncControls = (): void => {
     enableInput.checked = draft.enabled;
-    maxIterInput.value = String(draft.maxIterations);
-    maxChangeInput.value = String(draft.maxChange);
+    if (!invalidMaxIterations) maxIterInput.value = String(draft.maxIterations);
+    if (!invalidMaxChange)
+      maxChangeInput.value = formatEditableNumber(draft.maxChange, getLocale());
     const disabled = !draft.enabled;
     const reason = disabled ? t.inputsRequireEnabled : null;
     projectDisabledState(maxIterInput, disabled, reason, {
@@ -121,15 +135,27 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     syncControls();
   };
   const onIter = (): void => {
-    const n = Number.parseInt(maxIterInput.value, 10);
-    if (Number.isFinite(n)) draft.maxIterations = Math.max(1, Math.min(32767, n));
+    const n = parseLocalizedNumericInput(maxIterInput.value, getLocale());
+    invalidMaxIterations = n === null || !Number.isInteger(n);
+    maxIterInput.setCustomValidity(invalidMaxIterations ? 'invalid' : '');
+    if (n !== null && !invalidMaxIterations) {
+      draft.maxIterations = Math.max(1, Math.min(32767, n));
+    }
   };
   const onChange = (): void => {
-    const n = Number.parseFloat(maxChangeInput.value);
-    if (Number.isFinite(n) && n > 0) draft.maxChange = n;
+    const n = parseLocalizedNumericInput(maxChangeInput.value, getLocale());
+    invalidMaxChange = n === null || n <= 0;
+    maxChangeInput.setCustomValidity(invalidMaxChange ? 'invalid' : '');
+    if (n !== null && !invalidMaxChange) draft.maxChange = n;
   };
 
   const onOk = (): void => {
+    if (invalidMaxIterations || invalidMaxChange) {
+      const invalid = invalidMaxIterations ? maxIterInput : maxChangeInput;
+      invalid.setCustomValidity('invalid');
+      invalid.focus();
+      return;
+    }
     const wb = getWb();
     if (!wb) {
       api.close();
@@ -179,6 +205,8 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     if (!workbook || typeof workbook.getIterative !== 'function') return;
     const settings = workbook.getIterative();
     if (!settings) return;
+    invalidMaxIterations = false;
+    invalidMaxChange = false;
     draft.enabled = settings.enabled;
     if (settings.maxIterations > 0) draft.maxIterations = settings.maxIterations;
     if (settings.maxChange > 0) draft.maxChange = settings.maxChange;
@@ -187,6 +215,10 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   const api: IterativeDialogHandle = {
     open(): void {
       status.textContent = '';
+      invalidMaxIterations = false;
+      invalidMaxChange = false;
+      maxIterInput.setCustomValidity('');
+      maxChangeInput.setCustomValidity('');
       refreshFromWorkbook();
       syncControls();
       shell.open();

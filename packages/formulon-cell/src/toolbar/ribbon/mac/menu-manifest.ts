@@ -37,6 +37,9 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.insert.chartScatter',
   'mac.draw.eraser',
   'mac.draw.add',
+  'mac.page.theme',
+  'mac.page.color',
+  'mac.page.font',
   'mac.page.margins',
   'mac.page.orientation',
   'mac.page.size',
@@ -140,6 +143,18 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     leaf('mac.draw.penRed', 'penRed'),
     leaf('mac.draw.pencil', 'pencil'),
     leaf('mac.draw.highlighter', 'highlighter'),
+  ]),
+  'mac.page.theme': menu([
+    { id: 'mac.page.theme.office', label: 'Office', labelJa: 'Office' },
+    { id: 'mac.page.theme.gray', label: 'Grayscale', labelJa: 'グレースケール' },
+  ]),
+  'mac.page.color': menu([
+    { id: 'mac.page.color.office', label: 'Office', labelJa: 'Office' },
+    { id: 'mac.page.color.gray', label: 'Grayscale', labelJa: 'グレースケール' },
+  ]),
+  'mac.page.font': menu([
+    { id: 'mac.page.font.office', label: 'Office', labelJa: 'Office' },
+    { id: 'mac.page.font.gray', label: 'Grayscale', labelJa: 'グレースケール' },
   ]),
   'mac.page.margins': menu([
     { id: 'mac.page.margins.normal', label: 'Normal' },
@@ -293,6 +308,9 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.insert.chartScatter': 'menu-mac-insert-chart-scatter',
     'mac.draw.eraser': 'menu-mac-draw-eraser',
     'mac.draw.add': 'menu-mac-draw-add',
+    'mac.page.theme': 'menu-mac-page-theme',
+    'mac.page.color': 'menu-mac-page-color',
+    'mac.page.font': 'menu-mac-page-font',
     'mac.page.margins': 'menu-mac-page-margins',
     'mac.page.orientation': 'menu-mac-page-orientation',
     'mac.page.size': 'menu-mac-page-size',

@@ -1,6 +1,7 @@
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { CellFormat } from '../store/store.js';
 import type { ConditionalRule, ConditionalScalePoint } from '../store/types.js';
+import { formatA1Cell } from './address.js';
 import {
   borderRecordFromFormat,
   cssColorToArgb,
@@ -87,6 +88,33 @@ const sqrefOf = (rule: ConditionalRule): ConditionalFormatInput['sqref'] => [
     lastCol: rule.range.c1,
   },
 ];
+
+/** Encode a text-contains operand as an Excel formula string literal. */
+const formulaTextLiteral = (text: string): string => `"${text.replaceAll('"', '""')}"`;
+
+/**
+ * Build the case-sensitive equivalent of the native contains-text predicates.
+ * The engine's containsText family has no case-sensitive flag, so these rules
+ * are authored as expression rules instead. The top-left cell is deliberately
+ * left relative; the CF evaluator shifts it across the authored range.
+ */
+function caseSensitiveTextFormula(
+  rule: Extract<ConditionalRule, { kind: 'text-contains' }>,
+): string | null {
+  if (rule.text.length === 0) return null;
+  const text = formulaTextLiteral(rule.text);
+  const anchor = formatA1Cell(rule.range.r0, rule.range.c0);
+  switch (rule.mode) {
+    case 'not-contains':
+      return `NOT(ISNUMBER(FIND(${text},${anchor})))`;
+    case 'begins-with':
+      return `EXACT(LEFT(${anchor},LEN(${text})),${text})`;
+    case 'ends-with':
+      return `EXACT(RIGHT(${anchor},LEN(${text})),${text})`;
+    default:
+      return `ISNUMBER(FIND(${text},${anchor}))`;
+  }
+}
 
 const conditionalFormatKey = (sheet: number, input: ConditionalFormatInput): string =>
   JSON.stringify([sheet, input]);
@@ -302,7 +330,14 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
       if (!rule.formula.startsWith('=')) return null;
       return { sqref, type: RULE_TYPE.expression, formula1: rule.formula.slice(1) };
     }
-    case 'text-contains':
+    case 'text-contains': {
+      if (rule.caseSensitive === true) {
+        const formula1 = caseSensitiveTextFormula(rule);
+        // An empty local needle is intentionally a no-match predicate. Leave
+        // it local rather than asking the engine to interpret an empty FIND.
+        if (formula1 === null) return null;
+        return { sqref, type: RULE_TYPE.expression, formula1 };
+      }
       return {
         sqref,
         type:
@@ -315,6 +350,7 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
                 : RULE_TYPE.containsText,
         text: rule.text,
       };
+    }
     case 'duplicates':
       return { sqref, type: RULE_TYPE.duplicateValues };
     case 'unique':

@@ -85,6 +85,123 @@ describe('attachEvaluateFormulaDialog', () => {
     handle.detach();
   });
 
+  it('localizes formula displays after canonical reference substitution', () => {
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setCell(store, addr, { kind: 'number', value: 3.5 }, '=SUM(A2,B2)');
+    const wb = {
+      cellFormula: vi.fn(() => '=SUM(A2,B2)'),
+      getValue: vi.fn((a) => {
+        if (a.row === 1 && a.col === 0) return { kind: 'number', value: 1.5 };
+        if (a.row === 1 && a.col === 1) return { kind: 'number', value: 2 };
+        return { kind: 'number', value: 3.5 };
+      }),
+      getFormulaForDisplay: vi.fn((formula: string) =>
+        formula.replace('SUM', 'SUMME').replaceAll(',', ';').replaceAll('.', ','),
+      ),
+      getDisplayText: vi.fn(() => '3,5'),
+    } as unknown as WorkbookHandle;
+
+    const handle = attachEvaluateFormulaDialog({
+      host,
+      store,
+      getWb: () => wb,
+      getLocale: () => 'de-DE',
+      strings: en,
+    });
+    handle.open();
+
+    expect(boxes()[0]?.textContent).toBe('=SUMME(A2;B2)');
+    expect(boxes()[1]?.textContent).toBe('=SUMME(A2;B2)');
+    expect(boxes()[2]?.textContent).toBe('3,5');
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=SUMME(1,5;B2)');
+    expect(wb.cellFormula(addr)).toBe('=SUM(A2,B2)');
+    handle.detach();
+  });
+
+  it('reads qualified references from their own sheets with canonical literals', () => {
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setCell(store, addr, { kind: 'number', value: 1235 }, "='Data Sheet'!A1+Sheet3!A1");
+    const getValue = vi.fn((a: { sheet: number; row: number; col: number }) => {
+      if (a.sheet === 1) return { kind: 'number', value: 1234 };
+      if (a.sheet === 2) return { kind: 'bool', value: true };
+      return { kind: 'number', value: 1235 };
+    });
+    const wb = {
+      cellFormula: vi.fn(() => "='Data Sheet'!A1+Sheet3!A1"),
+      getValue,
+      sheetCount: 3,
+      sheetName: (sheet: number) => ['Sheet1', 'Data Sheet', 'Sheet3'][sheet] ?? '',
+      getFormulaForDisplay: (formula: string) => formula,
+      getDisplayText: () => '1235',
+    } as unknown as WorkbookHandle;
+
+    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    handle.open();
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=1234+Sheet3!A1');
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=1234+TRUE');
+    expect(getValue).toHaveBeenCalledWith({ sheet: 1, row: 0, col: 0 });
+    expect(getValue).toHaveBeenCalledWith({ sheet: 2, row: 0, col: 0 });
+    handle.detach();
+  });
+
+  it('substitutes every occurrence of a stepped repeated reference', () => {
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setCell(store, addr, { kind: 'number', value: 2468 }, '=A1+A1+B1');
+    const wb = {
+      cellFormula: vi.fn(() => '=A1+A1+B1'),
+      getValue: vi.fn((a) =>
+        a.col === 0 ? { kind: 'number', value: 1234 } : { kind: 'number', value: 5 },
+      ),
+      getFormulaForDisplay: (formula: string) => formula,
+      getDisplayText: () => '2468',
+    } as unknown as WorkbookHandle;
+
+    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    handle.open();
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=1234+1234+B1');
+    expect(evalButton()?.disabled).toBe(false);
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=1234+1234+5');
+    expect(evalButton()?.disabled).toBe(true);
+    handle.detach();
+  });
+
+  it('substitutes repeated qualified references from a non-active sheet together', () => {
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setCell(store, addr, { kind: 'number', value: 20 }, '=Data!A1+Data!A1');
+    const getValue = vi.fn((a: { sheet: number; row: number; col: number }) =>
+      a.sheet === 1 ? { kind: 'number', value: 10 } : { kind: 'number', value: 20 },
+    );
+    const wb = {
+      cellFormula: vi.fn(() => '=Data!A1+Data!A1'),
+      getValue,
+      sheetCount: 2,
+      sheetName: (sheet: number) => ['Sheet1', 'Data'][sheet] ?? '',
+      getFormulaForDisplay: (formula: string) => formula,
+      getDisplayText: () => '20',
+    } as unknown as WorkbookHandle;
+
+    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    handle.open();
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=10+10');
+    expect(evalButton()?.disabled).toBe(true);
+    expect(getValue).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
   it('disables Evaluate with a reason when the formula has no references', () => {
     const store = createSpreadsheetStore();
     const addr = { sheet: 0, row: 0, col: 0 };

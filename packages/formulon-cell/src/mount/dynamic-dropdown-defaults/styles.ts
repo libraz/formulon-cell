@@ -18,6 +18,7 @@ import {
   tableVariantFromOptions,
 } from '../../commands/format-as-table.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
+import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import {
   addConditionalRule,
   type ConditionalRule,
@@ -104,12 +105,13 @@ const buildConditionalMenuAction =
     await applyConditionalMenuAction(
       {
         inst: instance,
-        ribbonLang: instance.i18n.locale === 'ja' ? 'ja' : 'en',
+        ribbonLang: dictionaryLocaleFor(instance.i18n.locale),
         range: normalizedSelectionRange(instance),
         cfFill: { fill: '#ffc7ce', color: '#9c0006' },
         promptCfNumber: (spec) =>
           showConditionalFormatNumberDialog({
             ...spec,
+            locale: instance.locale,
             strings: conditionalDialogStrings,
           }),
         promptCfText: (spec) =>

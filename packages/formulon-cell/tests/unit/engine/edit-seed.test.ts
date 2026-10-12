@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { formatCellForEdit } from '../../../src/engine/edit-seed.js';
+import { describe, expect, it, vi } from 'vitest';
+import { formatCellForEdit, formulaForEdit } from '../../../src/engine/edit-seed.js';
 import type { Addr, CellValue } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
@@ -65,6 +65,39 @@ describe('formatCellForEdit', () => {
     );
   });
 
+  it('renders editable numbers and booleans with the active input locale', () => {
+    expect(
+      formatCellForEdit(
+        { value: { kind: 'number', value: 1.5 }, formula: null },
+        undefined,
+        undefined,
+        {
+          locale: 'de-DE',
+        },
+      ),
+    ).toBe('1,5');
+    expect(
+      formatCellForEdit(
+        { value: { kind: 'bool', value: true }, formula: null },
+        undefined,
+        undefined,
+        {
+          locale: 'de-DE',
+        },
+      ),
+    ).toBe('WAHR');
+    expect(
+      formatCellForEdit(
+        { value: { kind: 'bool', value: true }, formula: null },
+        undefined,
+        undefined,
+        {
+          locale: 'fr-FR',
+        },
+      ),
+    ).toBe('VRAI');
+  });
+
   it('renders text values verbatim', () => {
     expect(formatCellForEdit({ value: text('hello'), formula: null })).toBe('hello');
   });
@@ -103,5 +136,21 @@ describe('formatCellForEdit', () => {
     expect(
       formatCellForEdit({ value: num(7), formula: null }, wb, { sheet: 0, row: 0, col: 0 }),
     ).toBe('7');
+  });
+});
+
+describe('formulaForEdit', () => {
+  it('resolves native R1C1 references before full formula localization', () => {
+    const getFormulaForDisplay = vi.fn((formula: string) => `localized:${formula}`);
+    const wb = {
+      capabilities: { formulaR1C1: true },
+      sheetCount: 1,
+      cellFormulaR1C1: vi.fn(() => '=SUM(R[-2]C[-2],R2C2)'),
+      getFormulaForDisplay,
+    } as unknown as WorkbookHandle;
+    const addr = { sheet: 0, row: 2, col: 2 };
+
+    expect(formulaForEdit(wb, addr, '=SUM(A1,$B$2)', true)).toBe('localized:=SUM(R[-2]C[-2],R2C2)');
+    expect(getFormulaForDisplay).toHaveBeenCalledWith('=SUM(R[-2]C[-2],R2C2)');
   });
 });

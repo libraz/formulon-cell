@@ -1,4 +1,7 @@
+import type { PaginationPage, PaginationResult } from '@libraz/formulon';
 import { colLetter, formatA1Cell, parseAddrKey } from '../engine/address.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { numFmtToFormatCode } from '../engine/format-writeback.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
 //
@@ -15,6 +18,8 @@ import type { CellValue } from '../engine/types.js';
 // browser's print pipeline is the entire export path.
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { cellFontFamily } from '../render/painters/text.js';
+import { formatWithPending } from '../store/pending-format.js';
 import {
   type CellFormat,
   defaultPageSetup,
@@ -31,6 +36,7 @@ import {
   printColumnsForRegion,
   splitPrintRegionIntoTiles,
 } from './page-geometry.js';
+import { paginationFor } from './pagination.js';
 import {
   orderPrintRegionsForPageOrder,
   type PrintAreaBounds,
@@ -78,6 +84,25 @@ export interface PrintSheetOptions {
   printerProfileId?: string;
 }
 
+/** Refuse a print request before it can allocate a sheet-sized HTML table. */
+export const MAX_PRINT_MATERIALIZED_CELLS = 1_000_000;
+/** Keep the number of table sections bounded even when each section is sparse. */
+export const MAX_PRINT_GENERATED_PAGES = 10_000;
+
+export class PrintResourceLimitError extends Error {
+  readonly code = 'PRINT_RESOURCE_LIMIT';
+
+  constructor(
+    public readonly cellCount: number,
+    public readonly limit = MAX_PRINT_MATERIALIZED_CELLS,
+  ) {
+    super(
+      `Print range contains ${cellCount.toLocaleString()} cells; reduce the print area below ${limit.toLocaleString()} cells and try again.`,
+    );
+    this.name = 'PrintResourceLimitError';
+  }
+}
+
 const escapeHtml = (s: string): string =>
   s
     .replace(/&/g, '&amp;')
@@ -86,6 +111,58 @@ const escapeHtml = (s: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const splitFontFamily = (family: string): string[] => {
+  const parts: string[] = [];
+  let start = 0;
+  let quote = '';
+  let depth = 0;
+  for (let i = 0; i < family.length; i += 1) {
+    const ch = family[i] ?? '';
+    if (quote) {
+      if (ch === quote && family[i - 1] !== '\\') quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '(') depth += 1;
+    else if (ch === ')' && depth > 0) depth -= 1;
+    else if (ch === ',' && depth === 0) {
+      parts.push(family.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(family.slice(start).trim());
+  return parts.filter(Boolean);
+};
+
+/** Escape a dynamic value for a CSS string. `<` and `>` are escaped even
+ * inside quotes because the complete stylesheet is an HTML raw-text node. */
+const cssString = (value: string): string =>
+  `"${value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replace(/\r\n?|\n/g, '\\A ')
+    .replaceAll('&', '\\26 ')
+    .replaceAll('<', '\\3C ')
+    .replaceAll('>', '\\3E ')}"`;
+
+const safeFontFamily = (family: string): string =>
+  splitFontFamily(family)
+    .map((part) => {
+      const unquoted =
+        part.length >= 2 &&
+        ((part.startsWith('"') && part.endsWith('"')) ||
+          (part.startsWith("'") && part.endsWith("'")))
+          ? part.slice(1, -1)
+          : part;
+      return /^[a-zA-Z][a-zA-Z0-9-]*$/.test(unquoted) ? unquoted : cssString(unquoted);
+    })
+    .join(', ');
+
+const PRINT_FONT_FALLBACK = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
 const cellDisplay = (
   value: CellValue,
   formula: string | null,
@@ -93,14 +170,21 @@ const cellDisplay = (
   addr?: { row: number; col: number },
   r1c1 = false,
   cellErrorsAs: PrintCellErrorsMode = 'displayed',
+  nativeR1C1Formula?: string | null,
+  nativeDisplay?: string | null,
+  format?: CellFormat,
 ): string => {
-  if (showFormulas && formula) return r1c1 && addr ? formatA1FormulaAsR1C1(formula, addr) : formula;
-  if (value.kind === 'blank') return '';
+  if (showFormulas && formula) {
+    if (!r1c1) return formula;
+    return nativeR1C1Formula ?? (addr ? formatA1FormulaAsR1C1(formula, addr) : formula);
+  }
+  if (value.kind === 'blank') return format?.hyperlinkDisplay ?? '';
   if (value.kind === 'error') {
     if (cellErrorsAs === 'blank') return '';
     if (cellErrorsAs === 'dash') return '--';
     if (cellErrorsAs === 'na') return '#N/A';
   }
+  if (nativeDisplay !== null && nativeDisplay !== undefined) return nativeDisplay;
   return formatCell(value);
 };
 
@@ -159,11 +243,12 @@ function inlineCellStyle(
   value: CellValue,
   showGridlines: boolean,
   blackAndWhite: boolean,
+  scale = 1,
 ): string {
   const parts: string[] = [];
   if (showGridlines) {
     // Default hairline grid for unformatted cells. Per-side overrides below.
-    parts.push('border:1px solid #c8c8c8');
+    parts.push(`border:${scale}px solid #c8c8c8`);
   }
   if (!fmt) return parts.join(';');
   if (fmt.bold) parts.push('font-weight:600');
@@ -192,7 +277,7 @@ function inlineCellStyle(
   if (fmt.wrap) parts.push('white-space:pre-wrap');
   else parts.push('white-space:nowrap');
   if (typeof fmt.indent === 'number' && fmt.indent > 0) {
-    parts.push(`padding-left:${4 + fmt.indent * 8}px`);
+    parts.push(`padding-left:${(4 + fmt.indent * 8) * scale}px`);
   }
   if (typeof fmt.rotation === 'number' && fmt.rotation !== 0) {
     parts.push(`transform:rotate(${-fmt.rotation}deg);transform-origin:center`);
@@ -211,32 +296,44 @@ function inlineCellStyle(
     const image = fillPatternCss(fmt.fillPattern, fmt.fillPatternColor);
     if (image) parts.push(`background-image:${image}`);
     if (fmt.fillPattern === 'gray125' || fmt.fillPattern === 'gray25') {
-      parts.push('background-size:4px 4px');
+      parts.push(`background-size:${4 * scale}px ${4 * scale}px`);
     }
   }
-  if (fmt.fontFamily) parts.push(`font-family:${fmt.fontFamily}`);
-  if (typeof fmt.fontSize === 'number') parts.push(`font-size:${fmt.fontSize}px`);
+  if (fmt.fontFamily) {
+    parts.push(
+      `font-family:${safeFontFamily(cellFontFamily(fmt.fontFamily, PRINT_FONT_FALLBACK))}`,
+    );
+  }
+  if (typeof fmt.fontSize === 'number') parts.push(`font-size:${fmt.fontSize * scale}px`);
   if (fmt.borders) {
     const sideToCss = (side: 'top' | 'right' | 'bottom' | 'left'): void => {
       const b = fmt.borders?.[side];
       if (!b) return;
       if (b === true) {
-        parts.push(`border-${side}:1px solid #000`);
+        parts.push(`border-${side}:${scale}px solid #000`);
         return;
       }
-      const style =
+      const width =
         b.style === 'thick'
-          ? '2px solid'
+          ? 2
           : b.style === 'medium'
-            ? '1.5px solid'
+            ? 1.5
             : b.style === 'double'
-              ? '3px double'
+              ? 3
               : b.style === 'dashed' || b.style === 'mediumDashed' || b.style === 'dashDot'
-                ? '1px dashed'
+                ? 1
                 : b.style === 'dotted'
-                  ? '1px dotted'
-                  : '1px solid';
-      parts.push(`border-${side}:${style} ${blackAndWhite ? '#000' : (b.color ?? '#000')}`);
+                  ? 1
+                  : 1;
+      const style =
+        b.style === 'double'
+          ? 'double'
+          : b.style === 'dashed' || b.style === 'mediumDashed' || b.style === 'dashDot'
+            ? 'dashed'
+            : 'solid';
+      parts.push(
+        `border-${side}:${width * scale}px ${style} ${blackAndWhite ? '#000' : (b.color ?? '#000')}`,
+      );
     };
     sideToCss('top');
     sideToCss('right');
@@ -271,7 +368,7 @@ export function headerFieldToCssContent(raw: string, ctx: HeaderFooterContext): 
   let buf = '';
   const flush = (): void => {
     if (buf) {
-      parts.push(JSON.stringify(buf));
+      parts.push(cssString(buf));
       buf = '';
     }
   };
@@ -324,9 +421,30 @@ export function headerFieldToCssContent(raw: string, ctx: HeaderFooterContext): 
   return parts.length ? parts.join(' ') : '';
 }
 
-function buildPageRule(setup: PageSetup, ctx: HeaderFooterContext): string {
-  const size = `${PAPER_DIMENSIONS[setup.paperSize] ?? 'A4'} ${setup.orientation}`;
-  const m = effectivePrintMargins(setup);
+function buildPageRule(
+  setup: PageSetup,
+  ctx: HeaderFooterContext,
+  native?: PaginationResult,
+): string {
+  const size = native
+    ? `${native.paper.widthPt}pt ${native.paper.heightPt}pt`
+    : `${PAPER_DIMENSIONS[setup.paperSize] ?? 'A4'} ${setup.orientation}`;
+  const m = native
+    ? {
+        top: `${native.margins.top}pt`,
+        right: `${native.margins.right}pt`,
+        bottom: `${native.margins.bottom}pt`,
+        left: `${native.margins.left}pt`,
+      }
+    : (() => {
+        const margins = effectivePrintMargins(setup);
+        return {
+          top: `${margins.top}in`,
+          right: `${margins.right}in`,
+          bottom: `${margins.bottom}in`,
+          left: `${margins.left}in`,
+        };
+      })();
   const boxes: [string, string | undefined][] = [
     ['top-left', setup.headerLeft],
     ['top-center', setup.headerCenter],
@@ -343,7 +461,7 @@ function buildPageRule(setup: PageSetup, ctx: HeaderFooterContext): string {
     })
     .filter(Boolean)
     .join(' ');
-  const base = `@page { size: ${size}; margin: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in;`;
+  const base = `@page { size: ${size}; margin: ${m.top} ${m.right} ${m.bottom} ${m.left};`;
   return marginBoxes ? `${base} ${marginBoxes} }` : `${base} }`;
 }
 
@@ -384,33 +502,173 @@ export function buildPrintDocument(
   const showFormulas = state.ui.showFormulas;
   const hiddenRows = state.layout.hiddenRows;
   const hiddenCols = state.layout.hiddenCols;
+  // The native paginator is authoritative when the worksheet's print setup
+  // has been synchronized to the engine. A printer profile changes the
+  // session-only printable insets, so keep the local splitter for that path.
+  const nativePagination =
+    options.printableBounds === undefined
+      ? paginationFor(state, sheet, { engine: wb, purpose: 'print' })
+      : null;
+  const native = nativePagination?.native;
 
   // Collect populated cells. Track max row/col so the table doesn't run past
   // the last data cell.
   const cellMap = new Map<string, CellSnap>();
+  const formatAt = (row: number, col: number): CellFormat | undefined => {
+    const direct = formatWithPending(state, { sheet, row, col });
+    if (wb.capabilities.effectiveStyle === true && !wb.isStub) {
+      return (effectiveCellFormatWithPending(wb, state, { sheet, row, col }) ?? direct) as
+        | CellFormat
+        | undefined;
+    }
+    return direct;
+  };
   let maxRow = -1;
   let maxCol = -1;
   for (const e of wb.cells(sheet)) {
     const key = `${e.addr.row}:${e.addr.col}`;
-    const fmt = state.format.formats.get(`${sheet}:${e.addr.row}:${e.addr.col}`);
+    const fmt = formatAt(e.addr.row, e.addr.col);
     cellMap.set(key, { value: e.value, formula: e.formula, format: fmt });
     if (e.addr.row > maxRow) maxRow = e.addr.row;
     if (e.addr.col > maxCol) maxCol = e.addr.col;
   }
-  for (const [formatKey, fmt] of state.format.formats) {
+  for (const [formatKey] of state.format.formats) {
     const addr = parseAddrKey(formatKey);
     if (!addr || addr.sheet !== sheet) continue;
     const { row, col } = addr;
     const key = `${row}:${col}`;
     if (!cellMap.has(key)) {
-      cellMap.set(key, { value: { kind: 'blank' }, formula: null, format: fmt });
+      cellMap.set(key, {
+        value: { kind: 'blank' },
+        formula: null,
+        format: formatAt(row, col),
+      });
     }
     if (row > maxRow) maxRow = row;
     if (col > maxCol) maxCol = col;
   }
 
+  // Find merge extents before walking their interior. A single far-corner
+  // merge must be rejected by the same preflight as a far-corner value.
+  for (const range of state.merges.byAnchor.values()) {
+    if (range.sheet !== sheet) continue;
+    if (range.r1 > maxRow) maxRow = range.r1;
+    if (range.c1 > maxCol) maxCol = range.c1;
+  }
+  if (maxRow < 0) {
+    // Empty sheet — print at least one empty row so the user gets a real page.
+    maxRow = 0;
+    maxCol = 0;
+  }
+
+  const nativeHasPages = (native?.pages.length ?? 0) > 0;
+  const titleRowRange = native?.printTitles.hasRows
+    ? ([native.printTitles.firstRow, native.printTitles.lastRow] as [number, number])
+    : parsePrintTitleRows(setup.printTitleRows);
+  const titleColRange = native?.printTitles.hasCols
+    ? ([native.printTitles.firstCol, native.printTitles.lastCol] as [number, number])
+    : parsePrintTitleCols(setup.printTitleCols);
+  const nativePrintAreas = native?.printArea.length
+    ? native.printArea.map((area) => ({
+        row0: area.firstRow,
+        col0: area.firstCol,
+        row1: area.lastRow,
+        col1: area.lastCol,
+      }))
+    : null;
+  const printAreas = nativePrintAreas ?? parsePrintAreas(setup.printArea);
+  const rangeLength = (range: [number, number] | null): number =>
+    range && Number.isFinite(range[0]) && Number.isFinite(range[1]) && range[1] >= range[0]
+      ? range[1] - range[0] + 1
+      : 0;
+  const titleRowCount = rangeLength(titleRowRange);
+  const titleColCount = rangeLength(titleColRange);
+  const cappedAdd = (left: number, right: number): number =>
+    Math.min(MAX_PRINT_MATERIALIZED_CELLS + 1, left + right);
+  const cappedMultiply = (left: number, right: number): number => {
+    if (left <= 0 || right <= 0) return 0;
+    if (left > Math.floor((MAX_PRINT_MATERIALIZED_CELLS + 1) / right)) {
+      return MAX_PRINT_MATERIALIZED_CELLS + 1;
+    }
+    return left * right;
+  };
+  // This is intentionally conservative: title rows/columns are emitted in
+  // every table section, and headings add one row plus one corner column.
+  const generatedCellsForRegion = (region: PrintAreaBounds): number => {
+    const rows = cappedAdd(
+      Math.max(0, region.row1 - region.row0 + 1),
+      titleRowCount + (setup.showHeadings ? 1 : 0),
+    );
+    const cols = cappedAdd(
+      Math.max(0, region.col1 - region.col0 + 1),
+      titleColCount + (setup.showHeadings ? 1 : 0),
+    );
+    return cappedMultiply(rows, cols);
+  };
+  const throwIfOverPrintBudget = (estimatedCells: number): void => {
+    if (estimatedCells > MAX_PRINT_MATERIALIZED_CELLS) {
+      throw new PrintResourceLimitError(estimatedCells);
+    }
+  };
+
+  if (nativeHasPages) {
+    // Native pages may represent sparse content without materializing every
+    // sheet cell. Budget the rectangles that this HTML path will actually
+    // emit, while leaving a small sparse page valid.
+    if (native && native.pages.length > MAX_PRINT_GENERATED_PAGES) {
+      throw new PrintResourceLimitError(MAX_PRINT_MATERIALIZED_CELLS + 1);
+    }
+    let estimatedCells = 0;
+    for (const page of native?.pages ?? []) {
+      estimatedCells = cappedAdd(
+        estimatedCells,
+        generatedCellsForRegion({
+          row0: page.firstRow,
+          col0: page.firstCol,
+          row1: page.lastRow,
+          col1: page.lastCol,
+        }),
+      );
+      if (estimatedCells > MAX_PRINT_MATERIALIZED_CELLS) break;
+    }
+    throwIfOverPrintBudget(estimatedCells);
+  } else {
+    // Local/printer-profile pagination materializes every cell in each tile.
+    // Check the aggregate rectangle before merge maps, tiles, or HTML rows are
+    // allocated so a sparse far-corner cell has an explicit bounded outcome.
+    const areas = printAreas ?? [{ row0: 0, col0: 0, row1: maxRow, col1: maxCol }];
+    let estimatedCells = 0;
+    for (const area of areas) {
+      const row1 = Math.min(maxRow, area.row1);
+      const col1 = Math.min(maxCol, area.col1);
+      if (row1 < area.row0 || col1 < area.col0) continue;
+      estimatedCells = cappedAdd(
+        estimatedCells,
+        generatedCellsForRegion({ row0: area.row0, col0: area.col0, row1, col1 }),
+      );
+      if (estimatedCells > MAX_PRINT_MATERIALIZED_CELLS) break;
+    }
+    throwIfOverPrintBudget(estimatedCells);
+  }
+
   // Merges shape colspan/rowspan + cell-skip set (cells inside but not at
   // the anchor are absorbed into the anchor's span).
+  let mergeInteriorCells = 0;
+  for (const range of state.merges.byAnchor.values()) {
+    if (range.sheet !== sheet) continue;
+    const mergeCells = cappedMultiply(
+      Math.max(0, range.r1 - range.r0 + 1),
+      Math.max(0, range.c1 - range.c0 + 1),
+    );
+    mergeInteriorCells = cappedAdd(mergeInteriorCells, Math.max(0, mergeCells - 1));
+    if (mergeInteriorCells > MAX_PRINT_MATERIALIZED_CELLS) break;
+  }
+  // Every native page clones this skip set before rendering. Bound that
+  // repeated allocation as well as the initial interior-cell walk.
+  const mergeMaterializationCount = nativeHasPages
+    ? cappedMultiply(mergeInteriorCells, native?.pages.length ?? 0)
+    : mergeInteriorCells;
+  throwIfOverPrintBudget(mergeMaterializationCount);
   const skipKeys = new Set<string>();
   const spanByAnchor = new Map<string, { rowspan: number; colspan: number }>();
   for (const [, range] of state.merges.byAnchor) {
@@ -429,17 +687,8 @@ export function buildPrintDocument(
     }
   }
 
-  if (maxRow < 0) {
-    // Empty sheet — print at least one empty row so the user gets a real page.
-    maxRow = 0;
-    maxCol = 0;
-  }
-
-  const titleRowRange = parsePrintTitleRows(setup.printTitleRows);
-  const titleColRange = parsePrintTitleCols(setup.printTitleCols);
   const manualRowBreaks = new Set(setup.manualPageBreakRows ?? []);
   const manualColBreaks = new Set(setup.manualPageBreakCols ?? []);
-  const printAreas = parsePrintAreas(setup.printArea);
   const printRegions: PrintAreaBounds[] = orderPrintRegionsForPageOrder(
     (printAreas ?? [{ row0: 0, col0: 0, row1: maxRow, col1: maxCol }]).map((area) => {
       const row1 = Math.min(maxRow, area.row1);
@@ -481,6 +730,72 @@ export function buildPrintDocument(
     commentEntries.map((entry) => [`${entry.row}:${entry.col}`, entry]),
   );
 
+  const r1c1FormulaFor = (row: number, col: number, formula: string | null): string | null => {
+    if (!state.ui.r1c1 || !formula || wb.capabilities.formulaR1C1 !== true) return null;
+    try {
+      return wb.cellFormulaR1C1({ sheet, row, col });
+    } catch {
+      return null;
+    }
+  };
+
+  const effectiveFormatFor = (
+    row: number,
+    col: number,
+    snap: CellSnap | undefined,
+  ): CellFormat | undefined => {
+    const merged = snap?.format ?? formatAt(row, col) ?? {};
+    return Object.keys(merged).length > 0 ? merged : undefined;
+  };
+
+  const nativeDisplayFor = (
+    row: number,
+    col: number,
+    snap: CellSnap | undefined,
+    format: CellFormat | undefined,
+  ): string | null => {
+    if (state.ui.showFormulas === true || !snap || snap.value.kind === 'blank') return null;
+    // A store-side number-format edit can briefly lead the mirror. Format the
+    // value directly in that case; otherwise the workbook renderer accounts
+    // for inherited styles, date systems, and display overflow.
+    const ownFormatCode = format?.numFmt ? numFmtToFormatCode(format.numFmt) : null;
+    if (ownFormatCode && typeof wb.formatValueForDisplay === 'function') {
+      return wb.formatValueForDisplay(snap.value, ownFormatCode);
+    }
+    if (format?.hyperlinkDisplay || typeof wb.getDisplayText !== 'function') return null;
+    const displayed = wb.getDisplayText(sheet, row, col);
+    if (displayed === '') return null;
+    return displayed;
+  };
+
+  const nativeScale = native ? Math.max(Number.isFinite(native.scale) ? native.scale : 1, 0.01) : 1;
+  // Chromium rounds collapsed table borders and fractional point row heights
+  // independently. Leave a small physical reserve so the final row cannot be
+  // clipped when the native extent lands exactly on a browser pixel boundary.
+  const NATIVE_LAYOUT_EPSILON_PT = 3;
+  const rowHeightPt = (row: number): number =>
+    ((state.layout.rowHeights.get(row) ?? state.layout.defaultRowHeight) * 72) / 96;
+  const colWidthPt = (col: number): number =>
+    ((state.layout.colWidths.get(col) ?? state.layout.defaultColWidth) * 72) / 96;
+
+  const nativePageMetrics = (page: PaginationPage) => {
+    if (!native) return null;
+    const titleColsOffset = Math.max(0, page.originXPt - native.printable.x);
+    const titleRowsOffset = Math.max(0, page.originYPt - native.printable.y);
+    return {
+      titleColsOffset,
+      titleRowsOffset,
+      // `printable` already accounts for the header/footer encroachment that
+      // the native Windows geometry contract applies to the body height.
+      // Using paper-minus-margins here would let a browser lay out one extra
+      // row below a native footer band.
+      contentWidth: Math.max(1, native.printable.width),
+      contentHeight: Math.max(1, native.printable.height),
+      tableWidth: Math.max(1, titleColsOffset + page.widthPt),
+      tableHeight: Math.max(1, titleRowsOffset + page.heightPt),
+    };
+  };
+
   // Build column letters used for the optional `<colgroup>` headings strip.
   const renderCell = (
     row: number,
@@ -488,11 +803,14 @@ export function buildPrintDocument(
     tag: 'td' | 'th',
     regionMaxCol: number,
     renderedSkipKeys: Set<string>,
+    cellScale = 1,
+    nativeClip = false,
   ): string => {
     const key = `${row}:${col}`;
     if (renderedSkipKeys.has(key)) return '';
     const snap = cellMap.get(key);
     const value: CellValue = snap?.value ?? { kind: 'blank' };
+    const format = effectiveFormatFor(row, col, snap);
     const text = cellDisplay(
       value,
       snap?.formula ?? null,
@@ -500,17 +818,21 @@ export function buildPrintDocument(
       { row, col },
       state.ui.r1c1 === true,
       setup.cellErrorsAs,
+      r1c1FormulaFor(row, col, snap?.formula ?? null),
+      nativeDisplayFor(row, col, snap, format),
+      format,
     );
     const span = (() => {
       const mergeSpan = spanByAnchor.get(key);
       if (mergeSpan) return mergeSpan;
-      if (snap?.format?.align !== 'centerContinuous' || !text) return undefined;
+      if (format?.align !== 'centerContinuous' || !text) return undefined;
       let colspan = 1;
       for (let nextCol = col + 1; nextCol <= regionMaxCol; nextCol += 1) {
         if (hiddenCols.has(nextCol)) continue;
         const nextKey = `${row}:${nextCol}`;
         if (renderedSkipKeys.has(nextKey)) break;
         const nextSnap = cellMap.get(nextKey);
+        const nextFormat = effectiveFormatFor(row, nextCol, nextSnap);
         const nextText = cellDisplay(
           nextSnap?.value ?? { kind: 'blank' },
           nextSnap?.formula ?? null,
@@ -518,32 +840,56 @@ export function buildPrintDocument(
           { row, col: nextCol },
           state.ui.r1c1 === true,
           setup.cellErrorsAs,
+          r1c1FormulaFor(row, nextCol, nextSnap?.formula ?? null),
+          nativeDisplayFor(row, nextCol, nextSnap, nextFormat),
+          nextFormat,
         );
-        if (nextSnap?.format?.align !== 'centerContinuous' || nextText) break;
+        if (nextFormat?.align !== 'centerContinuous' || nextText) break;
         renderedSkipKeys.add(nextKey);
         colspan += 1;
       }
       return colspan > 1 ? { rowspan: 1, colspan } : undefined;
     })();
     const style = inlineCellStyle(
-      snap?.format,
+      format,
       value,
       setup.showGridlines === true,
       setup.blackAndWhite === true,
+      cellScale,
     );
     const rowspanAttr = span && span.rowspan > 1 ? ` rowspan="${span.rowspan}"` : '';
     const colspanAttr = span && span.colspan > 1 ? ` colspan="${span.colspan}"` : '';
-    const styleAttr = style ? ` style="${style}"` : '';
+    const styleAttr = style ? ` style="${escapeHtml(style)}"` : '';
     const comment = setup.comments === 'asDisplayed' ? commentByCell.get(key) : undefined;
     const commentHtml = comment
       ? `<div class="fc-print__comment-note">${escapeHtml(comment.text)}</div>`
       : '';
+    const verticalTextStyle = format?.fontVertAlign
+      ? `font-size:${
+          typeof format.fontSize === 'number' && Number.isFinite(format.fontSize)
+            ? `${format.fontSize * cellScale * 0.7}px`
+            : '70%'
+        };vertical-align:${format.fontVertAlign === 'superscript' ? 'super' : 'sub'}`
+      : '';
+    const textHtml = verticalTextStyle
+      ? `<span style="${verticalTextStyle}">${escapeHtml(text)}</span>`
+      : escapeHtml(text);
+    const verticalAlignment = format?.vAlign;
+    const contentJustify =
+      verticalAlignment === 'top'
+        ? 'flex-start'
+        : verticalAlignment && verticalAlignment !== 'bottom'
+          ? 'center'
+          : 'flex-end';
+    const cellContent = nativeClip
+      ? `<div class="fc-print__cell-content" style="justify-content:${contentJustify}">${textHtml}${commentHtml}</div>`
+      : `${textHtml}${commentHtml}`;
     const classes = [
-      manualColBreaks.has(col) ? 'fc-print__manual-break-col' : '',
+      manualColBreaks.has(col) && !native ? 'fc-print__manual-break-col' : '',
       isTitleCol(col) ? 'fc-print__title-col-cell' : '',
     ].filter(Boolean);
     const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
-    return `<${tag}${classAttr}${rowspanAttr}${colspanAttr}${styleAttr}>${escapeHtml(text)}${commentHtml}</${tag}>`;
+    return `<${tag}${classAttr}${rowspanAttr}${colspanAttr}${styleAttr}>${cellContent}</${tag}>`;
   };
 
   const renderRow = (
@@ -551,6 +897,8 @@ export function buildPrintDocument(
     isTitle: boolean,
     region: PrintAreaBounds,
     renderedSkipKeys: Set<string>,
+    nativePage?: PaginationPage,
+    nativeHeightPt?: number,
   ): string => {
     if (hiddenRows.has(row)) return '';
     const cells: string[] = [];
@@ -561,10 +909,26 @@ export function buildPrintDocument(
     const regionMaxCol = Math.max(...cols, region.col1);
     for (const c of cols) {
       if (hiddenCols.has(c)) continue;
-      cells.push(renderCell(row, c, isTitle ? 'th' : 'td', regionMaxCol, renderedSkipKeys));
+      cells.push(
+        renderCell(
+          row,
+          c,
+          isTitle ? 'th' : 'td',
+          regionMaxCol,
+          renderedSkipKeys,
+          nativePage ? nativeScale : 1,
+          nativePage !== undefined,
+        ),
+      );
     }
-    const cls = manualRowBreaks.has(row) && !isTitle ? ' class="fc-print__manual-break-row"' : '';
-    return `<tr${cls}>${cells.join('')}</tr>`;
+    const cls =
+      manualRowBreaks.has(row) && !isTitle && !nativePage
+        ? ' class="fc-print__manual-break-row"'
+        : '';
+    const nativeHeight = nativePage
+      ? ` style="height:${nativeHeightPt ?? rowHeightPt(row)}pt"`
+      : '';
+    return `<tr${cls}${nativeHeight}>${cells.join('')}</tr>`;
   };
 
   // Optional column-letter heading row. Repeated inside <thead> when print-
@@ -574,53 +938,171 @@ export function buildPrintDocument(
     const cells: string[] = [`<th class="fc-print__corner"></th>`];
     for (const c of columnsForRegion(region)) {
       if (hiddenCols.has(c)) continue;
-      const cls = manualColBreaks.has(c)
-        ? 'fc-print__colhead fc-print__manual-break-col'
-        : 'fc-print__colhead';
+      const cls =
+        manualColBreaks.has(c) && !native
+          ? 'fc-print__colhead fc-print__manual-break-col'
+          : 'fc-print__colhead';
       cells.push(`<th class="${cls}">${colLetter(c)}</th>`);
     }
     return `<tr>${cells.join('')}</tr>`;
   };
 
-  const renderTableSection = (region: PrintAreaBounds, sectionIndex: number): string => {
+  const renderTableSection = (
+    region: PrintAreaBounds,
+    sectionIndex: number,
+    nativePage?: PaginationPage,
+  ): string => {
+    const nativeMetrics = nativePage ? nativePageMetrics(nativePage) : null;
     const renderedSkipKeys = new Set(skipKeys);
+    const titleSet = new Set<number>();
+    if (titleRowRange) {
+      for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) titleSet.add(r);
+    }
+    const titleRowsInRegion = [...titleSet].filter(
+      (row) => row >= region.row0 && row <= region.row1 && !hiddenRows.has(row),
+    );
+    const actualTitleHeight = titleRowsInRegion.reduce((sum, row) => sum + rowHeightPt(row), 0);
+    const bodyNaturalHeight = Array.from(
+      { length: Math.max(0, region.row1 - region.row0 + 1) },
+      (_, i) => region.row0 + i,
+    )
+      .filter((row) => !titleSet.has(row) && !hiddenRows.has(row))
+      .reduce((sum, row) => sum + rowHeightPt(row), 0);
+    // Native page extents are already scaled physical points. Keep the table
+    // in that coordinate system so Chromium paginates the same boxes it
+    // paints. The first native page includes its title rows in `heightPt`;
+    // later pages report only their body block and reserve repeated titles in
+    // `originYPt`.
+    const nativeBodyHeight = nativePage
+      ? Math.max(
+          0.01,
+          nativePage.heightPt -
+            actualTitleHeight * nativeScale -
+            (bodyNaturalHeight > 0 ? NATIVE_LAYOUT_EPSILON_PT : 0),
+        )
+      : 0;
+    const nativeBodyScale =
+      nativePage && bodyNaturalHeight > 0 ? nativeBodyHeight / bodyNaturalHeight : 1;
+    const nativeRowHeightFor = (row: number, isTitle: boolean): number | undefined => {
+      if (!nativePage) return undefined;
+      if (isTitle) return rowHeightPt(row) * nativeScale;
+      return rowHeightPt(row) * nativeBodyScale;
+    };
     const theadRows: string[] = [];
     const heading = headingRow(region);
     if (heading) theadRows.push(heading);
     if (titleRowRange) {
       for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) {
-        const html = renderRow(r, true, region, renderedSkipKeys);
+        const html = renderRow(
+          r,
+          true,
+          region,
+          renderedSkipKeys,
+          nativePage,
+          nativeRowHeightFor(r, true),
+        );
         if (html) theadRows.push(html);
+      }
+      if (nativePage && nativeMetrics) {
+        const titleReserve = nativeMetrics.titleRowsOffset;
+        const renderedTitleHeight = actualTitleHeight * nativeScale;
+        const extraTitleHeight = Math.max(0, titleReserve - renderedTitleHeight);
+        if (extraTitleHeight > 0.01) {
+          const colCount = Math.max(
+            1,
+            columnsForRegion(region).filter((c) => !hiddenCols.has(c)).length,
+          );
+          theadRows.push(
+            `<tr class="fc-print__native-title-spacer"><th colspan="${colCount}" style="height:${extraTitleHeight}pt;padding:0;border:0"></th></tr>`,
+          );
+        }
       }
     }
     const thead = theadRows.length ? `<thead>${theadRows.join('')}</thead>` : '';
 
     const bodyRows: string[] = [];
-    const titleSet = new Set<number>();
-    if (titleRowRange) {
-      for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) titleSet.add(r);
-    }
     for (let r = region.row0; r <= region.row1; r += 1) {
       if (titleSet.has(r)) continue;
-      const html = renderRow(r, false, region, renderedSkipKeys);
+      const html = renderRow(
+        r,
+        false,
+        region,
+        renderedSkipKeys,
+        nativePage,
+        nativeRowHeightFor(r, false),
+      );
       if (html) bodyRows.push(html);
     }
     const tbody = `<tbody>${bodyRows.join('')}</tbody>`;
 
     const colgroup = (() => {
-      if (!titleColRange) return '';
+      // The fallback leaves column sizing to the browser unless repeated
+      // title columns need a stable `<col>` strip. Native pages always get a
+      // fixed colgroup: their page rectangle was measured in print points,
+      // and an auto-layout table would otherwise reflow it to the longest
+      // cell text and spill past the native page edge.
+      if (!nativePage || !nativeMetrics) {
+        if (!titleColRange) return '';
+        const cols: string[] = [];
+        if (setup.showHeadings) cols.push('<col>');
+        for (const c of columnsForRegion(region)) {
+          if (hiddenCols.has(c)) continue;
+          cols.push(isTitleCol(c) ? '<col class="fc-print__title-col">' : '<col>');
+        }
+        return `<colgroup>${cols.join('')}</colgroup>`;
+      }
       const cols: string[] = [];
       if (setup.showHeadings) cols.push('<col>');
-      for (const c of columnsForRegion(region)) {
-        if (hiddenCols.has(c)) continue;
-        cols.push(isTitleCol(c) ? '<col class="fc-print__title-col">' : '<col>');
+      const visibleCols = columnsForRegion(region).filter((c) => !hiddenCols.has(c));
+      const titleColsOffset = nativeMetrics?.titleColsOffset ?? 0;
+      const hasSeparateTitleCols =
+        nativePage !== undefined &&
+        titleColRange !== null &&
+        nativePage.firstCol > titleColRange[1];
+      const titleNaturalWidth = visibleCols
+        .filter((c) => hasSeparateTitleCols && isTitleCol(c))
+        .reduce((sum, c) => sum + colWidthPt(c), 0);
+      const bodyNaturalWidth = visibleCols
+        .filter((c) => !hasSeparateTitleCols || !isTitleCol(c))
+        .reduce((sum, c) => sum + colWidthPt(c), 0);
+      const widthForCol = (col: number): number => {
+        if (!nativePage || !nativeMetrics) return 0;
+        if (hasSeparateTitleCols && isTitleCol(col)) {
+          return titleNaturalWidth > 0
+            ? (titleColsOffset * colWidthPt(col)) / titleNaturalWidth
+            : 0;
+        }
+        const target = hasSeparateTitleCols ? nativePage.widthPt : nativeMetrics.tableWidth;
+        return bodyNaturalWidth > 0 ? (target * colWidthPt(col)) / bodyNaturalWidth : 0;
+      };
+      for (const c of visibleCols) {
+        const width = widthForCol(c);
+        const style = width > 0 ? ` style="width:${width}pt"` : '';
+        cols.push(isTitleCol(c) ? `<col class="fc-print__title-col"${style}>` : `<col${style}>`);
       }
+      if (cols.length === (setup.showHeadings ? 1 : 0)) cols.push('<col style="width:100%">');
       return `<colgroup>${cols.join('')}</colgroup>`;
     })();
 
     const sectionClass =
       sectionIndex === 0 ? 'fc-print__area' : 'fc-print__area fc-print__area--break';
-    return `<section class="${sectionClass}"><table class="fc-print__table"${tableTransform}>${colgroup}${thead}${tbody}</table></section>`;
+    if (!nativePage || !nativeMetrics) {
+      return `<section class="${sectionClass}"><table class="fc-print__table"${tableTransform}>${colgroup}${thead}${tbody}</table></section>`;
+    }
+    const pageStyle = ` style="position:relative;box-sizing:border-box;width:${nativeMetrics.contentWidth}pt;height:${nativeMetrics.contentHeight}pt;overflow:hidden;break-inside:avoid"`;
+    const nativeLeft = setup.centerHorizontally
+      ? Math.max(0, (nativeMetrics.contentWidth - nativeMetrics.tableWidth) / 2)
+      : 0;
+    const nativeTop = setup.centerVertically
+      ? Math.max(0, (nativeMetrics.contentHeight - nativeMetrics.tableHeight) / 2)
+      : 0;
+    // `PaginationPage` values are already scaled physical extents. A CSS
+    // transform would make the browser paginate the pre-scale table and only
+    // shrink its paint, dropping rows at page boundaries. Give layout the
+    // final point sizes directly instead.
+    const tableStyle = ` style="position:absolute;left:${nativeLeft}pt;top:${nativeTop}pt;width:${nativeMetrics.tableWidth}pt;height:${nativeMetrics.tableHeight}pt;table-layout:fixed;margin:0"`;
+    const placementAttrs = ` data-native-origin-x-pt="${nativePage.originXPt}" data-native-origin-y-pt="${nativePage.originYPt}" data-native-width-pt="${nativePage.widthPt}" data-native-height-pt="${nativePage.heightPt}"`;
+    return `<section class="${sectionClass} fc-print__native-page"${pageStyle}${placementAttrs}><table class="fc-print__table"${tableStyle}>${colgroup}${thead}${tbody}</table></section>`;
   };
 
   // Header / footer are rendered by the browser's paged-media engine via
@@ -649,28 +1131,60 @@ export function buildPrintDocument(
 
   // Fit-to-pages now derives a real scale from the content's natural size
   // instead of being ignored (which silently printed at 100%).
-  const scale = computeFitToPagesScale(setup, printRegions, state.layout, hiddenRows, hiddenCols);
+  const scale =
+    native?.scale ??
+    computeFitToPagesScale(setup, printRegions, state.layout, hiddenRows, hiddenCols);
   const tableTransform =
     scale === 1 ? '' : ` style="transform:scale(${scale});transform-origin:top left;"`;
 
-  const paginatedRegions = printRegions.flatMap((region) =>
-    splitPrintRegionIntoTiles(
-      region,
-      setup,
-      state.layout,
-      hiddenRows,
-      hiddenCols,
-      titleRowRange,
-      titleColRange,
-      scale,
-    ),
-  );
+  const paginatedRegions = native?.pages.length
+    ? native.pages.map((page) => ({
+        region: {
+          row0: page.firstRow,
+          col0: page.firstCol,
+          row1: page.lastRow,
+          col1: page.lastCol,
+        },
+        nativePage: page,
+      }))
+    : printRegions.flatMap((region) =>
+        splitPrintRegionIntoTiles(
+          region,
+          setup,
+          state.layout,
+          hiddenRows,
+          hiddenCols,
+          titleRowRange,
+          titleColRange,
+          scale,
+        ).map((tile) => ({ region: tile, nativePage: undefined })),
+      );
+
+  // The native preflight above covers the engine's rectangles. Re-check the
+  // concrete sections after local tiling so repeated title rows/columns and a
+  // large number of generated tables cannot grow the HTML without a bound.
+  if (paginatedRegions.length > MAX_PRINT_GENERATED_PAGES) {
+    throw new PrintResourceLimitError(MAX_PRINT_MATERIALIZED_CELLS + 1);
+  }
+  let generatedCells = 0;
+  for (const { region } of paginatedRegions) {
+    generatedCells = cappedAdd(generatedCells, generatedCellsForRegion(region));
+    if (generatedCells > MAX_PRINT_MATERIALIZED_CELLS) break;
+  }
+  throwIfOverPrintBudget(generatedCells);
 
   const tablesHtml = paginatedRegions
-    .map((region, index) => renderTableSection(region, index))
+    .map(({ region, nativePage }, index) => renderTableSection(region, index, nativePage))
     .join('');
 
-  const effectiveMargins = effectivePrintMargins(setup);
+  const effectiveMargins = native
+    ? {
+        top: native.margins.top / 72,
+        right: native.margins.right / 72,
+        bottom: native.margins.bottom / 72,
+        left: native.margins.left / 72,
+      }
+    : effectivePrintMargins(setup);
   const cssVars: Record<string, string> = {
     '--fc-print-paper': PAPER_DIMENSIONS[setup.paperSize] ?? 'A4',
     '--fc-print-orient': setup.orientation,
@@ -698,6 +1212,7 @@ export function buildPrintDocument(
     ),
   };
   const bodyClasses = [
+    native?.pages.length ? 'fc-print--native' : '',
     setup.centerHorizontally ? 'fc-print--center-h' : '',
     setup.centerVertically ? 'fc-print--center-v' : '',
     setup.blackAndWhite ? 'fc-print--black-white' : '',
@@ -709,7 +1224,7 @@ export function buildPrintDocument(
     .join(' ');
 
   const css = [
-    buildPageRule(setup, headerFooterCtx),
+    buildPageRule(setup, headerFooterCtx, native),
     'body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 10pt; color: #111; }',
     'table.fc-print__table { border-collapse: collapse; width: 100%; table-layout: auto; }',
     'table.fc-print__table td, table.fc-print__table th { padding: 2px 6px; vertical-align: bottom; box-sizing: border-box; }',
@@ -725,6 +1240,12 @@ export function buildPrintDocument(
     '.fc-print__header > :nth-child(3), .fc-print__footer > :nth-child(3) { text-align: right; }',
     '.fc-print--center-h .fc-print__table { margin-left: auto; margin-right: auto; width: auto; }',
     '.fc-print--center-v .fc-print__area { min-height: calc(100vh - var(--fc-print-effective-margin-top) - var(--fc-print-effective-margin-bottom)); display: flex; flex-direction: column; justify-content: center; }',
+    '.fc-print--native .fc-print__native-page { min-height: 0 !important; display: block !important; justify-content: initial !important; }',
+    `.fc-print--native table.fc-print__table { font-size: ${10 * nativeScale}pt; line-height: 1; }`,
+    `.fc-print--native table.fc-print__table td, .fc-print--native table.fc-print__table th { position: relative; padding: ${Math.max(0, 3 * nativeScale - 1)}px ${6 * nativeScale}px; line-height: 1; overflow: hidden; }`,
+    '.fc-print--native .fc-print__cell-content { position: absolute; inset: 0; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; padding: inherit; line-height: inherit; white-space: inherit; }',
+    `.fc-print--native .fc-print__comment-note { margin-top: ${3 * nativeScale}px; padding: ${3 * nativeScale}px ${5 * nativeScale}px; font-size: ${8 * nativeScale}pt; }`,
+    '.fc-print--native .fc-print__native-page > .fc-print__table { margin: 0 !important; }',
     '.fc-print--black-white { filter: grayscale(1); }',
     '.fc-print--draft * { box-shadow: none !important; text-shadow: none !important; }',
     '.fc-print--fit-to-pages .fc-print__table { width: 100%; max-width: 100%; }',

@@ -8,6 +8,17 @@ export type PreparedChange = {
   readonly patch: CellPatch;
   readonly implicitFormat?: CellFormat['numFmt'];
   readonly input?: CoercedInput;
+  /** Font axes inherited from a worksheet-wide override when a newly written
+   *  cell would otherwise be flushed with the native default XF. */
+  readonly inheritedFormat?: Partial<CellFormat>;
+  /** Raw row/column XF used by a loaded workbook's worksheet font. Pinning
+   *  this XF before a format sync preserves its font metadata (theme link,
+   *  charset, colour and apply flags) instead of rebuilding it from paint
+   *  values. */
+  readonly inheritedAxisXf?: {
+    readonly xfIndex: number;
+    readonly projected: CellFormat;
+  };
   /** A format staged by the editor/formula bar for this resolved anchor. */
   readonly pendingFormat?: Partial<CellFormat>;
 };
@@ -47,11 +58,34 @@ const mergeFormatPatch = (
   return next;
 };
 
+const mergeInheritedFormat = (
+  current: CellFormat | undefined,
+  inherited: Partial<CellFormat> | undefined,
+): CellFormat | undefined => {
+  if (!inherited) return current;
+  // Inherited axes are an implicit base. A direct format already present in
+  // the map remains authoritative even if a caller supplied both fields in
+  // the prepared change.
+  return { ...inherited, ...(current ?? {}) };
+};
+
 const projectPreparedFormat = (
   current: CellFormat | undefined,
   change: PreparedChange,
 ): CellFormat | undefined => {
   let next = current;
+  const needsStoredFormat =
+    current !== undefined ||
+    change.pendingFormat !== undefined ||
+    change.implicitFormat !== undefined ||
+    (change.inheritedAxisXf === undefined && change.inheritedFormat !== undefined);
+  if (needsStoredFormat) {
+    const inheritedBase = {
+      ...(change.inheritedAxisXf?.projected ?? {}),
+      ...(change.inheritedFormat ?? {}),
+    };
+    next = mergeInheritedFormat(next, inheritedBase);
+  }
   if (change.implicitFormat && (next?.numFmt === undefined || next.numFmt.kind === 'general')) {
     next = { ...(next ?? {}), numFmt: change.implicitFormat };
   }

@@ -137,7 +137,10 @@ const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string =
       ? Number.parseInt(m[4], 10) - 1
       : base.col + (m[3] !== undefined ? Number.parseInt(m[3], 10) : 0);
   if (row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL) return '#REF!';
-  return formatA1Cell(row, col);
+  const a1 = formatA1Cell(row, col);
+  const parts = /^([A-Z]+)(\d+)$/.exec(a1);
+  if (!parts) return a1;
+  return `${m[4] !== undefined ? '$' : ''}${parts[1]}${m[2] !== undefined ? '$' : ''}${parts[2]}`;
 };
 
 /** Convert R1C1 references in a user-authored formula into A1 references for
@@ -359,6 +362,20 @@ export const FUNCTION_NAMES: readonly string[] = [
   'IMAGE',
 ];
 
+/** Formula-text options shared by the argument scanner and editor helpers. */
+export interface FormulaScanOptions {
+  /** Active workbook list separator. Excel uses `;` for the German/French
+   * profiles and `,` for the canonical and other supported profiles. */
+  listSeparator?: string;
+  /** Resolve a user-facing function alias to its canonical catalog name. */
+  resolveKnownName?: (rawName: string) => string | null;
+}
+
+const formulaListSeparator = (value: string | undefined): ',' | ';' => (value === ';' ? ';' : ',');
+
+const isUnicodeIdentifierChar = (value: string | undefined): boolean =>
+  value !== undefined && /[\p{L}\p{N}_.]/u.test(value);
+
 /** Find the partial function-name token immediately before `caret` and
  *  return matching candidates. Returns `null` when the caret is not in a
  *  position that warrants a function suggestion (e.g. inside a string).
@@ -379,16 +396,16 @@ export function suggestFunctions(
   let i = caret - 1;
   while (i >= 0) {
     const ch = text[i] ?? '';
-    if (/[A-Za-z0-9_.]/.test(ch)) i -= 1;
+    if (isUnicodeIdentifierChar(ch)) i -= 1;
     else break;
   }
   const tokenStart = i + 1;
   const token = text.slice(tokenStart, caret);
   if (token.length < 1) return null;
-  if (!/^[A-Za-z]/.test(token)) return null;
-  const upper = token.toUpperCase();
+  if (!/^[\p{L}_]/u.test(token)) return null;
+  const upper = token.toLocaleUpperCase();
   const source = opts.names ?? FUNCTION_NAMES;
-  const matches = source.filter((n) => n.startsWith(upper)).slice(0, max);
+  const matches = source.filter((n) => n.toLocaleUpperCase().startsWith(upper)).slice(0, max);
   if (matches.length === 0) return null;
   return { token, tokenStart, matches };
 }
@@ -633,11 +650,20 @@ export interface ActiveSignature {
   activeArgIndex: number;
 }
 
-export function findActiveSignature(text: string, caret: number): ActiveSignature | null {
+export function findActiveSignature(
+  text: string,
+  caret: number,
+  options: FormulaScanOptions = {},
+): ActiveSignature | null {
   // Resolve every syntactic name first so an unknown innermost call masks an
   // enclosing known call, matching the historical helper. The static
   // signature lookup below decides whether that selected call is supported.
-  const span = findFunctionCallAtCaret(text, caret, (rawName) => rawName.toUpperCase());
+  const span = findFunctionCallAtCaret(
+    text,
+    caret,
+    options.resolveKnownName ?? ((rawName) => rawName.toUpperCase()),
+    options.listSeparator,
+  );
   if (!span) return null;
   // The legacy helper intentionally reports no signature once the caret has
   // moved past a complete top-level call. The span API keeps that boundary
@@ -654,7 +680,7 @@ export function findActiveSignature(text: string, caret: number): ActiveSignatur
   };
 }
 
-const isNameChar = (c: string | undefined): boolean => c != null && /[A-Za-z0-9_.]/.test(c);
+const isNameChar = (c: string | undefined): boolean => isUnicodeIdentifierChar(c);
 
 /** When `pos` sits on (or directly after) an identifier that is followed by
  *  `(` — i.e. a function name — return that identifier's `[start, end)`
@@ -666,7 +692,7 @@ function functionNameRangeAt(formula: string, pos: number): FormulaSelectionRang
   while (end < formula.length && isNameChar(formula[end])) end += 1;
   if (end <= start) return null;
   // A function name starts with a letter or underscore (not a digit/dot).
-  if (!/[A-Za-z_]/.test(formula[start] ?? '')) return null;
+  if (!/[\p{L}_]/u.test(formula[start] ?? '')) return null;
   let k = end;
   while (k < formula.length && formula[k] === ' ') k += 1;
   if (formula[k] !== '(') return null;
@@ -722,7 +748,7 @@ interface FunctionCallRecord {
 }
 
 const isFormulaIdentifierChar = (value: string | undefined): boolean =>
-  value !== undefined && /[A-Za-z0-9_.]/.test(value);
+  isUnicodeIdentifierChar(value);
 
 const functionNameBeforeParen = (
   formula: string,
@@ -732,7 +758,7 @@ const functionNameBeforeParen = (
   while (nameEnd > 0 && /\s/.test(formula[nameEnd - 1] ?? '')) nameEnd -= 1;
   let nameStart = nameEnd;
   while (nameStart > 0 && isFormulaIdentifierChar(formula[nameStart - 1])) nameStart -= 1;
-  if (nameStart === nameEnd || !/[A-Za-z_]/.test(formula[nameStart] ?? '')) return null;
+  if (nameStart === nameEnd || !/[\p{L}_]/u.test(formula[nameStart] ?? '')) return null;
   return { start: nameStart, end: nameEnd };
 };
 
@@ -783,6 +809,7 @@ export function findFunctionCallAtCaret(
   text: string,
   caret: number,
   resolveKnownName: (rawName: string) => string | null,
+  listSeparator?: string,
 ): FunctionCallSpan | null {
   if (!text.startsWith('=') || !Number.isInteger(caret) || caret < 0 || caret > text.length) {
     return null;
@@ -790,6 +817,7 @@ export function findFunctionCallAtCaret(
 
   const calls: FunctionCallRecord[] = [];
   const stack: FormulaDelimiter[] = [];
+  const separator = formulaListSeparator(listSeparator);
   let inDoubleQuote = false;
   let inSingleQuote = false;
 
@@ -868,7 +896,7 @@ export function findFunctionCallAtCaret(
       continue;
     }
 
-    if (ch === ',' && top?.kind === 'paren' && top.call) {
+    if (ch === separator && top?.kind === 'paren' && top.call) {
       top.call.separators.push(i);
     }
   }
@@ -929,7 +957,11 @@ export function findFunctionCallAtCaret(
  *  - null when the probe is at the top level, so the caller can fall back to
  *    the browser's native word selection.
  */
-export function dblClickRange(formula: string, probe: number): FormulaSelectionRange | null {
+export function dblClickRange(
+  formula: string,
+  probe: number,
+  listSeparator?: string,
+): FormulaSelectionRange | null {
   const n = formula.length;
   if (n === 0) return null;
   const p = Math.max(0, Math.min(probe, n));
@@ -937,41 +969,72 @@ export function dblClickRange(formula: string, probe: number): FormulaSelectionR
   const fnName = functionNameRangeAt(formula, p);
   if (fnName) return fnName;
 
-  // Single forward pass — tracks string state so quoted commas/parens inside
-  // string arguments don't confuse the segment boundaries.
-  let inString = false;
-  const stack: { sep: number }[] = [];
-  let probeDepth = -1;
+  // Single forward pass — tracks strings and every nested delimiter so
+  // separators inside quoted, structured, or array arguments don't become
+  // argument boundaries.
+  let quote: '"' | "'" | null = null;
+  const separator = formulaListSeparator(listSeparator);
+  const stack: { kind: 'paren' | 'brace' | 'bracket'; sep: number }[] = [];
+  let probeCallIndex = -1;
   let probeSep = -1;
   for (let i = 0; i <= n; i += 1) {
     if (i === p) {
-      if (stack.length === 0) return null; // top level
-      probeDepth = stack.length;
-      probeSep = stack[stack.length - 1]?.sep ?? -1;
+      probeCallIndex = -1;
+      for (let j = stack.length - 1; j >= 0; j -= 1) {
+        if (stack[j]?.kind === 'paren') {
+          probeCallIndex = j;
+          break;
+        }
+      }
+      if (probeCallIndex < 0) return null; // top level
+      probeSep = stack[probeCallIndex]?.sep ?? -1;
     }
     if (i === n) break;
-    const ch = formula[i];
-    if (ch === '"') {
-      inString = !inString;
+    const ch = formula[i] ?? '';
+    const top = stack[stack.length - 1];
+    if (top?.kind === 'bracket') {
+      if (ch === '[') {
+        stack.push({ kind: 'bracket', sep: i });
+        continue;
+      }
+      if (ch === ']') {
+        stack.pop();
+        continue;
+      }
+      // Structured-reference headers use apostrophes to escape [, ], #, @,
+      // and apostrophe itself. This is distinct from a quoted sheet name.
+      if (ch === "'" && "[]#'@".includes(formula[i + 1] ?? '')) i += 1;
       continue;
     }
-    if (inString) continue;
-    if (ch === '(') {
-      stack.push({ sep: i });
-    } else if (ch === ')') {
-      if (probeDepth >= 0 && stack.length === probeDepth) {
+    if (quote) {
+      if (ch === quote && formula[i + 1] === quote) {
+        i += 1;
+      } else if (ch === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '(' || ch === '{' || ch === '[') {
+      stack.push({ kind: ch === '(' ? 'paren' : ch === '{' ? 'brace' : 'bracket', sep: i });
+    } else if (ch === ')' || ch === '}' || ch === ']') {
+      const kind = ch === ')' ? 'paren' : ch === '}' ? 'brace' : 'bracket';
+      if (probeCallIndex >= 0 && stack.length - 1 === probeCallIndex && kind === 'paren') {
         return trimmedRange(formula, probeSep + 1, i);
       }
       stack.pop();
-    } else if (ch === ',') {
-      if (probeDepth >= 0 && stack.length === probeDepth) {
+    } else if (ch === separator) {
+      if (probeCallIndex >= 0 && stack.length - 1 === probeCallIndex) {
         return trimmedRange(formula, probeSep + 1, i);
       }
       const top = stack[stack.length - 1];
-      if (top) top.sep = i;
+      if (top?.kind === 'paren') top.sep = i;
     }
   }
   // Unclosed enclosing paren — extend the argument to the end of the formula.
-  if (probeDepth >= 0) return trimmedRange(formula, probeSep + 1, n);
+  if (probeCallIndex >= 0) return trimmedRange(formula, probeSep + 1, n);
   return null;
 }

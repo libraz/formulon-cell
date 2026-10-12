@@ -1,32 +1,48 @@
 import type { ToolbarLang } from '../../ribbon-model.js';
 import { MAC_AUTOMATION_GALLERY, MAC_AUTOMATION_GALLERY_TITLE } from './automation-gallery.js';
+import {
+  type Label,
+  type LabelLike,
+  type LegacyLabel,
+  localizedGroupLabel,
+  localizedLabel,
+  localizedMenuLabel,
+  MAC_DISABLED_TRANSLATIONS,
+  MAC_LOCALES,
+} from './labels-data.js';
 
-export type Label = { ja: string; en: string };
+export type { Label, LabelLike } from './labels-data.js';
 
-export const text = (lang: ToolbarLang, label: Label): string => label[lang];
+export const text = (lang: ToolbarLang, label: LabelLike): string =>
+  lang in label ? (label as Label)[lang] : label.en;
 
 export const OFFICE_REQUIRED: Label = {
   ja: 'クラウドサービスへの接続が必要です。',
   en: 'Requires a cloud service connection.',
+  ...MAC_DISABLED_TRANSLATIONS.officeRequired,
 };
 export const NOT_IMPLEMENTED: Label = {
   ja: 'この機能は未実装です。',
   en: 'This feature is not implemented yet.',
+  ...MAC_DISABLED_TRANSLATIONS.notImplemented,
 };
 export const EMBEDDED_UNSUPPORTED: Label = {
   ja: 'この埋め込み環境では未対応です。',
   en: 'This feature is not available in the embedded workbook.',
+  ...MAC_DISABLED_TRANSLATIONS.embeddedUnsupported,
 };
 export const WORKBOOK_THEME_UNSUPPORTED: Label = {
   ja: 'ブックのテーマはこの埋め込み環境では変更できません。',
   en: 'Workbook themes cannot be changed in the embedded workbook.',
+  ...MAC_DISABLED_TRANSLATIONS.workbookThemeUnsupported,
 };
 export const THREADED_COMMENTS_UNSUPPORTED: Label = {
   ja: 'スレッド形式のコメントは未対応です。セルのメモを使用してください。',
   en: 'Threaded comments are unavailable; use cell notes instead.',
+  ...MAC_DISABLED_TRANSLATIONS.threadedCommentsUnsupported,
 };
 
-export const labels: Record<string, Label> = {
+const labelSeeds: Record<string, LegacyLabel> = {
   home: { ja: 'ホーム', en: 'Home' },
   addins: { ja: 'アドイン', en: 'Add-ins' },
   pivotTable: { ja: 'ピボットテーブル', en: 'PivotTable' },
@@ -210,12 +226,65 @@ export const labels: Record<string, Label> = {
   macros: { ja: 'マクロ', en: 'Macros' },
   newScript: { ja: '新しいスクリプト', en: 'New Script' },
   showScripts: { ja: 'スクリプトの表示', en: 'View Scripts' },
-  gallery: MAC_AUTOMATION_GALLERY_TITLE,
 };
 
-export const t = (key: string): Label => labels[key] ?? { ja: key, en: key };
+export const labels: Record<string, Label> = Object.fromEntries([
+  ...Object.entries(labelSeeds).map(([key, seed]) => [key, localizedLabel(key, seed)]),
+  ['gallery', MAC_AUTOMATION_GALLERY_TITLE],
+  ...MAC_AUTOMATION_GALLERY.map((script) => [script.id, script.labels] as const),
+]);
 
-export const GROUP_LABELS: Readonly<Record<string, Label>> = {
+const unknownLabel = (key: string): Label =>
+  Object.fromEntries(MAC_LOCALES.map((locale) => [locale, key])) as Label;
+
+export const t = (key: string): Label => labels[key] ?? unknownLabel(key);
+
+const MORE_FUNCTION_CATEGORY_LABELS: Readonly<Record<string, Label>> = {
+  statistical: t('statistical'),
+  engineering: {
+    ja: 'エンジニアリング',
+    en: 'Engineering',
+    de: 'Technik',
+    fr: 'Ingénierie',
+    zh: '工程',
+    ko: '공학',
+    th: 'วิศวกรรม',
+  },
+  cube: {
+    ja: 'キューブ',
+    en: 'Cube',
+    de: 'Cube',
+    fr: 'Cube',
+    zh: '多维数据集',
+    ko: '큐브',
+    th: 'คิวบ์',
+  },
+  information: {
+    ja: '情報',
+    en: 'Information',
+    de: 'Informationen',
+    fr: 'Informations',
+    zh: '信息',
+    ko: '정보',
+    th: 'ข้อมูล',
+  },
+  compatibility: {
+    ja: '互換性',
+    en: 'Compatibility',
+    de: 'Kompatibilität',
+    fr: 'Compatibilité',
+    zh: '兼容性',
+    ko: '호환성',
+    th: 'ความเข้ากันได้',
+  },
+  web: { ja: 'Web', en: 'Web', de: 'Web', fr: 'Web', zh: 'Web', ko: '웹', th: 'เว็บ' },
+};
+
+export const macFunctionCategoryLabel = (category: string, lang: ToolbarLang): string =>
+  MORE_FUNCTION_CATEGORY_LABELS[category]?.[lang] ?? category;
+
+const groupSeeds: Record<string, LegacyLabel> = {
+  'Add-ins': { ja: 'アドイン', en: 'Add-ins' },
   Tables: { ja: 'テーブル', en: 'Tables' },
   Forms: { ja: 'フォーム', en: 'Forms' },
   Pictures: { ja: '画像', en: 'Pictures' },
@@ -265,6 +334,10 @@ export const GROUP_LABELS: Readonly<Record<string, Label>> = {
   Gallery: { ja: 'ギャラリー', en: 'Gallery' },
 };
 
+export const GROUP_LABELS: Readonly<Record<string, Label>> = Object.fromEntries(
+  Object.entries(groupSeeds).map(([key, seed]) => [key, localizedGroupLabel(key, seed)]),
+);
+
 export const macRibbonDisabledReason = (
   reason: string | undefined,
   lang: ToolbarLang,
@@ -289,7 +362,13 @@ export const macRibbonLabelForCommand = (id: string, lang: ToolbarLang): string 
   return label ? label[lang] : id;
 };
 
-const MENU_LABELS: Readonly<Record<string, Label>> = {
+const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
+  'mac.page.theme.office': { ja: 'Office', en: 'Office' },
+  'mac.page.theme.gray': { ja: 'グレースケール', en: 'Grayscale' },
+  'mac.page.color.office': { ja: 'Office', en: 'Office' },
+  'mac.page.color.gray': { ja: 'グレースケール', en: 'Grayscale' },
+  'mac.page.font.office': { ja: 'Office', en: 'Office' },
+  'mac.page.font.gray': { ja: 'グレースケール', en: 'Grayscale' },
   'mac.formulas.removeArrows.all': { ja: '矢印の削除', en: 'Remove Arrows' },
   'mac.formulas.removeArrows.precedents': {
     ja: '参照元の矢印の削除',
@@ -315,9 +394,36 @@ const MENU_LABELS: Readonly<Record<string, Label>> = {
   'mac.page.margins.custom': { ja: 'ユーザー設定の余白', en: 'Custom Margins' },
   'mac.page.orientation.portrait': { ja: '縦', en: 'Portrait' },
   'mac.page.orientation.landscape': { ja: '横', en: 'Landscape' },
+  'mac.page.size.a4': { ja: 'A4', en: 'A4' },
+  'mac.page.size.a3': { ja: 'A3', en: 'A3' },
+  'mac.page.size.letter': { ja: 'レター', en: 'Letter' },
+  'mac.page.size.legal': { ja: 'リーガル', en: 'Legal' },
   'mac.page.printArea.set': { ja: '印刷範囲の設定', en: 'Set Print Area' },
   'mac.page.printArea.add': { ja: '印刷範囲に追加', en: 'Add to Print Area' },
   'mac.page.printArea.clear': { ja: '印刷範囲のクリア', en: 'Clear Print Area' },
+  'mac.page.break.insert': { ja: '改ページを挿入', en: 'Insert Page Break' },
+  'mac.page.break.remove': { ja: '改ページを削除', en: 'Remove Page Break' },
+  'mac.page.break.reset': {
+    ja: 'すべての改ページをリセット',
+    en: 'Reset All Page Breaks',
+  },
+  'mac.autosum.SUM': { ja: '合計', en: 'Sum' },
+  'mac.autosum.AVERAGE': { ja: '平均', en: 'Average' },
+  'mac.autosum.COUNT': { ja: '数値の個数', en: 'Count Numbers' },
+  'mac.autosum.MAX': { ja: '最大値', en: 'Max' },
+  'mac.autosum.MIN': { ja: '最小値', en: 'Min' },
+  'mac.formulas.category.all': { ja: 'その他の関数...', en: 'More Functions...' },
+  'mac.formulas.category.recent': { ja: 'その他の関数...', en: 'More Functions...' },
+  'mac.formulas.calc.auto': { ja: '自動', en: 'Automatic' },
+  'mac.formulas.calc.autoNoTable': {
+    ja: 'データ テーブル以外は自動',
+    en: 'Automatic Except for Data Tables',
+  },
+  'mac.formulas.calc.manual': { ja: '手動', en: 'Manual' },
+  'mac.formulas.calc.iterative': {
+    ja: '反復計算を有効にする',
+    en: 'Enable Iterative Calculation',
+  },
   'mac.formulas.createNames.topRow': { ja: '上端行', en: 'Top row' },
   'mac.formulas.createNames.bottomRow': { ja: '下端行', en: 'Bottom row' },
   'mac.formulas.createNames.leftColumn': { ja: '左端列', en: 'Left column' },
@@ -334,10 +440,9 @@ const MENU_LABELS: Readonly<Record<string, Label>> = {
   'mac.view.freeze.off': { ja: 'ウィンドウ枠固定の解除', en: 'Unfreeze Panes' },
   'mac.view.freeze.firstRow': { ja: '先頭行の固定', en: 'Freeze Top Row' },
   'mac.view.freeze.firstColumn': { ja: '先頭列の固定', en: 'Freeze First Column' },
-  ...Object.fromEntries(
-    MAC_AUTOMATION_GALLERY.map((script) => [
-      script.commandId,
-      { ja: script.labelJa, en: script.label },
-    ]),
-  ),
 };
+
+const MENU_LABELS: Readonly<Record<string, Label>> = Object.fromEntries([
+  ...Object.entries(menuLabelSeeds).map(([key, seed]) => [key, localizedMenuLabel(key, seed)]),
+  ...MAC_AUTOMATION_GALLERY.map((script) => [script.commandId, script.labels] as const),
+]);

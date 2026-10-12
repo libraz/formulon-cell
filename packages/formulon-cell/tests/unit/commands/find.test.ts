@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { hydrateThreadedComments } from '../../../src/commands/comment.js';
 import {
   applySubstitution,
+  displayTextForFindMatch,
   findAll,
   findNext,
   replaceAll,
@@ -75,6 +77,92 @@ describe('findAll', () => {
   it('searches numeric values via formatted display', () => {
     seed(store, [{ row: 0, col: 0, value: 42 }]);
     expect(findAll(store.getState(), { query: '42' })).toHaveLength(1);
+  });
+
+  it('uses the explicit locale for displayed numeric search and replacement parsing', async () => {
+    const wb = await newWb();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    try {
+      wb.setNumber(addr, 1.234);
+      wb.recalc();
+      seed(store, [{ row: 0, col: 0, value: 1.234 }]);
+      const opts = { query: '1,234', locale: 'de-DE', workbook: wb };
+      expect(findAll(store.getState(), opts)).toEqual([{ addr }]);
+
+      const count = replaceAll(store.getState(), wb, { ...opts, query: '1' }, '2', store);
+      expect(count).toBe(1);
+      expect(wb.getValue(addr)).toEqual({ kind: 'number', value: 2.234 });
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('enumerates workbook cells and notes outside the active sheet', () => {
+    const otherSheet = { sheet: 1, row: 2, col: 3 };
+    const wb = {
+      sheetCount: 2,
+      cells: (sheet: number) =>
+        sheet === 1
+          ? [{ addr: otherSheet, value: { kind: 'text', value: 'other-sheet' }, formula: null }]
+          : [],
+      getDisplayText: (sheet: number, row: number, col: number) =>
+        sheet === otherSheet.sheet && row === otherSheet.row && col === otherSheet.col
+          ? 'other-sheet'
+          : null,
+      getValue: (addr: { sheet: number; row: number; col: number }) =>
+        addrKey(addr) === addrKey(otherSheet)
+          ? { kind: 'text', value: 'other-sheet' }
+          : { kind: 'blank' },
+      cellFormula: () => null,
+      capabilities: { comments: true, commentsEnumerable: true },
+      getComments: (sheet: number) =>
+        sheet === 1 ? [{ row: 4, col: 5, author: 'A', text: 'other-sheet note' }] : [],
+    } as unknown as WorkbookHandle;
+
+    expect(
+      findAll(store.getState(), { query: 'other-sheet', within: 'workbook', workbook: wb }),
+    ).toEqual([{ addr: otherSheet }]);
+    expect(
+      displayTextForFindMatch(store.getState(), otherSheet, {
+        query: 'other-sheet',
+        within: 'workbook',
+        workbook: wb,
+      }),
+    ).toBe('other-sheet');
+    expect(
+      findAll(store.getState(), {
+        query: 'other-sheet note',
+        lookIn: 'notes',
+        within: 'workbook',
+        workbook: wb,
+      }),
+    ).toEqual([{ addr: { sheet: 1, row: 4, col: 5 } }]);
+  });
+
+  it('replaces formula source only in formulas mode and never matches literal values', async () => {
+    const wb = await newWb();
+    const formulaAddr = { sheet: 0, row: 0, col: 0 };
+    const valueAddr = { sheet: 0, row: 1, col: 0 };
+    try {
+      wb.setFormula(formulaAddr, '=SUM(A2,1)');
+      wb.setNumber(valueAddr, 7);
+      wb.recalc();
+      const cells = [...wb.cells(0)];
+      store.setState((state) => ({
+        ...state,
+        data: {
+          ...state.data,
+          cells: new Map(cells.map((entry) => [addrKey(entry.addr), entry])),
+        },
+      }));
+      const opts = { query: 'SUM', lookIn: 'formulas' as const, workbook: wb };
+      expect(findAll(store.getState(), opts)).toEqual([{ addr: formulaAddr }]);
+      expect(replaceAll(store.getState(), wb, opts, 'AVERAGE', store)).toBe(1);
+      expect(wb.cellFormula(formulaAddr)).toBe('=AVERAGE(A2,1)');
+      expect(wb.getValue(valueAddr)).toEqual({ kind: 'number', value: 7 });
+    } finally {
+      wb.dispose();
+    }
   });
 
   it('returns row-major-ordered results', () => {
@@ -152,7 +240,7 @@ describe('findAll', () => {
       };
     });
     expect(findAll(store.getState(), { query: '1+1', lookIn: 'formulas' })).toHaveLength(1);
-    expect(findAll(store.getState(), { query: 'needle', lookIn: 'comments' })).toHaveLength(1);
+    expect(findAll(store.getState(), { query: 'needle', lookIn: 'notes' })).toHaveLength(1);
   });
 
   it('finds comments on cells without materialized values', () => {
@@ -162,8 +250,51 @@ describe('findAll', () => {
       return { ...s, format: { ...s.format, formats } };
     });
 
-    const got = findAll(store.getState(), { query: 'needle', lookIn: 'comments' });
+    const got = findAll(store.getState(), { query: 'needle', lookIn: 'notes' });
     expect(got).toEqual([{ addr: { sheet: 0, row: 4, col: 2 } }]);
+  });
+
+  it('keeps threaded comments separate from notes and resolves replies to the opener', () => {
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      formats.set(addrKey({ sheet: 0, row: 0, col: 0 }), { comment: 'legacy note' });
+      return { ...s, format: { ...s.format, formats } };
+    });
+    hydrateThreadedComments(store, 0, [
+      {
+        id: 'thread-1',
+        row: 1,
+        col: 2,
+        personId: 'person-1',
+        created: '2026-01-01T10:00:00.00',
+        text: 'thread opening',
+        parentId: '',
+        done: false,
+        mentions: [],
+      },
+      {
+        id: 'reply-1',
+        row: 1,
+        col: 2,
+        personId: 'person-1',
+        created: '2026-01-01T10:01:00.00',
+        text: 'reply body',
+        parentId: 'thread-1',
+        done: false,
+        mentions: [],
+      },
+    ]);
+
+    expect(findAll(store.getState(), { query: 'legacy', lookIn: 'comments' })).toEqual([]);
+    expect(findAll(store.getState(), { query: 'legacy', lookIn: 'notes' })).toEqual([
+      { addr: { sheet: 0, row: 0, col: 0 } },
+    ]);
+    expect(findAll(store.getState(), { query: 'reply body', lookIn: 'comments' })).toEqual([
+      { addr: { sheet: 0, row: 1, col: 2 } },
+    ]);
+    expect(findAll(store.getState(), { query: 'thread opening', lookIn: 'comments' })).toEqual([
+      { addr: { sheet: 0, row: 1, col: 2 } },
+    ]);
   });
 });
 
@@ -284,6 +415,13 @@ describe('replaceOne / replaceAll', () => {
     wb.recalc();
     expect(replaceOne(wb, { addr: { sheet: 0, row: 0, col: 0 } }, 'overwrite')).toBe(false);
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=1+1');
+  });
+
+  it('replaceOne refuses annotation modes instead of writing into the cell', () => {
+    sync([{ row: 0, col: 0, raw: 'cell value' }]);
+    const addr = { sheet: 0, row: 0, col: 0 };
+    expect(replaceOne(wb, { addr }, 'changed', store, undefined, 'notes')).toBe(false);
+    expect(wb.getValue(addr)).toEqual({ kind: 'text', value: 'cell value' });
   });
 
   it('replaceOne refuses locked cells on protected sheets', () => {

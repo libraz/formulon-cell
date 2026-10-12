@@ -57,7 +57,8 @@ const chartBar = (x: number, y: number, w: number, h: number, fill: string) =>
 const node = (x: number, y: number, fill: string, radius = 2.4) =>
   outlined(circle(x, y, radius), PALETTE.paper, fill, 'bold');
 
-const windowFrame = (options: { x?: number; y?: number; w?: number; h?: number } = {}) => {
+/** A window with a tinted title bar and traffic-light controls. */
+export const windowFrame = (options: { x?: number; y?: number; w?: number; h?: number } = {}) => {
   const x = options.x ?? 2.4;
   const y = options.y ?? 3.4;
   const w = options.w ?? 19.2;
@@ -673,29 +674,43 @@ export const MAC_ICONS: Record<MacIconKey, IconDefinition> = {
 
   /** A small database cylinder over a data grid. */
   data: [
-    filled(ellipse(12, 5.8, 7.4, 2.7), PALETTE.infoSoft),
-    filled(rect(4.6, 5.8, 14.8, 10.8), PALETTE.infoSoft),
-    filled(ellipse(12, 16.6, 7.4, 2.7), PALETTE.infoSoft),
+    filled(rect(4, 5.2, 16, 13.6), PALETTE.infoSoft),
+    filled(ellipse(12, 18.8, 8, 2.8), PALETTE.infoSoft),
+    outlined(ellipse(12, 5.2, 8, 2.8), PALETTE.paper, PALETTE.infoDeep, 'regular'),
     stroked(
-      join('M4.6 5.8v10.8', 'M19.4 5.8v10.8', 'M4.6 9.4c0 1.5 3.3 2.7 7.4 2.7s7.4-1.2 7.4-2.7'),
+      join(
+        'M4 5.2v13.6',
+        'M20 5.2v13.6',
+        'M4 12c0 1.5 3.6 2.8 8 2.8s8-1.3 8-2.8',
+        'M4 18.8c0 1.5 3.6 2.8 8 2.8s8-1.3 8-2.8',
+      ),
       PALETTE.infoDeep,
       'regular',
     ),
-    stroked('M7.2 19.2h9.6', PALETTE.accent, 'bold'),
   ],
 
+  // Two arcs chasing each other round one circle.
   refresh: [
     ...arcArrow({
-      from: [4.8, 16.8],
-      to: [19.2, 7.2],
-      radius: 9.6,
+      from: [3.8, 12],
+      to: [17.8, 6.2],
+      radius: 8.2,
       sweep: 1,
-      headDir: [0.9, -0.4],
+      headDir: [Math.SQRT1_2, Math.SQRT1_2],
       color: PALETTE.info,
       weight: 'bold',
       head: 'solid',
     }),
-    stroked('M3.4 7.8h5.2M3.4 7.8v5.2', PALETTE.accent, 'bold'),
+    ...arcArrow({
+      from: [20.2, 12],
+      to: [6.2, 17.8],
+      radius: 8.2,
+      sweep: 1,
+      headDir: [-Math.SQRT1_2, -Math.SQRT1_2],
+      color: PALETTE.info,
+      weight: 'bold',
+      head: 'solid',
+    }),
   ],
 
   /** A counting mark made from grouped tally strokes. */

@@ -93,6 +93,57 @@ describe('computeF9Preview', () => {
     });
   });
 
+  it('canonicalizes the selected expression before evaluation and localizes the inserted literal', () => {
+    const evaluated: string[] = [];
+    const result = computeF9Preview(
+      '=SUMME(1;2)',
+      'SUMME(1;2)',
+      0,
+      new Map(),
+      undefined,
+      (formula) => {
+        evaluated.push(formula);
+        return {
+          status: { status: 0 },
+          value: { kind: ValueKind.Number, number: 3 },
+        } as EvalResult;
+      },
+      true,
+      undefined,
+      {
+        canonicalizeFormula: (formula) => formula.replace('SUMME(1;2)', 'SUM(1,2)'),
+        localizeLiteral: (literal) => (literal === '3' ? '3' : literal),
+      },
+    );
+    expect(evaluated).toEqual(['=SUM(1,2)']);
+    expect(result).toEqual({ display: '3', substitutable: true });
+  });
+
+  it('localizes boolean literals while leaving source slices and caret replacement intact', () => {
+    const formula = '=IF(A1;TRUE;FALSE)';
+    const start = formula.indexOf('TRUE');
+    const replaced = replaceFormulaSelectionWithF9Preview(
+      formula,
+      start,
+      start + 'TRUE'.length,
+      0,
+      new Map(),
+      undefined,
+      undefined,
+      false,
+      undefined,
+      {
+        localizeLiteral: (literal) => (literal === 'TRUE' ? 'WAHR' : literal),
+      },
+    );
+    expect(replaced).toEqual({
+      text: '=IF(A1;WAHR;FALSE)',
+      start: start + 'WAHR'.length,
+      end: start + 'WAHR'.length,
+      preview: { display: 'WAHR', substitutable: true },
+    });
+  });
+
   it('resolves a single-cell ref to its current value', () => {
     const cells = new Map([['0:0:0', numCell(7)]]);
     expect(computeF9Preview('=A1+1', 'A1', 0, cells)).toEqual({

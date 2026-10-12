@@ -1,3 +1,4 @@
+import type { Locale } from '../../i18n/strings.js';
 // Fill Series subsystem: direction/mode types, the source-range collapse
 // helper, the auto-direction heuristic, and the modal dialog that lets the
 // user pick direction + series type. Kept self-contained so main.ts only
@@ -55,7 +56,7 @@ export const selectedFillSeriesRadio = <T extends string>(
 
 export const showFillSeriesDialog = (
   range: Range,
-  text: FillSeriesDialogText | 'ja' | 'en',
+  text: FillSeriesDialogText | Locale,
 ): Promise<{ direction: RibbonFillDirection; mode: RibbonFillSeriesMode } | null> => {
   return new Promise((resolve) => {
     const t = typeof text === 'string' ? dictionaries[text].fillSeriesDialog : text;

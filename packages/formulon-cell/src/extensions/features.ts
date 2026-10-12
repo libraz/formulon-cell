@@ -11,6 +11,7 @@ export const ALL_FEATURE_IDS = [
   'viewToolbar',
   'sheetTabs',
   'statusBar',
+  'localeSwitcher',
   'workbookObjects',
   'contextMenu',
   'findReplace',
@@ -50,12 +51,14 @@ export type FeatureFlags = Partial<Record<FeatureId, boolean>>;
  *
  *  `viewToolbar` is here because the ribbon's View tab already carries every
  *  control it offers, and a second always-visible strip for the same commands
- *  has no counterpart in the desktop app. Hosts that want the flat strip can
- *  still switch it on. */
+ *  has no counterpart in the desktop app. `localeSwitcher` is opt-in because
+ *  hosts may choose their own startup and language settings UI. Hosts that
+ *  want either compact strip can still switch it on. */
 export const DEFAULT_OFF_FEATURE_IDS: ReadonlySet<FeatureId> = new Set([
   'watchWindow',
   'slicer',
   'viewToolbar',
+  'localeSwitcher',
 ]);
 
 /** Whether `id` starts disabled. Hosts rendering a feature-toggle UI need this

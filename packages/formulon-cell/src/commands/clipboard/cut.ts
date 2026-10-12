@@ -1,5 +1,6 @@
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { State } from '../../store/store.js';
+import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../coerce-input.js';
 import { type CopyResult, copy } from './copy.js';
 
 /**
@@ -8,9 +9,8 @@ import { type CopyResult, copy } from './copy.js';
  * a cut and how overlapping cut moves preserve the captured values.
  */
 export function cut(state: State, wb: WorkbookHandle): CopyResult | null {
-  // `wb` remains in the signature for compatibility with command callers and
-  // future native clipboard implementations. A cut is deliberately capture
-  // only; pasteSpecial performs the deferred source clear in one transaction.
-  void wb;
-  return copy(state);
+  // A cut is deliberately capture only; pasteSpecial performs the deferred
+  // source clear in one transaction. Keep its TSV spelling aligned with copy
+  // while retaining the workbook argument used by existing callers.
+  return copy(state, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
 }

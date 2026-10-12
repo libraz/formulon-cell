@@ -49,8 +49,15 @@ describe('feature presets', () => {
     expect(flags.slicer).toBe(false);
     // The ribbon's View tab already carries the strip's commands.
     expect(flags.viewToolbar).toBe(false);
+    expect(flags.localeSwitcher).toBe(false);
     for (const id of ALL_FEATURE_IDS) {
-      if (id === 'watchWindow' || id === 'slicer' || id === 'viewToolbar') continue;
+      if (
+        id === 'watchWindow' ||
+        id === 'slicer' ||
+        id === 'viewToolbar' ||
+        id === 'localeSwitcher'
+      )
+        continue;
       expect(flags[id]).toBe(true);
     }
   });
@@ -58,6 +65,7 @@ describe('feature presets', () => {
   it('reports which features start disabled so hosts read flags the same way', () => {
     expect(isFeatureDefaultOff('viewToolbar')).toBe(true);
     expect(isFeatureDefaultOff('watchWindow')).toBe(true);
+    expect(isFeatureDefaultOff('localeSwitcher')).toBe(true);
     expect(isFeatureDefaultOff('statusBar')).toBe(false);
     expect([...DEFAULT_OFF_FEATURE_IDS].every((id) => resolveFlags()[id] === false)).toBe(true);
   });

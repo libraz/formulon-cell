@@ -37,7 +37,7 @@ describe('attachConditionalDialog', () => {
     const minType = scaleTypeSelects[0] as HTMLSelectElement;
     const maxType = scaleTypeSelects[2] as HTMLSelectElement;
     const numberInputs = Array.from(
-      document.querySelectorAll<HTMLInputElement>('.fc-conddlg__form input[type="number"]'),
+      document.querySelectorAll<HTMLInputElement>('.fc-conddlg__form input[aria-label]'),
     );
     const minValue = numberInputs.find(
       (input) => input.getAttribute('aria-label') === 'Min Value',

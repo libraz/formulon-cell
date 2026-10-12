@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
 import { setCellLocked, setProtectedSheet } from '../../../../src/commands/protection.js';
+import { MAX_COL, MAX_ROW } from '../../../../src/engine/address.js';
+import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { addrKey } from '../../../../src/engine/workbook-handle.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import {
@@ -287,6 +289,56 @@ describe('attachFormatDialog', () => {
     expect(formats.get(addrKey({ sheet: 0, row: 0, col: 1 }))?.bold).toBe(true);
     expect(formats.get(addrKey({ sheet: 0, row: 1, col: 0 }))?.bold).toBe(true);
     expect(formats.get(addrKey({ sheet: 0, row: 1, col: 1 }))?.bold).toBe(true);
+    handle.detach();
+  });
+
+  it('applies a font-only dialog change to the compact whole-sheet override', () => {
+    const history = new History();
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL },
+      },
+    }));
+    const handle = attachFormatDialog({ host, store, history, getWb: mergeWorkbook });
+    handle.open('font');
+
+    const sizeInput = document.querySelector<HTMLInputElement>('input[type="number"][min="1"]');
+    if (!sizeInput) throw new Error('font size input missing');
+    sizeInput.value = '18';
+    sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+    expect(store.getState().format.sheetFontOverrides?.get(0)?.patch).toEqual({ fontSize: 24 });
+    expect(history.undo()).toBe(true);
+    expect(store.getState().format.sheetFontOverrides?.get(0)).toBeUndefined();
+    expect(history.redo()).toBe(true);
+    expect(store.getState().format.sheetFontOverrides?.get(0)?.patch).toEqual({ fontSize: 24 });
+    handle.detach();
+  });
+
+  it('rejects whole-sheet font dialog changes without native axis support', () => {
+    const unsupported = (): WorkbookHandle =>
+      ({
+        ...mergeWorkbook(),
+        capabilities: { merges: true, sheetFontStyles: false },
+      }) as WorkbookHandle;
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL },
+      },
+    }));
+    const handle = attachFormatDialog({ host, store, getWb: unsupported });
+    handle.open('font');
+    const sizeInput = document.querySelector<HTMLInputElement>('input[type="number"][min="1"]');
+    if (!sizeInput) throw new Error('font size input missing');
+    sizeInput.value = '18';
+    sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(store.getState().format.sheetFontOverrides?.size ?? 0).toBe(0);
     handle.detach();
   });
 

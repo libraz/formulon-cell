@@ -35,15 +35,15 @@ export const SAFE_INSET = 1;
  */
 export const STROKE = {
   /** Interior rules and other detail that must not compete with the outline. */
-  hairline: '1',
+  hairline: '0.6',
   /** Secondary structure: inner frames, text rules, small detail. */
-  thin: '1.25',
+  thin: '0.8',
   /** Default outline weight. */
-  regular: '1.5',
+  regular: '1',
   /** Emphasis: arrows, primary action marks. */
-  bold: '1.75',
+  bold: '1.15',
   /** Reserved for marks that must survive at 16px, such as clear/delete Xs. */
-  heavy: '2',
+  heavy: '1.3',
 } as const;
 
 export type StrokeWeight = keyof typeof STROKE;

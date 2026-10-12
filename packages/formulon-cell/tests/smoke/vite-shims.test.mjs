@@ -30,12 +30,12 @@ describe('formulon browser shims', () => {
   it('every demo Vite config inherits the shared base', () => {
     for (const config of configs) {
       const source = readFileSync(resolve(root, config), 'utf8');
-      // Each app calls `baseConfig(__dirname)` and merges; that's what pulls
+      // Each app calls the shared config with its directory and merges; that pulls
       // the shim aliases in. Loose check on both pieces keeps the smoke
       // test robust against trivial whitespace changes.
       expect(source, `${config} must import baseConfig`).toMatch(/from '\.\.\/vite\.base\.js'/);
-      expect(source, `${config} must invoke baseConfig(__dirname)`).toContain(
-        'baseConfig(__dirname)',
+      expect(source, `${config} must invoke baseConfig with its own directory`).toMatch(
+        /baseConfig\((?:__dirname|import\.meta\.dirname)\)/,
       );
     }
   });

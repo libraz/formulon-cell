@@ -1,7 +1,7 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
-import { formatCellForEdit } from '../engine/edit-seed.js';
+import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellChangeEvent, SpreadsheetEmitter } from '../events.js';
@@ -33,6 +33,7 @@ import type { GridRenderer } from '../render/grid.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { resolveTheme } from '../theme/resolve.js';
+import { hydrateActiveSheetFromEngine } from './hydration.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
 
 type FeatureFlags = ReturnType<typeof resolveFlags>;
@@ -172,7 +173,12 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
             insertRefAtCaret: (ref) => editor.insertRefAtCaret(ref),
           }
         : (getFormulaBarEditor?.() ?? null),
-    () => ({ locale: getLocale(), theme: resolveTheme(host) }),
+    () => ({
+      locale: getLocale(),
+      theme: resolveTheme(host),
+      workbookDisplayFont: wb.workbookDisplayFont,
+      workbook: wb,
+    }),
   );
   // Header / footer slots are only reachable in Page Layout view, but the
   // listener is cheap and stateless until one is clicked.
@@ -302,6 +308,25 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         wb,
         strings,
         history,
+        getLocale,
+        onActivateSheet: (sheet) => {
+          if (
+            store.getState().layout.hiddenSheets.has(sheet) ||
+            store.getState().layout.veryHiddenSheets.has(sheet)
+          )
+            return false;
+          const tabs = getSheetTabs();
+          if (tabs) {
+            tabs.switchSheet(sheet);
+            return store.getState().data.sheetIndex === sheet;
+          }
+          mutators.setSheetIndex(store, sheet);
+          if (store.getState().data.sheetIndex !== sheet) return false;
+          hydrateActiveSheetFromEngine(wb, store);
+          updateChrome();
+          renderer.invalidate();
+          return true;
+        },
         onAfterCommit: refreshCells,
       })
     : null;
@@ -337,11 +362,12 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     const a = s.selection.active;
     const key = `${a.sheet}:${a.row}:${a.col}`;
     const fmt = s.format.formats.get(key);
+    const storedFormula = wb.cellFormula(a) ?? s.data.cells.get(key)?.formula ?? null;
     const seed = formatCellForEdit(s.data.cells.get(key), wb, a, {
-      formulaOverride: wb.cellFormula(a),
+      formulaOverride: formulaForEdit(wb, a, storedFormula, s.ui.r1c1),
       formulaHidden: fmt?.formulaHidden === true,
       sheetProtected: s.protection.protectedSheets.has(a.sheet),
-      formatFormula: s.ui.r1c1 ? (formula) => formatA1FormulaAsR1C1(formula, a) : undefined,
+      locale: inputLocaleForWorkbook(wb),
     });
     editor.begin(seed);
     e.preventDefault();

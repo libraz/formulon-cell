@@ -26,6 +26,11 @@ export interface WatchPanelDeps {
   history?: History | null;
   /** Workbook label shown in the Excel-compatible Book column. */
   workbookName?: string;
+  /** Optional live workbook label. Explicit `workbookName` remains highest
+   * priority; an absent getter keeps the existing neutral `Book1` fallback. */
+  getWorkbookName?: () => string | null | undefined;
+  /** Current UI locale used only when the native display renderer is absent. */
+  getLocale?: () => string;
 }
 
 export interface WatchPanelHandle {
@@ -162,11 +167,46 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     }
   };
 
-  const bookLabel = (): string => deps.workbookName ?? 'Book1';
+  const bookLabel = (): string => {
+    if (deps.workbookName !== undefined) return deps.workbookName;
+    try {
+      const live = deps.getWorkbookName?.();
+      if (live) return live;
+    } catch {
+      // A host-provided label is presentation-only; keep the stable fallback
+      // while a workbook is being swapped or disposed.
+    }
+    return 'Book1';
+  };
+
+  const workbookDisplayLocale = (wb: WorkbookHandle): string => {
+    try {
+      const profile = wb.spreadsheetProfileId();
+      const suffix = profile?.slice(profile.lastIndexOf('-') + 1);
+      if (suffix === 'ja_JP') return 'ja-JP';
+      if (suffix === 'de_DE') return 'de-DE';
+      if (suffix === 'fr_FR') return 'fr-FR';
+      if (suffix === 'zh_CN') return 'zh-CN';
+      if (suffix === 'ko_KR') return 'ko-KR';
+      if (suffix === 'th_TH') return 'th-TH';
+    } catch {
+      // Fall through to the host locale or the canonical formatter.
+    }
+    return deps.getLocale?.() ?? 'en-US';
+  };
 
   const readValue = (addr: Addr): string => {
     try {
-      return formatCell(getWb().getValue(addr));
+      const wb = getWb();
+      // getDisplayText is workbook-aware: it applies the active profile,
+      // number format, date system, localized booleans, and error spelling.
+      // An empty string is a valid display for a blank cell, so test null.
+      const native =
+        typeof wb.getDisplayText === 'function'
+          ? wb.getDisplayText(addr.sheet, addr.row, addr.col)
+          : null;
+      if (native !== null) return native;
+      return formatCell(wb.getValue(addr), workbookDisplayLocale(wb));
     } catch {
       return '';
     }
@@ -174,7 +214,14 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
 
   const formulaOf = (addr: Addr): string => {
     try {
-      return getWb().cellFormula(addr) ?? '';
+      const wb = getWb();
+      const formula = wb.cellFormula(addr) ?? '';
+      if (!formula) return '';
+      // Stored formulas stay canonical; the Watch Window is a display surface
+      // and follows the active profile's aliases/separators when available.
+      return typeof wb.getFormulaForDisplay === 'function'
+        ? wb.getFormulaForDisplay(formula)
+        : formula;
     } catch {
       return '';
     }

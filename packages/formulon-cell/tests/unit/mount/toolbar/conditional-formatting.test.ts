@@ -53,7 +53,7 @@ describe('Spreadsheet.mountToolbar', () => {
     formatSelect.value = 'yellow-dark-yellow';
     formatSelect.dispatchEvent(new Event('change', { bubbles: true }));
     expect(formatPreview?.style.background).toBe('#ffeb9c');
-    const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
+    const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     expect(input).toBeTruthy();
     if (!input) throw new Error('Expected conditional formatting number dialog.');
     input.value = '5';

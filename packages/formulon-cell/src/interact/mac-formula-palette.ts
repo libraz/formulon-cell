@@ -24,6 +24,7 @@ import type { FormulaEditLease, FormulaEditLeaseContext } from './formula-edit-l
 import {
   CATEGORY_LABEL_KEY,
   catalogLocaleOrdinal,
+  catalogLocaleTag,
   functionDescription,
 } from './function-catalog-text.js';
 import type { FxDialogHandle, FxDialogOpenOptions } from './fx-dialog.js';
@@ -130,7 +131,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   let returnFocusTarget: HTMLElement | null = null;
   let anchor: Addr | null = null;
   let sessionWb: WorkbookHandle | null = null;
-  let catalog = buildFunctionCatalog(null, catalogLocaleOrdinal(deps.getLocale()));
+  let catalog = buildFunctionCatalog(
+    null,
+    catalogLocaleOrdinal(deps.getLocale()),
+    catalogLocaleTag(deps.getLocale()),
+  );
   let pickerCategory: FunctionCategory = 'all';
   let pickerSelectionName: string | null = null;
   let pickerSelectionEntry: FunctionCatalogEntry | null = null;
@@ -197,6 +202,26 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
   };
 
+  const activeListSeparator = (): ',' | ';' => {
+    const workbook = safeWorkbook();
+    return typeof workbook?.localeFacts === 'function' &&
+      workbook.localeFacts()?.listSeparator === ';'
+      ? ';'
+      : ',';
+  };
+
+  const activeCatalogLocale = (): 0 | 1 | 2 | 3 => catalogLocaleOrdinal(deps.getLocale());
+
+  const nativeFunctionName = (canonical: string): string => {
+    try {
+      const workbook = safeWorkbook();
+      const localized = workbook?.localizeFunctionName(canonical, activeCatalogLocale());
+      return localized || canonical;
+    } catch {
+      return canonical;
+    }
+  };
+
   const isClosed = (): boolean => mode === 'closed';
 
   const setReturnFocusTarget = (target: HTMLElement | null): void => {
@@ -208,15 +233,33 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     let reader: FunctionCatalogReader | null = null;
     try {
       reader = deps.getWb();
-      return buildFunctionCatalog(reader, catalogLocaleOrdinal(deps.getLocale()));
+      return buildFunctionCatalog(
+        reader,
+        catalogLocaleOrdinal(deps.getLocale()),
+        catalogLocaleTag(deps.getLocale()),
+      );
     } catch {
-      return buildFunctionCatalog(null, catalogLocaleOrdinal(deps.getLocale()));
+      return buildFunctionCatalog(
+        null,
+        catalogLocaleOrdinal(deps.getLocale()),
+        catalogLocaleTag(deps.getLocale()),
+      );
     }
   };
 
   const resolveProjectedName = (rawName: string): string | null => {
     const name = canonicalName(rawName);
-    return catalog.knownNames.has(name) ? name : null;
+    if (catalog.knownNames.has(name)) return name;
+    const nativeMatch = [...catalog.entries.values()].find(
+      (entry) => canonicalName(nativeFunctionName(entry.canonicalName)) === name,
+    );
+    if (nativeMatch) return nativeMatch.canonicalName;
+    const workbook = safeWorkbook();
+    if (workbook && typeof workbook.canonicalizeFunctionName === 'function') {
+      const canonical = workbook.canonicalizeFunctionName(rawName, activeCatalogLocale());
+      if (canonical && catalog.knownNames.has(canonical)) return canonical;
+    }
+    return null;
   };
 
   const activeEndpoint = (view: DraftView): number =>
@@ -224,7 +267,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
 
   const reprojectDraft = (view: DraftView): ProjectedFormulaCall | null => {
     currentCaret = activeEndpoint(view);
-    callProjection = projectFormulaCallAtCaret(view.raw, currentCaret, resolveProjectedName);
+    callProjection = projectFormulaCallAtCaret(
+      view.raw,
+      currentCaret,
+      resolveProjectedName,
+      activeListSeparator(),
+    );
     return callProjection;
   };
 
@@ -247,7 +295,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   };
 
   const textForEntry = (entry: FunctionCatalogEntry): string =>
-    functionDescription(entry, catalogLocaleOrdinal(deps.getLocale()));
+    functionDescription(entry, catalogLocaleTag(deps.getLocale()));
 
   const argumentHelp = (entry: FunctionCatalogEntry, index: number): FunctionArgumentHelp =>
     resolveArgumentHelp(
@@ -276,7 +324,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     return textForEntry(selectedEntry) ?? '';
   };
 
-  const selectedSyntax = (): string => (selectedEntry ? functionSyntax(selectedEntry) : '');
+  const selectedSyntax = (): string =>
+    selectedEntry ? functionSyntax(selectedEntry, activeListSeparator()) : '';
 
   const categoryTitle = (category: CatalogFunctionCategory): string =>
     strings.fxDialog[CATEGORY_LABEL_KEY[category]];
@@ -359,7 +408,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         preview.textContent = labels.pending;
         return;
       }
-      const result = workbook.evaluateFormulaText(currentAnchor(), currentRaw);
+      const canonicalRaw =
+        typeof workbook.canonicalizeLocalizedFormula === 'function'
+          ? workbook.canonicalizeLocalizedFormula(currentRaw)
+          : currentRaw;
+      const result = workbook.evaluateFormulaText(currentAnchor(), canonicalRaw);
       if (!result.status.ok) {
         preview.textContent = labels.pending;
         return;
@@ -463,7 +516,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         ? {
             displayName: entry.displayName,
             description: textForEntry(entry),
-            syntax: functionSyntax(entry),
+            syntax: functionSyntax(entry, activeListSeparator()),
           }
         : null,
       insertDisabled:
@@ -661,13 +714,16 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     const committedCount = explicitArgumentCount;
     const committedPreservesCount = preserveExplicitArgumentCount;
     const parsed =
-      outcome === 'committed' && committedName ? parseOuterCall(committedRaw, committedName) : null;
+      outcome === 'committed' && committedName
+        ? parseOuterCall(committedRaw, committedName, activeListSeparator(), resolveProjectedName)
+        : null;
     const assembled =
       parsed && committedName
         ? formulaWithArgumentCount(
-            committedName,
+            nativeFunctionName(committedName),
             parsed.args,
             committedPreservesCount ? committedCount : null,
+            activeListSeparator(),
           )
         : null;
     const committedValid =
@@ -752,8 +808,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         postCommit.raw,
         postCommit.caret,
         resolveProjectedName,
+        activeListSeparator(),
       );
-      const parsed = selectedName ? parseOuterCall(currentRaw, selectedName) : null;
+      const parsed = selectedName
+        ? parseOuterCall(currentRaw, selectedName, activeListSeparator(), resolveProjectedName)
+        : null;
       explicitArgumentCount = callProjection?.args.length ?? parsed?.args.length ?? null;
       preserveExplicitArgumentCount = callProjection !== null || parsed !== null;
       synchronized =
@@ -769,7 +828,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     if (!binding) return false;
     const view = binding.handle.snapshot();
     const projection = view ? reprojectDraft(view) : null;
-    const parsed = parseOuterCall(currentRaw, postCommit.name);
+    const parsed = parseOuterCall(
+      currentRaw,
+      postCommit.name,
+      activeListSeparator(),
+      resolveProjectedName,
+    );
     synchronized =
       (projection?.span.canonicalName === postCommit.name && projection.span.complete) ||
       parsed !== null;
@@ -802,6 +866,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       view.raw,
       snapshotCaret,
       resolveProjectedName,
+      activeListSeparator(),
     );
     if (
       currentRaw !== view.raw ||
@@ -837,9 +902,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     const replaced = replaceProjectedFormulaCall(
       currentRaw,
       projection,
-      selectedName,
+      nativeFunctionName(selectedName),
       next.args,
       next.args.length,
+      activeListSeparator(),
     );
     if (!replaced) {
       synchronized = false;
@@ -1029,9 +1095,10 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       const replaced = replaceProjectedFormulaCall(
         raw,
         projection,
-        requestedName,
+        nativeFunctionName(requestedName),
         initialArgs,
         null,
+        activeListSeparator(),
       );
       if (!replaced) {
         synchronized = false;
@@ -1072,7 +1139,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     preserveExplicitArgumentCount = false;
     synchronized = true;
     guardMessage = '';
-    const formula = assembledFormula(selectedName, args);
+    const formula = assembledFormula(nativeFunctionName(selectedName), args, activeListSeparator());
     setDraftRaw(formula);
     mode = 'arguments-editing';
     postCommit = null;
@@ -1174,7 +1241,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       return;
     }
 
-    const requestedName = canonicalName(seedName);
+    const requestedName = resolveProjectedName(seedName) ?? canonicalName(seedName);
     const requestedEntry = catalog.entries.get(requestedName) ?? null;
     if (!requestedEntry || isFunctionUnavailableForInsertion(requestedEntry.availability)) {
       guardMessage = labels.unavailable;
@@ -1340,6 +1407,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const setStrings = (next: Strings): void => {
     strings = next;
     labels = paletteStrings(strings);
+    // Locale changes update both the dictionary and the workbook profile.
+    // Re-read metadata here so provider descriptions for zh/ko/th do not stay
+    // on the previous language while the palette remains mounted.
+    catalog = readCatalog();
+    reconcilePickerSelection();
+    selectedEntry = selectedName ? (catalog.entries.get(selectedName) ?? null) : null;
     render();
   };
 

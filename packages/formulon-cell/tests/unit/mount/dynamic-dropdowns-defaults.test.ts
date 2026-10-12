@@ -53,6 +53,55 @@ describe('default dynamic dropdown AutoSum', () => {
     expect(instance.openFunctionArguments).toHaveBeenCalledOnce();
   });
 
+  it('circles native invalid cells and validation-formatted blanks through the UI action', async () => {
+    const store = createSpreadsheetStore();
+    workbook = await WorkbookHandle.createDefault();
+    const host = document.createElement('div');
+    const history = new History();
+    const instance = {
+      host,
+      store,
+      workbook,
+      history,
+    } as unknown as SpreadsheetInstance;
+    expect(workbook.capabilities.validationEvaluation).toBe(true);
+    const listInvalidSpy = vi.spyOn(workbook, 'listInvalidCells');
+    expect(
+      workbook.addValidationEntry(0, {
+        ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }],
+        type: 1,
+        op: 0,
+        allowBlank: false,
+        formula1: '1',
+        formula2: '10',
+      }),
+    ).toBe(true);
+    workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 99);
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        validation: { kind: 'whole', op: 'between', a: 1, b: 10, allowBlank: false },
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 0 },
+      {
+        validation: { kind: 'whole', op: 'between', a: 1, b: 10, allowBlank: false },
+      },
+    );
+    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 99 });
+
+    createDefaultDynamicDropdownsCtx(instance).applyDataValidationAction('circle-invalid');
+
+    expect(listInvalidSpy).toHaveBeenCalled();
+    expect([...store.getState().errorIndicators.validationCircles]).toEqual(['0:0:0', '0:1:0']);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().errorIndicators.validationCircles.size).toBe(0);
+  });
+
   it('keeps illustration handler keys and override semantics stable', async () => {
     const instance = await createInstance();
     const base = createDefaultDynamicDropdownsCtx(instance);

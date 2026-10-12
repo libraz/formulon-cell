@@ -95,4 +95,26 @@ describe('parseCSV', () => {
     ];
     expect(parseCSV(encodeCSV(grid))).toEqual(grid);
   });
+
+  it('supports an explicitly selected semicolon delimiter', () => {
+    const grid = [
+      ['plain', 'with;semicolon', 'with "quote"'],
+      ['line1\r\nline2', '', '  spaces  '],
+    ];
+    const csv = encodeCSV(grid, { delimiter: ';', bom: true });
+    expect(csv).toBe(
+      '\uFEFFplain;"with;semicolon";"with ""quote"""\r\n"line1\r\nline2";;"  spaces  "',
+    );
+    expect(parseCSV(csv, { delimiter: ';' })).toEqual(grid);
+  });
+
+  it('does not auto-detect a semicolon delimiter', () => {
+    expect(parseCSV('a;b\r\nc;d')).toEqual([['a;b'], ['c;d']]);
+  });
+
+  it('rejects unsupported runtime delimiters clearly', () => {
+    const invalid = { delimiter: '|' } as never;
+    expect(() => parseCSV('a|b', invalid)).toThrowError('CSV delimiter must be "," or ";"');
+    expect(() => encodeCSV([['a|b']], invalid)).toThrowError('CSV delimiter must be "," or ";"');
+  });
 });

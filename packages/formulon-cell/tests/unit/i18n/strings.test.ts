@@ -31,6 +31,7 @@ describe('dictionaries', () => {
   it('exposes ja and en under the dictionaries record', () => {
     expect(dictionaries.ja).toBe(ja);
     expect(dictionaries.en).toBe(en);
+    expect(Object.keys(dictionaries).sort()).toEqual(['de', 'en', 'fr', 'ja', 'ko', 'th', 'zh']);
   });
 
   it('defaults to Japanese', () => {
@@ -41,7 +42,12 @@ describe('dictionaries', () => {
     expect(dictionaryLocaleFor('en-US')).toBe('en');
     expect(dictionaryLocaleFor('en_GB')).toBe('en');
     expect(dictionaryLocaleFor('ja-JP')).toBe('ja');
-    expect(dictionaryLocaleFor('fr-FR')).toBe('ja');
+    expect(dictionaryLocaleFor('fr-FR')).toBe('fr');
+    expect(dictionaryLocaleFor('de_DE')).toBe('de');
+    expect(dictionaryLocaleFor('zh-CN')).toBe('zh');
+    expect(dictionaryLocaleFor('ko-KR')).toBe('ko');
+    expect(dictionaryLocaleFor('th_TH')).toBe('th');
+    expect(dictionaryLocaleFor('custom')).toBe('ja');
   });
 
   it('keeps the same shape for ja and en', () => {
@@ -60,7 +66,22 @@ describe('dictionaries', () => {
   });
 
   it('keeps the same nested leaf keys for ja and en', () => {
-    expect(collectLeafPaths(ja)).toEqual(collectLeafPaths(en));
+    for (const [locale, dictionary] of Object.entries(dictionaries)) {
+      expect(collectLeafPaths(dictionary), locale).toEqual(collectLeafPaths(en));
+    }
+  });
+
+  it('preserves interpolation variables in all seven dictionaries', () => {
+    const reference = new Map(collectStringLeaves(en));
+    const variables = (value: unknown): string[] =>
+      typeof value === 'string'
+        ? [...value.matchAll(/\{([A-Za-z]\w*)\}/g)].map((match) => match[1] ?? '').sort()
+        : [];
+    for (const [locale, dictionary] of Object.entries(dictionaries)) {
+      for (const [path, value] of collectStringLeaves(dictionary)) {
+        expect(variables(value), `${locale}.${path}`).toEqual(variables(reference.get(path)));
+      }
+    }
   });
 
   it('does not ship missing or empty dictionary leaves', () => {

@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
+import { copy } from '../../../../src/commands/clipboard/copy.js';
 import { encodeHtml } from '../../../../src/commands/clipboard/html.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 
 const seed = async (
-  cells: { row: number; col: number; value: string | number; fmt?: Record<string, unknown> }[],
+  cells: {
+    row: number;
+    col: number;
+    value: string | number | boolean;
+    fmt?: Record<string, unknown>;
+  }[],
 ) => {
   const wb = await WorkbookHandle.createDefault({ preferStub: true });
   const store = createSpreadsheetStore();
@@ -18,6 +24,9 @@ const seed = async (
       if (typeof c.value === 'number') {
         wb.setNumber(addr, c.value);
         map.set(k, { value: { kind: 'number', value: c.value }, formula: null });
+      } else if (typeof c.value === 'boolean') {
+        wb.setBool(addr, c.value);
+        map.set(k, { value: { kind: 'bool', value: c.value }, formula: null });
       } else {
         wb.setText(addr, c.value);
         map.set(k, { value: { kind: 'text', value: c.value }, formula: null });
@@ -87,6 +96,25 @@ describe('commands/clipboard/encodeHtml', () => {
     expect(html).toContain('font-weight:bold');
     expect(html).toContain('font-style:italic');
     expect(html).toContain('text-decoration:underline line-through');
+  });
+
+  it('uses the effective resolver and keeps font names inside the style attribute', async () => {
+    const store = await seed([{ row: 0, col: 0, value: 'styled' }]);
+    const html = encodeHtml(
+      store.getState(),
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      undefined,
+      () => ({
+        fontFamily: 'x"><img src=x onerror="parent.__probe=1">',
+        fontSize: 24,
+      }),
+    );
+
+    expect(html).toContain('font-size:24px');
+    const parsed = document.createElement('div');
+    parsed.innerHTML = html;
+    expect(parsed.querySelector('img')).toBeNull();
+    expect(parsed.querySelector('[onerror]')).toBeNull();
   });
 
   it('emits color + fill + align styles', async () => {
@@ -184,6 +212,36 @@ describe('commands/clipboard/encodeHtml', () => {
     expect(html).toContain('$');
     expect(html).toContain('1,234.50');
   });
+
+  it.each([
+    ['de-DE', '1,50', 'WAHR'],
+    ['fr-FR', '1,50', 'VRAI'],
+  ] as const)(
+    'uses the live locale for HTML and TSV scalar display (%s)',
+    async (locale, numberText, boolText) => {
+      const store = await seed([
+        {
+          row: 0,
+          col: 0,
+          value: 1.5,
+          fmt: { numFmt: { kind: 'fixed', decimals: 2 } },
+        },
+        { row: 0, col: 1, value: true },
+      ]);
+      const range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+      mutators.setRange(store, range);
+
+      const html = encodeHtml(store.getState(), range, locale);
+      const tsv = copy(store.getState(), locale)?.tsv ?? '';
+
+      expect(html).toContain(numberText);
+      expect(html).toContain(boolText);
+      // TSV remains an edit-input payload, so it keeps precision without adding
+      // display-only trailing zeroes while sharing the locale decimal/boolean token.
+      expect(tsv).toContain('1,5');
+      expect(tsv).toContain(boolText);
+    },
+  );
 
   it('emits rowspan/colspan for contained merges and skips covered cells', async () => {
     const store = await seed([{ row: 0, col: 0, value: 'merged' }]);

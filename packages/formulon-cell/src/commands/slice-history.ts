@@ -1,5 +1,11 @@
+import { parseAddrKey } from '../engine/address.js';
+import {
+  type FormatHistoryTrackingSnapshot,
+  formatHistoryBridgeFor,
+  type NativeFormatSnapshot,
+} from '../engine/format-history-bridge.js';
 import { syncLayoutToEngine } from '../engine/layout-sync.js';
-import type { Range } from '../engine/types.js';
+import type { Range, SheetAxisFormatOverride, SheetFontOverride } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   CellFormat,
@@ -28,8 +34,40 @@ import type { History } from './history.js';
  *  (only explicitly formatted cells have entries). */
 export interface FormatSnapshot {
   formats: Map<string, CellFormat>;
+  sheetFontOverrides?: Map<number, SheetFontOverride>;
+  sheetAxisOverrides?: Map<number, SheetAxisFormatOverride>;
   customCellStyles: CustomCellStyle[];
 }
+const cloneSheetFontAxisSnapshot = (
+  snapshot: SheetFontOverride['baseline'],
+): SheetFontOverride['baseline'] =>
+  snapshot
+    ? {
+        columns: snapshot.columns.map((entry) => ({ ...entry })),
+        rows: snapshot.rows.map((entry) => ({ ...entry })),
+      }
+    : undefined;
+
+const cloneSheetFontOverride = (override: SheetFontOverride): SheetFontOverride => ({
+  patch: { ...override.patch },
+  ...(override.clearAxes ? { clearAxes: true } : {}),
+  ...(override.baseline ? { baseline: cloneSheetFontAxisSnapshot(override.baseline) } : {}),
+});
+
+const cloneSheetAxisOverride = (override: SheetAxisFormatOverride): SheetAxisFormatOverride => ({
+  baseline: cloneSheetFontAxisSnapshot(override.baseline) ?? { columns: [], rows: [] },
+  desired: cloneSheetFontAxisSnapshot(override.desired) ?? { columns: [], rows: [] },
+  ...(override.directXfs
+    ? {
+        directXfs: override.directXfs.map((entry) => ({
+          key: entry.key,
+          before: { ...entry.before },
+          afterXfIndex: entry.afterXfIndex,
+        })),
+      }
+    : {}),
+  ...(override.fontPatch ? { fontPatch: { ...override.fontPatch } } : {}),
+});
 
 const cloneCustomCellStyle = (style: CustomCellStyle): CustomCellStyle => ({
   ...style,
@@ -39,6 +77,18 @@ const cloneCustomCellStyle = (style: CustomCellStyle): CustomCellStyle => ({
 export function captureFormatSnapshot(state: State): FormatSnapshot {
   return {
     formats: new Map(state.format.formats),
+    sheetFontOverrides: new Map(
+      [...(state.format.sheetFontOverrides ?? new Map())].map(([sheet, override]) => [
+        sheet,
+        cloneSheetFontOverride(override),
+      ]),
+    ),
+    sheetAxisOverrides: new Map(
+      [...(state.format.sheetAxisOverrides ?? new Map())].map(([sheet, override]) => [
+        sheet,
+        cloneSheetAxisOverride(override),
+      ]),
+    ),
     customCellStyles: (state.format.customCellStyles ?? []).map(cloneCustomCellStyle),
   };
 }
@@ -48,6 +98,18 @@ export function applyFormatSnapshot(store: SpreadsheetStore, snap: FormatSnapsho
     ...s,
     format: {
       formats: new Map(snap.formats),
+      sheetFontOverrides: new Map(
+        [...(snap.sheetFontOverrides ?? new Map())].map(([sheet, override]) => [
+          sheet,
+          cloneSheetFontOverride(override),
+        ]),
+      ),
+      sheetAxisOverrides: new Map(
+        [...(snap.sheetAxisOverrides ?? new Map())].map(([sheet, override]) => [
+          sheet,
+          cloneSheetAxisOverride(override),
+        ]),
+      ),
       customCellStyles: snap.customCellStyles.map(cloneCustomCellStyle),
     },
   }));
@@ -56,13 +118,180 @@ export function applyFormatSnapshot(store: SpreadsheetStore, snap: FormatSnapsho
 const formatSnapshotKey = (snap: FormatSnapshot): string =>
   JSON.stringify({
     formats: [...snap.formats.entries()].sort(([a], [b]) => a.localeCompare(b)),
+    sheetFontOverrides: [...(snap.sheetFontOverrides ?? new Map()).entries()].sort(
+      ([a], [b]) => a - b,
+    ),
+    sheetAxisOverrides: [...(snap.sheetAxisOverrides ?? new Map()).entries()].sort(
+      ([a], [b]) => a - b,
+    ),
     customCellStyles: snap.customCellStyles,
   });
 
 const sameFormatSnapshot = (a: FormatSnapshot, b: FormatSnapshot): boolean =>
   a.formats.size === b.formats.size &&
+  (a.sheetFontOverrides?.size ?? 0) === (b.sheetFontOverrides?.size ?? 0) &&
+  (a.sheetAxisOverrides?.size ?? 0) === (b.sheetAxisOverrides?.size ?? 0) &&
   a.customCellStyles.length === b.customCellStyles.length &&
   formatSnapshotKey(a) === formatSnapshotKey(b);
+
+const jsonSnapshot = (value: unknown): string => JSON.stringify(value);
+
+const sameFormatValue = (a: CellFormat | undefined, b: CellFormat | undefined): boolean =>
+  jsonSnapshot(a) === jsonSnapshot(b);
+
+const changedFormatKeys = (before: FormatSnapshot, after: FormatSnapshot): Set<string> => {
+  const changed = new Set<string>();
+  for (const key of new Set([...before.formats.keys(), ...after.formats.keys()])) {
+    if (!sameFormatValue(before.formats.get(key), after.formats.get(key))) changed.add(key);
+  }
+  return changed;
+};
+
+const changedSheetFontOverrideKeys = (
+  before: FormatSnapshot,
+  after: FormatSnapshot,
+): Set<number> => {
+  const changed = new Set<number>();
+  const beforeOverrides = before.sheetFontOverrides ?? new Map();
+  const afterOverrides = after.sheetFontOverrides ?? new Map();
+  for (const sheet of new Set([...beforeOverrides.keys(), ...afterOverrides.keys()])) {
+    if (jsonSnapshot(beforeOverrides.get(sheet)) !== jsonSnapshot(afterOverrides.get(sheet))) {
+      changed.add(sheet);
+    }
+  }
+  return changed;
+};
+
+const changedSheetAxisOverrideKeys = (
+  before: FormatSnapshot,
+  after: FormatSnapshot,
+): Set<number> => {
+  const changed = new Set<number>();
+  const beforeOverrides = before.sheetAxisOverrides ?? new Map();
+  const afterOverrides = after.sheetAxisOverrides ?? new Map();
+  for (const sheet of new Set([...beforeOverrides.keys(), ...afterOverrides.keys()])) {
+    if (jsonSnapshot(beforeOverrides.get(sheet)) !== jsonSnapshot(afterOverrides.get(sheet))) {
+      changed.add(sheet);
+    }
+  }
+  return changed;
+};
+
+const directKeysForAxisOverrides = (
+  snapshot: FormatSnapshot,
+  sheets: Iterable<number>,
+): Set<string> => {
+  const keys = new Set<string>();
+  const overrides = snapshot.sheetAxisOverrides ?? new Map();
+  for (const sheet of sheets) {
+    for (const entry of overrides.get(sheet)?.directXfs ?? []) keys.add(entry.key);
+  }
+  return keys;
+};
+
+const cloneCellFormat = (format: CellFormat): CellFormat =>
+  JSON.parse(JSON.stringify(format)) as CellFormat;
+
+const formatPatch = (
+  before: FormatSnapshot,
+  keys: Iterable<string>,
+): Map<string, CellFormat | undefined> => {
+  const patch = new Map<string, CellFormat | undefined>();
+  for (const key of keys) {
+    const value = before.formats.get(key);
+    patch.set(key, value === undefined ? undefined : cloneCellFormat(value));
+  }
+  return patch;
+};
+
+const sheetFontPatch = (
+  before: FormatSnapshot,
+  sheets: Iterable<number>,
+): Map<number, SheetFontOverride | undefined> => {
+  const patch = new Map<number, SheetFontOverride | undefined>();
+  const overrides = before.sheetFontOverrides ?? new Map();
+  for (const sheet of sheets) {
+    const value = overrides.get(sheet);
+    patch.set(sheet, value === undefined ? undefined : cloneSheetFontOverride(value));
+  }
+  return patch;
+};
+
+const sheetAxisPatch = (
+  before: FormatSnapshot,
+  sheets: Iterable<number>,
+): Map<number, SheetAxisFormatOverride | undefined> => {
+  const patch = new Map<number, SheetAxisFormatOverride | undefined>();
+  const overrides = before.sheetAxisOverrides ?? new Map();
+  for (const sheet of sheets) {
+    const value = overrides.get(sheet);
+    patch.set(sheet, value === undefined ? undefined : cloneSheetAxisOverride(value));
+  }
+  return patch;
+};
+
+const formatsWithCellStyle = (snapshot: FormatSnapshot): Set<string> => {
+  const keys = new Set<string>();
+  for (const [key, format] of snapshot.formats) {
+    if (format.cellStyle !== undefined) keys.add(key);
+  }
+  return keys;
+};
+
+const sheetsForFormatKeys = (keys: Iterable<string>): Set<number> => {
+  const sheets = new Set<number>();
+  for (const key of keys) {
+    const addr = parseAddrKey(key);
+    if (addr && addr.sheet >= 0) sheets.add(addr.sheet);
+  }
+  return sheets;
+};
+
+const sheetsForCellStyles = (before: FormatSnapshot, after: FormatSnapshot): Set<number> => {
+  const sheets = sheetsForFormatKeys(
+    new Set([...formatsWithCellStyle(before), ...formatsWithCellStyle(after)]),
+  );
+  if (sheets.size === 0) sheets.add(0);
+  return sheets;
+};
+
+const applyScopedFormatChange = (
+  store: SpreadsheetStore,
+  formats: Map<string, CellFormat | undefined>,
+  sheetFonts: Map<number, SheetFontOverride | undefined>,
+  sheetAxes: Map<number, SheetAxisFormatOverride | undefined>,
+  customCellStyles: CustomCellStyle[] | undefined,
+): void => {
+  store.setState((state) => {
+    const nextFormats = new Map(state.format.formats);
+    for (const [key, value] of formats) {
+      if (value === undefined) nextFormats.delete(key);
+      else nextFormats.set(key, cloneCellFormat(value));
+    }
+    const nextSheetFonts = new Map(state.format.sheetFontOverrides ?? new Map());
+    for (const [sheet, value] of sheetFonts) {
+      if (value === undefined) nextSheetFonts.delete(sheet);
+      else nextSheetFonts.set(sheet, cloneSheetFontOverride(value));
+    }
+    const nextSheetAxes = new Map(state.format.sheetAxisOverrides ?? new Map());
+    for (const [sheet, value] of sheetAxes) {
+      if (value === undefined) nextSheetAxes.delete(sheet);
+      else nextSheetAxes.set(sheet, cloneSheetAxisOverride(value));
+    }
+    return {
+      ...state,
+      format: {
+        ...state.format,
+        formats: nextFormats,
+        sheetFontOverrides: nextSheetFonts,
+        sheetAxisOverrides: nextSheetAxes,
+        ...(customCellStyles === undefined
+          ? {}
+          : { customCellStyles: customCellStyles.map(cloneCustomCellStyle) }),
+      },
+    };
+  });
+};
 
 const mapSnapshotKey = <T>(snap: Map<string, T>): string =>
   JSON.stringify([...snap.entries()].sort(([a], [b]) => a.localeCompare(b)));
@@ -313,12 +542,192 @@ export function recordFormatChange(
   mutate: () => void,
   opts: { repeat?: () => void } = {},
 ): void {
+  const bridge = history && !history.isReplaying() ? formatHistoryBridgeFor(store) : undefined;
+  if (bridge) {
+    recordBridgedFormatChange(history as History, store, mutate, opts, bridge);
+    return;
+  }
   recordSliceChange(history, store, mutate, {
     capture: captureFormatSnapshot,
     apply: applyFormatSnapshot,
     same: sameFormatSnapshot,
     repeat: opts.repeat,
   });
+}
+
+/** Record a mounted format mutation while keeping native cell XFs in the same
+ * state as the store history entry. The store mirror is muted around the
+ * mutation and every replay; strict publication happens explicitly before
+ * the exact native XF snapshot is restored. */
+function recordBridgedFormatChange(
+  history: History,
+  store: SpreadsheetStore,
+  mutate: () => void,
+  opts: { repeat?: () => void },
+  bridge: import('../engine/format-history-bridge.js').FormatHistoryBridge,
+): void {
+  const before = captureFormatSnapshot(store.getState());
+  let after: FormatSnapshot | undefined;
+  let changedKeys = new Set<string>();
+  let changedFontSheets = new Set<number>();
+  let changedAxisSheets = new Set<number>();
+  let customStylesChanged = false;
+  let affectedSheets = new Set<number>();
+  const nativeKeys = new Set<string>();
+  let beforeNative: NativeFormatSnapshot = new Map();
+  let beforeTracking: FormatHistoryTrackingSnapshot | undefined;
+  let publicationAttempted = false;
+
+  const flushAndRestore = (
+    native: NativeFormatSnapshot,
+    tracking: FormatHistoryTrackingSnapshot,
+    flush: boolean,
+  ): void => {
+    const errors: unknown[] = [];
+    if (flush) {
+      try {
+        bridge.flush(affectedSheets);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    // A partial flush may have already published one or more cells. Always
+    // try the exact snapshot even when the retry flush failed, otherwise the
+    // first successful cell can remain stranded in the engine. Restore the
+    // high-water membership after native publication so a later unrelated
+    // flush cannot reset a cell that was already restored here.
+    let nativeRestored = false;
+    try {
+      bridge.restore(native);
+      nativeRestored = true;
+    } catch (error) {
+      errors.push(error);
+    }
+    // Keep newly published membership bits when exact native restoration is
+    // incomplete. Those bits describe the stranded native publication and
+    // must remain visible to the next cleanup attempt; clear them only after
+    // every native XF in the checkpoint was restored successfully.
+    if (nativeRestored) {
+      try {
+        bridge.restoreTracking(tracking);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'Format history recovery failed', {
+        cause: errors[0],
+      });
+    }
+  };
+
+  try {
+    bridge.withSyncMuted(mutate);
+    after = captureFormatSnapshot(store.getState());
+    changedKeys = changedFormatKeys(before, after);
+    changedFontSheets = changedSheetFontOverrideKeys(before, after);
+    changedAxisSheets = changedSheetAxisOverrideKeys(before, after);
+    customStylesChanged =
+      jsonSnapshot(before.customCellStyles) !== jsonSnapshot(after.customCellStyles);
+    if (
+      changedKeys.size === 0 &&
+      changedFontSheets.size === 0 &&
+      changedAxisSheets.size === 0 &&
+      !customStylesChanged
+    )
+      return;
+
+    affectedSheets = sheetsForFormatKeys(changedKeys);
+    for (const sheet of changedFontSheets) affectedSheets.add(sheet);
+    for (const sheet of changedAxisSheets) affectedSheets.add(sheet);
+    if (customStylesChanged) {
+      for (const sheet of sheetsForCellStyles(before, after)) affectedSheets.add(sheet);
+      for (const key of formatsWithCellStyle(before)) nativeKeys.add(key);
+      for (const key of formatsWithCellStyle(after)) nativeKeys.add(key);
+    }
+    for (const key of changedKeys) nativeKeys.add(key);
+    for (const key of directKeysForAxisOverrides(before, changedAxisSheets)) nativeKeys.add(key);
+    for (const key of directKeysForAxisOverrides(after, changedAxisSheets)) nativeKeys.add(key);
+
+    // The mirror stayed muted, so the engine is still at the pre-action XF.
+    beforeNative = bridge.capture(nativeKeys);
+    beforeTracking = bridge.captureTracking(nativeKeys);
+    publicationAttempted = true;
+    bridge.flush(affectedSheets);
+    const afterNative = bridge.capture(nativeKeys);
+
+    const beforeFormats = formatPatch(before, changedKeys);
+    const afterFormats = formatPatch(after, changedKeys);
+    const beforeSheetFonts = sheetFontPatch(before, changedFontSheets);
+    const afterSheetFonts = sheetFontPatch(after, changedFontSheets);
+    const beforeSheetAxes = sheetAxisPatch(before, changedAxisSheets);
+    const afterSheetAxes = sheetAxisPatch(after, changedAxisSheets);
+    const beforeStyles = customStylesChanged
+      ? before.customCellStyles.map(cloneCustomCellStyle)
+      : undefined;
+    const afterStyles = customStylesChanged
+      ? after.customCellStyles.map(cloneCustomCellStyle)
+      : undefined;
+
+    const replay = (
+      formats: Map<string, CellFormat | undefined>,
+      sheetFonts: Map<number, SheetFontOverride | undefined>,
+      sheetAxes: Map<number, SheetAxisFormatOverride | undefined>,
+      customStyles: CustomCellStyle[] | undefined,
+      native: NativeFormatSnapshot,
+    ): void => {
+      const immediate = captureFormatSnapshot(store.getState());
+      const immediateNative = bridge.capture(nativeKeys);
+      const immediateTracking = bridge.captureTracking(nativeKeys);
+      let replayPublicationAttempted = false;
+      try {
+        bridge.withSyncMuted(() => {
+          applyScopedFormatChange(store, formats, sheetFonts, sheetAxes, customStyles);
+          replayPublicationAttempted = true;
+          bridge.flush(affectedSheets);
+          bridge.restore(native);
+        });
+      } catch (error) {
+        try {
+          bridge.withSyncMuted(() => {
+            applyFormatSnapshot(store, immediate);
+            flushAndRestore(immediateNative, immediateTracking, replayPublicationAttempted);
+          });
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Format history replay failed and its rollback failed',
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+    };
+
+    history.push({
+      undo: () =>
+        replay(beforeFormats, beforeSheetFonts, beforeSheetAxes, beforeStyles, beforeNative),
+      redo: () => replay(afterFormats, afterSheetFonts, afterSheetAxes, afterStyles, afterNative),
+      repeat: opts.repeat,
+    });
+  } catch (error) {
+    try {
+      bridge.withSyncMuted(() => {
+        applyFormatSnapshot(store, before);
+        if (publicationAttempted && beforeTracking) {
+          flushAndRestore(beforeNative, beforeTracking, true);
+        }
+      });
+    } catch (rollbackError) {
+      throw new AggregateError(
+        [error, rollbackError],
+        'Format history change failed and its rollback failed',
+        { cause: error },
+      );
+    }
+    throw error;
+  }
 }
 
 /** Record a format command whose mutation derives its target from the current

@@ -14,6 +14,7 @@ import {
 } from '../commands/filter.js';
 import type { History } from '../commands/history.js';
 import type { Range } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 export type RibbonFilterDataAction =
@@ -34,18 +35,29 @@ export interface ExecuteRibbonFilterDataActionDeps {
   store: SpreadsheetStore;
   history: History;
   action: RibbonFilterDataAction;
+  getWb?: () => WorkbookHandle;
 }
 
 /** Toggle the auto-filter on the active range as one undoable step. Used as
  *  the host's "Filter" toolbar callback; the [[RibbonFilterDataAction.toggle]]
  *  branch routes back here so the host can also surface a closeDropdown.
  *  Pulled out so both hosts share the exact same begin/end shape. */
-export const toggleAutoFilterFromSelection = (store: SpreadsheetStore, history: History): void => {
+export const toggleAutoFilterFromSelection = (
+  store: SpreadsheetStore,
+  history: History,
+  getWb?: () => WorkbookHandle,
+): void => {
   const state = store.getState();
-  recordFilterChange(history, store, () => {
-    if (state.ui.filterRange) clearFilter(state, store, state.ui.filterRange);
-    else setAutoFilter(store, inferAutoFilterRange(state));
-  });
+  const wb = getWb?.();
+  recordFilterChange(
+    history,
+    store,
+    () => {
+      if (state.ui.filterRange) clearFilter(state, store, state.ui.filterRange, wb);
+      else setAutoFilter(store, inferAutoFilterRange(state), wb);
+    },
+    wb,
+  );
 };
 
 /** Dispatch a "Filter" menu item. The helper performs every mutation here so
@@ -63,29 +75,46 @@ export const executeRibbonFilterDataAction = (
   const { store, history, action } = deps;
   const state = store.getState();
   if (action === 'toggle') {
-    toggleAutoFilterFromSelection(store, history);
+    toggleAutoFilterFromSelection(store, history, deps.getWb);
     return { kind: 'toggle' };
   }
   if (action === 'clear') {
-    recordFilterChange(history, store, () =>
-      clearFilter(state, store, state.ui.filterRange ?? undefined),
+    const wb = deps.getWb?.();
+    recordFilterChange(
+      history,
+      store,
+      () => clearFilter(state, store, state.ui.filterRange ?? undefined, wb),
+      wb,
     );
     return { kind: 'mutated' };
   }
   if (action === 'reapply') {
-    recordFilterChange(history, store, () => reapplyFilters(store.getState(), store));
+    const wb = deps.getWb?.();
+    recordFilterChange(history, store, () => reapplyFilters(store.getState(), store, wb), wb);
     return { kind: 'mutated' };
   }
   if (action === 'filter-by-selected') {
-    recordFilterChange(history, store, () => filterBySelectedCellValue(store.getState(), store));
+    const wb = deps.getWb?.();
+    recordFilterChange(
+      history,
+      store,
+      () => filterBySelectedCellValue(store.getState(), store, undefined, wb),
+      wb,
+    );
     return { kind: 'mutated' };
   }
   if (action === 'advanced') {
     return { kind: 'open-advanced', range: state.ui.filterRange ?? inferAutoFilterRange(state) };
   }
   const range = state.ui.filterRange ?? inferAutoFilterRange(state);
-  recordFilterChange(history, store, () => {
-    if (!state.ui.filterRange) setAutoFilter(store, range);
-  });
+  const wb = deps.getWb?.();
+  recordFilterChange(
+    history,
+    store,
+    () => {
+      if (!state.ui.filterRange) setAutoFilter(store, range, wb);
+    },
+    wb,
+  );
   return { kind: 'open-filter-dropdown', range, column: state.selection.active.col };
 };

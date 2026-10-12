@@ -3,7 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
-import { coerceInputForCell, writeCoerced } from './coerce-input.js';
+import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from './coerce-input.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
@@ -50,6 +50,7 @@ export function textToColumns(
     .filter((entry): entry is typeof entry & { addr: Addr } => !!entry.addr)
     .filter((entry) => rangeContainsAddr(range, entry.addr))
     .sort((left, right) => left.addr.col - right.addr.col || left.addr.row - right.addr.row);
+  const inputLocale = inputLocaleForWorkbook(wb);
   // Operate column by column so consecutive runs land in the same target columns.
   wb.withBatchedRecalc(() => {
     for (const { key: sourceKey, cell, addr: sourceAddr } of candidates) {
@@ -66,7 +67,7 @@ export function textToColumns(
           warnProtected(dst);
           continue;
         }
-        writeCoerced(wb, dst, coerceInputForCell(state, dst, tok));
+        writeCoerced(wb, dst, coerceInputForCell(state, dst, tok, inputLocale, wb));
         if (sourceFormat) {
           formatWrites.push({ key: addrKey(dst), format: sourceFormat });
         }

@@ -250,7 +250,7 @@ describe('attachContextMenu', () => {
         { row: 0, col: 0, value: 'key' },
         { row: 1, col: 0, value: 'a' },
         { row: 2, col: 0, value: 'b' },
-        { row: 3, col: 0, value: 'a' },
+        { row: 3, col: 0, value: 'A' },
       ]);
       setRange(store, 1, 0, 1, 0);
       mutators.setFilterRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 });

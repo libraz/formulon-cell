@@ -40,7 +40,7 @@ export {
 } from './commands/cell-styles.js';
 export type { CopyResult } from './commands/clipboard/copy.js';
 export { copy } from './commands/clipboard/copy.js';
-export type { CSVEncodeOptions } from './commands/clipboard/csv.js';
+export type { CSVDelimiter, CSVEncodeOptions, CSVParseOptions } from './commands/clipboard/csv.js';
 export { encodeCSV, parseCSV } from './commands/clipboard/csv.js';
 export { cut } from './commands/clipboard/cut.js';
 export { encodeHtml } from './commands/clipboard/html.js';
@@ -79,13 +79,25 @@ export {
   writeInput,
   writeInputValidated,
 } from './commands/coerce-input.js';
-export type { CommentEntry } from './commands/comment.js';
+export type {
+  CommentEntry,
+  ThreadedCommentEntry,
+  ThreadedPersonEntry,
+} from './commands/comment.js';
 export {
+  addThreadedComment,
   clearComment,
   commentAt,
+  editThreadedComment,
+  hydrateThreadedComments,
   listComments,
+  listThreadedComments,
   recordCommentChange,
+  recordThreadedChange,
+  removeThreadedComment,
+  resolveThread,
   setComment,
+  threadedCommentsAt,
 } from './commands/comment.js';
 export type { ConditionalPresetAction } from './commands/conditional-format.js';
 export {
@@ -266,7 +278,7 @@ export {
   listHyperlinks,
   setHyperlink,
 } from './commands/hyperlinks.js';
-export type { ExportOptions, ImportResult } from './commands/import-export.js';
+export type { ExportOptions, ImportCSVOptions, ImportResult } from './commands/import-export.js';
 export { exportCSV, importCSV } from './commands/import-export.js';
 export type {
   ApplyChangesOptions,
@@ -413,6 +425,8 @@ export type {
 export {
   buildPrintDocument,
   computeFitToPagesScale,
+  MAX_PRINT_MATERIALIZED_CELLS,
+  PrintResourceLimitError,
   parsePrintArea,
   parsePrintAreas,
   parsePrintTitleCols,
@@ -464,7 +478,7 @@ export {
   isQuickAnalysisActionEnabled,
   quickAnalysisActionById,
 } from './commands/quick-analysis.js';
-export type { ActiveSignature, F4Result, FormulaRef } from './commands/refs.js';
+export type { ActiveSignature, F4Result, FormulaRef, FormulaScanOptions } from './commands/refs.js';
 export {
   extractRefs,
   FUNCTION_SIGNATURES,
@@ -666,8 +680,10 @@ export {
 } from './commands/traces.js';
 export type { ValidationOutcome } from './commands/validate.js';
 export {
+  circleInvalidValidationDataWithEngine,
   clearValidationInRange,
   clearValidationInRangeWithEngine,
+  listInvalidValidationCells,
   resolveListValues,
   validateAgainst,
 } from './commands/validate.js';
@@ -710,6 +726,7 @@ export {
   THEME_COLOR_COLUMNS,
 } from './components/color-palette.js';
 export { colLetter, formatA1Cell, formatA1Range, parseA1Atom } from './engine/address.js';
+export { hydrateThreadedCommentsFromEngine } from './engine/annotations-sync.js';
 export type { NamedCellStyle } from './engine/cell-styles-meta.js';
 export { computeNamedCellStyles } from './engine/cell-styles-meta.js';
 export type {
@@ -728,6 +745,7 @@ export {
 export type { LocaleOrdinal } from './engine/function-locale.js';
 export { canonicalizeFormula, localizeFormula } from './engine/function-locale.js';
 export { LOCALE_TAGS, localeTag, mergeFunctionMetadata } from './engine/function-metadata.js';
+export { hydrateImagesFromEngine } from './engine/images-sync.js';
 export type { LoadOptions } from './engine/loader.js';
 export { isUsingStub } from './engine/loader.js';
 export type { EnginePageSetupExtrasInput } from './engine/page-setup-xml.js';
@@ -787,6 +805,10 @@ export type {
   FunctionMetadataLocalized,
   FunctionMetadataProvider,
   FunctionMetadataResult,
+  LocaleDateOrder,
+  LocaleErrorName,
+  LocaleFacts,
+  LocaleFactsResult,
   MergedFunctionMetadataResult,
   PhoneticRun,
   PivotCell,
@@ -819,11 +841,30 @@ export type {
   WorkbookHandleFeatureMethods,
 } from './engine/workbook-handle.js';
 export { WorkbookHandle } from './engine/workbook-handle.js';
+export type {
+  EngineDrawingObject,
+  EngineImage,
+  EngineImageInfo,
+  EngineImageInsertOptions,
+  EngineMention,
+  EnginePerson,
+  EngineThreadedComment,
+} from './engine/workbook-handle-annotations.js';
 export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
 export type {
   EngineHeaderFooterInput,
   EnginePageSetupInput,
 } from './engine/workbook-handle-print.js';
+export type {
+  WorkbookThemePreset,
+  WorkbookThemePresetGroup,
+  WorkbookThemePresetId,
+} from './engine/workbook-theme-presets.js';
+export {
+  applyWorkbookThemePreset,
+  WORKBOOK_THEME_PRESETS,
+  workbookThemeMatchesPreset,
+} from './engine/workbook-theme-presets.js';
 // Public event surface — adapter packages and direct consumers wire to
 // these via `inst.on(...)`.
 export type {
@@ -902,14 +943,20 @@ export type {
 export { FormulaRegistry } from './formula.js';
 export type { I18nControllerInit } from './i18n/controller.js';
 export { createI18nController } from './i18n/controller.js';
+export { BUILT_IN_LOCALES } from './i18n/locales.js';
 export type { DeepPartial, Locale, Strings } from './i18n/strings.js';
 export {
+  de,
   defaultStrings,
   dictionaries,
   dictionaryLocaleFor,
   en,
+  fr,
   ja,
+  ko,
   mergeStrings,
+  th,
+  zh,
 } from './i18n/strings.js';
 export type { ArgHelperDeps, ArgHelperHandle, ArgHelperLabels } from './interact/arg-helper.js';
 export { attachArgHelper } from './interact/arg-helper.js';
@@ -1151,6 +1198,7 @@ export type {
   SpreadsheetStore,
   State,
   StatusAggKey,
+  ThreadedCommentsSlice,
   TraceArrow,
   TracesSlice,
   ValidationErrorStyle,

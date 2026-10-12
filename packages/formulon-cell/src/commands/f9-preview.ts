@@ -40,6 +40,12 @@ const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 const STRING_RE = /^"([^"]*)"$/;
 type F9FormulaEvaluator = (formula: string) => EvalResult;
 type F9ArrayEvaluator = (formula: string) => EvalArrayResult;
+export interface F9PreviewOptions {
+  /** Canonicalize localized formula syntax before an evaluator sees it. */
+  canonicalizeFormula?: (formula: string) => string;
+  /** Localize only the literal inserted into the still-localized draft. */
+  localizeLiteral?: (literal: string) => string;
+}
 const MAX_RANGE_EXPANSION_CELLS = 10_000;
 /** Upper bound on cells rendered into an F9 array constant. Beyond this the
  *  preview collapses to the array's top-left element rather than pasting an
@@ -105,19 +111,25 @@ export function computeF9Preview(
   evalFormula?: F9FormulaEvaluator,
   preferContextualEvaluation = false,
   evalFormulaArray?: F9ArrayEvaluator,
+  options: F9PreviewOptions = {},
 ): F9Preview {
+  const localize = (literal: string): string => options.localizeLiteral?.(literal) ?? literal;
+  const evaluate = (formula: string): EvalResult | null =>
+    evalFormula?.(options.canonicalizeFormula?.(formula) ?? formula) ?? null;
+  const evaluateArray = (formula: string): EvalArrayResult | null =>
+    evalFormulaArray?.(options.canonicalizeFormula?.(formula) ?? formula) ?? null;
   const trimmed = selection.trim();
   if (!trimmed) {
     return { display: '', substitutable: false };
   }
   if (NUMBER_RE.test(trimmed)) {
-    return { display: trimmed, substitutable: true };
+    return { display: localize(trimmed), substitutable: true };
   }
   if (STRING_RE.test(trimmed)) {
-    return { display: trimmed, substitutable: true };
+    return { display: localize(trimmed), substitutable: true };
   }
   if (/^(true|false)$/i.test(trimmed)) {
-    return { display: trimmed.toUpperCase(), substitutable: true };
+    return { display: localize(trimmed.toUpperCase()), substitutable: true };
   }
   const ref = trimmed.match(REF_RE);
   if (ref) {
@@ -138,20 +150,20 @@ export function computeF9Preview(
       sheet = resolved;
     }
     const cell = cells.get(addrKey({ sheet, row, col }));
-    return { display: renderCellValueForF9(cell?.value), substitutable: true };
+    return { display: localize(renderCellValueForF9(cell?.value)), substitutable: true };
   }
   if (evalFormulaArray && preferContextualEvaluation) {
-    const arr = evalFormulaArray(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
-    if (arr.status.status === 0) {
+    const arr = evaluateArray(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
+    if (arr && arr.status.status === 0) {
       const display = renderArrayForF9(arr);
-      if (display !== null) return { display, substitutable: true };
+      if (display !== null) return { display: localize(display), substitutable: true };
     }
   }
   if (evalFormula && preferContextualEvaluation) {
-    const contextual = evalFormula(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
-    if (contextual.status.status === 0) {
+    const contextual = evaluate(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
+    if (contextual && contextual.status.status === 0) {
       return {
-        display: renderCellValueForF9(fromEngineValue(contextual.value)),
+        display: localize(renderCellValueForF9(fromEngineValue(contextual.value))),
         substitutable: true,
       };
     }
@@ -160,9 +172,12 @@ export function computeF9Preview(
     ? substituteSingleCellRefs(trimmed, activeSheet, cells, sheetByName)
     : null;
   if (evalFormula && literalFormula) {
-    const res = evalFormula(literalFormula);
-    if (res.status.status === 0) {
-      return { display: renderCellValueForF9(fromEngineValue(res.value)), substitutable: true };
+    const res = evaluate(literalFormula);
+    if (res && res.status.status === 0) {
+      return {
+        display: localize(renderCellValueForF9(fromEngineValue(res.value))),
+        substitutable: true,
+      };
     }
   }
   return { display: '', substitutable: false };
@@ -281,6 +296,7 @@ export function replaceFormulaSelectionWithF9Preview(
   evalFormula?: F9FormulaEvaluator,
   preferContextualEvaluation = false,
   evalFormulaArray?: F9ArrayEvaluator,
+  options: F9PreviewOptions = {},
 ): F9Replacement | null {
   if (!formula.startsWith('=') || start === end) return null;
   const left = Math.max(0, Math.min(start, end));
@@ -295,6 +311,7 @@ export function replaceFormulaSelectionWithF9Preview(
     evalFormula,
     preferContextualEvaluation,
     evalFormulaArray,
+    options,
   );
   if (!preview.substitutable) return { text: formula, start: left, end: right, preview };
   const text = `${formula.slice(0, left)}${preview.display}${formula.slice(right)}`;

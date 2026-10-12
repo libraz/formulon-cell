@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  canonicalizeLocalizedFormulaForInput,
   coerceInput,
+  coerceInputForCell,
+  inputLocaleForWorkbook,
+  parseLocalizedNumericInput,
   writeCoerced,
   writeInput,
   writeInputValidated,
@@ -30,6 +34,23 @@ describe('coerceInput', () => {
     expect(coerceInput('true')).toEqual({ kind: 'bool', value: true });
   });
 
+  it('accepts upstream localized boolean text only for its matching locale', () => {
+    expect(coerceInput('WAHR', { locale: 'de-DE' })).toEqual({ kind: 'bool', value: true });
+    expect(coerceInput('wahr', { locale: 'de-DE' })).toEqual({ kind: 'bool', value: true });
+    expect(coerceInput('FALSCH', { locale: 'de-DE' })).toEqual({ kind: 'bool', value: false });
+    expect(coerceInput('VRAI', { locale: 'fr-FR' })).toEqual({ kind: 'bool', value: true });
+    expect(coerceInput('faux', { locale: 'fr-FR' })).toEqual({ kind: 'bool', value: false });
+
+    for (const locale of ['en-US', 'ja-JP', 'zh-CN', 'ko-KR', 'th-TH']) {
+      expect(coerceInput('WAHR', { locale })).toEqual({ kind: 'text', value: 'WAHR' });
+      expect(coerceInput('FALSCH', { locale })).toEqual({ kind: 'text', value: 'FALSCH' });
+      expect(coerceInput('VRAI', { locale })).toEqual({ kind: 'text', value: 'VRAI' });
+      expect(coerceInput('FAUX', { locale })).toEqual({ kind: 'text', value: 'FAUX' });
+    }
+    expect(coerceInput('VRAI', { locale: 'de-DE' })).toEqual({ kind: 'text', value: 'VRAI' });
+    expect(coerceInput('WAHR', { locale: 'fr-FR' })).toEqual({ kind: 'text', value: 'WAHR' });
+  });
+
   it('keeps full-width TRUE/FALSE text instead of coercing it to boolean', () => {
     expect(coerceInput('ｔｒｕｅ')).toEqual({ kind: 'text', value: 'ｔｒｕｅ' });
     expect(coerceInput('ＦＡＬＳＥ')).toEqual({ kind: 'text', value: 'ＦＡＬＳＥ' });
@@ -39,6 +60,190 @@ describe('coerceInput', () => {
     expect(coerceInput('42')).toEqual({ kind: 'number', value: 42 });
     expect(coerceInput('-3.5')).toEqual({ kind: 'number', value: -3.5 });
     expect(coerceInput('1e3')).toEqual({ kind: 'number', value: 1000 });
+  });
+
+  it('uses strict locale grouping and decimal separators', () => {
+    expect(coerceInput('1,234', { locale: 'en-US' })).toEqual({
+      kind: 'number',
+      value: 1234,
+    });
+    expect(coerceInput('1,234', { locale: 'de-DE' })).toEqual({
+      kind: 'number',
+      value: 1.234,
+    });
+    expect(coerceInput('1.234', { locale: 'de-DE' })).toEqual({
+      kind: 'number',
+      value: 1234,
+    });
+    expect(coerceInput('12,50%', { locale: 'de-DE' })).toEqual({
+      kind: 'number',
+      value: 0.125,
+      implicitFormat: { kind: 'percent', decimals: 2 },
+    });
+    expect(coerceInput('€1.234,50', { locale: 'de-DE' })).toEqual({
+      kind: 'number',
+      value: 1234.5,
+      implicitFormat: { kind: 'currency', decimals: 2, symbol: '€' },
+    });
+    expect(coerceInput('1\u202f234,50', { locale: 'fr-FR' })).toEqual({
+      kind: 'number',
+      value: 1234.5,
+    });
+    expect(coerceInput('1\u00a0234,50', { locale: 'fr-FR' })).toEqual({
+      kind: 'number',
+      value: 1234.5,
+    });
+    expect(coerceInput('1 234,50', { locale: 'fr-FR' })).toEqual({
+      kind: 'number',
+      value: 1234.5,
+    });
+    expect(coerceInput('1,23', { locale: 'en-US' })).toEqual({
+      kind: 'text',
+      value: '1,23',
+    });
+    expect(coerceInput('1.23,5', { locale: 'de-DE' })).toEqual({
+      kind: 'text',
+      value: '1.23,5',
+    });
+    expect(coerceInput('1\u202f23,5', { locale: 'fr-FR' })).toEqual({
+      kind: 'text',
+      value: '1\u202f23,5',
+    });
+  });
+
+  it('exposes strict numeric parsing for dialog criteria without date, boolean, or formula coercion', () => {
+    expect(parseLocalizedNumericInput('1,5', 'de-DE')).toBe(1.5);
+    expect(parseLocalizedNumericInput('1,5', 'fr-FR')).toBe(1.5);
+    for (const locale of ['en-US', 'ja-JP', 'zh-CN', 'ko-KR', 'th-TH']) {
+      expect(parseLocalizedNumericInput('1.5', locale)).toBe(1.5);
+    }
+    expect(parseLocalizedNumericInput('1.23,5', 'de-DE')).toBeNull();
+    expect(parseLocalizedNumericInput('', 'de-DE')).toBeNull();
+    expect(parseLocalizedNumericInput('TRUE', 'en-US')).toBeNull();
+    expect(parseLocalizedNumericInput('25.12.2024', 'de-DE')).toBeNull();
+    expect(parseLocalizedNumericInput('=SUMME(1,5;2)', 'de-DE')).toBeNull();
+    expect(parseLocalizedNumericInput('1e999', 'en-US')).toBeNull();
+  });
+
+  it('accepts natural German and French trailing currency symbols only once', () => {
+    for (const raw of ['1.234,50€', '1.234,50 €', '1.234,50\u00a0€', '1.234,50\u202f€']) {
+      expect(coerceInput(raw, { locale: 'de-DE' })).toEqual({
+        kind: 'number',
+        value: 1234.5,
+        implicitFormat: { kind: 'currency', decimals: 2, symbol: '€' },
+      });
+    }
+    for (const raw of ['1\u202f234,50€', '1\u202f234,50 €', '1\u202f234,50\u00a0€']) {
+      expect(coerceInput(raw, { locale: 'fr-FR' })).toEqual({
+        kind: 'number',
+        value: 1234.5,
+        implicitFormat: { kind: 'currency', decimals: 2, symbol: '€' },
+      });
+    }
+    expect(coerceInput('€1.234,50', { locale: 'de-DE' })).toEqual({
+      kind: 'number',
+      value: 1234.5,
+      implicitFormat: { kind: 'currency', decimals: 2, symbol: '€' },
+    });
+    for (const raw of ['€1.234,50€', '1.234,50€€', '€€1.234,50', '1.234,50 € $']) {
+      expect(coerceInput(raw, { locale: 'de-DE' })).toEqual({ kind: 'text', value: raw });
+    }
+    expect(coerceInput('1,234.50€', { locale: 'en-US' })).toEqual({
+      kind: 'text',
+      value: '1,234.50€',
+    });
+  });
+
+  it('uses the seven profile date orders without changing the Gregorian calendar', () => {
+    expect(coerceInput('25.12.2024', { locale: 'de-DE' })).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'd.m.yyyy' },
+    });
+    expect(coerceInput('25/12/2024', { locale: 'fr-FR' })).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'd/m/yyyy' },
+    });
+    expect(coerceInput('25/12/2024', { locale: 'th-TH' })).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'd/m/yyyy' },
+    });
+    expect(coerceInput('24/12/25', { locale: 'ja-JP' })).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'yyyy/m/d' },
+    });
+    expect(coerceInput('25/12/2567', { locale: 'th-TH' })).toEqual({
+      kind: 'number',
+      value: 243977,
+      implicitFormat: { kind: 'date', pattern: 'd/m/yyyy' },
+    });
+    expect(coerceInput('31.02.2024', { locale: 'de-DE' })).toEqual({
+      kind: 'text',
+      value: '31.02.2024',
+    });
+    expect(coerceInput('31/02/2024', { locale: 'fr-FR' })).toEqual({
+      kind: 'text',
+      value: '31/02/2024',
+    });
+    expect(coerceInput('2024/02/30', { locale: 'ja-JP' })).toEqual({
+      kind: 'text',
+      value: '2024/02/30',
+    });
+  });
+
+  it('maps public workbook profiles to input locales and falls back for older engines', () => {
+    const withProfile = (profile: string | null): WorkbookHandle =>
+      ({ spreadsheetProfileId: () => profile }) as unknown as WorkbookHandle;
+    expect(inputLocaleForWorkbook(withProfile('windows-de_DE'))).toBe('de-DE');
+    expect(inputLocaleForWorkbook(withProfile('mac-fr_FR'))).toBe('fr-FR');
+    expect(inputLocaleForWorkbook(withProfile('windows-th_TH'))).toBe('th-TH');
+    expect(inputLocaleForWorkbook(withProfile('unknown'))).toBeUndefined();
+    expect(inputLocaleForWorkbook(stubHandle())).toBeUndefined();
+  });
+
+  it.each([
+    ['windows-de_DE', 'de-DE', '=SUMME(1,5;2)'],
+    ['windows-fr_FR', 'fr-FR', '=SOMME(1,5;2)'],
+  ] as const)(
+    'canonicalizes a localized formula at the raw input boundary (%s)',
+    async (profile, locale, raw) => {
+      const wb = await WorkbookHandle.createDefault();
+      const store = createSpreadsheetStore();
+      try {
+        expect(wb.isStub).toBe(false);
+        expect(wb.capabilities.formulaLocale).toBe(true);
+        expect(wb.capabilities.localeFacts).toBe(true);
+        expect(wb.setSpreadsheetProfileId(profile)).toBe(true);
+
+        const input = coerceInputForCell(store.getState(), addr, raw, locale, wb);
+        expect(input).toEqual({ kind: 'formula', text: '=SUM(1.5,2)' });
+        expect(canonicalizeLocalizedFormulaForInput(wb, raw, locale)).toBe('=SUM(1.5,2)');
+
+        writeInput(wb, addr, raw, undefined, locale);
+        expect(wb.cellFormula(addr)).toBe('=SUM(1.5,2)');
+      } finally {
+        wb.dispose();
+      }
+    },
+  );
+
+  it('does not apply the active profile to an explicitly custom locale', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const store = createSpreadsheetStore();
+    try {
+      expect(wb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
+      const canonicalize = vi.spyOn(wb, 'canonicalizeLocalizedFormula');
+
+      const input = coerceInputForCell(store.getState(), addr, '=SUMME(A1)', 'de-brand', wb);
+      expect(input).toEqual({ kind: 'formula', text: '=SUMME(A1)' });
+      expect(canonicalizeLocalizedFormulaForInput(wb, '=SUMME(A1)', 'de-brand')).toBe('=SUMME(A1)');
+      expect(canonicalize).not.toHaveBeenCalled();
+    } finally {
+      wb.dispose();
+    }
   });
 
   it('normalizes full-width numeric input like desktop spreadsheets', () => {
@@ -58,6 +263,14 @@ describe('coerceInput', () => {
       kind: 'number',
       value: 0.125,
       implicitFormat: { kind: 'percent', decimals: 1 },
+    });
+  });
+
+  it.each(['₩', '฿'])('recognizes %s input as numeric currency', (symbol) => {
+    expect(coerceInput(`${symbol}1,234.50`)).toEqual({
+      kind: 'number',
+      value: 1234.5,
+      implicitFormat: { kind: 'currency', decimals: 2, symbol },
     });
   });
 
@@ -163,6 +376,13 @@ describe('coerceInput', () => {
       value: 38354,
       implicitFormat: { kind: 'date', pattern: 'm/d/yyyy' },
     });
+  });
+
+  it('uses the Excel 1900 date serial boundary for typed dates', () => {
+    expect(coerceInput('1900-01-01')).toMatchObject({ kind: 'number', value: 1 });
+    expect(coerceInput('1900-02-28')).toMatchObject({ kind: 'number', value: 59 });
+    expect(coerceInput('1900-02-29')).toEqual({ kind: 'text', value: '1900-02-29' });
+    expect(coerceInput('1900-03-01')).toMatchObject({ kind: 'number', value: 61 });
   });
 
   it('rejects impossible dates, leaving them as text', () => {

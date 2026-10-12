@@ -344,7 +344,7 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'deleteCommentReview', menuId: 'menu-review-comments' },
       commentsButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-review-comments .fc-tb__menu-item--iconic').length).toBe(2);
+    expect(host.querySelectorAll('#menu-review-comments .fc-tb__menu-item--iconic').length).toBe(3);
     const deleteActiveButton = host.querySelector<HTMLButtonElement>(
       '[data-comment-action="delete-active"]',
     );

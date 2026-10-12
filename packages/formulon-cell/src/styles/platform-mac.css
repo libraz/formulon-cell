@@ -28,6 +28,19 @@
  * the ribbon shell. The mount stamps this node so the selector stays local to
  * the toolbar instance. */
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell {
+  --fc-tb-font: var(
+    --fc-font-ui,
+    var(
+      --fc-font-ui-fallback,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Hiragino Sans",
+      "Yu Gothic UI",
+      "Segoe UI",
+      sans-serif
+    )
+  );
+  container: fc-mac-ribbon / inline-size;
   background: var(--fc-tb-ribbon-rail);
   border-bottom-color: var(--fc-tb-line);
   box-shadow: none;
@@ -37,6 +50,7 @@
   align-items: end;
   height: 30px;
   padding: 0 8px;
+  background: var(--fc-tb-ribbon-rail);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -51,8 +65,8 @@
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-tab--active {
-  background: var(--fc-tb-ribbon-bg);
-  color: var(--fc-tb-accent);
+  background: transparent;
+  color: var(--fc-tb-fg);
   font-weight: 500;
 }
 
@@ -109,15 +123,511 @@
   gap: 0;
 }
 
+/* The large Paste tile also owns a split chevron. Keep its content inside
+ * the 66px Excel tile instead of allowing the icon to overflow when the
+ * label occupies two lines. */
+[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--clipboard .fc-tb__rb--large {
+  position: relative;
+  box-sizing: border-box;
+  gap: 2px;
+  padding: 3px 2px 4px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--clipboard
+  .fc-tb__rb--large
+  .fc-tb__rb-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--clipboard
+  .fc-tb__rb--large
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  min-height: 2em;
+  max-height: 2em;
+  line-height: 1;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--clipboard
+  .fc-tb__rb--large
+  > .fc-tb__rb-split-chevron {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  margin: 0;
+}
+
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--font .fc-tb__ribbon-tools {
-  width: 296px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+  gap: 0 1px;
+  width: 242px;
+  min-width: 0;
+  min-height: 72px;
+  max-height: 72px;
+}
+
+/* Keep the Mac font group on the same two 26px rows as Excel. The first row
+ * owns the family/size fields and the grow/shrink buttons; the row break is
+ * left in the model for the shared renderer and hidden only on this profile. */
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontFamily"] {
+  box-sizing: border-box;
+  flex: 0 0 140px;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontSize"] {
+  box-sizing: border-box;
+  flex: 0 0 46px;
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontSize"]
+  > .fc-tb__rb-dd__btn {
+  min-width: 0;
+  width: 100%;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontGrow"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontShrink"] {
+  box-sizing: border-box;
+  flex: 0 0 26px;
+  width: 26px;
+  min-width: 26px;
+  max-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  padding: 0;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontGrow"]
+  .fc-tb__rb-icon,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontShrink"]
+  .fc-tb__rb-icon {
+  width: 16px;
+  height: 16px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="font-row-2"] {
+  display: block;
+  flex: 0 0 100%;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="bold"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="italic"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="underline"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="editPhonetic"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="borders"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fillColor"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontColor"] {
+  box-sizing: border-box;
+  flex: 0 0 26px;
+  width: 26px;
+  min-width: 26px;
+  max-width: 26px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  padding: 0;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="bold"]
+  .fc-tb__rb-icon,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="italic"]
+  .fc-tb__rb-icon,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="underline"]
+  .fc-tb__rb-icon,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="editPhonetic"]
+  .fc-tb__rb-icon,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="borders"]
+  .fc-tb__rb-icon {
+  width: 18px;
+  height: 18px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > :is(
+    [data-ribbon-command="bold"],
+    [data-ribbon-command="italic"],
+    [data-ribbon-command="underline"]
+  )
+  .fc-tb__rb-icon {
+  width: 14px;
+  height: 14px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fillColor"]
+  .fc-tb__rb-color__btn,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontColor"]
+  .fc-tb__rb-color__btn {
+  width: 26px;
+  height: 26px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fillColor"]
+  .fc-tb__rb-color__icon,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--font
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="fontColor"]
+  .fc-tb__rb-color__icon {
+  width: 18px;
+  height: 18px;
+}
+
+@container fc-mac-ribbon (min-width: 1500px) {
+  [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--font .fc-tb__ribbon-tools {
+    width: 296px;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--font
+    .fc-tb__ribbon-tools
+    > [data-ribbon-command="fontFamily"] {
+    flex-basis: 176px;
+    width: 176px;
+    min-width: 176px;
+    max-width: 176px;
+  }
 }
 
 [data-fc-platform="mac"]
   > .fc-tb__ribbon-shell
   .fc-tb__ribbon-group--alignment
   .fc-tb__ribbon-tools {
-  width: 190px;
+  display: grid;
+  grid-template-columns: repeat(5, 24px) max-content;
+  grid-template-rows: repeat(2, 26px);
+  grid-template-areas:
+    "top middle bottom orientation . wrap"
+    "left center right indent-decrease indent-increase merge";
+  align-content: center;
+  gap: 0 2px;
+  width: max-content;
+  min-width: 190px;
+  min-height: 72px;
+  max-height: 72px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="alignment-row-2"] {
+  display: none;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb {
+  box-sizing: border-box;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  padding: 0;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="top"] {
+  grid-area: top;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="middle"] {
+  grid-area: middle;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="bottomAlign"] {
+  grid-area: bottom;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="textOrientation"] {
+  grid-area: orientation;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="alignL"] {
+  grid-area: left;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="alignC"] {
+  grid-area: center;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="alignR"] {
+  grid-area: right;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="indentDecrease"] {
+  grid-area: indent-decrease;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="indentIncrease"] {
+  grid-area: indent-increase;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="wrap"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="merge"] {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  padding: 0 4px;
+  overflow: visible;
+  font-size: 10px;
+  line-height: 1;
+  text-align: left;
+  white-space: nowrap;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="wrap"] {
+  grid-column: 6;
+  grid-row: 1;
+  justify-self: start;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="merge"] {
+  grid-column: 6;
+  grid-row: 2;
+  justify-self: start;
+}
+
+/* Orientation is a split button in the fourth 24px track. Give the control
+ * room for its chevron while keeping the following spacer track empty. */
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="textOrientation"] {
+  position: relative;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  justify-content: flex-start;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="textOrientation"]
+  > .fc-tb__rb-icon {
+  width: 20px;
+  height: 20px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="textOrientation"]
+  > .fc-tb__rb-split-chevron {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="wrap"]
+  .fc-tb__rb-icon,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--alignment
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="merge"]
+  .fc-tb__rb-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__ribbon-tools {
@@ -136,8 +646,60 @@
   padding-left: 3px;
 }
 
+/* In the vertical Home tiles, flex-basis controls the chevron's height.
+ * The shared horizontal-button basis otherwise pushes it below a two-line label. */
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  :is(.fc-tb__ribbon-group--styles, .fc-tb__ribbon-group--editing)
+  .fc-tb__rb--wide:not(.fc-tb__rb--stacked)
+  > .fc-tb__rb-split-chevron {
+  flex: 0 0 6px;
+  width: 8px;
+  height: 6px;
+}
+
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--cells .fc-tb__ribbon-tools {
-  width: 68px;
+  width: 84px;
+}
+
+/* Home's style tiles use a two-line label box. The compact 60px Excel tile is
+ * enough for the short labels, but German/French and Japanese labels need a
+ * wider track to keep the second line from being clipped. The ribbon itself
+ * scrolls horizontally, so the extra width remains reachable at 390/640px. */
+[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
+  --fc-mac-table-tile-width: 60px;
+  --fc-mac-styles-tools-width: 188px;
+}
+
+[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles .fc-tb__ribbon-tools {
+  width: var(--fc-mac-styles-tools-width);
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--styles
+  > .fc-tb__ribbon-tools
+  > [data-ribbon-command="formatTableHome"] {
+  width: var(--fc-mac-table-tile-width);
+  min-width: var(--fc-mac-table-tile-width);
+  max-width: var(--fc-mac-table-tile-width);
+}
+
+/* These selectors intentionally follow the document language. The toolbar
+ * host is shared by embedders and does not always carry its own lang attr. */
+:lang(ja) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
+  --fc-mac-table-tile-width: 72px;
+  --fc-mac-styles-tools-width: 200px;
+}
+
+:lang(de) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
+  --fc-mac-table-tile-width: 72px;
+  --fc-mac-styles-tools-width: 200px;
+}
+
+:lang(fr) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
+  --fc-mac-table-tile-width: 96px;
+  --fc-mac-styles-tools-width: 224px;
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing .fc-tb__ribbon-tools {
@@ -162,6 +724,56 @@
   padding-left: 2px;
 }
 
+/* The editing group has two full-height tiles after its stacked column. Keep
+ * their grid tracks wide enough for translated labels; the same values also
+ * ensure the button, icon, and chevron share one hit target without overlap. */
+[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
+  --fc-mac-sort-tile-width: 56px;
+  --fc-mac-find-tile-width: 56px;
+  --fc-mac-editing-tools-width: 162px;
+}
+
+[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing .fc-tb__ribbon-tools {
+  width: var(--fc-mac-editing-tools-width);
+  grid-template-columns: 40px var(--fc-mac-sort-tile-width) var(--fc-mac-find-tile-width);
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--editing
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="sortFilterHome"] {
+  width: var(--fc-mac-sort-tile-width);
+  min-width: var(--fc-mac-sort-tile-width);
+  max-width: var(--fc-mac-sort-tile-width);
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--editing
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="findHome"] {
+  width: var(--fc-mac-find-tile-width);
+  min-width: var(--fc-mac-find-tile-width);
+  max-width: var(--fc-mac-find-tile-width);
+}
+
+:lang(ja) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
+  --fc-mac-sort-tile-width: 60px;
+  --fc-mac-editing-tools-width: 166px;
+}
+
+:lang(de) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
+  --fc-mac-sort-tile-width: 60px;
+  --fc-mac-find-tile-width: 72px;
+  --fc-mac-editing-tools-width: 180px;
+}
+
+:lang(fr) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
+  --fc-mac-find-tile-width: 80px;
+  --fc-mac-editing-tools-width: 184px;
+}
+
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb,
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb--wide,
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb--mono {
@@ -169,6 +781,44 @@
   width: 24px;
   padding-right: 2px;
   padding-left: 2px;
+}
+
+/* Currency is the only Number command with a split chevron. Give it a
+ * dedicated track so the glyph and chevron remain inside the same hit target
+ * as the other 26px commands. */
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--number
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="currency"] {
+  position: relative;
+  justify-content: flex-start;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--number
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="currency"]
+  > .fc-tb__rb-icon {
+  width: 18px;
+  height: 18px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--number
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="currency"]
+  > .fc-tb__rb-split-chevron {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  margin: 0;
+  transform: translateY(-50%);
 }
 
 /* Mac's dense command groups use compact horizontal controls arranged in
@@ -324,12 +974,23 @@
   .fc-tb__ribbon-tools
   > .fc-tb__rb--stacked
   > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  display: -webkit-box;
+  flex: 1 1 auto;
   min-width: 0;
   width: auto;
+  max-width: 100%;
+  max-height: 2.16em;
   align-self: stretch;
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  line-height: 1.08;
   white-space: normal;
+  /* The 44px family labels need character breaks to stay on two lines. */
+  word-break: normal;
+  text-wrap: wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 [data-fc-platform="mac"]
@@ -356,6 +1017,128 @@
   width: 8px;
   height: 7px;
   margin: 0;
+}
+
+/* English function-family labels are narrow Mac tiles. Use the same compact
+ * two-line rhythm for every tile and remove the line-clamp layout box: a
+ * clamped box still exposes hidden line fragments to Range geometry checks.
+ * The three longest English labels use 8px so their words fit in two lines;
+ * the other families remain at 9px. */
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--wide,
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--stacked {
+  gap: 2px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="mac.formulas.insertFunction"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="mac.formulas.lookup"],
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="mac.formulas.more"] {
+  font-size: 8px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > [data-ribbon-command="mac.formulas.insertFunction"] {
+  padding-right: 1px;
+  padding-left: 1px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--wide
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--stacked
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  display: block;
+  height: 2em;
+  min-height: 2em;
+  max-height: 2em;
+  line-height: 1;
+  overflow: hidden;
+  -webkit-line-clamp: unset;
+}
+
+/* German and French family names contain long compound labels. Widen only
+ * those locale projections so the text remains readable at the same 9px
+ * ribbon size; the panel already scrolls horizontally at compact widths. */
+[data-fc-platform="mac"]:is([lang="de"], [lang="fr"])
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb,
+[data-fc-platform="mac"]:is([lang="de"], [lang="fr"])
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--wide,
+[data-fc-platform="mac"]:is([lang="de"], [lang="fr"])
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--stacked {
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+}
+
+[data-fc-platform="mac"]:is([lang="zh"], [lang="ko"], [lang="th"])
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb,
+[data-fc-platform="mac"]:is([lang="zh"], [lang="ko"], [lang="th"])
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--wide,
+[data-fc-platform="mac"]:is([lang="zh"], [lang="ko"], [lang="th"])
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--function-library
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb--stacked {
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__rb--mac-checkbox {
@@ -501,6 +1284,35 @@
   font-size: 11px;
   text-align: left;
   white-space: nowrap;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--checks
+  .fc-tb__rb
+  > .fc-tb__rb-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--checks
+  .fc-tb__rb
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 2.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  line-height: 1.1;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--tiles .fc-tb__rb,
@@ -748,50 +1560,6 @@
   .fc-tb__rb-icon {
   width: 20px;
   height: 20px;
-}
-
-/* Native Insert tiles are narrower than the Home style galleries. Keep the
- * names wrapped below the icon so the complete tab remains reachable. */
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell:not(.fc-tb__ribbon-shell--singleLine)
-  [data-ribbon-panel="insert"]
-  .fc-tb__ribbon-group--tiles
-  .fc-tb__rb {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
-  padding-right: 2px;
-  padding-left: 2px;
-}
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell:not(.fc-tb__ribbon-shell--singleLine)
-  [data-ribbon-panel="insert"]
-  .fc-tb__ribbon-group--tiles
-  .fc-tb__rb
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  max-width: 56px;
-  white-space: normal;
-}
-
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell:not(.fc-tb__ribbon-shell--singleLine)
-  [data-ribbon-panel="insert"]
-  .fc-tb__ribbon-group--tiles
-  [data-ribbon-command="mac.insert.recommendedPivotTable"] {
-  width: 80px;
-  min-width: 80px;
-  max-width: 80px;
-}
-
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell:not(.fc-tb__ribbon-shell--singleLine)
-  [data-ribbon-panel="insert"]
-  .fc-tb__ribbon-group--tiles
-  [data-ribbon-command="mac.insert.recommendedPivotTable"]
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  width: 76px;
-  max-width: 76px;
-  white-space: normal;
 }
 
 /* Core surface bars are scoped to the host itself. A Mac demo root may wrap a

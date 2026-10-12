@@ -5,6 +5,12 @@
 import { formatNumber } from '../commands/format.js';
 import type { CellValue } from '../engine/types.js';
 import { formatCell, formatGeneralNumber } from '../engine/value.js';
+import {
+  cellFontFamily,
+  cellTextVerticalOffset,
+  fontSizeWithVerticalAlign,
+  shrinkFontSizeToFit,
+} from '../render/painters/text.js';
 import type { CellAlign, CellBorderSide, CellVAlign, FillPattern } from '../store/store.js';
 import type { DraftState, NumberCategory, SideKey } from './format-dialog-model.js';
 import { activeDraftSide, computeDialogNumFmt } from './format-dialog-state.js';
@@ -140,8 +146,16 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
       el.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
       el.style.textDecorationStyle =
         draft.underline === 'double' || draft.underline === 'doubleAccounting' ? 'double' : '';
-      el.style.fontFamily = draft.fontFamily || '';
-      el.style.fontSize = draft.fontSize !== undefined ? `${draft.fontSize}px` : '';
+      el.style.fontFamily = cellFontFamily(
+        draft.fontFamily,
+        'var(--fc-font-ui, system-ui, sans-serif)',
+      );
+      const size =
+        draft.fontSize !== undefined
+          ? fontSizeWithVerticalAlign(draft.fontSize, draft.fontVertAlign)
+          : undefined;
+      el.style.fontSize = size !== undefined ? `${size}px` : '';
+      el.style.lineHeight = size !== undefined ? `${size * 1.25}px` : '';
       el.style.verticalAlign = cssFontVertAlign;
       el.style.color = draft.color ?? '';
     };
@@ -164,16 +178,24 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
     preview.style.textAlign = cssHorizontalAlign(draft.align);
     applyFontPreview(previewCell);
     applyFontPreview(fontPreviewBox);
+    const fontPreviewRun = fontPreviewBox.querySelector<HTMLElement>(
+      '.fc-fmtdlg__font-preview-run',
+    );
+    if (fontPreviewRun) {
+      const size =
+        draft.fontSize === undefined
+          ? undefined
+          : fontSizeWithVerticalAlign(draft.fontSize, draft.fontVertAlign);
+      fontPreviewRun.style.transform =
+        size !== undefined && draft.fontVertAlign
+          ? `translateY(${cellTextVerticalOffset(size, draft.fontVertAlign)}px)`
+          : '';
+    }
     previewCell.style.textAlign = cssHorizontalAlign(draft.align);
     previewCell.style.direction = draft.textDirection === 'context' ? '' : draft.textDirection;
     applyFillPreview(previewCell);
     applyFillPreview(fillSample);
     previewCell.style.whiteSpace = draft.wrap ? 'pre-wrap' : 'nowrap';
-    previewCell.style.fontSize = draft.shrinkToFit
-      ? `${Math.max(8, Math.round((draft.fontSize ?? 13) * 0.85))}px`
-      : draft.fontSize !== undefined
-        ? `${draft.fontSize}px`
-        : '';
     previewCell.style.justifyContent = cssVerticalJustify(draft.vAlign);
     previewCell.style.borderTop = cssBorder(draft.borders.top);
     previewCell.style.borderRight = cssBorder(draft.borders.right);
@@ -229,6 +251,31 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
           : formatGeneralNumber(value.value, getLocale(), { useGrouping: false })
         : formatCell(value, getLocale());
     previewCell.textContent = numericText;
+    const basePreviewSize =
+      draft.fontSize !== undefined
+        ? fontSizeWithVerticalAlign(draft.fontSize, draft.fontVertAlign)
+        : undefined;
+    let previewSize = basePreviewSize;
+    if (draft.shrinkToFit && !draft.wrap && basePreviewSize !== undefined) {
+      // Use the browser's rendered width in the selected family. Headless DOMs
+      // report zero geometry, so they retain the authored size instead of the
+      // old arbitrary reduction applied to every preview.
+      previewSize = shrinkFontSizeToFit(
+        basePreviewSize,
+        previewCell.scrollWidth,
+        previewCell.clientWidth,
+      );
+    }
+    previewCell.style.fontSize = previewSize !== undefined ? `${previewSize}px` : '';
+    previewCell.style.lineHeight = previewSize !== undefined ? `${previewSize * 1.25}px` : '';
+    if (previewSize !== undefined && draft.fontVertAlign) {
+      const offset = cellTextVerticalOffset(previewSize, draft.fontVertAlign);
+      previewCell.style.paddingTop = `${Math.max(0, 8 + offset)}px`;
+      previewCell.style.paddingBottom = `${Math.max(0, 8 - offset)}px`;
+    } else {
+      previewCell.style.paddingTop = '';
+      previewCell.style.paddingBottom = '';
+    }
     if (!draft.color && value.kind === 'number' && value.value < 0) {
       previewCell.style.color =
         draft.negativeStyle === 'red' || draft.negativeStyle === 'red-parens' ? '#c00000' : '';

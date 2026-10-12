@@ -181,6 +181,9 @@ export interface DataObjectsStrings {
       dataValidation: string;
       hyperlinks: string;
       comments: string;
+      threadedComments: string;
+      images: string;
+      workbookTheme: string;
       phonetic: string;
       definedNames: string;
       namedCellStyles: string;
@@ -203,6 +206,9 @@ export interface DataObjectsStrings {
       dataValidation: string;
       hyperlinks: string;
       comments: string;
+      threadedComments: string;
+      images: string;
+      workbookTheme: string;
       phonetic: string;
       definedNames: string;
       namedCellStyles: string;

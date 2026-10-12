@@ -61,6 +61,22 @@ describe('integration: single-call ribbon toolbar', () => {
     expect(onTabChange).toHaveBeenCalledWith('home');
   });
 
+  it('updates built-in ribbon labels when the mounted locale changes', async () => {
+    sheet = await mountStubSheet({ toolbar: true, locale: 'en' });
+    const { host, instance } = sheet;
+    const tabLabel = (id: string): string | undefined =>
+      host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${id}"]`)?.textContent ?? undefined;
+
+    expect(tabLabel('home')).toBe('Home');
+    expect(tabLabel('insert')).toBe('Insert');
+    instance.toolbar?.setActiveTab('insert');
+
+    expect(instance.setLocale('ja')).toBe(true);
+    expect(tabLabel('home')).toBe('ホーム');
+    expect(tabLabel('insert')).toBe('挿入');
+    expect(instance.toolbar?.getActiveTab()).toBe('insert');
+  });
+
   it('disposes the toolbar and removes the ribbon host on dispose()', async () => {
     sheet = await mountStubSheet({ toolbar: true });
     const { host, instance } = sheet;

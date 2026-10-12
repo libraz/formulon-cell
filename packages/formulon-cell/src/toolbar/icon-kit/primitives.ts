@@ -714,10 +714,10 @@ export const bars = (options: {
 
 /** The filter cone, sized to the optical box. */
 export const funnel = (
-  options: { surface?: string; frame?: string; scale?: number } = {},
+  options: { surface?: string; frame?: string; scale?: number; cx?: number } = {},
 ): IconSegment[] => {
   const s = options.scale ?? 1;
-  const cx = CENTER;
+  const cx = options.cx ?? CENTER;
   const halfTop = 9 * s;
   const top = CENTER - 9 * s;
   const neckHalf = 1.6 * s;

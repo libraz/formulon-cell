@@ -1,10 +1,15 @@
-import { parseAddrKey } from '../engine/address.js';
-import type { RangeResolver } from '../engine/range-resolver.js';
-import type { CellValue, Range } from '../engine/types.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
+import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
+import type { Addr, CellValue, Range } from '../engine/types.js';
 import { syncValidationsToEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
-import type { CellValidation, SpreadsheetStore, ValidationOp } from '../store/store.js';
+import {
+  type CellValidation,
+  mutators,
+  type SpreadsheetStore,
+  type ValidationOp,
+} from '../store/store.js';
 import type { CoercedInput } from './coerce-input.js';
 import type { History } from './history.js';
 import { isCellWritable } from './protection.js';
@@ -17,6 +22,195 @@ export type ValidationOutcome =
 type BoundedKind = 'whole' | 'decimal' | 'date' | 'time' | 'textLength';
 type BoundedValidation = Extract<CellValidation, { kind: BoundedKind }>;
 type ListValidation = Extract<CellValidation, { kind: 'list' }>;
+
+/** Whether formulon's 0.13 proposed-value validator can evaluate this rule
+ * without falling back to the cell layer. Custom rules stay local because the
+ * upstream evaluator resolves their formulas against the saved workbook value.
+ * A list source is safe once the synchronized engine rule is checked below. */
+export function nativeValidationSupports(validation: CellValidation, input: CoercedInput): boolean {
+  if (input.kind === 'formula') return false;
+  if (validation.kind === 'custom') return false;
+  if (validation.kind === 'list') return true;
+  return (
+    validation.kind === 'whole' ||
+    validation.kind === 'decimal' ||
+    validation.kind === 'date' ||
+    validation.kind === 'time' ||
+    validation.kind === 'textLength'
+  );
+}
+
+/** Evaluate a proposed value with formulon's typed validation API. `null`
+ * means the engine cannot authoritatively answer this rule, so callers should
+ * run the existing JavaScript evaluator. */
+export function nativeValidationOutcome(
+  wb: WorkbookHandle,
+  addr: { sheet: number; row: number; col: number },
+  input: CoercedInput,
+  validation: CellValidation,
+): ValidationOutcome | null {
+  if (!nativeValidationSupports(validation, input)) return null;
+  if (typeof wb.validateValue !== 'function') return null;
+  const value = coercedInputAsCellValue(input);
+  const result = wb.validateValue(addr.sheet, addr.row, addr.col, value);
+  if (!result?.hasRule) return null;
+  if (!validationMatchesEngineRule(wb, addr, validation, result.ruleIndex)) return null;
+  if (result.valid) return { ok: true };
+  const local = validateAgainst(validation, input);
+  const severity =
+    result.errorStyle === 1 ? 'warning' : result.errorStyle === 2 ? 'information' : 'stop';
+  return {
+    ok: false,
+    severity,
+    message: local.ok ? validation.errorMessage || 'value is invalid' : local.message,
+  };
+}
+
+function validationMatchesEngineRule(
+  wb: WorkbookHandle,
+  addr: { sheet: number; row: number; col: number },
+  validation: CellValidation,
+  ruleIndex: number,
+): boolean {
+  if (typeof wb.getValidationsForSheet !== 'function') return false;
+  const entries = wb.getValidationsForSheet(addr.sheet);
+  const entry = entries[ruleIndex];
+  if (!entry?.ranges.some((range) => rangeContainsAddr(range, addr))) return false;
+  const type =
+    validation.kind === 'whole'
+      ? 1
+      : validation.kind === 'decimal'
+        ? 2
+        : validation.kind === 'list'
+          ? 3
+          : validation.kind === 'date'
+            ? 4
+            : validation.kind === 'time'
+              ? 5
+              : validation.kind === 'textLength'
+                ? 6
+                : 7;
+  if (entry.type !== type) return false;
+  const expectedErrorStyle =
+    validation.errorStyle === 'warning' ? 1 : validation.errorStyle === 'information' ? 2 : 0;
+  if (entry.errorStyle !== expectedErrorStyle) return false;
+  if (entry.allowBlank !== (validation.allowBlank !== false)) return false;
+  if (entry.showErrorMessage !== (validation.showErrorMessage !== false)) return false;
+  if (validation.kind === 'custom') {
+    return normalizeFormula(entry.formula1) === normalizeFormula(validation.formula);
+  }
+  if (validation.kind === 'list') {
+    if (Array.isArray(validation.source)) {
+      return normalizeListFormula(entry.formula1) === `"${validation.source.join(',')}"`;
+    }
+    return normalizeListFormula(entry.formula1) === normalizeListFormula(validation.source.ref);
+  }
+  const op =
+    validation.op === 'between'
+      ? 0
+      : validation.op === 'notBetween'
+        ? 1
+        : validation.op === '='
+          ? 2
+          : validation.op === '<>'
+            ? 3
+            : validation.op === '>'
+              ? 4
+              : validation.op === '<'
+                ? 5
+                : validation.op === '>='
+                  ? 6
+                  : 7;
+  if (entry.op !== op || Number(entry.formula1.replace(/^=/, '')) !== validation.a) return false;
+  const needsFormula2 = validation.op === 'between' || validation.op === 'notBetween';
+  return (
+    !needsFormula2 || Number(entry.formula2.replace(/^=/, '')) === (validation.b ?? validation.a)
+  );
+}
+
+function normalizeFormula(formula: string): string {
+  return formula.trim().replace(/^=/, '').replace(/\s+/g, '').toLowerCase();
+}
+
+function normalizeListFormula(formula: string): string {
+  return formula.trim().replace(/^=/, '').trim();
+}
+
+function coercedInputAsCellValue(input: CoercedInput): CellValue {
+  switch (input.kind) {
+    case 'number':
+      return { kind: 'number', value: input.value };
+    case 'bool':
+      return { kind: 'bool', value: input.value };
+    case 'text':
+      return { kind: 'text', value: input.value };
+    case 'blank':
+      return { kind: 'blank' };
+    case 'formula':
+      return { kind: 'blank' };
+  }
+}
+
+/** Enumerate native invalid cells page by page. `null` signals an older
+ * engine, allowing the existing cell-format scan to remain the fallback. */
+export function listInvalidValidationCells(wb: WorkbookHandle, sheet: number): Addr[] | null {
+  if (!wb.capabilities?.validationEvaluation || typeof wb.listInvalidCells !== 'function')
+    return null;
+  const out: Addr[] = [];
+  let cursor: number | null = null;
+  const seenCursors = new Set<number>();
+  do {
+    if (cursor !== null) {
+      if (seenCursors.has(cursor)) return null;
+      seenCursors.add(cursor);
+    }
+    const page = wb.listInvalidCells(sheet, cursor, 512);
+    if (!page) return null;
+    out.push(...page.cells);
+    if (page.nextCursor !== null && page.cells.length === 0) return null;
+    if (page.nextCursor !== null && page.nextCursor === cursor) return null;
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+  return out;
+}
+
+/** Replace the validation-circle set with formulon's paged invalid-cell list,
+ * optionally restricted to a selection. Returns `null` when the native list
+ * surface is unavailable. */
+export function circleInvalidValidationDataWithEngine(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  range?: Range,
+): number | null {
+  const cells = listInvalidValidationCells(wb, sheet);
+  if (!cells) return null;
+  const filtered = range ? cells.filter((addr) => rangeContainsAddr(range, addr)) : cells;
+  const keys = new Set(store.getState().errorIndicators.validationCircles);
+  const found = new Set<string>();
+  for (const addr of filtered) {
+    const key = addrKey(addr);
+    found.add(key);
+    keys.add(key);
+  }
+
+  // formulon's pager is intentionally limited to populated cells. Keep the
+  // cell-layer scan for validation-formatted blanks, especially rules with
+  // `allowBlank: false`, so Circle Invalid Data retains its previous coverage.
+  const state = store.getState();
+  const resolveRange = makeRangeResolver(wb, sheet);
+  for (const [key, format] of state.format.formats) {
+    if (!format.validation) continue;
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet || (range && !rangeContainsAddr(range, addr))) continue;
+    const value = state.data.cells.get(key)?.value ?? { kind: 'blank' as const };
+    if (!cellValueViolatesValidation(value, format.validation, resolveRange)) continue;
+    found.add(key);
+    keys.add(key);
+  }
+  mutators.setValidationCircles(store, keys);
+  return found.size;
+}
 
 export function clearValidationInRange(store: SpreadsheetStore, range: Range): number {
   let cleared = 0;

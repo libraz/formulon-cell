@@ -9,6 +9,16 @@ import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
 import { normalizedSelectionRange } from './selection.js';
 
+const dataUrlBytes = (src: string): Uint8Array | undefined => {
+  const match = /^data:image\/[^;,]+;base64,(.*)$/s.exec(src);
+  if (!match?.[1]) return undefined;
+  try {
+    return Uint8Array.from(atob(match[1]), (char) => char.charCodeAt(0));
+  } catch {
+    return undefined;
+  }
+};
+
 type IllustrationDropdownDefaults = Pick<
   DynamicDropdownsCtx,
   | 'applyArrangeAction'
@@ -26,7 +36,11 @@ export function createIllustrationDropdownDefaults(
     async (action) => {
       const strings = instance.i18n.strings;
       if (action === 'device') {
-        const result = await pickImageFileDataUrl();
+        const result = await pickImageFileDataUrl({
+          accept: instance.workbook.capabilities.images
+            ? 'image/png,image/jpeg,image/gif,image/bmp'
+            : 'image/*',
+        });
         if (result) {
           createRibbonImageFromSelection(
             instance.store as unknown as Parameters<typeof createRibbonImageFromSelection>[0],
@@ -34,6 +48,7 @@ export function createIllustrationDropdownDefaults(
             result.src,
             instance.history as unknown as Parameters<typeof createRibbonImageFromSelection>[3],
             result.alt,
+            { bytes: result.bytes, wb: instance.workbook },
           );
         }
         instance.host.focus();
@@ -113,24 +128,29 @@ export function createIllustrationDropdownDefaults(
         ? visible.findIndex((candidate) => candidate.id === activeId)
         : -1;
       const hasTarget = activeIndex >= 0;
+      const nativeTarget = hasTarget && visible[activeIndex]?.nativeObjectId !== undefined;
       const atBack = !hasTarget || activeIndex === 0;
       const atFront = !hasTarget || activeIndex === visible.length - 1;
       const strings = instance.i18n.strings.ribbonMenu;
       for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-arrange-action]')) {
         const action = button.dataset.arrangeAction;
         const disabled =
+          (nativeTarget && action !== 'selection-pane') ||
           (action === 'bring-forward' && atFront) ||
           (action === 'bring-front' && atFront) ||
           (action === 'send-backward' && atBack) ||
           (action === 'send-back' && atBack) ||
           (!hasTarget && action !== 'selection-pane');
-        const reason = !hasTarget
-          ? strings.arrangeRequiresObject
-          : action === 'bring-forward' || action === 'bring-front'
-            ? strings.arrangeAtFront
-            : action === 'send-backward' || action === 'send-back'
-              ? strings.arrangeAtBack
-              : undefined;
+        const reason =
+          nativeTarget && action !== 'selection-pane'
+            ? strings.arrangeNativeUnsupported
+            : !hasTarget
+              ? strings.arrangeRequiresObject
+              : action === 'bring-forward' || action === 'bring-front'
+                ? strings.arrangeAtFront
+                : action === 'send-backward' || action === 'send-back'
+                  ? strings.arrangeAtBack
+                  : undefined;
         setMenuControlDisabled(button, disabled, reason);
       }
     };
@@ -148,6 +168,8 @@ export function createIllustrationDropdownDefaults(
             normalizedSelectionRange(instance),
             dataUrl,
             instance.history as unknown as Parameters<typeof createRibbonImageFromSelection>[3],
+            undefined,
+            { bytes: dataUrlBytes(dataUrl), wb: instance.workbook },
           );
           instance.host.focus();
           return;
@@ -166,6 +188,7 @@ export function createIllustrationDropdownDefaults(
             clip.src,
             instance.history as unknown as Parameters<typeof createRibbonImageFromSelection>[3],
             clip.alt,
+            { bytes: dataUrlBytes(clip.src), wb: instance.workbook },
           );
           instance.host.focus();
           return;

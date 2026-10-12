@@ -1,3 +1,4 @@
+import type { Locale } from '../../i18n/strings.js';
 // Cell Format ribbon dispatcher. Extracted from main.ts so the playground
 // doesn't carry the dispatch table in module scope. Side effects live on the
 // caller's side via the `deps` struct (status text, tab list refresh, etc).
@@ -32,7 +33,7 @@ type CellFormatMenuText = ToolbarMenuText & {
 
 export interface CellFormatActionDeps {
   inst: SpreadsheetInstance | null;
-  ribbonLang: 'ja' | 'en';
+  ribbonLang: Locale;
   /** Result of `normalizedSelectionRange()`; main.ts computes this. */
   range: Range | null;
   statusMetric: HTMLElement | null;

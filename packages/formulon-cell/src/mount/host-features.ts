@@ -1,6 +1,6 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
-import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import {
   clearSessionIllustration,
   duplicateSessionIllustration,
@@ -9,7 +9,8 @@ import {
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { setSheetZoom } from '../commands/view.js';
 import { formatA1Range } from '../engine/address.js';
-import { formatCellForEdit } from '../engine/edit-seed.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEmitter } from '../events.js';
@@ -25,11 +26,13 @@ import type { InlineEditor } from '../interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from '../interact/error-menu.js';
 import { attachFormatDialog } from '../interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from '../interact/format-painter.js';
+import { catalogLocaleOrdinal } from '../interact/function-catalog-text.js';
 import { attachFxDialog, type FxDialogHandle } from '../interact/fx-dialog.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
 import { attachHyperlinkDialog } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
+import { attachLocaleSwitcher, type LocaleSwitcherHandle } from '../interact/locale-switcher.js';
 import {
   attachMacFormulaPalette,
   type FunctionArgumentHelpProvider,
@@ -57,6 +60,7 @@ import type { PageMargins, PageSetup, SpreadsheetStore } from '../store/store.js
 import { mutators } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import type { ChromeSlot } from './chrome.js';
+import type { ErrorIndicatorClickHandler } from './error-indicator-click.js';
 import type { FormulaBarController } from './formula-bar.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
 
@@ -123,6 +127,7 @@ export const HOST_TOGGLEABLE_IDS = [
   'shortcuts',
   'formulaBar',
   'viewToolbar',
+  'localeSwitcher',
   'sheetTabs',
 ] as const;
 
@@ -140,6 +145,7 @@ export const HOST_FEATURE_USES_STRINGS: ReadonlySet<string> = new Set([
   'statusBar',
   'workbookObjects',
   'viewToolbar',
+  'localeSwitcher',
   'watchWindow',
   'slicer',
   'charts',
@@ -184,10 +190,12 @@ export interface HostFeatureState {
   sessionCharts: SessionChartsHandle | null;
   sessionIllustrations: SessionIllustrationsHandle | null;
   viewToolbar: ViewToolbarHandle | null;
+  localeSwitcher: LocaleSwitcherHandle | null;
   workbookObjects: WorkbookObjectsPanelHandle | null;
   unsubSlicerRecalc: () => void;
   unsubSlicerWb: () => void;
   errorMenu: ErrorMenuHandle | null;
+  errorIndicatorClickHandler: ErrorIndicatorClickHandler | null;
   detachWheel: () => void;
   fxAutocomplete: AutocompleteHandle;
   fxArgHelper: ReturnType<typeof attachArgHelper> | null;
@@ -206,7 +214,7 @@ interface HostFeatureControllerInput {
   fxInput: HTMLTextAreaElement;
   getFormulaBar: () => FormulaBarController;
   getInlineEditor: () => Pick<InlineEditor, 'suspendForFormulaPalette'>;
-  getOnCanvasClick: () => (e: MouseEvent) => void;
+  getOnCanvasClick: () => ErrorIndicatorClickHandler;
   getOnHostKey: () => (e: KeyboardEvent) => void;
   getPrintableBoundsForPageSetup: (
     setup: PageSetup,
@@ -228,6 +236,9 @@ interface HostFeatureControllerInput {
   history: History;
   host: HTMLElement;
   i18nLocale: () => string;
+  getWorkbookName?: () => string | null | undefined;
+  localeSwitcher: HTMLElement;
+  setLocale: (locale: string) => boolean;
   isMacPlatform: () => boolean;
   projectFormulaDraftMirror: (anchor: Addr, raw: string | null) => void;
   refreshFeaturesView: () => void;
@@ -283,10 +294,12 @@ export function createHostFeatureState(autocompleteStub: AutocompleteHandle): Ho
     sessionCharts: null,
     sessionIllustrations: null,
     viewToolbar: null,
+    localeSwitcher: null,
     workbookObjects: null,
     unsubSlicerRecalc: (): void => {},
     unsubSlicerWb: (): void => {},
     errorMenu: null,
+    errorIndicatorClickHandler: null,
     detachWheel: (): void => {},
     fxAutocomplete: autocompleteStub,
     fxArgHelper: null,
@@ -326,6 +339,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           host: input.host,
           store: input.store,
           history: input.history,
+          formatResolver: (addr) => {
+            const wb = input.wb();
+            return !wb.isStub && wb.capabilities.effectiveStyle
+              ? effectiveCellFormatWithPending(wb, input.store.getState(), addr)
+              : input.store.getState().format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+          },
         });
         input.featureRegistry.set(
           'formatPainter',
@@ -359,6 +378,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           store: input.store,
           history: input.history,
           strings,
+          getWb: input.wb,
+          getLocale: input.i18nLocale,
           onChanged: input.onConditionalRulesChanged,
         });
         input.featureRegistry.set(
@@ -368,7 +389,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         break;
       case 'iterative':
         if (s.iterativeDialog) return;
-        s.iterativeDialog = attachIterativeDialog({ host: input.host, getWb: input.wb, strings });
+        s.iterativeDialog = attachIterativeDialog({
+          host: input.host,
+          getWb: input.wb,
+          getLocale: input.i18nLocale,
+          strings,
+        });
         input.featureRegistry.set(
           'iterative',
           input.wrapHandle(s.iterativeDialog, () => s.iterativeDialog?.detach()),
@@ -552,6 +578,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         input.setChromeAttached('statusbar', true);
         s.statusBar = attachStatusBar({
           statusbar: input.statusbar,
+          getLocale: input.i18nLocale,
           store: input.store,
           strings,
           getEngineLabel: () => (input.wb().isStub ? 'stub' : `formulon ${input.wb().version}`),
@@ -598,11 +625,20 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             panel?.focus();
           },
           onClearSessionIllustration: (id) =>
-            clearSessionIllustration(input.store, id, input.history),
+            clearSessionIllustration(input.store, id, input.history, input.wb(), {
+              origin: 'contextMenu',
+              commandId: 'workbookObjects.delete',
+            }),
           onDuplicateSessionIllustration: (id) =>
-            duplicateSessionIllustration(input.store, id, input.history),
+            duplicateSessionIllustration(input.store, id, input.history, input.wb(), {
+              origin: 'contextMenu',
+              commandId: 'workbookObjects.duplicate',
+            }),
           onUpdateSessionIllustration: (id, patch) =>
-            updateSessionIllustration(input.store, id, patch, input.history),
+            updateSessionIllustration(input.store, id, patch, input.history, input.wb(), {
+              origin: 'contextMenu',
+              commandId: 'workbookObjects.update',
+            }),
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),
           onOpenPivotTableDialog: () => s.pivotTableDialog?.open(),
           onAfterPivotEdit: () => {
@@ -637,6 +673,20 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           input.wrapHandle(s.viewToolbar, () => s.viewToolbar?.detach()),
         );
         break;
+      case 'localeSwitcher':
+        if (s.localeSwitcher) return;
+        input.setChromeAttached('localeSwitcher', true);
+        s.localeSwitcher = attachLocaleSwitcher({
+          container: input.localeSwitcher,
+          getLocale: input.i18nLocale,
+          setLocale: input.setLocale,
+          strings,
+        });
+        input.featureRegistry.set(
+          'localeSwitcher',
+          input.wrapHandle(s.localeSwitcher, () => s.localeSwitcher?.detach()),
+        );
+        break;
       case 'watchWindow':
         if (s.watchPanel) return;
         input.setChromeAttached('watchDock', true);
@@ -644,6 +694,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           host: input.watchDock,
           store: input.store,
           getWb: input.wb,
+          getLocale: input.i18nLocale,
+          getWorkbookName: input.getWorkbookName,
           history: input.history,
           strings,
         });
@@ -688,6 +740,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           host: input.host,
           store: input.store,
           history: input.history,
+          getWb: input.wb,
           closeLabel: strings.workbookObjects.close,
           resizeLabel: strings.sessionCharts.resize,
         });
@@ -709,13 +762,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             const key = `${addr.sheet}:${addr.row}:${addr.col}`;
             const cell = state.data.cells.get(key);
             const fmt = state.format.formats.get(key);
+            const storedFormula = input.wb().cellFormula(addr) ?? cell?.formula ?? null;
             input.fxInput.value = formatCellForEdit(cell, input.wb(), addr, {
-              formulaOverride: input.wb().cellFormula(addr),
+              formulaOverride: formulaForEdit(input.wb(), addr, storedFormula, state.ui.r1c1),
               formulaHidden: fmt?.formulaHidden === true,
               sheetProtected: state.protection.protectedSheets.has(addr.sheet),
-              formatFormula: state.ui.r1c1
-                ? (formula) => formatA1FormulaAsR1C1(formula, addr)
-                : undefined,
+              locale: inputLocaleForWorkbook(input.wb()),
             });
             input.fxInput.focus();
             input.fxInput.setSelectionRange(input.fxInput.value.length, input.fxInput.value.length);
@@ -727,7 +779,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           },
         });
         if (!s.canvasErrorClickAttached) {
-          input.canvas.addEventListener('click', input.getOnCanvasClick());
+          const handler = input.getOnCanvasClick();
+          input.host.addEventListener('pointerdown', handler.onPointerDown);
+          input.host.addEventListener('pointermove', handler.onPointerMove);
+          input.host.addEventListener('pointercancel', handler.onPointerCancel);
+          input.host.addEventListener('click', handler);
+          s.errorIndicatorClickHandler = handler;
           s.canvasErrorClickAttached = true;
         }
         input.featureRegistry.set(
@@ -743,9 +800,31 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           getTables: () => input.wb().getTables(),
           getCustomFunctions: () => input.formulaRegistry.list(),
           getFunctionNames: () => input.wb().functionNames(),
+          getFunctionDisplayNames: () => {
+            const wb = input.wb();
+            const names = wb.functionNames();
+            if (!names) return null;
+            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
+            return names.map((name) => wb.localizeFunctionName(name, locale) || name);
+          },
+          resolveFunctionName: (rawName) => {
+            const wb = input.wb();
+            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
+            return wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase();
+          },
+          getListSeparator: () => input.wb().localeFacts()?.listSeparator ?? ',',
           labels: strings.autocomplete,
         });
-        s.fxArgHelper = attachArgHelper({ input: input.fxInput, labels: strings.argHelper });
+        s.fxArgHelper = attachArgHelper({
+          input: input.fxInput,
+          getListSeparator: () => input.wb().localeFacts()?.listSeparator ?? ',',
+          resolveFunctionName: (rawName) => {
+            const wb = input.wb();
+            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
+            return wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase();
+          },
+          labels: strings.argHelper,
+        });
         break;
       case 'wheel':
         s.detachWheel();
@@ -863,6 +942,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         input.featureRegistry.delete('viewToolbar');
         input.setChromeAttached('viewbar', false);
         break;
+      case 'localeSwitcher':
+        s.localeSwitcher?.detach();
+        s.localeSwitcher = null;
+        input.featureRegistry.delete('localeSwitcher');
+        input.setChromeAttached('localeSwitcher', false);
+        break;
       case 'watchWindow':
         s.unsubWatchRecalc();
         s.unsubWatchWb();
@@ -893,8 +978,17 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         input.featureRegistry.delete('illustrations');
         break;
       case 'errorIndicators':
-        if (s.canvasErrorClickAttached)
-          input.canvas.removeEventListener('click', input.getOnCanvasClick());
+        if (s.canvasErrorClickAttached) {
+          const handler = s.errorIndicatorClickHandler;
+          if (handler) {
+            input.host.removeEventListener('pointerdown', handler.onPointerDown);
+            input.host.removeEventListener('pointermove', handler.onPointerMove);
+            input.host.removeEventListener('pointercancel', handler.onPointerCancel);
+            input.host.removeEventListener('click', handler);
+            handler.reset();
+          }
+        }
+        s.errorIndicatorClickHandler = null;
         s.canvasErrorClickAttached = false;
         s.errorMenu?.detach();
         s.errorMenu = null;

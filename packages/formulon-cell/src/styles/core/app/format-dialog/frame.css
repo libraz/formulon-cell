@@ -176,7 +176,9 @@
   }
   .fc-fmtdlg__tab {
     position: relative;
+    flex: 0 0 auto;
     min-width: 64px;
+    min-width: max-content;
     min-height: 26px;
     padding: 0 12px;
     background: transparent;

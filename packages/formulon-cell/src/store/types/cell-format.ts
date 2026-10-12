@@ -177,7 +177,7 @@ export interface CustomCellStyle {
 
 /** Comparison ordinals match OOXML data-validation `op`:
  *  0 between, 1 notBetween, 2 equal, 3 notEqual,
- *  4 lessThan, 5 lessThanOrEqual, 6 greaterThan, 7 greaterThanOrEqual. */
+ *  4 greaterThan, 5 lessThan, 6 greaterThanOrEqual, 7 lessThanOrEqual. */
 export type ValidationOp = 'between' | 'notBetween' | '=' | '<>' | '<' | '<=' | '>' | '>=';
 
 /** OOXML errorStyle: 0 stop, 1 warning, 2 information. `stop` rejects the

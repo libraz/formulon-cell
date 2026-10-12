@@ -1,5 +1,10 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
-import { listComments } from '../../../commands/comment.js';
+import {
+  listComments,
+  listThreadedComments,
+  recordThreadedChange,
+  removeThreadedComment,
+} from '../../../commands/comment.js';
 import { selectNextFormulaError } from '../../../commands/error-indicators.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../commands/page-setup.js';
@@ -8,10 +13,13 @@ import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
+import { selectAdjacentComment } from '../../../mount/toolbar-defaults.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
+import { applyWorkbookTheme } from '../../../mount/workbook-theme-action.js';
 import { reportDialogLabels, showReport } from '../../dialogs/report.js';
 import type { ApplyRibbonCommandDeps } from '../apply-ribbon-command.js';
 import { createMacRibbonActions, MAC_RIBBON_ACTION_IDS } from './actions.js';
+import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
 import { reportMacRibbonError } from './report-error.js';
 
@@ -44,8 +52,6 @@ const aliases: Readonly<Record<string, string>> = {
   'mac.data.showDetail': 'outlineShowDetail',
   'mac.data.hideDetail': 'outlineHideDetail',
   'mac.formulas.calcOptions': 'calcOptions',
-  'mac.review.nextNote': 'nextCommentReview',
-  'mac.review.previousNote': 'previousCommentReview',
   'mac.review.spelling': 'spellingReview',
   'mac.review.accessibility': 'accessibility',
   'mac.review.protectSheet': 'protectReview',
@@ -142,6 +148,15 @@ const operations = [
   'mac.data.textToColumns',
   'mac.data.removeDuplicates',
   'mac.data.validation',
+  'mac.page.theme.office',
+  'mac.page.theme.gray',
+  'mac.page.color.office',
+  'mac.page.color.gray',
+  'mac.page.font.office',
+  'mac.page.font.gray',
+  'mac.page.theme',
+  'mac.page.color',
+  'mac.page.font',
   'mac.page.margins.normal',
   'mac.page.margins.wide',
   'mac.page.margins.narrow',
@@ -160,6 +175,14 @@ const operations = [
   'mac.view.freeze.off',
   'mac.view.freeze.firstRow',
   'mac.view.freeze.firstColumn',
+  'mac.insert.newComment',
+  'mac.review.newComment',
+  'mac.review.deleteComment',
+  'mac.review.previousComment',
+  'mac.review.nextComment',
+  'mac.review.showComments',
+  'mac.review.previousNote',
+  'mac.review.nextNote',
   'mac.review.newNote',
   'mac.review.showNotes',
   'mac.draw.toggle',
@@ -251,9 +274,33 @@ export function dispatchMacRibbonCommand(
   const requiredAction = rootActionPermissions[id];
   if (requiredAction && !canExecuteBuiltIn(instance.store, requiredAction, 'ribbon').allowed)
     return true;
+  if (
+    id === 'mac.insert.newComment' ||
+    (id.startsWith('mac.review.') &&
+      ['newComment', 'deleteComment', 'previousComment', 'nextComment', 'showComments'].includes(
+        id.slice('mac.review.'.length),
+      ))
+  ) {
+    if (
+      !instance.workbook?.capabilities?.threadedComments ||
+      !canExecuteBuiltIn(instance.store, id, 'ribbon').allowed
+    )
+      return true;
+  }
   const alias = aliases[id];
   if (alias) return dispatchGeneric(alias);
   const run = (): unknown => {
+    const themeAction = /^mac\.page\.(theme|color|font)\.(office|gray)$/.exec(id);
+    if (themeAction) {
+      if (!canExecuteBuiltIn(instance.store, id, 'ribbon').allowed) return;
+      return applyWorkbookTheme(
+        instance,
+        themeAction[2] as 'office' | 'gray',
+        themeAction[1] === 'color' ? 'colors' : themeAction[1] === 'font' ? 'fonts' : 'all',
+        id,
+      );
+    }
+    if (['mac.page.theme', 'mac.page.color', 'mac.page.font'].includes(id)) return;
     if (id === 'mac.formulas.errorCheck.run') return runMacErrorCheck(instance);
     const ctx = createDefaultDynamicDropdownsCtx(instance);
     const state = instance.store.getState();
@@ -370,11 +417,57 @@ export function dispatchMacRibbonCommand(
         return ctx.applyFreezeAction('row');
       case 'mac.view.freeze.firstColumn':
         return ctx.applyFreezeAction('col');
+      case 'mac.insert.newComment':
+      case 'mac.review.newComment':
+        return instance.openCommentDialog({ mode: 'thread' });
       case 'mac.review.newNote':
-        return instance.openCommentDialog();
+        return instance.openCommentDialog({ mode: 'note' });
+      case 'mac.review.deleteComment': {
+        const active = state.selection.active;
+        const roots = listThreadedComments(instance.store, sheet, instance.workbook).filter(
+          (entry) => !entry.parentId && entry.row === active.row && entry.col === active.col,
+        );
+        return recordThreadedChange(
+          instance.history,
+          instance.store,
+          instance.workbook,
+          sheet,
+          () => {
+            for (const root of roots)
+              removeThreadedComment(instance.store, sheet, root.id, instance.workbook, {
+                origin: 'ribbon',
+                commandId: id,
+              });
+          },
+          { origin: 'ribbon', commandId: id },
+        );
+      }
+      case 'mac.review.previousComment':
+      case 'mac.review.nextComment':
+        return selectAdjacentComment(instance, id === 'mac.review.nextComment' ? 1 : -1, 'thread');
+      case 'mac.review.previousNote':
+      case 'mac.review.nextNote':
+        if (deps.hooks?.review?.selectComment) {
+          return deps.hooks.review.selectComment(id === 'mac.review.nextNote' ? 1 : -1, 'note');
+        }
+        return selectAdjacentComment(instance, id === 'mac.review.nextNote' ? 1 : -1, 'note');
+      case 'mac.review.showComments':
+        return showReport({
+          title: MAC_CONTEXT_LABELS.commentsTitle[toolbarLangForLocale(instance.i18n.locale)],
+          items: listThreadedComments(instance.store, sheet, instance.workbook)
+            .filter((entry) =>
+              isNavigationAddrAllowed(instance.store, { sheet, row: entry.row, col: entry.col }),
+            )
+            .map((entry) => ({
+              severity: 'info' as const,
+              label: formatA1Cell(entry.row, entry.col),
+              detail: entry.text,
+            })),
+          ...reportDialogLabels(instance.i18n.strings),
+        });
       case 'mac.review.showNotes':
         return showReport({
-          title: toolbarLangForLocale(instance.i18n.locale) === 'ja' ? 'メモ' : 'Notes',
+          title: MAC_CONTEXT_LABELS.notesTitle[toolbarLangForLocale(instance.i18n.locale)],
           items: listComments(state)
             .filter((note) => isNavigationAddrAllowed(instance.store, note.addr))
             .map((note) => ({
@@ -387,7 +480,10 @@ export function dispatchMacRibbonCommand(
     }
     if (id.startsWith('mac.draw.')) {
       const ink = ensureMacInk(instance);
-      if (!ink) throw new Error('Ink is unavailable for this spreadsheet.');
+      if (!ink)
+        throw new Error(
+          MAC_CONTEXT_LABELS.inkUnavailable[toolbarLangForLocale(instance.i18n.locale)],
+        );
       if (id === 'mac.draw.toggle') return ink.toggle();
       if (id === 'mac.draw.trackpad')
         return ink.setTrackpadMode(!ink.isActive() || !ink.getTrackpadMode());
@@ -403,7 +499,10 @@ export function dispatchMacRibbonCommand(
     }
     const action = createMacRibbonActions(instance)[id];
     if (action) return action();
-    throw new Error(`Unavailable ribbon command: ${id}`);
+    const unavailable = MAC_CONTEXT_LABELS.unavailableCommand[
+      toolbarLangForLocale(instance.i18n.locale)
+    ].replace('{id}', id);
+    throw new Error(unavailable);
   };
   invoke(instance, run);
   deps.runtime.projectFormatToolbar();

@@ -2,14 +2,25 @@
 // raw draft over the anchor cell, hiding itself whenever the cell is off-sheet,
 // scrolled behind a frozen band, or outside the grid.
 
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
+import {
+  cellFontFamily,
+  cellTextVerticalOffset,
+  cssCellFontSize,
+  fontSizeWithVerticalAlign,
+  visualZoom,
+} from '../render/painters/text.js';
 import { formatWithPending } from '../store/pending-format.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 export interface FormulaDraftMirrorDeps {
   grid: HTMLElement;
   store: SpreadsheetStore;
+  /** Workbook used to project inherited/theme font fields for the draft. */
+  wb?: WorkbookHandle;
 }
 
 export interface FormulaDraftMirror {
@@ -21,7 +32,7 @@ export interface FormulaDraftMirror {
 }
 
 export function attachFormulaDraftMirror(deps: FormulaDraftMirrorDeps): FormulaDraftMirror {
-  const { grid, store } = deps;
+  const { grid, store, wb } = deps;
   const el = document.createElement('div');
   el.className = 'fc-host__formula-draft-mirror';
   el.setAttribute('aria-hidden', 'true');
@@ -64,7 +75,9 @@ export function attachFormulaDraftMirror(deps: FormulaDraftMirrorDeps): FormulaD
       hide();
       return;
     }
-    const format = formatWithPending(state, mirrorState.anchor);
+    const format = wb
+      ? effectiveCellFormatWithPending(wb, state, mirrorState.anchor)
+      : formatWithPending(state, mirrorState.anchor);
     el.textContent = mirrorState.raw;
     el.style.left = `${rect.x}px`;
     el.style.top = `${rect.y}px`;
@@ -72,11 +85,33 @@ export function attachFormulaDraftMirror(deps: FormulaDraftMirrorDeps): FormulaD
     el.style.height = `${rect.h}px`;
     el.style.background = format?.fill ?? '';
     el.style.color = format?.color ?? '';
-    el.style.fontFamily = format?.fontFamily ?? '';
-    el.style.fontSize = format?.fontSize ? `${format.fontSize}px` : '';
+    el.style.fontFamily = cellFontFamily(
+      format?.fontFamily,
+      'var(--fc-font-ui, system-ui, sans-serif)',
+    );
+    const zoom = visualZoom(state.viewport.zoom);
+    el.style.fontSize = cssCellFontSize(format?.fontSize, format?.fontVertAlign, zoom);
+    const visualSize =
+      format?.fontSize !== undefined && Number.isFinite(format.fontSize)
+        ? fontSizeWithVerticalAlign(format.fontSize, format.fontVertAlign) * zoom
+        : undefined;
+    el.style.lineHeight = visualSize ? `${visualSize * 1.25}px` : '';
+    if (visualSize && format?.fontVertAlign) {
+      const offset = cellTextVerticalOffset(visualSize, format.fontVertAlign);
+      el.style.paddingTop = `${Math.max(0, 4 + offset)}px`;
+      el.style.paddingBottom = `${Math.max(0, 4 - offset)}px`;
+    } else {
+      el.style.paddingTop = '';
+      el.style.paddingBottom = '';
+    }
     el.style.fontWeight = format?.bold ? 'bold' : '';
     el.style.fontStyle = format?.italic ? 'italic' : '';
-    el.style.textDecoration = format?.underline ? 'underline' : '';
+    el.style.textDecoration = [
+      format?.underline ? 'underline' : '',
+      format?.strike ? 'line-through' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
     el.style.textAlign = format?.align ?? '';
     el.style.direction = layout.rtl ? 'rtl' : 'ltr';
     el.hidden = false;

@@ -1,9 +1,13 @@
 import type { History } from '../commands/history.js';
+import type { IllustrationMutationAuthorization } from '../commands/session-illustration.js';
 import {
   clearSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { cellRectUnclamped, layoutForView } from '../render/geometry.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 
 export interface SessionIllustrationsHandle {
   refresh(): void;
@@ -14,6 +18,47 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_W = 48;
 const MIN_H = 32;
 const KEYBOARD_STEP = 8;
+const EMU_PER_PX = 9525;
+
+const illustrationAuthorization = (
+  commandId: string,
+  origin: IllustrationMutationAuthorization['origin'] = 'contextMenu',
+): IllustrationMutationAuthorization => ({ origin, commandId });
+
+const renderedPosition = (
+  state: ReturnType<SpreadsheetStore['getState']>,
+  item: SessionIllustration,
+): { x: number; y: number; w: number; h: number } => {
+  const anchor = item.nativeAnchor;
+  if (!anchor) {
+    return {
+      x: item.x ?? 300,
+      y: item.y ?? 88,
+      w: item.w ?? 160,
+      h: item.h ?? 96,
+    };
+  }
+  try {
+    const rect = cellRectUnclamped(layoutForView(state), state.viewport, anchor.row, anchor.col);
+    const zoom =
+      state.viewport.zoom && Number.isFinite(state.viewport.zoom) && state.viewport.zoom > 0
+        ? state.viewport.zoom
+        : 1;
+    return {
+      x: rect.x + (anchor.colOffEmu / EMU_PER_PX) * zoom,
+      y: rect.y + (anchor.rowOffEmu / EMU_PER_PX) * zoom,
+      w: Math.max(1, anchor.widthEmu / EMU_PER_PX) * zoom,
+      h: Math.max(1, anchor.heightEmu / EMU_PER_PX) * zoom,
+    };
+  } catch {
+    return {
+      x: item.x ?? 300,
+      y: item.y ?? 88,
+      w: item.w ?? 160,
+      h: item.h ?? 96,
+    };
+  }
+};
 
 const appendSvg = <K extends keyof SVGElementTagNameMap>(
   parent: Element,
@@ -121,8 +166,9 @@ export function attachSessionIllustrations(deps: {
   pictureLabel?: string;
   shapeLabel?: string;
   resizeLabel?: string;
+  getWb?: () => WorkbookHandle | null;
 }): SessionIllustrationsHandle {
-  const { host, store, history = null } = deps;
+  const { host, store, history = null, getWb = (): WorkbookHandle | null => null } = deps;
   const root = document.createElement('div');
   root.className = 'fc-illustrations';
   root.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
@@ -153,13 +199,15 @@ export function attachSessionIllustrations(deps: {
     panel: HTMLElement,
   ): void => {
     if (e.button !== 0) return;
+    if (item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true) return;
     e.preventDefault();
     const startX = e.clientX;
     const startY = e.clientY;
-    const startLeft = item.x ?? panel.offsetLeft;
-    const startTop = item.y ?? panel.offsetTop;
-    const startW = item.w ?? panel.offsetWidth;
-    const startH = item.h ?? panel.offsetHeight;
+    const rendered = renderedPosition(store.getState(), item);
+    const startLeft = item.nativeAnchor ? rendered.x : (item.x ?? panel.offsetLeft);
+    const startTop = item.nativeAnchor ? rendered.y : (item.y ?? panel.offsetTop);
+    const startW = item.nativeAnchor ? rendered.w : (item.w ?? panel.offsetWidth);
+    const startH = item.nativeAnchor ? rendered.h : (item.h ?? panel.offsetHeight);
     const onMove = (move: PointerEvent): void => {
       const dx = move.clientX - startX;
       const dy = move.clientY - startY;
@@ -172,6 +220,8 @@ export function attachSessionIllustrations(deps: {
             y: Math.max(0, startTop + dy),
           },
           history,
+          getWb() ?? undefined,
+          illustrationAuthorization('sessionIllustration.move'),
         );
         return;
       }
@@ -183,6 +233,8 @@ export function attachSessionIllustrations(deps: {
           h: Math.max(MIN_H, startH + dy),
         },
         history,
+        getWb() ?? undefined,
+        illustrationAuthorization('sessionIllustration.resize'),
       );
     };
     const onUp = (): void => {
@@ -194,9 +246,16 @@ export function attachSessionIllustrations(deps: {
   };
 
   const applyKeyboard = (event: KeyboardEvent, item: SessionIllustration, panel: HTMLElement) => {
+    if (item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true) return;
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
-      clearSessionIllustration(store, item.id, history);
+      clearSessionIllustration(
+        store,
+        item.id,
+        history,
+        getWb() ?? undefined,
+        illustrationAuthorization('sessionIllustration.delete', 'keyboard'),
+      );
       host.focus({ preventScroll: true });
       return;
     }
@@ -210,15 +269,21 @@ export function attachSessionIllustrations(deps: {
     if (!delta) return;
     event.preventDefault();
     const [dx, dy] = delta;
+    const rendered = renderedPosition(store.getState(), item);
     if (event.shiftKey) {
       updateSessionIllustration(
         store,
         item.id,
         {
-          w: Math.max(MIN_W, (item.w ?? panel.offsetWidth) + dx),
-          h: Math.max(MIN_H, (item.h ?? panel.offsetHeight) + dy),
+          w: Math.max(MIN_W, (item.nativeAnchor ? rendered.w : (item.w ?? panel.offsetWidth)) + dx),
+          h: Math.max(
+            MIN_H,
+            (item.nativeAnchor ? rendered.h : (item.h ?? panel.offsetHeight)) + dy,
+          ),
         },
         history,
+        getWb() ?? undefined,
+        illustrationAuthorization('sessionIllustration.resize', 'keyboard'),
       );
       return;
     }
@@ -226,10 +291,12 @@ export function attachSessionIllustrations(deps: {
       store,
       item.id,
       {
-        x: Math.max(0, (item.x ?? panel.offsetLeft) + dx),
-        y: Math.max(0, (item.y ?? panel.offsetTop) + dy),
+        x: Math.max(0, (item.nativeAnchor ? rendered.x : (item.x ?? panel.offsetLeft)) + dx),
+        y: Math.max(0, (item.nativeAnchor ? rendered.y : (item.y ?? panel.offsetTop)) + dy),
       },
       history,
+      getWb() ?? undefined,
+      illustrationAuthorization('sessionIllustration.move', 'keyboard'),
     );
   };
 
@@ -255,12 +322,15 @@ export function attachSessionIllustrations(deps: {
             ? (item.alt ?? deps.pictureLabel ?? item.id)
             : (item.shape ?? deps.shapeLabel ?? item.id),
         );
+        const editable = item.nativeObjectId === undefined || item.nativeGeometryEditable === true;
+        projectDisabledState(panel, !editable, null);
         panel.style.cssText =
           'position:absolute;pointer-events:auto;background:transparent;box-sizing:border-box;';
-        panel.style.left = `${item.x ?? 300}px`;
-        panel.style.top = `${item.y ?? 88}px`;
-        panel.style.width = `${item.w ?? 160}px`;
-        panel.style.height = `${item.h ?? 96}px`;
+        const placement = renderedPosition(state, item);
+        panel.style.left = `${placement.x}px`;
+        panel.style.top = `${placement.y}px`;
+        panel.style.width = `${placement.w}px`;
+        panel.style.height = `${placement.h}px`;
         panel.addEventListener('focus', () => {
           selectedId = item.id;
           refreshSelection();
@@ -269,7 +339,9 @@ export function attachSessionIllustrations(deps: {
         panel.addEventListener('keydown', (event) => applyKeyboard(event, item, panel));
 
         if (item.kind === 'image') {
-          appendImage(panel, item, (event) => applyDrag(event, item, 'move', panel));
+          appendImage(panel, item, (event) => {
+            if (editable) applyDrag(event, item, 'move', panel);
+          });
         } else {
           const svg = document.createElementNS(SVG_NS, 'svg');
           svg.setAttribute('viewBox', '0 0 160 96');
@@ -280,13 +352,17 @@ export function attachSessionIllustrations(deps: {
           panel.appendChild(svg);
         }
 
-        const resize = document.createElement('div');
-        resize.setAttribute('role', 'separator');
-        resize.setAttribute('aria-label', deps.resizeLabel ?? deps.shapeLabel ?? item.id);
-        resize.style.cssText =
-          'position:absolute;right:-4px;bottom:-4px;width:8px;height:8px;background:var(--fc-accent, #0f6cbd);cursor:nwse-resize;';
-        resize.addEventListener('pointerdown', (event) => applyDrag(event, item, 'resize', panel));
-        panel.appendChild(resize);
+        if (editable) {
+          const resize = document.createElement('div');
+          resize.setAttribute('role', 'separator');
+          resize.setAttribute('aria-label', deps.resizeLabel ?? deps.shapeLabel ?? item.id);
+          resize.style.cssText =
+            'position:absolute;right:-4px;bottom:-4px;width:8px;height:8px;background:var(--fc-accent, #0f6cbd);cursor:nwse-resize;';
+          resize.addEventListener('pointerdown', (event) =>
+            applyDrag(event, item, 'resize', panel),
+          );
+          panel.appendChild(resize);
+        }
         root.appendChild(panel);
       });
     refreshSelection();

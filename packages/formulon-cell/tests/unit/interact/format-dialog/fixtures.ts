@@ -40,7 +40,7 @@ export const flushRaf = (): Promise<void> =>
 
 export const mergeWorkbook = (): WorkbookHandle =>
   ({
-    capabilities: { merges: true },
+    capabilities: { merges: true, sheetFontStyles: true },
     engineClearMerges: () => true,
     engineAddMerge: () => true,
     setBlank: () => undefined,

@@ -5,6 +5,7 @@
 // the click dispatch table.
 
 import type { RibbonFillAction } from '../../commands/fill.js';
+import type { WorkbookThemePresetId } from '../../engine/workbook-theme-presets.js';
 import type { SessionChartKind, SpreadsheetInstance } from '../../index.js';
 import { clamp, viewportSize } from '../../interact/overlay-position.js';
 import type { SessionShapeKind } from '../illustration-types.js';
@@ -94,6 +95,7 @@ export interface DynamicDropdownsCtx {
   applyPrintAreaAction: (action: PrintAreaAction) => void;
   applyArrangeAction: (action: ArrangeAction) => void;
   applyUiTheme: (theme: UiTheme) => void;
+  applyWorkbookTheme: (presetId: WorkbookThemePresetId) => void;
   focusSheet: () => void;
   applySortMenuAction: (action: string) => void;
   applyFindSelectAction: (action: string) => void;
@@ -167,6 +169,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'print-area-action',
   'arrange-action',
   'page-theme-action',
+  'workbook-theme-action',
   'sort',
   'find-select',
   'autosum-fn',
@@ -279,6 +282,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-protect-review': 'updateProtectMenu',
   'menu-protect-view': 'updateProtectMenu',
   'menu-review-comments': 'updateReviewCommentsMenu',
+  'menu-review-new-comment': 'updateReviewCommentsMenu',
   'menu-sort': 'updateSortMenu',
   'menu-sort-home': 'updateSortMenu',
   'menu-table-style-home': 'updateTableStylesMenu',
@@ -331,8 +335,14 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   };
 
   const dynamicDropdownButtonForSpec = (spec: RibbonDropdownSpec): HTMLButtonElement | null => {
-    return document.querySelector<HTMLButtonElement>(
-      `button[data-ribbon-command="${spec.command}"]`,
+    const buttons = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(`button[data-ribbon-command="${spec.command}"]`),
+    );
+    return (
+      buttons.find((button) => button.getAttribute('aria-expanded') === 'true') ??
+      buttons.find((button) => !button.closest('[hidden]')) ??
+      buttons[0] ??
+      null
     );
   };
 
@@ -386,9 +396,27 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     return visiblePanels.length === 1 ? (visiblePanels[0] ?? null) : null;
   };
 
-  const closeDynamicRibbonDropdown = (spec: RibbonDropdownSpec, restoreFocus = false): void => {
-    const menu = document.getElementById(spec.menuId) as HTMLDivElement | null;
-    const button = dynamicDropdownButtonForSpec(spec);
+  const dynamicMenuForButton = (
+    spec: RibbonDropdownSpec,
+    button: HTMLButtonElement | null,
+  ): HTMLDivElement | null => {
+    const sibling = button?.nextElementSibling;
+    if (sibling?.id === spec.menuId && sibling.matches('.fc-tb__menu')) {
+      return sibling as HTMLDivElement;
+    }
+    return document.getElementById(spec.menuId) as HTMLDivElement | null;
+  };
+
+  const closeDynamicRibbonDropdown = (
+    spec: RibbonDropdownSpec,
+    restoreFocus = false,
+    targetMenu?: HTMLDivElement,
+  ): void => {
+    const preceding = targetMenu?.previousElementSibling;
+    const button = preceding?.matches('button[data-ribbon-command]')
+      ? (preceding as HTMLButtonElement)
+      : dynamicDropdownButtonForSpec(spec);
+    const menu = targetMenu ?? dynamicMenuForButton(spec, button);
     if (!menu) return;
     menu.hidden = true;
     if (menu.id === 'menu-conditional') closeDynamicConditionalSubmenus(menu);
@@ -402,7 +430,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     for (const menu of document.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
       if (!ALL_DROPDOWN_IDS.has(menu.id) || menu.id === exceptMenuId) continue;
       const spec = dynamicDropdownSpecForMenu(menu);
-      if (spec) closeDynamicRibbonDropdown(spec);
+      if (spec) closeDynamicRibbonDropdown(spec, false, menu);
     }
   };
 
@@ -441,7 +469,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     spec: RibbonDropdownSpec,
     button: HTMLButtonElement | null = dynamicDropdownButtonForSpec(spec),
   ): void => {
-    const menu = document.getElementById(spec.menuId) as HTMLDivElement | null;
+    const menu = dynamicMenuForButton(spec, button);
     if (!menu || !button) return;
     menuRefreshers[spec.menuId]?.(menu);
     closeAllDynamicRibbonDropdowns(spec.menuId);
@@ -606,6 +634,13 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       attr: 'page-theme-action',
       handler: (v) => {
         ctx.applyUiTheme(v as UiTheme);
+        ctx.focusSheet();
+      },
+    },
+    {
+      attr: 'workbook-theme-action',
+      handler: (v) => {
+        ctx.applyWorkbookTheme(v as WorkbookThemePresetId);
         ctx.focusSheet();
       },
     },
@@ -836,7 +871,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       const button = target?.closest<HTMLButtonElement>('[data-ribbon-command]');
       const spec = button ? dynamicDropdownSpecForButton(button) : null;
       if (spec) {
-        const targetMenu = document.getElementById(spec.menuId) as HTMLElement | null;
+        const targetMenu = dynamicMenuForButton(spec, button ?? null);
         if (targetMenu && !targetMenu.hidden) {
           event.preventDefault();
           event.stopPropagation();

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../../src/engine/workbook-handle.js';
+import { dictionaries } from '../../../../src/i18n/strings.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import {
   createSpreadsheetStore,
@@ -61,6 +62,7 @@ describe('attachFormatDialog', () => {
   });
 
   it('font vertical-alignment controls are mutually exclusive and write the selected value', () => {
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontSize: 20 });
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
@@ -73,9 +75,17 @@ describe('attachFormatDialog', () => {
     superscript.checked = true;
     superscript.dispatchEvent(new Event('change', { bubbles: true }));
     expect(subscript.checked).toBe(false);
+    const sample = document.querySelector<HTMLElement>('.fc-fmtdlg__font-preview-run');
+    expect(sample).not.toBeNull();
+    expect(
+      Number.parseFloat(sample?.style.transform.slice('translateY('.length) ?? 'NaN'),
+    ).toBeLessThan(0);
     subscript.checked = true;
     subscript.dispatchEvent(new Event('change', { bubbles: true }));
     expect(superscript.checked).toBe(false);
+    expect(
+      Number.parseFloat(sample?.style.transform.slice('translateY('.length) ?? 'NaN'),
+    ).toBeGreaterThan(0);
 
     document
       .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
@@ -137,12 +147,31 @@ describe('attachFormatDialog', () => {
     colorInput.dispatchEvent(new Event('input', { bubbles: true }));
     boldItalic.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(preview.style.fontFamily).toBe('Georgia');
-    expect(preview.style.fontSize).toBe('18px');
+    expect(preview.style.fontFamily).toBe('Georgia, var(--fc-font-ui, system-ui, sans-serif)');
+    // The dialog displays Excel points; the draft/preview remains CSS px.
+    expect(preview.style.fontSize).toBe('24px');
     expect(preview.style.color).toBe('#cc0000');
     expect(preview.style.fontWeight).toBe('bold');
     expect(preview.style.fontStyle).toBe('italic');
 
+    handle.detach();
+  });
+
+  it('keeps a stable size selector when comma-decimal locales use a text input', () => {
+    const handle = attachFormatDialog({
+      host,
+      store,
+      strings: dictionaries.de,
+      getLocale: () => 'de',
+    });
+    handle.open('font');
+
+    const sizeInput = document.querySelector<HTMLInputElement>('input[data-fc-input="size"]');
+    if (!sizeInput) throw new Error('font size input missing');
+    expect(sizeInput.type).toBe('text');
+    expect(sizeInput.inputMode).toBe('decimal');
+    expect(sizeInput.min).toBe('1');
+    expect(sizeInput.max).toBe('409');
     handle.detach();
   });
 
@@ -205,6 +234,66 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('Japanese font list displays the body label but commits its canonical value', () => {
+    const handle = attachFormatDialog({
+      host,
+      store,
+      strings: dictionaries.ja,
+      getLocale: () => 'ja',
+    });
+    handle.open('font');
+
+    const bodyFont = document.querySelector<HTMLButtonElement>(
+      'button[data-fc-font-family="游ゴシック"]',
+    );
+    if (!bodyFont) throw new Error('Japanese body font option missing');
+    expect(bodyFont.textContent).toContain('游ゴシック Regular');
+
+    bodyFont.click();
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fontFamily,
+    ).toBe('游ゴシック');
+    handle.detach();
+  });
+
+  it('keeps an imported Japanese legacy row exact when that row is selected', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { fontFamily: '游ゴシック Regular' },
+    );
+    const handle = attachFormatDialog({
+      host,
+      store,
+      strings: dictionaries.ja,
+      getLocale: () => 'ja',
+    });
+    handle.open('font');
+
+    const legacy = document.querySelector<HTMLButtonElement>(
+      'button[data-fc-font-family="游ゴシック Regular"]',
+    );
+    const canonical = document.querySelector<HTMLButtonElement>(
+      'button[data-fc-font-family="游ゴシック"]',
+    );
+    if (!legacy || !canonical) throw new Error('Japanese legacy/canonical options missing');
+    expect(legacy.textContent).toBe('游ゴシック Regular');
+    expect(canonical.textContent).toBe('游ゴシック');
+
+    legacy.click();
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fontFamily,
+    ).toBe('游ゴシック Regular');
+    handle.detach();
+  });
+
   it('empty font family is converted to undefined on OK', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontFamily: 'Arial' });
     const handle = attachFormatDialog({ host, store });
@@ -225,7 +314,7 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
-  it('font size input clamps to [1, 409]', () => {
+  it('font size input clamps Excel points to [1, 409] before storing CSS px', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
@@ -240,7 +329,7 @@ describe('attachFormatDialog', () => {
 
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fontSize,
-    ).toBe(409);
+    ).toBeCloseTo((409 * 96) / 72, 10);
     handle.detach();
   });
 
@@ -259,7 +348,7 @@ describe('attachFormatDialog', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       expect(
         store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fontSize,
-      ).toBe(size);
+      ).toBeCloseTo((size * 96) / 72, 10);
     }
     handle.detach();
   });

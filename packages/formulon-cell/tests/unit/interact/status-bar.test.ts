@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
-import { en, ja } from '../../../src/i18n/strings.js';
+import { de, en, fr, ja } from '../../../src/i18n/strings.js';
 import { attachStatusBar } from '../../../src/interact/status-bar.js';
 import {
   createSpreadsheetStore,
@@ -67,6 +67,27 @@ describe('attachStatusBar', () => {
     expect(statusbar.querySelector('.fc-host__statusbar-left')?.textContent).toContain('準備完了');
     expect(right?.textContent).toContain('セル');
     expect(right?.textContent).not.toContain('stub');
+    handle.detach();
+  });
+
+  it('updates aggregate separators with the live locale', () => {
+    seedNumber(store, 0, 0, 1234.5);
+    seedNumber(store, 1, 0, 10);
+    setRange(store, 0, 0, 1, 0);
+    let locale = 'de';
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: de,
+      getEngineLabel: () => 'stub',
+      getLocale: () => locale,
+    });
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('1.244,5');
+    locale = 'fr';
+    handle.setStrings(fr);
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain(
+      '1\u202f244,5',
+    );
     handle.detach();
   });
 

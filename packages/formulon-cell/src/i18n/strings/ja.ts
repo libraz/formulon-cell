@@ -3,6 +3,7 @@ import { dataObjectsJa } from './data-objects/ja.js';
 import { editDialogsJa } from './edit-dialogs/ja.js';
 import { formulaDialogsJa } from './formula-dialogs/ja.js';
 import { gridPopupsJa } from './grid-popups/ja.js';
+import { localeSwitcherJa } from './locale-switcher/ja.js';
 import { macJa } from './mac/ja.js';
 import { pageLayoutJa } from './page-layout/ja.js';
 import { ribbonJa } from './ribbon/ja.js';
@@ -21,4 +22,5 @@ export const ja: Strings = {
   ...macJa,
   ...pageLayoutJa,
   ...workbookChromeJa,
+  ...localeSwitcherJa,
 };

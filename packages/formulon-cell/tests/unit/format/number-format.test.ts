@@ -11,6 +11,17 @@ describe('formatNumber', () => {
     expect(formatNumber(1234.5, undefined)).toBe('1,234.5');
   });
 
+  it.each(['en-US', 'ja-JP', 'de-DE', 'fr-FR', 'zh-CN', 'ko-KR', 'th-TH'])(
+    'keeps explicit General consistent with implicit General for %s',
+    (locale) => {
+      for (const value of [0, 0.125, 1e-20, 1e-9, 1e11, -1e11]) {
+        expect(formatNumber(value, { kind: 'general' }, locale)).toBe(
+          formatNumber(value, undefined, locale),
+        );
+      }
+    },
+  );
+
   it('applies fixed decimals', () => {
     expect(formatNumber(1.5, { kind: 'fixed', decimals: 3 })).toBe('1.500');
     expect(formatNumber(1.2345, { kind: 'fixed', decimals: 2 })).toBe('1.23');
@@ -36,6 +47,21 @@ describe('formatNumber', () => {
     expect(formatNumber(1.23e15, { kind: 'scientific', decimals: 2 })).toBe('1.23E+15');
   });
 
+  it.each([
+    ['en-US', '.'],
+    ['ja-JP', '.'],
+    ['de-DE', ','],
+    ['fr-FR', ','],
+    ['zh-CN', '.'],
+    ['ko-KR', '.'],
+    ['th-TH', '.'],
+  ] as const)('localizes built-in Scientific mantissas for %s', (locale, decimal) => {
+    const fmt = { kind: 'scientific' as const, decimals: 2 };
+    expect(formatNumber(-12345.678, fmt, locale)).toBe(`-1${decimal}23E+04`);
+    expect(formatNumber(-0.00012, fmt, locale)).toBe(`-1${decimal}20E-04`);
+    expect(formatNumber(1234567890123, fmt, locale)).toBe(`1${decimal}23E+12`);
+  });
+
   it('renders elapsed-time formats without wrapping at 24h/60 (H-5)', () => {
     // 1.5 days = 36 hours. [h] must show 36, not 12.
     expect(formatNumber(1.5, { kind: 'custom', pattern: '[h]:mm:ss' })).toBe('36:00:00');
@@ -56,8 +82,20 @@ describe('formatNumber', () => {
   it('matches Excel 1900 date serials before the leap-year bug boundary', () => {
     expect(formatNumber(1, { kind: 'custom', pattern: 'yyyy-mm-dd' })).toBe('1900-01-01');
     expect(formatNumber(59, { kind: 'custom', pattern: 'yyyy-mm-dd' })).toBe('1900-02-28');
+    expect(formatNumber(60, { kind: 'custom', pattern: 'yyyy-mm-dd' })).toBe('1900-02-29');
     expect(formatNumber(61, { kind: 'custom', pattern: 'yyyy-mm-dd' })).toBe('1900-03-01');
   });
+
+  it.each(['en-US', 'ja-JP', 'de-DE', 'fr-FR', 'zh-CN', 'ko-KR', 'th-TH'])(
+    'recognizes uppercase time tokens without changing literal case for %s',
+    (locale) => {
+      expect(formatNumber(0.5, { kind: 'custom', pattern: 'HH:MM:SS' }, locale)).toBe('12:00:00');
+      expect(formatNumber(0.5, { kind: 'custom', pattern: 'hh:mm AM/PM' }, locale)).toBe(
+        '12:00 PM',
+      );
+      expect(formatNumber(0.5, { kind: 'custom', pattern: 'HH" MM" \\M' }, locale)).toBe('12 MM M');
+    },
+  );
 
   it('renders scientific and engineering notation instead of E+0 verbatim (H-6)', () => {
     // Engineering: 3 integer placeholders → exponent stepped in multiples of 3.
@@ -67,6 +105,11 @@ describe('formatNumber', () => {
     expect(formatNumber(12345, { kind: 'custom', pattern: '0.00E+00' })).toBe('1.23E+04');
     // Negative keeps its sign; exponent sign spec `E-` omits the plus.
     expect(formatNumber(-12345, { kind: 'custom', pattern: '0.0E-0' })).toBe('-1.2E4');
+  });
+
+  it('localizes custom scientific mantissas without changing section syntax', () => {
+    expect(formatNumber(12345, { kind: 'custom', pattern: '0.00E+00' }, 'de-DE')).toBe('1,23E+04');
+    expect(formatNumber(-12345, { kind: 'custom', pattern: '0.0E-0' }, 'fr-FR')).toBe('-1,2E4');
   });
 
   it('distributes digits across multi-run integer patterns (M-1)', () => {

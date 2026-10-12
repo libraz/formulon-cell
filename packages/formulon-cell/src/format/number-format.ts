@@ -1,14 +1,15 @@
+import { formatGeneralNumber, formatScientificNumber } from '../engine/value.js';
 import type { NumFmt } from '../store/store.js';
+import { excelSerialToDate, excelSerialToDateParts } from './date-serial.js';
+import { normalizeFormatLocale } from './locale.js';
 
 export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'en-US'): string {
   if (!Number.isFinite(value)) return String(value);
-  if (!fmt || fmt.kind === 'general') {
-    return new Intl.NumberFormat(locale, { maximumFractionDigits: 12 }).format(value);
-  }
+  if (!fmt || fmt.kind === 'general') return formatGeneralNumber(value, locale);
   if (fmt.kind === 'text') return String(value);
   if (fmt.kind === 'fixed') {
     const negStyle = fmt.negativeStyle ?? 'minus';
-    const body = new Intl.NumberFormat(locale, {
+    const body = new Intl.NumberFormat(normalizeFormatLocale(locale), {
       style: 'decimal',
       minimumFractionDigits: fmt.decimals,
       maximumFractionDigits: fmt.decimals,
@@ -19,16 +20,16 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
   if (fmt.kind === 'currency') {
     const symbol = fmt.symbol ?? '$';
     const negStyle = fmt.negativeStyle ?? 'minus';
-    const body = new Intl.NumberFormat(locale, {
+    const body = new Intl.NumberFormat(normalizeFormatLocale(locale), {
       style: 'decimal',
       minimumFractionDigits: fmt.decimals,
       maximumFractionDigits: fmt.decimals,
       useGrouping: true,
     }).format(Math.abs(value));
-    return applyNegative(value, body, symbol, negStyle);
+    return applyNegative(value, placeCurrencySymbol(body, symbol, locale), '', negStyle);
   }
   if (fmt.kind === 'percent') {
-    return new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat(normalizeFormatLocale(locale), {
       style: 'percent',
       minimumFractionDigits: fmt.decimals,
       maximumFractionDigits: fmt.decimals,
@@ -38,23 +39,22 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
     // Excel's built-in Scientific format is `0.00E+00` — the exponent is
     // zero-padded to at least two digits. `toExponential` emits a bare `e+4`,
     // so re-pad to match.
-    return value
-      .toExponential(fmt.decimals)
-      .replace(
-        /e([+-])(\d+)/i,
-        (_m, sign: string, digits: string) => `E${sign}${digits.padStart(2, '0')}`,
-      );
+    return formatScientificNumber(value, fmt.decimals, locale);
   }
   if (fmt.kind === 'accounting') {
     const symbol = fmt.symbol ?? '$';
-    const body = new Intl.NumberFormat(locale, {
+    const body = new Intl.NumberFormat(normalizeFormatLocale(locale), {
       style: 'decimal',
       minimumFractionDigits: fmt.decimals,
       maximumFractionDigits: fmt.decimals,
       useGrouping: true,
     }).format(Math.abs(value));
-    if (value === 0) return `${symbol} -`;
-    return value < 0 ? `(${symbol}${body})` : `${symbol}${body} `;
+    if (value === 0) {
+      const placed = placeCurrencySymbol('-', symbol, locale);
+      return placed.startsWith(symbol) ? `${symbol} -` : placed;
+    }
+    const placed = placeCurrencySymbol(body, symbol, locale);
+    return value < 0 ? `(${placed})` : `${placed} `;
   }
   if (fmt.kind === 'date') {
     return renderDateTimePattern(value, fmt.pattern, locale);
@@ -72,6 +72,22 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
     return formatCustomPattern(value, fmt.pattern, locale);
   }
   return String(value);
+}
+
+/** Use the locale's currency position and spacing with the cell's chosen symbol. */
+function placeCurrencySymbol(body: string, symbol: string, locale: string): string {
+  const parts = new Intl.NumberFormat(normalizeFormatLocale(locale), {
+    style: 'currency',
+    currency: 'USD',
+  }).formatToParts(1);
+  const first = parts.findIndex((part) => part.type === 'integer');
+  let last = first;
+  for (let i = first; i < parts.length; i += 1) {
+    if (['integer', 'group', 'decimal', 'fraction'].includes(parts[i]?.type ?? '')) last = i;
+  }
+  const affix = (items: Intl.NumberFormatPart[]): string =>
+    items.map((part) => (part.type === 'currency' ? symbol : part.value)).join('');
+  return `${affix(parts.slice(0, first))}${body}${affix(parts.slice(last + 1))}`;
 }
 
 function applyNegative(
@@ -92,14 +108,6 @@ function applyNegative(
     default:
       return `-${symbol}${body}`;
   }
-}
-
-/** Spreadsheet serial date → JS Date. spreadsheet epoch is 1899-12-30 (with Lotus 123
- *  1900-leap-year bug compensation already baked in for serials > 60). */
-function spreadsheetSerialToDate(serial: number): Date {
-  const excel1900Offset = serial > 0 && serial < 60 ? 1 : 0;
-  const ms = (serial + excel1900Offset - 25569) * 86_400_000;
-  return new Date(ms);
 }
 
 const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
@@ -154,7 +162,7 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
   active = stripFormatDirectives(active);
 
   // If the section contains date/time tokens, render as date.
-  if (/y|m|d|h|s/.test(stripLiterals(active))) {
+  if (/y|m|d|h|s/i.test(stripLiterals(active))) {
     return renderDateTimePattern(value, active, locale);
   }
 
@@ -316,10 +324,12 @@ function hasUnquotedPercent(s: string): boolean {
 }
 
 function renderDateTimePattern(serial: number, pattern: string, locale: string): string {
-  const d = spreadsheetSerialToDate(serial);
-  const yyyy = d.getUTCFullYear();
-  const mm = d.getUTCMonth() + 1;
-  const dd = d.getUTCDate();
+  const d = excelSerialToDate(serial);
+  const parts = excelSerialToDateParts(serial);
+  if (!d || !parts) return '';
+  const yyyy = parts.year;
+  const mm = parts.month;
+  const dd = parts.day;
   const dow = d.getUTCDay();
   const hh = d.getUTCHours();
   const mi = d.getUTCMinutes();
@@ -334,24 +344,28 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
   const hh12 = ((hh + 11) % 12) + 1;
   const ampm = hh < 12 ? 'AM' : 'PM';
   const DAYS_LONG = Array.from({ length: 7 }, (_, i) =>
-    new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(
-      new Date(Date.UTC(2023, 0, i + 1)),
-    ),
+    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
+      weekday: 'long',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(2023, 0, i + 1))),
   );
   const DAYS_SHORT = Array.from({ length: 7 }, (_, i) =>
-    new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(
-      new Date(Date.UTC(2023, 0, i + 1)),
-    ),
+    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
+      weekday: 'short',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(2023, 0, i + 1))),
   );
   const MONTHS_LONG = Array.from({ length: 12 }, (_, i) =>
-    new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(
-      new Date(Date.UTC(2023, i, 1)),
-    ),
+    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
+      month: 'long',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(2023, i, 1))),
   );
   const MONTHS_SHORT = Array.from({ length: 12 }, (_, i) =>
-    new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(
-      new Date(Date.UTC(2023, i, 1)),
-    ),
+    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
+      month: 'short',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(2023, i, 1))),
   );
   let out = '';
   let prevWasH = false;
@@ -402,23 +416,24 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
     // Token matching, longest first. After hours, an "m"/"mm" token is
     //  minutes, not month — track prevWasH to disambiguate.
     let tok = '';
-    if (rest.startsWith('yyyy')) tok = 'yyyy';
-    else if (rest.startsWith('yy')) tok = 'yy';
-    else if (rest.startsWith('mmmmm')) tok = 'mmmmm';
-    else if (rest.startsWith('mmmm')) tok = 'mmmm';
-    else if (rest.startsWith('mmm')) tok = 'mmm';
-    else if (rest.startsWith('mm')) tok = 'mm';
-    else if (rest.startsWith('dddd')) tok = 'dddd';
-    else if (rest.startsWith('ddd')) tok = 'ddd';
-    else if (rest.startsWith('dd')) tok = 'dd';
-    else if (rest.startsWith('hh')) tok = 'hh';
-    else if (rest.startsWith('ss')) tok = 'ss';
+    const lowerRest = rest.toLowerCase();
+    if (lowerRest.startsWith('yyyy')) tok = 'yyyy';
+    else if (lowerRest.startsWith('yy')) tok = 'yy';
+    else if (lowerRest.startsWith('mmmmm')) tok = 'mmmmm';
+    else if (lowerRest.startsWith('mmmm')) tok = 'mmmm';
+    else if (lowerRest.startsWith('mmm')) tok = 'mmm';
+    else if (lowerRest.startsWith('mm')) tok = 'mm';
+    else if (lowerRest.startsWith('dddd')) tok = 'dddd';
+    else if (lowerRest.startsWith('ddd')) tok = 'ddd';
+    else if (lowerRest.startsWith('dd')) tok = 'dd';
+    else if (lowerRest.startsWith('hh')) tok = 'hh';
+    else if (lowerRest.startsWith('ss')) tok = 'ss';
     else if (/^am\/pm/i.test(rest)) tok = 'am/pm';
     else if (/^a\/p/i.test(rest)) tok = 'a/p';
-    else if (rest[0] === 'm') tok = 'm';
-    else if (rest[0] === 'd') tok = 'd';
-    else if (rest[0] === 'h') tok = 'h';
-    else if (rest[0] === 's') tok = 's';
+    else if (lowerRest[0] === 'm') tok = 'm';
+    else if (lowerRest[0] === 'd') tok = 'd';
+    else if (lowerRest[0] === 'h') tok = 'h';
+    else if (lowerRest[0] === 's') tok = 's';
 
     if (!tok) {
       // Preserve the hour context across time separators (`:`, spaces): in
@@ -474,10 +489,20 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
         out += String(ss);
         break;
       case 'am/pm':
-        out += /AM\/PM/.test(pattern.slice(i, i + 5)) ? ampm : ampm.toLowerCase();
+        out +=
+          pattern.slice(i, i + 5) === pattern.slice(i, i + 5).toUpperCase()
+            ? ampm
+            : ampm.toLowerCase();
         break;
       case 'a/p':
-        out += hh < 12 ? 'A' : 'P';
+        out +=
+          pattern.slice(i, i + 3) === pattern.slice(i, i + 3).toUpperCase()
+            ? hh < 12
+              ? 'A'
+              : 'P'
+            : hh < 12
+              ? 'a'
+              : 'p';
         break;
     }
     prevWasH = tok === 'h' || tok === 'hh';
@@ -574,7 +599,7 @@ function renderScientificPattern(value: number, pattern: string, locale: string)
     exp += step;
     mantissa = av / 10 ** exp;
   }
-  const mantissaText = new Intl.NumberFormat(locale, {
+  const mantissaText = new Intl.NumberFormat(normalizeFormatLocale(locale), {
     minimumIntegerDigits: Math.max(1, minIntDigits),
     minimumFractionDigits: minFracDigits,
     maximumFractionDigits: maxFracDigits,
@@ -638,7 +663,7 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
   const minFracDigits = (fracPart.match(/0/g) ?? []).length;
   const maxFracDigits = (fracPart.match(/[0#?]/g) ?? []).length;
 
-  const formatted = new Intl.NumberFormat(locale, {
+  const formatted = new Intl.NumberFormat(normalizeFormatLocale(locale), {
     minimumIntegerDigits: Math.max(1, minIntDigits),
     minimumFractionDigits: minFracDigits,
     maximumFractionDigits: maxFracDigits,

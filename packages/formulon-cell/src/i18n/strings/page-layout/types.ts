@@ -14,6 +14,7 @@ export interface PageLayoutStrings {
     rulerUnit: 'in' | 'cm';
   };
   pageSetup: {
+    printRangeTooLarge: string;
     /** Modal title — shown in the header bar and the aria-label. */
     title: string;
     tabPage: string;

@@ -23,10 +23,10 @@ export const SORT_FILTER_ICONS = {
 
   // Sort *and* filter: the cone with the direction arrow beside it.
   sortFilter: [
-    ...funnel({ scale: 0.82 }),
+    ...funnel({ scale: 0.9, cx: 9.4 }),
     ...arrow({
-      from: [19.4, 4.4],
-      to: [19.4, 19.6],
+      from: [20.4, 3.6],
+      to: [20.4, 20.4],
       color: PALETTE.accent,
       head: 'solid',
       tail: 'solid',

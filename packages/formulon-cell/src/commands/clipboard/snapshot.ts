@@ -1,5 +1,5 @@
 import { addrKey } from '../../engine/address.js';
-import type { CellValue, Range } from '../../engine/types.js';
+import type { Addr, CellValue, Range } from '../../engine/types.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
 import type { CellFormat, State } from '../../store/store.js';
 import type { CopyResult } from './copy.js';
@@ -56,17 +56,37 @@ export interface ClipboardSnapshot {
   colWidths?: Map<number, number>;
 }
 
+/**
+ * Resolve the display/effective format for a cell while capturing a
+ * clipboard payload.  The resolver is optional so the command remains a
+ * pure store helper for callers that do not have an engine handle.  UI
+ * integrations pass the engine projection here; that keeps inherited row,
+ * column, and sheet formats visible to copy/paste without writing them back
+ * to the source store.
+ */
+export type ClipboardFormatResolver = (addr: Addr) => Partial<CellFormat> | null | undefined;
+
 const blankCell = (): ClipboardCell => ({
   formula: null,
   value: { kind: 'blank' },
   format: undefined,
 });
 
+const cloneFormat = (format: Partial<CellFormat>): CellFormat => {
+  const clone: CellFormat = { ...format };
+  if (format.borders) clone.borders = { ...format.borders };
+  if (format.phonetic) clone.phonetic = format.phonetic.map((run) => ({ ...run }));
+  return clone;
+};
+
 export function captureSnapshot(
   state: State,
   range: Range,
   mode: 'copy' | 'cut' = 'copy',
-  options: { ignorePartialMerges?: boolean } = {},
+  options: {
+    ignorePartialMerges?: boolean;
+    formatResolver?: ClipboardFormatResolver;
+  } = {},
 ): ClipboardSnapshot | null {
   const rows = range.r1 - range.r0 + 1;
   const cols = range.c1 - range.c0 + 1;
@@ -106,7 +126,9 @@ export function captureSnapshot(
     for (let c = 0; c < cols; c += 1) {
       const key = addrKey({ sheet, row: range.r0 + r, col: range.c0 + c });
       const cell = state.data.cells.get(key);
-      const fmt = state.format.formats.get(key);
+      const fmt = options.formatResolver
+        ? options.formatResolver({ sheet, row: range.r0 + r, col: range.c0 + c })
+        : state.format.formats.get(key);
       if (!cell && !fmt) {
         line.push(blankCell());
         continue;
@@ -114,7 +136,7 @@ export function captureSnapshot(
       line.push({
         formula: cell?.formula ?? null,
         value: cell?.value ?? { kind: 'blank' },
-        format: fmt ? { ...fmt, borders: fmt.borders ? { ...fmt.borders } : undefined } : undefined,
+        format: fmt ? cloneFormat(fmt) : undefined,
       });
     }
     grid.push(line);
@@ -142,6 +164,7 @@ export function captureSnapshotFromCopyResult(
   state: State,
   result: CopyResult,
   mode: 'copy' | 'cut' = 'copy',
+  formatResolver?: ClipboardFormatResolver,
 ): ClipboardSnapshot | null {
   const ranges = result.payloadRanges ?? [result.range];
   if (ranges.length !== 1 || !ranges[0]) return null;
@@ -153,6 +176,7 @@ export function captureSnapshotFromCopyResult(
     // axis boundary. Excel copies the anchor/value but does not carry the
     // partial merge into the destination.
     ignorePartialMerges: logicalIsBand,
+    formatResolver,
   });
   if (!snapshot) return null;
   const rowHeights = new Map<number, number>();

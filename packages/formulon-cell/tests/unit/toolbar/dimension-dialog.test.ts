@@ -19,7 +19,7 @@ describe('showDimensionDialog', () => {
 
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Height (px)');
-    const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
+    const input = dialog?.querySelector<HTMLInputElement>('input[inputmode="decimal"]');
     expect(input?.min).toBe('1');
     expect(input?.max).toBe('409');
     expect(input?.step).toBe('1');

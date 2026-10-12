@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendDialogDatalistOptions,
   appendDialogSelectOptions,
   appendSelectRow,
   createDialogSelect,
@@ -53,6 +54,19 @@ describe('toolbar/dialogs/form-controls', () => {
       'asc',
       'desc',
       'custom',
+    ]);
+  });
+
+  it('keeps datalist values and display labels in the shared helper', () => {
+    const datalist = document.createElement('datalist');
+    appendDialogDatalistOptions(datalist, [
+      'Arial',
+      { value: '游ゴシック', label: '游ゴシック Regular' },
+    ]);
+
+    expect(Array.from(datalist.options, (option) => [option.value, option.label])).toEqual([
+      ['Arial', undefined],
+      ['游ゴシック', '游ゴシック Regular'],
     ]);
   });
 });

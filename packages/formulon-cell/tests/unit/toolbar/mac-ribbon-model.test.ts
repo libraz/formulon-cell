@@ -11,6 +11,7 @@ import {
 } from '../../../src/commands/interaction-controller.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createI18nController } from '../../../src/i18n/controller.js';
+import { dictionaries } from '../../../src/i18n/strings.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { createSpreadsheetStore, defaultPageSetup, mutators } from '../../../src/store/store.js';
@@ -621,6 +622,42 @@ describe('Mac Excel ribbon profile', () => {
       'mac.automate.newPivotTable',
     ]);
     expect(findCommand('automate', 'mac.automate.newPivotTable')?.disabled).not.toBe(true);
+  });
+
+  it('keeps Home alignment actions labeled and wide on Mac without changing their ids', () => {
+    const locales = ['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th'] as const;
+    for (const locale of locales) {
+      const macModel = buildRibbonModel(locale, { profile: 'excel365Mac' });
+      const genericModel = buildRibbonModel(locale);
+      const macAlignment = macModel
+        .find((tab) => tab.id === 'home')
+        ?.groups.find((group) => group.variant === 'alignment');
+      const genericAlignment = genericModel
+        .find((tab) => tab.id === 'home')
+        ?.groups.find((group) => group.variant === 'alignment');
+      const macById = new Map(macAlignment?.commands.map((command) => [command.id, command]));
+      const genericById = new Map(
+        genericAlignment?.commands.map((command) => [command.id, command]),
+      );
+
+      expect(macById.get('wrap')).toMatchObject({ kind: 'wide', layout: 'stacked' });
+      expect(macById.get('merge')).toMatchObject({ kind: 'wide', layout: 'stacked' });
+      expect(macById.get('merge')?.label).toBe(dictionaries[locale].ribbon.mergeAndCenter);
+      expect(macById.get('merge')?.title).toBe(dictionaries[locale].ribbon.mergeAndCenter);
+      expect(macById.get('wrap')?.label).toBe(
+        locale === 'ja' ? '折り返して全体を表示する' : genericById.get('wrap')?.label,
+      );
+      expect(macById.get('wrap')?.title).toBe(
+        locale === 'ja' ? '折り返して全体を表示する' : genericById.get('wrap')?.title,
+      );
+      expect(macAlignment?.commands.map((command) => command.id)).toEqual(
+        genericAlignment?.commands.map((command) => command.id),
+      );
+      expect(genericById.get('wrap')).toMatchObject({ kind: 'button' });
+      expect(genericById.get('merge')).toMatchObject({ kind: 'button' });
+      expect(genericById.get('merge')?.label).toBe(dictionaries[locale].ribbon.mergeAndCenter);
+      expect(genericById.get('merge')?.title).toBe(dictionaries[locale].ribbon.mergeAndCenter);
+    }
   });
 
   it('projects Mac checked states and contextual eligibility without accumulating titles', () => {

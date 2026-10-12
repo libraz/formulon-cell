@@ -66,6 +66,14 @@ export interface AutocompleteDeps {
    *  `commands/refs.ts`. Falls back to the static catalog when omitted
    *  or null. */
   getFunctionNames?: () => readonly string[] | null;
+  /** Display names for the active function locale. When omitted, the
+   * canonical names above are used. The values are intentionally kept as the
+   * insertion text so aliases and Unicode names remain visible to the user. */
+  getFunctionDisplayNames?: () => readonly string[] | null;
+  /** Resolve a display alias before looking up its canonical signature. */
+  resolveFunctionName?: (rawName: string) => string | null;
+  /** Read the workbook's live formula list separator. */
+  getListSeparator?: () => string;
   labels?: Partial<AutocompleteLabels>;
 }
 
@@ -181,8 +189,10 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
       const pick = ctx.matches[i] ?? '';
       let detail = labels.pickFromList;
       if (ctx.kind === 'function') {
-        const sig = FUNCTION_SIGNATURES[pick.toUpperCase()];
-        detail = sig ? `${pick}(${sig.join(', ')})` : labels.customFunction;
+        const canonical = deps.resolveFunctionName?.(pick) ?? pick.toLocaleUpperCase();
+        const sig = FUNCTION_SIGNATURES[canonical];
+        const separator = deps.getListSeparator?.() === ';' ? ';' : ',';
+        detail = sig ? `${pick}(${sig.join(`${separator} `)})` : labels.customFunction;
       } else if (ctx.kind === 'tableColumn') {
         detail = labels.structuredTableColumn;
       }
@@ -284,7 +294,9 @@ function computeContext(
   const struct = suggestStructuredRef(text, caret, deps.getTables?.() ?? []);
   if (struct) return struct;
   const engineNames = deps.getFunctionNames?.();
-  const fn = suggestFunctions(text, caret, 8, engineNames ? { names: engineNames } : undefined);
+  const displayNames = deps.getFunctionDisplayNames?.() ?? null;
+  const fnNames = displayNames ?? engineNames;
+  const fn = suggestFunctions(text, caret, 8, fnNames ? { names: fnNames } : undefined);
   const custom = suggestCustomFunctions(text, caret, deps.getCustomFunctions?.() ?? []);
   if (!fn && !custom) return null;
   // Merge custom names ahead of built-ins so user code surfaces first.
@@ -388,14 +400,14 @@ function suggestCustomFunctions(
   let i = caret - 1;
   while (i >= 0) {
     const ch = text[i] ?? '';
-    if (/[A-Za-z0-9_]/.test(ch)) i -= 1;
+    if (/[\p{L}\p{N}_]/u.test(ch)) i -= 1;
     else break;
   }
   const tokenStart = i + 1;
   const token = text.slice(tokenStart, caret);
-  if (token.length < 1 || !/^[A-Za-z]/.test(token)) return null;
-  const upper = token.toUpperCase();
-  const matches = names.filter((n) => n.startsWith(upper)).slice(0, 8);
+  if (token.length < 1 || !/^[\p{L}_]/u.test(token)) return null;
+  const upper = token.toLocaleUpperCase();
+  const matches = names.filter((n) => n.toLocaleUpperCase().startsWith(upper)).slice(0, 8);
   if (matches.length === 0) return null;
   return { token, tokenStart, matches };
 }

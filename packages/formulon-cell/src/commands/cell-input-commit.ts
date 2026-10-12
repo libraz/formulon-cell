@@ -3,12 +3,20 @@
 // both surfaces record the same undo entry and change batch; the direct
 // workbook path serves only controller-less (standalone) hosts.
 
+import { addrKey } from '../engine/address.js';
+import { effectiveCellFormatWithPending, flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
+import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending, sameFormatTarget } from '../store/pending-format.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { coerceInputForCell, validateCoercedInput, writeInputValidated } from './coerce-input.js';
-import { interactionControllerFor } from './interaction-controller.js';
+import {
+  coerceInputForCell,
+  inputLocaleForWorkbook,
+  validateCoercedInput,
+  writeInputValidated,
+} from './coerce-input.js';
+import { interactionControllerFor, nativeAxisFontFormatFor } from './interaction-controller.js';
 import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -54,10 +62,51 @@ export function commitCellInput({
   const state = store.getState();
   const anchor = mergeAnchorFor(state, addr);
   const fmt = formatWithPending(state, anchor);
-  const operation = inputOperation(raw, fmt?.numFmt?.kind === 'text');
+  let operation = inputOperation(raw, fmt?.numFmt?.kind === 'text');
   const controller = interactionControllerFor(store);
+  let inputLocale: ReturnType<typeof inputLocaleForWorkbook>;
+  let directInputAxis: ReturnType<typeof nativeAxisFontFormatFor>;
+  let directInputFont: { fontFamily?: string; fontSize?: number } | undefined;
   let notice: CellInputAlert | null = null;
   try {
+    // These reads cross the native adapter boundary and can throw when a
+    // caller races a commit with WorkbookHandle.dispose(). Keep them inside
+    // the same failure boundary as the write so the editor retains its raw
+    // caret/input state instead of escaping through the preflight.
+    const effectiveFormat = effectiveCellFormatWithPending(wb, state, anchor) ?? fmt;
+    operation = inputOperation(raw, effectiveFormat?.numFmt?.kind === 'text');
+    inputLocale = inputLocaleForWorkbook(wb);
+    directInputAxis = controller ? undefined : nativeAxisFontFormatFor(wb, anchor);
+    directInputFont = controller
+      ? undefined
+      : (() => {
+          const patch = sheetFontPatchFor(state, anchor.sheet);
+          // A saved row/column XF is pinned back after the value write. Keep
+          // that raw axis implicit; materialising its paint projection as a
+          // store format would turn a future inherited cell into a direct XF.
+          if (!patch || directInputAxis) return undefined;
+          const candidate = patch;
+          const direct = state.format.formats.get(addrKey(anchor));
+          const pending = state.ui.pendingFormat;
+          const pendingFormat =
+            pending && sameFormatTarget(state, pending.addr, anchor) ? pending.format : undefined;
+          const inherited: { fontFamily?: string; fontSize?: number } = {};
+          if (
+            candidate.fontFamily !== undefined &&
+            direct?.fontFamily === undefined &&
+            pendingFormat?.fontFamily === undefined
+          ) {
+            inherited.fontFamily = candidate.fontFamily;
+          }
+          if (
+            candidate.fontSize !== undefined &&
+            direct?.fontSize === undefined &&
+            pendingFormat?.fontSize === undefined
+          ) {
+            inherited.fontSize = candidate.fontSize;
+          }
+          return Object.keys(inherited).length > 0 ? inherited : undefined;
+        })();
     const mergeCells = mergeCellsFor(state, addr);
     if (mergeCells === null) {
       return {
@@ -80,7 +129,12 @@ export function commitCellInput({
       // rule's title nor non-blocking outcomes, so validate up front.
       const validation = fmt?.validation;
       const outcome = validation
-        ? validateCoercedInput(wb, anchor, coerceInputForCell(state, anchor, raw), validation)
+        ? validateCoercedInput(
+            wb,
+            anchor,
+            coerceInputForCell(state, anchor, raw, inputLocale, wb),
+            validation,
+          )
         : { ok: true as const };
       if (!outcome.ok) {
         const alert = {
@@ -113,7 +167,7 @@ export function commitCellInput({
         mutators.setPendingFormat(store, null);
       return { status: 'applied', notice };
     }
-    const outcome = writeInputValidated(wb, anchor, raw, fmt?.validation, store);
+    const outcome = writeInputValidated(wb, anchor, raw, fmt?.validation, store, inputLocale);
     if (!outcome.ok) {
       const alert = {
         severity: outcome.severity,
@@ -126,11 +180,35 @@ export function commitCellInput({
   } catch (error) {
     return { status: 'failed', operation, error };
   }
+  if (directInputAxis) {
+    try {
+      if (!wb.setCellXfIndex(anchor.sheet, anchor.row, anchor.col, directInputAxis.xfIndex)) {
+        return {
+          status: 'failed',
+          operation,
+          error: new Error(`could not preserve inherited font XF at ${addrKey(anchor)}`),
+        };
+      }
+    } catch (error) {
+      return { status: 'failed', operation, error };
+    }
+  }
   const currentState = store.getState();
   const currentPending = currentState.ui.pendingFormat;
+  if (directInputFont || currentPending) {
+    const currentFormat = currentState.format.formats.get(addrKey(anchor));
+    const nextFormat = {
+      ...(directInputFont ?? {}),
+      ...(currentFormat ?? {}),
+      ...(currentPending && sameFormatTarget(currentState, currentPending.addr, anchor)
+        ? currentPending.format
+        : {}),
+    };
+    if (Object.keys(nextFormat).length > 0) mutators.setCellFormat(store, anchor, nextFormat);
+  }
   if (currentPending && sameFormatTarget(currentState, currentPending.addr, anchor)) {
-    mutators.setCellFormat(store, anchor, currentPending.format);
     mutators.setPendingFormat(store, null);
   }
+  if (directInputAxis) flushFormatToEngine(wb, store, anchor.sheet);
   return { status: 'applied', notice };
 }

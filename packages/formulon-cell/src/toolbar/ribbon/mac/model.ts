@@ -1,4 +1,5 @@
 import { allFunctionNames } from '../../../commands/function-categories.js';
+import { dictionaries } from '../../../i18n/strings.js';
 import type { ExcelRibbonIconName } from '../../excel-ribbon-icons.js';
 import type {
   RibbonCommand,
@@ -10,16 +11,14 @@ import type {
 import {
   EMBEDDED_UNSUPPORTED,
   GROUP_LABELS,
-  type Label,
+  type LabelLike,
   labels,
   macRibbonDisabledReason,
   macRibbonLabelForCommand,
   NOT_IMPLEMENTED,
   OFFICE_REQUIRED,
-  THREADED_COMMENTS_UNSUPPORTED,
   t,
   text,
-  WORKBOOK_THEME_UNSUPPORTED,
 } from './labels.js';
 import { MAC_RIBBON_MENU_COMMANDS, MAC_RIBBON_MENU_ITEMS } from './menu-manifest.js';
 
@@ -36,12 +35,12 @@ export { projectMacRibbonState } from './state-projection.js';
 
 const command = (
   id: string,
-  label: Label,
+  label: LabelLike,
   icon?: string,
   options: {
     kind?: RibbonCommand['kind'];
     disabled?: boolean;
-    disabledReason?: Label;
+    disabledReason?: LabelLike;
     className?: string;
     layout?: RibbonCommand['layout'];
   } = {},
@@ -57,26 +56,30 @@ const command = (
   disabledReason: options.disabledReason ? text('en', options.disabledReason) : undefined,
 });
 
-const group = (title: Label, commands: RibbonCommand[], variant = 'tiles'): RibbonGroupModel => ({
+const group = (
+  title: LabelLike,
+  commands: RibbonCommand[],
+  variant = 'tiles',
+): RibbonGroupModel => ({
   title: text('en', title),
   commands,
   variant,
 });
 
-const menuCommand = (id: string, label: Label, icon?: string): RibbonCommand =>
+const menuCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
   command(id, label, icon, { kind: 'wide' });
 
-const compactCommand = (id: string, label: Label, icon?: string): RibbonCommand =>
+const compactCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
   command(id, label, icon, { kind: 'wide', layout: 'stacked' });
 
-const iconCommand = (id: string, label: Label, icon?: string): RibbonCommand =>
+const iconCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
   command(id, label, icon, { kind: 'button', className: 'fc-tb__rb--mac-icon-only' });
 
 const disabledIconCommand = (
   id: string,
-  label: Label,
+  label: LabelLike,
   icon: string | undefined,
-  reason: Label,
+  reason: LabelLike,
 ): RibbonCommand =>
   command(id, label, icon, {
     kind: 'button',
@@ -87,9 +90,9 @@ const disabledIconCommand = (
 
 const disabledCompactCommand = (
   id: string,
-  label: Label,
+  label: LabelLike,
   icon: string | undefined,
-  reason: Label,
+  reason: LabelLike,
 ): RibbonCommand =>
   command(id, label, icon, {
     kind: 'wide',
@@ -98,7 +101,7 @@ const disabledCompactCommand = (
     disabledReason: reason,
   });
 
-const checkboxCommand = (id: string, label: Label, icon?: string): RibbonCommand =>
+const checkboxCommand = (id: string, label: LabelLike, icon?: string): RibbonCommand =>
   command(id, label, icon, {
     kind: 'wide',
     layout: 'stacked',
@@ -107,7 +110,7 @@ const checkboxCommand = (id: string, label: Label, icon?: string): RibbonCommand
 
 const selectCommand = (
   id: string,
-  label: Label,
+  label: LabelLike,
   options: readonly RibbonOption[],
   className = 'fc-tb__rb-select--border',
 ): RibbonCommand => ({
@@ -119,12 +122,16 @@ const selectCommand = (
   className,
 });
 
-const disabledCommand = (id: string, label: Label, icon: string | undefined, reason: Label) =>
-  command(id, label, icon, { disabled: true, disabledReason: reason, kind: 'wide' });
+const disabledCommand = (
+  id: string,
+  label: LabelLike,
+  icon: string | undefined,
+  reason: LabelLike,
+) => command(id, label, icon, { disabled: true, disabledReason: reason, kind: 'wide' });
 
 const macTab = (
   id: RibbonTabModel['id'],
-  label: Label,
+  label: LabelLike,
   groups: RibbonGroupModel[],
 ): RibbonTabModel => ({
   id,
@@ -256,12 +263,7 @@ const insertTab = (): RibbonTabModel =>
     ]),
     group({ ja: 'リンク', en: 'Links' }, [menuCommand('mac.insert.link', t('link'), 'link')]),
     group({ ja: 'コメント', en: 'Comments' }, [
-      disabledCommand(
-        'mac.insert.newComment',
-        t('newComment'),
-        'commentAdd',
-        THREADED_COMMENTS_UNSUPPORTED,
-      ),
+      command('mac.insert.newComment', t('newComment'), 'commentAdd'),
     ]),
     group({ ja: 'テキスト', en: 'Text' }, [
       disabledCommand('mac.insert.textBox', t('textBox'), 'textBox', EMBEDDED_UNSUPPORTED),
@@ -309,9 +311,9 @@ const pageLayoutTab = (): RibbonTabModel =>
     group(
       { ja: 'テーマ', en: 'Themes' },
       [
-        disabledCommand('mac.page.theme', t('theme'), 'pageTheme', WORKBOOK_THEME_UNSUPPORTED),
-        disabledCommand('mac.page.color', t('color'), 'pageTheme', WORKBOOK_THEME_UNSUPPORTED),
-        disabledCommand('mac.page.font', t('font'), 'font', WORKBOOK_THEME_UNSUPPORTED),
+        menuCommand('mac.page.theme', t('theme'), 'pageTheme'),
+        menuCommand('mac.page.color', t('color'), 'pageTheme'),
+        menuCommand('mac.page.font', t('font'), 'font'),
       ],
       'compact',
     ),
@@ -429,7 +431,7 @@ const dataTab = (): RibbonTabModel =>
           'link',
           NOT_IMPLEMENTED,
         ),
-        disabledCompactCommand('mac.data.properties', t('properties'), 'options', NOT_IMPLEMENTED),
+        disabledCompactCommand('mac.data.properties', t('properties'), 'inspect', NOT_IMPLEMENTED),
         compactCommand('mac.data.workbookLinks', t('workbookLinks'), 'link'),
       ],
       'compact',
@@ -465,7 +467,7 @@ const dataTab = (): RibbonTabModel =>
     ),
     group(
       { ja: '予測', en: 'Forecast' },
-      [menuCommand('mac.data.whatIf', t('whatIf'), 'options')],
+      [menuCommand('mac.data.whatIf', t('whatIf'), 'whatIf')],
       'compact',
     ),
     group(
@@ -498,7 +500,7 @@ const reviewTab = (): RibbonTabModel =>
           'spelling',
           EMBEDDED_UNSUPPORTED,
         ),
-        compactCommand('mac.review.stats', t('stats'), 'options'),
+        compactCommand('mac.review.stats', t('stats'), 'count'),
       ],
       'compact',
     ),
@@ -525,7 +527,7 @@ const reviewTab = (): RibbonTabModel =>
         disabledCompactCommand(
           'mac.review.showChanges',
           t('showChanges'),
-          'options',
+          'showChanges',
           EMBEDDED_UNSUPPORTED,
         ),
       ],
@@ -534,36 +536,11 @@ const reviewTab = (): RibbonTabModel =>
     group(
       { ja: 'コメント', en: 'Comments' },
       [
-        disabledCompactCommand(
-          'mac.review.newComment',
-          t('newComment'),
-          'commentAdd',
-          THREADED_COMMENTS_UNSUPPORTED,
-        ),
-        disabledCompactCommand(
-          'mac.review.deleteComment',
-          t('deleteComment'),
-          'clear',
-          THREADED_COMMENTS_UNSUPPORTED,
-        ),
-        disabledCompactCommand(
-          'mac.review.previousComment',
-          t('previousComment'),
-          'goTo',
-          THREADED_COMMENTS_UNSUPPORTED,
-        ),
-        disabledCompactCommand(
-          'mac.review.nextComment',
-          t('nextComment'),
-          'goTo',
-          THREADED_COMMENTS_UNSUPPORTED,
-        ),
-        disabledCompactCommand(
-          'mac.review.showComments',
-          t('showComments'),
-          'commentAdd',
-          THREADED_COMMENTS_UNSUPPORTED,
-        ),
+        compactCommand('mac.review.newComment', t('newComment'), 'commentAdd'),
+        compactCommand('mac.review.deleteComment', t('deleteComment'), 'clear'),
+        compactCommand('mac.review.previousComment', t('previousComment'), 'goTo'),
+        compactCommand('mac.review.nextComment', t('nextComment'), 'goTo'),
+        compactCommand('mac.review.showComments', t('showComments'), 'commentAdd'),
       ],
       'compact',
     ),
@@ -603,7 +580,7 @@ const viewTab = (): RibbonTabModel =>
         selectCommand('sheetViewSelect', t('sheetViewSelect'), [
           { value: 'current', label: 'Current View' },
         ]),
-        compactCommand('mac.view.sheetViewSave', t('sheetViewSave'), 'options'),
+        compactCommand('mac.view.sheetViewSave', t('sheetViewSave'), 'save'),
         compactCommand('mac.view.sheetViewDelete', t('sheetViewDelete'), 'clear'),
       ],
       'compact',
@@ -617,7 +594,7 @@ const viewTab = (): RibbonTabModel =>
         disabledCompactCommand(
           'mac.view.customViews',
           t('customViews'),
-          'options',
+          'customViews',
           NOT_IMPLEMENTED,
         ),
       ],
@@ -625,7 +602,7 @@ const viewTab = (): RibbonTabModel =>
     ),
     group(
       { ja: '表示/非表示', en: 'Show' },
-      [compactCommand('mac.view.show', t('show'), 'options')],
+      [compactCommand('mac.view.show', t('show'), 'show')],
       'compact',
     ),
     group(
@@ -712,29 +689,46 @@ const automateTab = (): RibbonTabModel =>
   ]);
 
 const MAC_HOME_ICON_ONLY_COMMAND_IDS = new Set(['autosum', 'fillHome', 'clearFormat']);
+const MAC_HOME_WIDE_STACKED_COMMAND_IDS = new Set(['wrap', 'merge']);
 
-const macHomeCommand = (candidate: RibbonCommand): RibbonCommand => {
+const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonCommand => {
   const commandWithMacTitle = {
     ...candidate,
     title: candidate.title.replace(/\bCtrl\+/g, 'Cmd+'),
   };
-  if (!MAC_HOME_ICON_ONLY_COMMAND_IDS.has(candidate.id)) return commandWithMacTitle;
+  const homeLabel =
+    candidate.id === 'merge'
+      ? dictionaries[lang].ribbon.mergeAndCenter
+      : candidate.id === 'wrap' && lang === 'ja'
+        ? '折り返して全体を表示する'
+        : undefined;
+  const commandWithMacHomeLabel = homeLabel
+    ? { ...commandWithMacTitle, title: homeLabel, label: homeLabel }
+    : commandWithMacTitle;
+  if (MAC_HOME_WIDE_STACKED_COMMAND_IDS.has(candidate.id)) {
+    return {
+      ...commandWithMacHomeLabel,
+      kind: 'wide',
+      layout: 'stacked',
+    };
+  }
+  if (!MAC_HOME_ICON_ONLY_COMMAND_IDS.has(candidate.id)) return commandWithMacHomeLabel;
   return {
-    ...commandWithMacTitle,
+    ...commandWithMacHomeLabel,
     kind: 'button',
     layout: 'stacked',
     className: [candidate.className, 'fc-tb__rb--mac-icon-only'].filter(Boolean).join(' '),
   };
 };
 
-const macHomeTab = (home: RibbonTabModel): RibbonTabModel => ({
+const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => ({
   ...home,
   groups: [
     ...home.groups.map((current) => {
       if (current.variant !== 'font') {
         return {
           ...current,
-          commands: current.commands.map(macHomeCommand),
+          commands: current.commands.map((candidate) => macHomeCommand(candidate, lang)),
         };
       }
       const phonetic = current.commands.find((candidate) => candidate.id === 'editPhonetic');
@@ -743,8 +737,8 @@ const macHomeTab = (home: RibbonTabModel): RibbonTabModel => ({
         commands: [
           ...current.commands
             .filter((candidate) => candidate.id !== 'strike' && candidate.id !== 'editPhonetic')
-            .map(macHomeCommand),
-          ...(phonetic ? [phonetic] : []),
+            .map((candidate) => macHomeCommand(candidate, lang)),
+          ...(phonetic ? [macHomeCommand(phonetic, lang)] : []),
         ],
       };
     }),
@@ -770,23 +764,18 @@ export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): Ri
     ) {
       return options;
     }
+    const strings = dictionaries[lang];
+    const pageScale = strings.pageScale;
     const pageLabel = (value: string): string => {
-      if (lang === 'en') {
-        if (value === '0') return 'Automatic';
-        if (value === 'custom') return 'Custom';
-        return `${value} ${value === '1' ? 'page' : 'pages'}`;
-      }
-      if (value === '0') return '自動';
-      if (value === 'custom') return 'ユーザー設定';
-      return `${value} ページ`;
+      if (value === '0') return pageScale.automatic;
+      if (value === 'custom') return pageScale.custom;
+      return `${value} ${value === '1' ? pageScale.page : pageScale.pages}`;
     };
     return options.map((option) => ({
       ...option,
       label:
         commandId === 'sheetViewSelect' && option.value === 'current'
-          ? lang === 'ja'
-            ? '現在のビュー'
-            : 'Current View'
+          ? strings.viewToolbar.currentView
           : pageLabel(option.value),
     }));
   };
@@ -812,7 +801,7 @@ export const buildMacRibbonModel = (lang: ToolbarLang, home: RibbonTabModel): Ri
     })),
   });
   return [
-    macHomeTab(home),
+    macHomeTab(home, lang),
     insertTab(),
     drawTab(),
     pageLayoutTab(),

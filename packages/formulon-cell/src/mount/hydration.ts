@@ -1,7 +1,9 @@
+import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
 import { hydrateAutoFilterFromEngine } from '../engine/auto-filter-sync.js';
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from '../engine/format-sync.js';
+import { hydrateImagesFromEngine } from '../engine/images-sync.js';
 import { hydrateLayoutFromEngine } from '../engine/layout-sync.js';
 import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from '../engine/passthrough-sync.js';
@@ -18,6 +20,8 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
     const sheet = store.getState().data.sheetIndex;
     mutators.replaceCells(store, wb.cells(sheet));
     hydrateLayoutFromEngine(wb, store, sheet);
+    hydrateImagesFromEngine(wb, store, sheet);
+    hydrateThreadedCommentsFromEngine(wb, store, sheet);
     hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
     hydrateMergesFromEngine(wb, store, sheet);
     hydrateValidationsFromEngine(wb, store, sheet);
@@ -47,6 +51,9 @@ export function hydrateWorkbookMetadataFromEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
 ): void {
+  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+    hydrateThreadedCommentsFromEngine(wb, store, sheet);
+  }
   hydrateProtectionFromEngine(wb, store);
   hydrateTableOverlaysFromEngine(wb, store);
 }

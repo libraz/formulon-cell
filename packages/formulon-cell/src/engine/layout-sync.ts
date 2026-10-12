@@ -21,6 +21,8 @@ export function hydrateLayoutFromEngine(
 ): void {
   const cols = wb.getColumnLayouts(sheet);
   const rows = wb.getRowLayouts(sheet);
+  const defaults =
+    typeof wb.getSheetDefaultLayoutPx === 'function' ? wb.getSheetDefaultLayoutPx(sheet) : null;
   const view = wb.getSheetView(sheet);
   const hasAxisLayouts =
     wb.capabilities.colRowSize || wb.capabilities.hiddenRowsCols || wb.capabilities.outlines;
@@ -48,6 +50,7 @@ export function hydrateLayoutFromEngine(
     !hasAxisLayouts &&
     cols.length === 0 &&
     rows.length === 0 &&
+    defaults === null &&
     view === null &&
     hiddenSheets.size === 0
   ) {
@@ -60,7 +63,7 @@ export function hydrateLayoutFromEngine(
     const outlineCols = new Map(hasAxisLayouts ? [] : s.layout.outlineCols);
     for (const c of cols) {
       for (let col = c.first; col <= c.last; col += 1) {
-        if (c.width > 0) colWidths.set(col, c.width);
+        if (c.width > 0 && c.hasWidth !== false) colWidths.set(col, c.width);
         if (c.hidden) hiddenCols.add(col);
         if (c.outlineLevel > 0) outlineCols.set(col, c.outlineLevel);
       }
@@ -70,13 +73,14 @@ export function hydrateLayoutFromEngine(
     const hiddenRows = new Set(hasAxisLayouts ? [] : s.layout.hiddenRows);
     const outlineRows = new Map(hasAxisLayouts ? [] : s.layout.outlineRows);
     for (const r of rows) {
-      if (r.height > 0) rowHeights.set(r.row, r.height);
+      if (r.height > 0 && r.hasHeight !== false) rowHeights.set(r.row, r.height);
       if (r.hidden) hiddenRows.add(r.row);
       if (r.outlineLevel > 0) outlineRows.set(r.row, r.outlineLevel);
     }
 
     const layout = {
       ...s.layout,
+      ...(defaults ?? {}),
       colWidths,
       rowHeights,
       hiddenCols,
@@ -93,10 +97,18 @@ export function hydrateLayoutFromEngine(
 
     // Engine carries zoom as a percentage (10..400, default 100); the store
     // models it as a multiplier (1.0 = 100%) clamped to [0.5, 4].
-    const viewport =
-      view && view.zoomScale !== 100
-        ? { ...s.viewport, zoom: Math.max(0.5, Math.min(4, view.zoomScale / 100)) }
-        : s.viewport;
+    // A view readback is authoritative even when the native value is the
+    // default 100%. Hydration can follow a different sheet or a workbook
+    // replacement, so retaining the previous store zoom at 100% leaks the
+    // old sheet's visual scale into the new one.
+    const viewport = view
+      ? {
+          ...s.viewport,
+          zoom: Number.isFinite(view.zoomScale)
+            ? Math.max(0.5, Math.min(4, view.zoomScale / 100))
+            : 1,
+        }
+      : s.viewport;
 
     return {
       ...s,
@@ -125,9 +137,10 @@ export function hydrateLayoutFromEngine(
  * frozen panes). Each sub-sync is gated on its own capability flag so
  * partial engines (and the stub) only take the calls they support.
  *
- * Removed size entries (present in `before`, missing from `after`) are
- * written as the layout default — the engine has no "clear override" call,
- * but writing the default is visually equivalent.
+ * Removed column entries are written as the layout default because formulon
+ * still has no column-clear operation. Removed row entries use formulon's
+ * clear operation when available, and retain the default-write fallback for
+ * older adapters.
  */
 export function syncLayoutToEngine(
   wb: WorkbookHandle,
@@ -154,7 +167,15 @@ export function syncLayoutToEngine(
       const b = before.rowHeights.get(row);
       const a = after.rowHeights.get(row);
       if (b === a) continue;
-      wb.setRowHeight(sheet, row, a ?? layout.defaultRowHeight);
+      if (
+        a === undefined &&
+        wb.capabilities.rowHeightClear === true &&
+        typeof wb.clearRowHeight === 'function'
+      ) {
+        wb.clearRowHeight(sheet, row);
+      } else {
+        wb.setRowHeight(sheet, row, a ?? layout.defaultRowHeight);
+      }
     }
   }
 

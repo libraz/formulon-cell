@@ -75,6 +75,7 @@ describe('toolbar/ribbon menu primitives', () => {
       applyPrintAreaAction: vi.fn(),
       applyArrangeAction: vi.fn(),
       applyUiTheme: vi.fn(),
+      applyWorkbookTheme: vi.fn(),
       focusSheet: vi.fn(),
       applySortMenuAction: vi.fn(),
       applyFindSelectAction: vi.fn(),

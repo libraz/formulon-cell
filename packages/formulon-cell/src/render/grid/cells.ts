@@ -1,7 +1,10 @@
 import { isHeaderRow, tableForCell } from '../../commands/format-as-table.js';
 import { formatA1FormulaAsR1C1 } from '../../commands/refs.js';
 import { addrKey } from '../../engine/address.js';
+import { effectiveCellFormatFromEngine } from '../../engine/cell-format-sync.js';
 import { evaluateCfFromEngine } from '../../engine/cf-sync.js';
+import { formulaForEdit } from '../../engine/edit-seed.js';
+import { numFmtToFormatCode } from '../../engine/format-writeback.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
 import type { CellValue } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
@@ -21,6 +24,7 @@ import {
 import {
   CONDITIONAL_ICON_GUTTER,
   paintCellBackground,
+  paintCellBorders,
   paintCellFill,
   paintCellText,
   paintCommentMarker,
@@ -83,7 +87,14 @@ export function paintCells(
   } = state;
   const rtl = layout.rtl;
   const active = selection.active;
-  const conditional = evaluateConditional(state);
+  const wb = cellCtx.wb;
+  const visibleBounds = {
+    r0: state.viewport.rowStart,
+    c0: state.viewport.colStart,
+    r1: Math.max(state.viewport.rowStart, state.viewport.rowStart + state.viewport.rowCount - 1),
+    c1: Math.max(state.viewport.colStart, state.viewport.colStart + state.viewport.colCount - 1),
+  };
+  const conditional = new Map(evaluateConditional(state, wb, cellCtx.locale, visibleBounds));
   const sparklines = sparkline.sparklines;
   const ignored = errorIndicators.ignoredErrors;
   const validationCircles = errorIndicators.validationCircles;
@@ -91,6 +102,11 @@ export function paintCells(
   // protected. Pre-compute the flag so the per-cell loop can skip the
   // Map lookup on every iteration.
   const sheetProtected = protection.protectedSheets.has(data.sheetIndex);
+  const threadedRootKeys = new Set(
+    (state.threadedComments?.bySheet.get(data.sheetIndex) ?? [])
+      .filter((comment) => comment.parentId.length === 0)
+      .map((comment) => addrKey({ sheet: data.sheetIndex, row: comment.row, col: comment.col })),
+  );
   // RangeResolver is only needed for list-validation re-resolution. We
   // build it lazily — most viewport repaints don't have a single DV cell,
   // so allocating the resolver up-front would be wasted work.
@@ -107,15 +123,22 @@ export function paintCells(
   // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
   // currently win per field for cells with overlap. Restricted to the
   // visible viewport rect so we don't pay for off-screen cells.
-  const wb = cellCtx.wb;
+  const effectiveFormatAt = (row: number, col: number): Partial<CellFormat> | undefined => {
+    if (!wb?.capabilities.effectiveStyle || typeof wb.getEffectiveStyle !== 'function') {
+      return undefined;
+    }
+    return effectiveCellFormatFromEngine(wb, data.sheetIndex, row, col) ?? undefined;
+  };
   if (wb?.capabilities.conditionalFormat) {
     const sheet = state.data.sheetIndex;
-    const vp = state.viewport;
-    const r0 = vp.rowStart;
-    const r1 = Math.max(r0, vp.rowStart + vp.rowCount - 1);
-    const c0 = vp.colStart;
-    const c1 = Math.max(c0, vp.colStart + vp.colCount - 1);
-    const engineCf = evaluateCfFromEngine(wb, sheet, r0, c0, r1, c1);
+    const engineCf = evaluateCfFromEngine(
+      wb,
+      sheet,
+      visibleBounds.r0,
+      visibleBounds.c0,
+      visibleBounds.r1,
+      visibleBounds.c1,
+    );
     for (const [k, v] of engineCf) {
       const merged = { ...(conditional.get(k) ?? {}), ...v };
       conditional.set(k, merged);
@@ -295,6 +318,11 @@ export function paintCells(
       if (merges.byCell.has(key)) continue;
       const cell = data.cells.get(key);
       const fmt = format.formats.get(key);
+      // The engine may select a row/column XF for this cell even when the
+      // store has no direct format entry. Keep this projection local to the
+      // paint: materialising it into FormatSlice would turn inherited style
+      // into a direct XF on the next flush.
+      const engineFmt = effectiveFormatAt(r, c);
       const table = tableForCell(tables.tables, data.sheetIndex, r, c);
       const tableFmt = table ? tableCellFormat(table, r, c) : undefined;
       const isMergeAnchor = merges.byAnchor.has(key);
@@ -307,18 +335,25 @@ export function paintCells(
       const spark = sparklines.get(key);
       const isActive = r === active.row && c === active.col;
       const hasValidationCircle = validationCircles.has(key);
+      const hasThreadedComment = threadedRootKeys.has(key);
       // Render-worthy when there's data, a merge anchor, a static fill, or a
       // sparkline/table host — all reasons to paint into an otherwise blank cell.
       if (
         !cell &&
         !isActive &&
         !isMergeAnchor &&
+        !engineFmt?.fill &&
+        !engineFmt?.fillPattern &&
+        !engineFmt?.borders &&
         !fmt?.fill &&
         !fmt?.fillPattern &&
+        !fmt?.borders &&
         !tableFmt?.fill &&
         !tableFmt?.fillPattern &&
+        !tableFmt?.borders &&
         !spark &&
-        !hasValidationCircle
+        !hasValidationCircle &&
+        !hasThreadedComment
       )
         continue;
       const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
@@ -329,8 +364,9 @@ export function paintCells(
 
       const overlay = conditional.get(key);
       const baseFmt: typeof fmt =
-        tableFmt || fmt
+        engineFmt || tableFmt || fmt
           ? {
+              ...engineFmt,
               ...tableFmt,
               ...fmt,
             }
@@ -356,17 +392,55 @@ export function paintCells(
 
       const value: CellValue = cell?.value ?? { kind: 'blank' };
       const storedFormula = cell?.formula ?? null;
-      const formula =
-        storedFormula && state.ui.showFormulas === true && state.ui.r1c1 === true
-          ? formatA1FormulaAsR1C1(storedFormula, { row: r, col: c })
-          : storedFormula;
-      const displayOverride =
+      const cellAddr = { sheet: data.sheetIndex, row: r, col: c };
+      let formula = storedFormula;
+      if (storedFormula && state.ui.showFormulas === true) {
+        if (wb) {
+          try {
+            formula = formulaForEdit(wb, cellAddr, storedFormula, state.ui.r1c1) ?? storedFormula;
+          } catch {
+            // A detached or older workbook can expose only part of the edit
+            // seed API. Preserve the standalone renderer's conversion below.
+            formula = state.ui.r1c1
+              ? formatA1FormulaAsR1C1(storedFormula, cellAddr)
+              : storedFormula;
+          }
+        }
+        if (!wb && state.ui.r1c1 === true) {
+          formula = formatA1FormulaAsR1C1(storedFormula, { row: r, col: c });
+        }
+      }
+      const customDisplay =
         cellCtx.getDisplay?.(
           { sheet: data.sheetIndex, row: r, col: c },
           value,
           storedFormula,
           fmt,
         ) ?? null;
+      let nativeDisplay: string | null = null;
+      if (customDisplay === null && state.ui.showFormulas !== true && wb) {
+        // A just-authored number format may be present in the store before a
+        // mirror flush reaches the native XF table. Format that value directly
+        // with formulon; loaded/inherited formats can use the workbook cell
+        // renderer, which also applies its date system and effective XF.
+        const formatCode = fmt?.numFmt ? numFmtToFormatCode(fmt.numFmt) : null;
+        if (formatCode && !overlay && typeof wb.formatValueForDisplay === 'function') {
+          nativeDisplay = wb.formatValueForDisplay(value, formatCode);
+        } else if (
+          !formatCode &&
+          !overlay &&
+          !fmt?.hyperlinkDisplay &&
+          typeof wb.getDisplayText === 'function'
+        ) {
+          nativeDisplay = wb.getDisplayText(data.sheetIndex, r, c);
+          // A newly entered value can reach the store one paint before the
+          // engine mirror. An empty native result then means "not mirrored"
+          // for a nonblank value; let the painter's deterministic formatter
+          // handle that transient state.
+          if (nativeDisplay === '' && value.kind !== 'blank') nativeDisplay = null;
+        }
+      }
+      const displayOverride = customDisplay ?? nativeDisplay;
       const paintCtx = {
         ctx,
         theme,
@@ -381,6 +455,7 @@ export function paintCells(
         displayOverride,
         locale,
         rtl,
+        zoom: state.viewport.zoom,
       };
 
       // Static format fill OR overlay fill — both painted via paintCellFill,
@@ -446,19 +521,31 @@ export function paintCells(
       }
       if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme, rtl);
       if (spark) paintCellSparkline(ctx, bounds, spark, state, cellCtx.wb);
-      if (fmt?.comment) paintCommentMarker(ctx, bounds, rtl);
+      if (engineFmt?.borders && !fmt?.borders) {
+        paintCellBorders({
+          ctx,
+          theme,
+          bounds,
+          value,
+          formula,
+          isActive,
+          isInRange,
+          format: effectiveFmt,
+        });
+      }
+      if (fmt?.comment || hasThreadedComment) paintCommentMarker(ctx, bounds, rtl);
       if (hasValidationCircle) paintValidationCircle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);
       // Lock-icon overlay — only when the sheet is protected AND the cell
       // is explicitly unlocked, signalling which cells the user can still
       // type into despite the protection flag.
-      if (sheetProtected && fmt?.locked === false) paintLockMarker(ctx, bounds, theme, rtl);
+      if (sheetProtected && effectiveFmt?.locked === false)
+        paintLockMarker(ctx, bounds, theme, rtl);
 
       // Error / validation triangles. Error wins over validation when both
       // would apply (an error-kind value already implies the data is bad —
       // the green triangle conveys that without piling on a red one). The
       // ignoredErrors set suppresses both kinds for the cell once the user
       // dismisses the popover via the "Ignore" action.
-      const cellAddr = { sheet: data.sheetIndex, row: r, col: c };
       const cellKey = key;
       if (!ignored.has(cellKey)) {
         if (detectErrorKind(value)) {

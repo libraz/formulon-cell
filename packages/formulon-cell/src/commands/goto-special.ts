@@ -86,7 +86,14 @@ export function findMatchingCells(
   }
 
   const matches: Addr[] = [];
-  for (const entry of wb.cells(sheet)) {
+  const entries =
+    useSelection &&
+    kind !== 'data-validation' &&
+    kind !== 'conditional-format' &&
+    typeof wb.cellsInRange === 'function'
+      ? wb.cellsInRange(selection)
+      : wb.cells(sheet);
+  for (const entry of entries) {
     if (useSelection && !rangeContainsAddr(selection, entry.addr)) continue;
     if (matchesKind(entry.addr, entry.value, entry.formula, kind, store, filters)) {
       matches.push(entry.addr);

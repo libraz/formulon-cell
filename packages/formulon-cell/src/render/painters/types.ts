@@ -28,6 +28,10 @@ export interface CellPaintCtx {
    *  indentation and the in-cell affordances anchor to. Cell-level
    *  `format.textDirection` is separate — it governs the run of text itself. */
   rtl?: boolean;
+  /** Visual zoom multiplier. Cell geometry is already projected at this
+   *  scale; text metrics need the same multiplier so glyphs do not stay at
+   *  their 100% size inside a zoomed cell. */
+  zoom?: number;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

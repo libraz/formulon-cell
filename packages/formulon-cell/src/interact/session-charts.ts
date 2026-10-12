@@ -1,6 +1,10 @@
-import { type SessionChartSeriesPoint, sessionChartSeries } from '../commands/session-chart.js';
+import {
+  clearSessionChart,
+  type SessionChartSeriesPoint,
+  sessionChartSeries,
+  updateSessionChart,
+} from '../commands/session-chart.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
-import { mutators } from '../store/store.js';
 import { createInteractionButton } from './chip-button.js';
 
 export interface SessionChartsHandle {
@@ -150,28 +154,31 @@ function renderChartSvg(
     return;
   }
 
-  const slot = (w - pad * 2) / Math.max(1, series.length);
-  const bw = Math.max(6, Math.min(28, slot * 0.58));
+  const slot = ((chart.kind === 'bar' ? h : w) - pad * 2) / Math.max(1, series.length);
+  // Keep each mark inside its category slot. For dense series this may be a
+  // fractional SVG unit; preserving the slot fraction avoids overlap while
+  // still giving short series the same desktop-sized 28-unit cap.
+  const thickness = Math.min(28, slot * 0.58);
   for (let i = 0; i < series.length; i += 1) {
     const v = series[i]?.value ?? 0;
     const y = yFor(v);
     if (chart.kind === 'bar') {
-      const barY = pad + i * slot + (slot - bw) / 2;
+      const barY = pad + i * slot + (slot - thickness) / 2;
       const zeroX = pad + ((0 - min) / span) * (w - pad * 2);
       const x = pad + ((v - min) / span) * (w - pad * 2);
       appendSvg(svg, 'rect', {
         x: Math.min(x, zeroX),
         y: barY,
         width: Math.max(1, Math.abs(zeroX - x)),
-        height: bw,
+        height: thickness,
         rx: 2,
         fill: v < 0 ? '#d13438' : color,
       });
     } else {
       appendSvg(svg, 'rect', {
-        x: pad + i * slot + (slot - bw) / 2,
+        x: pad + i * slot + (slot - thickness) / 2,
         y: Math.min(y, zeroY),
-        width: bw,
+        width: thickness,
         height: Math.max(1, Math.abs(zeroY - y)),
         rx: 2,
         fill: v < 0 ? '#d13438' : color,
@@ -231,12 +238,12 @@ export function attachSessionCharts(deps: {
       const dx = move.clientX - startX;
       const dy = move.clientY - startY;
       if (mode === 'move') {
-        mutators.updateChart(store, chart.id, {
+        updateSessionChart(store, chart.id, {
           x: Math.max(0, startLeft + dx),
           y: Math.max(0, startTop + dy),
         });
       } else {
-        mutators.updateChart(store, chart.id, {
+        updateSessionChart(store, chart.id, {
           w: Math.max(MIN_W, startW + dx),
           h: Math.max(MIN_H, startH + dy),
         });
@@ -255,7 +262,7 @@ export function attachSessionCharts(deps: {
     selectChart(chart.id, panel);
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      mutators.removeChart(store, chart.id);
+      clearSessionChart(store, chart.id);
       host.focus({ preventScroll: true });
       return;
     }
@@ -272,14 +279,14 @@ export function attachSessionCharts(deps: {
 
     const [dx, dy] = delta;
     if (e.shiftKey) {
-      mutators.updateChart(store, chart.id, {
+      updateSessionChart(store, chart.id, {
         w: Math.max(MIN_W, ((chart.w ?? panel.offsetWidth) || 360) + dx),
         h: Math.max(MIN_H, ((chart.h ?? panel.offsetHeight) || 220) + dy),
       });
       return;
     }
 
-    mutators.updateChart(store, chart.id, {
+    updateSessionChart(store, chart.id, {
       x: Math.max(0, (chart.x ?? panel.offsetLeft) + dx),
       y: Math.max(0, (chart.y ?? panel.offsetTop) + dy),
     });
@@ -327,7 +334,7 @@ export function attachSessionCharts(deps: {
         title.textContent = chartLabel(chart, labels);
         const close = createSessionChartCloseButton(labels.close);
         close.addEventListener('click', () => {
-          mutators.removeChart(store, chart.id);
+          clearSessionChart(store, chart.id);
           host.focus({ preventScroll: true });
         });
         header.append(title, close);

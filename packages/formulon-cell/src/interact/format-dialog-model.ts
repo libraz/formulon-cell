@@ -1,4 +1,8 @@
-import { normalizeFormatLocale } from '../format/locale.js';
+import {
+  currencySymbolForLocale,
+  datePatternsForLocale,
+  normalizeFormatLocale,
+} from '../format/locale.js';
 import type {
   CellAlign,
   CellBorderStyle,
@@ -103,7 +107,7 @@ export interface DraftState {
   formulaHidden: boolean;
 }
 
-export const CURRENCY_SYMBOLS = ['$', '¥', '€', '£'];
+export const CURRENCY_SYMBOLS = ['$', '¥', '€', '£', '₩', '฿'];
 export const FRACTION_PATTERNS = [
   '# ?/?',
   '# ??/??',
@@ -116,8 +120,7 @@ export const FRACTION_PATTERNS = [
   '# ?/100',
 ] as const;
 
-export const defaultCurrencySymbolFor = (locale: string): string =>
-  normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';
+export const defaultCurrencySymbolFor = currencySymbolForLocale;
 
 export const patternPresetsFor = (
   locale: string,
@@ -143,6 +146,25 @@ export const patternPresetsFor = (
         '[DBNum3]#,##0',
       ],
       custom: ['#,##0', '#,##0.00', '0%', '0.00%', '¥#,##0;[Red]-¥#,##0', '0.00E+00'],
+    };
+  }
+  const language = normalizeFormatLocale(locale).split('-')[0];
+  if (language !== 'en') {
+    const patterns = datePatternsForLocale(locale);
+    const symbol = currencySymbolForLocale(locale);
+    return {
+      date: [patterns.short, patterns.long, 'yyyy-mm-dd'],
+      time: [patterns.time, 'HH:MM:SS', 'h:MM AM/PM'],
+      fraction: [...FRACTION_PATTERNS],
+      special: ['00000'],
+      custom: [
+        '#,##0',
+        '#,##0.00',
+        '0%',
+        '0.00%',
+        `${symbol}#,##0;[Red]-${symbol}#,##0`,
+        '0.00E+00',
+      ],
     };
   }
   return {

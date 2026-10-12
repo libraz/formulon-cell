@@ -7,6 +7,7 @@ export interface DimensionDialogOptions {
   max: number;
   okLabel: string;
   cancelLabel: string;
+  locale?: string | (() => string);
 }
 
 export const showDimensionDialog = (opts: DimensionDialogOptions): Promise<number | null> =>
@@ -20,4 +21,5 @@ export const showDimensionDialog = (opts: DimensionDialogOptions): Promise<numbe
     okLabel: opts.okLabel,
     cancelLabel: opts.cancelLabel,
     invalidMessage: opts.label,
+    locale: opts.locale,
   });

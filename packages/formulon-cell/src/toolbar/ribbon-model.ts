@@ -1,5 +1,6 @@
-import { dictionaries, type Strings } from '../i18n/strings.js';
+import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
 import { pageScaleMenuText, toolbarMenuText, viewToggleMenuText } from './menu-text.js';
+import { fontFamilyCatalog, fontFamilyLocaleForStrings } from './ribbon/font-family-options.js';
 import { buildMacRibbonModel } from './ribbon/mac/model.js';
 
 export type RibbonTab =
@@ -16,7 +17,7 @@ export type RibbonTab =
   | 'automate'
   | 'acrobat';
 
-export type ToolbarLang = 'ja' | 'en';
+export type ToolbarLang = Locale;
 
 /** Built-in ribbon surfaces. Consumers can still pass an explicit `tabs`
  *  list; the profile only selects the library-owned default surface. */
@@ -94,20 +95,15 @@ export const RIBBON_TABS: readonly RibbonTab[] = [
   ...OPTIONAL_RIBBON_TABS,
 ];
 
-export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> = {
-  file: { ja: 'ファイル', en: 'File' },
-  home: { ja: 'ホーム', en: 'Home' },
-  insert: { ja: '挿入', en: 'Insert' },
-  draw: { ja: '描画', en: 'Draw' },
-  pageLayout: { ja: 'ページ レイアウト', en: 'Page Layout' },
-  formulas: { ja: '数式', en: 'Formulas' },
-  data: { ja: 'データ', en: 'Data' },
-  review: { ja: '校閲', en: 'Review' },
-  view: { ja: '表示', en: 'View' },
-  help: { ja: 'ヘルプ', en: 'Help' },
-  automate: { ja: '自動化', en: 'Automate' },
-  acrobat: { ja: 'Acrobat', en: 'Acrobat' },
-};
+export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> =
+  Object.fromEntries(
+    RIBBON_TABS.map((tab) => [
+      tab,
+      Object.fromEntries(
+        Object.entries(dictionaries).map(([locale, strings]) => [locale, strings.ribbon.tabs[tab]]),
+      ),
+    ]),
+  ) as Record<RibbonTab, Record<ToolbarLang, string>>;
 
 export const RIBBON_KEYSHORTCUTS: Readonly<Record<string, string>> = {
   copy: 'Control+C Meta+C',
@@ -167,6 +163,11 @@ export const matchesRibbonShortcut = (
 
 export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36] as const;
 
+/**
+ * Public compatibility tuple.  The richer locale-aware catalog is internal
+ * to the picker surfaces; existing consumers keep the original values and
+ * order, including the legacy Japanese display value.
+ */
 export const FONT_FAMILIES = [
   'Aptos',
   'Aptos Display',
@@ -244,6 +245,7 @@ export function buildRibbonModel(
 ): RibbonTabModel[] {
   const strings = resolveStrings(input);
   const tr = strings.ribbon;
+  const fontLocale = typeof input === 'string' ? input : fontFamilyLocaleForStrings(strings);
   const menuText = toolbarMenuText(strings);
   const pageScaleText = pageScaleMenuText(strings);
   const viewText = viewToggleMenuText(strings);
@@ -300,7 +302,10 @@ export function buildRibbonModel(
             'fontFamily',
             tr.font,
             tr.font,
-            tr.fontFamilies.map((font) => ({ value: font, label: font })),
+            fontFamilyCatalog(fontLocale, tr.fontFamilies).map(({ value, label }) => ({
+              value,
+              label,
+            })),
             'fc-tb__rb-select--font',
           ),
           selectCmd(
@@ -337,7 +342,7 @@ export function buildRibbonModel(
           cmd('wrap', tr.wrapText, tr.wrapText, 'wrap'),
           cmd('indentDecrease', tr.decreaseIndent, tr.decreaseIndent, 'indentDecrease'),
           cmd('indentIncrease', tr.increaseIndent, tr.increaseIndent, 'indentIncrease'),
-          cmd('merge', tr.mergeCells, tr.mergeCells, 'merge'),
+          cmd('merge', tr.mergeAndCenter, tr.mergeAndCenter, 'merge'),
         ],
         'alignment',
       ),
@@ -569,23 +574,23 @@ export function buildRibbonModel(
         ),
       ]),
       group(tr.arrange, [
-        cmd('arrangeObjectsPageLayout', tr.arrange, tr.arrange, 'options', 'wide'),
-        cmd('selectionPanePageLayout', tr.selectionPane, tr.selectionPane, 'options', 'wide'),
+        cmd('arrangeObjectsPageLayout', tr.arrange, tr.arrange, 'bringForward', 'wide'),
+        cmd('selectionPanePageLayout', tr.selectionPane, tr.selectionPane, 'selectionPane', 'wide'),
       ]),
       group(tr.print, [cmd('printPageLayout', tr.print, tr.print, 'print', 'wide')]),
     ]),
     tab('formulas', [
       group(tr.functionLibrary, [
-        cmd('fx', 'fx', tr.insertFunction, 'function', 'mono'),
+        cmd('fx', tr.insertFunction, tr.insertFunction, 'function', 'wide'),
         cmd('autosumFormula', tr.autoSum, `${tr.autoSum} (Σ)`, 'autosum', 'wide'),
-        cmd('sum', 'SUM', functionArgsTitle('SUM'), 'function', 'mono'),
-        cmd('avg', 'AVG', functionArgsTitle('AVERAGE'), 'function', 'mono'),
-        cmd('ifFormula', 'IF', functionArgsTitle('IF'), 'function', 'mono'),
-        cmd('xlookupFormula', 'XLOOKUP', functionArgsTitle('XLOOKUP'), 'function', 'mono'),
-        cmd('concatFormula', 'CONCAT', functionArgsTitle('CONCAT'), 'function', 'mono'),
-        cmd('todayFormula', 'TODAY', functionArgsTitle('TODAY'), 'function', 'mono'),
-        cmd('pmtFormula', 'PMT', functionArgsTitle('PMT'), 'function', 'mono'),
-        cmd('roundFormula', 'ROUND', functionArgsTitle('ROUND'), 'function', 'mono'),
+        cmd('sum', 'SUM', functionArgsTitle('SUM'), 'functionMath', 'wide'),
+        cmd('avg', 'AVG', functionArgsTitle('AVERAGE'), 'functionMore', 'wide'),
+        cmd('ifFormula', 'IF', functionArgsTitle('IF'), 'functionLogical', 'wide'),
+        cmd('xlookupFormula', 'XLOOKUP', functionArgsTitle('XLOOKUP'), 'functionLookup', 'wide'),
+        cmd('concatFormula', 'CONCAT', functionArgsTitle('CONCAT'), 'functionText', 'wide'),
+        cmd('todayFormula', 'TODAY', functionArgsTitle('TODAY'), 'functionDateTime', 'wide'),
+        cmd('pmtFormula', 'PMT', functionArgsTitle('PMT'), 'functionFinancial', 'wide'),
+        cmd('roundFormula', 'ROUND', functionArgsTitle('ROUND'), 'functionMath', 'wide'),
       ]),
       group(tr.definedNames, [cmd('namedRanges', tr.names, tr.names, 'names', 'wide')]),
       group(tr.formulaAuditing, [
@@ -597,7 +602,7 @@ export function buildRibbonModel(
         cmd('evaluateFormula', tr.evaluateFormula, tr.evaluateFormula, 'function', 'wide'),
       ]),
       group(tr.calculation, [
-        cmd('recalcNow', tr.recalc, `${tr.recalc} (F9)`, 'autosum', 'wide'),
+        cmd('recalcNow', tr.recalc, `${tr.recalc} (F9)`, 'calcNow', 'wide'),
         cmd('calcOptions', tr.options, tr.options, 'calcOptions', 'wide'),
         cmd('watch', tr.watch, tr.watch, 'watch', 'wide'),
       ]),
@@ -674,24 +679,33 @@ export function buildRibbonModel(
           [{ value: 'current', label: strings.viewToolbar.currentView }],
           'fc-tb__rb-select--border',
         ),
-        cmd('sheetViewSave', strings.viewToolbar.saveView, strings.viewToolbar.saveView, 'options'),
+        cmd(
+          'sheetViewSave',
+          strings.viewToolbar.saveView,
+          strings.viewToolbar.saveView,
+          'save',
+          'wide',
+        ),
         cmd(
           'sheetViewDelete',
           strings.viewToolbar.deleteView,
           strings.viewToolbar.deleteView,
           'clear',
+          'wide',
         ),
         cmd(
           'workbookObjectsView',
           strings.viewToolbar.objects,
           strings.viewToolbar.objects,
-          'options',
+          'selectionPane',
+          'wide',
         ),
         cmd(
           'pivotFieldListView',
           strings.workbookObjects.pivotFieldList,
           strings.workbookObjects.pivotFieldList,
-          'options',
+          'pivotTable',
+          'wide',
         ),
       ]),
       group(tr.show, [
@@ -699,13 +713,19 @@ export function buildRibbonModel(
         cmd('viewHeadings', viewText.headings, viewText.headings, 'table', 'wide'),
         cmd('viewFormulas', viewText.formulas, viewText.formulas, 'function', 'wide'),
         cmd('viewFormulaBar', viewText.formulaBar, viewText.formulaBar, 'function', 'wide'),
-        cmd('viewR1C1', 'R1C1', tr.r1c1, 'options', 'wide'),
-        cmd('viewZeros', strings.viewToolbar.zeros, strings.viewToolbar.zeros, 'options', 'wide'),
+        cmd('viewR1C1', 'R1C1', tr.r1c1, 'referenceStyle', 'wide'),
+        cmd(
+          'viewZeros',
+          strings.viewToolbar.zeros,
+          strings.viewToolbar.zeros,
+          'zeroValues',
+          'wide',
+        ),
         cmd(
           'viewRightToLeft',
           strings.viewToolbar.rightToLeft,
           strings.viewToolbar.rightToLeft,
-          'options',
+          'rightToLeft',
           'wide',
         ),
       ]),
@@ -723,7 +743,7 @@ export function buildRibbonModel(
       group(tr.protection, [cmd('protect', tr.protect, tr.protect, 'protect', 'wide')]),
     ]),
     tab('help', [
-      group(tr.tabs.help, [cmd('helpSearch', tr.tabs.help, tr.tabs.help, 'options', 'wide', true)]),
+      group(tr.tabs.help, [cmd('helpSearch', tr.tabs.help, tr.tabs.help, 'help', 'wide', true)]),
     ]),
     tab('draw', [
       group(tr.tabs.draw, [
@@ -747,7 +767,11 @@ export function buildRibbonModel(
   const homeTab = allTabs.find((candidate) => candidate.id === 'home');
   if (!homeTab) return [];
   const profileLang: ToolbarLang =
-    typeof input === 'string' ? input : strings === dictionaries.en ? 'en' : 'ja';
+    typeof input === 'string'
+      ? input
+      : ((Object.entries(dictionaries).find(([, dictionary]) => dictionary === strings)?.[0] as
+          | ToolbarLang
+          | undefined) ?? 'ja');
   const profileTabs =
     opts.profile === 'excel365Mac' ? buildMacRibbonModel(profileLang, homeTab) : allTabs;
   const requestedTabs =

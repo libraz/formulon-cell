@@ -4,7 +4,11 @@
 import type { Range } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
 import type { ConditionalRule } from '../store/store.js';
-import { appendScalePointRow, collectScalePoint } from './conditional-form-controls.js';
+import {
+  appendScalePointRow,
+  collectScalePoint,
+  localizedScalePointValue,
+} from './conditional-form-controls.js';
 
 type ColorScaleRule = Extract<ConditionalRule, { kind: 'color-scale' }>;
 
@@ -24,6 +28,7 @@ export interface ColorScaleForm {
 export function appendColorScaleForm(
   form: HTMLElement,
   t: Strings['conditionalDialog'],
+  getLocale: () => string = () => 'en-US',
 ): ColorScaleForm {
   const group = document.createElement('div');
   group.className = 'fc-conddlg__sub';
@@ -109,15 +114,18 @@ export function appendColorScaleForm(
     const max = rule.stops.length === 3 ? thresholds[2] : thresholds[1];
     if (min) {
       scaleMin.type.value = min.kind;
-      scaleMin.value.value = 'value' in min ? String(min.value) : '0';
+      scaleMin.value.value =
+        'value' in min ? localizedScalePointValue(min.value, getLocale()) : '0';
     }
     if (mid) {
       scaleMid.type.value = mid.kind;
-      scaleMid.value.value = 'value' in mid ? String(mid.value) : '50';
+      scaleMid.value.value =
+        'value' in mid ? localizedScalePointValue(mid.value, getLocale()) : '50';
     }
     if (max) {
       scaleMax.type.value = max.kind;
-      scaleMax.value.value = 'value' in max ? String(max.value) : '100';
+      scaleMax.value.value =
+        'value' in max ? localizedScalePointValue(max.value, getLocale()) : '100';
     }
   };
 
@@ -125,11 +133,12 @@ export function appendColorScaleForm(
     const stops: [string, string] | [string, string, string] = useThreeCk.checked
       ? [stopMinInput.value, stopMidInput.value, stopMaxInput.value]
       : [stopMinInput.value, stopMaxInput.value];
-    const minPoint = collectScalePoint(scaleMin);
-    const maxPoint = collectScalePoint(scaleMax);
+    const locale = getLocale();
+    const minPoint = collectScalePoint(scaleMin, locale);
+    const maxPoint = collectScalePoint(scaleMax, locale);
     if (!minPoint || !maxPoint) return null;
     if (useThreeCk.checked) {
-      const midPoint = collectScalePoint(scaleMid);
+      const midPoint = collectScalePoint(scaleMid, locale);
       if (!midPoint) return null;
       return { kind: 'color-scale', range, stops, thresholds: [minPoint, midPoint, maxPoint] };
     }

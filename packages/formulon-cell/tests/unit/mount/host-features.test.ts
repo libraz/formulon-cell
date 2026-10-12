@@ -115,17 +115,22 @@ describe('mount/host-features — individual feature flags', () => {
     const englishTitle = root?.getAttribute('aria-label');
     expect(englishTitle).toBeTruthy();
 
-    sheet.instance.i18n.setLocale('ja');
+    // The Mac palette owns an external formula draft while open. A locale
+    // switch must leave that draft and pane intact so callers can close or
+    // commit it before retrying.
+    expect(sheet.instance.setLocale('ja')).toBe(false);
+    expect(sheet.instance.locale).toBe('en');
+    expect(workbook.spreadsheetProfileId()).toBe('mac-en_US');
 
     expect(sheet.host.querySelector('.fc-mac-formula-palette')).toBe(root);
     expect(sheet.instance.features.fxDialog).toBe(handle);
-    expect(root?.getAttribute('aria-label')).not.toBe(englishTitle);
+    expect(root?.getAttribute('aria-label')).toBe(englishTitle);
     root?.querySelector<HTMLButtonElement>('[data-action="close"]')?.click();
     expect(root?.hidden).toBe(true);
     expect(dock?.hidden).toBe(true);
-    // Locale replacement is a context discard; it must not restore focus to
-    // the opener that belonged to the discarded palette session.
-    expect(document.activeElement).not.toBe(fx);
+    expect(sheet.instance.setLocale('ja')).toBe(true);
+    expect(sheet.instance.locale).toBe('ja');
+    expect(workbook.spreadsheetProfileId()).toBe('mac-ja_JP');
   });
 
   it('suspends a mid-edit formula bar while the Mac palette is open and restores it on close', async () => {

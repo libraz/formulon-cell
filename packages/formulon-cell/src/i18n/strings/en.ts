@@ -3,6 +3,7 @@ import { dataObjectsEn } from './data-objects/en.js';
 import { editDialogsEn } from './edit-dialogs/en.js';
 import { formulaDialogsEn } from './formula-dialogs/en.js';
 import { gridPopupsEn } from './grid-popups/en.js';
+import { localeSwitcherEn } from './locale-switcher/en.js';
 import { macEn } from './mac/en.js';
 import { pageLayoutEn } from './page-layout/en.js';
 import { ribbonEn } from './ribbon/en.js';
@@ -21,4 +22,5 @@ export const en: Strings = {
   ...macEn,
   ...pageLayoutEn,
   ...workbookChromeEn,
+  ...localeSwitcherEn,
 };

@@ -1,11 +1,18 @@
 import { addrKey } from '../engine/address.js';
+import { cellFormatFromXf } from '../engine/cell-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
+import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, State } from '../store/types.js';
-import { type CoercedInput, coerceInputForCell, validateCoercedInput } from './coerce-input.js';
+import {
+  type CoercedInput,
+  coerceInputForCell,
+  inputLocaleForWorkbook,
+  validateCoercedInput,
+} from './coerce-input.js';
 import type { History } from './history.js';
 import { InteractionAuthorizer } from './interaction-authorizer.js';
 import {
@@ -45,6 +52,45 @@ const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
   'fill',
   'moveCells',
 ]);
+
+/** `EffectiveStyleSource` ordinals from the native engine. A row/column
+ * source is safe to materialise for a new cell; a cell source would flatten a
+ * direct style and a default source has no worksheet-level font to inherit. */
+const NATIVE_ROW_STYLE_SOURCE = 1;
+const NATIVE_COLUMN_STYLE_SOURCE = 2;
+
+export interface NativeAxisFontFormat {
+  readonly xfIndex: number;
+  readonly projected: CellFormat;
+}
+
+/** Read only the sparse font axes supplied by a native row/column style.
+ * Paint projections add workbook defaults, which would turn a size-only axis
+ * into a direct family as well; the raw XF projection avoids that flattening. */
+export const nativeAxisFontFormatFor = (
+  wb: WorkbookHandle,
+  addr: Addr,
+): NativeAxisFontFormat | undefined => {
+  if (wb.capabilities.cellFormatting !== true || wb.capabilities.effectiveStyle !== true) {
+    return undefined;
+  }
+  if (wb.getCellXfIndex(addr.sheet, addr.row, addr.col) !== 0) return undefined;
+  const effective = wb.getEffectiveStyle(addr.sheet, addr.row, addr.col);
+  if (
+    !effective ||
+    (effective.source !== NATIVE_ROW_STYLE_SOURCE &&
+      effective.source !== NATIVE_COLUMN_STYLE_SOURCE)
+  ) {
+    return undefined;
+  }
+  const xf = wb.getCellXf(effective.xfIndex);
+  if (!xf) return undefined;
+  const projected = cellFormatFromXf(wb, xf, wb.workbookDefaultFont);
+  const inherited = projected as CellFormat;
+  return Object.keys(inherited).length === 0
+    ? undefined
+    : { xfIndex: effective.xfIndex, projected: inherited };
+};
 
 export interface InteractionControllerOptions {
   readonly store: SpreadsheetStore;
@@ -184,6 +230,7 @@ export class InteractionController {
       return this.rejectResult([{ code: 'invalid', reason: 'workbook is unavailable' }]);
     }
     const state = this.store.getState();
+    const inputLocale = inputLocaleForWorkbook(wb);
     const prepared: PreparedChange[] = [];
     const globalRejections: BatchRejection[] = [];
     let includesFormula = false;
@@ -194,7 +241,14 @@ export class InteractionController {
     const pendingAnchorKey =
       mayApplyPendingFormat && pending ? addrKey(mergeAnchorFor(state, pending.addr)) : undefined;
     for (const change of command.changes) {
-      const preparedChange = this.prepareChange(state, change, command.operation, wb, true);
+      const preparedChange = this.prepareChange(
+        state,
+        change,
+        command.operation,
+        wb,
+        true,
+        inputLocale,
+      );
       if ('rejection' in preparedChange) {
         globalRejections.push(preparedChange.rejection);
         continue;
@@ -313,13 +367,14 @@ export class InteractionController {
       return this.rejectResult([{ code: 'invalid', reason: 'workbook is unavailable' }]);
     }
     const state = this.store.getState();
+    const inputLocale = inputLocaleForWorkbook(wb);
     const prepared: PreparedChange[] = [];
     const rejections: BatchRejection[] = [];
     let includesFormula = false;
     for (const change of changes) {
       // Host refreshes address the physical workbook and may intentionally
       // update cells outside the current navigation/viewport rectangle.
-      const next = this.prepareChange(state, change, 'valueEdit', wb, false);
+      const next = this.prepareChange(state, change, 'valueEdit', wb, false, inputLocale);
       if ('rejection' in next) rejections.push(next.rejection);
       else {
         prepared.push(next);
@@ -367,12 +422,24 @@ export class InteractionController {
     this.listeners.clear();
   }
 
+  /** Whether the bound engine can represent a worksheet-wide font override
+   * without expanding the selection into every physical cell. */
+  hasWholeSheetFontStyles(): boolean {
+    try {
+      const capabilities = this.getWb().capabilities;
+      return capabilities.sheetFontStyles === true && capabilities.cellFormatting === true;
+    } catch {
+      return false;
+    }
+  }
+
   private prepareChange(
     state: State,
     change: CellChangeInput,
     operation: CellBatchOperation,
     wb: WorkbookHandle,
     respectNavigationBounds: boolean,
+    inputLocale?: string,
   ): PreparedChange | { rejection: BatchRejection } {
     const addr = change.addr;
     if (
@@ -415,8 +482,13 @@ export class InteractionController {
     if (operation === 'clear') {
       return { patch: { addr: target, value: { kind: 'blank' }, formula: null } };
     }
+    const nativeAxis = nativeAxisFontFormatFor(wb, target);
+    const inheritedFormat = this.inheritedFontFormatFor(state, target, nativeAxis);
+    const inheritedAxisXf = nativeAxis
+      ? { xfIndex: nativeAxis.xfIndex, projected: nativeAxis.projected }
+      : undefined;
     if ('input' in change) {
-      const input = coerceInputForCell(state, target, change.input);
+      const input = coerceInputForCell(state, target, change.input, inputLocale, wb);
       if (input.kind === 'number' && !Number.isFinite(input.value)) {
         return { rejection: { addr, code: 'invalid', reason: 'number value must be finite' } };
       }
@@ -428,7 +500,7 @@ export class InteractionController {
           return { rejection: { addr, code: 'invalid', reason: outcome.message } };
         }
       }
-      return { ...prepared, input };
+      return { ...prepared, inheritedFormat, inheritedAxisXf, input };
     }
     const formula = change.formula === undefined ? null : change.formula;
     if (formula !== null && typeof formula !== 'string') {
@@ -450,7 +522,65 @@ export class InteractionController {
         value: change.value,
         formula: formula === null ? null : normalizeR1C1Formula(formula, target),
       },
+      inheritedFormat,
+      inheritedAxisXf,
     };
+  }
+
+  private inheritedFontFormatFor(
+    state: State,
+    addr: Addr,
+    nativeAxis: NativeAxisFontFormat | undefined,
+  ): Partial<CellFormat> | undefined {
+    const patch = sheetFontPatchFor(state, addr.sheet);
+    const key = addrKey(addr);
+    const direct = state.format.formats.get(key);
+    const pending = state.ui.pendingFormat;
+    const pendingFormat =
+      pending && addrKey(mergeAnchorFor(state, pending.addr)) === key ? pending.format : undefined;
+    const inherited: Partial<CellFormat> = {};
+    if (patch) {
+      if (
+        patch.fontFamily !== undefined &&
+        direct?.fontFamily === undefined &&
+        pendingFormat?.fontFamily === undefined
+      ) {
+        inherited.fontFamily = patch.fontFamily;
+      }
+      if (
+        patch.fontSize !== undefined &&
+        direct?.fontSize === undefined &&
+        pendingFormat?.fontSize === undefined
+      ) {
+        inherited.fontSize = patch.fontSize;
+      }
+    }
+
+    // A saved workbook has no session-side override map, but its column/row
+    // XF can still carry the worksheet font. Only materialise that font for a
+    // cell whose direct XF is the default and whose effective style came from
+    // an axis. This keeps display-only effective projections out of the store
+    // and leaves direct, non-font formatting authoritative.
+    if (nativeAxis) {
+      const projected = nativeAxis.projected;
+      if (
+        inherited.fontFamily === undefined &&
+        direct?.fontFamily === undefined &&
+        pendingFormat?.fontFamily === undefined &&
+        projected.fontFamily !== undefined
+      ) {
+        inherited.fontFamily = projected.fontFamily;
+      }
+      if (
+        inherited.fontSize === undefined &&
+        direct?.fontSize === undefined &&
+        pendingFormat?.fontSize === undefined &&
+        projected.fontSize !== undefined
+      ) {
+        inherited.fontSize = projected.fontSize;
+      }
+    }
+    return Object.keys(inherited).length === 0 ? undefined : inherited;
   }
 
   private patchFromCoerced(addr: Addr, input: CoercedInput): PreparedChange {
@@ -590,6 +720,20 @@ export class InteractionController {
       wb = this.getWb();
       const beforeFormats = new Map(this.store.getState().format.formats);
       const atomic = wb.applyCellPatchAtomic(prepared.map((change) => change.patch));
+      for (const change of prepared) {
+        const axis = change.inheritedAxisXf;
+        if (
+          axis &&
+          !wb.setCellXfIndex(
+            change.patch.addr.sheet,
+            change.patch.addr.row,
+            change.patch.addr.col,
+            axis.xfIndex,
+          )
+        ) {
+          throw new Error(`could not preserve inherited font XF at ${addrKey(change.patch.addr)}`);
+        }
+      }
       const afterFormats = this.applyPreparedFormats(beforeFormats, prepared);
       const changedFormats = changedFormatAddresses(beforeFormats, afterFormats, prepared);
       const applied = unionAddresses(atomic.changed, changedFormats);
@@ -605,10 +749,30 @@ export class InteractionController {
             const current = this.getWb();
             current.applyCellPatchAtomic(atomic.before.map(snapshotToPatch));
             this.restoreFormats(beforeFormats);
+            for (const change of prepared) {
+              const axis = change.inheritedAxisXf;
+              if (axis)
+                current.setCellXfIndex(
+                  change.patch.addr.sheet,
+                  change.patch.addr.row,
+                  change.patch.addr.col,
+                  axis.xfIndex,
+                );
+            }
           },
           redo: () => {
             const current = this.getWb();
             current.applyCellPatchAtomic(atomic.after.map(snapshotToPatch));
+            for (const change of prepared) {
+              const axis = change.inheritedAxisXf;
+              if (axis)
+                current.setCellXfIndex(
+                  change.patch.addr.sheet,
+                  change.patch.addr.row,
+                  change.patch.addr.col,
+                  axis.xfIndex,
+                );
+            }
             this.restoreFormats(afterFormats);
           },
           intent: intents.redo,

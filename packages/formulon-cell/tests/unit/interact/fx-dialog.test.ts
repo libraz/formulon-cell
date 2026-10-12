@@ -571,6 +571,51 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it('keeps a provider alias display-only while inserting the native localized name', () => {
+    const store = createSpreadsheetStore();
+    const inserted: string[] = [];
+    const reader = {
+      functionNames: () => ['SUM'] as const,
+      functionMetadata: () => ({
+        name: 'SUM',
+        minArity: 1,
+        maxArity: null,
+        localizedName: '合計',
+        signatureTemplate: '合計(number1, [number2])',
+      }),
+      localeFacts: () => ({ listSeparator: ';' }),
+      localizeFunctionName: (name: string) => (name === 'SUM' ? 'SUMME' : name),
+    };
+    const handle = attachFxDialog({
+      host,
+      store,
+      getWb: () => reader,
+      getLocale: () => 'de-DE',
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+
+    handle.open();
+    const item = document.querySelector<HTMLElement>('[data-fx-name="SUM"]');
+    expect(item?.querySelector('.fc-fxdialog__item-name')?.textContent).toBe('合計');
+    item?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const inputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    const [first, second] = Array.from(inputs);
+    if (!first || !second) throw new Error('expected SUM argument inputs');
+    first.value = '1';
+    first.dispatchEvent(new Event('input'));
+    second.value = '2';
+    second.dispatchEvent(new Event('input'));
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__preview')?.textContent).toBe(
+      '=SUMME(1; 2)',
+    );
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+    expect(inserted).toEqual(['=SUMME(1; 2)']);
+    handle.detach();
+  });
+
   it('keeps class-3 functions visible but guards seeded, clicked, and Enter insertion', () => {
     const store = createSpreadsheetStore();
     const inserted: string[] = [];

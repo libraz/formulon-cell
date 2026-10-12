@@ -106,6 +106,10 @@ export const attachRangePickerButton = (
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
+      // An inactive picker belongs to the dialog's normal keyboard route.
+      // Let its Escape handler dismiss the dialog; only an active range
+      // selection owns Escape and needs to cancel itself first.
+      if (!unsubscribe) return;
       event.preventDefault();
       event.stopPropagation();
       stopPicking();

@@ -1,4 +1,4 @@
-import { normalizeFormatLocale } from '../format/locale.js';
+import { currencySymbolForLocale, datePatternsForLocale } from '../format/locale.js';
 import type { NumFmt } from '../store/types.js';
 
 export type NumberFormatAction =
@@ -15,14 +15,13 @@ export type NumberFormatAction =
   | 'text'
   | 'more';
 
-const defaultCurrencySymbolForToolbar = (locale: string): string =>
-  normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';
+const defaultCurrencySymbolForToolbar = currencySymbolForLocale;
 
 export const numberFormatForAction = (
   action: NumberFormatAction,
   locale: string,
 ): NumFmt | null => {
-  const isJapanese = normalizeFormatLocale(locale).startsWith('ja');
+  const patterns = datePatternsForLocale(locale);
   const symbol = defaultCurrencySymbolForToolbar(locale);
   switch (action) {
     case 'general':
@@ -34,11 +33,11 @@ export const numberFormatForAction = (
     case 'accounting':
       return { kind: 'accounting', decimals: 2, symbol };
     case 'shortDate':
-      return { kind: 'date', pattern: isJapanese ? 'yyyy/m/d' : 'm/d/yyyy' };
+      return { kind: 'date', pattern: patterns.short };
     case 'longDate':
-      return { kind: 'date', pattern: isJapanese ? 'yyyy"年"m"月"d"日' : 'mmmm d, yyyy' };
+      return { kind: 'date', pattern: patterns.long };
     case 'time':
-      return { kind: 'time', pattern: isJapanese ? 'H:MM' : 'h:MM AM/PM' };
+      return { kind: 'time', pattern: patterns.time };
     case 'percent':
       return { kind: 'percent', decimals: 0 };
     case 'fraction':

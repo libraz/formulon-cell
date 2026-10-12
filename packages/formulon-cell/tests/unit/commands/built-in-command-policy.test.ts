@@ -105,6 +105,10 @@ describe('built-in Mac command policy catalog', () => {
         'mac.view.zoom100',
         'mac.formulas.errorCheck.run',
         'mac.data.workbookLinks',
+        'mac.review.previousNote',
+        'mac.review.nextNote',
+        'mac.review.previousComment',
+        'mac.review.nextComment',
       ]) {
         expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(true);
       }
@@ -122,7 +126,15 @@ describe('built-in Mac command policy catalog', () => {
         expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(false);
       }
       controller.setPolicy({ ...viewerPolicy(), selection: false });
-      expect(canExecuteBuiltIn(store, 'mac.formulas.errorCheck.run', 'ribbon').allowed).toBe(false);
+      for (const id of [
+        'mac.formulas.errorCheck.run',
+        'mac.review.previousNote',
+        'mac.review.nextNote',
+        'mac.review.previousComment',
+        'mac.review.nextComment',
+      ]) {
+        expect(canExecuteBuiltIn(store, id, 'ribbon').allowed, id).toBe(false);
+      }
     } finally {
       unregister();
       controller.dispose();

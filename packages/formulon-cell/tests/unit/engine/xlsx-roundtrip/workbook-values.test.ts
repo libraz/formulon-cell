@@ -7,7 +7,7 @@ import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import { canLoadWasm } from './fixtures.js';
 
 describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
-  it('exposes the 0.12.0 function catalog and recalculates USDOLLAR through the adapter', async () => {
+  it('exposes the engine function catalog and recalculates USDOLLAR through the adapter', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.sheetCount).toBe(1);

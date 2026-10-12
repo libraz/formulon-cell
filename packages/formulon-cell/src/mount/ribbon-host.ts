@@ -36,7 +36,6 @@ export function createRibbonHost(deps: RibbonHostDeps): RibbonHost {
       host.insertBefore(ribbonHost, host.firstChild);
       const toolbarOpts = next === true ? {} : next;
       toolbarHandle = mountToolbar(ribbonHost, deps.getInstance(), {
-        lang: deps.getLocale() === 'en' ? 'en' : 'ja',
         ...(deps.isRestricted() ? {} : { dynamicDropdowns: true as const }),
         ...toolbarOpts,
       });

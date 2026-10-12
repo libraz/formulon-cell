@@ -186,7 +186,7 @@ describe('hydrateValidationsFromEngine', () => {
     expect(fmt?.validation && 'showErrorMessage' in fmt.validation).toBe(false);
   });
 
-  it('decodes hidden in-cell dropdown arrows for list validations', () => {
+  it('keeps the native user-facing dropdown visibility on decode', () => {
     const wb = makeFake({
       entries: [
         partial({
@@ -200,11 +200,7 @@ describe('hydrateValidationsFromEngine', () => {
     const store = createSpreadsheetStore();
     hydrateValidationsFromEngine(wb, store, 0);
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
-    expect(fmt?.validation).toEqual({
-      kind: 'list',
-      source: ['A', 'B'],
-      showDropdown: false,
-    });
+    expect(fmt?.validation).toEqual({ kind: 'list', source: ['A', 'B'] });
   });
 
   it('no-op when capability is off', () => {
@@ -332,7 +328,7 @@ describe('syncValidationsToEngine', () => {
     expect(touched).toBe(false);
   });
 
-  it('encodes range-source list rules with a leading = on formula1', () => {
+  it('encodes range-source list rules without a leading = on formula1', () => {
     type AddCall = { sheet: number; input: { formula1?: string } };
     const adds: AddCall[] = [];
     const wb = makeFake({
@@ -356,10 +352,37 @@ describe('syncValidationsToEngine', () => {
     }));
     syncValidationsToEngine(wb, store, 0);
     expect(adds).toHaveLength(1);
-    expect(adds[0]?.input.formula1).toBe('=Sheet1!$A$1:$A$10');
+    expect(adds[0]?.input.formula1).toBe('Sheet1!$A$1:$A$10');
   });
 
-  it('encodes hidden in-cell dropdown arrows using OOXML showDropDown=true', () => {
+  it('encodes custom rules without a leading = on formula1', () => {
+    type AddCall = { input: { formula1?: string } };
+    const adds: AddCall[] = [];
+    const wb = makeFake({
+      onClear: () => true,
+      onAdd: (_sheet, input) => {
+        adds.push({ input: input as { formula1?: string } });
+        return true;
+      },
+    });
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([
+          [
+            addrKey({ sheet: 0, row: 0, col: 0 }),
+            { validation: { kind: 'custom' as const, formula: '=A1>10' } },
+          ],
+        ]),
+      },
+    }));
+    syncValidationsToEngine(wb, store, 0);
+    expect(adds).toHaveLength(1);
+    expect(adds[0]?.input.formula1).toBe('A1>10');
+  });
+
+  it('encodes hidden in-cell dropdown arrows using native showDropDown=false', () => {
     type AddCall = { sheet: number; input: { showDropDown?: boolean } };
     const adds: AddCall[] = [];
     const wb = makeFake({
@@ -389,6 +412,6 @@ describe('syncValidationsToEngine', () => {
     }));
     syncValidationsToEngine(wb, store, 0);
     expect(adds).toHaveLength(1);
-    expect(adds[0]?.input.showDropDown).toBe(true);
+    expect(adds[0]?.input.showDropDown).toBe(false);
   });
 });

@@ -12,11 +12,16 @@ export type {
   DxfResult,
   EvalArrayResult,
   EvalResult,
+  ExcelProfileId,
   FormulonModule,
   FunctionMetadataEntry,
   FunctionMetadataLocalized,
   FunctionMetadataProvider,
   FunctionMetadataResult,
+  LocaleDateOrder,
+  LocaleErrorName,
+  LocaleFacts,
+  LocaleFactsResult,
   MergedFunctionMetadataResult,
   NumberResult,
   PivotCell,
@@ -75,7 +80,28 @@ export type DxfRecord = Omit<import('@libraz/formulon').DxfRecord, 'font' | 'fil
   border?: BorderRecord;
 };
 
-export type SpreadsheetProfileId = 'windows-ja_JP' | 'mac-ja_JP';
+/**
+ * Formula-behaviour profiles exposed by the cell adapter.
+ *
+ * The `windows` spelling is kept for source compatibility with the first
+ * profile API. Formulon uses the shorter `win` prefix for the corresponding
+ * engine id (`win-365-*`).
+ */
+export type SpreadsheetProfileId =
+  | 'windows-ja_JP'
+  | 'windows-en_US'
+  | 'windows-de_DE'
+  | 'windows-fr_FR'
+  | 'windows-zh_CN'
+  | 'windows-ko_KR'
+  | 'windows-th_TH'
+  | 'mac-ja_JP'
+  | 'mac-en_US'
+  | 'mac-de_DE'
+  | 'mac-fr_FR'
+  | 'mac-zh_CN'
+  | 'mac-ko_KR'
+  | 'mac-th_TH';
 
 /** PivotTable axis ordinals. Mirrors `fm_pivot_axis_t`. */
 export const PivotAxis = {
@@ -359,6 +385,69 @@ export interface Range {
 }
 
 /**
+ * The sparse worksheet-level style records captured before a whole-sheet
+ * font edit.  The native axis style APIs retain width, height, hidden and
+ * outline attributes when a style is changed, so the consumer only needs to
+ * remember the style-bearing ranges/rows in order to restore them on undo.
+ */
+export interface SheetFontAxisSnapshot {
+  readonly columns: readonly {
+    readonly first: number;
+    readonly last: number;
+    readonly styleXf: number;
+  }[];
+  readonly rows: readonly {
+    readonly row: number;
+    readonly styleXf: number;
+  }[];
+}
+
+/** Font fields kept as an explicit worksheet-wide override in CSS units. */
+export interface SheetFontPatch {
+  readonly fontFamily?: string;
+  /** CSS pixels at the cell-layer boundary (`pt × 96 / 72`). */
+  readonly fontSize?: number;
+}
+
+/** State needed to paint blank/future cells after a whole-sheet font edit. */
+export interface SheetFontOverride {
+  readonly patch: SheetFontPatch;
+  /** A full-sheet Clear Formats request. The empty patch is meaningful here:
+   *  native row/column font styles must be removed while the captured
+   *  baseline remains available for undo. */
+  readonly clearAxes?: boolean;
+  /** Populated by the first engine sync; absent in a stub or before flush. */
+  readonly baseline?: SheetFontAxisSnapshot;
+}
+
+/** A sparse native direct-XF correction required when an axis style is
+ *  shadowed by another axis (for example, a row style wins over a selected
+ *  column).  Keeping these corrections in the override lets undo restore the
+ *  pre-action native state without expanding a whole worksheet into the store.
+ */
+export interface SheetAxisDirectXf {
+  readonly key: string;
+  readonly before: {
+    readonly directXfIndex: number;
+    readonly effectiveXfIndex: number | null;
+    readonly source: number | null;
+  };
+  readonly afterXfIndex: number;
+}
+
+/** Native axis-format state for row/column and mixed selections.  `baseline`
+ *  is immutable for the lifetime of an edit chain; `desired` is the exact
+ *  sparse axis state to publish.  `fontPatch` is retained so an existing
+ *  whole-sheet font override can be folded into the first axis edit.
+ */
+export interface SheetAxisFormatOverride {
+  readonly baseline: SheetFontAxisSnapshot;
+  readonly desired: SheetFontAxisSnapshot;
+  readonly directXfs?: readonly SheetAxisDirectXf[];
+  readonly fontPatch?: SheetFontPatch;
+}
+
+/**
  * One `<rPh>` block of a cell's phonetic guide: `text` is the reading for the
  * half-open span `[start, end)` of the cell's text, measured in UTF-16 code
  * units. A guide that reads the whole cell is a single run spanning all of it,
@@ -385,6 +474,17 @@ export type CellValue =
  *  Probes are conservative: a flag flips on only when *every* method
  *  required for round-tripping that feature is present. */
 export interface EngineCapabilities {
+  readonly typedAutoFilter?: boolean;
+  readonly validationEvaluation?: boolean;
+  readonly threadedComments?: boolean;
+  readonly images?: boolean;
+  readonly workbookTheme?: boolean;
+  readonly effectiveStyle?: boolean;
+  readonly displayText?: boolean;
+  readonly rangeEnumeration?: boolean;
+  readonly formulaRead?: boolean;
+  readonly formulaR1C1?: boolean;
+  readonly detailedPagination?: boolean;
   /** `addMerge` + `getMerges` + `removeMerge` + `clearMerges`. Round-trips
    *  through both the store and the engine, including unmerge. */
   readonly merges: boolean;
@@ -394,6 +494,17 @@ export interface EngineCapabilities {
    *  on the XF record carries number-format ids, so a separate `numberFormat`
    *  flag is unnecessary. */
   readonly cellFormatting: boolean;
+  /** Optional native removal of a direct cell XF, restoring row/column/default
+   *  inheritance instead of materialising its effective XF as a cell override. */
+  readonly cellFormattingClear?: boolean;
+  /** Worksheet column/row style setters used by whole-sheet font changes. */
+  readonly sheetFontStyles?: boolean;
+  /** Native row setters accept inclusive first/last bounds. */
+  readonly rowStyleRanges?: boolean;
+  /** Attribute remapping over a selection without enumerating its empty cells. */
+  readonly rangeStylePatch?: boolean;
+  /** Exact native style snapshots that leave cell contents untouched. */
+  readonly rangeStyleSnapshot?: boolean;
   /** Cell-level OOXML phonetic guide (`rPh`) read/write, as one reading for
    *  the whole cell. */
   readonly phonetic?: boolean;
@@ -420,6 +531,12 @@ export interface EngineCapabilities {
   readonly hiddenRowsCols: boolean;
   /** `setColumnWidth` + `setRowHeight`. */
   readonly colRowSize: boolean;
+  /** Sheet defaults and character/point conversions for CSS pixel layout. */
+  readonly geometry?: boolean;
+  /** Clear an explicit row height so the row follows its sheet default. */
+  readonly rowHeightClear?: boolean;
+  /** Resolve theme, indexed and automatic style colours to ARGB. */
+  readonly colorResolution?: boolean;
   /** `setSheetFreeze`. */
   readonly freeze: boolean;
   /** `getSheetView` readback for zoom, frozen panes, and tab visibility. */
@@ -469,6 +586,10 @@ export interface EngineCapabilities {
   readonly functionMetadata: boolean;
   /** `localizeFunctionName` + `canonicalizeFunctionName` round-trip. */
   readonly functionLocale: boolean;
+  /** Full formula text localization and canonicalization. */
+  readonly formulaLocale?: boolean;
+  /** `localeFacts` scalar profile facts readback. */
+  readonly localeFacts?: boolean;
   /** `calcMode` + `setCalcMode` round-trip metadata for `<calcPr>`. */
   readonly calcMode: boolean;
   /** Workbook formula-behaviour host profile. */

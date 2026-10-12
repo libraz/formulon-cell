@@ -9,9 +9,60 @@ import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
 import type { CellFormat, State } from '../../store/store.js';
 import { formatNumber } from '../format.js';
+import type { ClipboardFormatResolver } from './snapshot.js';
 
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const splitFontFamily = (family: string): string[] => {
+  const parts: string[] = [];
+  let start = 0;
+  let quote = '';
+  let depth = 0;
+  for (let i = 0; i < family.length; i += 1) {
+    const ch = family[i] ?? '';
+    if (quote) {
+      if (ch === quote && family[i - 1] !== '\\') quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '(') depth += 1;
+    else if (ch === ')' && depth > 0) depth -= 1;
+    else if (ch === ',' && depth === 0) {
+      parts.push(family.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(family.slice(start).trim());
+  return parts.filter(Boolean);
+};
+
+/** Keep a family name inside one CSS token before the style attribute is
+ * HTML-escaped. This preserves ordinary stacks (`Arial, sans-serif`) while
+ * making quotes, angle brackets, and declaration separators data. */
+const cssString = (value: string): string =>
+  `"${value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replace(/\r\n?|\n/g, '\\A ')
+    .replaceAll('<', '\\3C ')
+    .replaceAll('>', '\\3E ')}"`;
+
+const safeFontFamily = (family: string): string =>
+  splitFontFamily(family)
+    .map((part) => {
+      const unquoted =
+        part.length >= 2 &&
+        ((part.startsWith('"') && part.endsWith('"')) ||
+          (part.startsWith("'") && part.endsWith("'")))
+          ? part.slice(1, -1)
+          : part;
+      return /^[a-zA-Z][a-zA-Z0-9-]*$/.test(unquoted) ? unquoted : cssString(unquoted);
+    })
+    .join(', ');
 
 const MAX_HTML_CLIPBOARD_CELLS = 1_000_000;
 
@@ -27,13 +78,18 @@ const styleOf = (fmt: CellFormat | undefined): string => {
   if (fmt.color) parts.push(`color:${fmt.color}`);
   if (fmt.fill) parts.push(`background-color:${fmt.fill}`);
   if (fmt.align) parts.push(`text-align:${fmt.align}`);
-  if (fmt.fontFamily) parts.push(`font-family:${fmt.fontFamily}`);
+  if (fmt.fontFamily) parts.push(`font-family:${safeFontFamily(fmt.fontFamily)}`);
   if (fmt.fontSize) parts.push(`font-size:${fmt.fontSize}px`);
   return parts.join(';');
 };
 
 /** Render the range as an HTML `<table>` with inline styles. */
-export function encodeHtml(state: State, range: Range): string {
+export function encodeHtml(
+  state: State,
+  range: Range,
+  locale?: string,
+  formatResolver?: ClipboardFormatResolver,
+): string {
   const rowsCount = range.r1 - range.r0 + 1;
   const colsCount = range.c1 - range.c0 + 1;
   if (rowsCount <= 0 || colsCount <= 0) return '<table></table>';
@@ -71,7 +127,9 @@ export function encodeHtml(state: State, range: Range): string {
       const key = addrKey({ sheet: range.sheet, row: r, col: c });
       if (coveredByMerge.has(key)) continue;
       const cell = state.data.cells.get(key);
-      const fmt = state.format.formats.get(key);
+      const fmt = formatResolver
+        ? formatResolver({ sheet: range.sheet, row: r, col: c })
+        : state.format.formats.get(key);
       // Formula cells emit their formula text verbatim (`=...`); Excel and
       //  Sheets parse `=`-prefixed cell content on paste and rebuild the
       //  formula rather than freezing the last computed value.
@@ -82,10 +140,10 @@ export function encodeHtml(state: State, range: Range): string {
           : cell.value.kind === 'blank'
             ? (fmt?.hyperlinkDisplay ?? '')
             : cell.value.kind === 'number' && fmt?.numFmt
-              ? formatNumber(cell.value.value, fmt.numFmt)
-              : formatCell(cell.value);
-      const style = styleOf(fmt);
-      const styleAttr = style ? ` style="${style}"` : '';
+              ? formatNumber(cell.value.value, fmt.numFmt, locale)
+              : formatCell(cell.value, locale);
+      const style = styleOf(fmt ?? undefined);
+      const styleAttr = style ? ` style="${escapeHtml(style)}"` : '';
       const body = fmt?.hyperlink
         ? `<a href="${escapeHtml(fmt.hyperlink)}">${escapeHtml(text)}</a>`
         : escapeHtml(text);

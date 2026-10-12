@@ -463,6 +463,38 @@ describe('Spreadsheet.mountToolbar', () => {
     window.open = originalOpen;
   });
 
+  it('disables unsafe link opening while keeping removal available', () => {
+    setHyperlink(
+      sheet.instance.store,
+      { sheet: 0, row: 0, col: 0 },
+      'javascript:void(0)',
+      sheet.workbook,
+    );
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    try {
+      tb.dropdownsApi?.openDynamicRibbonDropdown({
+        command: 'linksData',
+        menuId: 'menu-links-data',
+      });
+      const open = host.querySelector<HTMLButtonElement>(
+        '#menu-links-data [data-link-action="open"]',
+      );
+      const clear = host.querySelector<HTMLButtonElement>(
+        '#menu-links-data [data-link-action="clear"]',
+      );
+      expect(open?.disabled).toBe(true);
+      expect(open?.dataset.menuDisabledReason).toBe(
+        sheet.instance.i18n.strings.ribbonMenu.linkUnsupportedTarget,
+      );
+      expect(clear?.disabled).toBe(false);
+    } finally {
+      tb.dispose();
+    }
+  });
+
   it('opens Name Manager from primary click and keeps Define Name secondary', async () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,

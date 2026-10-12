@@ -1,5 +1,7 @@
 import {
+  canonicalizeLocalizedFormulaForInput,
   coerceInputForCell,
+  inputLocaleForWorkbook,
   validateCoercedInput,
   writeCoerced,
   writeInputValidated,
@@ -140,6 +142,13 @@ export function writeSelectionInput(
   if (totalCells > MAX_SELECTION_INPUT_CELLS) return { status: 'limitExceeded' };
   const sheet = state.data.sheetIndex;
   const isFormula = raw.startsWith('=');
+  const inputLocale = inputLocaleForWorkbook(wb);
+  // Localize function aliases once, before relative references are shifted for
+  // each destination. The resulting plan is canonical and can be replayed by
+  // the workbook adapter without depending on the active display profile.
+  const canonicalFormula = isFormula
+    ? canonicalizeLocalizedFormulaForInput(wb, raw, inputLocale)
+    : raw;
 
   // Preflight: plan every write and validate value targets before touching the workbook.
   const plan: { target: Addr; formula?: string }[] = [];
@@ -152,7 +161,10 @@ export function writeSelectionInput(
           : state.format.formats.get(addrKey(target));
         if (isFormula && fmt?.numFmt?.kind !== 'text') {
           // Formula results aren't run through DV (Excel validates the typed entry).
-          plan.push({ target, formula: shiftFormulaRefs(raw, row - anchor.row, col - anchor.col) });
+          plan.push({
+            target,
+            formula: shiftFormulaRefs(canonicalFormula, row - anchor.row, col - anchor.col),
+          });
           continue;
         }
         plan.push({ target });
@@ -160,7 +172,7 @@ export function writeSelectionInput(
         const outcome = validateCoercedInput(
           wb,
           target,
-          coerceInputForCell(state, target, raw),
+          coerceInputForCell(state, target, raw, inputLocale, wb),
           fmt.validation,
         );
         if (!outcome.ok && outcome.severity === 'stop') {
@@ -182,7 +194,7 @@ export function writeSelectionInput(
     for (const { target, formula } of plan) {
       if (formula === undefined) {
         // Already validated; this applies protection, coercion and implicit formats.
-        writeInputValidated(wb, target, raw, undefined, store);
+        writeInputValidated(wb, target, raw, undefined, store, inputLocale);
         continue;
       }
       try {

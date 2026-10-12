@@ -1,5 +1,4 @@
 import { type CopyResult, copy } from '../commands/clipboard/copy.js';
-import { cut } from '../commands/clipboard/cut.js';
 import { encodeHtml } from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import {
@@ -12,11 +11,13 @@ import {
   captureSnapshotFromCopyResult,
 } from '../commands/clipboard/snapshot.js';
 import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
+import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { addrKey } from '../engine/address.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Range } from '../engine/types.js';
-import { formatCell } from '../engine/value.js';
+import { formatBoolean, formatCell, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { navigationBoundsFor } from './navigation-policy.js';
@@ -74,8 +75,23 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     ),
   });
 
-  const valueOnlyText = (source: ClipboardSnapshot): string =>
-    encodeTSV(source.cells.map((row) => row.map((cell) => formatCell(cell.value))));
+  const valueOnlyText = (source: ClipboardSnapshot): string => {
+    const locale = inputLocaleForWorkbook(wb);
+    return encodeTSV(
+      source.cells.map((row) =>
+        row.map((cell) => {
+          switch (cell.value.kind) {
+            case 'number':
+              return formatEditableNumber(cell.value.value, locale);
+            case 'bool':
+              return formatBoolean(cell.value.value, locale);
+            default:
+              return formatCell(cell.value, locale);
+          }
+        }),
+      ),
+    );
+  };
 
   const isWithinNavigationBounds = (range: Range | null): boolean => {
     if (!range) return false;
@@ -263,9 +279,20 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         layout: sourceLayout,
         selection: { ...state.selection, range: { ...ui.copyRange }, extraRanges: [] },
       };
-      const materialized = copy(sourceState);
+      const materialized = copy(
+        sourceState,
+        inputLocaleForWorkbook(wb),
+        localizeFormulaForClipboard(wb),
+      );
       const refreshed = materialized
-        ? captureSnapshotFromCopyResult(sourceState, materialized, 'copy')
+        ? captureSnapshotFromCopyResult(
+            sourceState,
+            materialized,
+            'copy',
+            wb.capabilities.effectiveStyle && !wb.isStub
+              ? (addr) => effectiveCellFormatWithPending(wb, sourceState, addr)
+              : (addr) => sourceState.format.formats.get(addrKey(addr)),
+          )
         : null;
       // Keep snapshotText untouched: it is the system clipboard token that
       // proves this is still the workbook's internal payload. Only the
@@ -303,16 +330,23 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   };
   const materializedRanges = (result: CopyResult): Range[] =>
     result.payloadRanges ?? [result.range];
+  const formatResolverFor =
+    (sourceState: State) => (addr: { sheet: number; row: number; col: number }) =>
+      wb.capabilities.effectiveStyle && !wb.isStub
+        ? effectiveCellFormatWithPending(wb, sourceState, addr)
+        : sourceState.format.formats.get(addrKey(addr));
   const captureMaterializedSnapshot = (
     state: State,
     result: CopyResult,
     mode: 'copy' | 'cut',
   ): ClipboardSnapshot | null => {
-    return captureSnapshotFromCopyResult(state, result, mode);
+    return captureSnapshotFromCopyResult(state, result, mode, formatResolverFor(state));
   };
   const encodeMaterializedHtml = (state: State, result: CopyResult): string =>
     materializedRanges(result)
-      .map((range) => encodeHtml(state, range))
+      .map((range) =>
+        encodeHtml(state, range, inputLocaleForWorkbook(wb), formatResolverFor(state)),
+      )
       .join('');
   const hasPastePayload = (text: string): boolean =>
     text.length > 0 ||
@@ -329,8 +363,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         extraRanges: [],
       },
     };
-    const result = copy(captureState);
-    return result ? captureSnapshotFromCopyResult(captureState, result) : null;
+    const result = copy(captureState, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
+    return result
+      ? captureSnapshotFromCopyResult(captureState, result, 'copy', formatResolverFor(captureState))
+      : null;
   };
 
   /** A cut can only be pasted once, so its marquee is consumed by the paste.
@@ -392,7 +428,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       e.preventDefault();
       return;
     }
-    const r = copy(s);
+    const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
     if (!r || !e.clipboardData) {
       snapshot = null;
       snapshotText = null;
@@ -420,7 +456,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       e.preventDefault();
       return;
     }
-    const r = cut(s, wb);
+    const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
     if (!r || !e.clipboardData) {
       snapshot = null;
       snapshotText = null;
@@ -491,7 +527,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (kind === 'copy') {
       const controller = interactionControllerFor(store);
       if (controller?.policy?.copy === false) return;
-      const r = copy(s);
+      const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
       if (!r) {
         snapshot = null;
         snapshotText = null;
@@ -510,7 +546,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     }
     if (kind === 'cut') {
       if (isRestricted()) return;
-      const r = cut(s, wb);
+      const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
       if (!r) {
         snapshot = null;
         snapshotText = null;

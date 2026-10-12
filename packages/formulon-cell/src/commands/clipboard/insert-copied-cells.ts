@@ -9,11 +9,24 @@ import {
   sameRange,
 } from '../../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore, type State } from '../../store/store.js';
-import { canShiftMerges, shiftCells, shiftFormats, shiftMerges } from '../cell-shift.js';
-import { coerceInputForCell, writeCoerced } from '../coerce-input.js';
+import {
+  canShiftMerges,
+  captureShiftReplayCheckpoint,
+  restoreShiftReplayCheckpoint,
+  type ShiftHistoryReplayRecovery,
+  shiftCellsWithHistory,
+  shiftFormats,
+  shiftMerges,
+} from '../cell-shift.js';
+import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from '../coerce-input.js';
 import type { History } from '../history.js';
 import { blockedByProtection, isCellWritable, isSheetProtected } from '../protection.js';
-import { insertCols, insertRows } from '../structure.js';
+import {
+  createStructureReplayCheckpointRef,
+  insertCols,
+  insertRows,
+  type StructureReplayCheckpointRef,
+} from '../structure.js';
 import {
   cloneCellFormat,
   commentsFitAfterInsert,
@@ -61,6 +74,7 @@ export function insertCopiedCellsFromTSV(
   if (height * width > MAX_INSERT_COPIED_CELLS) return null;
 
   const state = store.getState();
+  const inputLocale = inputLocaleForWorkbook(wb);
   const origin = state.selection.active;
   const sheet = origin.sheet;
   if (blockedByProtection(store, sheet, 'insert copied cells')) return null;
@@ -87,9 +101,24 @@ export function insertCopiedCellsFromTSV(
     return null;
   }
 
-  if (history) history.begin();
+  const replayRecovery: ShiftHistoryReplayRecovery = {};
+  if (history && !history.isReplaying()) {
+    replayRecovery.capture = () => captureShiftReplayCheckpoint(wb, store, affected);
+  }
+  const transaction = history?.begin();
+  let transactionClosed = false;
   try {
-    shiftCells(wb, affected, direction, direction === 'down' ? height : width);
+    if (
+      !shiftCellsWithHistory(
+        wb,
+        history,
+        affected,
+        direction,
+        direction === 'down' ? height : width,
+        replayRecovery,
+      )
+    )
+      return null;
     shiftFormats(store, history, affected, direction, direction === 'down' ? height : width);
     shiftMerges(store, wb, history, affected, direction, direction === 'down' ? height : width);
 
@@ -103,14 +132,49 @@ export function insertCopiedCellsFromTSV(
         for (let c = 0; c < cells.length; c += 1) {
           const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
           if (!isCellWritable(store.getState(), addr)) continue;
-          writeCoerced(wb, addr, coerceInputForCell(store.getState(), addr, cells[c] ?? ''));
+          writeCoerced(
+            wb,
+            addr,
+            coerceInputForCell(store.getState(), addr, cells[c] ?? '', inputLocale, wb),
+          );
         }
       }
     });
     copySnapshotMerges(store, wb, history, origin, snapshot);
     wb.recalcAuto();
+    if (history && !history.isReplaying()) {
+      replayRecovery.restore = (phase) => {
+        const checkpoint = phase === 'undo' ? replayRecovery.after : replayRecovery.before;
+        if (!checkpoint)
+          throw new Error(`insert copied cells: ${phase} replay checkpoint was not armed`);
+        restoreShiftReplayCheckpoint(wb, store, affected, checkpoint);
+      };
+      history.push({
+        undo: () => {
+          replayRecovery.after = replayRecovery.capture?.();
+        },
+        redo: () => {
+          replayRecovery.before = undefined;
+          replayRecovery.after = undefined;
+        },
+      });
+    }
+  } catch (error) {
+    if (transaction !== undefined) {
+      transactionClosed = true;
+      try {
+        history?.abort(transaction);
+      } catch (abortError) {
+        throw new AggregateError(
+          [error, abortError],
+          'insert copied cells: initial transaction rollback failed',
+          { cause: error },
+        );
+      }
+    }
+    throw error;
   } finally {
-    if (history) history.end();
+    if (transaction !== undefined && !transactionClosed) history?.end(transaction);
   }
 
   return {
@@ -290,11 +354,16 @@ export function insertCopiedBand(
   // the native operation result. The cheap checks above keep failures before
   // the mutation path; the boolean result prevents a paste after a failed
   // native insert.
-  if (history) history.begin();
+  const structureReplayCheckpoint: StructureReplayCheckpointRef | undefined =
+    history && !history.isReplaying()
+      ? createStructureReplayCheckpointRef(store, wb, targetSheet)
+      : undefined;
+  const transaction = history?.begin();
+  let transactionClosed = false;
   try {
     const inserted = wholeRows
-      ? insertRows(store, wb, history, insertionAt, count)
-      : insertCols(store, wb, history, insertionAt, count);
+      ? insertRows(store, wb, history, insertionAt, count, structureReplayCheckpoint)
+      : insertCols(store, wb, history, insertionAt, count, structureReplayCheckpoint);
     if (!inserted) return null;
 
     const refreshed = refreshCopiedBandSnapshot(
@@ -335,9 +404,39 @@ export function insertCopiedBand(
     );
     if (!pasted) throw new Error('formulon-cell: copied band paste failed after structural insert');
     mutators.setRange(store, band);
+    if (history && structureReplayCheckpoint) {
+      // This is the outer transaction's final child. The structure native
+      // child shares this handle, so a later paste child cannot leave native
+      // replay recovery armed with an intermediate post-structure snapshot.
+      history.push({
+        undo: () => {
+          structureReplayCheckpoint.after = structureReplayCheckpoint.capture?.();
+          if (!structureReplayCheckpoint.after)
+            throw new Error('formulon-cell: copied band undo checkpoint was not captured');
+        },
+        redo: () => {
+          structureReplayCheckpoint.before = undefined;
+          structureReplayCheckpoint.after = undefined;
+        },
+      });
+    }
     return { writtenRange: band };
+  } catch (error) {
+    if (transaction !== undefined) {
+      transactionClosed = true;
+      try {
+        history?.abort(transaction);
+      } catch (abortError) {
+        throw new AggregateError(
+          [error, abortError],
+          'formulon-cell: copied band initial transaction rollback failed',
+          { cause: error },
+        );
+      }
+    }
+    throw error;
   } finally {
-    if (history) history.end();
+    if (transaction !== undefined && !transactionClosed) history?.end(transaction);
   }
 }
 

@@ -82,6 +82,63 @@ describe('InteractionController', () => {
     expect(history.canUndo()).toBe(false);
   });
 
+  it('uses the live workbook profile when preparing cell batch input', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await WorkbookHandle.createDefault();
+    const history = new History();
+    const service = new InteractionController({ store, getWb: () => wb, history });
+    try {
+      expect(wb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
+
+      const result = service.execute(edit(A1, '1,25'));
+
+      expect(result.status).toBe('applied');
+      expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 1.25 });
+    } finally {
+      service.dispose();
+      wb.dispose();
+    }
+  });
+
+  it.each([
+    ['windows-de_DE', '=SUMME(1,5;2)'],
+    ['windows-fr_FR', '=SOMME(1,5;2)'],
+  ] as const)(
+    'canonicalizes raw localized input while preserving typed canonical formulas (%s)',
+    async (profile, raw) => {
+      const store = createSpreadsheetStore();
+      const wb = await WorkbookHandle.createDefault();
+      const history = new History();
+      const service = new InteractionController({ store, getWb: () => wb, history });
+      try {
+        expect(wb.isStub).toBe(false);
+        expect(wb.capabilities.formulaLocale).toBe(true);
+        expect(wb.capabilities.localeFacts).toBe(true);
+        expect(wb.setSpreadsheetProfileId(profile)).toBe(true);
+
+        const result = service.execute({
+          type: 'cellBatch',
+          operation: 'valueEdit',
+          origin: 'editor',
+          changes: [
+            { addr: A1, input: raw },
+            { addr: B1, value: { kind: 'number', value: 3.5 }, formula: '=SUM(1.5,2)' },
+          ],
+        });
+
+        expect(result.status).toBe('applied');
+        expect(result.applied).toEqual([A1, B1]);
+        expect(wb.cellFormula(A1)).toBe('=SUM(1.5,2)');
+        expect(wb.cellFormula(B1)).toBe('=SUM(1.5,2)');
+        expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 3.5 });
+        expect(wb.getValue(B1)).toEqual({ kind: 'number', value: 3.5 });
+      } finally {
+        service.dispose();
+        wb.dispose();
+      }
+    },
+  );
+
   it('supports reject and explicit skip modes for mixed fixed-form paste', async () => {
     const { controller: service, workbook: wb } = await createController();
     service.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }] }));

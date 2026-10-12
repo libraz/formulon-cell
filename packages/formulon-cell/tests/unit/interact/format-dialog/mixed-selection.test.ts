@@ -237,12 +237,12 @@ describe('attachFormatDialog', () => {
         document
           .querySelector<HTMLButtonElement>('[data-fc-font-size="18"]')
           ?.getAttribute('aria-selected'),
-      ).toBe('true');
+      ).toBe('false');
       expect(
         [...document.querySelectorAll<HTMLButtonElement>('[data-fc-font-size]')].filter(
           (item) => item.getAttribute('aria-selected') === 'true',
         ),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
     } finally {
       handle.detach();
     }

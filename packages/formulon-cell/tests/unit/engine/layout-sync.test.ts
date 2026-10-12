@@ -15,12 +15,15 @@ interface FakeColLayout {
   width: number;
   hidden: boolean;
   outlineLevel: number;
+  hasWidth?: boolean;
 }
 interface FakeRowLayout {
   row: number;
   height: number;
   hidden: boolean;
   outlineLevel: number;
+  hasHeight?: boolean;
+  customHeight?: boolean;
 }
 
 interface SetColCall {
@@ -33,6 +36,10 @@ interface SetRowCall {
   sheet: number;
   row: number;
   height: number;
+}
+interface ClearRowCall {
+  sheet: number;
+  row: number;
 }
 interface SetFreezeCall {
   sheet: number;
@@ -89,6 +96,7 @@ interface FakeWb {
   visibilityCalls: SetVisibilityCall[];
   colCalls: SetColCall[];
   rowCalls: SetRowCall[];
+  clearRowCalls: ClearRowCall[];
   freezeCalls: SetFreezeCall[];
   colHiddenCalls: SetColHiddenCall[];
   rowHiddenCalls: SetRowHiddenCall[];
@@ -105,14 +113,18 @@ const makeFake = (opts: {
   outlines?: boolean;
   sheetTabHidden?: boolean;
   sheetVisibility?: boolean;
+  geometry?: boolean;
+  rowHeightClear?: boolean;
   sheetCount?: number;
   cols?: FakeColLayout[];
   rows?: FakeRowLayout[];
   view?: FakeSheetView | null;
   views?: Record<number, FakeSheetView>;
+  defaults?: { defaultColWidth: number; defaultRowHeight: number } | null;
 }): FakeWb => {
   const colCalls: SetColCall[] = [];
   const rowCalls: SetRowCall[] = [];
+  const clearRowCalls: ClearRowCall[] = [];
   const freezeCalls: SetFreezeCall[] = [];
   const colHiddenCalls: SetColHiddenCall[] = [];
   const rowHiddenCalls: SetRowHiddenCall[] = [];
@@ -130,10 +142,13 @@ const makeFake = (opts: {
       outlines: opts.outlines ?? false,
       sheetTabHidden: opts.sheetTabHidden ?? false,
       sheetVisibility: opts.sheetVisibility ?? false,
+      geometry: opts.geometry ?? false,
+      rowHeightClear: opts.rowHeightClear ?? false,
     },
     sheetCount: opts.sheetCount ?? 1,
     getColumnLayouts: () => opts.cols ?? [],
     getRowLayouts: () => opts.rows ?? [],
+    getSheetDefaultLayoutPx: () => opts.defaults ?? null,
     getSheetView: (sheet: number) => opts.views?.[sheet] ?? opts.view ?? null,
     setColumnWidth: (sheet: number, first: number, last: number, width: number) => {
       colCalls.push({ sheet, first, last, width });
@@ -142,6 +157,10 @@ const makeFake = (opts: {
     setRowHeight: (sheet: number, row: number, height: number) => {
       rowCalls.push({ sheet, row, height });
       return opts.colRowSize;
+    },
+    clearRowHeight: (sheet: number, row: number) => {
+      clearRowCalls.push({ sheet, row });
+      return opts.rowHeightClear ?? false;
     },
     setSheetFreeze: (sheet: number, freezeRows: number, freezeCols: number) => {
       freezeCalls.push({ sheet, freezeRows, freezeCols });
@@ -178,6 +197,7 @@ const makeFake = (opts: {
     visibilityCalls,
     colCalls,
     rowCalls,
+    clearRowCalls,
     freezeCalls,
     colHiddenCalls,
     rowHiddenCalls,
@@ -219,6 +239,34 @@ describe('hydrateLayoutFromEngine', () => {
     // width=0 / height=0 must NOT seed a size override.
     expect(s.layout.colWidths.has(4)).toBe(false);
     expect(s.layout.rowHeights.has(3)).toBe(false);
+  });
+
+  it('hydrates sheet defaults and skips hidden-only axis size records', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeFake({
+      colRowSize: true,
+      defaults: { defaultColWidth: 71, defaultRowHeight: 22 },
+      cols: [
+        { first: 0, last: 0, width: 96, hidden: false, outlineLevel: 0, hasWidth: true },
+        { first: 1, last: 1, width: 0, hidden: true, outlineLevel: 2, hasWidth: false },
+      ],
+      rows: [
+        { row: 0, height: 31, hidden: false, outlineLevel: 0, hasHeight: true },
+        { row: 1, height: 20, hidden: true, outlineLevel: 1, hasHeight: false },
+      ],
+    });
+
+    hydrateLayoutFromEngine(wb, store, 0);
+
+    const { layout } = store.getState();
+    expect(layout.defaultColWidth).toBe(71);
+    expect(layout.defaultRowHeight).toBe(22);
+    expect(layout.colWidths.get(0)).toBe(96);
+    expect(layout.colWidths.has(1)).toBe(false);
+    expect(layout.rowHeights.get(0)).toBe(31);
+    expect(layout.rowHeights.has(1)).toBe(false);
+    expect(layout.hiddenCols.has(1)).toBe(true);
+    expect(layout.hiddenRows.has(1)).toBe(true);
   });
 
   it('is a no-op under the stub (capability off, empty engine arrays)', () => {
@@ -307,9 +355,9 @@ describe('hydrateLayoutFromEngine', () => {
     expect(store.getState().ui.rightToLeft).toBe(true);
   });
 
-  it('leaves zoom at 1.0 when engine reports the default 100%', () => {
+  it('resets a previous zoom when the engine reports the default 100%', () => {
     const store = createSpreadsheetStore();
-    const initialZoom = store.getState().viewport.zoom;
+    store.setState((s) => ({ ...s, viewport: { ...s.viewport, zoom: 2.5 } }));
     const { wb } = makeFake({
       colRowSize: false,
       sheetView: true,
@@ -317,7 +365,7 @@ describe('hydrateLayoutFromEngine', () => {
       view: { zoomScale: 100, freezeRows: 0, freezeCols: 0, tabHidden: false },
     });
     hydrateLayoutFromEngine(wb, store, 0);
-    expect(store.getState().viewport.zoom).toBe(initialZoom);
+    expect(store.getState().viewport.zoom).toBe(1);
   });
 
   it('clamps engine zoom into the store-supported range', () => {
@@ -401,6 +449,51 @@ describe('syncLayoutSizesToEngine', () => {
     syncLayoutSizesToEngine(wb, store.getState().layout, 1, before, after);
     expect(colCalls).toEqual([{ sheet: 1, first: 0, last: 0, width: 150 }]);
     expect(rowCalls).toEqual([{ sheet: 1, row: 3, height: 50 }]);
+  });
+
+  it('clears a removed row override on adapters with row-height clear', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, rowHeights: new Map([[3, 50]]) },
+    }));
+    const before = captureLayoutSnapshot(store.getState());
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, rowHeights: new Map() },
+    }));
+    const after = captureLayoutSnapshot(store.getState());
+    const { wb, rowCalls, clearRowCalls } = makeFake({
+      colRowSize: true,
+      rowHeightClear: true,
+    });
+
+    syncLayoutSizesToEngine(wb, store.getState().layout, 0, before, after);
+
+    expect(clearRowCalls).toEqual([{ sheet: 0, row: 3 }]);
+    expect(rowCalls).toEqual([]);
+  });
+
+  it('keeps the default-height write fallback for old adapters', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, rowHeights: new Map([[3, 50]]) },
+    }));
+    const before = captureLayoutSnapshot(store.getState());
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, rowHeights: new Map() },
+    }));
+    const after = captureLayoutSnapshot(store.getState());
+    const { wb, rowCalls, clearRowCalls } = makeFake({ colRowSize: true });
+
+    syncLayoutSizesToEngine(wb, store.getState().layout, 0, before, after);
+
+    expect(clearRowCalls).toEqual([]);
+    expect(rowCalls).toEqual([
+      { sheet: 0, row: 3, height: store.getState().layout.defaultRowHeight },
+    ]);
   });
 });
 

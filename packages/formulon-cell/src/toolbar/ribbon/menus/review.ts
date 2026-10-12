@@ -7,7 +7,7 @@ import { createMenu, menuIconButton, menuIdForCommand, menuSeparator } from './g
 
 export interface ReviewMenuFactories {
   createWatchMenu: (id: string) => HTMLDivElement;
-  createReviewCommentsMenu: () => HTMLDivElement;
+  createReviewCommentsMenu: (id?: string) => HTMLDivElement;
   createProtectMenu: (id: string) => HTMLDivElement;
 }
 
@@ -26,8 +26,10 @@ export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): Revi
     return menu;
   };
 
-  const createReviewCommentsMenu = (): HTMLDivElement => {
-    const menu = createMenu('menu-review-comments');
+  const createReviewCommentsMenu = (id = 'menu-review-comments'): HTMLDivElement => {
+    const menu = createMenu(id);
+    menu.append(menuIconButton(t.commentThread, 'commentAction', 'thread', 'comment-add'));
+    if (id === 'menu-review-new-comment') return menu;
     menu.append(
       menuIconButton(t.commentDelete, 'commentAction', 'delete-active', 'comment-delete'),
       menuIconButton(t.commentDeleteAll, 'commentAction', 'delete-all', 'comment-delete-all'),

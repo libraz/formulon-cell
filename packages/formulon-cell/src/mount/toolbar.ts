@@ -1,5 +1,6 @@
 import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
+import { attachRibbonScreenTips } from '../interact/ribbon-screen-tip.js';
 import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
 
 // `Spreadsheet.mountToolbar` — public entry that wires the ribbon into a host
@@ -51,6 +52,7 @@ import {
   type DynamicDropdownsCtx,
   ribbonDropdownMenuIdForCommand,
 } from '../toolbar/ribbon/dynamic-dropdowns.js';
+import { attachRibbonFit } from '../toolbar/ribbon/fit-ribbon.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { projectMacRibbonState } from '../toolbar/ribbon/mac/model.js';
 import {
@@ -286,6 +288,7 @@ export function mountToolbar(
       : () => instance;
   const initialInstance = getInstance();
   const previousPlatform = host.dataset.fcPlatform;
+  const previousLanguage = host.getAttribute('lang');
   const inheritedPlatform =
     host.dataset.fcPlatform ??
     host.closest<HTMLElement>('.fc-host')?.dataset.fcPlatform ??
@@ -306,11 +309,19 @@ export function mountToolbar(
   // is attached lazily on the first call to `attachStoreSubscription`.
   const unregisterOverlayOwner = registerOverlayOwner(host, () => getInstance()?.host ?? null);
 
-  const lang: ToolbarLang =
+  const langOverride = opts.lang;
+  let lang: ToolbarLang =
     opts.lang ?? (initialInstance ? toolbarLangForLocale(initialInstance.i18n.locale) : 'ja');
-  const text = opts.text ?? toolbarText(lang);
-  const menuText = opts.menuText ?? toolbarMenuText(lang);
-  const displayOptionsText = ribbonDisplayText(lang);
+  host.lang = lang;
+  const screenTips = attachRibbonScreenTips({
+    host,
+    getSheetHost: () => getInstance()?.host,
+    getPlatform: () => platform,
+  });
+  const ribbonFit = attachRibbonFit(host);
+  let text = opts.text ?? toolbarText(lang);
+  let menuText = opts.menuText ?? toolbarMenuText(lang);
+  let displayOptionsText = ribbonDisplayText(lang);
 
   let activeTab: RibbonTab = opts.activeTab ?? 'home';
   let displayMode: RibbonDisplayMode =
@@ -338,7 +349,10 @@ export function mountToolbar(
   const refreshCells = opts.refreshCells ?? ((): void => undefined);
   const refreshZoom = opts.refreshZoom ?? ((): void => undefined);
   const projectFormatToolbar = (): void => {
-    projectRibbonActiveState(host, getInstance());
+    projectRibbonActiveState(host, getInstance(), {
+      background: text.background,
+      sheetBackgroundClear: menuText.sheetBackgroundClear,
+    });
     const instance = getInstance();
     if (instance && platform === 'mac') {
       projectMacFunctionMenus(host, instance, lang);
@@ -365,51 +379,57 @@ export function mountToolbar(
     renderToolbar();
   };
 
-  // Defaults are derived once at mount time. They close over the live
-  // `borderStyle/borderColor` via getters so the borders submenu always
-  // picks the most recent value. The host may still override individual
-  // helpers/menus/hooks by spreading on top.
+  // Defaults are rebuilt when the instance locale changes. They close over
+  // the live `borderStyle/borderColor` via getters so the borders submenu
+  // always picks the most recent value. The host may still override
+  // individual helpers/menus/hooks by spreading on top.
   const defaultsInstance = initialInstance;
-  const defaultHelpers: RibbonRenderHelpers | null = defaultsInstance
-    ? createDefaultRibbonHelpers(defaultsInstance, {
-        lang,
-        focusSheet,
-        refreshCells,
-        projectFormatToolbar,
-      })
-    : null;
-  const defaultMenus: RibbonMenus = defaultsInstance
-    ? createDefaultRibbonMenus(defaultsInstance, {
-        lang,
-        getBorderColor: () => borderColor,
-        setBorderColor: (color) => {
-          borderColor = color;
-          defaultsInstance.borderDraw?.setColor(color);
-        },
-      })
-    : {};
-  const defaultHooks: RibbonHooks = defaultsInstance
-    ? createDefaultRibbonHooks(defaultsInstance, { lang, refreshZoom })
-    : {};
+  let mergedHelpers: RibbonRenderHelpers;
+  let mergedMenus: RibbonMenus;
+  let mergedHooks: RibbonHooks;
+  const rebuildLocalizedDefaults = (): void => {
+    const defaultHelpers: RibbonRenderHelpers | null = defaultsInstance
+      ? createDefaultRibbonHelpers(defaultsInstance, {
+          lang,
+          focusSheet,
+          refreshCells,
+          projectFormatToolbar,
+        })
+      : null;
+    const defaultMenus: RibbonMenus = defaultsInstance
+      ? createDefaultRibbonMenus(defaultsInstance, {
+          lang,
+          getBorderColor: () => borderColor,
+          setBorderColor: (color) => {
+            borderColor = color;
+            defaultsInstance.borderDraw?.setColor(color);
+          },
+        })
+      : {};
+    const defaultHooks: RibbonHooks = defaultsInstance
+      ? createDefaultRibbonHooks(defaultsInstance, { lang, refreshZoom })
+      : {};
 
-  const mergedHelpers: RibbonRenderHelpers = {
-    ...(defaultHelpers ?? {}),
-    ...(opts.helpers ?? {}),
-  } as RibbonRenderHelpers;
-  const mergedMenus: RibbonMenus = { ...defaultMenus, ...(opts.menus ?? {}) };
-  // Hooks merge: per-category shallow merge so the host can extend (not
-  // replace) any single group. Categories the host doesn't mention keep the
-  // defaults; categories it does mention spread on top of the default ones.
-  const mergedHooks: RibbonHooks = { ...defaultHooks };
-  if (opts.hooks) {
-    for (const key of Object.keys(opts.hooks) as (keyof RibbonHooks)[]) {
-      const hostGroup = opts.hooks[key];
-      if (!hostGroup) continue;
-      const defaultGroup = mergedHooks[key];
-      // biome-ignore lint/suspicious/noExplicitAny: index access onto union
-      (mergedHooks as any)[key] = { ...(defaultGroup ?? {}), ...hostGroup };
+    mergedHelpers = {
+      ...(defaultHelpers ?? {}),
+      ...(opts.helpers ?? {}),
+    } as RibbonRenderHelpers;
+    mergedMenus = { ...defaultMenus, ...(opts.menus ?? {}) };
+    // Hooks merge: per-category shallow merge so the host can extend (not
+    // replace) any single group. Categories the host doesn't mention keep the
+    // defaults; categories it does mention spread on top of the default ones.
+    mergedHooks = { ...defaultHooks };
+    if (opts.hooks) {
+      for (const key of Object.keys(opts.hooks) as (keyof RibbonHooks)[]) {
+        const hostGroup = opts.hooks[key];
+        if (!hostGroup) continue;
+        const defaultGroup = mergedHooks[key];
+        // biome-ignore lint/suspicious/noExplicitAny: index access onto union
+        (mergedHooks as any)[key] = { ...(defaultGroup ?? {}), ...hostGroup };
+      }
     }
-  }
+  };
+  rebuildLocalizedDefaults();
 
   // Auto-wire the default dynamic-dropdowns delegation when the host opts in;
   // dispose detaches its document listeners so they do not leak across re-mounts.
@@ -430,31 +450,33 @@ export function mountToolbar(
     dropdownsApi = dropdownsDelegation.api;
   }
 
-  const renderApi = createRenderRibbon({
-    getInst: getInstance,
-    ribbonLang: lang,
-    ribbonText: text,
-    ribbonMenuText: menuText,
-    ribbonDisplayOptionsText: displayOptionsText,
-    getProfile: () => (platform === 'mac' ? 'excel365Mac' : 'default'),
-    get ribbonTabs() {
-      return defaultRibbonTabs;
-    },
-    ribbonRoot: host,
-    state: {
-      getActiveTab: () => activeTab,
-      getCollapsed: () => isCollapsedMode(),
-      getDisplayMode: () => displayMode,
-      getAutoHidePeek: () => ribbonPeek,
-      getBackstageOpen: () => backstageOpen,
-      getDisplayMenuOpen: () => displayMenuOpen,
-      getFormulaBarVisible: () => formulaBarVisible,
-    },
-    helpers: mergedHelpers,
-    menus: mergedMenus,
-    createBackstageView: opts.createBackstageView ?? (() => document.createElement('div')),
-    projectFormatToolbar,
-  });
+  const createRibbonRenderer = () =>
+    createRenderRibbon({
+      getInst: getInstance,
+      ribbonLang: lang,
+      ribbonText: text,
+      ribbonMenuText: menuText,
+      ribbonDisplayOptionsText: displayOptionsText,
+      getProfile: () => (platform === 'mac' ? 'excel365Mac' : 'default'),
+      get ribbonTabs() {
+        return defaultRibbonTabs;
+      },
+      ribbonRoot: host,
+      state: {
+        getActiveTab: () => activeTab,
+        getCollapsed: () => isCollapsedMode(),
+        getDisplayMode: () => displayMode,
+        getAutoHidePeek: () => ribbonPeek,
+        getBackstageOpen: () => backstageOpen,
+        getDisplayMenuOpen: () => displayMenuOpen,
+        getFormulaBarVisible: () => formulaBarVisible,
+      },
+      helpers: mergedHelpers,
+      menus: mergedMenus,
+      createBackstageView: opts.createBackstageView ?? (() => document.createElement('div')),
+      projectFormatToolbar,
+    });
+  let renderApi = createRibbonRenderer();
 
   const wireBorderMenu = (): void => {
     borderMenuApi?.detach();
@@ -477,11 +499,17 @@ export function mountToolbar(
   };
 
   const renderToolbar = (): void => {
+    screenTips.refresh();
+    host.lang = lang;
     borderMenuApi?.detach();
     borderMenuApi = null;
     renderApi.renderRibbon();
+    ribbonFit.refit();
     wireBorderMenu();
     interactionPolicy.project();
+    host
+      .querySelector<HTMLElement>('[data-ribbon-tab][aria-selected="true"]')
+      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   };
 
   const syncInheritedPlatform = (current: SpreadsheetInstance | null): boolean => {
@@ -560,8 +588,23 @@ export function mountToolbar(
     return document.activeElement === tab;
   };
 
-  const projectRibbonTabs = (): void =>
+  const projectRibbonTabs = (): void => {
     projectRibbonShell(host, { activeTab, displayMode, peekRequested: ribbonPeek });
+    ribbonFit.refit();
+    host
+      .querySelector<HTMLElement>('[data-ribbon-tab][aria-selected="true"]')
+      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  };
+
+  const onRibbonFocus = (event: FocusEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest || !host.contains(target)) return;
+    if (target.closest('.fc-tb__menu, .fc-tb__submenu, .fc-tb__rb-dd')) return;
+    if (target.closest('.fc-tb__ribbon-tabs, .fc-tb__ribbon')) {
+      target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    }
+  };
+  host.addEventListener('focusin', onRibbonFocus, true);
 
   const dismissRibbonPeek = (): void => {
     if (!ribbonPeek) return;
@@ -886,7 +929,20 @@ export function mountToolbar(
   let unsubStore: (() => void) | null = null;
   let unsubPolicy: (() => void) | null = null;
   let unsubFunctionHistory: (() => void) | null = null;
+  let unsubLocale: (() => void) | null = null;
   let subscribedInstance: SpreadsheetInstance | null = null;
+  const refreshLocale = (current: SpreadsheetInstance): void => {
+    if (langOverride !== undefined) return;
+    const next = toolbarLangForLocale(current.i18n.locale);
+    if (next === lang) return;
+    lang = next;
+    if (opts.text === undefined) text = toolbarText(lang);
+    if (opts.menuText === undefined) menuText = toolbarMenuText(lang);
+    displayOptionsText = ribbonDisplayText(lang);
+    rebuildLocalizedDefaults();
+    renderApi = createRibbonRenderer();
+    renderToolbar();
+  };
   const ensureStoreSubscription = (): void => {
     const current = getInstance();
     if (current === subscribedInstance) {
@@ -897,9 +953,15 @@ export function mountToolbar(
     unsubStore?.();
     unsubPolicy?.();
     unsubFunctionHistory?.();
+    unsubLocale?.();
     subscribedInstance = current;
     syncInheritedPlatform(current);
     syncMacInkSubscription(current);
+    unsubLocale =
+      current && langOverride === undefined
+        ? current.i18n.subscribe(() => refreshLocale(current))
+        : null;
+    if (current) refreshLocale(current);
     unsubStore =
       current?.store.subscribe(() => {
         const nextInstance = getInstance();
@@ -976,10 +1038,15 @@ export function mountToolbar(
       return dropdownsApi;
     },
     dispose: () => {
+      screenTips.detach();
+      ribbonFit.detach();
       unregisterOverlayOwner();
+      if (previousLanguage === null) host.removeAttribute('lang');
+      else host.setAttribute('lang', previousLanguage);
       if (previousPlatform === undefined) delete host.dataset.fcPlatform;
       else host.dataset.fcPlatform = previousPlatform;
       interactionPolicy.detach();
+      host.removeEventListener('focusin', onRibbonFocus, true);
       host.removeEventListener('mousedown', onMouseDown);
       host.removeEventListener('click', onClick);
       host.removeEventListener('dblclick', onDoubleClick);
@@ -1000,6 +1067,8 @@ export function mountToolbar(
       unsubPolicy = null;
       unsubFunctionHistory?.();
       unsubFunctionHistory = null;
+      unsubLocale?.();
+      unsubLocale = null;
       unsubStore = null;
       subscribedInstance = null;
       cancelOpenAppDialogs();

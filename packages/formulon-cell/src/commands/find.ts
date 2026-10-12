@@ -1,9 +1,9 @@
-import { parseAddrKey } from '../engine/address.js';
-import type { Addr } from '../engine/types.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
+import type { Addr, CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
-import { writeInput } from './coerce-input.js';
+import { inputLocaleForWorkbook, writeInput } from './coerce-input.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 export interface FindOptions {
@@ -17,6 +17,11 @@ export interface FindOptions {
   searchBy?: 'rows' | 'columns';
   /** Excel's "Look in" option. Defaults to displayed values. */
   lookIn?: 'formulas' | 'values' | 'comments' | 'notes';
+  /** Workbook used for locale-aware display text and threaded comments.
+   *  Optional so the command remains usable against a store-only snapshot. */
+  workbook?: WorkbookHandle;
+  /** Explicit display/input locale used when the workbook cannot supply one. */
+  locale?: string;
 }
 
 export interface FindMatch {
@@ -28,31 +33,210 @@ interface CellEntry {
   display: string;
 }
 
-function cellsForSearch(state: State, opts: FindOptions): CellEntry[] {
-  const sheet = state.data.sheetIndex;
-  const out: CellEntry[] = [];
-  const lookIn = opts.lookIn ?? 'values';
-  if (lookIn === 'comments' || lookIn === 'notes') {
-    for (const [key, fmt] of state.format.formats) {
-      const addr = parseAddrKey(key);
-      if (!addr) continue;
-      if ((opts.within ?? 'sheet') === 'sheet' && addr.sheet !== sheet) continue;
-      if (!fmt.comment) continue;
-      out.push({ addr, display: fmt.comment });
-    }
-    return sortCellEntries(out, opts);
-  }
+interface ThreadEntry {
+  id: string;
+  parentId: string;
+  row: number;
+  col: number;
+  text: string;
+}
 
+interface SearchCell {
+  addr: Addr;
+  value: CellValue;
+  formula: string | null;
+}
+
+const localeForSearch = (opts: FindOptions): string =>
+  opts.locale ?? (opts.workbook ? inputLocaleForWorkbook(opts.workbook) : undefined) ?? 'en-US';
+
+const valueDisplay = (value: Parameters<typeof formatCell>[0], opts: FindOptions): string =>
+  formatCell(value, localeForSearch(opts));
+
+const workbookDisplay = (wb: WorkbookHandle | undefined, addr: Addr, fallback: string): string => {
+  if (!wb || typeof wb.getDisplayText !== 'function') return fallback;
+  try {
+    return wb.getDisplayText(addr.sheet, addr.row, addr.col) ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const formulaDisplay = (formula: string, opts: FindOptions): string => {
+  if (!opts.workbook || typeof opts.workbook.getFormulaForDisplay !== 'function') return formula;
+  try {
+    return opts.workbook.getFormulaForDisplay(formula);
+  } catch {
+    return formula;
+  }
+};
+
+const entriesForThreadedSheet = (
+  state: State,
+  sheet: number,
+  wb: WorkbookHandle | undefined,
+): readonly ThreadEntry[] => {
+  if (wb?.capabilities?.threadedComments) {
+    try {
+      return wb.getThreadedComments(sheet);
+    } catch {
+      // Use the hydrated store snapshot when an engine read is unavailable.
+    }
+  }
+  return state.threadedComments.bySheet.get(sheet) ?? [];
+};
+
+const threadedCommentCells = (state: State, opts: FindOptions): CellEntry[] => {
+  const wb = opts.workbook;
+  let sheets: number[];
+  if ((opts.within ?? 'sheet') === 'sheet') {
+    sheets = [state.data.sheetIndex];
+  } else if (wb) {
+    try {
+      sheets = Array.from({ length: wb.sheetCount }, (_, sheet) => sheet);
+    } catch {
+      sheets = [...state.threadedComments.bySheet.keys()];
+    }
+  } else {
+    sheets = [...state.threadedComments.bySheet.keys()];
+  }
+  const entries = new Map<string, CellEntry>();
+  for (const sheet of sheets) {
+    const comments = entriesForThreadedSheet(state, sheet, wb);
+    const byId = new Map(comments.map((entry) => [entry.id, entry]));
+    const orderedComments = [...comments].sort(
+      (left, right) => Number(left.parentId !== '') - Number(right.parentId !== ''),
+    );
+    for (const comment of orderedComments) {
+      const opening = comment.parentId ? (byId.get(comment.parentId) ?? comment) : comment;
+      const addr = { sheet, row: opening.row, col: opening.col };
+      const key = addrKey(addr);
+      const existing = entries.get(key);
+      entries.set(key, {
+        addr,
+        display: existing ? `${existing.display}\n${comment.text}` : comment.text,
+      });
+    }
+  }
+  return sortCellEntries([...entries.values()], opts);
+};
+
+const searchSheets = (state: State, opts: FindOptions): number[] => {
+  if ((opts.within ?? 'sheet') === 'sheet') return [state.data.sheetIndex];
+  if (opts.workbook) {
+    try {
+      const count = opts.workbook.sheetCount;
+      if (Number.isInteger(count) && count > 0) {
+        return Array.from({ length: count }, (_, sheet) => sheet);
+      }
+    } catch {
+      // Fall through to the sheets represented by the store snapshot.
+    }
+  }
+  const sheets = new Set<number>();
+  for (const key of state.data.cells.keys()) {
+    const addr = parseAddrKey(key);
+    if (addr) sheets.add(addr.sheet);
+  }
+  for (const key of state.format.formats.keys()) {
+    const addr = parseAddrKey(key);
+    if (addr) sheets.add(addr.sheet);
+  }
+  for (const sheet of state.threadedComments.bySheet.keys()) sheets.add(sheet);
+  sheets.add(state.data.sheetIndex);
+  return [...sheets].sort((left, right) => left - right);
+};
+
+const cellsForSearch = (state: State, opts: FindOptions): CellEntry[] => {
+  const lookIn = opts.lookIn ?? 'values';
+  if (lookIn === 'comments') return threadedCommentCells(state, opts);
+  if (lookIn === 'notes') return notesForSearch(state, opts);
+  const selected = new Set(searchSheets(state, opts));
+  const cells = new Map<string, SearchCell>();
+  if (opts.workbook) {
+    for (const sheet of selected) {
+      try {
+        for (const entry of opts.workbook.cells(sheet)) {
+          cells.set(addrKey(entry.addr), entry);
+        }
+      } catch {
+        // A store-only snapshot remains a valid fallback for older adapters.
+      }
+    }
+  }
+  // The store is authoritative for the active sheet's pending edits, and may
+  // also contain explicitly hydrated cells from other sheets in low-level
+  // hosts. Overlay it after the workbook enumeration to retain those edits.
   for (const [key, cell] of state.data.cells) {
     const addr = parseAddrKey(key);
-    if (!addr) continue;
-    if ((opts.within ?? 'sheet') === 'sheet' && addr.sheet !== sheet) continue;
-    const display =
-      lookIn === 'formulas' ? (cell.formula ?? formatCell(cell.value)) : formatCell(cell.value);
-    out.push({ addr, display });
+    if (!addr || !selected.has(addr.sheet)) continue;
+    cells.set(key, { addr, value: cell.value, formula: cell.formula });
   }
-  return sortCellEntries(out, opts);
-}
+  return sortCellEntries(
+    [...cells.values()].map((cell) => ({
+      addr: cell.addr,
+      display: cellDisplayForSearch(cell, cell.addr, opts),
+    })),
+    opts,
+  );
+};
+
+const notesForSearch = (state: State, opts: FindOptions): CellEntry[] => {
+  const selected = new Set(searchSheets(state, opts));
+  const out = new Map<string, CellEntry>();
+  const stateHasComment = new Set<string>();
+  for (const [key, fmt] of state.format.formats) {
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    if (!selected.has(addr.sheet)) continue;
+    if (Object.hasOwn(fmt, 'comment')) stateHasComment.add(key);
+    if (!fmt.comment) continue;
+    out.set(key, { addr, display: fmt.comment });
+  }
+  if (opts.workbook?.capabilities?.comments) {
+    for (const sheet of selected) {
+      try {
+        const native =
+          opts.workbook.capabilities.commentsEnumerable &&
+          typeof opts.workbook.getComments === 'function'
+            ? opts.workbook.getComments(sheet)
+            : [...opts.workbook.cells(sheet)].flatMap((entry) => {
+                const comment = opts.workbook?.getComment(sheet, entry.addr.row, entry.addr.col);
+                return comment ? [{ ...entry.addr, ...comment }] : [];
+              });
+        for (const comment of native) {
+          const addr = { sheet, row: comment.row, col: comment.col };
+          const key = addrKey(addr);
+          if (stateHasComment.has(key)) continue;
+          if (comment.text) out.set(key, { addr, display: comment.text });
+        }
+      } catch {
+        // The hydrated store remains the compatibility path for old engines.
+      }
+    }
+  }
+  return sortCellEntries([...out.values()], opts);
+};
+
+const cellDisplayForSearch = (
+  cell: { value: Parameters<typeof formatCell>[0]; formula: string | null } | undefined,
+  addr: Addr,
+  opts: FindOptions,
+): string => {
+  if (!cell) return '';
+  if (opts.lookIn === 'formulas') {
+    let formula = cell.formula;
+    if (opts.workbook && typeof opts.workbook.cellFormula === 'function') {
+      try {
+        formula = opts.workbook.cellFormula(addr) ?? formula;
+      } catch {
+        // Keep the hydrated store formula when the engine read is unavailable.
+      }
+    }
+    return formula ? formulaDisplay(formula, opts) : '';
+  }
+  return workbookDisplay(opts.workbook, addr, valueDisplay(cell.value, opts));
+};
 
 function sortCellEntries(entries: CellEntry[], opts: FindOptions): CellEntry[] {
   const byRows = opts.searchBy !== 'columns';
@@ -122,6 +306,40 @@ export function findNext(
   return pick ? { addr: pick.addr } : null;
 }
 
+/** Resolve the same displayed text used by findAll for a result row or a
+ * replacement. Keeping this projection in the command module prevents the
+ * dialog from falling back to the browser's English formatter. */
+export function displayTextForFindMatch(state: State, addr: Addr, opts: FindOptions): string {
+  const lookIn = opts.lookIn ?? 'values';
+  if (lookIn === 'comments' || lookIn === 'notes') {
+    const entries =
+      lookIn === 'comments' ? threadedCommentCells(state, opts) : notesForSearch(state, opts);
+    return entries.find((entry) => addrKey(entry.addr) === addrKey(addr))?.display ?? '';
+  }
+  const cell = state.data.cells.get(addrKey(addr));
+  if (cell) return cellDisplayForSearch(cell, addr, opts);
+
+  // Workbook-wide search can return a cell from a sheet that the store has
+  // not hydrated.  Result rows and restricted Replace All still need the
+  // exact projection used by the command search, so read the engine directly
+  // when there is no pending store overlay for this address.
+  if (!opts.workbook) return '';
+  if (lookIn === 'formulas') {
+    try {
+      const formula = opts.workbook.cellFormula(addr);
+      return formula ? formulaDisplay(formula, opts) : '';
+    } catch {
+      return '';
+    }
+  }
+  try {
+    const value = opts.workbook.getValue(addr);
+    return workbookDisplay(opts.workbook, addr, valueDisplay(value, opts));
+  } catch {
+    return '';
+  }
+}
+
 function substituteCaseAware(
   source: string,
   query: string,
@@ -158,18 +376,22 @@ export function replaceOne(
   match: FindMatch,
   replacement: string,
   store?: SpreadsheetStore,
+  locale?: string,
+  lookIn: FindOptions['lookIn'] = 'values',
 ): boolean {
-  // Don't mutate formula cells — the search runs on the displayed value, so
-  // overwriting would silently destroy the formula.
-  if (wb.cellFormula(match.addr) !== null) return false;
+  if (lookIn === 'comments' || lookIn === 'notes') return false;
+  const formula = wb.cellFormula(match.addr);
+  // Formula replacement is an explicit mode of Find/Replace. Values mode
+  // still refuses formulas so a displayed result can never destroy its
+  // source expression.
+  if (lookIn === 'formulas' ? formula === null : formula !== null) return false;
   if (store && !isCellWritable(store.getState(), match.addr)) {
     warnProtected(match.addr);
     return false;
   }
-  // `replacement` is the new raw cell content (callers compute substitution
-  // upstream when they need partial replace). Run through writeInput so type
-  // is preserved.
-  writeInput(wb, match.addr, replacement, store);
+  // `writeInput` canonicalizes a localized formula before it reaches the
+  // engine, and applies the selected input locale to displayed values.
+  writeInput(wb, match.addr, replacement, store, locale);
   return true;
 }
 
@@ -180,19 +402,25 @@ export function replaceAll(
   replacement: string,
   store?: SpreadsheetStore,
 ): number {
-  if (opts.query === '') return 0;
+  if (opts.query === '' || (opts.lookIn ?? 'values') === 'comments' || opts.lookIn === 'notes') {
+    return 0;
+  }
   const matches = findAll(state, opts);
   let count = 0;
-  // Formula cells are skipped, so every value read below is a literal — the
-  // batched recalc can't hand back a stale computed value here.
+  // The mode gate below keeps formula source replacement and displayed-value
+  // replacement separate, so a batched recalc cannot turn one into the other.
   wb.withBatchedRecalc(() => {
     for (const m of matches) {
-      if (wb.cellFormula(m.addr) !== null) continue;
+      const formula = wb.cellFormula(m.addr);
+      if (opts.lookIn === 'formulas' ? formula === null : formula !== null) continue;
       if (!isCellWritable(state, m.addr)) {
         warnProtected(m.addr);
         continue;
       }
-      const cur = formatCell(wb.getValue(m.addr));
+      const cur =
+        opts.lookIn === 'formulas'
+          ? formulaDisplay(formula ?? '', opts)
+          : workbookDisplay(wb, m.addr, valueDisplay(wb.getValue(m.addr), opts));
       const next = substituteCaseAware(
         cur,
         opts.query,
@@ -201,7 +429,7 @@ export function replaceAll(
         opts.matchWhole ?? false,
       );
       if (next === cur) continue;
-      writeInput(wb, m.addr, next, store);
+      writeInput(wb, m.addr, next, store, opts.locale);
       count += 1;
     }
   });

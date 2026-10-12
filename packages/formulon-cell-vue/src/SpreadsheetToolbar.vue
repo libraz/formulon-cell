@@ -4,6 +4,7 @@
 // component just owns a host div and mounts / disposes the core toolbar; all
 // DOM, helpers, menus, and hook defaults come from core.
 import {
+  dictionaryLocaleFor,
   type DynamicDropdownsCtx,
   openHostMenuFirstDropdown,
   type RibbonTab,
@@ -41,7 +42,7 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
   };
   try {
     toolbar = Spreadsheet.mountToolbar(host, instance, {
-      lang: props.locale === 'en' ? 'en' : 'ja',
+      lang: dictionaryLocaleFor(props.locale),
       activeTab: props.activeTab,
       ribbonTabs: props.ribbonTabs,
       onTabChange: (tab) => emit('tabChange', tab),

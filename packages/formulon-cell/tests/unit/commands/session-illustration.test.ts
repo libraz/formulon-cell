@@ -13,7 +13,17 @@ import {
   sessionIllustrationById,
   updateSessionIllustration,
 } from '../../../src/commands/session-illustration.js';
+import { EMU_PER_PX } from '../../../src/engine/images-sync.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+
+const bytesFromBase64 = (value: string): Uint8Array =>
+  Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+
+const PNG = bytesFromBase64(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+);
 
 const range = (r0: number, c0: number, r1: number, c1: number) =>
   ({ sheet: 0, r0, c0, r1, c1 }) as const;
@@ -212,6 +222,97 @@ describe('session illustration commands', () => {
     expect(listSessionIllustrations(store.getState())).toEqual([]);
     expect(history.undo()).toBe(true);
     expect(listSessionIllustrations(store.getState()).map((item) => item.id)).toEqual(['shape-a']);
+  });
+
+  it('keeps a persisted image native object in sync with history', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.isStub).toBe(false);
+      expect(wb.capabilities.images).toBe(true);
+      const store = createSpreadsheetStore();
+      const history = new History();
+      const image = createSessionImage(
+        store,
+        range(0, 1, 0, 1),
+        {
+          id: 'native-image',
+          src: 'data:image/png;base64,placeholder',
+          bytes: PNG,
+          wb,
+          x: 24,
+          y: 20,
+          w: 24,
+          h: 24,
+        },
+        history,
+      );
+      expect(image?.nativeObjectId).toBeGreaterThan(0);
+      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(1);
+
+      expect(history.undo()).toBe(true);
+      expect(sessionIllustrationById(store.getState(), 'native-image')).toBeNull();
+      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
+      expect(history.redo()).toBe(true);
+      expect(
+        sessionIllustrationById(store.getState(), 'native-image')?.nativeObjectId,
+      ).toBeGreaterThan(0);
+      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(1);
+
+      const original = wb
+        .listDrawingObjects(0)
+        .find((object) => object.objectId === image?.nativeObjectId);
+      if (!original) throw new Error('native image missing after redo');
+      store.setState((state) => ({
+        ...state,
+        viewport: { ...state.viewport, zoom: 2, rowStart: 3, colStart: 2 },
+      }));
+      const target = cellRectUnclamped(
+        layoutForView(store.getState()),
+        store.getState().viewport,
+        4,
+        3,
+      );
+      const moved = updateSessionIllustration(
+        store,
+        'native-image',
+        {
+          x: target.x + 10 * 2,
+          y: target.y + 5 * 2,
+          w: (original.cx / EMU_PER_PX) * 2,
+          h: (original.cy / EMU_PER_PX) * 2,
+        },
+        history,
+        wb,
+      );
+      expect(moved?.nativeObjectId).toBeGreaterThan(0);
+      const movedNative = wb
+        .listDrawingObjects(0)
+        .find((object) => object.objectId === moved?.nativeObjectId);
+      expect(movedNative).toMatchObject({ fromRow: 4, fromCol: 3 });
+      expect(movedNative?.fromColOff).toBe(10 * EMU_PER_PX);
+      expect(movedNative?.fromRowOff).toBe(5 * EMU_PER_PX);
+      expect(movedNative?.cx).toBe(original.cx);
+      expect(movedNative?.cy).toBe(original.cy);
+      expect(history.undo()).toBe(true);
+      const undoneNative = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      expect(undoneNative).toMatchObject({ fromRow: original.fromRow, fromCol: original.fromCol });
+      expect(undoneNative?.cx).toBe(original.cx);
+      expect(undoneNative?.cy).toBe(original.cy);
+      expect(history.redo()).toBe(true);
+      const redoneNative = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      expect(redoneNative).toMatchObject({ fromRow: 4, fromCol: 3 });
+      expect(redoneNative?.cx).toBe(original.cx);
+      expect(redoneNative?.cy).toBe(original.cy);
+
+      expect(clearSessionIllustration(store, 'native-image', history, wb)).toBe(true);
+      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
+      expect(history.undo()).toBe(true);
+      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(1);
+      expect(history.redo()).toBe(true);
+      expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
+    } finally {
+      wb.dispose();
+    }
   });
 
   it('arranges session illustrations within their sheet and records history', () => {

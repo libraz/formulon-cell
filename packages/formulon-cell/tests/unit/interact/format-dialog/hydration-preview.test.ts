@@ -65,7 +65,7 @@ describe('attachFormatDialog', () => {
     const sizeInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="1"][max="409"]',
     );
-    expect(sizeInput?.value).toBe('14');
+    expect(sizeInput?.value).toBe('10.5');
 
     const rightAlign = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="right"]',
@@ -119,7 +119,7 @@ describe('attachFormatDialog', () => {
     );
     expect(decimalsInput?.value).toBe('2');
     const symbolSelect = document.querySelector<HTMLSelectElement>('select');
-    expect(symbolSelect?.value).toBe('$');
+    expect(symbolSelect?.value).toBe('¥');
     handle.detach();
   });
 

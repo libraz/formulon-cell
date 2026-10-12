@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
+import { hydrateThreadedComments } from '../../src/commands/comment.js';
 import { findAll, findNext, replaceAll, replaceOne } from '../../src/commands/find.js';
+import { addrKey } from '../../src/engine/address.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
 
@@ -111,5 +112,58 @@ describe('integration: find/replace', () => {
     const before = workbook.cellFormula({ sheet: 0, row: 4, col: 0 });
     replaceAll(instance.store.getState(), workbook, { query: 'apple' }, 'X');
     expect(workbook.cellFormula({ sheet: 0, row: 4, col: 0 })).toBe(before);
+  });
+
+  it('separates threaded comments from notes and never replaces annotation text in cells', () => {
+    const { instance, workbook } = sheet;
+    const noteAddr = { sheet: 0, row: 6, col: 0 };
+    const threadAddr = { sheet: 0, row: 7, col: 0 };
+    instance.store.setState((state) => {
+      const formats = new Map(state.format.formats);
+      formats.set(addrKey(noteAddr), { comment: 'legacy note' });
+      return { ...state, format: { ...state.format, formats } };
+    });
+    hydrateThreadedComments(instance.store, 0, [
+      {
+        id: 'thread-1',
+        row: threadAddr.row,
+        col: threadAddr.col,
+        personId: 'person-1',
+        created: '2026-01-01T10:00:00.00',
+        text: 'thread opening',
+        parentId: '',
+        done: false,
+        mentions: [],
+      },
+      {
+        id: 'reply-1',
+        row: threadAddr.row,
+        col: threadAddr.col,
+        personId: 'person-1',
+        created: '2026-01-01T10:01:00.00',
+        text: 'thread reply',
+        parentId: 'thread-1',
+        done: false,
+        mentions: [],
+      },
+    ]);
+
+    expect(findAll(instance.store.getState(), { query: 'legacy', lookIn: 'comments' })).toEqual([]);
+    expect(findAll(instance.store.getState(), { query: 'legacy', lookIn: 'notes' })).toEqual([
+      { addr: noteAddr },
+    ]);
+    expect(
+      findAll(instance.store.getState(), { query: 'thread reply', lookIn: 'comments' }),
+    ).toEqual([{ addr: threadAddr }]);
+    expect(
+      replaceAll(
+        instance.store.getState(),
+        workbook,
+        { query: 'thread', lookIn: 'comments' },
+        'changed',
+        instance.store,
+      ),
+    ).toBe(0);
+    expect(workbook.getValue(threadAddr)).toEqual({ kind: 'blank' });
   });
 });

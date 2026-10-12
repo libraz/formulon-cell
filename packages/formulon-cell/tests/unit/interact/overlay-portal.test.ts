@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   disposeOverlayPortal,
   ensureOverlayPortal,
+  hasOpenLocaleDraft,
   overlayPortalFor,
   refreshOverlayPortal,
   setOverlayOptions,
@@ -26,9 +27,50 @@ afterEach(() => {
 });
 
 describe('overlay portal', () => {
+  it.each(['dialog', 'alertdialog'])(
+    'blocks visible %s drafts only in their owning sheet',
+    (role) => {
+      const host = makeHost();
+      const other = makeHost();
+      const portal = ensureOverlayPortal(host);
+      const modal = document.createElement('div');
+      modal.setAttribute('role', role);
+      modal.setAttribute('aria-modal', 'true');
+      portal.append(modal);
+      expect(hasOpenLocaleDraft(host)).toBe(true);
+      expect(hasOpenLocaleDraft(other)).toBe(false);
+      modal.hidden = true;
+      expect(hasOpenLocaleDraft(host)).toBe(false);
+      modal.hidden = false;
+      portal.style.display = 'none';
+      expect(hasOpenLocaleDraft(host)).toBe(false);
+      portal.style.display = '';
+      modal.remove();
+      expect(hasOpenLocaleDraft(host)).toBe(false);
+    },
+  );
+
+  it.each(['fc-find', 'fc-cmtnote', 'fc-filter-dropdown'])(
+    'preserves editable nonmodal %s drafts while allowing other panels',
+    (className) => {
+      const host = makeHost();
+      const panel = document.createElement('div');
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'false');
+      const portal = ensureOverlayPortal(host);
+      portal.append(panel);
+      expect(hasOpenLocaleDraft(host)).toBe(false);
+      panel.className = className;
+      expect(hasOpenLocaleDraft(host)).toBe(true);
+      panel.hidden = true;
+      expect(hasOpenLocaleDraft(host)).toBe(false);
+    },
+  );
+
   it('uses the host owner document body and preserves portal identity and theme', () => {
     const host = makeHost();
     host.dataset.fcTheme = 'ink';
+    host.lang = 'fr';
 
     const first = ensureOverlayPortal(host);
     const second = ensureOverlayPortal(host);
@@ -37,6 +79,10 @@ describe('overlay portal', () => {
     expect(first.parentElement).toBe(document.body);
     expect(first.ownerDocument).toBe(document);
     expect(first.dataset.fcTheme).toBe('ink');
+    expect(first.lang).toBe('fr');
+    host.lang = 'de';
+    refreshOverlayPortal(host);
+    expect(first.lang).toBe('de');
   });
 
   it('moves the owned portal between explicit roots without removing host roots', () => {

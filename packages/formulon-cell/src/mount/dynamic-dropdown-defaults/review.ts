@@ -31,12 +31,22 @@ const updateReviewCommentsMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateReviewCommentsMenu'] =>
   (menu) => {
     const state = instance.store.getState();
-    const hasActiveComment = commentAt(state, state.selection.active) !== null;
-    const hasAnyComment = listComments(state, state.data.sheetIndex).length > 0;
+    const threads = state.threadedComments.bySheet.get(state.data.sheetIndex) ?? [];
+    const hasActiveComment =
+      commentAt(state, state.selection.active) !== null ||
+      threads.some(
+        (entry) =>
+          !entry.parentId &&
+          entry.row === state.selection.active.row &&
+          entry.col === state.selection.active.col,
+      );
+    const hasAnyComment =
+      listComments(state, state.data.sheetIndex).length > 0 || threads.length > 0;
     const strings = instance.i18n.strings.ribbonMenu;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-comment-action]')) {
       const action = button.dataset.commentAction;
       const disabled =
+        (action === 'thread' && !instance.workbook.capabilities.threadedComments) ||
         (action === 'delete-active' && !hasActiveComment) ||
         (action === 'delete-all' && !hasAnyComment);
       const reason =
@@ -253,6 +263,11 @@ const updateProtectMenu =
 const buildReviewCommentAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyReviewCommentAction'] =>
   (action) => {
+    if (action === 'thread') {
+      if (instance.workbook.capabilities.threadedComments)
+        instance.openCommentDialog({ mode: 'thread' });
+      return;
+    }
     if (action !== 'delete-active' && action !== 'delete-all') return;
     executeRibbonCommentAction({
       store: instance.store,

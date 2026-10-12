@@ -4,7 +4,7 @@ import {
   InteractionController,
   registerInteractionController,
 } from './commands/interaction-controller.js';
-import { printSheet } from './commands/print.js';
+import { PrintResourceLimitError, printSheet } from './commands/print.js';
 import {
   isSheetProtected,
   setProtectedSheet,
@@ -24,12 +24,13 @@ import { SpreadsheetEmitter } from './events.js';
 import { resolveSpreadsheetUiOptions } from './extensions/index.js';
 import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
-import type { Strings } from './i18n/strings.js';
+import { dictionaryLocaleFor, type Strings } from './i18n/strings.js';
 import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
 import { attachNavigationPolicy, navigationBoundsFor } from './interact/navigation-policy.js';
 import {
   disposeOverlayPortal,
   ensureOverlayPortal,
+  hasOpenLocaleDraft,
   setOverlayOptions,
   syncOverlayPortalTheme,
 } from './interact/overlay-portal.js';
@@ -65,6 +66,7 @@ import {
 } from './mount/hydration.js';
 import { createInsertCopiedCellsOpener } from './mount/insert-copied-cells.js';
 import { createInstanceDialogApi } from './mount/instance-dialog-api.js';
+import { syncLocaleProfile } from './mount/locale-profile.js';
 import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
 import { createPrinterProfiles } from './mount/printer-profiles.js';
 import { createRibbonHost } from './mount/ribbon-host.js';
@@ -82,6 +84,7 @@ import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './moun
 import { GridRenderer } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
+import { showMessage } from './toolbar/dialogs/prompt.js';
 import { disposeMacRibbonActions } from './toolbar/ribbon/mac/actions.js';
 
 export type {
@@ -110,6 +113,35 @@ function normalizeScreenClipResult(result: string | ScreenClipResult | null | un
   if (!result) return null;
   if (typeof result === 'string') return result ? { src: result } : null;
   return result.src ? result : null;
+}
+
+// A workbook can be mounted by more than one host at a time.  The engine
+// exposes one history slot per workbook. The latest live mount owns that slot;
+// teardown restores the preceding owner without detaching another live mount.
+const workbookHistoryOwners = new WeakMap<WorkbookHandle, History[]>();
+
+function attachWorkbookHistory(wb: WorkbookHandle, history: History): void {
+  const owners = workbookHistoryOwners.get(wb) ?? [];
+  owners.push(history);
+  workbookHistoryOwners.set(wb, owners);
+  wb.attachHistory(history);
+}
+
+function detachWorkbookHistory(wb: WorkbookHandle, history: History): void {
+  const owners = workbookHistoryOwners.get(wb);
+  if (!owners) return;
+  const index = owners.indexOf(history);
+  if (index < 0) return;
+  const wasLatest = index === owners.length - 1;
+  owners.splice(index, 1);
+  if (owners.length === 0) workbookHistoryOwners.delete(wb);
+  if (wasLatest) wb.attachHistory(owners.at(-1) ?? null);
+}
+
+function throwCleanupErrors(errors: unknown[]): void {
+  if (errors.length === 0) return;
+  if (errors.length === 1) throw errors[0];
+  throw new AggregateError(errors, 'formulon-cell: one or more cleanup operations failed');
 }
 
 /**
@@ -156,8 +188,20 @@ export const Spreadsheet = {
       }
     }
 
+    const previousHostLanguage = host.getAttribute('lang');
+    const languageTag = (): string => {
+      try {
+        return (
+          Intl.getCanonicalLocales(i18n.locale.replaceAll('_', '-'))[0] ??
+          dictionaryLocaleFor(i18n.locale)
+        );
+      } catch {
+        return dictionaryLocaleFor(i18n.locale);
+      }
+    };
     const instanceId = prepareMountHost(host, strings, initialTheme, ui.platform);
-    ensureOverlayPortal(host, opts.overlays);
+    host.lang = languageTag();
+    const overlayPortal = ensureOverlayPortal(host, opts.overlays);
     host.dataset.fcEngineState = 'loading';
 
     let sheetTabsController: SheetTabsController | null = null;
@@ -166,19 +210,35 @@ export const Spreadsheet = {
     // should be touched by `seed`. Pre-loaded workbooks are the consumer's
     // data and must not be overwritten by the demo helper.
     let ownsWb = !opts.workbook;
-    let wb: WorkbookHandle;
+    let wb!: WorkbookHandle;
+    let workbookDisposed = false;
+    const disposeOwnedWorkbook = (): void => {
+      if (!ownsWb || workbookDisposed || !wb) return;
+      workbookDisposed = true;
+      wb.dispose();
+    };
     try {
       wb = opts.workbook ?? (await WorkbookHandle.createDefault({ locale: i18n.locale }));
+      // The engine profile is workbook state and is not persisted in files.
+      // Select it before a seed writes formulas so seeded values use the same
+      // host semantics as the first hydrated paint.
+      syncLocaleProfile(wb, i18n.locale, ui.platform, { throwOnFailure: true });
       if (opts.seed && ownsWb) opts.seed(wb);
       if (opts.viewport) {
-        try {
-          validateViewportAgainstWorkbook(opts.viewport, wb, opts.viewport.range?.sheet);
-        } catch (err) {
-          if (ownsWb) wb.dispose();
-          throw err;
-        }
+        validateViewportAgainstWorkbook(opts.viewport, wb, opts.viewport.range?.sheet);
       }
     } catch (err) {
+      // The default workbook is owned before the mount promise resolves.  A
+      // seed/profile/viewport failure must release it even though no instance
+      // exists for the caller to dispose.  External workbooks stay borrowed.
+      try {
+        disposeOwnedWorkbook();
+      } catch (cleanupError) {
+        console.error(
+          'formulon-cell: failed to dispose workbook after mount failure',
+          cleanupError,
+        );
+      }
       host.dataset.fcEngineState = 'error';
       disposeOverlayPortal(host);
       try {
@@ -198,6 +258,7 @@ export const Spreadsheet = {
       fxAccept,
       fxInput,
       viewbar,
+      localeSwitcher,
       taskpaneDock,
       grid,
       canvas,
@@ -244,7 +305,7 @@ export const Spreadsheet = {
     // stack after attach to drop any pre-attach entries (none expected, but
     // cheap insurance).
     const history = new History();
-    wb.attachHistory(history);
+    attachWorkbookHistory(wb, history);
     history.clear();
 
     hydrateActiveSheetFromEngine(wb, store);
@@ -324,7 +385,13 @@ export const Spreadsheet = {
     });
 
     const refreshCells = (): void => {
-      mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+      const sheetIndex = store.getState().data.sheetIndex;
+      // A host can change the store's active sheet while a workbook has no
+      // matching sheet yet (for example during a platform/workbook transition).
+      // Profile refresh must not turn that transient state into an engine
+      // sheet-index exception.
+      if (sheetIndex < 0 || sheetIndex >= wb.sheetCount) return;
+      mutators.replaceCells(store, wb.cells(sheetIndex));
     };
     const extensionRegistry = createExtensionRegistry({
       context: {
@@ -413,7 +480,7 @@ export const Spreadsheet = {
       hostTag: tag,
       hyperlinkDialog: () => featureState.hyperlinkDialog,
       invalidate: () => renderer.invalidate(),
-      locale: i18n.locale,
+      getLocale: () => i18n.locale,
       namedRangeDialog: () => featureState.namedRangeDialog,
       pasteSpecialDialog: () => binding.pasteSpecialDialog,
       quickAnalysis: () => binding.quickAnalysis,
@@ -423,6 +490,7 @@ export const Spreadsheet = {
     });
 
     const onCanvasClick = createErrorIndicatorClickHandler({
+      grid,
       canvas,
       getErrorMenu: () => featureState.errorMenu,
     });
@@ -461,7 +529,7 @@ export const Spreadsheet = {
       tag,
     });
 
-    const formulaDraftMirror = attachFormulaDraftMirror({ grid, store });
+    const formulaDraftMirror = attachFormulaDraftMirror({ grid, store, wb });
 
     // Resize observer — we follow the host, not the window.
     const ro = new ResizeObserver(() => {
@@ -508,6 +576,9 @@ export const Spreadsheet = {
       history,
       host,
       i18nLocale: () => i18n.locale,
+      getWorkbookName: opts.getWorkbookName,
+      localeSwitcher,
+      setLocale: (locale) => instance.setLocale(locale),
       isMacPlatform: () => host.dataset.fcPlatform === 'mac',
       projectFormulaDraftMirror: formulaDraftMirror.project,
       refreshFeaturesView,
@@ -538,15 +609,90 @@ export const Spreadsheet = {
       if (flags[id as keyof typeof flags]) attachHostFeature(id);
     }
 
-    if (opts.extensions) extensionRegistry.mountAll(opts.extensions);
     refreshFeaturesView();
 
     // Locale change → push fresh strings everywhere. Built-ins that ship a
     // `setStrings` hook live-update labels in place; the rest are rebuilt by
     // detaching and re-attaching with the new dictionary in their closure.
-    const unsubI18n = i18n.subscribe((next) => {
-      discardMacPalette();
+    // i18n.setLocale updates its current value before notifying us, so settle
+    // an active edit while the workbook still has the old profile. If a live
+    // profile write fails, restore the previous locale instead of leaving the
+    // UI and parser on different languages.
+    let appliedLocale = i18n.locale;
+    let rollingBackLocale = false;
+    const rollbackLocale = (previous: string, reason: unknown): void => {
+      console.warn('formulon-cell: locale profile switch rejected', reason);
+      if (rollingBackLocale || i18n.locale === previous) return;
+      rollingBackLocale = true;
+      try {
+        i18n.setLocale(previous);
+      } finally {
+        rollingBackLocale = false;
+      }
+    };
+    const settleEditsBeforeLocaleSwitch = (): boolean => {
+      if (binding.editor.isActive()) {
+        binding.editor.commit('none');
+        if (binding.editor.isActive()) return false;
+      }
+      if (formulaBar.isEditing()) {
+        if (!formulaBar.commitFx('none') || formulaBar.isEditing()) return false;
+      }
+      return true;
+    };
+    let deferredStrings: Strings | null = null;
+    const applyLocaleStrings = (next: Strings): void => {
+      const localeChanged = i18n.locale !== appliedLocale;
+      let profileChanged = false;
+      // Keep the dialog and all its inputs intact, including during the
+      // synchronous callback used to restore the controller's old locale.
+      if (hasOpenLocaleDraft(host)) {
+        if (localeChanged && !rollingBackLocale) {
+          rollbackLocale(appliedLocale, new Error('an active dialog draft is open'));
+        } else if (!rollingBackLocale) {
+          // Overlay updates do not change the language. Refresh safe chrome
+          // now and rebuild hidden factories once the last draft closes.
+          deferredStrings = next;
+          strings = next;
+          host.setAttribute('aria-label', strings.a11y.spreadsheet);
+          tag.setAttribute('aria-label', strings.a11y.nameBox);
+          refreshFormulaBarLabels();
+        }
+        return;
+      }
+      deferredStrings = null;
+      // The Mac formula palette owns an external formula draft while it is
+      // open. Its public handle can discard that lease, but cannot restore
+      // the user's raw text after the locale callback has already run. Keep
+      // the pane and reject the switch so the caller can retry after closing
+      // or committing it.
+      if (localeChanged && !rollingBackLocale && featureState.macFormulaPalette?.isOpen()) {
+        rollbackLocale(appliedLocale, new Error('an active Mac formula palette edit is open'));
+        return;
+      }
+      // A rollback callback must refresh the old labels without discarding
+      // the palette that caused the rejection.
+      if (!(rollingBackLocale && featureState.macFormulaPalette?.isOpen())) {
+        discardMacPalette();
+      }
+      if (localeChanged && !rollingBackLocale) {
+        if (!settleEditsBeforeLocaleSwitch()) {
+          rollbackLocale(appliedLocale, new Error('an active formula edit could not be committed'));
+          return;
+        }
+        try {
+          profileChanged = syncLocaleProfile(wb, i18n.locale, ui.platform, {
+            throwOnFailure: true,
+          });
+        } catch (error) {
+          rollbackLocale(appliedLocale, error);
+          return;
+        }
+        appliedLocale = i18n.locale;
+      }
       strings = next;
+      host.lang = languageTag();
+      overlayPortal.lang = host.lang;
       host.setAttribute('aria-label', strings.a11y.spreadsheet);
       tag.setAttribute('aria-label', strings.a11y.nameBox);
       refreshFormulaBarLabels();
@@ -555,6 +701,7 @@ export const Spreadsheet = {
       sheetTabsController?.update();
       renderer.invalidate();
       alwaysOnDialogs.setStrings(next);
+      if (profileChanged) refreshCells();
 
       // Toggleable host features: prefer setStrings when the handle exposes
       // it, otherwise fall back to detach+reattach.
@@ -577,7 +724,20 @@ export const Spreadsheet = {
       extensionRegistry.setUserStrings(next);
 
       emitter.emit('localeChange', { locale: i18n.locale, strings: next });
+    };
+    const unsubI18n = i18n.subscribe(applyLocaleStrings);
+    const draftObserver = new MutationObserver(() => {
+      if (disposed || deferredStrings === null || hasOpenLocaleDraft(host)) return;
+      applyLocaleStrings(deferredStrings);
     });
+    const draftObservation = {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'aria-hidden', 'style', 'class', 'open'],
+    };
+    draftObserver.observe(host, draftObservation);
+    draftObserver.observe(overlayPortal, draftObservation);
 
     host.dataset.fcEngineState = wb.isStub ? 'ready-stub' : 'ready';
 
@@ -623,6 +783,25 @@ export const Spreadsheet = {
       history,
       commands,
       applyChanges: (changes, options) => commands.applyChanges(changes, options),
+      get locale() {
+        return i18n.locale;
+      },
+      setLocale(next) {
+        if (disposed) return false;
+        const previous = i18n.locale;
+        if (next === previous) return true;
+        if (hasOpenLocaleDraft(host)) return false;
+        try {
+          i18n.setLocale(next);
+        } catch (error) {
+          // A subscriber can still fail after the profile transaction (for
+          // example while rebinding a host feature). Keep the public locale
+          // and engine profile aligned before reporting rejection.
+          rollbackLocale(previous, error);
+          return false;
+        }
+        return i18n.locale === next;
+      },
       setPolicy(next) {
         if (disposed) return;
         discardMacPalette();
@@ -678,6 +857,14 @@ export const Spreadsheet = {
         if (disposed) return;
         const nextUi = resolveSpreadsheetUiOptions(next);
         const platformChanged = nextUi.platform !== ui.platform;
+        let profileChanged = false;
+        if (platformChanged) {
+          // Keep the old UI platform attached when the profile-capable engine
+          // rejects the corresponding platform profile.
+          profileChanged = syncLocaleProfile(wb, i18n.locale, nextUi.platform, {
+            throwOnFailure: true,
+          });
+        }
         if (platformChanged) {
           discardMacPalette();
           if (featureState.fxDialog) detachHostFeature('fxDialog');
@@ -685,6 +872,7 @@ export const Spreadsheet = {
         ui = nextUi;
         host.dataset.fcPlatform = ui.platform;
         applyPlatformLayoutDefaults(store, ui.platform);
+        if (profileChanged) refreshCells();
         instance.setFeatures({ ...ui.features, ...opts.features });
         if (platformChanged && flags.fxDialog && !featureState.fxDialog) {
           attachHostFeature('fxDialog');
@@ -772,15 +960,25 @@ export const Spreadsheet = {
         // when the feature is off, both call sites are no-ops. Skip if the
         // dialog never attached so consumers can rely on the gate.
         if (!featureState.pageSetupDialog) return;
-        printSheet(
-          wb,
-          store,
-          store.getState().data.sheetIndex,
-          host,
-          mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
-          mode,
-          { printerProfiles: printers.getProfiles(), printerProfileId: printers.getProfileId() },
-        );
+        try {
+          printSheet(
+            wb,
+            store,
+            store.getState().data.sheetIndex,
+            host,
+            mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
+            mode,
+            { printerProfiles: printers.getProfiles(), printerProfileId: printers.getProfileId() },
+          );
+        } catch (error) {
+          if (!(error instanceof PrintResourceLimitError)) throw error;
+          void showMessage({
+            host,
+            title: strings.ribbon.print,
+            message: strings.pageSetup.printRangeTooLarge,
+            okLabel: strings.formatDialog.ok,
+          });
+        }
       },
       setPrinterProfiles: printers.setProfiles,
       setPrinterProfileId: printers.setProfileId,
@@ -856,6 +1054,7 @@ export const Spreadsheet = {
         return ok;
       },
       async setWorkbook(next) {
+        if (disposed) throw new Error('formulon-cell: spreadsheet is disposed');
         if (next === wb) return;
         // Validate before detaching the current workbook or clearing its history.
         if (navigation.options) {
@@ -866,6 +1065,10 @@ export const Spreadsheet = {
               Math.min(store.getState().data.sheetIndex, Math.max(0, next.sheetCount - 1)),
           );
         }
+        // Configure the incoming workbook while the old one is still live.
+        // A rejected profile leaves the current workbook and its store
+        // untouched because detachment happens only after this call.
+        syncLocaleProfile(next, i18n.locale, ui.platform, { throwOnFailure: true });
         discardMacPalette();
         // A Draw stroke belongs to the current workbook. Cancel it before
         // detaching the old engine so a late pointerup cannot commit points
@@ -874,18 +1077,24 @@ export const Spreadsheet = {
         binding.editor.cancel();
         formulaBar.discardFx();
         wb.detachStore(store);
+        detachWorkbookHistory(wb, history);
         binding.unbind();
-        if (ownsWb) wb.dispose();
+        disposeOwnedWorkbook();
         wb = next;
         syncedSessionCfRules = new Map();
         ownsWb = true; // we now own the next handle and will dispose it
-        wb.attachHistory(history);
+        workbookDisposed = false;
+        attachWorkbookHistory(wb, history);
         history.clear();
         const nextSheet =
           navigation.options?.range?.sheet ??
           Math.min(store.getState().data.sheetIndex, Math.max(0, wb.sheetCount - 1));
         mutators.setSheetIndex(store, nextSheet);
         mutators.clearIllustrations(store);
+        store.setState((state) => ({
+          ...state,
+          threadedComments: { bySheet: new Map(), persons: [] },
+        }));
         store.setState((state) => ({
           ...state,
           format: { formats: new Map(), customCellStyles: [] },
@@ -912,41 +1121,84 @@ export const Spreadsheet = {
       dispose() {
         if (disposed) return;
         disposed = true;
-        discardMacPalette();
-        formulaBar.discardFx();
-        unregisterCommands();
-        commands.dispose();
-        navigation.dispose();
-        wb.detachStore(store);
-        disposeMacRibbonActions(instance);
-        disposeMacInk(instance);
-        ribbon.dispose();
-        emitter.dispose();
-        ro.disconnect();
-        binding.unbind();
-        extensionRegistry.dispose();
-        for (const id of HOST_TOGGLEABLE_IDS) detachHostFeature(id);
-        formulaBar.detach();
-        sheetTabsController?.detach();
-        chromeSync?.detach();
-        alwaysOnDialogs.detach();
-        unsubCellRegistry();
-        formulaDraftMirror.detach();
-        pivotFieldListFollow.detach();
-        unsubI18n();
-        i18n.dispose();
-        renderer.dispose();
-        if (ownsWb) wb.dispose();
-        disposeOverlayPortal(host, instanceId);
-        releaseMountHost(host, instanceId);
+        const errors: unknown[] = [];
+        const cleanup = (fn: () => void): void => {
+          try {
+            fn();
+          } catch (error) {
+            errors.push(error);
+          }
+        };
+
+        // Every teardown is independent.  In particular, a user extension is
+        // allowed to throw without preventing the engine binding, workbook,
+        // portal, or host from being released.
+        cleanup(discardMacPalette);
+        cleanup(formulaBar.discardFx);
+        cleanup(unregisterCommands);
+        cleanup(() => commands.dispose());
+        cleanup(() => navigation.dispose());
+        cleanup(() => wb.detachStore(store));
+        cleanup(() => detachWorkbookHistory(wb, history));
+        cleanup(() => disposeMacRibbonActions(instance));
+        cleanup(() => disposeMacInk(instance));
+        cleanup(() => ribbon.dispose());
+        cleanup(() => emitter.dispose());
+        cleanup(() => ro.disconnect());
+        cleanup(() => binding.unbind());
+        cleanup(() => extensionRegistry.dispose());
+        for (const id of HOST_TOGGLEABLE_IDS) cleanup(() => detachHostFeature(id));
+        cleanup(() => formulaBar.detach());
+        cleanup(() => sheetTabsController?.detach());
+        cleanup(() => chromeSync?.detach());
+        cleanup(() => alwaysOnDialogs.detach());
+        cleanup(unsubCellRegistry);
+        cleanup(() => formulaDraftMirror.detach());
+        cleanup(() => pivotFieldListFollow.detach());
+        cleanup(unsubI18n);
+        cleanup(() => draftObserver.disconnect());
+        cleanup(() => i18n.dispose());
+        cleanup(() => renderer.dispose());
+        cleanup(disposeOwnedWorkbook);
+        cleanup(() => disposeOverlayPortal(host, instanceId));
+        cleanup(() => {
+          if (host.dataset.fcInstId === instanceId) {
+            if (previousHostLanguage === null) host.removeAttribute('lang');
+            else host.setAttribute('lang', previousHostLanguage);
+          }
+        });
+        cleanup(() => releaseMountHost(host, instanceId));
+        throwCleanupErrors(errors);
       },
     };
 
-    // Single-call ribbon: mount the toolbar into a `display: contents` host at
-    // the top of `.fc-host` so its shell participates in the host flex column
-    // directly (grid fills the rest). The toolbar reads the same
-    // `data-fc-theme`, so grid and toolbar theme together via the cascade.
-    instance.setToolbar(requestedToolbar);
+    try {
+      // Install the locale transaction before user extensions can subscribe.
+      if (opts.extensions) extensionRegistry.mountAll(opts.extensions);
+      refreshFeaturesView();
+
+      // Single-call ribbon: mount the toolbar into a `display: contents` host at
+      // the top of `.fc-host` so its shell participates in the host flex column
+      // directly (grid fills the rest). The toolbar reads the same
+      // `data-fc-theme`, so grid and toolbar theme together via the cascade.
+      instance.setToolbar(requestedToolbar);
+    } catch (error) {
+      // At this point the instance is fully live. A setup failure must still
+      // release every resource, while the caller receives the original setup
+      // error rather than a cleanup exception.
+      try {
+        instance.dispose();
+      } catch (cleanupError) {
+        console.error('formulon-cell: mount cleanup after setup failure threw', cleanupError);
+      }
+      try {
+        opts.onError?.(error);
+      } catch (hookError) {
+        console.error('formulon-cell: mount error handler threw', hookError);
+      }
+      if (opts.renderError !== false) renderMountError(host, error, strings.mountError);
+      throw error;
+    }
 
     return instance;
   },

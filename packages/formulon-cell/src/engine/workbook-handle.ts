@@ -3,6 +3,11 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
 import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
+import {
+  canonicalizeFormulaForEngine,
+  localeOrdinalForSpreadsheetProfile,
+  localizeFormula,
+} from './function-locale.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { numberValue } from './result.js';
@@ -14,6 +19,7 @@ import type {
   FontRecord,
   FormulonModule,
   FunctionMetadataProvider,
+  Range,
   Workbook,
 } from './types.js';
 import { fromEngineValue } from './value.js';
@@ -235,6 +241,24 @@ export class WorkbookHandle {
     return this.localeDefaultFont ?? this.getFontRecord(0);
   }
 
+  /**
+   * Font used for display when a cell has no explicit family or size.  This is
+   * deliberately resolved through the current workbook theme, while
+   * `workbookDefaultFont` remains the raw record used for writeback so a
+   * theme-linked `scheme` is never lost.
+   *
+   * The returned size is still in native points. Callers that paint or measure
+   * cells must convert it to CSS pixels at that surface boundary.
+   */
+  get workbookDisplayFont(): Pick<FontRecord, 'name' | 'size'> | null {
+    this.assertAlive();
+    if (this.localeDefaultFont) return { ...this.localeDefaultFont };
+    const resolved = this.getResolvedFontRecord(0);
+    if (resolved) return { name: resolved.name, size: resolved.size };
+    const fallback = this.workbookDefaultFont;
+    return fallback ? { name: fallback.name, size: fallback.size } : null;
+  }
+
   get sheetCount(): number {
     this.assertAlive();
     return numberValue(this.wb.sheetCount(), 'sheetCount');
@@ -393,11 +417,30 @@ export class WorkbookHandle {
   setFormula(a: Addr, formula: string): void {
     this.assertAlive();
     this.withJournal(a, () => {
-      const s = this.wb.setFormula(a.sheet, a.row, a.col, formula);
+      const s = this.wb.setFormula(a.sheet, a.row, a.col, this.formulaForEngine(formula));
       if (!s.ok) throw new Error(`setFormula: ${s.message}`);
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
     });
+  }
+
+  /**
+   * Render canonical stored formula text with the active profile's display
+   * grammar for formula-bar and inline-editor display. This does not change
+   * `cellFormula`, save output, or any formula used for engine references.
+   */
+  getFormulaForDisplay(formula: string): string {
+    this.assertAlive();
+    // formulon 0.13 can localize the complete formula grammar (function
+    // names, separators, decimal literals, booleans, and error spellings).
+    // Use that surface when present; the alias-only helper below remains the
+    // compatibility path for older engine packages.
+    if (this.capabilities.formulaLocale) return this.localizeFormulaText(formula);
+    return localizeFormula(
+      this,
+      formula,
+      localeOrdinalForSpreadsheetProfile(this.spreadsheetProfileId()),
+    );
   }
 
   /** Apply a set of cell writes as one adapter transaction. The raw engine is
@@ -421,7 +464,12 @@ export class WorkbookHandle {
         throw new Error('applyCellPatchAtomic: invalid address');
       }
       const key = addrKey(addr);
-      unique.set(key, { patch });
+      unique.set(key, {
+        patch:
+          typeof patch.formula === 'string'
+            ? { ...patch, formula: this.formulaForEngine(patch.formula) }
+            : patch,
+      });
     }
 
     const requested = [...unique.values()];
@@ -668,8 +716,90 @@ export class WorkbookHandle {
     }
   }
 
+  /** Read populated cells within a range, including evaluated spill cells and pivot overlays. */
+  *cellsInRange(
+    range: Range,
+    pageSize = 65536,
+  ): Generator<{ addr: Addr; value: CellValue; formula: string | null }> {
+    this.assertAlive();
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 65536) {
+      throw new RangeError('cellsInRange pageSize must be between 1 and 65536');
+    }
+    if (!this.capabilities.rangeEnumeration) {
+      for (const entry of this.cells(range.sheet)) {
+        if (
+          entry.addr.row >= range.r0 &&
+          entry.addr.row <= range.r1 &&
+          entry.addr.col >= range.c0 &&
+          entry.addr.col <= range.c1
+        )
+          yield entry;
+      }
+      return;
+    }
+    let cursor: number | null = null;
+    const cursors = new Set<number>();
+    do {
+      const result = this.wb.getCellsInRange(
+        range.sheet,
+        {
+          firstRow: range.r0,
+          firstCol: range.c0,
+          lastRow: range.r1,
+          lastCol: range.c1,
+        },
+        cursor,
+        pageSize,
+      );
+      if (!result.status.ok) throw new Error(`getCellsInRange: ${result.status.message}`);
+      for (const entry of result.cells) {
+        yield {
+          addr: { sheet: range.sheet, row: entry.row, col: entry.col },
+          value: fromEngineValue(entry.value),
+          formula: entry.formula
+            ? entry.formula.startsWith('=')
+              ? entry.formula
+              : `=${entry.formula}`
+            : null,
+        };
+      }
+      cursor = result.nextCursor;
+      if (cursor !== null) {
+        if (cursors.has(cursor)) throw new Error('getCellsInRange returned a repeated cursor');
+        cursors.add(cursor);
+      }
+    } while (cursor !== null);
+    for (const entry of this.pivotCells(range.sheet)) {
+      if (
+        entry.addr.row >= range.r0 &&
+        entry.addr.row <= range.r1 &&
+        entry.addr.col >= range.c0 &&
+        entry.addr.col <= range.c1
+      )
+        yield entry;
+    }
+  }
+
+  /** Stored formula in relative R1C1 notation, including the leading equals sign. */
+  cellFormulaR1C1(a: Addr): string | null {
+    this.assertAlive();
+    if (!this.capabilities.formulaR1C1) return null;
+    const result = this.wb.getFormulaR1C1(a.sheet, a.row, a.col);
+    if (!result.status.ok) return null;
+    return result.formula
+      ? result.formula.startsWith('=')
+        ? result.formula
+        : `=${result.formula}`
+      : null;
+  }
+
   cellFormula(a: Addr): string | null {
     this.assertAlive();
+    if (this.capabilities.formulaRead) {
+      const result = this.wb.getFormula(a.sheet, a.row, a.col);
+      if (!result.status.ok) throw new Error(`getFormula: ${result.status.message}`);
+      return result.formula;
+    }
     const n = numberValue(this.wb.cellCount(a.sheet), `cellCount(${a.sheet})`);
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.cellAt(a.sheet, i);
@@ -870,6 +1000,21 @@ export class WorkbookHandle {
                 ? this.wb.setError(a.sheet, a.row, a.col, value.code)
                 : this.wb.setBlank(a.sheet, a.row, a.col);
     if (!status.ok) throw new Error(`cell patch: ${status.message}`);
+  }
+
+  /**
+   * Formulon's stored formula grammar is canonical even when the active host
+   * profile displays German/French aliases. Keep this normalization at the
+   * two engine formula write boundaries (`setFormula` and atomic patches) so
+   * typed input, paste, commands, and trusted host changes persist portable
+   * formulas.
+   */
+  private formulaForEngine(formula: string): string {
+    return canonicalizeFormulaForEngine(
+      this,
+      formula,
+      localeOrdinalForSpreadsheetProfile(this.spreadsheetProfileId()),
+    );
   }
 
   /** Capture before/after, run the mutation, and push to the active history.

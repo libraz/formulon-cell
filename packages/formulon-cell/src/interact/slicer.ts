@@ -167,7 +167,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       const isOn = selected.size === 0 || selected.has(value);
       const chip = createInteractionChipButton({
         className: 'fc-slicer__chip',
-        label: value === '' ? '(blank)' : value,
+        label: value === '' ? strings.workbookObjects.pivotBlankItem : value,
         dataset: { fcValue: value },
         role: 'option',
         pressed: isOn,

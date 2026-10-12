@@ -1,4 +1,5 @@
 import { formatA1Cell, parseAddrKey } from '../engine/address.js';
+import type { Locale } from '../i18n/strings.js';
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import type { State } from '../store/types.js';
 
@@ -23,7 +24,7 @@ export interface ReviewCell {
 }
 
 export type ScriptCommand = 'uppercase' | 'lowercase' | 'trim' | 'clear';
-export type RibbonReportLang = 'en' | 'ja';
+export type RibbonReportLang = Locale;
 type ReviewReportText = Strings['reviewReports'];
 
 interface ReviewRange {

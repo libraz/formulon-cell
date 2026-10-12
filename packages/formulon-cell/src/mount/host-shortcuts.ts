@@ -25,6 +25,7 @@ import { recordFormatChange, recordTablesChange } from '../commands/slice-histor
 import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog } from '../interact/cell-shift-dialog.js';
 import { formatWithPending } from '../store/pending-format.js';
@@ -82,7 +83,7 @@ interface HostShortcutInput {
   namedRangeDialog: () => { open(): void } | null;
   pasteSpecialDialog: () => { open(): void } | null;
   quickAnalysis: () => { open(): void } | null;
-  locale: string;
+  getLocale: () => string;
   store: SpreadsheetStore;
   strings: () => Strings;
   wb: () => WorkbookHandle;
@@ -90,6 +91,10 @@ interface HostShortcutInput {
 
 export function createHostShortcutHandler(input: HostShortcutInput): (e: KeyboardEvent) => void {
   return (e: KeyboardEvent): void => {
+    // Native controls own their keyboard interaction. In particular, the
+    // locale selector must be able to handle function keys and modifier
+    // combinations without touching the workbook or preventing the event.
+    if (e.target instanceof HTMLSelectElement) return;
     const currentWb = input.wb();
     const restricted = interactionControllerFor(input.store)?.policy !== undefined;
     const meta = e.ctrlKey || e.metaKey;
@@ -129,7 +134,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       return;
     }
     const applyDirectNumberFormat = (action: NumberFormatAction): void => {
-      const fmt = numberFormatForAction(action, input.locale);
+      const fmt = numberFormatForAction(action, input.getLocale());
       if (!fmt) return;
       recordFormatChange(
         input.history,
@@ -418,9 +423,9 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       e.preventDefault();
       if (restricted) return;
       const now = new Date();
-      const utcMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-      const serial = utcMs / 86_400_000 + 25569;
-      currentWb.setNumber(input.store.getState().selection.active, Math.floor(serial));
+      const serial = excelSerialFromParts(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      if (serial === null) return;
+      currentWb.setNumber(input.store.getState().selection.active, serial);
       mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
     } else if (e.key === ':' || (e.shiftKey && e.key === ';')) {
       e.preventDefault();

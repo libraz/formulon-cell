@@ -1,3 +1,5 @@
+import { parseLocalizedNumericInput } from '../../commands/coerce-input.js';
+import { formatEditableNumber } from '../../engine/value.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -30,6 +32,10 @@ export interface NumberPromptOptions {
   okLabel: string;
   cancelLabel: string;
   invalidMessage: string;
+  /** BCP 47 input locale, or a getter for a live profile. */
+  locale?: string | (() => string);
+  /** Require a whole number. `step` controls the spinner increment only. */
+  integer?: boolean;
 }
 
 export interface ConfirmOptions {
@@ -41,6 +47,7 @@ export interface ConfirmOptions {
 }
 
 export interface MessageOptions {
+  host?: HTMLElement;
   title: string;
   message: string;
   okLabel: string;
@@ -86,13 +93,20 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> =>
 export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | null> =>
   new Promise<number | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title });
+    const getLocale = (): string =>
+      typeof opts.locale === 'function' ? opts.locale() : (opts.locale ?? 'en-US');
+    const locale = getLocale();
+    const integerContract = opts.integer === true;
     const input = appendInputRow(shell.body, opts.label, {
-      type: 'number',
-      initial: Number.isFinite(opts.initial) ? String(opts.initial) : '',
+      type: integerContract ? 'number' : 'text',
+      initial: Number.isFinite(opts.initial)
+        ? formatEditableNumber(opts.initial as number, locale)
+        : '',
       min: opts.min,
       max: opts.max,
       step: opts.step,
     });
+    if (!integerContract) input.inputMode = 'decimal';
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: opts.cancelLabel,
@@ -100,8 +114,9 @@ export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | nu
     });
 
     const readValue = (): number | null => {
-      const n = Number(input.value);
-      if (!Number.isFinite(n)) return null;
+      const n = parseLocalizedNumericInput(input.value, getLocale());
+      if (n === null) return null;
+      if (integerContract && !Number.isInteger(n)) return null;
       if (typeof opts.min === 'number' && n < opts.min) return null;
       if (typeof opts.max === 'number' && n > opts.max) return null;
       return n;
@@ -162,6 +177,7 @@ export const showConfirm = (opts: ConfirmOptions): Promise<boolean> =>
 export const showMessage = (opts: MessageOptions): Promise<void> =>
   new Promise<void>((resolve) => {
     const shell = createDialogShell({
+      host: opts.host,
       title: opts.title,
       role: 'alertdialog',
       bodyVariant: 'app',

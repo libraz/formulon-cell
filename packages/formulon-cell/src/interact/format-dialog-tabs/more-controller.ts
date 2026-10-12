@@ -2,7 +2,9 @@
 // the data-validation editor, which the Data Validation dialog mode shows on
 // its own. Date/time validation bounds round-trip through native pickers.
 
-import { coerceInput } from '../../commands/coerce-input.js';
+import { coerceInput, parseLocalizedNumericInput } from '../../commands/coerce-input.js';
+import { formatEditableNumber } from '../../engine/value.js';
+import { excelSerialToIsoDate } from '../../format/date-serial.js';
 import type { ValidationErrorStyle, ValidationOp } from '../../store/store.js';
 import type { ValidationKind } from '../format-dialog-model.js';
 import { type FormatTabContext, type FormatTabController, markMixed } from './controller.js';
@@ -11,13 +13,7 @@ import type { MoreTabRefs } from './more.js';
 /** Convert a spreadsheet date serial to a native `<input type="date">` value
  *  (`yyyy-mm-dd`, UTC). Returns '' for non-finite serials. */
 const serialToDateInputValue = (serial: number): string => {
-  if (!Number.isFinite(serial)) return '';
-  const ms = Math.round((serial - 25569) * 86_400_000);
-  const d = new Date(ms);
-  const y = String(d.getUTCFullYear()).padStart(4, '0');
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return excelSerialToIsoDate(serial) ?? '';
 };
 
 /** Convert a day-fraction time serial to a native `<input type="time">` value
@@ -34,33 +30,41 @@ const serialToTimeInputValue = (serial: number): string => {
 
 /** Format a stored bound (serial or plain number) for the bound `<input>` value,
  *  matching the input type chosen for the validation kind. */
-const boundInputValue = (kind: ValidationKind, value: number): string => {
+const boundInputValue = (kind: ValidationKind, value: number, locale?: string): string => {
   if (kind === 'date') return serialToDateInputValue(value);
   if (kind === 'time') return serialToTimeInputValue(value);
-  return String(value);
+  return formatEditableNumber(value, locale);
 };
 
 /** Parse a bound `<input>` value back into a stored number. Date/time kinds
  *  route the string through `coerceInput` so `yyyy-mm-dd` / `HH:mm` become the
  *  matching spreadsheet serial; other kinds parse a plain number. Returns null
  *  when the field is empty or unparseable so the previous bound is kept. */
-const parseBoundInputValue = (kind: ValidationKind, raw: string): number | null => {
+const parseBoundInputValue = (
+  kind: ValidationKind,
+  raw: string,
+  locale?: string,
+): number | null => {
   if (kind === 'date' || kind === 'time') {
     const coerced = coerceInput(raw);
     return coerced.kind === 'number' ? coerced.value : null;
   }
-  const n = Number.parseFloat(raw);
-  return Number.isFinite(n) ? n : null;
+  const n = parseLocalizedNumericInput(raw, locale);
+  if (n === null) return null;
+  if ((kind === 'whole' || kind === 'textLength') && !Number.isInteger(n)) return null;
+  return n;
 };
 
 export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatTabController {
   const { draft, on, touch, isMixed, syncControls } = ctx;
+  const getLocale = ctx.getLocale;
   const {
     hlInput,
     hlClear,
     commentArea,
     commentClear,
     validationKindSelect,
+    validationSection,
     validationOpRow,
     validationOpSelect,
     validationARow,
@@ -97,16 +101,33 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     validationErrorMessageArea,
   } = refs;
 
+  const dialog = validationSection.closest<HTMLElement>('[role="dialog"]');
+  const invalidBoundInputs = new Set<HTMLInputElement>();
+  const setBoundInputValidity = (input: HTMLInputElement, valid: boolean): void => {
+    if (valid) {
+      invalidBoundInputs.delete(input);
+      delete input.dataset.fcInvalid;
+      input.removeAttribute('aria-invalid');
+      input.setCustomValidity('');
+      return;
+    }
+    invalidBoundInputs.add(input);
+    input.dataset.fcInvalid = 'true';
+    input.setAttribute('aria-invalid', 'true');
+    input.setCustomValidity('invalid');
+  };
+
   /** Switch the A/B bound inputs to a native date/time picker for date/time
    *  validation (so bounds are pickable instead of raw serials) and back to a
-   *  number field otherwise. */
+   *  localized text field for numeric validation. */
   const applyBoundInputMode = (kind: ValidationKind): void => {
-    const type = kind === 'date' ? 'date' : kind === 'time' ? 'time' : 'number';
+    const type = kind === 'date' ? 'date' : kind === 'time' ? 'time' : 'text';
     for (const input of [validationAInput, validationBInput]) {
       if (input.type !== type) input.type = type;
       if (type === 'time') input.step = '1';
-      else if (type === 'number') input.step = 'any';
       else input.removeAttribute('step');
+      if (type === 'text') input.inputMode = kind === 'decimal' ? 'decimal' : 'numeric';
+      else input.removeAttribute('inputmode');
     }
   };
 
@@ -138,6 +159,12 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
   };
 
   const sync = (): void => {
+    // `sync()` also runs while FormatDialog is hydrating a new open. Drop an
+    // invalid edit left by a previous open before rehydrating the stored draft.
+    if (dialog?.hidden) {
+      setBoundInputValidity(validationAInput, true);
+      setBoundInputValidity(validationBInput, true);
+    }
     hlInput.value = draft.hyperlink;
     commentArea.value = draft.comment;
     validationArea.value = draft.validationList;
@@ -148,8 +175,20 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     validationKindSelect.value = draft.validationKind;
     validationOpSelect.value = draft.validationOp;
     applyBoundInputMode(draft.validationKind);
-    validationAInput.value = boundInputValue(draft.validationKind, draft.validationA);
-    validationBInput.value = boundInputValue(draft.validationKind, draft.validationB);
+    if (!invalidBoundInputs.has(validationAInput)) {
+      validationAInput.value = boundInputValue(
+        draft.validationKind,
+        draft.validationA,
+        getLocale(),
+      );
+    }
+    if (!invalidBoundInputs.has(validationBInput)) {
+      validationBInput.value = boundInputValue(
+        draft.validationKind,
+        draft.validationB,
+        getLocale(),
+      );
+    }
     validationFormulaInput.value = draft.validationFormula;
     validationAllowBlankInput.checked = draft.validationAllowBlank;
     validationErrorStyleSelect.value = draft.validationErrorStyle;
@@ -271,30 +310,47 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
   };
   const onValidationKindChange = (): void => {
     touch('validation');
+    setBoundInputValidity(validationAInput, true);
+    setBoundInputValidity(validationBInput, true);
     draft.validationKind = validationKindSelect.value as ValidationKind;
     // Switching between numeric / date / time kinds swaps the bound-input type,
     // so re-render the stored bounds in the new type's value format.
     applyBoundInputMode(draft.validationKind);
-    validationAInput.value = boundInputValue(draft.validationKind, draft.validationA);
-    validationBInput.value = boundInputValue(draft.validationKind, draft.validationB);
+    validationAInput.value = boundInputValue(draft.validationKind, draft.validationA, getLocale());
+    validationBInput.value = boundInputValue(draft.validationKind, draft.validationB, getLocale());
     syncControls();
   };
   const onValidationOpChange = (): void => {
     touch('validation');
     draft.validationOp = validationOpSelect.value as ValidationOp;
+    if (draft.validationOp !== 'between' && draft.validationOp !== 'notBetween') {
+      // A hidden upper bound is no longer part of the rule. Discard an
+      // unfinished edit there so it cannot block a valid one-sided commit.
+      setBoundInputValidity(validationBInput, true);
+    }
     syncControls();
   };
   const onValidationAInput = (): void => {
     touch('validation');
-    const n = parseBoundInputValue(draft.validationKind, validationAInput.value);
-    if (n !== null) draft.validationA = n;
-    syncControls();
+    const n = parseBoundInputValue(draft.validationKind, validationAInput.value, getLocale());
+    setBoundInputValidity(validationAInput, n !== null);
+    if (n !== null) {
+      draft.validationA = n;
+      syncControls();
+    } else {
+      syncValidationVisibility();
+    }
   };
   const onValidationBInput = (): void => {
     touch('validation');
-    const n = parseBoundInputValue(draft.validationKind, validationBInput.value);
-    if (n !== null) draft.validationB = n;
-    syncControls();
+    const n = parseBoundInputValue(draft.validationKind, validationBInput.value, getLocale());
+    setBoundInputValidity(validationBInput, n !== null);
+    if (n !== null) {
+      draft.validationB = n;
+      syncControls();
+    } else {
+      syncValidationVisibility();
+    }
   };
   const onValidationFormulaInput = (): void => {
     touch('validation');
@@ -365,6 +421,22 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
   on(validationShowErrorMessageInput, 'change', onValidationShowErrorMessageChange);
   on(validationErrorTitleInput, 'input', onValidationErrorTitleInput);
   on(validationErrorMessageArea, 'input', onValidationErrorMessageInput);
+
+  // FormatDialog's OK listener is registered after this controller is attached.
+  // Stop that listener while a numeric/date/time bound still carries an
+  // invalid edit, rather than letting the untouched draft value win silently.
+  const okButton = dialog?.querySelector<HTMLButtonElement>(
+    '.fc-fmtdlg__footer .fc-fmtdlg__btn--primary',
+  );
+  if (okButton) {
+    on(okButton, 'click', (event) => {
+      const invalid = [...invalidBoundInputs][0];
+      if (!invalid) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      invalid.focus();
+    });
+  }
 
   return { sync, syncMixed };
 }

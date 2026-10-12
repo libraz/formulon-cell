@@ -15,6 +15,56 @@
     .fc-fmtdlg__row > span:first-child {
       min-width: 100%;
     }
+    /* The desktop Font tab deliberately mirrors Excel's three-column grid.
+       At phone widths that grid leaves the style, colour, and preview tracks
+       outside the dialog. Stack its controls in source order so every
+       translated caption and field remains reachable in the body scroller. */
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+      padding: 14px 0 0;
+      overflow-x: hidden;
+    }
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"]::before {
+      display: none;
+    }
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] > * {
+      grid-column: 1 !important;
+      grid-row: auto !important;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-effects {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+      padding-left: 0;
+    }
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-family-row,
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-size-row,
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-color-row {
+      width: 100%;
+    }
+    .fc-fmtdlg__font-family-row input[type="text"],
+    .fc-fmtdlg__font-size-row [data-fc-input="size"] {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+    }
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-list {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-preview {
+      width: 100%;
+      min-width: 0;
+      padding-inline: 0;
+    }
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-preview-box {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
     .fc-fmtdlg__number-layout {
       grid-template-columns: 1fr;
     }

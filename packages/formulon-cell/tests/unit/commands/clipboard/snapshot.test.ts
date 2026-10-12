@@ -53,6 +53,37 @@ describe('captureSnapshot', () => {
     });
   });
 
+  it('captures inherited effective formats without materializing the source', () => {
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+        value: { kind: 'text', value: 'inherited' },
+        formula: null,
+      });
+      return { ...s, data: { ...s.data, cells } };
+    });
+
+    const snap = captureSnapshot(
+      store.getState(),
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      'copy',
+      {
+        formatResolver: () => ({
+          fontFamily: 'Inherited Font',
+          fontSize: 24,
+          borders: { top: true },
+        }),
+      },
+    );
+
+    expect(snap?.cells[0]?.[0]?.format).toEqual({
+      fontFamily: 'Inherited Font',
+      fontSize: 24,
+      borders: { top: true },
+    });
+    expect(store.getState().format.formats.size).toBe(0);
+  });
+
   it('represents missing cells as blank entries with undefined format', () => {
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
     expect(snap?.cells.flat()).toEqual([

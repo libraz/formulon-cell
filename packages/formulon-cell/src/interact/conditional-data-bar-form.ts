@@ -86,6 +86,7 @@ export function appendDataBarForm(
   form: HTMLElement,
   t: Strings['conditionalDialog'],
   isEditing: () => boolean,
+  getLocale: () => string = () => 'en-US',
 ): DataBarForm {
   const group = document.createElement('div');
   group.className = 'fc-conddlg__sub';
@@ -328,8 +329,8 @@ export function appendDataBarForm(
   };
 
   const reset = (): void => {
-    applyScalePoint(dataBarMin, undefined, { kind: 'min' }, '0');
-    applyScalePoint(dataBarMax, undefined, { kind: 'max' }, '100');
+    applyScalePoint(dataBarMin, undefined, { kind: 'min' }, '0', getLocale());
+    applyScalePoint(dataBarMax, undefined, { kind: 'max' }, '100', getLocale());
     barFillStyleSelect.value = 'gradient';
     resetDataBarAppearance();
     showValueCk.checked = true;
@@ -375,15 +376,16 @@ export function appendDataBarForm(
     barBorderStyleSelect.value =
       rule.borderColor !== undefined || rule.negativeBorderColor !== undefined ? 'solid' : 'none';
     showValueCk.checked = rule.showValue !== false;
-    applyScalePoint(dataBarMin, rule.min, { kind: 'min' }, '0');
-    applyScalePoint(dataBarMax, rule.max, { kind: 'max' }, '100');
+    applyScalePoint(dataBarMin, rule.min, { kind: 'min' }, '0', getLocale());
+    applyScalePoint(dataBarMax, rule.max, { kind: 'max' }, '100', getLocale());
     barDirectionSelect.value = rule.direction ?? 'context';
     syncDataBarAppearance();
   };
 
   const collect = (range: Range): DataBarRule | null => {
-    const min = collectScalePoint(dataBarMin);
-    const max = collectScalePoint(dataBarMax);
+    const locale = getLocale();
+    const min = collectScalePoint(dataBarMin, locale);
+    const max = collectScalePoint(dataBarMax, locale);
     if (!min || !max) return null;
     const axisPosition = barAxisPositionSelect.value as DataBarAxisPosition;
     const dataBarRule: DataBarRule = {

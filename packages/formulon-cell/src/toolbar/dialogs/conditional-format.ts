@@ -1,3 +1,4 @@
+import { parseLocalizedNumericInput } from '../../commands/coerce-input.js';
 import {
   applyConditionalStylePreview,
   type ConditionalFormatDialogStyle,
@@ -69,6 +70,8 @@ export interface ConditionalFormatNumberDialogOptions {
   secondLabel?: string;
   secondInitial?: number;
   initialStyle?: string;
+  /** BCP 47 locale used by the decimal input boundary and initial value. */
+  locale?: string;
   strings: ConditionalFormatRuleDialogStrings;
 }
 
@@ -141,13 +144,30 @@ const appendFormatRow = (
 
 const readNumber = (
   input: HTMLInputElement,
-  opts: { min?: number; max?: number },
+  opts: { locale?: string; min?: number; max?: number },
 ): number | null => {
-  const value = Number(input.value);
-  if (!Number.isFinite(value)) return null;
+  const value = parseLocalizedNumericInput(input.value, opts.locale);
+  if (value === null) return null;
   if (typeof opts.min === 'number' && value < opts.min) return null;
   if (typeof opts.max === 'number' && value > opts.max) return null;
   return value;
+};
+
+const formatLocalizedNumericInitial = (
+  value: number | undefined,
+  locale: string | undefined,
+): string => {
+  if (!Number.isFinite(value)) return '';
+  try {
+    return new Intl.NumberFormat(locale, {
+      useGrouping: false,
+      maximumSignificantDigits: 17,
+    }).format(value as number);
+  } catch {
+    // A custom dictionary may use an invalid BCP 47 tag. Keep the dialog
+    // usable while the input parser falls back to its default grammar.
+    return String(value);
+  }
 };
 
 export const showConditionalFormatNumberDialog = (
@@ -156,22 +176,24 @@ export const showConditionalFormatNumberDialog = (
   new Promise<ConditionalFormatDialogResult | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title });
     const first = appendInputRow(shell.body, opts.label, {
-      type: 'number',
-      initial: Number.isFinite(opts.initial) ? String(opts.initial) : '',
+      type: 'text',
+      initial: formatLocalizedNumericInitial(opts.initial, opts.locale),
       min: opts.min,
       max: opts.max,
       step: opts.step,
     });
+    first.inputMode = 'decimal';
     const second =
       opts.secondLabel !== undefined
         ? appendInputRow(shell.body, opts.secondLabel, {
-            type: 'number',
-            initial: Number.isFinite(opts.secondInitial) ? String(opts.secondInitial) : '',
+            type: 'text',
+            initial: formatLocalizedNumericInitial(opts.secondInitial, opts.locale),
             min: opts.min,
             max: opts.max,
             step: opts.step,
           })
         : null;
+    if (second) second.inputMode = 'decimal';
     const formatRow = appendFormatRow(shell.body, opts.strings, opts.initialStyle);
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {

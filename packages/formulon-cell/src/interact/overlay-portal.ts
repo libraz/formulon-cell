@@ -30,6 +30,27 @@ const portalHosts = new WeakMap<HTMLElement, HTMLElement>();
 const overlayOptions = new WeakMap<Element, OverlayOptions | undefined>();
 const overlayOwners = new WeakMap<Element, () => HTMLElement | null>();
 
+/** A locale transaction must not destroy an open dialog's uncommitted draft. */
+export function hasOpenLocaleDraft(host: HTMLElement): boolean {
+  const roots = [host, portals.get(host)?.portal];
+  return roots.some((root) => {
+    if (!root) return false;
+    return Array.from(
+      root.querySelectorAll<HTMLElement>(
+        '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], .fc-find, .fc-cmtnote, .fc-filter-dropdown',
+      ),
+    ).some((dialog) => {
+      if (!dialog.isConnected || dialog.closest('[hidden],[aria-hidden="true"]')) return false;
+      const view = dialog.ownerDocument.defaultView;
+      for (let node: HTMLElement | null = dialog; node; node = node.parentElement) {
+        const style = view?.getComputedStyle(node);
+        if (style?.display === 'none' || style?.visibility === 'hidden') return false;
+      }
+      return true;
+    });
+  });
+}
+
 /** Associate an external toolbar with its sheet without guessing a global host. */
 export function registerOverlayOwner(node: Element, getHost: () => HTMLElement | null): () => void {
   overlayOwners.set(node, getHost);
@@ -42,6 +63,8 @@ function syncTheme(host: HTMLElement, portal: HTMLElement): void {
   const theme = host.dataset.fcTheme;
   if (theme) portal.dataset.fcTheme = theme;
   else delete portal.dataset.fcTheme;
+  if (host.lang) portal.lang = host.lang;
+  else portal.removeAttribute('lang');
 }
 
 /** Stamp the portal with the host's current instance id. Remounting the same

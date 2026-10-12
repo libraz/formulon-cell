@@ -1,4 +1,8 @@
 import { SheetVisibility } from '../engine/types.js';
+import {
+  hasWholeSheetFontStoreBinding,
+  remapStoreSheetStateForStructureEvent,
+} from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
@@ -20,7 +24,14 @@ const shiftedAfterMove = (idx: number, from: number, to: number): number => {
 const remapWorkbookSheetLayout = (
   store: SpreadsheetStore,
   mapIndex: (idx: number) => number | null,
+  wb?: WorkbookHandle,
 ): void => {
+  const boundStore = wb ? hasWholeSheetFontStoreBinding(wb, store) : false;
+  // A mounted WorkbookHandle has already performed this remap from its
+  // structure event. Command-only callers still need the address-keyed store
+  // state moved alongside the native sheets, but must not apply the mapping a
+  // second time after the event path has handled it.
+  if (!boundStore) remapStoreSheetStateForStructureEvent(store, mapIndex);
   store.setState((s) => {
     const hiddenSheets = new Set<number>();
     for (const idx of s.layout.hiddenSheets) {
@@ -78,7 +89,7 @@ export function addSheet(
           mutators.setSheetIndex(store, Math.min(beforeActive, Math.max(0, wb.sheetCount - 2)));
         }
         if (wb.removeSheet(added)) {
-          remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, added));
+          remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, added), wb);
         }
       },
       redo: () => {
@@ -130,7 +141,7 @@ export function removeSheet(store: SpreadsheetStore, wb: WorkbookHandle, idx: nu
   if (wb.sheetCount <= 1) return false;
   const ok = wb.removeSheet(idx);
   if (!ok) return false;
-  remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, idx));
+  remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, idx), wb);
 
   const cur = store.getState().data.sheetIndex;
   let next = cur;
@@ -158,7 +169,7 @@ export function moveSheet(
   const beforeActive = store.getState().data.sheetIndex;
   const ok = wb.moveSheet(from, to);
   if (!ok) return false;
-  remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to));
+  remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to), wb);
 
   const cur = store.getState().data.sheetIndex;
   let next = cur;
@@ -173,12 +184,12 @@ export function moveSheet(
     history.push({
       undo: () => {
         if (!wb.moveSheet(to, from)) return;
-        remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, to, from));
+        remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, to, from), wb);
         mutators.setSheetIndex(store, beforeActive);
       },
       redo: () => {
         if (!wb.moveSheet(from, to)) return;
-        remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to));
+        remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to), wb);
         mutators.setSheetIndex(store, afterActive);
       },
     });

@@ -8,6 +8,7 @@ import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geomet
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
+import { sameSavedWorkbook } from './saved-workbook-proof.js';
 import { insertRows } from './structure.js';
 
 /** Data commands exposed by the Mac ribbon. The limits are
@@ -129,9 +130,6 @@ const isFiniteNumber = (value: CellValue): value is { kind: 'number'; value: num
 
 const sameAddr = (a: Addr, b: Addr): boolean =>
   a.sheet === b.sheet && a.row === b.row && a.col === b.col;
-
-const sameBytes = (a: Uint8Array, b: Uint8Array): boolean =>
-  a.length === b.length && a.every((byte, index) => byte === b[index]);
 
 const sameCellValue = (a: CellValue, b: CellValue): boolean => {
   if (a.kind !== b.kind) return false;
@@ -601,7 +599,7 @@ export function commitMacGoalSeek(
   } catch {
     return failure('stale', 'stale');
   }
-  if (!sameBytes(proof.sourceBytes, currentBytes)) {
+  if (!sameSavedWorkbook(proof.sourceBytes, currentBytes)) {
     return failure('stale', 'stale');
   }
   const result = instance.commands.execute({

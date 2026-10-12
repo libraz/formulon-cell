@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { InteractionController } from '../../../src/commands/interaction-controller.js';
 import type { OperationIntent } from '../../../src/commands/interaction-policy.js';
@@ -64,6 +64,54 @@ const makeControllerInstance = (
   return { workbook: wb, store, commands, history } as unknown as SpreadsheetInstance;
 };
 
+const readU16 = (bytes: Uint8Array, offset: number): number =>
+  (bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8);
+
+const readU32 = (bytes: Uint8Array, offset: number): number =>
+  ((bytes[offset] ?? 0) |
+    ((bytes[offset + 1] ?? 0) << 8) |
+    ((bytes[offset + 2] ?? 0) << 16) |
+    ((bytes[offset + 3] ?? 0) << 24)) >>>
+  0;
+
+const writeU16 = (bytes: Uint8Array, offset: number, value: number): void => {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >>> 8) & 0xff;
+};
+
+/** Change only the DOS time/date fields in the archive's central-referenced
+ * local and central headers. This keeps the Goal Seek test focused on the
+ * proof boundary rather than on a signature scan through XML payloads. */
+const withDifferentZipTimestamps = (source: Uint8Array): Uint8Array => {
+  const bytes = new Uint8Array(source);
+  let eocd = -1;
+  for (let offset = bytes.length - 22; offset >= 0; offset -= 1) {
+    if (readU32(bytes, offset) !== 0x06054b50) continue;
+    const commentLength = readU16(bytes, offset + 20);
+    if (offset + 22 + commentLength === bytes.length) {
+      eocd = offset;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error('saved workbook has no EOCD');
+  const count = readU16(bytes, eocd + 10);
+  let central = readU32(bytes, eocd + 16);
+  for (let index = 0; index < count; index += 1) {
+    if (readU32(bytes, central) !== 0x02014b50) throw new Error('invalid central directory');
+    const local = readU32(bytes, central + 42);
+    writeU16(bytes, local + 10, 0x7000 + index);
+    writeU16(bytes, local + 12, 0x6000 + index);
+    writeU16(bytes, central + 12, 0x7000 + index);
+    writeU16(bytes, central + 14, 0x6000 + index);
+    central +=
+      46 +
+      readU16(bytes, central + 28) +
+      readU16(bytes, central + 30) +
+      readU16(bytes, central + 32);
+  }
+  return bytes;
+};
+
 describe('Mac Data command operations', () => {
   const handles: WorkbookHandle[] = [];
 
@@ -89,6 +137,39 @@ describe('Mac Data command operations', () => {
     if (result.ok) expect(result.value.changingValue).toBeCloseTo(5, 8);
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 3 });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 6 });
+  });
+
+  it('accepts a commit when the second save only advances ZIP timestamps', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    handles.push(wb);
+    const store = createSpreadsheetStore();
+    wb.setNumber({ sheet: 0, row: 0, col: 0 }, 3);
+    wb.setFormula({ sheet: 0, row: 0, col: 1 }, '=A1*2');
+    wb.recalc();
+    const sourceBytes = new Uint8Array(wb.save());
+    const save = vi.spyOn(wb, 'save');
+    save
+      .mockReturnValueOnce(sourceBytes)
+      .mockReturnValueOnce(withDifferentZipTimestamps(sourceBytes));
+    const instance = makeInstance(wb, store);
+    const request = {
+      formulaCell: { sheet: 0, row: 0, col: 1 },
+      targetValue: 10,
+      changingCell: { sheet: 0, row: 0, col: 0 },
+    } as const;
+    const solved = await solveMacGoalSeek(instance, request);
+    expect(solved.ok).toBe(true);
+    if (!solved.ok) return;
+
+    const committed = commitMacGoalSeek(
+      instance,
+      request,
+      solved.value,
+      cellSnapshot(wb, request.formulaCell),
+      cellSnapshot(wb, request.changingCell),
+    );
+    expect(committed).toEqual({ ok: true, value: undefined });
+    expect(wb.getValue(request.changingCell)).toEqual({ kind: 'number', value: 5 });
   });
 
   it('recalculates each scratch trial in manual calculation mode', async () => {

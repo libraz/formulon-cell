@@ -5,7 +5,8 @@ import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import { indexRibbonButtons, projectActiveState } from '../../ribbon-active-state.js';
-import { type Label, macRibbonLabelForCommand, text } from './labels.js';
+import { macRibbonLabelForCommand } from './labels.js';
+import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
 
 const MAC_ACTIVE_STATE_KEYS: Readonly<Record<string, keyof ReturnType<typeof projectActiveState>>> =
@@ -27,6 +28,21 @@ const MAC_ACTIVE_STATE_KEYS: Readonly<Record<string, keyof ReturnType<typeof pro
   };
 
 const MAC_POLICY_PROJECTED_COMMANDS = [
+  'mac.page.theme',
+  'mac.page.color',
+  'mac.page.font',
+  'mac.page.theme.office',
+  'mac.page.theme.gray',
+  'mac.page.color.office',
+  'mac.page.color.gray',
+  'mac.page.font.office',
+  'mac.page.font.gray',
+  'mac.insert.newComment',
+  'mac.review.newComment',
+  'mac.review.deleteComment',
+  'mac.review.previousComment',
+  'mac.review.nextComment',
+  'mac.review.showComments',
   'mac.data.sortAsc',
   'mac.data.sortDesc',
   'mac.data.sortCustom',
@@ -45,15 +61,6 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.data.validation.clearCircles',
   'mac.data.validation.clearRules',
 ] as const;
-
-const FILTER_RANGE_REQUIRED: Label = {
-  ja: '適用中のフィルター範囲はありません。',
-  en: 'There is no active filter range.',
-};
-const FILTER_CRITERIA_REQUIRED: Label = {
-  ja: '再適用できるフィルター条件はありません。',
-  en: 'There are no filter criteria to reapply.',
-};
 
 const hasValidationInSelection = (instance: SpreadsheetInstance): boolean => {
   const { format, selection } = instance.store.getState();
@@ -88,9 +95,46 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
   const state = instance.store.getState();
   const strings = instance.i18n.strings.ribbonMenu;
   const lang = toolbarLangForLocale(instance.i18n.locale);
-  if (id === 'mac.data.clear' && !state.ui.filterRange) return text(lang, FILTER_RANGE_REQUIRED);
+  if (/^mac\.page\.(theme|color|font)(\.|$)/.test(id)) {
+    if (!instance.workbook?.capabilities?.workbookTheme)
+      return MAC_CONTEXT_LABELS.themeEngineUnavailable[lang];
+    if (state.protection.protectedSheets.size > 0) return MAC_CONTEXT_LABELS.themeProtected[lang];
+    if (instance.workbook.getTheme()?.source === 2) return MAC_CONTEXT_LABELS.themeUnreadable[lang];
+  }
+  if (
+    id === 'mac.insert.newComment' ||
+    (id.startsWith('mac.review.') &&
+      ['newComment', 'deleteComment', 'previousComment', 'nextComment', 'showComments'].includes(
+        id.slice('mac.review.'.length),
+      ))
+  ) {
+    if (!instance.workbook?.capabilities?.threadedComments)
+      return MAC_CONTEXT_LABELS.threadedCommentsUnavailable[lang];
+    const roots =
+      state.threadedComments.bySheet
+        .get(state.data.sheetIndex)
+        ?.filter((entry) => !entry.parentId) ?? [];
+    if (
+      id === 'mac.review.deleteComment' &&
+      !roots.some(
+        (entry) =>
+          entry.row === state.selection.active.row && entry.col === state.selection.active.col,
+      )
+    )
+      return strings.commentDeleteRequiresActive;
+    if (
+      ['mac.review.previousComment', 'mac.review.nextComment', 'mac.review.showComments'].includes(
+        id,
+      ) &&
+      !roots.length
+    )
+      return strings.commentNone;
+  }
+  if (id === 'mac.data.clear' && !state.ui.filterRange) {
+    return MAC_CONTEXT_LABELS.filterRangeRequired[lang];
+  }
   if (id === 'mac.data.reapply' && state.ui.filterCriteria.length === 0) {
-    return text(lang, FILTER_CRITERIA_REQUIRED);
+    return MAC_CONTEXT_LABELS.filterCriteriaRequired[lang];
   }
 
   if (id.startsWith('mac.formulas.removeArrows.')) {

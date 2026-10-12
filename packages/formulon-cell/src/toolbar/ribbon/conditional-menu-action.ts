@@ -1,3 +1,4 @@
+import type { Locale } from '../../i18n/strings.js';
 // Extracted from main.ts. Dispatches the ribbon's conditional formatting menu
 // actions: opens the new-rule / manage dialogs, prompts for inline rule input,
 // or applies preset actions on the store. State (workbook instance, locale,
@@ -128,7 +129,7 @@ export type CfTextDialogResult = { readonly text: string; readonly style: CfAppl
 
 export interface ConditionalMenuActionDeps {
   inst: SpreadsheetInstance | null;
-  ribbonLang: 'ja' | 'en';
+  ribbonLang: Locale;
   range: Range | null;
   cfFill: CfFillStyle;
   promptCfNumber: (spec: {

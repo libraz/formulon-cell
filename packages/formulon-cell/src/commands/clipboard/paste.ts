@@ -1,7 +1,7 @@
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { State } from '../../store/store.js';
-import { coerceInputForCell, writeCoerced } from '../coerce-input.js';
+import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from '../coerce-input.js';
 import { isCellWritable } from '../protection.js';
 import { parseTSV } from './tsv.js';
 
@@ -23,6 +23,7 @@ export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteR
 
   const origin: Addr = state.selection.active;
   const sheet = origin.sheet;
+  const inputLocale = inputLocaleForWorkbook(wb);
   let maxCols = 0;
 
   wb.withBatchedRecalc(() => {
@@ -32,7 +33,7 @@ export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteR
       for (let c = 0; c < cells.length; c += 1) {
         const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
         if (!isCellWritable(state, addr)) continue;
-        writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? ''));
+        writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? '', inputLocale, wb));
       }
     }
   });

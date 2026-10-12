@@ -52,6 +52,7 @@ export interface SpreadsheetFeatureSwitches {
   viewToolbar?: boolean;
   sheetTabs?: boolean;
   statusBar?: boolean;
+  localeSwitcher?: boolean;
   workbookObjects?: boolean;
   contextMenu?: boolean;
   findReplace?: boolean;
@@ -131,6 +132,7 @@ export function resolveSpreadsheetUiOptions(
   apply('viewToolbar', switches.viewToolbar);
   apply('sheetTabs', switches.sheetTabs);
   apply('statusBar', switches.statusBar);
+  apply('localeSwitcher', switches.localeSwitcher);
   apply('workbookObjects', switches.workbookObjects);
   apply('contextMenu', switches.contextMenu);
   apply('findReplace', switches.findReplace);

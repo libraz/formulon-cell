@@ -1,15 +1,24 @@
 import {
+  canonicalizeLocalizedFormulaForInput,
+  inputLocaleForWorkbook,
+} from '../commands/coerce-input.js';
+import {
   planSelectionFormat,
   type SelectionFormatAction,
   type SelectionFormatPlan,
+  setFont,
 } from '../commands/format.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAt, mergeWillLoseData } from '../commands/merge.js';
+import { recordFormatChange } from '../commands/slice-history.js';
 import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { CellValue, Range } from '../engine/types.js';
+import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
+import { defaultStrings, dictionaryLocaleFor, type Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
@@ -117,15 +126,41 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const { host, store } = deps;
   const history = deps.history ?? null;
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
-  const getFormatLocale = (): string => normalizeFormatLocale(deps.getLocale?.() ?? 'en-US');
   const strings = deps.strings ?? defaultStrings;
+  const getFormatLocale = (): string => {
+    const wb = getWb();
+    const wbLocale = wb ? inputLocaleForWorkbook(wb) : undefined;
+    return normalizeFormatLocale(
+      deps.getLocale?.() ?? wbLocale ?? bundledLocaleForStrings(strings) ?? 'en-US',
+    );
+  };
   const t = strings.formatDialog;
+
+  const localizeDialogFormula = (formula: string): string => {
+    const wb = getWb();
+    if (!wb || typeof wb.getFormulaForDisplay !== 'function') return formula;
+    try {
+      return wb.getFormulaForDisplay(formula);
+    } catch {
+      return formula;
+    }
+  };
+
+  const canonicalizeDialogFormula = (formula: string): string => {
+    const wb = getWb();
+    if (!wb) return formula;
+    try {
+      return canonicalizeLocalizedFormulaForInput(wb, formula, getFormatLocale());
+    } catch {
+      return formula;
+    }
+  };
 
   const view = createFormatDialogView({
     host,
     strings,
     t,
-    fontLocale: getFormatLocale().startsWith('ja') ? 'ja' : 'en',
+    fontLocale: dictionaryLocaleFor(getFormatLocale()),
   });
   const {
     shell,
@@ -192,8 +227,17 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       ? { activeFormat: initialFormat ?? {}, mixed: new Set<FormatDialogField>() }
       : summarizeDialogFormats(state, selectionPlanForDialog);
     for (const field of summary.mixed) mixedFields.add(field);
-    const fmt = summary.activeFormat;
-    hydrateDraftFromFormat(draft, fmt, getFormatLocale());
+    const dialogWb = getWb();
+    const displayMerge = mergeAt(state, active);
+    const displayAddr = displayMerge
+      ? { sheet: displayMerge.sheet, row: displayMerge.r0, col: displayMerge.c0 }
+      : active;
+    const displayFormat =
+      !applyDxf && dialogWb ? effectiveCellFormatWithPending(dialogWb, state, displayAddr) : null;
+    const fmt = displayFormat
+      ? { ...displayFormat, ...summary.activeFormat }
+      : summary.activeFormat;
+    hydrateDraftFromFormat(draft, fmt, getFormatLocale(), localizeDialogFormula);
     borderTab.clearPendingPreset();
 
     syncControlsFromDraft();
@@ -295,7 +339,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const range = state.selection.range;
     const liveWb = getWb();
     const plan = planSelectionFormat(state);
-    if (!plan) return;
+    const selectedRanges = [range, ...(state.selection.extraRanges ?? [])];
 
     const mergeRange = expandRangeWithMerges(state, range);
     const mergeAction = alignTab.mergeAction();
@@ -316,7 +360,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       if (!(await confirmMergeLoseData(strings, state, mergeRange))) return;
     }
 
-    const touchedPatch = buildTouchedDialogPatch(draft, touchedFields, defaultPatternFor);
+    const touchedPatch = buildTouchedDialogPatch(
+      draft,
+      touchedFields,
+      defaultPatternFor,
+      canonicalizeDialogFormula,
+    );
     let actionPatch: Partial<CellFormat> = touchedPatch;
     let borderAction: SelectionFormatAction['border'];
     const pendingBorderPreset = borderTab.pendingPreset();
@@ -334,6 +383,60 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       api.close();
       return;
     }
+
+    // Keep worksheet-wide font-only changes on their compact native font
+    // path even when the selection planner can now resolve complete axes.
+    // Keep the dialog path narrow: only the compact native font axes may be
+    // applied without enumerating the worksheet, and only when no structural
+    // merge action is part of the dialog submission. The format snapshot then
+    // captures both sparse cell formats and the sheet-level override so one
+    // undo restores the exact pre-dialog state.
+    const wholeSheetFontOnly =
+      mergeAction === null &&
+      borderAction === undefined &&
+      isWholeSheetSelection(selectedRanges) &&
+      Object.keys(actionPatch).length > 0 &&
+      Object.keys(actionPatch).every((key) => key === 'fontFamily' || key === 'fontSize');
+    if (wholeSheetFontOnly) {
+      if (liveWb?.capabilities.sheetFontStyles !== true) return;
+      const fontPatch: { fontFamily?: string | null; fontSize?: number | null } = {};
+      if (Object.hasOwn(actionPatch, 'fontFamily')) {
+        fontPatch.fontFamily = actionPatch.fontFamily ?? null;
+      }
+      if (Object.hasOwn(actionPatch, 'fontSize')) {
+        fontPatch.fontSize = actionPatch.fontSize ?? null;
+      }
+      const repeat = (): void => {
+        const current = store.getState();
+        const currentRanges = [current.selection.range, ...(current.selection.extraRanges ?? [])];
+        if (!isWholeSheetSelection(currentRanges)) return;
+        let applied = false;
+        recordFormatChange(
+          history,
+          store,
+          () => {
+            applied = setFont(current, store, fontPatch);
+          },
+          { repeat },
+        );
+        if (applied) history?.setRepeat(repeat);
+      };
+      let applied = false;
+      recordFormatChange(
+        history,
+        store,
+        () => {
+          applied = setFont(state, store, fontPatch);
+        },
+        { repeat },
+      );
+      if (applied) {
+        history?.setRepeat(repeat);
+        api.close();
+      }
+      return;
+    }
+    if (!plan) return;
 
     const action: SelectionFormatAction = {
       patch: actionPatch,

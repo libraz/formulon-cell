@@ -1,10 +1,10 @@
 import { clearSelectedContents } from '../commands/clear-contents.js';
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
-import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
-import { formatCellForEdit } from '../engine/edit-seed.js';
+import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -660,10 +660,11 @@ function formatExisting(
 ): string {
   const key = `${a.sheet}:${a.row}:${a.col}`;
   const fmt = s.format.formats.get(key);
+  const storedFormula = wb.cellFormula(a) ?? s.data.cells.get(key)?.formula ?? null;
   return formatCellForEdit(s.data.cells.get(key), wb, a, {
-    formulaOverride: wb.cellFormula(a),
+    formulaOverride: formulaForEdit(wb, a, storedFormula, s.ui.r1c1),
     formulaHidden: fmt?.formulaHidden === true,
     sheetProtected: s.protection.protectedSheets.has(a.sheet),
-    formatFormula: s.ui.r1c1 ? (formula) => formatA1FormulaAsR1C1(formula, a) : undefined,
+    locale: inputLocaleForWorkbook(wb),
   });
 }

@@ -70,6 +70,13 @@ describe('projectPreparedFormats', () => {
     expect(before.size).toBe(0);
     expect(out.size).toBe(0);
   });
+
+  it('uses inherited worksheet font axes without replacing explicit cell axes', () => {
+    const out = projectPreparedFormats(new Map([[addrKey(a1), { fontSize: 24 }]]), [
+      change(a1, { inheritedFormat: { fontFamily: '游ゴシック', fontSize: 18 } }),
+    ]);
+    expect(out.get(addrKey(a1))).toEqual({ fontFamily: '游ゴシック', fontSize: 24 });
+  });
 });
 
 describe('effectivePendingFormatAddresses', () => {

@@ -500,12 +500,12 @@ describe('attachPointer', () => {
       expect(w).toBeGreaterThan(180);
     });
 
-    it('double-click col autofit measures in the supplied theme font', () => {
+    it('double-click col autofit measures the workbook font ahead of the UI theme', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'HeaderName' }]);
       const theme = { textCell: 26, fontUi: 'sans-serif', fontMono: 'monospace' };
       detach = attachPointer(host, store, wb, undefined, null, undefined, () => ({ theme }));
       fireDblClick(host, 154, 10);
-      expect(store.getState().layout.colWidths.get(0)).toBe(157);
+      expect(store.getState().layout.colWidths.get(0)).toBe(96);
     });
 
     it('double-click col autofit reserves room for filter header buttons', () => {

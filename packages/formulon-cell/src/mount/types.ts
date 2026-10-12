@@ -43,6 +43,8 @@ export type {
 
 export interface MountOptions {
   workbook?: WorkbookHandle;
+  /** Current host filename or workbook title shown in Watch Window. */
+  getWorkbookName?: () => string | null | undefined;
   /** Host interaction restrictions. Omitted operations deny when a policy is supplied. */
   policy?: InteractionPolicy;
   /** Finite visible/selection region. Does not truncate workbook data or calculation. */
@@ -129,6 +131,13 @@ export interface SpreadsheetInstance {
   setContextMenu(next?: ContextMenuOptions): void;
   setOverlayOptions(next?: OverlayOptions): void;
   setUi(next?: SpreadsheetUiOptions): void;
+  /** Current UI locale, including runtime custom locale identifiers. */
+  readonly locale: string;
+  /**
+   * Change the UI and formula profile locale. Returns false when the mount
+   * rolls the request back after a profile or active-edit failure.
+   */
+  setLocale(locale: string): boolean;
   setToolbar(next: boolean | MountToolbarOptions): void;
   /** Trusted host update; defaults to resetting user history after success. */
   applyChanges(
@@ -171,7 +180,7 @@ export interface SpreadsheetInstance {
   openEvaluateFormulaDialog(): void;
   openFunctionArguments(seedName?: string, options?: FxDialogOpenOptions): void;
   openHyperlinkDialog(): void;
-  openCommentDialog(): void;
+  openCommentDialog(options?: { mode?: 'note' | 'thread' }): void;
   openDefineNameDialog(): void;
   openFindReplace(tab?: 'find' | 'replace'): void;
   closeFindReplace(): void;

@@ -3,12 +3,28 @@ import {
   allFunctionNames,
   buildFunctionCatalog,
   FUNCTION_CATEGORY_NAMES,
+  functionSyntax,
   isFunctionUnavailableForInsertion,
   supportedFunctionNames,
 } from '../../../src/commands/function-categories.js';
 import { FUNCTION_SIGNATURES } from '../../../src/commands/refs.js';
 
 describe('function category catalog', () => {
+  it('renders function syntax with the active formula separator', () => {
+    expect(
+      functionSyntax(
+        {
+          canonicalName: 'SUM',
+          displayName: 'SUMME',
+          minArity: 1,
+          maxArity: null,
+          argumentLabels: ['number1', '[number2]'],
+        },
+        ';',
+      ),
+    ).toBe('SUMME(number1; [number2]; ...)');
+  });
+
   it('keeps every function in exactly one family with stable counts', () => {
     const expectedCounts = {
       compatibility: 39,
@@ -115,6 +131,34 @@ describe('function category catalog', () => {
     expect(snapshot.entries.get('ACCRINT')).toMatchObject({ minArity: 0, maxArity: null });
     expect(functionNames).toHaveBeenCalledTimes(1);
     expect(functionMetadata).toHaveBeenCalledTimes(3);
+  });
+
+  it('prefers the seven-language metadata tag path over the legacy ordinal', () => {
+    const functionMetadata = vi.fn(() => ({
+      name: 'ACOS',
+      minArity: 1,
+      maxArity: 1,
+      description: 'English fallback',
+    }));
+    const functionMetadataForLocale = vi.fn((name: string, locale: string) => ({
+      name,
+      minArity: 1,
+      maxArity: 1,
+      description: locale === 'zh-CN' ? '中文说明' : 'Tagged description',
+    }));
+    const snapshot = buildFunctionCatalog(
+      {
+        functionNames: () => ['ACOS'],
+        functionMetadata,
+        functionMetadataForLocale,
+      },
+      0,
+      'zh-CN',
+    );
+
+    expect(snapshot.entries.get('ACOS')?.description).toBe('中文说明');
+    expect(functionMetadataForLocale).toHaveBeenCalledWith('ACOS', 'zh-CN');
+    expect(functionMetadata).not.toHaveBeenCalled();
   });
 
   it('treats a valid empty engine catalog as authoritative and never guesses families', () => {

@@ -1,10 +1,23 @@
+import type { Locale } from '../../i18n/strings.js';
+import type { FontFamilyOption } from './font-family-options.js';
 // Heuristic font probing for the playground's font-family dropdown. The
 // canvas measurement trick compares the text width against the generic
 // fallbacks — if it shifts, the font is installed. Results are cached so
 // each option only probes once per session.
 
-export const THEME_FONT_VALUES = new Set(['Aptos', 'Aptos Display', 'Aptos Narrow']);
-export const RECENT_FONT_VALUES = new Set(['Yu Gothic UI']);
+/**
+ * Compatibility exports for hosts that used the old value sets.  Grouping in
+ * the UI now comes from FontFamilyOption metadata; there is no recent-font
+ * state or submenu implementation to expose here.
+ */
+export const THEME_FONT_VALUES = new Set([
+  'Aptos',
+  'Aptos Display',
+  'Aptos Narrow',
+  '游ゴシック Light',
+  '游ゴシック',
+]);
+export const RECENT_FONT_VALUES = new Set<string>();
 export const COMMON_FONT_VALUES = new Set([
   'Calibri',
   'Arial',
@@ -12,7 +25,7 @@ export const COMMON_FONT_VALUES = new Set([
   'Times New Roman',
   'Consolas',
 ]);
-export const FONT_SUBMENU_FAMILIES = new Set(['Yu Gothic UI', 'BIZ UDGothic', 'Meiryo UI']);
+export const FONT_SUBMENU_FAMILIES = new Set<string>();
 
 const fontAvailabilityCache = new Map<string, boolean>();
 
@@ -40,15 +53,23 @@ export const isFontProbablyAvailable = (font: string): boolean => {
   return available;
 };
 
+export const isFontOptionProbablyAvailable = (option: FontFamilyOption): boolean => {
+  if (option.alwaysVisible) return true;
+  const names = [option.value, ...(option.probeNames ?? [])];
+  return names.some((name) => isFontProbablyAvailable(name));
+};
+
 /** Filter callback for the font-family dropdown: keep the active value
  *  even if probing says it's unavailable, skip Japanese fonts in English
  *  locale, and otherwise fall back to the canvas probe. */
 export const shouldShowFontOption = (
   value: string,
   current: string,
-  locale: 'ja' | 'en',
+  locale: Locale,
+  option?: FontFamilyOption,
 ): boolean => {
   if (value === current) return true;
   if (locale !== 'ja' && isJapaneseFontName(value)) return false;
-  return isFontProbablyAvailable(value);
+  if (option?.alwaysVisible) return true;
+  return option ? isFontOptionProbablyAvailable(option) : isFontProbablyAvailable(value);
 };

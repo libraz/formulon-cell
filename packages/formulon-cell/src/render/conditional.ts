@@ -1,5 +1,6 @@
-import { addrKey } from '../engine/address.js';
-import type { CellValue, Range } from '../engine/types.js';
+import { addrKey, formatA1Cell } from '../engine/address.js';
+import { type CellValue, type Range, ValueKind } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   CellFormat,
   ConditionalIconSet,
@@ -59,7 +60,21 @@ let cachedRulesRef: State['conditional']['rules'] | null = null;
 let cachedCellsRef: State['data']['cells'] | null = null;
 let cachedSheet: number | null = null;
 let cachedRtl: boolean | null = null;
+let cachedWb: WorkbookHandle | null = null;
+let cachedLocale: string | null = null;
+let cachedProfile: ReturnType<WorkbookHandle['spreadsheetProfileId']> = null;
+let cachedVisibleBounds: ConditionalVisibleBounds | null = null;
 let cachedOverlay: Map<string, ConditionalCellOverlay> | null = null;
+
+/** Optional paint bounds. Exported evaluation calls omit this to preserve
+ * full-range behaviour; the canvas passes its current viewport so native
+ * predicates do not walk millions of blank cells off screen. */
+export interface ConditionalVisibleBounds {
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
+}
 
 /** Test hook — drop the cached overlay so the next call recomputes. */
 export function _resetConditionalCache(): void {
@@ -67,7 +82,115 @@ export function _resetConditionalCache(): void {
   cachedCellsRef = null;
   cachedSheet = null;
   cachedRtl = null;
+  cachedWb = null;
+  cachedLocale = null;
+  cachedProfile = null;
+  cachedVisibleBounds = null;
   cachedOverlay = null;
+}
+
+/** Read the workbook's active formula-behaviour profile for the renderer
+ * cache. Older/stub workbooks intentionally report null. */
+function profileForCache(
+  wb: WorkbookHandle | null,
+): ReturnType<WorkbookHandle['spreadsheetProfileId']> {
+  if (!wb?.capabilities.spreadsheetProfile) return null;
+  try {
+    return wb.spreadsheetProfileId();
+  } catch {
+    return null;
+  }
+}
+
+/** Convert an engine conditional-formula result using the same truthiness
+ * contract as the WASM API: only a successful non-zero number or TRUE bool
+ * matches. Text, blank, errors, and failed calls do not match. */
+function nativeConditionalFormulaPasses(
+  wb: WorkbookHandle,
+  sheet: number,
+  row: number,
+  col: number,
+  formula: string,
+  anchorRow: number,
+  anchorCol: number,
+): boolean {
+  try {
+    const result = wb.evaluateConditionalFormula(
+      { sheet, row, col },
+      { row: anchorRow, col: anchorCol },
+      formula,
+    );
+    if (!result.status.ok) return false;
+    if (result.value.kind === ValueKind.Bool) return result.value.boolean !== 0;
+    if (result.value.kind === ValueKind.Number) {
+      return Number.isFinite(result.value.number) && result.value.number !== 0;
+    }
+    return false;
+  } catch {
+    // A capability-enabled engine must not silently switch to the local
+    // evaluator after an error: the two evaluators can have different
+    // locale, reference, and function semantics.
+    return false;
+  }
+}
+
+/** Encode a cell-value boundary as an expression operand. Formula-valued
+ * boundaries are kept as expressions; all other strings are quoted so a
+ * localized text boundary remains text under the engine's profile. */
+function nativeBoundaryOperand(value: number | string): string | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : null;
+  }
+  const trimmed = value.trim();
+  if (trimmed.startsWith('=')) {
+    const expression = trimmed.slice(1).trim();
+    return expression === '' ? null : `(${expression})`;
+  }
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+/** Build the native formula for a cell-value rule. The left operand is the
+ * range's top-left A1 reference so the engine can shift it to each target
+ * cell using its conditional-formula anchor semantics. */
+function nativeCellValueFormula(
+  rule: Extract<ConditionalRule, { kind: 'cell-value' }>,
+): string | null {
+  const left = formatA1Cell(rule.range.r0, rule.range.c0);
+  const a = nativeBoundaryOperand(rule.a);
+  if (!a) return null;
+  if (rule.op !== 'between' && rule.op !== 'not-between') {
+    return `=${left}${rule.op}${a}`;
+  }
+  const b = rule.b === undefined ? null : nativeBoundaryOperand(rule.b);
+  if (!b) return null;
+  const between = `OR(AND(${left}>=${a},${left}<=${b}),AND(${left}>=${b},${left}<=${a}))`;
+  return rule.op === 'between' ? `=${between}` : `=NOT(${between})`;
+}
+
+function nativeCellValuePasses(
+  wb: WorkbookHandle,
+  sheet: number,
+  row: number,
+  col: number,
+  rule: Extract<ConditionalRule, { kind: 'cell-value' }>,
+  formula: string,
+): boolean {
+  return nativeConditionalFormulaPasses(wb, sheet, row, col, formula, rule.range.r0, rule.range.c0);
+}
+
+function boundsForRule(
+  rule: { range: Range },
+  visible: ConditionalVisibleBounds | null,
+): ConditionalVisibleBounds {
+  if (!visible) {
+    return { r0: rule.range.r0, c0: rule.range.c0, r1: rule.range.r1, c1: rule.range.c1 };
+  }
+  return {
+    r0: Math.max(rule.range.r0, visible.r0),
+    c0: Math.max(rule.range.c0, visible.c0),
+    r1: Math.min(rule.range.r1, visible.r1),
+    c1: Math.min(rule.range.c1, visible.c1),
+  };
 }
 
 /** Number of slots per icon family. `arrows5` is the only 5-slot family;
@@ -144,13 +267,26 @@ const isBlankValue = (v: CellValue): boolean => v.kind === 'blank';
  * compute per-rule numeric extremes for color-scale / data-bar rules once,
  * then walk the cell entries assigning overlays.
  */
-export function evaluateConditional(state: State): Map<string, ConditionalCellOverlay> {
+export function evaluateConditional(
+  state: State,
+  wb: WorkbookHandle | null = null,
+  locale = '',
+  visibleBounds: ConditionalVisibleBounds | null = null,
+): Map<string, ConditionalCellOverlay> {
+  const profile = profileForCache(wb);
   if (
     cachedOverlay !== null &&
     cachedRulesRef === state.conditional.rules &&
     cachedCellsRef === state.data.cells &&
     cachedSheet === state.data.sheetIndex &&
-    cachedRtl === state.ui.rightToLeft
+    cachedRtl === state.ui.rightToLeft &&
+    cachedWb === wb &&
+    cachedLocale === locale &&
+    cachedProfile === profile &&
+    cachedVisibleBounds?.r0 === visibleBounds?.r0 &&
+    cachedVisibleBounds?.c0 === visibleBounds?.c0 &&
+    cachedVisibleBounds?.r1 === visibleBounds?.r1 &&
+    cachedVisibleBounds?.c1 === visibleBounds?.c1
   ) {
     return cachedOverlay;
   }
@@ -161,6 +297,10 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
     cachedCellsRef = state.data.cells;
     cachedSheet = state.data.sheetIndex;
     cachedRtl = state.ui.rightToLeft;
+    cachedWb = wb;
+    cachedLocale = locale;
+    cachedProfile = profile;
+    cachedVisibleBounds = visibleBounds ? { ...visibleBounds } : null;
     cachedOverlay = out;
     return out;
   }
@@ -174,7 +314,7 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
     const ruleOverlay = new Map<string, ConditionalCellOverlay>();
 
     if (rule.kind === 'cell-value') {
-      paintCellValue(state, rule, ruleOverlay);
+      paintCellValue(state, rule, ruleOverlay, wb, visibleBounds);
     } else if (rule.kind === 'color-scale') {
       paintColorScale(state, rule, ruleOverlay);
     } else if (rule.kind === 'data-bar') {
@@ -190,7 +330,7 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
     } else if (rule.kind === 'date-occurring') {
       paintDateOccurring(state, rule, ruleOverlay);
     } else if (rule.kind === 'formula') {
-      paintFormula(state, rule, ruleOverlay);
+      paintFormula(state, rule, ruleOverlay, wb, visibleBounds);
     } else if (rule.kind === 'duplicates' || rule.kind === 'unique') {
       paintDupsUnique(state, rule, ruleOverlay);
     } else if (
@@ -215,6 +355,10 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
   cachedCellsRef = state.data.cells;
   cachedSheet = state.data.sheetIndex;
   cachedRtl = state.ui.rightToLeft;
+  cachedWb = wb;
+  cachedLocale = locale;
+  cachedProfile = profile;
+  cachedVisibleBounds = visibleBounds ? { ...visibleBounds } : null;
   cachedOverlay = out;
   return out;
 }
@@ -223,15 +367,24 @@ function paintCellValue(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'cell-value' }>,
   out: Map<string, ConditionalCellOverlay>,
+  wb: WorkbookHandle | null,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
   const sheet = state.data.sheetIndex;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
+  const nativeFormula =
+    wb?.capabilities.conditionalFormulaEvaluation === true ? nativeCellValueFormula(rule) : null;
+  const bounds = boundsForRule(rule, visibleBounds);
+  for (let r = bounds.r0; r <= bounds.r1; r += 1) {
+    for (let c = bounds.c0; c <= bounds.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
       if (!cell) continue;
       if (!inRange(sheet, r, c, rule.range)) continue;
-      if (testCellValue(cell.value, rule.op, rule.a, rule.b)) {
+      const passes =
+        nativeFormula !== null && wb
+          ? nativeCellValuePasses(wb, sheet, r, c, rule, nativeFormula)
+          : testCellValue(cell.value, rule.op, rule.a, rule.b);
+      if (passes) {
         const overlay = out.get(key) ?? {};
         mergeApply(overlay, rule.apply);
         out.set(key, overlay);
@@ -707,13 +860,42 @@ function paintFormula(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'formula' }>,
   out: Map<string, ConditionalCellOverlay>,
+  wb: WorkbookHandle | null,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
+  const useNative = wb?.capabilities.conditionalFormulaEvaluation === true;
+  if (useNative && wb) {
+    const sheet = state.data.sheetIndex;
+    const bounds = boundsForRule(rule, visibleBounds);
+    for (let r = bounds.r0; r <= bounds.r1; r += 1) {
+      for (let c = bounds.c0; c <= bounds.c1; c += 1) {
+        const key = addrKey({ sheet, row: r, col: c });
+        if (
+          !nativeConditionalFormulaPasses(
+            wb,
+            sheet,
+            r,
+            c,
+            rule.formula,
+            rule.range.r0,
+            rule.range.c0,
+          )
+        )
+          continue;
+        const overlay = out.get(key) ?? {};
+        mergeApply(overlay, rule.apply);
+        out.set(key, overlay);
+      }
+    }
+    return;
+  }
   const formulaPredicate = compileFormulaCellPredicate(state, rule);
   const predicate = parseFormulaPredicate(rule.formula);
   if (!formulaPredicate && !predicate) return;
   const sheet = state.data.sheetIndex;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
+  const bounds = boundsForRule(rule, visibleBounds);
+  for (let r = bounds.r0; r <= bounds.r1; r += 1) {
+    for (let c = bounds.c0; c <= bounds.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
       const passes = formulaPredicate?.test(r, c) ?? (cell ? predicate?.test(cell.value) : false);

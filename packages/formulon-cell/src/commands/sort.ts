@@ -1,6 +1,7 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL } from '../engine/address.js';
+import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { writeCell } from '../engine/value.js';
+import { fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -135,12 +136,200 @@ const hydrateSortComments = (
 };
 
 const MAX_SORT_CELLS = 100_000;
+// Native SORTBY is n log n and remained sub-100ms at 75k rows in the
+// bundled-engine probe. Keep a separate row budget so a future engine
+// regression cannot synchronously evaluate an unbounded dynamic array.
+const MAX_NATIVE_SORT_ROWS = 50_000;
+// UNIQUE in the bundled engine grows much faster than SORTBY: 10k rows took
+// ~0.3s, 20k ~1.5s, 50k ~7s, and 75k ~23s in the local probe. Mutating
+// commands reject the native route above this budget before evaluating.
+const MAX_NATIVE_UNIQUE_ROWS = 20_000;
 
 const sortArea = (range: Range, startRow: number): number =>
   Math.max(0, range.r1 - startRow + 1) * (range.c1 - range.c0 + 1);
 
 const canRewriteExactRange = (range: Range, startRow = range.r0): boolean =>
   sortArea(range, startRow) <= MAX_SORT_CELLS;
+
+const columnName = (column: number): string => {
+  let n = column + 1;
+  let out = '';
+  while (n > 0) {
+    const digit = (n - 1) % 26;
+    out = String.fromCharCode(65 + digit) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+};
+
+const absoluteColumnRange = (column: number, firstRow: number, lastRow: number): string => {
+  const name = columnName(column);
+  return `$${name}$${firstRow + 1}:$${name}$${lastRow + 1}`;
+};
+
+const verticalNumberArray = (values: readonly number[]): string => `{${values.join(';')}}`;
+
+const nativeEvaluationAnchor = (state: State, range: Range): Addr => {
+  // evaluateFormulaArray is read-only, but the engine still rejects a spill
+  // whose anchor cell already carries a value. Pick an empty cell on the same
+  // sheet; the formula itself uses only absolute references, so the anchor
+  // does not change its meaning. State hydration makes this scan cheap in the
+  // normal case and keeps it bounded for sparse large sheets.
+  const columns = Math.min(MAX_COL, Math.max(range.c1 + 8, 64));
+  for (let row = 0; row <= Math.min(range.r0 + 1, 64); row += 1) {
+    for (let col = 0; col <= columns; col += 1) {
+      if (!state.data.cells.has(addrKey({ sheet: range.sheet, row, col }))) {
+        return { sheet: range.sheet, row, col };
+      }
+    }
+  }
+  return { sheet: range.sheet, row: 0, col: 0 };
+};
+
+/**
+ * Ask the real formulon bundle for the row permutation. Dynamic-array
+ * evaluation is read-only, so the temporary SORTBY formula never creates a
+ * scratch cell or changes recalc state. The caller must treat a malformed
+ * result as a hard failure: a native workbook should not silently fall back
+ * to a browser comparator after a native operation was attempted.
+ */
+const nativeSortPermutation = (
+  state: State,
+  wb: WorkbookHandle,
+  range: Range,
+  startRow: number,
+  sortKeys: readonly SortKey[],
+): number[] | null => {
+  const count = range.r1 - startRow + 1;
+  if (count <= 0) return [];
+  if (count > MAX_NATIVE_SORT_ROWS) return null;
+
+  const byKey = sortKeys.map((key) => {
+    const direction = key.direction === 'desc' ? -1 : 1;
+    const sortOn = key.sortOn ?? 'value';
+    if (sortOn === 'value') {
+      return `${absoluteColumnRange(key.byCol, startRow, range.r1)},${direction}`;
+    }
+    const ranks: number[] = [];
+    for (let row = startRow; row <= range.r1; row += 1) {
+      const sortValue = sortKeyForCell(state, range.sheet, row, key);
+      if (sortOn === 'cellColor' || sortOn === 'fontColor') {
+        ranks.push(sortValue.match === true ? 0 : 1);
+      } else {
+        // Unknown custom-list entries remain after all listed entries in both
+        // directions, matching the existing JS path's explicit sentinel.
+        ranks.push(sortValue.customIndex ?? sortKeys.length + count);
+      }
+    }
+    return `${verticalNumberArray(ranks)},${direction}`;
+  });
+  const formula = `=SORTBY(SEQUENCE(${count}),${byKey.join(',')})`;
+  try {
+    const result = wb.evaluateFormulaArray(nativeEvaluationAnchor(state, range), formula);
+    if (!result.status.ok || result.rows !== count || result.cols !== 1) return null;
+    if (result.cells.length !== count) return null;
+    const permutation: number[] = [];
+    const seen = new Set<number>();
+    for (const row of result.cells) {
+      if (row?.length !== 1) return null;
+      const raw = row?.[0];
+      if (!raw) return null;
+      const value = fromEngineValue(raw);
+      if (value.kind !== 'number' || !Number.isInteger(value.value)) return null;
+      const index = value.value;
+      if (index < 1 || index > count || seen.has(index)) return null;
+      seen.add(index);
+      permutation.push(index);
+    }
+    return permutation.length === count ? permutation : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Key used only while recovering representatives from a native UNIQUE
+ * result. The engine's dynamic-array ABI exposes both a source blank and a
+ * numeric zero as numeric zero; keep them in one queue so a repeated native
+ * zero can still recover the source rows in first-occurrence order. */
+const nativeUniqueValueKey = (value: CellValue): string => {
+  switch (value.kind) {
+    case 'blank':
+      return 'zero-or-blank';
+    case 'number':
+      return value.value === 0 ? 'zero-or-blank' : `number:${String(value.value)}`;
+    case 'text':
+      return `text:${value.value}`;
+    case 'bool':
+      return `bool:${value.value ? '1' : '0'}`;
+    case 'error':
+      return `error:${value.code}:${value.text}`;
+  }
+};
+
+const nativeUniqueRowKey = (values: readonly CellValue[]): string =>
+  JSON.stringify(values.map((value) => nativeUniqueValueKey(value)));
+
+const nativeUniqueRows = (
+  state: State,
+  wb: WorkbookHandle,
+  range: Range,
+  firstDataRow: number,
+  keyColumns: readonly number[],
+): number[] | null => {
+  const count = range.r1 - firstDataRow + 1;
+  if (count <= 0 || keyColumns.length === 0) return [];
+  if (count > MAX_NATIVE_UNIQUE_ROWS) return null;
+  const startRef = absoluteColumnRange(range.c0, firstDataRow, range.r1);
+  const endRef = absoluteColumnRange(range.c1, firstDataRow, range.r1).split(':')[1];
+  const sourceRange = `${startRef.split(':')[0]}:${endRef}`;
+  const relativeColumns = keyColumns.map((column) => column - range.c0 + 1);
+  const keyFormula =
+    relativeColumns.length === range.c1 - range.c0 + 1
+      ? sourceRange
+      : `CHOOSECOLS(${sourceRange},${relativeColumns.join(',')})`;
+  try {
+    const result = wb.evaluateFormulaArray(
+      nativeEvaluationAnchor(state, range),
+      `=UNIQUE(${keyFormula})`,
+    );
+    if (!result.status.ok || result.cols !== keyColumns.length || result.rows < 1) return null;
+    if (result.rows > count || result.cells.length !== result.rows) return null;
+    const uniqueValues = result.cells.map((row) => {
+      if (row.length !== keyColumns.length) return null;
+      return row.map((value) => fromEngineValue(value));
+    });
+    if (uniqueValues.some((row): row is null => row === null)) return null;
+
+    const candidates = new Map<string, number[]>();
+    for (let row = firstDataRow; row <= range.r1; row += 1) {
+      const sourceKey = nativeUniqueRowKey(
+        keyColumns.map(
+          (column) =>
+            state.data.cells.get(addrKey({ sheet: range.sheet, row, col: column }))?.value ??
+            ({ kind: 'blank' } as const),
+        ),
+      );
+      const rows = candidates.get(sourceKey);
+      if (rows) rows.push(row);
+      else candidates.set(sourceKey, [row]);
+    }
+    const offsets = new Map<string, number>();
+    const representativeRows: number[] = [];
+    for (const values of uniqueValues) {
+      if (!values) return null;
+      const outputKey = nativeUniqueRowKey(values);
+      const rows = candidates.get(outputKey);
+      const offset = offsets.get(outputKey) ?? 0;
+      const found = rows?.[offset];
+      if (found === undefined) return null;
+      offsets.set(outputKey, offset + 1);
+      representativeRows.push(found);
+    }
+    return representativeRows;
+  } catch {
+    return null;
+  }
+};
 
 const normalizedSortKeys = (opts: SortOptions): SortKey[] => {
   const keys = opts.keys?.length ? opts.keys : [{ byCol: opts.byCol, direction: opts.direction }];
@@ -227,6 +416,7 @@ const compareSortKeys = (
     customIndex?: number | null;
   },
   direction: SortDirection,
+  compareText: (left: string, right: string) => number,
 ): number => {
   const dir = direction === 'desc' ? -1 : 1;
   if (a.kind === 'color' || b.kind === 'color') {
@@ -257,10 +447,7 @@ const compareSortKeys = (
     case 'bool':
       return dir * ((a.n ?? 0) - (b.n ?? 0));
     case 'text':
-      return (
-        dir *
-        (a.s ?? '').localeCompare(b.s ?? '', undefined, { numeric: false, sensitivity: 'base' })
-      );
+      return dir * compareText(a.s ?? '', b.s ?? '');
     case 'error':
       // Errors retain their source order, matching Excel's stable sort.
       return 0;
@@ -351,6 +538,17 @@ export function sortRange(
   if (!canRewriteExactRange(range, start)) return false;
   if (rangeIntersectsMerges(state, range)) return false;
   if (!ensureWritableRange(state, { ...range, r0: start })) return false;
+
+  // A real formulon bundle owns the comparison semantics for formula-driven
+  // sorts. Do this before hydrating comments or touching any cell so an
+  // unsupported/malformed native result is an atomic no-op. Stub workbooks
+  // intentionally use the explicit-locale JS comparator below.
+  const nativeBundle = wb.isStub === false && wb.capabilities.arrayFormulaEvaluation === true;
+  const nativeOrder = nativeBundle
+    ? nativeSortPermutation(state, wb, range, start, sortKeys)
+    : null;
+  if (nativeBundle && nativeOrder === null) return false;
+
   state = hydrateSortComments(store, wb, range, start);
 
   // Snapshot the rows we'll move, including formula text so we can write it back.
@@ -391,17 +589,33 @@ export function sortRange(
     });
   }
 
-  snaps.sort((a, b) => {
-    for (let i = 0; i < sortKeys.length; i += 1) {
-      const result = compareSortKeys(
-        a.snap.sortKeys[i] ?? { kind: 'blank' },
-        b.snap.sortKeys[i] ?? { kind: 'blank' },
-        sortKeys[i]?.direction ?? 'asc',
-      );
-      if (result !== 0) return result;
-    }
-    return a.row - b.row;
-  });
+  if (nativeOrder) {
+    const bySourceIndex = new Map(snaps.map((entry, index) => [entry.row, index]));
+    const ordered = nativeOrder.map((sourceIndex) => snaps[sourceIndex - 1]);
+    // nativeSortPermutation validates the sequence, but retain a defensive
+    // check at this boundary so a future result-shape change still cannot
+    // cause a partial write.
+    if (ordered.some((entry) => !entry) || bySourceIndex.size !== snaps.length) return false;
+    snaps.splice(
+      0,
+      snaps.length,
+      ...ordered.filter((entry): entry is (typeof snaps)[number] => !!entry),
+    );
+  } else {
+    const textSemantics = createProfileTextSemantics(localeForWorkbook(wb));
+    snaps.sort((a, b) => {
+      for (let i = 0; i < sortKeys.length; i += 1) {
+        const result = compareSortKeys(
+          a.snap.sortKeys[i] ?? { kind: 'blank' },
+          b.snap.sortKeys[i] ?? { kind: 'blank' },
+          sortKeys[i]?.direction ?? 'asc',
+          textSemantics.compare,
+        );
+        if (result !== 0) return result;
+      }
+      return a.row - b.row;
+    });
+  }
 
   // Write back into wb in sorted order.
   wb.withBatchedRecalc(() => {
@@ -490,25 +704,35 @@ export function removeDuplicates(
     : Array.from({ length: range.c1 - range.c0 + 1 }, (_, i) => range.c0 + i);
   const firstDataRow = options.hasHeader ? range.r0 + 1 : range.r0;
   if (firstDataRow > range.r1) return 0;
-  const seen = new Set<string>();
+  const nativeBundle = wb.isStub === false && wb.capabilities.arrayFormulaEvaluation === true;
+  const nativeKeep = nativeBundle
+    ? nativeUniqueRows(state, wb, range, firstDataRow, keyColumns)
+    : null;
+  if (nativeBundle && nativeKeep === null) return 0;
   const keep: number[] = options.hasHeader ? [range.r0] : [];
-  for (let r = firstDataRow; r <= range.r1; r += 1) {
-    const sig: string[] = [];
-    for (const c of keyColumns) {
-      const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: c }));
-      if (!cell) sig.push('');
-      else {
-        const v = cell.value;
-        if (v.kind === 'number') sig.push(`n:${v.value}`);
-        else if (v.kind === 'text') sig.push(`t:${v.value}`);
-        else if (v.kind === 'bool') sig.push(`b:${v.value ? 1 : 0}`);
-        else sig.push('');
+  if (nativeKeep) keep.push(...nativeKeep);
+  if (!nativeKeep) {
+    const semantics = createProfileTextSemantics(localeForWorkbook(wb));
+    const seen = new Set<string>();
+    for (let r = firstDataRow; r <= range.r1; r += 1) {
+      const sig: string[] = [];
+      for (const c of keyColumns) {
+        const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: c }));
+        if (!cell) sig.push('blank:');
+        else {
+          const v = cell.value;
+          if (v.kind === 'number') sig.push(`number:${v.value}`);
+          else if (v.kind === 'text') sig.push(`text:${semantics.key(v.value)}`);
+          else if (v.kind === 'bool') sig.push(`bool:${v.value ? 1 : 0}`);
+          else if (v.kind === 'error') sig.push(`error:${v.code}:${v.text}`);
+          else sig.push('blank:');
+        }
       }
+      const key = sig.join('');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      keep.push(r);
     }
-    const key = sig.join('');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    keep.push(r);
   }
   if (keep.length === range.r1 - range.r0 + 1) return 0;
 

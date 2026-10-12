@@ -1,3 +1,4 @@
+import { isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { makeButton, makeIconButton } from './mac-formula-palette-buttons.js';
 import type { MacPaletteStrings } from './mac-formula-palette-catalog.js';
@@ -290,9 +291,10 @@ export function createMacFormulaPaletteView(root: HTMLElement, ctx: MacFormulaPa
     const syntaxText = document.createElement('p');
     syntaxText.textContent = `${labels.syntax}: ${state.syntax}`;
     help.appendChild(syntaxText);
-    if (state.helpUrl) {
+    const helpUrl = state.helpUrl?.trim();
+    if (helpUrl && isSafeHyperlinkTarget(helpUrl)) {
       const link = document.createElement('a');
-      link.href = state.helpUrl;
+      link.href = helpUrl;
       link.target = '_blank';
       link.rel = 'noreferrer';
       link.textContent = labels.help;

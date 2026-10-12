@@ -12,6 +12,7 @@ import {
   computeNamedCellStyles,
   type NamedCellStylesView,
 } from '../../../src/engine/cell-styles-meta.js';
+import { argbToCssColor } from '../../../src/engine/format-writeback.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -170,6 +171,47 @@ describe('named-style engine publication', () => {
     }
   });
 
+  it('publishes and round-trips custom and built-in 53 style records', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    let reloaded: WorkbookHandle | null = null;
+    try {
+      expect(wb.isStub).toBe(false);
+      const store = createSpreadsheetStore();
+      mutators.upsertCustomCellStyle(store, {
+        id: 'custom:Probe Custom',
+        label: 'Probe Custom',
+        format: { bold: true },
+      });
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { cellStyle: 'Probe Custom' });
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { cellStyle: 'explanatoryText' });
+      syncCellFormatsToEngine(wb, store, 0, { strict: true });
+
+      const publishedCustom = wb
+        .getNamedCellStyles()
+        .find((style) => style.name === 'Probe Custom');
+      expect(publishedCustom).toMatchObject({ name: 'Probe Custom', builtinId: 0xffffffff });
+      const publishedBuiltin = wb.getNamedCellStyles().find((style) => style.builtinId === 53);
+      expect(publishedBuiltin).toBeDefined();
+      if (!publishedCustom || !publishedBuiltin) return;
+
+      reloaded = await WorkbookHandle.loadBytes(wb.save());
+      expect(reloaded.isStub).toBe(false);
+      expect(
+        reloaded.getNamedCellStyles().find((style) => style.name === 'Probe Custom'),
+      ).toMatchObject({
+        name: 'Probe Custom',
+        builtinId: 0xffffffff,
+      });
+      expect(reloaded.getNamedCellStyles().find((style) => style.builtinId === 53)).toMatchObject({
+        name: publishedBuiltin.name,
+        builtinId: 53,
+      });
+    } finally {
+      reloaded?.dispose();
+      wb.dispose();
+    }
+  });
+
   it('treats omitted and explicit off values as the same style defaults', () => {
     expect(cellStyleGroupMatches({ underline: false }, {}, 'font')).toBe(true);
     expect(
@@ -200,7 +242,7 @@ describe('named-style engine publication', () => {
     }
   });
 
-  it('surfaces a later catalog failure with the residual real-engine entry', async () => {
+  it('removes a newly published entry after a later catalog failure', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.isStub).toBe(false);
@@ -226,11 +268,60 @@ describe('named-style engine publication', () => {
 
       expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).toThrow(AggregateError);
       expect(calls).toBe(2);
-      expect(wb.getNamedCellStyles().some((style) => style.name === 'Probe One')).toBe(true);
+      expect(wb.getNamedCellStyles().some((style) => style.name === 'Probe One')).toBe(false);
+      expect(wb.getNamedCellStyles().some((style) => style.name === 'Probe Two')).toBe(false);
     } finally {
       wb.dispose();
     }
   });
+
+  it.each([
+    { originalName: 'Hidden Probe', registeredName: 'Hidden Probe', hidden: true },
+    { originalName: 'case probe', registeredName: 'Case Probe', hidden: false },
+  ])(
+    'restores $originalName after a later catalog failure',
+    async ({ originalName, registeredName, hidden }) => {
+      const wb = await WorkbookHandle.createDefault();
+      try {
+        const prior = {
+          name: originalName,
+          xfId: 0,
+          builtinId: 1,
+          iLevel: 4,
+          hidden,
+          customBuiltin: true,
+        };
+        expect(wb.setNamedCellStyleRecord(prior)).toBe(true);
+        expect(wb.getNamedCellStyles().some((style) => style.name === prior.name)).toBe(!hidden);
+        const store = createSpreadsheetStore();
+        for (const [col, name] of [registeredName, 'Later Failure'].entries()) {
+          mutators.upsertCustomCellStyle(store, {
+            id: `custom:${name}`,
+            label: name,
+            format: { bold: true },
+          });
+          mutators.setCellFormat(store, { sheet: 0, row: 0, col }, { cellStyle: name });
+        }
+        const original = wb.setNamedCellStyle.bind(wb);
+        vi.spyOn(wb, 'setNamedCellStyle').mockImplementation((name, xfId, builtinId) =>
+          name === 'Later Failure' ? false : original(name, xfId, builtinId),
+        );
+        expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).toThrow(
+          AggregateError,
+        );
+        const styles = Array.from({ length: wb.cellStyleCount() }, (_, index) =>
+          wb.getCellStyle(index),
+        );
+        expect(styles.find((style) => style?.name === prior.name)).toMatchObject(prior);
+        expect(styles.some((style) => style?.name === 'Later Failure')).toBe(false);
+        if (registeredName !== originalName) {
+          expect(styles.some((style) => style?.name === registeredName)).toBe(false);
+        }
+      } finally {
+        wb.dispose();
+      }
+    },
+  );
 
   it('replaces a stale custom native XF when a removed font member differs', async () => {
     const wb = await WorkbookHandle.createDefault();
@@ -265,7 +356,7 @@ describe('named-style engine publication', () => {
     }
   });
 
-  it('reports both an unrestorable new style and a failed prior-style rollback', async () => {
+  it('removes a new style and reports a failed prior-style rollback', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.isStub).toBe(false);
@@ -274,7 +365,16 @@ describe('named-style engine publication', () => {
       if (!normalXf) return;
       const existingXfId = wb.addCellStyleXfRecord({ ...normalXf, fontIndex: 0 });
       expect(existingXfId).toBeGreaterThanOrEqual(0);
-      expect(wb.setNamedCellStyle('Probe Replace', existingXfId, null)).toBe(true);
+      expect(
+        wb.setNamedCellStyleRecord({
+          name: 'Probe Replace',
+          xfId: existingXfId,
+          builtinId: 1,
+          iLevel: 4,
+          hidden: false,
+          customBuiltin: true,
+        }),
+      ).toBe(true);
 
       const store = createSpreadsheetStore();
       for (const [col, style] of [
@@ -294,11 +394,20 @@ describe('named-style engine publication', () => {
         );
       }
       const original = wb.setNamedCellStyle.bind(wb);
+      const originalRecord = wb.setNamedCellStyleRecord.bind(wb);
+      let rollbackRecord: Parameters<typeof wb.setNamedCellStyleRecord>[0] | undefined;
       let calls = 0;
       vi.spyOn(wb, 'setNamedCellStyle').mockImplementation((name, xfId, builtinId) => {
         calls += 1;
-        if (calls === 3 || calls === 4) return false;
+        if (calls === 3) return false;
         return original(name, xfId, builtinId);
+      });
+      vi.spyOn(wb, 'setNamedCellStyleRecord').mockImplementation((record) => {
+        if (calls >= 3 && record.name === 'Probe Replace') {
+          rollbackRecord = record;
+          return false;
+        }
+        return originalRecord(record);
       });
 
       let error: unknown;
@@ -309,8 +418,16 @@ describe('named-style engine publication', () => {
       }
       expect(error).toBeInstanceOf(AggregateError);
       const details = error instanceof AggregateError ? error.errors.map(String).join('\n') : '';
-      expect(details).toContain('unavailable for new entries');
       expect(details).toContain('rollback failed: Probe Replace');
+      expect(details).not.toContain('unavailable for new entries');
+      expect(wb.getNamedCellStyles().some((style) => style.name === 'Probe New')).toBe(false);
+      expect(rollbackRecord).toMatchObject({
+        name: 'Probe Replace',
+        builtinId: 1,
+        iLevel: 4,
+        hidden: false,
+        customBuiltin: true,
+      });
     } finally {
       wb.dispose();
     }
@@ -376,6 +493,13 @@ describe('named-style engine publication', () => {
       });
       expect(styleXfId).toBeGreaterThanOrEqual(0);
       expect(wb.setNamedCellStyle('Good', styleXfId, 26)).toBe(true);
+      const resolvedFont = wb.getResolvedFontRecord(themedFontIndex);
+      const resolvedFill = wb.getResolvedFillRecord(indexedFillIndex);
+      expect(resolvedFont).not.toBeNull();
+      expect(resolvedFill).not.toBeNull();
+      if (!resolvedFont || !resolvedFill) return;
+      const hydratedFontColor = argbToCssColor(resolvedFont.colorArgb);
+      const hydratedFillColor = argbToCssColor(resolvedFill.fgArgb);
 
       const numFmtId = wb.addNumFmtCode('0.00');
       const currentXfId = wb.addXfRecord({
@@ -410,8 +534,8 @@ describe('named-style engine publication', () => {
         store,
         { sheet: 0, row: 0, col: 0 },
         {
-          color: '#006100',
-          fill: '#c6efce',
+          color: hydratedFontColor,
+          fill: hydratedFillColor,
           borders: { top: { style: 'medium' } },
           align: 'right',
           vAlign: 'middle',

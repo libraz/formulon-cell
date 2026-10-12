@@ -31,9 +31,9 @@ describe('interact/format-dialog-model', () => {
       expect(defaultCurrencySymbolFor('ja-JP')).toBe('¥');
     });
 
-    it('uses $ for everything else', () => {
+    it('resolves currency from language and region', () => {
       expect(defaultCurrencySymbolFor('en')).toBe('$');
-      expect(defaultCurrencySymbolFor('fr-CA')).toBe('$');
+      expect(defaultCurrencySymbolFor('fr-CA')).toBe('C$');
       expect(defaultCurrencySymbolFor('')).toBe('$');
     });
   });
@@ -83,8 +83,8 @@ describe('interact/format-dialog-model', () => {
   });
 
   describe('canonical option lists', () => {
-    it('exposes the 4 baseline currency symbols', () => {
-      expect(CURRENCY_SYMBOLS).toEqual(['$', '¥', '€', '£']);
+    it('exposes currency symbols for the seven locales', () => {
+      expect(CURRENCY_SYMBOLS).toEqual(['$', '¥', '€', '£', '₩', '฿']);
     });
   });
 });

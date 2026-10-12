@@ -1,9 +1,16 @@
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { syncAutoFilterToEngine, syncHiddenRowsToEngine } from '../engine/auto-filter-sync.js';
+import {
+  createProfileTextSemantics,
+  localeForWorkbook,
+  profileTextKey,
+} from '../engine/profile-text-semantics.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { formatCell, writeCell } from '../engine/value.js';
+import { formatCell, fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
+import { parseLocalizedNumericInput } from './coerce-input.js';
 import { formatNumber } from './format.js';
 import type { History } from './history.js';
 
@@ -26,6 +33,22 @@ export interface ConditionFilterOptions {
   value: string;
 }
 
+const numericConditionOperator = (op: ConditionFilterOp): boolean =>
+  op === 'equals' ||
+  op === 'notEquals' ||
+  op === 'greaterThan' ||
+  op === 'greaterThanOrEqual' ||
+  op === 'lessThan' ||
+  op === 'lessThanOrEqual';
+
+/** Store numeric criteria in the workbook's canonical grammar. Keeping the
+ * raw text for invalid input preserves the existing no-match behavior while
+ * making a valid `1,5` criterion survive a later locale switch as `1.5`. */
+const canonicalNumericCriterion = (raw: string, locale: string): string => {
+  const parsed = parseLocalizedNumericInput(raw, locale);
+  return parsed === null ? raw : String(parsed);
+};
+
 interface FilterSnapshot {
   hiddenRows: Set<number>;
   filterRange: Range | null;
@@ -43,11 +66,27 @@ const cloneCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCri
   }));
 
 const MAX_EXACT_FILTER_ROWS = 100_000;
+// UNIQUE in the bundled engine grows much faster than SORTBY. The matching
+// budget is kept explicit here so a large checklist never blocks the UI while
+// asking the engine for an unbounded dynamic array.
+const MAX_NATIVE_DISTINCT_ROWS = 20_000;
 
 const dataRowCount = (range: Range): number => Math.max(0, range.r1 - range.r0);
 
 const canEvaluateFilterRange = (range: Range): boolean =>
   dataRowCount(range) <= MAX_EXACT_FILTER_ROWS;
+
+function syncFilterToEngine(wb: WorkbookHandle | undefined, store: SpreadsheetStore): void {
+  if (!wb) return;
+  const state = store.getState();
+  syncAutoFilterToEngine(
+    wb,
+    state,
+    state.ui.filterRange?.sheet ?? state.data.sheetIndex,
+    store,
+    localeForWorkbook(wb),
+  );
+}
 
 const rowInRange = (row: number, range: Range): boolean => row > range.r0 && row <= range.r1;
 
@@ -79,7 +118,12 @@ function captureFilterSnapshot(state: State): FilterSnapshot {
   };
 }
 
-function applyFilterSnapshot(store: SpreadsheetStore, snap: FilterSnapshot): void {
+function applyFilterSnapshot(
+  store: SpreadsheetStore,
+  snap: FilterSnapshot,
+  wb?: WorkbookHandle,
+): void {
+  const beforeHidden = new Set(store.getState().layout.hiddenRows);
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: new Set(snap.hiddenRows) },
@@ -89,6 +133,9 @@ function applyFilterSnapshot(store: SpreadsheetStore, snap: FilterSnapshot): voi
       filterCriteria: cloneCriteria(snap.filterCriteria),
     },
   }));
+  if (wb) {
+    syncHiddenRowsToEngine(wb, store.getState().data.sheetIndex, beforeHidden, snap.hiddenRows);
+  }
 }
 
 function sameOptionalRange(a: Range | null, b: Range | null): boolean {
@@ -130,14 +177,15 @@ export function recordFilterChange<T>(
   history: History | null,
   store: SpreadsheetStore,
   mutate: () => T,
+  wb?: WorkbookHandle,
 ): T {
   const before = captureFilterSnapshot(store.getState());
   const result = mutate();
   const after = captureFilterSnapshot(store.getState());
   if (history && !history.isReplaying() && !sameFilterSnapshot(before, after)) {
     history.push({
-      undo: () => applyFilterSnapshot(store, before),
-      redo: () => applyFilterSnapshot(store, after),
+      undo: () => applyFilterSnapshot(store, before, wb),
+      redo: () => applyFilterSnapshot(store, after, wb),
     });
   }
   return result;
@@ -203,22 +251,45 @@ export function applyValueFilter(
   range: Range,
   byCol: number,
   hiddenValues: readonly string[],
+  wb?: WorkbookHandle,
 ): number {
   if (!canEvaluateFilterRange(range)) {
     stampFilterRangeWithoutCriteria(store, range);
+    syncFilterToEngine(wb, store);
     return 0;
+  }
+  const locale = localeForWorkbook(wb);
+  const semantics = createProfileTextSemantics(locale);
+  const uniqueHiddenValues: string[] = [];
+  const seenHiddenValues = new Set<string>();
+  for (const value of hiddenValues) {
+    const key = semantics.key(value);
+    if (seenHiddenValues.has(key)) continue;
+    seenHiddenValues.add(key);
+    uniqueHiddenValues.push(value);
   }
   const criteria = upsertCriteria(state.ui.filterCriteria, {
     range,
     byCol,
-    hiddenValues: Array.from(new Set(hiddenValues)).sort(),
+    hiddenValues: uniqueHiddenValues.sort((a, b) => semantics.compare(a, b)),
   });
-  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
+  // Recomputing with no remaining criterion would otherwise keep the rows
+  // hidden by the just-cleared column. Start from a revealed target range and
+  // let any other active criteria add their rows back as needed.
+  const recomputeState: State = {
+    ...state,
+    layout: {
+      ...state.layout,
+      hiddenRows: clearHiddenRowsInRange(state.layout.hiddenRows, range),
+    },
+  };
+  const { hidden, count } = recomputeHiddenFromCriteria(recomputeState, criteria, locale);
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: hidden },
     ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
   }));
+  syncFilterToEngine(wb, store);
   return count;
 }
 
@@ -228,23 +299,30 @@ export function applyConditionFilter(
   range: Range,
   byCol: number,
   condition: ConditionFilterOptions,
+  wb?: WorkbookHandle,
 ): number {
   if (!canEvaluateFilterRange(range)) {
     stampFilterRangeWithoutCriteria(store, range);
+    syncFilterToEngine(wb, store);
     return 0;
   }
+  const locale = localeForWorkbook(wb);
+  const value = numericConditionOperator(condition.op)
+    ? canonicalNumericCriterion(condition.value, locale)
+    : condition.value;
   const criteria = upsertCriteria(state.ui.filterCriteria, {
     range,
     byCol,
     hiddenValues: [],
-    condition: { op: condition.op, value: condition.value },
+    condition: { op: condition.op, value },
   });
-  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
+  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria, locale);
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: hidden },
     ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
   }));
+  syncFilterToEngine(wb, store);
   return count;
 }
 
@@ -254,9 +332,11 @@ export function applyColorFilter(
   range: Range,
   byCol: number,
   color: { kind: 'cellColor' | 'fontColor'; color: string },
+  wb?: WorkbookHandle,
 ): number {
   if (!canEvaluateFilterRange(range)) {
     stampFilterRangeWithoutCriteria(store, range);
+    syncFilterToEngine(wb, store);
     return 0;
   }
   const criteria = upsertCriteria(state.ui.filterCriteria, {
@@ -265,12 +345,13 @@ export function applyColorFilter(
     hiddenValues: [],
     color: { kind: color.kind, color: normalizeColorKey(color.color) },
   });
-  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
+  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria, localeForWorkbook(wb));
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: hidden },
     ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
   }));
+  syncFilterToEngine(wb, store);
   return count;
 }
 
@@ -284,6 +365,7 @@ export function applyColorFilter(
 function recomputeHiddenFromCriteria(
   state: State,
   criteria: readonly ValueFilterCriteria[],
+  locale = 'en-US',
 ): { hidden: Set<number>; count: number } {
   const baseline = new Set(state.layout.hiddenRows);
   for (const c of criteria) {
@@ -294,15 +376,18 @@ function recomputeHiddenFromCriteria(
   const next = new Set(baseline);
   for (const c of criteria) {
     if (!canEvaluateFilterRange(c.range)) continue;
-    const hiddenSet = c.condition || c.color ? null : new Set(c.hiddenValues);
+    const hiddenSet =
+      c.condition || c.color
+        ? null
+        : new Set(c.hiddenValues.map((value) => filterMatchKey(value, locale)));
     for (let r = c.range.r0 + 1; r <= c.range.r1; r += 1) {
       if (next.has(r)) continue;
       const cell = state.data.cells.get(addrKey({ sheet: c.range.sheet, row: r, col: c.byCol }));
       const hide = c.color
         ? !colorMatches(state, c.range.sheet, r, c.byCol, c.color)
         : c.condition
-          ? !conditionMatches(cell, c.condition)
-          : (hiddenSet as Set<string>).has(filterValueKey(cell?.value));
+          ? !conditionMatches(cell, c.condition, locale)
+          : (hiddenSet as Set<string>).has(filterMatchKey(filterValueKey(cell?.value), locale));
       if (hide) next.add(r);
     }
   }
@@ -310,6 +395,11 @@ function recomputeHiddenFromCriteria(
 }
 
 const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
+
+/** Formulon's AutoFilter text matcher follows Excel and compares text without
+ * regard to case. Keep checklist labels in their original case, but fold
+ * value keys whenever a selection is evaluated. */
+const filterMatchKey = (value: string, locale = 'en-US'): string => profileTextKey(value, locale);
 
 function colorMatches(
   state: State,
@@ -331,6 +421,7 @@ export function filterBySelectedCellValue(
   state: State,
   store: SpreadsheetStore,
   range: Range = state.ui.filterRange ?? inferAutoFilterRange(state),
+  wb?: WorkbookHandle,
 ): number {
   const active = state.selection.active;
   if (
@@ -344,15 +435,21 @@ export function filterBySelectedCellValue(
   }
   const selected = state.data.cells.get(addrKey(active));
   const selectedValue = selected?.value ?? { kind: 'blank' as const };
-  const selectedLabel = filterItemLabel(state, active, selectedValue, 'en-US');
-  const hiddenValues = distinctFilterItems(state, range, active.col)
-    .filter((item) => item.label !== selectedLabel)
+  const locale = localeForWorkbook(wb);
+  const semantics = createProfileTextSemantics(locale);
+  const selectedLabel = filterItemLabel(state, active, selectedValue, locale);
+  const distinct = distinctFilterItemsResult(state, range, active.col, locale, wb);
+  // Native evaluation refusal/failure must be atomic for this command. An
+  // empty checklist would otherwise be interpreted as "hide nothing".
+  if (distinct.failure) return 0;
+  const hiddenValues = distinct.items
+    .filter((item) => !semantics.equals(item.label, selectedLabel))
     .map((item) => item.key);
   if (hiddenValues.length === 0) {
-    setAutoFilter(store, range);
+    setAutoFilter(store, range, wb);
     return 0;
   }
-  return applyValueFilter(state, store, range, active.col, hiddenValues);
+  return applyValueFilter(state, store, range, active.col, hiddenValues, wb);
 }
 
 const isNonBlankCell = (state: State, sheet: number, row: number, col: number): boolean => {
@@ -450,14 +547,17 @@ export function applyAdvancedFilter(
   store: SpreadsheetStore,
   listRange: Range,
   criteriaRange: Range,
+  wb?: WorkbookHandle,
 ): number {
   if (!canEvaluateFilterRange(listRange)) {
     stampFilterRangeWithoutCriteria(store, listRange);
+    syncFilterToEngine(wb, store);
     return 0;
   }
-  const criteriaRows = buildAdvancedCriteriaRows(state, listRange, criteriaRange);
+  const locale = localeForWorkbook(wb);
+  const criteriaRows = buildAdvancedCriteriaRows(state, listRange, criteriaRange, locale);
   if (criteriaRows.length === 0) {
-    setAutoFilter(store, listRange);
+    setAutoFilter(store, listRange, wb);
     return 0;
   }
 
@@ -471,6 +571,7 @@ export function applyAdvancedFilter(
         advancedCriterionMatches(
           state.data.cells.get(addrKey({ sheet: listRange.sheet, row: r, col })),
           criterion,
+          locale,
         ),
       ),
     );
@@ -485,6 +586,7 @@ export function applyAdvancedFilter(
     layout: { ...s.layout, hiddenRows: nextHidden },
     ui: { ...s.ui, filterRange: { ...listRange } },
   }));
+  syncFilterToEngine(wb, store);
   return hiddenCount;
 }
 
@@ -501,7 +603,8 @@ export function copyAdvancedFilterResult(
   wb?: WorkbookHandle | null,
 ): number {
   if (!canEvaluateFilterRange(listRange)) return 0;
-  const criteriaRows = buildAdvancedCriteriaRows(state, listRange, criteriaRange);
+  const locale = localeForWorkbook(wb);
+  const criteriaRows = buildAdvancedCriteriaRows(state, listRange, criteriaRange, locale);
   const width = listRange.c1 - listRange.c0 + 1;
   const rowIndexes: number[] = [listRange.r0];
   const seen = new Set<string>();
@@ -514,12 +617,13 @@ export function copyAdvancedFilterResult(
           advancedCriterionMatches(
             state.data.cells.get(addrKey({ sheet: listRange.sheet, row: r, col })),
             criterion,
+            locale,
           ),
         ),
       );
     if (!rowMatches) continue;
     if (options.uniqueOnly) {
-      const key = advancedRowKey(state, listRange, r);
+      const key = advancedRowKey(state, listRange, r, locale);
       if (seen.has(key)) continue;
       seen.add(key);
     }
@@ -556,6 +660,7 @@ function buildAdvancedCriteriaRows(
   state: State,
   listRange: Range,
   criteriaRange: Range,
+  locale = 'en-US',
 ): Array<Array<{ col: number; criterion: AdvancedCriterion }>> {
   const headerToCol = new Map<string, number>();
   for (let c = listRange.c0; c <= listRange.c1; c += 1) {
@@ -576,18 +681,20 @@ function buildAdvancedCriteriaRows(
     for (const { col, listCol } of criteriaCols) {
       const raw = cellText(state, criteriaRange.sheet, r, col).trim();
       if (!raw) continue;
-      criteria.push({ col: listCol, criterion: parseAdvancedCriterion(raw) });
+      criteria.push({ col: listCol, criterion: parseAdvancedCriterion(raw, locale) });
     }
     if (criteria.length > 0) rows.push(criteria);
   }
   return rows;
 }
 
-function advancedRowKey(state: State, range: Range, row: number): string {
+function advancedRowKey(state: State, range: Range, row: number, locale = 'en-US'): string {
   const parts: string[] = [];
   for (let col = range.c0; col <= range.c1; col += 1) {
+    const value = state.data.cells.get(addrKey({ sheet: range.sheet, row, col }))?.value;
+    const key = filterValueKey(value);
     parts.push(
-      filterValueKey(state.data.cells.get(addrKey({ sheet: range.sheet, row, col }))?.value),
+      `${value?.kind ?? 'blank'}:${value?.kind === 'text' ? profileTextKey(key, locale) : key}`,
     );
   }
   return parts.join('\u001f');
@@ -609,26 +716,27 @@ function writeCellRecord(
   else wb.setBlank(addr);
 }
 
-function parseAdvancedCriterion(raw: string): AdvancedCriterion {
+function parseAdvancedCriterion(raw: string, locale = 'en-US'): AdvancedCriterion {
   const match = /^(<=|>=|<>|=|<|>)(.*)$/.exec(raw);
   if (match) {
     const op = match[1] as ComparisonOp;
     const body = (match[2] ?? '').trim();
     // A bare operator means blank / non-blank (Excel: `=` → is blank).
     if (body === '') return op === '<>' ? { kind: 'nonBlank' } : { kind: 'blank' };
-    const numeric = Number(body);
-    if (Number.isFinite(numeric)) return { kind: 'number', op, value: numeric };
+    const numeric = parseLocalizedNumericInput(body, locale);
+    if (numeric !== null) return { kind: 'number', op, value: numeric };
     return { kind: 'text', op, value: body };
   }
   // No operator: bare numbers match by equality, bare text is "begins with".
-  const numeric = Number(raw);
-  if (raw !== '' && Number.isFinite(numeric)) return { kind: 'number', op: '=', value: numeric };
+  const numeric = parseLocalizedNumericInput(raw, locale);
+  if (raw !== '' && numeric !== null) return { kind: 'number', op: '=', value: numeric };
   return { kind: 'beginsWith', value: raw };
 }
 
 function advancedCriterionMatches(
   cell: { value: unknown; formula: string | null } | undefined,
   criterion: AdvancedCriterion,
+  locale = 'en-US',
 ): boolean {
   const text = filterValueKey(cell?.value);
   switch (criterion.kind) {
@@ -637,20 +745,19 @@ function advancedCriterionMatches(
     case 'nonBlank':
       return text !== '';
     case 'beginsWith':
-      return textLikeMatch(text, criterion.value, false);
+      return textLikeMatch(text, criterion.value, false, locale);
     case 'text': {
       switch (criterion.op) {
         case '=':
-          return textLikeMatch(text, criterion.value, true);
+          return textLikeMatch(text, criterion.value, true, locale);
         case '<>':
-          return !textLikeMatch(text, criterion.value, true);
+          return !textLikeMatch(text, criterion.value, true, locale);
         default: {
-          const a = text.toLowerCase();
-          const b = criterion.value.toLowerCase();
-          if (criterion.op === '>') return a > b;
-          if (criterion.op === '>=') return a >= b;
-          if (criterion.op === '<') return a < b;
-          return a <= b;
+          const compare = createProfileTextSemantics(locale).compare(text, criterion.value);
+          if (criterion.op === '>') return compare > 0;
+          if (criterion.op === '>=') return compare >= 0;
+          if (criterion.op === '<') return compare < 0;
+          return compare <= 0;
         }
       }
     }
@@ -678,11 +785,17 @@ function advancedCriterionMatches(
 /** Case-insensitive wildcard match. `*`/`?` are Excel wildcards; when
  *  `anchorEnd` is false the pattern only has to match the start of `text`
  *  (Excel's "begins with" semantics for bare-text criteria). */
-function textLikeMatch(text: string, pattern: string, anchorEnd: boolean): boolean {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+function textLikeMatch(
+  text: string,
+  pattern: string,
+  anchorEnd: boolean,
+  locale = 'en-US',
+): boolean {
+  const loweredPattern = pattern.toLocaleLowerCase(locale);
+  const escaped = loweredPattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
   const body = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
-  const regex = new RegExp(`^${body}${anchorEnd ? '$' : ''}`, 'i');
-  return regex.test(text);
+  const regex = new RegExp(`^${body}${anchorEnd ? '$' : ''}`);
+  return regex.test(text.toLocaleLowerCase(locale));
 }
 
 function cellText(state: State, sheet: number, row: number, col: number): string {
@@ -702,16 +815,18 @@ function cellNumber(value: unknown): number | null {
 function conditionMatches(
   cell: { value: unknown; formula: string | null } | undefined,
   condition: ConditionFilterOptions,
+  locale = 'en-US',
 ): boolean {
   const needle = condition.value.trim();
   const text = filterValueKey(cell?.value);
+  const semantics = createProfileTextSemantics(locale);
   switch (condition.op) {
     case 'notEquals':
-      return text !== needle;
+      return !semantics.equals(text, needle);
     case 'contains':
-      return text.toLowerCase().includes(needle.toLowerCase());
+      return text.toLocaleLowerCase(locale).includes(needle.toLocaleLowerCase(locale));
     case 'notContains':
-      return !text.toLowerCase().includes(needle.toLowerCase());
+      return !text.toLocaleLowerCase(locale).includes(needle.toLocaleLowerCase(locale));
     case 'greaterThan':
     case 'greaterThanOrEqual':
     case 'lessThan':
@@ -725,23 +840,32 @@ function conditionMatches(
       return value <= target;
     }
     default:
-      return text === needle;
+      return semantics.equals(text, needle);
   }
 }
 
-export function reapplyFilters(state: State, store: SpreadsheetStore): number {
+export function reapplyFilters(state: State, store: SpreadsheetStore, wb?: WorkbookHandle): number {
   const criteria = state.ui.filterCriteria;
-  if (criteria.length === 0) return 0;
+  if (criteria.length === 0) {
+    syncFilterToEngine(wb, store);
+    return 0;
+  }
   let hiddenCount = 0;
   store.setState((s) => ({
     ...s,
     layout: {
       ...s.layout,
-      hiddenRows: rowsAfterReapply(s, criteria, (count) => {
-        hiddenCount = count;
-      }),
+      hiddenRows: rowsAfterReapply(
+        s,
+        criteria,
+        (count) => {
+          hiddenCount = count;
+        },
+        localeForWorkbook(wb),
+      ),
     },
   }));
+  syncFilterToEngine(wb, store);
   return hiddenCount;
 }
 
@@ -749,8 +873,9 @@ function rowsAfterReapply(
   state: State,
   criteria: readonly ValueFilterCriteria[],
   setHiddenCount: (count: number) => void,
+  locale = 'en-US',
 ): Set<number> {
-  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
+  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria, locale);
   setHiddenCount(count);
   return hidden;
 }
@@ -778,14 +903,24 @@ function upsertCriteria(
 /** Mark `range` as the active autofilter region without applying any predicate.
  *  Headers in the range paint the chevron so the user can open the dropdown
  *  per column. Equivalent to the "Filter" toggle (Ctrl+Shift+L). */
-export function setAutoFilter(store: SpreadsheetStore, range: Range | null): void {
+export function setAutoFilter(
+  store: SpreadsheetStore,
+  range: Range | null,
+  wb?: WorkbookHandle,
+): void {
   store.setState((s) => ({ ...s, ui: { ...s.ui, filterRange: range ? { ...range } : null } }));
+  syncFilterToEngine(wb, store);
 }
 
 /** Reveal all rows in `range` (or all rows when range is omitted). Also clears
  *  `ui.filterRange` when `range` matches the active autofilter region (or when
  *  no range is supplied). */
-export function clearFilter(state: State, store: SpreadsheetStore, range?: Range): void {
+export function clearFilter(
+  state: State,
+  store: SpreadsheetStore,
+  range?: Range,
+  wb?: WorkbookHandle,
+): void {
   const next = range ? clearHiddenRowsInRange(state.layout.hiddenRows, range) : new Set<number>();
   store.setState((s) => {
     const fr = s.ui.filterRange;
@@ -807,6 +942,7 @@ export function clearFilter(state: State, store: SpreadsheetStore, range?: Range
       },
     };
   });
+  syncFilterToEngine(wb, store);
 }
 
 function filterCriteriaAfterClear(
@@ -830,6 +966,15 @@ export interface FilterValueItem {
   label: string;
 }
 
+export type DistinctFilterFailureReason = 'native-limit' | 'native-result';
+
+export interface DistinctFilterItemsResult {
+  items: FilterValueItem[];
+  /** Native dynamic-array failure, while items remains a safe explicit
+   * locale approximation for checklist rendering. */
+  failure: DistinctFilterFailureReason | null;
+}
+
 const classifyFilterValue = (value: CellValue | undefined): FilterItemKind => {
   if (!value || value.kind === 'blank' || value.kind === 'error') return 'blank';
   if (value.kind === 'number') return 'number';
@@ -846,25 +991,127 @@ const filterItemLabel = (state: State, addr: Addr, value: CellValue, locale: str
 
 const FILTER_GROUP_ORDER: Record<FilterItemKind, number> = { number: 0, text: 1, blank: 2 };
 
+const columnName = (column: number): string => {
+  let n = column + 1;
+  let out = '';
+  while (n > 0) {
+    const digit = (n - 1) % 26;
+    out = String.fromCharCode(65 + digit) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+};
+
+const nativeFilterAnchor = (state: State, range: Range): Addr => {
+  const columns = Math.min(MAX_COL, Math.max(range.c1 + 8, 64));
+  for (let row = 0; row <= Math.min(range.r0 + 1, 64); row += 1) {
+    for (let col = 0; col <= columns; col += 1) {
+      if (!state.data.cells.has(addrKey({ sheet: range.sheet, row, col }))) {
+        return { sheet: range.sheet, row, col };
+      }
+    }
+  }
+  return { sheet: range.sheet, row: 0, col: 0 };
+};
+
+/** Native UNIQUE/SORT can expose a source blank as numeric zero through the
+ * engine value ABI. Keep those two source forms in one representative queue;
+ * the queue remains source ordered, so a real zero and a blank stay distinct
+ * when the native result contains both. */
+const nativeFilterValueKey = (value: CellValue): string => {
+  if (value.kind === 'blank' || (value.kind === 'number' && value.value === 0)) {
+    return 'zero-or-blank';
+  }
+  if (value.kind === 'number') return `number:${String(value.value)}`;
+  if (value.kind === 'text') return `text:${value.value}`;
+  if (value.kind === 'bool') return `bool:${value.value ? '1' : '0'}`;
+  return `error:${value.code}:${value.text}`;
+};
+
+const nativeDistinctFilterItems = (
+  state: State,
+  wb: WorkbookHandle,
+  range: Range,
+  byCol: number,
+  locale: string,
+): FilterValueItem[] | null => {
+  const count = Math.max(0, range.r1 - range.r0);
+  if (count === 0) return [];
+  const column = columnName(byCol);
+  const first = range.r0 + 2;
+  const last = range.r1 + 1;
+  const formula = `=SORT(UNIQUE($${column}$${first}:$${column}$${last}))`;
+  try {
+    const result = wb.evaluateFormulaArray(nativeFilterAnchor(state, range), formula);
+    if (!result.status.ok || result.cols !== 1 || result.rows < 1 || result.rows > count)
+      return null;
+    if (result.cells.length !== result.rows || result.cells.some((row) => row.length !== 1))
+      return null;
+    const values = result.cells.map((row) => (row?.[0] ? fromEngineValue(row[0]) : null));
+    if (values.some((value): value is null => value === null)) return null;
+    const candidates = new Map<string, number[]>();
+    for (let row = range.r0 + 1; row <= range.r1; row += 1) {
+      const source =
+        state.data.cells.get(addrKey({ sheet: range.sheet, row, col: byCol }))?.value ??
+        ({ kind: 'blank' } as const);
+      const key = nativeFilterValueKey(source);
+      const rows = candidates.get(key);
+      if (rows) rows.push(row);
+      else candidates.set(key, [row]);
+    }
+    const offsets = new Map<string, number>();
+    const items: FilterValueItem[] = [];
+    for (const value of values) {
+      if (!value) return null;
+      const nativeKey = nativeFilterValueKey(value);
+      const rows = candidates.get(nativeKey);
+      const offset = offsets.get(nativeKey) ?? 0;
+      const representative = rows?.[offset];
+      if (representative === undefined) return null;
+      offsets.set(nativeKey, offset + 1);
+      const addr = { sheet: range.sheet, row: representative, col: byCol };
+      const sourceValue =
+        state.data.cells.get(addrKey({ sheet: range.sheet, row: representative, col: byCol }))
+          ?.value ?? ({ kind: 'blank' } as const);
+      const key = sourceValue.kind === 'blank' ? '' : filterValueKey(value);
+      items.push({
+        key,
+        label: key === '' ? '' : filterItemLabel(state, addr, value, locale),
+      });
+    }
+    return items;
+  } catch {
+    return null;
+  }
+};
+
 /** Distinct values of `byCol` in `range` (excluding the header row) as
  *  {@link FilterValueItem}s. De-duplicated by filter key and ordered the way the
  *  AutoFilter checklist orders them — numbers ascending numerically, then text
  *  ascending, with blanks last — instead of a raw lexical sort of serials. */
-export function distinctFilterItems(
+function fallbackDistinctFilterItems(
   state: State,
   range: Range,
   byCol: number,
   locale = 'en-US',
 ): FilterValueItem[] {
-  const items = new Map<string, { label: string; kind: FilterItemKind; num: number }>();
+  const semantics = createProfileTextSemantics(locale);
+  const items = new Map<
+    string,
+    { key: string; label: string; kind: FilterItemKind; num: number }
+  >();
   const visitValue = (row: number, value: CellValue | undefined): void => {
     const addr = { sheet: range.sheet, row, col: byCol };
     const key = filterValueKey(value);
-    if (items.has(key)) return;
+    // Keep number/text/blank types separate. Within the text class the
+    // locale key folds case and width for linear-time checklist membership.
+    const matchKey =
+      value?.kind === 'text' ? semantics.key(key) : `${value?.kind ?? 'blank'}:${key}`;
+    if (items.has(matchKey)) return;
     const kind = key === '' ? 'blank' : classifyFilterValue(value);
     const num = value?.kind === 'number' ? value.value : 0;
     const label = key === '' || !value ? '' : filterItemLabel(state, addr, value, locale);
-    items.set(key, { label, kind, num });
+    items.set(matchKey, { key, label, kind, num });
   };
 
   if (canEvaluateFilterRange(range)) {
@@ -880,23 +1127,67 @@ export function distinctFilterItems(
       visitValue(addr.row, cell.value);
     }
   }
-  return Array.from(items, ([key, meta]) => ({ key, meta }))
+  return Array.from(items.values())
     .sort((a, b) => {
-      const groupDelta = FILTER_GROUP_ORDER[a.meta.kind] - FILTER_GROUP_ORDER[b.meta.kind];
+      const groupDelta = FILTER_GROUP_ORDER[a.kind] - FILTER_GROUP_ORDER[b.kind];
       if (groupDelta !== 0) return groupDelta;
-      if (a.meta.kind === 'number') {
-        return a.meta.num - b.meta.num || a.meta.label.localeCompare(b.meta.label);
+      if (a.kind === 'number') {
+        return a.num - b.num || semantics.compare(a.label, b.label);
       }
-      if (a.meta.kind === 'text') return a.meta.label.localeCompare(b.meta.label);
+      if (a.kind === 'text') return semantics.compare(a.label, b.label);
       return 0;
     })
-    .map(({ key, meta }) => ({ key, label: meta.label }));
+    .map(({ key, label }) => ({ key, label }));
+}
+
+export function distinctFilterItemsResult(
+  state: State,
+  range: Range,
+  byCol: number,
+  locale = 'en-US',
+  wb?: WorkbookHandle,
+): DistinctFilterItemsResult {
+  if (wb?.isStub === false && wb.capabilities.arrayFormulaEvaluation === true) {
+    // A real bundle owns UNIQUE/SORT equality and collation for bounded
+    // ranges. Above the native budget, or when the result is malformed, use
+    // the explicit-locale store path so a checklist failure cannot turn into
+    // an empty list that hides every row when the user applies it.
+    if (dataRowCount(range) > MAX_NATIVE_DISTINCT_ROWS) {
+      return {
+        items: fallbackDistinctFilterItems(state, range, byCol, locale),
+        failure: 'native-limit',
+      };
+    }
+    const native = nativeDistinctFilterItems(state, wb, range, byCol, locale);
+    if (native !== null) return { items: native, failure: null };
+    return {
+      items: fallbackDistinctFilterItems(state, range, byCol, locale),
+      failure: 'native-result',
+    };
+  }
+  return { items: fallbackDistinctFilterItems(state, range, byCol, locale), failure: null };
+}
+
+export function distinctFilterItems(
+  state: State,
+  range: Range,
+  byCol: number,
+  locale = 'en-US',
+  wb?: WorkbookHandle,
+): FilterValueItem[] {
+  return distinctFilterItemsResult(state, range, byCol, locale, wb).items;
 }
 
 /** Distinct (string-coerced) filter keys found in `byCol` of `range`, excluding
  *  the header row, ordered like the AutoFilter checklist. */
-export function distinctValues(state: State, range: Range, byCol: number): string[] {
-  return distinctFilterItems(state, range, byCol).map((item) => item.key);
+export function distinctValues(
+  state: State,
+  range: Range,
+  byCol: number,
+  locale = 'en-US',
+  wb?: WorkbookHandle,
+): string[] {
+  return distinctFilterItems(state, range, byCol, locale, wb).map((item) => item.key);
 }
 
 export const filterValueKey = (v: unknown): string => {

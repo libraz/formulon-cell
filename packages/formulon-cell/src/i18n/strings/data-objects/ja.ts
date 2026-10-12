@@ -185,6 +185,9 @@ export const dataObjectsJa: DataObjectsStrings = {
       dataValidation: 'データの入力規則',
       hyperlinks: 'ハイパーリンク',
       comments: 'コメント',
+      threadedComments: 'スレッドコメント',
+      images: '画像',
+      workbookTheme: 'ブックのテーマ',
       phonetic: 'ふりがな',
       definedNames: '名前定義',
       namedCellStyles: '名前付きセル スタイル',
@@ -212,6 +215,11 @@ export const dataObjectsJa: DataObjectsStrings = {
         'エンジンの書き戻しに対応している場合、ハイパーリンクを一覧、追加、削除できます。',
       comments:
         'シート全体のコメント列挙 API がある場合、空セル上のコメントも含めて一覧、読み書きできます。',
+      threadedComments:
+        'エンジンが対応している場合、コメント、返信、作成者、解決状態をXLSXに保存できます。',
+      images:
+        'エンジンが画像に対応している場合、新規挿入した画像を編集してXLSXに保存できます。読み込んだ画像は閲覧のみで、画像の重なり順変更には未対応です。図形はセッション内の表示です。',
+      workbookTheme: 'アプリの外観とは別に、ブックのテーマ色と見出し・本文用の書体を編集できます。',
       phonetic: 'ふりがなは OOXML の rPh / phoneticPr を読み書きするエンジン API が必要です。',
       definedNames:
         'スコープ付き名前 API がある場合、ブック スコープとシート スコープの名前定義を一覧、更新、保存往復できます。',

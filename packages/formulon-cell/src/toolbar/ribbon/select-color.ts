@@ -1,3 +1,4 @@
+import type { Locale } from '../../i18n/strings.js';
 // Ribbon `<select>`-style dropdown and color-picker control builders extracted
 // from main.ts. The factory wires in i18n, host hooks (apply/read control
 // value, font availability, color palette) and produces the DOM elements that
@@ -12,6 +13,7 @@ import {
   RECENT_FONT_VALUES,
   THEME_FONT_VALUES,
 } from './font-availability.js';
+import { type FontFamilyOption, fontFamilyOptions } from './font-family-options.js';
 
 export interface SelectColorRibbonText {
   numberFormatNoSpecific: string;
@@ -40,13 +42,13 @@ export interface SelectColorPageScaleText {
 }
 
 export interface SelectColorCtx {
-  ribbonLang: 'ja' | 'en';
+  ribbonLang: Locale;
   ribbonText: SelectColorRibbonText;
   pageScaleText: SelectColorPageScaleText;
   getInst: () => SpreadsheetInstance | null;
   applyRibbonControl: (id: string, value: string) => void;
   currentRibbonControlValue: (id: string) => string;
-  shouldShowFontOption: (value: string, current: string, locale: 'ja' | 'en') => boolean;
+  shouldShowFontOption: (value: string, current: string, locale: Locale) => boolean;
   createRibbonIcon: (name: string) => SVGSVGElement | null;
 }
 
@@ -116,31 +118,32 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     value === 'general' ? ribbonText.numberFormatNoSpecific : '';
 
   const ribbonFontSection = (
-    value: string,
-    options: readonly { value: string; label: string }[],
+    option: FontFamilyOption,
+    options: readonly FontFamilyOption[],
   ): string | null => {
-    const firstTheme = options.find((option) => THEME_FONT_VALUES.has(option.value))?.value;
-    if (value === firstTheme) return ribbonText.fontSectionTheme;
-    const firstRecent = options.find((option) => RECENT_FONT_VALUES.has(option.value))?.value;
-    if (value === firstRecent) return ribbonText.fontSectionRecent;
-    const firstAll = options.find(
-      (option) => !THEME_FONT_VALUES.has(option.value) && !RECENT_FONT_VALUES.has(option.value),
-    )?.value;
-    if (value === firstAll) return ribbonText.fontSectionAll;
+    // Theme/all grouping now comes from the shared option catalog.  Keep the
+    // legacy sets as a compatibility fallback for hosts that construct an
+    // older command model by hand; RECENT_FONT_VALUES is intentionally empty
+    // until real recent-use state exists. The retained
+    // ribbonText.fontSectionRecent string stays in the text contract for
+    // hosts that provide real recent-use data later.
+    const section = option.section || (THEME_FONT_VALUES.has(option.value) ? 'theme' : 'all');
+    const firstInSection = options.find((candidate) => {
+      const candidateSection =
+        candidate.section || (THEME_FONT_VALUES.has(candidate.value) ? 'theme' : 'all');
+      return candidateSection === section;
+    })?.value;
+    if (option.value === firstInSection) {
+      if (RECENT_FONT_VALUES.has(option.value)) return null;
+      return section === 'theme' ? ribbonText.fontSectionTheme : ribbonText.fontSectionAll;
+    }
     return null;
   };
 
-  const ribbonFontRole = (value: string): string | null => {
-    switch (value) {
-      case 'Aptos Display':
-      case '游ゴシック Light':
-        return ribbonText.fontRoleHeading;
-      case 'Aptos Narrow':
-      case '游ゴシック Regular':
-        return ribbonText.fontRoleBody;
-      default:
-        return null;
-    }
+  const ribbonFontRole = (option: FontFamilyOption | undefined): string | null => {
+    if (option?.role === 'heading') return ribbonText.fontRoleHeading;
+    if (option?.role === 'body') return ribbonText.fontRoleBody;
+    return null;
   };
 
   const ribbonOptionsForCommand = (
@@ -158,7 +161,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       return [{ value: 'current', label: ribbonText.currentView }, ...views];
     }
     if (command.id !== 'fontFamily') return options;
-    return options.filter((option) => shouldShowFontOption(option.value, current, ribbonLang));
+    return fontFamilyOptions(ribbonLang, current, options, shouldShowFontOption);
   };
 
   const RIBBON_CHEVRON_PATH =
@@ -190,8 +193,22 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     );
     const value = wrap.querySelector<HTMLElement>('.fc-tb__rb-dd__value');
     if (value) {
-      const base = option?.label ?? current;
-      const role = command.id === 'fontFamily' ? ribbonFontRole(current) : null;
+      const base =
+        option?.label ??
+        (command.id === 'fontSize' && Number.isFinite(Number(current))
+          ? new Intl.NumberFormat(ribbonLang, {
+              useGrouping: false,
+              maximumFractionDigits: 6,
+            }).format(Number(current))
+          : current);
+      const role =
+        command.id === 'fontFamily'
+          ? ribbonFontRole(
+              fontFamilyOptions(ribbonLang, current, command.options, shouldShowFontOption).find(
+                (option) => option.value === current,
+              ),
+            )
+          : null;
       value.textContent = role ? `${base} ${role}` : base;
     }
   };
@@ -267,8 +284,11 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       const nextValue = option.dataset.value;
       if (nextValue == null) return;
       applyRibbonControl(command.id, nextValue);
-      const label = option.querySelector<HTMLElement>('.fc-tb__rb-dd__label')?.textContent;
-      if (label) value.textContent = label;
+      // The command may reject the requested value (for example, a protected
+      // selection can reject a font change), or may normalize it to a
+      // different value. Read the control again after dispatch so the ribbon
+      // reflects the workbook state instead of echoing the clicked option.
+      updateRibbonSelectDisplay(wrap, command);
       close();
       button.focus({ preventScroll: true });
     };
@@ -288,8 +308,11 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       const current = currentRibbonControlValue(command.id);
       const options = ribbonOptionsForCommand(command, current);
       for (const option of options) {
+        const fontOption = command.id === 'fontFamily' ? (option as FontFamilyOption) : null;
         const section =
-          command.id === 'fontFamily' ? ribbonFontSection(option.value, options) : null;
+          fontOption && command.id === 'fontFamily'
+            ? ribbonFontSection(fontOption, options as readonly FontFamilyOption[])
+            : null;
         if (section) {
           const heading = document.createElement('div');
           heading.className = 'fc-tb__rb-dd__section';
@@ -332,7 +355,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           const preview = document.createElement('span');
           preview.className = 'fc-tb__rb-dd__font-preview';
           preview.style.fontFamily = `"${option.value}", sans-serif`;
-          const role = ribbonFontRole(option.value);
+          const role = ribbonFontRole(fontOption ?? undefined);
           if (role) {
             const detail = document.createElement('span');
             detail.className = 'fc-tb__rb-dd__font-role';
@@ -342,12 +365,9 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
             preview.append(label);
           }
           item.append(check, preview);
-          if (FONT_SUBMENU_FAMILIES.has(option.value)) {
-            const arrow = document.createElement('span');
-            arrow.className = 'fc-tb__rb-dd__submenu';
-            arrow.setAttribute('aria-hidden', 'true');
-            item.appendChild(arrow);
-          }
+          // FONT_SUBMENU_FAMILIES is retained as a compatibility export, but
+          // no arrow is rendered until a real submenu interaction exists.
+          if (FONT_SUBMENU_FAMILIES.has(option.value)) item.dataset.fcFontSubmenu = 'false';
         } else if (command.id === 'numberFormat' && numberFormatHasSubtitle(option.value)) {
           const text = document.createElement('span');
           text.className = 'fc-tb__rb-dd__numfmt-text';
@@ -422,6 +442,9 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       }
     });
 
+    wrap.addEventListener('fc-ribbon-control-refresh', () =>
+      updateRibbonSelectDisplay(wrap, command),
+    );
     updateRibbonSelectDisplay(wrap, command);
     return wrap;
   };

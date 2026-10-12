@@ -1,9 +1,21 @@
 /** Theme, page setup, print, zoom and window icons. */
 
-import { circle, join, poly, rect, roundRect } from '../path.js';
-import { badge, bars, filled, magnifier, outlined, place, sheet, stroked } from '../primitives.js';
+import { circle, ellipse, join, type Point, poly, rect, roundRect } from '../path.js';
+import {
+  arrow,
+  badge,
+  bars,
+  doc,
+  filled,
+  magnifier,
+  outlined,
+  place,
+  sheet,
+  stroked,
+} from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
+import { windowFrame } from './mac.js';
 
 /** A themed window: title band, body text and two accent swatches. */
 const themedWindow = (
@@ -54,6 +66,27 @@ const page = (fold = 4.4) => [
     'thin',
     { join: 'miter' },
   ),
+];
+
+/** Eight flat teeth around a ring; the hub is knocked out by the even-odd fill. */
+const cog = (cx: number, cy: number, outer: number, inner: number, hub: number): string => {
+  const at = (deg: number, r: number): Point => {
+    const rad = (deg * Math.PI) / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+  };
+  const points: Point[] = [];
+  for (let tooth = 0; tooth < 8; tooth++) {
+    const mid = tooth * 45;
+    points.push(at(mid - 15, inner), at(mid - 9, outer), at(mid + 9, outer), at(mid + 15, inner));
+  }
+  return join(poly(points, true), circle(cx, cy, hub));
+};
+
+/** A round plate in the bottom-right corner carrying a small paper-coloured mark. */
+const cornerPlate = (tone: string, mark: readonly ReturnType<typeof stroked>[]) => [
+  filled(circle(17.4, 17.4, 4.8), PALETTE.paper),
+  filled(circle(17.4, 17.4, 4.2), tone),
+  ...mark,
 ];
 
 export const VIEW_ICONS = {
@@ -213,23 +246,73 @@ export const VIEW_ICONS = {
     }),
   ],
 
-  // A cog: one ring with the tooth gaps and the hub cut out by fill-rule.
-  options: [
-    {
-      d: join(
-        circle(12, 12, 9.4),
-        circle(21.1, 12.0, 2.4),
-        circle(18.43, 18.43, 2.4),
-        circle(12.0, 21.1, 2.4),
-        circle(5.57, 18.43, 2.4),
-        circle(2.9, 12.0, 2.4),
-        circle(5.57, 5.57, 2.4),
-        circle(12.0, 2.9, 2.4),
-        circle(18.43, 5.57, 2.4),
-        circle(12, 12, 3.4),
+  options: [{ d: cog(12, 12, 9.6, 7.2, 3.2), fill: PALETTE.info, fillRule: 'evenodd' }],
+
+  help: [
+    outlined(circle(12, 12, 9.2), PALETTE.paper, PALETTE.info, 'bold'),
+    stroked(
+      'M9.3 9.5c0-1.7 1.2-2.8 2.8-2.8s2.8 1 2.8 2.5c0 2-2.8 2.1-2.8 4.3',
+      PALETTE.info,
+      'bold',
+    ),
+    filled(circle(12.1, 16.8, 1.05), PALETTE.info),
+  ],
+
+  // Row and column headers both numbered, one cell addressed by them.
+  referenceStyle: [
+    ...sheet({
+      x: 2.4,
+      y: 3.4,
+      w: 19.2,
+      h: 17.2,
+      cols: 4,
+      rows: 4,
+      bands: [
+        { axis: 'row', index: 0, fill: PALETTE.infoSoft },
+        { axis: 'col', index: 0, fill: PALETTE.infoSoft },
+      ],
+    }),
+    stroked(rect(12, 12, 4.8, 4.3), PALETTE.info, 'bold', { join: 'miter', cap: 'butt' }),
+  ],
+
+  zeroValues: [
+    ...sheet({ x: 2.4, y: 3.4, w: 19.2, h: 17.2, cols: 1, rows: 1 }),
+    stroked(ellipse(12, 12, 3.4, 4.9), PALETTE.ink, 'heavy'),
+  ],
+
+  rightToLeft: [
+    stroked(join('M7.2 4.8h13.2', 'M11.4 8.8h9', 'M7.2 12.8h13.2'), PALETTE.ink, 'bold', {
+      cap: 'butt',
+    }),
+    ...arrow({ from: [20.4, 18.6], to: [3.6, 18.6], color: PALETTE.info, head: 'solid' }),
+  ],
+
+  bringForward: [
+    outlined(roundRect(2.6, 2.6, 11.6, 11.6, 1.2), PALETTE.paper, PALETTE.grid, 'regular'),
+    outlined(roundRect(9.8, 9.8, 11.6, 11.6, 1.2), PALETTE.infoSoft, PALETTE.info, 'regular'),
+  ],
+
+  whatIf: [
+    ...sheet({ x: 2.4, y: 3.4, w: 15.2, h: 13.6, cols: 3, rows: 3 }),
+    ...cornerPlate(PALETTE.info, [
+      stroked(
+        'M15.8 16.4c0-1 .7-1.6 1.6-1.6s1.6.6 1.6 1.4c0 1.1-1.6 1.2-1.6 2.3',
+        PALETTE.paper,
+        'regular',
       ),
-      fill: PALETTE.info,
-      fillRule: 'evenodd',
-    },
+      filled(circle(17.4, 20.1, 0.6), PALETTE.paper),
+    ]),
+  ],
+
+  showChanges: [
+    ...doc({ x: 4, y: 2.4, w: 13, h: 16.4, fold: 3.6, lines: 3 }),
+    ...cornerPlate(PALETTE.info, [
+      stroked(join('M17.4 17.4v-2.4', 'M17.4 17.4l1.8 1.2'), PALETTE.paper, 'regular'),
+    ]),
+  ],
+
+  customViews: [
+    ...windowFrame({ x: 2.4, y: 3.4, w: 16.6, h: 14.6 }),
+    ...badge({ glyph: 'star', corner: 'br' }),
   ],
 } satisfies Record<string, IconDefinition>;

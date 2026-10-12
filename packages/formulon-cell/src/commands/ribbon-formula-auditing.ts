@@ -24,6 +24,7 @@ import {
   selectNextFormulaError,
 } from './error-indicators.js';
 import type { History } from './history.js';
+import { circleInvalidValidationDataWithEngine } from './validate.js';
 
 type FormulaAuditingStrings = Pick<Strings['ribbonMenu'], 'errorChecking'>;
 
@@ -93,11 +94,19 @@ export const executeRibbonFormulaAuditingAction = (
   if (action === 'circleInvalid') {
     const state = store.getState();
     recordValidationCirclesChange(history, store, () => {
-      circleInvalidValidationData(
+      const nativeCount = circleInvalidValidationDataWithEngine(
         store,
+        workbook,
+        state.selection.range.sheet,
         state.selection.range,
-        makeRangeResolver(workbook, state.data.sheetIndex),
       );
+      if (nativeCount === null) {
+        circleInvalidValidationData(
+          store,
+          state.selection.range,
+          makeRangeResolver(workbook, state.data.sheetIndex),
+        );
+      }
     });
     return { kind: 'mutated' };
   }

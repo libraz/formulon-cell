@@ -26,8 +26,10 @@ interface Setup {
   wb: WorkbookHandle;
   recalc: ReturnType<typeof vi.fn>;
   cells: ReturnType<typeof vi.fn>;
+  getWb: ReturnType<typeof vi.fn>;
   invalidate: ReturnType<typeof vi.fn>;
   host: HTMLElement;
+  setLocale: (locale: string) => void;
   setNumber: ReturnType<typeof vi.fn>;
   hostTag: HTMLInputElement;
   feature: {
@@ -51,6 +53,8 @@ function makeSetup(
   const cells = vi.fn().mockReturnValue([]);
   const invalidate = vi.fn();
   const setNumber = vi.fn();
+  const getWb = vi.fn();
+  let locale = 'en-US';
   const wb =
     workbook ??
     ({
@@ -59,6 +63,7 @@ function makeSetup(
       cells,
       setNumber,
     } as unknown as WorkbookHandle);
+  getWb.mockReturnValue(wb);
   const store = createSpreadsheetStore();
   const history = new History();
   const host = document.createElement('div');
@@ -87,13 +92,13 @@ function makeSetup(
     hostTag,
     hyperlinkDialog: () => feature.hyperlinkDialog,
     invalidate,
-    locale: 'en-US',
+    getLocale: () => locale,
     namedRangeDialog: () => feature.namedRangeDialog,
     pasteSpecialDialog: () => feature.pasteSpecialDialog,
     quickAnalysis: () => feature.quickAnalysis,
     store,
     strings: () => en,
-    wb: () => wb,
+    wb: getWb,
   });
 
   return {
@@ -104,8 +109,12 @@ function makeSetup(
     wb,
     recalc,
     cells,
+    getWb,
     invalidate,
     host,
+    setLocale: (next) => {
+      locale = next;
+    },
     setNumber,
     hostTag,
     feature,
@@ -381,6 +390,80 @@ describe('mount/host-shortcuts', () => {
       addr: { sheet: 0, row: 0, col: 1 },
       format: { bold: true },
     });
+  });
+
+  it('reads the current locale for direct and repeated number formats', () => {
+    s.handler(key({ key: '$', code: 'Digit4', ctrlKey: true, shiftKey: true }));
+    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+      kind: 'currency',
+      symbol: '$',
+      decimals: 2,
+    });
+
+    s.setLocale('ja-JP');
+    mutators.setActive(s.store, { sheet: 0, row: 0, col: 1 });
+    s.handler(key({ key: 'F4' }));
+    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+      kind: 'currency',
+      symbol: '¥',
+      decimals: 2,
+    });
+
+    s.handler(key({ key: '#', code: 'Digit3', ctrlKey: true, shiftKey: true }));
+    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+      kind: 'date',
+      pattern: 'yyyy/m/d',
+    });
+    s.setLocale('en-US');
+    mutators.setActive(s.store, { sheet: 0, row: 0, col: 2 });
+    s.handler(key({ key: 'F4' }));
+    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+      kind: 'date',
+      pattern: 'm/d/yyyy',
+    });
+
+    s.handler(key({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true }));
+    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+      kind: 'time',
+      pattern: 'h:MM AM/PM',
+    });
+    s.setLocale('ja-JP');
+    mutators.setActive(s.store, { sheet: 0, row: 0, col: 3 });
+    s.handler(key({ key: 'F4' }));
+    expect(s.store.getState().ui.pendingFormat?.format.numFmt).toEqual({
+      kind: 'time',
+      pattern: 'H:MM',
+    });
+  });
+
+  it('leaves native locale selector shortcuts to the select element', () => {
+    const select = document.createElement('select');
+    s.host.appendChild(select);
+    s.host.addEventListener('keydown', s.handler);
+
+    const hostEvent = key({ key: 'F9', bubbles: true });
+    s.host.dispatchEvent(hostEvent);
+    expect(hostEvent.defaultPrevented).toBe(true);
+    expect(s.recalc).toHaveBeenCalledOnce();
+    s.getWb.mockClear();
+    s.recalc.mockClear();
+    s.invalidate.mockClear();
+
+    const events = [
+      key({ key: 'F9', bubbles: true }),
+      key({ key: 'F11', shiftKey: true, bubbles: true }),
+      key({ key: '$', code: 'Digit4', ctrlKey: true, shiftKey: true, bubbles: true }),
+    ];
+    for (const event of events) {
+      select.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+
+    expect(s.getWb).not.toHaveBeenCalled();
+    expect(s.recalc).not.toHaveBeenCalled();
+    expect(s.addSheet).not.toHaveBeenCalled();
+    expect(s.invalidate).not.toHaveBeenCalled();
+    expect(s.store.getState().ui.pendingFormat).toBeNull();
   });
 
   it('Ctrl+Shift+V opens paste-special', () => {

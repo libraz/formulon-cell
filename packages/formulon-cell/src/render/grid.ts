@@ -272,6 +272,7 @@ export class GridRenderer {
     if (state.ui.workbookView === 'normal') return null;
     const { viewport } = state;
     return paginationFor(this.getState(), state.data.sheetIndex, {
+      engine: this.getWb() ?? undefined,
       throughRow: viewport.rowStart + viewport.rowCount,
       throughCol: viewport.colStart + viewport.colCount,
     });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { localeTag, mergeFunctionMetadata } from '../../../src/engine/function-metadata.js';
+import {
+  displayLocaleTag,
+  localeOrdinalForTag,
+  localeTag,
+  mergeFunctionMetadata,
+} from '../../../src/engine/function-metadata.js';
 import type { FunctionMetadataEntry, FunctionMetadataResult } from '../../../src/engine/types.js';
 
 const base: FunctionMetadataResult = {
@@ -15,7 +20,30 @@ describe('localeTag', () => {
   it('maps ordinals to BCP-47 tags and defaults to en-US', () => {
     expect(localeTag(0)).toBe('en-US');
     expect(localeTag(1)).toBe('ja-JP');
+    expect(localeTag(2)).toBe('de-DE');
+    expect(localeTag(3)).toBe('fr-FR');
     expect(localeTag(99)).toBe('en-US');
+  });
+});
+
+describe('display locale tags', () => {
+  it('normalizes every built-in UI locale without expanding native ordinals', () => {
+    expect(['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th'].map(displayLocaleTag)).toEqual([
+      'en-US',
+      'ja-JP',
+      'de-DE',
+      'fr-FR',
+      'zh-CN',
+      'ko-KR',
+      'th-TH',
+    ]);
+    expect(localeOrdinalForTag('en-US')).toBe(0);
+    expect(localeOrdinalForTag('ja-JP')).toBe(1);
+    expect(localeOrdinalForTag('de-DE')).toBe(2);
+    expect(localeOrdinalForTag('fr-FR')).toBe(3);
+    expect(localeOrdinalForTag('zh-CN')).toBeNull();
+    expect(localeOrdinalForTag('ko-KR')).toBeNull();
+    expect(localeOrdinalForTag('th-TH')).toBeNull();
   });
 });
 

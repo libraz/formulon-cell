@@ -4,7 +4,13 @@ import type {
   TableOverlay,
 } from '../commands/format-as-table.js';
 import type { SheetView } from '../commands/sheet-views.js';
-import type { Addr, CellValue, Range } from '../engine/types.js';
+import type {
+  Addr,
+  CellValue,
+  Range,
+  SheetAxisFormatOverride,
+  SheetFontOverride,
+} from '../engine/types.js';
 import type { CellFormat, CustomCellStyle } from './types/cell-format.js';
 import type { ConditionalRule } from './types/conditional-rule.js';
 import type { PageSetup } from './types/page-setup.js';
@@ -255,6 +261,14 @@ export interface StatusBarOptions {
 export interface FormatSlice {
   /** Per-cell format keyed by `addrKey`. Missing entries → defaults. */
   formats: Map<string, CellFormat>;
+  /** Sparse worksheet-level font overrides. These are deliberately separate
+   *  from `formats`: applying a font to all 1,048,576 × 16,384 cells must not
+   *  materialise millions of empty cell records. */
+  sheetFontOverrides?: Map<number, SheetFontOverride>;
+  /** Sparse row/column style overrides created by full-axis selections. The
+   *  map is separate from cell formats so a selected column or row never
+   *  materialises the worksheet's millions of blank cells. */
+  sheetAxisOverrides?: Map<number, SheetAxisFormatOverride>;
   /** Session-scoped custom named styles created from the Cell Styles gallery. */
   customCellStyles?: CustomCellStyle[];
 }
@@ -322,9 +336,24 @@ export type SessionShapeKind =
   | 'line'
   | 'arrow';
 
-/** Session illustration overlay. Like session charts, this is UI-owned until
- *  writable drawing parts exist in the engine. */
+/** Illustration overlay. Pictures with a nativeObjectId are stored in the workbook. */
 export interface SessionIllustration {
+  nativeObjectId?: number;
+  /** Imported drawings remain read-only until the engine can update anchors
+   * without replacing opaque picture metadata. */
+  nativeGeometryEditable?: boolean;
+  imageBytes?: Uint8Array;
+  imageFormat?: number;
+  nativeAnchor?: {
+    row: number;
+    col: number;
+    rowOffEmu: number;
+    colOffEmu: number;
+    widthEmu: number;
+    heightEmu: number;
+    name: string;
+    descr: string;
+  };
   id: string;
   kind: 'shape' | 'image';
   shape?: SessionShapeKind;
@@ -475,7 +504,13 @@ export interface ProtectionSlice {
   allowedEditRanges: readonly AllowedEditRange[];
 }
 
+export interface ThreadedCommentsSlice {
+  bySheet: ReadonlyMap<number, readonly import('@libraz/formulon').ThreadedComment[]>;
+  persons: readonly import('@libraz/formulon').Person[];
+}
+
 export interface State {
+  threadedComments: ThreadedCommentsSlice;
   viewport: ViewportSlice;
   selection: SelectionSlice;
   layout: LayoutSlice;

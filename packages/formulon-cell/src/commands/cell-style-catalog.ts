@@ -1,4 +1,6 @@
 /** Built-in cell style presets: ids, format payloads, builtin metadata, gallery groups, and platform overrides. */
+
+import { fontPointsToCssPx } from '../engine/font-units.js';
 import type { CellFormat } from '../store/store.js';
 
 /** Built-in named cell styles. Each style is a partial CellFormat that
@@ -92,14 +94,14 @@ const CELL_STYLE_DEFS: readonly CellStyleDef[] = [
   {
     id: 'title',
     label: 'Title',
-    format: { bold: false, fontSize: 18, color: '#1f4e79' },
+    format: { bold: false, fontSize: fontPointsToCssPx(18), color: '#1f4e79' },
   },
   {
     id: 'heading1',
     label: 'Heading 1',
     format: {
       bold: true,
-      fontSize: 15,
+      fontSize: fontPointsToCssPx(15),
       color: '#1f4e79',
       borders: { bottom: { style: 'medium', color: '#1f4e79' } },
     },
@@ -109,7 +111,7 @@ const CELL_STYLE_DEFS: readonly CellStyleDef[] = [
     label: 'Heading 2',
     format: {
       bold: true,
-      fontSize: 13,
+      fontSize: fontPointsToCssPx(13),
       color: '#1f4e79',
       borders: { bottom: { style: 'thin', color: '#1f4e79' } },
     },
@@ -117,12 +119,12 @@ const CELL_STYLE_DEFS: readonly CellStyleDef[] = [
   {
     id: 'heading3',
     label: 'Heading 3',
-    format: { bold: true, fontSize: 11, color: '#1f4e79' },
+    format: { bold: true, fontSize: fontPointsToCssPx(11), color: '#1f4e79' },
   },
   {
     id: 'heading4',
     label: 'Heading 4',
-    format: { bold: true, italic: false, fontSize: 11, color: '#1f4e79' },
+    format: { bold: true, italic: false, fontSize: fontPointsToCssPx(11), color: '#1f4e79' },
   },
   { id: 'good', label: 'Good', format: { color: '#006100', fill: '#c6efce' } },
   { id: 'bad', label: 'Bad', format: { color: '#9c0006', fill: '#ffc7ce' } },

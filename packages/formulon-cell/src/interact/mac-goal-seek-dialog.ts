@@ -1,3 +1,4 @@
+import { parseLocalizedNumericInput } from '../commands/coerce-input.js';
 import {
   cellSnapshot,
   commitMacGoalSeek,
@@ -36,13 +37,32 @@ interface Field {
   readonly text: HTMLSpanElement;
 }
 
-const appendField = (body: HTMLElement, id: string, type: 'text' | 'number'): Field => {
+const formatLocalizedNumericInitial = (value: number, locale: string | undefined): string => {
+  try {
+    return new Intl.NumberFormat(locale, {
+      useGrouping: false,
+      maximumSignificantDigits: 17,
+    }).format(value);
+  } catch {
+    // A custom dictionary may use an invalid BCP 47 tag. Keep the dialog
+    // usable while the input parser falls back to its default grammar.
+    return String(value);
+  }
+};
+
+const appendField = (
+  body: HTMLElement,
+  id: string,
+  type: 'text' | 'number',
+  inputMode?: HTMLInputElement['inputMode'],
+): Field => {
   const row = document.createElement('label');
   row.className = 'fc-fmtdlg__row fc-mac-goalseek__row';
   const text = document.createElement('span');
   const input = document.createElement('input');
   input.id = id;
   input.type = type;
+  if (inputMode) input.inputMode = inputMode;
   input.className = 'fc-fmtdlg__input';
   input.autocomplete = 'off';
   input.spellcheck = false;
@@ -67,7 +87,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     footerClass: 'fc-fmtdlg__footer fc-mac-goalseek__footer',
   });
   const formulaField = appendField(body, 'fc-mac-goalseek-formula-cell', 'text');
-  const targetField = appendField(body, 'fc-mac-goalseek-target-value', 'number');
+  const targetField = appendField(body, 'fc-mac-goalseek-target-value', 'text', 'decimal');
   const changingField = appendField(body, 'fc-mac-goalseek-changing-cell', 'text');
   const iterationField = appendField(body, 'fc-mac-goalseek-iterations', 'number');
   const formulaInput = formulaField.input;
@@ -147,7 +167,9 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     changingInput.value = formatMacCellAddress(instance.workbook, next);
     const current = instance.workbook.getValue(active);
     targetInput.value =
-      current.kind === 'number' && Number.isFinite(current.value) ? String(current.value) : '';
+      current.kind === 'number' && Number.isFinite(current.value)
+        ? formatLocalizedNumericInitial(current.value, instance.locale || instance.i18n.locale)
+        : '';
     iterationInput.value = '100';
   };
 
@@ -194,8 +216,11 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
       return;
     }
     const targetText = targetInput.value.trim();
-    const targetValue = Number(targetText);
-    if (!targetText || !Number.isFinite(targetValue)) {
+    const targetValue = parseLocalizedNumericInput(
+      targetText,
+      instance.locale || instance.i18n.locale,
+    );
+    if (targetValue === null) {
       showMessage(t.invalidTarget);
       return;
     }

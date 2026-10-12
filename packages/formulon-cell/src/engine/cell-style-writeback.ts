@@ -47,6 +47,9 @@ interface PendingNamedStyleRegistration {
     readonly name: string;
     readonly xfId: number;
     readonly builtinId: number | null;
+    readonly iLevel: number;
+    readonly hidden: boolean;
+    readonly customBuiltin: boolean;
   };
 }
 
@@ -172,15 +175,13 @@ const sameNamedStyleFormat = (
   return stylePayloadMatchesNative(wb, xf, native, format, cellStyleGroups({ format }));
 };
 
-/** Built-in ordinals above 47 are useful when reading an OOXML catalog, but
- *  the current engine rejects them when authoring a cellStyle record. */
+/** Built-in ordinals in the OOXML catalog are accepted by formulon 0.13. */
 const writableBuiltinId = (builtinId: number | null): number | null =>
-  builtinId !== null && builtinId >= 0 && builtinId <= 47 ? builtinId : null;
+  builtinId !== null && builtinId >= 0 && builtinId <= 53 ? builtinId : null;
 
 /** Stage named-style catalog changes until all cell XF and metadata writes have
- *  succeeded. The plan intentionally has no rollback claim for catalog rows:
- *  the current engine can replace a row but cannot delete a newly registered
- *  one. A later failed registration is surfaced as an AggregateError. */
+ *  succeeded. A later failed registration rolls back replacements and removes
+ *  newly registered rows when the engine exposes that operation. */
 export function planNamedCellStylesToEngine(
   wb: WorkbookHandle,
   state: State,
@@ -193,7 +194,15 @@ export function planNamedCellStylesToEngine(
   }
 
   const registrations = collectNamedStyles(state);
-  const named = wb.getNamedCellStyles();
+  // Rollback must see the entire catalog, including entries hidden from the
+  // gallery; a same-name write replaces those entries too.
+  const named =
+    typeof wb.cellStyleCount === 'function' && typeof wb.getCellStyle === 'function'
+      ? Array.from({ length: wb.cellStyleCount() }, (_, index) => {
+          const style = wb.getCellStyle(index);
+          return style ? [{ ...style, index }] : [];
+        }).flat()
+      : wb.getNamedCellStyles();
   const byBuiltin = new Map<number, (typeof named)[number]>();
   const byName = new Map<string, (typeof named)[number]>();
   for (const entry of named) {
@@ -231,7 +240,9 @@ export function planNamedCellStylesToEngine(
     // custom/imported row. Keep an exact row only as the replacement target so
     // a failed strict publication can restore it.
     const existing = reg.builtinId === null ? exact : builtin;
-    const replacement = builtin ?? exact;
+    // Native writes replace only an exactly spelled name. A case-insensitive
+    // semantic match may instead append a row, which rollback must remove.
+    const replacement = named.find((entry) => entry.name === reg.name);
     if (
       existing &&
       (reg.builtinId !== null || sameNamedStyleFormat(wb, reg.format, existing.xfId))
@@ -254,6 +265,9 @@ export function planNamedCellStylesToEngine(
               name: replacement.name,
               xfId: replacement.xfId,
               builtinId: writableBuiltinId(replacement.builtinId),
+              iLevel: replacement.iLevel,
+              hidden: wb.getCellStyle(replacement.index)?.hidden ?? false,
+              customBuiltin: replacement.customBuiltin,
             },
           }
         : {}),
@@ -276,19 +290,16 @@ export function planNamedCellStylesToEngine(
         );
         if (committed > 0) {
           const rollbackErrors: unknown[] = [];
-          let unrestorable = false;
           for (const appliedRegistration of applied.reverse()) {
             if (!appliedRegistration.previous) {
-              unrestorable = true;
+              if (!wb.removeNamedCellStyle(appliedRegistration.name)) {
+                rollbackErrors.push(
+                  new Error(`Named-style catalog rollback failed: ${appliedRegistration.name}`),
+                );
+              }
               continue;
             }
-            if (
-              !wb.setNamedCellStyle(
-                appliedRegistration.previous.name,
-                appliedRegistration.previous.xfId,
-                appliedRegistration.previous.builtinId,
-              )
-            ) {
+            if (!wb.setNamedCellStyleRecord(appliedRegistration.previous)) {
               rollbackErrors.push(
                 new Error(
                   `Named-style catalog rollback failed: ${appliedRegistration.previous.name}`,
@@ -297,13 +308,7 @@ export function planNamedCellStylesToEngine(
             }
           }
           throw new AggregateError(
-            [
-              failure,
-              ...rollbackErrors,
-              ...(unrestorable
-                ? [new Error('Named-style catalog rollback is unavailable for new entries')]
-                : []),
-            ],
+            [failure, ...rollbackErrors],
             'Strict named-style publication failed after a partial catalog commit',
             { cause: failure },
           );
@@ -332,7 +337,15 @@ export function syncNamedCellStylesToEngine(
   const resolved = new Map<string, number>();
   if (!wb.capabilities.cellStyleMutate) return resolved;
   const registrations = collectNamedStyles(state);
-  const named = wb.getNamedCellStyles();
+  // Rollback must see the entire catalog, including entries hidden from the
+  // gallery; a same-name write replaces those entries too.
+  const named =
+    typeof wb.cellStyleCount === 'function' && typeof wb.getCellStyle === 'function'
+      ? Array.from({ length: wb.cellStyleCount() }, (_, index) => {
+          const style = wb.getCellStyle(index);
+          return style ? [{ ...style, index }] : [];
+        }).flat()
+      : wb.getNamedCellStyles();
   const byBuiltin = new Map<number, (typeof named)[number]>();
   const byName = new Map<string, (typeof named)[number]>();
   for (const entry of named) {

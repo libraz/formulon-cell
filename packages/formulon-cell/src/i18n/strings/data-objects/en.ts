@@ -183,6 +183,9 @@ export const dataObjectsEn: DataObjectsStrings = {
       dataValidation: 'Data validation',
       hyperlinks: 'Hyperlinks',
       comments: 'Comments',
+      threadedComments: 'Threaded comments',
+      images: 'Images',
+      workbookTheme: 'Workbook theme',
       phonetic: 'Phonetic guides',
       definedNames: 'Defined names',
       namedCellStyles: 'Named cell styles',
@@ -210,6 +213,12 @@ export const dataObjectsEn: DataObjectsStrings = {
         'Hyperlinks can be enumerated, added, and cleared when engine writeback is available.',
       comments:
         'Cell comments, including comments on blank cells, can be enumerated, read, and written when sheet-wide enumeration is available.',
+      threadedComments:
+        'Comments, replies, people and resolution are saved in XLSX when the engine supports threaded comments.',
+      images:
+        'When the engine supports images, newly inserted pictures can be edited and saved in XLSX. Loaded pictures are read-only; native picture reordering is unavailable. Shapes remain session overlays.',
+      workbookTheme:
+        'Theme colours and major/minor typefaces can be edited separately from the application appearance.',
       phonetic:
         'Phonetic guides (furigana) require engine support for OOXML rPh and phoneticPr records.',
       definedNames:

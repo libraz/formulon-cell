@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  captureSyncedFormatKeyMembership,
   flushFormatToEngine,
   hydrateCellFormatsFromEngine,
+  restoreSyncedFormatKeyMembership,
+  seedSyncedFormatKeys,
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';
 import type {
@@ -435,6 +438,53 @@ describe('syncCellFormatsToEngine', () => {
     }));
     syncCellFormatsToEngine(wb, store, 0);
     expect(log.addNumFmt).toEqual([]);
+  });
+});
+
+describe('synced format key checkpoints', () => {
+  it('restores only the captured membership bits and preserves unrelated tracking', () => {
+    const { wb } = makeFake();
+    const tracked = addrKey({ sheet: 0, row: 0, col: 0 });
+    const untracked = addrKey({ sheet: 0, row: 0, col: 1 });
+    const unrelated = addrKey({ sheet: 1, row: 2, col: 2 });
+    seedSyncedFormatKeys(wb, 0, [tracked]);
+    seedSyncedFormatKeys(wb, 1, [unrelated]);
+
+    const checkpoint = captureSyncedFormatKeyMembership(wb, [tracked, untracked]);
+    expect(checkpoint).toEqual(
+      new Map([
+        [tracked, true],
+        [untracked, false],
+      ]),
+    );
+
+    // Model a failed flush that changed both tracked keys. The checkpoint
+    // should put only its own scope back while leaving sheet 1 untouched.
+    seedSyncedFormatKeys(wb, 0, [untracked]);
+    restoreSyncedFormatKeyMembership(wb, checkpoint);
+
+    expect(captureSyncedFormatKeyMembership(wb, [tracked, untracked, unrelated])).toEqual(
+      new Map([
+        [tracked, true],
+        [untracked, false],
+        [unrelated, true],
+      ]),
+    );
+  });
+
+  it('does not create tracking state while capturing an untouched workbook', () => {
+    const { wb } = makeFake();
+    const key = addrKey({ sheet: 4, row: 3, col: 2 });
+    expect(captureSyncedFormatKeyMembership(wb, [key, 'malformed'])).toEqual(
+      new Map([[key, false]]),
+    );
+
+    // A false checkpoint remains a no-op and must not create an empty map or
+    // set that could affect later high-water resets.
+    restoreSyncedFormatKeyMembership(wb, new Map([[key, false]]));
+    seedSyncedFormatKeys(wb, 4, [key]);
+    restoreSyncedFormatKeyMembership(wb, new Map([[key, false]]));
+    expect(captureSyncedFormatKeyMembership(wb, [key])).toEqual(new Map([[key, false]]));
   });
 });
 

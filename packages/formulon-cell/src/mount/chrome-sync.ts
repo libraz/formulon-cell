@@ -1,6 +1,8 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { isValidDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
-import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formulaForEdit } from '../engine/edit-seed.js';
+import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
@@ -60,24 +62,24 @@ const cellDisplayText = (
   if (formula && fmt?.formulaHidden === true && state.protection.protectedSheets.has(addr.sheet)) {
     return '';
   }
-  if (formula) return state.ui.r1c1 ? formatA1FormulaAsR1C1(formula, addr) : formula;
+  if (formula) return formulaForEdit(wb, addr, formula, state.ui.r1c1) ?? formula;
   if (!cell) {
     const lambda = wb.getLambdaText(addr);
-    return lambda ? `=${lambda}` : '';
+    return lambda ? wb.getFormulaForDisplay(`=${lambda}`) : '';
   }
   const v = cell.value;
   switch (v.kind) {
     case 'number':
-      return String(v.value);
+      return formatEditableNumber(v.value, inputLocaleForWorkbook(wb));
     case 'bool':
-      return v.value ? 'TRUE' : 'FALSE';
+      return formatBoolean(v.value, inputLocaleForWorkbook(wb));
     case 'text':
       return v.value;
     case 'error':
       return v.text;
     default: {
       const lambda = wb.getLambdaText(addr);
-      return lambda ? `=${lambda}` : '';
+      return lambda ? wb.getFormulaForDisplay(`=${lambda}`) : '';
     }
   }
 };

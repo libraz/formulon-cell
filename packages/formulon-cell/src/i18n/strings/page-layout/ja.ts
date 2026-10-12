@@ -9,6 +9,7 @@ export const pageLayoutJa: PageLayoutStrings = {
     rulerUnit: 'cm',
   },
   pageSetup: {
+    printRangeTooLarge: '印刷範囲が大きすぎます。印刷範囲を狭めて、もう一度お試しください。',
     title: 'ページ設定',
     tabPage: 'ページ',
     tabMargins: '余白',

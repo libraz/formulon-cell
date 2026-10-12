@@ -2,8 +2,21 @@ import {
   ENGINE_SPREADSHEET_PROFILE_GETTER,
   ENGINE_SPREADSHEET_PROFILE_SETTER,
 } from './capabilities.js';
-import { localeTag, mergeFunctionMetadata } from './function-metadata.js';
-import { numberValue } from './result.js';
+import {
+  canonicalizeFormula,
+  canonicalizeFormulaForEngine,
+  type LocaleOrdinal,
+  localeOrdinalForSpreadsheetProfile,
+  localizeFormula,
+  spreadsheetProfileForLocaleOrdinal,
+} from './function-locale.js';
+import {
+  displayLocaleTag,
+  localeOrdinalForTag,
+  localeTag,
+  mergeFunctionMetadata,
+} from './function-metadata.js';
+import { checkStatus, numberValue } from './result.js';
 import { computeEngineSpillRanges } from './spill.js';
 import {
   type EngineSpreadsheetProfileId,
@@ -15,8 +28,10 @@ import type {
   EngineCapabilities,
   EvalArrayResult,
   EvalResult,
+  ExcelProfileId,
   FormulonModule,
   FunctionMetadataProvider,
+  LocaleFacts,
   Range,
   SpreadsheetProfileId,
   Workbook,
@@ -29,6 +44,21 @@ type WorkbookHandleInternals = {
   module: FormulonModule;
   functionMetadataProvider: FunctionMetadataProvider | null;
   assertAlive(): void;
+};
+
+type FormulaLocaleWorkbook = Workbook & {
+  localizeFormula?: (
+    formula: string,
+    profileId: ExcelProfileId,
+  ) => { status: { ok: boolean }; value: string };
+  canonicalizeFormula?: (
+    formula: string,
+    profileId: ExcelProfileId,
+  ) => { status: { ok: boolean }; value: string };
+  localeFacts?: (profileId: ExcelProfileId) => {
+    status: { ok: boolean };
+    facts: LocaleFacts | null;
+  };
 };
 
 declare module './workbook-handle.js' {
@@ -51,6 +81,10 @@ function moduleOf(handle: unknown): FormulonModule {
   return internals(handle).module;
 }
 
+function formulaLocaleWb(handle: unknown): FormulaLocaleWorkbook {
+  return wb(handle) as FormulaLocaleWorkbook;
+}
+
 export abstract class WorkbookHandleFormulasMethods {
   declare readonly capabilities: EngineCapabilities;
 
@@ -58,16 +92,51 @@ export abstract class WorkbookHandleFormulasMethods {
    *  with literal values) in a fresh engine workbook and return its
    *  `{ status, value }` result. Callers that need live-cell context must
    *  substitute refs first (see the custom data-validation evaluator and the
-   *  F9 / evaluate-formula surfaces). */
+   *  F9 / evaluate-formula surfaces). Formula function aliases are converted
+   *  from the active German/French profile before evaluation. */
   evalFormula(formula: string): EvalResult {
     assertAlive(this);
-    return moduleOf(this).evalFormula(formula);
+    const canonical = this.formulaForEvaluation(formula);
+    const module = moduleOf(this);
+    if (!this.capabilities.formulaTextEvaluation || !this.capabilities.spreadsheetProfile) {
+      return module.evalFormula(canonical);
+    }
+
+    const active = wb(this) as unknown as Record<string, unknown>;
+    const getProfile = active[ENGINE_SPREADSHEET_PROFILE_GETTER];
+    if (typeof getProfile !== 'function') return module.evalFormula(canonical);
+    const profileResult = getProfile.call(active) as {
+      status: Parameters<typeof checkStatus>[0];
+      value?: string | null;
+    };
+    if (!profileResult.value) {
+      if (!profileResult.status.ok) checkStatus(profileResult.status, 'excelProfileId');
+      return module.evalFormula(canonical);
+    }
+    if (!profileResult.status.ok) checkStatus(profileResult.status, 'excelProfileId');
+
+    let scratch: Workbook | null = null;
+    try {
+      scratch = module.Workbook.createDefault();
+      const fresh = scratch as unknown as Record<string, unknown>;
+      const setProfile = fresh[ENGINE_SPREADSHEET_PROFILE_SETTER];
+      const evaluate = fresh.evaluateFormulaText;
+      if (typeof setProfile !== 'function' || typeof evaluate !== 'function') {
+        return module.evalFormula(canonical);
+      }
+      const setResult = setProfile.call(scratch, profileResult.value);
+      checkStatus(setResult, 'setExcelProfileId');
+      return evaluate.call(scratch, 0, 0, 0, canonical) as EvalResult;
+    } finally {
+      scratch?.delete();
+    }
   }
 
   evaluateFormulaText(addr: Addr, formula: string): EvalResult {
     assertAlive(this);
-    if (!this.capabilities.formulaTextEvaluation) return moduleOf(this).evalFormula(formula);
-    return wb(this).evaluateFormulaText(addr.sheet, addr.row, addr.col, formula);
+    const canonical = this.formulaForEvaluation(formula);
+    if (!this.capabilities.formulaTextEvaluation) return moduleOf(this).evalFormula(canonical);
+    return wb(this).evaluateFormulaText(addr.sheet, addr.row, addr.col, canonical);
   }
 
   /** Ad-hoc evaluation that returns the *whole* dynamic-array / spilled
@@ -81,7 +150,12 @@ export abstract class WorkbookHandleFormulasMethods {
       const single = this.evaluateFormulaText(addr, formula);
       return { status: single.status, rows: 1, cols: 1, cells: [[single.value]] };
     }
-    return wb(this).evaluateFormulaArray(addr.sheet, addr.row, addr.col, formula);
+    return wb(this).evaluateFormulaArray(
+      addr.sheet,
+      addr.row,
+      addr.col,
+      this.formulaForEvaluation(formula),
+    );
   }
 
   evaluateConditionalFormula(
@@ -90,14 +164,24 @@ export abstract class WorkbookHandleFormulasMethods {
     formula: string,
   ): EvalResult {
     assertAlive(this);
-    if (!this.capabilities.conditionalFormulaEvaluation) return moduleOf(this).evalFormula(formula);
+    const canonical = this.formulaForEvaluation(formula);
+    if (!this.capabilities.conditionalFormulaEvaluation)
+      return moduleOf(this).evalFormula(canonical);
     return wb(this).evaluateConditionalFormula(
       addr.sheet,
       addr.row,
       addr.col,
       anchor.row,
       anchor.col,
+      canonical,
+    );
+  }
+
+  private formulaForEvaluation(formula: string): string {
+    return canonicalizeFormulaForEngine(
+      this as unknown as WorkbookHandle,
       formula,
+      localeOrdinalForSpreadsheetProfile(this.spreadsheetProfileId()),
     );
   }
 
@@ -178,7 +262,7 @@ export abstract class WorkbookHandleFormulasMethods {
 
   /** Engine metadata for `name` (case-insensitive), with any host-registered
    *  provider entry merged over it (see `setFunctionMetadataProvider`).
-   *  `locale`: 0 = en-US, 1 = ja-JP. The engine guarantees `minArity` /
+   *  `locale`: 0 = en-US, 1 = ja-JP, 2 = de-DE, 3 = fr-FR. The engine guarantees `minArity` /
    *  `maxArity` whenever the function is known; `signatureTemplate` and
    *  `description` come from the per-locale metadata table or a provider
    *  override, and are absent until either is populated. `localizedName`
@@ -199,14 +283,49 @@ export abstract class WorkbookHandleFormulasMethods {
     description?: string;
     localizedName?: string;
   } | null {
+    return this.functionMetadataForLocale(name, localeTag(locale));
+  }
+
+  /** Locale-tagged metadata lookup for all seven UI languages. Provider
+   * aliases/descriptions are selected by the normalized BCP-47 tag; native
+   * aliases are queried only for the legacy ja/de/fr ordinal locales. */
+  functionMetadataForLocale(
+    name: string,
+    locale: string,
+  ): {
+    name: string;
+    minArity: number;
+    maxArity: number | null;
+    availability?: number;
+    signatureTemplate?: string;
+    description?: string;
+    localizedName?: string;
+  } | null {
     assertAlive(this);
     if (!this.capabilities.functionMetadata) return null;
-    const m = wb(this).functionMetadata(name, locale);
+    const tag = displayLocaleTag(locale);
+    const m = wb(this).functionMetadata(name);
     if (!m.ok) return null;
     const provider = internals(this).functionMetadataProvider;
     const canonical = m.name ?? name;
     const entry = provider?.[canonical.toUpperCase()];
-    const merged = mergeFunctionMetadata(m, entry, localeTag(locale));
+    const merged = mergeFunctionMetadata(m, entry, tag);
+    // Newer formulon builds carry aliases in the engine's locale table for
+    // German and French. Provider aliases still win, but the catalog should
+    // be able to display the native alias when no host metadata document is
+    // installed. Older builds simply return the canonical name here.
+    const providerAlias = entry?.aliases?.[tag];
+    const nativeOrdinal = localeOrdinalForTag(tag);
+    const engineAlias =
+      nativeOrdinal !== null && nativeOrdinal !== 0 && this.capabilities.functionLocale
+        ? this.localizeFunctionName(canonical, nativeOrdinal)
+        : null;
+    const displayName =
+      providerAlias !== undefined
+        ? providerAlias
+        : engineAlias && engineAlias !== canonical
+          ? engineAlias
+          : merged.localizedName;
     return {
       name: canonical,
       minArity: merged.minArity ?? 0,
@@ -214,21 +333,43 @@ export abstract class WorkbookHandleFormulasMethods {
       ...(m.availability !== undefined ? { availability: m.availability } : {}),
       ...(merged.signatureTemplate ? { signatureTemplate: merged.signatureTemplate } : {}),
       ...(merged.description ? { description: merged.description } : {}),
-      ...(merged.localizedName ? { localizedName: merged.localizedName } : {}),
+      ...(displayName ? { localizedName: displayName } : {}),
     };
   }
 
   /** Canonical → localized function-name lookup. `locale`: 0 = en-US,
-   *  1 = ja-JP. Returns the canonical name unchanged when no alias is
-   *  registered for `locale` (currently the case for every locale except
-   *  en-US). Returns the empty string for an unsuccessful lookup.
+   *  1 = ja-JP, 2 = de-DE, 3 = fr-FR. Returns the canonical name unchanged
+   *  when no alias is registered for `locale`. Returns the empty string for
+   *  an unsuccessful lookup.
    *  Returns `null` when the engine doesn't expose
    *  `localizeFunctionName`. */
   localizeFunctionName(canonicalName: string, locale = 0): string | null {
     assertAlive(this);
     if (!this.capabilities.functionLocale) return null;
-    const result = wb(this).localizeFunctionName(canonicalName, locale);
-    return result.status.ok ? result.value : '';
+    try {
+      // formulon <= 0.12 used a small locale ordinal here. The 0.13 surface
+      // takes the full ExcelProfileId; keep the adapter's old ordinal API for
+      // callers while selecting the new raw signature only when its formula
+      // locale capability is present.
+      const raw = wb(this) as unknown as {
+        localizeFunctionName: (
+          name: string,
+          localeOrProfile: LocaleOrdinal | ExcelProfileId,
+        ) => { status: { ok: boolean }; value: string };
+      };
+      const localeOrProfile = this.capabilities.formulaLocale
+        ? publicProfileToEngine(
+            spreadsheetProfileForLocaleOrdinal(
+              this.spreadsheetProfileId(),
+              locale as LocaleOrdinal,
+            ),
+          )
+        : (locale as LocaleOrdinal);
+      const result = raw.localizeFunctionName(canonicalName, localeOrProfile);
+      return result.status.ok ? result.value : '';
+    } catch {
+      return '';
+    }
   }
 
   /** Localized → canonical function-name lookup. Falls through to a
@@ -239,8 +380,102 @@ export abstract class WorkbookHandleFormulasMethods {
   canonicalizeFunctionName(localizedName: string, locale = 0): string | null {
     assertAlive(this);
     if (!this.capabilities.functionLocale) return null;
-    const result = wb(this).canonicalizeFunctionName(localizedName, locale);
-    return result.status.ok ? result.value : '';
+    try {
+      const raw = wb(this) as unknown as {
+        canonicalizeFunctionName: (
+          name: string,
+          localeOrProfile: LocaleOrdinal | ExcelProfileId,
+        ) => { status: { ok: boolean }; value: string };
+      };
+      const localeOrProfile = this.capabilities.formulaLocale
+        ? publicProfileToEngine(
+            spreadsheetProfileForLocaleOrdinal(
+              this.spreadsheetProfileId(),
+              locale as LocaleOrdinal,
+            ),
+          )
+        : (locale as LocaleOrdinal);
+      const result = raw.canonicalizeFunctionName(localizedName, localeOrProfile);
+      return result.status.ok ? result.value : '';
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * Localize a canonical formula for display under the active profile, or an
+   * explicitly supplied public profile. This is display-only: callers that
+   * persist formulas must continue using the canonical write boundary.
+   *
+   * Older formulon packages expose only function-name aliases, so the
+   * adapter falls back to the older alias-only conversion when the full text
+   * surface is absent or when the engine reports/fails a call. That fallback
+   * deliberately leaves separators, literals, and quoted text untouched.
+   */
+  localizeFormulaText(formula: string, profileOverride?: SpreadsheetProfileId | null): string {
+    assertAlive(this);
+    const profile = profileOverride ?? this.spreadsheetProfileId();
+    const locale = localeOrdinalForSpreadsheetProfile(profile);
+    const aliasOnly = (): string =>
+      localizeFormula(this as unknown as WorkbookHandle, formula, locale);
+    if (!this.capabilities.formulaLocale) return aliasOnly();
+    if (!profile) return aliasOnly();
+    const localize = formulaLocaleWb(this).localizeFormula;
+    if (typeof localize !== 'function') return aliasOnly();
+    try {
+      const result = localize.call(formulaLocaleWb(this), formula, publicProfileToEngine(profile));
+      return result.status.ok ? result.value : aliasOnly();
+    } catch {
+      return aliasOnly();
+    }
+  }
+
+  /**
+   * Convert a formula written with a profile's display syntax back to
+   * formulon's canonical en-invariant text. The conversion is intentionally
+   * opt-in at this public method; setFormula and evaluation retain the
+   * existing alias-only boundary so comma-separated legacy formulas remain
+   * unambiguous until the host has explicitly canonicalized full syntax.
+   */
+  canonicalizeLocalizedFormula(
+    formula: string,
+    profileOverride?: SpreadsheetProfileId | null,
+  ): string {
+    assertAlive(this);
+    const profile = profileOverride ?? this.spreadsheetProfileId();
+    const locale = localeOrdinalForSpreadsheetProfile(profile);
+    const aliasOnly = (): string =>
+      canonicalizeFormula(this as unknown as WorkbookHandle, formula, locale);
+    if (!this.capabilities.formulaLocale) return aliasOnly();
+    if (!profile) return aliasOnly();
+    const canonicalize = formulaLocaleWb(this).canonicalizeFormula;
+    if (typeof canonicalize !== 'function') return aliasOnly();
+    try {
+      const result = canonicalize.call(
+        formulaLocaleWb(this),
+        formula,
+        publicProfileToEngine(profile),
+      );
+      return result.status.ok ? result.value : aliasOnly();
+    } catch {
+      return aliasOnly();
+    }
+  }
+
+  /** Return scalar locale facts for the active or explicitly selected profile. */
+  localeFacts(profileOverride?: SpreadsheetProfileId | null): LocaleFacts | null {
+    assertAlive(this);
+    if (!this.capabilities.localeFacts) return null;
+    const profile = profileOverride ?? this.spreadsheetProfileId();
+    if (!profile) return null;
+    const readFacts = formulaLocaleWb(this).localeFacts;
+    if (typeof readFacts !== 'function') return null;
+    try {
+      const result = readFacts.call(formulaLocaleWb(this), publicProfileToEngine(profile));
+      return result.status.ok ? result.facts : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Workbook calc-mode metadata mirroring `<calcPr calcMode>`. The engine

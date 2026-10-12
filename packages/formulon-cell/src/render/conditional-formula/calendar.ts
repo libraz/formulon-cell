@@ -1,17 +1,31 @@
 import type { CellValue } from '../../engine/types.js';
+import {
+  excelSerialFromParts,
+  excelSerialToDate,
+  excelSerialToDateParts,
+} from '../../format/date-serial.js';
 import { textValue } from './coercion.js';
 import { FORMULA_NUMBER_LITERAL } from './parser.js';
 
 const dateSerialFromParts = (year: number, month: number, day: number): number => {
   const normalizedYear = year >= 0 && year < 1900 ? year + 1900 : year;
-  const date = new Date(Date.UTC(normalizedYear, month - 1, day));
-  if (normalizedYear >= 0 && normalizedYear < 100) date.setUTCFullYear(normalizedYear);
-  return date.getTime() / 86_400_000 + 25569;
+  if (normalizedYear === 1900 && month === 2 && day === 29) return 60;
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(normalizedYear, month - 1, day);
+  const serial = excelSerialFromParts(
+    date.getUTCFullYear(),
+    date.getUTCMonth() + 1,
+    date.getUTCDate(),
+    { allowFictitious: true },
+  );
+  return serial ?? Number.NaN;
 };
 const validatedDateSerial = (year: number, month: number, day: number): number | null => {
   const normalizedYear = year >= 0 && year < 1900 ? year + 1900 : year;
-  const date = new Date(Date.UTC(normalizedYear, month - 1, day));
-  if (normalizedYear >= 0 && normalizedYear < 100) date.setUTCFullYear(normalizedYear);
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(normalizedYear, month - 1, day);
   if (
     date.getUTCFullYear() !== normalizedYear ||
     date.getUTCMonth() !== month - 1 ||
@@ -19,7 +33,7 @@ const validatedDateSerial = (year: number, month: number, day: number): number |
   ) {
     return null;
   }
-  return dateSerialFromParts(year, month, day);
+  return excelSerialFromParts(normalizedYear, month, day);
 };
 const dateValueText = (value: CellValue): CellValue => {
   const text = textValue(value)?.trim();
@@ -66,16 +80,15 @@ const todaySerial = (): number => {
 };
 const serialTimeFraction = (serial: number): number => ((serial % 1) + 1) % 1;
 const dateFromSerial = (serial: number): Date | null => {
-  if (!Number.isFinite(serial)) return null;
-  return new Date(Math.trunc(serial) * 86_400_000 - 25569 * 86_400_000);
+  return excelSerialToDate(serial);
 };
 const serialDateParts = (serial: number): { year: number; month: number; day: number } | null => {
-  const date = dateFromSerial(serial);
-  if (date === null) return null;
+  const parts = excelSerialToDateParts(serial);
+  if (parts === null) return null;
   return {
-    year: date.getUTCFullYear(),
-    month: date.getUTCMonth() + 1,
-    day: date.getUTCDate(),
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
   };
 };
 const isLastDayOfFebruary = (year: number, month: number, day: number): boolean =>

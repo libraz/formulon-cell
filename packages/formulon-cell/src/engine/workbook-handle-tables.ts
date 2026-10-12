@@ -1,3 +1,4 @@
+import type { AutoFilter, AutoFilterEvalResult } from '@libraz/formulon';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
 import type { Addr, CellValue, EngineCapabilities, TableInput, Workbook } from './types.js';
 import { formatCell } from './value.js';
@@ -21,6 +22,12 @@ type TableAuthoringWorkbook = Workbook & {
 type AutoFilterWorkbook = Workbook & {
   getSheetAutoFilterXml?: (sheet: number) => { status: { ok: boolean }; xml: string };
   setSheetAutoFilterXml?: (sheet: number, xml: string) => { ok: boolean };
+  getAutoFilter?: (sheet: number) => { status: { ok: boolean }; autoFilter: AutoFilter | null };
+  setAutoFilter?: (sheet: number, filter: AutoFilter) => { ok: boolean };
+  removeAutoFilter?: (sheet: number) => { ok: boolean };
+  applyAutoFilter?: (sheet: number) => { ok: boolean };
+  clearAutoFilter?: (sheet: number) => { ok: boolean };
+  evaluateAutoFilter?: (sheet: number) => AutoFilterEvalResult;
 };
 
 declare module './workbook-handle.js' {
@@ -78,6 +85,55 @@ export abstract class WorkbookHandleTablesMethods {
     assertAlive(this);
     if (!this.capabilities.autoFilter) return false;
     return (wb(this) as AutoFilterWorkbook).setSheetAutoFilterXml?.(sheet, xml)?.ok === true;
+  }
+
+  /** Read the typed worksheet AutoFilter. `null` means that the sheet has no
+   * definition; `null` is also returned when this engine predates the typed
+   * AutoFilter surface or the read itself failed. */
+  getAutoFilter(sheet: number): AutoFilter | null {
+    assertAlive(this);
+    if (!this.capabilities.typedAutoFilter) return null;
+    const result = (wb(this) as AutoFilterWorkbook).getAutoFilter?.(sheet);
+    return result?.status.ok ? result.autoFilter : null;
+  }
+
+  /** Replace the typed worksheet AutoFilter definition. This does not change
+   * row visibility; callers that want Excel's Reapply behaviour should call
+   * {@link applyAutoFilter} after this method. */
+  setAutoFilter(sheet: number, filter: AutoFilter): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedAutoFilter) return false;
+    return (wb(this) as AutoFilterWorkbook).setAutoFilter?.(sheet, filter)?.ok === true;
+  }
+
+  /** Remove a worksheet AutoFilter definition. Row visibility is unchanged by
+   * the engine, so a caller clearing the UI filter should clear it first. */
+  removeAutoFilter(sheet: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedAutoFilter) return false;
+    return (wb(this) as AutoFilterWorkbook).removeAutoFilter?.(sheet)?.ok === true;
+  }
+
+  /** Apply the worksheet AutoFilter and update native row visibility. */
+  applyAutoFilter(sheet: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedAutoFilter) return false;
+    return (wb(this) as AutoFilterWorkbook).applyAutoFilter?.(sheet)?.ok === true;
+  }
+
+  /** Remove all worksheet AutoFilter criteria and show every body row. */
+  clearAutoFilter(sheet: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedAutoFilter) return false;
+    return (wb(this) as AutoFilterWorkbook).clearAutoFilter?.(sheet)?.ok === true;
+  }
+
+  /** Evaluate the worksheet AutoFilter without changing native visibility. */
+  evaluateAutoFilter(sheet: number): AutoFilterEvalResult | null {
+    assertAlive(this);
+    if (!this.capabilities.typedAutoFilter) return null;
+    const result = (wb(this) as AutoFilterWorkbook).evaluateAutoFilter?.(sheet);
+    return result?.status.ok ? result : null;
   }
 
   /** Creates an OOXML worksheet table and returns its index, or -1 when the

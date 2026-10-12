@@ -24,6 +24,7 @@ import {
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { setSheetZoom } from '../commands/view.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
@@ -68,6 +69,12 @@ export const formatPainter = (): Extension => ({
       host: ctx.host,
       store: ctx.store,
       history: ctx.history,
+      formatResolver: (addr) => {
+        const wb = ctx.getWb();
+        return !wb.isStub && wb.capabilities.effectiveStyle
+          ? effectiveCellFormatWithPending(wb, ctx.store.getState(), addr)
+          : ctx.store.getState().format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+      },
     });
     return {
       ...handle,

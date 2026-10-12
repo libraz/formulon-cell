@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
+import {
+  arrangeSessionIllustration,
+  clearSessionIllustration,
+  duplicateSessionIllustration,
+  updateSessionIllustration,
+} from '../../../src/commands/session-illustration.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachSessionIllustrations } from '../../../src/interact/session-illustrations.js';
+import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const firePointer = (
@@ -105,6 +118,65 @@ describe('attachSessionIllustrations', () => {
     handle.detach();
   });
 
+  it('tracks native anchor offsets and dimensions through zoom and scroll', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    store.setState((state) => ({
+      ...state,
+      viewport: { ...state.viewport, zoom: 2, rowStart: 3, colStart: 2 },
+    }));
+    mutators.upsertIllustration(store, {
+      id: 'imported-native',
+      kind: 'image',
+      sheet: 0,
+      src: 'data:image/png;base64,image',
+      nativeObjectId: 7,
+      nativeGeometryEditable: false,
+      nativeAnchor: {
+        row: 5,
+        col: 6,
+        rowOffEmu: 10 * 9525,
+        colOffEmu: 12 * 9525,
+        widthEmu: 100 * 9525,
+        heightEmu: 50 * 9525,
+        name: 'Imported',
+        descr: 'Imported',
+      },
+    });
+
+    const handle = attachSessionIllustrations({ host, store });
+    const panel = host.querySelector<HTMLElement>('.fc-illustration');
+    if (!panel) throw new Error('native overlay missing');
+    const first = cellRectUnclamped(
+      layoutForView(store.getState()),
+      store.getState().viewport,
+      5,
+      6,
+    );
+    expect(Number.parseFloat(panel.style.left)).toBeCloseTo(first.x + 12 * 2);
+    expect(Number.parseFloat(panel.style.top)).toBeCloseTo(first.y + 10 * 2);
+    expect(Number.parseFloat(panel.style.width)).toBeCloseTo(100 * 2);
+    expect(Number.parseFloat(panel.style.height)).toBeCloseTo(50 * 2);
+    expect(panel.querySelector('[role="separator"]')).toBeNull();
+
+    store.setState((state) => ({
+      ...state,
+      viewport: { ...state.viewport, rowStart: 4, colStart: 3 },
+    }));
+    const repositioned = host.querySelector<HTMLElement>('.fc-illustration');
+    if (!repositioned) throw new Error('native overlay missing after scroll');
+    const second = cellRectUnclamped(
+      layoutForView(store.getState()),
+      store.getState().viewport,
+      5,
+      6,
+    );
+    expect(Number.parseFloat(repositioned.style.left)).toBeCloseTo(second.x + 12 * 2);
+    expect(Number.parseFloat(repositioned.style.top)).toBeCloseTo(second.y + 10 * 2);
+    handle.detach();
+  });
+
   it('moves, resizes, deletes, and records keyboard changes through shared commands', () => {
     const host = document.createElement('div');
     host.tabIndex = -1;
@@ -192,5 +264,55 @@ describe('attachSessionIllustrations', () => {
     ]);
 
     handle.detach();
+  });
+
+  it('reauthorizes illustration mutations while a viewer policy is active', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const controller = new InteractionController({
+      store,
+      getWb: () => wb,
+      history,
+    });
+    const unregister = registerInteractionController(store, controller);
+    controller.setPolicy(viewerPolicy());
+    mutators.upsertIllustration(store, {
+      id: 'viewer-image',
+      kind: 'image',
+      sheet: 0,
+      src: 'data:image/png;base64,image',
+      x: 20,
+      y: 30,
+      w: 160,
+      h: 96,
+    });
+    mutators.upsertIllustration(store, {
+      id: 'viewer-shape',
+      kind: 'shape',
+      shape: 'rectangle',
+      sheet: 0,
+      x: 40,
+      y: 50,
+      w: 160,
+      h: 96,
+    });
+
+    expect(updateSessionIllustration(store, 'viewer-image', { x: 80 }, history, wb)).toBeNull();
+    expect(clearSessionIllustration(store, 'viewer-image', history, wb)).toBe(false);
+    expect(duplicateSessionIllustration(store, 'viewer-image', history, wb)).toBeNull();
+    expect(arrangeSessionIllustration(store, 'viewer-image', 'bring-front', history)).toBeNull();
+    expect(store.getState().illustrations.illustrations.map((item) => item.id)).toEqual([
+      'viewer-image',
+      'viewer-shape',
+    ]);
+    expect(history.canUndo()).toBe(false);
+
+    unregister();
+    controller.dispose();
+    wb.dispose();
+    host.remove();
   });
 });

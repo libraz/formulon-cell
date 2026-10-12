@@ -4,8 +4,11 @@ import {
   pivotTableStyleAssignment,
   tableStyleSwatch,
 } from '../commands/format-as-table.js';
+import { formatWithPending } from '../store/pending-format.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
+import { syncAxisFormatOverrides } from './axis-format-sync.js';
+import { type AxisStructureShift, mapAxisAddress } from './axis-structure-remap.js';
 import {
   cellStyleKeysByXfId,
   type NamedStyleXfResolution,
@@ -13,12 +16,14 @@ import {
   resolveNamedStyleXfs,
   syncNamedCellStylesToEngine,
 } from './cell-style-writeback.js';
+import { fontCssPxToPoints, fontPointsToCssPx } from './font-units.js';
 import { syncHyperlinksToEngine } from './format-sync.js';
 import {
   BUILTIN_NUM_FMT_GENERAL,
   borderRecordFromFormat,
   borderRecordToFormat,
   buildXfRecord,
+  cssColorToArgb,
   fillRecordFromFormat,
   fillRecordToFormat,
   fontRecordFromFormat,
@@ -28,8 +33,21 @@ import {
   readingOrderToTextDirection,
   textRotationToCellRotation,
 } from './format-writeback.js';
-import type { Addr, CellValue, CellXf, FontRecord, PhoneticRun } from './types.js';
+import type {
+  Addr,
+  CellValue,
+  CellXf,
+  ColorSpec,
+  FontRecord,
+  PhoneticRun,
+  SheetFontPatch,
+} from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
+import {
+  formatWithSheetFontPatch,
+  sheetFontPatchFor,
+  syncWholeSheetFontOverrides,
+} from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 const HALIGN_GENERAL = 0;
@@ -84,6 +102,145 @@ export function seedSyncedFormatKeys(
 ): void {
   const set = formattedKeySet(wb, sheet);
   for (const key of keys) set.add(key);
+}
+
+/**
+ * Capture only the membership bits for the supplied address keys. Format
+ * history can temporarily flush a store snapshot while the native engine is
+ * being used as the source of truth; on a failed flush it must restore the
+ * high-water bookkeeping that existed before that attempt. Do not call
+ * `formattedKeySet` here: a read-only checkpoint must not create a cache
+ * bucket for an untouched workbook or sheet.
+ */
+export function captureSyncedFormatKeyMembership(
+  wb: WorkbookHandle,
+  keys: Iterable<string>,
+): Map<string, boolean> {
+  const snapshot = new Map<string, boolean>();
+  const perSheet = syncedFormatKeys.get(wb);
+  for (const key of keys) {
+    const addr = parseAddrKey(key);
+    if (!addr || addrKey(addr) !== key) continue;
+    snapshot.set(key, perSheet?.get(addr.sheet)?.has(key) === true);
+  }
+  return snapshot;
+}
+
+/** Restore membership bits captured by `captureSyncedFormatKeyMembership`.
+ * The supplied keys are the complete scope of the checkpoint: unrelated
+ * sheets and cells retain their current tracking state. Empty buckets are
+ * removed so this rollback does not leave inert WeakMap state behind. */
+export function restoreSyncedFormatKeyMembership(
+  wb: WorkbookHandle,
+  snapshot: ReadonlyMap<string, boolean>,
+): void {
+  let perSheet = syncedFormatKeys.get(wb);
+  for (const [key, tracked] of snapshot) {
+    const addr = parseAddrKey(key);
+    if (!addr || addrKey(addr) !== key) continue;
+
+    if (tracked) {
+      if (!perSheet) {
+        perSheet = new Map();
+        syncedFormatKeys.set(wb, perSheet);
+      }
+      let set = perSheet.get(addr.sheet);
+      if (!set) {
+        set = new Set();
+        perSheet.set(addr.sheet, set);
+      }
+      set.add(key);
+      continue;
+    }
+
+    const set = perSheet?.get(addr.sheet);
+    if (!set) continue;
+    set.delete(key);
+    if (set.size === 0) perSheet?.delete(addr.sheet);
+  }
+  if (perSheet?.size === 0) syncedFormatKeys.delete(wb);
+}
+
+/** Keep the high-water reset cache aligned with a native sheet move/remove.
+ * This must run before the corresponding store publication; otherwise a flush
+ * of the newly mapped format entries can reset an unrelated sheet using the
+ * old cache key. */
+export function remapSyncedFormatKeys(
+  wb: WorkbookHandle,
+  mapIndex: (index: number) => number | null,
+): void {
+  const current = syncedFormatKeys.get(wb);
+  if (!current) return;
+  const next = new Map<number, Set<string>>();
+  for (const [sheet, keys] of current) {
+    const mappedSheet = mapIndex(sheet);
+    if (mappedSheet === null) continue;
+    let mappedKeys = next.get(mappedSheet);
+    if (!mappedKeys) {
+      mappedKeys = new Set<string>();
+      next.set(mappedSheet, mappedKeys);
+    }
+    for (const key of keys) {
+      const addr = parseAddrKey(key);
+      // The outer sheet bucket and the address prefix must agree. A malformed
+      // cache entry cannot safely be reset after a permutation, so discard it
+      // rather than allowing a future flush to target an unrelated cell.
+      if (!addr || addr.sheet !== sheet) continue;
+      const mappedKey = mapIndex(addr.sheet);
+      if (mappedKey !== null) mappedKeys.add(addrKey({ ...addr, sheet: mappedKey }));
+    }
+  }
+  syncedFormatKeys.set(wb, next);
+}
+
+/** Keep the cell-XF high-water cache aligned with a row/column structure edit.
+ * Only the selected sheet is remapped; all other sheet buckets retain their
+ * current membership. Keys in a deleted band disappear from the cache. */
+export function remapSyncedFormatKeysForStructure(
+  wb: WorkbookHandle,
+  sheet: number,
+  shift: AxisStructureShift,
+): void {
+  const current = syncedFormatKeys.get(wb);
+  const keys = current?.get(sheet);
+  if (!current || !keys) return;
+  const next = new Map(current);
+  const mapped = new Set<string>();
+  for (const key of keys) {
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const nextAddr = mapAxisAddress(addr, shift);
+    if (nextAddr) mapped.add(addrKey(nextAddr));
+  }
+  if (mapped.size === 0) next.delete(sheet);
+  else next.set(sheet, mapped);
+  if (next.size === 0) syncedFormatKeys.delete(wb);
+  else syncedFormatKeys.set(wb, next);
+}
+
+/** Capture the exact high-water membership for one sheet before a row/column
+ * structure edit. `null` distinguishes an absent bucket from an empty one so
+ * history replay can restore the cache without coordinate re-expansion. */
+export function captureSyncedFormatKeysForStructure(
+  wb: WorkbookHandle,
+  sheet: number,
+): Set<string> | null {
+  const keys = syncedFormatKeys.get(wb)?.get(sheet);
+  return keys ? new Set(keys) : null;
+}
+
+/** Restore a structure checkpoint's exact high-water membership. */
+export function restoreSyncedFormatKeysForStructure(
+  wb: WorkbookHandle,
+  sheet: number,
+  snapshot: ReadonlySet<string> | null,
+): void {
+  const current = syncedFormatKeys.get(wb);
+  const next = current ? new Map(current) : new Map<number, Set<string>>();
+  if (snapshot === null || snapshot.size === 0) next.delete(sheet);
+  else next.set(sheet, new Set(snapshot));
+  if (next.size === 0) syncedFormatKeys.delete(wb);
+  else syncedFormatKeys.set(wb, next);
 }
 
 /** Concatenate a guide's readings into the single string the whole-cell
@@ -176,6 +333,7 @@ export function syncCellFormatsToEngine(
   }
   const previous = formattedKeySet(wb, sheet);
   const current = new Set<string>();
+  const sheetFontPatch = sheetFontPatchFor(state, sheet);
   for (const [key, fmt] of formats) {
     const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) continue;
@@ -187,6 +345,7 @@ export function syncCellFormatsToEngine(
       { sheet, row, col },
       namedStyleXfs,
       strict,
+      sheetFontPatch,
     );
     if (xfIndex < 0) {
       if (strict) throw strictSyncError('resolveXf', key);
@@ -351,11 +510,27 @@ export function cellFormatFromXf(
   const patch: Partial<CellFormat> = {};
   const styleKey = xf.xfId === undefined ? undefined : styleKeysByXfId?.get(xf.xfId);
   if (styleKey !== undefined) patch.cellStyle = styleKey;
-  const font = wb.getFontRecord(xf.fontIndex);
+  const resolved = wb as WorkbookHandle & {
+    getResolvedFontRecord?: (fontIndex: number) => FontRecord | null;
+    getResolvedFillRecord?: (fillIndex: number) => ReturnType<WorkbookHandle['getFillRecord']>;
+    getResolvedBorderRecord?: (
+      borderIndex: number,
+    ) => ReturnType<WorkbookHandle['getBorderRecord']>;
+  };
+  const font =
+    typeof resolved.getResolvedFontRecord === 'function'
+      ? resolved.getResolvedFontRecord(xf.fontIndex)
+      : wb.getFontRecord(xf.fontIndex);
   if (font) Object.assign(patch, fontRecordToFormat(font, workbookDefaultFont));
-  const fill = wb.getFillRecord(xf.fillIndex);
+  const fill =
+    typeof resolved.getResolvedFillRecord === 'function'
+      ? resolved.getResolvedFillRecord(xf.fillIndex)
+      : wb.getFillRecord(xf.fillIndex);
   if (fill) Object.assign(patch, fillRecordToFormat(fill));
-  const border = wb.getBorderRecord(xf.borderIndex);
+  const border =
+    typeof resolved.getResolvedBorderRecord === 'function'
+      ? resolved.getResolvedBorderRecord(xf.borderIndex)
+      : wb.getBorderRecord(xf.borderIndex);
   if (border) Object.assign(patch, borderRecordToFormat(border));
   if (xf.numFmtId !== BUILTIN_NUM_FMT_GENERAL) {
     const code = wb.getNumFmtCode(xf.numFmtId);
@@ -401,7 +576,76 @@ export function cellFormatFromXf(
     const direction = readingOrderToTextDirection(xf.readingOrder);
     if (direction !== undefined) patch.textDirection = direction;
   }
+  if (xf.hasProtection === true) {
+    patch.locked = xf.locked !== false;
+    patch.formulaHidden = xf.hidden === true;
+  }
   return patch;
+}
+
+/**
+ * Project the engine's effective style for rendering a cell. The result is a
+ * display projection only: when the engine selected a row or column XF, the
+ * caller must keep the store entry absent so a later format flush does not
+ * flatten inherited formatting into a direct cell XF.
+ */
+export function effectiveCellFormatFromEngine(
+  wb: WorkbookHandle,
+  sheet: number,
+  row: number,
+  col: number,
+): Partial<CellFormat> | null {
+  if (!wb.capabilities?.effectiveStyle) {
+    const displayFont = wb.workbookDisplayFont;
+    return displayFont
+      ? {
+          fontFamily: displayFont.name,
+          fontSize: fontPointsToCssPx(displayFont.size),
+        }
+      : null;
+  }
+  const effective = wb.getEffectiveStyle(sheet, row, col);
+  if (!effective) return null;
+  const xf = wb.getCellXf(effective.xfIndex);
+  if (!xf) return null;
+  const format = cellFormatFromXf(wb, xf, wb.workbookDefaultFont);
+  // `cellFormatFromXf` intentionally strips the workbook default from the
+  // sparse store representation. Rendering still needs the actual workbook
+  // font, including a theme-resolved family and its native point size.
+  const displayFont = wb.workbookDisplayFont;
+  if (displayFont) {
+    if (!Object.hasOwn(format, 'fontFamily')) format.fontFamily = displayFont.name;
+    if (!Object.hasOwn(format, 'fontSize')) {
+      format.fontSize = fontPointsToCssPx(displayFont.size);
+    }
+  }
+  // The effective result carries protection and the resolved number-format
+  // code even when the selected XF omits an explicit protection/numFmt
+  // element. Keep those fields in this paint-only projection; this helper is
+  // never fed back into the direct XF synchronizer.
+  if (!Object.hasOwn(format, 'locked')) format.locked = effective.locked;
+  if (!Object.hasOwn(format, 'formulaHidden')) format.formulaHidden = effective.hidden;
+  if (!Object.hasOwn(format, 'numFmt') && effective.numFmtCode) {
+    const numFmt = formatCodeToNumFmt(effective.numFmtCode);
+    if (numFmt) format.numFmt = numFmt;
+  }
+  return format;
+}
+
+/**
+ * Display-only effective format for one address. Engine style (including row
+ * and column inheritance) is the base; direct and pending store fields then
+ * take precedence. The result must never be written back to the format slice.
+ */
+export function effectiveCellFormatWithPending(
+  wb: WorkbookHandle,
+  state: import('../store/store.js').State,
+  addr: Addr,
+): Partial<CellFormat> | null {
+  const effective = effectiveCellFormatFromEngine(wb, addr.sheet, addr.row, addr.col);
+  const direct = formatWithPending(state, addr);
+  if (!effective && !direct) return null;
+  return { ...(effective ?? {}), ...(direct ?? {}) };
 }
 
 /** A raw alignment group can only be reused when every authored extended
@@ -443,8 +687,13 @@ function rawAlignmentHasAuthoredDifference(fmt: CellFormat, raw: CellXf): boolea
 
 /** Assemble the XF record for a CellFormat, ensuring every component record
  *  exists first (the engine dedups on add). Returns null on engine failure. */
-function buildXfForFormat(wb: WorkbookHandle, fmt: CellFormat): CellXf | null {
-  const fontIndex = wb.addFontRecord(fontRecordFromFormat(fmt, wb.workbookDefaultFont));
+function buildXfForFormat(
+  wb: WorkbookHandle,
+  fmt: CellFormat,
+  sheetFontPatch?: SheetFontPatch,
+): CellXf | null {
+  const effectiveFormat = formatWithSheetFontPatch(fmt, sheetFontPatch);
+  const fontIndex = wb.addFontRecord(fontRecordFromFormat(effectiveFormat, wb.workbookDefaultFont));
   if (fontIndex < 0) return null;
   const fillIndex = wb.addFillRecord(fillRecordFromFormat(fmt));
   if (fillIndex < 0) return null;
@@ -474,15 +723,123 @@ const RAW_ALIGNMENT_OPTIONAL_FIELDS = [
   'readingOrder',
 ] as const;
 
+const CELL_STYLE_GROUP_FIELDS: Record<CellStyleFormatGroup, readonly (keyof CellFormat)[]> = {
+  number: ['numFmt'],
+  alignment: [
+    'align',
+    'vAlign',
+    'wrap',
+    'justifyLastLine',
+    'shrinkToFit',
+    'indent',
+    'rotation',
+    'textDirection',
+  ],
+  font: [
+    'fontFamily',
+    'fontSize',
+    'bold',
+    'italic',
+    'underline',
+    'strike',
+    'fontVertAlign',
+    'color',
+  ],
+  border: ['borders'],
+  fill: ['fill', 'fillPattern', 'fillPatternColor'],
+  protection: ['locked', 'formulaHidden'],
+};
+
+const formatHasGroupFields = (fmt: CellFormat, group: CellStyleFormatGroup): boolean =>
+  CELL_STYLE_GROUP_FIELDS[group].some((field) => Object.hasOwn(fmt, field));
+
+const FONT_NON_AXIS_FIELDS: readonly (keyof CellFormat)[] = [
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'fontVertAlign',
+  'color',
+];
+
+const sameFontNonAxisField = (
+  format: CellFormat,
+  current: Partial<CellFormat>,
+  field: keyof CellFormat,
+): boolean => {
+  // A sparse direct format changes only authored fields. An omitted bold,
+  // colour, or vertical-alignment axis inherits the raw source value and
+  // therefore must not force a generic font rebuild that drops native
+  // metadata. An explicitly authored `false`/`undefined` remains a real
+  // reset and is compared below.
+  if (!Object.hasOwn(format, field)) return true;
+  const left = format[field];
+  const right = current[field];
+  if (field === 'bold' || field === 'italic' || field === 'strike') {
+    return (left === true) === (right === true);
+  }
+  return Object.is(left, right);
+};
+
+const fontNonAxisMatches = (format: CellFormat, current: Partial<CellFormat>): boolean =>
+  FONT_NON_AXIS_FIELDS.every((field) => sameFontNonAxisField(format, current, field));
+
+/** Preserve the raw inherited font record when a direct write changes only
+ *  family and/or size. The raw record carries theme, charset, colour and
+ *  apply metadata that CellFormat intentionally does not model. */
+const preserveRawFontForAxisEdit = (
+  wb: WorkbookHandle,
+  record: CellXf,
+  source: CellXf,
+  currentProjected: Partial<CellFormat>,
+  effectiveFormat: CellFormat,
+): void => {
+  if (!fontNonAxisMatches(effectiveFormat, currentProjected)) return;
+  const familyChanged =
+    Object.hasOwn(effectiveFormat, 'fontFamily') &&
+    effectiveFormat.fontFamily !== currentProjected.fontFamily;
+  const sizeChanged =
+    Object.hasOwn(effectiveFormat, 'fontSize') &&
+    effectiveFormat.fontSize !== currentProjected.fontSize;
+  if (!familyChanged && !sizeChanged) return;
+  const baseFont = wb.getFontRecord(source.fontIndex);
+  if (!baseFont) return;
+  const font = { ...baseFont };
+  if (familyChanged) {
+    const name = effectiveFormat.fontFamily;
+    if (name !== undefined) font.name = name;
+    font.scheme =
+      name === wb.workbookDefaultFont?.name ? wb.workbookDefaultFont?.scheme : undefined;
+  }
+  if (sizeChanged && effectiveFormat.fontSize !== undefined) {
+    font.size = fontCssPxToPoints(effectiveFormat.fontSize);
+  }
+  if (!font.name || !Number.isFinite(font.size) || font.size <= 0) return;
+  const fontIndex = wb.addFontRecord(font);
+  if (fontIndex >= 0) {
+    record.fontIndex = fontIndex;
+    record.applyFont = source.applyFont;
+  }
+};
+
 const copyRawGroup = (target: CellXf, source: CellXf, group: CellStyleFormatGroup): void => {
-  if (group === 'font') target.fontIndex = source.fontIndex;
-  else if (group === 'fill') target.fillIndex = source.fillIndex;
-  else if (group === 'border') target.borderIndex = source.borderIndex;
-  else if (group === 'number') target.numFmtId = source.numFmtId;
-  else if (group === 'alignment') {
+  if (group === 'font') {
+    target.fontIndex = source.fontIndex;
+    target.applyFont = source.applyFont;
+  } else if (group === 'fill') {
+    target.fillIndex = source.fillIndex;
+    target.applyFill = source.applyFill;
+  } else if (group === 'border') {
+    target.borderIndex = source.borderIndex;
+    target.applyBorder = source.applyBorder;
+  } else if (group === 'number') {
+    target.numFmtId = source.numFmtId;
+    target.applyNumberFormat = source.applyNumberFormat;
+  } else if (group === 'alignment') {
     target.horizontalAlign = source.horizontalAlign;
     target.verticalAlign = source.verticalAlign;
     target.wrapText = source.wrapText;
+    target.applyAlignment = source.applyAlignment;
     const targetRecord = target as unknown as Record<string, unknown>;
     const sourceRecord = source as unknown as Record<string, unknown>;
     for (const field of RAW_ALIGNMENT_OPTIONAL_FIELDS) {
@@ -492,8 +849,261 @@ const copyRawGroup = (target: CellXf, source: CellXf, group: CellStyleFormatGrou
         delete targetRecord[field];
       }
     }
+  } else if (group === 'protection') {
+    target.applyProtection = source.applyProtection;
+    target.hasProtection = source.hasProtection;
+    target.locked = source.locked;
+    target.hidden = source.hidden;
   }
 };
+
+const literalColorSpec = (): ColorSpec => ({ kind: 0, rgb: 0, theme: 0, tint: 0, indexed: 0 });
+
+const copyRawAlignmentFieldsExcept = (
+  target: CellXf,
+  source: CellXf,
+  patch: Partial<CellFormat>,
+): void => {
+  const targetRecord = target as unknown as Record<string, unknown>;
+  const sourceRecord = source as unknown as Record<string, unknown>;
+  const owners: Readonly<Record<string, keyof CellFormat | undefined>> = {
+    horizontalAlign: 'align',
+    hasHorizontalAlign: 'align',
+    verticalAlign: 'vAlign',
+    hasVerticalAlign: 'vAlign',
+    wrapText: 'wrap',
+    hasWrapText: 'wrap',
+    justifyLastLine: 'justifyLastLine',
+    hasJustifyLastLine: 'justifyLastLine',
+    textRotation: 'rotation',
+    indent: 'indent',
+    shrinkToFit: 'shrinkToFit',
+    readingOrder: 'textDirection',
+  };
+  for (const [field, owner] of Object.entries(owners)) {
+    // `hasAlignment` is derived from all alignment fields. Once any one of
+    // them is authored, the target builder owns that flag; copying a source
+    // false would otherwise suppress the newly authored field.
+    if (Object.hasOwn(patch, owner as keyof CellFormat)) continue;
+    if (Object.hasOwn(sourceRecord, field)) targetRecord[field] = sourceRecord[field];
+    else delete targetRecord[field];
+  }
+  const alignmentPatched = [
+    'align',
+    'vAlign',
+    'wrap',
+    'justifyLastLine',
+    'shrinkToFit',
+    'indent',
+    'rotation',
+    'textDirection',
+  ].some((field) => Object.hasOwn(patch, field));
+  if (!alignmentPatched) {
+    if (Object.hasOwn(sourceRecord, 'hasAlignment')) {
+      targetRecord.hasAlignment = sourceRecord.hasAlignment;
+    } else {
+      delete targetRecord.hasAlignment;
+    }
+  } else if (targetRecord.hasAlignment === false && sourceRecord.hasAlignment === false) {
+    // Keep an explicit empty alignment child when the patch itself clears the
+    // last authored alignment field. Otherwise the target builder's `true`
+    // presence bit remains authoritative for the newly patched field.
+    targetRecord.hasAlignment = false;
+  }
+  for (const field of RAW_ALIGNMENT_OPTIONAL_FIELDS) {
+    if (Object.hasOwn(owners, field)) continue;
+    if (field === 'hasAlignment') continue;
+    if (Object.hasOwn(sourceRecord, field)) targetRecord[field] = sourceRecord[field];
+    else delete targetRecord[field];
+  }
+};
+
+/**
+ * Build a new XF by changing only the fields in `patch` while retaining the
+ * raw source record for every untouched style group.  Axis styles are native
+ * cell-style XFs rather than CellFormat entries, so routing them through the
+ * ordinary sparse writer would otherwise lose apply flags, charset/theme
+ * selectors, quotePrefix, or extended alignment metadata.
+ */
+export function patchXfIndexFromBase(
+  wb: WorkbookHandle,
+  baseXfIndex: number,
+  patch: Partial<CellFormat>,
+): number {
+  const source = wb.getCellXf(baseXfIndex);
+  if (!source) return -1;
+  const base = cellFormatFromXf(wb, source, wb.workbookDefaultFont);
+  const effective: CellFormat = { ...base, ...patch };
+  if (patch.borders) effective.borders = { ...(base.borders ?? {}), ...patch.borders };
+  for (const key of Object.keys(patch) as Array<keyof CellFormat>) {
+    if (patch[key] === undefined) delete (effective as Partial<CellFormat>)[key];
+  }
+
+  const target = buildXfForFormat(wb, effective);
+  if (!target) return -1;
+  const has = (key: keyof CellFormat): boolean => Object.hasOwn(patch, key);
+  const groups: readonly CellStyleFormatGroup[] = [
+    'number',
+    'alignment',
+    'font',
+    'border',
+    'fill',
+    'protection',
+  ];
+  const touched = new Set<CellStyleFormatGroup>();
+  if (
+    [
+      'fontFamily',
+      'fontSize',
+      'bold',
+      'italic',
+      'underline',
+      'strike',
+      'fontVertAlign',
+      'color',
+    ].some((key) => has(key as keyof CellFormat))
+  )
+    touched.add('font');
+  if (['fill', 'fillPattern', 'fillPatternColor'].some((key) => has(key as keyof CellFormat)))
+    touched.add('fill');
+  if (has('borders')) touched.add('border');
+  if (has('numFmt')) touched.add('number');
+  if (
+    [
+      'align',
+      'vAlign',
+      'wrap',
+      'justifyLastLine',
+      'shrinkToFit',
+      'indent',
+      'rotation',
+      'textDirection',
+    ].some((key) => has(key as keyof CellFormat))
+  )
+    touched.add('alignment');
+  if (['locked', 'formulaHidden'].some((key) => has(key as keyof CellFormat)))
+    touched.add('protection');
+  for (const group of groups) {
+    if (!touched.has(group)) copyRawGroup(target, source, group);
+  }
+
+  if (touched.has('font')) {
+    const sourceFont = wb.getFontRecord(source.fontIndex);
+    if (!sourceFont) return -1;
+    const font = { ...sourceFont };
+    if (has('fontFamily')) {
+      const defaultFont = wb.workbookDefaultFont;
+      font.name = patch.fontFamily ?? defaultFont?.name ?? font.name;
+      font.scheme =
+        font.name === wb.workbookDefaultFont?.name ? wb.workbookDefaultFont?.scheme : undefined;
+    }
+    if (has('fontSize')) {
+      const size = patch.fontSize;
+      if (size !== undefined && Number.isFinite(size) && size > 0) {
+        font.size = fontCssPxToPoints(size);
+      } else if (wb.workbookDefaultFont) {
+        font.size = wb.workbookDefaultFont.size;
+      }
+    }
+    if (has('bold')) {
+      font.bold = patch.bold === true;
+      font.hasBold = true;
+    }
+    if (has('italic')) {
+      font.italic = patch.italic === true;
+      font.hasItalic = true;
+    }
+    if (has('strike')) {
+      font.strike = patch.strike === true;
+      font.hasStrike = true;
+    }
+    if (has('underline')) {
+      font.underline =
+        patch.underline === true || patch.underline === 'single'
+          ? 1
+          : patch.underline === 'double'
+            ? 2
+            : patch.underline === 'singleAccounting'
+              ? 3
+              : patch.underline === 'doubleAccounting'
+                ? 4
+                : 0;
+    }
+    if (has('fontVertAlign')) {
+      font.vertAlign =
+        patch.fontVertAlign === 'superscript' ? 1 : patch.fontVertAlign === 'subscript' ? 2 : 0;
+    }
+    if (has('color')) {
+      font.colorArgb =
+        patch.color === undefined ? 0xff000000 : (cssColorToArgb(patch.color) ?? 0xff000000);
+      // A source theme/indexed selector is authoritative over colorArgb in
+      // the native writer. Replacing it with kind=0 makes an explicit UI
+      // colour win while leaving every other raw font field intact.
+      font.color = literalColorSpec();
+    }
+    const fontIndex = wb.addFontRecord(font);
+    if (fontIndex < 0) return -1;
+    target.fontIndex = fontIndex;
+    target.applyFont = true;
+  }
+  if (touched.has('fill')) {
+    const sourceFill = wb.getFillRecord(source.fillIndex);
+    const targetFill = wb.getFillRecord(target.fillIndex);
+    if (!sourceFill || !targetFill) return -1;
+    const fill = { ...sourceFill };
+    const fillRecord = fill as unknown as Record<string, unknown>;
+    const setLiteral = (slot: 'fg' | 'bg', argb: number): void => {
+      fillRecord[slot] = literalColorSpec();
+      fillRecord[`${slot}Argb`] = argb;
+    };
+    if (has('fillPattern') || has('fill')) fill.pattern = targetFill.pattern;
+    if (has('fillPatternColor')) setLiteral('fg', targetFill.fgArgb);
+    // `fill` is the visible solid foreground for a solid/empty pattern and
+    // the background for a patterned fill. Change only that owned colour
+    // pair; the other selector stays exactly as it was in the source record.
+    if (has('fill'))
+      setLiteral(
+        targetFill.pattern > 1 ? 'bg' : 'fg',
+        targetFill.pattern > 1 ? targetFill.bgArgb : targetFill.fgArgb,
+      );
+    const fillIndex = wb.addFillRecord(fill);
+    if (fillIndex < 0) return -1;
+    target.fillIndex = fillIndex;
+    target.applyFill = true;
+  }
+  if (touched.has('border')) {
+    const sourceBorder = wb.getBorderRecord(source.borderIndex);
+    const targetBorder = wb.getBorderRecord(target.borderIndex);
+    if (!sourceBorder || !targetBorder) return -1;
+    const border = { ...sourceBorder };
+    const borderPatch = patch.borders ?? {};
+    for (const side of ['left', 'right', 'top', 'bottom'] as const) {
+      if (Object.hasOwn(borderPatch, side)) border[side] = targetBorder[side];
+    }
+    if (Object.hasOwn(borderPatch, 'diagonalDown')) {
+      border.diagonalDown = targetBorder.diagonalDown;
+      if (borderPatch.diagonalDown) border.diagonal = targetBorder.diagonal;
+    }
+    if (Object.hasOwn(borderPatch, 'diagonalUp')) {
+      border.diagonalUp = targetBorder.diagonalUp;
+      if (borderPatch.diagonalUp) border.diagonal = targetBorder.diagonal;
+    }
+    const borderIndex = wb.addBorderRecord(border);
+    if (borderIndex < 0) return -1;
+    target.borderIndex = borderIndex;
+    target.applyBorder = true;
+  }
+  if (touched.has('alignment')) copyRawAlignmentFieldsExcept(target, source, patch);
+  // These fields are not style groups, but they are meaningful OOXML
+  // metadata and must survive an axis edit verbatim.
+  const targetRecord = target as unknown as Record<string, unknown>;
+  const sourceRecord = source as unknown as Record<string, unknown>;
+  for (const key of ['quotePrefix', 'xfId'] as const) {
+    if (Object.hasOwn(sourceRecord, key)) targetRecord[key] = sourceRecord[key];
+    else delete targetRecord[key];
+  }
+  return wb.addXfRecord(target);
+}
 
 /** Resolve a CellFormat to an engine xfIndex. `styleXfIds` maps a named style
  *  to its `<cellStyleXfs>` row, so a styled cell records which style it came
@@ -506,8 +1116,10 @@ function resolveXfForFormat(
   addr: Addr,
   namedStyleXfs: ReadonlyMap<string, NamedStyleXfResolution>,
   strict: boolean,
+  sheetFontPatch?: SheetFontPatch,
 ): number {
-  const record = buildXfForFormat(wb, fmt);
+  const effectiveFormat = formatWithSheetFontPatch(fmt, sheetFontPatch);
+  const record = buildXfForFormat(wb, fmt, sheetFontPatch);
   if (!record) return -1;
   const namedKey = fmt.cellStyle ?? 'normal';
   const namedXf = namedStyleXfs.get(namedKey);
@@ -520,6 +1132,14 @@ function resolveXfForFormat(
   const currentProjected = currentRaw
     ? cellFormatFromXf(wb, currentRaw, wb.workbookDefaultFont)
     : null;
+  if (currentRaw && currentProjected) {
+    preserveRawFontForAxisEdit(wb, record, currentRaw, currentProjected, effectiveFormat);
+  }
+  // quotePrefix has no CellFormat counterpart. Carry it through an edit as
+  // opaque XF metadata while the current cell still points at its source row.
+  if (currentRaw && Object.hasOwn(currentRaw, 'quotePrefix')) {
+    record.quotePrefix = currentRaw.quotePrefix;
+  }
   const groups: readonly CellStyleFormatGroup[] = [
     'number',
     'alignment',
@@ -531,15 +1151,28 @@ function resolveXfForFormat(
   for (const group of groups) {
     const namedMatch =
       namedXf?.groups.includes(group) === true &&
-      !(group === 'alignment' && rawAlignmentHasAuthoredDifference(fmt, namedXf.raw)) &&
-      cellStyleGroupMatches(fmt, namedXf.projected, group);
+      !(group === 'alignment' && rawAlignmentHasAuthoredDifference(effectiveFormat, namedXf.raw)) &&
+      cellStyleGroupMatches(effectiveFormat, namedXf.projected, group);
     const currentMatch =
       currentRaw !== null &&
       currentProjected !== null &&
-      !(group === 'alignment' && rawAlignmentHasAuthoredDifference(fmt, currentRaw)) &&
-      cellStyleGroupMatches(fmt, currentProjected, group);
-    if (namedMatch) copyRawGroup(record, namedXf.raw, group);
+      !(group === 'alignment' && rawAlignmentHasAuthoredDifference(effectiveFormat, currentRaw)) &&
+      !(
+        group === 'protection' &&
+        formatHasGroupFields(fmt, 'protection') &&
+        currentRaw.hasProtection !== true
+      ) &&
+      cellStyleGroupMatches(effectiveFormat, currentProjected, group);
+    // An explicitly named style owns the groups it declares, so prefer its
+    // raw selectors. An unstyled cell still inherits Normal semantically, but
+    // its current XF may carry meaningful source metadata (apply flags,
+    // explicit defaults), which must survive an unrelated edit.
+    if (fmt.cellStyle !== undefined && namedMatch) copyRawGroup(record, namedXf.raw, group);
+    else if (!formatHasGroupFields(effectiveFormat, group) && currentRaw !== null)
+      copyRawGroup(record, currentRaw, group);
     else if (currentMatch) copyRawGroup(record, currentRaw, group);
+    else if (namedMatch && !formatHasGroupFields(effectiveFormat, group))
+      copyRawGroup(record, namedXf.raw, group);
   }
   const xfId = mappedXfId;
   return wb.addXfRecord(xfId === undefined ? record : { ...record, xfId });
@@ -561,8 +1194,21 @@ export function flushFormatToEngine(
   store: SpreadsheetStore,
   sheet: number,
   options?: EngineSyncOptions,
-): void {
+): boolean {
+  const sheetFontsOk = syncWholeSheetFontOverrides(wb, store, [sheet]);
+  if (options?.strict && !sheetFontsOk) {
+    throw strictSyncError('sheetFontStyles', `sheet:${sheet}`);
+  }
+  const axesOk = syncAxisFormatOverrides(wb, store, [sheet]);
+  if (options?.strict && !axesOk) {
+    throw strictSyncError('axisFormatStyles', `sheet:${sheet}`);
+  }
+  // Publish compact native row/column styles before sparse cell XFs. Axis
+  // application can clear dimension records and must therefore be complete
+  // before direct cells are written; strict callers also avoid a partial cell
+  // publication when an axis setter rejects the transaction.
   syncCellFormatsToEngine(wb, store, sheet, options);
   syncValidationsToEngine(wb, store, sheet, options);
   syncHyperlinksToEngine(wb, store, sheet, options);
+  return sheetFontsOk;
 }

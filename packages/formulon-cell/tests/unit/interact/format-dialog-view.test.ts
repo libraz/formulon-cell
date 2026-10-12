@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import { createFormatDialogView } from '../../../src/interact/format-dialog-view.js';
-import { FONT_FAMILIES, FONT_SIZES } from '../../../src/toolbar/ribbon-model.js';
+import { FONT_SIZES } from '../../../src/toolbar/ribbon-model.js';
 
 const en = dictionaries.en;
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -85,25 +85,110 @@ describe('interact/format-dialog-view', () => {
     expect(Array.from(datalist?.options ?? [], (option) => option.value)).toContain('Arial');
   });
 
-  it('uses the ribbon font collections and Japanese locale filtering in the Font tab', () => {
+  it('uses the curated Japanese values and keeps the Font tab list/datalist in sync', () => {
     const view = createFormatDialogView({
       host,
-      strings: en,
-      t: en.formatDialog,
+      strings: dictionaries.ja,
+      t: dictionaries.ja.formatDialog,
       fontLocale: 'ja',
     });
     const datalist = document.getElementById(
       view.familyInput.getAttribute('list') ?? '',
     ) as HTMLDataListElement;
-    expect(Array.from(datalist.options, (option) => option.value)).toEqual(
-      expect.arrayContaining(FONT_FAMILIES as unknown as string[]),
+    const datalistValues = Array.from(datalist.options, (option) => option.value);
+    const listValues = Array.from(
+      view.panel.querySelectorAll<HTMLButtonElement>('button[data-fc-font-family]'),
+      (button) => button.dataset.fcFontFamily,
     );
+    expect(datalistValues).toEqual(listValues);
+    expect(new Set(datalistValues).size).toBe(datalistValues.length);
+    expect(datalistValues).toContain('游ゴシック');
+    expect(datalistValues).not.toContain('游ゴシック Regular');
+    expect(
+      view.panel.querySelector<HTMLButtonElement>('button[data-fc-font-family="游ゴシック"]')
+        ?.textContent,
+    ).toContain('游ゴシック Regular');
+
+    view.syncFontFamilyOptions('Imported Font 14');
+    const retainedValues = Array.from(
+      view.panel.querySelectorAll<HTMLButtonElement>('button[data-fc-font-family]'),
+      (button) => button.dataset.fcFontFamily,
+    );
+    expect(retainedValues).toContain('Imported Font 14');
+    expect(Array.from(datalist.options, (option) => option.value)).toEqual(retainedValues);
     expect(
       Array.from(
         view.panel.querySelectorAll<HTMLButtonElement>('button[data-fc-font-size]'),
         (button) => Number(button.dataset.fcFontSize),
       ),
     ).toEqual([...FONT_SIZES]);
+  });
+
+  it('defers selected family and size reveal until the dialog and Font tab are visible', async () => {
+    const scrolled: Element[] = [];
+    const originalDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollIntoView',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value(this: Element) {
+        scrolled.push(this);
+      },
+    });
+
+    const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
+    try {
+      view.syncFontFamilyOptions('Imported Font 14');
+      view.syncFontSizeOptions(36);
+      expect(scrolled).toHaveLength(0);
+
+      const fontPanel = view.tabPanels.get('font');
+      if (!fontPanel) throw new Error('font panel missing');
+      view.overlay.hidden = false;
+      fontPanel.hidden = false;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      expect(scrolled).toEqual(
+        expect.arrayContaining([
+          view.panel.querySelector('[data-fc-font-family="Imported Font 14"]'),
+          view.panel.querySelector('[data-fc-font-size="36"]'),
+        ]),
+      );
+    } finally {
+      view.shell.dispose();
+      if (originalDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalDescriptor);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+      }
+    }
+  });
+
+  it('uses the caller ribbon font source for both Format Cells pickers', () => {
+    const custom = structuredClone(dictionaries.ja);
+    custom.ribbon.fontFamilies = ['Custom Corporate Font'];
+    const view = createFormatDialogView({
+      host,
+      strings: custom,
+      t: custom.formatDialog,
+      fontLocale: 'ja',
+    });
+    try {
+      const datalist = document.getElementById(
+        view.familyInput.getAttribute('list') ?? '',
+      ) as HTMLDataListElement;
+      const datalistValues = Array.from(datalist.options, (option) => option.value);
+      const listValues = Array.from(
+        view.panel.querySelectorAll<HTMLButtonElement>('button[data-fc-font-family]'),
+        (button) => button.dataset.fcFontFamily,
+      );
+      expect(datalistValues).toEqual(['Custom Corporate Font']);
+      expect(listValues).toEqual(datalistValues);
+      expect(listValues).not.toContain('游ゴシック');
+    } finally {
+      view.shell.dispose();
+    }
   });
 
   it('appends the overlay to document.body so it escapes `.fc-host` contain:strict / isolation:isolate', () => {
@@ -172,7 +257,13 @@ describe('interact/format-dialog-view', () => {
     ).toEqual([
       ['ja', '日本語'],
       ['en', 'English'],
+      ['de', 'Deutsch'],
+      ['fr', 'Français'],
+      ['zh', '简体中文'],
+      ['ko', '한국어'],
+      ['th', 'ไทย'],
     ]);
+    expect(view.localeSelect.disabled).toBe(true);
     expect(view.calendarSelect.dataset.fcSelect).toBe('calendarType');
     expect(Array.from(view.calendarSelect.options, (option) => option.value)).toEqual([
       'gregorian',

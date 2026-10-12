@@ -15,11 +15,18 @@ describe('normalizeR1C1Formula', () => {
   const base = { row: 3, col: 3 }; // D4
 
   it('converts relative, absolute, and same-axis R1C1 refs to A1 refs', () => {
-    expect(normalizeR1C1Formula('=R[-2]C[-2]+R1C1+RC[-1]', base)).toBe('=B2+A1+C4');
+    expect(normalizeR1C1Formula('=R[-2]C[-2]+R1C1+RC[-1]', base)).toBe('=B2+$A$1+C4');
   });
 
   it('converts R1C1 ranges atom-by-atom', () => {
     expect(normalizeR1C1Formula('=SUM(R[-2]C[-2]:R[-1]C[-1])', base)).toBe('=SUM(B2:C3)');
+  });
+
+  it('retains mixed anchors through display/edit and subsequent copy', () => {
+    const source = '=A1+$A$1+A$1+$A1+D4';
+    const edited = normalizeR1C1Formula(`${formatA1FormulaAsR1C1(source, base)}+1`, base);
+    expect(edited).toBe(`${source}+1`);
+    expect(shiftFormulaRefs(edited, 1, 1)).toBe('=B2+$A$1+B$1+$A2+E5+1');
   });
 
   it('does not rewrite R1C1-looking text inside strings or identifiers', () => {
@@ -149,6 +156,19 @@ describe('findActiveSignature', () => {
     expect(sig?.activeArgIndex).toBe(2);
   });
 
+  it('uses the active semicolon separator and resolves a localized alias', () => {
+    const text = '=SUMME(A1;IF(B1;C1;D1);';
+    const sig = findActiveSignature(text, text.length, {
+      listSeparator: ';',
+      resolveKnownName: (rawName) => (rawName === 'SUMME' ? 'SUM' : rawName.toUpperCase()),
+    });
+    expect(sig).toEqual({
+      name: 'SUM',
+      args: FUNCTION_SIGNATURES.SUM,
+      activeArgIndex: 2,
+    });
+  });
+
   it('ignores commas inside nested calls', () => {
     const text = '=SUMIF(A1:A10, ">5", SUM(B1, B2),';
     const sig = findActiveSignature(text, text.length);
@@ -258,6 +278,24 @@ describe('findFunctionCallAtCaret', () => {
     expect(text.slice(span?.call.start, span?.call.end)).toBe('=_xlfn.BETA.DIST (1)'.slice(1));
   });
 
+  it('keeps Unicode aliases and semicolon arguments in source-order spans', () => {
+    const text = '=合計(A1;"a,b";{1,2;3,4})';
+    const span = findFunctionCallAtCaret(
+      text,
+      text.indexOf('3'),
+      (rawName) => (rawName === '合計' ? 'SUM' : null),
+      ';',
+    );
+    expect(span?.rawName).toBe('合計');
+    expect(span?.canonicalName).toBe('SUM');
+    expect(span?.argumentSpans.map(({ start, end }) => text.slice(start, end))).toEqual([
+      'A1',
+      '"a,b"',
+      '{1,2;3,4}',
+    ]);
+    expect(span?.activeArgumentIndex).toBe(2);
+  });
+
   it('keeps emoji prefixes in UTF-16 offsets and preserves the source text', () => {
     const text = '="😀"+SUM(A1)';
     const span = findFunctionCallAtCaret(text, text.indexOf('A1') + 1, resolve);
@@ -362,6 +400,15 @@ describe('dblClickRange', () => {
     expect(dblClickRange('=SUM(F4:F8)', 2)).toEqual({ start: 1, end: 4 });
   });
 
+  it('selects Unicode function aliases as one name', () => {
+    const text = '=合計(1;2)';
+    const start = text.indexOf('合');
+    expect(dblClickRange(text, start + 1, ';')).toEqual({
+      start,
+      end: start + '合計'.length,
+    });
+  });
+
   it('selects a whole range argument rather than splitting at the colon', () => {
     const text = '=SUM(F4:F8)';
     expect(dblClickRange(text, 7)).toEqual({ start: 5, end: 10 });
@@ -372,6 +419,14 @@ describe('dblClickRange', () => {
     const text = '=IF(A1>0, B7, C9)';
     const r = dblClickRange(text, 11); // probe on "B7"
     expect(text.slice(r?.start, r?.end)).toBe('B7');
+  });
+
+  it('selects the argument between semicolons without splitting an array', () => {
+    const text = '=SUMME({1;2};B1;C1)';
+    expect(dblClickRange(text, text.indexOf('B1'), ';')).toEqual({
+      start: text.indexOf('B1'),
+      end: text.indexOf('B1') + 2,
+    });
   });
 
   it('trims surrounding whitespace from the argument', () => {
@@ -390,6 +445,20 @@ describe('dblClickRange', () => {
     const r = dblClickRange(text, 10); // probe inside "a, b"
     expect(text.slice(r?.start, r?.end)).toBe('"a, b"');
   });
+
+  it('does not split quoted sheet names at the active separator or delimiters', () => {
+    const text = "=SUMME('A;(B)'!A1;2)";
+    const r = dblClickRange(text, text.indexOf('A1'), ';');
+    expect(text.slice(r?.start, r?.end)).toBe("'A;(B)'!A1");
+  });
+
+  it.each(["=SUMME(Table1[Sales']];2)", "=SUMME(Table1['#OfItems];2)"])(
+    'keeps escaped structured-reference apostrophes from swallowing the next argument: %s',
+    (text) => {
+      const r = dblClickRange(text, text.lastIndexOf('2'), ';');
+      expect(text.slice(r?.start, r?.end)).toBe('2');
+    },
+  );
 
   it('returns null at the top level so native word selection wins', () => {
     expect(dblClickRange('=A1+B2', 2)).toBeNull();

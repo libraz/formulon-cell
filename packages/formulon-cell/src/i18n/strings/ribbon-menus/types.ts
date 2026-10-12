@@ -55,6 +55,9 @@ export interface RibbonMenusStrings {
     themePaper: string;
     themeInk: string;
     themeContrast: string;
+    themeWorkbookOffice: string;
+    themeWorkbookGray: string;
+    themeWorkbookUnavailable: string;
     fill: string;
     fillDown: string;
     fillRight: string;
@@ -104,6 +107,7 @@ export interface RibbonMenusStrings {
     linkClear: string;
     linkExternalLinks: string;
     linkNoHyperlink: string;
+    linkUnsupportedTarget: string;
     definedNameMutationUnavailable: string;
     findSelect: string;
     find: string;
@@ -118,6 +122,7 @@ export interface RibbonMenusStrings {
     objectSelect: string;
     selectionPane: string;
     findNoMatches: string;
+    commentThread: string;
     commentDelete: string;
     commentDeleteAll: string;
     commentNone: string;
@@ -191,6 +196,7 @@ export interface RibbonMenusStrings {
     arrangeSendToBack: string;
     arrangeSelectionPane: string;
     arrangeRequiresObject: string;
+    arrangeNativeUnsupported: string;
     arrangeAtFront: string;
     arrangeAtBack: string;
     underlineSingle: string;

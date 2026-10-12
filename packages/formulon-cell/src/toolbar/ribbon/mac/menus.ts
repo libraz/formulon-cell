@@ -1,11 +1,14 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import {
   type CatalogFunctionCategory,
+  type CatalogLocaleOrdinal,
   type FunctionCatalogReader,
   isFunctionUnavailableForInsertion,
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
 import { getRecentFunctions } from '../../../commands/function-history.js';
+import type { Locale } from '../../../i18n/strings.js';
+import { catalogLocaleOrdinal, catalogLocaleTag } from '../../../interact/function-catalog-text.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
 import type { SpreadsheetStore } from '../../../store/store.js';
 import { focusMenuItem, prepareMenu, projectDisabledState } from '../../menu-a11y.js';
@@ -17,6 +20,8 @@ import {
   visualMenuGrid,
   visualMenuTile,
 } from '../menus/general.js';
+import { macFunctionCategoryLabel } from './labels.js';
+import { localizedFunctionName, MAC_CONTEXT_LABELS } from './labels-data.js';
 import {
   MAC_FORMULAS_MORE_MENU_ID,
   MAC_RIBBON_MENU_ITEMS,
@@ -32,24 +37,29 @@ type LiveFunctionNames = ReadonlySet<string> | readonly string[] | null | undefi
 
 export interface MacFunctionAvailabilityContext {
   /** The live workbook reader, supplied only when functionNames() was live. */
-  reader?: FunctionCatalogReader | null;
+  reader?: LocalizedFunctionCatalogReader | null;
   /** Localized reason shown on intrinsic unavailable leaves. */
   unavailableReason?: string;
 }
 
+type LocalizedFunctionCatalogReader = FunctionCatalogReader & {
+  canonicalizeFunctionName?: (name: string, locale: CatalogLocaleOrdinal) => string | null;
+  localizeFunctionName?: (name: string, locale: CatalogLocaleOrdinal) => string | null;
+};
+
 type ReaderAvailabilityCache = {
   id: number;
-  byLocale: Map<0 | 1, Map<string, number | undefined>>;
+  /** Cache by BCP-47 tag so zh/ko/th do not collapse into the en ordinal. */
+  byLocale: Map<string, Map<string, number | undefined>>;
+  displayByLocale: Map<string, Map<string, string | undefined>>;
 };
 
 const readerAvailabilityCache = new WeakMap<object, ReaderAvailabilityCache>();
 let nextReaderAvailabilityId = 1;
 
 /** Fallback tooltip for a function leaf the live engine cannot insert. */
-export const defaultFunctionUnavailableReason = (lang: 'en' | 'ja'): string =>
-  lang === 'ja'
-    ? 'この関数は現在の計算エンジンでは使用できません。'
-    : 'This function is unavailable in the current calculation engine.';
+export const defaultFunctionUnavailableReason = (lang: Locale): string =>
+  MAC_CONTEXT_LABELS.functionUnavailable[lang];
 
 const readerCacheFor = (reader: FunctionCatalogReader): ReaderAvailabilityCache => {
   const key = reader as object;
@@ -58,6 +68,7 @@ const readerCacheFor = (reader: FunctionCatalogReader): ReaderAvailabilityCache 
   const created: ReaderAvailabilityCache = {
     id: nextReaderAvailabilityId++,
     byLocale: new Map(),
+    displayByLocale: new Map(),
   };
   readerAvailabilityCache.set(key, created);
   return created;
@@ -68,36 +79,42 @@ const readerIdFor = (reader: FunctionCatalogReader | null | undefined): string =
 
 const functionAvailabilityFor = (
   reader: FunctionCatalogReader | null | undefined,
-  lang: 'en' | 'ja',
+  lang: Locale,
   name: string,
 ): number | undefined => {
-  if (!reader?.functionMetadata) return undefined;
+  if (!reader?.functionMetadata && !reader?.functionMetadataForLocale) return undefined;
   const cache = readerCacheFor(reader);
-  const locale: 0 | 1 = lang === 'ja' ? 1 : 0;
-  let byName = cache.byLocale.get(locale);
+  const localeTag = catalogLocaleTag(lang);
+  const localeOrdinal = catalogLocaleOrdinal(lang);
+  let byName = cache.byLocale.get(localeTag);
   if (!byName) {
     byName = new Map();
-    cache.byLocale.set(locale, byName);
+    cache.byLocale.set(localeTag, byName);
   }
   if (byName.has(name)) return byName.get(name);
-  const value = reader.functionMetadata(name, locale)?.availability;
+  const metadata =
+    reader.functionMetadataForLocale?.(name, localeTag) ??
+    reader.functionMetadata?.(name, localeOrdinal) ??
+    null;
+  const value = metadata?.availability;
   byName.set(name, value);
   return value;
 };
 
 const functionAvailabilitySignature = (
   context: MacFunctionAvailabilityContext | undefined,
-  lang: 'en' | 'ja',
+  lang: Locale,
 ): string => `${readerIdFor(context?.reader)}:${lang}`;
 
 const projectFunctionButtonState = (
   button: HTMLButtonElement,
   name: string,
   store: SpreadsheetStore,
-  lang: 'en' | 'ja',
+  lang: Locale,
   context: MacFunctionAvailabilityContext | undefined,
 ): void => {
   const availability = functionAvailabilityFor(context?.reader, lang, name);
+  const displayName = functionDisplayName(context?.reader, lang, name);
   const unavailable = isFunctionUnavailableForInsertion(availability);
   const reason = context?.unavailableReason ?? defaultFunctionUnavailableReason(lang);
   const decision = canExecuteBuiltIn(store, `mac.function.${name}`, 'ribbon');
@@ -108,13 +125,13 @@ const projectFunctionButtonState = (
       : (decision.reason ?? decision.code);
   projectDisabledState(button, unavailable || !decision.allowed, disabledReason, {
     datasetKey: 'ribbonDisabledReason',
-    titlePrefix: name,
+    titlePrefix: displayName,
   });
   if (unavailable) {
     button.dataset.functionUnavailable = 'true';
     button.setAttribute('aria-description', reason);
     button.dataset.ribbonDisabledReason = reason;
-    button.title = `${name}\n${reason}`;
+    button.title = `${displayName}\n${reason}`;
   } else {
     delete button.dataset.functionUnavailable;
   }
@@ -131,16 +148,15 @@ const functionCategoryMenuIds: Readonly<Record<string, CatalogFunctionCategory>>
 
 type MacMoreFunctionCategory = {
   category: CatalogFunctionCategory;
-  label: { en: string; ja: string };
 };
 
 const MORE_FUNCTION_CATEGORIES: readonly MacMoreFunctionCategory[] = [
-  { category: 'statistical', label: { en: 'Statistical', ja: '統計' } },
-  { category: 'engineering', label: { en: 'Engineering', ja: 'エンジニアリング' } },
-  { category: 'cube', label: { en: 'Cube', ja: 'キューブ' } },
-  { category: 'information', label: { en: 'Information', ja: '情報' } },
-  { category: 'compatibility', label: { en: 'Compatibility', ja: '互換性' } },
-  { category: 'web', label: { en: 'Web', ja: 'Web' } },
+  { category: 'statistical' },
+  { category: 'engineering' },
+  { category: 'cube' },
+  { category: 'information' },
+  { category: 'compatibility' },
+  { category: 'web' },
 ];
 
 const moreFunctionPanelId = (category: CatalogFunctionCategory): string =>
@@ -154,7 +170,60 @@ const liveNameSet = (names: LiveFunctionNames): ReadonlySet<string> | undefined 
 const liveNameSignature = (names: ReadonlySet<string> | undefined): string =>
   names === undefined ? 'static' : [...names].sort().join(',');
 
-const menuLabel = (commandId: string, lang: 'ja' | 'en'): string =>
+const canonicalFunctionName = (
+  reader: LocalizedFunctionCatalogReader | null | undefined,
+  lang: Locale,
+  name: string,
+): string => {
+  const normalized = name.trim().toUpperCase();
+  const canonical = reader?.canonicalizeFunctionName?.(normalized, catalogLocaleOrdinal(lang));
+  return canonical?.trim().toUpperCase() || normalized;
+};
+
+const canonicalLiveNameSet = (
+  names: ReadonlySet<string> | undefined,
+  lang: Locale,
+  reader: LocalizedFunctionCatalogReader | null | undefined,
+): ReadonlySet<string> | undefined => {
+  if (names === undefined) return undefined;
+  return new Set([...names].map((name) => canonicalFunctionName(reader, lang, name)));
+};
+
+const functionDisplayName = (
+  reader: LocalizedFunctionCatalogReader | null | undefined,
+  lang: Locale,
+  canonicalName: string,
+): string => {
+  const localeTag = catalogLocaleTag(lang);
+  const localeOrdinal = catalogLocaleOrdinal(lang);
+  if (reader?.functionMetadata || reader?.functionMetadataForLocale) {
+    const cache = readerCacheFor(reader);
+    let byName = cache.displayByLocale.get(localeTag);
+    if (!byName) {
+      byName = new Map();
+      cache.displayByLocale.set(localeTag, byName);
+    }
+    if (byName.has(canonicalName)) return byName.get(canonicalName) ?? canonicalName;
+    const metadata =
+      reader.functionMetadataForLocale?.(canonicalName, localeTag) ??
+      reader.functionMetadata?.(canonicalName, localeOrdinal) ??
+      null;
+    const metadataName = metadata?.localizedName?.trim();
+    if (metadataName) {
+      byName.set(canonicalName, metadataName);
+      return metadataName;
+    }
+    const localized = reader.localizeFunctionName?.(canonicalName, localeOrdinal)?.trim();
+    if (localized) {
+      byName.set(canonicalName, localized);
+      return localized;
+    }
+    byName.set(canonicalName, undefined);
+  }
+  return localizedFunctionName(canonicalName, lang);
+};
+
+const menuLabel = (commandId: string, lang: Locale): string =>
   macRibbonLabelForCommand(commandId, lang);
 
 const CHART_ICONS: Readonly<Record<string, VisualTileIconSlug>> = {
@@ -177,10 +246,20 @@ const SHAPE_ICONS: Readonly<Record<string, VisualTileIconSlug>> = {
 
 const menuItemButton = (
   item: MacRibbonMenuItem,
-  lang: 'ja' | 'en',
+  lang: Locale,
   visual = false,
+  displayName?: string,
 ): HTMLButtonElement => {
-  const label = item.labelJa && lang === 'ja' ? item.labelJa : item.label;
+  const functionName = item.id.startsWith('mac.function.')
+    ? item.id.slice('mac.function.'.length)
+    : null;
+  const localized =
+    displayName ??
+    (functionName
+      ? functionDisplayName(undefined, lang, functionName)
+      : macRibbonLabelForCommand(item.id, lang));
+  const label =
+    localized === item.id ? (item.labelJa && lang === 'ja' ? item.labelJa : item.label) : localized;
   const icon = CHART_ICONS[item.id] ?? SHAPE_ICONS[item.icon ?? ''];
   const button =
     visual && icon
@@ -210,15 +289,15 @@ const menuItemButton = (
   return button;
 };
 
-const createMoreFunctionsMenu = (lang: 'ja' | 'en'): HTMLDivElement => {
+const createMoreFunctionsMenu = (lang: Locale): HTMLDivElement => {
   const menu = document.createElement('div');
   menu.className = 'fc-tb__menu fc-tb__menu--mac fc-tb__menu--mac-more';
   menu.id = MAC_FORMULAS_MORE_MENU_ID;
   menu.hidden = true;
   prepareMenu(menu, macRibbonLabelForCommand('mac.formulas.more', lang));
 
-  for (const { category, label } of MORE_FUNCTION_CATEGORIES) {
-    const localizedLabel = label[lang];
+  for (const { category } of MORE_FUNCTION_CATEGORIES) {
+    const localizedLabel = macFunctionCategoryLabel(category, lang);
     const panelId = moreFunctionPanelId(category);
     const trigger = createRibbonButton({
       className: 'fc-tb__menu-item fc-tb__menu-item--mac',
@@ -250,7 +329,7 @@ const createMoreFunctionsMenu = (lang: 'ja' | 'en'): HTMLDivElement => {
  *  profile. Menu leaves deliberately use the same command attribute as top
  *  level buttons so toolbar delegation, keyboard focus restoration, and
  *  restricted-embedding checks remain shared. */
-export const createMacRibbonMenuFactory = (lang: 'ja' | 'en'): MacRibbonMenuFactory => {
+export const createMacRibbonMenuFactory = (lang: Locale): MacRibbonMenuFactory => {
   return (commandId: string): HTMLDivElement | null => {
     if (commandId === 'mac.formulas.more') return createMoreFunctionsMenu(lang);
     const items = MAC_RIBBON_MENU_ITEMS[commandId];
@@ -286,7 +365,7 @@ export const createMacRibbonMenuFactory = (lang: 'ja' | 'en'): MacRibbonMenuFact
 };
 
 export const createMacRibbonMenus = (
-  lang: 'ja' | 'en',
+  lang: Locale,
 ): Readonly<Record<string, MacRibbonMenuFactory>> => {
   const factory = createMacRibbonMenuFactory(lang);
   return Object.fromEntries(
@@ -298,14 +377,15 @@ export const createMacRibbonMenus = (
 export const projectMacRecentMenu = (
   host: HTMLElement,
   store: SpreadsheetStore,
-  lang: 'en' | 'ja',
+  lang: Locale,
   liveNames?: LiveFunctionNames,
   availabilityContext?: MacFunctionAvailabilityContext,
 ): void => {
   const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-recent');
   if (!menu) return;
-  const names = getRecentFunctions(store, liveNameSet(liveNames));
-  const signature = `${lang}:${liveNameSignature(liveNameSet(liveNames))}:${functionAvailabilitySignature(availabilityContext, lang)}:${names.join(',')}`;
+  const liveSet = canonicalLiveNameSet(liveNameSet(liveNames), lang, availabilityContext?.reader);
+  const names = getRecentFunctions(store, liveSet);
+  const signature = `${lang}:${liveNameSignature(liveSet)}:${functionAvailabilitySignature(availabilityContext, lang)}:${names.join(',')}`;
   const rebuild = menu.dataset.recentFunctions !== signature;
   const focused =
     rebuild && menu.contains(menu.ownerDocument.activeElement)
@@ -315,7 +395,21 @@ export const projectMacRecentMenu = (
     ...names.map((name) => ({ id: `mac.function.${name}`, label: name })),
     ...(MAC_RIBBON_MENU_ITEMS['mac.formulas.recent'] ?? []),
   ];
-  if (rebuild) menu.replaceChildren(...items.map((item) => menuItemButton(item, lang)));
+  if (rebuild) {
+    menu.replaceChildren(
+      ...items.map((item) => {
+        const name = item.id.startsWith('mac.function.')
+          ? item.id.slice('mac.function.'.length)
+          : undefined;
+        return menuItemButton(
+          item,
+          lang,
+          false,
+          name ? functionDisplayName(availabilityContext?.reader, lang, name) : undefined,
+        );
+      }),
+    );
+  }
   const buttons = Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]'));
   for (const button of buttons) {
     const name = button.dataset.ribbonCommand?.replace(/^mac\.function\./, '');
@@ -349,7 +443,7 @@ const projectFunctionCategoryMenu = (
   menu: HTMLElement,
   category: CatalogFunctionCategory,
   store: SpreadsheetStore,
-  lang: 'en' | 'ja',
+  lang: Locale,
   liveSet: ReadonlySet<string> | undefined,
   liveSignature: string,
   availabilityContext: MacFunctionAvailabilityContext | undefined,
@@ -368,7 +462,17 @@ const projectFunctionCategoryMenu = (
     }),
   );
   if (rebuild) {
-    menu.replaceChildren(...items.map((item) => menuItemButton(item, lang)));
+    menu.replaceChildren(
+      ...items.map((item) => {
+        const name = item.id.slice('mac.function.'.length);
+        return menuItemButton(
+          item,
+          lang,
+          false,
+          functionDisplayName(availabilityContext?.reader, lang, name),
+        );
+      }),
+    );
     prepareMenu(menu, menu.getAttribute('aria-label') ?? undefined);
   }
   for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
@@ -390,11 +494,11 @@ const projectFunctionCategoryMenu = (
 export const projectMacFunctionCategoryMenus = (
   host: HTMLElement,
   store: SpreadsheetStore,
-  lang: 'en' | 'ja',
+  lang: Locale,
   liveNames?: LiveFunctionNames,
   availabilityContext?: MacFunctionAvailabilityContext,
 ): void => {
-  const liveSet = liveNameSet(liveNames);
+  const liveSet = canonicalLiveNameSet(liveNameSet(liveNames), lang, availabilityContext?.reader);
   const liveSignature = liveNameSignature(liveSet);
   for (const [commandId, category] of Object.entries(functionCategoryMenuIds)) {
     const menuId = macRibbonMenuIdForCommand(commandId);
@@ -433,7 +537,7 @@ export const projectMacFunctionCategoryMenus = (
 export const projectMacFunctionMenus = (
   host: HTMLElement,
   instance: SpreadsheetInstance,
-  lang: 'en' | 'ja',
+  lang: Locale,
 ): void => {
   const reportedNames =
     typeof instance.workbook.functionNames === 'function'
@@ -442,7 +546,9 @@ export const projectMacFunctionMenus = (
   const liveNames = reportedNames === null ? null : new Set(reportedNames);
   const availabilityContext = {
     reader:
-      reportedNames === null ? undefined : (instance.workbook as unknown as FunctionCatalogReader),
+      reportedNames === null
+        ? undefined
+        : (instance.workbook as unknown as LocalizedFunctionCatalogReader),
     unavailableReason:
       instance.i18n.strings.fxDialog.functionUnavailable ?? defaultFunctionUnavailableReason(lang),
   };

@@ -62,7 +62,15 @@ export const createPageLayoutMenuFactories = (
         icon: 'theme-contrast',
       },
     ]);
-    menu.append(grid);
+    // The three tiles above are the host's paper/ink/contrast chrome themes.
+    // Workbook themes are separate actions: they edit the OOXML clrScheme
+    // and typefaces and therefore follow the file when it is saved.
+    menu.append(
+      grid,
+      menuSeparator(),
+      menuIconButton(t.themeWorkbookOffice, 'workbookThemeAction', 'office', 'table-style-new'),
+      menuIconButton(t.themeWorkbookGray, 'workbookThemeAction', 'gray', 'format-dialog'),
+    );
     return menu;
   };
 

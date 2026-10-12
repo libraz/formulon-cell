@@ -1,7 +1,7 @@
 import type { History } from '../commands/history.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import { addrKey } from '../engine/address.js';
-import type { Range } from '../engine/types.js';
+import type { Addr, Range } from '../engine/types.js';
 import { hitTest, layoutForView } from '../render/geometry.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
@@ -9,6 +9,10 @@ import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store
 export interface FormatPainterDeps {
   host: HTMLElement;
   store: SpreadsheetStore;
+  /** Optional display/effective format projection. When present, inherited
+   *  row, column, and sheet formatting is captured without materializing it
+   *  into the source store. */
+  formatResolver?: (addr: Addr) => Partial<CellFormat> | null | undefined;
   /** Optional shared history. When provided, paint operations push a single
    *  format-snapshot entry per paste so Cmd+Z reverts the painted formats. */
   history?: History | null;
@@ -78,8 +82,19 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     for (let dr = 0; dr < rows; dr += 1) {
       const row: (CellFormat | undefined)[] = [];
       for (let dc = 0; dc < cols; dc += 1) {
-        const f = s.format.formats.get(addrKey({ sheet, row: r.r0 + dr, col: r.c0 + dc }));
-        row.push(f ? { ...f, borders: f.borders ? { ...f.borders } : undefined } : undefined);
+        const addr = { sheet, row: r.r0 + dr, col: r.c0 + dc };
+        const f = deps.formatResolver
+          ? deps.formatResolver(addr)
+          : s.format.formats.get(addrKey(addr));
+        row.push(
+          f
+            ? {
+                ...f,
+                borders: f.borders ? { ...f.borders } : undefined,
+                phonetic: f.phonetic?.map((run) => ({ ...run })),
+              }
+            : undefined,
+        );
       }
       pattern.push(row);
     }

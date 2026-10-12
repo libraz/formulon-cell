@@ -6,6 +6,7 @@ import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachFindReplace } from '../../../src/interact/find-replace.js';
+import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -160,28 +161,25 @@ describe('attachFindReplace', () => {
     handle.detach();
   });
 
-  it('projects the Look in disabled reason on the Replace tab', () => {
+  it('keeps Values as the replacement default while allowing Formula mode', () => {
     const handle = attachFindReplace({ host, store, wb, strings: en });
     handle.open('replace');
     $<HTMLButtonElement>(host, '.fc-find__options-btn').click();
     const lookIn = $<HTMLSelectElement>(host, '#fc-find-look-in');
-    expect(lookIn.disabled).toBe(true);
-    expect(lookIn.value).toBe('formulas');
-    expect(lookIn.dataset.disabledReason).toBe(en.findReplace.lookInRequiresFindTab);
-    expect(lookIn.getAttribute('aria-description')).toBe(en.findReplace.lookInRequiresFindTab);
-    expect(lookIn.title).toBe(`${en.findReplace.lookIn}\n${en.findReplace.lookInRequiresFindTab}`);
-    expect(host.querySelector<HTMLLabelElement>('label[for="fc-find-look-in"]')?.title).toBe(
-      `${en.findReplace.lookIn}\n${en.findReplace.lookInRequiresFindTab}`,
-    );
-
-    $<HTMLButtonElement>(host, '.fc-find__tab').click();
     expect(lookIn.disabled).toBe(false);
+    expect(lookIn.value).toBe('values');
     expect(lookIn.dataset.disabledReason).toBeUndefined();
     expect(lookIn.hasAttribute('aria-description')).toBe(false);
     expect(lookIn.title).toBe(en.findReplace.lookIn);
     expect(host.querySelector<HTMLLabelElement>('label[for="fc-find-look-in"]')?.title).toBe(
       en.findReplace.lookIn,
     );
+
+    lookIn.value = 'formulas';
+    lookIn.dispatchEvent(new Event('change', { bubbles: true }));
+    $<HTMLButtonElement>(host, '.fc-find__tab').click();
+    expect(lookIn.disabled).toBe(false);
+    expect(lookIn.value).toBe('formulas');
     handle.detach();
   });
 
@@ -200,6 +198,48 @@ describe('attachFindReplace', () => {
     rows[1]?.click();
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 2 });
     handle.detach();
+  });
+
+  it('renders and replaces a workbook-scoped inactive formula under navigation restriction', () => {
+    const otherSheet = wb.addSheet('Other');
+    const addr = { sheet: otherSheet, row: 0, col: 0 };
+    wb.setFormula(addr, '=SUM(1,2)');
+    wb.recalc();
+    store.setState((state) => ({
+      ...state,
+      data: { ...state.data, sheetIndex: otherSheet },
+      selection: {
+        ...state.selection,
+        active: addr,
+        anchor: addr,
+        range: { sheet: otherSheet, r0: 0, c0: 0, r1: 0, c1: 0 },
+      },
+    }));
+    const navigation = attachNavigationPolicy(store, () => wb, {
+      selectable: [{ sheet: otherSheet, r0: 0, c0: 0, r1: 0, c1: 0 }],
+    });
+    const handle = attachFindReplace({ host, store, wb });
+    handle.open();
+    $<HTMLButtonElement>(host, '.fc-find__options-btn').click();
+    const within = $<HTMLSelectElement>(host, '#fc-find-within');
+    within.value = 'workbook';
+    within.dispatchEvent(new Event('change', { bubbles: true }));
+    const lookIn = $<HTMLSelectElement>(host, '#fc-find-look-in');
+    lookIn.value = 'formulas';
+    lookIn.dispatchEvent(new Event('change', { bubbles: true }));
+    setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'SUM');
+    $<HTMLButtonElement>(host, '.fc-find__btn--find-all').click();
+    const row = $<HTMLTableRowElement>(host, '.fc-find__results tbody tr');
+    expect(row.textContent).toContain('=SUM(1,2)');
+
+    $<HTMLButtonElement>(host, '.fc-find__tab:nth-of-type(2)').click();
+    setInputValue($<HTMLInputElement>(host, '#fc-find-replace-input'), 'AVERAGE');
+    $<HTMLButtonElement>(host, '.fc-find__btn--replace-all').click();
+    expect(wb.cellFormula(addr)).toBe('=AVERAGE(1,2)');
+    expect($<HTMLElement>(host, '.fc-find__pill').textContent).toContain('1');
+
+    handle.detach();
+    navigation.dispose();
   });
 
   it('Enter steps to the next match and updates the active cell + pill index', () => {

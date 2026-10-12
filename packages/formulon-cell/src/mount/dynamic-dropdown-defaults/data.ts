@@ -1,5 +1,10 @@
-import { cellValueViolatesValidation } from '../../commands/validate.js';
+import {
+  circleInvalidValidationData,
+  recordValidationCirclesChange,
+} from '../../commands/error-indicators.js';
+import { circleInvalidValidationDataWithEngine } from '../../commands/validate.js';
 import { parseAddrKey } from '../../engine/address.js';
+import { makeRangeResolver } from '../../engine/range-resolver.js';
 import {
   clearValidationInRangeWithEngine,
   mutators,
@@ -113,17 +118,22 @@ const buildDataValidationAction =
       return;
     }
     if (action !== 'circle-invalid') return;
-    const state = instance.store.getState();
     const range = normalizedSelectionRange(instance);
-    const invalid = new Set<string>();
-    for (const [key, format] of state.format.formats) {
-      if (!format.validation) continue;
-      const addr = parseAddrKey(key);
-      if (!addr || !rangeContainsAddr(range, addr)) continue;
-      const value = instance.workbook.getValue(addr);
-      if (cellValueViolatesValidation(value, format.validation)) invalid.add(key);
-    }
-    mutators.setValidationCircles(instance.store, invalid);
+    recordValidationCirclesChange(instance.history, instance.store, () => {
+      const nativeCount = circleInvalidValidationDataWithEngine(
+        instance.store,
+        instance.workbook,
+        range.sheet,
+        range,
+      );
+      if (nativeCount === null) {
+        circleInvalidValidationData(
+          instance.store,
+          range,
+          makeRangeResolver(instance.workbook, range.sheet),
+        );
+      }
+    });
     instance.host.focus();
   };
 

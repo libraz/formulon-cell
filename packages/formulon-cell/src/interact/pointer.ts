@@ -779,7 +779,7 @@ export function attachPointer(
     const s = store.getState();
     const sheet = s.data.sheetIndex;
     if (handle.kind === 'printArea') {
-      const pagination = paginationFor(s, sheet);
+      const pagination = paginationFor(s, sheet, { engine: wb });
       const origin = handle.axis === 'row' ? pagination.origin.row : pagination.origin.col;
       if (target < origin) return;
       resizePrintArea(store, sheet, handle.axis, target, pagination.content, history);

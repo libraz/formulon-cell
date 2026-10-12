@@ -23,9 +23,21 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
     expect(wb.setRowHeight(0, 0, 24)).toBe(false);
   });
 
+  it('clearRowHeight no-ops on stub', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    expect(wb.capabilities.rowHeightClear).toBe(false);
+    expect(wb.clearRowHeight(0, 0)).toBe(false);
+  });
+
   it('getColumnLayouts returns [] on stub', async () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     expect(wb.getColumnLayouts(0)).toEqual([]);
+  });
+
+  it('getSheetDefaultLayoutPx returns null on stub', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    expect(wb.capabilities.geometry).toBe(false);
+    expect(wb.getSheetDefaultLayoutPx(0)).toBeNull();
   });
 
   it('setSheetFreeze no-ops on stub', async () => {
@@ -54,6 +66,36 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
   it('selects a locale-appropriate default font for a new workbook', () => {
     expect(defaultFontForLocale('ja-JP')).toEqual({ name: '游ゴシック', size: 11 });
     expect(defaultFontForLocale('en-US')).toEqual({ name: 'Calibri', size: 11 });
+  });
+
+  it('projects a literal workbook display font in native point units', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'en-US' });
+    try {
+      expect(wb.setWorkbookDefaultFont({ name: 'Aptos', size: 12 })).toBe(true);
+      expect(wb.workbookDisplayFont).toEqual({ name: 'Aptos', size: 12 });
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('resolves a theme-linked workbook display font without changing its raw scheme', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'en-US' });
+    try {
+      const before = wb.getFontRecord(0);
+      expect(before).not.toBeNull();
+      expect(wb.setWorkbookDefaultFont({ name: before?.name, size: 12, scheme: 2 })).toBe(true);
+      const resolved = wb.getResolvedFontRecord(0);
+      expect(resolved).not.toBeNull();
+      expect(wb.workbookDisplayFont).toEqual({ name: resolved?.name, size: resolved?.size });
+      expect(wb.getFontRecord(0)?.scheme).toBe(2);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('uses the locale fallback as display font on the stub engine', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true, locale: 'ja-JP' });
+    expect(wb.workbookDisplayFont).toEqual({ name: '游ゴシック', size: 11 });
   });
 
   it('setSheetVisibility no-ops on stub', async () => {

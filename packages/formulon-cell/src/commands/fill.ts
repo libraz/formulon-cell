@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { excelSerialFromDate, excelSerialToDate } from '../format/date-serial.js';
 import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
@@ -233,14 +234,10 @@ type ProjectedCell =
  */
 type DateFillUnit = 'days' | 'weekdays' | 'months' | 'years';
 
-const MS_PER_DAY = 86_400_000;
-const SERIAL_UNIX_EPOCH = 25569;
-
-const serialToDate = (serial: number): Date =>
-  new Date((Math.floor(serial) - SERIAL_UNIX_EPOCH) * MS_PER_DAY);
+const serialToDate = (serial: number): Date => excelSerialToDate(serial) ?? new Date(Number.NaN);
 
 const dateToSerial = (date: Date, fraction: number): number =>
-  Math.floor(date.getTime() / MS_PER_DAY + SERIAL_UNIX_EPOCH) + fraction;
+  Math.floor(excelSerialFromDate(date) ?? Number.NaN) + fraction;
 
 const daysInMonth = (year: number, month: number): number =>
   new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
@@ -275,14 +272,13 @@ function buildDateProjection(line: SourceCell[], unit: DateFillUnit): SeriesProj
   const lastDate = serialToDate(last);
   return {
     at: (i) => {
+      if (unit === 'days') return { kind: 'number', value: last + i };
       const date =
-        unit === 'days'
-          ? new Date(lastDate.getTime() + i * MS_PER_DAY)
-          : unit === 'weekdays'
-            ? addWeekdays(lastDate, i)
-            : unit === 'months'
-              ? addMonthsClamped(lastDate, i)
-              : addMonthsClamped(lastDate, i * 12);
+        unit === 'weekdays'
+          ? addWeekdays(lastDate, i)
+          : unit === 'months'
+            ? addMonthsClamped(lastDate, i)
+            : addMonthsClamped(lastDate, i * 12);
       return { kind: 'number', value: dateToSerial(date, fraction) };
     },
   };

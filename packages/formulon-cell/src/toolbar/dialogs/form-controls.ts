@@ -3,6 +3,11 @@ export interface DialogSelectOption {
   label: string;
 }
 
+export interface DialogDatalistOption {
+  value: string;
+  label?: string;
+}
+
 export interface DialogSelectOptions {
   className?: string;
   fieldName?: string;
@@ -24,11 +29,16 @@ export const appendDialogSelectOptions = (
 
 export const appendDialogDatalistOptions = (
   datalist: HTMLDataListElement,
-  values: readonly string[],
+  values: readonly (string | DialogDatalistOption)[],
 ): void => {
-  for (const value of values) {
+  for (const entry of values) {
     const opt = document.createElement('option');
-    opt.value = value;
+    if (typeof entry === 'string') {
+      opt.value = entry;
+    } else {
+      opt.value = entry.value;
+      if (entry.label !== undefined) opt.label = entry.label;
+    }
     datalist.appendChild(opt);
   }
 };

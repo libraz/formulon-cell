@@ -7,6 +7,7 @@ import { recordSlicersChange } from '../../../src/commands/slice-history.js';
 import type { CellValue } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachSlicer } from '../../../src/interact/slicer.js';
 import {
   createSpreadsheetStore,
@@ -172,6 +173,25 @@ describe('attachSlicer', () => {
     expect(chips[0]?.getAttribute('aria-selected')).toBe('true');
     expect(chips[0]?.tabIndex).toBe(0);
     expect(chips[1]?.tabIndex).toBe(-1);
+    handle.detach();
+  });
+
+  it('localizes the blank chip while preserving its empty filter key', () => {
+    seedCell(store, 0, 4, 0, { kind: 'blank' });
+    const blankWb = makeFakeWb({
+      name: 'Sales',
+      ref: 'A1:A5',
+      sheetIndex: 0,
+      columns: ['Region'],
+    });
+    const handle = attachSlicer({ host, store, getWb: () => blankWb, strings: ja });
+    handle.addSlicer({ tableName: 'Sales', column: 'Region' });
+
+    const blank = host.querySelector<HTMLButtonElement>('.fc-slicer__chip[data-fc-value=""]');
+    expect(blank?.textContent).toBe('(空白)');
+    blank?.click();
+    expect(store.getState().slicers.slicers[0]?.selected).toEqual(['']);
+    expect(blank?.dataset.fcValue).toBe('');
     handle.detach();
   });
 

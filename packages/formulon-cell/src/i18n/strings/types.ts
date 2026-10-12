@@ -1,8 +1,10 @@
+import type { BuiltInLocale } from '../locales.js';
 import type { CellFormatStrings } from './cell-format/types.js';
 import type { DataObjectsStrings } from './data-objects/types.js';
 import type { EditDialogsStrings } from './edit-dialogs/types.js';
 import type { FormulaDialogsStrings } from './formula-dialogs/types.js';
 import type { GridPopupsStrings } from './grid-popups/types.js';
+import type { LocaleSwitcherStrings } from './locale-switcher/types.js';
 import type { MacStrings } from './mac/types.js';
 import type { PageLayoutStrings } from './page-layout/types.js';
 import type { RibbonStrings } from './ribbon/types.js';
@@ -32,8 +34,9 @@ export interface Strings
     DataObjectsStrings,
     MacStrings,
     PageLayoutStrings,
-    WorkbookChromeStrings {}
+    WorkbookChromeStrings,
+    LocaleSwitcherStrings {}
 
-export type Locale = 'ja' | 'en';
+export type Locale = BuiltInLocale;
 
 export type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;

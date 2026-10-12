@@ -119,6 +119,25 @@ describe('attachFormatPainter', () => {
     handle.detach();
   });
 
+  it('captures inherited formatting supplied by the effective-format resolver', () => {
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachFormatPainter({
+      host,
+      store,
+      formatResolver: () => ({ fontFamily: 'Inherited Font', fontSize: 24 }),
+    });
+    handle.activate();
+
+    fireDown(host, 300, 100);
+    fireUp(host, 300, 100);
+
+    expect(formatAt(store, 2, 2)).toMatchObject({
+      fontFamily: 'Inherited Font',
+      fontSize: 24,
+    });
+    handle.detach();
+  });
+
   it('activate() is a no-op when the selection range is inverted', () => {
     store.setState((s) => ({
       ...s,

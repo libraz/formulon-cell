@@ -5,11 +5,17 @@ import { parseAddrKey } from '../engine/address.js';
  */
 
 import type { Addr, Range } from '../engine/types.js';
+import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
-import { type CSVEncodeOptions, encodeCSV, parseCSV } from './clipboard/csv.js';
-import { coerceInputForCell, writeCoerced } from './coerce-input.js';
+import {
+  type CSVEncodeOptions,
+  type CSVParseOptions,
+  encodeCSV,
+  parseCSV,
+} from './clipboard/csv.js';
+import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from './coerce-input.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -24,6 +30,14 @@ export interface ImportResult {
   rows: number;
 }
 
+export interface ImportCSVOptions extends CSVParseOptions {
+  /**
+   * Locale used to coerce numeric and boolean fields. When omitted, the
+   * workbook's active profile supplies the input locale.
+   */
+  locale?: string;
+}
+
 /**
  * Parse a CSV blob and write the resulting cells starting at `anchor` (or the
  * active cell when omitted). Each value runs through `coerceInput` so a leading
@@ -36,13 +50,15 @@ export function importCSV(
   text: string,
   anchor?: Addr,
   history?: History | null,
+  options: ImportCSVOptions = {},
 ): ImportResult | null {
   if (!text) return null;
-  const rows = parseCSV(text);
+  const rows = parseCSV(text, options);
   if (rows.length === 0) return null;
 
   const origin: Addr = anchor ?? state.selection.active;
   const sheet = origin.sheet;
+  const inputLocale = options.locale ?? inputLocaleForWorkbook(wb);
   let maxCols = 0;
   let cellsWritten = 0;
 
@@ -58,7 +74,7 @@ export function importCSV(
             warnProtected(addr);
             continue;
           }
-          writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? ''));
+          writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? '', inputLocale, wb));
           cellsWritten += 1;
         }
       }
@@ -84,6 +100,11 @@ export interface ExportOptions extends CSVEncodeOptions {
   /** Range to export. Defaults to the current selection. When the selection is
    *  a single cell, the entire used region of the sheet is exported instead. */
   range?: Range;
+  /**
+   * Locale used for editable number and boolean output. When omitted, the
+   * existing canonical CSV representation is preserved.
+   */
+  locale?: string;
 }
 
 /**
@@ -106,11 +127,11 @@ export function exportCSV(state: State, opts: ExportOptions = {}): string {
   for (let row = range.r0; row <= range.r1; row += 1) {
     const line: string[] = [];
     for (let col = range.c0; col <= range.c1; col += 1) {
-      line.push(displayValue(state, sheet, row, col));
+      line.push(displayValue(state, sheet, row, col, opts.locale));
     }
     grid.push(line);
   }
-  return encodeCSV(grid, { eol: opts.eol, bom: opts.bom });
+  return encodeCSV(grid, { delimiter: opts.delimiter, eol: opts.eol, bom: opts.bom });
 }
 
 function selectionOrUsed(state: State): Range | null {
@@ -165,18 +186,30 @@ function usedRangeInRange(state: State, range: Range): Range | null {
   return { sheet, r0, c0, r1, c1 };
 }
 
-function displayValue(state: State, sheet: number, row: number, col: number): string {
+function displayValue(
+  state: State,
+  sheet: number,
+  row: number,
+  col: number,
+  locale?: string,
+): string {
   const key = `${sheet}:${row}:${col}`;
   const cell = state.data.cells.get(key);
   const hyperlinkDisplay = state.format.formats.get(key)?.hyperlinkDisplay;
   if (!cell) return hyperlinkDisplay ?? '';
   switch (cell.value.kind) {
     case 'number':
-      return String(cell.value.value);
+      return locale === undefined
+        ? String(cell.value.value)
+        : formatEditableNumber(cell.value.value, locale);
     case 'text':
       return cell.value.value;
     case 'bool':
-      return cell.value.value ? 'TRUE' : 'FALSE';
+      return locale === undefined
+        ? cell.value.value
+          ? 'TRUE'
+          : 'FALSE'
+        : formatBoolean(cell.value.value, locale);
     case 'error':
       return cell.value.text;
     default:

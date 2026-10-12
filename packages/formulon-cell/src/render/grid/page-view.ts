@@ -6,7 +6,12 @@
 // the passes only add the paper, the break lines, and the page numbering that
 // tell the user where the printed sheet ends.
 
-import { bandIndexAt, pageNumberOf, type SheetPagination } from '../../commands/pagination.js';
+import {
+  type AxisBand,
+  bandIndexAt,
+  pageNumberOf,
+  type SheetPagination,
+} from '../../commands/pagination.js';
 import type { PageSetup } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
@@ -35,12 +40,122 @@ interface BandRun {
   closes: boolean;
 }
 
+const CSS_PX_PER_POINT = 96 / 72;
+
 type SegmentKind = 'content' | 'paper' | 'gutter';
 
 interface Segment {
   start: number;
   end: number;
   kind: SegmentKind;
+}
+
+function nativePageForBand(
+  pagination: SheetPagination,
+  band: AxisBand,
+  axis: 'row' | 'col',
+): NonNullable<SheetPagination['native']>['pages'][number] | undefined {
+  return pagination.native?.pages.find((page) =>
+    axis === 'row'
+      ? page.firstRow === band.start && page.lastRow === band.end
+      : page.firstCol === band.start && page.lastCol === band.end,
+  );
+}
+
+/** Physical paper start for one axis, including blank preview bands that do
+ * not have a native page entry. Blank bands continue the last paper plus the
+ * fixed preview gutter so the paper does not jump when the grid is scrolled. */
+function nativePaperStartForBand(
+  pagination: SheetPagination,
+  runs: readonly BandRun[],
+  bandIndex: number,
+  axis: 'row' | 'col',
+  zoom: number,
+): number | null {
+  const native = pagination.native;
+  const band = (axis === 'row' ? pagination.rowBands : pagination.colBands)[bandIndex];
+  const run = runs.find((candidate) => candidate.band === bandIndex && candidate.opens);
+  if (!native || !band || !run) return null;
+  const factor = (CSS_PX_PER_POINT * zoom) / Math.max(pagination.scale, 0.01);
+  const nativePage = nativePageForBand(pagination, band, axis);
+  if (nativePage) {
+    const origin = nativePageOriginPt(pagination, nativePage, axis);
+    return run.start - origin * factor;
+  }
+  // The page-layout gap map is computed for every band even when virtualization
+  // starts inside a blank tail. Carry the last native page's effective origin
+  // into that band so this paper rect agrees with the cell position regardless
+  // of which earlier runs happen to be visible.
+  const previousPage = native.pages
+    .filter((candidate) =>
+      axis === 'row' ? candidate.lastRow < band.start : candidate.lastCol < band.start,
+    )
+    .sort((a, b) => (axis === 'row' ? b.lastRow - a.lastRow : b.lastCol - a.lastCol))[0];
+  if (previousPage) {
+    const previousOrigin = nativePageOriginPt(pagination, previousPage, axis);
+    return run.start - previousOrigin * factor;
+  }
+  const printableOrigin = axis === 'row' ? native.printable.y : native.printable.x;
+  return run.start - printableOrigin * factor;
+}
+
+function nativeFallbackPageRect(
+  pagination: SheetPagination,
+  rowRun: BandRun,
+  colRun: BandRun,
+  rowRuns: readonly BandRun[],
+  colRuns: readonly BandRun[],
+  zoom: number,
+): Rect | null {
+  if (!pagination.native || !rowRun.opens || !colRun.opens) return null;
+  const rowStart = nativePaperStartForBand(pagination, rowRuns, rowRun.band, 'row', zoom);
+  const colStart = nativePaperStartForBand(pagination, colRuns, colRun.band, 'col', zoom);
+  if (rowStart === null || colStart === null) return null;
+  const factor = (CSS_PX_PER_POINT * zoom) / Math.max(pagination.scale, 0.01);
+  return {
+    x: colStart,
+    y: rowStart,
+    w: pagination.native.paper.widthPt * factor,
+    h: pagination.native.paper.heightPt * factor,
+  };
+}
+
+/** Native pagination reports the uncentered cell-block origin. Page Layout
+ *  places that block in the remaining printable space when a sheet requests
+ *  horizontal or vertical centering. */
+function nativePageOriginPt(
+  pagination: SheetPagination,
+  page: NonNullable<SheetPagination['native']>['pages'][number],
+  axis: 'row' | 'col',
+): number {
+  const native = pagination.native;
+  if (!native) return axis === 'row' ? page.originYPt : page.originXPt;
+  const origin = axis === 'row' ? page.originYPt : page.originXPt;
+  const printableOrigin = axis === 'row' ? native.printable.y : native.printable.x;
+  const pageExtent = axis === 'row' ? page.heightPt : page.widthPt;
+  const printableExtent = axis === 'row' ? native.printable.height : native.printable.width;
+  const centered = axis === 'row' ? pagination.centerVertically : pagination.centerHorizontally;
+  if (!centered) return origin;
+  const titleOffset = Math.max(0, origin - printableOrigin);
+  return origin + Math.max(0, (printableExtent - titleOffset - pageExtent) / 2);
+}
+
+function nativeAxisPaperSpan(
+  pagination: SheetPagination,
+  run: BandRun,
+  axis: 'row' | 'col',
+  zoom: number,
+  runs: readonly BandRun[],
+): { start: number; end: number } | null {
+  if (!pagination.native || !run.opens) return null;
+  const bands = axis === 'row' ? pagination.rowBands : pagination.colBands;
+  const band = bands[run.band];
+  if (!band) return null;
+  const factor = (CSS_PX_PER_POINT * zoom) / Math.max(pagination.scale, 0.01);
+  const start = nativePaperStartForBand(pagination, runs, run.band, axis, zoom);
+  if (start === null) return null;
+  const size = axis === 'row' ? pagination.native.paper.heightPt : pagination.native.paper.widthPt;
+  return { start, end: start + size * factor };
 }
 
 function runsFor(axis: AxisLayout, bands: SheetPagination['rowBands'], origin: number): BandRun[] {
@@ -92,12 +207,31 @@ function paperRects(
   rowRuns: readonly BandRun[],
   colRuns: readonly BandRun[],
   margins: { top: number; right: number; bottom: number; left: number },
+  pagination?: SheetPagination,
+  zoom = 1,
 ): Rect[] {
   const rects: Rect[] = [];
   for (const rowRun of rowRuns) {
     const top = rowRun.opens ? rowRun.start - margins.top : rowRun.start;
     const bottom = rowRun.closes ? rowRun.end + margins.bottom : rowRun.end;
     for (const colRun of colRuns) {
+      const rowBand = pagination?.rowBands[rowRun.band];
+      const colBand = pagination?.colBands[colRun.band];
+      if (pagination?.native && (!rowBand || !colBand)) continue;
+      if (pagination?.native) {
+        const nativeRect = nativeFallbackPageRect(
+          pagination,
+          rowRun,
+          colRun,
+          rowRuns,
+          colRuns,
+          zoom,
+        );
+        if (nativeRect) {
+          rects.push(nativeRect);
+          continue;
+        }
+      }
       const left = colRun.opens ? colRun.start - margins.left : colRun.start;
       const right = colRun.closes ? colRun.end + margins.right : colRun.end;
       rects.push({ x: left, y: top, w: right - left, h: bottom - top });
@@ -113,6 +247,7 @@ interface PageAxes {
   margins: { top: number; right: number; bottom: number; left: number };
   originX: number;
   originY: number;
+  zoom: number;
 }
 
 function pageAxes(
@@ -134,6 +269,7 @@ function pageAxes(
     },
     originX: gridOriginX(state.layout),
     originY: gridOriginY(state.layout),
+    zoom,
   };
 }
 
@@ -170,7 +306,7 @@ export function paintPageLayoutBackground(
   ctx.fillStyle = theme.pageBackdrop;
   ctx.fillRect(0, 0, cssWidth, cssHeight);
   ctx.fillStyle = theme.pagePaper;
-  for (const rect of paperRects(axes.rowRuns, axes.colRuns, axes.margins)) {
+  for (const rect of paperRects(axes.rowRuns, axes.colRuns, axes.margins, pagination, axes.zoom)) {
     const x = mirrorX(state.layout, rect.x, rect.w);
     ctx.fillRect(x, rect.y, rect.w, rect.h);
   }
@@ -235,23 +371,28 @@ export function paintPageLayoutChrome(
   clipToData(pc, state);
 
   // Everything except the cell content: a product cell is paper when neither
-  // axis is in a gutter, and desk otherwise.
-  for (const rowSeg of rowSegs) {
-    for (const colSeg of colSegs) {
-      if (rowSeg.kind === 'content' && colSeg.kind === 'content') continue;
-      const gutter = rowSeg.kind === 'gutter' || colSeg.kind === 'gutter';
-      ctx.fillStyle = gutter ? theme.pageBackdrop : theme.pagePaper;
-      const w = colSeg.end - colSeg.start;
-      ctx.fillRect(
-        mirrorX(state.layout, colSeg.start, w),
-        rowSeg.start,
-        w,
-        rowSeg.end - rowSeg.start,
-      );
+  // axis is in a gutter, and desk otherwise. Native pages already painted
+  // their physical paper rectangles in the background pass; re-crossing the
+  // display bands here would overwrite the native trailing paper when Print
+  // geometry is wider or taller than display geometry.
+  if (!pagination.native) {
+    for (const rowSeg of rowSegs) {
+      for (const colSeg of colSegs) {
+        if (rowSeg.kind === 'content' && colSeg.kind === 'content') continue;
+        const gutter = rowSeg.kind === 'gutter' || colSeg.kind === 'gutter';
+        ctx.fillStyle = gutter ? theme.pageBackdrop : theme.pagePaper;
+        const w = colSeg.end - colSeg.start;
+        ctx.fillRect(
+          mirrorX(state.layout, colSeg.start, w),
+          rowSeg.start,
+          w,
+          rowSeg.end - rowSeg.start,
+        );
+      }
     }
   }
 
-  const rects = paperRects(axes.rowRuns, axes.colRuns, axes.margins);
+  const rects = paperRects(axes.rowRuns, axes.colRuns, axes.margins, pagination, axes.zoom);
   ctx.strokeStyle = theme.pageEdge;
   ctx.lineWidth = 1 / dpr;
   const align = 0.5 / dpr;
@@ -260,7 +401,7 @@ export function paintPageLayoutChrome(
     ctx.strokeRect(Math.round(x) + align, Math.round(rect.y) + align, rect.w, rect.h);
   }
 
-  pageBandHits = paintPageBands(pc, state, theme, axes, setup, strings);
+  pageBandHits = paintPageBands(pc, state, theme, axes, setup, strings, pagination);
   ctx.restore();
 }
 
@@ -274,6 +415,7 @@ function paintPageBands(
   axes: PageAxes,
   setup: PageSetup,
   strings: PageBandStrings,
+  pagination: SheetPagination,
 ): PageBandHit[] {
   const { ctx } = pc;
   const hits: PageBandHit[] = [];
@@ -285,15 +427,46 @@ function paintPageBands(
   for (const rowRun of axes.rowRuns) {
     for (const colRun of axes.colRuns) {
       if (!colRun.opens || !colRun.closes) continue;
-      const left = colRun.start;
-      const width = colRun.end - colRun.start;
+      const rowBand = pagination.rowBands[rowRun.band];
+      const colBand = pagination.colBands[colRun.band];
+      if (pagination.native && (!rowBand || !colBand)) continue;
+      const nativeRect = pagination.native
+        ? nativeFallbackPageRect(pagination, rowRun, colRun, axes.rowRuns, axes.colRuns, axes.zoom)
+        : null;
+      const nativeFactor = pagination.native
+        ? (CSS_PX_PER_POINT * axes.zoom) / Math.max(pagination.scale, 0.01)
+        : 1;
+      const nativeMarginLeft = pagination.native
+        ? pagination.native.margins.left * nativeFactor
+        : axes.margins.left;
+      const nativeMarginRight = pagination.native
+        ? pagination.native.margins.right * nativeFactor
+        : axes.margins.right;
+      const nativeMarginTop = pagination.native
+        ? pagination.native.margins.top * nativeFactor
+        : axes.margins.top;
+      const nativeMarginBottom = pagination.native
+        ? pagination.native.margins.bottom * nativeFactor
+        : axes.margins.bottom;
+      const left = nativeRect ? nativeRect.x + nativeMarginLeft : colRun.start;
+      const width = nativeRect
+        ? Math.max(0, nativeRect.w - nativeMarginLeft - nativeMarginRight)
+        : colRun.end - colRun.start;
       if (width < 90) continue;
       const bands: { kind: PageBandHit['kind']; y: number }[] = [];
-      if (rowRun.opens && axes.margins.top >= BAND_HEIGHT) {
-        bands.push({ kind: 'header', y: rowRun.start - axes.margins.top + 4 });
+      if (rowRun.opens && nativeMarginTop >= BAND_HEIGHT) {
+        bands.push({
+          kind: 'header',
+          y: nativeRect ? nativeRect.y + 4 : rowRun.start - axes.margins.top + 4,
+        });
       }
-      if (rowRun.closes && axes.margins.bottom >= BAND_HEIGHT) {
-        bands.push({ kind: 'footer', y: rowRun.end + axes.margins.bottom - BAND_HEIGHT - 4 });
+      if (rowRun.closes && nativeMarginBottom >= BAND_HEIGHT) {
+        bands.push({
+          kind: 'footer',
+          y: nativeRect
+            ? nativeRect.y + nativeRect.h - nativeMarginBottom - BAND_HEIGHT - 4
+            : rowRun.end + axes.margins.bottom - BAND_HEIGHT - 4,
+        });
       }
       for (const band of bands) {
         const slotW = width / 3;
@@ -421,8 +594,13 @@ export function paintPageRulers(
     }
     ctx.clip();
     for (const run of runs) {
-      const paperStart = run.opens ? run.start - lead : run.start;
-      const paperEnd = run.closes ? run.end + trail : run.end;
+      const nativeSpan = pagination.native
+        ? nativeAxisPaperSpan(pagination, run, horizontal ? 'col' : 'row', zoom, runs)
+        : null;
+      const paperStart = nativeSpan ? nativeSpan.start : run.opens ? run.start - lead : run.start;
+      const paperEnd = nativeSpan ? nativeSpan.end : run.closes ? run.end + trail : run.end;
+      const contentStart = run.start;
+      const contentEnd = run.end;
       const fill = (from: number, to: number, colour: string): void => {
         if (to <= from) return;
         ctx.fillStyle = colour;
@@ -433,9 +611,9 @@ export function paintPageRulers(
           ctx.fillRect(vBandX + 2, from, band - 4, to - from);
         }
       };
-      fill(paperStart, run.start, theme.pageBackdrop);
-      fill(run.start, run.end, theme.pagePaper);
-      fill(run.end, paperEnd, theme.pageBackdrop);
+      fill(paperStart, contentStart, theme.pageBackdrop);
+      fill(contentStart, Math.min(contentEnd, paperEnd), theme.pagePaper);
+      fill(Math.max(contentEnd, paperStart), paperEnd, theme.pageBackdrop);
 
       // Ticks, numbered outward from the printable origin.
       ctx.fillStyle = theme.headerFg;
@@ -583,6 +761,9 @@ export function paintPageBreakPreview(
     for (const colRun of liveCols) {
       const page = pageNumberOf(pagination, rowRun.band, colRun.band, setup.pageOrder);
       if (page <= 0) continue;
+      // Page Break Preview keeps the continuous cell grid. Native paper
+      // origins belong to Page Layout, whose gaps move each band; applying
+      // them here would place the watermark far away from a narrow band.
       const trail = Math.min(colRun.end, printTrail);
       const w = trail - colRun.start;
       const h = bottom - rowRun.start;

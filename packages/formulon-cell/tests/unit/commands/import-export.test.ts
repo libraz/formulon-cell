@@ -85,6 +85,64 @@ describe('importCSV', () => {
     });
   });
 
+  it('uses the workbook profile when importing localized numeric strings', () => {
+    vi.spyOn(wb, 'spreadsheetProfileId').mockReturnValue('windows-de_DE');
+
+    importCSV(store.getState(), wb, '"1,25"');
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'number',
+      value: 1.25,
+    });
+  });
+
+  it('lets an explicit import locale override the workbook profile', () => {
+    vi.spyOn(wb, 'spreadsheetProfileId').mockReturnValue('windows-de_DE');
+
+    importCSV(store.getState(), wb, '1.25,TRUE', undefined, undefined, {
+      locale: 'en-US',
+    });
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'number',
+      value: 1.25,
+    });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+      kind: 'bool',
+      value: true,
+    });
+  });
+
+  it('canonicalizes an explicit English CSV formula without double-converting an active German profile', async () => {
+    const targetStore = createSpreadsheetStore();
+    const targetWb = await WorkbookHandle.createDefault();
+    try {
+      expect(targetWb.isStub).toBe(false);
+      expect(targetWb.capabilities.formulaLocale).toBe(true);
+      expect(targetWb.capabilities.localeFacts).toBe(true);
+      expect(targetWb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
+
+      const result = importCSV(
+        targetStore.getState(),
+        targetWb,
+        '"=SUM(1.5,2)"',
+        undefined,
+        undefined,
+        { locale: 'en-US' },
+      );
+
+      expect(result?.cellsWritten).toBe(1);
+      expect(targetWb.spreadsheetProfileId()).toBe('windows-de_DE');
+      expect(targetWb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=SUM(1.5,2)');
+      expect(targetWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+        kind: 'number',
+        value: 3.5,
+      });
+    } finally {
+      targetWb.dispose();
+    }
+  });
+
   it('respects Text-formatted destination cells when importing CSV', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { numFmt: { kind: 'text' } });
@@ -280,5 +338,104 @@ describe('exportCSV', () => {
     expect(exportCSV(store.getState(), { range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 } })).toBe(
       '"a, b"',
     );
+  });
+
+  it('keeps canonical number and boolean output when locale is omitted', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1.25 },
+      { row: 0, col: 1, value: true },
+    ]);
+    expect(exportCSV(store.getState(), { range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 } })).toBe(
+      '1.25,TRUE',
+    );
+  });
+
+  it('uses locale decimal and boolean tokens without changing error text', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1.25 },
+      { row: 0, col: 1, value: true },
+    ]);
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(addrKey({ sheet: 0, row: 0, col: 2 }), {
+        value: { kind: 'error', code: 2, text: '#DIV/0!' },
+        formula: null,
+      });
+      return { ...s, data: { ...s.data, cells } };
+    });
+
+    expect(
+      exportCSV(store.getState(), {
+        locale: 'de-DE',
+        delimiter: ';',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+      }),
+    ).toBe('1,25;WAHR;#DIV/0!');
+  });
+
+  it('round-trips typed numbers and booleans for all seven locales on the real engine', async () => {
+    const sourceStore = createSpreadsheetStore();
+    const sourceWb = await WorkbookHandle.createDefault();
+    seedAndMirror(sourceStore, sourceWb, [
+      { row: 0, col: 0, value: 1.25 },
+      { row: 0, col: 1, value: true },
+      { row: 1, col: 0, value: 1.23e-12 },
+      { row: 1, col: 1, value: false },
+    ]);
+
+    const targetStore = createSpreadsheetStore();
+    const targetWb = await WorkbookHandle.createDefault();
+    expect(targetWb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
+    importCSV(targetStore.getState(), targetWb, '1.25,TRUE', undefined, undefined, {
+      locale: 'en-US',
+    });
+    expect(targetWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'number',
+      value: 1.25,
+    });
+    expect(targetWb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+      kind: 'bool',
+      value: true,
+    });
+
+    const cases = [
+      { locale: 'en-US', profile: 'windows-en_US', delimiter: ',' as const },
+      { locale: 'ja-JP', profile: 'windows-ja_JP', delimiter: ',' as const },
+      { locale: 'de-DE', profile: 'windows-de_DE', delimiter: ';' as const },
+      { locale: 'fr-FR', profile: 'windows-fr_FR', delimiter: ';' as const },
+      { locale: 'zh-CN', profile: 'windows-zh_CN', delimiter: ',' as const },
+      { locale: 'ko-KR', profile: 'windows-ko_KR', delimiter: ',' as const },
+      { locale: 'th-TH', profile: 'windows-th_TH', delimiter: ',' as const },
+    ] as const;
+
+    for (const { locale, profile, delimiter } of cases) {
+      expect(targetWb.setSpreadsheetProfileId(profile)).toBe(true);
+      const csv = exportCSV(sourceStore.getState(), {
+        locale,
+        delimiter,
+        range: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+      });
+      importCSV(targetStore.getState(), targetWb, csv, undefined, undefined, {
+        delimiter,
+        locale,
+      });
+
+      expect(targetWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+        kind: 'number',
+        value: 1.25,
+      });
+      expect(targetWb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+        kind: 'bool',
+        value: true,
+      });
+      expect(targetWb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+        kind: 'number',
+        value: 1.23e-12,
+      });
+      expect(targetWb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({
+        kind: 'bool',
+        value: false,
+      });
+    }
   });
 });

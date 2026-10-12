@@ -121,8 +121,23 @@ export function createExtensionRegistry(deps: ExtensionRegistryDeps): ExtensionR
     for (const [k, v] of userHandles) featuresView[k] = v;
   };
   const disposeUserHandles = (): void => {
-    for (const handle of userHandles.values()) handle.dispose();
+    const errors: unknown[] = [];
+    for (const handle of userHandles.values()) {
+      try {
+        handle.dispose();
+      } catch (error) {
+        // Continue through every independent extension.  Mount teardown wraps
+        // this call too, so later core cleanup still runs before the first
+        // error is reported to the host.
+        errors.push(error);
+      }
+    }
     userHandles.clear();
+    wbListeners.clear();
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'formulon-cell: extension cleanup failed');
+    }
   };
 
   return {
@@ -140,17 +155,40 @@ export function createExtensionRegistry(deps: ExtensionRegistryDeps): ExtensionR
     remove(id) {
       const handle = userHandles.get(id);
       if (!handle) return false;
-      handle.dispose();
-      userHandles.delete(id);
-      refreshFeaturesView();
+      try {
+        handle.dispose();
+      } finally {
+        userHandles.delete(id);
+        refreshFeaturesView();
+      }
       return true;
     },
     setExtensions(next) {
       // Dispose all currently-mounted user extensions, then re-mount the
       // new list. Built-ins are untouched — use `setFeatures` for those.
-      disposeUserHandles();
-      if (next?.length) mountAll(next);
-      refreshFeaturesView();
+      try {
+        disposeUserHandles();
+      } finally {
+        // A throwing disposer still cleared the user map. Keep the public
+        // features view in sync before the error reaches the host, and do not
+        // mount a replacement list after a partial teardown.
+        refreshFeaturesView();
+      }
+      try {
+        if (next?.length) mountAll(next);
+      } catch (setupError) {
+        // `mountAll` may have mounted earlier extensions before a later setup
+        // throws. Roll every partial handle back, but preserve the setup error
+        // as the operation's public failure even if rollback also fails.
+        try {
+          disposeUserHandles();
+        } catch (rollbackError) {
+          console.error('formulon-cell: extension setup rollback failed', rollbackError);
+        }
+        throw setupError;
+      } finally {
+        refreshFeaturesView();
+      }
     },
     setUserStrings(next) {
       for (const handle of userHandles.values()) handle.setStrings?.(next);

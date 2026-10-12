@@ -89,6 +89,26 @@ describe('InlineEditor', () => {
     expect(input.style.height).toBe('28px');
   });
 
+  it('scales the editing glyph and vertical alignment with viewport zoom', () => {
+    const anchor = { sheet: 0, row: 0, col: 0 };
+    mutators.setCellFormat(store, anchor, { fontSize: 20, fontVertAlign: 'superscript' });
+    store.setState((state) => ({
+      ...state,
+      viewport: { ...state.viewport, zoom: 2 },
+    }));
+    mutators.setActive(store, anchor);
+    editor.begin('x');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.fontSize).toBe('28px');
+    expect(Number.parseFloat(input.style.paddingTop)).toBeLessThan(4);
+
+    store.setState((state) => ({
+      ...state,
+      viewport: { ...state.viewport, zoom: 0.5 },
+    }));
+    expect(input.style.fontSize).toBe('7px');
+  });
+
   it('keeps the raw edit, caret and pending style when the workbook write fails', async () => {
     const realWorkbook = await WorkbookHandle.createDefault();
     expect(realWorkbook.isStub).toBe(false);
@@ -232,6 +252,16 @@ describe('InlineEditor', () => {
     editor.begin('text');
     input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
     expect(input.style.textAlign).toBe('left');
+  });
+
+  it('uses the workbook profile when aligning localized numeric input', () => {
+    vi.spyOn(wb, 'spreadsheetProfileId').mockReturnValue('windows-de_DE');
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    editor.begin('1,25');
+
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.textAlign).toBe('right');
   });
 
   it('honors explicit cell alignment while editing', () => {

@@ -1,14 +1,363 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type {
+  EngineMention,
+  EnginePerson,
+  EngineThreadedComment,
+} from '../engine/workbook-handle-annotations.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import type { History } from './history.js';
+import { interactionControllerFor } from './interaction-controller.js';
+import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 export interface CommentEntry {
   addr: Addr;
   text: string;
   author?: string;
+}
+
+export type ThreadedCommentEntry = EngineThreadedComment;
+export type ThreadedPersonEntry = EnginePerson;
+
+export interface ThreadedMutationAuthorization {
+  origin?: InteractionOrigin;
+  commandId?: string;
+}
+
+const commentIntentFor = (
+  addr: Addr,
+  authorization: ThreadedMutationAuthorization = {},
+): {
+  operation: 'comment';
+  origin: InteractionOrigin;
+  commandId: string;
+  effects: readonly OperationEffect[];
+} => ({
+  operation: 'comment',
+  origin: authorization.origin ?? 'instanceApi',
+  commandId: authorization.commandId ?? 'commentDialog',
+  effects: [{ kind: 'cells', cells: [addr] }],
+});
+
+const canMutateThreadedCell = (
+  store: SpreadsheetStore,
+  addr: Addr,
+  authorization?: ThreadedMutationAuthorization,
+): boolean => {
+  if (!isCellWritable(store.getState(), addr)) {
+    warnProtected(addr);
+    return false;
+  }
+  const controller = interactionControllerFor(store);
+  return !controller || controller.canExecute(commentIntentFor(addr, authorization)).allowed;
+};
+
+const cloneThread = (entry: ThreadedCommentEntry): ThreadedCommentEntry => ({
+  ...entry,
+  mentions: entry.mentions.map((mention) => ({ ...mention })),
+});
+
+const cloneThreads = (entries: readonly ThreadedCommentEntry[]): ThreadedCommentEntry[] =>
+  entries.map(cloneThread);
+
+const sameThreads = (
+  a: readonly ThreadedCommentEntry[],
+  b: readonly ThreadedCommentEntry[],
+): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+/** Replace the active sheet's thread cache after workbook hydration. */
+export function hydrateThreadedComments(
+  store: SpreadsheetStore,
+  sheet: number,
+  entries: readonly ThreadedCommentEntry[],
+): void {
+  const snapshot = cloneThreads(entries);
+  store.setState((state) => ({
+    ...state,
+    threadedComments: {
+      ...state.threadedComments,
+      bySheet: new Map(state.threadedComments.bySheet).set(sheet, snapshot),
+    },
+  }));
+}
+
+/** Read threaded comments, preferring the native workbook so callers always
+ * see edits made by another command or by a workbook replacement. */
+export function listThreadedComments(
+  store: SpreadsheetStore,
+  sheet = store.getState().data.sheetIndex,
+  wb?: WorkbookHandle,
+): ThreadedCommentEntry[] {
+  if (wb?.capabilities.threadedComments) {
+    const entries = wb.getThreadedComments(sheet);
+    hydrateThreadedComments(store, sheet, entries);
+    store.setState((state) => ({
+      ...state,
+      threadedComments: { ...state.threadedComments, persons: wb.getPersons() },
+    }));
+    return cloneThreads(entries);
+  }
+  return cloneThreads(store.getState().threadedComments.bySheet.get(sheet) ?? []);
+}
+
+export function threadedCommentsAt(
+  store: SpreadsheetStore,
+  addr: Addr,
+  wb?: WorkbookHandle,
+): ThreadedCommentEntry[] {
+  return listThreadedComments(store, addr.sheet, wb).filter(
+    (entry) => entry.parentId === '' && entry.row === addr.row && entry.col === addr.col,
+  );
+}
+
+const guid = (): string => {
+  const random = globalThis.crypto?.randomUUID?.();
+  if (random) return `{${random.toUpperCase()}}`;
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i += 1) bytes[i] = (i * 47 + Date.now()) & 0xff;
+  const version = bytes[6] ?? 0;
+  const variant = bytes[8] ?? 0;
+  bytes[6] = (version & 0x0f) | 0x40;
+  bytes[8] = (variant & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  return `{${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}}`.toUpperCase();
+};
+
+const timestamp = (): string => {
+  const value = new Date().toISOString();
+  return `${value.slice(0, 19)}.${value.slice(20, 22)}`;
+};
+
+const ensurePerson = (wb: WorkbookHandle, author: string): string => {
+  const displayName = author.trim() || 'Formulon';
+  const existing = wb.getPersons().find((person) => person.displayName === displayName);
+  if (existing) return existing.id;
+  const id = guid();
+  const person: EnginePerson = { id, displayName, userId: '', providerId: 'None' };
+  if (!wb.addPerson(person)) {
+    const retry = wb.getPersons().find((candidate) => candidate.displayName === displayName);
+    if (retry) return retry.id;
+    throw new Error('threaded comment author registration failed');
+  }
+  return id;
+};
+
+const threadedEntryAddress = (
+  sheet: number,
+  entries: readonly ThreadedCommentEntry[],
+  id: string,
+): Addr | null => {
+  const entry = entries.find((candidate) => candidate.id === id);
+  if (!entry) return null;
+  const opening = entry.parentId
+    ? (entries.find((candidate) => candidate.id === entry.parentId) ?? entry)
+    : entry;
+  return { sheet, row: opening.row, col: opening.col };
+};
+
+const refreshThreadCache = (store: SpreadsheetStore, wb: WorkbookHandle, sheet: number): void => {
+  hydrateThreadedComments(store, sheet, wb.getThreadedComments(sheet));
+  const persons = wb.getPersons();
+  store.setState((state) => ({
+    ...state,
+    threadedComments: { ...state.threadedComments, persons },
+  }));
+};
+
+/** Add a native thread opener at `addr`; replies use `replyToThread`. */
+export function addThreadedComment(
+  store: SpreadsheetStore,
+  addr: Addr,
+  text: string,
+  wb: WorkbookHandle | undefined,
+  options: {
+    author?: string;
+    replyToThread?: string;
+    mentions?: readonly EngineMention[];
+    authorization?: ThreadedMutationAuthorization;
+  } = {},
+): ThreadedCommentEntry | null {
+  if (!wb?.capabilities.threadedComments || text.length === 0) return null;
+  if (!canMutateThreadedCell(store, addr, options.authorization)) return null;
+  // formulon rejects a thread and a legacy note on the same cell. Preserve
+  // the note and avoid registering an unused person when the UI explicitly
+  // requests a thread on such a cell.
+  if (commentAt(store.getState(), addr) !== null) return null;
+  let personId: string;
+  try {
+    personId = ensurePerson(wb, options.author ?? '');
+  } catch {
+    return null;
+  }
+  const entry: Partial<ThreadedCommentEntry> & Pick<ThreadedCommentEntry, 'id' | 'text'> = {
+    id: guid(),
+    row: addr.row,
+    col: addr.col,
+    personId,
+    created: timestamp(),
+    text,
+    parentId: options.replyToThread ?? '',
+    done: false,
+    mentions: options.mentions ? options.mentions.map((mention) => ({ ...mention })) : [],
+  };
+  if (!wb.addThreadedComment(addr.sheet, entry)) return null;
+  refreshThreadCache(store, wb, addr.sheet);
+  return (
+    listThreadedComments(store, addr.sheet, wb).find((candidate) => candidate.id === entry.id) ??
+    null
+  );
+}
+
+export function editThreadedComment(
+  store: SpreadsheetStore,
+  sheet: number,
+  id: string,
+  text: string,
+  wb: WorkbookHandle | undefined,
+  mentions: readonly EngineMention[] = [],
+  authorization?: ThreadedMutationAuthorization,
+): boolean {
+  if (!wb?.capabilities.threadedComments || text.length === 0) return false;
+  const address = threadedEntryAddress(sheet, wb.getThreadedComments(sheet), id);
+  if (!address || !canMutateThreadedCell(store, address, authorization)) return false;
+  if (!wb.editThreadedComment(sheet, id, text, mentions)) return false;
+  refreshThreadCache(store, wb, sheet);
+  return true;
+}
+
+export function resolveThread(
+  store: SpreadsheetStore,
+  sheet: number,
+  threadId: string,
+  done: boolean,
+  wb: WorkbookHandle | undefined,
+  authorization?: ThreadedMutationAuthorization,
+): boolean {
+  if (!wb?.capabilities.threadedComments) return false;
+  const address = threadedEntryAddress(sheet, wb.getThreadedComments(sheet), threadId);
+  if (!address || !canMutateThreadedCell(store, address, authorization)) return false;
+  if (!wb.setThreadResolved(sheet, threadId, done)) return false;
+  refreshThreadCache(store, wb, sheet);
+  return true;
+}
+
+export function removeThreadedComment(
+  store: SpreadsheetStore,
+  sheet: number,
+  id: string,
+  wb: WorkbookHandle | undefined,
+  authorization?: ThreadedMutationAuthorization,
+): boolean {
+  if (!wb?.capabilities.threadedComments) return false;
+  const address = threadedEntryAddress(sheet, wb.getThreadedComments(sheet), id);
+  if (!address || !canMutateThreadedCell(store, address, authorization)) return false;
+  if (!wb.removeThreadedComment(sheet, id)) return false;
+  refreshThreadCache(store, wb, sheet);
+  return true;
+}
+
+const applyThreadSnapshot = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  snapshot: readonly ThreadedCommentEntry[],
+  authorization: ThreadedMutationAuthorization = {},
+): void => {
+  const current = listThreadedComments(store, sheet, wb);
+  const addresses = new Map<string, Addr>();
+  for (const entry of [...current, ...snapshot]) {
+    const address = threadedEntryAddress(sheet, [...current, ...snapshot], entry.id);
+    if (address) addresses.set(addrKey(address), address);
+  }
+  for (const address of addresses.values()) {
+    if (!canMutateThreadedCell(store, address, authorization)) {
+      throw new Error('thread history replay blocked by protection or policy');
+    }
+  }
+  const removeAll = (entries: readonly ThreadedCommentEntry[]): void => {
+    // Replies must be removed before their opener: native removal of an
+    // opener intentionally removes the whole thread.
+    for (const entry of [...entries].sort(
+      (a, b) => Number(a.parentId === '') - Number(b.parentId === ''),
+    )) {
+      if (!wb.removeThreadedComment(sheet, entry.id)) {
+        throw new Error('thread history remove failed');
+      }
+    }
+  };
+  const restore = (entries: readonly ThreadedCommentEntry[]): void => {
+    // The native API requires a reply's opener to exist first.
+    for (const entry of [...entries].sort(
+      (a, b) => Number(a.parentId !== '') - Number(b.parentId !== ''),
+    )) {
+      if (!wb.addThreadedComment(sheet, cloneThread(entry))) {
+        throw new Error('thread history restore failed');
+      }
+    }
+  };
+  try {
+    removeAll(current);
+    restore(snapshot);
+    refreshThreadCache(store, wb, sheet);
+  } catch (error) {
+    // A failed native add/remove must not leave a half-replayed thread in the
+    // workbook. Reconcile the native state first, then restore the original
+    // snapshot. If the engine rejects the rollback too, reflect its actual
+    // state in the store before surfacing the original failure.
+    try {
+      removeAll(wb.getThreadedComments(sheet));
+      restore(current);
+      refreshThreadCache(store, wb, sheet);
+    } catch {
+      refreshThreadCache(store, wb, sheet);
+    }
+    throw error;
+  }
+};
+
+/** Wrap a native threaded-comment mutation in the same undo boundary as the
+ * legacy note commands. The snapshot contains original IDs, replies, mentions
+ * and resolution, so undo/redo never synthesizes a new thread identity. */
+export function recordThreadedChange<T>(
+  history: History | null,
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  mutate: () => T,
+  authorization: ThreadedMutationAuthorization = {},
+): T {
+  const before = listThreadedComments(store, sheet, wb);
+  const result = mutate();
+  const after = listThreadedComments(store, sheet, wb);
+  if (history && !history.isReplaying() && !sameThreads(before, after)) {
+    const addresses = new Map<string, Addr>();
+    for (const entry of [...before, ...after]) {
+      const source = entry.parentId
+        ? ([...before, ...after].find((candidate) => candidate.id === entry.parentId) ?? entry)
+        : entry;
+      const address = { sheet, row: source.row, col: source.col };
+      addresses.set(addrKey(address), address);
+    }
+    const effects: readonly OperationEffect[] = [{ kind: 'cells', cells: [...addresses.values()] }];
+    const intent = {
+      operation: 'comment' as const,
+      origin: authorization.origin ?? 'instanceApi',
+      commandId: authorization.commandId ?? 'commentDialog',
+      effects,
+    };
+    history.push({
+      undo: () =>
+        applyThreadSnapshot(store, wb, sheet, before, { ...authorization, origin: 'undo' }),
+      redo: () =>
+        applyThreadSnapshot(store, wb, sheet, after, { ...authorization, origin: 'redo' }),
+      intent: { ...intent, origin: 'redo' },
+      inverseIntent: { ...intent, origin: 'undo' },
+    });
+  }
+  return result;
 }
 
 type CommentSnapshot = Array<{ addr: Addr; text: string | null; author: string | null }>;
@@ -53,34 +402,48 @@ export function setComment(
   addr: Addr,
   text: string,
   wb?: WorkbookHandle,
-): void {
+  authorization?: ThreadedMutationAuthorization,
+): boolean {
   if (!isCellWritable(store.getState(), addr)) {
     warnProtected(addr);
-    return;
+    return false;
+  }
+  const controller = interactionControllerFor(store);
+  if (controller && !controller.canExecute(commentIntentFor(addr, authorization)).allowed) {
+    return false;
+  }
+  if (
+    text.length > 0 &&
+    wb?.capabilities.threadedComments &&
+    threadedCommentsAt(store, addr, wb).length > 0
+  ) {
+    return false;
   }
   const author = commentAuthorAt(store.getState(), addr) ?? '';
+  if (wb?.capabilities.comments) {
+    if (wb.setCommentEntry(addr.sheet, addr.row, addr.col, author, text) === false) return false;
+  }
   if (text.length === 0) {
     mutators.setCellFormat(store, addr, { comment: undefined, commentAuthor: undefined });
   } else {
     mutators.setCellFormat(store, addr, { comment: text });
   }
-  if (wb?.capabilities.comments) {
-    wb.setCommentEntry(addr.sheet, addr.row, addr.col, author, text);
-  }
+  return true;
 }
 
 /** Drop the comment from a cell. No-op when there isn't one. */
-export function clearComment(store: SpreadsheetStore, addr: Addr, wb?: WorkbookHandle): void {
+export function clearComment(
+  store: SpreadsheetStore,
+  addr: Addr,
+  wb?: WorkbookHandle,
+  authorization?: ThreadedMutationAuthorization,
+): void {
   if (!isCellWritable(store.getState(), addr)) {
     warnProtected(addr);
     return;
   }
   if (commentAt(store.getState(), addr) === null) return;
-  const author = commentAuthorAt(store.getState(), addr) ?? '';
-  mutators.setCellFormat(store, addr, { comment: undefined, commentAuthor: undefined });
-  if (wb?.capabilities.comments) {
-    wb.setCommentEntry(addr.sheet, addr.row, addr.col, author, '');
-  }
+  setComment(store, addr, '', wb, authorization);
 }
 
 const cloneAddr = (addr: Addr): Addr => ({ sheet: addr.sheet, row: addr.row, col: addr.col });
@@ -161,13 +524,13 @@ const applyPhysicalCommentSnapshot = (
   for (const entry of snapshot) {
     const comment = entry.comment;
     if (
-      !wb.setCommentEntry(
+      wb.setCommentEntry(
         entry.addr.sheet,
         entry.addr.row,
         entry.addr.col,
         comment?.author ?? '',
         comment?.text ?? '',
-      )
+      ) === false
     ) {
       throw new Error('comment engine write failed');
     }
@@ -178,8 +541,16 @@ const applyCommentSnapshot = (
   store: SpreadsheetStore,
   wb: WorkbookHandle | undefined,
   snapshot: CommentSnapshot,
+  authorization: ThreadedMutationAuthorization = {},
 ): void => {
   const tracked = uniqueAddrs(snapshot.map((entry) => entry.addr));
+  const controller = interactionControllerFor(store);
+  if (
+    controller &&
+    tracked.some((addr) => !controller.canExecute(commentIntentFor(addr, authorization)).allowed)
+  ) {
+    throw new Error('comment history replay blocked by protection or policy');
+  }
   const beforeStore = captureCommentSnapshot(store.getState(), tracked);
   const beforePhysical = capturePhysicalCommentSnapshot(wb, tracked);
   try {
@@ -212,6 +583,7 @@ export function clearComments(
   store: SpreadsheetStore,
   addrs: readonly Addr[],
   wb?: WorkbookHandle,
+  authorization?: ThreadedMutationAuthorization,
 ): void {
   const tracked = uniqueAddrs(addrs);
   const state = store.getState();
@@ -223,6 +595,7 @@ export function clearComments(
     store,
     wb,
     writable.map((addr) => ({ addr, text: null, author: null })),
+    authorization,
   );
 }
 
@@ -232,6 +605,7 @@ export function recordCommentChange<T>(
   wb: WorkbookHandle | undefined,
   addrs: readonly Addr[],
   mutate: () => T,
+  authorization: ThreadedMutationAuthorization = {},
 ): T {
   if (!history || history.isReplaying()) return mutate();
   const tracked = uniqueAddrs(addrs);
@@ -248,9 +622,22 @@ export function recordCommentChange<T>(
     changedAfter.push(afterEntry);
   }
   if (changedBefore.length > 0) {
+    const effects: readonly OperationEffect[] = [
+      { kind: 'cells', cells: changedBefore.map((entry) => entry.addr) },
+    ];
+    const intent = {
+      operation: 'comment' as const,
+      origin: authorization.origin ?? 'instanceApi',
+      commandId: authorization.commandId ?? 'commentChange',
+      effects,
+    };
     history.push({
-      undo: () => applyCommentSnapshot(store, wb, changedBefore),
-      redo: () => applyCommentSnapshot(store, wb, changedAfter),
+      undo: () =>
+        applyCommentSnapshot(store, wb, changedBefore, { ...authorization, origin: 'undo' }),
+      redo: () =>
+        applyCommentSnapshot(store, wb, changedAfter, { ...authorization, origin: 'redo' }),
+      intent: { ...intent, origin: 'redo' },
+      inverseIntent: { ...intent, origin: 'undo' },
     });
   }
   return result;

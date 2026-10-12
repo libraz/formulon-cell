@@ -1,3 +1,4 @@
+import type { Locale } from '../../i18n/strings.js';
 // Ribbon DOM renderer. Owns the tab/panel layout, the per-command button
 // rendering, the split-button chevron, the display-mode toggle, and the
 // backstage hand-off. State (active tab, collapsed flag, backstage flag,
@@ -104,6 +105,7 @@ export interface RibbonMenus {
   errorChecking?: RibbonMenuFactory;
   watch?: RibbonMenuFactory;
   reviewComments?: RibbonMenuFactory;
+  reviewNewComment?: RibbonMenuFactory;
   protect?: RibbonMenuFactory;
   calcOptions?: RibbonMenuFactory;
   sort?: RibbonMenuFactory;
@@ -151,7 +153,7 @@ export interface RibbonRenderState {
 
 export interface RenderRibbonCtx {
   getInst: () => SpreadsheetInstance | null;
-  ribbonLang: 'ja' | 'en';
+  ribbonLang: Locale;
   ribbonText: ToolbarText;
   ribbonMenuText: ToolbarMenuText;
   ribbonDisplayOptionsText: RibbonDisplayText;

@@ -1,3 +1,5 @@
+import type { OperationIntent } from '../../commands/interaction-policy.js';
+import { workbookThemeMatchesPreset } from '../../engine/workbook-theme-presets.js';
 import {
   addPrintArea,
   clearPrintArea,
@@ -14,6 +16,7 @@ import {
 } from '../../index.js';
 import { pickImageFileDataUrl } from '../../toolbar/dialogs/image-file.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import { applyWorkbookTheme } from '../workbook-theme-action.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
 import { normalizedSelectionRange } from './selection.js';
 
@@ -21,6 +24,13 @@ const buildUiTheme =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyUiTheme'] =>
   (theme) => {
     instance.setTheme(theme);
+  };
+
+const buildWorkbookTheme =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyWorkbookTheme'] =>
+  (presetId) => {
+    applyWorkbookTheme(instance, presetId);
+    instance.host.focus();
   };
 
 /** Normalize the grid's stored theme to the `ThemeName` vocabulary the
@@ -41,6 +51,34 @@ const updatePageThemeMenu =
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(active));
       button.classList.toggle('fc-tb__visual-tile--active', active);
+    }
+    const workbookTheme = instance.workbook.capabilities.workbookTheme
+      ? instance.workbook.getTheme()
+      : null;
+    const workbookThemeIntent: OperationIntent = {
+      operation: 'format',
+      origin: 'ribbon',
+      commandId: 'workbookTheme',
+      effects: [{ kind: 'workbook' }],
+    };
+    const workbookFormatAllowed =
+      instance.commands?.canExecute(workbookThemeIntent).allowed ?? true;
+    const workbookThemeUnavailable =
+      !workbookTheme ||
+      workbookTheme.source === 2 ||
+      instance.store.getState().protection.protectedSheets.size > 0 ||
+      !workbookFormatAllowed;
+    const unavailableReason = instance.i18n.strings.ribbonMenu.themeWorkbookUnavailable;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-workbook-theme-action]')) {
+      const action = button.dataset.workbookThemeAction;
+      const active =
+        !workbookThemeUnavailable &&
+        (action === 'office' || action === 'gray') &&
+        workbookThemeMatchesPreset(instance.workbook, action);
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(active));
+      button.classList.toggle('fc-tb__visual-tile--active', active);
+      setMenuControlDisabled(button, workbookThemeUnavailable, unavailableReason);
     }
   };
 
@@ -155,6 +193,7 @@ const buildSheetBackgroundAction =
 type PageLayoutDropdownDefaults = Pick<
   DynamicDropdownsCtx,
   | 'applyUiTheme'
+  | 'applyWorkbookTheme'
   | 'updatePageThemeMenu'
   | 'applyPrintAreaAction'
   | 'updatePrintAreaMenu'
@@ -168,6 +207,7 @@ export function createPageLayoutDropdownDefaults(
 ): PageLayoutDropdownDefaults {
   return {
     applyUiTheme: buildUiTheme(instance),
+    applyWorkbookTheme: buildWorkbookTheme(instance),
     updatePageThemeMenu: updatePageThemeMenu(instance),
     applyPrintAreaAction: buildPrintAreaAction(instance),
     updatePrintAreaMenu: updatePrintAreaMenu(instance),

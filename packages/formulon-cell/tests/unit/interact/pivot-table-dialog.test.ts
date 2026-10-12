@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { type CellValue, PivotShowValuesAs } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
@@ -347,6 +348,26 @@ describe('attachPivotTableDialog', () => {
     expect(calls).toContain('pivot');
     expect(store.getState().data.sheetIndex).toBe(1);
     expect(store.getState().selection.active).toEqual({ sheet: 1, row: 0, col: 0 });
+    handle.detach();
+  });
+
+  it('refuses new worksheet creation when workbook structure is protected', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    setWorkbookStructureProtected(store, true);
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open({ placement: 'new' });
+    document
+      .querySelector('form')
+      ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).not.toContain('add-sheet');
+    expect(calls).not.toContain('pivot');
+    expect(document.querySelector('.fc-pivotdlg__body')?.textContent).toContain(
+      'Workbook structure is protected.',
+    );
     handle.detach();
   });
 

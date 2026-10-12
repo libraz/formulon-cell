@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cellFont,
+  cellFontFamily,
+  shrinkFontSizeToFit,
+} from '../../../src/render/painters/text.js';
+import {
   FILL_HANDLE_SIZE,
   paintActiveCellOutline,
   paintCellBorders,
@@ -312,6 +317,70 @@ describe('textBaselineY', () => {
 });
 
 describe('paintCellText font strictness', () => {
+  it('never enlarges a small font when shrink-to-fit is requested', () => {
+    expect(shrinkFontSizeToFit(6.5, 100, 40)).toBeLessThanOrEqual(6.5);
+  });
+  it('keeps an explicit cell family first and appends the UI fallback stack', () => {
+    expect(cellFontFamily('Calibri', 'Aptos, system-ui, sans-serif')).toBe(
+      'Calibri, Aptos, system-ui, sans-serif',
+    );
+    expect(cellFontFamily('Calibri', 'var(--fc-font-ui, system-ui, sans-serif)')).toBe(
+      'Calibri, var(--fc-font-ui, system-ui, sans-serif)',
+    );
+    expect(cellFontFamily(undefined, 'Aptos, system-ui, sans-serif')).toBe(
+      'Aptos, system-ui, sans-serif',
+    );
+  });
+
+  it('preserves the existing UI and formula monospace defaults without a cell family', () => {
+    const uiTheme = theme({ fontUi: 'Aptos', fontMono: 'Menlo' });
+    expect(cellFont(undefined, uiTheme, false).family).toBe('Aptos');
+    expect(cellFont(undefined, uiTheme, true).family).toBe('Menlo');
+  });
+
+  it.each([
+    [0.5, '400 6.5px sans-serif'],
+    [1, '400 13px sans-serif'],
+    [2, '400 26px sans-serif'],
+    [4, '400 52px sans-serif'],
+  ])('scales the painted glyph with viewport zoom %s', (zoom, expectedFont) => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 200 * zoom, h: 24 * zoom },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text', value: 'ABC' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      zoom,
+    });
+
+    expect(spy.fonts.at(-1)).toBe(expectedFont);
+  });
+
+  it('applies the same reduced size and baseline direction to vertical alignment', () => {
+    const normal = makeTextSpy();
+    const superscript = makeTextSpy();
+    const subscript = makeTextSpy();
+    const base = {
+      bounds: { x: 0, y: 0, w: 120, h: 30 },
+      theme: theme({ textCell: 20 }),
+      value: { kind: 'text' as const, value: 'x' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+    };
+    paintCellText({ ...base, ctx: normal.ctx });
+    paintCellText({ ...base, ctx: superscript.ctx, format: { fontVertAlign: 'superscript' } });
+    paintCellText({ ...base, ctx: subscript.ctx, format: { fontVertAlign: 'subscript' } });
+
+    expect(superscript.fonts.at(-1)).toBe('400 14px sans-serif');
+    expect(subscript.fonts.at(-1)).toBe('400 14px sans-serif');
+    expect(superscript.fills[0]?.y).toBeLessThan(normal.fills[0]?.y ?? Infinity);
+    expect(subscript.fills[0]?.y).toBeGreaterThan(normal.fills[0]?.y ?? -Infinity);
+  });
+
   it('uses the grid UI font for ordinary numbers like desktop spreadsheets', () => {
     const spy = makeTextSpy();
     paintCellText({
@@ -499,7 +568,7 @@ describe('paintCellText font strictness', () => {
     expect(spy.fills[0]?.x).toBe(3);
   });
 
-  it('shrinks unformatted numbers to fit the cell width before falling back to ####', () => {
+  it.each([false, true])('fits General numbers before #### (explicit=%s)', (explicit) => {
     const fills: string[] = [];
     const ctx = {
       font: '',
@@ -524,6 +593,7 @@ describe('paintCellText font strictness', () => {
     // renderer must trim, not clip.
     paintCellText({
       ctx,
+      format: explicit ? { numFmt: { kind: 'general' } } : undefined,
       bounds: { x: 0, y: 0, w: 60, h: 20 },
       theme: theme({ textCell: 13 }),
       value: { kind: 'number', value: 686.6666666666667 },
@@ -537,6 +607,41 @@ describe('paintCellText font strictness', () => {
     expect(rendered.startsWith('686')).toBe(true);
     expect(rendered.length * 6).toBeLessThanOrEqual(60 - 6);
     expect(rendered).not.toMatch(/^#+$/);
+  });
+
+  it('uses the locale decimal mark in width-fitting scientific output', () => {
+    const fills: string[] = [];
+    const ctx = {
+      font: '',
+      fillStyle: '',
+      direction: 'inherit',
+      textBaseline: 'alphabetic',
+      textAlign: 'left',
+      save(): void {},
+      restore(): void {},
+      beginPath(): void {},
+      rect(): void {},
+      clip(): void {},
+      measureText(text: string): TextMetrics {
+        return { width: text.length * 6 } as TextMetrics;
+      },
+      fillText(text: string): void {
+        fills.push(text);
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    paintCellText({
+      ctx,
+      bounds: { x: 0, y: 0, w: 66, h: 20 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'number', value: 123456789012 },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      locale: 'de-DE',
+    });
+
+    expect(fills).toEqual(['1,2346E+11']);
   });
 
   it('falls back to #### when the integer part itself is wider than the cell', () => {
@@ -633,8 +738,8 @@ describe('paintCellText font strictness', () => {
       format: { bold: true, fontFamily: 'Times New Roman', fontSize: 13 },
     });
 
-    expect(normal.fonts.at(-1)).toBe('400 13px "Times New Roman"');
-    expect(bold.fonts.at(-1)).toBe('700 13px "Times New Roman"');
+    expect(normal.fonts.at(-1)).toBe('400 13px "Times New Roman", sans-serif');
+    expect(bold.fonts.at(-1)).toBe('700 13px "Times New Roman", sans-serif');
     expect(bold.fills[0]?.y).toBe(normal.fills[0]?.y);
   });
 

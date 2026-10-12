@@ -1,7 +1,7 @@
 import {
   applyValueFilter,
   clearFilter,
-  distinctValues,
+  distinctFilterItemsResult,
   filterValueKey,
   inferAutoFilterRange,
   reapplyFilters,
@@ -18,6 +18,7 @@ import type { History } from '../commands/history.js';
 import { phoneticReading, setPhoneticReading } from '../commands/phonetic.js';
 import { inferSortHasHeader, sortRange } from '../commands/sort.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
+import { localeForWorkbook, profileTextKey } from '../engine/profile-text-semantics.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -118,12 +119,12 @@ export function runContextMenuFormatSortItem(
     }
     case 'filterClear': {
       const range = boundRowsToData(store, state.ui.filterRange ?? inferAutoFilterRange(state));
-      recordFilterChange(history, store, () => clearFilter(store.getState(), store, range));
+      recordFilterChange(history, store, () => clearFilter(store.getState(), store, range, wb), wb);
       ctx.afterCommit();
       return true;
     }
     case 'filterReapply': {
-      recordFilterChange(history, store, () => reapplyFilters(store.getState(), store));
+      recordFilterChange(history, store, () => reapplyFilters(store.getState(), store, wb), wb);
       ctx.afterCommit();
       return true;
     }
@@ -131,9 +132,17 @@ export function runContextMenuFormatSortItem(
       const range = boundRowsToData(store, state.ui.filterRange ?? inferAutoFilterRange(state));
       const byCol = state.selection.active.col;
       const keep = filterValueKey(state.data.cells.get(addrKey(state.selection.active))?.value);
-      const hidden = distinctValues(state, range, byCol).filter((k) => k !== keep);
-      recordFilterChange(history, store, () =>
-        applyValueFilter(store.getState(), store, range, byCol, hidden),
+      const locale = localeForWorkbook(wb);
+      const distinct = distinctFilterItemsResult(state, range, byCol, locale, wb);
+      if (distinct.failure) return true;
+      const hidden = distinct.items
+        .map((item) => item.key)
+        .filter((k) => profileTextKey(k, locale) !== profileTextKey(keep, locale));
+      recordFilterChange(
+        history,
+        store,
+        () => applyValueFilter(store.getState(), store, range, byCol, hidden, wb),
+        wb,
       );
       ctx.afterCommit();
       return true;

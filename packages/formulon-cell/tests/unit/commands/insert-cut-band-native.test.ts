@@ -183,10 +183,11 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
       text: 'far note',
     });
     expect(wb.getComment(0, note.row, note.col)).toBeNull();
-    expect(size(wb, 1)).toBe(
+    expect(size(wb, 1)).toBeCloseTo(
       axis === 'col'
         ? store.getState().layout.defaultColWidth
         : store.getState().layout.defaultRowHeight,
+      8,
     );
     expect(size(wb, 3, targetSheet)).toBe(sourceSize);
     expect(size(wb, 4, targetSheet)).toBe(targetSize);
@@ -222,10 +223,11 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     expect(size(wb, 3, targetSheet)).toBe(targetSize);
     expect(history.redo()).toBe(true);
     expect(wb.cellFormula(formulaAddr)).toBe(movedFormula);
-    expect(size(wb, 1)).toBe(
+    expect(size(wb, 1)).toBeCloseTo(
       axis === 'col'
         ? store.getState().layout.defaultColWidth
         : store.getState().layout.defaultRowHeight,
+      8,
     );
   });
 

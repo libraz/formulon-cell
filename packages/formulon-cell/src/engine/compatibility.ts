@@ -13,6 +13,9 @@ export type SpreadsheetCompatibilityId =
   | 'data-validation'
   | 'hyperlinks'
   | 'comments'
+  | 'threaded-comments'
+  | 'images'
+  | 'workbook-theme'
   | 'phonetic'
   | 'defined-names'
   | 'named-cell-styles'
@@ -108,6 +111,30 @@ export function summarizeSpreadsheetCompatibility(
     (passthroughs.byCategory.media ?? 0);
 
   const items: SpreadsheetCompatibilityItem[] = [
+    {
+      id: 'threaded-comments',
+      label: 'Threaded comments',
+      status: c.threadedComments ? 'writable' : 'unsupported',
+      reason: c.threadedComments
+        ? 'Threaded comments, replies, people and resolution can be read and written.'
+        : 'Threaded comment editing requires the native comment and person APIs.',
+    },
+    {
+      id: 'images',
+      label: 'Images',
+      status: c.images ? 'writable' : 'session',
+      reason: c.images
+        ? 'Picture bytes and anchors can be loaded, inserted and removed.'
+        : 'Pictures are available as session overlays.',
+    },
+    {
+      id: 'workbook-theme',
+      label: 'Workbook theme',
+      status: c.workbookTheme ? 'writable' : 'unsupported',
+      reason: c.workbookTheme
+        ? 'The workbook colour scheme and major/minor typefaces can be read and written.'
+        : 'Workbook theme editing requires the native theme APIs.',
+    },
     {
       id: 'cell-formatting',
       label: 'Cell formatting',

@@ -1,6 +1,7 @@
 import type { Strings } from '../i18n/strings.js';
 import type { NegativeStyle } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogIconButton,
   appendDialogOptionButton,
@@ -19,7 +20,7 @@ interface CreateFormatDialogViewInput {
   host: HTMLElement;
   strings: Strings;
   t: Strings['formatDialog'];
-  fontLocale?: 'ja' | 'en';
+  fontLocale?: import('../i18n/strings.js').Locale;
 }
 
 export function createFormatDialogView(input: CreateFormatDialogViewInput) {
@@ -239,10 +240,17 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     [
       { value: 'ja', label: '日本語' },
       { value: 'en', label: 'English' },
+      { value: 'de', label: 'Deutsch' },
+      { value: 'fr', label: 'Français' },
+      { value: 'zh', label: '简体中文' },
+      { value: 'ko', label: '한국어' },
+      { value: 'th', label: 'ไทย' },
     ],
     'ja',
     { className: '', ariaLabel: t.languageLocation },
   );
+  // Per-cell locale overrides are not persisted yet; show the active UI locale.
+  projectDisabledState(localeSelect, true, null);
   localeRow.append(localeLabel, localeSelect);
   numberControls.appendChild(localeRow);
 
@@ -262,6 +270,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     { className: '', ariaLabel: t.calendarType },
   );
   calendarSelect.dataset.fcSelect = 'calendarType';
+  // Calendar selection has no persisted format mapping yet.
+  projectDisabledState(calendarSelect, true, null);
   calendarRow.append(calendarLabel, calendarSelect);
   numberControls.appendChild(calendarRow);
 
@@ -314,7 +324,12 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   } = alignTab;
 
   // ── Font tab ───────────────────────────────────────────────────────────
-  const fontTab = createFontTab(tabPanels.get('font') as HTMLDivElement, t, fontLocale);
+  const fontTab = createFontTab(
+    tabPanels.get('font') as HTMLDivElement,
+    t,
+    fontLocale,
+    strings.ribbon.fontFamilies,
+  );
   const {
     boldCk,
     italicCk,

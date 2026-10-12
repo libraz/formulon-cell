@@ -155,6 +155,12 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.draw.pencil': 'object',
   'mac.draw.highlighter': 'object',
   'mac.draw.trackpad': 'object',
+  'mac.page.theme.office': 'format',
+  'mac.page.theme.gray': 'format',
+  'mac.page.color.office': 'format',
+  'mac.page.color.gray': 'format',
+  'mac.page.font.office': 'format',
+  'mac.page.font.gray': 'format',
   'mac.page.background': 'pageSetup',
   'mac.page.printTitles': 'pageSetup',
   'mac.page.pageSetup': 'pageSetup',
@@ -244,9 +250,8 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.data.hideDetail': 'format',
   'mac.data.analysis': 'object',
   'mac.review.newComment': 'comment',
+  'mac.review.deleteComment': 'comment',
   'mac.review.newNote': 'comment',
-  'mac.review.previousNote': 'comment',
-  'mac.review.nextNote': 'comment',
   'mac.review.protectSheet': 'protection',
   'mac.review.protectWorkbook': 'protection',
   'mac.view.freeze': 'format',
@@ -286,6 +291,7 @@ const SAFE_NAVIGATION_COMMANDS: ReadonlySet<string> = new Set([
   'mac.insert.shapes',
   'mac.draw.eraser',
   'mac.draw.add',
+  'mac.page.theme',
   'mac.page.color',
   'mac.page.font',
   'mac.page.margins',
@@ -338,6 +344,10 @@ const SAFE_NAVIGATION_COMMANDS: ReadonlySet<string> = new Set([
 const SELECTING_NAVIGATION_COMMANDS: ReadonlySet<string> = new Set([
   'selectAll',
   'mac.formulas.errorCheck.run',
+  'mac.review.previousComment',
+  'mac.review.nextComment',
+  'mac.review.previousNote',
+  'mac.review.nextNote',
 ]);
 
 const SELECTION_FORMAT_COMMANDS: ReadonlySet<string> = new Set([
@@ -398,7 +408,9 @@ export function canExecuteBuiltIn(
   const operation =
     BUILT_IN_COMMAND_OPERATION[id] ?? (dynamicFunctionRecorded ? 'formulaEdit' : undefined);
   if (!operation) return unsupported(id);
-  if (operation === 'format' && !SELECTION_FORMAT_COMMANDS.has(id)) return unsupported(id);
+  const workbookTheme = /^mac\.page\.(theme|color|font)\.(office|gray)$/.test(id);
+  if (operation === 'format' && !SELECTION_FORMAT_COMMANDS.has(id) && !workbookTheme)
+    return unsupported(id);
   const state = store.getState();
   const selectionFormat =
     operation === 'format' && SELECTION_FORMAT_COMMANDS.has(id)
@@ -411,7 +423,7 @@ export function canExecuteBuiltIn(
     origin,
     commandId: id,
     effects:
-      operation === 'print' || operation === 'export'
+      operation === 'print' || operation === 'export' || workbookTheme
         ? [{ kind: 'workbook' }]
         : (selectionFormat ?? [{ kind: 'range', range: state.selection.range }]),
   };

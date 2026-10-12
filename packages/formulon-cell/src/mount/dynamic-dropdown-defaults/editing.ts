@@ -465,7 +465,13 @@ const buildSortMenuAction =
             },
           ]);
         } else {
-          applyAdvancedFilter(instance.store.getState(), instance.store, listRange, criteriaRange);
+          applyAdvancedFilter(
+            instance.store.getState(),
+            instance.store,
+            listRange,
+            criteriaRange,
+            instance.workbook,
+          );
         }
       } finally {
         instance.history.end();
@@ -488,6 +494,7 @@ const buildSortMenuAction =
         store: instance.store,
         history: instance.history,
         action: filterAction,
+        getWb: () => instance.workbook,
       });
       instance.host.focus();
     }

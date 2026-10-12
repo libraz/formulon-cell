@@ -47,6 +47,37 @@ describe('Goal Seek dialog', () => {
     expect(status().textContent).not.toBe('');
   });
 
+  it('uses a locale-aware decimal text input and rejects an empty target', async () => {
+    fx.i18n.setLocale('de');
+    const target = byId<HTMLInputElement>('fc-mac-goalseek-target-value');
+    expect(target.type).toBe('text');
+    expect(target.inputMode).toBe('decimal');
+
+    target.value = '1,5';
+    byAction('goal-seek-ok').click();
+    await waitFor(() => status().dataset.state === 'success');
+    byAction('goal-seek-cancel').click();
+
+    openMacGoalSeekDialog(fx.instance);
+    const reopenedTarget = byId<HTMLInputElement>('fc-mac-goalseek-target-value');
+    reopenedTarget.value = '';
+    byAction('goal-seek-ok').click();
+    expect(status().dataset.state).toBe('error');
+    expect(reopenedTarget.value).toBe('');
+  });
+
+  it('hydrates numeric targets with the active locale', () => {
+    fx.i18n.setLocale('de');
+    disposeMacGoalSeekDialog(fx.instance);
+    openMacGoalSeekDialog(fx.instance);
+    expect(byId<HTMLInputElement>('fc-mac-goalseek-target-value').value).toBe('3');
+
+    fx.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1234.5);
+    disposeMacGoalSeekDialog(fx.instance);
+    openMacGoalSeekDialog(fx.instance);
+    expect(byId<HTMLInputElement>('fc-mac-goalseek-target-value').value).toBe('1234,5');
+  });
+
   it('ignores Enter on the Cancel button', () => {
     const event = pressEnter(byAction('goal-seek-cancel'));
     expect(event.defaultPrevented).toBe(false);

@@ -574,6 +574,20 @@ describe('filter commands', () => {
     expect(state.layout.hiddenRows.size).toBe(0);
   });
 
+  it('reveals the range when Select All removes the last value criterion', () => {
+    seedText(store, 0, 0, 'Name');
+    seedText(store, 1, 0, 'East');
+    seedText(store, 2, 0, 'West');
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+
+    applyValueFilter(store.getState(), store, range, 0, ['West']);
+    expect(store.getState().layout.hiddenRows).toEqual(new Set([2]));
+
+    applyValueFilter(store.getState(), store, range, 0, []);
+    expect(store.getState().ui.filterCriteria).toEqual([]);
+    expect(store.getState().layout.hiddenRows).toEqual(new Set());
+  });
+
   it('distinctFilterItems scans materialized cells for huge ranges', () => {
     const range = { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 };
     seedText(store, 1, 0, 'b');

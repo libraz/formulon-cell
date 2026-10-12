@@ -29,6 +29,19 @@ export interface EditDialogsStrings {
     title: string;
     titleEdit: string;
     placeholder: string;
+    /** Header used by the native threaded-comment surface. */
+    threadTitle?: string;
+    /** Placeholder used while composing a native threaded comment. */
+    threadPlaceholder?: string;
+    reply?: string;
+    resolve?: string;
+    reopen?: string;
+    edit?: string;
+    noReplies?: string;
+    authorFallback?: string;
+    noteConflict?: string;
+    threadConflict?: string;
+    writeFailed?: string;
     remove: string;
     cancel: string;
     ok: string;

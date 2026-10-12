@@ -17,12 +17,13 @@ import {
   type WorkbookHandle,
 } from '@libraz/formulon-cell';
 import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 export interface SpreadsheetProps {
   /** Optional pre-loaded workbook (e.g. from xlsx bytes). When omitted, a
    *  fresh default workbook is created on mount. */
   workbook?: WorkbookHandle;
+  getWorkbookName?: MountOptions['getWorkbookName'];
   /** Host interaction restrictions for embedded forms and viewers. */
   policy?: MountOptions['policy'];
   /** Visible/selectable bounds and keyboard-navigation behavior. */
@@ -41,7 +42,8 @@ export interface SpreadsheetProps {
    *  `instance.setTheme()` to keep the spreadsheet in sync. */
   theme?: MountOptions['theme'];
   /** UI locale. When the prop changes after mount, the component calls
-   *  `instance.i18n.setLocale()`. */
+   *  `instance.setLocale()` and reports a rejected controlled update through
+   *  `onLocaleChange` with the active locale plus `onError`. */
   locale?: MountOptions['locale'];
   /** Per-string overrides applied on top of the chosen locale. */
   strings?: MountOptions['strings'];
@@ -71,7 +73,7 @@ export interface SpreadsheetProps {
   /** Fires once after mount with the live instance. Use this to wire toolbars
    *  / menus that talk to the spreadsheet's imperative API. */
   onReady?: (instance: SpreadsheetInstance) => void;
-  /** Fires when the component cannot mount a spreadsheet instance. */
+  /** Fires when mounting or a runtime locale update fails. */
   onError?: (error: unknown) => void;
   /** Optional framework-native fallback shown after mount failure. */
   errorFallback?: ReactNode | ((error: unknown) => ReactNode);
@@ -84,7 +86,8 @@ export interface SpreadsheetProps {
   onSelectionChange?: (e: SelectionChangeEvent) => void;
   /** Fires after `instance.setWorkbook(next)` swaps the engine. */
   onWorkbookChange?: (e: WorkbookChangeEvent) => void;
-  /** Fires when `instance.i18n.setLocale` switches the active dictionary. */
+  /** Fires when the active dictionary changes, including controlled-prop
+   *  reconciliation after a rejected locale update. */
   onLocaleChange?: (e: LocaleChangeEvent) => void;
   /** Fires when the host theme attribute changes. */
   onThemeChange?: (e: ThemeChangeEvent) => void;
@@ -105,11 +108,24 @@ const applyRuntimeProps = async (
   inst: SpreadsheetInstance,
   props: SpreadsheetProps,
   baseline: SpreadsheetProps = {},
+  handlers: {
+    onLocaleChange?: (event: LocaleChangeEvent) => void;
+    onError?: (error: unknown) => void;
+    getLocaleEventGeneration?: () => number;
+  } = {},
 ): Promise<void> => {
   const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
   const ui = props.ui ? resolvedUi : null;
   if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
-    await inst.setWorkbook(props.workbook);
+    try {
+      await inst.setWorkbook(props.workbook);
+    } catch (error) {
+      // A controlled replacement is transactional in core: the old workbook
+      // remains active when validation/profile setup rejects the incoming one.
+      // Report the original error, then continue reconciling the independent
+      // controlled props captured while the async mount was pending.
+      handlers.onError?.(error);
+    }
   }
   if (props.policy !== baseline.policy) inst.setPolicy(props.policy);
   if (props.viewport !== baseline.viewport) inst.setViewportOptions(props.viewport);
@@ -120,8 +136,17 @@ const applyRuntimeProps = async (
   const baselineTheme =
     baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
   if (nextTheme && nextTheme !== baselineTheme) inst.setTheme(nextTheme);
-  if (props.locale && props.locale !== baseline.locale) inst.i18n.setLocale(props.locale);
-  if (props.strings && props.strings !== baseline.strings) {
+  const localeAccepted =
+    props.locale && props.locale !== baseline.locale
+      ? applyLocale(
+          inst,
+          props.locale,
+          handlers.onLocaleChange,
+          handlers.onError,
+          handlers.getLocaleEventGeneration,
+        )
+      : undefined;
+  if (props.strings && (props.strings !== baseline.strings || localeAccepted === true)) {
     inst.i18n.extend(inst.i18n.locale, props.strings);
   }
   if (props.features !== baseline.features || props.ui !== baseline.ui) {
@@ -145,6 +170,38 @@ const applyRuntimeProps = async (
   }
 };
 
+const applyLocale = (
+  inst: SpreadsheetInstance,
+  requested: string,
+  onLocaleChange?: (event: LocaleChangeEvent) => void,
+  onError?: (error: unknown) => void,
+  getLocaleEventGeneration?: () => number,
+): boolean => {
+  const generationBefore = getLocaleEventGeneration?.();
+  let accepted = false;
+  let failure: unknown;
+  try {
+    accepted = inst.setLocale(requested);
+  } catch (error) {
+    failure = error;
+  }
+  if (accepted) return true;
+
+  // The core normally emits this during its rollback. Keep this explicit
+  // fallback so adapters also reconcile correctly when a host instance (or a
+  // future core version) rejects without emitting the rollback event.
+  if (generationBefore === undefined || getLocaleEventGeneration?.() === generationBefore) {
+    onLocaleChange?.({ locale: inst.locale, strings: inst.i18n.strings });
+  }
+  onError?.(
+    failure ??
+      new Error(
+        `formulon-cell: locale change to "${requested}" was rejected; active locale is "${inst.locale}"`,
+      ),
+  );
+  return false;
+};
+
 const SpreadsheetComponent = (
   props: SpreadsheetProps,
   ref: ForwardedRef<SpreadsheetRef>,
@@ -159,6 +216,13 @@ const SpreadsheetComponent = (
   const propsRef = useRef(props);
   propsRef.current = props;
   const previousUiRef = useRef(props.ui);
+  const localeEventGenerationRef = useRef(0);
+
+  const notifyLocaleChange = useCallback((event: LocaleChangeEvent): void => {
+    localeEventGenerationRef.current += 1;
+    propsRef.current.onLocaleChange?.(event);
+  }, []);
+  const getLocaleEventGeneration = useCallback(() => localeEventGenerationRef.current, []);
 
   useImperativeHandle(
     ref,
@@ -195,6 +259,7 @@ const SpreadsheetComponent = (
         ...(cur.printerProfiles ? { printerProfiles: cur.printerProfiles } : {}),
         ...(cur.printerProfileId ? { printerProfileId: cur.printerProfileId } : {}),
         refreshPrinterProfiles: () => propsRef.current.refreshPrinterProfiles?.(),
+        getWorkbookName: () => propsRef.current.getWorkbookName?.(),
         captureScreenClip: () => propsRef.current.captureScreenClip?.(),
         getFunctionArgumentHelp: (name, index, locale) =>
           propsRef.current.getFunctionArgumentHelp?.(name, index, locale),
@@ -220,12 +285,18 @@ const SpreadsheetComponent = (
         inst.on('cellChange', (e) => propsRef.current.onCellChange?.(e)),
         inst.on('selectionChange', (e) => propsRef.current.onSelectionChange?.(e)),
         inst.on('workbookChange', (e) => propsRef.current.onWorkbookChange?.(e)),
-        inst.on('localeChange', (e) => propsRef.current.onLocaleChange?.(e)),
+        inst.on('localeChange', notifyLocaleChange),
         inst.on('themeChange', (e) => propsRef.current.onThemeChange?.(e)),
         inst.on('recalc', (e) => propsRef.current.onRecalc?.(e)),
       );
       if (propsRef.current !== cur) {
-        await applyRuntimeProps(inst, propsRef.current, cur);
+        await applyRuntimeProps(inst, propsRef.current, cur, {
+          onLocaleChange: notifyLocaleChange,
+          onError: (error) => {
+            if (!disposed) propsRef.current.onError?.(error);
+          },
+          getLocaleEventGeneration,
+        });
       }
       if (disposed) return;
       setLiveInstance(inst);
@@ -244,21 +315,35 @@ const SpreadsheetComponent = (
     };
     // Mount once; prop mutations land via imperative methods on `instance`
     // and event handlers re-read from propsRef on each fire.
-  }, []);
+  }, [getLocaleEventGeneration, notifyLocaleChange]);
 
   // Forward reactive theme / locale / features / extensions prop changes
   // to the running instance via imperative APIs — avoids re-mounting.
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst || !props.workbook || props.workbook === inst.workbook) return;
-    void inst.setWorkbook(props.workbook);
+    void inst.setWorkbook(props.workbook).catch((error: unknown) => {
+      // Do not surface a late rejection after the instance has been disposed
+      // or replaced by another mount.
+      if (instanceRef.current === inst) propsRef.current.onError?.(error);
+    });
   }, [props.workbook]);
 
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst || !props.locale) return;
-    inst.i18n.setLocale(props.locale);
-  }, [props.locale]);
+    const accepted = applyLocale(
+      inst,
+      props.locale,
+      notifyLocaleChange,
+      (error) => propsRef.current.onError?.(error),
+      getLocaleEventGeneration,
+    );
+    const strings = propsRef.current.strings;
+    if (accepted && strings) {
+      inst.i18n.extend(inst.i18n.locale, strings);
+    }
+  }, [getLocaleEventGeneration, notifyLocaleChange, props.locale]);
 
   useEffect(() => {
     const inst = instanceRef.current;

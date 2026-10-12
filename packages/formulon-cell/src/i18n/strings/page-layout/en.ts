@@ -9,6 +9,7 @@ export const pageLayoutEn: PageLayoutStrings = {
     rulerUnit: 'in',
   },
   pageSetup: {
+    printRangeTooLarge: 'The print area is too large. Select a smaller print area and try again.',
     title: 'Page Setup',
     tabPage: 'Page',
     tabMargins: 'Margins',

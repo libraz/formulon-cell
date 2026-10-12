@@ -1,6 +1,20 @@
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import {
+  type ActiveAxisFormatSnapshot,
+  captureActiveAxisFormatOverrideForStructure,
+  restoreActiveAxisFormatOverrideForStructure,
+} from '../engine/axis-format-sync.js';
+import {
+  captureSyncedFormatKeysForStructure,
+  restoreSyncedFormatKeysForStructure,
+} from '../engine/cell-format-sync.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
+import {
+  type ActiveWholeSheetFontSnapshot,
+  captureActiveWholeSheetFontOverrideForStructure,
+  restoreActiveWholeSheetFontOverrideForStructure,
+} from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
 import { rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
@@ -20,11 +34,122 @@ export interface CellRecord {
   formula: string | null;
 }
 
+interface ShiftCellRecord extends CellRecord {
+  /** Effective XF to carry with a moved value when the source inherited an
+   * axis style. Null leaves the destination at its normal/inherited style. */
+  styleXf: number | null;
+}
+
 interface EngineCommentRecord {
   addr: Addr;
   author: string;
   text: string;
 }
+
+export interface ShiftReplayCheckpoint {
+  readonly store: State;
+  readonly activeAxis: ActiveAxisFormatSnapshot | null;
+  readonly activeWholeSheetFont: ActiveWholeSheetFontSnapshot | null;
+  readonly syncedFormatKeys: ReadonlySet<string> | null;
+  readonly cells: readonly CellRecord[];
+  readonly externalFormulas: readonly CellRecord[];
+  readonly style: Uint8Array | null;
+  readonly comments: readonly EngineCommentRecord[];
+  readonly merges: readonly Range[];
+}
+
+export interface ShiftHistoryReplayRecovery {
+  restore?: (phase: 'undo' | 'redo') => void;
+  capture?: () => ShiftReplayCheckpoint;
+  before?: ShiftReplayCheckpoint;
+  after?: ShiftReplayCheckpoint;
+}
+
+const cloneStoreState = (store: SpreadsheetStore): State =>
+  structuredClone(store.getState()) as State;
+
+export const captureShiftReplayCheckpoint = (
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  affected: Range,
+): ShiftReplayCheckpoint => {
+  const style =
+    wb.capabilities.rangeStyleSnapshot === true ? wb.snapshotRangeStyle(affected) : null;
+  if (wb.capabilities.rangeStyleSnapshot === true && style === null) {
+    throw new Error('cell shift: native range style replay checkpoint failed');
+  }
+  return {
+    store: cloneStoreState(store),
+    activeAxis: captureActiveAxisFormatOverrideForStructure(wb, affected.sheet),
+    activeWholeSheetFont: captureActiveWholeSheetFontOverrideForStructure(wb, affected.sheet),
+    syncedFormatKeys: captureSyncedFormatKeysForStructure(wb, affected.sheet),
+    cells: collectSheetCells(wb, affected.sheet),
+    externalFormulas: collectExternalFormulaCells(wb, affected.sheet),
+    style,
+    comments: collectEngineComments(
+      wb,
+      affected,
+      listComments(store.getState(), affected.sheet).map((comment) => comment.addr),
+    ),
+    merges: wb.capabilities.merges
+      ? wb.getMerges(affected.sheet).map((merge) => ({ ...merge }))
+      : [],
+  };
+};
+
+export const restoreShiftReplayCheckpoint = (
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  affected: Range,
+  checkpoint: ShiftReplayCheckpoint,
+): void => {
+  wb.withEngineSyncMuted(() => {
+    store.setState(() => structuredClone(checkpoint.store) as State);
+    restoreActiveAxisFormatOverrideForStructure(wb, affected.sheet, checkpoint.activeAxis);
+    restoreActiveWholeSheetFontOverrideForStructure(
+      wb,
+      affected.sheet,
+      checkpoint.activeWholeSheetFont,
+    );
+    restoreSyncedFormatKeysForStructure(wb, affected.sheet, checkpoint.syncedFormatKeys);
+    wb.withBatchedRecalc(() => {
+      restoreSheetCells(wb, affected.sheet, checkpoint.cells);
+      restoreFormulaCells(wb, checkpoint.externalFormulas);
+    });
+    if (checkpoint.style !== null && !wb.restoreRangeStyle(affected.sheet, checkpoint.style)) {
+      throw new Error('cell shift: failed to restore transaction style');
+    }
+    if (wb.capabilities.comments) {
+      const currentComments = collectEngineComments(
+        wb,
+        affected,
+        listComments(store.getState(), affected.sheet).map((comment) => comment.addr),
+      );
+      for (const comment of currentComments) {
+        wb.setCommentEntry(comment.addr.sheet, comment.addr.row, comment.addr.col, '', '');
+      }
+      for (const comment of checkpoint.comments) {
+        wb.setCommentEntry(
+          comment.addr.sheet,
+          comment.addr.row,
+          comment.addr.col,
+          comment.author,
+          comment.text,
+        );
+      }
+    }
+    if (wb.capabilities.merges) {
+      if (!wb.engineClearMerges(affected.sheet)) {
+        throw new Error('cell shift: failed to restore merges');
+      }
+      for (const merge of checkpoint.merges) {
+        if (!wb.engineAddMerge(affected.sheet, merge)) {
+          throw new Error('cell shift: failed to restore merge');
+        }
+      }
+    }
+  });
+};
 
 export function insertCells(
   store: SpreadsheetStore,
@@ -76,27 +201,14 @@ function shiftCellBand(
     return false;
   }
 
-  if (history) history.begin();
+  const replayRecovery: ShiftHistoryReplayRecovery = {};
+  if (history && !history.isReplaying()) {
+    replayRecovery.capture = () => captureShiftReplayCheckpoint(wb, store, affected);
+  }
+  const transaction = history?.begin();
+  let transactionClosed = false;
   try {
-    const beforeCells =
-      history && !history.isReplaying() ? collectSheetCells(wb, affected.sheet) : null;
-    const beforeExternalFormulas =
-      history && !history.isReplaying() ? collectExternalFormulaCells(wb, affected.sheet) : null;
-    shiftCells(wb, affected, axis, delta);
-    if (history && beforeCells && beforeExternalFormulas) {
-      const afterCells = collectSheetCells(wb, affected.sheet);
-      const afterExternalFormulas = collectExternalFormulaCells(wb, affected.sheet);
-      history.push({
-        undo: () => {
-          restoreSheetCells(wb, affected.sheet, beforeCells);
-          restoreFormulaCells(wb, beforeExternalFormulas);
-        },
-        redo: () => {
-          restoreSheetCells(wb, affected.sheet, afterCells);
-          restoreFormulaCells(wb, afterExternalFormulas);
-        },
-      });
-    }
+    if (!shiftCellsWithHistory(wb, history, affected, axis, delta, replayRecovery)) return false;
     const initialStoreCommentAddresses = listComments(store.getState(), affected.sheet)
       .filter((comment) => rangeContainsAddr(affected, comment.addr))
       .map((comment) => comment.addr);
@@ -119,10 +231,208 @@ function shiftCellBand(
     });
     shiftMerges(store, wb, history, affected, axis, delta);
     wb.recalcAuto();
+    if (history && !history.isReplaying()) {
+      replayRecovery.restore = (phase) => {
+        const checkpoint = phase === 'undo' ? replayRecovery.after : replayRecovery.before;
+        if (!checkpoint) throw new Error(`cell shift: ${phase} replay checkpoint was not armed`);
+        restoreShiftReplayCheckpoint(wb, store, affected, checkpoint);
+      };
+      history.push({
+        undo: () => {
+          replayRecovery.after = replayRecovery.capture?.();
+        },
+        redo: () => {
+          replayRecovery.before = undefined;
+          replayRecovery.after = undefined;
+        },
+      });
+    }
+  } catch (error) {
+    if (transaction !== undefined) {
+      transactionClosed = true;
+      try {
+        history?.abort(transaction);
+      } catch (abortError) {
+        throw new AggregateError(
+          [error, abortError],
+          'cell shift: initial transaction rollback failed',
+          { cause: error },
+        );
+      }
+    }
+    throw error;
   } finally {
-    if (history) history.end();
+    if (transaction !== undefined && !transactionClosed) history?.end(transaction);
   }
   return true;
+}
+
+/**
+ * Shift a cell band and record the value/formula change as one history child.
+ *
+ * Cell writes used while moving values can materialize the effective row or
+ * column style as a direct XF. The native range checkpoint is deliberately
+ * attached to this value child, so both undo and redo restore styles after
+ * the value replay has finished. Partial cell shifts keep axis journal keys
+ * at their original coordinates; the native checkpoint is the source of
+ * truth for the affected rectangle.
+ */
+export function shiftCellsWithHistory(
+  wb: WorkbookHandle,
+  history: History | null,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+  replayRecovery?: ShiftHistoryReplayRecovery,
+): boolean {
+  const recording = history !== null && !history.isReplaying();
+  const beforeCells = recording ? collectSheetCells(wb, affected.sheet) : null;
+  const beforeExternalFormulas = recording ? collectExternalFormulaCells(wb, affected.sheet) : null;
+  const checkpointEnabled = recording && wb.capabilities.rangeStyleSnapshot === true;
+  let beforeStyle: Uint8Array | null = null;
+
+  if (checkpointEnabled) {
+    beforeStyle = wb.snapshotRangeStyle(affected);
+    // A capable native module must provide a checkpoint. Refusing before the
+    // mutation keeps the command atomic when the adapter/native call fails.
+    if (beforeStyle === null) return false;
+  }
+
+  try {
+    shiftCells(wb, affected, axis, delta);
+    const afterCells = recording ? collectSheetCells(wb, affected.sheet) : null;
+    const afterExternalFormulas = recording
+      ? collectExternalFormulaCells(wb, affected.sheet)
+      : null;
+    let afterStyle: Uint8Array | null = null;
+    if (checkpointEnabled) {
+      afterStyle = wb.snapshotRangeStyle(affected);
+      if (afterStyle === null) {
+        throw new Error('cell shift: native range style after-snapshot failed');
+      }
+    }
+
+    if (history && beforeCells && beforeExternalFormulas && afterCells && afterExternalFormulas) {
+      history.push({
+        undo: () => {
+          if (replayRecovery && replayRecovery.after === undefined) {
+            replayRecovery.after = replayRecovery.capture?.();
+          }
+          replayCellShiftSnapshot(
+            wb,
+            affected,
+            beforeCells,
+            beforeExternalFormulas,
+            beforeStyle,
+            afterCells,
+            afterExternalFormulas,
+            afterStyle,
+            replayRecovery,
+            'undo',
+          );
+        },
+        redo: () => {
+          if (replayRecovery) replayRecovery.before = replayRecovery.capture?.();
+          replayCellShiftSnapshot(
+            wb,
+            affected,
+            afterCells,
+            afterExternalFormulas,
+            afterStyle,
+            beforeCells,
+            beforeExternalFormulas,
+            beforeStyle,
+            replayRecovery,
+            'redo',
+          );
+        },
+      });
+    }
+    return true;
+  } catch (error) {
+    if (recording && beforeCells && beforeExternalFormulas) {
+      const rollbackErrors: unknown[] = [];
+      try {
+        restoreSheetCells(wb, affected.sheet, beforeCells);
+        restoreFormulaCells(wb, beforeExternalFormulas);
+      } catch (rollbackError) {
+        rollbackErrors.push(rollbackError);
+      }
+      try {
+        restoreCellShiftStyle(wb, affected, beforeStyle);
+      } catch (rollbackError) {
+        rollbackErrors.push(rollbackError);
+      }
+      if (rollbackErrors.length > 0) {
+        throw new AggregateError(
+          [error, ...rollbackErrors],
+          'cell shift: value/style rollback failed',
+          { cause: error },
+        );
+      }
+    }
+    throw error;
+  }
+}
+
+/** Replay a value/style checkpoint as one atomic history child. Value replay
+ * can materialize direct XFs before the range-style restore runs. If that
+ * restore rejects, put both the values and the native style back to the state
+ * that was visible before this child started; otherwise a failed undo would
+ * leave the child half-applied while its containing transaction continues. */
+function replayCellShiftSnapshot(
+  wb: WorkbookHandle,
+  affected: Range,
+  targetCells: readonly CellRecord[],
+  targetExternalFormulas: readonly CellRecord[],
+  targetStyle: Uint8Array | null,
+  rollbackCells: readonly CellRecord[],
+  rollbackExternalFormulas: readonly CellRecord[],
+  rollbackStyle: Uint8Array | null,
+  replayRecovery: ShiftHistoryReplayRecovery | undefined,
+  phase: 'undo' | 'redo',
+): void {
+  try {
+    restoreSheetCells(wb, affected.sheet, targetCells);
+    restoreFormulaCells(wb, targetExternalFormulas);
+    restoreCellShiftStyle(wb, affected, targetStyle);
+  } catch (error) {
+    const rollbackErrors: unknown[] = [];
+    try {
+      restoreSheetCells(wb, affected.sheet, rollbackCells);
+      restoreFormulaCells(wb, rollbackExternalFormulas);
+    } catch (rollbackError) {
+      rollbackErrors.push(rollbackError);
+    }
+    try {
+      restoreCellShiftStyle(wb, affected, rollbackStyle);
+    } catch (rollbackError) {
+      rollbackErrors.push(rollbackError);
+    }
+    try {
+      replayRecovery?.restore?.(phase);
+    } catch (recoveryError) {
+      rollbackErrors.push(recoveryError);
+    }
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...rollbackErrors],
+        'cell shift: history replay rollback failed',
+        { cause: error },
+      );
+    }
+    throw error;
+  }
+}
+
+function restoreCellShiftStyle(
+  wb: WorkbookHandle,
+  affected: Range,
+  bytes: Uint8Array | null,
+): void {
+  if (bytes === null) return;
+  const restored = wb.withEngineSyncMuted(() => wb.restoreRangeStyle(affected.sheet, bytes));
+  if (!restored) throw new Error('cell shift: native range style restore failed');
 }
 
 function collectSheetCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
@@ -267,16 +577,30 @@ function writeShiftedCells(
   delta: number,
 ): void {
   const allSheets = Array.from({ length: wb.sheetCount }, (_, sheet) =>
-    Array.from(wb.physicalCells(sheet)).map<CellRecord>((c) => ({
+    Array.from(wb.physicalCells(sheet)).map<ShiftCellRecord>((c) => ({
       addr: c.addr,
       value: c.value,
       formula: c.formula,
+      styleXf: styleXfForMovedCell(wb, c.addr),
     })),
   );
   const all = allSheets[affected.sheet] ?? [];
   const sheetNames = Array.from({ length: wb.sheetCount }, (_, sheet) => wb.sheetName(sheet));
   const moving = all.filter((cell) => rangeContainsAddr(affected, cell.addr));
-  for (const cell of moving) wb.setBlank(cell.addr);
+  for (const cell of moving) {
+    wb.setBlank(cell.addr);
+    // setBlank clears contents only. A partial shift must also remove the
+    // source's direct XF, including an explicit blank XF0 or an imported XF
+    // whose value has moved elsewhere. Older native bundles cannot express
+    // that distinction, so keep their historical behavior behind the
+    // capability guard.
+    if (
+      wb.capabilities.cellFormattingClear === true &&
+      !wb.clearCellXfIndex(cell.addr.sheet, cell.addr.row, cell.addr.col)
+    ) {
+      throw new Error('cell shift: failed to clear moved source style');
+    }
+  }
 
   const sorted =
     axis === 'down'
@@ -297,6 +621,9 @@ function writeShiftedCells(
         })
       : null;
     writeCell(wb, next, cell.value, formula);
+    if (cell.styleXf !== null && !wb.setCellXfIndex(next.sheet, next.row, next.col, cell.styleXf)) {
+      throw new Error('cell shift: failed to preserve moved cell style');
+    }
   }
 
   for (let sheet = 0; sheet < allSheets.length; sheet += 1) {
@@ -312,6 +639,17 @@ function writeShiftedCells(
       if (nextFormula !== cell.formula) wb.setFormula(cell.addr, nextFormula);
     }
   }
+}
+
+/** Preserve the visible style of a value while moving it between rows or
+ * columns. A partial cell shift does not move the row/column axis records, so
+ * writing only the value would otherwise resolve the destination against a
+ * different inherited XF. */
+function styleXfForMovedCell(wb: WorkbookHandle, addr: Addr): number | null {
+  const effective = wb.getEffectiveStyle(addr.sheet, addr.row, addr.col);
+  if (effective?.source === 0) return effective.xfIndex;
+  if (effective && effective.xfIndex !== 0) return effective.xfIndex;
+  return null;
 }
 
 export function shiftFormats(

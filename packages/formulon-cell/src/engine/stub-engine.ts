@@ -479,6 +479,12 @@ const asWorkbook = (wb: StubWorkbook): Workbook => wb as unknown as Workbook;
 class StubModule implements FormulonModule {
   Workbook = {
     createDefault: (): Workbook => asWorkbook(new StubWorkbook(['Sheet1'])),
+    createForProfile: (): Workbook => {
+      const wb = new StubWorkbook([]);
+      // Profile-specific evaluation requires the real engine.
+      wb.delete();
+      return asWorkbook(wb);
+    },
     createEmpty: (): Workbook => asWorkbook(new StubWorkbook([])),
     loadBytes: (): Workbook => {
       const wb = new StubWorkbook([]);

@@ -1,17 +1,18 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import {
   applySubstitution,
+  displayTextForFindMatch,
   type FindMatch,
   type FindOptions,
   findAll,
-  findNext,
   replaceAll,
   replaceOne,
 } from '../commands/find.js';
 import type { History } from '../commands/history.js';
-import { addrKey, formatA1Cell } from '../engine/address.js';
+import { formatA1Cell } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
-import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
@@ -24,6 +25,12 @@ export interface FindReplaceDeps {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   strings?: Strings;
+  /** Current UI locale. The workbook profile remains the fallback for
+   * low-level hosts that do not provide this getter. */
+  getLocale?: () => string;
+  /** Activate and hydrate a workbook sheet before selecting a match on it.
+   * Return false when the sheet is hidden or blocked by a host policy. */
+  onActivateSheet?: (sheet: number) => boolean;
   history?: History | null;
   onAfterCommit?: () => void;
 }
@@ -237,6 +244,12 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       lookInSelect.value === 'notes'
         ? lookInSelect.value
         : 'values',
+    workbook: wb,
+    locale:
+      deps.getLocale?.() ??
+      inputLocaleForWorkbook(wb) ??
+      bundledLocaleForStrings(strings) ??
+      'en-US',
   });
 
   const navigationRestricted = (): boolean => {
@@ -245,7 +258,12 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   };
 
   const matchesForNavigation = (state: ReturnType<SpreadsheetStore['getState']>, o: FindOptions) =>
-    findAll(state, o).filter((match) => isNavigationAddrAllowed(store, match.addr));
+    findAll(state, o).filter(
+      (match) =>
+        !state.layout.hiddenSheets.has(match.addr.sheet) &&
+        !state.layout.veryHiddenSheets.has(match.addr.sheet) &&
+        isNavigationAddrAllowed(store, match.addr),
+    );
 
   const nextMatchForNavigation = (
     state: ReturnType<SpreadsheetStore['getState']>,
@@ -253,7 +271,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     from: Addr | null,
     direction: 'next' | 'prev',
   ): FindMatch | null => {
-    if (!navigationRestricted()) return findNext(state, o, from, direction);
     const matches = matchesForNavigation(state, o);
     if (matches.length === 0) return null;
     if (!from) return direction === 'next' ? (matches[0] ?? null) : (matches.at(-1) ?? null);
@@ -272,6 +289,30 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     return matches.at(-1) ?? null;
   };
 
+  const sameAddr = (left: Addr, right: Addr): boolean =>
+    left.sheet === right.sheet && left.row === right.row && left.col === right.col;
+
+  const activateMatch = (match: FindMatch): boolean => {
+    const current = store.getState().data.sheetIndex;
+    if (current !== match.addr.sheet) {
+      if (
+        store.getState().layout.hiddenSheets.has(match.addr.sheet) ||
+        store.getState().layout.veryHiddenSheets.has(match.addr.sheet)
+      )
+        return false;
+      if (deps.onActivateSheet && !deps.onActivateSheet(match.addr.sheet)) return false;
+      if (!deps.onActivateSheet) {
+        mutators.setSheetIndex(store, match.addr.sheet);
+        if (store.getState().data.sheetIndex === match.addr.sheet) {
+          mutators.replaceCells(store, wb.cells(match.addr.sheet));
+        }
+      }
+      if (store.getState().data.sheetIndex !== match.addr.sheet) return false;
+    }
+    mutators.setActive(store, match.addr);
+    return sameAddr(store.getState().selection.active, match.addr);
+  };
+
   const clearResults = (): void => {
     resultsBody.replaceChildren();
     results.hidden = true;
@@ -286,12 +327,13 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       const tr = document.createElement('tr');
       tr.tabIndex = 0;
       const sheetName = wb.sheetName(match.addr.sheet);
-      const value = valueForMatch(match.addr, opts().lookIn ?? 'values');
+      const value = displayTextForFindMatch(store.getState(), match.addr, opts());
       tr.append(td(sheetName), td(addrLabel(match.addr)), td(value));
       tr.addEventListener('click', () => {
-        currentMatch = match;
-        mutators.setActive(store, match.addr);
-        updateSummary(all.length);
+        if (activateMatch(match)) {
+          currentMatch = match;
+          updateSummary(all.length);
+        }
       });
       tr.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -335,11 +377,20 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       updateSummary();
       return;
     }
-    const state = store.getState();
-    const from = currentMatch ? currentMatch.addr : state.selection.active;
-    const m = nextMatchForNavigation(state, o, from, direction);
+    let state = store.getState();
+    let from = currentMatch ? currentMatch.addr : state.selection.active;
+    const attempted = new Set<string>();
+    let m = nextMatchForNavigation(state, o, from, direction);
+    while (m) {
+      const key = `${m.addr.sheet}:${m.addr.row}:${m.addr.col}`;
+      if (attempted.has(key)) break;
+      attempted.add(key);
+      if (activateMatch(m)) break;
+      from = m.addr;
+      state = store.getState();
+      m = nextMatchForNavigation(state, o, from, direction);
+    }
     currentMatch = m;
-    if (m) mutators.setActive(store, m.addr);
     updateSummary();
   };
 
@@ -361,17 +412,26 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
         ) ??
         nextMatchForNavigation(state, o, active, 'next') ??
         null;
-      if (currentMatch) mutators.setActive(store, currentMatch.addr);
-      else {
+      if (!currentMatch) {
         updateSummary();
         return;
       }
     }
-    if (wb.cellFormula(currentMatch.addr) === null) {
-      const cur = formatCell(wb.getValue(currentMatch.addr));
-      const next = applySubstitution(cur, o, replaceInput.value);
-      if (next !== cur) {
-        if (replaceOne(wb, currentMatch, next, store)) deps.onAfterCommit?.();
+    if (!activateMatch(currentMatch)) {
+      currentMatch = null;
+      clearResults();
+      updateSummary();
+      return;
+    }
+    if (o.lookIn !== 'comments' && o.lookIn !== 'notes') {
+      if (o.lookIn === 'formulas' || wb.cellFormula(currentMatch.addr) === null) {
+        const cur = displayTextForFindMatch(store.getState(), currentMatch.addr, o);
+        const next = applySubstitution(cur, o, replaceInput.value);
+        if (next !== cur) {
+          if (replaceOne(wb, currentMatch, next, store, o.locale, o.lookIn)) {
+            deps.onAfterCommit?.();
+          }
+        }
       }
     }
     clearResults();
@@ -391,14 +451,16 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     try {
       if (!restricted) {
         n = replaceAll(store.getState(), wb, o, replaceInput.value, store);
+      } else if (o.lookIn === 'comments' || o.lookIn === 'notes') {
+        n = 0;
       } else {
         const matches = matchesForNavigation(store.getState(), o);
         wb.withBatchedRecalc(() => {
           for (const match of matches) {
-            if (wb.cellFormula(match.addr) !== null) continue;
-            const current = formatCell(wb.getValue(match.addr));
+            if (o.lookIn !== 'formulas' && wb.cellFormula(match.addr) !== null) continue;
+            const current = displayTextForFindMatch(store.getState(), match.addr, o);
             const next = applySubstitution(current, o, replaceInput.value);
-            if (next !== current && replaceOne(wb, match, next, store)) n += 1;
+            if (next !== current && replaceOne(wb, match, next, store, o.locale, o.lookIn)) n += 1;
           }
         });
       }
@@ -419,16 +481,25 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     replaceBtn.hidden = activeTab === 'find';
     replaceAllBtn.hidden = activeTab === 'find';
     findAllBtn.hidden = activeTab === 'replace';
-    const lookInDisabled = activeTab === 'replace';
-    projectDisabledState(lookInSelect, lookInDisabled, t.lookInRequiresFindTab, {
+    // Find and Replace share the same projection.  Values remain the default
+    // for a new replacement session, while Formula search stays available for
+    // callers that explicitly choose it; both modes preserve their source
+    // semantics through the command layer.
+    if (
+      activeTab === 'replace' &&
+      lookInSelect.value !== 'formulas' &&
+      lookInSelect.value !== 'values'
+    ) {
+      lookInSelect.value = 'values';
+    }
+    projectDisabledState(lookInSelect, false, null, {
       datasetKey: 'disabledReason',
       titlePrefix: t.lookIn,
     });
-    projectDisabledReason(lookInRow.label, lookInDisabled ? t.lookInRequiresFindTab : null, {
+    projectDisabledReason(lookInRow.label, null, {
       ariaDescription: false,
       titlePrefix: t.lookIn,
     });
-    if (activeTab === 'replace') lookInSelect.value = 'formulas';
     findInput.placeholder = activeTab === 'find' ? t.findLabel : t.findWhat;
   };
 
@@ -507,16 +578,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     control.addEventListener('change', resetSearch);
   }
   overlay.addEventListener('keydown', onOverlayKey);
-
-  const valueForMatch = (addr: Addr, lookIn: FindOptions['lookIn']): string => {
-    const key = addrKey(addr);
-    const cell = store.getState().data.cells.get(key);
-    if (lookIn === 'formulas') return cell ? (cell.formula ?? formatCell(cell.value)) : '';
-    if (lookIn === 'comments' || lookIn === 'notes') {
-      return store.getState().format.formats.get(key)?.comment ?? '';
-    }
-    return cell ? formatCell(cell.value) : '';
-  };
 
   const api: FindReplaceHandle = {
     open(tab: FindTab = 'find'): void {

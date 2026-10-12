@@ -194,7 +194,7 @@ describe('interact/mac-formula-palette picker', () => {
         ? {
             label: 'Provided number',
             description: 'Provider argument details.',
-            url: 'https://example.com/acos-help',
+            url: '  https://example.com/acos-help  ',
           }
         : null,
     );
@@ -216,6 +216,58 @@ describe('interact/mac-formula-palette picker', () => {
     expect(help?.querySelector('a')?.getAttribute('href')).toBe('https://example.com/acos-help');
     expect(getFunctionArgumentHelp).toHaveBeenCalledWith('ACOS', 0, 'en-US');
     palette.close();
+  });
+
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'])(
+    'renders unsafe argument-help URL %s as inert text',
+    (url) => {
+      const getFunctionArgumentHelp = vi.fn(() => ({
+        label: 'Provided number',
+        description: 'Provider argument details.',
+        url,
+      }));
+      const { palette } = setup(
+        () => sheet.workbook,
+        () => en,
+        () => 'en-US',
+        getFunctionArgumentHelp,
+      );
+      palette.open('ACOS');
+
+      const root = paletteRoot(palette);
+      const help = root.querySelector('.fc-mac-formula-palette__help');
+      expect(help?.querySelector('a')).toBeNull();
+      expect(root.querySelector('.fc-mac-formula-palette__argument small')?.textContent).toBe(
+        'Provider argument details.',
+      );
+      palette.close();
+    },
+  );
+
+  it('uses the native localized alias when provider metadata supplies a display label', () => {
+    sheet.workbook.setFunctionMetadataProvider({
+      SUM: { aliases: { 'de-DE': '合計' } },
+    });
+    expect(sheet.workbook.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
+    const { formulaBar, palette } = setup(
+      () => sheet.workbook,
+      () => defaultStrings,
+      () => 'de-DE',
+    );
+    palette.open('SUM');
+
+    const root = paletteRoot(palette);
+    expect(root.querySelector('.fc-mac-formula-palette__args-name')?.textContent).toContain('合計');
+    const input = root.querySelector<HTMLInputElement>('[data-argument-index="0"]');
+    if (!input) throw new Error('expected SUM argument input');
+    input.value = '1';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(formulaBar.input.value).toBe('=SUMME(1)');
+    expect(root.querySelector('.fc-mac-formula-palette__help')?.textContent).toContain('合計');
+
+    root.querySelector<HTMLButtonElement>('[data-action="done"]')?.click();
+    expect(sheet.workbook.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=SUM(1)');
+    palette.detach();
   });
 
   it('ignores detached picker rows and reflects live metadata changes before Insert', () => {

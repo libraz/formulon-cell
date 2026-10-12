@@ -27,6 +27,7 @@ import {
   setWorkbookView,
   setZerosVisible,
 } from '../../commands/view.js';
+import { fontPointsToCssPx } from '../../engine/font-units.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup } from '../../store/store.js';
@@ -35,7 +36,8 @@ import { showPrompt } from '../dialogs/prompt.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 import { applyMergeAction } from '../merge-action.js';
-import type { ToolbarText } from '../ribbon-model.js';
+import { projectActiveState } from '../ribbon-active-state.js';
+import { FONT_SIZES, type ToolbarText } from '../ribbon-model.js';
 import {
   RIBBON_BORDER_DRAW_MODES,
   RIBBON_DIALOG_OPENERS,
@@ -118,7 +120,7 @@ export interface RibbonHooks {
     translate?: () => void;
     accessibility?: () => void;
     deleteComment?: () => void;
-    selectComment?: (direction: 1 | -1) => void;
+    selectComment?: (direction: 1 | -1, mode?: 'note' | 'thread' | 'all') => void;
   };
   protection?: {
     runSheet?: () => Promise<unknown> | unknown;
@@ -167,6 +169,17 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       applyGenericRibbonCommand(alias, deps, id),
     );
   return applyGenericRibbonCommand(id, deps, id);
+};
+
+/** Pick Excel's next named font-size step, with a one-point fallback outside
+ * the named list (for example 13 -> 14 and 14 -> 16). */
+export const adjacentFontSizePoints = (current: number, direction: 1 | -1): number => {
+  const finite = Number.isFinite(current) ? Number(current.toPrecision(14)) : 11;
+  if (direction > 0) {
+    return FONT_SIZES.find((size) => size > finite) ?? finite + 1;
+  }
+  const previous = [...FONT_SIZES].reverse().find((size) => size < finite);
+  return previous ?? Math.max(1, finite - 1);
 };
 
 const applyGenericRibbonCommand = (
@@ -267,9 +280,8 @@ const applyGenericRibbonCommand = (
           store,
           'ribbon',
           () => {
-            const a = s.selection.active;
-            const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-            setFont(s, store, { fontSize: (f?.fontSize ?? 11) + 1 });
+            const points = projectActiveState(i).fontSize;
+            setFont(s, store, { fontSize: fontPointsToCssPx(adjacentFontSizePoints(points, 1)) });
           },
           policyCommandId,
         ),
@@ -281,9 +293,10 @@ const applyGenericRibbonCommand = (
           store,
           'ribbon',
           () => {
-            const a = s.selection.active;
-            const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-            setFont(s, store, { fontSize: Math.max(1, (f?.fontSize ?? 11) - 1) });
+            const points = projectActiveState(i).fontSize;
+            setFont(s, store, {
+              fontSize: fontPointsToCssPx(adjacentFontSizePoints(points, -1)),
+            });
           },
           policyCommandId,
         ),

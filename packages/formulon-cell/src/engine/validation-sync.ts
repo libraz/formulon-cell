@@ -25,26 +25,26 @@ const DV_TYPE_LIST = 3;
 const DV_TYPE_CUSTOM = 7;
 
 /** OOXML op ordinal — 0 between, 1 notBetween, 2 equal, 3 notEqual,
- *  4 lessThan, 5 lessThanOrEqual, 6 greaterThan, 7 greaterThanOrEqual. */
+ *  4 greaterThan, 5 lessThan, 6 greaterThanOrEqual, 7 lessThanOrEqual. */
 const OP_ORDINAL: Record<ValidationOp, number> = {
   between: 0,
   notBetween: 1,
   '=': 2,
   '<>': 3,
-  '<': 4,
-  '<=': 5,
-  '>': 6,
-  '>=': 7,
+  '>': 4,
+  '<': 5,
+  '>=': 6,
+  '<=': 7,
 };
 const OP_FROM_ORDINAL: Record<number, ValidationOp> = {
   0: 'between',
   1: 'notBetween',
   2: '=',
   3: '<>',
-  4: '<',
-  5: '<=',
-  6: '>',
-  7: '>=',
+  4: '>',
+  5: '<',
+  6: '>=',
+  7: '<=',
 };
 
 const ERROR_STYLE_ORDINAL: Record<ValidationErrorStyle, number> = {
@@ -66,7 +66,7 @@ const strictSyncError = (operation: string, address: string): Error =>
  * Every supported `type` ordinal is surfaced — `list` parses inline literals,
  * `whole`/`decimal`/`date`/`time`/`textLength` decode formula1/formula2 to
  * numbers, `custom` carries the formula1 string verbatim. Range-ref list
- * sources still drop (no formula expansion at hydrate time).
+ * sources retain their range expression for the native and local validators.
  */
 export function hydrateValidationsFromEngine(
   wb: WorkbookHandle,
@@ -178,8 +178,9 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
     // omits the field when enabled (the default) and only records the disabled
     // case, so decoding `true` must NOT emit the field.
     ...(v.showErrorMessage === false ? { showErrorMessage: false } : {}),
-    // OOXML `showDropDown=true` means "hide the in-cell dropdown arrow".
-    ...(v.showDropDown === true ? { showDropdown: false } : {}),
+    // The native API exposes the user-facing meaning (arrow shown/hidden),
+    // while the engine handles OOXML's inverted attribute internally.
+    ...(v.showDropDown === false ? { showDropdown: false } : {}),
     ...(v.errorTitle ? { errorTitle: v.errorTitle } : {}),
     ...(v.errorMessage ? { errorMessage: v.errorMessage } : {}),
     ...(v.promptTitle ? { promptTitle: v.promptTitle } : {}),
@@ -256,7 +257,9 @@ function encodeValidation(
       return {
         ranges,
         type: DV_TYPE_CUSTOM,
-        formula1: ensureFormulaPrefix(validation.formula),
+        // Formulon's public validation API consumes the raw OOXML formula
+        // without the optional leading `=`.
+        formula1: validation.formula.trim().replace(/^=/, '').trim(),
         ...metaPayload,
       };
     default: {
@@ -301,17 +304,12 @@ function encodeMeta(validation: ValidationMeta): {
     ...(validation.showErrorMessage !== undefined
       ? { showErrorMessage: validation.showErrorMessage }
       : { showErrorMessage: true }),
-    ...(validation.showDropdown === false ? { showDropDown: true } : {}),
+    ...(validation.showDropdown === false ? { showDropDown: false } : {}),
     ...(validation.errorTitle ? { errorTitle: validation.errorTitle } : {}),
     ...(validation.errorMessage ? { errorMessage: validation.errorMessage } : {}),
     ...(validation.promptTitle ? { promptTitle: validation.promptTitle } : {}),
     ...(validation.promptMessage ? { promptMessage: validation.promptMessage } : {}),
   };
-}
-
-function ensureFormulaPrefix(formula: string): string {
-  const t = formula.trim();
-  return t.startsWith('=') ? t : `=${t}`;
 }
 
 /** Parse spreadsheet-style inline list literals. Returns null when the source
@@ -348,10 +346,10 @@ function parseNumberFormula(formula: string): number | null {
 
 /** Encode either a literal string-array or a range-ref source to formula1.
  *  Inline literals always wrap in double quotes so spreadsheets parse them back as
- *  a list (rather than a function call); range refs pass through with a
- *  leading `=` to disambiguate from a single-token literal. */
+ *  a list (rather than a function call). Formulon's validation API follows the
+ *  OOXML contract and expects range refs without the optional leading `=`. */
 function encodeListSource(source: string[] | { ref: string }): string {
   if (Array.isArray(source)) return `"${source.join(',')}"`;
   const ref = source.ref.trim().replace(/^=/, '');
-  return `=${ref}`;
+  return ref;
 }

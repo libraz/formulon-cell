@@ -1,5 +1,6 @@
 import { parseAddrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
+import { formatBoolean, formatEditableNumber, formatError } from '../../engine/value.js';
 import { isWholeColumnRange, isWholeRowRange, sameRange } from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
 import { encodeTSV } from './tsv.js';
@@ -27,9 +28,16 @@ export interface CopyResult {
  * Snapshot the current selection into a TSV payload. Cells come from the
  * store's cached cell map (no engine reads). Formula cells emit their formula
  * text verbatim so a paste into Excel / Sheets rebuilds the formula; plain
- * cells emit their cached value.
+ * cells emit their cached value. When `locale` is supplied, scalar values use
+ * the active profile's edit-input spellings; omitted locale keeps the
+ * canonical English clipboard representation. `localizeFormula` affects only
+ * the external TSV payload; structured snapshots capture canonical formulas.
  */
-export function copy(state: State): CopyResult | null {
+export function copy(
+  state: State,
+  locale?: string,
+  localizeFormula?: (formula: string) => string,
+): CopyResult | null {
   const normalized = normalizedCopyRanges(state);
   if (!normalized) return null;
   const { payloadRanges, sourceRanges: ranges } = normalized;
@@ -49,7 +57,7 @@ export function copy(state: State): CopyResult | null {
     for (let row = range.r0; row <= range.r1; row += 1) {
       const line: string[] = [];
       for (let col = range.c0; col <= range.c1; col += 1) {
-        line.push(displayValue(state, sheet, row, col));
+        line.push(displayValue(state, sheet, row, col, locale, localizeFormula));
       }
       grid.push(line);
     }
@@ -142,7 +150,14 @@ function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
   return ranges.map((r) => (wholeRows ? { ...r, c0: min, c1: max } : { ...r, r0: min, r1: max }));
 }
 
-function displayValue(state: State, sheet: number, row: number, col: number): string {
+function displayValue(
+  state: State,
+  sheet: number,
+  row: number,
+  col: number,
+  locale?: string,
+  localizeFormula?: (formula: string) => string,
+): string {
   const key = `${sheet}:${row}:${col}`;
   const cell = state.data.cells.get(key);
   const hyperlinkDisplay = state.format.formats.get(key)?.hyperlinkDisplay;
@@ -150,16 +165,16 @@ function displayValue(state: State, sheet: number, row: number, col: number): st
   // Formula cells emit the formula text (already `=`-prefixed) so a paste
   //  into Excel / Sheets reconstructs the formula instead of freezing the
   //  last computed value.
-  if (cell.formula != null) return cell.formula;
+  if (cell.formula != null) return localizeFormula?.(cell.formula) ?? cell.formula;
   switch (cell.value.kind) {
     case 'number':
-      return String(cell.value.value);
+      return formatEditableNumber(cell.value.value, locale);
     case 'text':
       return cell.value.value;
     case 'bool':
-      return cell.value.value ? 'TRUE' : 'FALSE';
+      return formatBoolean(cell.value.value, locale);
     case 'error':
-      return cell.value.text;
+      return formatError(cell.value.code, cell.value.text, locale);
     default:
       return hyperlinkDisplay ?? '';
   }

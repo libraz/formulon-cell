@@ -12,6 +12,7 @@ import {
   cellStyleKeysByXfId,
   collectNamedStyles,
 } from '../../../../src/engine/cell-style-writeback.js';
+import { argbToCssColor } from '../../../../src/engine/format-writeback.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/index.js';
 import { macStyleOracle } from './fixtures.js';
@@ -427,12 +428,18 @@ describe('CELL_STYLES', () => {
         fillIndex: themedFill,
       });
       expect(workbook.setNamedCellStyle('Check Cell', styleXfId, 23)).toBe(true);
+      const resolvedFont = workbook.getResolvedFontRecord(themedFont);
+      const resolvedFill = workbook.getResolvedFillRecord(themedFill);
+      expect(resolvedFont).not.toBeNull();
+      expect(resolvedFill).not.toBeNull();
+      if (!resolvedFont || !resolvedFill) return;
+      const resolvedColors = {
+        color: argbToCssColor(resolvedFont.colorArgb),
+        fill: argbToCssColor(resolvedFill.fgArgb),
+      };
       expect(
         cellStyleCommands.resolveCellStyleFormat('checkCell', workbook, 'excel365Mac'),
-      ).toMatchObject({
-        color: '#123456',
-        fill: '#654321',
-      });
+      ).toMatchObject(resolvedColors);
 
       const store = createSpreadsheetStore();
       const history = new History();
@@ -445,8 +452,7 @@ describe('CELL_STYLES', () => {
         expect(applyCellStyleToSelection(store, history, 'checkCell', context)).toBe(true);
         expect(store.getState().format.formats.get(`0:0:${col}`)).toMatchObject({
           cellStyle: 'checkCell',
-          color: '#123456',
-          fill: '#654321',
+          ...resolvedColors,
         });
       }
       syncCellFormatsToEngine(workbook, store, 0, { strict: true });
@@ -489,8 +495,7 @@ describe('CELL_STYLES', () => {
       expect(history.repeatLast()).toBe(true);
       expect(store.getState().format.formats.get('0:0:2')).toMatchObject({
         cellStyle: 'checkCell',
-        color: '#123456',
-        fill: '#654321',
+        ...resolvedColors,
       });
       syncCellFormatsToEngine(workbook, store, 0, { strict: true });
       const afterRepeat = workbook.getNamedCellStyles().find((style) => style.builtinId === 23);
@@ -605,12 +610,18 @@ describe('CELL_STYLES', () => {
         fillIndex: themedFill,
       });
       expect(workbook.setNamedCellStyle('40% - Accent 1', styleXfId, 31)).toBe(true);
+      const resolvedFont = workbook.getResolvedFontRecord(themedFont);
+      const resolvedFill = workbook.getResolvedFillRecord(themedFill);
+      expect(resolvedFont).not.toBeNull();
+      expect(resolvedFill).not.toBeNull();
+      if (!resolvedFont || !resolvedFill) return;
+      const resolvedColors = {
+        color: argbToCssColor(resolvedFont.colorArgb),
+        fill: argbToCssColor(resolvedFill.fgArgb),
+      };
       expect(
         cellStyleCommands.resolveCellStyleFormat('accent1_40', workbook, 'excel365Mac'),
-      ).toMatchObject({
-        color: '#123456',
-        fill: '#654321',
-      });
+      ).toMatchObject(resolvedColors);
 
       const store = createSpreadsheetStore();
       mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
@@ -684,11 +695,14 @@ describe('CELL_STYLES', () => {
     expect(getCellStyle('linkedCell')?.format.italic).toBe(false);
     expect(getCellStyle('calculation')?.format.italic).toBe(false);
     expect(getCellStyle('explanatoryText')?.builtinId).toBe(53);
-    expect(getCellStyle('heading3')?.format).toMatchObject({ bold: true, fontSize: 11 });
+    expect(getCellStyle('title')?.format.fontSize).toBe(24);
+    expect(getCellStyle('heading1')?.format.fontSize).toBe(20);
+    expect(getCellStyle('heading2')?.format.fontSize).toBeCloseTo(52 / 3);
+    expect(getCellStyle('heading3')?.format).toMatchObject({ bold: true, fontSize: 44 / 3 });
     expect(getCellStyle('heading4')?.format).toMatchObject({
       bold: true,
       italic: false,
-      fontSize: 11,
+      fontSize: 44 / 3,
     });
   });
 });

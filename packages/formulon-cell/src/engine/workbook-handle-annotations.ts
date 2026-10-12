@@ -1,3 +1,12 @@
+import type {
+  DrawingObject,
+  ImageInfoResult,
+  ImageInsertOptions,
+  ImageResult,
+  Mention,
+  Person,
+  ThreadedComment,
+} from '@libraz/formulon';
 import type { EngineCapabilities, PhoneticRun, Workbook } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -19,6 +28,16 @@ type CommentEnumerableWorkbook = Workbook & {
  * at the public package boundary; gallery commands use it without widening
  * the root cell API. */
 export type EngineHyperlinkRecord = import('@libraz/formulon').HyperlinkEntry;
+
+/** The native threaded-comment record, kept as a named cell-layer export so
+ * callers do not have to depend on the generated formulon declaration. */
+export type EngineThreadedComment = ThreadedComment;
+export type EngineMention = Mention;
+export type EnginePerson = Person;
+export type EngineDrawingObject = DrawingObject;
+export type EngineImageInfo = ImageInfoResult;
+export type EngineImage = ImageResult;
+export type EngineImageInsertOptions = ImageInsertOptions;
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleAnnotationsMethods {}
@@ -118,6 +137,122 @@ export abstract class WorkbookHandleAnnotationsMethods {
     if (!this.capabilities.comments) return false;
     const s = wb(this).setComment(sheet, row, col, author, text);
     return s.ok;
+  }
+
+  /** Read every native threaded comment on a sheet, including replies. Notes
+   * are deliberately excluded: the two annotation models are independent in
+   * OOXML and the engine rejects putting both on one cell. */
+  getThreadedComments(sheet: number): EngineThreadedComment[] {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return [];
+    const result = wb(this).getThreadedComments(sheet);
+    return result.status.ok
+      ? result.comments.map((comment) => ({
+          ...comment,
+          mentions: comment.mentions.map((mention) => ({ ...mention })),
+        }))
+      : [];
+  }
+
+  /** Add a thread opener or reply. The caller supplies a stable GUID and may
+   * include mentions; the engine validates both before mutating the workbook. */
+  addThreadedComment(
+    sheet: number,
+    comment: Partial<EngineThreadedComment> & Pick<EngineThreadedComment, 'id' | 'text'>,
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return false;
+    return wb(this).addThreadedComment(sheet, {
+      ...comment,
+      mentions: comment.mentions?.map((mention) => ({ ...mention })),
+    }).ok;
+  }
+
+  editThreadedComment(
+    sheet: number,
+    id: string,
+    text: string,
+    mentions: readonly EngineMention[] = [],
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return false;
+    return wb(this).editThreadedComment(
+      sheet,
+      id,
+      text,
+      mentions.map((mention) => ({ ...mention })),
+    ).ok;
+  }
+
+  setThreadResolved(sheet: number, threadId: string, done: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return false;
+    return wb(this).setThreadResolved(sheet, threadId, done).ok;
+  }
+
+  removeThreadedComment(sheet: number, id: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return false;
+    return wb(this).removeThreadedComment(sheet, id).ok;
+  }
+
+  getPersons(): EnginePerson[] {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return [];
+    const result = wb(this).getPersons();
+    return result.status.ok ? result.persons.map((person) => ({ ...person })) : [];
+  }
+
+  addPerson(person: EnginePerson): boolean {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return false;
+    return wb(this).addPerson({ ...person }).ok;
+  }
+
+  removePerson(id: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.threadedComments) return false;
+    return wb(this).removePerson(id).ok;
+  }
+
+  /** Inspect image bytes before inserting them. This is useful to reject an
+   * unsupported file before the UI creates a persistent object. */
+  probeImage(bytes: Uint8Array): EngineImageInfo | null {
+    assertAlive(this);
+    if (!this.capabilities.images) return null;
+    const result = wb(this).probeImage(bytes);
+    return result.status.ok ? { ...result } : null;
+  }
+
+  listDrawingObjects(sheet: number): EngineDrawingObject[] {
+    assertAlive(this);
+    if (!this.capabilities.images) return [];
+    const result = wb(this).listDrawingObjects(sheet);
+    return result.status.ok ? result.map((object) => ({ ...object })) : [];
+  }
+
+  getImage(sheet: number, objectId: number): EngineImage | null {
+    assertAlive(this);
+    if (!this.capabilities.images) return null;
+    const result = wb(this).getImage(sheet, objectId);
+    return result.status.ok ? { ...result, bytes: Uint8Array.from(result.bytes) } : null;
+  }
+
+  insertImage(
+    sheet: number,
+    bytes: Uint8Array,
+    options: EngineImageInsertOptions = {},
+  ): number | null {
+    assertAlive(this);
+    if (!this.capabilities.images) return null;
+    const result = wb(this).insertImage(sheet, bytes, { ...options });
+    return result.status.ok ? result.objectId : null;
+  }
+
+  removeImage(sheet: number, objectId: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.images) return false;
+    return wb(this).removeImage(sheet, objectId).ok;
   }
 
   /** Full hyperlink snapshot, preserving rectangle and internal-link fields.

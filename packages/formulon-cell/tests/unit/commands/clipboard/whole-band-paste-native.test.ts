@@ -6,6 +6,7 @@ import { pasteSpecial } from '../../../../src/commands/clipboard/paste-special.j
 import { captureSnapshotFromCopyResult } from '../../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../../src/commands/history.js';
 import { addrKey } from '../../../../src/engine/address.js';
+import { hydrateLayoutFromEngine } from '../../../../src/engine/layout-sync.js';
 import type { Addr } from '../../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
@@ -21,6 +22,7 @@ describe('whole-band paste native persistence', () => {
     async ({ axis, custom }) => {
       const wb = await WorkbookHandle.createDefault();
       const store = createSpreadsheetStore();
+      hydrateLayoutFromEngine(wb, store, 0);
       const column = axis === 'column';
       const addr = (offset: number, band: number): Addr => ({
         sheet: 0,
@@ -47,9 +49,10 @@ describe('whole-band paste native persistence', () => {
         : { sheet: 0, r0: 3, c0: 0, r1: 3, c1: 16_383 };
       const size = (handle: WorkbookHandle, band: number): number | undefined =>
         column
-          ? handle.getColumnLayouts(0).find((item) => item.first <= band && item.last >= band)
-              ?.width
-          : handle.getRowLayouts(0).find((item) => item.row === band)?.height;
+          ? (handle.getColumnLayouts(0).find((item) => item.first <= band && item.last >= band)
+              ?.width ?? handle.getSheetDefaultLayoutPx(0)?.defaultColWidth)
+          : (handle.getRowLayouts(0).find((item) => item.row === band)?.height ??
+            handle.getSheetDefaultLayoutPx(0)?.defaultRowHeight);
       try {
         expect(wb.isStub).toBe(false);
         expect(wb.capabilities.commentsEnumerable).toBe(true);
@@ -121,7 +124,10 @@ describe('whole-band paste native persistence', () => {
           author: 'Alice',
           text: 'source note',
         });
-        expect(size(wb, 3)).toBe(sourceSize);
+        expect(size(wb, 3)).toBeCloseTo(sourceSize, 8);
+        if (!column && !custom) {
+          expect(wb.getRowLayouts(0).some((item) => item.row === 3 && item.hasHeight)).toBe(false);
+        }
         expect(history.undo()).toBe(true);
         expect(wb.getValue(destination)).toEqual({ kind: 'blank' });
         expect(wb.getValue(tail)).toEqual({ kind: 'number', value: 99 });
@@ -133,7 +139,7 @@ describe('whole-band paste native persistence', () => {
           commentAuthor: 'Bob',
           comment: 'engine-only tail',
         });
-        expect(size(wb, 3)).toBe(destinationSize);
+        expect(size(wb, 3)).toBeCloseTo(destinationSize, 8);
         expect(history.canUndo()).toBe(false);
         expect(history.redo()).toBe(true);
         expect(wb.getComment(0, tailNote.row, tailNote.col)).toBeNull();
@@ -147,7 +153,12 @@ describe('whole-band paste native persistence', () => {
             author: 'Alice',
             text: 'source note',
           });
-          expect(size(reloaded, 3)).toBe(sourceSize);
+          expect(size(reloaded, 3)).toBeCloseTo(sourceSize, 8);
+          if (!column && !custom) {
+            expect(reloaded.getRowLayouts(0).some((item) => item.row === 3 && item.hasHeight)).toBe(
+              false,
+            );
+          }
         } finally {
           reloaded.dispose();
         }

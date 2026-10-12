@@ -1,6 +1,12 @@
+import {
+  canonicalizeLocalizedFormulaForInput,
+  inputLocaleForWorkbook,
+  parseLocalizedNumericInput,
+} from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { formatA1Range } from '../engine/address.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type CellFormat,
@@ -36,6 +42,8 @@ export interface ConditionalDialogDeps {
   store: SpreadsheetStore;
   history?: History | null;
   strings?: Strings;
+  getWb?: () => WorkbookHandle | null;
+  getLocale?: () => string;
   onChanged?: () => void;
 }
 
@@ -67,6 +75,44 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
   const t = strings.conditionalDialog;
+  const getLocale = (): string => {
+    const wb = deps.getWb?.() ?? null;
+    const wbLocale = wb ? inputLocaleForWorkbook(wb) : undefined;
+    return deps.getLocale?.() ?? wbLocale ?? 'en-US';
+  };
+  const localizeFormulaForDisplay = (formula: string): string => {
+    const wb = deps.getWb?.() ?? null;
+    if (!wb || typeof wb.getFormulaForDisplay !== 'function') return formula;
+    try {
+      return wb.getFormulaForDisplay(formula);
+    } catch {
+      return formula;
+    }
+  };
+  const canonicalizeFormulaForCommit = (formula: string): string => {
+    if (!formula.startsWith('=')) return formula;
+    const wb = deps.getWb?.() ?? null;
+    if (!wb) return formula;
+    try {
+      return canonicalizeLocalizedFormulaForInput(wb, formula, getLocale());
+    } catch {
+      return formula;
+    }
+  };
+  const localizedNumericInput = (value: number): string => {
+    try {
+      return new Intl.NumberFormat(getLocale(), {
+        useGrouping: false,
+        maximumSignificantDigits: 17,
+      }).format(value);
+    } catch {
+      return String(value);
+    }
+  };
+  const boundaryInputValue = (value: number | string): string => {
+    if (typeof value === 'number') return localizedNumericInput(value);
+    return value.startsWith('=') ? localizeFormulaForDisplay(value) : value;
+  };
   const shell = createDialogShell({
     host,
     className: 'fc-conddlg',
@@ -244,9 +290,9 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   cellPresetRow.append(cellPresetLabel, cellPresetWrap);
   cellValueGroup.appendChild(cellPresetRow);
 
-  const colorScale = appendColorScaleForm(form, t);
-  const dataBar = appendDataBarForm(form, t, () => currentMode === 'edit');
-  const iconSet = appendIconSetForm(form, t, () => currentMode === 'edit');
+  const colorScale = appendColorScaleForm(form, t, getLocale);
+  const dataBar = appendDataBarForm(form, t, () => currentMode === 'edit', getLocale);
+  const iconSet = appendIconSetForm(form, t, () => currentMode === 'edit', getLocale);
 
   // ── Top/Bottom subform ─────────────────────────────────────────────────
   const topBottomGroup = document.createElement('div');
@@ -493,7 +539,16 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   averageModeSelect.addEventListener('change', syncSubforms);
   let dxfFormatDialog: FormatDialogHandle | null = null;
   const getDxfFormatDialog = (): FormatDialogHandle => {
-    if (!dxfFormatDialog) dxfFormatDialog = attachFormatDialog({ host, store, strings, history });
+    if (!dxfFormatDialog) {
+      dxfFormatDialog = attachFormatDialog({
+        host,
+        store,
+        strings,
+        history,
+        getWb: deps.getWb,
+        getLocale: deps.getLocale,
+      });
+    }
     return dxfFormatDialog;
   };
   let cellCustomStyle: Partial<CellFormat> | null = null;
@@ -622,7 +677,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       case 'date-occurring':
         return `${range} · ${t.kindDateOccurring} (${datePeriodLabelFor(rule.period)})`;
       case 'formula':
-        return `${range} · ${t.kindFormula} (${rule.formula})`;
+        return `${range} · ${t.kindFormula} (${localizeFormulaForDisplay(rule.formula)})`;
       case 'duplicates':
         return `${range} · ${t.kindDuplicates}`;
       case 'unique':
@@ -651,8 +706,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     kindSelect.value = rule.kind;
     if (rule.kind === 'cell-value') {
       opSelect.value = rule.op;
-      valueAInput.value = String(rule.a);
-      valueBInput.value = String(rule.b ?? rule.a);
+      valueAInput.value = boundaryInputValue(rule.a);
+      valueBInput.value = boundaryInputValue(rule.b ?? rule.a);
       applyPatchToConditionalApplyControls(cellValueApplyControls, rule.apply);
     } else if (rule.kind === 'color-scale') {
       colorScale.populate(rule);
@@ -670,7 +725,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       averageStdDevSelect.value = String(rule.stdDev ?? 1);
       applyPatchToConditionalApplyControls(sharedApplyControls, rule.apply);
     } else if (rule.kind === 'formula') {
-      formulaInput.value = rule.formula;
+      formulaInput.value = localizeFormulaForDisplay(rule.formula);
       applyPatchToConditionalApplyControls(sharedApplyControls, rule.apply);
     } else if (rule.kind === 'text-contains') {
       textContainsModeSelect.value = rule.mode ?? 'contains';
@@ -701,8 +756,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       const parseCellValueBoundary = (raw: string): number | string | null => {
         const text = raw.trim();
         if (text === '') return null;
-        const num = Number(text);
-        return Number.isFinite(num) ? num : text;
+        const num = parseLocalizedNumericInput(text, getLocale());
+        return num === null ? canonicalizeFormulaForCommit(text) : num;
       };
       const a = parseCellValueBoundary(valueAInput.value);
       const b = parseCellValueBoundary(valueBInput.value);
@@ -758,7 +813,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       rule = {
         kind: 'formula',
         range,
-        formula: f,
+        formula: canonicalizeFormulaForCommit(f),
         apply: collectSharedApplyPatch(),
       };
     } else if (kind === 'text-contains') {

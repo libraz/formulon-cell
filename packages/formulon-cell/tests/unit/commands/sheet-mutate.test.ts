@@ -249,6 +249,27 @@ describe('removeSheet', () => {
     expect(protection.allowedEditRanges[0]?.title).toBe('Keep');
     expect(protection.allowedEditRanges[0]?.range.sheet).toBe(1);
   });
+
+  it('remaps worksheet-wide font overrides after removal', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        ...s.format,
+        sheetFontOverrides: new Map([
+          [0, { patch: { fontSize: 18 } }],
+          [1, { patch: { fontFamily: 'Calibri' } }],
+          [2, { patch: { fontSize: 24 } }],
+        ]),
+      },
+    }));
+    const { wb } = makeFake({ sheetCount: 3 });
+    expect(removeSheet(store, wb, 1)).toBe(true);
+    expect([...(store.getState().format.sheetFontOverrides ?? new Map())]).toEqual([
+      [0, { patch: { fontSize: 18 } }],
+      [1, { patch: { fontSize: 24 } }],
+    ]);
+  });
 });
 
 describe('moveSheet', () => {
@@ -328,6 +349,30 @@ describe('moveSheet', () => {
     expect(Array.from(store.getState().layout.sheetTabColors.entries())).toEqual([
       [2, '#c00000'],
       [1, '#4472c4'],
+    ]);
+  });
+
+  it('moves worksheet-wide font overrides with the sheet', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        ...s.format,
+        sheetFontOverrides: new Map([
+          [0, { patch: { fontSize: 18 } }],
+          [1, { patch: { fontFamily: 'Calibri' } }],
+          [2, { patch: { fontSize: 24 } }],
+        ]),
+      },
+    }));
+    const { wb } = makeFake();
+    expect(moveSheet(store, wb, 0, 2)).toBe(true);
+    const overrides = store.getState().format.sheetFontOverrides;
+    expect(overrides).toBeDefined();
+    expect([...(overrides ?? new Map())]).toEqual([
+      [2, { patch: { fontSize: 18 } }],
+      [0, { patch: { fontFamily: 'Calibri' } }],
+      [1, { patch: { fontSize: 24 } }],
     ]);
   });
 

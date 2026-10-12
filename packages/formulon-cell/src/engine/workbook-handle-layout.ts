@@ -1,3 +1,4 @@
+import { GeometryMode } from '@libraz/formulon';
 import type { EngineCapabilities, Range, Workbook } from './types.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -6,6 +7,27 @@ type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
   wb: Workbook;
   assertAlive(): void;
+};
+
+const CSS_PX_PER_POINT = 96 / 72;
+const POINTS_PER_CSS_PX = 72 / 96;
+
+type LayoutCol = {
+  first: number;
+  last: number;
+  width: number;
+  hidden: boolean;
+  outlineLevel: number;
+  hasWidth?: boolean;
+};
+
+type LayoutRow = {
+  row: number;
+  height: number;
+  hidden: boolean;
+  outlineLevel: number;
+  hasHeight?: boolean;
+  customHeight?: boolean;
 };
 
 declare module './workbook-handle.js' {
@@ -22,6 +44,38 @@ function assertAlive(handle: unknown): void {
 
 function wb(handle: unknown): Workbook {
   return internals(handle).wb;
+}
+
+function optionalFlag(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  return undefined;
+}
+
+function columnCharsToPx(handle: unknown, sheet: number, chars: number): number | null {
+  if (!Number.isFinite(chars)) return null;
+  try {
+    const result = wb(handle).columnCharsToPt(sheet, GeometryMode.Display, chars);
+    if (!result.status.ok || !Number.isFinite(result.value)) return null;
+    return result.value * CSS_PX_PER_POINT;
+  } catch {
+    return null;
+  }
+}
+
+function columnPxToChars(handle: unknown, sheet: number, width: number): number | null {
+  if (!Number.isFinite(width)) return null;
+  try {
+    const result = wb(handle).columnPtToChars(
+      sheet,
+      GeometryMode.Display,
+      width * POINTS_PER_CSS_PX,
+    );
+    if (!result.status.ok || !Number.isFinite(result.value)) return null;
+    return result.value;
+  } catch {
+    return null;
+  }
 }
 
 /** Resolve a sheet view's tab state. `visibility` is authoritative when the
@@ -41,50 +95,91 @@ export abstract class WorkbookHandleLayoutMethods {
   /** Persist a column-width override on `[first, last]` for `sheet`.
    *  No-op (returns false) when the engine doesn't expose `setColumnWidth`
    *  — i.e. the stub fallback. The UI store stays the source of truth in
-   *  that case so paint still reflects the drag. */
+   *  that case so paint still reflects the drag. The public width is CSS px;
+   *  formulon's geometry-aware engines store the native character width. */
   setColumnWidth(sheet: number, first: number, last: number, width: number): boolean {
     assertAlive(this);
     if (!this.capabilities.colRowSize) return false;
-    const s = wb(this).setColumnWidth(sheet, first, last, width);
+    const nativeWidth =
+      this.capabilities.geometry === true ? columnPxToChars(this, sheet, width) : width;
+    if (nativeWidth === null) return false;
+    const s = wb(this).setColumnWidth(sheet, first, last, nativeWidth);
     return s.ok;
   }
 
   /** Persist a row-height override at `row` for `sheet`. See `setColumnWidth`
-   *  for the no-op-on-stub rationale. */
+   *  for the no-op-on-stub rationale. The public height is CSS px; geometry
+   *  aware engines store row heights in points. */
   setRowHeight(sheet: number, row: number, height: number): boolean {
     assertAlive(this);
     if (!this.capabilities.colRowSize) return false;
-    const s = wb(this).setRowHeight(sheet, row, height);
+    const nativeHeight = this.capabilities.geometry === true ? height * POINTS_PER_CSS_PX : height;
+    if (!Number.isFinite(nativeHeight)) return false;
+    const s = wb(this).setRowHeight(sheet, row, nativeHeight);
     return s.ok;
+  }
+
+  /** Remove an explicit row-height override so the row follows its sheet
+   *  default. Older engines have no clear operation and return false. */
+  clearRowHeight(sheet: number, row: number): boolean {
+    assertAlive(this);
+    if (this.capabilities.rowHeightClear !== true) return false;
+    const clear = wb(this).clearRowHeight;
+    if (typeof clear !== 'function') return false;
+    return clear.call(wb(this), sheet, row).ok;
   }
 
   /** Snapshot of column overrides on `sheet`. Empty array under the stub.
    *  The returned objects own no engine memory — the underlying vector
    *  handle is released before this method returns. */
-  getColumnLayouts(
-    sheet: number,
-  ): { first: number; last: number; width: number; hidden: boolean; outlineLevel: number }[] {
+  getColumnLayouts(sheet: number): LayoutCol[] {
     assertAlive(this);
     if (!this.capabilities.colRowSize) return [];
     const r = wb(this).getSheetColumns(sheet);
-    const out: {
-      first: number;
-      last: number;
-      width: number;
-      hidden: boolean;
-      outlineLevel: number;
-    }[] = [];
+    const out: LayoutCol[] = [];
     if (!r.status.ok) return out;
     for (const e of r.columns) {
-      out.push({
+      const source = e as unknown as Record<string, unknown>;
+      const width =
+        this.capabilities.geometry === true ? columnCharsToPx(this, sheet, e.width) : e.width;
+      if (width === null) return [];
+      const hasWidth = optionalFlag(source.hasWidth);
+      const entry: LayoutCol = {
         first: e.first,
         last: e.last,
-        width: e.width,
+        width,
         hidden: e.hidden !== 0,
         outlineLevel: e.outlineLevel,
-      });
+      };
+      if (hasWidth !== undefined) entry.hasWidth = hasWidth;
+      out.push(entry);
     }
     return out;
+  }
+
+  /** Return sheet defaults in the store's CSS-pixel units. The engine's
+   *  implicit default uses 8.43 characters / 102/7 points. Null means the
+   *  engine lacks geometry support or a native read/conversion failed. */
+  getSheetDefaultLayoutPx(
+    sheet: number,
+  ): { defaultColWidth: number; defaultRowHeight: number } | null {
+    assertAlive(this);
+    if (this.capabilities.geometry !== true) return null;
+    let defaults: ReturnType<Workbook['getSheetFormatDefaults']>;
+    try {
+      defaults = wb(this).getSheetFormatDefaults(sheet);
+    } catch {
+      return null;
+    }
+    if (!defaults.status.ok) return null;
+
+    const chars = defaults.hasDefaultColWidth ? defaults.defaultColWidth : 8.43;
+    const colWidth = columnCharsToPx(this, sheet, chars);
+    const rowPoints = defaults.hasDefaultRowHeight ? defaults.defaultRowHeight : 102 / 7;
+    if (colWidth === null || !Number.isFinite(rowPoints)) return null;
+    const rowHeight = rowPoints * CSS_PX_PER_POINT;
+    if (!Number.isFinite(rowHeight)) return null;
+    return { defaultColWidth: colWidth, defaultRowHeight: rowHeight };
   }
 
   /** Persist frozen-pane counts on `sheet`. No-op (returns false) under stub. */
@@ -305,21 +400,27 @@ export abstract class WorkbookHandleLayoutMethods {
   }
 
   /** Snapshot of row overrides on `sheet`. See `getColumnLayouts`. */
-  getRowLayouts(
-    sheet: number,
-  ): { row: number; height: number; hidden: boolean; outlineLevel: number }[] {
+  getRowLayouts(sheet: number): LayoutRow[] {
     assertAlive(this);
     if (!this.capabilities.colRowSize) return [];
     const r = wb(this).getSheetRowOverrides(sheet);
-    const out: { row: number; height: number; hidden: boolean; outlineLevel: number }[] = [];
+    const out: LayoutRow[] = [];
     if (!r.status.ok) return out;
     for (const e of r.rows) {
-      out.push({
+      const source = e as unknown as Record<string, unknown>;
+      const height = this.capabilities.geometry === true ? e.height * CSS_PX_PER_POINT : e.height;
+      if (!Number.isFinite(height)) return [];
+      const hasHeight = optionalFlag(source.hasHeight);
+      const customHeight = optionalFlag(source.customHeight);
+      const entry: LayoutRow = {
         row: e.row,
-        height: e.height,
+        height,
         hidden: e.hidden !== 0,
         outlineLevel: e.outlineLevel,
-      });
+      };
+      if (hasHeight !== undefined) entry.hasHeight = hasHeight;
+      if (customHeight !== undefined) entry.customHeight = customHeight;
+      out.push(entry);
     }
     return out;
   }

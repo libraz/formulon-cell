@@ -1,0 +1,66 @@
+@layer fc.surface {
+  .fc-host__locale-switcher {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 30px;
+    min-width: 0;
+    padding: 3px 8px;
+    border-bottom: var(--fc-hairline) solid var(--fc-rule);
+    background: var(--fc-bg-rail);
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-size: var(--fc-text-rail);
+    flex: 0 0 auto;
+  }
+
+  .fc-host__locale-switcher-label {
+    color: var(--fc-fg-mute);
+    white-space: nowrap;
+  }
+
+  .fc-host__locale-switcher-select {
+    min-width: 8rem;
+    max-width: min(14rem, 45vw);
+    min-height: 24px;
+    padding: 1px 22px 1px 6px;
+    border: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: 2px;
+    background: var(--fc-bg);
+    color: var(--fc-fg);
+    font: inherit;
+  }
+
+  .fc-host__locale-switcher-select:hover {
+    border-color: var(--fc-rule-strong, var(--fc-rule));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
+  }
+
+  .fc-host__locale-switcher-select:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+
+  .fc-host__locale-switcher-status {
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 12rem;
+    color: var(--fc-danger, #b42318);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .fc-host__locale-switcher-status:empty {
+    flex: 0 1 0;
+    width: 0;
+    max-width: 0;
+  }
+}
+
+@media print {
+  .fc-host__locale-switcher {
+    display: none !important;
+  }
+}
