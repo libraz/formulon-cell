@@ -14,17 +14,17 @@ versioning is [SemVer](https://semver.org/).
 - An opt-in language selector controlled by `features.localeSwitcher`, including live visibility changes.
 - Locale-aware scalar input, numeric editing and clipboard text. German and French function aliases and boolean tokens follow the active profile.
 - Native formula conversion for localized input and display, including decimal, argument and array separators, boolean and error tokens. Stored formulas retain canonical syntax.
-
 - Typed AutoFilter hydration and native filter evaluation, with the existing evaluator retained for color criteria.
 - Native validation of proposed values for supported rules and paged enumeration for Circle Invalid Data. Custom formulas retain the local input validator because native evaluation reads saved workbook values.
 - Threaded comments with replies, editing, resolution, navigation and undo/redo. Authors and threads persist in XLSX; legacy notes remain separate.
 - Native image insertion, deletion and geometry edits with undo/redo, original image bytes and XLSX save/load. Loaded images are read-only to preserve drawing metadata; native picture reordering remains unavailable.
 - Workbook theme color and font presets in Page Layout, including the Mac ribbon. Theme edits support undo/redo independently of the app's paper/ink/contrast theme.
 - Native detailed pagination for print, including page dimensions, repeated titles and placement. Interactive page views use native geometry for layouts representable by the grid; multiple or overlapping print areas retain the local preview paginator.
+- AutoFit row height and column width across disjoint multi-range selections. Each range keeps its own cross-axis span, rows or columns selected more than once take the largest fit, and one undo restores all of them.
 
 ### Changed
 
-- Update `@libraz/formulon` to 0.15.0, including measured Mac locale collation, locale tags in number formats and native row and column style records, and migrate named-style writes to its record API.
+- Update `@libraz/formulon` to 0.15.1, including measured Mac locale collation, locale tags in number formats and native row and column style records, and migrate named-style writes to its record API.
 - Require Node.js 22 or later for all three packages.
 - Narrow ribbon groups in stages when space runs short: labels wrap, then large buttons become stacked rows, then icon-only rows. Command order stays the same.
 - Give function-library, calculation, view, help, arrange and selection-pane commands dedicated icons on the default and Mac ribbons.
@@ -51,6 +51,11 @@ versioning is [SemVer](https://semver.org/).
 - Restore native style records, whole-sheet font and row/column formats when undoing or redoing cell, row and column insertion and deletion, including inserted copied cells.
 - Widen a styled row or column span when a row or column is inserted inside it, without saving the new gap as an explicit default style.
 - Stop Goal Seek from reporting a stale workbook when the saved file differs only in archive timestamps.
+- Wrap cell text at locale-aware word boundaries, so text without spaces such as Japanese or Chinese wraps instead of overflowing, and break oversized words without splitting grapheme clusters. Wrapped lines, padding and indent stay consistent across zoom levels, and AutoFit row height counts the same lines the grid draws.
+- Show the function name in the active language in the cell editor and formula-bar argument helpers.
+- Show a hyperlink's screen tip on hover when the cell has no comment.
+- Use the full font name, including its theme font role, as the tooltip and accessible name of font dropdown options.
+- Stop dialogs and the filter dropdown from moving focus to their initial field after the user has already started typing in another field, which sent the typed text to the wrong input.
 
 ## 0.8.0 — 2026-10-04
 
@@ -677,6 +682,8 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.9.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.9.0
+[0.8.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.8.0
 [0.7.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.7.0
 [0.6.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.6.0
 [0.5.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.1

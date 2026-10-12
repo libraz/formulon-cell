@@ -47,7 +47,6 @@ sheet.setTheme('ink'); // グリッドとリボンのテーマをまとめて切
 
 言語選択UIは初期状態では非表示です。`features.localeSwitcher: true` で表示し、`sheet.setFeatures({ localeSwitcher: false })` で動的に非表示へ戻せます。`sheet.setLocale()` は表示辞書と計算プロファイルを同時に切り替えます。切り替えが拒否された場合は `false` を返し、現在の言語を維持します。ダイアログ、検索・置換、コメント編集、フィルターメニューを閉じてから切り替えてください。拒否時は入力途中の内容を保持します。
 
-
 グリッドだけの入力フォームや閲覧ビューにするときは、`ui: { profile: 'embedded' }` と、`fixedFormPolicy(ranges)` や `viewerPolicy()` などのポリシーを渡してマウントします。詳しくは [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
 
 ## プリセット

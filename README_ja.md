@@ -41,7 +41,7 @@ npm install @libraz/formulon-cell zustand
 
 `zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。
 
-formulon 0.15.0 の標準 WASM エンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。Node.js で使う場合は22以降が必要です。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われ、テストと明示的なデモ専用です。
+formulon 0.15.1 の標準 WASM エンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。Node.js で使う場合は22以降が必要です。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われ、テストと明示的なデモ専用です。
 
 ## クイックスタート
 
@@ -64,7 +64,6 @@ sheet.setTheme('ink');      // ダークテーマ
 `getWorkbookName: () => currentFilename` を指定すると、ウォッチウィンドウに現在のブック名を表示します。React / Vueコンポーネントも同じコールバックを受け取ります。
 
 言語選択UIは初期状態では非表示です。`features.localeSwitcher: true` で表示し、`sheet.setFeatures({ localeSwitcher: false })` で動的に非表示へ戻せます。`sheet.setLocale()` は表示辞書と計算プロファイルを同時に切り替えます。切り替えが拒否された場合は `false` を返し、現在の言語を維持します。ダイアログ、検索・置換、コメント編集、フィルターメニューを閉じてから切り替えてください。拒否時は入力途中の内容を保持します。
-
 
 React と Vue では、同じオプションをコンポーネントの props で渡します。
 

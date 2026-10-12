@@ -47,7 +47,6 @@ Pass `getWorkbookName: () => currentFilename` to show the current workbook name 
 
 The language selector is hidden by default. Enable it with `features.localeSwitcher: true`, or toggle it with `sheet.setFeatures({ localeSwitcher: false })`. `sheet.setLocale()` updates the dictionary and calculation profile together; it returns `false` when the change is rejected and keeps the current locale. Close open dialogs, Find/Replace, comment edits and filter menus before switching; their drafts are preserved when a switch is rejected.
 
-
 For a grid-only form or viewer, mount with `ui: { profile: 'embedded' }` and a policy such as `fixedFormPolicy(ranges)` or `viewerPolicy()`. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
 
 ## Presets
