@@ -4,6 +4,54 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.9.0 — 2026-10-12
+
+### Added
+
+- Localized ribbon screen tips on hover and keyboard focus, with platform shortcuts, viewport clamping and Escape dismissal.
+- Seven built-in locales (English, Japanese, German, French, Chinese, Korean and Thai), synchronized calculation profiles, and `instance.setLocale()` for runtime switching.
+- Explicit locale and comma/semicolon delimiter options for CSV import/export.
+- An opt-in language selector controlled by `features.localeSwitcher`, including live visibility changes.
+- Locale-aware scalar input, numeric editing and clipboard text. German and French function aliases and boolean tokens follow the active profile.
+- Native formula conversion for localized input and display, including decimal, argument and array separators, boolean and error tokens. Stored formulas retain canonical syntax.
+
+- Typed AutoFilter hydration and native filter evaluation, with the existing evaluator retained for color criteria.
+- Native validation of proposed values for supported rules and paged enumeration for Circle Invalid Data. Custom formulas retain the local input validator because native evaluation reads saved workbook values.
+- Threaded comments with replies, editing, resolution, navigation and undo/redo. Authors and threads persist in XLSX; legacy notes remain separate.
+- Native image insertion, deletion and geometry edits with undo/redo, original image bytes and XLSX save/load. Loaded images are read-only to preserve drawing metadata; native picture reordering remains unavailable.
+- Workbook theme color and font presets in Page Layout, including the Mac ribbon. Theme edits support undo/redo independently of the app's paper/ink/contrast theme.
+- Native detailed pagination for print, including page dimensions, repeated titles and placement. Interactive page views use native geometry for layouts representable by the grid; multiple or overlapping print areas retain the local preview paginator.
+
+### Changed
+
+- Update `@libraz/formulon` to 0.15.0, including measured Mac locale collation, locale tags in number formats and native row and column style records, and migrate named-style writes to its record API.
+- Require Node.js 22 or later for all three packages.
+- Narrow ribbon groups in stages when space runs short: labels wrap, then large buttons become stacked rows, then icon-only rows. Command order stays the same.
+- Give function-library, calculation, view, help, arrange and selection-pane commands dedicated icons on the default and Mac ribbons.
+- Use native range enumeration for populated-cell searches and native formula reads for A1/R1C1 display.
+
+### Fixed
+
+- Keep ribbon commands reachable on narrow screens, prevent translated labels from collapsing icons, and use the measured German and French font-control glyphs.
+- Convert font sizes between native points and public CSS pixels, and synchronize point-based ribbon controls with cell painting, editing, dialogs and autofit.
+- Preserve open dialog, find, comment and filter drafts when a locale switch is rejected.
+- Parse localized conditional-format thresholds and canonicalize custom conditional-format and validation formulas when committed.
+- Evaluate conditional-format formulas through the workbook profile and invalidate their display cache after locale changes.
+- Show Watch Window values and formulas in the current profile and accept a live `getWorkbookName` callback in core, React and Vue.
+- Use the current locale for number-format shortcuts and F4 repeat after a language switch, and keep workbook shortcuts out of native select controls.
+- Associate language-switch failures with the selector for assistive technology, refresh repeated failure notices, and allow long notices to wrap.
+- Preserve the active calculation profile for standalone formula evaluation while keeping workbook cells and names isolated.
+- Localize scientific notation, Show Formulas and HTML/TSV clipboard output using the active language profile.
+- Roll back newly registered named styles when a later catalog write fails, and retain built-in style ids 48–53.
+- Convert engine column widths in characters and row heights in points to CSS pixels. Read sheet defaults and clear removed row-height overrides back to auto.
+- Preserve XF apply flags, quote prefixes and protection metadata across format edits.
+- Resolve theme, indexed and automatic colours for cell-format projection while retaining the original selectors for save/load.
+- Render inherited row and column styles without writing them back as direct cell formatting, and use native display formatting where applicable.
+- Preserve absolute and mixed references when editing formulas displayed in R1C1 notation.
+- Restore native style records, whole-sheet font and row/column formats when undoing or redoing cell, row and column insertion and deletion, including inserted copied cells.
+- Widen a styled row or column span when a row or column is inserted inside it, without saving the new gap as an explicit default style.
+- Stop Goal Seek from reporting a stale workbook when the saved file differs only in archive timestamps.
+
 ## 0.8.0 — 2026-10-04
 
 ### Added
