@@ -309,6 +309,8 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       const options = ribbonOptionsForCommand(command, current);
       for (const option of options) {
         const fontOption = command.id === 'fontFamily' ? (option as FontFamilyOption) : null;
+        const fontRole = fontOption ? ribbonFontRole(fontOption) : null;
+        const optionLabel = fontRole ? `${option.label} ${fontRole}` : option.label;
         const section =
           fontOption && command.id === 'fontFamily'
             ? ribbonFontSection(fontOption, options as readonly FontFamilyOption[])
@@ -323,6 +325,8 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         const selected = option.value === current;
         const item = createRibbonControlButton({
           className: `fc-tb__rb-dd__opt${selected ? ' fc-tb__rb-dd__opt--selected' : ''}`,
+          title: optionLabel,
+          ariaLabel: optionLabel,
           role: 'option',
           selected,
           tabIndex: -1,
@@ -355,11 +359,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           const preview = document.createElement('span');
           preview.className = 'fc-tb__rb-dd__font-preview';
           preview.style.fontFamily = `"${option.value}", sans-serif`;
-          const role = ribbonFontRole(fontOption ?? undefined);
-          if (role) {
+          if (fontRole) {
             const detail = document.createElement('span');
             detail.className = 'fc-tb__rb-dd__font-role';
-            detail.textContent = role;
+            detail.textContent = fontRole;
             preview.append(label, detail);
           } else {
             preview.append(label);

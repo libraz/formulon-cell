@@ -105,6 +105,8 @@ describe('toolbar/ribbon/font-family-options', () => {
         '.fc-tb__rb-dd__opt[data-value="游ゴシック"]',
       );
       expect(bodyOption?.textContent).toContain('(本文)');
+      expect(bodyOption?.title).toBe('游ゴシック Regular (本文)');
+      expect(bodyOption?.getAttribute('aria-label')).toBe('游ゴシック Regular (本文)');
       expect(bodyOption?.querySelector('.fc-tb__rb-dd__submenu')).toBeNull();
       bodyOption?.click();
       expect(applied).toContain('游ゴシック');

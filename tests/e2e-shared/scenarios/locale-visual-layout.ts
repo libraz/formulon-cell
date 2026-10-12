@@ -198,6 +198,29 @@ export async function runLocaleVisualLayout(
     await expect(paste).toHaveAttribute('aria-describedby', (await tip.getAttribute('id')) ?? '');
     await page.keyboard.press('Escape');
     await expect(tip).toHaveCount(0);
+    await shell.locator('[data-ribbon-command="fontFamily"] button').first().click();
+    const fontOptions = page.locator('.fc-tb__rb-dd__list [role="option"]');
+    await expect(fontOptions.first()).toBeVisible();
+    const missingFontLabels = await fontOptions.evaluateAll((options) =>
+      options.flatMap((option) => {
+        const name = option.querySelector('.fc-tb__rb-dd__label')?.textContent?.trim();
+        const title = option.getAttribute('title');
+        const accessibleName = option.getAttribute('aria-label');
+        const describedBy = option.getAttribute('aria-describedby');
+        const tooltipText = describedBy
+          ? option.ownerDocument.getElementById(describedBy)?.textContent
+          : null;
+        const fullText = title ?? tooltipText;
+        return name && accessibleName?.includes(name) && fullText?.includes(accessibleName)
+          ? []
+          : [name];
+      }),
+    );
+    expect(
+      missingFontLabels,
+      `${locale}/${platform} font candidates expose their full names`,
+    ).toEqual([]);
+    await page.keyboard.press('Escape');
     if (width === 1280) {
       await page.screenshot({ path: info.outputPath(`${platform}-${locale}-home.png`) });
     }
