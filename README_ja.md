@@ -41,7 +41,7 @@ npm install @libraz/formulon-cell zustand
 
 `zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。
 
-formulon 0.12.0 の標準 WASM エンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われ、テストと明示的なデモ専用です。
+formulon 0.15.0 の標準 WASM エンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。Node.js で使う場合は22以降が必要です。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われ、テストと明示的なデモ専用です。
 
 ## クイックスタート
 
@@ -52,14 +52,19 @@ import '@libraz/formulon-cell/styles.css';
 const wb = await WorkbookHandle.createDefault();
 const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
   workbook: wb,
-  features: presets.full(),
+  features: { ...presets.full(), localeSwitcher: true },
   locale: 'ja',
   toolbar: true,
 });
 
-sheet.i18n.setLocale('en'); // 再マウントせずにロケールを切り替え
+sheet.setLocale('en'); // 再マウントせずにロケールを切り替え
 sheet.setTheme('ink');      // ダークテーマ
 ```
+
+`getWorkbookName: () => currentFilename` を指定すると、ウォッチウィンドウに現在のブック名を表示します。React / Vueコンポーネントも同じコールバックを受け取ります。
+
+言語選択UIは初期状態では非表示です。`features.localeSwitcher: true` で表示し、`sheet.setFeatures({ localeSwitcher: false })` で動的に非表示へ戻せます。`sheet.setLocale()` は表示辞書と計算プロファイルを同時に切り替えます。切り替えが拒否された場合は `false` を返し、現在の言語を維持します。ダイアログ、検索・置換、コメント編集、フィルターメニューを閉じてから切り替えてください。拒否時は入力途中の内容を保持します。
+
 
 React と Vue では、同じオプションをコンポーネントの props で渡します。
 
@@ -116,9 +121,10 @@ export default defineConfig({
 
 - デスクトップ表計算ソフト風の UI: 数式バー、ステータスバー、リボン、シートタブ、コンテキストメニュー、各種ダイアログ（セルの書式設定、形式を選択して貼り付け、検索と置換、ジャンプ、条件付き書式、名前の定義、データの入力規則、ピボットテーブルの作成など）。
 - CSS トークンでテーマを切り替えられる Canvas 描画のグリッド。`paper`（ライト）、`ink`（ダーク）、`contrast` を同梱しています。
+- スレッドコメント、挿入した画像、ブックテーマ、フィルターを XLSX に保存できます。読み込んだ画像は描画情報を保持するため閲覧のみです。
 - 機能フラグと拡張ファクトリ。よく使う組み合わせは `presets.minimal()`、`presets.standard()`、`presets.full()` で選べ、個々の部品は差し替えも省略もできます。
 - オプトインの Mac プロファイル。`ui: { platform: 'mac' }`（ブラウザから判定する場合は `'auto'`）で、Mac 向けのリボンタブ構成とショートカット、モードレスの関数引数パレットに切り替わります。
-- 実行時の言語切り替え。`ja` と `en` を同梱し、`sheet.i18n.register()` で再マウントせずに言語を追加できます。
+- 実行時の言語切り替え。`en`、`ja`、`de`、`fr`、`zh`、`ko`、`th` の7言語を同梱し、`sheet.i18n.register()` で再マウントせずに言語を追加できます。
 - キャンバスとストアだけを残すヘッドレス構成。UI をホスト側で用意する場合に使います。
 
 ## ドキュメント

@@ -34,14 +34,19 @@ import '@libraz/formulon-cell/styles.css';
 const wb = await WorkbookHandle.createDefault();
 const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
   workbook: wb,
-  features: presets.full(),
+  features: { ...presets.full(), localeSwitcher: true },
   locale: 'ja',
   toolbar: true, // リボンも同時にマウントし、sheet.toolbar で参照できる
 });
 
-sheet.i18n.setLocale('en');
+sheet.setLocale('en');
 sheet.setTheme('ink'); // グリッドとリボンのテーマをまとめて切り替え
 ```
+
+`getWorkbookName: () => currentFilename` を指定すると、ウォッチウィンドウに現在のブック名を表示します。React / Vueコンポーネントも同じコールバックを受け取ります。
+
+言語選択UIは初期状態では非表示です。`features.localeSwitcher: true` で表示し、`sheet.setFeatures({ localeSwitcher: false })` で動的に非表示へ戻せます。`sheet.setLocale()` は表示辞書と計算プロファイルを同時に切り替えます。切り替えが拒否された場合は `false` を返し、現在の言語を維持します。ダイアログ、検索・置換、コメント編集、フィルターメニューを閉じてから切り替えてください。拒否時は入力途中の内容を保持します。
+
 
 グリッドだけの入力フォームや閲覧ビューにするときは、`ui: { profile: 'embedded' }` と、`fixedFormPolicy(ranges)` や `viewerPolicy()` などのポリシーを渡してマウントします。詳しくは [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
 
@@ -60,7 +65,7 @@ sheet.setTheme('ink'); // グリッドとリボンのテーマをまとめて切
 | `@libraz/formulon-cell` | `Spreadsheet`、`WorkbookHandle`、`presets`、ポリシー、拡張ファクトリ |
 | `@libraz/formulon-cell/extensions` | 拡張ファクトリ一式 |
 | `@libraz/formulon-cell/extensions/*` | 個別の拡張（`statusBar`、`findReplace`、`contextMenu` など） |
-| `@libraz/formulon-cell/i18n/ja`、`/i18n/en` | ロケール辞書 |
+| `@libraz/formulon-cell/i18n/{en,ja,de,fr,zh,ko,th}` | 7言語のロケール辞書 |
 | `@libraz/formulon-cell/styles.css` | グリッド、ダイアログ、オーバーレイ、リボン、全テーマをまとめたスタイルシート |
 | `@libraz/formulon-cell/styles/{tokens,paper,ink,contrast,toolbar}.css` | 個別に読み込む場合のスタイルシート |
 
@@ -71,12 +76,16 @@ sheet.setTheme('ink'); // グリッドとリボンのテーマをまとめて切
 | `Spreadsheet.mount(host, opts)` | DOM 要素に表計算をマウントする |
 | `WorkbookHandle.createDefault()` | WASM エンジンを使うワークブックを作る |
 | `workbook.withBatchedRecalc(fn)` | 複数セルへの書き込みを 1 回の再計算にまとめる |
-| `instance.i18n.setLocale(loc)` / `instance.setTheme(theme)` | 実行時にロケールやテーマを切り替える |
+| `instance.setLocale(loc)` / `instance.setTheme(theme)` | 実行時にロケールやテーマを切り替える |
 | `instance.setPolicy` / `setViewportOptions` / `setContextMenu` / `setUi` / `setToolbar` | 埋め込み設定を実行時に変更する |
 | `instance.applyChanges(changes)` | ユーザー向けポリシーを通さない、ホストからの更新 |
 | `instance.on(event, handler)` | `cellChange`、`selectionChange`、`changeBatch`、`recalc` など |
 
 オプションと API の一覧は [ドキュメントサイト](https://formulon.libraz.net/ja/cell/) にあります。
+
+CSV出力にはロケールと区切り文字を指定できます。例: `exportCSV(state, { locale: 'de', delimiter: ';' })`。取り込みでは `importCSV(state, workbook, text, anchor, history, settings)` の第6引数へ同じ設定を渡すと、数値と真偽値を同じ規則で解析します。出力の既定値は英語の正規表記とカンマ区切りです。取り込みは `settings.locale` が未指定の場合、現在のワークブックのプロファイルを使います。
+
+数式の編集と外部クリップボードからの入力には、現在のプロファイルの構文を使います。たとえば独語の `=SUMME(1,5;2)` は `=SUM(1.5,2)` として保存されます。コードから呼ぶ `workbook.setFormula()` には正規構文を渡してください。ローカライズされた文字列は、先に `workbook.canonicalizeLocalizedFormula()` で変換できます。表示用の変換は `workbook.localizeFormulaText()`、区切り文字や真偽値などの定義取得は `workbook.localeFacts()` を使います。
 
 ## ドキュメント
 

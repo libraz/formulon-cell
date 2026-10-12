@@ -41,7 +41,7 @@ npm install @libraz/formulon-cell zustand
 
 `zustand` is a peer dependency so the host can read the same store the chrome subscribes to.
 
-The default WASM engine in formulon 0.12.0 is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; there is no silent fallback. The in-memory stub engine is opt-in through `preferStub: true`, for tests and explicit demos only.
+The default WASM engine in formulon 0.15.0 is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; there is no silent fallback. Node.js integrations require Node 22 or later. The in-memory stub engine is opt-in through `preferStub: true`, for tests and explicit demos only.
 
 ## Quick start
 
@@ -52,14 +52,19 @@ import '@libraz/formulon-cell/styles.css';
 const wb = await WorkbookHandle.createDefault();
 const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
   workbook: wb,
-  features: presets.full(),
+  features: { ...presets.full(), localeSwitcher: true },
   locale: 'en',
   toolbar: true,
 });
 
-sheet.i18n.setLocale('ja'); // swap locale without re-mounting
+sheet.setLocale('ja'); // swap locale without re-mounting
 sheet.setTheme('ink');      // dark theme
 ```
+
+Pass `getWorkbookName: () => currentFilename` to show the current workbook name in Watch Window. The React and Vue components accept the same callback.
+
+The language selector is hidden by default. Enable it with `features.localeSwitcher: true`, or toggle it with `sheet.setFeatures({ localeSwitcher: false })`. `sheet.setLocale()` updates the dictionary and calculation profile together; it returns `false` when the change is rejected and keeps the current locale. Close open dialogs, Find/Replace, comment edits and filter menus before switching; their drafts are preserved when a switch is rejected.
+
 
 React and Vue take the same options as component props:
 
@@ -116,9 +121,10 @@ Only a direct import of `@libraz/formulon/threads` needs `worker: { format: 'es'
 
 - Desktop-spreadsheet chrome: formula bar, status bar, ribbon, sheet tabs, context menu, and dialogs (format cells, paste special, find/replace, Go To, conditional formatting, named ranges, validation, PivotTable creation, and more).
 - A canvas-rendered grid themed through CSS tokens. `paper` (light), `ink` (dark), and `contrast` ship in the box.
+- XLSX persistence for threaded comments, inserted images, workbook themes and filters. Loaded images remain read-only to preserve drawing metadata.
 - Feature flags and extension factories. `presets.minimal()`, `presets.standard()`, and `presets.full()` cover the common sets; any piece can be swapped or left out.
 - An opt-in Mac profile. `ui: { platform: 'mac' }` (or `'auto'` to detect it from the browser) switches to a Mac ribbon tab set, Mac shortcuts, and a nonmodal formula argument palette.
-- Runtime i18n. `ja` and `en` ship by default, and `sheet.i18n.register()` adds more without re-mounting.
+- Runtime i18n. `en`, `ja`, `de`, `fr`, `zh`, `ko`, and `th` ship by default, and `sheet.i18n.register()` adds more without re-mounting.
 - A headless mode that keeps only the canvas and the store, for hosts that bring their own chrome.
 
 ## Documentation
