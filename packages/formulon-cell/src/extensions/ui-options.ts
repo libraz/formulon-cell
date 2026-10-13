@@ -85,7 +85,6 @@ export interface SpreadsheetUiOptions {
    */
   platform?: SpreadsheetPlatform;
   theme?: ThemeName;
-  lockTheme?: boolean;
   features?: SpreadsheetFeatureSwitches;
   advancedFeatures?: FeatureFlags;
 }
@@ -94,7 +93,6 @@ export interface ResolvedSpreadsheetUiOptions {
   profile: SpreadsheetUiProfile;
   platform: ResolvedSpreadsheetPlatform;
   theme: ThemeName;
-  lockTheme: boolean;
   ribbon: boolean;
   print: boolean;
   features: FeatureFlags;
@@ -163,7 +161,6 @@ export function resolveSpreadsheetUiOptions(
     profile,
     platform: resolveSpreadsheetPlatform(opts.platform),
     theme: opts.theme ?? 'paper',
-    lockTheme: opts.lockTheme ?? false,
     ribbon: switches.ribbon ?? profile !== 'embedded',
     print: switches.print ?? profile !== 'embedded',
     features,

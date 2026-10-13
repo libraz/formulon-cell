@@ -63,7 +63,6 @@ sheet.setTheme('ink'); // グリッドとリボンのテーマをまとめて切
 |---|---|
 | `@libraz/formulon-cell` | `Spreadsheet`、`WorkbookHandle`、`presets`、ポリシー、拡張ファクトリ |
 | `@libraz/formulon-cell/extensions` | 拡張ファクトリ一式 |
-| `@libraz/formulon-cell/extensions/*` | 個別の拡張（`statusBar`、`findReplace`、`contextMenu` など） |
 | `@libraz/formulon-cell/i18n/{en,ja,de,fr,zh,ko,th}` | 7言語のロケール辞書 |
 | `@libraz/formulon-cell/styles.css` | グリッド、ダイアログ、オーバーレイ、リボン、全テーマをまとめたスタイルシート |
 | `@libraz/formulon-cell/styles/{tokens,paper,ink,contrast,toolbar}.css` | 個別に読み込む場合のスタイルシート |

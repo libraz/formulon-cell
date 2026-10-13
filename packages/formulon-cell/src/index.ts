@@ -1,10 +1,5 @@
-// Cell renderer / editor registry — `inst.cells.registerFormatter(...)`.
-export type {
-  CellEditorEntry,
-  CellEditorHandle,
-  CellFormatterEntry,
-  CellRenderInput,
-} from './cells.js';
+// Cell renderer registry — `inst.cells.registerFormatter(...)`.
+export type { CellFormatterEntry, CellRenderInput } from './cells.js';
 export { CellRegistry } from './cells.js';
 export type { SelectionStats, StatusAggregateEntry } from './commands/aggregate.js';
 export {

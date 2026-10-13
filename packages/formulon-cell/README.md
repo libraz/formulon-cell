@@ -63,7 +63,6 @@ For a grid-only form or viewer, mount with `ui: { profile: 'embedded' }` and a p
 |---|---|
 | `@libraz/formulon-cell` | `Spreadsheet`, `WorkbookHandle`, `presets`, policies, extension factories |
 | `@libraz/formulon-cell/extensions` | all extension factories |
-| `@libraz/formulon-cell/extensions/*` | one extension (`statusBar`, `findReplace`, `contextMenu`, …) |
 | `@libraz/formulon-cell/i18n/{en,ja,de,fr,zh,ko,th}` | seven locale dictionaries |
 | `@libraz/formulon-cell/styles.css` | grid, dialogs, overlays, ribbon, and all themes in one file |
 | `@libraz/formulon-cell/styles/{tokens,paper,ink,contrast,toolbar}.css` | individual stylesheets for granular setups |

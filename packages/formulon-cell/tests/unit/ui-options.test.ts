@@ -113,11 +113,10 @@ describe('resolveSpreadsheetUiOptions', () => {
     expect(resolved.features.sheetTabs).toBe(false);
   });
 
-  it('preserves theme and lockTheme host options independently from feature flags', () => {
+  it('preserves the theme host option independently from feature flags', () => {
     const resolved = resolveSpreadsheetUiOptions({
       profile: 'standard',
       theme: 'ink',
-      lockTheme: true,
       features: {
         ribbon: false,
       },
@@ -125,7 +124,6 @@ describe('resolveSpreadsheetUiOptions', () => {
 
     expect(resolved.profile).toBe('standard');
     expect(resolved.theme).toBe('ink');
-    expect(resolved.lockTheme).toBe(true);
     expect(resolved.ribbon).toBe(false);
     expect(resolved.features.formatDialog).toBe(false);
   });

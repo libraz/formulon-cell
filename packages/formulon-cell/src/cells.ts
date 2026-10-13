@@ -1,8 +1,5 @@
-// Cell renderer / editor registry — lets consumers override the
-// displayed string for matching cells, and (eventually) inject custom
-// inline editors. v0.1 covers the formatter slot; the editor slot is
-// reserved for v0.2 once the InlineEditor grows a custom-component
-// hook.
+// Cell renderer registry — lets consumers override the displayed string
+// for matching cells.
 //
 // Formatters do not bypass canvas rendering — the grid still paints
 // text via the normal cell-paint pipeline. They just substitute the
@@ -32,30 +29,8 @@ export interface CellFormatterEntry {
   readonly priority?: number;
 }
 
-/** Editor entry — reserved for v0.2. The shape is documented now so
- *  consumers can plan for it. */
-export interface CellEditorEntry {
-  readonly id: string;
-  readonly match: (input: CellRenderInput) => boolean;
-  /** Construct the editor element. The host gives you the bounds and
-   *  the current value; commit by calling `commit(next)`. v0.2 wires
-   *  this through `InlineEditor`. */
-  readonly mount: (host: HTMLElement, input: CellRenderInput) => CellEditorHandle;
-  readonly priority?: number;
-}
-
-export interface CellEditorHandle {
-  /** Currently-staged value; used by Escape / blur paths. */
-  readValue(): string;
-  /** Force-focus the editor. */
-  focus(): void;
-  /** Tear down the DOM, listeners, and any portals. */
-  detach(): void;
-}
-
 export class CellRegistry {
   private readonly formatters: CellFormatterEntry[] = [];
-  private readonly editors: CellEditorEntry[] = [];
   private readonly listeners = new Set<() => void>();
 
   /** Register a formatter. Returns a disposer. Last-wins on duplicate id. */
@@ -97,23 +72,6 @@ export class CellRegistry {
   /** Snapshot of registered formatter ids. */
   formatterIds(): string[] {
     return this.formatters.map((e) => e.id);
-  }
-
-  /** Reserved for v0.2 — registers a custom editor against `match`. */
-  registerEditor(entry: CellEditorEntry): () => void {
-    this.editors.push(entry);
-    this.editors.sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
-    return () => {
-      const i = this.editors.indexOf(entry);
-      if (i >= 0) this.editors.splice(i, 1);
-    };
-  }
-
-  /** Pick the first matching editor entry. v0.2 wires this through
-   *  the InlineEditor. */
-  resolveEditor(input: CellRenderInput): CellEditorEntry | null {
-    for (const e of this.editors) if (e.match(input)) return e;
-    return null;
   }
 
   subscribe(fn: () => void): () => void {

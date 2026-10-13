@@ -100,26 +100,4 @@ describe('CellRegistry', () => {
     expect(good).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalledWith('formulon-cell: cell-registry listener threw', error);
   });
-
-  it('resolves editor entries by priority and removes only the registered entry', () => {
-    const registry = new CellRegistry();
-    registry.registerEditor({
-      id: 'fallback-editor',
-      priority: 50,
-      match: () => true,
-      mount: () => ({ readValue: () => '', focus() {}, detach() {} }),
-    });
-    const disposeWinner = registry.registerEditor({
-      id: 'number-editor',
-      priority: 10,
-      match: ({ value }) => value.kind === 'number',
-      mount: () => ({ readValue: () => '10', focus() {}, detach() {} }),
-    });
-
-    expect(registry.resolveEditor(input)?.id).toBe('number-editor');
-
-    disposeWinner();
-
-    expect(registry.resolveEditor(input)?.id).toBe('fallback-editor');
-  });
 });

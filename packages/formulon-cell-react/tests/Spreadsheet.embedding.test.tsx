@@ -7,7 +7,6 @@ const resolveUi = vi.fn(
   (options: { profile?: string; theme?: string; features?: Record<string, boolean> } = {}) => ({
     profile: options.profile ?? 'excel365',
     theme: options.theme ?? 'paper',
-    lockTheme: false,
     ribbon: options.features?.ribbon ?? options.profile !== 'embedded',
     print: true,
     features: options.features ?? {},
