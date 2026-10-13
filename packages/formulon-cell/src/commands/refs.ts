@@ -653,7 +653,10 @@ export interface ActiveSignature {
 export function findActiveSignature(
   text: string,
   caret: number,
-  options: FormulaScanOptions = {},
+  options: FormulaScanOptions & {
+    /** Argument labels for a host-registered function without a built-in signature. */
+    getCustomFunctionArgs?: (name: string) => readonly string[] | undefined;
+  } = {},
 ): ActiveSignature | null {
   // Resolve every syntactic name first so an unknown innermost call masks an
   // enclosing known call, matching the historical helper. The static
@@ -671,7 +674,8 @@ export function findActiveSignature(
   if (span.complete && span.closeParen !== null && caret === span.closeParen + 1) {
     return null;
   }
-  const args = FUNCTION_SIGNATURES[span.canonicalName];
+  const args =
+    FUNCTION_SIGNATURES[span.canonicalName] ?? options.getCustomFunctionArgs?.(span.canonicalName);
   if (!args) return null;
   return {
     name: span.canonicalName,

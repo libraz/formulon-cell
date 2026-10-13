@@ -50,6 +50,9 @@ export interface AutocompleteDeps {
    *  list. Pulled from `inst.formula.list()` so consumer registrations
    *  appear alongside the engine's built-ins. */
   getCustomFunctions?: () => readonly string[];
+  /** Argument labels for a custom function (`CustomFunctionMeta.args`), shown
+   *  as its signature. Returning `undefined` falls back to the generic label. */
+  getCustomFunctionArgs?: (name: string) => readonly string[] | undefined;
   /** Spreadsheet-style "pick from list" source. Called for plain-text edits to
    *  surface previous text values entered above the active cell in the same
    *  column. Implementations should return values in nearest-first order
@@ -190,7 +193,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
       let detail = labels.pickFromList;
       if (ctx.kind === 'function') {
         const canonical = deps.resolveFunctionName?.(pick) ?? pick.toLocaleUpperCase();
-        const sig = FUNCTION_SIGNATURES[canonical];
+        const sig = FUNCTION_SIGNATURES[canonical] ?? deps.getCustomFunctionArgs?.(canonical);
         const separator = deps.getListSeparator?.() === ';' ? ';' : ',';
         detail = sig ? `${pick}(${sig.join(`${separator} `)})` : labels.customFunction;
       } else if (ctx.kind === 'tableColumn') {

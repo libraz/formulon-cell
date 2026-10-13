@@ -799,6 +799,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           onAfterInsert: () => input.getFormulaBar().syncFxRefs(),
           getTables: () => input.wb().getTables(),
           getCustomFunctions: () => input.formulaRegistry.list(),
+          getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
           getFunctionNames: () => input.wb().functionNames(),
           getFunctionDisplayNames: () => {
             const wb = input.wb();
@@ -836,6 +837,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
             return wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase();
           },
+          getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
           labels: strings.argHelper,
         });
         break;

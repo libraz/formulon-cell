@@ -74,6 +74,7 @@ export interface EditorDeps {
     argHelper?: Partial<ArgHelperLabels>;
   };
   getCustomFunctions?: () => readonly string[];
+  getCustomFunctionArgs?: (name: string) => readonly string[] | undefined;
 }
 
 /**
@@ -752,6 +753,7 @@ export class InlineEditor {
       getColumnValues: (sheet, col, beforeRow) =>
         pickListValues(this.deps.wb.cells(sheet), col, beforeRow),
       getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
+      getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
       getFunctionNames: () => this.deps.wb.functionNames(),
       getFunctionDisplayNames: () => {
         const wb = this.deps.wb;
@@ -788,6 +790,7 @@ export class InlineEditor {
           this.deps.wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase()
         );
       },
+      getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
       labels: this.deps.getLabels?.().argHelper,
     });
     this.argHelper.refresh();

@@ -151,6 +151,30 @@ describe('attachAutocomplete labels', () => {
     input.remove();
   });
 
+  it('shows a custom function signature from its args and falls back to the label', () => {
+    const input = document.createElement('textarea');
+    input.value = '=CUS';
+    document.body.appendChild(input);
+    input.setSelectionRange(input.value.length, input.value.length);
+    const handle = attachAutocomplete({
+      input,
+      getCustomFunctions: () => ['CUSTOM_RATE', 'CUSTOM_PLAIN'],
+      getCustomFunctionArgs: (name) =>
+        name === 'CUSTOM_RATE' ? ['base', 'rate', '[step]'] : undefined,
+      getListSeparator: () => ';',
+      labels: { customFunction: 'Custom function' },
+    });
+
+    handle.refresh();
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('CUSTOM_RATE(base; rate; [step])');
+    expect(text).toContain('Custom function');
+    expect(text).not.toContain('CUSTOM_PLAIN(');
+
+    handle.detach();
+    input.remove();
+  });
+
   it('updates visible labels in place', () => {
     const input = document.createElement('textarea');
     input.value = '=Sales[';

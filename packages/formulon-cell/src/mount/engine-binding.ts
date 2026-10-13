@@ -157,6 +157,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       argHelper: strings.argHelper,
     }),
     getCustomFunctions: () => formulaRegistry.list(),
+    getCustomFunctionArgs: (name) => formulaRegistry.get(name)?.meta.args,
     onValidation: (outcome) => validationAlert?.show(outcome),
     onAfterCommit: refreshCells,
   });

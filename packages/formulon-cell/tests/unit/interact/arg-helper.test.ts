@@ -44,6 +44,22 @@ describe('attachArgHelper', () => {
     handle.detach();
   });
 
+  it('shows a custom function signature from its registered args', () => {
+    setText(input, '=CUSTOM_RATE(A1,');
+    const handle = attachArgHelper({
+      input,
+      getCustomFunctionArgs: (name) =>
+        name === 'CUSTOM_RATE' ? ['base', 'rate', '[step]'] : undefined,
+    });
+    handle.refresh();
+    expect(args().map((a) => a.textContent)).toEqual(['base', 'rate', '[step]']);
+    expect(activeArg()?.textContent).toBe('rate');
+    setText(input, '=CUSTOM_PLAIN(');
+    handle.refresh();
+    expect(tooltip()).toBeNull();
+    handle.detach();
+  });
+
   it('advances the active argument across each top-level comma', () => {
     setText(input, '=IF(A1>0,');
     const handle = attachArgHelper({ input });

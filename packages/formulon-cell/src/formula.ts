@@ -2,7 +2,7 @@
 // add at runtime. The formulon engine does not currently expose a
 // callback-based user-function surface, so v0.1 keeps the registry on the
 // JS side: the spreadsheet uses it for autocomplete suggestions and
-// signature hints, and exposes `evaluate(name, args)` so application code
+// argument hints, and exposes `evaluate(name, args)` so application code
 // can wire its own derived-cell flow via `inst.on('cellChange', …)`.
 //
 // When the engine grows native user-function support the registry
@@ -13,10 +13,11 @@ import type { CellValue } from './engine/types.js';
 export type CustomFunctionReturn = CellValue | number | string | boolean | null;
 
 export interface CustomFunctionMeta {
-  /** Short description shown in tooltips / docs. */
+  /** Short description for host code; the spreadsheet UI does not display it. */
   description?: string;
-  /** Argument labels — used by the autocomplete signature popover. Mark
-   *  optional args with surrounding brackets: `'[step]'`. */
+  /** Argument labels — shown in the autocomplete list and the argument
+   *  helper while typing inside the call. Mark optional args with
+   *  surrounding brackets: `'[step]'`. */
   args?: readonly string[];
   /** Optional return-type hint. Doesn't affect runtime. */
   returnType?: 'number' | 'text' | 'bool' | 'any';

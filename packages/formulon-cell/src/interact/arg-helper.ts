@@ -25,6 +25,8 @@ export interface ArgHelperDeps {
   resolveFunctionName?: (rawName: string) => string | null;
   /** Resolve a canonical catalog name to the workbook's live display name. */
   getFunctionDisplayName?: (canonicalName: string) => string | null;
+  /** Argument labels for a custom function (`CustomFunctionMeta.args`). */
+  getCustomFunctionArgs?: (name: string) => readonly string[] | undefined;
   labels?: Partial<ArgHelperLabels>;
 }
 
@@ -119,6 +121,7 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
     const sig = findActiveSignature(text, caret, {
       listSeparator: deps.getListSeparator?.(),
       resolveKnownName: deps.resolveFunctionName,
+      getCustomFunctionArgs: deps.getCustomFunctionArgs,
     });
     if (!sig || sig.args.length === 0) {
       close();
