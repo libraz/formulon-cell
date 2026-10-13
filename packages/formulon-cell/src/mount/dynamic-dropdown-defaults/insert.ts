@@ -105,14 +105,12 @@ const buildChartAction =
 const buildRecommendedChartAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createRecommendedChartFromSelection'] =>
   async () => {
-    const strings = instance.i18n.strings;
-    await showInstanceReport(instance, strings.ribbonMenu.recommendedCharts, [
-      {
-        severity: 'info',
-        label: strings.ribbon.chart,
-        detail: strings.workbookObjects.compatibilityDetails.chartAuthoring,
-      },
-    ]);
+    createRibbonChartFromSelection({
+      store: instance.store,
+      range: normalizedSelectionRange(instance),
+      action: 'recommended',
+      history: instance.history,
+    });
     instance.host.focus();
   };
 

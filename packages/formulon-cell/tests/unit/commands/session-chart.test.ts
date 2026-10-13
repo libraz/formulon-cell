@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import {
   clearSessionChart,
@@ -7,11 +12,12 @@ import {
   createSessionChart,
   listSessionCharts,
   sessionChartById,
+  sessionChartData,
   sessionChartSeries,
   sessionChartsForRange,
   updateSessionChart,
 } from '../../../src/commands/session-chart.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const range = (r0: number, c0: number, r1: number, c1: number) =>
@@ -34,6 +40,323 @@ const seedNumbers = (
 };
 
 describe('session chart commands', () => {
+  it('preserves axis crossings through type changes and undo/redo', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const chart = createSessionChart(store, range(0, 0, 2, 1), {
+      id: 'crossed-axes',
+      kind: 'scatter',
+      xAxis: { crossing: 'max', reverseOrder: true, min: -10 },
+      yAxis: { crossing: 2.5, numberFormat: '0.00' },
+    });
+    if (!chart) throw new Error('Chart creation was rejected');
+    expect(chart.xAxis).toEqual({ crossing: 'max', reverseOrder: true, min: -10 });
+    expect(chart.yAxis).toEqual({ crossing: 2.5, numberFormat: '0.00' });
+    updateSessionChart(store, chart.id, { kind: 'doughnut' }, history);
+    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.crossing).toBe(2.5);
+    updateSessionChart(
+      store,
+      chart.id,
+      {
+        kind: 'bar',
+        xAxis: { ...chart.xAxis, crossing: 'min' },
+        yAxis: { ...chart.yAxis, crossing: 2 },
+      },
+      history,
+    );
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
+      kind: 'doughnut',
+      xAxis: { crossing: 'max' },
+      yAxis: { crossing: 2.5 },
+    });
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
+      kind: 'bar',
+      xAxis: { crossing: 'min', reverseOrder: true, min: -10 },
+      yAxis: { crossing: 2, numberFormat: '0.00' },
+    });
+  });
+
+  it('keeps physical-axis reversal options through creation and history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const chart = createSessionChart(store, range(0, 0, 2, 1), {
+      id: 'reversed-axes',
+      kind: 'scatter',
+      xAxis: { reverseOrder: true, min: -10, max: 20 },
+      yAxis: { reverseOrder: false, numberFormat: '0.00' },
+    });
+    expect(chart?.xAxis).toEqual({ reverseOrder: true, min: -10, max: 20 });
+    expect(chart?.yAxis).toEqual({ reverseOrder: false, numberFormat: '0.00' });
+    if (!chart) throw new Error('Chart creation was rejected');
+    expect(
+      updateSessionChart(
+        store,
+        chart.id,
+        {
+          xAxis: { ...chart.xAxis, reverseOrder: false },
+          yAxis: { ...chart.yAxis, reverseOrder: true },
+        },
+        history,
+      ),
+    ).toMatchObject({
+      xAxis: { reverseOrder: false, min: -10, max: 20 },
+      yAxis: { reverseOrder: true, numberFormat: '0.00' },
+    });
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)?.xAxis?.reverseOrder).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.reverseOrder).toBe(false);
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)?.xAxis?.reverseOrder).toBe(false);
+    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.reverseOrder).toBe(true);
+  });
+
+  it('preserves scatter style across creation, type changes, and history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const chart = createSessionChart(store, range(0, 0, 2, 1), {
+      id: 'connected-scatter',
+      kind: 'scatter',
+      scatterStyle: 'lineMarker',
+    });
+    expect(chart?.scatterStyle).toBe('lineMarker');
+    expect(updateSessionChart(store, 'connected-scatter', { kind: 'column' }, history)?.kind).toBe(
+      'column',
+    );
+    expect(sessionChartById(store.getState(), 'connected-scatter')?.scatterStyle).toBe(
+      'lineMarker',
+    );
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'connected-scatter')).toMatchObject({
+      kind: 'scatter',
+      scatterStyle: 'lineMarker',
+    });
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'connected-scatter')?.kind).toBe('column');
+    expect(
+      updateSessionChart(
+        store,
+        'connected-scatter',
+        { kind: 'scatter', scatterStyle: 'line' },
+        history,
+      )?.scatterStyle,
+    ).toBe('line');
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'connected-scatter')?.scatterStyle).toBe(
+      'lineMarker',
+    );
+    const implicit = createSessionChart(store, range(0, 0, 2, 1), {
+      id: 'implicit-scatter',
+      kind: 'scatter',
+    });
+    expect(implicit?.scatterStyle).toBeUndefined();
+  });
+
+  it('keeps doughnut geometry and dormant settings through type changes and history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    seedNumbers(store, [
+      { row: 0, col: 0, value: 10 },
+      { row: 0, col: 1, value: 20 },
+      { row: 1, col: 0, value: 30 },
+      { row: 1, col: 1, value: 40 },
+    ]);
+    const sourceCells = store.getState().data.cells;
+    const chart = createSessionChart(store, range(0, 0, 1, 1), {
+      id: 'rings',
+      kind: 'doughnut',
+      holeSize: 70,
+      firstSliceAngle: 90,
+      grouping: 'stacked',
+      yAxis: { min: -10, max: 50, numberFormat: '0.00' },
+      filter: { hiddenCategoryIds: ['category-1'] },
+    });
+    expect(chart?.title).toBe('Doughnut chart');
+    expect(chart?.holeSize).toBe(70);
+    if (!chart) throw new Error('Doughnut chart creation was rejected');
+    const data = sessionChartData(store.getState(), chart);
+    expect(data.domain).toBe('category');
+    expect(data.series).toHaveLength(2);
+    expect(updateSessionChart(store, 'rings', { kind: 'column' }, history)).toMatchObject({
+      kind: 'column',
+    });
+    expect(sessionChartById(store.getState(), 'rings')).toMatchObject({
+      kind: 'column',
+      holeSize: 70,
+      firstSliceAngle: 90,
+      grouping: 'stacked',
+      yAxis: { min: -10, max: 50, numberFormat: '0.00' },
+      filter: { hiddenCategoryIds: ['category-1'] },
+    });
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'rings')?.kind).toBe('doughnut');
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'rings')?.kind).toBe('column');
+    expect(store.getState().data.cells).toBe(sourceCells);
+  });
+
+  it('reports the replay origin consistently to a host history guard', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    createSessionChart(store, range(0, 0, 2, 2), { id: 'origin' });
+    updateSessionChart(store, 'origin', { dataLabels: { visible: true } }, history, {
+      origin: 'contextMenu',
+    });
+    const origins: string[] = [];
+    history.setGuard((entry, direction) => {
+      const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
+      origins.push(intent?.origin ?? 'missing');
+      return intent?.origin === direction;
+    });
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'origin')?.dataLabels).toBeUndefined();
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'origin')?.dataLabels?.visible).toBe(true);
+    expect(origins).toEqual(['undo', 'redo']);
+  });
+  it('detaches nested settings from callers, patches, returned charts and history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const hiddenSeriesIds = ['series-1'];
+    const markerFill = { color: '#123456' };
+    const pointFill = { color: '#abcdef' };
+    const styles = [
+      {
+        seriesId: 'series-0',
+        marker: { fill: markerFill },
+        points: [{ pointId: 'category-0', fill: pointFill }],
+      },
+    ];
+    const chart = createSessionChart(
+      store,
+      range(0, 0, 2, 2),
+      {
+        id: 'nested',
+        filter: { hiddenSeriesIds },
+        dataLabels: { visible: true, color: '#112233' },
+        seriesStyles: styles,
+      },
+      history,
+    );
+    hiddenSeriesIds.push('series-0');
+    markerFill.color = '#000000';
+    pointFill.color = '#000000';
+    expect(sessionChartById(store.getState(), 'nested')?.filter?.hiddenSeriesIds).toEqual([
+      'series-1',
+    ]);
+    expect(
+      sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.marker?.fill?.color,
+    ).toBe('#123456');
+    const detached = chart?.seriesStyles?.[0]?.points?.[0]?.fill;
+    if (!detached) throw new Error('missing detached point style');
+    (detached as { color: string }).color = '#ffffff';
+    const patchFill = { color: '#ff0000' };
+    updateSessionChart(
+      store,
+      'nested',
+      { seriesStyles: [{ seriesId: 'series-0', fill: patchFill }] },
+      history,
+    );
+    patchFill.color = '#000000';
+    expect(sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.fill?.color).toBe(
+      '#ff0000',
+    );
+    history.undo();
+    expect(
+      sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.points?.[0]?.fill?.color,
+    ).toBe('#abcdef');
+    const list = listSessionCharts(store.getState());
+    const listMarker = list[0]?.seriesStyles?.[0]?.marker?.fill;
+    if (!listMarker) throw new Error('missing detached marker');
+    (listMarker as { color: string }).color = '#000000';
+    history.redo();
+    expect(sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.fill?.color).toBe(
+      '#ff0000',
+    );
+    history.undo();
+    expect(
+      sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.marker?.fill?.color,
+    ).toBe('#123456');
+  });
+
+  it('rejects chart settings, insertion, deletion and replay in a viewer', async () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const controller = new InteractionController({ store, history, getWb: () => wb });
+    const unregister = registerInteractionController(store, controller);
+    try {
+      const chart = createSessionChart(store, range(0, 0, 2, 2), { id: 'policy' }, history);
+      expect(chart).not.toBeNull();
+      updateSessionChart(store, 'policy', { dataLabels: { visible: true } }, history);
+      expect(history.undo()).toBe(true);
+      controller.setPolicy(viewerPolicy());
+      expect(history.redo()).toBe(false);
+      expect(history.undo()).toBe(false);
+      expect(
+        updateSessionChart(store, 'policy', { dataLabels: { visible: true } }, history),
+      ).toBeNull();
+      expect(clearSessionChart(store, 'policy', history)).toBe(false);
+      expect(clearSessionChartsInRange(store, range(0, 0, 2, 2), history)).toBe(0);
+      expect(createSessionChart(store, range(0, 0, 2, 2), { id: 'denied' }, history)).toBeNull();
+      expect(store.getState().charts.charts).toHaveLength(1);
+      expect(sessionChartById(store.getState(), 'policy')?.dataLabels).toBeUndefined();
+    } finally {
+      unregister();
+      controller.dispose();
+      wb.dispose();
+    }
+  });
+
+  it('checks both protected sheets when a settings update moves its source', () => {
+    const store = createSpreadsheetStore();
+    createSessionChart(store, range(0, 0, 2, 2), { id: 'source' });
+    setProtectedSheet(store, 1, true);
+    expect(
+      updateSessionChart(store, 'source', { source: { ...range(0, 0, 2, 2), sheet: 1 } }),
+    ).toBeNull();
+    expect(sessionChartById(store.getState(), 'source')?.source.sheet).toBe(0);
+  });
+  it('preserves Excel geometry options through create, update, undo and redo', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const chart = createSessionChart(
+      store,
+      range(0, 0, 2, 2),
+      {
+        id: 'geometry',
+        gapWidth: 150,
+        overlap: -25,
+        firstSliceAngle: 90,
+      },
+      history,
+    );
+    expect(chart).toMatchObject({ gapWidth: 150, overlap: -25, firstSliceAngle: 90 });
+    updateSessionChart(
+      store,
+      'geometry',
+      { gapWidth: 0, overlap: 100, firstSliceAngle: 270 },
+      history,
+    );
+    expect(sessionChartById(store.getState(), 'geometry')).toMatchObject({
+      gapWidth: 0,
+      overlap: 100,
+      firstSliceAngle: 270,
+    });
+    history.undo();
+    expect(sessionChartById(store.getState(), 'geometry')).toMatchObject({
+      gapWidth: 150,
+      overlap: -25,
+      firstSliceAngle: 90,
+    });
+    history.redo();
+    expect(sessionChartById(store.getState(), 'geometry')).toMatchObject({
+      gapWidth: 0,
+      overlap: 100,
+      firstSliceAngle: 270,
+    });
+  });
   it('creates a reusable session chart overlay with stable defaults', () => {
     const store = createSpreadsheetStore();
     const r = range(1, 0, 5, 2);
@@ -94,6 +417,159 @@ describe('session chart commands', () => {
       y: 40,
       w: 480,
       h: 280,
+    });
+  });
+
+  it('keeps nested chart options detached from callers and the returned command value', () => {
+    const store = createSpreadsheetStore();
+    const palette = ['#107c10', '#ed7d31'];
+    const legend = { visible: true, position: 'bottom' as const };
+    const chart = createSessionChart(store, range(0, 0, 3, 1), {
+      kind: 'column',
+      palette,
+      legend,
+      xAxis: { title: 'Month' },
+      yAxis: { min: 0, max: 100 },
+    });
+    if (!chart) throw new Error('expected chart');
+
+    palette[0] = '#000000';
+    legend.visible = false;
+    if (chart.palette) (chart.palette as string[])[0] = '#ffffff';
+    expect(store.getState().charts.charts[0]).toMatchObject({
+      palette: ['#107c10', '#ed7d31'],
+      legend: { visible: true, position: 'bottom' },
+      xAxis: { title: 'Month' },
+      yAxis: { min: 0, max: 100 },
+    });
+
+    const patchPalette = ['#4472c4'];
+    const patch = { palette: patchPalette, legend: { visible: false } };
+    updateSessionChart(store, chart.id, patch);
+    patchPalette[0] = '#000000';
+    expect(store.getState().charts.charts[0]?.palette).toEqual(['#4472c4']);
+    expect(store.getState().charts.charts[0]?.legend).toEqual({ visible: false });
+  });
+
+  it('maps a labeled table to named category series without summing columns', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      data: {
+        ...s.data,
+        cells: new Map([
+          [
+            addrKey({ sheet: 0, row: 0, col: 0 }),
+            { value: { kind: 'text', value: 'Month' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 0, col: 1 }),
+            { value: { kind: 'text', value: 'North' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 0, col: 2 }),
+            { value: { kind: 'text', value: 'South' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 1, col: 0 }),
+            { value: { kind: 'text', value: 'Jan' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 1, col: 1 }),
+            { value: { kind: 'number', value: 10 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 1, col: 2 }),
+            { value: { kind: 'number', value: 20 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 2, col: 0 }),
+            { value: { kind: 'text', value: 'Feb' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 2, col: 1 }),
+            { value: { kind: 'number', value: 30 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 2, col: 2 }),
+            { value: { kind: 'number', value: 40 }, formula: null },
+          ],
+        ]),
+      },
+    }));
+
+    expect(sessionChartData(store.getState(), range(0, 0, 2, 2), { kind: 'column' })).toEqual({
+      domain: 'category',
+      categories: ['Jan', 'Feb'],
+      series: [
+        { id: 'series-0', name: 'North', values: [10, 30] },
+        { id: 'series-1', name: 'South', values: [20, 40] },
+      ],
+    });
+  });
+
+  it('forwards explicit header flags from a session chart to the data adapter', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      data: {
+        ...s.data,
+        cells: new Map([
+          [
+            addrKey({ sheet: 0, row: 0, col: 0 }),
+            { value: { kind: 'text', value: 'Category' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 0, col: 1 }),
+            { value: { kind: 'number', value: 2025 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 0, col: 2 }),
+            { value: { kind: 'number', value: 2026 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 1, col: 0 }),
+            { value: { kind: 'text', value: 'A' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 1, col: 1 }),
+            { value: { kind: 'number', value: 1 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 1, col: 2 }),
+            { value: { kind: 'number', value: 2 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 2, col: 0 }),
+            { value: { kind: 'text', value: 'B' }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 2, col: 1 }),
+            { value: { kind: 'number', value: 3 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 2, col: 2 }),
+            { value: { kind: 'number', value: 4 }, formula: null },
+          ],
+        ]),
+      },
+    }));
+
+    const chart = createSessionChart(store, range(0, 0, 2, 2), {
+      kind: 'column',
+      seriesDirection: 'columns',
+      headerRow: true,
+      headerColumn: true,
+    });
+    if (!chart) throw new Error('expected chart');
+    expect(chart).toMatchObject({ headerRow: true, headerColumn: true });
+    expect(sessionChartData(store.getState(), chart)).toEqual({
+      domain: 'category',
+      categories: ['A', 'B'],
+      series: [
+        { id: 'series-0', name: '2025', values: [1, 3] },
+        { id: 'series-1', name: '2026', values: [2, 4] },
+      ],
     });
   });
 

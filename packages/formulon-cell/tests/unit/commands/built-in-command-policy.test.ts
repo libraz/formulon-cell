@@ -32,10 +32,35 @@ describe('built-in Mac command policy catalog', () => {
     expect(BUILT_IN_COMMAND_OPERATION['mac.formulas.removeArrows.all']).toBe('formulaEdit');
     expect(BUILT_IN_COMMAND_OPERATION['mac.autosum.SUM']).toBe('formulaEdit');
     expect(BUILT_IN_COMMAND_OPERATION['mac.insert.shapeOval']).toBe('object');
+    expect(BUILT_IN_COMMAND_OPERATION['mac.insert.recommendedChart']).toBe('object');
     expect(BUILT_IN_COMMAND_OPERATION['mac.data.validation.clearRules']).toBe('validation');
     expect(BUILT_IN_COMMAND_OPERATION['mac.page.size.a4']).toBe('pageSetup');
     expect(BUILT_IN_COMMAND_OPERATION.scaleWidth).toBe('pageSetup');
     expect(BUILT_IN_COMMAND_OPERATION.sheetViewSelect).toBe('format');
+  });
+
+  it('allows Recommended Chart for normal instances but denies it in viewer mode', async () => {
+    const store = createSpreadsheetStore();
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const controller = new InteractionController({
+      store,
+      getWb: () => workbook,
+      history: new History(),
+    });
+    const unregister = registerInteractionController(store, controller);
+    try {
+      controller.setPolicy(undefined);
+      expect(canExecuteBuiltIn(store, 'mac.insert.recommendedChart', 'ribbon')).toEqual({
+        allowed: true,
+      });
+
+      controller.setPolicy(viewerPolicy());
+      expect(canExecuteBuiltIn(store, 'mac.insert.recommendedChart', 'ribbon').allowed).toBe(false);
+    } finally {
+      unregister();
+      controller.dispose();
+      workbook.dispose();
+    }
   });
 
   it('leaves selection-only and removed ids out of the operation map', () => {

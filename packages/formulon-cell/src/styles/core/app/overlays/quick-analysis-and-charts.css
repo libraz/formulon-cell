@@ -205,6 +205,33 @@
     user-select: none;
   }
 
+  .fc-chart__settings {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 2px;
+  }
+
+  .fc-chart__settings-button {
+    min-width: 22px;
+    min-height: 22px;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font: inherit;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .fc-chart__settings-button:hover,
+  .fc-chart__settings-button:focus-visible {
+    border-color: var(--fc-accent, Highlight);
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
+    color: var(--fc-fg, CanvasText);
+    outline: none;
+  }
+
   .fc-chart__title {
     min-width: 0;
     flex: 1;
@@ -231,6 +258,320 @@
   .fc-chart__close:focus-visible {
     background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
     outline: none;
+  }
+
+  .fc-chart-settings {
+    position: absolute;
+    z-index: calc(var(--fc-z-grid, 2147483010) + 2);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: min(320px, calc(100% - 8px));
+    min-width: 256px;
+    max-height: min(520px, calc(100% - 8px));
+    overflow: hidden;
+    padding: 8px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
+    border-radius: 2px;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.18),
+      0 1px 3px rgba(0, 0, 0, 0.12);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+  }
+
+  .fc-chart-settings[hidden] {
+    display: none;
+  }
+
+  .fc-chart-settings__header,
+  .fc-chart-settings__footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fc-chart-settings__header {
+    min-height: 26px;
+    padding: 0 0 5px;
+  }
+
+  .fc-chart-settings__title {
+    min-width: 0;
+    flex: 1;
+    margin: 0;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fc-chart-settings__close {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .fc-chart-settings__close:hover,
+  .fc-chart-settings__close:focus-visible {
+    border-color: var(--fc-accent, Highlight);
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
+    outline: none;
+  }
+
+  .fc-chart-settings__tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+
+  .fc-chart-settings__tab {
+    min-width: 0;
+    min-height: 27px;
+    flex: 1 1 0;
+    padding: 4px 5px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .fc-chart-settings__tab[aria-selected="true"] {
+    border-bottom-color: var(--fc-accent, Highlight);
+    color: var(--fc-fg, CanvasText);
+  }
+
+  .fc-chart-settings__tab:hover,
+  .fc-chart-settings__tab:focus-visible {
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
+    outline: none;
+  }
+
+  .fc-chart-settings__body {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 8px;
+    min-height: min(180px, calc(100vh - 210px));
+    max-height: min(410px, calc(100vh - 170px));
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 8px 1px;
+    scrollbar-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 25%, transparent))
+      transparent;
+    scrollbar-width: thin;
+  }
+
+  .fc-chart-settings__group {
+    min-width: 0;
+    margin: 0;
+    padding: 6px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: 2px;
+  }
+
+  .fc-chart-settings__legend {
+    padding-bottom: 4px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .fc-chart-settings__field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(92px, 1.1fr);
+    align-items: center;
+    gap: 6px;
+    min-height: 25px;
+  }
+
+  .fc-chart-settings__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fc-chart-settings input[type="text"],
+  .fc-chart-settings input[type="number"],
+  .fc-chart-settings select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 24px;
+    padding: 3px 5px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule-strong, color-mix(in srgb, CanvasText 25%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+    color: inherit;
+    font: inherit;
+  }
+
+  .fc-chart-settings input:focus-visible,
+  .fc-chart-settings select:focus-visible {
+    border-color: var(--fc-accent, Highlight);
+    outline: 1px solid var(--fc-accent, Highlight);
+    outline-offset: -1px;
+  }
+
+  .fc-chart-settings__check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 25px;
+    cursor: pointer;
+  }
+
+  .fc-chart-settings__check input {
+    margin: 0;
+    accent-color: var(--fc-accent, Highlight);
+  }
+
+  .fc-chart-settings__check:has(input:disabled) {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 50%, transparent));
+    cursor: not-allowed;
+  }
+
+  .fc-chart-settings__color-controls {
+    display: flex;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .fc-chart-settings__color-controls input[type="text"] {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .fc-chart-settings__color-controls input[type="color"] {
+    width: 28px;
+    min-width: 28px;
+    height: 24px;
+    padding: 1px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule-strong, color-mix(in srgb, CanvasText 25%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+    cursor: pointer;
+  }
+
+  .fc-chart-settings__palette-presets,
+  .fc-chart-settings__filter-actions {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 5px;
+  }
+
+  .fc-chart-settings__palette-button,
+  .fc-chart-settings__filter-actions button {
+    min-width: 0;
+    min-height: 24px;
+    flex: 1 1 0;
+    padding: 3px 5px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule-strong, color-mix(in srgb, CanvasText 25%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .fc-chart-settings__palette-button {
+    display: flex;
+    align-items: stretch;
+    min-height: 20px;
+    padding: 2px;
+  }
+
+  .fc-chart-settings__palette-swatches {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    width: 100%;
+    min-height: 14px;
+  }
+
+  .fc-chart-settings__palette-swatch {
+    min-width: 0;
+  }
+
+  .fc-chart-settings__palette-button:hover,
+  .fc-chart-settings__palette-button:focus-visible,
+  .fc-chart-settings__filter-actions button:hover,
+  .fc-chart-settings__filter-actions button:focus-visible {
+    border-color: var(--fc-accent, Highlight);
+    outline: none;
+  }
+
+  .fc-chart-settings__filter-item {
+    min-height: 24px;
+  }
+
+  .fc-chart-settings__empty {
+    padding: 4px 0;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font-style: italic;
+  }
+
+  .fc-chart-settings__footer {
+    justify-content: flex-end;
+    padding-top: 2px;
+  }
+
+  .fc-chart-settings__cancel,
+  .fc-chart-settings__apply {
+    min-width: 68px;
+    min-height: 26px;
+    padding: 4px 9px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule-strong, color-mix(in srgb, CanvasText 25%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .fc-chart-settings__apply {
+    border-color: var(--fc-accent, Highlight);
+    background: var(--fc-accent, Highlight);
+    color: var(--fc-accent-contrast, Canvas);
+  }
+
+  .fc-chart-settings__cancel:hover,
+  .fc-chart-settings__cancel:focus-visible,
+  .fc-chart-settings__apply:hover,
+  .fc-chart-settings__apply:focus-visible {
+    filter: brightness(0.94);
+    outline: none;
+  }
+
+  @media (max-width: 640px) {
+    .fc-chart-settings {
+      width: min(320px, calc(100% - 8px));
+      min-width: 256px;
+    }
   }
 
   .fc-chart__plot {

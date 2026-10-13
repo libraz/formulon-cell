@@ -202,6 +202,7 @@ export const isMacRibbonCommandSupported = (id: string, liveNames?: LiveFunction
   }
   return (
     id in aliases ||
+    id === 'mac.insert.recommendedChart' ||
     id in chartKinds ||
     id in shapeKinds ||
     id in autoSumFunctions ||
@@ -305,6 +306,7 @@ export function dispatchMacRibbonCommand(
     const ctx = createDefaultDynamicDropdownsCtx(instance);
     const state = instance.store.getState();
     const sheet = state.data.sheetIndex;
+    if (id === 'mac.insert.recommendedChart') return ctx.createRecommendedChartFromSelection();
     const chart = chartKinds[id as keyof typeof chartKinds];
     if (chart) return ctx.createChartFromSelection(chart);
     const shape = shapeKinds[id as keyof typeof shapeKinds];

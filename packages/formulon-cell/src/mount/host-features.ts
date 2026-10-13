@@ -41,6 +41,7 @@ import {
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
+import { formatSessionChartValue } from '../interact/session-chart-format.js';
 import { attachSessionCharts, type SessionChartsHandle } from '../interact/session-charts.js';
 import {
   attachSessionIllustrations,
@@ -722,18 +723,22 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.unsubSlicerRecalc = input.emitter.on('recalc', () => s.slicer?.refresh());
         s.unsubSlicerWb = input.emitter.on('workbookChange', () => s.slicer?.refresh());
         break;
-      case 'charts':
+      case 'charts': {
         if (s.sessionCharts) return;
         s.sessionCharts = attachSessionCharts({
           host: input.host,
           store: input.store,
           labels: strings.sessionCharts,
+          history: input.history,
+          locale: input.i18nLocale(),
+          formatValue: formatSessionChartValue,
         });
-        input.featureRegistry.set(
-          'charts',
-          input.wrapHandle(s.sessionCharts, () => s.sessionCharts?.detach()),
-        );
+        const chartHandle = input.wrapHandle(s.sessionCharts, () => s.sessionCharts?.detach());
+        chartHandle.setStrings = (next) =>
+          s.sessionCharts?.setLabels(next.sessionCharts, input.i18nLocale());
+        input.featureRegistry.set('charts', chartHandle);
         break;
+      }
       case 'illustrations':
         if (s.sessionIllustrations) return;
         s.sessionIllustrations = attachSessionIllustrations({

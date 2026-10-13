@@ -298,6 +298,41 @@ describe('recordFormatChange / recordLayoutChange', () => {
     expect(store.getState().charts.charts).toEqual([]);
   });
 
+  it('detaches nested chart options in history snapshots and replay', () => {
+    const chart = {
+      id: 'chart-nested',
+      kind: 'column' as const,
+      source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
+      palette: ['#4472c4', '#ed7d31'],
+      legend: { visible: true, position: 'right' as const },
+      xAxis: { title: 'Month', min: 0 },
+      yAxis: { title: 'Sales', max: 100 },
+    };
+
+    recordChartsChange(h, store, () => {
+      mutators.upsertChart(store, chart);
+    });
+    chart.palette[0] = '#000000';
+    chart.legend.visible = false;
+    chart.xAxis.title = 'Mutated';
+
+    expect(captureChartsSnapshot(store.getState())).toEqual([
+      {
+        ...chart,
+        palette: ['#4472c4', '#ed7d31'],
+        legend: { visible: true, position: 'right' },
+        xAxis: { title: 'Month', min: 0 },
+      },
+    ]);
+    h.undo();
+    h.redo();
+    expect(store.getState().charts.charts[0]).toMatchObject({
+      palette: ['#4472c4', '#ed7d31'],
+      legend: { visible: true, position: 'right' },
+      xAxis: { title: 'Month', min: 0 },
+    });
+  });
+
   it('recordChartsChange skips unchanged chart snapshots', () => {
     recordChartsChange(h, store, () => {
       store.setState((s) => ({ ...s, charts: { charts: [...s.charts.charts] } }));

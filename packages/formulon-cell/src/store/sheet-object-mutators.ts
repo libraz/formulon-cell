@@ -1,3 +1,4 @@
+import { cloneChartSpec } from '../charts/clone.js';
 import type {
   CustomTableStyle,
   PivotTableStyleAssignment,
@@ -15,6 +16,11 @@ import type {
   SlicerSpec,
   Sparkline,
 } from './types.js';
+
+const cloneSessionChart = (chart: SessionChart): SessionChart => ({
+  ...cloneChartSpec(chart),
+  source: { ...chart.source },
+});
 
 function keyInRange(key: string, range: Range): boolean {
   const addr = parseAddrKey(key);
@@ -90,7 +96,7 @@ export const sheetObjectMutators = {
   upsertChart(store: SpreadsheetStore, chart: SessionChart): void {
     store.setState((s) => {
       const next = s.charts.charts.filter((c) => c.id !== chart.id);
-      return { ...s, charts: { charts: [...next, { ...chart, source: { ...chart.source } }] } };
+      return { ...s, charts: { charts: [...next, cloneSessionChart(chart)] } };
     });
   },
 
@@ -108,7 +114,7 @@ export const sheetObjectMutators = {
       const next = s.charts.charts.map((chart) => {
         if (chart.id !== id) return chart;
         changed = true;
-        return { ...chart, ...patch, source: patch.source ? { ...patch.source } : chart.source };
+        return cloneSessionChart({ ...chart, ...patch });
       });
       if (!changed) return s;
       return { ...s, charts: { charts: next } };

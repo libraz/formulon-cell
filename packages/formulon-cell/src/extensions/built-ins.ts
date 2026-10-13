@@ -42,6 +42,7 @@ import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
+import { formatSessionChartValue } from '../interact/session-chart-format.js';
 import { attachSessionCharts } from '../interact/session-charts.js';
 import { attachSessionIllustrations } from '../interact/session-illustrations.js';
 import { attachSlicer } from '../interact/slicer.js';
@@ -193,10 +194,13 @@ export const charts = (): Extension => ({
       host: ctx.host,
       store: ctx.store,
       labels: ctx.i18n.strings.sessionCharts,
+      history: ctx.history,
+      locale: ctx.i18n.locale,
+      formatValue: formatSessionChartValue,
     });
     return {
       refresh: () => handle.refresh(),
-      setStrings: (next) => handle.setLabels(next.sessionCharts),
+      setStrings: (next) => handle.setLabels(next.sessionCharts, ctx.i18n.locale),
       dispose: () => handle.detach(),
     };
   },

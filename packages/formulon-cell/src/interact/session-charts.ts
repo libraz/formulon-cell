@@ -1,19 +1,31 @@
+import { layoutChart } from '../charts/layout.js';
+import type { ChartPrimitive, ChartScene } from '../charts/types.js';
+import type { History } from '../commands/history.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { isSheetProtected } from '../commands/protection.js';
 import {
   clearSessionChart,
-  type SessionChartSeriesPoint,
-  sessionChartSeries,
+  sessionChartData,
   updateSessionChart,
 } from '../commands/session-chart.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import { createInteractionButton } from './chip-button.js';
+import { formatSessionChartValue } from './session-chart-format.js';
+import {
+  type ChartValueFormatter,
+  chartSettingsDefaults,
+  createSessionChartSettings,
+  type SessionChartSettingsHandle,
+  type SessionChartSettingsLabels,
+} from './session-chart-settings.js';
 
 export interface SessionChartsHandle {
   refresh(): void;
-  setLabels(labels: Partial<SessionChartLabels>): void;
+  setLabels(labels: Partial<SessionChartLabels>, locale?: string): void;
   detach(): void;
 }
 
-export interface SessionChartLabels {
+export interface SessionChartLabels extends Partial<SessionChartSettingsLabels> {
   close: string;
   resize: string;
   columnChart: string;
@@ -21,6 +33,7 @@ export interface SessionChartLabels {
   lineChart: string;
   areaChart: string;
   pieChart: string;
+  doughnutChart: string;
   scatterChart: string;
 }
 
@@ -28,6 +41,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_W = 240;
 const MIN_H = 160;
 const KEYBOARD_STEP = 8;
+const SESSION_CHART_PALETTE = ['#0f6cbd', '#ed7d31', '#70ad47', '#ffc000', '#5b9bd5', '#a5a5a5'];
 
 const DEFAULT_LABELS: SessionChartLabels = {
   close: 'Close',
@@ -37,7 +51,17 @@ const DEFAULT_LABELS: SessionChartLabels = {
   lineChart: 'Line chart',
   areaChart: 'Area chart',
   pieChart: 'Pie chart',
+  doughnutChart: 'Doughnut chart',
   scatterChart: 'Scatter chart',
+};
+
+const SETTINGS_TAB_LABELS: Pick<
+  SessionChartSettingsLabels,
+  'elementsTab' | 'stylesTab' | 'filtersTab'
+> = {
+  elementsTab: chartSettingsDefaults.elementsTab,
+  stylesTab: chartSettingsDefaults.stylesTab,
+  filtersTab: chartSettingsDefaults.filtersTab,
 };
 
 const createSessionChartCloseButton = (label: string): HTMLButtonElement =>
@@ -53,147 +77,47 @@ const chartLabel = (chart: SessionChart, labels: SessionChartLabels): string => 
   if (chart.kind === 'line') return labels.lineChart;
   if (chart.kind === 'area') return labels.areaChart;
   if (chart.kind === 'pie') return labels.pieChart;
+  if (chart.kind === 'doughnut') return labels.doughnutChart;
   if (chart.kind === 'scatter') return labels.scatterChart;
   return labels.columnChart;
 };
 
-function appendSvg<K extends keyof SVGElementTagNameMap>(
-  parent: Element,
-  tag: K,
-  attrs: Record<string, string | number>,
-): SVGElementTagNameMap[K] {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, String(value));
-  parent.appendChild(el);
-  return el;
-}
+const appendChartPrimitive = (parent: SVGSVGElement, primitive: ChartPrimitive): void => {
+  const element = document.createElementNS(SVG_NS, primitive.tag);
+  for (const [key, value] of Object.entries(primitive.attrs)) {
+    element.setAttribute(key, String(value));
+  }
+  if (primitive.role !== undefined) element.setAttribute('data-chart-role', primitive.role);
+  if (primitive.seriesIndex !== undefined)
+    element.setAttribute('data-series-index', String(primitive.seriesIndex));
+  if (primitive.pointIndex !== undefined)
+    element.setAttribute('data-point-index', String(primitive.pointIndex));
+  if (primitive.seriesId !== undefined) element.setAttribute('data-series-id', primitive.seriesId);
+  if (primitive.pointId !== undefined) element.setAttribute('data-point-id', primitive.pointId);
+  if (primitive.text !== undefined) element.textContent = primitive.text;
+  parent.appendChild(element);
+};
 
-function renderChartSvg(
-  svg: SVGSVGElement,
-  chart: SessionChart,
-  series: readonly SessionChartSeriesPoint[],
-): void {
+/** Map the pure chart scene to native SVG nodes. Text is assigned through
+ * `textContent`; chart data never becomes markup or an HTML string. */
+const renderChartScene = (svg: SVGSVGElement, scene: ChartScene): void => {
   svg.replaceChildren();
-  const w = 320;
-  const h = 132;
-  const pad = 20;
-  appendSvg(svg, 'rect', { x: 0, y: 0, width: w, height: h, rx: 6, fill: 'transparent' });
-  if (series.length === 0) return;
-  const values = series.map((s) => s.value);
-  const min = Math.min(0, ...values);
-  const max = Math.max(0, ...values);
-  const span = max - min || 1;
-  const xFor = (i: number): number =>
-    series.length === 1 ? w / 2 : pad + (i * (w - pad * 2)) / (series.length - 1);
-  const yFor = (v: number): number => h - pad - ((v - min) / span) * (h - pad * 2);
-  const zeroY = yFor(0);
-  appendSvg(svg, 'line', {
-    x1: pad,
-    x2: w - pad,
-    y1: zeroY,
-    y2: zeroY,
-    stroke: 'currentColor',
-    'stroke-opacity': 0.24,
-    'stroke-width': 1,
-  });
-
-  const color = chart.color ?? '#0f6cbd';
-  if (chart.kind === 'pie') {
-    const total = series.reduce((sum, point) => sum + Math.max(0, point.value), 0);
-    const cx = w / 2;
-    const cy = h / 2;
-    const r = Math.min(w, h) / 2 - pad;
-    if (total <= 0) {
-      appendSvg(svg, 'circle', { cx, cy, r, fill: '#d9d9d9' });
-      return;
-    }
-    let start = -Math.PI / 2;
-    series.forEach((point, index) => {
-      const value = Math.max(0, point.value);
-      const end = start + (value / total) * Math.PI * 2;
-      const x1 = cx + Math.cos(start) * r;
-      const y1 = cy + Math.sin(start) * r;
-      const x2 = cx + Math.cos(end) * r;
-      const y2 = cy + Math.sin(end) * r;
-      const large = end - start > Math.PI ? 1 : 0;
-      appendSvg(svg, 'path', {
-        d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`,
-        fill: chart.color ?? `hsl(${(index * 57) % 360} 64% 48%)`,
-        stroke: 'Canvas',
-        'stroke-width': 1,
-      });
-      start = end;
-    });
-    return;
-  }
-
-  if (chart.kind === 'line' || chart.kind === 'area' || chart.kind === 'scatter') {
-    if (chart.kind === 'area') {
-      const points = series.map((s, i) => `${xFor(i)},${yFor(s.value)}`).join(' ');
-      const area = `${pad},${zeroY} ${points} ${w - pad},${zeroY}`;
-      appendSvg(svg, 'polygon', {
-        points: area,
-        fill: color,
-        'fill-opacity': 0.2,
-      });
-    }
-    const points = series.map((s, i) => `${xFor(i)},${yFor(s.value)}`).join(' ');
-    if (chart.kind !== 'scatter') {
-      appendSvg(svg, 'polyline', {
-        points,
-        fill: 'none',
-        stroke: color,
-        'stroke-width': 2.5,
-        'stroke-linejoin': 'round',
-        'stroke-linecap': 'round',
-      });
-    }
-    for (let i = 0; i < series.length; i += 1) {
-      appendSvg(svg, 'circle', { cx: xFor(i), cy: yFor(series[i]?.value ?? 0), r: 3, fill: color });
-    }
-    return;
-  }
-
-  const slot = ((chart.kind === 'bar' ? h : w) - pad * 2) / Math.max(1, series.length);
-  // Keep each mark inside its category slot. For dense series this may be a
-  // fractional SVG unit; preserving the slot fraction avoids overlap while
-  // still giving short series the same desktop-sized 28-unit cap.
-  const thickness = Math.min(28, slot * 0.58);
-  for (let i = 0; i < series.length; i += 1) {
-    const v = series[i]?.value ?? 0;
-    const y = yFor(v);
-    if (chart.kind === 'bar') {
-      const barY = pad + i * slot + (slot - thickness) / 2;
-      const zeroX = pad + ((0 - min) / span) * (w - pad * 2);
-      const x = pad + ((v - min) / span) * (w - pad * 2);
-      appendSvg(svg, 'rect', {
-        x: Math.min(x, zeroX),
-        y: barY,
-        width: Math.max(1, Math.abs(zeroX - x)),
-        height: thickness,
-        rx: 2,
-        fill: v < 0 ? '#d13438' : color,
-      });
-    } else {
-      appendSvg(svg, 'rect', {
-        x: pad + i * slot + (slot - thickness) / 2,
-        y: Math.min(y, zeroY),
-        width: thickness,
-        height: Math.max(1, Math.abs(zeroY - y)),
-        rx: 2,
-        fill: v < 0 ? '#d13438' : color,
-      });
-    }
-  }
-}
+  svg.setAttribute('viewBox', `0 0 ${scene.width} ${scene.height}`);
+  for (const primitive of scene.elements) appendChartPrimitive(svg, primitive);
+};
 
 export function attachSessionCharts(deps: {
   host: HTMLElement;
   store: SpreadsheetStore;
   closeLabel?: string;
   labels?: Partial<SessionChartLabels>;
+  history?: History | null;
+  locale?: string;
+  formatValue?: ChartValueFormatter;
 }): SessionChartsHandle {
-  const { host, store } = deps;
+  const { host, store, history = null } = deps;
+  const formatValue = deps.formatValue ?? formatSessionChartValue;
+  let locale = deps.locale;
   let labels: SessionChartLabels = {
     ...DEFAULT_LABELS,
     ...deps.labels,
@@ -203,6 +127,48 @@ export function attachSessionCharts(deps: {
   root.className = 'fc-charts';
   host.appendChild(root);
   let selectedId: string | null = null;
+  let settings: SessionChartSettingsHandle;
+
+  const canEditCharts = (chart: SessionChart): boolean => {
+    if (isSheetProtected(store.getState(), chart.source.sheet)) return false;
+    const controller = interactionControllerFor(store);
+    if (!controller) return true;
+    return controller.canExecute({
+      operation: 'object',
+      origin: 'instanceApi',
+      effects: [
+        {
+          kind: 'cells',
+          cells: [
+            {
+              sheet: chart.source.sheet,
+              row: chart.source.r0,
+              col: chart.source.c0,
+            },
+          ],
+        },
+      ],
+    }).allowed;
+  };
+
+  settings = createSessionChartSettings({
+    host,
+    store,
+    history,
+    locale,
+    formatValue,
+    labels: { ...SETTINGS_TAB_LABELS, ...deps.labels },
+    canEdit: canEditCharts,
+    readData: (draftChart) => sessionChartData(store.getState(), draftChart),
+    onApply: (id, patch, patchHistory) => {
+      updateSessionChart(
+        store,
+        id,
+        patch as Parameters<typeof updateSessionChart>[2],
+        patchHistory,
+      );
+    },
+  });
 
   const updateSelectionClasses = (): void => {
     const panels = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart'));
@@ -234,16 +200,24 @@ export function attachSessionCharts(deps: {
     const startTop = chart.y ?? panel.offsetTop;
     const startW = chart.w ?? (panel.offsetWidth || 360);
     const startH = chart.h ?? (panel.offsetHeight || 220);
+    let latest: { x?: number; y?: number; w?: number; h?: number } = {};
+    const preview = (patch: { x?: number; y?: number; w?: number; h?: number }): void => {
+      if (patch.x !== undefined) panel.style.left = `${patch.x}px`;
+      if (patch.y !== undefined) panel.style.top = `${patch.y}px`;
+      if (patch.w !== undefined) panel.style.width = `${patch.w}px`;
+      if (patch.h !== undefined) panel.style.height = `${patch.h}px`;
+      latest = patch;
+    };
     const onMove = (move: PointerEvent): void => {
       const dx = move.clientX - startX;
       const dy = move.clientY - startY;
       if (mode === 'move') {
-        updateSessionChart(store, chart.id, {
+        preview({
           x: Math.max(0, startLeft + dx),
           y: Math.max(0, startTop + dy),
         });
       } else {
-        updateSessionChart(store, chart.id, {
+        preview({
           w: Math.max(MIN_W, startW + dx),
           h: Math.max(MIN_H, startH + dy),
         });
@@ -252,6 +226,8 @@ export function attachSessionCharts(deps: {
     const onUp = (): void => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      const committed = updateSessionChart(store, chart.id, latest, history);
+      if (!committed) render();
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
@@ -259,10 +235,17 @@ export function attachSessionCharts(deps: {
 
   const applyKeyboard = (e: KeyboardEvent, chart: SessionChart, panel: HTMLElement): void => {
     if (e.defaultPrevented) return;
+    const target = e.target;
+    if (
+      target instanceof HTMLElement &&
+      target.closest('button, input, select, textarea, option, [contenteditable="true"]')
+    ) {
+      return;
+    }
     selectChart(chart.id, panel);
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      clearSessionChart(store, chart.id);
+      clearSessionChart(store, chart.id, history);
       host.focus({ preventScroll: true });
       return;
     }
@@ -279,25 +262,51 @@ export function attachSessionCharts(deps: {
 
     const [dx, dy] = delta;
     if (e.shiftKey) {
-      updateSessionChart(store, chart.id, {
-        w: Math.max(MIN_W, ((chart.w ?? panel.offsetWidth) || 360) + dx),
-        h: Math.max(MIN_H, ((chart.h ?? panel.offsetHeight) || 220) + dy),
-      });
+      updateSessionChart(
+        store,
+        chart.id,
+        {
+          w: Math.max(MIN_W, ((chart.w ?? panel.offsetWidth) || 360) + dx),
+          h: Math.max(MIN_H, ((chart.h ?? panel.offsetHeight) || 220) + dy),
+        },
+        history,
+      );
       return;
     }
 
-    updateSessionChart(store, chart.id, {
-      x: Math.max(0, (chart.x ?? panel.offsetLeft) + dx),
-      y: Math.max(0, (chart.y ?? panel.offsetTop) + dy),
-    });
+    updateSessionChart(
+      store,
+      chart.id,
+      {
+        x: Math.max(0, (chart.x ?? panel.offsetLeft) + dx),
+        y: Math.max(0, (chart.y ?? panel.offsetTop) + dy),
+      },
+      history,
+    );
+  };
+
+  let subscribedController: ReturnType<typeof interactionControllerFor>;
+  let unsubscribeController: () => void = () => {};
+  const syncControllerSubscription = (): void => {
+    const nextController = interactionControllerFor(store);
+    if (nextController === subscribedController) return;
+    unsubscribeController();
+    subscribedController = nextController;
+    unsubscribeController = nextController?.subscribe(() => render()) ?? (() => {});
   };
 
   const render = (): void => {
+    // Policy changes are emitted by the interaction controller rather than
+    // the workbook store. Keep the settings surface live, and follow a
+    // controller replacement the next time the chart root renders.
+    syncControllerSubscription();
     const state = store.getState();
+    const visibleChartIds = new Set<string>();
     root.replaceChildren();
     state.charts.charts
       .filter((chart) => chart.source.sheet === state.data.sheetIndex)
       .forEach((chart, idx) => {
+        visibleChartIds.add(chart.id);
         const panel = document.createElement('section');
         panel.className = 'fc-chart';
         panel.dataset.chartId = chart.id;
@@ -326,25 +335,78 @@ export function attachSessionCharts(deps: {
         const header = document.createElement('div');
         header.className = 'fc-chart__header';
         header.addEventListener('pointerdown', (e) => {
-          if (e.target === close) return;
+          if (
+            e.target instanceof Element &&
+            e.target.closest('button, input, select, textarea, option, [contenteditable="true"]')
+          ) {
+            return;
+          }
           applyDrag(e, chart, 'move', panel);
         });
         const title = document.createElement('div');
         title.className = 'fc-chart__title';
         title.textContent = chartLabel(chart, labels);
+        const settingsButtons = document.createElement('div');
+        settingsButtons.className = 'fc-chart__settings';
+        const settingTabs: readonly {
+          id: Parameters<SessionChartSettingsHandle['open']>[3];
+          label: string;
+        }[] = [
+          { id: 'elements', label: labels.elementsTab ?? chartSettingsDefaults.elementsTab },
+          { id: 'styles', label: labels.stylesTab ?? chartSettingsDefaults.stylesTab },
+          { id: 'filters', label: labels.filtersTab ?? chartSettingsDefaults.filtersTab },
+        ];
+        for (const item of settingTabs) {
+          if (!item.id) continue;
+          const button = createInteractionButton({
+            className: 'fc-chart__settings-button',
+            ariaLabel: item.label,
+            text: item.label,
+          });
+          button.dataset.chartSettingsTab = item.id;
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            settings.open(chart, data, button, item.id);
+          });
+          settingsButtons.appendChild(button);
+        }
         const close = createSessionChartCloseButton(labels.close);
         close.addEventListener('click', () => {
-          clearSessionChart(store, chart.id);
+          clearSessionChart(store, chart.id, history);
           host.focus({ preventScroll: true });
         });
-        header.append(title, close);
+        header.append(title, settingsButtons, close);
 
         const svg = document.createElementNS(SVG_NS, 'svg');
         svg.classList.add('fc-chart__plot');
         svg.setAttribute('viewBox', '0 0 320 132');
         svg.setAttribute('role', 'img');
         svg.setAttribute('aria-label', title.textContent);
-        renderChartSvg(svg, chart, sessionChartSeries(state, chart));
+        const data = sessionChartData(state, chart);
+        const spec = {
+          ...chart,
+          // The overlay header owns the title; standalone scenes render their own.
+          title: undefined,
+          // Preserve the legacy session-chart colour when a host supplied one
+          // while allowing the pure chart module to own palette selection.
+          palette:
+            chart.palette && chart.palette.length > 0
+              ? chart.palette
+              : [
+                  chart.color ?? SESSION_CHART_PALETTE[0] ?? '#0f6cbd',
+                  ...SESSION_CHART_PALETTE.slice(1),
+                ],
+        };
+        const layoutInput = {
+          spec,
+          data,
+          width: 320,
+          height: 132,
+          locale,
+          formatValue,
+        };
+        renderChartScene(svg, layoutChart(layoutInput as Parameters<typeof layoutChart>[0]));
         const resize = document.createElement('div');
         resize.className = 'fc-chart__resize';
         resize.setAttribute('role', 'separator');
@@ -352,7 +414,11 @@ export function attachSessionCharts(deps: {
         resize.addEventListener('pointerdown', (e) => applyDrag(e, chart, 'resize', panel));
         panel.append(header, svg, resize);
         root.appendChild(panel);
+        settings.sync(chart, data, panel);
       });
+    if (settings.isOpen() && !visibleChartIds.has(settings.chartId() ?? '')) {
+      settings.close(true);
+    }
   };
 
   const unsubscribe = store.subscribe(render);
@@ -360,12 +426,20 @@ export function attachSessionCharts(deps: {
 
   return {
     refresh: render,
-    setLabels(next) {
+    setLabels(next, nextLocale) {
       labels = { ...labels, ...next };
+      if (nextLocale) {
+        // Keep the pure chart scene and the settings surface on the same
+        // locale after a host switches languages.
+        locale = nextLocale;
+      }
+      settings.setLabels(next, nextLocale);
       render();
     },
     detach() {
       unsubscribe();
+      unsubscribeController();
+      settings.detach();
       root.remove();
     },
   };

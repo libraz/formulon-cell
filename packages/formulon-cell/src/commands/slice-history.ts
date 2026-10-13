@@ -1,3 +1,4 @@
+import { cloneChartSpec } from '../charts/clone.js';
 import { parseAddrKey } from '../engine/address.js';
 import {
   type FormatHistoryTrackingSnapshot,
@@ -27,6 +28,9 @@ import type {
   TableOverlay,
 } from './format-as-table.js';
 import type { History } from './history.js';
+import { interactionControllerFor } from './interaction-controller.js';
+import type { OperationIntent } from './interaction-policy.js';
+import { isSheetProtected } from './protection.js';
 
 /* ---------- Snapshot helpers ---------- */
 
@@ -305,9 +309,11 @@ const sameJsonSnapshot = <T>(a: readonly T[], b: readonly T[]): boolean =>
 /** How one store slice is snapshotted, restored and compared for history. */
 interface SliceCodec<T> {
   capture: (state: State) => T;
-  apply: (store: SpreadsheetStore, snap: T) => void;
+  apply: (store: SpreadsheetStore, snap: T, origin?: 'undo' | 'redo') => void;
   same: (a: T, b: T) => boolean;
   repeat?: () => void;
+  intent?: OperationIntent;
+  inverseIntent?: OperationIntent;
 }
 
 /** Run `mutate`, capturing the slice before and after, and push one entry
@@ -328,9 +334,11 @@ function recordSliceChange<T>(
   const after = codec.capture(store.getState());
   if (codec.same(before, after)) return;
   history.push({
-    undo: () => codec.apply(store, before),
-    redo: () => codec.apply(store, after),
+    undo: () => codec.apply(store, before, 'undo'),
+    redo: () => codec.apply(store, after, 'redo'),
     repeat: codec.repeat,
+    ...(codec.intent ? { intent: codec.intent } : {}),
+    ...(codec.inverseIntent ? { inverseIntent: codec.inverseIntent } : {}),
   });
 }
 
@@ -399,7 +407,7 @@ export function recordTablesChange(
 }
 
 const cloneSessionChart = (chart: SessionChart): SessionChart => ({
-  ...chart,
+  ...cloneChartSpec(chart),
   source: { ...chart.source },
 });
 
@@ -418,11 +426,38 @@ export function recordChartsChange(
   history: History | null,
   store: SpreadsheetStore,
   mutate: () => void,
+  intent?: OperationIntent,
 ): void {
   recordSliceChange(history, store, mutate, {
     capture: captureChartsSnapshot,
-    apply: applyChartsSnapshot,
+    apply: (target, snapshot, origin) => {
+      if (intent) {
+        for (const effect of intent.effects) {
+          if (
+            effect.kind === 'cells' &&
+            effect.cells.some((cell) => isSheetProtected(target.getState(), cell.sheet))
+          ) {
+            throw new Error('Chart history replay denied by sheet protection');
+          }
+        }
+        if (
+          interactionControllerFor(target)?.canExecute({
+            ...intent,
+            origin: origin ?? intent.origin,
+          }).allowed === false
+        ) {
+          throw new Error('Chart history replay denied by interaction policy');
+        }
+      }
+      applyChartsSnapshot(target, snapshot);
+    },
     same: sameJsonSnapshot,
+    ...(intent
+      ? {
+          intent: { ...intent, origin: 'redo' as const },
+          inverseIntent: { ...intent, origin: 'undo' as const },
+        }
+      : {}),
   });
 }
 

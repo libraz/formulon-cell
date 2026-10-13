@@ -576,7 +576,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('opens Recommended Charts report from primary click and keeps chart types secondary', async () => {
+  it('creates the recommended chart from primary click and keeps chart types secondary', async () => {
     seedNumber(sheet, 0, 0, 1);
     seedNumber(sheet, 1, 0, 2);
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
@@ -592,14 +592,9 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(chartButton).toBeTruthy();
     chartButton?.click();
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
-      'Recommended Charts',
-    );
-    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
-      'Persisted chart creation and editing',
-    );
-    expect(sheet.instance.store.getState().charts.charts).toEqual([]);
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    expect(sheet.instance.store.getState().charts.charts).toMatchObject([
+      { kind: 'column', source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 } },
+    ]);
 
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
     tb.dropdownsApi?.openDynamicRibbonDropdown({
@@ -617,11 +612,11 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(recommendedEvent, 'target', { value: recommendedButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(recommendedEvent)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
-      'Recommended Charts',
-    );
-    expect(sheet.instance.store.getState().charts.charts).toEqual([]);
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    expect(sheet.instance.store.getState().charts.charts).toHaveLength(2);
+    expect(sheet.instance.store.getState().charts.charts[1]).toMatchObject({
+      kind: 'column',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+    });
 
     tb.dropdownsApi?.openDynamicRibbonDropdown({
       command: 'chartInsert',
@@ -633,9 +628,12 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(event, 'target', { value: barButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
 
-    expect(sheet.instance.store.getState().charts.charts).toMatchObject([
-      { kind: 'bar', source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 } },
-    ]);
+    const charts = sheet.instance.store.getState().charts.charts;
+    expect(charts).toHaveLength(3);
+    expect(charts[2]).toMatchObject({
+      kind: 'bar',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+    });
 
     tb.dispose();
   });

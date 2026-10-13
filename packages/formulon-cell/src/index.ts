@@ -1,6 +1,44 @@
 // Cell renderer registry — `inst.cells.registerFormatter(...)`.
 export type { CellFormatterEntry, CellRenderInput } from './cells.js';
 export { CellRegistry } from './cells.js';
+export {
+  chartDataFromTable,
+  formatChartNumber,
+  formatChartValue,
+  layoutChart,
+} from './charts/index.js';
+export type {
+  CategoryChartData,
+  CategoryChartSeries,
+  ChartAxisSpec,
+  ChartData,
+  ChartDataLabelSpec,
+  ChartDataLabelsSpec,
+  ChartEmptyCellMode,
+  ChartFillSpec,
+  ChartFilterSpec,
+  ChartGrouping,
+  ChartKind,
+  ChartLabelPosition,
+  ChartLegendSpec,
+  ChartLineSpec,
+  ChartMarkerSpec,
+  ChartPlotBounds,
+  ChartPointStyleSpec,
+  ChartPrimitive,
+  ChartPrimitiveRole,
+  ChartPrimitiveTag,
+  ChartScatterStyle,
+  ChartScene,
+  ChartSeriesDirection,
+  ChartSeriesStyleSpec,
+  ChartSpec,
+  ChartTableCell,
+  ChartValueFormatter,
+  XYChartData,
+  XYChartPoint,
+  XYChartSeries,
+} from './charts/types.js';
 export type { SelectionStats, StatusAggregateEntry } from './commands/aggregate.js';
 export {
   aggregateSelection,
@@ -521,6 +559,7 @@ export {
   showRowsAroundSelection,
 } from './commands/row-col-layout.js';
 export type {
+  ChartMutationAuthorization,
   CreateRibbonChartFromSelectionOptions,
   CreateSessionChartOptions,
   RibbonChartAction,
@@ -535,6 +574,7 @@ export {
   inferRecommendedChartKind,
   listSessionCharts,
   sessionChartById,
+  sessionChartData,
   sessionChartSeries,
   sessionChartsForRange,
   updateSessionChart,

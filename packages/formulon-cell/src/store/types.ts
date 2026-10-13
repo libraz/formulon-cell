@@ -1,3 +1,4 @@
+import type { ChartKind, ChartSpec } from '../charts/types.js';
 import type {
   CustomTableStyle,
   PivotTableStyleAssignment,
@@ -306,16 +307,17 @@ export interface SparklineSlice {
   sparklines: Map<string, Sparkline>;
 }
 
-export type SessionChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'scatter';
+/** @deprecated Use `ChartKind` from `@libraz/formulon-cell/charts` instead. */
+export type SessionChartKind = ChartKind;
 
 /** Session chart overlay. This is intentionally UI-owned until the engine
  *  exposes chart authoring; the source range can later map to a persisted
  *  chart definition without changing the public command shape. */
-export interface SessionChart {
+export interface SessionChart extends Omit<ChartSpec, 'kind'> {
   id: string;
   kind: SessionChartKind;
   source: Range;
-  title?: string;
+  /** Legacy single-series colour. `palette` is preferred for multi-series charts. */
   color?: string;
   x?: number;
   y?: number;
