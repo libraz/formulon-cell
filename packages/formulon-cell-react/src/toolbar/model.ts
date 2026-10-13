@@ -47,6 +47,7 @@ export interface SpreadsheetToolbarProps {
   dropdownActions?: Partial<DynamicDropdownsCtx>;
   /** Shared tab surface. Use `EXCEL365_STANDARD_RIBBON_TABS` for the
    *  baseline Excel profile; append `OPTIONAL_RIBBON_TABS` only when those
-   *  add-in/automation tabs are intentionally exposed. */
+   *  add-in/automation tabs are intentionally exposed. Defaults to
+   *  `EXCEL365_STANDARD_RIBBON_TABS` (the Mac set on macOS). */
   ribbonTabs?: readonly RibbonTab[];
 }

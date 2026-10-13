@@ -203,7 +203,9 @@ export interface BuildRibbonModelOptions {
    *  Microsoft 365 baseline and append `OPTIONAL_RIBBON_TABS` only when the
    *  host really exposes those add-in/automation surfaces. */
   tabs?: readonly RibbonTab[];
-  /** Selects the built-in tab and command surface when `tabs` is omitted. */
+  /** Selects the built-in tab and command surface when `tabs` is omitted.
+   *  The catalog default is the full `RIBBON_TABS` set; `mountToolbar`
+   *  applies its own standard-tab default. */
   profile?: RibbonProfile;
 }
 

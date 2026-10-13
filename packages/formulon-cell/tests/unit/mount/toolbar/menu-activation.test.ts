@@ -35,7 +35,10 @@ import {
   DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS,
   RIBBON_DROPDOWN_MENU_FOR_COMMAND,
 } from '../../../../src/toolbar/ribbon/dynamic-dropdowns.js';
-import { ribbonActivatableSurfaceCommandIds } from '../../../../src/toolbar/ribbon-model.js';
+import {
+  RIBBON_TABS,
+  ribbonActivatableSurfaceCommandIds,
+} from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
 import { dynamicDropdownNoopOverrides, stubHelpers } from './fixtures.js';
 
@@ -169,6 +172,7 @@ describe('Spreadsheet.mountToolbar', () => {
 
   it('wires every registered dynamic ribbon dropdown to a rendered button and menu', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      ribbonTabs: RIBBON_TABS,
       dynamicDropdowns: true,
       helpers: stubHelpers(),
     });
@@ -428,7 +432,10 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('renders exactly the shared activatable ribbon command surface as buttons', () => {
-    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      ribbonTabs: RIBBON_TABS,
+      helpers: stubHelpers(),
+    });
     const renderedButtonCommands = Array.from(
       host.querySelectorAll<HTMLButtonElement>('button[data-ribbon-command]'),
     )
@@ -684,6 +691,7 @@ describe('Spreadsheet.mountToolbar', () => {
       variant: 'bandedFirstCol',
     });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      ribbonTabs: RIBBON_TABS,
       dynamicDropdowns: true,
       helpers: stubHelpers(),
     });

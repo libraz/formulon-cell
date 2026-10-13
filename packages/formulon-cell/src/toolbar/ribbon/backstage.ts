@@ -1,7 +1,6 @@
-// Backstage view ("File" tab) UI helpers extracted from main.ts. The view is
-// purely presentational: it builds the navigation rail, properties panel, and
-// the command/card grid. Behaviour is wired by the parent through data-backstage-*
-// attributes on the produced buttons.
+// Presentational backstage view: navigation rail, properties panel and the
+// command/card grid. Buttons carry `data-backstage-action` attributes; the
+// toolbar wires only "back" (and Escape), hosts handle the rest.
 
 import { createExcelRibbonSvg } from '../excel-ribbon-icons.js';
 import { projectDisabledState } from '../menu-a11y.js';

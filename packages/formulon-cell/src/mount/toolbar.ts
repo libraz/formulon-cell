@@ -70,7 +70,7 @@ import {
 import { projectRibbonActiveState } from '../toolbar/ribbon-active-state.js';
 import {
   EXCEL365_MAC_RIBBON_TABS,
-  RIBBON_TABS,
+  EXCEL365_STANDARD_RIBBON_TABS,
   type RibbonTab,
   type ToolbarLang,
   type ToolbarText,
@@ -132,17 +132,18 @@ export interface MountToolbarOptions {
    *  is independently optional. */
   hooks?: RibbonHooks;
 
-  /** Backstage view factory. When the user opens the "File" tab the toolbar
-   *  replaces its body with the element this returns. Without it, the file
-   *  tab simply switches to an empty panel. */
+  /** Factory for the element rendered while `setBackstageOpen(true)` is in
+   *  effect. Clicking the "File" tab does not open it. Core wires only the
+   *  Back button and Escape; other `data-backstage-action` buttons are the
+   *  host's to handle. Without it, the open backstage is an empty panel. */
   createBackstageView?: () => HTMLElement;
 
   /** Initial UI state. */
   activeTab?: RibbonTab;
   /** Explicit ribbon tab surface. Pass `EXCEL365_STANDARD_RIBBON_TABS` for
    *  the Microsoft 365 baseline and append optional add-in/automation tabs
-   *  only when the host has those surfaces wired. Defaults to the historical
-   *  full tab set for backwards compatibility. */
+   *  only when the host has those surfaces wired. Defaults to
+   *  `EXCEL365_STANDARD_RIBBON_TABS` (`EXCEL365_MAC_RIBBON_TABS` on macOS). */
   ribbonTabs?: readonly RibbonTab[];
   ribbonDisplayMode?: RibbonDisplayMode;
   collapsed?: boolean;
@@ -186,7 +187,9 @@ export interface MountToolbarOptions {
   showMessage?: RibbonRuntime['showMessage'];
   applyRibbonFormat?: RibbonRuntime['applyRibbonFormat'];
 
-  /** Lifecycle callbacks fired after the matching internal state change. */
+  /** Lifecycle callbacks fired after the matching internal state change.
+   *  `onTabChange('file')` is the hook for hosts that render their own
+   *  backstage; the File tab does not open one by itself. */
   onTabChange?: (tab: RibbonTab) => void;
   onCollapsedChange?: (collapsed: boolean) => void;
   onDisplayModeChange?: (mode: RibbonDisplayMode) => void;
@@ -225,7 +228,10 @@ export interface ToolbarInstance {
   getCollapsed(): boolean;
   setDisplayMode(mode: RibbonDisplayMode): void;
   getDisplayMode(): RibbonDisplayMode;
+  /** Show or hide core's presentational backstage (`createBackstageView`).
+   *  Core closes it on Back and Escape; every other action is host-handled. */
   setBackstageOpen(open: boolean): void;
+  /** Whether core's presentational backstage is currently shown. */
   getBackstageOpen(): boolean;
   setDisplayMenuOpen(open: boolean): void;
   setFormulaBarVisible(visible: boolean): void;
@@ -300,8 +306,9 @@ export function mountToolbar(
       (inheritedPlatform === 'mac' || inheritedPlatform === 'default' ? inheritedPlatform : 'auto'),
   );
   host.dataset.fcPlatform = platform;
-  let defaultRibbonTabs =
-    opts.ribbonTabs ?? (platform === 'mac' ? EXCEL365_MAC_RIBBON_TABS : undefined);
+  const platformRibbonTabs = (p: typeof platform): readonly RibbonTab[] =>
+    p === 'mac' ? EXCEL365_MAC_RIBBON_TABS : EXCEL365_STANDARD_RIBBON_TABS;
+  let defaultRibbonTabs: readonly RibbonTab[] = opts.ribbonTabs ?? platformRibbonTabs(platform);
 
   // Probe once at mount-time for language inference and the initial subscribe.
   // The toolbar continues to work if the probe returns null (deferred mount);
@@ -328,6 +335,7 @@ export function mountToolbar(
     opts.ribbonDisplayMode ?? (opts.collapsed ? 'tabsOnly' : 'full');
   let ribbonPeek = false;
   let backstageOpen = false;
+  let backstageReturnTab: RibbonTab = 'home';
   let displayMenuOpen = false;
   let formulaBarVisible = opts.formulaBarVisible ?? true;
   let theme: UiTheme = opts.theme ?? 'paper';
@@ -335,7 +343,7 @@ export function mountToolbar(
   let borderColor = opts.borderColor ?? DEFAULT_BORDER_COLOR;
 
   const rehomeActiveTabForPlatform = (): void => {
-    const available = opts.ribbonTabs ?? defaultRibbonTabs ?? RIBBON_TABS;
+    const available = opts.ribbonTabs ?? defaultRibbonTabs;
     if (available.includes(activeTab)) return;
     activeTab = available[0] ?? 'home';
   };
@@ -522,7 +530,7 @@ export function mountToolbar(
     platform = next;
     host.dataset.fcPlatform = next;
     if (!ribbonTabsOverride) {
-      defaultRibbonTabs = next === 'mac' ? EXCEL365_MAC_RIBBON_TABS : undefined;
+      defaultRibbonTabs = platformRibbonTabs(next);
       rehomeActiveTabForPlatform();
     }
     return true;
@@ -620,10 +628,21 @@ export function mountToolbar(
     dropdownsApi?.closeAllDynamicRibbonDropdowns();
     closeStaticRibbonMenus(host);
     const changed = tab !== activeTab;
+    if (tab === 'file' && activeTab !== 'file') backstageReturnTab = activeTab;
     activeTab = tab;
     if (reveal && tab !== 'file' && isCollapsedMode()) ribbonPeek = true;
     projectRibbonTabs();
     if (changed) opts.onTabChange?.(tab);
+  };
+
+  const closeBackstage = (): void => {
+    if (!backstageOpen) return;
+    backstageOpen = false;
+    const restored = activeTab === 'file' && backstageReturnTab !== 'file';
+    if (restored) activeTab = backstageReturnTab;
+    opts.onBackstageOpenChange?.(false);
+    renderToolbar();
+    if (restored) opts.onTabChange?.(activeTab);
   };
 
   const hasOpenStaticMenu = (): boolean => !dropdownsApi && hasOpenStaticRibbonMenu(host);
@@ -649,6 +668,11 @@ export function mountToolbar(
   const onClick = (e: MouseEvent): void => {
     const target = e.target;
     if (!(target instanceof Element)) return;
+
+    if (backstageOpen && target.closest('[data-backstage-action="back"]')) {
+      closeBackstage();
+      return;
+    }
 
     const tabBtn = target.closest<HTMLButtonElement>('[data-ribbon-tab]');
     if (tabBtn) {
@@ -866,6 +890,11 @@ export function mountToolbar(
   // location — Excel-style global shortcut. Attached at document so the
   // sheet (or any other focus target) doesn't need to route the key.
   const onGlobalKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && backstageOpen) {
+      e.preventDefault();
+      closeBackstage();
+      return;
+    }
     if (e.key === 'Escape' && hasOpenStaticMenu()) {
       e.preventDefault();
       closeStaticRibbonMenus(host, undefined, true);

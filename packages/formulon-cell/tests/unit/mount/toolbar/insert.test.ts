@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
+import { RIBBON_TABS } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
 import { seedNumber, seedText, stubHelpers, waitFor } from './fixtures.js';
 
@@ -100,6 +101,7 @@ describe('Spreadsheet.mountToolbar', () => {
     seedText(sheet, 0, 0, ' alpha ');
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      ribbonTabs: RIBBON_TABS,
       dynamicDropdowns: true,
       helpers: stubHelpers(),
     });
@@ -156,6 +158,7 @@ describe('Spreadsheet.mountToolbar', () => {
   it('runs PDF and Add-ins primary actions while keeping secondary menus available', async () => {
     const print = vi.spyOn(sheet.instance, 'print').mockImplementation(() => undefined);
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      ribbonTabs: RIBBON_TABS,
       dynamicDropdowns: true,
       helpers: stubHelpers(),
     });
