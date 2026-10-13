@@ -28,6 +28,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./charts": {
+      "types": "./dist/charts/index.d.ts",
+      "import": "./dist/charts/index.js"
+    },
     "./extensions": {
       "types": "./dist/extensions/index.d.ts",
       "import": "./dist/extensions/index.js"
