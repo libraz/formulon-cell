@@ -1,9 +1,8 @@
 /* Single all-in-one stylesheet for @libraz/formulon-cell.
  *
  * Importing this one file (`@libraz/formulon-cell/styles.css`) is enough to
- * style the grid, the toolbar, and all three built-in palettes. `mount()` also
- * injects these rules at runtime (see `styles/inject.ts`), so importing the
- * file is only needed for setups that disable auto-injection.
+ * style the grid, the toolbar, and all three built-in palettes. `mount()` does
+ * not inject styles at runtime, so the host must import this file.
  *
  * Layered so consumer styles always win:
  *   @layer fc.reset, fc.base, fc.theme, fc.tokens, fc.surface, fc.app;

@@ -4,6 +4,27 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- `mountToolbar` now defaults to the standard ribbon tab set (`EXCEL365_STANDARD_RIBBON_TABS`, or the Mac set on macOS) when `ribbonTabs` is omitted. Pass `RIBBON_TABS` or `[...EXCEL365_STANDARD_RIBBON_TABS, ...OPTIONAL_RIBBON_TABS]` explicitly to keep the Draw, Automate and Acrobat tabs.
+
+### Removed
+
+- `CellRegistry.registerEditor`, `resolveEditor` and the `CellEditorEntry` / `CellEditorHandle` types. Registered editors were never mounted.
+- The `ui.lockTheme` option, which had no effect.
+- The `@libraz/formulon-cell/extensions/*` subpath export. Import extension factories from `@libraz/formulon-cell/extensions`.
+
+### Fixed
+
+- React and Vue `SpreadsheetToolbar` fall back to the core Spelling, Accessibility and Translate reports and the core script and add-in actions when the matching callback prop is omitted. A provided `onRunScript` / `onAddIn` handles only its own menu item.
+- Autocomplete and the argument helper show a custom function's `meta.args` signature.
+- The stylesheet header no longer claims that `mount()` injects styles at runtime.
+
+- The File tab only switches the active tab and fires `onTabChange('file')`; hosts render their own backstage from that callback. The docs for `createBackstageView`, `setBackstageOpen` and `onTabChange` now say so.
+- Back and Escape now close the backstage opened through `setBackstageOpen(true)` and restore the previously active tab. Other backstage actions remain host-handled.
+
 ## 0.9.0 — 2026-10-12
 
 ### Added
