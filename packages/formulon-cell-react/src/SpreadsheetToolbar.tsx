@@ -9,9 +9,11 @@
 // on internal class names or sub-component exports should migrate to the
 // core's `data-ribbon-*` attributes for selection.
 import {
+  createDefaultDynamicDropdownsCtx,
   type DynamicDropdownsCtx,
   dictionaryLocaleFor,
   openHostMenuFirstDropdown,
+  type RibbonHooks,
   Spreadsheet,
   type SpreadsheetInstance,
   type ToolbarInstance,
@@ -82,27 +84,48 @@ export const SpreadsheetToolbar = ({
     onToolbarReady,
   };
 
+  // Presence (not identity) of these props decides whether core defaults are
+  // overridden, so only a change in presence re-mounts the toolbar.
+  const hasSpelling = Boolean(onSpellingReview);
+  const hasAccessibility = Boolean(onAccessibilityCheck);
+  const hasTranslate = Boolean(onTranslate);
+  const hasRunScript = Boolean(onRunScript);
+  const hasAddIn = Boolean(onAddIn);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab handled by the tab-switch effect below; including it would re-mount the toolbar on every tab click
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !instance) return undefined;
-    // Forward host-supplied callbacks onto the matching `scriptAction` /
-    // `addInAction` menu items so a plain click on the Script / AddIn ribbon
-    // button opens its menu (built-in UX) and the host hook fires only when
-    // the user picks the action that maps to its prop. Other menu items keep
-    // the default no-op until a future PR extends the prop surface.
-    // Host-supplied `dropdownActions` win over the wrapper's built-in
-    // script/addIn wiring — consumers can fully replace those if they want.
+    // A provided prop handles only its own menu item (`custom` for scripts,
+    // `manage` for add-ins); every other action, and every action when the
+    // prop is omitted, reaches core's default handler. Likewise review hooks
+    // are registered only for provided props so core's built-in reports stay.
+    // Host-supplied `dropdownActions` win over the wrapper's wiring.
     // Pass a memoized object to avoid re-mounting the toolbar on every render.
-    const dropdownOverrides: Partial<DynamicDropdownsCtx> = {
-      applyScriptAction: (action) => {
-        if (action === 'custom') callbacksRef.current.onRunScript?.();
-      },
-      applyAddInAction: (action) => {
-        if (action === 'manage') callbacksRef.current.onAddIn?.();
-      },
-      ...dropdownActions,
+    let coreDefaults: DynamicDropdownsCtx | null = null;
+    const getCoreDefaults = (): DynamicDropdownsCtx => {
+      coreDefaults ??= createDefaultDynamicDropdownsCtx(instance as SpreadsheetInstance);
+      return coreDefaults;
     };
+    const dropdownOverrides: Partial<DynamicDropdownsCtx> = {};
+    if (hasRunScript) {
+      dropdownOverrides.applyScriptAction = (action) =>
+        action === 'custom'
+          ? callbacksRef.current.onRunScript?.()
+          : getCoreDefaults().applyScriptAction(action);
+    }
+    if (hasAddIn) {
+      dropdownOverrides.applyAddInAction = (action) =>
+        action === 'manage'
+          ? callbacksRef.current.onAddIn?.()
+          : getCoreDefaults().applyAddInAction(action);
+    }
+    Object.assign(dropdownOverrides, dropdownActions);
+    const review: NonNullable<RibbonHooks['review']> = {};
+    if (hasSpelling) review.spelling = () => callbacksRef.current.onSpellingReview?.();
+    if (hasAccessibility)
+      review.accessibility = () => callbacksRef.current.onAccessibilityCheck?.();
+    if (hasTranslate) review.translate = () => callbacksRef.current.onTranslate?.();
     let tb: ToolbarInstance;
     try {
       tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
@@ -116,11 +139,7 @@ export const SpreadsheetToolbar = ({
         // playground's `createDynamicDropdowns` wiring.
         dynamicDropdowns: dropdownOverrides,
         hooks: {
-          review: {
-            spelling: () => callbacksRef.current.onSpellingReview?.(),
-            accessibility: () => callbacksRef.current.onAccessibilityCheck?.(),
-            translate: () => callbacksRef.current.onTranslate?.(),
-          },
+          review,
           drawing: {
             setInkMode: (mode) => {
               if (mode === 'pen') callbacksRef.current.onDrawPen?.();
@@ -141,7 +160,17 @@ export const SpreadsheetToolbar = ({
       tb.dispose();
       toolbarRef.current = null;
     };
-  }, [instance, locale, dropdownActions, ribbonTabs]);
+  }, [
+    instance,
+    locale,
+    dropdownActions,
+    ribbonTabs,
+    hasSpelling,
+    hasAccessibility,
+    hasTranslate,
+    hasRunScript,
+    hasAddIn,
+  ]);
 
   // Forward external tab changes into the toolbar without re-mounting.
   useEffect(() => {

@@ -9,7 +9,10 @@
 // adapter's coverage: DOM mount, tab forwarding both ways, ribbon-command
 // hooks, and dispose on unmount.
 import {
+  createDefaultDynamicDropdownsCtx,
   type DynamicDropdownsCtx,
+  RIBBON_TABS,
+  type RibbonHooks,
   Spreadsheet,
   type SpreadsheetInstance,
   type ToolbarInstance,
@@ -49,6 +52,7 @@ interface AdapterProps {
   onError?: (error: unknown) => void;
   onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
   dropdownActions?: Partial<DynamicDropdownsCtx>;
+  ribbonTabs?: readonly RibbonTab[];
 }
 
 // Verbatim copy of the SFC's `<script setup>` body, expressed as a
@@ -78,6 +82,7 @@ const AdapterComponent = defineComponent({
       type: Object as () => Partial<DynamicDropdownsCtx> | undefined,
       default: undefined,
     },
+    ribbonTabs: { type: Array as unknown as () => readonly RibbonTab[], default: undefined },
   },
   emits: ['tabChange', 'error'],
   setup(props: AdapterProps, { emit }) {
@@ -89,27 +94,34 @@ const AdapterComponent = defineComponent({
       if (!host) return;
       if (toolbar) props.onToolbarReady?.(null);
       toolbar?.dispose();
-      const dropdownOverrides: Partial<DynamicDropdownsCtx> = {
-        applyScriptAction: (action) => {
-          if (action === 'custom') props.onRunScript?.();
-        },
-        applyAddInAction: (action) => {
-          if (action === 'manage') props.onAddIn?.();
-        },
-        ...props.dropdownActions,
+      let coreDefaults: DynamicDropdownsCtx | null = null;
+      const getCoreDefaults = (): DynamicDropdownsCtx => {
+        coreDefaults ??= createDefaultDynamicDropdownsCtx(instance);
+        return coreDefaults;
       };
+      const dropdownOverrides: Partial<DynamicDropdownsCtx> = {};
+      if (props.onRunScript) {
+        dropdownOverrides.applyScriptAction = (action) =>
+          action === 'custom' ? props.onRunScript?.() : getCoreDefaults().applyScriptAction(action);
+      }
+      if (props.onAddIn) {
+        dropdownOverrides.applyAddInAction = (action) =>
+          action === 'manage' ? props.onAddIn?.() : getCoreDefaults().applyAddInAction(action);
+      }
+      Object.assign(dropdownOverrides, props.dropdownActions);
+      const review: NonNullable<RibbonHooks['review']> = {};
+      if (props.onSpellingReview) review.spelling = () => props.onSpellingReview?.();
+      if (props.onAccessibilityCheck) review.accessibility = () => props.onAccessibilityCheck?.();
+      if (props.onTranslate) review.translate = () => props.onTranslate?.();
       try {
         toolbar = Spreadsheet.mountToolbar(host, instance, {
           lang: props.locale === 'en' ? 'en' : 'ja',
           activeTab: props.activeTab,
+          ribbonTabs: props.ribbonTabs,
           onTabChange: (tab) => emit('tabChange', tab),
           dynamicDropdowns: dropdownOverrides,
           hooks: {
-            review: {
-              spelling: () => props.onSpellingReview?.(),
-              accessibility: () => props.onAccessibilityCheck?.(),
-              translate: () => props.onTranslate?.(),
-            },
+            review,
             drawing: {
               setInkMode: (mode) => {
                 if (mode === 'pen') props.onDrawPen?.();
@@ -132,7 +144,16 @@ const AdapterComponent = defineComponent({
     });
 
     watch(
-      () => [props.instance, props.locale] as const,
+      () =>
+        [
+          props.instance,
+          props.locale,
+          Boolean(props.onSpellingReview),
+          Boolean(props.onAccessibilityCheck),
+          Boolean(props.onTranslate),
+          Boolean(props.onRunScript),
+          Boolean(props.onAddIn),
+        ] as const,
       ([instance], _prev, onCleanup) => {
         if (!hostEl.value) return;
         if (instance) mountToolbarFor(instance);
@@ -297,6 +318,7 @@ describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
         onAddIn,
         onDrawPen,
         onDrawEraser,
+        ribbonTabs: RIBBON_TABS,
       },
       'review',
     );
@@ -326,6 +348,75 @@ describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
     expect(onDrawPen).toHaveBeenCalledTimes(1);
     expect(onDrawEraser).toHaveBeenCalledTimes(1);
     await harness.unmount();
+  });
+
+  describe('core default fallback', () => {
+    const click = async (harness: Harness, selector: string): Promise<void> => {
+      harness.host.querySelector<HTMLButtonElement>(selector)?.click();
+      await flush();
+    };
+    const clearDialogs = (): void => {
+      document.body.querySelectorAll('.fc-tb__dlg').forEach((el) => {
+        el.remove();
+      });
+    };
+    const dialogs = (): number => document.body.querySelectorAll('.fc-tb__dlg').length;
+
+    it('falls back to the core review reports when review props are omitted', async () => {
+      const harness = await mountAdapter(mounted.instance, {}, 'review');
+      for (const cmd of ['spellingReview', 'accessibility', 'translateReview']) {
+        clearDialogs();
+        await click(harness, `[data-ribbon-command="${cmd}"]`);
+        expect(dialogs()).toBeGreaterThan(0);
+      }
+      await harness.unmount();
+    });
+
+    it('lets a provided review prop replace the core report', async () => {
+      const onSpellingReview = vi.fn();
+      const harness = await mountAdapter(mounted.instance, { onSpellingReview }, 'review');
+      await click(harness, '[data-ribbon-command="spellingReview"]');
+      expect(onSpellingReview).toHaveBeenCalledTimes(1);
+      expect(dialogs()).toBe(0);
+      // Sibling review commands without a prop still use the core default.
+      await click(harness, '[data-ribbon-command="accessibility"]');
+      expect(dialogs()).toBeGreaterThan(0);
+      await harness.unmount();
+    });
+
+    it('reaches the core script/add-in defaults when onRunScript/onAddIn are omitted', async () => {
+      const harness = await mountAdapter(mounted.instance, { ribbonTabs: RIBBON_TABS }, 'review');
+      await click(harness, '[data-ribbon-command="addIn"]');
+      await click(harness, '[data-add-in-action="get"]');
+      expect(dialogs()).toBeGreaterThan(0);
+      await harness.unmount();
+    });
+
+    it('keeps non-custom script and non-manage add-in actions on the core default', async () => {
+      const onRunScript = vi.fn();
+      const onAddIn = vi.fn();
+      const harness = await mountAdapter(
+        mounted.instance,
+        { onRunScript, onAddIn, ribbonTabs: RIBBON_TABS },
+        'review',
+      );
+      await click(harness, '[data-ribbon-command="addIn"]');
+      await click(harness, '[data-add-in-action="get"]');
+      expect(onAddIn).not.toHaveBeenCalled();
+      expect(dialogs()).toBeGreaterThan(0);
+      clearDialogs();
+
+      await click(harness, '[data-ribbon-command="script"]');
+      await click(harness, '[data-script-action="uppercase"]');
+      expect(onRunScript).not.toHaveBeenCalled();
+      expect(dialogs()).toBeGreaterThan(0);
+
+      await click(harness, '[data-script-action="custom"]');
+      await click(harness, '[data-add-in-action="manage"]');
+      expect(onRunScript).toHaveBeenCalledTimes(1);
+      expect(onAddIn).toHaveBeenCalledTimes(1);
+      await harness.unmount();
+    });
   });
 
   it('routes dropdownActions overrides through core dynamic-dropdowns dispatcher', async () => {

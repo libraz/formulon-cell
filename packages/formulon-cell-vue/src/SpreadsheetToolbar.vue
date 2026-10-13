@@ -4,9 +4,11 @@
 // component just owns a host div and mounts / disposes the core toolbar; all
 // DOM, helpers, menus, and hook defaults come from core.
 import {
+  createDefaultDynamicDropdownsCtx,
   dictionaryLocaleFor,
   type DynamicDropdownsCtx,
   openHostMenuFirstDropdown,
+  type RibbonHooks,
   type RibbonTab,
   Spreadsheet,
   type SpreadsheetInstance,
@@ -29,17 +31,30 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
   if (!host) return;
   if (toolbar) props.onToolbarReady?.(null);
   toolbar?.dispose();
-  // Host-supplied `dropdownActions` win over the wrapper's built-in
-  // script/addIn wiring — consumers can fully replace those if they want.
-  const dropdownOverrides: Partial<DynamicDropdownsCtx> = {
-    applyScriptAction: (action) => {
-      if (action === 'custom') props.onRunScript?.();
-    },
-    applyAddInAction: (action) => {
-      if (action === 'manage') props.onAddIn?.();
-    },
-    ...props.dropdownActions,
+  // A provided prop handles only its own menu item (`custom` for scripts,
+  // `manage` for add-ins); every other action, and every action when the
+  // prop is omitted, reaches core's default handler. Likewise review hooks
+  // are registered only for provided props so core's built-in reports stay.
+  // Host-supplied `dropdownActions` win over the wrapper's wiring.
+  let coreDefaults: DynamicDropdownsCtx | null = null;
+  const getCoreDefaults = (): DynamicDropdownsCtx => {
+    coreDefaults ??= createDefaultDynamicDropdownsCtx(instance);
+    return coreDefaults;
   };
+  const dropdownOverrides: Partial<DynamicDropdownsCtx> = {};
+  if (props.onRunScript) {
+    dropdownOverrides.applyScriptAction = (action) =>
+      action === 'custom' ? props.onRunScript?.() : getCoreDefaults().applyScriptAction(action);
+  }
+  if (props.onAddIn) {
+    dropdownOverrides.applyAddInAction = (action) =>
+      action === 'manage' ? props.onAddIn?.() : getCoreDefaults().applyAddInAction(action);
+  }
+  Object.assign(dropdownOverrides, props.dropdownActions);
+  const review: NonNullable<RibbonHooks['review']> = {};
+  if (props.onSpellingReview) review.spelling = () => props.onSpellingReview?.();
+  if (props.onAccessibilityCheck) review.accessibility = () => props.onAccessibilityCheck?.();
+  if (props.onTranslate) review.translate = () => props.onTranslate?.();
   try {
     toolbar = Spreadsheet.mountToolbar(host, instance, {
       lang: dictionaryLocaleFor(props.locale),
@@ -52,11 +67,7 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
       // playground's `createDynamicDropdowns` wiring.
       dynamicDropdowns: dropdownOverrides,
       hooks: {
-        review: {
-          spelling: () => props.onSpellingReview?.(),
-          accessibility: () => props.onAccessibilityCheck?.(),
-          translate: () => props.onTranslate?.(),
-        },
+        review,
         drawing: {
           setInkMode: (mode) => {
             if (mode === 'pen') props.onDrawPen?.();
@@ -81,7 +92,20 @@ onMounted(() => {
 });
 
 watch(
-  () => [props.instance, props.locale, props.dropdownActions, props.ribbonTabs] as const,
+  // The `Boolean` entries track presence only: an omitted prop falls back to
+  // core's default, so toggling presence re-mounts while identity changes don't.
+  () =>
+    [
+      props.instance,
+      props.locale,
+      props.dropdownActions,
+      props.ribbonTabs,
+      Boolean(props.onSpellingReview),
+      Boolean(props.onAccessibilityCheck),
+      Boolean(props.onTranslate),
+      Boolean(props.onRunScript),
+      Boolean(props.onAddIn),
+    ] as const,
   ([instance]) => {
     if (!hostEl.value) return;
     if (instance) mountToolbarFor(instance);

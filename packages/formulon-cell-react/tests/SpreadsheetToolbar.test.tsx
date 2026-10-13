@@ -6,7 +6,7 @@
 // optional review / automation / drawing callbacks as `RibbonHooks` so a
 // click on the matching ribbon command lands on the host callback.
 
-import { Spreadsheet } from '@libraz/formulon-cell';
+import { RIBBON_TABS, Spreadsheet } from '@libraz/formulon-cell';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -154,6 +154,7 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
     const harness = await mountToolbar(
       mounted,
       <SpreadsheetToolbar
+        ribbonTabs={RIBBON_TABS}
         instance={mounted.instance}
         activeTab="review"
         onTabChange={() => {}}
@@ -195,6 +196,141 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
     expect(onDrawPen).toHaveBeenCalledTimes(1);
     expect(onDrawEraser).toHaveBeenCalledTimes(1);
     await harness.unmount();
+  });
+
+  describe('core default fallback', () => {
+    const click = async (harness: Harness, selector: string): Promise<void> => {
+      await act(async () => {
+        harness.host.querySelector<HTMLButtonElement>(selector)?.click();
+        await flush();
+      });
+    };
+    const dialogs = (): number => document.body.querySelectorAll('.fc-tb__dlg').length;
+
+    it('falls back to the core review reports when review props are omitted', async () => {
+      const harness = await mountToolbar(
+        mounted,
+        <SpreadsheetToolbar
+          instance={mounted.instance}
+          activeTab="review"
+          onTabChange={() => {}}
+          locale="en"
+        />,
+      );
+      for (const cmd of ['spellingReview', 'accessibility', 'translateReview']) {
+        document.body.querySelectorAll('.fc-tb__dlg').forEach((el) => {
+          el.remove();
+        });
+        await click(harness, `[data-ribbon-command="${cmd}"]`);
+        expect(dialogs()).toBeGreaterThan(0);
+      }
+      await harness.unmount();
+    });
+
+    it('lets a provided review prop replace the core report', async () => {
+      const onSpellingReview = vi.fn();
+      const harness = await mountToolbar(
+        mounted,
+        <SpreadsheetToolbar
+          instance={mounted.instance}
+          activeTab="review"
+          onTabChange={() => {}}
+          locale="en"
+          onSpellingReview={onSpellingReview}
+        />,
+      );
+      await click(harness, '[data-ribbon-command="spellingReview"]');
+      expect(onSpellingReview).toHaveBeenCalledTimes(1);
+      expect(dialogs()).toBe(0);
+      // Sibling review commands without a prop still use the core default.
+      await click(harness, '[data-ribbon-command="accessibility"]');
+      expect(dialogs()).toBeGreaterThan(0);
+      await harness.unmount();
+    });
+
+    it('reaches the core script/add-in defaults when onRunScript/onAddIn are omitted', async () => {
+      const harness = await mountToolbar(
+        mounted,
+        <SpreadsheetToolbar
+          ribbonTabs={RIBBON_TABS}
+          instance={mounted.instance}
+          activeTab="review"
+          onTabChange={() => {}}
+          locale="en"
+        />,
+      );
+      await click(harness, '[data-ribbon-command="addIn"]');
+      await click(harness, '[data-add-in-action="get"]');
+      expect(dialogs()).toBeGreaterThan(0);
+      await harness.unmount();
+    });
+
+    it('keeps non-custom script and non-manage add-in actions on the core default', async () => {
+      const onRunScript = vi.fn();
+      const onAddIn = vi.fn();
+      const harness = await mountToolbar(
+        mounted,
+        <SpreadsheetToolbar
+          ribbonTabs={RIBBON_TABS}
+          instance={mounted.instance}
+          activeTab="review"
+          onTabChange={() => {}}
+          locale="en"
+          onRunScript={onRunScript}
+          onAddIn={onAddIn}
+        />,
+      );
+      await click(harness, '[data-ribbon-command="addIn"]');
+      await click(harness, '[data-add-in-action="get"]');
+      expect(onAddIn).not.toHaveBeenCalled();
+      expect(dialogs()).toBeGreaterThan(0);
+      document.body.querySelectorAll('.fc-tb__dlg').forEach((el) => {
+        el.remove();
+      });
+
+      await click(harness, '[data-ribbon-command="script"]');
+      await click(harness, '[data-script-action="uppercase"]');
+      expect(onRunScript).not.toHaveBeenCalled();
+      expect(dialogs()).toBeGreaterThan(0);
+
+      await click(harness, '[data-script-action="custom"]');
+      await click(harness, '[data-add-in-action="manage"]');
+      expect(onRunScript).toHaveBeenCalledTimes(1);
+      expect(onAddIn).toHaveBeenCalledTimes(1);
+      await harness.unmount();
+    });
+
+    it('re-mounts when a review prop appears but not when its identity changes', async () => {
+      const mountSpy = vi.spyOn(Spreadsheet, 'mountToolbar');
+      const render = (onSpellingReview?: () => void): ReactNode => (
+        <SpreadsheetToolbar
+          instance={mounted.instance}
+          activeTab="review"
+          onTabChange={() => {}}
+          locale="en"
+          onSpellingReview={onSpellingReview}
+        />
+      );
+      const harness = await mountToolbar(mounted, render());
+      const initial = mountSpy.mock.calls.length;
+      const first = vi.fn();
+      const second = vi.fn();
+      await act(async () => {
+        harness.root.render(render(first));
+        await flush();
+      });
+      expect(mountSpy.mock.calls.length).toBe(initial + 1);
+      await act(async () => {
+        harness.root.render(render(second));
+        await flush();
+      });
+      expect(mountSpy.mock.calls.length).toBe(initial + 1);
+      await click(harness, '[data-ribbon-command="spellingReview"]');
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(1);
+      await harness.unmount();
+      mountSpy.mockRestore();
+    });
   });
 
   it('routes dropdownActions overrides through core dynamic-dropdowns dispatcher', async () => {
