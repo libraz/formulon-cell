@@ -4,7 +4,7 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
-## Unreleased
+## 0.9.1 — 2026-10-14
 
 ### Changed
 
@@ -26,7 +26,6 @@ versioning is [SemVer](https://semver.org/).
 - React and Vue `SpreadsheetToolbar` fall back to the core Spelling, Accessibility and Translate reports and the core script and add-in actions when the matching callback prop is omitted. A provided `onRunScript` / `onAddIn` handles only its own menu item.
 - Autocomplete and the argument helper show a custom function's `meta.args` signature.
 - The stylesheet header no longer claims that `mount()` injects styles at runtime.
-
 - The File tab only switches the active tab and fires `onTabChange('file')`; hosts render their own backstage from that callback. The docs for `createBackstageView`, `setBackstageOpen` and `onTabChange` now say so.
 - Back and Escape now close the backstage opened through `setBackstageOpen(true)` and restore the previously active tab. Other backstage actions remain host-handled.
 
@@ -708,6 +707,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.9.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.9.1
 [0.9.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.9.0
 [0.8.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.8.0
 [0.7.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.7.0
