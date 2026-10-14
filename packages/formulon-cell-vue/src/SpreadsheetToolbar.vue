@@ -92,20 +92,19 @@ onMounted(() => {
 });
 
 watch(
-  // The `Boolean` entries track presence only: an omitted prop falls back to
-  // core's default, so toggling presence re-mounts while identity changes don't.
-  () =>
-    [
-      props.instance,
-      props.locale,
-      props.dropdownActions,
-      props.ribbonTabs,
-      Boolean(props.onSpellingReview),
-      Boolean(props.onAccessibilityCheck),
-      Boolean(props.onTranslate),
-      Boolean(props.onRunScript),
-      Boolean(props.onAddIn),
-    ] as const,
+  // A source list compares each entry, so only a real change re-mounts. The
+  // `Boolean` entries track presence: an omitted prop falls back to core's default.
+  [
+    () => props.instance,
+    () => props.locale,
+    () => props.dropdownActions,
+    () => props.ribbonTabs,
+    () => Boolean(props.onSpellingReview),
+    () => Boolean(props.onAccessibilityCheck),
+    () => Boolean(props.onTranslate),
+    () => Boolean(props.onRunScript),
+    () => Boolean(props.onAddIn),
+  ],
   ([instance]) => {
     if (!hostEl.value) return;
     if (instance) mountToolbarFor(instance);

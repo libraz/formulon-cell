@@ -144,16 +144,15 @@ const AdapterComponent = defineComponent({
     });
 
     watch(
-      () =>
-        [
-          props.instance,
-          props.locale,
-          Boolean(props.onSpellingReview),
-          Boolean(props.onAccessibilityCheck),
-          Boolean(props.onTranslate),
-          Boolean(props.onRunScript),
-          Boolean(props.onAddIn),
-        ] as const,
+      [
+        () => props.instance,
+        () => props.locale,
+        () => Boolean(props.onSpellingReview),
+        () => Boolean(props.onAccessibilityCheck),
+        () => Boolean(props.onTranslate),
+        () => Boolean(props.onRunScript),
+        () => Boolean(props.onAddIn),
+      ],
       ([instance], _prev, onCleanup) => {
         if (!hostEl.value) return;
         if (instance) mountToolbarFor(instance);
@@ -298,6 +297,39 @@ describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
     await flush();
     expect(harness.tabChange).toHaveBeenCalledWith('insert');
     await harness.unmount();
+  });
+
+  it('keeps the mounted ribbon when the host re-renders with fresh inline callbacks', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const activeTab = ref<RibbonTab>('home');
+    const instance = mounted.instance;
+    const app = createApp(
+      defineComponent({
+        setup() {
+          return () =>
+            h(AdapterComponent, {
+              instance,
+              activeTab: activeTab.value,
+              locale: 'en',
+              onTranslate: () => {},
+              onAddIn: () => {},
+            });
+        },
+      }),
+    );
+    app.mount(host);
+    await flush();
+    const spy = vi.spyOn(Spreadsheet, 'mountToolbar');
+    activeTab.value = 'insert';
+    await flush();
+    expect(spy).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-ribbon-tab="insert"]')?.getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    spy.mockRestore();
+    app.unmount();
+    host.remove();
   });
 
   it('routes ribbon review/automation/drawing commands to the matching host callback', async () => {
