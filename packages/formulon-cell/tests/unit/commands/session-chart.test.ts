@@ -40,6 +40,77 @@ const seedNumbers = (
 };
 
 describe('session chart commands', () => {
+  it('preserves log bases and dormant linear options through type changes and history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const chart = createSessionChart(store, range(0, 0, 2, 1), {
+      id: 'log-axes',
+      kind: 'scatter',
+      xAxis: { logBase: 2, reverseOrder: true, majorUnit: 5 },
+      yAxis: { logBase: 10, min: 1, max: 1000, crossing: 10 },
+    });
+    if (!chart) throw new Error('Chart creation was rejected');
+    expect(chart.xAxis).toEqual({ logBase: 2, reverseOrder: true, majorUnit: 5 });
+    updateSessionChart(store, chart.id, { kind: 'doughnut' }, history);
+    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.logBase).toBe(10);
+    updateSessionChart(
+      store,
+      chart.id,
+      {
+        kind: 'column',
+        yAxis: { ...chart.yAxis, logBase: 1000 },
+      },
+      history,
+    );
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
+      kind: 'doughnut',
+      yAxis: { logBase: 10, min: 1, max: 1000, crossing: 10 },
+    });
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
+      kind: 'column',
+      xAxis: { logBase: 2, reverseOrder: true, majorUnit: 5 },
+      yAxis: { logBase: 1000, min: 1, max: 1000, crossing: 10 },
+    });
+  });
+
+  it('preserves axis label positions across creation, kind changes, and history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const chart = createSessionChart(store, range(0, 0, 2, 1), {
+      id: 'positioned-labels',
+      kind: 'scatter',
+      xAxis: { labelPosition: 'high', crossing: 2, reverseOrder: true },
+      yAxis: { labelPosition: 'nextTo', title: 'Value' },
+    });
+    if (!chart) throw new Error('Chart creation was rejected');
+    expect(chart.xAxis).toEqual({ labelPosition: 'high', crossing: 2, reverseOrder: true });
+    expect(chart.yAxis).toEqual({ labelPosition: 'nextTo', title: 'Value' });
+    updateSessionChart(store, chart.id, { kind: 'doughnut' }, history);
+    expect(sessionChartById(store.getState(), chart.id)?.xAxis?.labelPosition).toBe('high');
+    updateSessionChart(
+      store,
+      chart.id,
+      {
+        kind: 'bar',
+        yAxis: { ...chart.yAxis, labelPosition: 'none' },
+      },
+      history,
+    );
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
+      kind: 'doughnut',
+      yAxis: { labelPosition: 'nextTo', title: 'Value' },
+    });
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
+      kind: 'bar',
+      xAxis: { labelPosition: 'high', crossing: 2, reverseOrder: true },
+      yAxis: { labelPosition: 'none', title: 'Value' },
+    });
+  });
+
   it('preserves axis crossings through type changes and undo/redo', () => {
     const store = createSpreadsheetStore();
     const history = new History();

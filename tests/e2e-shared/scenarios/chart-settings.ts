@@ -246,6 +246,114 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   expect(Number(await verticalAxis.getAttribute('x1'))).toBeCloseTo(automaticCrossing.x);
   expect(Number(await horizontalAxis.getAttribute('y1'))).toBeCloseTo(automaticCrossing.y);
 
+  const xCategoryLabels = chart.locator('[data-chart-role="category-label"][data-chart-axis="x"]');
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('high');
+  await yAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('high');
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  expect(Number(await xCategoryLabels.first().getAttribute('y'))).toBeCloseTo(
+    Number(await verticalAxis.getAttribute('y1')) - 4,
+  );
+  expect(Number(await yAxisLabels.first().getAttribute('x'))).toBeCloseTo(
+    Number(await horizontalAxis.getAttribute('x2')) + 4,
+  );
+  await expect(yAxisLabels.first()).toHaveAttribute('text-anchor', 'start');
+  await page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+  );
+  expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(beforeReverse.y);
+  await page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+  );
+  await expect(yAxisLabels.first()).toHaveAttribute('text-anchor', 'start');
+
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('nextTo');
+  await yAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('nextTo');
+  await xAxis
+    .getByRole('combobox', { name: 'Vertical axis crosses', exact: true })
+    .selectOption('max');
+  await yAxis
+    .getByRole('combobox', { name: 'Horizontal axis crosses', exact: true })
+    .selectOption('custom');
+  await yAxis.getByRole('spinbutton', { name: 'Custom value', exact: true }).fill('10');
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  expect(Number(await xCategoryLabels.first().getAttribute('y'))).toBeCloseTo(
+    Number(await horizontalAxis.getAttribute('y1')) + 12,
+  );
+  expect(Number(await yAxisLabels.first().getAttribute('x'))).toBeCloseTo(
+    Number(await verticalAxis.getAttribute('x1')) - 2,
+  );
+  expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
+
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('none');
+  await yAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('none');
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(xCategoryLabels).toHaveCount(0);
+  await expect(yAxisLabels).toHaveCount(0);
+  await expect(horizontalAxis).toHaveCount(1);
+  await expect(verticalAxis).toHaveCount(1);
+  expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('low');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(xCategoryLabels).toHaveCount(0);
+
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await xAxis
+    .getByRole('combobox', { name: 'Label position', exact: true })
+    .selectOption('automatic');
+  await yAxis
+    .getByRole('combobox', { name: 'Label position', exact: true })
+    .selectOption('automatic');
+  await xAxis
+    .getByRole('combobox', { name: 'Vertical axis crosses', exact: true })
+    .selectOption('auto');
+  await yAxis
+    .getByRole('combobox', { name: 'Horizontal axis crosses', exact: true })
+    .selectOption('auto');
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(xCategoryLabels).toHaveText(['Jan', 'Mar']);
+  await expect(yAxisLabels).toHaveText(['0.0', '5.0', '10.0', '15.0', '20.0']);
+  expect(Number(await inheritedPoint.getAttribute('x'))).toBeCloseTo(beforeReverse.x);
+  expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(beforeReverse.y);
+
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await expect(
+    xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }),
+  ).toBeDisabled();
+  await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).check();
+  await expect(yAxis.getByRole('spinbutton', { name: 'Log base', exact: true })).toHaveValue('10');
+  await expect(yAxis.getByRole('spinbutton', { name: 'Major unit', exact: true })).toBeDisabled();
+  await yAxis.getByRole('spinbutton', { name: 'Minimum', exact: true }).fill('1');
+  await yAxis.getByRole('spinbutton', { name: 'Maximum', exact: true }).fill('1000');
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(yAxisLabels).toHaveText(['1.0', '10.0', '100.0', '1000.0']);
+  const logPlotHeight =
+    Number(await verticalAxis.getAttribute('y2')) - Number(await verticalAxis.getAttribute('y1'));
+  expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(logPlotHeight / 3);
+  await page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+  );
+  await expect(yAxisLabels).toHaveText(['0.0', '5.0', '10.0', '15.0', '20.0']);
+  await page.evaluate(() =>
+    (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
+  );
+  await expect(yAxisLabels).toHaveText(['1.0', '10.0', '100.0', '1000.0']);
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await yAxis.getByRole('spinbutton', { name: 'Log base', exact: true }).fill('2');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(yAxisLabels).toHaveText(['1.0', '10.0', '100.0', '1000.0']);
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
+  await expect(yAxis.getByRole('spinbutton', { name: 'Major unit', exact: true })).toBeEnabled();
+  await expect(yAxis.getByRole('spinbutton', { name: 'Major unit', exact: true })).toHaveValue('5');
+  await yAxis.getByRole('spinbutton', { name: 'Minimum', exact: true }).fill('0');
+  await yAxis.getByRole('spinbutton', { name: 'Maximum', exact: true }).fill('20');
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
+
   const automaticWidth = Number(await inheritedPoint.getAttribute('width'));
   await chart.locator('[data-chart-settings-tab="styles"]').click();
   await dialog.getByRole('spinbutton', { name: 'Gap width (%)', exact: true }).fill('0');
@@ -447,6 +555,40 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(connectors).toHaveCount(2);
   await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(3);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).check();
+  await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).check();
+  for (const axis of [xAxis, yAxis]) {
+    await axis.getByRole('spinbutton', { name: 'Minimum', exact: true }).fill('1');
+    await axis.getByRole('spinbutton', { name: 'Maximum', exact: true }).fill('100');
+  }
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  const logPoints = chart.locator('[data-chart-role="point"]');
+  await expect(logPoints).toHaveCount(3);
+  await expect(connectors).toHaveCount(2);
+  expect(Number(await connectors.first().getAttribute('x1'))).toBeCloseTo(
+    Number(await logPoints.first().getAttribute('cx')),
+  );
+  expect(Number(await connectors.first().getAttribute('y1'))).toBeCloseTo(
+    Number(await logPoints.first().getAttribute('cy')),
+  );
+  await page.evaluate(() => {
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '0' }]);
+    if (result.status !== 'applied') throw new Error('Log scatter zero fixture was not applied');
+  });
+  await expect(logPoints).toHaveCount(2);
+  await expect(connectors).toHaveCount(0);
+  await page.evaluate(() => {
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '8' }]);
+    if (result.status !== 'applied') throw new Error('Log scatter source fixture was not restored');
+  });
+  await expect(connectors).toHaveCount(2);
+  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
+  await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
+  await yAxis.getByRole('spinbutton', { name: 'Minimum', exact: true }).fill('0');
+  await yAxis.getByRole('spinbutton', { name: 'Maximum', exact: true }).fill('20');
   await dialog.getByRole('combobox', { name: 'Chart type', exact: true }).selectOption('column');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(bars).toHaveCount(4);

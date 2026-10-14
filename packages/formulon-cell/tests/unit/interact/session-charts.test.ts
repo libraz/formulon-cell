@@ -66,6 +66,33 @@ const chartAxisCrossingCustom = (surface: HTMLElement, axisLabel: string): HTMLI
   return input;
 };
 
+const chartAxisLabelPositionSelect = (
+  surface: HTMLElement,
+  axisLabel: string,
+): HTMLSelectElement => {
+  const input = chartAxisFieldset(surface, axisLabel).querySelector<HTMLSelectElement>(
+    '.fc-chart-settings__label-position select',
+  );
+  if (!input) throw new Error(`missing label position select: ${axisLabel}`);
+  return input;
+};
+
+const chartAxisLogCheckbox = (surface: HTMLElement, axisLabel: string): HTMLInputElement => {
+  const input = chartAxisFieldset(surface, axisLabel).querySelector<HTMLInputElement>(
+    '.fc-chart-settings__log-scale input',
+  );
+  if (!input) throw new Error(`missing logarithmic scale checkbox: ${axisLabel}`);
+  return input;
+};
+
+const chartAxisLogBase = (surface: HTMLElement, axisLabel: string): HTMLInputElement => {
+  const input = chartAxisFieldset(surface, axisLabel).querySelector<HTMLInputElement>(
+    '.fc-chart-settings__log-base input',
+  );
+  if (!input) throw new Error(`missing log base input: ${axisLabel}`);
+  return input;
+};
+
 describe('attachSessionCharts', () => {
   it('uses the renderer auto-legend default for one series and allows an explicit legend', () => {
     const host = document.createElement('div');
@@ -618,8 +645,11 @@ describe('attachSessionCharts', () => {
       const handle = attachSessionCharts({ host, store });
       host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
       const selects = host.querySelectorAll<HTMLSelectElement>('.fc-chart-settings select');
-      const select = Array.from(selects).find((candidate) =>
-        candidate.parentElement?.textContent?.includes('Position'),
+      const select = Array.from(selects).find(
+        (candidate) =>
+          candidate.parentElement?.querySelector('.fc-chart-settings__label')?.textContent ===
+            'Label position' &&
+          !candidate.parentElement.classList.contains('fc-chart-settings__label-position'),
       );
       if (!select) throw new Error('missing chart label position select');
       return { host, store, handle, select };
@@ -2935,6 +2965,486 @@ describe('attachSessionCharts', () => {
     surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
     expect(store.getState().charts.charts[0]?.title).toBe('Draft title');
     expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe(2);
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('keeps sparse label positions and invalid raw values until edited', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.upsertChart(store, {
+      id: 'label-position-sparse',
+      kind: 'column',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+    });
+    const handle = attachSessionCharts({ host, store, history });
+    const openElements = (): HTMLElement => {
+      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
+      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+      if (!surface) throw new Error('missing chart settings');
+      return surface;
+    };
+
+    let surface = openElements();
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('automatic');
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(history.canUndo()).toBe(false);
+    expect(store.getState().charts.charts[0]?.xAxis).toBeUndefined();
+
+    mutators.updateChart(store, 'label-position-sparse', {
+      xAxis: { labelPosition: 'low' },
+    });
+    history.clear();
+    surface = openElements();
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('low');
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(history.canUndo()).toBe(false);
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('low');
+
+    surface = openElements();
+    const lowToAuto = chartAxisLabelPositionSelect(surface, 'X-axis');
+    lowToAuto.value = 'automatic';
+    lowToAuto.dispatchEvent(new Event('change', { bubbles: true }));
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(history.canUndo()).toBe(true);
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBeUndefined();
+    expect(history.undo()).toBe(true);
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('low');
+    expect(history.redo()).toBe(true);
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBeUndefined();
+    history.clear();
+
+    surface = openElements();
+    const mode = chartAxisLabelPositionSelect(surface, 'X-axis');
+    mode.value = 'nextTo';
+    mode.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    const restoredAutomatic = chartAxisLabelPositionSelect(surface, 'X-axis');
+    restoredAutomatic.value = 'automatic';
+    restoredAutomatic.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(history.canUndo()).toBe(false);
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBeUndefined();
+    history.clear();
+
+    mutators.updateChart(store, 'label-position-sparse', {
+      xAxis: { labelPosition: 'invalid-runtime-value' } as never,
+      yAxis: { labelPosition: 17 } as never,
+    });
+    surface = openElements();
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('automatic');
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('automatic');
+    const title = surface.querySelector<HTMLInputElement>(
+      '.fc-chart-settings__field input[type="text"]',
+    );
+    if (!title) throw new Error('missing title input');
+    title.value = 'Unrelated title';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    const chart = store.getState().charts.charts[0];
+    expect(chart?.xAxis?.labelPosition).toBe('invalid-runtime-value');
+    expect(chart?.yAxis?.labelPosition).toBe(17);
+    expect(chart?.title).toBe('Unrelated title');
+
+    surface = openElements();
+    const cancel = chartAxisLabelPositionSelect(surface, 'X-axis');
+    cancel.value = 'high';
+    cancel.dispatchEvent(new Event('change', { bubbles: true }));
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('invalid-runtime-value');
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('keeps dormant circular label positions through chart kind cycles', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    mutators.upsertChart(store, {
+      id: 'label-position-dormant',
+      kind: 'pie',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      xAxis: { labelPosition: 'high' },
+      yAxis: { labelPosition: 'none' },
+    });
+    const handle = attachSessionCharts({ host, store });
+    const openElements = (): HTMLElement => {
+      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
+      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+      if (!surface) throw new Error('missing chart settings');
+      return surface;
+    };
+
+    let surface = openElements();
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('none');
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').disabled).toBe(true);
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').disabled).toBe(true);
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('high');
+    expect(store.getState().charts.charts[0]?.yAxis?.labelPosition).toBe('none');
+
+    mutators.updateChart(store, 'label-position-dormant', { kind: 'column' });
+    surface = openElements();
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').disabled).toBe(false);
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
+    mutators.updateChart(store, 'label-position-dormant', { kind: 'pie' });
+    surface = openElements();
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('none');
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('high');
+    expect(store.getState().charts.charts[0]?.yAxis?.labelPosition).toBe('none');
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('syncs untouched label positions while protecting a dirty position and title', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.upsertChart(store, {
+      id: 'label-position-sync',
+      kind: 'column',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+    });
+    const handle = attachSessionCharts({ host, store, history });
+    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
+    let surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+    if (!surface) throw new Error('missing chart settings');
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('automatic');
+
+    mutators.updateChart(store, 'label-position-sync', {
+      xAxis: { labelPosition: 'low' },
+      yAxis: { labelPosition: 'high' },
+    });
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+    if (!surface) throw new Error('missing synced chart settings');
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('low');
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('high');
+
+    const dirtyCrossing = chartAxisCrossingSelect(surface, 'X-axis');
+    dirtyCrossing.value = 'min';
+    dirtyCrossing.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    mutators.updateChart(store, 'label-position-sync', {
+      xAxis: { crossing: 'max', labelPosition: 'high' },
+      yAxis: { labelPosition: 'low' },
+    });
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('min');
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('low');
+
+    const title = surface.querySelector<HTMLInputElement>(
+      '.fc-chart-settings__field input[type="text"]',
+    );
+    if (!title) throw new Error('missing title input');
+    title.value = 'Draft title';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    const dirtyPosition = chartAxisLabelPositionSelect(surface, 'X-axis');
+    dirtyPosition.value = 'nextTo';
+    dirtyPosition.dispatchEvent(new Event('change', { bubbles: true }));
+
+    mutators.updateChart(store, 'label-position-sync', {
+      xAxis: { crossing: 'max', labelPosition: 'none' },
+      yAxis: { labelPosition: 'high' },
+    });
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('nextTo');
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('high');
+    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('min');
+    expect(
+      surface.querySelector<HTMLInputElement>('.fc-chart-settings__field input[type="text"]')
+        ?.value,
+    ).toBe('Draft title');
+
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.title).toBe('Draft title');
+    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('nextTo');
+    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe('min');
+    expect(store.getState().charts.charts[0]?.yAxis?.labelPosition).toBe('high');
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('keeps sparse logarithmic settings, remembered bases, and invalid raw values', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.upsertChart(store, {
+      id: 'log-sparse',
+      kind: 'column',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      yAxis: { majorUnit: 2 },
+    });
+    const handle = attachSessionCharts({ host, store, history });
+    const openElements = (): HTMLElement => {
+      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
+      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+      if (!surface) throw new Error('missing chart settings');
+      return surface;
+    };
+    const majorUnit = (surface: HTMLElement): HTMLInputElement => {
+      const field = Array.from(
+        chartAxisFieldset(surface, 'Y-axis').querySelectorAll<HTMLElement>(
+          '.fc-chart-settings__field',
+        ),
+      ).find(
+        (candidate) =>
+          candidate.querySelector('.fc-chart-settings__label')?.textContent === 'Major unit',
+      );
+      const input = field?.querySelector<HTMLInputElement>('input');
+      if (!input) throw new Error('missing major unit input');
+      return input;
+    };
+
+    let surface = openElements();
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(false);
+    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('10');
+    expect(chartAxisLogBase(surface, 'Y-axis').min).toBe('2');
+    expect(chartAxisLogBase(surface, 'Y-axis').max).toBe('1000');
+    expect(chartAxisLogBase(surface, 'Y-axis').step).toBe('any');
+    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(true);
+    expect(majorUnit(surface).disabled).toBe(false);
+
+    const enable = chartAxisLogCheckbox(surface, 'Y-axis');
+    enable.checked = true;
+    enable.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(false);
+    expect(majorUnit(surface).disabled).toBe(true);
+    const remembered = chartAxisLogBase(surface, 'Y-axis');
+    remembered.value = '20';
+    remembered.dispatchEvent(new Event('input', { bubbles: true }));
+    const disable = chartAxisLogCheckbox(surface, 'Y-axis');
+    disable.checked = false;
+    disable.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('20');
+    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(true);
+    expect(majorUnit(surface).disabled).toBe(false);
+    const reenableDraft = chartAxisLogCheckbox(surface, 'Y-axis');
+    reenableDraft.checked = true;
+    reenableDraft.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('20');
+    const disableAgain = chartAxisLogCheckbox(surface, 'Y-axis');
+    disableAgain.checked = false;
+    disableAgain.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(history.canUndo()).toBe(false);
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBeUndefined();
+    expect(store.getState().charts.charts[0]?.yAxis?.majorUnit).toBe(2);
+
+    surface = openElements();
+    const reenable = chartAxisLogCheckbox(surface, 'Y-axis');
+    reenable.checked = true;
+    reenable.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    const clampHigh = chartAxisLogBase(surface, 'Y-axis');
+    clampHigh.value = '1001';
+    clampHigh.dispatchEvent(new Event('input', { bubbles: true }));
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1000);
+    expect(history.canUndo()).toBe(true);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBeUndefined();
+    expect(history.redo()).toBe(true);
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1000);
+
+    surface = openElements();
+    const fallbackBase = chartAxisLogBase(surface, 'Y-axis');
+    fallbackBase.value = '';
+    fallbackBase.dispatchEvent(new Event('input', { bubbles: true }));
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(10);
+    history.clear();
+
+    mutators.updateChart(store, 'log-sparse', {
+      yAxis: { logBase: 1 } as never,
+    });
+    history.clear();
+    surface = openElements();
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(false);
+    const title = surface.querySelector<HTMLInputElement>(
+      '.fc-chart-settings__field input[type="text"]',
+    );
+    if (!title) throw new Error('missing title input');
+    title.value = 'Unrelated title';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1);
+    expect(store.getState().charts.charts[0]?.title).toBe('Unrelated title');
+    expect(history.canUndo()).toBe(true);
+    history.clear();
+
+    surface = openElements();
+    const invalidOn = chartAxisLogCheckbox(surface, 'Y-axis');
+    invalidOn.checked = true;
+    invalidOn.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    const invalidOff = chartAxisLogCheckbox(surface, 'Y-axis');
+    invalidOff.checked = false;
+    invalidOff.dispatchEvent(new Event('change', { bubbles: true }));
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(history.canUndo()).toBe(false);
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1);
+
+    surface = openElements();
+    const cancelled = chartAxisLogCheckbox(surface, 'Y-axis');
+    cancelled.checked = true;
+    cancelled.dispatchEvent(new Event('change', { bubbles: true }));
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1);
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('keeps dormant logarithmic bases by chart type and grouping', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    mutators.upsertChart(store, {
+      id: 'log-dormant',
+      kind: 'column',
+      grouping: 'stacked',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      xAxis: { logBase: 10 },
+      yAxis: { logBase: 5 },
+    });
+    const handle = attachSessionCharts({ host, store });
+    const openElements = (): HTMLElement => {
+      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
+      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+      if (!surface) throw new Error('missing chart settings');
+      return surface;
+    };
+
+    let surface = openElements();
+    expect(chartAxisLogCheckbox(surface, 'X-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(true);
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
+    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(true);
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.xAxis?.logBase).toBe(10);
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(5);
+
+    mutators.updateChart(store, 'log-dormant', {
+      grouping: 'percent-stacked',
+    });
+    surface = openElements();
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
+
+    mutators.updateChart(store, 'log-dormant', {
+      kind: 'bar',
+      grouping: 'clustered',
+    });
+    surface = openElements();
+    expect(chartAxisLogCheckbox(surface, 'X-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(false);
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
+
+    mutators.updateChart(store, 'log-dormant', { kind: 'scatter' });
+    surface = openElements();
+    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(false);
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(false);
+    expect(chartAxisLogBase(surface, 'X-axis').value).toBe('10');
+    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('5');
+
+    mutators.updateChart(store, 'log-dormant', { kind: 'pie' });
+    surface = openElements();
+    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(true);
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    expect(store.getState().charts.charts[0]?.xAxis?.logBase).toBe(10);
+    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(5);
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('syncs untouched logarithmic axes around dirty crossing and label fields', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.upsertChart(store, {
+      id: 'log-sync',
+      kind: 'column',
+      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+    });
+    const handle = attachSessionCharts({ host, store, history });
+    const openElements = (): HTMLElement => {
+      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
+      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+      if (!surface) throw new Error('missing chart settings');
+      return surface;
+    };
+
+    let surface = openElements();
+    mutators.updateChart(store, 'log-sync', {
+      yAxis: { logBase: 20 },
+    });
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('20');
+
+    const dirtyCrossing = chartAxisCrossingSelect(surface, 'Y-axis');
+    dirtyCrossing.value = 'min';
+    dirtyCrossing.dispatchEvent(new Event('change', { bubbles: true }));
+    mutators.updateChart(store, 'log-sync', {
+      yAxis: { crossing: 'max', logBase: 30 },
+    });
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisCrossingSelect(surface, 'Y-axis').value).toBe('min');
+    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('30');
+
+    const dirtyPosition = chartAxisLabelPositionSelect(surface, 'Y-axis');
+    dirtyPosition.value = 'nextTo';
+    dirtyPosition.dispatchEvent(new Event('change', { bubbles: true }));
+    mutators.updateChart(store, 'log-sync', {
+      yAxis: { crossing: 'max', labelPosition: 'high', logBase: 40 },
+    });
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisCrossingSelect(surface, 'Y-axis').value).toBe('min');
+    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('nextTo');
+    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('40');
+
+    mutators.updateChart(store, 'log-sync', { kind: 'scatter' });
+    surface = openElements();
+    const dirtyLog = chartAxisLogCheckbox(surface, 'X-axis');
+    dirtyLog.checked = true;
+    dirtyLog.dispatchEvent(new Event('change', { bubbles: true }));
+    mutators.updateChart(store, 'log-sync', {
+      xAxis: { crossing: 'max', labelPosition: 'none', logBase: 50 },
+    });
+    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
+    expect(chartAxisLogCheckbox(surface, 'X-axis').checked).toBe(true);
+    expect(chartAxisLogBase(surface, 'X-axis').value).toBe('10');
+    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('max');
+    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('none');
+
+    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    const chart = store.getState().charts.charts[0];
+    expect(chart?.xAxis?.logBase).toBe(10);
+    expect(chart?.xAxis?.crossing).toBe('max');
+    expect(chart?.xAxis?.labelPosition).toBe('none');
 
     handle.detach();
     host.remove();

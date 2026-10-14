@@ -128,6 +128,12 @@ export interface SessionChartSettingsLabels {
   reverseOrder: string;
   verticalAxisCrosses: string;
   horizontalAxisCrosses: string;
+  labelPositionNextTo: string;
+  labelPositionLow: string;
+  labelPositionHigh: string;
+  labelPositionNone: string;
+  logarithmicScale: string;
+  logBase: string;
   custom: string;
   customValue: string;
   minimum: string;
@@ -212,7 +218,7 @@ const DEFAULT_LABELS: SessionChartSettingsLabels = {
   showPercentage: 'Percentage',
   showLegendKey: 'Legend key',
   labelSeparator: 'Separator',
-  labelPosition: 'Position',
+  labelPosition: 'Label position',
   positionBestFit: 'Best fit',
   positionAutomatic: 'Automatic',
   positionCenter: 'Center',
@@ -280,6 +286,12 @@ const DEFAULT_LABELS: SessionChartSettingsLabels = {
   reverseOrder: 'Reverse order',
   verticalAxisCrosses: 'Vertical axis crosses',
   horizontalAxisCrosses: 'Horizontal axis crosses',
+  labelPositionNextTo: 'Next to axis',
+  labelPositionLow: 'Low (bottom/left)',
+  labelPositionHigh: 'High (top/right)',
+  labelPositionNone: 'None',
+  logarithmicScale: 'Logarithmic scale',
+  logBase: 'Log base',
   custom: 'Custom',
   customValue: 'Custom value',
   minimum: 'Minimum',
@@ -444,6 +456,8 @@ type ChartAxisField =
   | 'visible'
   | 'reverseOrder'
   | 'crossing'
+  | 'labelPosition'
+  | 'logBase'
   | 'title'
   | 'min'
   | 'max'
@@ -452,6 +466,17 @@ type ChartAxisField =
   | 'majorGridlines';
 
 type AxisCrossingMode = 'auto' | 'min' | 'max' | 'custom';
+type AxisLabelPositionMode = 'automatic' | 'nextTo' | 'low' | 'high' | 'none';
+
+const validAxisLogBase = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 2 && value <= 1000
+    ? value
+    : undefined;
+
+const normalizedAxisLogBase = (value: number): number => {
+  if (!Number.isFinite(value)) return 10;
+  return Math.max(2, Math.min(1000, value));
+};
 
 interface ChartAxisDraft {
   visible: boolean;
@@ -460,6 +485,13 @@ interface ChartAxisDraft {
   crossing?: ChartAxisSpec['crossing'];
   crossingMode: AxisCrossingMode;
   crossingCustom: number;
+  /** The raw value is retained until the label position control is edited. */
+  labelPosition?: ChartAxisSpec['labelPosition'];
+  labelPositionMode: AxisLabelPositionMode;
+  /** The raw value is retained until the logarithmic-scale control is edited. */
+  logBase?: ChartAxisSpec['logBase'];
+  logEnabled: boolean;
+  logBaseDraft: number;
   title: string;
   min?: number;
   max?: number;
@@ -479,12 +511,27 @@ const axisFromChart = (axis: SessionChart['xAxis']): ChartAxisDraft => {
       : finite(crossing) === undefined
         ? 'auto'
         : 'custom';
+  const labelPosition = raw.labelPosition as ChartAxisSpec['labelPosition'];
+  const labelPositionMode: AxisLabelPositionMode =
+    labelPosition === 'nextTo' ||
+    labelPosition === 'low' ||
+    labelPosition === 'high' ||
+    labelPosition === 'none'
+      ? labelPosition
+      : 'automatic';
+  const logBase = raw.logBase as ChartAxisSpec['logBase'];
+  const validLogBase = validAxisLogBase(logBase);
   return {
     visible: raw.visible !== false,
     reverseOrder: raw.reverseOrder === true,
     crossing,
     crossingMode,
     crossingCustom: finite(crossing) ?? 0,
+    labelPosition,
+    labelPositionMode,
+    logBase,
+    logEnabled: validLogBase !== undefined,
+    logBaseDraft: validLogBase ?? 10,
     title: typeof raw.title === 'string' ? raw.title : '',
     min: finite(raw.min),
     max: finite(raw.max),
@@ -795,6 +842,61 @@ const updateAxisCrossingCustom = (
   updateCrossingChanged(draft, axisName);
 };
 
+const labelPositionMatchesBaseline = (axis: ChartAxisDraft, baseline: ChartAxisDraft): boolean =>
+  axis.labelPositionMode === baseline.labelPositionMode;
+
+const updateLabelPositionChanged = (draft: ChartDraft, axisName: AxisName): void => {
+  const axis = draft[axisName];
+  const baseline = draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'];
+  const changed = draft[axisName === 'xAxis' ? 'xAxisChanged' : 'yAxisChanged'];
+  if (labelPositionMatchesBaseline(axis, baseline)) changed.delete('labelPosition');
+  else changed.add('labelPosition');
+};
+
+const updateAxisLabelPosition = (
+  draft: ChartDraft,
+  axisName: AxisName,
+  mode: AxisLabelPositionMode,
+): void => {
+  const axis = draft[axisName];
+  axis.labelPositionMode = mode;
+  axis.labelPosition = mode === 'automatic' ? undefined : mode;
+  updateLabelPositionChanged(draft, axisName);
+};
+
+const logMatchesBaseline = (axis: ChartAxisDraft, baseline: ChartAxisDraft): boolean =>
+  axis.logEnabled === baseline.logEnabled &&
+  (!axis.logEnabled || axis.logBaseDraft === baseline.logBaseDraft);
+
+const updateLogChanged = (draft: ChartDraft, axisName: AxisName): void => {
+  const axis = draft[axisName];
+  const baseline = draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'];
+  const changed = draft[axisName === 'xAxis' ? 'xAxisChanged' : 'yAxisChanged'];
+  if (logMatchesBaseline(axis, baseline)) changed.delete('logBase');
+  else changed.add('logBase');
+};
+
+const updateAxisLogEnabled = (draft: ChartDraft, axisName: AxisName, enabled: boolean): void => {
+  const axis = draft[axisName];
+  axis.logEnabled = enabled;
+  if (enabled) {
+    axis.logBaseDraft = normalizedAxisLogBase(axis.logBaseDraft);
+    axis.logBase = axis.logBaseDraft;
+  } else {
+    axis.logBase = undefined;
+  }
+  updateLogChanged(draft, axisName);
+};
+
+const updateAxisLogBase = (draft: ChartDraft, axisName: AxisName, value: string): void => {
+  const trimmed = value.trim();
+  const parsed = trimmed === '' ? Number.NaN : Number(trimmed);
+  const axis = draft[axisName];
+  axis.logBaseDraft = normalizedAxisLogBase(Number.isFinite(parsed) ? parsed : 10);
+  if (axis.logEnabled) axis.logBase = axis.logBaseDraft;
+  updateLogChanged(draft, axisName);
+};
+
 const parseOptionalNumber = (value: string): number | undefined => {
   if (value.trim() === '') return undefined;
   const parsed = Number(value);
@@ -816,6 +918,12 @@ const axisPatch = (
       } else {
         next.crossing = draft.crossingCustom;
       }
+    } else if (key === 'labelPosition') {
+      if (draft.labelPositionMode === 'automatic') delete next.labelPosition;
+      else next.labelPosition = draft.labelPositionMode;
+    } else if (key === 'logBase') {
+      if (!draft.logEnabled) delete next.logBase;
+      else next.logBase = draft.logBaseDraft;
     } else if (key === 'title') next[key] = draft.title.trim() || undefined;
     else if (key === 'numberFormat') next[key] = draft.numberFormat.trim() || undefined;
     else next[key] = draft[key];
@@ -1195,6 +1303,15 @@ const axisIsNumeric = (chart: Pick<SessionChart, 'kind'>, axis: AxisName): boole
   if (chart.kind === 'scatter') return true;
   if (chart.kind === 'bar') return axis === 'xAxis';
   return axis === 'yAxis';
+};
+
+const axisLogEligible = (
+  chart: Pick<SessionChart, 'kind' | 'grouping'>,
+  axis: AxisName,
+): boolean => {
+  if (!axisIsNumeric(chart, axis)) return false;
+  if (chart.kind === 'scatter') return true;
+  return (chart.grouping ?? 'clustered') === 'clustered';
 };
 
 const emptyCellOptionDisabled = (
@@ -1608,6 +1725,7 @@ const renderAxisControls = (
   const axis = draft[axisName];
   const enabled = !isCircularKind(chart.kind);
   const numeric = axisIsNumeric(chart, axisName);
+  const logEligible = axisLogEligible(chart, axisName);
   const categoryCount = categoryCountForDraft(data, draft);
   const group = element('fieldset', 'fc-chart-settings__group');
   group.appendChild(textNode('legend', axisLabel, 'fc-chart-settings__legend'));
@@ -1625,6 +1743,31 @@ const renderAxisControls = (
     (checked) => updateAxisField(draft, axisName, 'reverseOrder', checked),
     !enabled,
   );
+  makeCheckbox(
+    group,
+    labels.logarithmicScale,
+    axis.logEnabled,
+    (checked) => {
+      updateAxisLogEnabled(draft, axisName, checked);
+      rerender();
+    },
+    !enabled || !logEligible,
+    'fc-chart-settings__log-scale',
+  );
+  const logBaseInput = makeTextInput(
+    group,
+    labels.logBase,
+    String(axis.logBaseDraft),
+    (value) => updateAxisLogBase(draft, axisName, value),
+    'number',
+    {
+      min: 2,
+      max: 1000,
+      step: 'any',
+      disabled: !enabled || !logEligible || !axis.logEnabled,
+    },
+  );
+  logBaseInput.parentElement?.classList.add('fc-chart-settings__log-base');
   const crossingSelect = makeSelect(
     group,
     axisName === 'xAxis' ? labels.verticalAxisCrosses : labels.horizontalAxisCrosses,
@@ -1657,6 +1800,23 @@ const renderAxisControls = (
       disabled: !enabled || axis.crossingMode !== 'custom',
     },
   );
+  const labelPositionSelect = makeSelect(
+    group,
+    labels.labelPosition,
+    axis.labelPositionMode,
+    [
+      { value: 'automatic', label: labels.automatic },
+      { value: 'nextTo', label: labels.labelPositionNextTo },
+      { value: 'low', label: labels.labelPositionLow },
+      { value: 'high', label: labels.labelPositionHigh },
+      { value: 'none', label: labels.labelPositionNone },
+    ],
+    (value) => {
+      updateAxisLabelPosition(draft, axisName, value as AxisLabelPositionMode);
+    },
+    !enabled,
+  );
+  labelPositionSelect.parentElement?.classList.add('fc-chart-settings__label-position');
   makeTextInput(
     group,
     axisName === 'xAxis' ? labels.xAxisTitle : labels.yAxisTitle,
@@ -1709,7 +1869,7 @@ const renderAxisControls = (
       min: 0,
       step: 'any',
       placeholder: labels.automatic,
-      disabled: !enabled || !numeric,
+      disabled: !enabled || !numeric || (logEligible && axis.logEnabled),
     },
   );
   makeTextInput(
@@ -2133,20 +2293,39 @@ export function createSessionChartSettings(
         draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'].reverseOrder = reverseOrder;
       }
 
-      if (changed.has('crossing')) continue;
-      const nextCrossing = axisFromChart(chart[axisName]);
-      nextCrossing.crossingCustom = normalizedCrossingCustom(
-        nextCrossing.crossingCustom,
-        axisIsNumeric({ kind: draft.kind }, axisName),
-        categoryCountForDraft(data, draft),
-      );
       const baseline = draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'];
-      draft[axisName].crossing = nextCrossing.crossing;
-      draft[axisName].crossingMode = nextCrossing.crossingMode;
-      draft[axisName].crossingCustom = nextCrossing.crossingCustom;
-      baseline.crossing = nextCrossing.crossing;
-      baseline.crossingMode = nextCrossing.crossingMode;
-      baseline.crossingCustom = nextCrossing.crossingCustom;
+      if (!changed.has('crossing')) {
+        const nextCrossing = axisFromChart(chart[axisName]);
+        nextCrossing.crossingCustom = normalizedCrossingCustom(
+          nextCrossing.crossingCustom,
+          axisIsNumeric({ kind: draft.kind }, axisName),
+          categoryCountForDraft(data, draft),
+        );
+        draft[axisName].crossing = nextCrossing.crossing;
+        draft[axisName].crossingMode = nextCrossing.crossingMode;
+        draft[axisName].crossingCustom = nextCrossing.crossingCustom;
+        baseline.crossing = nextCrossing.crossing;
+        baseline.crossingMode = nextCrossing.crossingMode;
+        baseline.crossingCustom = nextCrossing.crossingCustom;
+      }
+
+      if (!changed.has('labelPosition')) {
+        const nextLabelPosition = axisFromChart(chart[axisName]);
+        draft[axisName].labelPosition = nextLabelPosition.labelPosition;
+        draft[axisName].labelPositionMode = nextLabelPosition.labelPositionMode;
+        baseline.labelPosition = nextLabelPosition.labelPosition;
+        baseline.labelPositionMode = nextLabelPosition.labelPositionMode;
+      }
+
+      if (!changed.has('logBase')) {
+        const nextLog = axisFromChart(chart[axisName]);
+        draft[axisName].logBase = nextLog.logBase;
+        draft[axisName].logEnabled = nextLog.logEnabled;
+        draft[axisName].logBaseDraft = nextLog.logBaseDraft;
+        baseline.logBase = nextLog.logBase;
+        baseline.logEnabled = nextLog.logEnabled;
+        baseline.logBaseDraft = nextLog.logBaseDraft;
+      }
     }
     if (!draft.legendManuallyChanged) {
       const nextLegendOverride = chart.legend?.visible;
@@ -2373,6 +2552,16 @@ export function createSessionChartSettings(
       const previousYCrossingMode = draft.yAxis.crossingMode;
       const previousXCrossingCustom = draft.xAxis.crossingCustom;
       const previousYCrossingCustom = draft.yAxis.crossingCustom;
+      const previousXLabelPosition = draft.xAxis.labelPosition;
+      const previousYLabelPosition = draft.yAxis.labelPosition;
+      const previousXLabelPositionMode = draft.xAxis.labelPositionMode;
+      const previousYLabelPositionMode = draft.yAxis.labelPositionMode;
+      const previousXLogBase = draft.xAxis.logBase;
+      const previousYLogBase = draft.yAxis.logBase;
+      const previousXLogEnabled = draft.xAxis.logEnabled;
+      const previousYLogEnabled = draft.yAxis.logEnabled;
+      const previousXLogBaseDraft = draft.xAxis.logBaseDraft;
+      const previousYLogBaseDraft = draft.yAxis.logBaseDraft;
       chart = nextChart;
       if (!draft.kindDirty) {
         draft.kind = nextChart.kind;
@@ -2410,6 +2599,18 @@ export function createSessionChartSettings(
         !Object.is(draft.yAxis.crossing, previousYCrossing) ||
         !Object.is(draft.xAxis.crossingCustom, previousXCrossingCustom) ||
         !Object.is(draft.yAxis.crossingCustom, previousYCrossingCustom);
+      const axisLabelPositionChanged =
+        draft.xAxis.labelPositionMode !== previousXLabelPositionMode ||
+        draft.yAxis.labelPositionMode !== previousYLabelPositionMode ||
+        !Object.is(draft.xAxis.labelPosition, previousXLabelPosition) ||
+        !Object.is(draft.yAxis.labelPosition, previousYLabelPosition);
+      const axisLogChanged =
+        draft.xAxis.logEnabled !== previousXLogEnabled ||
+        draft.yAxis.logEnabled !== previousYLogEnabled ||
+        !Object.is(draft.xAxis.logBase, previousXLogBase) ||
+        !Object.is(draft.yAxis.logBase, previousYLogBase) ||
+        !Object.is(draft.xAxis.logBaseDraft, previousXLogBaseDraft) ||
+        !Object.is(draft.yAxis.logBaseDraft, previousYLogBaseDraft);
       if (
         permissionChanged ||
         chartFamilyChanged ||
@@ -2417,6 +2618,8 @@ export function createSessionChartSettings(
         scatterStyleChangedExternally ||
         axisReverseOrderChanged ||
         axisCrossingChanged ||
+        axisLabelPositionChanged ||
+        axisLogChanged ||
         nextKey !== dataKey
       ) {
         const view = captureSettingsView(surface);

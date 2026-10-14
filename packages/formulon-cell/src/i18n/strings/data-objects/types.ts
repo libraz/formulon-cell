@@ -338,6 +338,12 @@ export interface DataObjectsStrings {
     reverseOrder: string;
     verticalAxisCrosses: string;
     horizontalAxisCrosses: string;
+    labelPositionNextTo: string;
+    labelPositionLow: string;
+    labelPositionHigh: string;
+    labelPositionNone: string;
+    logarithmicScale: string;
+    logBase: string;
     custom: string;
     customValue: string;
     minimum: string;
