@@ -1,6 +1,7 @@
 import type { History } from '../commands/history.js';
 import {
   type DefinedNameEntry,
+  definedNameDisplayFormula,
   deleteDefinedName,
   recordDefinedNamesChange,
   upsertDefinedName,
@@ -363,7 +364,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const entry = currentRows[selectedNameIndex];
     const canMutate = wb.capabilities.definedNameMutate;
     const enabled = canMutate && Boolean(entry);
-    quickInput.value = entry?.formula ?? '';
+    quickInput.value = definedNameDisplayFormula(entry?.formula ?? '');
     if (!canMutate) {
       setReadOnlyState(quickInput, true);
       setReadOnlyState(quickCommitBtn, true);
@@ -418,7 +419,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       value.textContent = definedNameValueText(entry.formula);
       const formulaCell = document.createElement('span');
       formulaCell.className = 'fc-namedlg__row-formula';
-      formulaCell.textContent = entry.formula;
+      formulaCell.textContent = definedNameDisplayFormula(entry.formula);
       const scope = document.createElement('span');
       scope.className = 'fc-namedlg__row-scope';
       scope.textContent = scopeLabel(entry.localSheetId);
@@ -630,7 +631,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     nameInput.value = entry?.name ?? '';
     scopeSelect.value = String(entry?.localSheetId ?? -1);
     commentInput.value = '';
-    formulaInput.value = entry?.formula ?? '';
+    formulaInput.value = definedNameDisplayFormula(entry?.formula ?? '');
     clearError();
     editorShell.open();
     requestAnimationFrame(() => {

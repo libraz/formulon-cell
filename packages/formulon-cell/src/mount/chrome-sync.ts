@@ -1,5 +1,9 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
-import { isValidDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
+import {
+  definedNameDisplayFormula,
+  isValidDefinedName,
+  upsertDefinedName,
+} from '../commands/named-ranges.js';
 import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formulaForEdit } from '../engine/edit-seed.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
@@ -353,7 +357,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
         text: row.name,
       });
       item.setAttribute('role', 'option');
-      item.title = row.formula;
+      item.title = definedNameDisplayFormula(row.formula);
       item.addEventListener('click', (e) => {
         tag.value = row.name;
         if (e.ctrlKey || e.metaKey) {

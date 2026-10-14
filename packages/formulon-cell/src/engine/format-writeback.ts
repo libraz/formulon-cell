@@ -157,6 +157,7 @@ export function fontRecordFromFormat(
     hasBold: fmt.bold !== undefined,
     hasItalic: fmt.italic !== undefined,
     hasStrike: fmt.strike !== undefined,
+    hasSize: Number.isFinite(fmt.fontSize),
     underline: underlineOrdinal(fmt.underline),
     vertAlign: fmt.fontVertAlign === 'superscript' ? 1 : fmt.fontVertAlign === 'subscript' ? 2 : 0,
     colorArgb: fmt.color ? (cssColorToArgb(fmt.color) ?? BLACK_ARGB) : BLACK_ARGB,

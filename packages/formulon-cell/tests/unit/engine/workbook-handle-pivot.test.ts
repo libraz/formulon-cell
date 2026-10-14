@@ -8,6 +8,7 @@ import {
   PivotFilterType,
   PivotFilterValueKind,
   PivotReportLayout,
+  PivotSortOrder,
   ValueKind,
 } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -403,7 +404,7 @@ describe('WorkbookHandle PivotTable projection', () => {
     expect(wb.createPivotTable(0, 'Pivot1', 8, { row: 4, col: 1 })).toBe(3);
     expect(wb.getPivotReportLayout(0, 3)).toBe(PivotReportLayout.Tabular);
     expect(wb.setPivotReportLayout(0, 3, PivotReportLayout.Outline)).toBe(true);
-    expect(wb.setPivotFieldSort(0, 3, 0, true, 'Sales')).toBe(true);
+    expect(wb.setPivotFieldSort(0, 3, 0, PivotSortOrder.Ascending, 'Sales')).toBe(true);
     expect(wb.setPivotFieldSubtotalTop(0, 3, 0, false)).toBe(true);
     expect(wb.addPivotFieldItem(0, 3, 0, 'East', true)).toBe(true);
     expect(wb.clearPivotFieldItems(0, 3, 0)).toBe(true);

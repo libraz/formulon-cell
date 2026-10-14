@@ -357,6 +357,28 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     handle.detach();
   });
 
+  it('shows engine-stored references with a leading = as the spreadsheet does', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', 'Sheet1!$A$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__row-formula')?.textContent).toBe(
+      '=Sheet1!$A$1',
+    );
+    expect(document.querySelector<HTMLInputElement>('.fc-namedlg__refers-input')?.value).toBe(
+      '=Sheet1!$A$1',
+    );
+    Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
+    )[1]?.click();
+    expect(
+      document.querySelector<HTMLInputElement>('.fc-namedlg-editor__input[aria-label="参照先"]')
+        ?.value,
+    ).toBe('=Sheet1!$A$1');
+    handle.detach();
+  });
+
   it('sorts the Name Manager list from column headers', () => {
     const { wb, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$C$1');

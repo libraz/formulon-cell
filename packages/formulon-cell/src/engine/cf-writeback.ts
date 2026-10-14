@@ -303,6 +303,7 @@ function inputWithDxf(
  * - `date-occurring` — the `timePeriod` ordinal set isn't stable in this API.
  * - `formula` rules that carry a comparator-prefix predicate (`>10`) rather
  *   than a full `=`-expression.
+ * - `icon-set` rules with fewer than N-1 thresholds for an N-icon set.
  *
  * This pure translator intentionally leaves `rule.apply` out of the returned
  * input. The sync path attaches a `dxfId` after allocating a differential
@@ -451,9 +452,15 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
       const name = iconSetOrdinal(rule.icons);
       if (name < 0) return null;
       const slots = iconSetSlotCount(rule.icons);
-      const thresholds = rule.thresholds
-        ? rule.thresholds.slice(0, slots - 1).map(scalePointToCfValueObject)
-        : defaultIconThresholds(slots);
+      // The engine takes exactly N-1 thresholds; a shorter list renders with
+      // fewer buckets locally and has no file representation.
+      if (rule.thresholds && rule.thresholds.length > 0 && rule.thresholds.length < slots - 1) {
+        return null;
+      }
+      const thresholds =
+        rule.thresholds && rule.thresholds.length > 0
+          ? rule.thresholds.slice(0, slots - 1).map(scalePointToCfValueObject)
+          : defaultIconThresholds(slots);
       return {
         sqref,
         type: RULE_TYPE.iconSet,

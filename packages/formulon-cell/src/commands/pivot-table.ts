@@ -3,7 +3,7 @@ import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { pivotAggregationName } from '../engine/pivot-aggregation.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
-import { PivotAggregation, PivotAxis } from '../engine/types.js';
+import { PivotAggregation, PivotAxis, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -356,15 +356,14 @@ export function createPivotTableFromRange(
       opts.destination.sheet,
       pivotIndex,
       rowPivotField,
-      opts.rowSort === 'asc',
+      opts.rowSort === 'asc' ? PivotSortOrder.Ascending : PivotSortOrder.Descending,
       '',
     );
     if (!ok) return failAfterPivot('row-sort');
   }
 
-  let colPivotField = -1;
   if (columnField) {
-    colPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
+    const colPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
       sourceName: columnField.name,
       axis: PivotAxis.Col,
       subtotalTop: opts.columnSubtotalTop ?? true,
@@ -375,22 +374,10 @@ export function createPivotTableFromRange(
         opts.destination.sheet,
         pivotIndex,
         colPivotField,
-        opts.columnSort === 'asc',
+        opts.columnSort === 'asc' ? PivotSortOrder.Ascending : PivotSortOrder.Descending,
         '',
       );
       if (!ok) return failAfterPivot('col-sort');
-    }
-  }
-
-  // Adding a field assigns its axis but leaves the axis order empty in a new
-  // PivotTable. Set the source fields explicitly so the evaluator can build
-  // the row/column hierarchies from the cache records.
-  if (!wb.setPivotRowFieldOrder(opts.destination.sheet, pivotIndex, [rowPivotField])) {
-    return failAfterPivot('row-field-order');
-  }
-  if (colPivotField >= 0) {
-    if (!wb.setPivotColFieldOrder(opts.destination.sheet, pivotIndex, [colPivotField])) {
-      return failAfterPivot('col-field-order');
     }
   }
 

@@ -19,6 +19,7 @@ import {
   PivotAxis,
   PivotFilterType,
   PivotFilterValueKind,
+  type PivotSortOrder,
 } from './types.js';
 import { fromEngineValue } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -446,12 +447,12 @@ export abstract class WorkbookHandlePivotMethods {
     sheet: number,
     pivotIdx: number,
     fieldIdx: number,
-    ascending: boolean,
+    order: PivotSortOrder,
     byField = '',
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldSetSort(sheet, pivotIdx, fieldIdx, ascending, byField).ok;
+    return pivotWb(this).pivotFieldSetSort(sheet, pivotIdx, fieldIdx, order, byField).ok;
   }
 
   setPivotFieldSubtotalTop(

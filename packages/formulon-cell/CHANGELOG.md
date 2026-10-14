@@ -8,6 +8,11 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
+- Update `@libraz/formulon` to 0.15.2, including Windows Excel arithmetic rounding and collation, XLSB differential formats, and pivot tables that open in Excel.
+- `WorkbookHandle.setPivotFieldSort` takes a `PivotSortOrder` (`Descending`, `Ascending`, `Manual`) in place of the `ascending` flag. `PivotSortOrder` is exported from the package root.
+- Defined names read back without a leading `=`, matching names loaded from a file. `upsertDefinedName` and `createDefinedNamesFromSelection` return entries in that stored form. The Name Manager and the Name Box list still show references with a leading `=`.
+- Icon-set rules with fewer than N-1 thresholds for an N-icon set are no longer written to the workbook; they still render locally. An empty threshold list writes the default thresholds.
+- Conditional-format font differences that do not set a size no longer write one, so the rule leaves the cell's font size unchanged.
 - `mountToolbar` now defaults to the standard ribbon tab set (`EXCEL365_STANDARD_RIBBON_TABS`, or the Mac set on macOS) when `ribbonTabs` is omitted. Pass `RIBBON_TABS` or `[...EXCEL365_STANDARD_RIBBON_TABS, ...OPTIONAL_RIBBON_TABS]` explicitly to keep the Draw, Automate and Acrobat tabs.
 
 ### Removed

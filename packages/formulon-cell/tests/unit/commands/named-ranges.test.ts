@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
   createDefinedNamesFromSelection,
+  definedNameDisplayFormula,
   deleteDefinedName,
   insertDefinedNameFormula,
   isValidDefinedName,
@@ -101,13 +102,19 @@ describe('named range commands', () => {
     ]);
   });
 
+  it('displays stored defined-name formulas with one leading =', () => {
+    expect(definedNameDisplayFormula('Sheet1!$A$1')).toBe('=Sheet1!$A$1');
+    expect(definedNameDisplayFormula('=Sheet1!$A$1')).toBe('=Sheet1!$A$1');
+    expect(definedNameDisplayFormula('')).toBe('');
+  });
+
   it('adds or replaces a defined name', () => {
     const { wb, calls } = makeWb();
     const result = upsertDefinedName(wb, ' Total ', ' =Sheet1!$B$1 ');
 
     expect(result).toEqual({
       ok: true,
-      entry: { name: 'Total', formula: '=Sheet1!$B$1', localSheetId: -1 },
+      entry: { name: 'Total', formula: 'Sheet1!$B$1', localSheetId: -1 },
     });
     expect(calls).toEqual([{ name: 'Total', formula: '=Sheet1!$B$1', localSheetId: -1 }]);
   });
@@ -186,7 +193,7 @@ describe('named range commands', () => {
     const result = createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
     expect(result).toEqual({
       ok: true,
-      entries: [{ name: '_A1', formula: '=$A$2:$A$3', localSheetId: -1 }],
+      entries: [{ name: '_A1', formula: '$A$2:$A$3', localSheetId: -1 }],
     });
   });
 
@@ -224,8 +231,8 @@ describe('named range commands', () => {
     expect(result).toEqual({
       ok: true,
       entries: [
-        { name: 'Sales_Total', formula: '=$A$2:$A$3', localSheetId: -1 },
-        { name: '_2026_Rate', formula: '=$B$2:$B$3', localSheetId: -1 },
+        { name: 'Sales_Total', formula: '$A$2:$A$3', localSheetId: -1 },
+        { name: '_2026_Rate', formula: '$B$2:$B$3', localSheetId: -1 },
       ],
     });
     expect(calls).toEqual([
@@ -246,8 +253,8 @@ describe('named range commands', () => {
     expect(result).toEqual({
       ok: true,
       entries: [
-        { name: 'Sales_Total', formula: '=$A$1:$A$2', localSheetId: -1 },
-        { name: 'Tax_Rate', formula: '=$B$1:$B$2', localSheetId: -1 },
+        { name: 'Sales_Total', formula: '$A$1:$A$2', localSheetId: -1 },
+        { name: 'Tax_Rate', formula: '$B$1:$B$2', localSheetId: -1 },
       ],
     });
     expect(calls).toEqual([
@@ -266,8 +273,8 @@ describe('named range commands', () => {
     expect(createDefinedNamesFromSelection(store.getState(), left.wb, 'left-column')).toEqual({
       ok: true,
       entries: [
-        { name: 'North', formula: '=$B$1:$C$1', localSheetId: -1 },
-        { name: 'South', formula: '=$B$2:$C$2', localSheetId: -1 },
+        { name: 'North', formula: '$B$1:$C$1', localSheetId: -1 },
+        { name: 'South', formula: '$B$2:$C$2', localSheetId: -1 },
       ],
     });
 
@@ -278,8 +285,8 @@ describe('named range commands', () => {
     expect(createDefinedNamesFromSelection(store.getState(), right.wb, 'right-column')).toEqual({
       ok: true,
       entries: [
-        { name: 'West', formula: '=$A$1:$B$1', localSheetId: -1 },
-        { name: 'East', formula: '=$A$2:$B$2', localSheetId: -1 },
+        { name: 'West', formula: '$A$1:$B$1', localSheetId: -1 },
+        { name: 'East', formula: '$A$2:$B$2', localSheetId: -1 },
       ],
     });
   });

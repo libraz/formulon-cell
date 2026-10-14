@@ -16,9 +16,9 @@ const FORMULA_CELL: CellAddress = { sheet: 0, row: 0, col: 3 };
  *   (`col_kana_hira_kata`, `col_fullwidth_latin_upper`, `col_accent_a_acute`,
  *   `colfn_sort_hw_voiced`, `colfn_unique_hw_voiced`, and the matching COUNTIF).
  * - mac-365-* `locale_tokens.golden.json` (`weekdays_aaaa`).
- * - win-365-ja_JP `countif_kana_folding_probes.golden.json` for the legacy
- *   COUNTIF byte behaviour. Windows SORT/UNIQUE values are kept separate from
- *   the measured Mac values and follow the 0.14 engine observations.
+ * - win-365-ja_JP `collation.golden.json` and `collation_functions.golden.json`
+ *   (same case ids) for every Windows profile, and
+ *   `countif_kana_folding_probes.golden.json` for the legacy COUNTIF byte behaviour.
  */
 const profiles = [
   {
@@ -81,7 +81,7 @@ const profiles = [
     id: 'windows-en_US',
     host: 'windows',
     weekday: 'Tuesday',
-    collation: { kana: 'LT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
+    collation: { kana: 'GT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
     countifKana: 1,
     filterMatch: [true, false, false],
   },
@@ -89,7 +89,7 @@ const profiles = [
     id: 'windows-ja_JP',
     host: 'windows',
     weekday: '火曜日',
-    collation: { kana: 'LT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
+    collation: { kana: 'GT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
     countifKana: 1,
     filterMatch: [true, false, false],
   },
@@ -97,7 +97,7 @@ const profiles = [
     id: 'windows-de_DE',
     host: 'windows',
     weekday: 'Dienstag',
-    collation: { kana: 'LT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
+    collation: { kana: 'GT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
     countifKana: 1,
     filterMatch: [true, false, false],
   },
@@ -105,7 +105,7 @@ const profiles = [
     id: 'windows-fr_FR',
     host: 'windows',
     weekday: '2024',
-    collation: { kana: 'LT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
+    collation: { kana: 'GT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
     countifKana: 1,
     filterMatch: [true, false, false],
   },
@@ -113,7 +113,7 @@ const profiles = [
     id: 'windows-zh_CN',
     host: 'windows',
     weekday: '星期二',
-    collation: { kana: 'LT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
+    collation: { kana: 'GT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
     countifKana: 1,
     filterMatch: [true, false, false],
   },
@@ -121,7 +121,7 @@ const profiles = [
     id: 'windows-ko_KR',
     host: 'windows',
     weekday: '화요일',
-    collation: { kana: 'LT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
+    collation: { kana: 'GT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
     countifKana: 1,
     filterMatch: [true, false, false],
   },
@@ -129,7 +129,7 @@ const profiles = [
     id: 'windows-th_TH',
     host: 'windows',
     weekday: 'วันอังคาร',
-    collation: { kana: 'LT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
+    collation: { kana: 'GT', width: 'GT', accent: 'LT', sort: 'ｶﾞ', unique: 1 },
     countifKana: 1,
     filterMatch: [true, false, false],
   },

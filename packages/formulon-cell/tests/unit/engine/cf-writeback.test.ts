@@ -301,13 +301,19 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         kind: 'icon-set',
         range,
         icons: 'traffic3',
-        thresholds: [{ kind: 'percent', value: 67 }],
+        thresholds: [
+          { kind: 'percent', value: 33 },
+          { kind: 'percent', value: 67 },
+        ],
         floor: { kind: 'number', value: 10 },
       }),
     ).toMatchObject({
       type: 4,
       iconSet: {
-        thresholds: [{ type: 1, value: '67' }],
+        thresholds: [
+          { type: 1, value: '33' },
+          { type: 1, value: '67' },
+        ],
         floor: { type: 0, value: '10' },
       },
     });
@@ -391,6 +397,27 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         apply: {},
       }),
     ).toBeNull();
+  });
+
+  it('returns null for icon sets with fewer than N-1 thresholds', () => {
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'icon-set',
+        range,
+        icons: 'arrows3',
+        thresholds: [{ kind: 'percent', value: 50 }],
+      }),
+    ).toBeNull();
+  });
+
+  it('writes default thresholds for an icon set with an empty threshold list', () => {
+    expect(
+      conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows3', thresholds: [] })
+        ?.iconSet?.thresholds,
+    ).toEqual([
+      { type: 1, value: '33' },
+      { type: 1, value: '67' },
+    ]);
   });
 });
 

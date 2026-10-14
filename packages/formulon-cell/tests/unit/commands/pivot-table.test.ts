@@ -15,6 +15,7 @@ import {
   PivotFilterType,
   PivotFilterValueKind,
   PivotShowValuesAs,
+  PivotSortOrder,
 } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -139,18 +140,10 @@ const makeWb = () => {
       _sheet: number,
       _pivot: number,
       fieldIdx: number,
-      ascending: boolean,
+      order: PivotSortOrder,
       byField: string,
     ) => {
-      calls.push(`sort:${fieldIdx}:${ascending}:${byField}`);
-      return true;
-    },
-    setPivotRowFieldOrder: (_sheet: number, _pivot: number, indices: readonly number[]) => {
-      calls.push(`row-order:${indices.join(',')}`);
-      return true;
-    },
-    setPivotColFieldOrder: (_sheet: number, _pivot: number, indices: readonly number[]) => {
-      calls.push(`col-order:${indices.join(',')}`);
+      calls.push(`sort:${fieldIdx}:${order}:${byField}`);
       return true;
     },
     addPivotDataField: (
@@ -233,26 +226,11 @@ describe('pivot-table command helpers', () => {
     expect(calls).toContain('pivot-field:Region:0');
     expect(calls).toContain('grand:false:true');
     expect(calls).toContain('subtotal-top:Region:false');
-    expect(calls).toContain('sort:0:true:');
-    expect(calls).toContain('sort:1:false:');
+    expect(calls).toContain(`sort:0:${PivotSortOrder.Ascending}:`);
+    expect(calls).toContain(`sort:1:${PivotSortOrder.Descending}:`);
     expect(calls).toContain('pivot-field:Product:1');
     expect(calls).toContain('pivot-field:Sales:2');
     expect(calls).toContain('data-field:Sum of Sales:2:0:#,##0:');
-  });
-
-  it('sets source fields on the row and column axis order', () => {
-    const { wb, calls } = makeWb();
-    const result = createPivotTableFromRange(wb, {
-      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
-      destination: { sheet: 0, row: 5, col: 0 },
-      rowField: 'Region',
-      columnField: 'Product',
-      valueField: 'Sales',
-    });
-
-    expect(result).toMatchObject({ ok: true });
-    expect(calls).toContain('row-order:0');
-    expect(calls).toContain('col-order:1');
   });
 
   it('projects source row and column labels through the real WASM engine', async () => {

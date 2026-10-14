@@ -824,6 +824,7 @@ export {
   PivotFilterType,
   PivotFilterValueKind,
   PivotShowValuesAs,
+  PivotSortOrder,
   SheetVisibility,
 } from './engine/types.js';
 export { formatCell, fromEngineValue } from './engine/value.js';

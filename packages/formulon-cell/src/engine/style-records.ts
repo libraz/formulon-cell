@@ -26,6 +26,7 @@ export function completeFontRecord(record: FontRecord): EngineFontRecord {
     hasBold: record.hasBold ?? true,
     hasItalic: record.hasItalic ?? true,
     hasStrike: record.hasStrike ?? true,
+    hasSize: record.hasSize ?? true,
     hasFamily: record.hasFamily ?? false,
     family: record.family ?? 0,
     hasCharset: record.hasCharset ?? false,

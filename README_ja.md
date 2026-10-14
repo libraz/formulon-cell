@@ -41,7 +41,7 @@ npm install @libraz/formulon-cell zustand
 
 `zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。
 
-formulon 0.15.1 の標準 WASM エンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。Node.js で使う場合は22以降が必要です。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われ、テストと明示的なデモ専用です。
+formulon 0.15.2 の標準 WASM エンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。Node.js で使う場合は22以降が必要です。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われ、テストと明示的なデモ専用です。
 
 ## クイックスタート
 

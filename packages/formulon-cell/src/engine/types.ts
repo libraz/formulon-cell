@@ -51,6 +51,7 @@ export type FontRecord = EngineFilled<
   | 'hasBold'
   | 'hasItalic'
   | 'hasStrike'
+  | 'hasSize'
   | 'hasFamily'
   | 'family'
   | 'hasCharset'
@@ -111,6 +112,14 @@ export const PivotAxis = {
   Page: 3,
 } as const;
 export type PivotAxis = (typeof PivotAxis)[keyof typeof PivotAxis];
+
+/** Sibling item order of a pivot field. Mirrors `fm_pivot_sort_order_t`. */
+export const PivotSortOrder = {
+  Descending: 0,
+  Ascending: 1,
+  Manual: 2,
+} as const;
+export type PivotSortOrder = (typeof PivotSortOrder)[keyof typeof PivotSortOrder];
 
 export interface PivotFieldSpec {
   readonly sourceName: string;

@@ -156,6 +156,11 @@ export function recordDefinedNamesChange<T>(
   return result;
 }
 
+/** A stored defined-name formula as name lists show it: with a leading `=`. */
+export function definedNameDisplayFormula(formula: string): string {
+  return formula && !formula.startsWith('=') ? `=${formula}` : formula;
+}
+
 /** Snapshot workbook- and sheet-scoped defined names into a stable array. */
 export function listDefinedNames(wb: WorkbookHandle): DefinedNameEntry[] {
   return [...wb.definedNames()];
@@ -180,7 +185,9 @@ export function upsertDefinedName(
   // Defining/redefining a name changes what `=MyRange` resolves to — recompute
   // so dependent cells and a subsequent save reflect the new target.
   wb.recalcAuto();
-  return { ok: true, entry: { name: trimmedName, formula: trimmedFormula, localSheetId } };
+  // The engine stores the formula without its leading `=`, as `definedNames()` reads it back.
+  const stored = trimmedFormula.replace(/^=/, '');
+  return { ok: true, entry: { name: trimmedName, formula: stored, localSheetId } };
 }
 
 /** Remove a workbook- or sheet-scoped defined name. */
