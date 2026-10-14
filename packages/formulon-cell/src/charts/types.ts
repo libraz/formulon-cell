@@ -19,6 +19,10 @@ export type ChartTableCell = number | string | boolean | null;
 export interface ChartAxisSpec {
   /** Hide the axis line, labels, and title while allowing gridlines independently. */
   readonly visible?: boolean;
+  /** Finite logarithmic base from 2 through 1000; unsupported values stay linear. */
+  readonly logBase?: number;
+  /** Position axis labels relative to the physical axis edge or crossing line. */
+  readonly labelPosition?: 'nextTo' | 'low' | 'high' | 'none';
   /** Reverse the visual order of this axis while retaining ascending numeric ticks. */
   readonly reverseOrder?: boolean;
   /**

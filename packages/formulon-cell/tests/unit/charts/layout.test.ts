@@ -5,7 +5,12 @@ import {
   defaultChartLabelPosition,
   resolveChartLabelPosition,
 } from '../../../src/charts/label-options.js';
-import type { ChartAxisSpec, ChartData, ChartSpec } from '../../../src/charts/types.js';
+import type {
+  ChartAxisSpec,
+  ChartData,
+  ChartPrimitive,
+  ChartSpec,
+} from '../../../src/charts/types.js';
 
 const sceneFor = (spec: ChartSpec, data: ChartData) =>
   layoutChart({ spec, data, width: 320, height: 132 });
@@ -3039,6 +3044,878 @@ describe('layoutChart', () => {
     }
   });
 
+  it('positions axis labels additively while preserving legacy and mark identities', () => {
+    const data: ChartData = {
+      domain: 'category',
+      categories: ['A', 'B'],
+      categoryIds: ['category-a', 'category-b'],
+      series: [{ id: 'series-a', values: [1, 2] }],
+    };
+    const baseline = sceneFor({ kind: 'column' }, data);
+    const explicitLow = sceneFor(
+      { kind: 'column', xAxis: { labelPosition: 'low' }, yAxis: { labelPosition: 'low' } },
+      data,
+    );
+    const invalid = sceneFor(
+      {
+        kind: 'column',
+        xAxis: { labelPosition: 'runtime-invalid' as never },
+        yAxis: { labelPosition: 17 as never },
+      },
+      data,
+    );
+    expect(explicitLow).toEqual(baseline);
+    expect(invalid).toEqual(baseline);
+
+    const high = sceneFor(
+      { kind: 'column', xAxis: { labelPosition: 'high' }, yAxis: { labelPosition: 'high' } },
+      data,
+    );
+    const highXLabels = high.elements.filter(
+      (element) => element.role === 'category-label' && element.attrs['data-chart-axis'] === 'x',
+    );
+    const highYLabels = high.elements.filter(
+      (element) => element.role === 'axis-label' && element.attrs['data-chart-axis'] === 'y',
+    );
+    expect(highXLabels.length).toBe(2);
+    expect(highXLabels.every((label) => label.attrs.y === high.plot.y - 4)).toBe(true);
+    expect(highYLabels.length).toBeGreaterThan(0);
+    expect(highYLabels.every((label) => label.attrs.x === high.plot.x + high.plot.width + 4)).toBe(
+      true,
+    );
+    expect(highYLabels.every((label) => label.attrs['text-anchor'] === 'start')).toBe(true);
+    expect(
+      high.elements
+        .filter((element) => element.role === 'bar')
+        .map((element) => [element.seriesId, element.pointId]),
+    ).toEqual(
+      baseline.elements
+        .filter((element) => element.role === 'bar')
+        .map((element) => [element.seriesId, element.pointId]),
+    );
+
+    const none = sceneFor(
+      { kind: 'column', xAxis: { labelPosition: 'none' }, yAxis: { labelPosition: 'none' } },
+      data,
+    );
+    expect(none.plot).toEqual(baseline.plot);
+    expect(
+      none.elements.filter((element) =>
+        ['axis-label', 'category-label'].includes(String(element.role)),
+      ),
+    ).toHaveLength(0);
+    expect(
+      none.elements.filter(
+        (element) => !['axis-label', 'category-label'].includes(String(element.role)),
+      ),
+    ).toEqual(
+      baseline.elements.filter(
+        (element) => !['axis-label', 'category-label'].includes(String(element.role)),
+      ),
+    );
+  });
+
+  it('keeps next-to labels beside the actual crossing lines and retains controllers', () => {
+    const data: ChartData = {
+      domain: 'category',
+      categories: ['A', 'B'],
+      series: [{ id: 'series-a', values: [1, 2] }],
+    };
+    const scene = sceneFor(
+      {
+        kind: 'column',
+        xAxis: { crossing: 'max', labelPosition: 'nextTo' },
+        yAxis: { crossing: 'max', labelPosition: 'nextTo' },
+      },
+      data,
+    );
+    const xAxisLine = scene.elements.find(
+      (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'x',
+    );
+    const yAxisLine = scene.elements.find(
+      (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'y',
+    );
+    expect(xAxisLine).toBeDefined();
+    expect(yAxisLine).toBeDefined();
+    const xLabels = scene.elements.filter(
+      (element) => element.role === 'category-label' && element.attrs['data-chart-axis'] === 'x',
+    );
+    const yLabels = scene.elements.filter(
+      (element) => element.role === 'axis-label' && element.attrs['data-chart-axis'] === 'y',
+    );
+    expect(xLabels.every((label) => label.attrs.y === Number(xAxisLine?.attrs.y1) + 12)).toBe(true);
+    expect(yLabels.every((label) => label.attrs.x === Number(yAxisLine?.attrs.x1) - 2)).toBe(true);
+
+    const hiddenController = sceneFor(
+      { kind: 'column', xAxis: { visible: false, labelPosition: 'nextTo' } },
+      data,
+    );
+    expect(
+      hiddenController.elements.some(
+        (element) => element.role === 'axis-tick' && element.attrs['data-chart-axis'] === 'y',
+      ),
+    ).toBe(true);
+    expect(
+      hiddenController.elements.some(
+        (element) => element.role === 'category-label' && element.attrs['data-chart-axis'] === 'x',
+      ),
+    ).toBe(false);
+
+    const circularBaseline = sceneFor({ kind: 'pie' }, data);
+    for (const labelPosition of ['nextTo', 'high', 'none'] as const) {
+      expect(
+        sceneFor({ kind: 'pie', xAxis: { labelPosition }, yAxis: { labelPosition } }, data),
+      ).toEqual(circularBaseline);
+    }
+  });
+
+  it('reserves high label lanes for titles and separates right legends from bounded labels', () => {
+    const data: ChartData = {
+      domain: 'category',
+      categories: ['非常に長いカテゴリラベル一', '非常に長いカテゴリラベル二'],
+      series: [{ id: 'series-a', name: 'Series', values: [1, 2] }],
+    };
+    const title = sceneAt(
+      { kind: 'column', title: 'Chart title', xAxis: { labelPosition: 'high' } },
+      data,
+      240,
+      132,
+    );
+    expect(title.plot.y).toBeGreaterThanOrEqual(34);
+    const topLegend = sceneAt(
+      {
+        kind: 'column',
+        legend: { visible: true, position: 'top' },
+        xAxis: { labelPosition: 'high' },
+      },
+      data,
+      240,
+      132,
+    );
+    expect(topLegend.plot.y).toBeGreaterThanOrEqual(34);
+
+    const rightLegend = sceneAt(
+      {
+        kind: 'bar',
+        legend: { visible: true, position: 'right' },
+        yAxis: { labelPosition: 'high' },
+      },
+      data,
+      240,
+      132,
+    );
+    const categoryLabels = rightLegend.elements.filter(
+      (element) => element.role === 'category-label' && element.attrs['data-chart-axis'] === 'y',
+    );
+    expect(categoryLabels).toHaveLength(2);
+    expect(categoryLabels.every((label) => label.attrs['aria-label'])).toBe(true);
+    const legendRects = rightLegend.elements.filter(
+      (element) => element.role === 'legend' && element.tag === 'rect',
+    );
+    expect(legendRects.length).toBeGreaterThan(0);
+    const labelRight = Math.max(
+      ...categoryLabels.map(
+        (label) =>
+          Number(label.attrs.x) +
+          Array.from(String(label.text ?? '')).reduce(
+            (width, character) => width + (character === '…' ? 8.2 : 10),
+            0,
+          ),
+      ),
+    );
+    expect(Math.min(...legendRects.map((legend) => Number(legend.attrs.x))) > labelRight).toBe(
+      true,
+    );
+    expect(
+      rightLegend.elements.every((element) =>
+        Object.values(element.attrs).every(
+          (value) => typeof value !== 'number' || Number.isFinite(value),
+        ),
+      ),
+    ).toBe(true);
+
+    const mixedData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-a',
+          points: [
+            { x: 0, y: 0 },
+            { x: 10, y: 1 },
+          ],
+        },
+      ],
+    };
+    const mixedBaseline = layoutChart({
+      spec: {
+        kind: 'scatter',
+        xAxis: { min: 0, max: 10, majorUnit: 5, numberFormat: 'long-x' },
+        yAxis: { min: 0, max: 1, majorUnit: 1 },
+      },
+      data: mixedData,
+      width: 320,
+      height: 132,
+      formatValue: (value, code) => `${code}:${value}:a-long-x-axis-label`,
+    });
+    const mixedHighY = layoutChart({
+      spec: {
+        kind: 'scatter',
+        xAxis: { min: 0, max: 10, majorUnit: 5, numberFormat: 'long-x' },
+        yAxis: { min: 0, max: 1, majorUnit: 1, labelPosition: 'high' },
+      },
+      data: mixedData,
+      width: 320,
+      height: 132,
+      formatValue: (value, code) => `${code}:${value}:a-long-x-axis-label`,
+    });
+    const xLabelTexts = (scene: ReturnType<typeof sceneFor>) =>
+      scene.elements
+        .filter(
+          (element) => element.role === 'axis-label' && element.attrs['data-chart-axis'] === 'x',
+        )
+        .map((element) => [element.text, element.attrs['aria-label']]);
+    expect(xLabelTexts(mixedHighY)).toEqual(xLabelTexts(mixedBaseline));
+
+    const highYTitle = sceneAt(
+      {
+        kind: 'bar',
+        legend: { visible: true, position: 'left' },
+        yAxis: { labelPosition: 'high', title: 'Categories' },
+      },
+      data,
+      240,
+      132,
+    );
+    const yTitle = highYTitle.elements.find(
+      (element) => element.role === 'axis-title' && element.attrs['data-chart-axis'] === 'y',
+    );
+    expect(Number(yTitle?.attrs.x)).toBeGreaterThanOrEqual(12);
+    expect(Number(yTitle?.attrs.x)).toBeLessThan(highYTitle.plot.x);
+  });
+
+  it('covers the approved 31-row axis-position pairwise matrix analytically', () => {
+    const rows = [
+      ['area', 'low', 'default', 'max', true, false],
+      ['area', 'high', 'high', 'custom', false, true],
+      ['column', 'nextTo', 'low', 'max', false, false],
+      ['scatter', 'none', 'none', 'min', false, false],
+      ['bar', 'low', 'nextTo', 'min', false, true],
+      ['column', 'high', 'none', 'min', true, true],
+      ['scatter', 'default', 'low', 'custom', true, true],
+      ['line', 'default', 'nextTo', 'custom', false, false],
+      ['bar', 'none', 'high', 'max', true, true],
+      ['line', 'nextTo', 'default', 'min', true, true],
+      ['area', 'low', 'low', 'min', false, true],
+      ['bar', 'nextTo', 'none', 'custom', true, true],
+      ['column', 'none', 'nextTo', 'custom', true, false],
+      ['line', 'none', 'low', 'custom', false, true],
+      ['bar', 'high', 'default', 'custom', true, false],
+      ['column', 'low', 'high', 'min', false, false],
+      ['column', 'default', 'default', 'max', false, true],
+      ['scatter', 'high', 'nextTo', 'max', false, true],
+      ['line', 'low', 'none', 'max', false, true],
+      ['scatter', 'low', 'high', 'custom', true, false],
+      ['scatter', 'nextTo', 'default', 'max', false, false],
+      ['area', 'none', 'default', 'min', true, true],
+      ['scatter', 'default', 'high', 'max', true, false],
+      ['area', 'nextTo', 'nextTo', 'max', true, true],
+      ['line', 'default', 'none', 'min', false, false],
+      ['line', 'high', 'high', 'custom', true, false],
+      ['bar', 'default', 'default', 'max', false, true],
+      ['bar', 'high', 'low', 'custom', true, true],
+      ['area', 'default', 'high', 'min', true, true],
+      ['area', 'high', 'none', 'custom', false, false],
+      ['column', 'nextTo', 'high', 'custom', false, true],
+    ] as const;
+    expect(rows).toHaveLength(31);
+
+    const categoryData: ChartData = {
+      domain: 'category',
+      categories: ['A', 'B', 'C'],
+      categoryIds: ['a', 'b', 'c'],
+      series: [{ id: 'series-a', name: 'Series', values: [-4, 10, 7] }],
+    };
+    const scatterData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-a',
+          name: 'Series',
+          points: [
+            { id: 'p-a', x: -4, y: 2 },
+            { id: 'p-b', x: 10, y: -3 },
+            { id: 'p-c', x: 7, y: 5 },
+          ],
+        },
+      ],
+    };
+    const baseAxis = (axis: ChartAxisSpec): ChartAxisSpec => {
+      const { labelPosition: _labelPosition, ...withoutPosition } = axis;
+      return withoutPosition;
+    };
+    const axisFor = (
+      kind: ChartSpec['kind'],
+      axis: 'x' | 'y',
+      position: (typeof rows)[number][1],
+      reverseOrder: boolean,
+      crossingMode: (typeof rows)[number][3],
+    ): ChartAxisSpec => {
+      const numeric = kind === 'scatter' || (axis === 'x' ? kind === 'bar' : kind !== 'bar');
+      const crossing = crossingMode === 'custom' ? (numeric ? 2.5 : 2) : crossingMode;
+      return {
+        min: -10,
+        max: 10,
+        reverseOrder,
+        crossing,
+        ...(position === 'default' ? {} : { labelPosition: position }),
+      };
+    };
+    const labelsFor = (scene: ReturnType<typeof sceneFor>, axis: 'x' | 'y') =>
+      scene.elements.filter(
+        (element) =>
+          (element.role === 'axis-label' || element.role === 'category-label') &&
+          element.attrs['data-chart-axis'] === axis,
+      );
+    const marksFor = (scene: ReturnType<typeof sceneFor>) =>
+      scene.elements.filter((element) => element.role === 'bar' || element.role === 'point');
+    const normalized = (
+      scene: ReturnType<typeof sceneFor>,
+      mark: ChartPrimitive,
+      coordinate: 'x' | 'y',
+    ): number => {
+      const value = Number(
+        mark.attrs[
+          coordinate === 'x'
+            ? mark.tag === 'circle'
+              ? 'cx'
+              : 'x'
+            : mark.tag === 'circle'
+              ? 'cy'
+              : 'y'
+        ],
+      );
+      return coordinate === 'x'
+        ? (value - scene.plot.x) / scene.plot.width
+        : (value - scene.plot.y) / scene.plot.height;
+    };
+
+    for (const [kind, labelX, labelY, crossingMode, reverseX, reverseY] of rows) {
+      const xAxis = axisFor(kind, 'x', labelX, reverseX, crossingMode);
+      const yAxis = axisFor(kind, 'y', labelY, reverseY, crossingMode);
+      const spec: ChartSpec = {
+        kind,
+        scatterStyle: 'lineMarker',
+        legend: { visible: false },
+        xAxis,
+        yAxis,
+      };
+      const data = kind === 'scatter' ? scatterData : categoryData;
+      const scene = sceneAt(spec, data, 420, 180);
+      const baselineSpec: ChartSpec = {
+        ...spec,
+        xAxis: baseAxis(xAxis),
+        yAxis: baseAxis(yAxis),
+      };
+      const baseline = sceneAt(baselineSpec, data, 420, 180);
+      if (labelX === 'default' || labelX === 'low') {
+        expect(sceneAt({ ...spec, xAxis: baseAxis(xAxis) }, data, 420, 180)).toEqual(scene);
+      }
+      if (labelY === 'default' || labelY === 'low') {
+        expect(sceneAt({ ...spec, yAxis: baseAxis(yAxis) }, data, 420, 180)).toEqual(scene);
+      }
+
+      const xLine = scene.elements.find(
+        (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'x',
+      );
+      const yLine = scene.elements.find(
+        (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'y',
+      );
+      expect(xLine).toBeDefined();
+      expect(yLine).toBeDefined();
+      for (const [axis, position] of [
+        ['x', labelX],
+        ['y', labelY],
+      ] as const) {
+        const actual = labelsFor(scene, axis);
+        const expectedCount = labelsFor(baseline, axis).length;
+        if (position === 'none') {
+          expect(actual).toHaveLength(0);
+          continue;
+        }
+        expect(actual).toHaveLength(expectedCount);
+        for (const label of actual) {
+          if (axis === 'x') {
+            const expectedY =
+              position === 'high'
+                ? scene.plot.y - 4
+                : position === 'nextTo'
+                  ? Number(xLine?.attrs.y1) + 12
+                  : scene.plot.y + scene.plot.height + 12;
+            expect(Number(label.attrs.y)).toBeCloseTo(expectedY);
+          } else {
+            const offset = kind === 'bar' ? 4 : 2;
+            const expectedX =
+              position === 'high'
+                ? scene.plot.x + scene.plot.width + 4
+                : position === 'nextTo'
+                  ? Number(yLine?.attrs.x1) - offset
+                  : scene.plot.x - offset;
+            expect(Number(label.attrs.x)).toBeCloseTo(expectedX);
+            expect(label.attrs['text-anchor']).toBe(position === 'high' ? 'start' : 'end');
+          }
+        }
+      }
+
+      const marks = marksFor(scene);
+      const baselineMarks = marksFor(baseline);
+      expect(marks).toHaveLength(baselineMarks.length);
+      marks.forEach((mark, index) => {
+        const baselineMark = baselineMarks[index];
+        if (!baselineMark) throw new Error(`missing baseline mark at index ${index}`);
+        expect([mark.seriesId, mark.pointId, mark.attrs.fill]).toEqual([
+          baselineMark.seriesId,
+          baselineMark.pointId,
+          baselineMark.attrs.fill,
+        ]);
+        expect(normalized(scene, mark, 'x')).toBeCloseTo(
+          normalized(baseline, baselineMark, 'x'),
+          6,
+        );
+        expect(normalized(scene, mark, 'y')).toBeCloseTo(
+          normalized(baseline, baselineMark, 'y'),
+          6,
+        );
+      });
+    }
+  });
+
   // Category crossings intentionally address visible ordinal bands by number;
   // this module has no ID-valued axis-position API for an individual category.
+
+  it('projects scatter points and axes in log space while keeping reversal and crossings finite', () => {
+    const data: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-a',
+          points: [
+            { id: 'p1', x: 1, y: 1 },
+            { id: 'p2', x: 10, y: 10 },
+            { id: 'p3', x: 100, y: 100 },
+          ],
+        },
+      ],
+    };
+    const scene = sceneAt(
+      {
+        kind: 'scatter',
+        legend: { visible: false },
+        xAxis: { logBase: 10, reverseOrder: true, crossing: 10 },
+        yAxis: { logBase: 10, reverseOrder: true, crossing: 10 },
+      },
+      data,
+      420,
+      180,
+    );
+    const points = scene.elements.filter((element) => element.role === 'point');
+    expect(points).toHaveLength(3);
+    const x = points.map((point) => Number(point.attrs.cx));
+    const y = points.map((point) => Number(point.attrs.cy));
+    expect(x[0]).toBeCloseTo(scene.plot.x + scene.plot.width);
+    expect(x[1]).toBeCloseTo(scene.plot.x + scene.plot.width / 2);
+    expect(x[2]).toBeCloseTo(scene.plot.x);
+    expect(y[0]).toBeCloseTo(scene.plot.y);
+    expect(y[1]).toBeCloseTo(scene.plot.y + scene.plot.height / 2);
+    expect(y[2]).toBeCloseTo(scene.plot.y + scene.plot.height);
+    expect(
+      scene.elements
+        .filter((element) => element.role === 'axis-label')
+        .map((element) => element.text),
+    ).toEqual(expect.arrayContaining(['1', '10', '100']));
+    const axes = scene.elements.filter((element) => element.role === 'axis');
+    expect(
+      axes.every((axis) =>
+        Object.values(axis.attrs).every(
+          (value) => typeof value !== 'number' || Number.isFinite(value),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it('skips non-positive category values and uses the positive domain minimum as baseline', () => {
+    const data: ChartData = {
+      domain: 'category',
+      categories: ['one', 'zero', 'negative', 'ten', 'nan'],
+      categoryIds: ['one', 'zero', 'negative', 'ten', 'nan'],
+      series: [{ id: 'series-a', values: [1, 0, -2, 10, Number.NaN] }],
+    };
+    const scene = sceneAt(
+      {
+        kind: 'column',
+        legend: { visible: false },
+        yAxis: { logBase: 10 },
+        dataLabels: { visible: true, showValue: true },
+      },
+      data,
+      420,
+      180,
+    );
+    const bars = scene.elements.filter((element) => element.role === 'bar');
+    expect(bars).toHaveLength(2);
+    expect(bars.map((bar) => bar.pointId)).toEqual(['one', 'ten']);
+    expect(Number(bars[0]?.attrs.height)).toBeCloseTo(0);
+    expect(Number(bars[1]?.attrs.height)).toBeGreaterThan(0);
+    expect(
+      scene.elements
+        .filter((element) => element.role === 'data-label')
+        .map((element) => element.pointId),
+    ).toEqual(['one', 'ten']);
+    expect(scene.elements.some((element) => element.role === 'empty')).toBe(false);
+  });
+
+  it('keeps clustered log lines positive and breaks span runs at invalid values', () => {
+    const data: ChartData = {
+      domain: 'category',
+      categories: ['a', 'b', 'blank', 'c', 'zero', 'd', 'nan', 'e', 'f'],
+      series: [{ id: 'series-a', values: [1, 2, null, 3, 0, 4, Number.NaN, 5, 6] }],
+    };
+    const scene = sceneFor({ kind: 'line', emptyCells: 'span', yAxis: { logBase: 10 } }, data);
+    const lines = scene.elements.filter((element) => element.role === 'line');
+    const points = scene.elements.filter((element) => element.role === 'point');
+    expect(lines).toHaveLength(2);
+    expect(points).toHaveLength(6);
+    expect(
+      scene.elements.every((element) =>
+        Object.values(element.attrs).every(
+          (value) => typeof value !== 'number' || Number.isFinite(value),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it('uses pair eligibility for mixed log-linear scatter axes and hard-breaks invalid coordinates', () => {
+    const data: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-a',
+          points: [
+            { id: 'p1', x: 1, y: 1 },
+            { id: 'p2', x: 10, y: 10 },
+            { id: 'bad', x: 0, y: null },
+            { id: 'p3', x: 100, y: 100 },
+          ],
+        },
+      ],
+    };
+    const scene = sceneAt(
+      {
+        kind: 'scatter',
+        scatterStyle: 'lineMarker',
+        emptyCells: 'span',
+        legend: { visible: false },
+        xAxis: { logBase: 10 },
+      },
+      data,
+      420,
+      180,
+    );
+    const points = scene.elements.filter((element) => element.role === 'point');
+    expect(points.map((point) => point.pointId)).toEqual(['p1', 'p2', 'p3']);
+    expect(scene.elements.filter((element) => element.role === 'line')).toHaveLength(1);
+  });
+
+  it('keeps mixed-axis scatter data labels aligned with marker pair eligibility', () => {
+    const yLinearData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-a',
+          points: [
+            { id: 'inside', x: 2, y: 50 },
+            { id: 'outside-y', x: 2, y: 200 },
+          ],
+        },
+      ],
+    };
+    const xLogScene = sceneAt(
+      {
+        kind: 'scatter',
+        legend: { visible: false },
+        dataLabels: { visible: true, showValue: true },
+        xAxis: { logBase: 10, min: 1, max: 10 },
+        yAxis: { min: 0, max: 100 },
+      },
+      yLinearData,
+      420,
+      180,
+    );
+    expect(
+      xLogScene.elements.filter((element) => element.role === 'point').map((e) => e.pointId),
+    ).toEqual(['inside']);
+    expect(
+      xLogScene.elements.filter((element) => element.role === 'data-label').map((e) => e.pointId),
+    ).toEqual(['inside']);
+
+    const xLinearData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-a',
+          points: [
+            { id: 'inside', x: 50, y: 2 },
+            { id: 'outside-x', x: 200, y: 2 },
+          ],
+        },
+      ],
+    };
+    const yLogScene = sceneAt(
+      {
+        kind: 'scatter',
+        legend: { visible: false },
+        dataLabels: { visible: true, showValue: true },
+        xAxis: { min: 0, max: 100 },
+        yAxis: { logBase: 10, min: 1, max: 10 },
+      },
+      xLinearData,
+      420,
+      180,
+    );
+    expect(
+      yLogScene.elements.filter((element) => element.role === 'point').map((e) => e.pointId),
+    ).toEqual(['inside']);
+    expect(
+      yLogScene.elements.filter((element) => element.role === 'data-label').map((e) => e.pointId),
+    ).toEqual(['inside']);
+  });
+
+  it('covers the approved 22-row clustered log matrix analytically', () => {
+    const rows = [
+      ['bar', 10, true, 'custom', 'nextTo'],
+      ['column', 1000, false, 'custom', 'none'],
+      ['line', 2, false, 'max', 'nextTo'],
+      ['area', 2, true, 'auto', 'none'],
+      ['area', 10, false, 'min', 'low'],
+      ['scatter', 1000, true, 'min', 'nextTo'],
+      ['bar', 2, false, 'min', 'high'],
+      ['bar', 1000, true, 'max', 'low'],
+      ['column', 10, true, 'max', 'high'],
+      ['column', 2, true, 'min', 'low'],
+      ['scatter', 10, false, 'min', 'none'],
+      ['area', 1000, true, 'max', 'high'],
+      ['line', 2, true, 'custom', 'low'],
+      ['line', 10, false, 'auto', 'high'],
+      ['scatter', 2, true, 'custom', 'high'],
+      ['column', 10, false, 'auto', 'nextTo'],
+      ['bar', 1000, true, 'auto', 'none'],
+      ['scatter', 2, true, 'auto', 'low'],
+      ['line', 1000, true, 'max', 'none'],
+      ['area', 10, false, 'custom', 'nextTo'],
+      ['line', 1000, true, 'min', 'low'],
+      ['scatter', 1000, false, 'max', 'high'],
+    ] as const;
+    expect(rows).toHaveLength(22);
+
+    const categoryData: ChartData = {
+      domain: 'category',
+      categories: ['A', 'B', 'C'],
+      categoryIds: ['a', 'b', 'c'],
+      series: [{ id: 'series-a', values: [1, 10, 100] }],
+    };
+    const scatterData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-a',
+          points: [
+            { id: 'p-a', x: 1, y: 1 },
+            { id: 'p-b', x: 10, y: 10 },
+            { id: 'p-c', x: 100, y: 100 },
+          ],
+        },
+      ],
+    };
+    const labelPositions = ['default', 'low', 'high', 'nextTo', 'none'] as const;
+    type MatrixLabelPosition = (typeof labelPositions)[number];
+    const axisFor = (
+      kind: ChartSpec['kind'],
+      axis: 'x' | 'y',
+      base: number,
+      reverse: boolean,
+      crossingMode: (typeof rows)[number][3],
+      labelPosition: MatrixLabelPosition,
+    ): ChartAxisSpec => {
+      const numeric = kind === 'scatter' || (kind === 'bar' ? axis === 'x' : axis === 'y');
+      return {
+        ...(numeric ? { logBase: base } : {}),
+        reverseOrder: reverse,
+        crossing: crossingMode === 'custom' ? 10 : crossingMode,
+        ...(labelPosition === 'default' ? {} : { labelPosition }),
+      };
+    };
+    const numericMaximum = (base: number): number => (base === 2 ? 128 : base === 10 ? 100 : base);
+    const logFraction = (value: number, base: number): number =>
+      Math.log(value) / Math.log(numericMaximum(base));
+    const pointCoordinate = (mark: ChartPrimitive, coordinate: 'x' | 'y'): number =>
+      Number(
+        mark.attrs[
+          coordinate === 'x'
+            ? mark.tag === 'circle'
+              ? 'cx'
+              : 'x'
+            : mark.tag === 'circle'
+              ? 'cy'
+              : 'y'
+        ],
+      );
+    const withoutLog = (axis: ChartAxisSpec): ChartAxisSpec => {
+      const { logBase: _logBase, ...legacyAxis } = axis;
+      return legacyAxis;
+    };
+
+    for (const [kind, base, reverse, crossingMode, labelPosition] of rows) {
+      const xAxis = axisFor(kind, 'x', base, reverse, crossingMode, labelPosition);
+      const yAxis = axisFor(kind, 'y', base, reverse, crossingMode, labelPosition);
+      const spec: ChartSpec = {
+        kind,
+        legend: { visible: false },
+        dataLabels: { visible: true, showValue: true },
+        xAxis,
+        yAxis,
+      };
+      const data = kind === 'scatter' ? scatterData : categoryData;
+      const scene = sceneAt(spec, data, 420, 180);
+      const marks = scene.elements.filter(
+        (element) =>
+          (element.role === 'bar' || element.role === 'point') && element.pointId !== undefined,
+      );
+      expect(marks.map((mark) => mark.pointId)).toEqual(
+        kind === 'scatter' ? ['p-a', 'p-b', 'p-c'] : ['a', 'b', 'c'],
+      );
+      const values = [1, 10, 100];
+      for (const [index, value] of values.entries()) {
+        const mark = marks[index];
+        if (!mark) throw new Error(`missing matrix mark ${kind}/${base}/${index}`);
+        const fraction = logFraction(value, base);
+        if (kind === 'bar') {
+          const end = reverse
+            ? Number(mark.attrs.x)
+            : Number(mark.attrs.x) + Number(mark.attrs.width);
+          expect((end - scene.plot.x) / scene.plot.width).toBeCloseTo(
+            reverse ? 1 - fraction : fraction,
+            6,
+          );
+        } else if (kind === 'scatter') {
+          const x = pointCoordinate(mark, 'x');
+          const y = pointCoordinate(mark, 'y');
+          expect((x - scene.plot.x) / scene.plot.width).toBeCloseTo(
+            reverse ? 1 - fraction : fraction,
+            6,
+          );
+          expect((y - scene.plot.y) / scene.plot.height).toBeCloseTo(
+            reverse ? fraction : 1 - fraction,
+            6,
+          );
+        } else {
+          const end = reverse
+            ? Number(mark.attrs.y) + Number(mark.attrs.height)
+            : Number(mark.attrs.y);
+          const y = mark.role === 'bar' ? end : pointCoordinate(mark, 'y');
+          expect((y - scene.plot.y) / scene.plot.height).toBeCloseTo(
+            reverse ? fraction : 1 - fraction,
+            6,
+          );
+        }
+      }
+
+      const labels = scene.elements.filter(
+        (element) => element.role === 'data-label' && element.pointId !== undefined,
+      );
+      expect(labels.map((label) => label.pointId)).toEqual(
+        kind === 'scatter' ? ['p-a', 'p-b', 'p-c'] : ['a', 'b', 'c'],
+      );
+      const axisLabels = scene.elements.filter(
+        (element) =>
+          (element.role === 'axis-label' || element.role === 'category-label') &&
+          element.attrs['data-chart-axis'] !== undefined,
+      );
+      if (labelPosition === 'none') expect(axisLabels).toHaveLength(0);
+      else expect(axisLabels.length).toBeGreaterThan(0);
+      expect(
+        scene.elements.every((element) =>
+          Object.values(element.attrs).every(
+            (attribute) => typeof attribute !== 'number' || Number.isFinite(attribute),
+          ),
+        ),
+      ).toBe(true);
+
+      const crossingFraction =
+        crossingMode === 'max' ? 1 : crossingMode === 'custom' ? logFraction(10, base) : 0;
+      if (kind === 'bar') {
+        const line = scene.elements.find(
+          (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'y',
+        );
+        expect(Number(line?.attrs.x1)).toBeCloseTo(
+          scene.plot.x + scene.plot.width * (reverse ? 1 - crossingFraction : crossingFraction),
+          6,
+        );
+      } else if (kind === 'scatter') {
+        const xLine = scene.elements.find(
+          (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'y',
+        );
+        const yLine = scene.elements.find(
+          (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'x',
+        );
+        expect(Number(xLine?.attrs.x1)).toBeCloseTo(
+          scene.plot.x + scene.plot.width * (reverse ? 1 - crossingFraction : crossingFraction),
+          6,
+        );
+        expect(Number(yLine?.attrs.y1)).toBeCloseTo(
+          scene.plot.y + scene.plot.height * (reverse ? crossingFraction : 1 - crossingFraction),
+          6,
+        );
+      } else {
+        const line = scene.elements.find(
+          (element) => element.role === 'axis' && element.attrs['data-chart-axis'] === 'x',
+        );
+        expect(Number(line?.attrs.y1)).toBeCloseTo(
+          scene.plot.y + scene.plot.height * (reverse ? crossingFraction : 1 - crossingFraction),
+          6,
+        );
+      }
+
+      const invalidSpec: ChartSpec = {
+        ...spec,
+        xAxis: { ...xAxis, ...(xAxis.logBase === undefined ? {} : { logBase: 1 }) },
+        yAxis: { ...yAxis, ...(yAxis.logBase === undefined ? {} : { logBase: 1 }) },
+      };
+      const legacySpec: ChartSpec = {
+        ...spec,
+        xAxis: withoutLog(xAxis),
+        yAxis: withoutLog(yAxis),
+      };
+      expect(sceneAt(invalidSpec, data, 420, 180)).toEqual(sceneAt(legacySpec, data, 420, 180));
+    }
+    expect(new Set(rows.map((row) => row[4]))).toEqual(new Set(labelPositions.slice(1)));
+  });
+
+  it('leaves stacked and invalid log settings on the exact legacy linear layout', () => {
+    const category: ChartData = {
+      domain: 'category',
+      categories: ['A', 'B'],
+      series: [
+        { id: 'a', values: [1, 10] },
+        { id: 'b', values: [2, 20] },
+      ],
+    };
+    expect(
+      sceneFor({ kind: 'column', grouping: 'stacked', yAxis: { logBase: 10 } }, category),
+    ).toEqual(sceneFor({ kind: 'column', grouping: 'stacked' }, category));
+    expect(sceneFor({ kind: 'column', yAxis: { logBase: 1 } }, category)).toEqual(
+      sceneFor({ kind: 'column' }, category),
+    );
+    expect(
+      sceneFor({ kind: 'pie', xAxis: { logBase: 10 }, yAxis: { logBase: 10 } }, category),
+    ).toEqual(sceneFor({ kind: 'pie' }, category));
+  });
 });

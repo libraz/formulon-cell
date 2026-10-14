@@ -3,6 +3,177 @@ export interface NumericDomain {
   readonly max: number;
 }
 
+/** Return a usable logarithmic base, or leave the axis on its linear path. */
+export const validateLogBase = (value: number | undefined): number | undefined =>
+  Number.isFinite(value) && (value as number) >= 2 && (value as number) <= 1000
+    ? (value as number)
+    : undefined;
+
+const positivePower = (base: number, exponent: number): number => {
+  if (!Number.isFinite(base) || base <= 1 || !Number.isFinite(exponent)) return 1;
+  const value = base ** exponent;
+  if (Number.isFinite(value) && value > 0) return value;
+  if (value === 0 || value < 0) return Number.MIN_VALUE;
+  return Number.MAX_VALUE;
+};
+
+const powerExponent = (value: number, base: number): number => {
+  const raw = Math.log(value) / Math.log(base);
+  return Number.isFinite(raw) ? raw : 0;
+};
+
+const powerBoundary = (value: number, base: number, lower: boolean): number => {
+  const exponent = powerExponent(value, base);
+  const nearestExponent = Math.round(exponent);
+  if (positivePower(base, nearestExponent) === value) {
+    return positivePower(base, nearestExponent);
+  }
+  let candidate = positivePower(base, lower ? Math.floor(exponent) : Math.ceil(exponent));
+  if (lower && candidate > value) {
+    candidate = positivePower(base, Math.floor(exponent) - 1);
+  } else if (!lower && candidate < value) {
+    candidate = positivePower(base, Math.ceil(exponent) + 1);
+  }
+  return candidate;
+};
+
+const strictPowerBoundary = (value: number, base: number, lower: boolean): number => {
+  const exponent = powerExponent(value, base);
+  const nearestExponent = Math.round(exponent);
+  if (positivePower(base, nearestExponent) === value) {
+    return positivePower(base, nearestExponent + (lower ? -1 : 1));
+  }
+  const candidate = powerBoundary(value, base, lower);
+  if ((lower && candidate < value) || (!lower && candidate > value)) return candidate;
+  return positivePower(base, Math.round(exponent) + (lower ? -1 : 1));
+};
+
+const widenedPositiveDomain = (value: number, base: number): NumericDomain => {
+  const exponent = powerExponent(value, base);
+  const nearestExponent = Math.round(exponent);
+  const exactPower = positivePower(base, nearestExponent) === value;
+  let min = exactPower
+    ? positivePower(base, nearestExponent - 1)
+    : powerBoundary(value, base, true);
+  let max = exactPower
+    ? positivePower(base, nearestExponent + 1)
+    : powerBoundary(value, base, false);
+  if (!(min < value)) min = value === Number.MIN_VALUE ? value : value / base;
+  if (!(max > value)) max = value === Number.MAX_VALUE ? value : value * base;
+  if (!(min > 0) || !Number.isFinite(min)) min = Number.MIN_VALUE;
+  if (!(max > 0) || !Number.isFinite(max)) max = Number.MAX_VALUE;
+  if (min === max) {
+    if (value < Number.MAX_VALUE) max = Math.min(Number.MAX_VALUE, value * (1 + Number.EPSILON));
+    if (min === max && value > Number.MIN_VALUE) min = value * (1 - Number.EPSILON);
+  }
+  return { min, max };
+};
+
+/**
+ * Resolve a positive domain for a logarithmic axis.
+ *
+ * Non-positive and non-finite values/bounds are ignored. Automatic bounds are
+ * expanded to surrounding powers; explicit positive bounds remain exact.
+ */
+export function resolvePositivePowerDomain(
+  values: readonly number[],
+  explicitMin: number | undefined,
+  explicitMax: number | undefined,
+  baseInput: number,
+): NumericDomain {
+  const base = validateLogBase(baseInput) ?? 10;
+  const positiveValues = values.filter((value) => Number.isFinite(value) && value > 0);
+  const hasExplicitMin = Number.isFinite(explicitMin) && (explicitMin as number) > 0;
+  const hasExplicitMax = Number.isFinite(explicitMax) && (explicitMax as number) > 0;
+
+  if (positiveValues.length === 0 && !hasExplicitMin && !hasExplicitMax) {
+    return { min: 1, max: base };
+  }
+
+  const observedMin = positiveValues.reduce(
+    (current, value) => Math.min(current, value),
+    Number.POSITIVE_INFINITY,
+  );
+  const observedMax = positiveValues.reduce(
+    (current, value) => Math.max(current, value),
+    Number.NEGATIVE_INFINITY,
+  );
+  let min = hasExplicitMin ? (explicitMin as number) : observedMin;
+  let max = hasExplicitMax ? (explicitMax as number) : observedMax;
+
+  if (hasExplicitMin && hasExplicitMax) {
+    if (min > max) [min, max] = [max, min];
+    if (min === max) return widenedPositiveDomain(min, base);
+    return { min, max };
+  }
+
+  if (!(min > 0) || !Number.isFinite(min)) {
+    min = hasExplicitMax ? (explicitMax as number) : 1;
+  }
+  if (!(max > 0) || !Number.isFinite(max)) {
+    max = hasExplicitMin ? (explicitMin as number) : base;
+  }
+
+  if (hasExplicitMin && !hasExplicitMax) {
+    if (!(max > min)) max = strictPowerBoundary(min, base, false);
+    else max = powerBoundary(max, base, false);
+  } else if (!hasExplicitMin && hasExplicitMax) {
+    if (!(min < max)) min = strictPowerBoundary(max, base, true);
+    else min = powerBoundary(min, base, true);
+  } else if (min === max) {
+    return widenedPositiveDomain(min, base);
+  } else {
+    min = powerBoundary(min, base, true);
+    max = powerBoundary(max, base, false);
+  }
+
+  if (!(min > 0) || !Number.isFinite(min)) min = Number.MIN_VALUE;
+  if (!(max > 0) || !Number.isFinite(max)) max = Number.MAX_VALUE;
+  if (min === max) {
+    if (hasExplicitMin && !hasExplicitMax) return widenedPositiveDomain(min, base);
+    if (!hasExplicitMin && hasExplicitMax) return widenedPositiveDomain(min, base);
+    return widenedPositiveDomain(min, base);
+  }
+  if (min > max) [min, max] = [max, min];
+  return { min, max };
+}
+
+/** Generate ascending base-power ticks, bounded to 101 finite values. */
+export function powerTicks(
+  minInput: number,
+  maxInput: number,
+  baseInput: number,
+): readonly number[] {
+  const base = validateLogBase(baseInput) ?? 10;
+  let min = Number.isFinite(minInput) && minInput > 0 ? minInput : 1;
+  let max = Number.isFinite(maxInput) && maxInput > 0 ? maxInput : base;
+  if (min > max) [min, max] = [max, min];
+  if (min === max) {
+    const exponent = Math.round(powerExponent(min, base));
+    return positivePower(base, exponent) === min ? [min] : [];
+  }
+
+  const lowerLog = Math.log(min) / Math.log(base);
+  const upperLog = Math.log(max) / Math.log(base);
+  if (!Number.isFinite(lowerLog) || !Number.isFinite(upperLog)) return [];
+  const tolerance = Number.EPSILON * 32 * Math.max(1, Math.abs(lowerLog), Math.abs(upperLog));
+  const first = Math.ceil(lowerLog - tolerance);
+  const last = Math.floor(upperLog + tolerance);
+  if (!Number.isFinite(first) || !Number.isFinite(last) || last < first) return [];
+
+  const count = last - first + 1;
+  const stride = count > 101 ? Math.ceil(count / 101) : 1;
+  const ticks: number[] = [];
+  for (let exponent = first; exponent <= last; exponent += stride) {
+    const tick = positivePower(base, exponent);
+    if (!(tick > 0) || !Number.isFinite(tick)) continue;
+    if (tick < min || tick > max) continue;
+    if (ticks.length === 0 || tick > (ticks[ticks.length - 1] as number)) ticks.push(tick);
+    if (ticks.length >= 101) break;
+  }
+  return ticks;
+}
+
 const finiteOr = (value: number, fallback: number): number =>
   Number.isFinite(value) ? value : fallback;
 
@@ -173,6 +344,52 @@ export function majorTicks(
     ticks.push(cleanZero(tick));
   }
   return ticks.length > 0 ? ticks : [cleanZero(lo)];
+}
+
+/**
+ * Project a positive value in log space without clamping the resulting
+ * fraction. Endpoint checks keep adjacent extreme values from collapsing to
+ * a midpoint when their natural logarithms round to the same number.
+ */
+export function unclampedLogProjection(
+  value: number,
+  domainMin: number,
+  domainMax: number,
+  rangeMin: number,
+  rangeMax: number,
+  reverse = false,
+): number {
+  const from = reverse ? rangeMax : rangeMin;
+  const to = reverse ? rangeMin : rangeMax;
+  const lo = domainMin;
+  const hi = domainMax;
+  if (
+    !Number.isFinite(value) ||
+    !(value > 0) ||
+    !Number.isFinite(lo) ||
+    !(lo > 0) ||
+    !Number.isFinite(hi) ||
+    !(hi > 0) ||
+    lo === hi
+  ) {
+    return linearScale(value, lo, hi, from, to) ?? from;
+  }
+  if (value === lo) return from;
+  if (value === hi) return to;
+  const logMin = Math.log(lo);
+  const logMax = Math.log(hi);
+  const logSpan = logMax - logMin;
+  if (!(logSpan > 0) || !Number.isFinite(logSpan)) {
+    return linearScale(value, lo, hi, from, to) ?? from;
+  }
+  const logValue = Math.log(value);
+  const fraction = (logValue - logMin) / logSpan;
+  if (!Number.isFinite(fraction)) return linearScale(value, lo, hi, from, to) ?? from;
+  const mapped = from + fraction * (to - from);
+  if (Number.isFinite(mapped)) return mapped;
+  if (fraction <= 0) return from;
+  if (fraction >= 1) return to;
+  return (from + to) / 2;
 }
 
 /** Map a finite value into a screen range without ever returning NaN/Infinity. */

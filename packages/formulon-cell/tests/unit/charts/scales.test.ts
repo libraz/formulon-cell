@@ -5,6 +5,10 @@ import {
   niceDomain,
   niceTicks,
   numericDomain,
+  powerTicks,
+  resolvePositivePowerDomain,
+  unclampedLogProjection,
+  validateLogBase,
 } from '../../../src/charts/scales.js';
 
 describe('chart scales', () => {
@@ -79,5 +83,80 @@ describe('chart scales', () => {
     expect(extreme.length).toBeGreaterThan(0);
     expect(extreme.length).toBeLessThanOrEqual(101);
     expect(extreme.every(Number.isFinite)).toBe(true);
+  });
+
+  it('resolves finite positive log domains without admitting zero or invalid bounds', () => {
+    expect(validateLogBase(2)).toBe(2);
+    expect(validateLogBase(1000)).toBe(1000);
+    expect(validateLogBase(1.99)).toBeUndefined();
+    expect(validateLogBase(Number.NaN)).toBeUndefined();
+    expect(
+      resolvePositivePowerDomain([0, -2, Number.NaN, 2, 80], undefined, undefined, 10),
+    ).toEqual({ min: 1, max: 100 });
+    expect(resolvePositivePowerDomain([], undefined, undefined, 10)).toEqual({ min: 1, max: 10 });
+    expect(resolvePositivePowerDomain([2, 80], 100, 1, 10)).toEqual({ min: 1, max: 100 });
+    expect(resolvePositivePowerDomain([10], undefined, undefined, 10)).toEqual({
+      min: 1,
+      max: 100,
+    });
+    expect(resolvePositivePowerDomain([2], undefined, undefined, 10)).toEqual({
+      min: 1,
+      max: 10,
+    });
+    expect(resolvePositivePowerDomain([10 - Number.EPSILON * 8], undefined, undefined, 10)).toEqual(
+      {
+        min: 1,
+        max: 10,
+      },
+    );
+    expect(resolvePositivePowerDomain([10 + Number.EPSILON * 8], undefined, undefined, 10)).toEqual(
+      {
+        min: 10,
+        max: 100,
+      },
+    );
+    expect(resolvePositivePowerDomain([1000, 10000], undefined, undefined, 10)).toEqual({
+      min: 1000,
+      max: 10000,
+    });
+    expect(resolvePositivePowerDomain([2], -1, Number.POSITIVE_INFINITY, 10)).toEqual({
+      min: 1,
+      max: 10,
+    });
+    expect(resolvePositivePowerDomain([1], 100, undefined, 10)).toEqual({ min: 100, max: 1000 });
+    expect(resolvePositivePowerDomain([], 1000, undefined, 10)).toEqual({ min: 1000, max: 10000 });
+    expect(resolvePositivePowerDomain([1000], undefined, 1, 10)).toEqual({ min: 0.1, max: 1 });
+    expect(resolvePositivePowerDomain([1], 1000, undefined, 10)).toEqual({
+      min: 1000,
+      max: 10000,
+    });
+    expect(resolvePositivePowerDomain([], 100, undefined, 10)).toEqual({ min: 100, max: 1000 });
+    expect(resolvePositivePowerDomain([], undefined, 1, 10)).toEqual({ min: 0.1, max: 1 });
+    const maximumBound = resolvePositivePowerDomain([], Number.MAX_VALUE, undefined, 10);
+    expect(maximumBound.min).toBeGreaterThan(0);
+    expect(maximumBound.min).toBeLessThan(maximumBound.max);
+    expect(maximumBound.max).toBe(Number.MAX_VALUE);
+    const minimumBound = resolvePositivePowerDomain([], undefined, Number.MIN_VALUE, 10);
+    expect(minimumBound.min).toBe(Number.MIN_VALUE);
+    expect(minimumBound.max).toBeGreaterThan(minimumBound.min);
+  });
+
+  it('generates bounded ascending power ticks and keeps log projection unclamped', () => {
+    const ticks = powerTicks(1, Number.MAX_VALUE, 2);
+    expect(ticks.length).toBeLessThanOrEqual(101);
+    expect(ticks.every(Number.isFinite)).toBe(true);
+    expect(ticks.every((tick, index) => index === 0 || tick > (ticks[index - 1] as number))).toBe(
+      true,
+    );
+    expect(powerTicks(1, 100, 10)).toEqual([1, 10, 100]);
+    expect(powerTicks(2, 3, 10)).toEqual([]);
+    expect(unclampedLogProjection(1, 1, 100, 20, 220)).toBe(20);
+    expect(unclampedLogProjection(100, 1, 100, 20, 220)).toBe(220);
+    expect(unclampedLogProjection(10, 1, 100, 20, 220)).toBeCloseTo(120);
+    expect(
+      Number.isFinite(
+        unclampedLogProjection(Number.MAX_VALUE, Number.MAX_VALUE / 2, Number.MAX_VALUE, 20, 220),
+      ),
+    ).toBe(true);
   });
 });

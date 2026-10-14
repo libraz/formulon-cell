@@ -2,7 +2,16 @@ import type { CategoryChartView, PreparedChartData, XYChartView } from './filter
 import { prepareChartData } from './filters.js';
 import { formatChartValue } from './format.js';
 import { resolveChartLabelPosition } from './label-options.js';
-import { formatTick, linearScale, majorTicks, niceDomain } from './scales.js';
+import {
+  formatTick,
+  linearScale,
+  majorTicks,
+  niceDomain,
+  powerTicks,
+  resolvePositivePowerDomain,
+  unclampedLogProjection,
+  validateLogBase,
+} from './scales.js';
 import { type ScatterLineSample, scatterLineSegments } from './scatter-lines.js';
 import {
   DEFAULT_PALETTE,
@@ -127,8 +136,12 @@ const dataHasValues = (
   data: ChartData,
   emptyCells: ResolvedEmptyCellMode,
   kind: ChartKind,
+  numericLogBase?: number,
+  scatterLogBases?: { readonly x?: number; readonly y?: number },
 ): boolean => {
   if (data.domain === 'category') {
+    const valueIsPlottable = (value: number | null): boolean =>
+      value !== null && Number.isFinite(value) && (numericLogBase === undefined || value > 0);
     if (kind === 'pie') {
       const first = data.series[0];
       return (
@@ -144,7 +157,8 @@ const dataHasValues = (
     return data.series.some((series) =>
       series.values.some(
         (value) =>
-          (value !== null && Number.isFinite(value)) || (value === null && emptyCells === 'zero'),
+          valueIsPlottable(value) ||
+          (value === null && emptyCells === 'zero' && numericLogBase === undefined),
       ),
     );
   }
@@ -152,7 +166,14 @@ const dataHasValues = (
     series.points.some((point) => {
       const x = point.x === null && emptyCells === 'zero' ? 0 : point.x;
       const y = point.y === null && emptyCells === 'zero' ? 0 : point.y;
-      return x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y);
+      return (
+        x !== null &&
+        y !== null &&
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        (scatterLogBases?.x === undefined || x > 0) &&
+        (scatterLogBases?.y === undefined || y > 0)
+      );
     }),
   );
 };
@@ -280,7 +301,11 @@ const axisDomain = (
   explicitMax: number | undefined,
   includeZero: boolean,
   percent: boolean,
+  logBase?: number,
 ): Domain => {
+  if (logBase !== undefined) {
+    return resolvePositivePowerDomain(values, explicitMin, explicitMax, logBase);
+  }
   const finiteValues = values.filter(Number.isFinite);
   let min = 0;
   let max = 1;
@@ -353,6 +378,37 @@ const axisDomain = (
 
 const reversedAxis = (axis: ChartAxisSpec | undefined): boolean => axis?.reverseOrder === true;
 
+const resolvedLogBase = (axis: ChartAxisSpec | undefined): number | undefined =>
+  validateLogBase(axis?.logBase);
+
+/** Numeric axes are log-capable only for the chart families with one. */
+const categoryNumericLogBase = (spec: ChartSpec, axis: 'x' | 'y'): number | undefined => {
+  if ((spec.grouping ?? 'clustered') !== 'clustered') return undefined;
+  if (axis === 'x' && spec.kind === 'bar') return resolvedLogBase(spec.xAxis);
+  if (axis === 'y' && (spec.kind === 'column' || spec.kind === 'line' || spec.kind === 'area')) {
+    return resolvedLogBase(spec.yAxis);
+  }
+  return undefined;
+};
+
+const scatterLogBases = (spec: ChartSpec): { readonly x?: number; readonly y?: number } =>
+  spec.kind === 'scatter'
+    ? {
+        x: resolvedLogBase(spec.xAxis),
+        y: resolvedLogBase(spec.yAxis),
+      }
+    : {};
+
+type ResolvedAxisLabelPosition = 'nextTo' | 'low' | 'high' | 'none';
+
+/** Invalid runtime values retain the legacy low-edge label placement. */
+const resolvedAxisLabelPosition = (axis: ChartAxisSpec | undefined): ResolvedAxisLabelPosition => {
+  const position = axis?.labelPosition;
+  return position === 'nextTo' || position === 'low' || position === 'high' || position === 'none'
+    ? position
+    : 'low';
+};
+
 const categoryIndex = (count: number, index: number, reverse: boolean): number =>
   reverse ? count - 1 - index : index;
 
@@ -383,14 +439,15 @@ const numericProjection = (
   start: number,
   end: number,
   reverse: boolean,
+  logBase?: number,
 ): number => {
   const from = reverse ? end : start;
   const to = reverse ? start : end;
-  return clamp(
-    linearScale(value, domain.min, domain.max, from, to) ?? from,
-    Math.min(start, end),
-    Math.max(start, end),
-  );
+  const projected =
+    logBase === undefined
+      ? (linearScale(value, domain.min, domain.max, from, to) ?? from)
+      : unclampedLogProjection(value, domain.min, domain.max, from, to);
+  return clamp(projected, Math.min(start, end), Math.max(start, end));
 };
 
 /**
@@ -402,11 +459,18 @@ const numericAxisCrossing = (
   axis: ChartAxisSpec | undefined,
   domain: Domain,
   scale: (value: number) => number,
+  logBase?: number,
 ): number => {
   const crossing = axis?.crossing;
   if (crossing === 'min') return scale(domain.min);
   if (crossing === 'max') return scale(domain.max);
-  if (typeof crossing === 'number' && Number.isFinite(crossing)) return scale(crossing);
+  if (
+    typeof crossing === 'number' &&
+    Number.isFinite(crossing) &&
+    (logBase === undefined || crossing > 0)
+  )
+    return scale(crossing);
+  if (logBase !== undefined) return scale(clamp(1, domain.min, domain.max));
   return scale(0);
 };
 
@@ -445,8 +509,14 @@ const axisIsVisible = (axis: ChartAxisSpec | undefined): boolean => axis?.visibl
 const axisHasGridlines = (axis: ChartAxisSpec | undefined): boolean =>
   axis?.majorGridlines !== false;
 
-const axisTicks = (domain: Domain, axis: ChartAxisSpec | undefined): readonly number[] =>
-  majorTicks(domain.min, domain.max, axis?.majorUnit);
+const axisTicks = (
+  domain: Domain,
+  axis: ChartAxisSpec | undefined,
+  logBase?: number,
+): readonly number[] =>
+  logBase === undefined
+    ? majorTicks(domain.min, domain.max, axis?.majorUnit)
+    : powerTicks(domain.min, domain.max, logBase);
 
 const axisTickLabel = (
   value: number,
@@ -512,6 +582,29 @@ const numericAxisLabel = (
     undefined,
     undefined,
     text,
+  );
+};
+
+const categoryAxisLabel = (
+  attrs: Record<string, string | number>,
+  label: string,
+  position: ResolvedAxisLabelPosition,
+  maxLabelWidth: number,
+  categoryOriginalIndex: number,
+  categoryId: string,
+): ChartPrimitive => {
+  const text = position === 'high' ? boundedAxisLabel(label, maxLabelWidth) : label;
+  return primitive(
+    'text',
+    {
+      ...attrs,
+      ...(text === label ? {} : { 'aria-label': label }),
+    },
+    'category-label',
+    undefined,
+    categoryOriginalIndex,
+    text,
+    { pointId: categoryId },
   );
 };
 
@@ -586,6 +679,9 @@ const addAxis = (
   maxLabelWidth: number,
   locale: string,
   formatter: ChartValueFormatter | undefined,
+  yAxisLabelMaxWidth = maxLabelWidth,
+  xLogBase?: number,
+  yLogBase?: number,
 ): void => {
   const horizontalCategory = kind === 'bar';
   if (isCircularKind(kind)) return;
@@ -596,18 +692,40 @@ const addAxis = (
   const yVisible = axisIsVisible(yAxis);
   const xGridlines = axisHasGridlines(xAxis);
   const yGridlines = axisHasGridlines(yAxis);
+  const xLabelPosition = resolvedAxisLabelPosition(xAxis);
+  const yLabelPosition = resolvedAxisLabelPosition(yAxis);
   const xScale = xDomain
     ? (value: number): number =>
-        numericProjection(value, xDomain, plot.x, plot.x + plot.width, reversedAxis(xAxis))
+        numericProjection(
+          value,
+          xDomain,
+          plot.x,
+          plot.x + plot.width,
+          reversedAxis(xAxis),
+          xLogBase,
+        )
     : null;
   const yScale = yDomain
     ? (value: number): number =>
-        numericProjection(value, yDomain, plot.y + plot.height, plot.y, reversedAxis(yAxis))
+        numericProjection(
+          value,
+          yDomain,
+          plot.y + plot.height,
+          plot.y,
+          reversedAxis(yAxis),
+          yLogBase,
+        )
     : null;
   const categoryReverse = horizontalCategory ? reversedAxis(yAxis) : reversedAxis(xAxis);
+  const categoryLabelMaxWidth = (axis: 'x' | 'y'): number => {
+    if (axis === 'y') return yAxisLabelMaxWidth;
+    if (xLabelPosition !== 'high') return maxLabelWidth;
+    const categoryCount = Math.max(1, xLabels.length);
+    return Math.min(maxLabelWidth, Math.max(12, plot.width / categoryCount - 4));
+  };
 
   if (horizontalCategory && xDomain && xScale) {
-    const zeroX = numericAxisCrossing(xAxis, xDomain, xScale);
+    const zeroX = numericAxisCrossing(xAxis, xDomain, xScale, xLogBase);
     const categoryY = categoryAxisCrossing(
       yAxis,
       xLabels.length,
@@ -632,7 +750,7 @@ const addAxis = (
         ),
       );
     }
-    const xTicks = axisTicks(xDomain, xAxis);
+    const xTicks = axisTicks(xDomain, xAxis, xLogBase);
     const xLabelVisibility = xVisible
       ? numericAxisLabelVisibility(
           xTicks,
@@ -664,10 +782,16 @@ const addAxis = (
           ),
         );
       }
-      if (xVisible && xLabelVisibility[index]) {
+      if (xVisible && xLabelPosition !== 'none' && xLabelVisibility[index]) {
+        const labelY =
+          xLabelPosition === 'high'
+            ? plot.y - 4
+            : xLabelPosition === 'nextTo'
+              ? categoryY + 12
+              : plot.y + plot.height + 12;
         elements.push(
           numericAxisLabel(
-            { x, y: plot.y + plot.height + 12, 'text-anchor': 'middle', 'data-chart-axis': 'x' },
+            { x, y: labelY, 'text-anchor': 'middle', 'data-chart-axis': 'x' },
             tick,
             percent,
             xAxis,
@@ -679,23 +803,30 @@ const addAxis = (
       }
     }
     if (yVisible) {
-      for (let index = 0; index < xLabels.length; index += 1) {
-        elements.push(
-          primitive(
-            'text',
-            {
-              x: plot.x - 4,
-              y: yCategory(plot, xLabels.length, index, categoryReverse) + 3,
-              'text-anchor': 'end',
-              'data-chart-axis': 'y',
-            },
-            'category-label',
-            undefined,
-            categoryOriginalIndices[index] ?? index,
-            xLabels[index],
-            { pointId: categoryIds[index] },
-          ),
-        );
+      if (yLabelPosition !== 'none') {
+        for (let index = 0; index < xLabels.length; index += 1) {
+          const labelX =
+            yLabelPosition === 'high'
+              ? plot.x + plot.width + 4
+              : yLabelPosition === 'nextTo'
+                ? zeroX - 4
+                : plot.x - 4;
+          elements.push(
+            categoryAxisLabel(
+              {
+                x: labelX,
+                y: yCategory(plot, xLabels.length, index, categoryReverse) + 3,
+                'text-anchor': yLabelPosition === 'high' ? 'start' : 'end',
+                'data-chart-axis': 'y',
+              },
+              xLabels[index] ?? '',
+              yLabelPosition,
+              categoryLabelMaxWidth('y'),
+              categoryOriginalIndices[index] ?? index,
+              categoryIds[index] ?? `category-${categoryOriginalIndices[index] ?? index}`,
+            ),
+          );
+        }
       }
       elements.push(
         primitive(
@@ -713,7 +844,7 @@ const addAxis = (
       );
     }
   } else if (!horizontalCategory && yDomain && yScale && !xDomain) {
-    const zeroY = numericAxisCrossing(yAxis, yDomain, yScale);
+    const zeroY = numericAxisCrossing(yAxis, yDomain, yScale, yLogBase);
     const categoryX = categoryAxisCrossing(
       xAxis,
       xLabels.length,
@@ -738,7 +869,7 @@ const addAxis = (
         ),
       );
     }
-    const yTicks = axisTicks(yDomain, yAxis);
+    const yTicks = axisTicks(yDomain, yAxis, yLogBase);
     const yLabelVisibility = yVisible
       ? numericAxisLabelVisibility(
           yTicks,
@@ -747,7 +878,7 @@ const addAxis = (
           yAxis,
           locale,
           formatter,
-          maxLabelWidth,
+          yAxisLabelMaxWidth,
           'vertical',
         )
       : [];
@@ -771,36 +902,53 @@ const addAxis = (
           ),
         );
       }
-      if (yVisible && yLabelVisibility[index]) {
+      if (yVisible && yLabelPosition !== 'none' && yLabelVisibility[index]) {
+        const labelX =
+          yLabelPosition === 'high'
+            ? plot.x + plot.width + 4
+            : yLabelPosition === 'nextTo'
+              ? categoryX - 2
+              : plot.x - 2;
         elements.push(
           numericAxisLabel(
-            { x: plot.x - 2, y: y + 3, 'text-anchor': 'end', 'data-chart-axis': 'y' },
+            {
+              x: labelX,
+              y: y + 3,
+              'text-anchor': yLabelPosition === 'high' ? 'start' : 'end',
+              'data-chart-axis': 'y',
+            },
             tick,
             percent,
             yAxis,
             locale,
             formatter,
-            maxLabelWidth,
+            yAxisLabelMaxWidth,
           ),
         );
       }
     }
     if (xVisible) {
       for (let index = 0; index < xLabels.length; index += 1) {
+        if (xLabelPosition === 'none') continue;
+        const labelY =
+          xLabelPosition === 'high'
+            ? plot.y - 4
+            : xLabelPosition === 'nextTo'
+              ? zeroY + 12
+              : plot.y + plot.height + 12;
         elements.push(
-          primitive(
-            'text',
+          categoryAxisLabel(
             {
               x: xCategory(plot, xLabels.length, index, categoryReverse),
-              y: plot.y + plot.height + 12,
+              y: labelY,
               'text-anchor': 'middle',
               'data-chart-axis': 'x',
             },
-            'category-label',
-            undefined,
+            xLabels[index] ?? '',
+            xLabelPosition,
+            categoryLabelMaxWidth('x'),
             categoryOriginalIndices[index] ?? index,
-            xLabels[index],
-            { pointId: categoryIds[index] },
+            categoryIds[index] ?? `category-${categoryOriginalIndices[index] ?? index}`,
           ),
         );
       }
@@ -822,8 +970,8 @@ const addAxis = (
       );
     }
   } else if (xDomain && xScale && yDomain && yScale) {
-    const zeroY = numericAxisCrossing(yAxis, yDomain, yScale);
-    const zeroX = numericAxisCrossing(xAxis, xDomain, xScale);
+    const zeroY = numericAxisCrossing(yAxis, yDomain, yScale, yLogBase);
+    const zeroX = numericAxisCrossing(xAxis, xDomain, xScale, xLogBase);
     if (xVisible) {
       elements.push(
         primitive(
@@ -856,7 +1004,7 @@ const addAxis = (
         ),
       );
     }
-    const yTicks = axisTicks(yDomain, yAxis);
+    const yTicks = axisTicks(yDomain, yAxis, yLogBase);
     const yLabelVisibility = yVisible
       ? numericAxisLabelVisibility(
           yTicks,
@@ -865,7 +1013,7 @@ const addAxis = (
           yAxis,
           locale,
           formatter,
-          maxLabelWidth,
+          yAxisLabelMaxWidth,
           'vertical',
         )
       : [];
@@ -889,21 +1037,32 @@ const addAxis = (
           ),
         );
       }
-      if (yVisible && yLabelVisibility[index]) {
+      if (yVisible && yLabelPosition !== 'none' && yLabelVisibility[index]) {
+        const labelX =
+          yLabelPosition === 'high'
+            ? plot.x + plot.width + 4
+            : yLabelPosition === 'nextTo'
+              ? zeroX - 2
+              : plot.x - 2;
         elements.push(
           numericAxisLabel(
-            { x: plot.x - 2, y: y + 3, 'text-anchor': 'end', 'data-chart-axis': 'y' },
+            {
+              x: labelX,
+              y: y + 3,
+              'text-anchor': yLabelPosition === 'high' ? 'start' : 'end',
+              'data-chart-axis': 'y',
+            },
             tick,
             percent,
             yAxis,
             locale,
             formatter,
-            maxLabelWidth,
+            yAxisLabelMaxWidth,
           ),
         );
       }
     }
-    const xTicks = axisTicks(xDomain, xAxis);
+    const xTicks = axisTicks(xDomain, xAxis, xLogBase);
     const xLabelVisibility = xVisible
       ? numericAxisLabelVisibility(
           xTicks,
@@ -935,10 +1094,16 @@ const addAxis = (
           ),
         );
       }
-      if (xVisible && xLabelVisibility[index]) {
+      if (xVisible && xLabelPosition !== 'none' && xLabelVisibility[index]) {
+        const labelY =
+          xLabelPosition === 'high'
+            ? plot.y - 4
+            : xLabelPosition === 'nextTo'
+              ? zeroY + 12
+              : plot.y + plot.height + 12;
         elements.push(
           numericAxisLabel(
-            { x, y: plot.y + plot.height + 12, 'text-anchor': 'middle', 'data-chart-axis': 'x' },
+            { x, y: labelY, 'text-anchor': 'middle', 'data-chart-axis': 'x' },
             tick,
             false,
             xAxis,
@@ -969,23 +1134,26 @@ const addAxis = (
     );
   }
   if (yVisible && yAxis?.title) {
-    const yLabelWidth = horizontalCategory
-      ? xLabels.reduce((current, label) => Math.max(current, textWidth(label)), 12)
-      : yDomain
-        ? axisTicks(yDomain, yAxis).reduce(
-            (current, tick) =>
-              Math.max(
-                current,
-                textWidth(
-                  boundedAxisLabel(
-                    axisTickLabel(tick, percent, yAxis, locale, formatter),
-                    maxLabelWidth,
+    const yLabelWidth =
+      yLabelPosition === 'high'
+        ? 12
+        : horizontalCategory
+          ? xLabels.reduce((current, label) => Math.max(current, textWidth(label)), 12)
+          : yDomain
+            ? axisTicks(yDomain, yAxis, yLogBase).reduce(
+                (current, tick) =>
+                  Math.max(
+                    current,
+                    textWidth(
+                      boundedAxisLabel(
+                        axisTickLabel(tick, percent, yAxis, locale, formatter),
+                        yAxisLabelMaxWidth,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            12,
-          )
-        : 12;
+                12,
+              )
+            : 12;
     const x = Math.max(AXIS_TITLE_MIN_X, plot.x - Math.max(28, yLabelWidth + 16));
     const y = plot.y + plot.height / 2;
     elements.push(
@@ -1169,6 +1337,7 @@ const addCategoryMarks = (
   plot: ChartScene['plot'],
   yDomain: Domain,
   palette: readonly string[],
+  numericLogBase?: number,
 ): void => {
   const data = view.data;
   const grouping = spec.grouping ?? 'clustered';
@@ -1181,9 +1350,23 @@ const addCategoryMarks = (
   const categoryReverse = isBar ? reversedAxis(spec.yAxis) : reversedAxis(spec.xAxis);
   const numericScale = (value: number): number => {
     if (isBar) {
-      return numericProjection(value, yDomain, plot.x, plot.x + plot.width, numericReverse);
+      return numericProjection(
+        value,
+        yDomain,
+        plot.x,
+        plot.x + plot.width,
+        numericReverse,
+        numericLogBase,
+      );
     }
-    return numericProjection(value, yDomain, plot.y + plot.height, plot.y, numericReverse);
+    return numericProjection(
+      value,
+      yDomain,
+      plot.y + plot.height,
+      plot.y,
+      numericReverse,
+      numericLogBase,
+    );
   };
   if (spec.kind === 'column' || spec.kind === 'bar') {
     const seriesCount = Math.max(1, data.series.length);
@@ -1195,6 +1378,11 @@ const addCategoryMarks = (
       for (let pointIndex = 0; pointIndex < data.categories.length; pointIndex += 1) {
         const segment = segments[seriesIndex]?.[pointIndex] ?? null;
         if (!segment) continue;
+        if (
+          numericLogBase !== undefined &&
+          (!(segment.value > 0) || !Number.isFinite(segment.value))
+        )
+          continue;
         const originalPointIndex = view.originalCategoryIndices[pointIndex] ?? pointIndex;
         const pointId = categoryIdAt(view, pointIndex);
         const style = resolveChartStyle(
@@ -1205,7 +1393,9 @@ const addCategoryMarks = (
           originalSeriesIndex,
           originalPointIndex,
         );
-        const valueStart = numericScale(segment.start);
+        const valueStart = numericScale(
+          numericLogBase !== undefined && !(segment.start > 0) ? yDomain.min : segment.start,
+        );
         const valueEnd = numericScale(segment.end);
         const categoryPosition = categoryIndex(count, pointIndex, categoryReverse);
         if (isBar) {
@@ -1270,17 +1460,28 @@ const addCategoryMarks = (
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     const points = Array.from({ length: data.categories.length }, (_value, pointIndex) => {
       const segment = segments[seriesIndex]?.[pointIndex] ?? null;
+      const plottableSegment =
+        segment !== null &&
+        (numericLogBase === undefined || (segment.value > 0 && Number.isFinite(segment.value)));
       return {
         pointIndex,
         x: xCategory(plot, data.categories.length, pointIndex, categoryReverse),
-        y: segment ? numericScale(segment.end) : null,
-        segment,
+        y: plottableSegment ? numericScale(segment.end) : null,
+        segment: plottableSegment ? segment : null,
       };
     });
     const runs: { index: number; value: number; base: number }[][] = [];
     let run: { index: number; value: number; base: number }[] = [];
     for (const point of points) {
       if (point.y === null || !point.segment) {
+        const raw = data.series[seriesIndex]?.values[point.pointIndex] ?? null;
+        const logBreak =
+          numericLogBase !== undefined && raw !== null && (!Number.isFinite(raw) || raw <= 0);
+        if (logBreak) {
+          if (run.length > 0) runs.push(run);
+          run = [];
+          continue;
+        }
         if (emptyCells === 'span') continue;
         if (run.length > 0) runs.push(run);
         run = [];
@@ -1288,7 +1489,11 @@ const addCategoryMarks = (
         run.push({
           index: point.pointIndex,
           value: point.y,
-          base: numericScale(point.segment.start),
+          base: numericScale(
+            numericLogBase !== undefined && !(point.segment.start > 0)
+              ? yDomain.min
+              : point.segment.start,
+          ),
         });
       }
     }
@@ -1405,20 +1610,53 @@ const addScatterMarks = (
   yDomain: Domain,
   palette: readonly string[],
   emptyCells: ResolvedEmptyCellMode,
+  xLogBase?: number,
+  yLogBase?: number,
 ): void => {
   const data = view.data;
   const xScale = (value: number): number =>
-    numericProjection(value, xDomain, plot.x, plot.x + plot.width, reversedAxis(spec.xAxis));
+    numericProjection(
+      value,
+      xDomain,
+      plot.x,
+      plot.x + plot.width,
+      reversedAxis(spec.xAxis),
+      xLogBase,
+    );
   const yScale = (value: number): number =>
-    numericProjection(value, yDomain, plot.y + plot.height, plot.y, reversedAxis(spec.yAxis));
+    numericProjection(
+      value,
+      yDomain,
+      plot.y + plot.height,
+      plot.y,
+      reversedAxis(spec.yAxis),
+      yLogBase,
+    );
   const inDomain = (value: number, domain: Domain): boolean =>
     Number.isFinite(value) && value >= domain.min && value <= domain.max;
+  const logEligible = (value: number, logBase: number | undefined): boolean =>
+    logBase === undefined || value > 0;
+  const lineAxis = (domain: Domain, logBase: number | undefined) => {
+    if (logBase === undefined) return { domain, transform: (value: number): number => value };
+    const domainMin = Math.log(domain.min);
+    const domainMax = Math.log(domain.max);
+    if (!(domainMax > domainMin) || !Number.isFinite(domainMin) || !Number.isFinite(domainMax)) {
+      return { domain, transform: (value: number): number => value };
+    }
+    return {
+      domain: { min: domainMin, max: domainMax },
+      transform: (value: number): number => Math.log(value),
+    };
+  };
+  const lineX = lineAxis(xDomain, xLogBase);
+  const lineY = lineAxis(yDomain, yLogBase);
+  const lineDomains = { x: lineX.domain, y: lineY.domain };
   const scatterStyle = spec.scatterStyle ?? 'marker';
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     if (!series) continue;
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
-    const samples: ScatterLineSample[] = [];
+    const lineSamples: ScatterLineSample[] = [];
     const markerPoints: Array<{
       readonly originalPointIndex: number;
       readonly pointId: string;
@@ -1434,17 +1672,30 @@ const addScatterMarks = (
       const nonFinite =
         (point.x !== null && !Number.isFinite(point.x)) ||
         (point.y !== null && !Number.isFinite(point.y));
-      if (nonFinite) {
+      const nonPositiveLog =
+        (point.x !== null && Number.isFinite(point.x) && !logEligible(point.x, xLogBase)) ||
+        (point.y !== null && Number.isFinite(point.y) && !logEligible(point.y, yLogBase));
+      if (nonFinite || nonPositiveLog) {
         // Non-finite values are a hard run break, including span mode.
-        samples.push({ kind: 'break', sourceIndex: originalPointIndex });
+        lineSamples.push({ kind: 'break', sourceIndex: originalPointIndex });
         continue;
       }
       if (point.x === null || point.y === null) {
-        samples.push({ kind: 'blank', sourceIndex: originalPointIndex });
+        lineSamples.push({ kind: 'blank', sourceIndex: originalPointIndex });
         continue;
       }
-      samples.push({ kind: 'point', x: point.x, y: point.y, sourceIndex: originalPointIndex });
-      if (inDomain(point.x, xDomain) && inDomain(point.y, yDomain)) {
+      lineSamples.push({
+        kind: 'point',
+        x: lineX.transform(point.x),
+        y: lineY.transform(point.y),
+        sourceIndex: originalPointIndex,
+      });
+      if (
+        inDomain(point.x, xDomain) &&
+        inDomain(point.y, yDomain) &&
+        logEligible(point.x, xLogBase) &&
+        logEligible(point.y, yLogBase)
+      ) {
         markerPoints.push({ originalPointIndex, pointId, x: point.x, y: point.y });
       }
     }
@@ -1465,13 +1716,10 @@ const addScatterMarks = (
         const opacity = lineOpacity(lineStyle.line);
         const dash = dashArray(lineStyle.line?.dash);
         for (const segment of scatterLineSegments(
-          samples,
+          lineSamples,
           plot,
           emptyCells === 'span',
-          {
-            x: xDomain,
-            y: yDomain,
-          },
+          lineDomains,
           {
             reverseX: reversedAxis(spec.xAxis),
             reverseY: reversedAxis(spec.yAxis),
@@ -1750,6 +1998,7 @@ const addLegend = (
   height: number,
   plot: ChartScene['plot'],
   palette: readonly string[],
+  rightLabelGutter = 0,
 ): void => {
   const data = view.data;
   const entries: {
@@ -1830,7 +2079,7 @@ const addLegend = (
   let y = 12;
   let horizontal = false;
   if (position === 'right') {
-    x = plot.x + plot.width + 8;
+    x = plot.x + plot.width + 8 + rightLabelGutter;
     y = plot.y + 8;
   } else if (position === 'left') {
     x = 4;
@@ -2171,6 +2420,7 @@ const addCategoryDataLabels = (
   height: number,
   locale: string,
   formatter: ChartValueFormatter | undefined,
+  numericLogBase?: number,
 ): void => {
   const labelSpec = spec.dataLabels;
   if (!labelSpec || labelSpec.visible === false) return;
@@ -2185,8 +2435,22 @@ const addCategoryDataLabels = (
   const categoryReverse = isBar ? reversedAxis(spec.yAxis) : reversedAxis(spec.xAxis);
   const valueScale = (value: number): number =>
     isBar
-      ? numericProjection(value, domain, plot.x, plot.x + plot.width, numericReverse)
-      : numericProjection(value, domain, plot.y + plot.height, plot.y, numericReverse);
+      ? numericProjection(
+          value,
+          domain,
+          plot.x,
+          plot.x + plot.width,
+          numericReverse,
+          numericLogBase,
+        )
+      : numericProjection(
+          value,
+          domain,
+          plot.y + plot.height,
+          plot.y,
+          numericReverse,
+          numericLogBase,
+        );
   const geometry = barGeometry(slot, Math.max(1, data.series.length), grouping, spec);
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
@@ -2194,7 +2458,8 @@ const addCategoryDataLabels = (
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     for (let pointIndex = 0; pointIndex < data.categories.length; pointIndex += 1) {
       const raw = series.values[pointIndex] ?? null;
-      if (raw === null || !Number.isFinite(raw)) continue;
+      if (raw === null || !Number.isFinite(raw) || (numericLogBase !== undefined && !(raw > 0)))
+        continue;
       const segment = segments[seriesIndex]?.[pointIndex];
       if (!segment) continue;
       const originalPointIndex = view.originalCategoryIndices[pointIndex] ?? pointIndex;
@@ -2219,7 +2484,9 @@ const addCategoryDataLabels = (
         formatter,
       );
       if (fullText.length === 0 && !labelSpec.showLegendKey) continue;
-      const valueStart = valueScale(segment.start);
+      const valueStart = valueScale(
+        numericLogBase !== undefined && !(segment.start > 0) ? domain.min : segment.start,
+      );
       const valueEnd = valueScale(segment.end);
       const valueDelta = valueEnd - valueStart;
       const rawPositive = raw >= 0;
@@ -2344,15 +2611,32 @@ const addScatterDataLabels = (
   height: number,
   locale: string,
   formatter: ChartValueFormatter | undefined,
+  xLogBase?: number,
+  yLogBase?: number,
 ): void => {
   const labelSpec = spec.dataLabels;
   if (!labelSpec || labelSpec.visible === false) return;
   const data = view.data;
   const emptyCells = resolveEmptyCellMode(spec);
   const xScale = (value: number): number =>
-    numericProjection(value, xDomain, plot.x, plot.x + plot.width, reversedAxis(spec.xAxis));
+    numericProjection(
+      value,
+      xDomain,
+      plot.x,
+      plot.x + plot.width,
+      reversedAxis(spec.xAxis),
+      xLogBase,
+    );
   const yScale = (value: number): number =>
-    numericProjection(value, yDomain, plot.y + plot.height, plot.y, reversedAxis(spec.yAxis));
+    numericProjection(
+      value,
+      yDomain,
+      plot.y + plot.height,
+      plot.y,
+      reversedAxis(spec.yAxis),
+      yLogBase,
+    );
+  const anyLogAxis = xLogBase !== undefined || yLogBase !== undefined;
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     if (!series) continue;
@@ -2365,7 +2649,14 @@ const addScatterDataLabels = (
         point.x === null ||
         point.y === null ||
         !Number.isFinite(point.x) ||
-        !Number.isFinite(point.y)
+        !Number.isFinite(point.y) ||
+        (xLogBase !== undefined && !(point.x > 0)) ||
+        (yLogBase !== undefined && !(point.y > 0)) ||
+        (anyLogAxis &&
+          (point.x < xDomain.min ||
+            point.x > xDomain.max ||
+            point.y < yDomain.min ||
+            point.y > yDomain.max))
       )
         continue;
       const originalPointIndex = view.originalPointIndices[seriesIndex]?.[pointIndex] ?? pointIndex;
@@ -2723,6 +3014,8 @@ const addDataLabels = (
   height: number,
   locale: string,
   formatter: ChartValueFormatter | undefined,
+  categoryLogBase?: number,
+  scatterLogBases?: { readonly x?: number; readonly y?: number },
 ): void => {
   if (!spec.dataLabels || spec.dataLabels.visible === false) return;
   if (view.data.domain === 'category') {
@@ -2762,6 +3055,7 @@ const addDataLabels = (
         height,
         locale,
         formatter,
+        categoryLogBase,
       );
   } else if (xDomain && yDomain) {
     addScatterDataLabels(
@@ -2776,6 +3070,8 @@ const addDataLabels = (
       height,
       locale,
       formatter,
+      scatterLogBases?.x,
+      scatterLogBases?.y,
     );
   }
 };
@@ -2799,8 +3095,28 @@ export function layoutChart(input: {
   const { spec } = input;
   const prepared = prepareChartData(input.data, spec);
   const data = prepared.data;
+  const categoryXLogBase =
+    data.domain === 'category' ? categoryNumericLogBase(spec, 'x') : undefined;
+  const categoryYLogBase =
+    data.domain === 'category' ? categoryNumericLogBase(spec, 'y') : undefined;
+  const scatterLogs = data.domain === 'xy' && spec.kind === 'scatter' ? scatterLogBases(spec) : {};
+  const xLogBase = data.domain === 'category' ? categoryXLogBase : scatterLogs.x;
+  const yLogBase = data.domain === 'category' ? categoryYLogBase : scatterLogs.y;
   const palette = paletteFor(spec);
   const emptyCells = resolveEmptyCellMode(spec);
+  const scatterPointEligible = (
+    point: XYChartData['series'][number]['points'][number],
+  ): boolean => {
+    const resolved = scatterPointFor(point, emptyCells);
+    return (
+      resolved.x !== null &&
+      resolved.y !== null &&
+      Number.isFinite(resolved.x) &&
+      Number.isFinite(resolved.y) &&
+      (scatterLogs.x === undefined || resolved.x > 0) &&
+      (scatterLogs.y === undefined || resolved.y > 0)
+    );
+  };
   const elements: ChartPrimitive[] = [
     primitive('rect', { x: 0, y: 0, width, height, fill: 'transparent' }, 'background'),
   ];
@@ -2816,6 +3132,7 @@ export function layoutChart(input: {
   let right = 20;
   let top = 20;
   let bottom = 20;
+  let rightLegendReserve = 0;
   if (hasLegend) {
     const legendLabels =
       data.domain === 'category' && isCircularKind(spec.kind)
@@ -2825,7 +3142,10 @@ export function layoutChart(input: {
       (current, label) => Math.max(current, textWidth(label) + 20),
       56,
     );
-    if (legendPosition === 'right') right += Math.min(180, Math.max(56, legendWidth));
+    if (legendPosition === 'right') {
+      rightLegendReserve = Math.min(180, Math.max(56, legendWidth));
+      right += rightLegendReserve;
+    }
     if (legendPosition === 'left') left += Math.min(100, Math.max(56, width * 0.24));
     if (legendPosition === 'top') top = Math.max(top, spec.title ? 36 : 20);
     if (legendPosition === 'bottom') {
@@ -2837,12 +3157,35 @@ export function layoutChart(input: {
       );
     }
   }
+  const highXLabels =
+    !isCircularKind(spec.kind) &&
+    axisIsVisible(spec.xAxis) &&
+    resolvedAxisLabelPosition(spec.xAxis) === 'high';
+  if (highXLabels && (Boolean(spec.title) || (hasLegend && legendPosition === 'top'))) {
+    top += 14;
+  }
+  const highYLabels =
+    !isCircularKind(spec.kind) &&
+    axisIsVisible(spec.yAxis) &&
+    resolvedAxisLabelPosition(spec.yAxis) === 'high';
+  let rightLabelGutter = 0;
   if (spec.kind === 'bar' && data.domain === 'category' && axisIsVisible(spec.yAxis)) {
     const categoryWidth = data.categories.reduce(
-      (current, label) => Math.max(current, textWidth(label) + 10),
+      (current, label) =>
+        Math.max(
+          current,
+          textWidth(highYLabels ? boundedAxisLabel(label, maxNumericLabelWidth) : label) + 10,
+        ),
       20,
     );
-    left = Math.max(left, Math.min(Math.max(20, width - 8), categoryWidth));
+    if (highYLabels) {
+      rightLabelGutter = Math.max(rightLabelGutter, categoryWidth - 2);
+      if (!(hasLegend && legendPosition === 'right')) {
+        right = Math.max(right, rightLabelGutter);
+      }
+    } else {
+      left = Math.max(left, Math.min(Math.max(20, width - 8), categoryWidth));
+    }
   }
   const yValueCandidates =
     data.domain === 'category'
@@ -2861,13 +3204,9 @@ export function layoutChart(input: {
         })()
       : data.series.flatMap((series) =>
           series.points.flatMap((rawPoint) => {
+            if (!scatterPointEligible(rawPoint)) return [];
             const point = scatterPointFor(rawPoint, emptyCells);
-            return point.x !== null &&
-              point.y !== null &&
-              Number.isFinite(point.x) &&
-              Number.isFinite(point.y)
-              ? [point.y]
-              : [];
+            return point.y === null ? [] : [point.y];
           }),
         );
   const xValueCandidates =
@@ -2876,33 +3215,30 @@ export function layoutChart(input: {
       : spec.kind === 'scatter' && data.domain === 'xy'
         ? data.series.flatMap((series) =>
             series.points.flatMap((rawPoint) => {
+              if (!scatterPointEligible(rawPoint)) return [];
               const point = scatterPointFor(rawPoint, emptyCells);
-              return point.x !== null &&
-                point.y !== null &&
-                Number.isFinite(point.x) &&
-                Number.isFinite(point.y)
-                ? [point.x]
-                : [];
+              return point.x === null ? [] : [point.x];
             }),
           )
         : [];
   const xEstimate =
-    xValueCandidates.length > 0
+    xValueCandidates.length > 0 || xLogBase !== undefined
       ? axisDomain(
           xValueCandidates,
           spec.xAxis?.min,
           spec.xAxis?.max,
           spec.kind === 'bar',
           spec.kind === 'bar' && spec.grouping === 'percent-stacked',
+          xLogBase,
         )
       : null;
   if (
     xEstimate &&
     axisIsVisible(spec.xAxis) &&
-    spec.xAxis?.numberFormat !== undefined &&
-    spec.xAxis.numberFormat.trim().length > 0
+    (xLogBase !== undefined ||
+      (spec.xAxis?.numberFormat !== undefined && spec.xAxis.numberFormat.trim().length > 0))
   ) {
-    const xLabels = axisTicks(xEstimate, spec.xAxis).map((tick) =>
+    const xLabels = axisTicks(xEstimate, spec.xAxis, xLogBase).map((tick) =>
       boundedAxisLabel(
         axisTickLabel(
           tick,
@@ -2926,12 +3262,19 @@ export function layoutChart(input: {
   }
   let yLabelWidth =
     spec.kind === 'bar' && data.domain === 'category' && axisIsVisible(spec.yAxis)
-      ? data.categories.reduce((current, label) => Math.max(current, textWidth(label)), 12)
+      ? data.categories.reduce(
+          (current, label) =>
+            Math.max(
+              current,
+              textWidth(highYLabels ? boundedAxisLabel(label, maxNumericLabelWidth) : label),
+            ),
+          12,
+        )
       : 12;
   if (
     spec.kind !== 'bar' &&
     !isCircularKind(spec.kind) &&
-    yValueCandidates.length > 0 &&
+    (yValueCandidates.length > 0 || yLogBase !== undefined) &&
     axisIsVisible(spec.yAxis)
   ) {
     const yEstimate = axisDomain(
@@ -2940,8 +3283,9 @@ export function layoutChart(input: {
       spec.yAxis?.max,
       data.domain === 'category',
       data.domain === 'category' && spec.grouping === 'percent-stacked',
+      yLogBase,
     );
-    yLabelWidth = axisTicks(yEstimate, spec.yAxis).reduce(
+    yLabelWidth = axisTicks(yEstimate, spec.yAxis, yLogBase).reduce(
       (current, tick) =>
         Math.max(
           current,
@@ -2964,17 +3308,29 @@ export function layoutChart(input: {
       // SVG text metrics are a little wider than the character estimate on
       // the default system font. Keep a small safety gutter so the first
       // signed/percent tick remains inside the canvas.
-      left = Math.max(left, Math.min(Math.max(20, width - 8), yLabelWidth + 6));
+      if (highYLabels) {
+        rightLabelGutter = Math.max(rightLabelGutter, yLabelWidth + 8);
+        if (!(hasLegend && legendPosition === 'right')) {
+          right = Math.max(right, rightLabelGutter);
+        }
+      } else {
+        left = Math.max(left, Math.min(Math.max(20, width - 8), yLabelWidth + 6));
+      }
     }
   }
   if (!isCircularKind(spec.kind) && axisIsVisible(spec.yAxis) && spec.yAxis?.title) {
     // A rotated title still needs a horizontal gutter beside wide y tick
     // labels. Keep the historic 36px minimum for ordinary labels, then add
     // a separate reserve once labels exceed that width.
-    left = Math.max(left, yLabelWidth > 36 ? yLabelWidth + 32 : 36);
+    left = Math.max(left, highYLabels ? 36 : yLabelWidth > 36 ? yLabelWidth + 32 : 36);
   }
   if (!isCircularKind(spec.kind) && axisIsVisible(spec.xAxis) && spec.xAxis?.title)
     bottom = Math.max(bottom, 32);
+  if (highYLabels) {
+    rightLabelGutter = Math.max(rightLabelGutter, yLabelWidth + 8);
+    if (hasLegend && legendPosition === 'right') right += rightLabelGutter;
+    else right = Math.max(right, rightLabelGutter);
+  }
   left = Math.min(left, Math.max(1, width - 2));
   right = Math.min(right, Math.max(1, width - left - 1));
   top = Math.min(top, Math.max(1, height - 2));
@@ -2985,6 +3341,13 @@ export function layoutChart(input: {
     width: Math.max(1, width - left - right),
     height: Math.max(1, height - top - bottom),
   };
+  const allocatedRightLabelGutter = highYLabels
+    ? Math.max(0, Math.min(rightLabelGutter, right - rightLegendReserve))
+    : 0;
+  const axisLabelWidth =
+    highYLabels && allocatedRightLabelGutter > 0
+      ? Math.min(maxNumericLabelWidth, Math.max(12, allocatedRightLabelGutter - 6))
+      : maxNumericLabelWidth;
   if (spec.title) {
     elements.push(
       primitive(
@@ -3017,11 +3380,26 @@ export function layoutChart(input: {
       grouping === 'clustered' ? rawValues : [...totals.positive, ...totals.negative];
     const horizontal = spec.kind === 'bar';
     const axisSpec = horizontal ? spec.xAxis : spec.yAxis;
-    const domain = axisDomain(stackValues, axisSpec?.min, axisSpec?.max, true, percent);
+    const domain = axisDomain(
+      stackValues,
+      axisSpec?.min,
+      axisSpec?.max,
+      true,
+      percent,
+      horizontal ? categoryXLogBase : categoryYLogBase,
+    );
     if (horizontal) xDomain = domain;
     else yDomain = domain;
     if (!isCircularKind(spec.kind)) {
-      addCategoryMarks(elements, prepared as CategoryChartView, spec, plot, domain, palette);
+      addCategoryMarks(
+        elements,
+        prepared as CategoryChartView,
+        spec,
+        plot,
+        domain,
+        palette,
+        horizontal ? categoryXLogBase : categoryYLogBase,
+      );
       addAxis(
         elements,
         plot,
@@ -3037,6 +3415,9 @@ export function layoutChart(input: {
         maxNumericLabelWidth,
         input.locale ?? 'en-US',
         input.formatValue,
+        axisLabelWidth,
+        categoryXLogBase,
+        categoryYLogBase,
       );
     }
   } else if (spec.kind === 'scatter') {
@@ -3048,13 +3429,15 @@ export function layoutChart(input: {
             point.x !== null &&
             point.y !== null &&
             Number.isFinite(point.x) &&
-            Number.isFinite(point.y),
+            Number.isFinite(point.y) &&
+            (scatterLogs.x === undefined || point.x > 0) &&
+            (scatterLogs.y === undefined || point.y > 0),
         ),
     );
     const xValues = pairedPoints.flatMap((point) => (point.x === null ? [] : [point.x]));
     const yValues = pairedPoints.flatMap((point) => (point.y === null ? [] : [point.y]));
-    xDomain = axisDomain(xValues, spec.xAxis?.min, spec.xAxis?.max, false, false);
-    yDomain = axisDomain(yValues, spec.yAxis?.min, spec.yAxis?.max, false, false);
+    xDomain = axisDomain(xValues, spec.xAxis?.min, spec.xAxis?.max, false, false, scatterLogs.x);
+    yDomain = axisDomain(yValues, spec.yAxis?.min, spec.yAxis?.max, false, false, scatterLogs.y);
     addScatterMarks(
       elements,
       prepared as XYChartView,
@@ -3064,6 +3447,8 @@ export function layoutChart(input: {
       yDomain,
       palette,
       emptyCells,
+      scatterLogs.x,
+      scatterLogs.y,
     );
     addAxis(
       elements,
@@ -3080,6 +3465,9 @@ export function layoutChart(input: {
       maxNumericLabelWidth,
       input.locale ?? 'en-US',
       input.formatValue,
+      axisLabelWidth,
+      scatterLogs.x,
+      scatterLogs.y,
     );
   } else {
     // A malformed domain/kind pair is still laid out safely as an empty chart.
@@ -3098,6 +3486,9 @@ export function layoutChart(input: {
       maxNumericLabelWidth,
       input.locale ?? 'en-US',
       input.formatValue,
+      axisLabelWidth,
+      undefined,
+      undefined,
     );
   }
 
@@ -3118,9 +3509,28 @@ export function layoutChart(input: {
     height,
     input.locale ?? 'en-US',
     input.formatValue,
+    data.domain === 'category'
+      ? spec.kind === 'bar'
+        ? categoryXLogBase
+        : categoryYLogBase
+      : undefined,
+    data.domain === 'xy' ? scatterLogs : undefined,
   );
-  if (hasLegend) addLegend(elements, prepared, spec, width, height, plot, palette);
-  if (!dataHasValues(data, emptyCells, spec.kind)) {
+  if (hasLegend)
+    addLegend(elements, prepared, spec, width, height, plot, palette, allocatedRightLabelGutter);
+  if (
+    !dataHasValues(
+      data,
+      emptyCells,
+      spec.kind,
+      data.domain === 'category'
+        ? spec.kind === 'bar'
+          ? categoryXLogBase
+          : categoryYLogBase
+        : undefined,
+      data.domain === 'xy' ? scatterLogs : undefined,
+    )
+  ) {
     elements.push(
       primitive(
         'text',
