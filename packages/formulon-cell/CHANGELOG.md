@@ -4,6 +4,27 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.10.0 — 2026-10-20
+
+### Added
+
+- Charts module, exported as `@libraz/formulon-cell/charts`. `layoutChart` lays out column, bar, line, area, pie, doughnut and scatter charts independently of the renderer. The module also provides chart and series types, scales with logarithmic axes, number formatting, data-label options, scatter line fitting and style resolution.
+- Session charts render through the charts module and have a settings panel. It covers chart type and grouping, series direction, empty-cell handling, axes (including log scale and label position), legend, data labels, and series and point formatting. Chart edits respect sheet protection and the interaction policy, and support undo/redo.
+- Charts in loaded workbooks are read and edited through the engine's chart API, and they save back to XLSX. Charts the module cannot draw show a placeholder.
+- Chart series can be added and removed from the settings panel or with `addSessionChartSeries` / `removeSessionChartSeries`. Both support undo/redo, and the last series cannot be removed. The series name must be a cell reference.
+- Pivot value-field settings list every show-values-as kind, including the new % Of, % Running Total In, Rank Smallest to Largest and Rank Largest to Smallest. The base field and base item selects appear only for the kinds that use them. `PivotShowValuesAs` gains `PercentOf`, `PercentOfRunningTotal`, `RankAscending` and `RankDescending`.
+- Pictures can be reordered in the engine (bring forward / send backward).
+
+### Changed
+
+- Update `@libraz/formulon` to 0.16.0. The engine adds a chart API, stores formula text the way the spreadsheet stores entered text (`1.50` reads back as `1.5`), and resolves built-in number format ids to the active profile's locale.
+- `WorkbookHandle.removeImage` is renamed to `removeDrawing` and now acts on charts as well as pictures. It is joined by `setDrawingAnchor`, `setDrawingZOrder`, `snapshotDrawing` and `restoreDrawing`. `EngineCapabilities` gains `drawings` and `charts`.
+- `SessionChartKind` is a deprecated alias of `ChartKind`.
+
+### Removed
+
+- The root exports `SessionChartSeriesPoint`, `sessionChartSeries`, `applyChartsSnapshot`, `captureChartsSnapshot` and `recordChartsChange`. Chart data comes from the charts module, and chart history goes through the operation history.
+
 ## 0.9.1 — 2026-10-14
 
 ### Changed
@@ -707,6 +728,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.10.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.10.0
 [0.9.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.9.1
 [0.9.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.9.0
 [0.8.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.8.0
