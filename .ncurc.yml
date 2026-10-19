@@ -6,6 +6,10 @@
 cooldown: 1d
 
 reject:
+  # @axe-core/playwright: pinned to 4.13.0. axe-core 4.14 enables
+  # label-content-name-mismatch, which flags ribbon buttons whose visible text
+  # (.00, the font-size value, the number-format value, fx) is not part of their aria-label.
+  - '@axe-core/playwright'
   # typescript: held at 6.x. tests/unit/toolbar/ribbon-menu-primitives/fixtures.ts
   # imports the compiler API (`import ts from 'typescript'`) to parse the ribbon
   # menu sources; 7.x no longer exposes that API from the package entry point.

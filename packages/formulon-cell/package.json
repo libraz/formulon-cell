@@ -78,12 +78,12 @@
     "zustand": "^5"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "5.0.3",
-    "happy-dom": "20.14.6",
+    "@vitest/coverage-v8": "5.0.5",
+    "happy-dom": "21.0.3",
     "typescript": "6.0.3",
     "unplugin-dts": "1.1.2",
     "vite": "8.3.4",
-    "vitest": "5.0.3",
+    "vitest": "5.0.5",
     "zustand": "^5"
   }
 }
