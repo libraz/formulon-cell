@@ -28,6 +28,10 @@ import {
   type WorkbookHandleAnnotationsMethods,
 } from './workbook-handle-annotations.js';
 import {
+  installChartsMethods,
+  type WorkbookHandleChartsMethods,
+} from './workbook-handle-charts.js';
+import {
   installConditionalFormatMethods,
   type WorkbookHandleConditionalFormatMethods,
 } from './workbook-handle-conditional-format.js';
@@ -1073,6 +1077,7 @@ export class WorkbookHandle {
 /** Aggregate of the feature mixins installed on `WorkbookHandle`. */
 export interface WorkbookHandleFeatureMethods
   extends WorkbookHandleAnnotationsMethods,
+    WorkbookHandleChartsMethods,
     WorkbookHandleConditionalFormatMethods,
     WorkbookHandleFormulasMethods,
     WorkbookHandleLayoutMethods,
@@ -1082,6 +1087,7 @@ export interface WorkbookHandleFeatureMethods
     WorkbookHandleTablesMethods {}
 
 installAnnotationsMethods(WorkbookHandle);
+installChartsMethods(WorkbookHandle);
 installConditionalFormatMethods(WorkbookHandle);
 installFormulasMethods(WorkbookHandle);
 installLayoutMethods(WorkbookHandle);

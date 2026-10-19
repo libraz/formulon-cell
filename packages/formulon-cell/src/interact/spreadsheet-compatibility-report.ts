@@ -37,7 +37,6 @@ const COMPATIBILITY_LABEL_KEYS: Record<
   'format-as-table': 'formatAsTable',
   'pivot-layouts': 'pivotLayouts',
   'pivot-authoring': 'pivotAuthoring',
-  'session-charts': 'sessionCharts',
   'charts-drawings': 'chartsDrawings',
   'chart-authoring': 'chartAuthoring',
   'external-links': 'externalLinks',

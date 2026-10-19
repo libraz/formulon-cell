@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ignoreCellError } from '../../../src/commands/error-indicators.js';
 import { History } from '../../../src/commands/history.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -115,27 +115,34 @@ describe('Mac ribbon command dispatch', () => {
     }
   });
 
-  it('routes Mac Recommended Chart to the session chart command', () => {
+  it('routes Mac Recommended Chart to the session chart command', async () => {
     const store = createSpreadsheetStore();
     const history = new History();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 10 });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 0 }, { kind: 'number', value: 20 });
-    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
-    const instance = {
-      store,
-      history,
-      host: document.createElement('div'),
-    } as unknown as SpreadsheetInstance;
-    const deps = {
-      inst: instance,
-      runtime: { projectFormatToolbar: () => undefined },
-    } as unknown as ApplyRibbonCommandDeps;
+    const workbook = await WorkbookHandle.createDefault();
+    try {
+      workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 10);
+      workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 20);
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
+      const instance = {
+        store,
+        history,
+        workbook,
+        host: document.createElement('div'),
+      } as unknown as SpreadsheetInstance;
+      const deps = {
+        inst: instance,
+        runtime: { projectFormatToolbar: () => undefined },
+      } as unknown as ApplyRibbonCommandDeps;
 
-    expect(isMacRibbonCommandSupported('mac.insert.recommendedChart')).toBe(true);
-    expect(dispatchMacRibbonCommand('mac.insert.recommendedChart', deps, () => false)).toBe(true);
-    expect(store.getState().charts.charts).toMatchObject([
-      { kind: 'column', source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 } },
-    ]);
+      expect(isMacRibbonCommandSupported('mac.insert.recommendedChart')).toBe(true);
+      expect(dispatchMacRibbonCommand('mac.insert.recommendedChart', deps, () => false)).toBe(true);
+      expect(store.getState().charts.charts).toMatchObject([
+        { kind: 'column', source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 } },
+      ]);
+      expect(workbook.listDrawingObjects(0)).toHaveLength(1);
+    } finally {
+      workbook.dispose();
+    }
   });
 
   it('supports and dispatches dynamic function leaves only from the current live catalog', () => {

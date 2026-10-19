@@ -1,3 +1,4 @@
+import { DEFAULT_THEME_ACCENTS } from './series-colors.js';
 import type {
   ChartFillSpec,
   ChartLineSpec,
@@ -5,17 +6,6 @@ import type {
   ChartSeriesStyleSpec,
   ChartSpec,
 } from './types.js';
-
-export const DEFAULT_PALETTE = [
-  '#4472c4',
-  '#ed7d31',
-  '#70ad47',
-  '#ffc000',
-  '#5b9bd5',
-  '#a5a5a5',
-  '#264478',
-  '#9e480e',
-] as const;
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -51,6 +41,9 @@ export interface ResolvedChartStyle {
 const styleFor = (spec: ChartSpec, seriesId: string): ChartSeriesStyleSpec | undefined =>
   spec.seriesStyles?.find((style) => style.seriesId === seriesId);
 
+const colorOnly = (color: string | undefined): ChartFillSpec | undefined =>
+  color === undefined ? undefined : { color };
+
 /** Resolve point overrides field-by-field so a point can change only its fill color. */
 export const resolveChartStyle = (
   spec: ChartSpec,
@@ -70,7 +63,13 @@ export const resolveChartStyle = (
     ? (originalPointIndex ?? originalSeriesIndex)
     : originalSeriesIndex;
   const color =
-    palette[((paletteIndex % palette.length) + palette.length) % palette.length] ?? '#4472c4';
+    palette[((paletteIndex % palette.length) + palette.length) % palette.length] ??
+    DEFAULT_THEME_ACCENTS[0] ??
+    '#156082';
+  // Excel keeps no fill on a line or scatter series or point: a fill colour stands in
+  // for the palette entry on the line and markers, and its transparency is not drawn.
+  const stroked = spec.kind === 'line' || spec.kind === 'scatter';
+  const pointColor = stroked ? colorOnly(pointStyle?.fill?.color) : undefined;
   const markerBase = seriesStyle?.marker;
   const markerOverride = pointStyle?.marker;
   const defaultMarkerVisible = !(
@@ -87,9 +86,28 @@ export const resolveChartStyle = (
     visible: markerOverride?.visible ?? markerBase?.visible ?? defaultMarkerVisible,
     // A point-level general fill/line is inherited by its marker too. An
     // explicit point marker fill/line still wins over that inherited value.
-    fill: mergeFill(mergeFill(markerBase?.fill, pointStyle?.fill), markerOverride?.fill),
-    line: mergeLine(mergeLine(markerBase?.line, pointStyle?.line), markerOverride?.line),
+    fill: mergeFill(
+      mergeFill(markerBase?.fill, stroked ? pointColor : pointStyle?.fill),
+      markerOverride?.fill,
+    ),
+    line: mergeLine(
+      mergeLine(mergeLine(markerBase?.line, pointStyle?.line), pointColor),
+      markerOverride?.line,
+    ),
   };
+  if (stroked) {
+    return {
+      color: pointColor?.color ?? seriesStyle?.fill?.color ?? color,
+      fill: undefined,
+      line: mergeLine(
+        seriesStyle?.line,
+        pointStyle?.line?.color === undefined
+          ? mergeLine(pointStyle?.line, pointColor)
+          : pointStyle.line,
+      ),
+      marker,
+    };
+  }
   return {
     color,
     fill: mergeFill(seriesStyle?.fill, pointStyle?.fill),

@@ -748,11 +748,10 @@ const seedObjectFixture = async (page: Page): Promise<void> => {
         throw new Error(`full-check objects fixture pivot creation failed: ${pivot.reason}`);
       }
       const { createSessionChart } = await import(nextChartUrl);
-      const chartX = Math.max(20, Math.min(340, window.innerWidth - 380));
       const chart = createSessionChart(
         instance.store as never,
         tableRange,
-        { kind: 'column', title: null, x: chartX, y: 96, w: 360, h: 220 },
+        { wb: instance.workbook as never, kind: 'column' },
         instance.history as never,
       );
       if (!chart)

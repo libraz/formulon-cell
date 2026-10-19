@@ -641,7 +641,7 @@ export function unsupportedMetadataBlocksBand(
     state.conditional.rules.some((rule) => sheets.has(rule.range.sheet)) ||
     (state.ui.filterRange !== null && sheets.has(state.ui.filterRange.sheet)) ||
     state.tables.tables.some((table) => sheets.has(table.range.sheet)) ||
-    state.charts.charts.some((chart) => sheets.has(chart.source.sheet)) ||
+    state.charts.charts.some((chart) => sheets.has(chart.sheet)) ||
     state.illustrations.illustrations.some((item) => sheets.has(item.sheet)) ||
     state.sparkline.sparklines.size > 0 ||
     state.protection.allowedEditRanges.some((entry) => sheets.has(entry.range.sheet)) ||

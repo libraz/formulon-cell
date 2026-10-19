@@ -27,7 +27,6 @@ export type SpreadsheetCompatibilityId =
   | 'format-as-table'
   | 'pivot-layouts'
   | 'pivot-authoring'
-  | 'session-charts'
   | 'charts-drawings'
   | 'chart-authoring'
   | 'external-links';
@@ -285,27 +284,25 @@ export function summarizeSpreadsheetCompatibility(
         : 'Creating or editing PivotTable definitions needs new engine APIs.',
     },
     {
-      id: 'session-charts',
-      label: 'Session chart previews',
-      status: 'session',
-      reason:
-        'Column/line chart overlays can be created in the UI; persisted chart writeback is gated on engine chart APIs.',
-    },
-    {
       id: 'charts-drawings',
       label: 'Charts, drawings, and images',
-      status: chartDrawingCount > 0 ? 'read-only' : 'unsupported',
+      status:
+        c.charts && c.images ? 'writable' : chartDrawingCount > 0 ? 'read-only' : 'unsupported',
       count: chartDrawingCount,
       reason:
-        chartDrawingCount > 0
-          ? 'OOXML parts are preserved and inventoried, but anchors/content are not exposed.'
-          : 'No preserved chart/drawing/media parts were reported by the engine.',
+        c.charts && c.images
+          ? 'Charts and pictures are anchored to cells, edited in the workbook and saved with it; other drawing and media parts are preserved.'
+          : chartDrawingCount > 0
+            ? 'OOXML parts are preserved and inventoried, but anchors/content are not exposed.'
+            : 'No preserved chart/drawing/media parts were reported by the engine.',
     },
     {
       id: 'chart-authoring',
       label: 'Chart authoring',
-      status: 'unsupported',
-      reason: 'Chart creation/editing requires a chart model in the engine.',
+      status: c.charts ? 'writable' : 'unsupported',
+      reason: c.charts
+        ? 'Column, bar, line, area, pie, doughnut and scatter charts are created and edited in the workbook; other chart types can be moved, resized and deleted.'
+        : 'Chart creation/editing requires the engine chart APIs.',
     },
     {
       id: 'external-links',

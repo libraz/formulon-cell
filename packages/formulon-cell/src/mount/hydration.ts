@@ -2,6 +2,7 @@ import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js
 import { hydrateAutoFilterFromEngine } from '../engine/auto-filter-sync.js';
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
+import { hydrateChartsFromEngine } from '../engine/charts-sync.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from '../engine/format-sync.js';
 import { hydrateImagesFromEngine } from '../engine/images-sync.js';
 import { hydrateLayoutFromEngine } from '../engine/layout-sync.js';
@@ -21,6 +22,7 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
     mutators.replaceCells(store, wb.cells(sheet));
     hydrateLayoutFromEngine(wb, store, sheet);
     hydrateImagesFromEngine(wb, store, sheet);
+    hydrateChartsFromEngine(wb, store, sheet);
     hydrateThreadedCommentsFromEngine(wb, store, sheet);
     hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
     hydrateMergesFromEngine(wb, store, sheet);

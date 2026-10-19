@@ -728,6 +728,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.sessionCharts = attachSessionCharts({
           host: input.host,
           store: input.store,
+          getWb: input.wb,
           labels: strings.sessionCharts,
           history: input.history,
           locale: input.i18nLocale(),

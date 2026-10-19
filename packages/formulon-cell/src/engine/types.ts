@@ -37,6 +37,24 @@ export type {
   Workbook,
 } from '@libraz/formulon';
 
+/** Anchor geometry of a drawing object (picture or chart), as the engine
+ * reports it in `listDrawingObjects`. */
+export type EngineDrawingAnchor = Pick<
+  import('@libraz/formulon').DrawingObject,
+  | 'anchorKind'
+  | 'editAs'
+  | 'fromRow'
+  | 'fromCol'
+  | 'fromRowOff'
+  | 'fromColOff'
+  | 'toRow'
+  | 'toCol'
+  | 'toRowOff'
+  | 'toColOff'
+  | 'cx'
+  | 'cy'
+>;
+
 /** Marks the fields a record only carries when the engine read it back out of
  * a workbook: the original OOXML `<color>` selector and the "was this element
  * present in the source" flags. The cell layer authors records from UI state,
@@ -161,6 +179,10 @@ export const PivotShowValuesAs = {
   PercentOfParentRow: 9,
   PercentOfParentCol: 10,
   PercentOfParent: 11,
+  PercentOf: 12,
+  PercentOfRunningTotal: 13,
+  RankAscending: 14,
+  RankDescending: 15,
 } as const;
 export type PivotShowValuesAs = (typeof PivotShowValuesAs)[keyof typeof PivotShowValuesAs];
 
@@ -486,7 +508,9 @@ export interface EngineCapabilities {
   readonly typedAutoFilter?: boolean;
   readonly validationEvaluation?: boolean;
   readonly threadedComments?: boolean;
+  readonly drawings?: boolean;
   readonly images?: boolean;
+  readonly charts?: boolean;
   readonly workbookTheme?: boolean;
   readonly effectiveStyle?: boolean;
   readonly displayText?: boolean;

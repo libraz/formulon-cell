@@ -1,3 +1,4 @@
+import { AnchorEditAs } from '@libraz/formulon';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import {
   type ActiveAxisFormatSnapshot,
@@ -17,6 +18,7 @@ import {
   remapSyncedFormatKeysForStructure,
   restoreSyncedFormatKeysForStructure,
 } from '../engine/cell-format-sync.js';
+import { hydrateChartsFromEngine } from '../engine/charts-sync.js';
 import {
   type FormatHistoryTrackingSnapshot,
   formatHistoryBridgeFor,
@@ -37,6 +39,7 @@ import {
   restoreActiveWholeSheetFontOverrideForStructure,
 } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
 import {
   type ConditionalRule,
@@ -533,6 +536,22 @@ function applyStructureFormatRemap(
  * outside the shifted band are *not* touched in the store cache here; the
  * caller is expected to refresh via `replaceCells` after this returns.
  */
+/** Whether deleting `count` lines at `split` removes the drawing object: the
+ * engine drops a move-and-size object whose both corners lie in the band. */
+const drawingRemovedByDelete = (
+  object: EngineDrawingObject,
+  axis: 'row' | 'col',
+  split: number,
+  count: number,
+): boolean => {
+  const inBand = (line: number): boolean => line >= split && line < split + count;
+  return (
+    object.editAs === AnchorEditAs.TwoCell &&
+    inBand(axis === 'row' ? object.fromRow : object.fromCol) &&
+    inBand(axis === 'row' ? object.toRow : object.toCol)
+  );
+};
+
 function applyAxisShiftViaEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
@@ -598,6 +617,17 @@ function applyAxisShiftViaEngine(
     }
     originalFormulas.push(...collectAllFormulas(wb));
   }
+  // The engine deletes the pictures and charts lying inside the band; undo puts
+  // them back from these captures, under their own ids.
+  const deletedDrawings: Uint8Array[] = [];
+  if (!positive && record && wb.capabilities.drawings) {
+    for (const object of wb.listDrawingObjects(sheet)) {
+      if (!drawingRemovedByDelete(object, axis, split, count)) continue;
+      const snapshot = wb.snapshotDrawing(sheet, object.objectId);
+      if (snapshot === null) return false;
+      deletedDrawings.push(snapshot);
+    }
+  }
 
   const canRestoreMerges = record && wb.capabilities.merges;
   const beforeMerges = canRestoreMerges ? wb.getMerges(sheet) : [];
@@ -619,6 +649,7 @@ function applyAxisShiftViaEngine(
     }
     if (!ok) return false;
     wb.recalcAuto();
+    hydrateChartsFromEngine(wb, store, sheet);
     return true;
   };
 
@@ -795,6 +826,13 @@ function applyAxisShiftViaEngine(
       for (const c of captured) writeCell(wb, c.addr, c.value, c.formula);
       for (const entry of originalFormulas) wb.setFormula(entry.addr, entry.formula);
     });
+    if (deletedDrawings.length === 0) return;
+    for (const snapshot of deletedDrawings) {
+      if (wb.restoreDrawing(sheet, snapshot) === null) {
+        throw new Error('structure: failed to restore a deleted drawing');
+      }
+    }
+    hydrateChartsFromEngine(wb, store, sheet);
   };
 
   const rollbackRedo = (): void => {

@@ -13,7 +13,8 @@ import {
   sessionIllustrationById,
   updateSessionIllustration,
 } from '../../../src/commands/session-illustration.js';
-import { EMU_PER_PX } from '../../../src/engine/images-sync.js';
+import { drawingAnchorOf, EMU_PER_PX } from '../../../src/engine/drawing-geometry.js';
+import { hydrateImagesFromEngine } from '../../../src/engine/images-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
@@ -284,7 +285,7 @@ describe('session illustration commands', () => {
         history,
         wb,
       );
-      expect(moved?.nativeObjectId).toBeGreaterThan(0);
+      expect(moved?.nativeObjectId).toBe(image?.nativeObjectId);
       const movedNative = wb
         .listDrawingObjects(0)
         .find((object) => object.objectId === moved?.nativeObjectId);
@@ -295,12 +296,17 @@ describe('session illustration commands', () => {
       expect(movedNative?.cy).toBe(original.cy);
       expect(history.undo()).toBe(true);
       const undoneNative = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      expect(undoneNative?.objectId).toBe(original.objectId);
+      expect(sessionIllustrationById(store.getState(), 'native-image')?.nativeObjectId).toBe(
+        original.objectId,
+      );
       expect(undoneNative).toMatchObject({ fromRow: original.fromRow, fromCol: original.fromCol });
       expect(undoneNative?.cx).toBe(original.cx);
       expect(undoneNative?.cy).toBe(original.cy);
       expect(history.redo()).toBe(true);
       const redoneNative = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
       expect(redoneNative).toMatchObject({ fromRow: 4, fromCol: 3 });
+      expect(redoneNative?.objectId).toBe(original.objectId);
       expect(redoneNative?.cx).toBe(original.cx);
       expect(redoneNative?.cy).toBe(original.cy);
 
@@ -308,8 +314,129 @@ describe('session illustration commands', () => {
       expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
       expect(history.undo()).toBe(true);
       expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(1);
+      expect(sessionIllustrationById(store.getState(), 'native-image')?.nativeObjectId).toBe(
+        original.objectId,
+      );
+      expect(wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0)?.objectId).toBe(
+        original.objectId,
+      );
       expect(history.redo()).toBe(true);
       expect(wb.listDrawingObjects(0).filter((object) => object.imageFormat !== 0)).toHaveLength(0);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('moves a loaded two-cell anchored image in place and undoes it', async () => {
+    const first = await WorkbookHandle.createDefault();
+    let wb: WorkbookHandle | null = null;
+    try {
+      const inserted = first.insertImage(0, PNG, {
+        row: 2,
+        col: 1,
+        anchorKind: 1,
+        editAs: 1,
+        widthEmu: 40 * EMU_PER_PX,
+        heightEmu: 30 * EMU_PER_PX,
+      });
+      expect(inserted).not.toBeNull();
+      wb = await WorkbookHandle.loadBytes(first.save());
+      const loaded = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      if (!loaded) throw new Error('loaded image missing');
+      expect(loaded.anchorKind).toBe(1);
+
+      const store = createSpreadsheetStore();
+      const history = new History();
+      hydrateImagesFromEngine(wb, store, 0);
+      const id = `image-native-0-${loaded.objectId}`;
+      expect(sessionIllustrationById(store.getState(), id)?.nativeGeometryEditable).toBe(true);
+
+      const target = cellRectUnclamped(
+        layoutForView(store.getState()),
+        store.getState().viewport,
+        6,
+        4,
+      );
+      const moved = updateSessionIllustration(store, id, { x: target.x, y: target.y }, history, wb);
+      expect(moved?.nativeObjectId).toBe(loaded.objectId);
+      const after = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      expect(after).toMatchObject({
+        objectId: loaded.objectId,
+        anchorKind: 1,
+        editAs: 1,
+        fromRow: 6,
+        fromCol: 4,
+        cx: loaded.cx,
+        cy: loaded.cy,
+      });
+      // The projection holds the engine's anchor, to marker included.
+      if (!after) throw new Error('moved image missing');
+      expect(moved?.nativeAnchor).toEqual(drawingAnchorOf(after));
+
+      expect(history.undo()).toBe(true);
+      const undone = wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0);
+      expect(undone).toMatchObject({
+        objectId: loaded.objectId,
+        anchorKind: 1,
+        fromRow: loaded.fromRow,
+        fromCol: loaded.fromCol,
+      });
+      expect(history.redo()).toBe(true);
+      expect(wb.listDrawingObjects(0).find((object) => object.imageFormat !== 0)).toMatchObject({
+        objectId: loaded.objectId,
+        fromRow: 6,
+        fromCol: 4,
+      });
+    } finally {
+      wb?.dispose();
+      first.dispose();
+    }
+  });
+
+  it('arranges a native image through the engine z-order with undo and redo', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const store = createSpreadsheetStore();
+      const history = new History();
+      const make = (id: string, col: number) =>
+        createSessionImage(
+          store,
+          range(0, col, 0, col),
+          { id, src: 'data:image/png;base64,x', bytes: PNG, wb, w: 24, h: 24 },
+          null,
+        );
+      const a = make('img-a', 0);
+      const b = make('img-b', 1);
+      const c = make('img-c', 2);
+      const order = () => wb.listDrawingObjects(0).map((object) => object.objectId);
+      const ids = [a?.nativeObjectId, b?.nativeObjectId, c?.nativeObjectId];
+      expect(order()).toEqual(ids);
+
+      expect(
+        arrangeSessionIllustration(store, 'img-a', 'bring-front', history, undefined, wb),
+      ).not.toBeNull();
+      expect(order()).toEqual([ids[1], ids[2], ids[0]]);
+      expect(listSessionIllustrations(store.getState()).map((item) => item.id)).toEqual([
+        'img-b',
+        'img-c',
+        'img-a',
+      ]);
+
+      expect(history.undo()).toBe(true);
+      expect(order()).toEqual(ids);
+      expect(listSessionIllustrations(store.getState()).map((item) => item.id)).toEqual([
+        'img-a',
+        'img-b',
+        'img-c',
+      ]);
+      expect(sessionIllustrationById(store.getState(), 'img-a')?.nativeObjectId).toBe(ids[0]);
+      expect(history.redo()).toBe(true);
+      expect(order()).toEqual([ids[1], ids[2], ids[0]]);
+
+      expect(
+        arrangeSessionIllustration(store, 'img-a', 'bring-front', history, undefined, wb),
+      ).toBeNull();
+      expect(arrangeSessionIllustration(store, 'img-b', 'bring-front', history)).toBeNull();
     } finally {
       wb.dispose();
     }

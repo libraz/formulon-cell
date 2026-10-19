@@ -16,6 +16,14 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
   const w = wb as unknown as Record<string, unknown>;
   const has = (k: string): boolean => typeof w[k] === 'function';
   const all = (...keys: string[]): boolean => keys.every(has);
+  const drawings = all(
+    'listDrawingObjects',
+    'setDrawingAnchor',
+    'setDrawingZOrder',
+    'snapshotDrawing',
+    'restoreDrawing',
+    'removeDrawing',
+  );
 
   return Object.freeze({
     typedAutoFilter: all(
@@ -37,7 +45,28 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
       'addPerson',
       'removePerson',
     ),
-    images: all('probeImage', 'listDrawingObjects', 'getImage', 'insertImage', 'removeImage'),
+    drawings,
+    images: drawings && all('probeImage', 'getImage', 'insertImage'),
+    charts:
+      drawings &&
+      all(
+        'getChart',
+        'getChartData',
+        'previewChartData',
+        'insertChart',
+        'setChartType',
+        'setChartTitle',
+        'setChartLegend',
+        'setChartAxis',
+        'setChartDisplay',
+        'setChartSeries',
+        'setChartPoint',
+        'setChartPlot',
+        'setChartFilter',
+        'addChartSeries',
+        'removeChartSeries',
+        'setChartSource',
+      ),
     workbookTheme: all('getTheme', 'setThemeColors', 'setThemeFonts'),
     effectiveStyle: has('getEffectiveStyle'),
     displayText: all('getDisplayText', 'formatValue'),

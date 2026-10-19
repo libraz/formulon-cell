@@ -2,6 +2,7 @@ import type {
   DrawingObject,
   ImageInfoResult,
   ImageInsertOptions,
+  ImagePlacement,
   ImageResult,
   Mention,
   Person,
@@ -226,7 +227,7 @@ export abstract class WorkbookHandleAnnotationsMethods {
 
   listDrawingObjects(sheet: number): EngineDrawingObject[] {
     assertAlive(this);
-    if (!this.capabilities.images) return [];
+    if (!this.capabilities.drawings) return [];
     const result = wb(this).listDrawingObjects(sheet);
     return result.status.ok ? result.map((object) => ({ ...object })) : [];
   }
@@ -249,10 +250,46 @@ export abstract class WorkbookHandleAnnotationsMethods {
     return result.status.ok ? result.objectId : null;
   }
 
-  removeImage(sheet: number, objectId: number): boolean {
+  /** Remove the picture or chart `objectId` and the parts only it reached. */
+  removeDrawing(sheet: number, objectId: number): boolean {
     assertAlive(this);
-    if (!this.capabilities.images) return false;
-    return wb(this).removeImage(sheet, objectId).ok;
+    if (!this.capabilities.drawings) return false;
+    return wb(this).removeDrawing(sheet, objectId).ok;
+  }
+
+  /** Move and resize a picture or chart, keeping its object id. */
+  setDrawingAnchor(sheet: number, objectId: number, placement: ImagePlacement): boolean {
+    assertAlive(this);
+    if (!this.capabilities.drawings) return false;
+    return wb(this).setDrawingAnchor(sheet, objectId, { ...placement }).ok;
+  }
+
+  /** Move the object to `index` of `listDrawingObjects` (0 is the back). */
+  setDrawingZOrder(sheet: number, objectId: number, index: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.drawings) return false;
+    return wb(this).setDrawingZOrder(sheet, objectId, index).ok;
+  }
+
+  /** Capture a picture or chart as opaque bytes for `restoreDrawing`. */
+  snapshotDrawing(sheet: number, objectId: number): Uint8Array | null {
+    assertAlive(this);
+    if (!this.capabilities.drawings) return null;
+    const result = wb(this).snapshotDrawing(sheet, objectId);
+    return result.status.ok ? Uint8Array.from(result.bytes) : null;
+  }
+
+  /** Put a `snapshotDrawing` capture back and return the object id: the same
+   *  id in place by default, or a fresh one on top with `newId`. */
+  restoreDrawing(
+    sheet: number,
+    bytes: Uint8Array,
+    options: { newId?: boolean } = {},
+  ): number | null {
+    assertAlive(this);
+    if (!this.capabilities.drawings) return null;
+    const result = wb(this).restoreDrawing(sheet, bytes, { ...options });
+    return result.status.ok ? result.objectId : null;
   }
 
   /** Full hyperlink snapshot, preserving rectangle and internal-link fields.

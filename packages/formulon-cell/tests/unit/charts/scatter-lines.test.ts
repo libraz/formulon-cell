@@ -2,10 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { layoutChart } from '../../../src/charts/layout.js';
 import { clipScatterSegment, scatterLineSegments } from '../../../src/charts/scatter-lines.js';
 import { resolveChartStyle } from '../../../src/charts/styles.js';
-import type { ChartData, ChartPlotBounds, ChartSpec } from '../../../src/charts/types.js';
+import type {
+  ChartData,
+  ChartPlotBounds,
+  ChartPointState,
+  ChartSpec,
+} from '../../../src/charts/types.js';
 
 const data = (
-  points: readonly { id: string; x: number | null; y: number | null }[],
+  points: readonly {
+    id: string;
+    x: number | null;
+    y: number | null;
+    state?: ChartPointState;
+  }[],
 ): ChartData => ({
   domain: 'xy',
   series: [{ id: 'series', points }],
@@ -163,39 +173,49 @@ describe('scatter line geometry', () => {
     expect(points(suppressed)).toHaveLength(2);
   });
 
-  it('applies gap, zero, and span blank policies and always breaks on non-finite values', () => {
-    const blankData = data([
-      { id: 'p0', x: 0, y: 0 },
-      { id: 'blank', x: null, y: 2 },
-      { id: 'p2', x: 10, y: 10 },
-    ]);
+  it('draws blank points by their state and always breaks on non-finite values', () => {
+    const lineSpec: ChartSpec = { kind: 'scatter', scatterStyle: 'line' };
+    const around = (middle: {
+      id: string;
+      x: number | null;
+      y: number | null;
+      state?: ChartPointState;
+    }): ChartData =>
+      data([
+        { id: 'p0', x: 0, y: 0, state: 'value' },
+        middle,
+        { id: 'p2', x: 10, y: 10, state: 'value' },
+      ]);
+
     expect(
-      lines(sceneFor({ kind: 'scatter', scatterStyle: 'line', emptyCells: 'gap' }, blankData)),
+      lines(sceneFor(lineSpec, around({ id: 'blank', x: null, y: null, state: 'gap' }))),
     ).toHaveLength(0);
     expect(
-      lines(sceneFor({ kind: 'scatter', scatterStyle: 'line', emptyCells: 'zero' }, blankData)),
-    ).toHaveLength(2);
-    expect(
-      lines(sceneFor({ kind: 'scatter', scatterStyle: 'line', emptyCells: 'span' }, blankData)),
+      lines(sceneFor(lineSpec, around({ id: 'blank', x: null, y: null, state: 'connect' }))),
     ).toHaveLength(1);
-
-    const invalidData = data([
-      { id: 'p0', x: 0, y: 0 },
-      { id: 'invalid', x: Number.NaN, y: 2 },
-      { id: 'p2', x: 10, y: 10 },
-    ]);
+    // A blank plotted as zero arrives from the engine as a value point.
     expect(
-      lines(sceneFor({ kind: 'scatter', scatterStyle: 'line', emptyCells: 'span' }, invalidData)),
-    ).toHaveLength(0);
-
-    const mixedInvalidData = data([
-      { id: 'p0', x: 0, y: 0 },
-      { id: 'invalid', x: null, y: Number.POSITIVE_INFINITY },
-      { id: 'p2', x: 10, y: 10 },
-    ]);
+      lines(sceneFor(lineSpec, around({ id: 'zero', x: 5, y: 0, state: 'value' }))),
+    ).toHaveLength(2);
+    // The point state decides, not the spec's empty-cell mode.
     expect(
       lines(
-        sceneFor({ kind: 'scatter', scatterStyle: 'line', emptyCells: 'span' }, mixedInvalidData),
+        sceneFor(
+          { ...lineSpec, emptyCells: 'span' },
+          around({ id: 'blank', x: null, y: null, state: 'gap' }),
+        ),
+      ),
+    ).toHaveLength(0);
+
+    expect(
+      lines(sceneFor(lineSpec, around({ id: 'invalid', x: Number.NaN, y: 2, state: 'value' }))),
+    ).toHaveLength(0);
+    expect(
+      lines(
+        sceneFor(
+          lineSpec,
+          around({ id: 'invalid', x: null, y: Number.POSITIVE_INFINITY, state: 'value' }),
+        ),
       ),
     ).toHaveLength(0);
   });

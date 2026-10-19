@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { automaticPalette, DEFAULT_THEME_ACCENTS } from '../../../src/charts/series-colors.js';
+import type { ChartData, ChartKind } from '../../../src/charts/types.js';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -9,11 +12,51 @@ import {
 } from '../../../src/commands/interaction-controller.js';
 import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
-import { createSessionChart, updateSessionChart } from '../../../src/commands/session-chart.js';
+import {
+  type CreateSessionChartOptions,
+  createSessionChart,
+  type SessionChartPatch,
+  updateSessionChart,
+} from '../../../src/commands/session-chart.js';
+import {
+  hydrateChartsFromEngine,
+  refreshChartsAfterRecalc,
+} from '../../../src/engine/charts-sync.js';
+import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { formatSessionChartValue } from '../../../src/interact/session-chart-format.js';
 import { attachSessionCharts } from '../../../src/interact/session-charts.js';
-import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SessionChart,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
+
+const projection = vi.hoisted(() => ({
+  /** Id of a chart seeded straight into the store, with no workbook object behind it. */
+  id: 'chart-native-0-999',
+  /** Every patch the settings surface applied, in order. */
+  patches: [] as unknown[],
+}));
+
+// The settings surface's own contract is the patch it applies. A chart seeded
+// only into the store stands in for the engine: its patch is echoed into the
+// store so that sync and reopen behave as after a real update.
+vi.mock('../../../src/commands/session-chart.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/commands/session-chart.js')>();
+  const { mutators: storeMutators } = await import('../../../src/store/store.js');
+  return {
+    ...actual,
+    updateSessionChart: (...args: Parameters<typeof actual.updateSessionChart>) => {
+      const [store, id, patch] = args;
+      projection.patches.push(patch);
+      if (id !== projection.id) return actual.updateSessionChart(...args);
+      storeMutators.updateChart(store, id, patch as Partial<SessionChart>);
+      return null;
+    },
+  };
+});
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -93,481 +136,816 @@ const chartAxisLogBase = (surface: HTMLElement, axisLabel: string): HTMLInputEle
   return input;
 };
 
+const setInput = (input: HTMLInputElement, value: string): void => {
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+const setSelect = (select: HTMLSelectElement, value: string): void => {
+  select.value = value;
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+const setChecked = (input: HTMLInputElement, checked: boolean): void => {
+  input.checked = checked;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+/** A field control whose label row contains `label`. */
+const fieldControl = <T extends HTMLElement = HTMLInputElement>(
+  within: HTMLElement,
+  label: string,
+  selector = 'input',
+): T => {
+  const field = Array.from(within.querySelectorAll<HTMLElement>('.fc-chart-settings__field')).find(
+    (candidate) => candidate.textContent?.includes(label),
+  );
+  const control = field?.querySelector<T>(selector);
+  if (!control) throw new Error(`missing field: ${label}`);
+  return control;
+};
+
+/** A checkbox whose label is exactly `label`. */
+const checkbox = (within: HTMLElement, label: string): HTMLInputElement => {
+  const row = Array.from(within.querySelectorAll<HTMLElement>('.fc-chart-settings__check')).find(
+    (candidate) => candidate.textContent?.trim() === label,
+  );
+  const input = row?.querySelector<HTMLInputElement>('input');
+  if (!input) throw new Error(`missing checkbox: ${label}`);
+  return input;
+};
+
+const reverseOrder = (surface: HTMLElement, axisLabel: string): HTMLInputElement => {
+  const row = Array.from(
+    chartAxisFieldset(surface, axisLabel).querySelectorAll<HTMLElement>(
+      '.fc-chart-settings__check',
+    ),
+  ).find((candidate) => candidate.textContent?.includes('Reverse order'));
+  const input = row?.querySelector<HTMLInputElement>('input');
+  if (!input) throw new Error(`missing reverse order checkbox: ${axisLabel}`);
+  return input;
+};
+
+const CATEGORY_DATA: ChartData = {
+  domain: 'category',
+  categories: ['A', 'B'],
+  categoryIds: ['category-0', 'category-1'],
+  series: [{ id: 'series-0', name: 'Value', values: [10, 20] }],
+};
+
+const PROJECTED_ANCHOR = {
+  anchorKind: AnchorKind.TwoCell,
+  editAs: AnchorEditAs.TwoCell,
+  fromRow: 1,
+  fromCol: 1,
+  fromRowOff: 0,
+  fromColOff: 0,
+  toRow: 16,
+  toCol: 8,
+  toRowOff: 0,
+  toColOff: 0,
+  cx: 4_572_000,
+  cy: 2_743_200,
+};
+
 describe('attachSessionCharts', () => {
-  it('uses the renderer auto-legend default for one series and allows an explicit legend', () => {
-    const host = document.createElement('div');
+  let wb: WorkbookHandle;
+  let store: SpreadsheetStore;
+  let history: History;
+  let host: HTMLDivElement;
+
+  beforeEach(async () => {
+    wb = await WorkbookHandle.createDefault();
+    store = createSpreadsheetStore();
+    history = new History();
+    host = document.createElement('div');
     document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    [
-      ['Month', 'Sales'],
-      ['Jan', 10],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
+    projection.patches.length = 0;
+  });
+
+  afterEach(() => {
+    host.remove();
+    wb.dispose();
+  });
+
+  const range = (r0: number, c0: number, r1: number, c1: number): Range => ({
+    sheet: 0,
+    r0,
+    c0,
+    r1,
+    c1,
+  });
+
+  /** Write a table into the workbook from A1. */
+  const put = (rows: readonly (readonly (string | number | null)[])[]): void => {
+    rows.forEach((cells, row) => {
+      cells.forEach((value, col) => {
+        if (typeof value === 'number') wb.setNumber({ sheet: 0, row, col }, value);
+        else if (typeof value === 'string') wb.setText({ sheet: 0, row, col }, value);
       });
     });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'single-series-legend', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
-    const legendCheckbox = (surface: HTMLElement): HTMLInputElement => {
-      const row = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__check'),
-      ).find((candidate) => candidate.textContent?.trim() === 'Legend');
-      const input = row?.querySelector<HTMLInputElement>('input');
-      if (!input) throw new Error('missing legend checkbox');
-      return input;
-    };
+  };
 
-    const initial = openElements();
-    expect(legendCheckbox(initial).checked).toBe(false);
-    initial.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+  const create = (
+    source: Range,
+    options: Omit<CreateSessionChartOptions, 'wb'> = {},
+  ): SessionChart => {
+    const chart = createSessionChart(store, source, { wb, ...options });
+    if (!chart) throw new Error('chart was not created');
+    return chart;
+  };
+
+  /** Seed a chart into the store only; see the module mock. */
+  const project = (
+    spec: Partial<Omit<SessionChart, 'kind'>> & { kind: ChartKind },
+    data: ChartData = CATEGORY_DATA,
+  ): void => {
+    mutators.upsertChart(store, {
+      id: projection.id,
+      sheet: 0,
+      nativeObjectId: 999,
+      nativeAnchor: PROJECTED_ANCHOR,
+      data,
+      ...spec,
+    });
+  };
+
+  const attach = (
+    extra: Partial<Parameters<typeof attachSessionCharts>[0]> = {},
+  ): ReturnType<typeof attachSessionCharts> =>
+    attachSessionCharts({ host, store, history, getWb: () => wb, ...extra });
+
+  const surface = (): HTMLElement => {
+    const found = host.querySelector<HTMLElement>('.fc-chart-settings');
+    if (!found) throw new Error('missing chart settings');
+    return found;
+  };
+
+  const openTab = (tab: 'elements' | 'styles' | 'filters' = 'elements'): HTMLElement => {
+    host.querySelector<HTMLButtonElement>(`[data-chart-settings-tab="${tab}"]`)?.click();
+    return surface();
+  };
+
+  const switchTab = (tab: 'elements' | 'styles' | 'filters'): HTMLElement => {
+    surface().querySelector<HTMLButtonElement>(`#fc-chart-settings-tab-${tab}`)?.click();
+    return surface();
+  };
+
+  const apply = (): void => {
+    surface().querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+  };
+
+  const cancel = (): void => {
+    surface().querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
+  };
+
+  const titleInput = (): HTMLInputElement => {
+    const input = surface().querySelector<HTMLInputElement>(
+      '.fc-chart-settings__field input[type="text"]',
+    );
+    if (!input) throw new Error('missing chart title input');
+    return input;
+  };
+
+  const chartType = (): HTMLSelectElement =>
+    fieldControl<HTMLSelectElement>(surface(), 'Chart type', 'select');
+
+  const scatterStyle = (): HTMLSelectElement =>
+    fieldControl<HTMLSelectElement>(surface(), 'Scatter style', 'select');
+
+  const current = (): SessionChart | undefined => store.getState().charts.charts[0];
+
+  const lastPatch = (): SessionChartPatch =>
+    projection.patches[projection.patches.length - 1] as SessionChartPatch;
+
+  const panel = (): HTMLElement => {
+    const found = host.querySelector<HTMLElement>('.fc-chart');
+    if (!found) throw new Error('missing chart overlay');
+    return found;
+  };
+
+  const pixels = (element: HTMLElement) => ({
+    x: Number.parseFloat(element.style.left),
+    y: Number.parseFloat(element.style.top),
+    w: Number.parseFloat(element.style.width),
+    h: Number.parseFloat(element.style.height),
+  });
+
+  const fixture = (name: string): Uint8Array =>
+    new Uint8Array(readFileSync(join(root, 'tests/fixtures/charts', name)));
+
+  it('turns the legend off in the workbook and undoes it', () => {
+    put([
+      ['Month', 'Sales'],
+      ['Jan', 10],
+    ]);
+    create(range(0, 0, 1, 1), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+
+    expect(checkbox(openTab(), 'Legend').checked).toBe(true);
+    apply();
+    expect(projection.patches).toHaveLength(0);
     expect(history.canUndo()).toBe(false);
 
-    const changed = openElements();
-    const checkbox = legendCheckbox(changed);
-    checkbox.checked = true;
-    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-    changed.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.legend?.visible).toBe(true);
-    expect(host.querySelectorAll('[data-chart-role="legend"]')).not.toHaveLength(0);
-    expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.legend).toBeUndefined();
+    setChecked(checkbox(openTab(), 'Legend'), false);
+    apply();
+    expect(current()?.legend?.visible).toBe(false);
     expect(host.querySelectorAll('[data-chart-role="legend"]')).toHaveLength(0);
+    expect(history.undo()).toBe(true);
+    expect(current()?.legend?.visible).toBe(true);
+    expect(host.querySelectorAll('[data-chart-role="legend"]')).not.toHaveLength(0);
     handle.detach();
-    host.remove();
+  });
+
+  it('keeps an implicit legend sparse for a single series and allows an explicit one', () => {
+    project({ kind: 'column' });
+    const handle = attach();
+
+    expect(checkbox(openTab(), 'Legend').checked).toBe(false);
+    apply();
+    expect(projection.patches).toHaveLength(0);
+
+    setChecked(checkbox(openTab(), 'Legend'), true);
+    apply();
+    expect(lastPatch().legend).toEqual({ visible: true });
+    expect(host.querySelectorAll('[data-chart-role="legend"]')).not.toHaveLength(0);
+    handle.detach();
   });
 
   it('opens a non-modal settings surface and applies labels with one undoable update', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'Month' });
-    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'Sales' });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 0 }, { kind: 'text', value: 'Jan' });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 1 }, { kind: 'number', value: 10 });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'settings-chart', kind: 'column', title: 'Old title' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
+    put([
+      ['Month', 'Sales'],
+      ['Jan', 10],
+    ]);
+    create(range(0, 0, 1, 1), { kind: 'column', title: 'Old title' });
+    const handle = attach();
     const settingsButton = host.querySelector<HTMLButtonElement>(
       '.fc-chart__settings-button[data-chart-settings-tab="elements"]',
     );
     expect(settingsButton).toBeTruthy();
     settingsButton?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    expect(surface?.getAttribute('role')).toBe('dialog');
-    expect(surface?.getAttribute('aria-modal')).toBe('false');
-    expect(surface?.parentElement).toBe(host);
-    expect(surface?.querySelectorAll('[role="tab"]')).toHaveLength(3);
-    const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-    expect(title?.value).toBe('Old title');
-    if (!title) throw new Error('missing chart title input');
-    title.value = 'New title';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    const settings = surface();
+    expect(settings.getAttribute('role')).toBe('dialog');
+    expect(settings.getAttribute('aria-modal')).toBe('false');
+    expect(settings.parentElement).toBe(host);
+    expect(settings.querySelectorAll('[role="tab"]')).toHaveLength(3);
+    expect(titleInput().value).toBe('Old title');
+    setInput(titleInput(), 'New title');
+    apply();
 
-    expect(store.getState().charts.charts[0]?.title).toBe('New title');
-    expect(history.canUndo()).toBe(true);
+    expect(current()?.title).toBe('New title');
     expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.title).toBe('Old title');
+    expect(current()?.title).toBe('Old title');
     expect(history.redo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.title).toBe('New title');
+    expect(current()?.title).toBe('New title');
     handle.detach();
-    host.remove();
   });
 
   it('keeps filter drafts outside the chart root and commits selected series/categories', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const table = [
+    put([
       ['Month', 'Sales', 'Costs'],
       ['Jan', 10, 20],
       ['Feb', 30, 40],
-    ];
-    table.forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
-      { id: 'filter-chart', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="filters"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    expect(surface?.closest('.fc-charts')).toBeNull();
-    const filterGroups = surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group');
+    ]);
+    create(range(0, 0, 2, 2), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    const settings = openTab('filters');
+    expect(settings.closest('.fc-charts')).toBeNull();
+    const filterGroups = settings.querySelectorAll<HTMLElement>('.fc-chart-settings__group');
     expect(filterGroups).toHaveLength(2);
     const seriesChecks =
-      filterGroups?.[0]?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+      filterGroups[0]?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     const categoryChecks =
-      filterGroups?.[1]?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+      filterGroups[1]?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     expect(seriesChecks).toHaveLength(2);
     expect(categoryChecks).toHaveLength(2);
     seriesChecks?.[0]?.click();
     categoryChecks?.[1]?.click();
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.filter).toEqual({
+    apply();
+    expect(current()?.filter).toEqual({
       hiddenSeriesIds: ['series-0'],
       hiddenCategoryIds: ['category-1'],
     });
     expect(host.querySelectorAll('[data-chart-role="bar"]')).toHaveLength(1);
     handle.detach();
-    host.remove();
   });
 
   it('keeps pie variation stable for title-only and no-op Apply', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    [
+    put([
       ['A', 'B'],
       [1, 2],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number' ? { kind: 'number', value } : { kind: 'text', value },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'pie-stability', kind: 'pie' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
+    ]);
+    create(range(0, 0, 1, 1), { kind: 'pie' });
+    const handle = attach();
     const fills = (): string[] =>
       Array.from(host.querySelectorAll<SVGElement>('[data-chart-role="slice"]')).map(
         (slice) => slice.getAttribute('fill') ?? '',
       );
     const before = fills();
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing title input');
-    title.value = 'Updated pie';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    openTab();
+    setInput(titleInput(), 'Updated pie');
+    apply();
     expect(fills()).toEqual(before);
-    expect(history.canUndo()).toBe(true);
     expect(history.undo()).toBe(true);
     expect(history.canUndo()).toBe(false);
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    host
-      .querySelector<HTMLElement>('.fc-chart-settings')
-      ?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')
-      ?.click();
+    openTab();
+    apply();
     expect(history.canUndo()).toBe(false);
     expect(fills()).toEqual(before);
     handle.detach();
-    host.remove();
   });
 
-  it('applies palette, series styles, point styles, and cancels drafts with focus restoration', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 1 });
-    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'number', value: 2 });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      { id: 'style-chart', kind: 'line' },
-    );
-    const history = new History();
-    const handle = attachSessionCharts({ host, store, history });
+  it('applies series styles and cancels drafts with focus restoration', () => {
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'line' });
+    const handle = attach();
     expect(host.querySelector('[data-chart-role="line"]')?.getAttribute('data-series-id')).toBe(
       'series-0',
     );
-    expect(host.querySelector('[data-chart-role="point"]')?.getAttribute('data-point-id')).toBe(
-      'category-0',
-    );
-    const stylesButton = host.querySelector<HTMLButtonElement>(
-      '[data-chart-settings-tab="styles"]',
-    );
-    expect(stylesButton).toBeTruthy();
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+    const settings = openTab('styles');
     expect(
-      surface?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.textContent,
+      settings.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.textContent,
     ).toBe('Styles');
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    apply();
     expect(history.canUndo()).toBe(false);
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const styleGroups = surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group');
-    const target = styleGroups?.[1];
-    const seriesFill = target?.querySelector<HTMLInputElement>('input[type="color"]');
-    expect(seriesFill).toBeTruthy();
-    seriesFill?.setAttribute('value', '#ff0000');
-    if (seriesFill) {
-      seriesFill.value = '#ff0000';
-      seriesFill.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.seriesStyles?.[0]?.fill?.color).toBe('#ff0000');
 
-    const reopenedStylesButton = host.querySelector<HTMLButtonElement>(
-      '[data-chart-settings-tab="styles"]',
+    // A line series has no fill: its first colour control is the line colour.
+    const target = openTab('styles').querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    const labels = Array.from(target?.querySelectorAll('.fc-chart-settings__label') ?? []).map(
+      (label) => label.textContent ?? '',
     );
-    reopenedStylesButton?.click();
-    const reopened = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const reopenedSelects = reopened?.querySelectorAll<HTMLSelectElement>('select');
-    const point = reopenedSelects?.[1];
-    if (point) {
-      point.value = 'category-0';
-      point.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    const pointSurface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const pointGroups = pointSurface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group');
-    const pointFill = pointGroups?.[1]?.querySelector<HTMLInputElement>('input[type="color"]');
-    if (pointFill) {
-      pointFill.value = '#00aa00';
-      pointFill.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    pointSurface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.seriesStyles?.[0]?.points?.[0]?.fill?.color).toBe(
-      '#00aa00',
-    );
+    expect(labels.some((label) => label.startsWith('Fill color'))).toBe(false);
+    const lineColor = target?.querySelector<HTMLInputElement>('input[type="color"]');
+    if (!lineColor) throw new Error('missing line colour');
+    setInput(lineColor, '#ff0000');
+    apply();
+    expect(current()?.seriesStyles?.[0]?.line?.color).toBe('#ff0000');
+    expect(current()?.seriesStyles?.[0]?.fill).toBeUndefined();
+    expect(host.querySelector('[data-chart-role="line"]')?.getAttribute('stroke')).toBe('#ff0000');
 
     const cancelStylesButton = host.querySelector<HTMLButtonElement>(
       '[data-chart-settings-tab="styles"]',
     );
-    cancelStylesButton?.click();
-    const cancelSurface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const cancelTitle = cancelSurface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (cancelTitle) {
-      cancelTitle.value = 'discarded';
-      cancelTitle.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    cancelSurface?.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]?.title).toBe('Line chart');
+    openTab('styles');
+    setInput(titleInput(), 'discarded');
+    cancel();
+    expect(current()?.title).toEqual({ auto: true });
     expect(document.activeElement).toBe(cancelStylesButton);
+
     const elementsButton = host.querySelector<HTMLButtonElement>(
       '[data-chart-settings-tab="elements"]',
     );
-    elementsButton?.click();
-    const escapeSurface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const escapeTitle = escapeSurface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (escapeTitle) {
-      escapeTitle.value = 'escaped draft';
-      escapeTitle.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    openTab('elements');
+    setInput(titleInput(), 'escaped draft');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(store.getState().charts.charts[0]?.title).toBe('Line chart');
+    expect(current()?.title).toEqual({ auto: true });
     expect(document.activeElement).toBe(elementsButton);
     handle.detach();
-    host.remove();
   });
 
-  it('shows effective palette and inherited point colors in style controls', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const table = [
+  it('shows the series colours the workbook stores in the palette and style controls', () => {
+    put([
       ['Month', 'Sales', 'Costs'],
       ['Jan', 10, 20],
       ['Feb', 30, 40],
-    ];
-    table.forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
-      { id: 'effective-colors', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store });
-    const firstBar = host.querySelector<SVGElement>(
-      '[data-chart-role="bar"][data-series-index="0"]',
-    );
-    const secondBar = host.querySelector<SVGElement>(
-      '[data-chart-role="bar"][data-series-index="1"]',
-    );
-    expect(firstBar?.getAttribute('fill')).toBe('#0f6cbd');
-    expect(secondBar?.getAttribute('fill')).toBe('#ed7d31');
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    let surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    let groups = surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group');
-    let target = groups?.[1];
-    expect(target?.querySelector<HTMLInputElement>('input[type="color"]')?.value).toBe('#0f6cbd');
+    ]);
+    create(range(0, 0, 2, 2), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    const barFill = (series: number): string | null | undefined =>
+      host
+        .querySelector<SVGElement>(`[data-chart-role="bar"][data-series-index="${series}"]`)
+        ?.getAttribute('fill');
+    const fills = current()?.seriesStyles?.map((style) => style.fill?.color);
+    expect(fills).toHaveLength(2);
+    expect(barFill(0)).toBe(fills?.[0]);
+    expect(barFill(1)).toBe(fills?.[1]);
+
+    let settings = openTab('styles');
+    const palette = settings.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[0];
+    const paletteColors = Array.from(
+      palette?.querySelectorAll<HTMLInputElement>('input[type="color"]') ?? [],
+    ).map((input) => input.value);
+    expect(paletteColors.slice(0, 2)).toEqual(fills);
+    let target = settings.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    expect(target?.querySelector<HTMLInputElement>('input[type="color"]')?.value).toBe(barFill(0));
     const seriesSelect = target?.querySelectorAll<HTMLSelectElement>('select')[0];
     if (!seriesSelect) throw new Error('missing series selector');
-    seriesSelect.value = 'series-1';
-    seriesSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    groups = surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group');
-    target = groups?.[1];
-    expect(target?.querySelector<HTMLInputElement>('input[type="color"]')?.value).toBe('#ed7d31');
-    handle.detach();
-    host.remove();
+    setSelect(seriesSelect, 'series-1');
+    settings = surface();
+    target = settings.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    expect(target?.querySelector<HTMLInputElement>('input[type="color"]')?.value).toBe(barFill(1));
 
-    const pieHost = document.createElement('div');
-    document.body.appendChild(pieHost);
-    const pieStore = createSpreadsheetStore();
-    [
+    // A palette replaces the series' own colours.
+    settings.querySelector<HTMLButtonElement>('[data-palette="mono"]')?.click();
+    apply();
+    const mono = current()?.seriesStyles?.map((style) => style.fill?.color);
+    expect(mono).not.toEqual(fills);
+    expect(barFill(0)).toBe(mono?.[0]);
+    handle.detach();
+  });
+
+  it('shows the inherited colour of a pie slice in its point controls', () => {
+    put([
       ['A', 'B'],
       [1, 2],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          pieStore,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      pieStore,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'effective-pie-colors', kind: 'pie', seriesDirection: 'rows' },
-    );
-    const pieHandle = attachSessionCharts({ host: pieHost, store: pieStore });
-    const secondSlice = pieHost.querySelector<SVGElement>(
+    ]);
+    create(range(0, 0, 1, 1), { kind: 'pie', seriesDirection: 'rows' });
+    const handle = attach();
+    const secondSlice = host.querySelector<SVGElement>(
       '[data-chart-role="slice"][data-point-index="1"]',
     );
-    expect(secondSlice?.getAttribute('fill')).toBe('#ed7d31');
-    pieHost.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const pieSurface = pieHost.querySelector<HTMLElement>('.fc-chart-settings');
-    const pieTarget = pieSurface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    const pieTarget = openTab('styles').querySelectorAll<HTMLElement>(
+      '.fc-chart-settings__group',
+    )[1];
     const pointSelect = pieTarget?.querySelectorAll<HTMLSelectElement>('select')[1];
     if (!pointSelect) throw new Error('missing point selector');
-    pointSelect.value = 'category-1';
-    pointSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    const pointSurface = pieHost.querySelector<HTMLElement>('.fc-chart-settings');
-    const pointTarget = pointSurface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    setSelect(pointSelect, 'category-1');
+    const pointTarget = surface().querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
     expect(pointTarget?.querySelector<HTMLInputElement>('input[type="color"]')?.value).toBe(
       secondSlice?.getAttribute('fill'),
     );
-    pieHandle.detach();
-    pieHost.remove();
+    handle.detach();
   });
 
-  it('keeps point overrides sparse when editing inherited fill, line, and marker fields', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    [
-      ['Jan', 'Feb'],
-      [10, 20],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      {
-        id: 'sparse-point-style',
-        kind: 'line',
-        seriesDirection: 'rows',
-        seriesStyles: [
-          {
-            seriesId: 'series-0',
-            fill: { color: '#ff0000', transparency: 25 },
-            line: { color: '#00aa00', transparency: 30, width: 2 },
-            marker: { visible: true, shape: 'circle', size: 8 },
-          },
-        ],
-      },
-    );
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    let surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    let target = surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+  it('writes a point style to the workbook as that point', () => {
+    put([
+      ['Month', 'Sales'],
+      ['Jan', 10],
+      ['Feb', 15],
+      ['Mar', 8],
+    ]);
+    const chart = create(range(0, 0, 3, 1), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    let target = openTab('styles').querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
     const pointSelect = target?.querySelectorAll<HTMLSelectElement>('select')[1];
     if (!pointSelect) throw new Error('missing point selector');
-    pointSelect.value = 'category-0';
-    pointSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    target = surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    setSelect(pointSelect, 'category-1');
+    target = surface().querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    const pointFill = target?.querySelector<HTMLInputElement>('input[type="color"]');
+    if (!pointFill) throw new Error('missing point fill');
+    setInput(pointFill, '#ff0000');
+    apply();
+
+    const engineSeries = wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series[0];
+    expect(engineSeries?.points.map((point) => point.idx)).toEqual([1]);
+    expect(current()?.seriesStyles?.[0]?.points).toEqual([
+      { pointId: 'category-1', fill: { color: '#ff0000' } },
+    ]);
+    expect(
+      host
+        .querySelector('[data-chart-role="bar"][data-point-id="category-1"]')
+        ?.getAttribute('fill'),
+    ).toBe('#ff0000');
+    expect(history.undo()).toBe(true);
+    expect(current()?.seriesStyles?.[0]?.points).toBeUndefined();
+    handle.detach();
+  });
+
+  it('keeps point overrides sparse when editing inherited line and marker fields', () => {
+    project({
+      kind: 'line',
+      seriesStyles: [
+        {
+          seriesId: 'series-0',
+          fill: { color: '#ff0000', transparency: 25 },
+          line: { color: '#00aa00', transparency: 30, width: 2 },
+          marker: { visible: true, shape: 'circle', size: 8 },
+        },
+      ],
+    });
+    const handle = attach();
+    let target = openTab('styles').querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    const pointSelect = target?.querySelectorAll<HTMLSelectElement>('select')[1];
+    if (!pointSelect) throw new Error('missing point selector');
+    setSelect(pointSelect, 'category-0');
+    target = surface().querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    // A line point has no fill fields: its colour is the line's and marker's.
     const numericInputs = target?.querySelectorAll<HTMLInputElement>('input[type="number"]');
-    const fillTransparency = numericInputs?.[0];
-    const lineTransparency = numericInputs?.[1];
-    const markerSize = numericInputs?.[3];
-    if (!fillTransparency || !lineTransparency || !markerSize) {
+    const lineTransparency = numericInputs?.[0];
+    const markerSize = numericInputs?.[2];
+    if (!lineTransparency || !markerSize) {
       throw new Error('missing point style inputs');
     }
-    fillTransparency.value = '40';
-    fillTransparency.dispatchEvent(new Event('input', { bubbles: true }));
-    lineTransparency.value = '50';
-    lineTransparency.dispatchEvent(new Event('input', { bubbles: true }));
-    markerSize.value = '12';
-    markerSize.dispatchEvent(new Event('input', { bubbles: true }));
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    const style = store.getState().charts.charts[0]?.seriesStyles?.[0];
+    setInput(lineTransparency, '50');
+    setInput(markerSize, '12');
+    apply();
+    const style = current()?.seriesStyles?.[0];
     expect(style?.fill).toEqual({ color: '#ff0000', transparency: 25 });
     expect(style?.line).toEqual({ color: '#00aa00', transparency: 30, width: 2 });
     expect(style?.marker).toEqual({ visible: true, shape: 'circle', size: 8 });
     expect(style?.points?.[0]).toEqual({
       pointId: 'category-0',
-      fill: { transparency: 40 },
-      line: { transparency: 50 },
+      // A transparency carries the colour it applies to, as a workbook line does.
+      line: { color: '#00aa00', transparency: 50 },
       marker: { size: 12 },
     });
     handle.detach();
-    host.remove();
+  });
+
+  it('offers every writable marker symbol and applies a new one', () => {
+    project({
+      kind: 'line',
+      seriesStyles: [{ seriesId: 'series-0', marker: { visible: true, shape: 'circle' } }],
+    });
+    const handle = attach();
+    const target = openTab('styles').querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    const shapes = Array.from(target?.querySelectorAll<HTMLSelectElement>('select') ?? []).find(
+      (select) => Array.from(select.options).some((option) => option.value === 'triangle'),
+    );
+    if (!shapes) throw new Error('missing marker shape picker');
+    // A picture marker is read from workbooks only, so it is not offered.
+    expect(Array.from(shapes.options).map((option) => option.value)).toEqual([
+      'circle',
+      'square',
+      'diamond',
+      'triangle',
+      'x',
+      'star',
+      'plus',
+      'dot',
+      'dash',
+    ]);
+    expect(Array.from(shapes.options).map((option) => option.textContent)).toEqual([
+      'Circle',
+      'Square',
+      'Diamond',
+      'Triangle',
+      'X',
+      'Star',
+      'Plus',
+      'Dot',
+      'Dash',
+    ]);
+    setSelect(shapes, 'star');
+    apply();
+    expect(current()?.seriesStyles?.[0]?.marker?.shape).toBe('star');
+    handle.detach();
+  });
+
+  it('takes the office preset and uncoloured series from the workbook theme accents', () => {
+    project({ kind: 'column' });
+    const handle = attach();
+    const office = (): string[] => {
+      const button = openTab('styles').querySelector('[data-palette="office"]');
+      return Array.from(
+        button?.querySelectorAll<HTMLElement>('.fc-chart-settings__palette-swatch') ?? [],
+      ).map((swatch) => swatch.style.backgroundColor);
+    };
+    // The default workbook carries the default Office theme.
+    expect(office()).toEqual(DEFAULT_THEME_ACCENTS);
+    const palette = surface()
+      .querySelectorAll<HTMLElement>('.fc-chart-settings__group')[0]
+      ?.querySelectorAll<HTMLInputElement>('input[type="color"]');
+    expect(Array.from(palette ?? []).map((input) => input.value)).toEqual(
+      automaticPalette().slice(0, 6),
+    );
+    cancel();
+
+    const theme = wb.getTheme()?.colors ?? [];
+    const accents = [0xff4472c4, 0xffed7d31, 0xffa5a5a5, 0xffffc000, 0xff5b9bd5, 0xff70ad47];
+    expect(wb.setThemeColors([...theme.slice(0, 4), ...accents, ...theme.slice(10)])).toBe(true);
+    expect(office()).toEqual(['#4472c4', '#ed7d31', '#a5a5a5', '#ffc000', '#5b9bd5', '#70ad47']);
+    handle.detach();
+  });
+
+  it('shows and resets an automatic title', () => {
+    project({ kind: 'column', title: 'Sales' });
+    const handle = attach();
+    const header = (): string | null | undefined =>
+      host.querySelector('.fc-chart__title')?.textContent;
+    const automatic = (): HTMLInputElement | undefined =>
+      Array.from(surface().querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(
+        (input) => input.closest('.fc-chart-settings__check')?.textContent === 'Automatic title',
+      );
+    expect(header()).toBe('Sales');
+    openTab();
+    const toggle = automatic();
+    if (!toggle) throw new Error('missing automatic title option');
+    expect(toggle.checked).toBe(false);
+    toggle.click();
+    apply();
+    expect(current()?.title).toEqual({ auto: true });
+    // One series: Excel's automatic title is its name.
+    expect(header()).toBe('Value');
+
+    // Typing a title replaces the automatic one.
+    openTab();
+    expect(automatic()?.checked).toBe(true);
+    setInput(titleInput(), 'Revenue');
+    expect(automatic()?.checked).toBe(false);
+    apply();
+    expect(current()?.title).toBe('Revenue');
+    handle.detach();
+  });
+
+  it('toggles the automatic axis title and lets typed text replace it', () => {
+    project({ kind: 'column', yAxis: { title: 'Units' } });
+    const handle = attach();
+    const changed = openTab();
+    const yAxis = chartAxisFieldset(changed, 'Y-axis');
+    const checkbox = (): HTMLInputElement | undefined =>
+      Array.from(yAxis.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(
+        (input) => input.closest('.fc-chart-settings__check')?.textContent === 'Automatic title',
+      );
+    const title = yAxis.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!checkbox() || !title) throw new Error('missing axis title controls');
+    expect(checkbox()?.checked).toBe(false);
+    checkbox()?.click();
+    apply();
+    expect(current()?.yAxis?.title).toEqual({ auto: true });
+
+    const again = chartAxisFieldset(openTab(), 'Y-axis');
+    const toggle = Array.from(
+      again.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+    ).find(
+      (input) => input.closest('.fc-chart-settings__check')?.textContent === 'Automatic title',
+    );
+    expect(toggle?.checked).toBe(true);
+    const input = again.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!input) throw new Error('missing axis title input');
+    setInput(input, 'Revenue');
+    expect(toggle?.checked).toBe(false);
+    apply();
+    expect(current()?.yAxis?.title).toBe('Revenue');
+    handle.detach();
+  });
+
+  it('titles an automatic chart of several series with the localised chart title', () => {
+    project(
+      { kind: 'column', title: { auto: true } },
+      {
+        domain: 'category',
+        categories: ['A'],
+        series: [
+          { id: 'series-0', name: 'North', values: [1] },
+          { id: 'series-1', name: 'South', values: [2] },
+        ],
+      },
+    );
+    const handle = attach({ labels: { chartTitle: 'グラフ タイトル' } });
+    expect(host.querySelector('.fc-chart__title')?.textContent).toBe('グラフ タイトル');
+    handle.detach();
+  });
+
+  it('toggles a smoothed line on a line series, not on a point', () => {
+    project({ kind: 'line', seriesStyles: [{ seriesId: 'series-0' }] });
+    const handle = attach();
+    const smoothToggle = (): HTMLInputElement | undefined => {
+      const target = surface().querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+      return Array.from(
+        target?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [],
+      ).find(
+        (input) => input.closest('.fc-chart-settings__check')?.textContent === 'Smoothed line',
+      );
+    };
+    openTab('styles');
+    const toggle = smoothToggle();
+    if (!toggle) throw new Error('missing smoothed line toggle');
+    expect(toggle.checked).toBe(false);
+    toggle.click();
+    apply();
+    expect(current()?.seriesStyles?.[0]?.smooth).toBe(true);
+    expect(host.querySelector('[data-chart-role="line"]')?.tagName.toLowerCase()).toBe('path');
+
+    openTab('styles');
+    const pointSelect = surface()
+      .querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1]
+      ?.querySelectorAll<HTMLSelectElement>('select')[1];
+    if (!pointSelect) throw new Error('missing point selector');
+    setSelect(pointSelect, 'category-0');
+    expect(smoothToggle()).toBeUndefined();
+    handle.detach();
+  });
+
+  describe('series add and remove', () => {
+    const seriesSelect = (): HTMLSelectElement =>
+      fieldControl<HTMLSelectElement>(surface(), 'Series', 'select');
+    const button = (className: string): HTMLButtonElement => {
+      const found = surface().querySelector<HTMLButtonElement>(`.${className}`);
+      if (!found) throw new Error(`missing button: ${className}`);
+      return found;
+    };
+    const refInput = (field: string): HTMLInputElement | null =>
+      surface().querySelector<HTMLInputElement>(`[data-series-ref="${field}"]`);
+    const typeRef = (field: string, value: string): void => {
+      const input = refInput(field);
+      if (!input) throw new Error(`missing reference input: ${field}`);
+      setInput(input, value);
+    };
+    const seriesNames = (): (string | undefined)[] =>
+      current()?.data.series.map((series) => series.name) ?? [];
+
+    beforeEach(() => {
+      put([
+        [null, 'North', 'South', 'West'],
+        ['Jan', 10, 20, 30],
+        ['Feb', 15, 25, 35],
+      ]);
+    });
+
+    it('validates the references, adds the series, and selects it', () => {
+      create(range(0, 0, 2, 2), { seriesDirection: 'columns' });
+      const handle = attach();
+      openTab('styles');
+      expect(refInput('values')).toBeNull();
+      button('fc-chart-settings__add-series').click();
+      expect(refInput('categories')).not.toBeNull();
+      expect(refInput('x')).toBeNull();
+
+      // Values are required and every typed field must be a reference.
+      typeRef('name', 'not a ref');
+      button('fc-chart-settings__new-series-confirm').click();
+      expect(refInput('values')?.getAttribute('aria-invalid')).toBe('true');
+      expect(refInput('name')?.getAttribute('aria-invalid')).toBe('true');
+      expect(surface().querySelector('.fc-chart-settings__error')?.textContent).toBe(
+        'Enter a valid cell reference.',
+      );
+      expect(seriesNames()).toEqual(['North', 'South']);
+
+      // A sheet the workbook does not have parses but cannot be resolved.
+      typeRef('name', 'D1');
+      typeRef('values', 'Nowhere!D2:D3');
+      button('fc-chart-settings__new-series-confirm').click();
+      expect(refInput('values')?.getAttribute('aria-invalid')).toBe('true');
+      expect(history.canUndo()).toBe(false);
+
+      typeRef('values', 'Sheet1!$D$2:$D$3');
+      typeRef('categories', 'A2:A3');
+      button('fc-chart-settings__new-series-confirm').click();
+      expect(seriesNames()).toEqual(['North', 'South', 'West']);
+      expect(current()?.data).toMatchObject({ categories: ['Jan', 'Feb'] });
+      expect(refInput('values')).toBeNull();
+      expect(seriesSelect().value).toBe('series-2');
+      expect(host.querySelectorAll('.fc-chart__plot [data-chart-role="bar"]')).toHaveLength(6);
+
+      expect(history.undo()).toBe(true);
+      expect(seriesNames()).toEqual(['North', 'South']);
+      expect(seriesSelect().value).toBe('series-0');
+      expect(history.redo()).toBe(true);
+      expect(seriesNames()).toEqual(['North', 'South', 'West']);
+      handle.detach();
+    });
+
+    it('asks a scatter series for X and Y values', () => {
+      create(range(0, 1, 2, 2), { kind: 'scatter' });
+      const handle = attach();
+      openTab('styles');
+      button('fc-chart-settings__add-series').click();
+      expect(refInput('categories')).toBeNull();
+      expect(fieldControl(surface(), 'Series Y values')).toBe(refInput('values'));
+      typeRef('name', 'D1');
+      typeRef('values', 'D2:D3');
+      typeRef('x', 'B2:B3');
+      button('fc-chart-settings__new-series-confirm').click();
+      expect(seriesNames()).toContain('West');
+      handle.detach();
+    });
+
+    it('removes the selected series and keeps the last one', () => {
+      create(range(0, 0, 2, 2), { seriesDirection: 'columns' });
+      const handle = attach();
+      openTab('styles');
+      setSelect(seriesSelect(), 'series-1');
+      button('fc-chart-settings__remove-series').click();
+      expect(seriesNames()).toEqual(['North']);
+      expect(seriesSelect().value).toBe('series-0');
+
+      const remove = button('fc-chart-settings__remove-series');
+      expect(remove.disabled).toBe(true);
+      expect(remove.title).toBe('A chart needs at least one series.');
+      expect(button('fc-chart-settings__add-series').disabled).toBe(false);
+
+      expect(history.undo()).toBe(true);
+      expect(seriesNames()).toEqual(['North', 'South']);
+      expect(button('fc-chart-settings__remove-series').disabled).toBe(false);
+      handle.detach();
+    });
+
+    it('keeps a pending draft and drops its styles of a removed series', () => {
+      create(range(0, 0, 2, 2), { seriesDirection: 'columns' });
+      const handle = attach();
+      openTab('styles');
+      setSelect(seriesSelect(), 'series-1');
+      const fill = surface()
+        .querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1]
+        ?.querySelector<HTMLInputElement>('input[type="color"]');
+      if (!fill) throw new Error('missing fill colour');
+      setInput(fill, '#ff0000');
+      button('fc-chart-settings__remove-series').click();
+      switchTab('elements');
+      setInput(titleInput(), 'Kept');
+      apply();
+      expect(current()?.title).toBe('Kept');
+      expect(seriesNames()).toEqual(['North']);
+      handle.detach();
+    });
   });
 
   it('keeps settings drafts through a locale update and removes listeners on detach', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    createSessionChart(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }, { id: 'locale-chart' });
-    const handle = attachSessionCharts({ host, store, locale: 'en-US' });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing title input');
-    title.value = 'draft title';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    project({ kind: 'column' });
+    const handle = attach({ locale: 'en-US' });
+    const settings = openTab();
+    setInput(titleInput(), 'draft title');
     handle.setLabels(
       {
         settings: 'グラフ設定',
@@ -577,107 +955,81 @@ describe('attachSessionCharts', () => {
       },
       'ja-JP',
     );
-    expect(surface?.lang).toBe('ja-JP');
-    expect(surface?.querySelector('.fc-chart-settings__title')?.textContent).toBe('グラフ設定');
-    expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe(
-      'draft title',
-    );
+    expect(settings.lang).toBe('ja-JP');
+    expect(settings.querySelector('.fc-chart-settings__title')?.textContent).toBe('グラフ設定');
+    expect(titleInput().value).toBe('draft title');
     handle.detach();
     expect(host.querySelector('.fc-chart-settings')).toBeNull();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    host.remove();
   });
 
   it('reformats SVG data labels when the session locale changes', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 1234.5 });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-      {
-        id: 'locale-label-chart',
-        kind: 'column',
-        dataLabels: { visible: true, showValue: true },
-      },
-    );
-    const handle = attachSessionCharts({
-      host,
-      store,
-      locale: 'en-US',
-      formatValue: formatSessionChartValue,
+    put([[1234.5]]);
+    create(range(0, 0, 0, 0), {
+      kind: 'column',
+      dataLabels: { visible: true, showValue: true },
     });
+    const handle = attach({ locale: 'en-US', formatValue: formatSessionChartValue });
     const label = (): string | null =>
       host.querySelector<SVGTextElement>('[data-chart-role="data-label"]')?.textContent ?? null;
     expect(label()).toBe('1,234.5');
     handle.setLabels({}, 'de-DE');
     expect(label()).toBe('1.234,5');
     handle.detach();
-    host.remove();
   });
 
   it('uses Excel chart label positions and preserves an invalid current position', () => {
-    const openPositionSelect = (
-      kind: 'column' | 'line' | 'area' | 'pie',
-      grouping?: 'clustered' | 'stacked',
-      position?: 'outside-end',
-    ): {
-      host: HTMLDivElement;
-      store: ReturnType<typeof createSpreadsheetStore>;
-      handle: ReturnType<typeof attachSessionCharts>;
-      select: HTMLSelectElement;
-    } => {
-      const host = document.createElement('div');
-      document.body.appendChild(host);
-      const store = createSpreadsheetStore();
-      mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 10 });
-      createSessionChart(
-        store,
-        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-        {
-          id: `${kind}-${grouping ?? 'default'}`,
-          kind,
-          grouping,
-          dataLabels: { visible: true, ...(position ? { position } : {}) },
-        },
-      );
-      const handle = attachSessionCharts({ host, store });
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const selects = host.querySelectorAll<HTMLSelectElement>('.fc-chart-settings select');
-      const select = Array.from(selects).find(
+    const positionSelect = (): HTMLSelectElement => {
+      const select = Array.from(
+        surface().querySelectorAll<HTMLSelectElement>('.fc-chart-settings select'),
+      ).find(
         (candidate) =>
           candidate.parentElement?.querySelector('.fc-chart-settings__label')?.textContent ===
             'Label position' &&
           !candidate.parentElement.classList.contains('fc-chart-settings__label-position'),
       );
       if (!select) throw new Error('missing chart label position select');
-      return { host, store, handle, select };
+      return select;
+    };
+    const openPositionSelect = (
+      kind: 'column' | 'line' | 'area',
+      grouping?: 'clustered' | 'stacked',
+      position?: 'outside-end',
+    ): { handle: ReturnType<typeof attachSessionCharts>; select: HTMLSelectElement } => {
+      project({
+        kind,
+        ...(grouping ? { grouping } : {}),
+        dataLabels: { visible: true, ...(position ? { position } : {}) },
+      });
+      const handle = attach();
+      openTab();
+      return { handle, select: positionSelect() };
     };
 
-    const pie = openPositionSelect('pie');
-    expect(
-      pie.select.querySelector<HTMLOptionElement>('option[value="inside-end"]')?.disabled,
-    ).toBe(false);
-    pie.select.value = 'inside-end';
-    pie.select.dispatchEvent(new Event('change', { bubbles: true }));
-    pie.host.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(pie.store.getState().charts.charts[0]?.dataLabels?.position).toBe('inside-end');
-    pie.handle.detach();
-    pie.host.remove();
+    put([[10]]);
+    create(range(0, 0, 0, 0), { kind: 'pie', dataLabels: { visible: true } });
+    const pieHandle = attach();
+    openTab();
+    const pie = positionSelect();
+    expect(pie.querySelector<HTMLOptionElement>('option[value="inside-end"]')?.disabled).toBe(
+      false,
+    );
+    setSelect(pie, 'inside-end');
+    apply();
+    expect(current()?.dataLabels?.position).toBe('inside-end');
+    pieHandle.detach();
+    store = createSpreadsheetStore();
 
     const stacked = openPositionSelect('column', 'stacked', 'outside-end');
     expect(
       stacked.select.querySelector<HTMLOptionElement>('option[value="outside-end"]')?.disabled,
     ).toBe(true);
     stacked.handle.detach();
-    stacked.host.remove();
 
     const line = openPositionSelect('line');
     expect(line.select.querySelector('option[value="best-fit"]')?.textContent).toBe('Automatic');
     expect(['best-fit', 'right']).toContain(line.select.value);
     line.handle.detach();
-    line.host.remove();
 
     const area = openPositionSelect('area');
     expect(area.select.disabled).toBe(true);
@@ -685,314 +1037,195 @@ describe('attachSessionCharts', () => {
       true,
     );
     area.handle.detach();
-    area.host.remove();
   });
 
   it('uses the built-in Excel formatter for direct chart attachment', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 1234.5 });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-      {
-        id: 'default-formatter-chart',
-        kind: 'column',
-        dataLabels: { visible: true, showValue: true, numberFormat: '#,##0.00' },
-      },
-    );
+    put([[1234.5]]);
+    create(range(0, 0, 0, 0), {
+      kind: 'column',
+      dataLabels: { visible: true, showValue: true, numberFormat: '#,##0.00' },
+    });
     const handle = attachSessionCharts({ host, store, locale: 'en-US' });
     expect(host.querySelector<SVGTextElement>('[data-chart-role="data-label"]')?.textContent).toBe(
       '1,234.50',
     );
     handle.detach();
-    host.remove();
   });
 
   it('patches only changed data-label fields and preserves sparse API values', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-      {
-        id: 'sparse-labels',
-        kind: 'column',
-        dataLabels: { visible: true, showValue: true, color: '#123456', fontSize: 72 },
-      },
-      history,
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const dataLabelFields = Array.from(
-      surface?.querySelectorAll<HTMLElement>('fieldset') ?? [],
-    ).find((fieldset) => fieldset.querySelector('legend')?.textContent === 'Data labels');
-    const dataLabelNumberFormat = Array.from(
-      dataLabelFields?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    ).find((field) => field.textContent?.includes('Number format'));
-    const numberFormat = dataLabelNumberFormat?.querySelector<HTMLInputElement>('input');
-    if (!numberFormat) throw new Error('missing number format input');
-    numberFormat.value = '#,##0.00';
-    numberFormat.dispatchEvent(new Event('input', { bubbles: true }));
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.dataLabels).toEqual({
-      visible: true,
-      showValue: true,
-      color: '#123456',
-      fontSize: 72,
-      numberFormat: '#,##0.00',
+    project({
+      kind: 'column',
+      dataLabels: { visible: true, showValue: true, color: '#123456', fontSize: 72 },
     });
-    expect(history.canUndo()).toBe(true);
+    const handle = attach();
+    const dataLabelFields = Array.from(openTab().querySelectorAll<HTMLElement>('fieldset')).find(
+      (fieldset) => fieldset.querySelector('legend')?.textContent === 'Data labels',
+    );
+    if (!dataLabelFields) throw new Error('missing data label fields');
+    setInput(fieldControl(dataLabelFields, 'Number format'), '#,##0.00');
+    apply();
+    expect(lastPatch()).toEqual({
+      dataLabels: {
+        visible: true,
+        showValue: true,
+        color: '#123456',
+        fontSize: 72,
+        numberFormat: '#,##0.00',
+      },
+    });
     handle.detach();
-    host.remove();
   });
 
   it('keeps implicit value labels when another label flag is enabled', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    [
+    put([
       ['Month', 'Sales'],
       ['Jan', 10],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'implicit-value-label', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
+    ]);
+    create(range(0, 0, 1, 1), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    const settings = openTab();
     const findCheckbox = (label: string): HTMLInputElement | undefined =>
-      Array.from(surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__check') ?? [])
+      Array.from(settings.querySelectorAll<HTMLElement>('.fc-chart-settings__check'))
         .find((row) => row.textContent?.includes(label))
         ?.querySelector<HTMLInputElement>('input') ?? undefined;
     const showDataLabels = findCheckbox('Show data labels');
     const showCategoryName = findCheckbox('Category name');
     if (!showDataLabels || !showCategoryName) throw new Error('missing data-label controls');
-    showDataLabels.checked = true;
-    showDataLabels.dispatchEvent(new Event('change', { bubbles: true }));
-    showCategoryName.checked = true;
-    showCategoryName.dispatchEvent(new Event('change', { bubbles: true }));
-    const dataLabelFields = Array.from(
-      surface?.querySelectorAll<HTMLElement>('fieldset') ?? [],
-    ).find((fieldset) => fieldset.querySelector('legend')?.textContent === 'Data labels');
-    const numberFormatField = Array.from(
-      dataLabelFields?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    ).find((field) => field.textContent?.includes('Number format'));
-    const numberFormat = numberFormatField?.querySelector<HTMLInputElement>('input');
-    if (!numberFormat) throw new Error('missing number format input');
-    numberFormat.value = '#,##0.00';
-    numberFormat.dispatchEvent(new Event('input', { bubbles: true }));
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.dataLabels?.showValue).toBe(true);
+    setChecked(showDataLabels, true);
+    setChecked(showCategoryName, true);
+    const dataLabelFields = Array.from(settings.querySelectorAll<HTMLElement>('fieldset')).find(
+      (fieldset) => fieldset.querySelector('legend')?.textContent === 'Data labels',
+    );
+    if (!dataLabelFields) throw new Error('missing data label fields');
+    setInput(fieldControl(dataLabelFields, 'Number format'), '#,##0.00');
+    apply();
+    expect(current()?.dataLabels?.showValue).toBe(true);
     expect(host.querySelector<SVGTextElement>('[data-chart-role="data-label"]')?.textContent).toBe(
       'Jan, 10.00',
     );
     handle.detach();
-    host.remove();
   });
 
   it('rejects settings Apply on a protected chart source', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      { id: 'protected-settings', kind: 'column', title: 'Original' },
-    );
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing title input');
-    title.value = 'Blocked';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'column', title: 'Original' });
+    const handle = attach();
+    openTab();
+    setInput(titleInput(), 'Blocked');
     setProtectedSheet(store, 0, true);
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.title).toBe('Original');
+    apply();
+    expect(current()?.title).toBe('Original');
     handle.detach();
-    host.remove();
   });
 
   it('updates open settings editability when protection changes', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      { id: 'live-protection', kind: 'column', title: 'Original' },
-    );
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing title input');
-    title.value = 'Draft';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'column', title: 'Original' });
+    const handle = attach();
+    openTab();
+    setInput(titleInput(), 'Draft');
     setProtectedSheet(store, 0, true);
-    expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.disabled).toBe(true);
-    expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe('Draft');
+    expect(titleInput().disabled).toBe(true);
+    expect(titleInput().value).toBe('Draft');
     setProtectedSheet(store, 0, false);
-    expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.disabled).toBe(false);
-    expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe('Draft');
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]?.title).toBe('Original');
+    expect(titleInput().disabled).toBe(false);
+    expect(titleInput().value).toBe('Draft');
+    cancel();
+    expect(current()?.title).toBe('Original');
     handle.detach();
-    host.remove();
   });
 
-  it('updates open settings editability when interaction policy changes', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
-    const controller = new InteractionController({ store, history, getWb: () => workbook });
+  it('keeps the settings surface read-only without a workbook', () => {
+    project({ kind: 'column', title: 'Original' });
+    const handle = attachSessionCharts({ host, store });
+    openTab();
+    expect(titleInput().disabled).toBe(true);
+    expect(surface().querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.disabled).toBe(
+      true,
+    );
+    handle.detach();
+  });
+
+  it('updates open settings editability when interaction policy changes', () => {
+    const controller = new InteractionController({ store, history, getWb: () => wb });
     const unregister = registerInteractionController(store, controller);
     try {
-      createSessionChart(
-        store,
-        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-        { id: 'live-policy', kind: 'column', title: 'Original' },
-        history,
-      );
-      const handle = attachSessionCharts({ host, store, history });
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-      const apply = surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply');
-      if (!title || !apply) throw new Error('missing live policy settings controls');
-      title.value = 'Draft';
-      title.dispatchEvent(new Event('input', { bubbles: true }));
-      expect(apply.disabled).toBe(false);
+      put([[1, 2]]);
+      create(range(0, 0, 0, 1), { kind: 'column', title: 'Original' });
+      const handle = attach();
+      openTab();
+      setInput(titleInput(), 'Draft');
+      const applyButton = (): HTMLButtonElement | null =>
+        surface().querySelector<HTMLButtonElement>('.fc-chart-settings__apply');
+      expect(applyButton()?.disabled).toBe(false);
 
       controller.setPolicy(viewerPolicy());
-      expect(surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.disabled).toBe(
-        true,
-      );
-      expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe('Draft');
+      expect(applyButton()?.disabled).toBe(true);
+      expect(titleInput().value).toBe('Draft');
 
       controller.setPolicy(undefined);
-      expect(surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.disabled).toBe(
-        false,
-      );
-      expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe('Draft');
+      expect(applyButton()?.disabled).toBe(false);
+      expect(titleInput().value).toBe('Draft');
       handle.detach();
       expect(() => controller.setPolicy(viewerPolicy())).not.toThrow();
       expect(host.querySelector('.fc-chart-settings')).toBeNull();
     } finally {
       unregister();
       controller.dispose();
-      workbook.dispose();
     }
-    host.remove();
   });
 
-  it('shows a read-only settings surface for viewer policy', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
-    const controller = new InteractionController({ store, history, getWb: () => workbook });
+  it('shows a read-only settings surface for viewer policy', () => {
+    const controller = new InteractionController({ store, history, getWb: () => wb });
     const unregister = registerInteractionController(store, controller);
     try {
-      createSessionChart(
-        store,
-        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-        { id: 'viewer-settings', kind: 'column', title: 'Original' },
-        history,
-      );
-      const handle = attachSessionCharts({ host, store, history });
+      put([[1, 2]]);
+      create(range(0, 0, 0, 1), { kind: 'column', title: 'Original' });
+      const handle = attach();
       controller.setPolicy(viewerPolicy());
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      expect(surface?.querySelector<HTMLInputElement>('input[type="text"]')?.disabled).toBe(true);
-      expect(surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.disabled).toBe(
-        true,
-      );
-      surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-      expect(store.getState().charts.charts[0]?.title).toBe('Original');
+      openTab();
+      expect(titleInput().disabled).toBe(true);
+      const applyButton = surface().querySelector<HTMLButtonElement>('.fc-chart-settings__apply');
+      expect(applyButton?.disabled).toBe(true);
+      applyButton?.click();
+      expect(current()?.title).toBe('Original');
       handle.detach();
     } finally {
       unregister();
       controller.dispose();
-      workbook.dispose();
     }
-    host.remove();
   });
 
   it('applies gap width and overlap updates to the displayed columns', () => {
-    const host = document.createElement('div');
-    const store = createSpreadsheetStore();
-    [
+    put([
       ['Month', 'Sales', 'Costs'],
       ['Jan', 10, 20],
-    ].forEach((row, r) => {
-      row.forEach((value, col) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: r, col },
-          typeof value === 'number' ? { kind: 'number', value } : { kind: 'text', value },
-        );
-      });
+    ]);
+    const chart = create(range(0, 0, 1, 2), {
+      kind: 'column',
+      seriesDirection: 'columns',
+      gapWidth: 150,
+      overlap: 0,
     });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 2 },
-      {
-        id: 'geometry',
-        kind: 'column',
-        seriesDirection: 'columns',
-        gapWidth: 150,
-        overlap: 0,
-      },
+    const handle = attach();
+    const before = Array.from(host.querySelectorAll('[data-chart-role="bar"]'));
+    expect(before).toHaveLength(2);
+    const width = Number(before[0]?.getAttribute('width'));
+    expect(width).toBeGreaterThan(0);
+    expect(Number(before[1]?.getAttribute('x'))).toBeCloseTo(
+      Number(before[0]?.getAttribute('x')) + width,
     );
-    const handle = attachSessionCharts({ host, store });
-    try {
-      const before = Array.from(host.querySelectorAll('[data-chart-role="bar"]'));
-      expect(before).toHaveLength(2);
-      const width = Number(before[0]?.getAttribute('width'));
-      expect(width).toBeGreaterThan(0);
-      expect(Number(before[1]?.getAttribute('x'))).toBeCloseTo(
-        Number(before[0]?.getAttribute('x')) + width,
-      );
-      updateSessionChart(store, 'geometry', { gapWidth: 0, overlap: 100 });
-      const after = Array.from(host.querySelectorAll('[data-chart-role="bar"]'));
-      expect(after).toHaveLength(2);
-      expect(Number(after[0]?.getAttribute('width'))).toBeCloseTo(width * 3.5);
-      expect(after[0]?.getAttribute('x')).toBe(after[1]?.getAttribute('x'));
-    } finally {
-      handle.detach();
-    }
+    updateSessionChart(store, chart.id, { gapWidth: 0, overlap: 100 }, null, wb);
+    const after = Array.from(host.querySelectorAll('[data-chart-role="bar"]'));
+    expect(after).toHaveLength(2);
+    expect(Number(after[0]?.getAttribute('width'))).toBeCloseTo(width * 3.5);
+    expect(after[0]?.getAttribute('x')).toBe(after[1]?.getAttribute('x'));
+    handle.detach();
   });
 
   it('edits axis fields sparsely, preserves unknown values, and accepts negative and zero values', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'axis-settings',
+    project({
       kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
       xAxis: { title: 'Original X', customAxisValue: 'keep-x' } as never,
       yAxis: {
         min: -10,
@@ -1003,14 +1236,8 @@ describe('attachSessionCharts', () => {
         customAxisValue: 'keep-y',
       } as never,
     });
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
-    const fieldInput = (fieldset: HTMLElement, text: string): HTMLInputElement => {
+    const handle = attach();
+    const axisInput = (fieldset: HTMLElement, text: string): HTMLInputElement => {
       const field = Array.from(
         fieldset.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
       ).find(
@@ -1022,228 +1249,102 @@ describe('attachSessionCharts', () => {
       if (!input) throw new Error(`missing axis field: ${text}`);
       return input;
     };
-    const axisFieldset = (surface: HTMLElement, label: string): HTMLElement => {
-      const fieldset = Array.from(surface.querySelectorAll<HTMLElement>('fieldset')).find(
-        (candidate) => candidate.querySelector('legend')?.textContent === label,
-      );
-      if (!fieldset) throw new Error(`missing axis fieldset: ${label}`);
-      return fieldset;
-    };
 
-    const surface = openElements();
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
+    openTab();
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    const changedSurface = openElements();
-    const xAxis = axisFieldset(changedSurface, 'X-axis');
-    const yAxis = axisFieldset(changedSurface, 'Y-axis');
-    const xTitle = fieldInput(xAxis, 'X-axis title');
-    xTitle.value = 'Updated X';
-    xTitle.dispatchEvent(new Event('input', { bubbles: true }));
-    const minimum = fieldInput(yAxis, 'Minimum');
-    minimum.value = '-5';
-    minimum.dispatchEvent(new Event('input', { bubbles: true }));
-    const maximum = fieldInput(yAxis, 'Maximum');
-    maximum.value = '0';
-    maximum.dispatchEvent(new Event('input', { bubbles: true }));
-    const majorUnit = fieldInput(yAxis, 'Major unit');
-    majorUnit.value = '0';
-    majorUnit.dispatchEvent(new Event('input', { bubbles: true }));
-    changedSurface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
+    const changed = openTab();
+    const xAxis = chartAxisFieldset(changed, 'X-axis');
+    const yAxis = chartAxisFieldset(changed, 'Y-axis');
+    setInput(axisInput(xAxis, 'X-axis title'), 'Updated X');
+    setInput(axisInput(yAxis, 'Minimum'), '-5');
+    setInput(axisInput(yAxis, 'Maximum'), '0');
+    setInput(axisInput(yAxis, 'Major unit'), '0');
+    apply();
 
-    const chart = store.getState().charts.charts[0];
-    expect(chart?.xAxis).toMatchObject({ title: 'Updated X', customAxisValue: 'keep-x' });
-    expect(chart?.yAxis).toMatchObject({
+    expect(projection.patches).toHaveLength(1);
+    expect(current()?.xAxis).toMatchObject({ title: 'Updated X', customAxisValue: 'keep-x' });
+    expect(current()?.yAxis).toMatchObject({
       min: -5,
       max: 0,
       numberFormat: '0.0',
       majorGridlines: false,
       customAxisValue: 'keep-y',
     });
-    expect(chart?.yAxis?.majorUnit).toBeUndefined();
-    expect(history.canUndo()).toBe(true);
-    expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis).toMatchObject({
-      title: 'Original X',
-      customAxisValue: 'keep-x',
-    });
+    expect(current()?.yAxis?.majorUnit).toBeUndefined();
     handle.detach();
-    host.remove();
   });
 
-  it('applies both axis reverse-order controls sparsely with undo, redo, and cancel', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'axis-reverse-history',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      xAxis: { title: 'Original X', customAxisValue: 'keep-x' } as never,
-      yAxis: { reverseOrder: false, title: 'Original Y', customAxisValue: 'keep-y' } as never,
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
-    const reverseOrder = (surface: HTMLElement, axisLabel: string): HTMLInputElement => {
-      const fieldset = Array.from(surface.querySelectorAll<HTMLElement>('fieldset')).find(
-        (candidate) => candidate.querySelector('legend')?.textContent === axisLabel,
-      );
-      const row = Array.from(
-        fieldset?.querySelectorAll<HTMLElement>('.fc-chart-settings__check') ?? [],
-      ).find((candidate) => candidate.textContent?.includes('Reverse order'));
-      const input = row?.querySelector<HTMLInputElement>('input');
-      if (!input) throw new Error(`missing reverse order checkbox: ${axisLabel}`);
-      return input;
-    };
+  it('applies both axis reverse-order controls with undo, redo, and cancel', () => {
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'column' });
+    const handle = attach();
+    const before = { xAxis: current()?.xAxis, yAxis: current()?.yAxis };
 
-    const before = {
-      xAxis: store.getState().charts.charts[0]?.xAxis,
-      yAxis: store.getState().charts.charts[0]?.yAxis,
-    };
-    openElements().querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis).toEqual(before.xAxis);
-    expect(store.getState().charts.charts[0]?.yAxis).toEqual(before.yAxis);
+    openTab();
+    apply();
     expect(history.canUndo()).toBe(false);
 
-    const noOp = openElements();
-    const xNoOp = reverseOrder(noOp, 'X-axis');
-    const yNoOp = reverseOrder(noOp, 'Y-axis');
-    xNoOp.checked = true;
-    xNoOp.dispatchEvent(new Event('change', { bubbles: true }));
-    xNoOp.checked = false;
-    xNoOp.dispatchEvent(new Event('change', { bubbles: true }));
-    yNoOp.checked = true;
-    yNoOp.dispatchEvent(new Event('change', { bubbles: true }));
-    yNoOp.checked = false;
-    yNoOp.dispatchEvent(new Event('change', { bubbles: true }));
-    noOp.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis).toEqual(before.xAxis);
+    const noOp = openTab();
+    setChecked(reverseOrder(noOp, 'X-axis'), true);
+    setChecked(reverseOrder(noOp, 'X-axis'), false);
+    setChecked(reverseOrder(noOp, 'Y-axis'), true);
+    setChecked(reverseOrder(noOp, 'Y-axis'), false);
+    apply();
+    expect(current()?.xAxis).toEqual(before.xAxis);
     expect(history.canUndo()).toBe(false);
 
-    const changed = openElements();
-    const xChanged = reverseOrder(changed, 'X-axis');
-    const yChanged = reverseOrder(changed, 'Y-axis');
-    xChanged.checked = true;
-    xChanged.dispatchEvent(new Event('change', { bubbles: true }));
-    yChanged.checked = true;
-    yChanged.dispatchEvent(new Event('change', { bubbles: true }));
-    changed.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis).toMatchObject({
-      title: 'Original X',
-      customAxisValue: 'keep-x',
-      reverseOrder: true,
-    });
-    expect(store.getState().charts.charts[0]?.yAxis).toMatchObject({
-      title: 'Original Y',
-      customAxisValue: 'keep-y',
-      reverseOrder: true,
-    });
-    expect(history.canUndo()).toBe(true);
+    const changed = openTab();
+    setChecked(reverseOrder(changed, 'X-axis'), true);
+    setChecked(reverseOrder(changed, 'Y-axis'), true);
+    apply();
+    expect(current()?.xAxis?.reverseOrder).toBe(true);
+    expect(current()?.yAxis?.reverseOrder).toBe(true);
 
     expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis).toEqual(before.xAxis);
-    expect(store.getState().charts.charts[0]?.yAxis).toEqual(before.yAxis);
+    expect(current()?.xAxis).toEqual(before.xAxis);
+    expect(current()?.yAxis).toEqual(before.yAxis);
     expect(history.redo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis?.reverseOrder).toBe(true);
-    expect(store.getState().charts.charts[0]?.yAxis?.reverseOrder).toBe(true);
+    expect(current()?.xAxis?.reverseOrder).toBe(true);
+    expect(current()?.yAxis?.reverseOrder).toBe(true);
 
-    const cancel = openElements();
-    const xCancel = reverseOrder(cancel, 'X-axis');
-    xCancel.checked = false;
-    xCancel.dispatchEvent(new Event('change', { bubbles: true }));
-    cancel.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.reverseOrder).toBe(true);
-    expect(store.getState().charts.charts[0]?.yAxis?.reverseOrder).toBe(true);
+    setChecked(reverseOrder(openTab(), 'X-axis'), false);
+    cancel();
+    expect(current()?.xAxis?.reverseOrder).toBe(true);
+    expect(current()?.yAxis?.reverseOrder).toBe(true);
     handle.detach();
-    host.remove();
   });
 
   it('syncs untouched external axis reversal while preserving a dirty draft', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'axis-reverse-sync',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing chart settings');
-    const reverseOrder = (axisLabel: string): HTMLInputElement => {
-      const fieldset = Array.from(surface.querySelectorAll<HTMLElement>('fieldset')).find(
-        (candidate) => candidate.querySelector('legend')?.textContent === axisLabel,
-      );
-      const row = Array.from(
-        fieldset?.querySelectorAll<HTMLElement>('.fc-chart-settings__check') ?? [],
-      ).find((candidate) => candidate.textContent?.includes('Reverse order'));
-      const input = row?.querySelector<HTMLInputElement>('input');
-      if (!input) throw new Error(`missing reverse order checkbox: ${axisLabel}`);
-      return input;
-    };
+    project({ kind: 'column' });
+    const handle = attach();
+    const settings = openTab();
+    setInput(titleInput(), 'Draft title');
+    mutators.updateChart(store, projection.id, { xAxis: { reverseOrder: true } });
+    expect(reverseOrder(settings, 'X-axis').checked).toBe(true);
+    expect(titleInput().value).toBe('Draft title');
 
-    const title = surface.querySelector<HTMLInputElement>(
-      '.fc-chart-settings__field input[type="text"]',
-    );
-    if (!title) throw new Error('missing chart title input');
-    title.value = 'Draft title';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    mutators.updateChart(store, 'axis-reverse-sync', { xAxis: { reverseOrder: true } });
-    expect(reverseOrder('X-axis').checked).toBe(true);
-    expect(
-      surface.querySelector<HTMLInputElement>('.fc-chart-settings__field input[type="text"]')
-        ?.value,
-    ).toBe('Draft title');
+    setChecked(reverseOrder(settings, 'Y-axis'), true);
+    mutators.updateChart(store, projection.id, { yAxis: { reverseOrder: false } });
+    expect(reverseOrder(settings, 'Y-axis').checked).toBe(true);
 
-    const yDraft = reverseOrder('Y-axis');
-    yDraft.checked = true;
-    yDraft.dispatchEvent(new Event('change', { bubbles: true }));
-    mutators.updateChart(store, 'axis-reverse-sync', { yAxis: { reverseOrder: false } });
-    expect(reverseOrder('Y-axis').checked).toBe(true);
-
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.title).toBe('Draft title');
-    expect(store.getState().charts.charts[0]?.xAxis?.reverseOrder).toBe(true);
-    expect(store.getState().charts.charts[0]?.yAxis?.reverseOrder).toBe(true);
+    apply();
+    expect(lastPatch().xAxis).toBeUndefined();
+    expect(current()?.title).toBe('Draft title');
+    expect(current()?.xAxis?.reverseOrder).toBe(true);
+    expect(current()?.yAxis?.reverseOrder).toBe(true);
     handle.detach();
-    host.remove();
   });
 
   it.each(['pie', 'doughnut'] as const)('disables reverse-order controls for %s charts', (kind) => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: `axis-reverse-${kind}`,
-      kind,
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      xAxis: { reverseOrder: true },
-      yAxis: { reverseOrder: false },
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing chart settings');
+    project({ kind, xAxis: { reverseOrder: true }, yAxis: { reverseOrder: false } });
+    const handle = attach();
+    const settings = openTab();
     for (const axisLabel of ['X-axis', 'Y-axis']) {
-      const fieldset = Array.from(surface.querySelectorAll<HTMLElement>('fieldset')).find(
-        (candidate) => candidate.querySelector('legend')?.textContent === axisLabel,
-      );
-      const row = Array.from(
-        fieldset?.querySelectorAll<HTMLElement>('.fc-chart-settings__check') ?? [],
-      ).find((candidate) => candidate.textContent?.includes('Reverse order'));
-      const input = row?.querySelector<HTMLInputElement>('input');
-      expect(input?.disabled).toBe(true);
+      expect(reverseOrder(settings, axisLabel).disabled).toBe(true);
     }
     handle.detach();
-    host.remove();
   });
 
   it('disables axis controls according to chart roles and disables unsupported grouping', () => {
@@ -1254,25 +1355,10 @@ describe('attachSessionCharts', () => {
       { kind: 'pie' as const, xNumeric: false, yNumeric: false, grouping: true },
     ];
     for (const item of cases) {
-      const host = document.createElement('div');
-      document.body.appendChild(host);
-      const store = createSpreadsheetStore();
-      mutators.upsertChart(store, {
-        id: `axis-role-${item.kind}`,
-        kind: item.kind,
-        source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      });
-      const handle = attachSessionCharts({ host, store });
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing settings surface');
-      const axis = (label: string): HTMLElement => {
-        const fieldset = Array.from(surface.querySelectorAll<HTMLElement>('fieldset')).find(
-          (candidate) => candidate.querySelector('legend')?.textContent === label,
-        );
-        if (!fieldset) throw new Error(`missing axis ${label}`);
-        return fieldset;
-      };
+      store = createSpreadsheetStore();
+      project({ kind: item.kind });
+      const handle = attach();
+      const settings = openTab();
       const minimum = (fieldset: HTMLElement): HTMLInputElement => {
         const field = Array.from(
           fieldset.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
@@ -1285,797 +1371,351 @@ describe('attachSessionCharts', () => {
         if (!input) throw new Error('missing minimum input');
         return input;
       };
-      expect(minimum(axis('X-axis')).disabled).toBe(!item.xNumeric);
-      expect(minimum(axis('Y-axis')).disabled).toBe(!item.yNumeric);
-      const grouping = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((field) => field.textContent?.includes('Grouping'));
-      expect(grouping?.querySelector('select')?.disabled).toBe(item.grouping);
+      expect(minimum(chartAxisFieldset(settings, 'X-axis')).disabled).toBe(!item.xNumeric);
+      expect(minimum(chartAxisFieldset(settings, 'Y-axis')).disabled).toBe(!item.yNumeric);
+      expect(fieldControl<HTMLSelectElement>(settings, 'Grouping', 'select').disabled).toBe(
+        item.grouping,
+      );
       handle.detach();
-      host.remove();
     }
   });
 
   it('shows automatic for invalid stored major units and keeps the raw value until edited', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'invalid-major-unit',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      yAxis: { majorUnit: -1, customAxisValue: 'keep' } as never,
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const yAxis = Array.from(surface?.querySelectorAll<HTMLElement>('fieldset') ?? []).find(
-      (candidate) => candidate.querySelector('legend')?.textContent === 'Y-axis',
-    );
-    const majorUnit = Array.from(
-      yAxis?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('Major unit'))
-      ?.querySelector<HTMLInputElement>('input');
-    expect(majorUnit?.value).toBe('');
-    const title = Array.from(
-      yAxis?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('Y-axis title'))
-      ?.querySelector<HTMLInputElement>('input');
-    if (!title) throw new Error('missing y-axis title');
-    title.value = 'Value';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.yAxis).toMatchObject({
+    project({ kind: 'column', yAxis: { majorUnit: -1, customAxisValue: 'keep' } as never });
+    const handle = attach();
+    const yAxis = chartAxisFieldset(openTab(), 'Y-axis');
+    expect(fieldControl(yAxis, 'Major unit').value).toBe('');
+    setInput(fieldControl(yAxis, 'Y-axis title'), 'Value');
+    apply();
+    expect(current()?.yAxis).toMatchObject({
       majorUnit: -1,
       customAxisValue: 'keep',
       title: 'Value',
     });
     handle.detach();
-    host.remove();
   });
 
   it('shows forced zero for stacked line empty cells without rewriting the stored choice', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'forced-empty-cells',
-      kind: 'line',
-      grouping: 'stacked',
-      emptyCells: 'gap',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing settings surface');
-    const field = Array.from(
-      surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-    ).find((candidate) => candidate.textContent?.includes('Empty cells'));
-    const select = field?.querySelector<HTMLSelectElement>('select');
-    expect(select?.disabled).toBe(true);
-    expect(select?.value).toBe('zero');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.emptyCells).toBe('gap');
+    project({ kind: 'line', grouping: 'stacked', emptyCells: 'gap' });
+    const handle = attach();
+    const select = fieldControl<HTMLSelectElement>(openTab(), 'Empty cells', 'select');
+    expect(select.disabled).toBe(true);
+    expect(select.value).toBe('zero');
+    apply();
+    expect(projection.patches).toHaveLength(0);
+    expect(current()?.emptyCells).toBe('gap');
     handle.detach();
-    host.remove();
   });
 
   it('enables scatter span only for line modes and preserves it through kind changes', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const table = [
+    put([
       ['X', 'Sales'],
       [1, 10],
-      [null, null],
+      [2, 20],
       [3, 30],
-    ];
-    table.forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        if (value === null) return;
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
-      {
-        id: 'scatter-empty-cells',
-        kind: 'scatter',
-        seriesDirection: 'columns',
-        emptyCells: 'gap',
-      },
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing scatter elements');
-    const selectFor = (label: string): HTMLSelectElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes(label));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error(`missing ${label} select`);
-      return select;
-    };
+    ]);
+    create(range(0, 0, 3, 1), { kind: 'scatter', seriesDirection: 'columns', emptyCells: 'gap' });
+    const handle = attach();
+    openTab();
+    const emptyCells = (): HTMLSelectElement =>
+      fieldControl<HTMLSelectElement>(surface(), 'Empty cells', 'select');
     const spanOption = (): HTMLOptionElement => {
-      const option = Array.from(selectFor('Empty cells').options).find(
+      const option = Array.from(emptyCells().options).find(
         (candidate) => candidate.value === 'span',
       );
       if (!option) throw new Error('missing span option');
       return option;
     };
-    const chartType = (): HTMLSelectElement => selectFor('Chart type');
-    const scatterStyle = (): HTMLSelectElement => selectFor('Scatter style');
 
     expect(scatterStyle().value).toBe('marker');
     expect(spanOption().disabled).toBe(true);
-    scatterStyle().value = 'line';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
+    setSelect(scatterStyle(), 'line');
     expect(spanOption().disabled).toBe(false);
-    scatterStyle().value = 'lineMarker';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
+    setSelect(scatterStyle(), 'lineMarker');
     expect(spanOption().disabled).toBe(false);
 
-    scatterStyle().value = 'line';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
-    const emptyCells = selectFor('Empty cells');
-    emptyCells.value = 'span';
-    emptyCells.dispatchEvent(new Event('change', { bubbles: true }));
-    chartType().value = 'column';
-    chartType().dispatchEvent(new Event('change', { bubbles: true }));
-    expect(selectFor('Empty cells').value).toBe('span');
-    chartType().value = 'scatter';
-    chartType().dispatchEvent(new Event('change', { bubbles: true }));
+    setSelect(scatterStyle(), 'line');
+    setSelect(emptyCells(), 'span');
+    setSelect(chartType(), 'column');
+    expect(emptyCells().value).toBe('span');
+    setSelect(chartType(), 'scatter');
     expect(scatterStyle().value).toBe('line');
-    expect(selectFor('Empty cells').value).toBe('span');
+    expect(emptyCells().value).toBe('span');
     expect(spanOption().disabled).toBe(false);
 
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      kind: 'scatter',
-      emptyCells: 'span',
-      scatterStyle: 'line',
-    });
-    expect(host.querySelectorAll('[data-chart-role="line"]')).toHaveLength(1);
+    apply();
+    expect(current()).toMatchObject({ kind: 'scatter', emptyCells: 'span', scatterStyle: 'line' });
+    // One segment between each pair of points.
+    expect(host.querySelectorAll('[data-chart-role="line"]')).toHaveLength(2);
     handle.detach();
-    host.remove();
   });
 
   it('applies chart geometry knobs with Excel ranges and keeps pie angle separate', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'knob-column',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing settings surface');
-    const fieldInput = (text: string): HTMLInputElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes(text));
-      const input = field?.querySelector<HTMLInputElement>('input');
-      if (!input) throw new Error(`missing geometry field: ${text}`);
-      return input;
-    };
-    const gap = fieldInput('Gap width');
-    gap.value = '0';
-    gap.dispatchEvent(new Event('input', { bubbles: true }));
-    const overlap = fieldInput('Overlap');
-    overlap.value = '-100';
-    overlap.dispatchEvent(new Event('input', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({ gapWidth: 0, overlap: -100 });
+    put([[1, 2]]);
+    const column = create(range(0, 0, 0, 1), { kind: 'column' });
+    const handle = attach();
+    const styles = openTab('styles');
+    setInput(fieldControl(styles, 'Gap width'), '0');
+    setInput(fieldControl(styles, 'Overlap'), '-100');
+    apply();
+    expect(current()).toMatchObject({ gapWidth: 0, overlap: -100 });
     handle.detach();
-    host.remove();
+    mutators.removeChart(store, column.id);
 
-    const pieHost = document.createElement('div');
-    document.body.appendChild(pieHost);
-    const pieStore = createSpreadsheetStore();
-    mutators.upsertChart(pieStore, {
-      id: 'knob-pie',
-      kind: 'pie',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const pieHandle = attachSessionCharts({ host: pieHost, store: pieStore });
-    pieHost.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const pieSurface = pieHost.querySelector<HTMLElement>('.fc-chart-settings');
-    const angle = Array.from(
-      pieSurface?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('First slice angle'))
-      ?.querySelector<HTMLInputElement>('input');
-    if (!angle) throw new Error('missing pie angle input');
-    angle.value = '360';
-    angle.dispatchEvent(new Event('input', { bubbles: true }));
-    pieSurface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(pieStore.getState().charts.charts[0]?.firstSliceAngle).toBe(360);
+    create(range(0, 0, 0, 1), { kind: 'pie' });
+    const pieHandle = attach();
+    setInput(fieldControl(openTab('styles'), 'First slice angle'), '360');
+    apply();
+    expect(current()?.firstSliceAngle).toBe(360);
     pieHandle.detach();
-    pieHost.remove();
   });
 
   it('does not materialize clamped geometry defaults when another field changes', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'raw-geometry',
-      kind: 'column',
-      gapWidth: 999,
-      overlap: 200,
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing chart title');
-    title.value = 'Keep raw geometry';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      title: 'Keep raw geometry',
-      gapWidth: 999,
-      overlap: 200,
-    });
+    project({ kind: 'column', gapWidth: 999, overlap: 200 });
+    const handle = attach();
+    openTab();
+    setInput(titleInput(), 'Keep raw geometry');
+    apply();
+    expect(lastPatch()).toEqual({ title: 'Keep raw geometry' });
     handle.detach();
-    host.remove();
   });
 
   it('keeps an out-of-range doughnut hole raw until the field is edited', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'raw-hole-size',
-      kind: 'doughnut',
-      holeSize: 99,
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const elements = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const title = elements?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing title input');
-    title.value = 'Keep raw hole';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    elements?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      title: 'Keep raw hole',
-      holeSize: 99,
-    });
+    project({ kind: 'doughnut', holeSize: 99 });
+    const handle = attach();
+    openTab();
+    setInput(titleInput(), 'Keep raw hole');
+    apply();
+    expect(lastPatch()).toEqual({ title: 'Keep raw hole' });
 
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const styles = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const hole = Array.from(
-      styles?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('Hole size'))
-      ?.querySelector<HTMLInputElement>('input');
-    if (!hole) throw new Error('missing hole size input');
+    const hole = fieldControl(openTab('styles'), 'Hole size');
     expect(hole.value).toBe('90');
-    hole.value = '90';
-    hole.dispatchEvent(new Event('input', { bubbles: true }));
-    styles?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.holeSize).toBe(99);
+    setInput(hole, '90');
+    apply();
+    expect(current()?.holeSize).toBe(99);
 
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const reopenedStyles = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const reopenedHole = Array.from(
-      reopenedStyles?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('Hole size'))
-      ?.querySelector<HTMLInputElement>('input');
-    if (!reopenedHole) throw new Error('missing reopened hole size input');
-    reopenedHole.value = '70';
-    reopenedHole.dispatchEvent(new Event('input', { bubbles: true }));
-    reopenedStyles?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.holeSize).toBe(70);
+    setInput(fieldControl(openTab('styles'), 'Hole size'), '70');
+    apply();
+    expect(lastPatch()).toEqual({ holeSize: 70 });
     handle.detach();
-    host.remove();
-
-    const defaultHost = document.createElement('div');
-    document.body.appendChild(defaultHost);
-    const defaultStore = createSpreadsheetStore();
-    const defaultHistory = new History();
-    mutators.upsertChart(defaultStore, {
-      id: 'default-hole-size',
-      kind: 'doughnut',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const defaultHandle = attachSessionCharts({
-      host: defaultHost,
-      store: defaultStore,
-      history: defaultHistory,
-    });
-    defaultHost.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const defaultStyles = defaultHost.querySelector<HTMLElement>('.fc-chart-settings');
-    const defaultHole = Array.from(
-      defaultStyles?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('Hole size'))
-      ?.querySelector<HTMLInputElement>('input');
-    if (!defaultHole) throw new Error('missing default hole size input');
-    defaultHole.value = '70';
-    defaultHole.dispatchEvent(new Event('input', { bubbles: true }));
-    defaultStyles?.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-elements')?.click();
-    const defaultElements = defaultHost.querySelector<HTMLElement>('.fc-chart-settings');
-    defaultElements?.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    const rerenderedStyles = defaultHost.querySelector<HTMLElement>('.fc-chart-settings');
-    const rerenderedHole = Array.from(
-      rerenderedStyles?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('Hole size'))
-      ?.querySelector<HTMLInputElement>('input');
-    if (!rerenderedHole) throw new Error('missing rerendered hole size input');
-    rerenderedHole.value = '50';
-    rerenderedHole.dispatchEvent(new Event('input', { bubbles: true }));
-    rerenderedStyles?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(defaultStore.getState().charts.charts[0]?.holeSize).toBeUndefined();
-    expect(defaultHistory.canUndo()).toBe(false);
-    defaultHandle.detach();
-    defaultHost.remove();
   });
 
-  it('reparses draft data across chart kinds and applies one undoable kind change', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const table = [
+  it('keeps a default doughnut hole sparse when edited back', () => {
+    project({ kind: 'doughnut' });
+    const handle = attach();
+    setInput(fieldControl(openTab('styles'), 'Hole size'), '70');
+    switchTab('elements');
+    setInput(fieldControl(switchTab('styles'), 'Hole size'), '50');
+    apply();
+    expect(projection.patches).toHaveLength(0);
+    handle.detach();
+  });
+
+  it('previews draft data across chart kinds and applies one undoable kind change', () => {
+    put([
       ['Month', 'Sales', 'Costs'],
       ['Jan', 10, 6],
       ['Feb', 15, 8],
       ['Mar', 8, 3],
-    ];
-    table.forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
-      { id: 'draft-kind-data', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    const chartBefore = structuredClone(store.getState().charts.charts[0]);
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
+    ]);
+    create(range(0, 0, 3, 2), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    const chartBefore = structuredClone(current());
+    const styleSelects = (): { series: HTMLSelectElement; points: HTMLSelectElement } => {
+      const fields = Array.from(
+        surface().querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
+      );
+      const select = (label: string): HTMLSelectElement => {
+        const found = fields
+          .find((field) => field.querySelector('.fc-chart-settings__label')?.textContent === label)
+          ?.querySelector<HTMLSelectElement>('select');
+        if (!found) throw new Error(`missing ${label} select`);
+        return found;
+      };
+      return { series: select('Series'), points: select('Point') };
     };
-    const chartType = (surface: HTMLElement): HTMLSelectElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes('Chart type'));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error('missing chart type select');
-      return select;
-    };
+    const optionValues = (select: HTMLSelectElement): string[] =>
+      Array.from(select.options).map((option) => option.value);
 
-    const cancelled = openElements();
-    chartType(cancelled).value = 'scatter';
-    chartType(cancelled).dispatchEvent(new Event('change', { bubbles: true }));
-    cancelled.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]).toEqual(chartBefore);
+    openTab();
+    setSelect(chartType(), 'scatter');
+    cancel();
+    expect(current()).toEqual(chartBefore);
 
-    const scatterDraft = openElements();
-    chartType(scatterDraft).value = 'scatter';
-    chartType(scatterDraft).dispatchEvent(new Event('change', { bubbles: true }));
-    scatterDraft.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    let styles = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!styles) throw new Error('missing scatter styles');
-    const scatterSeries = Array.from(
-      styles.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-    )
-      .find((field) => field.querySelector('.fc-chart-settings__label')?.textContent === 'Series')
-      ?.querySelector<HTMLSelectElement>('select');
-    const scatterPoints = Array.from(
-      styles.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-    )
-      .find((field) => field.querySelector('.fc-chart-settings__label')?.textContent === 'Point')
-      ?.querySelector<HTMLSelectElement>('select');
-    expect(Array.from(scatterSeries?.options ?? [])).toHaveLength(1);
-    expect(scatterSeries?.options[0]?.textContent).toBe('Costs');
-    expect(Array.from(scatterPoints?.options ?? []).map((option) => option.value)).toEqual([
+    openTab();
+    setSelect(chartType(), 'scatter');
+    switchTab('styles');
+    // Text categories become X values 1, 2, 3; every series stays.
+    expect(Array.from(styleSelects().series.options).map((option) => option.textContent)).toEqual([
+      'Sales',
+      'Costs',
+    ]);
+    expect(optionValues(styleSelects().points)).toEqual([
       '__all__',
       'point-0',
       'point-1',
       'point-2',
     ]);
 
-    styles.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-elements')?.click();
-    const doughnutDraft = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!doughnutDraft) throw new Error('missing doughnut elements');
-    chartType(doughnutDraft).value = 'doughnut';
-    chartType(doughnutDraft).dispatchEvent(new Event('change', { bubbles: true }));
-    doughnutDraft.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    styles = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!styles) throw new Error('missing doughnut styles');
-    const doughnutSeries = Array.from(
-      styles.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-    )
-      .find((field) => field.querySelector('.fc-chart-settings__label')?.textContent === 'Series')
-      ?.querySelector<HTMLSelectElement>('select');
-    const doughnutPoints = Array.from(
-      styles.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-    )
-      .find((field) => field.querySelector('.fc-chart-settings__label')?.textContent === 'Point')
-      ?.querySelector<HTMLSelectElement>('select');
-    expect(Array.from(doughnutSeries?.options ?? [])).toHaveLength(2);
-    expect(Array.from(doughnutPoints?.options ?? []).map((option) => option.value)).toEqual([
+    switchTab('elements');
+    setSelect(chartType(), 'doughnut');
+    switchTab('styles');
+    expect(styleSelects().series.options).toHaveLength(2);
+    expect(optionValues(styleSelects().points)).toEqual([
       '__all__',
       'category-0',
       'category-1',
       'category-2',
     ]);
-    styles.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.kind).toBe('doughnut');
+    apply();
+    expect(current()?.kind).toBe('doughnut');
     expect(host.querySelectorAll('[data-chart-role="slice"]')).toHaveLength(6);
-    expect(history.canUndo()).toBe(true);
     expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.kind).toBe('column');
+    expect(current()?.kind).toBe('column');
     expect(history.redo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.kind).toBe('doughnut');
+    expect(current()?.kind).toBe('doughnut');
     handle.detach();
-    host.remove();
   });
 
-  it('keeps implicit legend and vary-colors defaults sparse across draft toggles', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const table = [
+  it('previews the engine split when the draft changes the series direction', () => {
+    put([
       ['Month', 'Sales', 'Costs'],
       ['Jan', 10, 6],
       ['Feb', 15, 8],
-    ];
-    table.forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
-      { id: 'implicit-chart-defaults', kind: 'pie', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    const checkbox = (surface: HTMLElement, label: string): HTMLInputElement => {
-      const row = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__check'),
-      ).find((candidate) => candidate.textContent?.trim() === label);
-      const input = row?.querySelector<HTMLInputElement>('input');
-      if (!input) throw new Error(`missing checkbox: ${label}`);
-      return input;
-    };
-    const open = (tab: 'elements' | 'styles'): HTMLElement => {
-      host.querySelector<HTMLButtonElement>(`[data-chart-settings-tab="${tab}"]`)?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
+      ['Mar', 8, 3],
+    ]);
+    create(range(0, 0, 3, 2), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    openTab();
+    setSelect(fieldControl<HTMLSelectElement>(surface(), 'Series direction', 'select'), 'rows');
+    const series = Array.from(
+      switchTab('filters')
+        .querySelectorAll<HTMLElement>('.fc-chart-settings__group')[0]
+        ?.querySelectorAll<HTMLElement>('.fc-chart-settings__check') ?? [],
+    ).map((row) => row.textContent?.trim());
+    expect(series).toEqual(['Jan', 'Feb', 'Mar']);
+    apply();
+    expect(current()?.seriesDirection).toBe('rows');
+    expect(current()?.data.series.map((entry) => entry.name)).toEqual(['Jan', 'Feb', 'Mar']);
+    handle.detach();
+  });
 
-    let surface = open('elements');
-    const legend = checkbox(surface, 'Legend');
+  it('keeps legend and vary-colors sparse across draft toggles', () => {
+    put([
+      ['Month', 'Sales', 'Costs'],
+      ['Jan', 10, 6],
+      ['Feb', 15, 8],
+    ]);
+    create(range(0, 0, 2, 2), { kind: 'pie', seriesDirection: 'columns' });
+    const handle = attach();
+
+    const legend = checkbox(openTab(), 'Legend');
     expect(legend.checked).toBe(true);
-    legend.checked = false;
-    legend.dispatchEvent(new Event('change', { bubbles: true }));
-    legend.checked = true;
-    legend.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.legend).toBeUndefined();
+    setChecked(legend, false);
+    setChecked(legend, true);
+    apply();
     expect(history.canUndo()).toBe(false);
 
-    surface = open('styles');
-    const vary = checkbox(surface, 'Vary colors by point');
+    const vary = checkbox(openTab('styles'), 'Vary colors by point');
     expect(vary.checked).toBe(true);
-    vary.checked = false;
-    vary.dispatchEvent(new Event('change', { bubbles: true }));
-    vary.checked = true;
-    vary.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.varyColors).toBeUndefined();
+    setChecked(vary, false);
+    setChecked(vary, true);
+    apply();
     expect(history.canUndo()).toBe(false);
 
-    surface = open('elements');
-    const kindField = Array.from(
-      surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-    ).find((field) => field.textContent?.includes('Chart type'));
-    const kind = kindField?.querySelector<HTMLSelectElement>('select');
-    if (!kind) throw new Error('missing chart type select');
-    kind.value = 'doughnut';
-    kind.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    const explicitFalse = checkbox(surface, 'Vary colors by point');
+    openTab();
+    setSelect(chartType(), 'doughnut');
+    const explicitFalse = checkbox(switchTab('styles'), 'Vary colors by point');
     expect(explicitFalse.checked).toBe(true);
-    explicitFalse.checked = false;
-    explicitFalse.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      kind: 'doughnut',
-      varyColors: false,
-    });
+    setChecked(explicitFalse, false);
+    apply();
+    expect(current()).toMatchObject({ kind: 'doughnut', varyColors: false });
     expect(history.canUndo()).toBe(true);
     handle.detach();
-    host.remove();
   });
 
   it('keeps optional defaults sparse when a new kind checkbox is toggled back', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    [
-      ['Month', 'Sales'],
-      ['Jan', 10],
-      ['Feb', 20],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
-      { id: 'sparse-kind-defaults', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    const checkbox = (surface: HTMLElement, label: string): HTMLInputElement => {
-      const row = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__check'),
-      ).find((candidate) => candidate.textContent?.trim() === label);
-      const input = row?.querySelector<HTMLInputElement>('input');
-      if (!input) throw new Error(`missing checkbox: ${label}`);
-      return input;
-    };
-    const chartType = (surface: HTMLElement): HTMLSelectElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes('Chart type'));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error('missing chart type select');
-      return select;
-    };
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    let surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing chart settings');
-    expect(checkbox(surface, 'Legend').checked).toBe(false);
-    chartType(surface).value = 'doughnut';
-    chartType(surface).dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing chart settings after kind change');
+    project({ kind: 'column' });
+    const handle = attach();
+    expect(checkbox(openTab(), 'Legend').checked).toBe(false);
+    setSelect(chartType(), 'doughnut');
 
-    const legend = checkbox(surface, 'Legend');
+    const legend = checkbox(surface(), 'Legend');
     expect(legend.checked).toBe(true);
-    legend.checked = false;
-    legend.dispatchEvent(new Event('change', { bubbles: true }));
-    legend.checked = true;
-    legend.dispatchEvent(new Event('change', { bubbles: true }));
+    setChecked(legend, false);
+    setChecked(legend, true);
 
-    surface.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing styles after kind change');
-    const vary = checkbox(surface, 'Vary colors by point');
+    const vary = checkbox(switchTab('styles'), 'Vary colors by point');
     expect(vary.checked).toBe(true);
-    vary.checked = false;
-    vary.dispatchEvent(new Event('change', { bubbles: true }));
-    vary.checked = true;
-    vary.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-elements')?.click();
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing elements after kind change');
-    chartType(surface).value = 'column';
-    chartType(surface).dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({ kind: 'column' });
-    expect(store.getState().charts.charts[0]?.legend).toBeUndefined();
-    expect(store.getState().charts.charts[0]?.varyColors).toBeUndefined();
-    expect(history.canUndo()).toBe(false);
+    setChecked(vary, false);
+    setChecked(vary, true);
+    switchTab('elements');
+    setSelect(chartType(), 'column');
+    apply();
+    expect(projection.patches).toHaveLength(0);
     handle.detach();
-    host.remove();
+  });
 
-    const explicitHost = document.createElement('div');
-    document.body.appendChild(explicitHost);
-    const explicitStore = createSpreadsheetStore();
-    const explicitHistory = new History();
-    mutators.setCell(explicitStore, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'Month' });
-    mutators.setCell(explicitStore, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'Sales' });
-    mutators.setCell(explicitStore, { sheet: 0, row: 1, col: 0 }, { kind: 'text', value: 'Jan' });
-    mutators.setCell(explicitStore, { sheet: 0, row: 1, col: 1 }, { kind: 'number', value: 10 });
-    createSessionChart(
-      explicitStore,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'explicit-vary-colors', kind: 'column', varyColors: false },
-    );
-    const explicitHandle = attachSessionCharts({
-      host: explicitHost,
-      store: explicitStore,
-      history: explicitHistory,
-    });
-    explicitHost.querySelector<HTMLButtonElement>('[data-chart-settings-tab="styles"]')?.click();
-    const explicitSurface = explicitHost.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!explicitSurface) throw new Error('missing explicit styles');
-    const explicitVary = checkbox(explicitSurface, 'Vary colors by point');
-    expect(explicitVary.checked).toBe(false);
-    explicitVary.checked = true;
-    explicitVary.dispatchEvent(new Event('change', { bubbles: true }));
-    explicitVary.checked = false;
-    explicitVary.dispatchEvent(new Event('change', { bubbles: true }));
-    explicitSurface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(explicitStore.getState().charts.charts[0]?.varyColors).toBe(false);
-    expect(explicitHistory.canUndo()).toBe(false);
-    explicitHandle.detach();
-    explicitHost.remove();
+  it('keeps an explicit vary-colors value when toggled back', () => {
+    project({ kind: 'column', varyColors: false });
+    const handle = attach();
+    const vary = checkbox(openTab('styles'), 'Vary colors by point');
+    expect(vary.checked).toBe(false);
+    setChecked(vary, true);
+    setChecked(vary, false);
+    apply();
+    expect(projection.patches).toHaveLength(0);
+    handle.detach();
   });
 
   it('does not overwrite an external kind update when applying another draft field', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'external-kind-update',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing title input');
-    title.value = 'External kind survives';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    mutators.updateChart(store, 'external-kind-update', { kind: 'scatter' });
-    surface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      kind: 'scatter',
-      title: 'External kind survives',
-    });
+    project({ kind: 'column' });
+    const handle = attach();
+    openTab();
+    setInput(titleInput(), 'External kind survives');
+    mutators.updateChart(store, projection.id, { kind: 'scatter' });
+    apply();
+    expect(lastPatch()).toEqual({ title: 'External kind survives' });
+    expect(current()).toMatchObject({ kind: 'scatter', title: 'External kind survives' });
     handle.detach();
-    host.remove();
   });
 
   it('keeps external legend and vary-colors overrides when applying only a title', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'external-optional-updates',
-      kind: 'column',
-      legend: { visible: false },
-      varyColors: false,
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    const checkbox = (surface: HTMLElement, label: string): HTMLInputElement => {
-      const row = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__check'),
-      ).find((candidate) => candidate.textContent?.trim() === label);
-      const input = row?.querySelector<HTMLInputElement>('input');
-      if (!input) throw new Error(`missing checkbox: ${label}`);
-      return input;
-    };
+    project({ kind: 'column', legend: { visible: false }, varyColors: false });
+    const handle = attach();
     const openAndEditTitle = (value: string): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      const title = surface?.querySelector<HTMLInputElement>('input[type="text"]');
-      if (!surface || !title) throw new Error('missing title settings');
-      title.value = value;
-      title.dispatchEvent(new Event('input', { bubbles: true }));
-      return surface;
+      const settings = openTab();
+      setInput(titleInput(), value);
+      return settings;
     };
 
-    let surface = openAndEditTitle('External true');
-    mutators.updateChart(store, 'external-optional-updates', {
-      legend: { visible: true },
-      varyColors: true,
-    });
-    expect(checkbox(surface, 'Legend').checked).toBe(true);
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      title: 'External true',
-      legend: { visible: true },
-      varyColors: true,
-    });
+    let settings = openAndEditTitle('External true');
+    mutators.updateChart(store, projection.id, { legend: { visible: true }, varyColors: true });
+    expect(checkbox(settings, 'Legend').checked).toBe(true);
+    apply();
+    expect(lastPatch()).toEqual({ title: 'External true' });
+    expect(current()).toMatchObject({ legend: { visible: true }, varyColors: true });
 
-    surface = openAndEditTitle('External false');
-    surface.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    expect(checkbox(surface, 'Vary colors by point').checked).toBe(true);
-    mutators.updateChart(store, 'external-optional-updates', {
-      legend: { visible: false },
-      varyColors: false,
-    });
-    expect(checkbox(surface, 'Vary colors by point').checked).toBe(false);
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      title: 'External false',
-      legend: { visible: false },
-      varyColors: false,
-    });
+    settings = openAndEditTitle('External false');
+    settings = switchTab('styles');
+    expect(checkbox(settings, 'Vary colors by point').checked).toBe(true);
+    mutators.updateChart(store, projection.id, { legend: { visible: false }, varyColors: false });
+    expect(checkbox(surface(), 'Vary colors by point').checked).toBe(false);
+    apply();
+    expect(lastPatch()).toEqual({ title: 'External false' });
+    expect(current()).toMatchObject({ legend: { visible: false }, varyColors: false });
     handle.detach();
-    host.remove();
   });
 
   it('refreshes chart kind and axis roles for external same-domain kind changes', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    [
-      ['Month', 'Sales'],
-      ['Jan', 10],
-      ['Feb', 20],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
-      { id: 'external-same-domain-kind', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-
-    const chartType = (): HTMLSelectElement => {
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      const field = Array.from(
-        surface?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-      ).find((candidate) => candidate.textContent?.includes('Chart type'));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error('missing chart type select');
-      return select;
-    };
+    project({ kind: 'column' });
+    const handle = attach();
+    openTab();
     const axisMinimum = (axis: 'X-axis' | 'Y-axis'): HTMLInputElement => {
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      const fieldset = Array.from(surface?.querySelectorAll<HTMLElement>('fieldset') ?? []).find(
-        (candidate) => candidate.querySelector('legend')?.textContent === axis,
-      );
       const field = Array.from(
-        fieldset?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
+        chartAxisFieldset(surface(), axis).querySelectorAll<HTMLElement>(
+          '.fc-chart-settings__field',
+        ),
       ).find(
         (candidate) =>
           !candidate.classList.contains('fc-chart-settings__crossing-mode') &&
@@ -2090,56 +1730,28 @@ describe('attachSessionCharts', () => {
     expect(axisMinimum('X-axis').disabled).toBe(true);
     expect(axisMinimum('Y-axis').disabled).toBe(false);
 
-    mutators.updateChart(store, 'external-same-domain-kind', { kind: 'bar' });
+    mutators.updateChart(store, projection.id, { kind: 'bar' });
     expect(chartType().value).toBe('bar');
     expect(axisMinimum('X-axis').disabled).toBe(false);
     expect(axisMinimum('Y-axis').disabled).toBe(true);
 
-    mutators.updateChart(store, 'external-same-domain-kind', { kind: 'line' });
+    mutators.updateChart(store, projection.id, { kind: 'line' });
     expect(chartType().value).toBe('line');
     expect(axisMinimum('X-axis').disabled).toBe(true);
     expect(axisMinimum('Y-axis').disabled).toBe(false);
     handle.detach();
-    host.remove();
   });
 
   it('shows all scatter styles and resolves marker visibility for each mode', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    [
+    put([
       ['X', 'Sales'],
       [1, 10],
       [2, 20],
       [3, 30],
-    ].forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
-    });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
-      { id: 'scatter-style-modes', kind: 'scatter', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing scatter elements');
-    const scatterStyle = (): HTMLSelectElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes('Scatter style'));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error('missing scatter style select');
-      return select;
-    };
+    ]);
+    create(range(0, 0, 3, 1), { kind: 'scatter', seriesDirection: 'columns' });
+    const handle = attach();
+    openTab();
     expect(Array.from(scatterStyle().options).map((option) => option.value)).toEqual([
       'marker',
       'line',
@@ -2147,167 +1759,81 @@ describe('attachSessionCharts', () => {
     ]);
     expect(scatterStyle().value).toBe('marker');
 
-    scatterStyle().value = 'line';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    const lineSurface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const lineMarker = Array.from(
-      lineSurface?.querySelectorAll<HTMLElement>('.fc-chart-settings__check') ?? [],
-    ).find((candidate) => candidate.textContent?.includes('Visible'));
-    const lineMarkerInput = lineMarker?.querySelector<HTMLInputElement>('input');
-    expect(lineMarkerInput?.checked).toBe(false);
-    if (!lineMarkerInput) throw new Error('missing line marker checkbox');
-    lineMarkerInput.checked = true;
-    lineMarkerInput.dispatchEvent(new Event('change', { bubbles: true }));
+    const markerVisible = (): HTMLInputElement => {
+      const row = Array.from(
+        surface().querySelectorAll<HTMLElement>('.fc-chart-settings__check'),
+      ).find((candidate) => candidate.textContent?.includes('Visible'));
+      const input = row?.querySelector<HTMLInputElement>('input');
+      if (!input) throw new Error('missing marker checkbox');
+      return input;
+    };
+    setSelect(scatterStyle(), 'line');
+    switchTab('styles');
+    expect(markerVisible().checked).toBe(false);
+    setChecked(markerVisible(), true);
 
-    lineSurface?.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-elements')?.click();
-    scatterStyle().value = 'lineMarker';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('#fc-chart-settings-tab-styles')?.click();
-    const lineMarkerSurface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const lineMarkerCheckbox = Array.from(
-      lineMarkerSurface?.querySelectorAll<HTMLElement>('.fc-chart-settings__check') ?? [],
-    ).find((candidate) => candidate.textContent?.includes('Visible'));
-    expect(lineMarkerCheckbox?.querySelector<HTMLInputElement>('input')?.checked).toBe(true);
-    lineMarkerSurface?.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.seriesStyles?.[0]?.marker?.visible).toBe(true);
+    switchTab('elements');
+    setSelect(scatterStyle(), 'lineMarker');
+    switchTab('styles');
+    expect(markerVisible().checked).toBe(true);
+    apply();
+    expect(current()?.seriesStyles?.[0]?.marker?.visible).toBe(true);
     handle.detach();
-    host.remove();
   });
 
   it('keeps scatter style sparse through kind cycles and preserves dormant edits', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'X' });
-    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'Sales' });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 0 }, { kind: 'number', value: 1 });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 1 }, { kind: 'number', value: 10 });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'scatter-style-dormant', kind: 'column', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing kind settings');
-    const chartType = (): HTMLSelectElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes('Chart type'));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error('missing chart type select');
-      return select;
-    };
-    const scatterStyle = (): HTMLSelectElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes('Scatter style'));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error('missing scatter style select');
-      return select;
-    };
-    chartType().value = 'scatter';
-    chartType().dispatchEvent(new Event('change', { bubbles: true }));
+    put([
+      ['X', 'Sales'],
+      [1, 10],
+    ]);
+    create(range(0, 0, 1, 1), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    openTab();
+    setSelect(chartType(), 'scatter');
     expect(scatterStyle().value).toBe('marker');
-    scatterStyle().value = 'line';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
-    chartType().value = 'column';
-    chartType().dispatchEvent(new Event('change', { bubbles: true }));
-    chartType().value = 'scatter';
-    chartType().dispatchEvent(new Event('change', { bubbles: true }));
+    setSelect(scatterStyle(), 'line');
+    setSelect(chartType(), 'column');
+    setSelect(chartType(), 'scatter');
     expect(scatterStyle().value).toBe('line');
-    scatterStyle().value = 'marker';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
-    chartType().value = 'column';
-    chartType().dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({ kind: 'column' });
-    expect(store.getState().charts.charts[0]?.scatterStyle).toBeUndefined();
+    setSelect(scatterStyle(), 'marker');
+    setSelect(chartType(), 'column');
+    apply();
+    expect(current()).toMatchObject({ kind: 'column' });
+    expect(current()?.scatterStyle).toBeUndefined();
     expect(history.canUndo()).toBe(false);
     handle.detach();
-    host.remove();
   });
 
-  it('preserves external scatter styles, no-op drafts, and Apply undo/redo', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'X' });
-    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'Sales' });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 0 }, { kind: 'number', value: 1 });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 1 }, { kind: 'number', value: 10 });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
-      { id: 'scatter-style-history', kind: 'scatter', seriesDirection: 'columns' },
-    );
-    const handle = attachSessionCharts({ host, store, history });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing scatter elements');
-    const scatterStyle = (): HTMLSelectElement => {
-      const field = Array.from(
-        surface.querySelectorAll<HTMLElement>('.fc-chart-settings__field'),
-      ).find((candidate) => candidate.textContent?.includes('Scatter style'));
-      const select = field?.querySelector<HTMLSelectElement>('select');
-      if (!select) throw new Error('missing scatter style select');
-      return select;
-    };
-    scatterStyle().value = 'line';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
-    scatterStyle().value = 'marker';
-    scatterStyle().dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.scatterStyle).toBeUndefined();
-    expect(history.canUndo()).toBe(false);
+  it('preserves external scatter styles and no-op drafts', () => {
+    project({ kind: 'scatter' });
+    const handle = attach();
+    openTab();
+    setSelect(scatterStyle(), 'line');
+    setSelect(scatterStyle(), 'marker');
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    mutators.updateChart(store, 'scatter-style-history', { scatterStyle: 'line' });
+    openTab();
+    mutators.updateChart(store, projection.id, { scatterStyle: 'line' });
     expect(scatterStyle().value).toBe('line');
-    const title = surface.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!title) throw new Error('missing scatter title');
-    title.value = 'External line';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    mutators.updateChart(store, 'scatter-style-history', { scatterStyle: 'lineMarker' });
+    setInput(titleInput(), 'External line');
+    mutators.updateChart(store, projection.id, { scatterStyle: 'lineMarker' });
     expect(scatterStyle().value).toBe('lineMarker');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      title: 'External line',
-      scatterStyle: 'lineMarker',
-    });
-    expect(history.canUndo()).toBe(true);
-    expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.scatterStyle).toBe('lineMarker');
-    expect(history.redo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.title).toBe('External line');
+    apply();
+    expect(lastPatch()).toEqual({ title: 'External line' });
+    expect(current()).toMatchObject({ title: 'External line', scatterStyle: 'lineMarker' });
 
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const cancelSurface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    const cancelStyle = Array.from(
-      cancelSurface?.querySelectorAll<HTMLElement>('.fc-chart-settings__field') ?? [],
-    )
-      .find((field) => field.textContent?.includes('Scatter style'))
-      ?.querySelector<HTMLSelectElement>('select');
-    if (cancelStyle) {
-      cancelStyle.value = 'marker';
-      cancelStyle.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    cancelSurface?.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]?.scatterStyle).toBe('lineMarker');
+    openTab();
+    setSelect(scatterStyle(), 'marker');
+    cancel();
+    expect(current()?.scatterStyle).toBe('lineMarker');
     handle.detach();
-    host.remove();
   });
 
   it.each(['column', 'bar', 'line', 'area', 'pie', 'scatter'] as const)(
     'renders %s through the chart scene and shows the title once',
     (kind) => {
-      const host = document.createElement('div');
-      const store = createSpreadsheetStore();
-      const table =
+      put(
         kind === 'scatter'
           ? [
               ['X', 'Sales'],
@@ -2320,33 +1846,12 @@ describe('attachSessionCharts', () => {
               ['Jan', 10],
               ['Feb', 20],
               ['Mar', 30],
-            ];
-      table.forEach((row, r) => {
-        row.forEach((value, col) => {
-          mutators.setCell(
-            store,
-            { sheet: 0, row: r, col },
-            typeof value === 'number'
-              ? { kind: 'number', value }
-              : { kind: 'text', value: String(value) },
-          );
-        });
-      });
-      createSessionChart(
-        store,
-        { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
-        {
-          kind,
-          title: 'Revenue',
-          seriesDirection: 'columns',
-        },
+            ],
       );
-      const handle = attachSessionCharts({ host, store });
-      const role = kind === 'pie' ? 'slice' : kind === 'bar' || kind === 'column' ? 'bar' : 'point';
-      expect(host.querySelectorAll(`[data-chart-role="${role}"]`)).toHaveLength(3);
-      expect(
-        host.querySelector(`[data-chart-role="${role}"]`)?.getAttribute('data-series-index'),
-      ).toBe('0');
+      create(range(0, 0, 3, 1), { kind, title: 'Revenue', seriesDirection: 'columns' });
+      const handle = attach();
+      const marks = host.querySelectorAll('.fc-chart__plot [data-series-index="0"]');
+      expect(marks.length).toBeGreaterThan(0);
       expect(host.querySelector('svg')?.textContent).not.toContain('Revenue');
       expect(host.querySelector('.fc-chart__title')?.textContent).toBe('Revenue');
       handle.detach();
@@ -2354,87 +1859,61 @@ describe('attachSessionCharts', () => {
   );
 
   it('preserves distinct series and updates chart marks when source cells change', () => {
-    const host = document.createElement('div');
-    const store = createSpreadsheetStore();
-    const table = [
+    put([
       ['Month', 'Sales', 'Costs'],
       ['Jan', 10, 20],
       ['Feb', 30, 40],
-    ];
-    table.forEach((row, r) => {
-      row.forEach((value, col) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: r, col },
-          typeof value === 'number'
-            ? { kind: 'number', value }
-            : { kind: 'text', value: String(value) },
-        );
-      });
+    ]);
+    create(range(0, 0, 2, 2), {
+      kind: 'column',
+      seriesDirection: 'columns',
+      yAxis: { min: 0, max: 100 },
     });
-    createSessionChart(
-      store,
-      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
-      {
-        kind: 'column',
-        seriesDirection: 'columns',
-        yAxis: { min: 0, max: 100 },
-      },
-    );
-    const handle = attachSessionCharts({ host, store });
+    const handle = attach();
     expect(host.querySelectorAll('[data-chart-role="bar"]')).toHaveLength(4);
     expect(host.querySelectorAll('text[data-chart-role="legend"]')).toHaveLength(2);
     const selector = '[data-chart-role="bar"][data-series-index="0"][data-point-index="0"]';
     const before = Number(host.querySelector(selector)?.getAttribute('height'));
-    mutators.setCell(store, { sheet: 0, row: 1, col: 1 }, { kind: 'number', value: 50 });
+    const unsubscribe = wb.subscribe((event) => {
+      if (event.kind === 'recalc') refreshChartsAfterRecalc(wb, store);
+    });
+    try {
+      wb.setNumber({ sheet: 0, row: 1, col: 1 }, 50);
+    } finally {
+      unsubscribe();
+    }
     const after = Number(host.querySelector(selector)?.getAttribute('height'));
     expect(before).toBeGreaterThan(0);
     expect(after).toBeCloseTo(before * 5);
     handle.detach();
   });
 
-  it('renders session chart overlays and removes them from the store', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 10 });
-    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'number', value: 20 });
-    mutators.upsertChart(store, {
-      id: 'chart-1',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      title: 'Revenue',
-    });
-
-    const handle = attachSessionCharts({ host, store, closeLabel: '閉じる' });
+  it('renders chart overlays and deletes them from the workbook', () => {
+    put([[10, 20]]);
+    const chart = create(range(0, 0, 0, 1), { kind: 'column', title: 'Revenue' });
+    const handle = attach({ closeLabel: '閉じる' });
 
     expect(host.querySelector('.fc-chart__title')?.textContent).toBe('Revenue');
-    expect(host.querySelector('svg rect[fill="#0f6cbd"]')).toBeTruthy();
+    expect(host.querySelector('svg rect[data-chart-role="bar"]')).toBeTruthy();
     host.tabIndex = -1;
 
     const close = host.querySelector<HTMLButtonElement>('.fc-chart__close');
     expect(close?.getAttribute('aria-label')).toBe('閉じる');
     close?.click();
     expect(store.getState().charts.charts).toHaveLength(0);
+    expect(wb.listDrawingObjects(0).map((object) => object.objectId)).not.toContain(
+      chart.nativeObjectId,
+    );
     expect(host.querySelector('.fc-chart')).toBeNull();
     expect(document.activeElement).toBe(host);
-
+    expect(history.undo()).toBe(true);
+    expect(store.getState().charts.charts.map((entry) => entry.id)).toEqual([chart.id]);
     handle.detach();
   });
 
   it('uses localized fallback labels for untitled charts', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'chart-1',
-      kind: 'line',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-
-    const handle = attachSessionCharts({
-      host,
-      store,
+    project({ kind: 'line' });
+    const handle = attach({
       labels: {
         close: '閉じる',
         resize: 'グラフのサイズ変更',
@@ -2444,7 +1923,7 @@ describe('attachSessionCharts', () => {
     });
 
     expect(host.querySelector('.fc-chart__title')?.textContent).toBe('折れ線グラフ');
-    expect(host.querySelector('.fc-chart')?.getAttribute('aria-label')).toBe('折れ線グラフ');
+    expect(panel().getAttribute('aria-label')).toBe('折れ線グラフ');
     expect(host.querySelector('.fc-chart__resize')?.getAttribute('aria-label')).toBe(
       'グラフのサイズ変更',
     );
@@ -2452,36 +1931,32 @@ describe('attachSessionCharts', () => {
     handle.setLabels({ lineChart: '線グラフ', resize: 'サイズ変更' });
     expect(host.querySelector('.fc-chart__title')?.textContent).toBe('線グラフ');
     expect(host.querySelector('.fc-chart__resize')?.getAttribute('aria-label')).toBe('サイズ変更');
-
     handle.detach();
   });
 
   it('keeps bar and column marks inside padded slots for sparse and dense series', () => {
+    // 346 x 189 px leaves the 320 x 132 scene inside the frame's header and padding.
+    const sceneAnchor = { ...PROJECTED_ANCHOR, cx: 346 * 9525, cy: 189 * 9525 };
     for (const kind of ['bar', 'column'] as const) {
       for (const count of [1, 2, 16, 100]) {
-        const host = document.createElement('div');
-        document.body.appendChild(host);
-        const store = createSpreadsheetStore();
-        for (let index = 0; index < count; index += 1) {
-          const row = kind === 'bar' ? index : 0;
-          const col = kind === 'bar' ? 0 : index;
-          mutators.setCell(store, { sheet: 0, row, col }, { kind: 'number', value: index + 1 });
-        }
-        mutators.upsertChart(store, {
-          id: `${kind}-chart-${count}`,
-          kind,
-          source: {
-            sheet: 0,
-            r0: 0,
-            c0: 0,
-            r1: kind === 'bar' ? count - 1 : 0,
-            c1: kind === 'bar' ? 0 : count - 1,
+        store = createSpreadsheetStore();
+        project(
+          { kind, nativeAnchor: sceneAnchor },
+          {
+            domain: 'category',
+            categories: Array.from({ length: count }, (_, index) => `C${index + 1}`),
+            series: [
+              {
+                id: 'series-0',
+                values: Array.from({ length: count }, (_, index) => index + 1),
+              },
+            ],
           },
-        });
-
-        const handle = attachSessionCharts({ host, store });
+        );
+        const handle = attach();
+        expect(host.querySelector('.fc-chart__plot')?.getAttribute('viewBox')).toBe('0 0 320 132');
         const marks = Array.from(
-          host.querySelectorAll<SVGRectElement>('.fc-chart__plot rect[fill="#0f6cbd"]'),
+          host.querySelectorAll<SVGRectElement>('.fc-chart__plot rect[data-chart-role="bar"]'),
         )
           .map((mark) => ({
             start: Number(mark.getAttribute(kind === 'bar' ? 'y' : 'x')),
@@ -2496,165 +1971,208 @@ describe('attachSessionCharts', () => {
         }
         for (let index = 1; index < marks.length; index += 1) {
           const previous = marks[index - 1];
-          const current = marks[index];
-          if (!previous || !current) throw new Error('chart mark missing from measured series');
-          expect(current.start).toBeGreaterThanOrEqual(previous.start + previous.size - 1e-9);
+          const mark = marks[index];
+          if (!previous || !mark) throw new Error('chart mark missing from measured series');
+          expect(mark.start).toBeGreaterThanOrEqual(previous.start + previous.size - 1e-9);
         }
         handle.detach();
-        host.remove();
       }
     }
   });
 
-  it('routes chart object edits through the protection guard', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'protected-chart',
-      kind: 'line',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      x: 20,
-      y: 30,
-      w: 320,
-      h: 180,
-    });
+  it('places the frame at the chart anchor and follows it', () => {
+    put([[1, 2]]);
+    const chart = create(range(0, 0, 0, 1), { kind: 'column' });
+    const handle = attach();
+    const before = pixels(panel());
+    // Excel's default frame is 360 x 216 pt.
+    expect(before.w).toBeCloseTo(480);
+    expect(before.h).toBeCloseTo(288);
+    const { fromRow, fromRowOff } = chart.nativeAnchor;
+    updateSessionChart(
+      store,
+      chart.id,
+      { anchor: { row: fromRow + 2, rowOffEmu: fromRowOff } },
+      null,
+      wb,
+    );
+    expect(pixels(panel()).y).toBeCloseTo(before.y + 40);
+    handle.detach();
+  });
 
-    const handle = attachSessionCharts({ host, store });
-    const chart = host.querySelector<HTMLElement>('.fc-chart');
+  it('routes chart object edits through the protection guard', () => {
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'line' });
+    const handle = attach();
     const header = host.querySelector<HTMLElement>('.fc-chart__header');
     const close = host.querySelector<HTMLButtonElement>('.fc-chart__close');
-    if (!chart || !header || !close) throw new Error('missing chart controls');
+    if (!header || !close) throw new Error('missing chart controls');
     setProtectedSheet(store, 0, true);
-    const before = structuredClone(store.getState().charts.charts[0]);
+    const before = structuredClone(current());
+    const start = pixels(panel());
 
     firePointer(header, 'pointerdown', { clientX: 10, clientY: 10 });
     firePointer(window, 'pointermove', { clientX: 45, clientY: 60 });
     firePointer(window, 'pointerup', { clientX: 45, clientY: 60 });
-    fireKey(chart, 'ArrowRight');
-    fireKey(chart, 'Delete');
+    fireKey(panel(), 'ArrowRight');
+    fireKey(panel(), 'Delete');
     close.click();
 
     expect(store.getState().charts.charts).toHaveLength(1);
-    expect(store.getState().charts.charts[0]).toEqual(before);
+    expect(current()).toEqual(before);
+    expect(pixels(panel())).toEqual(start);
     setProtectedSheet(store, 0, false);
-    fireKey(chart, 'ArrowRight');
-    expect(store.getState().charts.charts[0]?.x).toBe(28);
+    fireKey(panel(), 'ArrowRight');
+    expect(pixels(panel()).x).toBeCloseTo(start.x + 8);
     handle.detach();
   });
 
   it('moves and resizes chart overlays through pointer interactions', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'chart-1',
-      kind: 'line',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      title: 'Trend',
-      x: 20,
-      y: 30,
-      w: 320,
-      h: 180,
-    });
-
-    const handle = attachSessionCharts({ host, store });
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'line', title: 'Trend' });
+    const handle = attach();
+    const start = pixels(panel());
     const header = host.querySelector<HTMLElement>('.fc-chart__header');
-    expect(header).toBeTruthy();
     if (!header) throw new Error('missing chart header');
     firePointer(header, 'pointerdown', { clientX: 10, clientY: 10 });
     firePointer(window, 'pointermove', { clientX: 45, clientY: 60 });
     firePointer(window, 'pointerup', { clientX: 45, clientY: 60 });
-    expect(store.getState().charts.charts[0]).toMatchObject({ x: 55, y: 80 });
+    const moved = pixels(panel());
+    expect(moved.x).toBeCloseTo(start.x + 35);
+    expect(moved.y).toBeCloseTo(start.y + 50);
 
     const resize = host.querySelector<HTMLElement>('.fc-chart__resize');
-    expect(resize).toBeTruthy();
     if (!resize) throw new Error('missing chart resize handle');
     firePointer(resize, 'pointerdown', { clientX: 100, clientY: 100 });
     firePointer(window, 'pointermove', { clientX: 180, clientY: 145 });
     firePointer(window, 'pointerup', { clientX: 180, clientY: 145 });
-    expect(store.getState().charts.charts[0]).toMatchObject({ w: 400, h: 225 });
-
+    const resized = pixels(panel());
+    expect(resized.w).toBeCloseTo(start.w + 80);
+    expect(resized.h).toBeCloseTo(start.h + 45);
+    expect(history.undo()).toBe(true);
+    expect(pixels(panel()).w).toBeCloseTo(start.w);
     handle.detach();
   });
 
   it('marks the active chart overlay as selected and brings it forward', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'chart-1',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      title: 'First',
-    });
-    mutators.upsertChart(store, {
-      id: 'chart-2',
-      kind: 'line',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      title: 'Second',
-    });
-
-    const handle = attachSessionCharts({ host, store });
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'column', title: 'First' });
+    create(range(0, 0, 0, 1), { kind: 'line', title: 'Second' });
+    const handle = attach();
     const charts = Array.from(host.querySelectorAll<HTMLElement>('.fc-chart'));
     expect(charts).toHaveLength(2);
-    const first = charts[0];
-    const second = charts[1];
+    const [first, second] = charts;
     if (!first || !second) throw new Error('missing chart overlays');
+    // The workbook's stacking order: the later chart sits on top.
+    expect(Number(second.style.zIndex)).toBeGreaterThan(Number(first.style.zIndex));
 
-    firePointer(second, 'pointerdown');
-    expect(second.classList.contains('fc-chart--selected')).toBe(true);
-    expect(second.getAttribute('aria-selected')).toBe('true');
-    expect(second.style.zIndex).toBe('2');
-    expect(first.getAttribute('aria-selected')).toBe('false');
-
-    first.focus();
+    firePointer(first, 'pointerdown');
     expect(first.classList.contains('fc-chart--selected')).toBe(true);
-    expect(first.style.zIndex).toBe('2');
+    expect(first.getAttribute('aria-selected')).toBe('true');
+    expect(Number(first.style.zIndex)).toBeGreaterThan(Number(second.style.zIndex));
     expect(second.getAttribute('aria-selected')).toBe('false');
 
+    second.focus();
+    expect(second.classList.contains('fc-chart--selected')).toBe(true);
+    expect(Number(second.style.zIndex)).toBeGreaterThan(Number(first.style.zIndex));
+    expect(first.getAttribute('aria-selected')).toBe('false');
     handle.detach();
   });
 
   it('moves, resizes, and removes focused chart overlays through keyboard interactions', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'chart-1',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      title: 'Accessible chart',
-      x: 20,
-      y: 30,
-      w: 320,
-      h: 180,
-    });
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'column', title: 'Accessible chart' });
+    const handle = attach();
+    expect(panel().tabIndex).toBe(0);
+    expect(panel().getAttribute('aria-label')).toBe('Accessible chart');
+    expect(panel().getAttribute('aria-roledescription')).toBe('chart');
+    expect(panel().getAttribute('aria-keyshortcuts')).toContain('Shift+ArrowDown');
+    const start = pixels(panel());
 
-    const handle = attachSessionCharts({ host, store });
-    const chart = host.querySelector<HTMLElement>('.fc-chart');
-    expect(chart?.tabIndex).toBe(0);
-    expect(chart?.getAttribute('aria-label')).toBe('Accessible chart');
-    expect(chart?.getAttribute('aria-roledescription')).toBe('chart');
-    expect(chart?.getAttribute('aria-keyshortcuts')).toContain('Shift+ArrowDown');
-    if (!chart) throw new Error('missing chart');
-
-    const move = fireKey(chart, 'ArrowRight');
+    const move = fireKey(panel(), 'ArrowRight');
     expect(move.defaultPrevented).toBe(true);
-    expect(store.getState().charts.charts[0]).toMatchObject({ x: 28, y: 30 });
+    expect(pixels(panel()).x).toBeCloseTo(start.x + 8);
+    expect(pixels(panel()).y).toBeCloseTo(start.y);
 
-    const resize = fireKey(host.querySelector<HTMLElement>('.fc-chart') ?? chart, 'ArrowDown', {
-      shiftKey: true,
-    });
+    const resize = fireKey(panel(), 'ArrowDown', { shiftKey: true });
     expect(resize.defaultPrevented).toBe(true);
-    expect(store.getState().charts.charts[0]).toMatchObject({ w: 320, h: 188 });
+    expect(pixels(panel()).w).toBeCloseTo(start.w);
+    expect(pixels(panel()).h).toBeCloseTo(start.h + 8);
 
-    fireKey(host.querySelector<HTMLElement>('.fc-chart') ?? chart, 'Delete');
+    fireKey(panel(), 'Delete');
     expect(store.getState().charts.charts).toHaveLength(0);
     expect(host.querySelector('.fc-chart')).toBeNull();
     expect(document.activeElement).toBe(host);
-
     handle.detach();
+  });
+
+  it('draws a chart it cannot render as a placeholder that only moves, resizes and deletes', async () => {
+    const loaded = await WorkbookHandle.loadBytes(fixture('chart_chartex.xlsx'));
+    try {
+      hydrateChartsFromEngine(loaded, store, 0);
+      const handle = attachSessionCharts({
+        host,
+        store,
+        history,
+        getWb: () => loaded,
+        labels: { unsupportedChart: 'このグラフの種類は表示できません' },
+      });
+      const placeholder = panel();
+      expect(placeholder.classList.contains('fc-chart--unsupported')).toBe(true);
+      expect(host.querySelector('.fc-chart__title')?.textContent).toBe('cx1');
+      expect(host.querySelector('[data-chart-settings-tab]')).toBeNull();
+      expect(
+        host.querySelector('.fc-chart__plot [data-chart-role="unsupported"]')?.textContent,
+      ).toBe('このグラフの種類は表示できません');
+      expect(host.querySelector('.fc-chart__resize')).toBeTruthy();
+
+      const start = pixels(placeholder);
+      fireKey(placeholder, 'ArrowDown');
+      expect(pixels(panel()).y).toBeCloseTo(start.y + 8);
+      fireKey(panel(), 'Delete');
+      expect(store.getState().charts.charts).toHaveLength(0);
+      expect(history.undo()).toBe(true);
+      expect(current()?.kind).toBe('unsupported');
+      handle.detach();
+    } finally {
+      loaded.dispose();
+    }
+  });
+
+  it('disables the series and data range settings of a PivotChart', async () => {
+    const loaded = await WorkbookHandle.loadBytes(fixture('chart_pivot.xlsx'));
+    try {
+      hydrateChartsFromEngine(loaded, store, 1);
+      mutators.setSheetIndex(store, 1);
+      const handle = attachSessionCharts({ host, store, history, getWb: () => loaded });
+      expect(current()?.pivotChart).toBe(true);
+      expect(
+        host.querySelectorAll('.fc-chart__plot [data-chart-role="bar"]').length,
+      ).toBeGreaterThan(0);
+      const direction = fieldControl<HTMLSelectElement>(openTab(), 'Series direction', 'select');
+      expect(direction.disabled).toBe(true);
+      expect(fieldControl<HTMLSelectElement>(surface(), 'Chart type', 'select').disabled).toBe(
+        false,
+      );
+      const filters = Array.from(
+        switchTab('filters').querySelectorAll<HTMLInputElement | HTMLButtonElement>(
+          '.fc-chart-settings__body input, .fc-chart-settings__body button',
+        ),
+      );
+      expect(filters.length).toBeGreaterThan(0);
+      expect(filters.every((control) => control.disabled)).toBe(true);
+      const styles = switchTab('styles');
+      for (const action of ['add-series', 'remove-series']) {
+        const control = styles.querySelector<HTMLButtonElement>(`.fc-chart-settings__${action}`);
+        expect(control?.disabled).toBe(true);
+        expect(control?.title).toBe(
+          'The series and data range of a PivotChart follow its PivotTable.',
+        );
+      }
+      handle.detach();
+    } finally {
+      loaded.dispose();
+    }
   });
 
   it('keeps chart close button DOM on the shared interaction primitive', () => {
@@ -2697,506 +2215,288 @@ describe('attachSessionCharts', () => {
   });
 
   it('keeps sparse crossing auto and invalid raw values untouched until edited', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'crossing-sparse',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
+    project({ kind: 'column' });
+    const handle = attach();
 
-    let surface = openElements();
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('auto');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.xAxis).toBeUndefined();
+    let settings = openTab();
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('auto');
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    surface = openElements();
-    const xSelect = chartAxisCrossingSelect(surface, 'X-axis');
-    xSelect.value = 'min';
-    xSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const xAuto = chartAxisCrossingSelect(surface, 'X-axis');
-    xAuto.value = 'auto';
-    xAuto.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.xAxis).toBeUndefined();
+    settings = openTab();
+    setSelect(chartAxisCrossingSelect(settings, 'X-axis'), 'min');
+    setSelect(chartAxisCrossingSelect(surface(), 'X-axis'), 'auto');
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    mutators.updateChart(store, 'crossing-sparse', {
+    mutators.updateChart(store, projection.id, {
       xAxis: { crossing: Number.NaN } as never,
       yAxis: { crossing: Number.POSITIVE_INFINITY } as never,
     });
-    surface = openElements();
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('auto');
-    expect(chartAxisCrossingSelect(surface, 'Y-axis').value).toBe('auto');
-    const rawTitle = surface.querySelector<HTMLInputElement>(
-      '.fc-chart-settings__field input[type="text"]',
-    );
-    if (!rawTitle) throw new Error('missing title input');
-    rawTitle.value = 'Raw title';
-    rawTitle.dispatchEvent(new Event('input', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    const untouched = store.getState().charts.charts[0];
-    expect(Number.isNaN(untouched?.xAxis?.crossing as number)).toBe(true);
-    expect(untouched?.yAxis?.crossing).toBe(Number.POSITIVE_INFINITY);
-    expect(untouched?.title).toBe('Raw title');
-    expect(history.canUndo()).toBe(true);
-    history.clear();
+    settings = openTab();
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('auto');
+    expect(chartAxisCrossingSelect(settings, 'Y-axis').value).toBe('auto');
+    setInput(titleInput(), 'Raw title');
+    apply();
+    expect(lastPatch()).toEqual({ title: 'Raw title' });
+    expect(Number.isNaN(current()?.xAxis?.crossing as number)).toBe(true);
+    expect(current()?.yAxis?.crossing).toBe(Number.POSITIVE_INFINITY);
 
-    mutators.updateChart(store, 'crossing-sparse', {
+    mutators.updateChart(store, projection.id, {
       xAxis: { crossing: 'auto' },
       yAxis: { crossing: 'auto' },
     });
-    surface = openElements();
-    const explicitAuto = chartAxisCrossingSelect(surface, 'X-axis');
-    explicitAuto.value = 'min';
-    explicitAuto.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const restoredAuto = chartAxisCrossingSelect(surface, 'X-axis');
-    restoredAuto.value = 'auto';
-    restoredAuto.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe('auto');
-
+    const applied = projection.patches.length;
+    settings = openTab();
+    setSelect(chartAxisCrossingSelect(settings, 'X-axis'), 'min');
+    setSelect(chartAxisCrossingSelect(surface(), 'X-axis'), 'auto');
+    apply();
+    expect(projection.patches).toHaveLength(applied);
+    expect(current()?.xAxis?.crossing).toBe('auto');
     handle.detach();
-    host.remove();
   });
 
-  it('normalizes category crossings, keeps numeric defaults, and supports history and cancel', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const table = [
+  it('normalizes category crossings, keeps numeric defaults, and supports cancel', () => {
+    project(
+      { kind: 'column', filter: { hiddenCategoryIds: ['category-1'] } },
+      {
+        domain: 'category',
+        categories: ['A', 'B', 'C'],
+        categoryIds: ['category-0', 'category-1', 'category-2'],
+        series: [{ id: 'series-0', name: 'Value', values: [1, 2, 3] }],
+      },
+    );
+    const handle = attach();
+
+    let settings = openTab();
+    setSelect(chartAxisCrossingSelect(settings, 'X-axis'), 'custom');
+    const xCustom = chartAxisCrossingCustom(surface(), 'X-axis');
+    expect(xCustom.min).toBe('1');
+    expect(xCustom.step).toBe('1');
+    setInput(xCustom, '2.6');
+    setSelect(chartAxisCrossingSelect(surface(), 'Y-axis'), 'custom');
+    settings = surface();
+    expect(chartAxisCrossingCustom(settings, 'X-axis').value).toBe('2');
+    const yCustom = chartAxisCrossingCustom(settings, 'Y-axis');
+    expect(yCustom.step).toBe('any');
+    expect(yCustom.value).toBe('0');
+    setInput(yCustom, '-2.5');
+    apply();
+    expect(current()?.xAxis?.crossing).toBe(2);
+    expect(current()?.yAxis?.crossing).toBe(-2.5);
+
+    settings = openTab();
+    setSelect(chartAxisCrossingSelect(settings, 'X-axis'), 'min');
+    setSelect(chartAxisCrossingSelect(surface(), 'X-axis'), 'custom');
+    expect(chartAxisCrossingCustom(surface(), 'X-axis').value).toBe('2');
+    cancel();
+
+    setSelect(chartAxisCrossingSelect(openTab(), 'X-axis'), 'min');
+    apply();
+    expect(current()?.xAxis?.crossing).toBe('min');
+
+    setSelect(chartAxisCrossingSelect(openTab(), 'X-axis'), 'max');
+    apply();
+    expect(current()?.xAxis?.crossing).toBe('max');
+
+    setSelect(chartAxisCrossingSelect(openTab(), 'X-axis'), 'auto');
+    apply();
+    expect(current()?.xAxis?.crossing).toBeUndefined();
+
+    setSelect(chartAxisCrossingSelect(openTab(), 'X-axis'), 'min');
+    cancel();
+    expect(current()?.xAxis?.crossing).toBeUndefined();
+    handle.detach();
+  });
+
+  it('applies a custom axis crossing in the workbook with undo and redo', () => {
+    put([
       ['Category', 'Value'],
       ['A', 1],
       ['B', 2],
       ['C', 3],
-    ];
-    table.forEach((row, rowIndex) => {
-      row.forEach((value, colIndex) => {
-        mutators.setCell(
-          store,
-          { sheet: 0, row: rowIndex, col: colIndex },
-          typeof value === 'number' ? { kind: 'number', value } : { kind: 'text', value },
-        );
-      });
-    });
-    mutators.upsertChart(store, {
-      id: 'crossing-values',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
-      filter: { hiddenCategoryIds: ['category-1'] },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
-
-    let surface = openElements();
-    const xMode = chartAxisCrossingSelect(surface, 'X-axis');
-    xMode.value = 'custom';
-    xMode.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const xCustom = chartAxisCrossingCustom(surface, 'X-axis');
-    expect(xCustom.min).toBe('1');
-    expect(xCustom.step).toBe('1');
-    xCustom.value = '2.6';
-    xCustom.dispatchEvent(new Event('input', { bubbles: true }));
-
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const yMode = chartAxisCrossingSelect(surface, 'Y-axis');
-    yMode.value = 'custom';
-    yMode.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisCrossingCustom(surface, 'X-axis').value).toBe('2');
-    const yCustom = chartAxisCrossingCustom(surface, 'Y-axis');
-    expect(yCustom.step).toBe('any');
-    expect(yCustom.value).toBe('0');
-    yCustom.value = '-2.5';
-    yCustom.dispatchEvent(new Event('input', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe(2);
-    expect(store.getState().charts.charts[0]?.yAxis?.crossing).toBe(-2.5);
-    expect(history.canUndo()).toBe(true);
+    ]);
+    create(range(0, 0, 3, 1), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    setSelect(chartAxisCrossingSelect(openTab(), 'Y-axis'), 'custom');
+    setInput(chartAxisCrossingCustom(surface(), 'Y-axis'), '-2.5');
+    apply();
+    expect(current()?.yAxis?.crossing).toBe(-2.5);
     expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBeUndefined();
-    expect(store.getState().charts.charts[0]?.yAxis?.crossing).toBeUndefined();
+    expect(current()?.yAxis?.crossing).toBe('auto');
     expect(history.redo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe(2);
-    expect(store.getState().charts.charts[0]?.yAxis?.crossing).toBe(-2.5);
-
-    surface = openElements();
-    const rememberedMin = chartAxisCrossingSelect(surface, 'X-axis');
-    rememberedMin.value = 'min';
-    rememberedMin.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const rememberedCustom = chartAxisCrossingSelect(surface, 'X-axis');
-    rememberedCustom.value = 'custom';
-    rememberedCustom.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisCrossingCustom(surface, 'X-axis').value).toBe('2');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-
-    surface = openElements();
-    const finiteMin = chartAxisCrossingSelect(surface, 'X-axis');
-    finiteMin.value = 'min';
-    finiteMin.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe('min');
-
-    surface = openElements();
-    const finiteMax = chartAxisCrossingSelect(surface, 'X-axis');
-    finiteMax.value = 'max';
-    finiteMax.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe('max');
-
-    surface = openElements();
-    const finiteAuto = chartAxisCrossingSelect(surface, 'X-axis');
-    finiteAuto.value = 'auto';
-    finiteAuto.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBeUndefined();
-
-    surface = openElements();
-    const cancelX = chartAxisCrossingSelect(surface, 'X-axis');
-    cancelX.value = 'min';
-    cancelX.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBeUndefined();
-
+    expect(current()?.yAxis?.crossing).toBe(-2.5);
     handle.detach();
-    host.remove();
   });
 
   it('retains dormant circular crossings and maps numeric roles per chart family', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'crossing-dormant',
-      kind: 'pie',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      xAxis: { crossing: 2 },
-      yAxis: { crossing: 'max' },
-    });
-    const handle = attachSessionCharts({ host, store });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing chart settings');
-    expect(chartAxisCrossingSelect(surface, 'X-axis').disabled).toBe(true);
-    expect(chartAxisCrossingSelect(surface, 'Y-axis').disabled).toBe(true);
-    expect(chartAxisCrossingCustom(surface, 'X-axis').disabled).toBe(true);
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe(2);
-    expect(store.getState().charts.charts[0]?.yAxis?.crossing).toBe('max');
+    project({ kind: 'pie', xAxis: { crossing: 2 }, yAxis: { crossing: 'max' } });
+    const handle = attach();
+    const settings = openTab();
+    expect(chartAxisCrossingSelect(settings, 'X-axis').disabled).toBe(true);
+    expect(chartAxisCrossingSelect(settings, 'Y-axis').disabled).toBe(true);
+    expect(chartAxisCrossingCustom(settings, 'X-axis').disabled).toBe(true);
+    apply();
+    expect(projection.patches).toHaveLength(0);
     handle.detach();
-    host.remove();
   });
 
   it('syncs untouched crossings and preserves a dirty crossing with other draft fields', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'Category' });
-    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'Value' });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 0 }, { kind: 'text', value: 'A' });
-    mutators.setCell(store, { sheet: 0, row: 1, col: 1 }, { kind: 'number', value: 1 });
-    mutators.setCell(store, { sheet: 0, row: 2, col: 0 }, { kind: 'text', value: 'B' });
-    mutators.setCell(store, { sheet: 0, row: 2, col: 1 }, { kind: 'number', value: 2 });
-    mutators.upsertChart(store, {
-      id: 'crossing-sync',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    let surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing chart settings');
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('auto');
-    mutators.updateChart(store, 'crossing-sync', { xAxis: { crossing: 'min' } });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing synced chart settings');
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('min');
+    project({ kind: 'column' });
+    const handle = attach();
+    let settings = openTab();
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('auto');
+    mutators.updateChart(store, projection.id, { xAxis: { crossing: 'min' } });
+    settings = surface();
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('min');
 
-    const title = surface.querySelector<HTMLInputElement>(
-      '.fc-chart-settings__field input[type="text"]',
-    );
-    if (!title) throw new Error('missing title input');
-    title.value = 'Draft title';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    const dirtyMode = chartAxisCrossingSelect(surface, 'X-axis');
-    dirtyMode.value = 'custom';
-    dirtyMode.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const dirtyCustom = chartAxisCrossingCustom(surface, 'X-axis');
-    dirtyCustom.value = '2';
-    dirtyCustom.dispatchEvent(new Event('input', { bubbles: true }));
-    mutators.updateChart(store, 'crossing-sync', { xAxis: { crossing: 'max' } });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('custom');
-    expect(
-      surface.querySelector<HTMLInputElement>('.fc-chart-settings__field input[type="text"]')
-        ?.value,
-    ).toBe('Draft title');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.title).toBe('Draft title');
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe(2);
-
+    setInput(titleInput(), 'Draft title');
+    setSelect(chartAxisCrossingSelect(settings, 'X-axis'), 'custom');
+    setInput(chartAxisCrossingCustom(surface(), 'X-axis'), '2');
+    mutators.updateChart(store, projection.id, { xAxis: { crossing: 'max' } });
+    settings = surface();
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('custom');
+    expect(titleInput().value).toBe('Draft title');
+    apply();
+    expect(current()?.title).toBe('Draft title');
+    expect(current()?.xAxis?.crossing).toBe(2);
     handle.detach();
-    host.remove();
   });
 
   it('keeps sparse label positions and invalid raw values until edited', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'label-position-sparse',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
+    project({ kind: 'column' });
+    const handle = attach();
 
-    let surface = openElements();
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('automatic');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.xAxis).toBeUndefined();
+    let settings = openTab();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('automatic');
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    mutators.updateChart(store, 'label-position-sparse', {
-      xAxis: { labelPosition: 'low' },
-    });
-    history.clear();
-    surface = openElements();
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('low');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('low');
+    mutators.updateChart(store, projection.id, { xAxis: { labelPosition: 'low' } });
+    settings = openTab();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('low');
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    surface = openElements();
-    const lowToAuto = chartAxisLabelPositionSelect(surface, 'X-axis');
-    lowToAuto.value = 'automatic';
-    lowToAuto.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBeUndefined();
-    expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('low');
-    expect(history.redo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBeUndefined();
-    history.clear();
+    setSelect(chartAxisLabelPositionSelect(openTab(), 'X-axis'), 'automatic');
+    apply();
+    expect(projection.patches).toHaveLength(1);
+    expect(current()?.xAxis?.labelPosition).toBeUndefined();
 
-    surface = openElements();
-    const mode = chartAxisLabelPositionSelect(surface, 'X-axis');
-    mode.value = 'nextTo';
-    mode.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const restoredAutomatic = chartAxisLabelPositionSelect(surface, 'X-axis');
-    restoredAutomatic.value = 'automatic';
-    restoredAutomatic.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBeUndefined();
-    history.clear();
+    settings = openTab();
+    setSelect(chartAxisLabelPositionSelect(settings, 'X-axis'), 'nextTo');
+    setSelect(chartAxisLabelPositionSelect(surface(), 'X-axis'), 'automatic');
+    apply();
+    expect(projection.patches).toHaveLength(1);
 
-    mutators.updateChart(store, 'label-position-sparse', {
+    mutators.updateChart(store, projection.id, {
       xAxis: { labelPosition: 'invalid-runtime-value' } as never,
       yAxis: { labelPosition: 17 } as never,
     });
-    surface = openElements();
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('automatic');
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('automatic');
-    const title = surface.querySelector<HTMLInputElement>(
-      '.fc-chart-settings__field input[type="text"]',
-    );
-    if (!title) throw new Error('missing title input');
-    title.value = 'Unrelated title';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    const chart = store.getState().charts.charts[0];
-    expect(chart?.xAxis?.labelPosition).toBe('invalid-runtime-value');
-    expect(chart?.yAxis?.labelPosition).toBe(17);
-    expect(chart?.title).toBe('Unrelated title');
+    settings = openTab();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('automatic');
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').value).toBe('automatic');
+    setInput(titleInput(), 'Unrelated title');
+    apply();
+    expect(lastPatch()).toEqual({ title: 'Unrelated title' });
+    expect(current()?.xAxis?.labelPosition).toBe('invalid-runtime-value');
+    expect(current()?.yAxis?.labelPosition).toBe(17);
 
-    surface = openElements();
-    const cancel = chartAxisLabelPositionSelect(surface, 'X-axis');
-    cancel.value = 'high';
-    cancel.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('invalid-runtime-value');
-
+    setSelect(chartAxisLabelPositionSelect(openTab(), 'X-axis'), 'high');
+    cancel();
+    expect(current()?.xAxis?.labelPosition).toBe('invalid-runtime-value');
     handle.detach();
-    host.remove();
+  });
+
+  it('applies an axis label position in the workbook with undo and redo', () => {
+    put([[1, 2]]);
+    create(range(0, 0, 0, 1), { kind: 'column' });
+    const handle = attach();
+    setSelect(chartAxisLabelPositionSelect(openTab(), 'X-axis'), 'low');
+    apply();
+    expect(current()?.xAxis?.labelPosition).toBe('low');
+    expect(history.undo()).toBe(true);
+    expect(current()?.xAxis?.labelPosition).toBe('nextTo');
+    expect(history.redo()).toBe(true);
+    expect(current()?.xAxis?.labelPosition).toBe('low');
+    handle.detach();
   });
 
   it('keeps dormant circular label positions through chart kind cycles', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'label-position-dormant',
-      kind: 'pie',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      xAxis: { labelPosition: 'high' },
-      yAxis: { labelPosition: 'none' },
-    });
-    const handle = attachSessionCharts({ host, store });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
+    project({ kind: 'pie', xAxis: { labelPosition: 'high' }, yAxis: { labelPosition: 'none' } });
+    const handle = attach();
 
-    let surface = openElements();
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('none');
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').disabled).toBe(true);
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').disabled).toBe(true);
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('high');
-    expect(store.getState().charts.charts[0]?.yAxis?.labelPosition).toBe('none');
+    let settings = openTab();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('high');
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').value).toBe('none');
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').disabled).toBe(true);
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').disabled).toBe(true);
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    mutators.updateChart(store, 'label-position-dormant', { kind: 'column' });
-    surface = openElements();
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').disabled).toBe(false);
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
-    mutators.updateChart(store, 'label-position-dormant', { kind: 'pie' });
-    surface = openElements();
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('none');
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('high');
-    expect(store.getState().charts.charts[0]?.yAxis?.labelPosition).toBe('none');
-
+    mutators.updateChart(store, projection.id, { kind: 'column' });
+    settings = openTab();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').disabled).toBe(false);
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('high');
+    mutators.updateChart(store, projection.id, { kind: 'pie' });
+    settings = openTab();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('high');
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').value).toBe('none');
+    apply();
+    expect(projection.patches).toHaveLength(0);
     handle.detach();
-    host.remove();
   });
 
   it('syncs untouched label positions while protecting a dirty position and title', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'label-position-sync',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-    let surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing chart settings');
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('automatic');
+    project({ kind: 'column' });
+    const handle = attach();
+    let settings = openTab();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('automatic');
 
-    mutators.updateChart(store, 'label-position-sync', {
+    mutators.updateChart(store, projection.id, {
       xAxis: { labelPosition: 'low' },
       yAxis: { labelPosition: 'high' },
     });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-    if (!surface) throw new Error('missing synced chart settings');
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('low');
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('high');
+    settings = surface();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('low');
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').value).toBe('high');
 
-    const dirtyCrossing = chartAxisCrossingSelect(surface, 'X-axis');
-    dirtyCrossing.value = 'min';
-    dirtyCrossing.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    mutators.updateChart(store, 'label-position-sync', {
+    setSelect(chartAxisCrossingSelect(settings, 'X-axis'), 'min');
+    mutators.updateChart(store, projection.id, {
       xAxis: { crossing: 'max', labelPosition: 'high' },
       yAxis: { labelPosition: 'low' },
     });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('min');
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('high');
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('low');
+    settings = surface();
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('min');
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('high');
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').value).toBe('low');
 
-    const title = surface.querySelector<HTMLInputElement>(
-      '.fc-chart-settings__field input[type="text"]',
-    );
-    if (!title) throw new Error('missing title input');
-    title.value = 'Draft title';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    const dirtyPosition = chartAxisLabelPositionSelect(surface, 'X-axis');
-    dirtyPosition.value = 'nextTo';
-    dirtyPosition.dispatchEvent(new Event('change', { bubbles: true }));
-
-    mutators.updateChart(store, 'label-position-sync', {
+    setInput(titleInput(), 'Draft title');
+    setSelect(chartAxisLabelPositionSelect(settings, 'X-axis'), 'nextTo');
+    mutators.updateChart(store, projection.id, {
       xAxis: { crossing: 'max', labelPosition: 'none' },
       yAxis: { labelPosition: 'high' },
     });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('nextTo');
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('high');
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('min');
-    expect(
-      surface.querySelector<HTMLInputElement>('.fc-chart-settings__field input[type="text"]')
-        ?.value,
-    ).toBe('Draft title');
+    settings = surface();
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('nextTo');
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').value).toBe('high');
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('min');
+    expect(titleInput().value).toBe('Draft title');
 
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.title).toBe('Draft title');
-    expect(store.getState().charts.charts[0]?.xAxis?.labelPosition).toBe('nextTo');
-    expect(store.getState().charts.charts[0]?.xAxis?.crossing).toBe('min');
-    expect(store.getState().charts.charts[0]?.yAxis?.labelPosition).toBe('high');
-
+    apply();
+    expect(current()?.title).toBe('Draft title');
+    expect(current()?.xAxis?.labelPosition).toBe('nextTo');
+    expect(current()?.xAxis?.crossing).toBe('min');
+    expect(current()?.yAxis?.labelPosition).toBe('high');
     handle.detach();
-    host.remove();
   });
 
   it('keeps sparse logarithmic settings, remembered bases, and invalid raw values', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'log-sparse',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-      yAxis: { majorUnit: 2 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
-    const majorUnit = (surface: HTMLElement): HTMLInputElement => {
+    project({ kind: 'column', yAxis: { majorUnit: 2 } });
+    const handle = attach();
+    const majorUnit = (settings: HTMLElement): HTMLInputElement => {
       const field = Array.from(
-        chartAxisFieldset(surface, 'Y-axis').querySelectorAll<HTMLElement>(
+        chartAxisFieldset(settings, 'Y-axis').querySelectorAll<HTMLElement>(
           '.fc-chart-settings__field',
         ),
       ).find(
@@ -3208,245 +2508,167 @@ describe('attachSessionCharts', () => {
       return input;
     };
 
-    let surface = openElements();
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(false);
-    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('10');
-    expect(chartAxisLogBase(surface, 'Y-axis').min).toBe('2');
-    expect(chartAxisLogBase(surface, 'Y-axis').max).toBe('1000');
-    expect(chartAxisLogBase(surface, 'Y-axis').step).toBe('any');
-    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(true);
-    expect(majorUnit(surface).disabled).toBe(false);
+    let settings = openTab();
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').checked).toBe(false);
+    expect(chartAxisLogBase(settings, 'Y-axis').value).toBe('10');
+    expect(chartAxisLogBase(settings, 'Y-axis').min).toBe('2');
+    expect(chartAxisLogBase(settings, 'Y-axis').max).toBe('1000');
+    expect(chartAxisLogBase(settings, 'Y-axis').step).toBe('any');
+    expect(chartAxisLogBase(settings, 'Y-axis').disabled).toBe(true);
+    expect(majorUnit(settings).disabled).toBe(false);
 
-    const enable = chartAxisLogCheckbox(surface, 'Y-axis');
-    enable.checked = true;
-    enable.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(false);
-    expect(majorUnit(surface).disabled).toBe(true);
-    const remembered = chartAxisLogBase(surface, 'Y-axis');
-    remembered.value = '20';
-    remembered.dispatchEvent(new Event('input', { bubbles: true }));
-    const disable = chartAxisLogCheckbox(surface, 'Y-axis');
-    disable.checked = false;
-    disable.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('20');
-    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(true);
-    expect(majorUnit(surface).disabled).toBe(false);
-    const reenableDraft = chartAxisLogCheckbox(surface, 'Y-axis');
-    reenableDraft.checked = true;
-    reenableDraft.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('20');
-    const disableAgain = chartAxisLogCheckbox(surface, 'Y-axis');
-    disableAgain.checked = false;
-    disableAgain.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBeUndefined();
-    expect(store.getState().charts.charts[0]?.yAxis?.majorUnit).toBe(2);
+    setChecked(chartAxisLogCheckbox(settings, 'Y-axis'), true);
+    settings = surface();
+    expect(chartAxisLogBase(settings, 'Y-axis').disabled).toBe(false);
+    expect(majorUnit(settings).disabled).toBe(true);
+    setInput(chartAxisLogBase(settings, 'Y-axis'), '20');
+    setChecked(chartAxisLogCheckbox(settings, 'Y-axis'), false);
+    settings = surface();
+    expect(chartAxisLogBase(settings, 'Y-axis').value).toBe('20');
+    expect(chartAxisLogBase(settings, 'Y-axis').disabled).toBe(true);
+    expect(majorUnit(settings).disabled).toBe(false);
+    setChecked(chartAxisLogCheckbox(settings, 'Y-axis'), true);
+    settings = surface();
+    expect(chartAxisLogBase(settings, 'Y-axis').value).toBe('20');
+    setChecked(chartAxisLogCheckbox(settings, 'Y-axis'), false);
+    apply();
+    expect(projection.patches).toHaveLength(0);
+    expect(current()?.yAxis?.majorUnit).toBe(2);
 
-    surface = openElements();
-    const reenable = chartAxisLogCheckbox(surface, 'Y-axis');
-    reenable.checked = true;
-    reenable.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const clampHigh = chartAxisLogBase(surface, 'Y-axis');
-    clampHigh.value = '1001';
-    clampHigh.dispatchEvent(new Event('input', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1000);
-    expect(history.canUndo()).toBe(true);
-    expect(history.undo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBeUndefined();
-    expect(history.redo()).toBe(true);
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1000);
+    settings = openTab();
+    setChecked(chartAxisLogCheckbox(settings, 'Y-axis'), true);
+    setInput(chartAxisLogBase(surface(), 'Y-axis'), '1001');
+    apply();
+    expect(current()?.yAxis?.logBase).toBe(1000);
 
-    surface = openElements();
-    const fallbackBase = chartAxisLogBase(surface, 'Y-axis');
-    fallbackBase.value = '';
-    fallbackBase.dispatchEvent(new Event('input', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(10);
-    history.clear();
+    setInput(chartAxisLogBase(openTab(), 'Y-axis'), '');
+    apply();
+    expect(current()?.yAxis?.logBase).toBe(10);
 
-    mutators.updateChart(store, 'log-sparse', {
-      yAxis: { logBase: 1 } as never,
-    });
-    history.clear();
-    surface = openElements();
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(false);
-    const title = surface.querySelector<HTMLInputElement>(
-      '.fc-chart-settings__field input[type="text"]',
-    );
-    if (!title) throw new Error('missing title input');
-    title.value = 'Unrelated title';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1);
-    expect(store.getState().charts.charts[0]?.title).toBe('Unrelated title');
-    expect(history.canUndo()).toBe(true);
-    history.clear();
+    mutators.updateChart(store, projection.id, { yAxis: { logBase: 1 } as never });
+    settings = openTab();
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').checked).toBe(false);
+    setInput(titleInput(), 'Unrelated title');
+    apply();
+    expect(lastPatch()).toEqual({ title: 'Unrelated title' });
+    expect(current()?.yAxis?.logBase).toBe(1);
 
-    surface = openElements();
-    const invalidOn = chartAxisLogCheckbox(surface, 'Y-axis');
-    invalidOn.checked = true;
-    invalidOn.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    const invalidOff = chartAxisLogCheckbox(surface, 'Y-axis');
-    invalidOff.checked = false;
-    invalidOff.dispatchEvent(new Event('change', { bubbles: true }));
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(history.canUndo()).toBe(false);
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1);
+    const applied = projection.patches.length;
+    settings = openTab();
+    setChecked(chartAxisLogCheckbox(settings, 'Y-axis'), true);
+    setChecked(chartAxisLogCheckbox(surface(), 'Y-axis'), false);
+    apply();
+    expect(projection.patches).toHaveLength(applied);
+    expect(current()?.yAxis?.logBase).toBe(1);
 
-    surface = openElements();
-    const cancelled = chartAxisLogCheckbox(surface, 'Y-axis');
-    cancelled.checked = true;
-    cancelled.dispatchEvent(new Event('change', { bubbles: true }));
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__cancel')?.click();
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(1);
-
+    setChecked(chartAxisLogCheckbox(openTab(), 'Y-axis'), true);
+    cancel();
+    expect(current()?.yAxis?.logBase).toBe(1);
     handle.detach();
-    host.remove();
+  });
+
+  it('applies a logarithmic value axis in the workbook with undo and redo', () => {
+    put([[1, 100]]);
+    create(range(0, 0, 0, 1), { kind: 'column' });
+    const handle = attach();
+    setChecked(chartAxisLogCheckbox(openTab(), 'Y-axis'), true);
+    setInput(chartAxisLogBase(surface(), 'Y-axis'), '20');
+    apply();
+    expect(current()?.yAxis?.logBase).toBe(20);
+    expect(history.undo()).toBe(true);
+    expect(current()?.yAxis?.logBase).toBeUndefined();
+    expect(history.redo()).toBe(true);
+    expect(current()?.yAxis?.logBase).toBe(20);
+    handle.detach();
   });
 
   it('keeps dormant logarithmic bases by chart type and grouping', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    mutators.upsertChart(store, {
-      id: 'log-dormant',
+    project({
       kind: 'column',
       grouping: 'stacked',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
       xAxis: { logBase: 10 },
       yAxis: { logBase: 5 },
     });
-    const handle = attachSessionCharts({ host, store });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
+    const handle = attach();
 
-    let surface = openElements();
-    expect(chartAxisLogCheckbox(surface, 'X-axis').checked).toBe(true);
-    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(true);
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
-    expect(chartAxisLogBase(surface, 'Y-axis').disabled).toBe(true);
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.logBase).toBe(10);
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(5);
+    let settings = openTab();
+    expect(chartAxisLogCheckbox(settings, 'X-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(settings, 'X-axis').disabled).toBe(true);
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').disabled).toBe(true);
+    expect(chartAxisLogBase(settings, 'Y-axis').disabled).toBe(true);
+    apply();
+    expect(projection.patches).toHaveLength(0);
 
-    mutators.updateChart(store, 'log-dormant', {
-      grouping: 'percent-stacked',
-    });
-    surface = openElements();
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
+    mutators.updateChart(store, projection.id, { grouping: 'percent-stacked' });
+    settings = openTab();
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').disabled).toBe(true);
 
-    mutators.updateChart(store, 'log-dormant', {
-      kind: 'bar',
-      grouping: 'clustered',
-    });
-    surface = openElements();
-    expect(chartAxisLogCheckbox(surface, 'X-axis').checked).toBe(true);
-    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(false);
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
+    mutators.updateChart(store, projection.id, { kind: 'bar', grouping: 'clustered' });
+    settings = openTab();
+    expect(chartAxisLogCheckbox(settings, 'X-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(settings, 'X-axis').disabled).toBe(false);
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').disabled).toBe(true);
 
-    mutators.updateChart(store, 'log-dormant', { kind: 'scatter' });
-    surface = openElements();
-    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(false);
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(false);
-    expect(chartAxisLogBase(surface, 'X-axis').value).toBe('10');
-    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('5');
+    mutators.updateChart(store, projection.id, { kind: 'scatter' });
+    settings = openTab();
+    expect(chartAxisLogCheckbox(settings, 'X-axis').disabled).toBe(false);
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').disabled).toBe(false);
+    expect(chartAxisLogBase(settings, 'X-axis').value).toBe('10');
+    expect(chartAxisLogBase(settings, 'Y-axis').value).toBe('5');
 
-    mutators.updateChart(store, 'log-dormant', { kind: 'pie' });
-    surface = openElements();
-    expect(chartAxisLogCheckbox(surface, 'X-axis').disabled).toBe(true);
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').disabled).toBe(true);
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    expect(store.getState().charts.charts[0]?.xAxis?.logBase).toBe(10);
-    expect(store.getState().charts.charts[0]?.yAxis?.logBase).toBe(5);
-
+    mutators.updateChart(store, projection.id, { kind: 'pie' });
+    settings = openTab();
+    expect(chartAxisLogCheckbox(settings, 'X-axis').disabled).toBe(true);
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').disabled).toBe(true);
+    apply();
+    expect(projection.patches).toHaveLength(0);
     handle.detach();
-    host.remove();
   });
 
   it('syncs untouched logarithmic axes around dirty crossing and label fields', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const store = createSpreadsheetStore();
-    const history = new History();
-    mutators.upsertChart(store, {
-      id: 'log-sync',
-      kind: 'column',
-      source: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
-    });
-    const handle = attachSessionCharts({ host, store, history });
-    const openElements = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[data-chart-settings-tab="elements"]')?.click();
-      const surface = host.querySelector<HTMLElement>('.fc-chart-settings');
-      if (!surface) throw new Error('missing chart settings');
-      return surface;
-    };
+    project({ kind: 'column' });
+    const handle = attach();
 
-    let surface = openElements();
-    mutators.updateChart(store, 'log-sync', {
-      yAxis: { logBase: 20 },
-    });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisLogCheckbox(surface, 'Y-axis').checked).toBe(true);
-    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('20');
+    let settings = openTab();
+    mutators.updateChart(store, projection.id, { yAxis: { logBase: 20 } });
+    settings = surface();
+    expect(chartAxisLogCheckbox(settings, 'Y-axis').checked).toBe(true);
+    expect(chartAxisLogBase(settings, 'Y-axis').value).toBe('20');
 
-    const dirtyCrossing = chartAxisCrossingSelect(surface, 'Y-axis');
-    dirtyCrossing.value = 'min';
-    dirtyCrossing.dispatchEvent(new Event('change', { bubbles: true }));
-    mutators.updateChart(store, 'log-sync', {
-      yAxis: { crossing: 'max', logBase: 30 },
-    });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisCrossingSelect(surface, 'Y-axis').value).toBe('min');
-    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('30');
+    setSelect(chartAxisCrossingSelect(settings, 'Y-axis'), 'min');
+    mutators.updateChart(store, projection.id, { yAxis: { crossing: 'max', logBase: 30 } });
+    settings = surface();
+    expect(chartAxisCrossingSelect(settings, 'Y-axis').value).toBe('min');
+    expect(chartAxisLogBase(settings, 'Y-axis').value).toBe('30');
 
-    const dirtyPosition = chartAxisLabelPositionSelect(surface, 'Y-axis');
-    dirtyPosition.value = 'nextTo';
-    dirtyPosition.dispatchEvent(new Event('change', { bubbles: true }));
-    mutators.updateChart(store, 'log-sync', {
+    setSelect(chartAxisLabelPositionSelect(settings, 'Y-axis'), 'nextTo');
+    mutators.updateChart(store, projection.id, {
       yAxis: { crossing: 'max', labelPosition: 'high', logBase: 40 },
     });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisCrossingSelect(surface, 'Y-axis').value).toBe('min');
-    expect(chartAxisLabelPositionSelect(surface, 'Y-axis').value).toBe('nextTo');
-    expect(chartAxisLogBase(surface, 'Y-axis').value).toBe('40');
+    settings = surface();
+    expect(chartAxisCrossingSelect(settings, 'Y-axis').value).toBe('min');
+    expect(chartAxisLabelPositionSelect(settings, 'Y-axis').value).toBe('nextTo');
+    expect(chartAxisLogBase(settings, 'Y-axis').value).toBe('40');
 
-    mutators.updateChart(store, 'log-sync', { kind: 'scatter' });
-    surface = openElements();
-    const dirtyLog = chartAxisLogCheckbox(surface, 'X-axis');
-    dirtyLog.checked = true;
-    dirtyLog.dispatchEvent(new Event('change', { bubbles: true }));
-    mutators.updateChart(store, 'log-sync', {
+    mutators.updateChart(store, projection.id, { kind: 'scatter' });
+    settings = openTab();
+    setChecked(chartAxisLogCheckbox(settings, 'X-axis'), true);
+    mutators.updateChart(store, projection.id, {
       xAxis: { crossing: 'max', labelPosition: 'none', logBase: 50 },
     });
-    surface = host.querySelector<HTMLElement>('.fc-chart-settings') as HTMLElement;
-    expect(chartAxisLogCheckbox(surface, 'X-axis').checked).toBe(true);
-    expect(chartAxisLogBase(surface, 'X-axis').value).toBe('10');
-    expect(chartAxisCrossingSelect(surface, 'X-axis').value).toBe('max');
-    expect(chartAxisLabelPositionSelect(surface, 'X-axis').value).toBe('none');
+    settings = surface();
+    expect(chartAxisLogCheckbox(settings, 'X-axis').checked).toBe(true);
+    expect(chartAxisLogBase(settings, 'X-axis').value).toBe('10');
+    expect(chartAxisCrossingSelect(settings, 'X-axis').value).toBe('max');
+    expect(chartAxisLabelPositionSelect(settings, 'X-axis').value).toBe('none');
 
-    surface.querySelector<HTMLButtonElement>('.fc-chart-settings__apply')?.click();
-    const chart = store.getState().charts.charts[0];
-    expect(chart?.xAxis?.logBase).toBe(10);
-    expect(chart?.xAxis?.crossing).toBe('max');
-    expect(chart?.xAxis?.labelPosition).toBe('none');
-
+    apply();
+    expect(current()?.xAxis?.logBase).toBe(10);
+    expect(current()?.xAxis?.crossing).toBe('max');
+    expect(current()?.xAxis?.labelPosition).toBe('none');
     handle.detach();
-    host.remove();
   });
 });

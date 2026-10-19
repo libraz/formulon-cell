@@ -1,6 +1,5 @@
-export { chartDataFromTable } from './data.js';
 export { formatChartNumber, formatChartValue } from './format.js';
-export { layoutChart } from './layout.js';
+export { layoutChart, layoutUnsupportedChart } from './layout.js';
 export {
   formatTick,
   linearScale,
@@ -26,6 +25,7 @@ export type {
   ChartLineSpec,
   ChartMarkerSpec,
   ChartPlotBounds,
+  ChartPointState,
   ChartPointStyleSpec,
   ChartPrimitive,
   ChartPrimitiveRole,
@@ -35,7 +35,6 @@ export type {
   ChartSeriesDirection,
   ChartSeriesStyleSpec,
   ChartSpec,
-  ChartTableCell,
   ChartValueFormatter,
   DataLabelSpec,
   XYChartData,

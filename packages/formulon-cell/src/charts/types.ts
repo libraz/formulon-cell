@@ -13,9 +13,6 @@ export type ChartEmptyCellMode = 'gap' | 'zero' | 'span';
 /** Direction in which a rectangular table is read as a category chart. */
 export type ChartSeriesDirection = 'auto' | 'columns' | 'rows';
 
-/** Values accepted by the table adapter. Invalid numeric values are null in the model. */
-export type ChartTableCell = number | string | boolean | null;
-
 export interface ChartAxisSpec {
   /** Hide the axis line, labels, and title while allowing gridlines independently. */
   readonly visible?: boolean;
@@ -31,7 +28,8 @@ export interface ChartAxisSpec {
    * Numeric values are clamped to the resolved axis domain at layout time.
    */
   readonly crossing?: 'auto' | 'min' | 'max' | number;
-  readonly title?: string;
+  /** Title text, or Excel's automatic title. */
+  readonly title?: string | ChartAutoTitle;
   readonly min?: number;
   readonly max?: number;
   /** Explicit finite positive major tick interval. */
@@ -69,7 +67,18 @@ export interface ChartLineSpec {
 
 export interface ChartMarkerSpec {
   readonly visible?: boolean;
-  readonly shape?: 'circle' | 'square' | 'diamond' | 'triangle';
+  /** Excel's marker symbols; a picture marker is read from a workbook and cannot be written. */
+  readonly shape?:
+    | 'circle'
+    | 'square'
+    | 'diamond'
+    | 'triangle'
+    | 'x'
+    | 'star'
+    | 'plus'
+    | 'dot'
+    | 'dash'
+    | 'picture';
   /** Marker size in points. */
   readonly size?: number;
   readonly fill?: ChartFillSpec;
@@ -88,6 +97,10 @@ export interface ChartSeriesStyleSpec {
   readonly fill?: ChartFillSpec;
   readonly line?: ChartLineSpec;
   readonly marker?: ChartMarkerSpec;
+  /** Line and scatter series: Excel's smoothed line through the points. */
+  readonly smooth?: boolean;
+  /** Labels of this series; overrides the chart-wide `dataLabels`. */
+  readonly dataLabels?: ChartDataLabelsSpec;
   readonly points?: readonly ChartPointStyleSpec[];
 }
 
@@ -127,6 +140,14 @@ export type ChartValueFormatter = (
   locale: string,
 ) => string | null | undefined;
 
+/**
+ * Excel's automatic title. A chart title shows the only series' name of a
+ * one-series chart, else "Chart Title"; an axis title shows "Axis Title".
+ */
+export interface ChartAutoTitle {
+  readonly auto: true;
+}
+
 export interface ChartSpec {
   readonly kind: ChartKind;
   readonly grouping?: ChartGrouping;
@@ -149,7 +170,8 @@ export interface ChartSpec {
   readonly headerRow?: boolean;
   /** Override automatic first-column header inference for ambiguous tables. */
   readonly headerColumn?: boolean;
-  readonly title?: string;
+  /** Title text, `''` for no title, or Excel's automatic title. */
+  readonly title?: string | ChartAutoTitle;
   readonly palette?: readonly string[];
   readonly legend?: ChartLegendSpec;
   readonly filter?: ChartFilterSpec;
@@ -161,10 +183,17 @@ export interface ChartSpec {
   readonly yAxis?: ChartAxisSpec;
 }
 
+/** How a resolved point is drawn: a value, a break in the line, or skipped with the line joined across it. */
+export type ChartPointState = 'value' | 'gap' | 'connect';
+
 export interface CategoryChartSeries {
   readonly id: string;
   readonly name?: string;
   readonly values: readonly (number | null)[];
+  /** Per-point state, parallel to `values`. */
+  readonly states?: readonly ChartPointState[];
+  /** Number format of the series values. */
+  readonly formatCode?: string;
 }
 
 export interface CategoryChartData {
@@ -172,6 +201,8 @@ export interface CategoryChartData {
   readonly categories: readonly string[];
   /** Stable category identities used by filters and point styles. */
   readonly categoryIds?: readonly string[];
+  /** Number format of the category labels. */
+  readonly categoryFormatCode?: string;
   readonly series: readonly CategoryChartSeries[];
 }
 
@@ -180,12 +211,17 @@ export interface XYChartPoint {
   readonly id?: string;
   readonly x: number | null;
   readonly y: number | null;
+  readonly state?: ChartPointState;
 }
 
 export interface XYChartSeries {
   readonly id: string;
   readonly name?: string;
   readonly points: readonly XYChartPoint[];
+  /** Number format of the y values. */
+  readonly formatCode?: string;
+  /** Number format of the x values. */
+  readonly xFormatCode?: string;
 }
 
 export interface XYChartData {

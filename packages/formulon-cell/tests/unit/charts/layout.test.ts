@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { chartDataFromTable, layoutChart } from '../../../src/charts/index.js';
+import { layoutChart } from '../../../src/charts/index.js';
 import {
   chartLabelPositions,
   defaultChartLabelPosition,
   resolveChartLabelPosition,
 } from '../../../src/charts/label-options.js';
+import {
+  axisTitleText,
+  chartTitleText,
+  layoutUnsupportedChart,
+} from '../../../src/charts/layout.js';
 import type {
   ChartAxisSpec,
   ChartData,
@@ -29,14 +34,11 @@ const pointPairs = (points: string): [number, number][] =>
 
 describe('layoutChart', () => {
   it('retains the default padded plot and emits readable category axes', () => {
-    const data = chartDataFromTable(
-      [
-        ['A', 'B'],
-        ['one', 1],
-        ['two', 2],
-      ],
-      { kind: 'column', seriesDirection: 'columns' },
-    );
+    const data: ChartData = {
+      domain: 'category',
+      categories: ['one', 'two'],
+      series: [{ id: 'series-0', name: 'B', values: [1, 2] }],
+    };
     const scene = sceneFor({ kind: 'column' }, data);
     expect(scene.plot).toEqual({ x: 20, y: 20, width: 280, height: 92 });
     expect(
@@ -53,27 +55,30 @@ describe('layoutChart', () => {
   });
 
   it('uses numeric x scaling for scatter and renders a full-circle pie safely', () => {
-    const scatterData = chartDataFromTable(
-      [
-        ['x', 'value'],
-        [1, 2],
-        [10, 20],
-        [100, 200],
+    const scatterData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-0',
+          name: 'value',
+          points: [
+            { x: 1, y: 2 },
+            { x: 10, y: 20 },
+            { x: 100, y: 200 },
+          ],
+        },
       ],
-      { kind: 'scatter', seriesDirection: 'columns' },
-    );
+    };
     const scatter = sceneFor({ kind: 'scatter' }, scatterData);
     const points = scatter.elements.filter((element) => element.role === 'point');
     expect(points).toHaveLength(3);
     expect(new Set(points.map((point) => point.attrs.cx)).size).toBe(3);
 
-    const pieData = chartDataFromTable(
-      [
-        ['Category', 'Only'],
-        ['slice', 1],
-      ],
-      { kind: 'pie', seriesDirection: 'columns' },
-    );
+    const pieData: ChartData = {
+      domain: 'category',
+      categories: ['slice'],
+      series: [{ id: 'series-0', name: 'Only', values: [1] }],
+    };
     const pie = sceneFor({ kind: 'pie' }, pieData);
     expect(
       pie.elements.some((element) => element.tag === 'circle' && element.role === 'slice'),
@@ -87,7 +92,7 @@ describe('layoutChart', () => {
     ).toBe(true);
   });
 
-  it('separates positive and negative stacks and respects gap/span line modes', () => {
+  it('separates positive and negative stacks and leaves empty points unplotted', () => {
     const data: ChartData = {
       domain: 'category',
       categories: ['A', 'B', 'C'],
@@ -101,11 +106,7 @@ describe('layoutChart', () => {
     expect(bars).toHaveLength(4);
     expect(bars.every((bar) => Number(bar.attrs.height) >= 0)).toBe(true);
 
-    const gap = sceneFor({ kind: 'line', emptyCells: 'gap' }, data);
-    const span = sceneFor({ kind: 'line', emptyCells: 'span' }, data);
-    const gapLines = gap.elements.filter((element) => element.role === 'line');
-    const spanLines = span.elements.filter((element) => element.role === 'line');
-    expect(spanLines.length).toBeLessThan(gapLines.length + 2);
+    const gap = sceneFor({ kind: 'line' }, data);
     expect(
       gap.elements.some(
         (element) =>
@@ -115,24 +116,25 @@ describe('layoutChart', () => {
   });
 
   it('lays out all seven chart families with finite semantic primitives', () => {
-    const categoryData = chartDataFromTable(
-      [
-        ['Category', 'A'],
-        ['one', 1],
-        ['two', 10],
-        ['three', 100],
+    const categoryData: ChartData = {
+      domain: 'category',
+      categories: ['one', 'two', 'three'],
+      series: [{ id: 'series-0', name: 'A', values: [1, 10, 100] }],
+    };
+    const scatterData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-0',
+          name: 'A',
+          points: [
+            { x: 1, y: 2 },
+            { x: 10, y: 20 },
+            { x: 100, y: 200 },
+          ],
+        },
       ],
-      { kind: 'column', seriesDirection: 'columns' },
-    );
-    const scatterData = chartDataFromTable(
-      [
-        ['x', 'A'],
-        [1, 2],
-        [10, 20],
-        [100, 200],
-      ],
-      { kind: 'scatter', seriesDirection: 'columns' },
-    );
+    };
     const cases: Array<{ kind: ChartSpec['kind']; data: ChartData; role: string }> = [
       { kind: 'column', data: categoryData, role: 'bar' },
       { kind: 'bar', data: categoryData, role: 'bar' },
@@ -154,15 +156,20 @@ describe('layoutChart', () => {
   });
 
   it('uses logarithmically meaningful scatter spacing and percent endpoints', () => {
-    const scatterData = chartDataFromTable(
-      [
-        ['x', 'A'],
-        [1, 2],
-        [10, 20],
-        [100, 200],
+    const scatterData: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 'series-0',
+          name: 'A',
+          points: [
+            { x: 1, y: 2 },
+            { x: 10, y: 20 },
+            { x: 100, y: 200 },
+          ],
+        },
       ],
-      { kind: 'scatter', seriesDirection: 'columns' },
-    );
+    };
     const scatter = sceneFor({ kind: 'scatter' }, scatterData);
     const points = scatter.elements.filter((element) => element.role === 'point');
     const x = points.map((point) => Number(point.attrs.cx));
@@ -186,20 +193,85 @@ describe('layoutChart', () => {
     expect(tickLabels).toContain('-100%');
   });
 
-  it('distinguishes gap, span, and zero line modes and keeps stacked area envelopes', () => {
-    const data: ChartData = {
-      domain: 'category',
-      categories: ['A', 'B', 'C'],
-      series: [{ id: 's', values: [1, null, 3] }],
-    };
-    const gap = sceneFor({ kind: 'line', emptyCells: 'gap' }, data);
-    const span = sceneFor({ kind: 'line', emptyCells: 'span' }, data);
-    const zero = sceneFor({ kind: 'line', emptyCells: 'zero' }, data);
-    expect(gap.elements.filter((element) => element.role === 'line')).toHaveLength(0);
-    expect(span.elements.filter((element) => element.role === 'line')).toHaveLength(1);
-    expect(zero.elements.filter((element) => element.role === 'line')).toHaveLength(1);
+  it('breaks a line at gap points, joins across connect points, and plots value points', () => {
+    const base = { domain: 'category', categories: ['A', 'B', 'C'] } as const;
+    const lines = (scene: ReturnType<typeof sceneFor>) =>
+      scene.elements.filter((element) => element.role === 'line');
+    const gap = sceneFor(
+      { kind: 'line' },
+      { ...base, series: [{ id: 's', values: [1, null, 3], states: ['value', 'gap', 'value'] }] },
+    );
+    const connect = sceneFor(
+      { kind: 'line' },
+      {
+        ...base,
+        series: [{ id: 's', values: [1, null, 3], states: ['value', 'connect', 'value'] }],
+      },
+    );
+    const zero = sceneFor(
+      { kind: 'line' },
+      { ...base, series: [{ id: 's', values: [1, 0, 3], states: ['value', 'value', 'value'] }] },
+    );
+    expect(lines(gap)).toHaveLength(0);
+    expect(gap.elements.filter((element) => element.role === 'point')).toHaveLength(2);
+    expect(lines(connect)).toHaveLength(1);
+    expect(pointPairs(String(lines(connect)[0]?.attrs.points))).toHaveLength(2);
+    expect(connect.elements.filter((element) => element.role === 'point')).toHaveLength(2);
+    expect(lines(zero)).toHaveLength(1);
     expect(zero.elements.filter((element) => element.role === 'point')).toHaveLength(3);
 
+    const split = sceneFor(
+      { kind: 'line' },
+      {
+        domain: 'category',
+        categories: ['A', 'B', 'C', 'D', 'E'],
+        series: [
+          {
+            id: 's',
+            values: [1, 2, null, 4, 5],
+            states: ['value', 'value', 'gap', 'value', 'value'],
+          },
+        ],
+      },
+    );
+    expect(lines(split)).toHaveLength(2);
+  });
+
+  it('keeps the states of visible points when a filter hides series or categories', () => {
+    const scene = sceneFor(
+      { kind: 'line', filter: { hiddenSeriesIds: ['hidden'], hiddenCategoryIds: ['category-1'] } },
+      {
+        domain: 'category',
+        categories: ['A', 'B', 'C', 'D'],
+        series: [
+          { id: 'hidden', values: [1, 1, 1, 1] },
+          { id: 's', values: [1, 2, null, 4], states: ['value', 'value', 'gap', 'value'] },
+        ],
+      },
+    );
+    const lines = scene.elements.filter((element) => element.role === 'line');
+    expect(lines).toHaveLength(0);
+    expect(scene.elements.filter((element) => element.role === 'point')).toHaveLength(2);
+  });
+
+  it('breaks scatter lines at gap points and joins across connect points', () => {
+    const points = (state: 'gap' | 'connect') => [
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+      { x: null, y: null, state },
+      { x: 4, y: 4 },
+      { x: 5, y: 5 },
+    ];
+    const segments = (state: 'gap' | 'connect') =>
+      sceneFor(
+        { kind: 'scatter', scatterStyle: 'lineMarker' },
+        { domain: 'xy', series: [{ id: 's', points: points(state) }] },
+      ).elements.filter((element) => element.role === 'line');
+    expect(segments('gap')).toHaveLength(2);
+    expect(segments('connect')).toHaveLength(3);
+  });
+
+  it('keeps stacked area envelopes', () => {
     const stackedAreaData: ChartData = {
       domain: 'category',
       categories: ['A', 'B'],
@@ -957,8 +1029,12 @@ describe('layoutChart', () => {
       true,
     );
     const zero = sceneFor(
-      { kind: 'column', emptyCells: 'zero' },
-      { domain: 'category', categories: ['A'], series: [{ id: 's', values: [null] }] },
+      { kind: 'column' },
+      {
+        domain: 'category',
+        categories: ['A'],
+        series: [{ id: 's', values: [0], states: ['value'] }],
+      },
     );
     expect(zero.elements.some((element) => element.role === 'empty')).toBe(false);
     expect(barElements(zero)).toHaveLength(1);
@@ -1023,54 +1099,50 @@ describe('layoutChart', () => {
     );
   });
 
-  it('resolves Excel blank modes before stacking, area runs, and bar geometry', () => {
-    const data: ChartData = {
+  it('draws stacked and area series from the engine states without re-deriving blanks', () => {
+    const data = (state: 'gap' | 'connect' | 'value'): ChartData => ({
       domain: 'category',
       categories: ['A', 'B', 'C'],
-      series: [{ id: 'series', values: [1, null, 3] }],
-    };
-    const stackedLine = sceneFor({ kind: 'line', grouping: 'stacked', emptyCells: 'gap' }, data);
-    expect(stackedLine.elements.filter((element) => element.role === 'point')).toHaveLength(3);
-    expect(
-      stackedLine.elements.some((element) => element.role === 'point' && element.pointIndex === 1),
-    ).toBe(true);
-
-    const stackedArea = sceneFor(
-      { kind: 'area', grouping: 'percent-stacked', emptyCells: 'span' },
-      data,
-    );
-    expect(stackedArea.elements.filter((element) => element.role === 'point')).toHaveLength(3);
-
-    const standardArea = sceneFor({ kind: 'area', emptyCells: 'span' }, data);
-    expect(standardArea.elements.filter((element) => element.role === 'point')).toHaveLength(2);
-    expect(barElements(sceneFor({ kind: 'column', emptyCells: 'span' }, data))).toHaveLength(2);
+      series: [
+        {
+          id: 'series',
+          values: [1, state === 'value' ? 0 : null, 3],
+          states: ['value', state, 'value'],
+        },
+      ],
+    });
+    const points = (scene: ReturnType<typeof sceneFor>) =>
+      scene.elements.filter((element) => element.role === 'point');
+    expect(points(sceneFor({ kind: 'line', grouping: 'stacked' }, data('value')))).toHaveLength(3);
+    expect(points(sceneFor({ kind: 'line', grouping: 'stacked' }, data('gap')))).toHaveLength(2);
+    expect(points(sceneFor({ kind: 'area' }, data('connect')))).toHaveLength(2);
+    expect(barElements(sceneFor({ kind: 'column' }, data('gap')))).toHaveLength(2);
+    expect(barElements(sceneFor({ kind: 'column' }, data('value')))).toHaveLength(3);
   });
 
-  it('maps scatter blanks to zero before domains and drops nonfinite coordinates', () => {
+  it('draws scatter points from the engine states and drops nonfinite coordinates', () => {
     const data: ChartData = {
       domain: 'xy',
       series: [
         {
           id: 'series',
           points: [
-            { x: null, y: 1 },
-            { x: 2, y: null },
+            { x: 0, y: 1, state: 'value' },
+            { x: 2, y: 0, state: 'value' },
             { x: Number.POSITIVE_INFINITY, y: 3 },
             { x: Number.NaN, y: 4 },
             { x: 4, y: 5 },
+            { x: null, y: null, state: 'gap' },
           ],
         },
       ],
     };
-    const zero = sceneFor({ kind: 'scatter', emptyCells: 'zero' }, data);
-    const points = zero.elements.filter((element) => element.role === 'point');
+    const scene = sceneFor({ kind: 'scatter' }, data);
+    const points = scene.elements.filter((element) => element.role === 'point');
     expect(points.map((point) => point.pointIndex)).toEqual([0, 1, 4]);
-    expect(Number(points[0]?.attrs.cx)).toBeCloseTo(zero.plot.x);
-    expect(Number(points[1]?.attrs.cy)).toBeCloseTo(zero.plot.y + zero.plot.height);
-
-    const gap = sceneFor({ kind: 'scatter', emptyCells: 'gap' }, data);
-    expect(gap.elements.filter((element) => element.role === 'point')).toHaveLength(1);
-    expect(gap.elements.some((element) => element.role === 'empty')).toBe(false);
+    expect(Number(points[0]?.attrs.cx)).toBeCloseTo(scene.plot.x);
+    expect(Number(points[1]?.attrs.cy)).toBeCloseTo(scene.plot.y + scene.plot.height);
+    expect(scene.elements.some((element) => element.role === 'empty')).toBe(false);
   });
 
   it('normalizes pie magnitudes before summing and rotates from twelve o’clock', () => {
@@ -1165,6 +1237,45 @@ describe('layoutChart', () => {
     ).elements.find((element) => element.role === 'slice' && element.seriesId === 'inner');
     expect(explicitLine?.attrs.stroke).toBe('#edge');
     expect(explicitLine?.attrs['stroke-width']).toBe(0);
+  });
+
+  it('draws per-slice pie fills keyed by category id, also under a category filter', () => {
+    const data: ChartData = {
+      domain: 'category',
+      categories: ['A', 'B', 'C'],
+      categoryIds: ['category-0', 'category-1', 'category-2'],
+      series: [{ id: 'series-0', values: [1, 2, 3] }],
+    };
+    const spec: ChartSpec = {
+      kind: 'pie',
+      seriesStyles: [
+        {
+          seriesId: 'series-0',
+          points: [
+            { pointId: 'category-0', fill: { color: '#aa0000' } },
+            { pointId: 'category-1', fill: { color: '#00aa00' } },
+            { pointId: 'category-2', fill: { color: '#0000aa' } },
+          ],
+        },
+      ],
+    };
+    const fills = (scene: ReturnType<typeof sceneFor>) =>
+      scene.elements
+        .filter((element) => element.role === 'slice')
+        .map((element) => [element.pointId, element.attrs.fill]);
+
+    expect(fills(sceneFor(spec, data))).toEqual([
+      ['category-0', '#aa0000'],
+      ['category-1', '#00aa00'],
+      ['category-2', '#0000aa'],
+    ]);
+    // Hiding the first category leaves the others on their own styles.
+    expect(
+      fills(sceneFor({ ...spec, filter: { hiddenCategoryIds: ['category-0'] } }, data)),
+    ).toEqual([
+      ['category-1', '#00aa00'],
+      ['category-2', '#0000aa'],
+    ]);
   });
 
   it('keeps doughnut filtering, first-angle rotation, identities, ring styles, and category legends', () => {
@@ -1539,22 +1650,22 @@ describe('layoutChart', () => {
     },
   );
 
-  it('draws continuous stacked lines through zero and rejects area span interpolation', () => {
-    const data: ChartData = {
-      domain: 'category',
-      categories: ['A', 'B', 'C'],
-      series: [{ id: 's', values: [1, null, 3] }],
-    };
-    const scene = sceneFor({ kind: 'line', grouping: 'stacked' }, data);
+  it('draws a stacked line through an engine zero and breaks an area at a gap', () => {
+    const base = { domain: 'category', categories: ['A', 'B', 'C'] } as const;
+    const scene = sceneFor(
+      { kind: 'line', grouping: 'stacked' },
+      { ...base, series: [{ id: 's', values: [1, 0, 3], states: ['value', 'value', 'value'] }] },
+    );
     const lines = scene.elements.filter((element) => element.role === 'line');
     expect(lines).toHaveLength(1);
     const points = pointPairs(String(lines[0]?.attrs.points));
     expect(points).toHaveLength(3);
     expect(points[1]?.[1]).toBeCloseTo(scene.plot.y + scene.plot.height);
-    const areaGap = sceneFor({ kind: 'area', emptyCells: 'gap' }, data);
-    const areaSpan = sceneFor({ kind: 'area', emptyCells: 'span' }, data);
-    expect(areaSpan.elements).toEqual(areaGap.elements);
-    expect(areaSpan.elements.filter((element) => element.role === 'line')).toHaveLength(0);
+    const area = sceneFor(
+      { kind: 'area' },
+      { ...base, series: [{ id: 's', values: [1, null, 3], states: ['value', 'gap', 'value'] }] },
+    );
+    expect(area.elements.filter((element) => element.role === 'area')).toHaveLength(2);
   });
 
   it('preserves pie proportions for overflowing totals and negative magnitudes', () => {
@@ -1767,6 +1878,300 @@ describe('layoutChart', () => {
     );
     const markers = scene.elements.filter((element) => element.role === 'point');
     expect(markers.map((marker) => marker.attrs.fill)).toEqual(['#point-fill', '#point-marker']);
+  });
+
+  it('draws a line or scatter series colour on its line, markers and key, without the fill transparency', () => {
+    const line = sceneFor(
+      {
+        kind: 'line',
+        palette: ['#palette'],
+        legend: { visible: true },
+        seriesStyles: [
+          {
+            seriesId: 'sales',
+            fill: { color: '#series', transparency: 75 },
+            marker: { visible: true },
+          },
+          { seriesId: 'costs', line: { color: '#edge' } },
+        ],
+      },
+      {
+        domain: 'category',
+        categories: ['A', 'B'],
+        series: [
+          { id: 'sales', values: [1, 2] },
+          { id: 'costs', values: [2, 1] },
+        ],
+      },
+    );
+    const lines = line.elements.filter((element) => element.role === 'line');
+    expect(lines.map((element) => element.attrs.stroke)).toEqual(['#series', '#edge']);
+    const markers = line.elements.filter(
+      (element) => element.role === 'point' && element.seriesIndex === 0,
+    );
+    expect(markers.map((marker) => marker.attrs.fill)).toEqual(['#series', '#series']);
+    expect(markers[0]?.attrs['fill-opacity']).toBeUndefined();
+    const keys = line.elements.filter(
+      (element) => element.role === 'legend' && element.tag === 'rect',
+    );
+    expect(keys.map((key) => key.attrs.fill)).toEqual(['#series', '#edge']);
+    const scatter = sceneFor(
+      {
+        kind: 'scatter',
+        scatterStyle: 'marker',
+        palette: ['#palette'],
+        legend: { visible: true },
+        seriesStyles: [{ seriesId: 'y', marker: { fill: { color: '#marker' } } }],
+      },
+      { domain: 'xy', series: [{ id: 'y', points: [{ id: 'point-0', x: 1, y: 2 }] }] },
+    );
+    expect(
+      scatter.elements.find((element) => element.role === 'legend' && element.tag === 'rect')?.attrs
+        .fill,
+    ).toBe('#marker');
+  });
+
+  it.each([
+    ['x', 'path', { d: 'M15,15 L25,25 M15,25 L25,15', fill: 'none', stroke: '#edge' }],
+    [
+      'star',
+      'path',
+      { d: 'M15,15 L25,25 M15,25 L25,15 M20,15 L20,25', fill: 'none', stroke: '#edge' },
+    ],
+    ['plus', 'path', { d: 'M15,20 L25,20 M20,15 L20,25', fill: 'none', stroke: '#edge' }],
+    ['dot', 'rect', { x: 17.5, y: 19, width: 5, height: 2, fill: '#series' }],
+    ['dash', 'rect', { x: 15, y: 19, width: 10, height: 2, fill: '#series' }],
+    ['picture', 'circle', { cx: 20, cy: 20, r: 5, fill: '#series' }],
+  ] as const)('draws a %s marker as Excel does at its size', (shape, tag, attrs) => {
+    const marker = (strokeColor?: string) =>
+      sceneFor(
+        {
+          kind: 'scatter',
+          scatterStyle: 'marker',
+          palette: ['#series'],
+          xAxis: { min: 0, max: 2 },
+          yAxis: { min: 0, max: 2 },
+          seriesStyles: [
+            {
+              seriesId: 's',
+              marker: {
+                visible: true,
+                shape,
+                size: 10,
+                line: { width: 2, ...(strokeColor ? { color: strokeColor } : {}) },
+              },
+            },
+          ],
+        },
+        { domain: 'xy', series: [{ id: 's', points: [{ id: 'point-0', x: 1, y: 1 }] }] },
+      ).elements.find((element) => element.role === 'point');
+    const drawn = marker('#edge');
+    expect(drawn?.tag).toBe(tag);
+    // Coordinates are compared relative to the marker centre, moved to (20, 20).
+    const centre = sceneFor(
+      {
+        kind: 'scatter',
+        scatterStyle: 'marker',
+        xAxis: { min: 0, max: 2 },
+        yAxis: { min: 0, max: 2 },
+      },
+      { domain: 'xy', series: [{ id: 's', points: [{ id: 'point-0', x: 1, y: 1 }] }] },
+    ).elements.find((element) => element.role === 'point')?.attrs;
+    const dx = Number(centre?.cx) - 20;
+    const dy = Number(centre?.cy) - 20;
+    const moved = Object.fromEntries(
+      Object.keys(attrs).map((key) => {
+        const value = drawn?.attrs[key];
+        if (key === 'd') {
+          return [
+            key,
+            String(value).replace(
+              /(-?[\d.]+),(-?[\d.]+)/g,
+              (_match, px, py) => `${Number(px) - dx},${Number(py) - dy}`,
+            ),
+          ];
+        }
+        if (key === 'x' || key === 'cx') return [key, Number(value) - dx];
+        if (key === 'y' || key === 'cy') return [key, Number(value) - dy];
+        return [key, value];
+      }),
+    );
+    expect(moved).toEqual(attrs);
+    if (tag === 'path') {
+      expect(drawn?.attrs['stroke-width']).toBe(2);
+      // Without an outline colour the line shapes take the series colour.
+      expect(marker()?.attrs.stroke).toBe('#series');
+    }
+  });
+
+  it('colours series without a palette in Excel’s automatic cycle of the theme accents', () => {
+    const slices = (accents?: readonly string[]) =>
+      layoutChart({
+        spec: { kind: 'pie' },
+        data: {
+          domain: 'category',
+          categories: Array.from({ length: 13 }, (_, index) => `c${index}`),
+          series: [{ id: 's', values: Array.from({ length: 13 }, () => 1) }],
+        },
+        width: 320,
+        height: 132,
+        ...(accents ? { accents } : {}),
+      })
+        .elements.filter((element) => element.role === 'slice')
+        .map((slice) => slice.attrs.fill);
+    // Default Office theme: accent1, ..., then point 10 is accent5 at lumMod 60000, 12 accent1 at 80000 + 20000.
+    const automatic = slices();
+    expect(automatic.slice(0, 6)).toEqual([
+      '#156082',
+      '#e97132',
+      '#196b24',
+      '#0f9ed5',
+      '#a02b93',
+      '#4ea72e',
+    ]);
+    expect(automatic[10]).toBe('#601a58');
+    expect(automatic[12]).toBe('#1f8ebe');
+    // A workbook theme's accents replace the default theme's.
+    const theme = ['#4472c4', '#ed7d31', '#a5a5a5', '#ffc000', '#5b9bd5', '#70ad47'];
+    expect(slices(theme).slice(0, 6)).toEqual(theme);
+    expect(slices(theme)[6]).toBe('#254278');
+  });
+
+  it('draws a smoothed line as Catmull-Rom Béziers with tension 1/6', () => {
+    const lineOf = (smooth: boolean) =>
+      sceneFor(
+        { kind: 'line', seriesStyles: [{ seriesId: 's', smooth }] },
+        {
+          domain: 'category',
+          categories: ['A', 'B', 'C'],
+          series: [{ id: 's', values: [1, 3, 2] }],
+        },
+      ).elements.find((element) => element.role === 'line');
+    const straight = lineOf(false);
+    expect(straight?.tag).toBe('polyline');
+    const points = String(straight?.attrs.points)
+      .split(' ')
+      .map((pair) => pair.split(',').map(Number) as [number, number]);
+    const [p0, p1, p2] = points as [[number, number], [number, number], [number, number]];
+    const smooth = lineOf(true);
+    expect(smooth?.tag).toBe('path');
+    expect(smooth?.attrs.d).toBe(
+      [
+        `M${p0[0]},${p0[1]}`,
+        `C${p0[0] + (p1[0] - p0[0]) / 6},${p0[1] + (p1[1] - p0[1]) / 6} ${p1[0] - (p2[0] - p0[0]) / 6},${p1[1] - (p2[1] - p0[1]) / 6} ${p1[0]},${p1[1]}`,
+        `C${p1[0] + (p2[0] - p0[0]) / 6},${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p2[0] - p1[0]) / 6},${p2[1] - (p2[1] - p1[1]) / 6} ${p2[0]},${p2[1]}`,
+      ].join(' '),
+    );
+    const scatter = sceneFor(
+      {
+        kind: 'scatter',
+        scatterStyle: 'line',
+        seriesStyles: [{ seriesId: 's', smooth: true }],
+      },
+      {
+        domain: 'xy',
+        series: [
+          {
+            id: 's',
+            points: [
+              { id: 'point-0', x: 1, y: 1 },
+              { id: 'point-1', x: 2, y: 3 },
+              { id: 'point-2', x: 3, y: 2 },
+            ],
+          },
+        ],
+      },
+    ).elements.filter((element) => element.role === 'line');
+    // One smoothed path through the joined segments, not one line per segment.
+    expect(scatter.map((element) => element.tag)).toEqual(['path']);
+    expect(String(scatter[0]?.attrs.d).match(/C/g)).toHaveLength(2);
+  });
+
+  it('formats a scatter chart by its x and y number formats unless the spec sets one', () => {
+    const data: ChartData = {
+      domain: 'xy',
+      series: [
+        {
+          id: 's',
+          formatCode: '0.000',
+          xFormatCode: '0.00',
+          points: [
+            { id: 'point-0', x: 1, y: 2 },
+            { id: 'point-1', x: 3, y: 4 },
+          ],
+        },
+      ],
+    };
+    const texts = (spec: ChartSpec, role: 'axis-label' | 'data-label') =>
+      sceneAt(spec, data, 640, 320)
+        .elements.filter((element) => element.role === role)
+        // A data label near the edge is truncated; its accessible name keeps the whole text.
+        .map((element) => String(element.attrs['aria-label'] ?? element.text ?? ''));
+    const axes = texts({ kind: 'scatter' }, 'axis-label');
+    const xLabel = /^\d+\.\d\d$/;
+    const yLabel = /^\d+\.\d\d\d$/;
+    expect(axes.some((text) => xLabel.test(text))).toBe(true);
+    expect(axes.some((text) => yLabel.test(text))).toBe(true);
+    expect(axes.every((text) => xLabel.test(text) || yLabel.test(text))).toBe(true);
+    // An axis format of the spec wins over the data's.
+    const own = texts({ kind: 'scatter', xAxis: { numberFormat: '0' } }, 'axis-label');
+    expect(own.some((text) => /^\d+$/.test(text))).toBe(true);
+    expect(own.some((text) => xLabel.test(text))).toBe(false);
+    const labels = { visible: true, showCategoryName: true, showValue: true };
+    expect(texts({ kind: 'scatter', dataLabels: labels }, 'data-label')).toEqual([
+      '1.00, 2.000',
+      '3.00, 4.000',
+    ]);
+    expect(
+      texts({ kind: 'scatter', dataLabels: { ...labels, numberFormat: '0' } }, 'data-label'),
+    ).toEqual(['1, 2', '3, 4']);
+  });
+
+  it('draws an automatic title as the only series name, else the localised chart title', () => {
+    const titleOf = (series: number, chartTitle?: string) =>
+      layoutChart({
+        spec: { kind: 'column', title: { auto: true } },
+        data: {
+          domain: 'category',
+          categories: ['A'],
+          series: Array.from({ length: series }, (_, index) => ({
+            id: `s${index}`,
+            name: `Series ${index}`,
+            values: [1],
+          })),
+        },
+        width: 320,
+        height: 132,
+        ...(chartTitle ? { chartTitle } : {}),
+      }).elements.find((element) => element.role === 'title')?.text;
+    expect(titleOf(1)).toBe('Series 0');
+    expect(titleOf(2)).toBe('Chart Title');
+    expect(titleOf(2, 'グラフ タイトル')).toBe('グラフ タイトル');
+    expect(chartTitleText('', { domain: 'category', categories: [], series: [] })).toBeUndefined();
+    expect(chartTitleText(undefined, { domain: 'category', categories: [], series: [] })).toBe(
+      undefined,
+    );
+  });
+
+  it('draws an automatic axis title as the localised default', () => {
+    const titles = (axisTitle?: string) =>
+      layoutChart({
+        spec: { kind: 'column', xAxis: { title: { auto: true } }, yAxis: { title: 'Units' } },
+        data: {
+          domain: 'category',
+          categories: ['A'],
+          series: [{ id: 's0', name: 'S', values: [1] }],
+        },
+        width: 320,
+        height: 132,
+        ...(axisTitle ? { axisTitle } : {}),
+      })
+        .elements.filter((element) => element.role === 'axis-title')
+        .map((element) => element.text);
+    expect(titles()).toEqual(['Axis Title', 'Units']);
+    expect(titles('軸ラベル')).toEqual(['軸ラベル', 'Units']);
+    expect(axisTitleText('')).toBeUndefined();
+    expect(axisTitleText(undefined)).toBeUndefined();
   });
 
   it('supports vary-colors defaults, marker shapes, and separate marker transparency', () => {
@@ -3917,5 +4322,164 @@ describe('layoutChart', () => {
     expect(
       sceneFor({ kind: 'pie', xAxis: { logBase: 10 }, yAxis: { logBase: 10 } }, category),
     ).toEqual(sceneFor({ kind: 'pie' }, category));
+  });
+});
+
+describe('layoutChart series data labels', () => {
+  const data: ChartData = {
+    domain: 'category',
+    categories: ['A', 'B'],
+    series: [
+      { id: 'one', values: [1, 2] },
+      { id: 'two', values: [3, 4] },
+    ],
+  };
+  const labelTexts = (scene: ReturnType<typeof sceneFor>, seriesIndex: number) =>
+    scene.elements
+      .filter((element) => element.role === 'data-label' && element.seriesIndex === seriesIndex)
+      .map((element) => element.text);
+
+  it('draws labels only for the series that carry them', () => {
+    const scene = sceneFor(
+      {
+        kind: 'column',
+        seriesStyles: [{ seriesId: 'two', dataLabels: { visible: true, showValue: true } }],
+      },
+      data,
+    );
+    expect(labelTexts(scene, 0)).toEqual([]);
+    expect(labelTexts(scene, 1)).toEqual(['3', '4']);
+  });
+
+  it('lets a series override or suppress the chart-wide labels', () => {
+    const scene = sceneFor(
+      {
+        kind: 'column',
+        dataLabels: { visible: true, showValue: true },
+        seriesStyles: [{ seriesId: 'one', dataLabels: { visible: false } }],
+      },
+      data,
+    );
+    expect(labelTexts(scene, 0)).toEqual([]);
+    expect(labelTexts(scene, 1)).toEqual(['3', '4']);
+  });
+
+  it('draws per-series labels on scatter and doughnut charts', () => {
+    const scatter = sceneFor(
+      {
+        kind: 'scatter',
+        seriesStyles: [{ seriesId: 'b', dataLabels: { visible: true, showValue: true } }],
+      },
+      {
+        domain: 'xy',
+        series: [
+          { id: 'a', points: [{ x: 1, y: 1 }] },
+          { id: 'b', points: [{ x: 2, y: 7 }] },
+        ],
+      },
+    );
+    expect(labelTexts(scatter, 0)).toEqual([]);
+    expect(labelTexts(scatter, 1)).toHaveLength(1);
+
+    const doughnut = sceneFor(
+      {
+        kind: 'doughnut',
+        seriesStyles: [{ seriesId: 'two', dataLabels: { visible: true, showValue: true } }],
+      },
+      data,
+    );
+    expect(labelTexts(doughnut, 0)).toEqual([]);
+    expect(labelTexts(doughnut, 1).length).toBeGreaterThan(0);
+  });
+});
+
+describe('layoutChart legend default', () => {
+  it('places the legend at the bottom when no position is given', () => {
+    const scene = layoutChart({
+      spec: { kind: 'column' },
+      data: {
+        domain: 'category',
+        categories: ['A'],
+        series: [
+          { id: 'one', name: 'One', values: [1] },
+          { id: 'two', name: 'Two', values: [2] },
+        ],
+      },
+      width: 320,
+      height: 200,
+    });
+    const legend = scene.elements.filter((element) => element.role === 'legend');
+    expect(legend.length).toBeGreaterThan(0);
+    const textY = legend.filter((element) => element.tag === 'text').map((e) => Number(e.attrs.y));
+    expect(Math.min(...textY)).toBeGreaterThan(scene.plot.y + scene.plot.height);
+  });
+});
+
+describe('layoutUnsupportedChart', () => {
+  it('draws a frame, the title, and the given message', () => {
+    const scene = layoutUnsupportedChart({
+      title: 'Sales',
+      message: 'Not supported',
+      width: 300,
+      height: 150,
+    });
+    expect(scene.elements.some((element) => element.role === 'frame')).toBe(true);
+    expect(scene.elements.find((element) => element.role === 'title')?.text).toBe('Sales');
+    expect(scene.elements.find((element) => element.role === 'unsupported')?.text).toBe(
+      'Not supported',
+    );
+  });
+
+  it('omits the title element when the chart has none', () => {
+    const scene = layoutUnsupportedChart({ message: 'Not supported', width: 300, height: 150 });
+    expect(scene.elements.some((element) => element.role === 'title')).toBe(false);
+  });
+});
+
+describe('layoutChart engine format codes', () => {
+  const dateFormatter = (value: number, code: string | undefined) =>
+    code === 'yyyy-mm-dd' ? `D${value}` : undefined;
+  const category = (formatCode?: string): ChartData => ({
+    domain: 'category',
+    categories: ['45000', '45001'],
+    ...(formatCode === undefined ? {} : { categoryFormatCode: 'yyyy-mm-dd' }),
+    series: [{ id: 's', values: [0.25, 0.5], ...(formatCode ? { formatCode } : {}) }],
+  });
+  const texts = (scene: ReturnType<typeof sceneFor>, role: string) =>
+    scene.elements.filter((element) => element.role === role).map((element) => element.text);
+
+  it('renders date serial categories with the category format code', () => {
+    const scene = layoutChart({
+      spec: { kind: 'column' },
+      data: category('0%'),
+      width: 320,
+      height: 200,
+      formatValue: dateFormatter,
+    });
+    expect(texts(scene, 'category-label')).toEqual(['D45000', 'D45001']);
+    const plain = sceneFor({ kind: 'column' }, category());
+    expect(texts(plain, 'category-label')).toEqual(['45000', '45001']);
+  });
+
+  it('uses the first series format for value labels and the value axis', () => {
+    const scene = sceneFor(
+      { kind: 'column', dataLabels: { visible: true, showValue: true } },
+      category('0%'),
+    );
+    expect(texts(scene, 'data-label')).toEqual(['25%', '50%']);
+    expect(texts(scene, 'axis-label').some((text) => text?.endsWith('%'))).toBe(true);
+  });
+
+  it('lets an explicit numberFormat override the series format', () => {
+    const scene = sceneFor(
+      {
+        kind: 'column',
+        dataLabels: { visible: true, showValue: true, numberFormat: '0.00' },
+        yAxis: { numberFormat: '0.0' },
+      },
+      category('0%'),
+    );
+    expect(texts(scene, 'data-label')).toEqual(['0.25', '0.50']);
+    expect(texts(scene, 'axis-label').some((text) => text?.endsWith('%'))).toBe(false);
   });
 });

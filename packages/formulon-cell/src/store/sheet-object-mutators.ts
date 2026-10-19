@@ -17,9 +17,13 @@ import type {
   Sparkline,
 } from './types.js';
 
-const cloneSessionChart = (chart: SessionChart): SessionChart => ({
+/** Detach the nested settings and anchor; `data` is never mutated in place, so
+ *  the projection shares it. */
+export const cloneSessionChart = (chart: SessionChart): SessionChart => ({
   ...cloneChartSpec(chart),
-  source: { ...chart.source },
+  nativeAnchor: { ...chart.nativeAnchor },
+  ...(chart.source ? { source: { ...chart.source } } : {}),
+  ...(chart.unsupported ? { unsupported: { ...chart.unsupported } } : {}),
 });
 
 function keyInRange(key: string, range: Range): boolean {
@@ -121,11 +125,16 @@ export const sheetObjectMutators = {
     });
   },
 
-  clearChartsInRange(store: SpreadsheetStore, range: Range): void {
+  /** Replace every chart projection of `sheet`, keeping the other sheets'. */
+  replaceSheetCharts(
+    store: SpreadsheetStore,
+    sheet: number,
+    charts: readonly SessionChart[],
+  ): void {
     store.setState((s) => {
-      const next = s.charts.charts.filter((chart) => !rangesIntersect(chart.source, range));
-      if (next.length === s.charts.charts.length) return s;
-      return { ...s, charts: { charts: next } };
+      const kept = s.charts.charts.filter((chart) => chart.sheet !== sheet);
+      if (kept.length === s.charts.charts.length && charts.length === 0) return s;
+      return { ...s, charts: { charts: [...kept, ...charts.map(cloneSessionChart)] } };
     });
   },
 

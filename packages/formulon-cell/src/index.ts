@@ -2,10 +2,10 @@
 export type { CellFormatterEntry, CellRenderInput } from './cells.js';
 export { CellRegistry } from './cells.js';
 export {
-  chartDataFromTable,
   formatChartNumber,
   formatChartValue,
   layoutChart,
+  layoutUnsupportedChart,
 } from './charts/index.js';
 export type {
   CategoryChartData,
@@ -24,6 +24,7 @@ export type {
   ChartLineSpec,
   ChartMarkerSpec,
   ChartPlotBounds,
+  ChartPointState,
   ChartPointStyleSpec,
   ChartPrimitive,
   ChartPrimitiveRole,
@@ -33,7 +34,6 @@ export type {
   ChartSeriesDirection,
   ChartSeriesStyleSpec,
   ChartSpec,
-  ChartTableCell,
   ChartValueFormatter,
   XYChartData,
   XYChartPoint,
@@ -564,18 +564,18 @@ export type {
   CreateSessionChartOptions,
   RibbonChartAction,
   SessionChartPatch,
-  SessionChartSeriesPoint,
+  SessionChartSeriesInput,
 } from './commands/session-chart.js';
 export {
+  addSessionChartSeries,
   clearSessionChart,
   clearSessionChartsInRange,
   createRibbonChartFromSelection,
   createSessionChart,
   inferRecommendedChartKind,
   listSessionCharts,
+  removeSessionChartSeries,
   sessionChartById,
-  sessionChartData,
-  sessionChartSeries,
   sessionChartsForRange,
   updateSessionChart,
 } from './commands/session-chart.js';
@@ -630,7 +630,6 @@ export type {
   TablesSnapshot,
 } from './commands/slice-history.js';
 export {
-  applyChartsSnapshot,
   applyConditionalRulesSnapshot,
   applyFormatSnapshot,
   applyIllustrationsSnapshot,
@@ -640,7 +639,6 @@ export {
   applySlicersSnapshot,
   applySparklineSnapshot,
   applyTableOverlaysSnapshot,
-  captureChartsSnapshot,
   captureConditionalRulesSnapshot,
   captureFormatSnapshot,
   captureIllustrationsSnapshot,
@@ -650,7 +648,6 @@ export {
   captureSlicersSnapshot,
   captureSparklineSnapshot,
   captureTableOverlaysSnapshot,
-  recordChartsChange,
   recordConditionalRulesChange,
   recordFormatChange,
   recordIllustrationsChange,
@@ -1224,6 +1221,7 @@ export type {
   ProtectionSlice,
   SessionChart,
   SessionChartKind,
+  SessionChartUnsupportedReason,
   SessionIllustration,
   SessionShapeKind,
   SlicerSpec,

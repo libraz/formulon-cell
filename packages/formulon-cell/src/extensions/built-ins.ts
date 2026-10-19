@@ -193,6 +193,7 @@ export const charts = (): Extension => ({
     const handle = attachSessionCharts({
       host: ctx.host,
       store: ctx.store,
+      getWb: () => ctx.getWb(),
       labels: ctx.i18n.strings.sessionCharts,
       history: ctx.history,
       locale: ctx.i18n.locale,

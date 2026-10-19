@@ -112,6 +112,8 @@ export function createIllustrationDropdownDefaults(
           id,
           action,
           instance.history as unknown as Parameters<typeof arrangeSessionIllustration>[3],
+          undefined,
+          instance.workbook,
         );
       }
       instance.host.focus();

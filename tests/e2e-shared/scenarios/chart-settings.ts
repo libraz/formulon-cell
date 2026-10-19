@@ -7,7 +7,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await sheet.mount();
   await sheet.expectNoStub();
   const commandsUrl = `/@fs${new URL('../../../packages/formulon-cell/src/commands/session-chart.ts', import.meta.url).pathname}`;
-  await page.evaluate(
+  const chartId = await page.evaluate(
     async ({ commandsUrl }) => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
       const { createSessionChart } = await import(commandsUrl);
@@ -29,26 +29,33 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
         ),
       );
       if (result.status !== 'applied') throw new Error('chart fixture cells were not applied');
-      createSessionChart(
+      const created = createSessionChart(
         instance.store,
         { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
         {
-          id: 'settings-e2e',
+          wb: instance.workbook,
           kind: 'column',
           seriesDirection: 'columns',
           title: 'Monthly sales',
-          x: 140,
-          y: 60,
-          w: 420,
-          h: 280,
+          // 420 x 280 px at C3.
+          anchor: {
+            row: 2,
+            col: 2,
+            rowOffEmu: 0,
+            colOffEmu: 0,
+            widthEmu: 4_000_500,
+            heightEmu: 2_667_000,
+          },
         },
         instance.history,
       );
+      if (!created) throw new Error('chart fixture was not created');
+      return created.id as string;
     },
     { commandsUrl },
   );
 
-  const chart = page.locator('[data-chart-id="settings-e2e"]');
+  const chart = page.locator(`[data-chart-id="${chartId}"]`);
   const bars = chart.locator('[data-chart-role="bar"]');
   await expect(bars).toHaveCount(6);
   const originalFills = await bars.evaluateAll((nodes) =>
@@ -128,7 +135,12 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     .selectOption({ label: 'All points' });
   await pointFill.fill('#00aa00');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(inheritedPoint).toHaveAttribute('fill', '#00aa00');
+  // The series colour reaches the legend; a point keeps the colour its transparency carried.
+  await expect(chart.locator('rect[data-chart-role="legend"]').first()).toHaveAttribute(
+    'fill',
+    '#00aa00',
+  );
+  await expect(inheritedPoint).toHaveAttribute('fill', originalFills[0] ?? '');
   await expect(inheritedPoint).toHaveAttribute('fill-opacity', '0.75');
   await expect(styledPoint).toHaveAttribute('fill', '#ff0000');
 
@@ -431,6 +443,10 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(slices).toHaveCount(2);
   await expect(bars).toHaveCount(0);
   await expect(chart.locator('[data-chart-role="axis"]')).toHaveCount(0);
+  // The point fill set on the column chart carries over to the doughnut.
+  await expect(
+    chart.locator('[data-chart-role="slice"][data-point-id="category-2"]'),
+  ).toHaveAttribute('fill', '#ff0000');
   const originalSlice = await slices.first().getAttribute('d');
   await chart.locator('[data-chart-settings-tab="styles"]').click();
   const holeSize = dialog.getByRole('spinbutton', { name: 'Hole size (%)', exact: true });
@@ -468,57 +484,62 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   await expect(slices.first()).toHaveAttribute('d', resizedSlice ?? '');
 
+  // Show every series and category again before the scatter steps.
   await chart.locator('[data-chart-settings-tab="filters"]').click();
   await dialog.getByLabel('Costs', { exact: true }).check();
+  await dialog.getByLabel('Feb', { exact: true }).check();
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(slices).toHaveCount(4);
+  await expect(slices).toHaveCount(6);
   expect(
     await slices.evaluateAll((nodes) => [
       ...new Set(nodes.map((node) => node.getAttribute('data-series-id'))),
     ]),
   ).toEqual(['series-0', 'series-1']);
 
+  // As in Excel, a scatter keeps every series and plots text categories at X = 1, 2, 3.
+  const points = chart.locator('[data-chart-role="point"]');
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await dialog.getByRole('combobox', { name: 'Chart type', exact: true }).selectOption('scatter');
   await dialog.getByRole('tab', { name: 'Styles', exact: true }).click();
   await dialog.getByRole('combobox', { name: 'Point', exact: true }).selectOption('point-1');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(slices).toHaveCount(4);
+  await expect(slices).toHaveCount(6);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await dialog.getByRole('combobox', { name: 'Chart type', exact: true }).selectOption('scatter');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(3);
+  await expect(points).toHaveCount(6);
   await expect(slices).toHaveCount(0);
   await page.evaluate(() =>
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
   );
-  await expect(slices).toHaveCount(4);
+  await expect(slices).toHaveCount(6);
   await page.evaluate(() =>
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
   );
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(3);
+  await expect(points).toHaveCount(6);
   const connectors = chart.locator('[data-chart-role="line"]');
   await expect(connectors).toHaveCount(0);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await dialog.getByRole('combobox', { name: 'Scatter style', exact: true }).selectOption('line');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(connectors).toHaveCount(2);
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(0);
+  // Two segments per series.
+  await expect(connectors).toHaveCount(4);
+  await expect(points).toHaveCount(0);
   await page.evaluate(() =>
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
   );
   await expect(connectors).toHaveCount(0);
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(3);
+  await expect(points).toHaveCount(6);
   await page.evaluate(() =>
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
   );
-  await expect(connectors).toHaveCount(2);
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(0);
+  await expect(connectors).toHaveCount(4);
+  await expect(points).toHaveCount(0);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await dialog.getByRole('combobox', { name: 'Scatter style', exact: true }).selectOption('marker');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(connectors).toHaveCount(2);
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(0);
+  await expect(connectors).toHaveCount(4);
+  await expect(points).toHaveCount(0);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await dialog
     .getByRole('combobox', { name: 'Scatter style', exact: true })
@@ -531,29 +552,31 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     .fill('#225588');
   await dialog.getByRole('combobox', { name: 'Line dash', exact: true }).selectOption('dash');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(connectors).toHaveCount(2);
+  await expect(connectors).toHaveCount(4);
   await expect(connectors.first()).toHaveAttribute('stroke', '#225588');
   await expect(connectors.first()).toHaveAttribute('stroke-dasharray', '6 4');
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(3);
+  await expect(points).toHaveCount(6);
+
+  // A blank Costs value for Feb breaks that series' line until blanks span.
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '' }]);
     if (result.status !== 'applied') throw new Error('Scatter blank fixture was not applied');
   });
-  await expect(connectors).toHaveCount(0);
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(2);
+  await expect(connectors).toHaveCount(2);
+  await expect(points).toHaveCount(5);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await dialog.getByRole('combobox', { name: 'Empty cells', exact: true }).selectOption('span');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(connectors).toHaveCount(1);
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(2);
+  await expect(connectors).toHaveCount(3);
+  await expect(points).toHaveCount(5);
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '8' }]);
     if (result.status !== 'applied') throw new Error('Scatter source fixture was not restored');
   });
-  await expect(connectors).toHaveCount(2);
-  await expect(chart.locator('[data-chart-role="point"]')).toHaveCount(3);
+  await expect(connectors).toHaveCount(4);
+  await expect(points).toHaveCount(6);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).check();
   await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).check();
@@ -562,28 +585,30 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     await axis.getByRole('spinbutton', { name: 'Maximum', exact: true }).fill('100');
   }
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  const logPoints = chart.locator('[data-chart-role="point"]');
-  await expect(logPoints).toHaveCount(3);
-  await expect(connectors).toHaveCount(2);
-  expect(Number(await connectors.first().getAttribute('x1'))).toBeCloseTo(
-    Number(await logPoints.first().getAttribute('cx')),
-  );
-  expect(Number(await connectors.first().getAttribute('y1'))).toBeCloseTo(
-    Number(await logPoints.first().getAttribute('cy')),
-  );
+  await expect(points).toHaveCount(6);
+  await expect(connectors).toHaveCount(4);
+  // Excel gives automatic markers a symbol by series, a diamond for the first, so the
+  // marker centre is read from its box rather than a circle's centre.
+  const [markerX, markerY] = await points.first().evaluate((node) => {
+    const box = (node as SVGGraphicsElement).getBBox();
+    return [box.x + box.width / 2, box.y + box.height / 2];
+  });
+  expect(Number(await connectors.first().getAttribute('x1'))).toBeCloseTo(markerX ?? Number.NaN);
+  expect(Number(await connectors.first().getAttribute('y1'))).toBeCloseTo(markerY ?? Number.NaN);
+  // A zero cannot sit on a logarithmic axis.
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '0' }]);
     if (result.status !== 'applied') throw new Error('Log scatter zero fixture was not applied');
   });
-  await expect(logPoints).toHaveCount(2);
-  await expect(connectors).toHaveCount(0);
+  await expect(points).toHaveCount(5);
+  await expect(connectors).toHaveCount(2);
   await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     const result = instance.applyChanges([{ addr: { sheet: 0, row: 2, col: 2 }, input: '8' }]);
     if (result.status !== 'applied') throw new Error('Log scatter source fixture was not restored');
   });
-  await expect(connectors).toHaveCount(2);
+  await expect(connectors).toHaveCount(4);
   await chart.locator('[data-chart-settings-tab="elements"]').click();
   await xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
   await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
@@ -591,8 +616,5 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await yAxis.getByRole('spinbutton', { name: 'Maximum', exact: true }).fill('20');
   await dialog.getByRole('combobox', { name: 'Chart type', exact: true }).selectOption('column');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(bars).toHaveCount(4);
-  await expect(
-    chart.locator('[data-chart-role="bar"][data-series-id="series-0"][data-point-id="category-2"]'),
-  ).toHaveAttribute('fill', '#ff0000');
+  await expect(bars).toHaveCount(6);
 }

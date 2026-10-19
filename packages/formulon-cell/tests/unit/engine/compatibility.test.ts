@@ -98,7 +98,6 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.byId['auto-filter'].reason).toContain('AutoFilter');
     expect(summary.items.find((i) => i.id === 'sheet-protection')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'sheet-views')?.status).toBe('session');
-    expect(summary.items.find((i) => i.id === 'session-charts')?.status).toBe('session');
     expect(summary.items.find((i) => i.id === 'pivot-authoring')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'charts-drawings')).toMatchObject({
       status: 'read-only',
@@ -109,12 +108,26 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(spreadsheetCompatibilityItem(summary, 'comments').label).toBe('Comments');
     expect(spreadsheetCompatibilityStatus(summary, 'sheet-protection')).toBe('writable');
     expect(isSpreadsheetFeatureWritable(summary, 'defined-names')).toBe(true);
-    expect(isSpreadsheetFeatureAvailable(summary, 'session-charts')).toBe(true);
     expect(isSpreadsheetFeatureAvailable(summary, 'chart-authoring')).toBe(false);
     expect(summary.byStatus.writable).toBeGreaterThan(0);
     expect(summary.byStatus['read-only']).toBeGreaterThan(0);
     expect(summary.byStatus.session).toBeGreaterThan(0);
     expect(summary.byStatus.unsupported).toBeGreaterThan(0);
+  });
+
+  it('marks charts writable once the engine models charts and pictures', () => {
+    const wb = {
+      capabilities: { ...baseCaps, drawings: true, images: true, charts: true },
+      getPassthroughs: () => [{ path: 'xl/charts/chart1.xml' }],
+      getTables: () => [],
+      getPivotTables: () => [],
+    } as unknown as WorkbookHandle;
+
+    const summary = summarizeSpreadsheetCompatibility(wb);
+
+    expect(summary.byId['charts-drawings']).toMatchObject({ status: 'writable', count: 1 });
+    expect(summary.byId['chart-authoring'].status).toBe('writable');
+    expect(summary.byId['chart-authoring'].reason).toContain('moved, resized and deleted');
   });
 
   it('surfaces scoped defined names as an engine capability', () => {

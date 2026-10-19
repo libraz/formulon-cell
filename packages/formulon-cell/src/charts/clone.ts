@@ -7,7 +7,7 @@ const cloneMarker = (marker: ChartMarkerSpec): ChartMarkerSpec => ({
 });
 
 /** Detach nested chart settings at store, history, and public API boundaries. */
-export function cloneChartSpec<T extends ChartSpec>(value: T): T {
+export function cloneChartSpec<T extends Omit<ChartSpec, 'kind'>>(value: T): T {
   return {
     ...value,
     ...(value.palette ? { palette: [...value.palette] } : {}),
@@ -35,6 +35,7 @@ export function cloneChartSpec<T extends ChartSpec>(value: T): T {
             ...(series.fill ? { fill: { ...series.fill } } : {}),
             ...(series.line ? { line: { ...series.line } } : {}),
             ...(series.marker ? { marker: cloneMarker(series.marker) } : {}),
+            ...(series.dataLabels ? { dataLabels: { ...series.dataLabels } } : {}),
             ...(series.points
               ? {
                   points: series.points.map((point) => ({

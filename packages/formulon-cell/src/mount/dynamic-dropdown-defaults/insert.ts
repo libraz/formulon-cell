@@ -95,6 +95,7 @@ const buildChartAction =
   (kind) => {
     createRibbonChartFromSelection({
       store: instance.store,
+      wb: instance.workbook,
       range: normalizedSelectionRange(instance),
       action: kind,
       history: instance.history,
@@ -107,6 +108,7 @@ const buildRecommendedChartAction =
   async () => {
     createRibbonChartFromSelection({
       store: instance.store,
+      wb: instance.workbook,
       range: normalizedSelectionRange(instance),
       action: 'recommended',
       history: instance.history,

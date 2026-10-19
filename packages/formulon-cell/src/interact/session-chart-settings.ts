@@ -1,5 +1,7 @@
+import { seriesColorOf, withoutSeriesColor } from '../charts/engine-adapter.js';
 import { prepareChartData } from '../charts/filters.js';
 import { chartLabelPositions } from '../charts/label-options.js';
+import { automaticPalette, DEFAULT_THEME_ACCENTS } from '../charts/series-colors.js';
 import { resolveChartStyle } from '../charts/styles.js';
 import type {
   ChartAxisSpec,
@@ -8,6 +10,7 @@ import type {
   ChartEmptyCellMode,
   ChartFillSpec,
   ChartGrouping,
+  ChartKind,
   ChartLabelPosition,
   ChartLineSpec,
   ChartMarkerSpec,
@@ -15,9 +18,11 @@ import type {
   ChartScatterStyle,
   ChartSeriesDirection,
   ChartSeriesStyleSpec,
+  ChartSpec,
   ChartValueFormatter as CoreChartValueFormatter,
 } from '../charts/types.js';
 import type { History } from '../commands/history.js';
+import { parseRangeRef } from '../engine/range-resolver.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 
@@ -26,9 +31,10 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
  * usable without a workbook engine. */
 export type ChartValueFormatter = CoreChartValueFormatter;
 
-export type SessionChartSettingsShape = SessionChart;
+/** A chart the settings surface can edit: one the renderer can draw. */
+export type SessionChartSettingsShape = SessionChart & { kind: ChartKind };
 export type SessionChartSettingsPatch = {
-  -readonly [Key in keyof Omit<SessionChart, 'id'>]?: Omit<SessionChart, 'id'>[Key];
+  -readonly [Key in keyof ChartSpec]?: ChartSpec[Key];
 };
 
 export interface SessionChartSettingsLabels {
@@ -93,12 +99,30 @@ export interface SessionChartSettingsLabels {
   shapeSquare: string;
   shapeDiamond: string;
   shapeTriangle: string;
+  shapeX: string;
+  shapeStar: string;
+  shapePlus: string;
+  shapeDot: string;
+  shapeDash: string;
+  smoothLine: string;
+  titleAutomatic: string;
   markerSize: string;
   categories: string;
   selectAll: string;
   clearAll: string;
   noSeries: string;
   noCategories: string;
+  pivotChartLocked: string;
+  addSeries: string;
+  removeSeries: string;
+  addSeriesConfirm: string;
+  seriesNameRef: string;
+  seriesValuesRef: string;
+  seriesXValuesRef: string;
+  seriesYValuesRef: string;
+  axisLabelsRef: string;
+  invalidReference: string;
+  lastSeriesLocked: string;
   palette: string;
   paletteOffice: string;
   paletteBlue: string;
@@ -150,8 +174,13 @@ export interface SessionChartSettingsLabels {
 }
 
 export interface SessionChartSettingsHandle {
-  open(chart: SessionChart, data: ChartData, anchor: HTMLElement, tab?: SettingsTab): void;
-  sync(chart: SessionChart, data: ChartData, anchor: HTMLElement): void;
+  open(
+    chart: SessionChartSettingsShape,
+    data: ChartData,
+    anchor: HTMLElement,
+    tab?: SettingsTab,
+  ): void;
+  sync(chart: SessionChartSettingsShape, data: ChartData, anchor: HTMLElement): void;
   close(discard?: boolean): void;
   setLabels(next: Partial<SessionChartSettingsLabels>, locale?: string): void;
   detach(): void;
@@ -161,6 +190,14 @@ export interface SessionChartSettingsHandle {
 
 export type SettingsTab = 'elements' | 'styles' | 'filters';
 
+/** Cell references of a series to add, as typed; `values` are a scatter chart's Y values. */
+export interface SessionChartSeriesRefs {
+  name?: string;
+  values: string;
+  categories?: string;
+  x?: string;
+}
+
 export interface SessionChartSettingsDeps {
   readonly host: HTMLElement;
   readonly store: SpreadsheetStore;
@@ -168,17 +205,27 @@ export interface SessionChartSettingsDeps {
   readonly locale?: string;
   readonly formatValue?: ChartValueFormatter;
   readonly labels?: Partial<SessionChartSettingsLabels>;
-  readonly canEdit?: (chart: SessionChart) => boolean;
+  readonly canEdit?: (chart: SessionChartSettingsShape) => boolean;
   /** Rebuild source data when a draft changes chart family or orientation. */
-  readonly readData?: (chart: SessionChart) => ChartData;
+  readonly readData?: (chart: SessionChartSettingsShape) => ChartData;
   readonly onApply: (id: string, patch: SessionChartSettingsPatch, history: History | null) => void;
+  /** Append a series to the workbook chart; its id, or null when refused. */
+  readonly onAddSeries: (
+    id: string,
+    refs: SessionChartSeriesRefs,
+    history: History | null,
+  ) => string | null;
+  /** Remove a series from the workbook chart; false when refused. */
+  readonly onRemoveSeries: (id: string, seriesId: string, history: History | null) => boolean;
+  /** The workbook theme's accent1..accent6; the default theme's when omitted. */
+  readonly accents?: () => readonly string[] | undefined;
 }
 
 const SVG_SAFE_HEX = /^#[0-9a-f]{6}$/i;
 const ALL_POINTS = '__all__';
-const DEFAULT_PALETTE = ['#0f6cbd', '#ed7d31', '#70ad47', '#ffc000', '#5b9bd5', '#a5a5a5'];
+/** Fixed presets; `office` is the theme's accents, the default theme's here. */
 const PALETTE_PRESETS: Record<string, readonly string[]> = {
-  office: DEFAULT_PALETTE,
+  office: DEFAULT_THEME_ACCENTS,
   blue: ['#1f4e78', '#5b9bd5', '#9dc3e6', '#d9eaf7', '#17365d', '#2f75b5'],
   mono: ['#1f1f1f', '#4d4d4d', '#737373', '#999999', '#bfbfbf', '#d9d9d9'],
 };
@@ -251,12 +298,30 @@ const DEFAULT_LABELS: SessionChartSettingsLabels = {
   shapeSquare: 'Square',
   shapeDiamond: 'Diamond',
   shapeTriangle: 'Triangle',
+  shapeX: 'X',
+  shapeStar: 'Star',
+  shapePlus: 'Plus',
+  shapeDot: 'Dot',
+  shapeDash: 'Dash',
+  smoothLine: 'Smoothed line',
+  titleAutomatic: 'Automatic title',
   markerSize: 'Size',
   categories: 'Categories',
   selectAll: 'Select all',
   clearAll: 'Clear all',
   noSeries: 'No series',
   noCategories: 'No categories',
+  pivotChartLocked: 'The series and data range of a PivotChart follow its PivotTable.',
+  addSeries: 'Add series',
+  removeSeries: 'Remove series',
+  addSeriesConfirm: 'Add',
+  seriesNameRef: 'Series name',
+  seriesValuesRef: 'Series values',
+  seriesXValuesRef: 'Series X values',
+  seriesYValuesRef: 'Series Y values',
+  axisLabelsRef: 'Axis label range',
+  invalidReference: 'Enter a valid cell reference.',
+  lastSeriesLocked: 'A chart needs at least one series.',
   palette: 'Palette',
   paletteOffice: 'Office',
   paletteBlue: 'Blue',
@@ -404,8 +469,8 @@ const cloneStyles = (
   }));
 
 interface ChartDraft {
-  kind: SessionChart['kind'];
-  kindBaseline: SessionChart['kind'];
+  kind: SessionChartSettingsShape['kind'];
+  kindBaseline: SessionChartSettingsShape['kind'];
   kindDirty: boolean;
   kindChanged: boolean;
   scatterStyle: ChartScatterStyle;
@@ -416,6 +481,8 @@ interface ChartDraft {
   seriesDirectionBaseline: ChartSeriesDirection;
   seriesDirectionDirty: boolean;
   title: string;
+  /** Excel's automatic title, which the text field does not override. */
+  titleAuto: boolean;
   legendVisible: boolean;
   legendBaseline: boolean;
   legendOriginalOverride?: boolean;
@@ -442,6 +509,7 @@ interface ChartDraft {
   dataLabelsBaseline: MutableDataLabels;
   dataLabelsChanged: Set<keyof MutableDataLabels>;
   palette: string[];
+  paletteBaseline: string[];
   varyColors: boolean;
   varyColorsBaseline: boolean;
   varyColorsOriginalOverride?: boolean;
@@ -459,6 +527,7 @@ type ChartAxisField =
   | 'labelPosition'
   | 'logBase'
   | 'title'
+  | 'titleAuto'
   | 'min'
   | 'max'
   | 'majorUnit'
@@ -493,6 +562,8 @@ interface ChartAxisDraft {
   logEnabled: boolean;
   logBaseDraft: number;
   title: string;
+  /** Excel's automatic title, which the text field does not override. */
+  titleAuto: boolean;
   min?: number;
   max?: number;
   majorUnit?: number;
@@ -500,7 +571,7 @@ interface ChartAxisDraft {
   majorGridlines: boolean;
 }
 
-const axisFromChart = (axis: SessionChart['xAxis']): ChartAxisDraft => {
+const axisFromChart = (axis: SessionChartSettingsShape['xAxis']): ChartAxisDraft => {
   const raw = (axis ?? {}) as Record<string, unknown>;
   const finite = (value: unknown): number | undefined =>
     typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -533,6 +604,7 @@ const axisFromChart = (axis: SessionChart['xAxis']): ChartAxisDraft => {
     logEnabled: validLogBase !== undefined,
     logBaseDraft: validLogBase ?? 10,
     title: typeof raw.title === 'string' ? raw.title : '',
+    titleAuto: typeof raw.title === 'object',
     min: finite(raw.min),
     max: finite(raw.max),
     majorUnit: (() => {
@@ -581,22 +653,43 @@ const cloneDataLabels = (value?: ChartDataLabelSpec): MutableDataLabels => {
   return next;
 };
 
-const effectivePalette = (chart: SessionChart): string[] =>
-  chart.palette && chart.palette.length > 0
-    ? [...chart.palette]
-    : [chart.color ?? DEFAULT_PALETTE[0] ?? '#0f6cbd', ...DEFAULT_PALETTE.slice(1)];
+/** The colours the series are drawn with: the palette when one is set, else each
+ *  series' own colour, which is how the workbook stores them. */
+const effectivePalette = (
+  chart: SessionChartSettingsShape,
+  data: ChartData,
+  automatic: readonly string[],
+): string[] => {
+  if (chart.palette && chart.palette.length > 0) return [...chart.palette];
+  const fills = data.series.map((series) =>
+    seriesColorOf(
+      chart,
+      chart.seriesStyles?.find((style) => style.seriesId === series.id),
+    ),
+  );
+  return Array.from(
+    { length: Math.max(6, fills.length) },
+    (_, index) =>
+      fills[index] ?? automatic[index % automatic.length] ?? DEFAULT_THEME_ACCENTS[0] ?? '',
+  );
+};
+
+/** Drop the series' own colours so an edited palette takes effect. */
+const releaseSeriesColors = (draft: ChartDraft): void => {
+  draft.seriesStyles = draft.seriesStyles.map((style) => withoutSeriesColor(draft.kind, style));
+};
 
 const isCircularKind = (kind: string): boolean => kind === 'pie' || kind === 'doughnut';
 const isDoughnutKind = (kind: string): boolean => kind === 'doughnut';
 
 const defaultVaryColors = (kind: string): boolean => isCircularKind(kind);
 
-const scatterStyleOf = (chart: SessionChart): ChartScatterStyle | undefined => {
+const scatterStyleOf = (chart: SessionChartSettingsShape): ChartScatterStyle | undefined => {
   const value = chart.scatterStyle;
   return value === 'marker' || value === 'line' || value === 'lineMarker' ? value : undefined;
 };
 
-const effectiveLegendVisible = (chart: SessionChart, data: ChartData): boolean => {
+const effectiveLegendVisible = (chart: SessionChartSettingsShape, data: ChartData): boolean => {
   if (chart.legend?.visible !== undefined) return chart.legend.visible;
   const prepared = prepareChartData(data, chart);
   return prepared.data.domain === 'category' && isCircularKind(chart.kind)
@@ -612,7 +705,10 @@ const boundedHoleSize = (value: number | undefined): number =>
  * panel answer questions about the draft chart family and data orientation
  * without writing defaults into the persisted chart.
  */
-const effectiveDraftChart = (chart: SessionChart, draft: ChartDraft): SessionChart =>
+const effectiveDraftChart = (
+  chart: SessionChartSettingsShape,
+  draft: ChartDraft,
+): SessionChartSettingsShape =>
   ({
     ...chart,
     kind: draft.kind,
@@ -635,10 +731,10 @@ const effectiveDraftChart = (chart: SessionChart, draft: ChartDraft): SessionCha
     },
     xAxis: { ...draft.xAxis },
     yAxis: { ...draft.yAxis },
-  }) as SessionChart;
+  }) as SessionChartSettingsShape;
 
 const effectiveLegendDefault = (
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   draft: ChartDraft,
   data: ChartData,
 ): boolean => {
@@ -646,11 +742,16 @@ const effectiveLegendDefault = (
   const spec = {
     ...draftSpec,
     legend: draftSpec.legend ? { ...draftSpec.legend, visible: undefined } : undefined,
-  } as SessionChart;
+  } as SessionChartSettingsShape;
   return effectiveLegendVisible(spec, data);
 };
 
-const draftFromChart = (chart: SessionChart, data: ChartData): ChartDraft => {
+const draftFromChart = (
+  chart: SessionChartSettingsShape,
+  data: ChartData,
+  automatic: readonly string[],
+): ChartDraft => {
+  const palette = effectivePalette(chart, data, automatic);
   const dataLabels = cloneDataLabels(chart.dataLabels);
   const legendBaseline = effectiveLegendVisible(chart, data);
   const legendOriginalOverride = chart.legend?.visible;
@@ -693,7 +794,8 @@ const draftFromChart = (chart: SessionChart, data: ChartData): ChartDraft => {
     scatterStyleChanged: false,
     seriesDirectionBaseline: chart.seriesDirection ?? 'auto',
     seriesDirectionDirty: false,
-    title: chart.title ?? '',
+    title: typeof chart.title === 'string' ? chart.title : '',
+    titleAuto: typeof chart.title === 'object',
     legendVisible: legendBaseline,
     legendBaseline,
     ...(legendOriginalOverride === undefined ? {} : { legendOverride: legendOriginalOverride }),
@@ -719,7 +821,8 @@ const draftFromChart = (chart: SessionChart, data: ChartData): ChartDraft => {
     dataLabels,
     dataLabelsBaseline: { ...dataLabels },
     dataLabelsChanged: new Set(),
-    palette: effectivePalette(chart),
+    palette: [...palette],
+    paletteBaseline: palette,
     varyColors: varyColorsBaseline,
     varyColorsBaseline,
     ...(chart.varyColors === undefined ? {} : { varyColorsOverride: chart.varyColors }),
@@ -904,7 +1007,7 @@ const parseOptionalNumber = (value: string): number | undefined => {
 };
 
 const axisPatch = (
-  original: SessionChart['xAxis'],
+  original: SessionChartSettingsShape['xAxis'],
   draft: ChartAxisDraft,
   changed: Set<ChartAxisField>,
 ): Record<string, unknown> | undefined => {
@@ -924,21 +1027,29 @@ const axisPatch = (
     } else if (key === 'logBase') {
       if (!draft.logEnabled) delete next.logBase;
       else next.logBase = draft.logBaseDraft;
-    } else if (key === 'title') next[key] = draft.title.trim() || undefined;
-    else if (key === 'numberFormat') next[key] = draft.numberFormat.trim() || undefined;
+    } else if (key === 'title' || key === 'titleAuto') {
+      next.title = draft.titleAuto ? { auto: true } : draft.title.trim() || undefined;
+    } else if (key === 'numberFormat') next[key] = draft.numberFormat.trim() || undefined;
     else next[key] = draft[key];
   }
   return next;
 };
 
-const toPatch = (draft: ChartDraft, chart: SessionChart): SessionChartSettingsPatch => {
+const toPatch = (
+  draft: ChartDraft,
+  chart: SessionChartSettingsShape,
+): SessionChartSettingsPatch => {
   const patch: SessionChartSettingsPatch = {};
   if (draft.kind !== chart.kind) patch.kind = draft.kind;
   if (draft.scatterStyleChanged && draft.scatterStyleOverride !== scatterStyleOf(chart)) {
     patch.scatterStyle = draft.scatterStyleOverride;
   }
-  const title = draft.title.trim() || undefined;
-  if (title !== chart.title) patch.title = title;
+  if (draft.titleAuto) {
+    if (typeof chart.title !== 'object') patch.title = { auto: true };
+  } else {
+    const title = draft.title.trim() || undefined;
+    if (title !== (typeof chart.title === 'string' ? chart.title : undefined)) patch.title = title;
+  }
 
   const currentLegendPosition = chart.legend?.position ?? 'right';
   const currentLegendOverride = chart.legend?.visible;
@@ -985,7 +1096,7 @@ const toPatch = (draft: ChartDraft, chart: SessionChart): SessionChartSettingsPa
     if (valueDefaultsToImplicit) dataLabels.showValue = true;
     patch.dataLabels = dataLabels as ChartDataLabelSpec;
   }
-  if (!jsonEqual(draft.palette, effectivePalette(chart))) patch.palette = [...draft.palette];
+  if (!jsonEqual(draft.palette, draft.paletteBaseline)) patch.palette = [...draft.palette];
   const currentVaryColorsOverride = chart.varyColors;
   const varyColorsChanged = draft.varyColorsOverride !== currentVaryColorsOverride;
   if (varyColorsChanged) {
@@ -1135,7 +1246,7 @@ const makeColorField = (
   const native = element('input');
   native.type = 'color';
   native.setAttribute('aria-label', label);
-  native.value = validColor(value) ?? '#4472c4';
+  native.value = validColor(value) ?? DEFAULT_THEME_ACCENTS[0] ?? '#000000';
   const apply = (next: string): void => {
     const color = validColor(next);
     if (!color) return;
@@ -1259,7 +1370,7 @@ const POSITION_LABELS: Record<ChartLabelPosition, keyof SessionChartSettingsLabe
 };
 
 const allowedPositions = (
-  chart: Pick<SessionChart, 'kind' | 'grouping'>,
+  chart: Pick<SessionChartSettingsShape, 'kind' | 'grouping'>,
   current: ChartLabelPosition,
 ): readonly {
   value: ChartLabelPosition;
@@ -1290,15 +1401,17 @@ const allowedPositions = (
   return options;
 };
 
-const supportsPercentage = (chart: Pick<SessionChart, 'kind'>, grouping: ChartGrouping): boolean =>
-  isCircularKind(chart.kind) || grouping === 'percent-stacked';
+const supportsPercentage = (
+  chart: Pick<SessionChartSettingsShape, 'kind'>,
+  grouping: ChartGrouping,
+): boolean => isCircularKind(chart.kind) || grouping === 'percent-stacked';
 
-const groupingSupported = (chart: Pick<SessionChart, 'kind'>): boolean =>
+const groupingSupported = (chart: Pick<SessionChartSettingsShape, 'kind'>): boolean =>
   chart.kind === 'bar' || chart.kind === 'column' || chart.kind === 'line' || chart.kind === 'area';
 
 type AxisName = 'xAxis' | 'yAxis';
 
-const axisIsNumeric = (chart: Pick<SessionChart, 'kind'>, axis: AxisName): boolean => {
+const axisIsNumeric = (chart: Pick<SessionChartSettingsShape, 'kind'>, axis: AxisName): boolean => {
   if (isCircularKind(chart.kind)) return false;
   if (chart.kind === 'scatter') return true;
   if (chart.kind === 'bar') return axis === 'xAxis';
@@ -1306,7 +1419,7 @@ const axisIsNumeric = (chart: Pick<SessionChart, 'kind'>, axis: AxisName): boole
 };
 
 const axisLogEligible = (
-  chart: Pick<SessionChart, 'kind' | 'grouping'>,
+  chart: Pick<SessionChartSettingsShape, 'kind' | 'grouping'>,
   axis: AxisName,
 ): boolean => {
   if (!axisIsNumeric(chart, axis)) return false;
@@ -1315,7 +1428,7 @@ const axisLogEligible = (
 };
 
 const emptyCellOptionDisabled = (
-  chart: Pick<SessionChart, 'kind' | 'scatterStyle'>,
+  chart: Pick<SessionChartSettingsShape, 'kind' | 'scatterStyle'>,
   grouping: ChartGrouping,
   value: ChartEmptyCellMode,
 ): boolean => {
@@ -1327,7 +1440,7 @@ const emptyCellOptionDisabled = (
 };
 
 const emptyCellsForcedZero = (
-  chart: Pick<SessionChart, 'kind'>,
+  chart: Pick<SessionChartSettingsShape, 'kind'>,
   grouping: ChartGrouping,
 ): boolean => (chart.kind === 'line' || chart.kind === 'area') && grouping !== 'clustered';
 
@@ -1367,7 +1480,7 @@ const pointIdForData = (data: ChartData, seriesIndex: number, pointIndex: number
 };
 
 const resolvedStyleForSelection = (
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   data: ChartData,
   draft: ChartDraft,
   seriesId: string,
@@ -1409,7 +1522,7 @@ const resolvedStyleForSelection = (
 const renderColorAndLineControls = (
   body: HTMLElement,
   labels: SessionChartSettingsLabels,
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   data: ChartData,
   draft: ChartDraft,
   seriesId: string,
@@ -1421,20 +1534,27 @@ const renderColorAndLineControls = (
   const resolved = resolvedStyleForSelection(chart, data, draft, seriesId, pointId);
   let currentFill = { ...(pointId === null ? (style.fill ?? {}) : (point?.fill ?? {})) };
   let currentLine = { ...(pointId === null ? (style.line ?? {}) : (point?.line ?? {})) };
-  makeColorField(body, labels.fillColor, resolved.fill?.color ?? resolved.color, (color) => {
-    currentFill = patchFill(currentFill, { color });
-    styleTarget(draft, seriesId, pointId, { fill: currentFill });
-  });
-  makeTextInput(
-    body,
-    `${labels.fillColor} ${labels.transparency}`,
-    String(resolved.fill?.transparency ?? 0),
-    (value) => {
-      currentFill = patchFill(currentFill, { transparency: clampPercent(value) });
+  // Excel keeps no fill on a line or scatter series or point; its colour is the line's and markers'.
+  if (chart.kind !== 'line' && chart.kind !== 'scatter') {
+    makeColorField(body, labels.fillColor, resolved.fill?.color ?? resolved.color, (color) => {
+      currentFill = patchFill(currentFill, { color });
       styleTarget(draft, seriesId, pointId, { fill: currentFill });
-    },
-    'number',
-  );
+    });
+    makeTextInput(
+      body,
+      `${labels.fillColor} ${labels.transparency}`,
+      String(resolved.fill?.transparency ?? 0),
+      (value) => {
+        // A workbook fill carries its colour with its transparency, so the inherited colour is kept.
+        currentFill = patchFill(currentFill, {
+          color: currentFill.color ?? resolved.fill?.color ?? resolved.color,
+          transparency: clampPercent(value),
+        });
+        styleTarget(draft, seriesId, pointId, { fill: currentFill });
+      },
+      'number',
+    );
+  }
   makeColorField(body, labels.lineColor, resolved.line?.color ?? resolved.color, (color) => {
     currentLine = patchLine(currentLine, { color });
     styleTarget(draft, seriesId, pointId, { line: currentLine });
@@ -1444,7 +1564,10 @@ const renderColorAndLineControls = (
     `${labels.lineColor} ${labels.transparency}`,
     String(resolved.line?.transparency ?? 0),
     (value) => {
-      currentLine = patchLine(currentLine, { transparency: clampPercent(value) });
+      currentLine = patchLine(currentLine, {
+        color: currentLine.color ?? resolved.line?.color ?? resolved.color,
+        transparency: clampPercent(value),
+      });
       styleTarget(draft, seriesId, pointId, { line: currentLine });
     },
     'number',
@@ -1479,12 +1602,21 @@ const renderColorAndLineControls = (
       styleTarget(draft, seriesId, pointId, { line: currentLine });
     },
   );
+  // Smoothing belongs to a series' line, so it shows where a line or scatter series draws one.
+  const drawsLine =
+    chart.kind === 'line' ||
+    (chart.kind === 'scatter' && (chart.scatterStyle ?? 'marker') !== 'marker');
+  if (pointId === null && drawsLine) {
+    makeCheckbox(body, labels.smoothLine, style.smooth === true, (checked) => {
+      updateSeriesStyle(draft, seriesId, { smooth: checked });
+    });
+  }
 };
 
 const renderMarkerControls = (
   body: HTMLElement,
   labels: SessionChartSettingsLabels,
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   data: ChartData,
   draft: ChartDraft,
   seriesId: string,
@@ -1516,6 +1648,11 @@ const renderMarkerControls = (
       { value: 'square', label: labels.shapeSquare },
       { value: 'diamond', label: labels.shapeDiamond },
       { value: 'triangle', label: labels.shapeTriangle },
+      { value: 'x', label: labels.shapeX },
+      { value: 'star', label: labels.shapeStar },
+      { value: 'plus', label: labels.shapePlus },
+      { value: 'dot', label: labels.shapeDot },
+      { value: 'dash', label: labels.shapeDash },
     ],
     (value) => patchMarker({ shape: value as ChartMarkerSpec['shape'] }),
   );
@@ -1550,7 +1687,7 @@ const renderMarkerControls = (
 const renderChartGeometryControls = (
   body: HTMLElement,
   labels: SessionChartSettingsLabels,
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   draft: ChartDraft,
 ): void => {
   if (chart.kind === 'bar' || chart.kind === 'column') {
@@ -1621,19 +1758,160 @@ const renderChartGeometryControls = (
   }
 };
 
+type NewSeriesField = keyof SessionChartSeriesRefs;
+
+/** The add-series form as typed, kept across re-renders. */
+interface NewSeriesDraft {
+  name: string;
+  values: string;
+  categories: string;
+  x: string;
+  invalid: NewSeriesField[];
+}
+
+interface StylesState {
+  seriesId: string;
+  pointId: string | null;
+  newSeries: NewSeriesDraft | null;
+}
+
+/** Series add and remove, which change the workbook chart at once rather than the draft. */
+interface SeriesActions {
+  /** The workbook chart's kind, which decides the references a new series takes. */
+  readonly kind: ChartKind;
+  /** Why both actions are unavailable; null when they are available. */
+  readonly locked: string | null;
+  readonly disabled: boolean;
+  add(refs: SessionChartSeriesRefs): string | null;
+  remove(seriesId: string): boolean;
+}
+
+/** The typed references, or the fields that are not references. Only `values` is required. */
+const newSeriesRefs = (
+  form: NewSeriesDraft,
+  scatter: boolean,
+): SessionChartSeriesRefs | NewSeriesField[] => {
+  const fields: readonly NewSeriesField[] = ['name', 'values', scatter ? 'x' : 'categories'];
+  const invalid = fields.filter((field) => {
+    const text = form[field].trim();
+    return text ? parseRangeRef(text) === null : field === 'values';
+  });
+  if (invalid.length > 0) return invalid;
+  const refs: SessionChartSeriesRefs = { values: form.values.trim() };
+  for (const field of fields) {
+    const text = form[field].trim();
+    if (field !== 'values' && text) refs[field] = text;
+  }
+  return refs;
+};
+
+const renderSeriesActions = (
+  target: HTMLElement,
+  labels: SessionChartSettingsLabels,
+  seriesCount: number,
+  state: StylesState,
+  rerender: () => void,
+  actions: SeriesActions,
+): void => {
+  const row = element('div', 'fc-chart-settings__series-actions');
+  const add = element('button', 'fc-chart-settings__add-series');
+  add.type = 'button';
+  add.textContent = labels.addSeries;
+  add.setAttribute('aria-expanded', String(state.newSeries !== null));
+  add.addEventListener('click', () => {
+    state.newSeries = state.newSeries
+      ? null
+      : { name: '', values: '', categories: '', x: '', invalid: [] };
+    rerender();
+  });
+  const remove = element('button', 'fc-chart-settings__remove-series');
+  remove.type = 'button';
+  remove.textContent = labels.removeSeries;
+  remove.addEventListener('click', () => {
+    if (actions.remove(state.seriesId)) rerender();
+  });
+  row.append(add, remove);
+  target.appendChild(row);
+  const unavailable = actions.locked !== null || actions.disabled;
+  projectDisabledState(add, unavailable, actions.locked);
+  projectDisabledState(
+    remove,
+    unavailable || seriesCount < 2,
+    actions.locked ?? (seriesCount < 2 ? labels.lastSeriesLocked : null),
+  );
+  const form = state.newSeries;
+  if (!form || unavailable) return;
+
+  const scatter = actions.kind === 'scatter';
+  const group = element('div', 'fc-chart-settings__new-series');
+  const fields: readonly [NewSeriesField, string][] = [
+    ['name', labels.seriesNameRef],
+    ['values', scatter ? labels.seriesYValuesRef : labels.seriesValuesRef],
+    scatter ? ['x', labels.seriesXValuesRef] : ['categories', labels.axisLabelsRef],
+  ];
+  for (const [field, label] of fields) {
+    const input = makeTextInput(group, label, form[field], (value) => {
+      form[field] = value;
+    });
+    input.dataset.seriesRef = field;
+    if (form.invalid.includes(field)) input.setAttribute('aria-invalid', 'true');
+  }
+  if (form.invalid.length > 0) {
+    const error = textNode('div', labels.invalidReference, 'fc-chart-settings__error');
+    error.setAttribute('role', 'alert');
+    group.appendChild(error);
+  }
+  const buttons = element('div', 'fc-chart-settings__new-series-actions');
+  const confirm = element('button', 'fc-chart-settings__new-series-confirm');
+  confirm.type = 'button';
+  confirm.textContent = labels.addSeriesConfirm;
+  confirm.addEventListener('click', () => {
+    const refs = newSeriesRefs(form, scatter);
+    if (Array.isArray(refs)) {
+      form.invalid = refs;
+      rerender();
+      return;
+    }
+    const added = actions.add(refs);
+    if (added === null) {
+      // The engine resolves what the syntax check cannot, such as an unknown sheet.
+      form.invalid = ['values'];
+    } else {
+      state.seriesId = added;
+      state.pointId = null;
+      state.newSeries = null;
+    }
+    rerender();
+  });
+  const dismiss = element('button', 'fc-chart-settings__new-series-cancel');
+  dismiss.type = 'button';
+  dismiss.textContent = labels.cancel;
+  dismiss.addEventListener('click', () => {
+    state.newSeries = null;
+    rerender();
+  });
+  buttons.append(confirm, dismiss);
+  group.appendChild(buttons);
+  target.appendChild(group);
+};
+
 const renderStyles = (
   body: HTMLElement,
   labels: SessionChartSettingsLabels,
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   data: ChartData,
   draft: ChartDraft,
-  state: { seriesId: string; pointId: string | null },
+  state: StylesState,
   rerender: () => void,
+  accents: readonly string[] | undefined,
+  seriesActions: SeriesActions,
 ): void => {
+  const automatic = automaticPalette(accents);
+  const presets = { ...PALETTE_PRESETS, office: automatic.slice(0, 6) };
   const palette = element('fieldset', 'fc-chart-settings__group');
   palette.appendChild(textNode('legend', labels.palette, 'fc-chart-settings__legend'));
   const presetRow = element('div', 'fc-chart-settings__palette-presets');
-  for (const [id, colors] of Object.entries(PALETTE_PRESETS)) {
+  for (const [id, colors] of Object.entries(presets)) {
     const button = element('button');
     button.type = 'button';
     button.className = 'fc-chart-settings__palette-button';
@@ -1649,6 +1927,7 @@ const renderStyles = (
     button.appendChild(swatches);
     button.addEventListener('click', () => {
       draft.palette = [...colors];
+      releaseSeriesColors(draft);
       rerender();
     });
     presetRow.appendChild(button);
@@ -1656,9 +1935,10 @@ const renderStyles = (
   palette.appendChild(presetRow);
   for (let index = 0; index < Math.max(6, draft.palette.length); index += 1) {
     const color =
-      draft.palette[index] ?? DEFAULT_PALETTE[index % DEFAULT_PALETTE.length] ?? '#4472c4';
+      draft.palette[index] ?? automatic[index % automatic.length] ?? DEFAULT_THEME_ACCENTS[0] ?? '';
     makeColorField(palette, `${labels.palette} ${index + 1}`, color, (next) => {
       draft.palette[index] = next;
+      releaseSeriesColors(draft);
     });
   }
   makeCheckbox(palette, labels.varyColors, draft.varyColors, (checked) => {
@@ -1693,6 +1973,7 @@ const renderStyles = (
       rerender();
     },
   );
+  renderSeriesActions(target, labels, entries.length, state, rerender, seriesActions);
   makeSelect(
     target,
     labels.point,
@@ -1715,7 +1996,7 @@ const renderStyles = (
 const renderAxisControls = (
   body: HTMLElement,
   labels: SessionChartSettingsLabels,
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   data: ChartData,
   draft: ChartDraft,
   axisName: AxisName,
@@ -1817,13 +2098,28 @@ const renderAxisControls = (
     !enabled,
   );
   labelPositionSelect.parentElement?.classList.add('fc-chart-settings__label-position');
+  // Typing a title replaces the automatic one; the checkbox returns to it.
+  let automatic: HTMLInputElement | undefined;
   makeTextInput(
     group,
     axisName === 'xAxis' ? labels.xAxisTitle : labels.yAxisTitle,
     axis.title,
-    (value) => updateAxisField(draft, axisName, 'title', value),
+    (value) => {
+      updateAxisField(draft, axisName, 'title', value);
+      if (value.trim().length > 0 && draft[axisName].titleAuto) {
+        updateAxisField(draft, axisName, 'titleAuto', false);
+        if (automatic) automatic.checked = false;
+      }
+    },
     'text',
     { disabled: !enabled },
+  );
+  automatic = makeCheckbox(
+    group,
+    labels.titleAutomatic,
+    axis.titleAuto,
+    (checked) => updateAxisField(draft, axisName, 'titleAuto', checked),
+    !enabled,
   );
   makeTextInput(
     group,
@@ -1893,15 +2189,24 @@ const renderAxisControls = (
 const renderElements = (
   body: HTMLElement,
   labels: SessionChartSettingsLabels,
-  chart: SessionChart,
+  chart: SessionChartSettingsShape,
   data: ChartData,
   draft: ChartDraft,
   rerender: () => void,
 ): void => {
   const general = element('fieldset', 'fc-chart-settings__group');
   general.appendChild(textNode('legend', labels.title, 'fc-chart-settings__legend'));
+  // Typing a title replaces the automatic one; the checkbox returns to it.
+  let automatic: HTMLInputElement | undefined;
   makeTextInput(general, labels.title, draft.title, (value) => {
     draft.title = value;
+    if (value.trim().length > 0 && draft.titleAuto) {
+      draft.titleAuto = false;
+      if (automatic) automatic.checked = false;
+    }
+  });
+  automatic = makeCheckbox(general, labels.titleAutomatic, draft.titleAuto, (checked) => {
+    draft.titleAuto = checked;
   });
   makeSelect(
     general,
@@ -1938,6 +2243,12 @@ const renderElements = (
       (value) => {
         const next = value as ChartScatterStyle;
         draft.scatterStyle = next;
+        // Like Excel's subtype change, the style rewrites any explicit marker visibility.
+        draft.seriesStyles = draft.seriesStyles.map((style) =>
+          style.marker?.visible === undefined
+            ? style
+            : { ...style, marker: { ...style.marker, visible: next !== 'line' } },
+        );
         draft.scatterStyleChanged = next !== draft.scatterStyleBaseline;
         draft.scatterStyleOverride =
           next === draft.scatterStyleBaseline ? draft.scatterStyleOriginalOverride : next;
@@ -1982,7 +2293,7 @@ const renderElements = (
     },
     !groupingSupported(chart),
   );
-  makeSelect(
+  const direction = makeSelect(
     general,
     labels.seriesDirection,
     draft.seriesDirection,
@@ -2000,6 +2311,8 @@ const renderElements = (
       rerender();
     },
   );
+  // A PivotChart's series follow its PivotTable.
+  if (chart.pivotChart) projectDisabledState(direction, true, labels.pivotChartLocked);
   makeSelect(
     general,
     labels.emptyCells,
@@ -2209,13 +2522,14 @@ export function createSessionChartSettings(
   const { host, history = null } = deps;
   let labels = labelsWithDefaults(deps.labels);
   let locale = deps.locale ?? 'en-US';
-  let chart: SessionChart | null = null;
+  let chart: SessionChartSettingsShape | null = null;
   let data: ChartData | null = null;
   let anchor: HTMLElement | null = null;
   let draft: ChartDraft | null = null;
   let activeTab: SettingsTab = 'elements';
   let styleSeriesId = 'series-0';
   let stylePointId: string | null = null;
+  let newSeries: NewSeriesDraft | null = null;
   let dataKey = '';
   let editable = true;
   let disposed = false;
@@ -2240,6 +2554,7 @@ export function createSessionChartSettings(
     data = null;
     anchor = null;
     draft = null;
+    newSeries = null;
     dataKey = '';
     if (returnFocus && returnTarget?.isConnected) returnTarget.focus({ preventScroll: true });
   };
@@ -2340,7 +2655,7 @@ export function createSessionChartSettings(
       const implicit = {
         ...effective,
         legend: effective.legend ? { ...effective.legend, visible: undefined } : undefined,
-      } as SessionChart;
+      } as SessionChartSettingsShape;
       draft.legendBaseline = effectiveLegendVisible(implicit, data);
       draft.legendVisible = draft.legendOverride ?? draft.legendBaseline;
     }
@@ -2397,6 +2712,18 @@ export function createSessionChartSettings(
       const points = stylePointEntries(data, styleSeriesId);
       if (!points.some((point) => point.id === stylePointId)) stylePointId = null;
     }
+  };
+
+  /** Align the draft with series added or removed in the workbook. */
+  const reconcileSeriesDraft = (): void => {
+    if (!chart || !draft) return;
+    const known = new Set(chart.data.series.map((series) => series.id));
+    const styles = draft.seriesStyles.filter((style) => known.has(style.seriesId));
+    for (const style of cloneStyles(chart.seriesStyles) ?? []) {
+      if (!styles.some((entry) => entry.seriesId === style.seriesId)) styles.push(style);
+    }
+    draft.seriesStyles = styles;
+    draft.filter.hiddenSeriesIds = draft.filter.hiddenSeriesIds.filter((id) => known.has(id));
   };
 
   const renderPanel = (): void => {
@@ -2461,13 +2788,50 @@ export function createSessionChartSettings(
     const effective = effectiveDraftChart(chart, draft);
     if (activeTab === 'elements') renderElements(body, labels, effective, data, draft, renderAgain);
     else if (activeTab === 'styles') {
-      const state = { seriesId: styleSeriesId, pointId: stylePointId };
-      renderStyles(body, labels, effective, data, draft, state, () => {
-        styleSeriesId = state.seriesId;
-        stylePointId = state.pointId;
-        renderAgain();
-      });
-    } else renderFilters(body, labels, data, draft);
+      const state: StylesState = { seriesId: styleSeriesId, pointId: stylePointId, newSeries };
+      const committed = chart;
+      // The series of a draft that re-splits them are not the workbook's yet.
+      const seriesActions: SeriesActions = {
+        kind: committed.kind,
+        locked: committed.pivotChart ? labels.pivotChartLocked : null,
+        disabled: draft.kindChanged,
+        add: (refs) => {
+          const added = deps.onAddSeries(committed.id, refs, history);
+          if (added !== null) reconcileSeriesDraft();
+          return added;
+        },
+        remove: (seriesId) => {
+          const removed = deps.onRemoveSeries(committed.id, seriesId, history);
+          if (removed) reconcileSeriesDraft();
+          return removed;
+        },
+      };
+      renderStyles(
+        body,
+        labels,
+        effective,
+        data,
+        draft,
+        state,
+        () => {
+          styleSeriesId = state.seriesId;
+          stylePointId = state.pointId;
+          newSeries = state.newSeries;
+          renderAgain();
+        },
+        deps.accents?.(),
+        seriesActions,
+      );
+    } else {
+      renderFilters(body, labels, data, draft);
+      if (chart.pivotChart) {
+        for (const control of Array.from(
+          body.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button'),
+        )) {
+          projectDisabledState(control, true, labels.pivotChartLocked);
+        }
+      }
+    }
 
     const footer = element('div', 'fc-chart-settings__footer');
     const cancel = element('button');
@@ -2510,7 +2874,7 @@ export function createSessionChartSettings(
   }
 
   const open = (
-    nextChart: SessionChart,
+    nextChart: SessionChartSettingsShape,
     nextData: ChartData,
     nextAnchor: HTMLElement,
     tab?: SettingsTab,
@@ -2519,10 +2883,11 @@ export function createSessionChartSettings(
     chart = nextChart;
     data = nextData;
     anchor = nextAnchor;
-    draft = draftFromChart(nextChart, nextData);
+    draft = draftFromChart(nextChart, nextData, automaticPalette(deps.accents?.()));
     activeTab = tab ?? 'elements';
     styleSeriesId = seriesEntries(nextData)[0]?.id ?? 'series-0';
     stylePointId = null;
+    newSeries = null;
     dataKey = dataSignature(nextData);
     editable = deps.canEdit?.(nextChart) !== false;
     surface.hidden = false;

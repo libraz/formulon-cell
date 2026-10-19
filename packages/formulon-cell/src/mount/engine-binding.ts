@@ -1,6 +1,7 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { refreshChartsAfterRecalc, reloadChartsFromEngine } from '../engine/charts-sync.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
@@ -351,7 +352,8 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         invalidate: () => renderer.invalidate(),
         onOpenPivotTable: flags.pivotTableDialog ? () => getPivotTableDialog()?.open() : undefined,
         canOpenPivotTable: () => !!getPivotTableDialog(),
-        canCreateChart: () => flags.charts && !!getSessionCharts(),
+        canCreateChart: () =>
+          flags.charts && !!getSessionCharts() && wb.capabilities.charts === true,
       })
     : null;
 
@@ -454,6 +456,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     if (e.kind === 'value') {
       publishAtomicValue(e);
     } else if (e.kind === 'recalc') {
+      refreshChartsAfterRecalc(wb, store);
       emitter.emit('recalc', { dirty: e.dirty });
     } else if (
       e.kind === 'sheet-add' ||
@@ -462,6 +465,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       e.kind === 'sheet-move'
     ) {
       getSheetTabs()?.update();
+      if (e.kind !== 'sheet-add') reloadChartsFromEngine(wb, store);
     }
   });
 

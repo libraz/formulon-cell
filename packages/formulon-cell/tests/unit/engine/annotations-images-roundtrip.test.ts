@@ -123,6 +123,38 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
     }
   });
 
+  it('moves and restores a picture keeping its object id through save/load', async () => {
+    const first = await WorkbookHandle.createDefault();
+    try {
+      const objectId = first.insertImage(0, PNG, { row: 1, col: 1, name: 'logo' });
+      expect(objectId).not.toBeNull();
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        const id = objectId ?? 0;
+        expect(reloaded.setDrawingAnchor(0, id, { row: 5, col: 3, rowOffEmu: 9525 })).toBe(true);
+        expect(reloaded.listDrawingObjects(0).find((o) => o.objectId === id)).toMatchObject({
+          fromRow: 5,
+          fromCol: 3,
+          fromRowOff: 9525,
+        });
+        const snapshot = reloaded.snapshotDrawing(0, id);
+        expect(snapshot).not.toBeNull();
+        expect(reloaded.removeDrawing(0, id)).toBe(true);
+        expect(reloaded.listDrawingObjects(0).some((o) => o.objectId === id)).toBe(false);
+        expect(reloaded.restoreDrawing(0, snapshot ?? new Uint8Array())).toBe(id);
+        expect(reloaded.listDrawingObjects(0).find((o) => o.objectId === id)).toMatchObject({
+          fromRow: 5,
+          fromCol: 3,
+          name: 'logo',
+        });
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
   it('preserves the original annotation when notes and threads share a cell', async () => {
     const first = await WorkbookHandle.createDefault();
     try {

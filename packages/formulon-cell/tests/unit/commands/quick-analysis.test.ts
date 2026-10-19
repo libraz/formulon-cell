@@ -403,28 +403,36 @@ describe('executeQuickAnalysisAction', () => {
     ]);
   });
 
-  it('adds a session chart overlay for chart actions', () => {
+  it('creates a workbook chart for chart actions', async () => {
     const store = createSpreadsheetStore();
-    const { wb } = makeWb();
-    const r = range(0, 0, 4, 2);
-    const result = executeQuickAnalysisAction({
-      store,
-      wb,
-      actionId: 'charts-line',
-      range: r,
-      stats: mkStats({ numericCount: 10 }),
-      chartAvailable: true,
-    });
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      for (let row = 0; row <= 4; row += 1) {
+        for (let col = 0; col <= 2; col += 1) wb.setNumber({ sheet: 0, row, col }, row + col);
+      }
+      const r = range(0, 0, 4, 2);
+      const history = new History();
+      const result = executeQuickAnalysisAction({
+        store,
+        wb,
+        actionId: 'charts-line',
+        range: r,
+        stats: mkStats({ numericCount: 15 }),
+        chartAvailable: true,
+        history,
+      });
 
-    expect(result).toEqual({ ok: true, kind: 'chart', count: 1 });
-    expect(store.getState().charts.charts).toEqual([
-      expect.objectContaining({
-        id: 'qa-chart-0-0-0-4-2-line',
-        kind: 'line',
-        source: r,
-      }),
-    ]);
-    expect(store.getState().charts.charts[0]?.title).toBeUndefined();
+      expect(result).toEqual({ ok: true, kind: 'chart', count: 1 });
+      const [chart] = store.getState().charts.charts;
+      expect(chart).toMatchObject({ kind: 'line', source: r });
+      // The inserted chart keeps Excel's automatic title.
+      expect(chart?.title).toEqual({ auto: true });
+      expect(wb.getChart(0, chart?.nativeObjectId ?? 0)).not.toBeNull();
+      expect(history.undo()).toBe(true);
+      expect(store.getState().charts.charts).toEqual([]);
+    } finally {
+      wb.dispose();
+    }
   });
 
   it('records Quick Analysis sparklines as undoable overlay changes', () => {
@@ -512,12 +520,6 @@ describe('executeQuickAnalysisAction', () => {
       showValue: true,
     });
     mutators.setSparkline(store, { sheet: 0, row: 1, col: 1 }, { kind: 'line', source: 'A1:C1' });
-    mutators.upsertChart(store, {
-      id: 'chart',
-      kind: 'column',
-      source: r,
-      title: 'Column chart',
-    });
     mutators.upsertTableOverlay(store, {
       id: 'tbl',
       source: 'session',
@@ -540,8 +542,46 @@ describe('executeQuickAnalysisAction', () => {
     expect(store.getState().format.formats.size).toBe(0);
     expect(store.getState().conditional.rules).toHaveLength(0);
     expect(store.getState().sparkline.sparklines.size).toBe(0);
-    expect(store.getState().charts.charts).toHaveLength(0);
     expect(store.getState().tables.tables).toHaveLength(0);
+  });
+
+  it('deletes the workbook charts of the cleared range in the same undo step', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+      wb.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
+      const r = range(0, 0, 1, 0);
+      mutators.setRangeFormat(store, r, { fill: '#ffff00' });
+      expect(
+        executeQuickAnalysisAction({
+          store,
+          wb,
+          actionId: 'charts-column',
+          range: range(0, 0, 1, 1),
+          stats: mkStats({ numericCount: 2 }),
+          chartAvailable: true,
+        }).ok,
+      ).toBe(true);
+      const history = new History();
+      const result = executeQuickAnalysisAction({
+        store,
+        wb,
+        actionId: 'format-clear',
+        range: r,
+        stats: mkStats({ numericCount: 2 }),
+        history,
+      });
+
+      expect(result).toEqual({ ok: true, kind: 'clear-format', count: 1 });
+      expect(store.getState().charts.charts).toHaveLength(0);
+      expect(wb.listDrawingObjects(0)).toHaveLength(0);
+      expect(history.undo()).toBe(true);
+      expect(store.getState().charts.charts).toHaveLength(1);
+      expect(store.getState().format.formats.size).toBeGreaterThan(0);
+    } finally {
+      wb.dispose();
+    }
   });
 
   it('clears huge selected ranges by visiting only existing format entries', () => {

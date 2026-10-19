@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { RIBBON_TABS } from '../../../../src/toolbar/ribbon-model.js';
@@ -577,6 +578,9 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('creates the recommended chart from primary click and keeps chart types secondary', async () => {
+    // Charts live in the workbook, which the stub engine does not model.
+    sheet.dispose();
+    sheet = await mountStubSheet({ locale: 'en', workbook: await WorkbookHandle.createDefault() });
     seedNumber(sheet, 0, 0, 1);
     seedNumber(sheet, 1, 0, 2);
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });

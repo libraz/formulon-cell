@@ -1,17 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import * as sliceHistory from '../../../src/commands/slice-history.js';
 import {
-  applyChartsSnapshot,
   applyConditionalRulesSnapshot,
   applyFormatSnapshot,
   applyLayoutSnapshot,
   applyTableOverlaysSnapshot,
-  captureChartsSnapshot,
   captureConditionalRulesSnapshot,
   captureFormatSnapshot,
   captureLayoutSnapshot,
   captureTableOverlaysSnapshot,
-  recordChartsChange,
   recordConditionalRulesChange,
   recordFormatChange,
   recordLayoutChange,
@@ -271,74 +269,9 @@ describe('recordFormatChange / recordLayoutChange', () => {
     expect(h.canUndo()).toBe(false);
   });
 
-  it('recordChartsChange round-trips session chart overlays', () => {
-    const chart = {
-      id: 'chart-a',
-      kind: 'column' as const,
-      source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
-      title: 'Chart',
-      x: 10,
-      y: 20,
-      w: 300,
-      h: 180,
-    };
-
-    recordChartsChange(h, store, () => {
-      mutators.upsertChart(store, chart);
-    });
-    expect(captureChartsSnapshot(store.getState())).toEqual([chart]);
-
-    h.undo();
-    expect(store.getState().charts.charts).toEqual([]);
-
-    h.redo();
-    expect(store.getState().charts.charts).toEqual([chart]);
-
-    applyChartsSnapshot(store, []);
-    expect(store.getState().charts.charts).toEqual([]);
-  });
-
-  it('detaches nested chart options in history snapshots and replay', () => {
-    const chart = {
-      id: 'chart-nested',
-      kind: 'column' as const,
-      source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
-      palette: ['#4472c4', '#ed7d31'],
-      legend: { visible: true, position: 'right' as const },
-      xAxis: { title: 'Month', min: 0 },
-      yAxis: { title: 'Sales', max: 100 },
-    };
-
-    recordChartsChange(h, store, () => {
-      mutators.upsertChart(store, chart);
-    });
-    chart.palette[0] = '#000000';
-    chart.legend.visible = false;
-    chart.xAxis.title = 'Mutated';
-
-    expect(captureChartsSnapshot(store.getState())).toEqual([
-      {
-        ...chart,
-        palette: ['#4472c4', '#ed7d31'],
-        legend: { visible: true, position: 'right' },
-        xAxis: { title: 'Month', min: 0 },
-      },
-    ]);
-    h.undo();
-    h.redo();
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      palette: ['#4472c4', '#ed7d31'],
-      legend: { visible: true, position: 'right' },
-      xAxis: { title: 'Month', min: 0 },
-    });
-  });
-
-  it('recordChartsChange skips unchanged chart snapshots', () => {
-    recordChartsChange(h, store, () => {
-      store.setState((s) => ({ ...s, charts: { charts: [...s.charts.charts] } }));
-    });
-
-    expect(h.canUndo()).toBe(false);
+  it('leaves charts to their engine snapshots', () => {
+    // A store-only chart snapshot would drift from the workbook's drawing objects.
+    expect(Object.keys(sliceHistory).filter((name) => /chart/i.test(name))).toEqual([]);
   });
 
   it('passes through when history is null', () => {

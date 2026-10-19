@@ -1,4 +1,4 @@
-import type { ChartKind, ChartSpec } from '../charts/types.js';
+import type { ChartData, ChartKind, ChartSpec } from '../charts/types.js';
 import type {
   CustomTableStyle,
   PivotTableStyleAssignment,
@@ -8,6 +8,7 @@ import type { SheetView } from '../commands/sheet-views.js';
 import type {
   Addr,
   CellValue,
+  EngineDrawingAnchor,
   Range,
   SheetAxisFormatOverride,
   SheetFontOverride,
@@ -310,19 +311,29 @@ export interface SparklineSlice {
 /** @deprecated Use `ChartKind` from `@libraz/formulon-cell/charts` instead. */
 export type SessionChartKind = ChartKind;
 
-/** Session chart overlay. This is intentionally UI-owned until the engine
- *  exposes chart authoring; the source range can later map to a persisted
- *  chart definition without changing the public command shape. */
+/** Why a workbook chart is drawn as a frame and title instead of a chart. */
+export type SessionChartUnsupportedReason = 'chartex' | 'multi-plot' | 'plot-type' | 'unparseable';
+
+/** Projection of a workbook chart. The engine owns the chart; the store holds
+ *  what the engine reports, re-read after every edit, recalc and structural
+ *  change. Position and size come from `nativeAnchor` at draw time. */
 export interface SessionChart extends Omit<ChartSpec, 'kind'> {
+  /** `chart-native-${sheet}-${nativeObjectId}`. */
   id: string;
-  kind: SessionChartKind;
-  source: Range;
-  /** Legacy single-series colour. `palette` is preferred for multi-series charts. */
-  color?: string;
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
+  /** Sheet hosting the chart, which can differ from the sheet of its data. */
+  sheet: number;
+  nativeObjectId: number;
+  nativeAnchor: EngineDrawingAnchor;
+  kind: SessionChartKind | 'unsupported';
+  /** The rectangle the series were split from; absent when no single range
+   *  describes them. */
+  source?: Range;
+  /** Present when `kind` is `'unsupported'`. */
+  unsupported?: { reason: SessionChartUnsupportedReason; title: string | null };
+  /** A PivotChart: its series and data range follow the PivotTable. */
+  pivotChart?: boolean;
+  /** Series resolved against the current cell values. */
+  data: ChartData;
 }
 
 export interface ChartsSlice {
@@ -341,21 +352,11 @@ export type SessionShapeKind =
 /** Illustration overlay. Pictures with a nativeObjectId are stored in the workbook. */
 export interface SessionIllustration {
   nativeObjectId?: number;
-  /** Imported drawings remain read-only until the engine can update anchors
-   * without replacing opaque picture metadata. */
+  /** False for an absolute anchor, which the engine cannot re-anchor. */
   nativeGeometryEditable?: boolean;
   imageBytes?: Uint8Array;
   imageFormat?: number;
-  nativeAnchor?: {
-    row: number;
-    col: number;
-    rowOffEmu: number;
-    colOffEmu: number;
-    widthEmu: number;
-    heightEmu: number;
-    name: string;
-    descr: string;
-  };
+  nativeAnchor?: EngineDrawingAnchor;
   id: string;
   kind: 'shape' | 'image';
   shape?: SessionShapeKind;

@@ -157,8 +157,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    min-width: 240px;
-    min-height: 160px;
+    box-sizing: border-box;
     background: var(--fc-bg-elev, Canvas);
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
@@ -580,6 +579,16 @@
     min-height: 0;
     padding: 12px;
     box-sizing: border-box;
+  }
+
+  .fc-chart--unsupported .fc-chart__plot {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+  }
+
+  .fc-chart--unsupported .fc-chart__plot text {
+    fill: currentColor;
+    font-size: 12px;
+    dominant-baseline: middle;
   }
 
   .fc-chart__resize {

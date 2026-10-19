@@ -7,9 +7,8 @@ import type { SelectionStats } from './aggregate.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
 import type { History } from './history.js';
 import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
-import { createSessionChart } from './session-chart.js';
+import { clearSessionChartsInRange, createSessionChart } from './session-chart.js';
 import {
-  recordChartsChange,
   recordConditionalRulesChange,
   recordFormatChange,
   recordSparklineChange,
@@ -24,7 +23,7 @@ import {
  *
  * Sections mirror common spreadsheet apps:
  *   - 書式設定 (Formatting)  — fill / data-bar / icon-set tied to numbers.
- *   - グラフ (Charts)        — session chart overlays.
+ *   - グラフ (Charts)        — workbook charts of the selection.
  *   - 合計 (Totals)          — sum / average etc. for numeric ranges.
  *   - テーブル (Tables)      — Format-As-Table / PivotTable creation flow.
  *   - スパークライン         — line / column / win-loss for numeric ranges.
@@ -483,18 +482,8 @@ function addChart(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult 
   const { actionId, range, store } = input;
   if (isSheetProtected(store.getState(), range.sheet)) return { ok: false, reason: 'protected' };
   const kind = actionId === 'charts-line' ? 'line' : 'column';
-  const count = store.getState().charts.charts.length;
-  recordChartsChange(input.history ?? null, store, () => {
-    createSessionChart(store, range, {
-      id: `qa-chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}`,
-      kind,
-      title: null,
-      x: 320 + (count % 3) * 24,
-      y: 72 + (count % 3) * 24,
-      w: 360,
-      h: 220,
-    });
-  });
+  const chart = createSessionChart(store, range, { wb: input.wb, kind }, input.history ?? null);
+  if (!chart) return { ok: false, reason: 'unsupported' };
   return { ok: true, kind: 'chart', count: 1 };
 }
 
@@ -541,9 +530,7 @@ function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysi
       recordSparklineChange(history, store, () => {
         mutators.clearSparklinesInRange(store, range);
       });
-      recordChartsChange(history, store, () => {
-        mutators.clearChartsInRange(store, range);
-      });
+      clearSessionChartsInRange(store, range, history, input.wb);
       recordTablesChange(history, store, () => {
         mutators.clearTableOverlaysInRange(store, range);
       });

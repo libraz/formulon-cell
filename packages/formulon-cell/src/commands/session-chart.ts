@@ -1,60 +1,78 @@
-import { cloneChartSpec } from '../charts/clone.js';
-import { chartDataFromTable } from '../charts/data.js';
-import type {
-  ChartData,
-  ChartEmptyCellMode,
-  ChartGrouping,
-  ChartLegendSpec,
-  ChartSeriesDirection,
-  ChartSpec,
-  ChartTableCell,
-} from '../charts/types.js';
-import { colLetter } from '../engine/address.js';
-import type { Range } from '../engine/types.js';
-import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import {
-  mutators,
-  type SessionChart,
-  type SessionChartKind,
-  type SpreadsheetStore,
-  type State,
-} from '../store/store.js';
+  AnchorEditAs,
+  AnchorKind,
+  type ChartSeriesPatch,
+  ChartSeriesDirection as EngineSeriesDirection,
+  type ImagePlacement,
+} from '@libraz/formulon';
+import {
+  type ChartEngineOp,
+  chartAxisId,
+  chartInsertOptions,
+  chartSeriesIdx,
+  chartSpecFromEngine,
+  chartSpecOps,
+  withoutSeriesColor,
+} from '../charts/engine-adapter.js';
+import type { ChartSeriesStyleSpec, ChartSpec } from '../charts/types.js';
+import { syncChartFromEngine } from '../engine/charts-sync.js';
+import {
+  EMU_PER_PX,
+  placementForAnchor,
+  placementForPixels,
+  viewportZoom,
+} from '../engine/drawing-geometry.js';
+import type { EngineDrawingAnchor, Range } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { EngineChartInfo } from '../engine/workbook-handle-charts.js';
+import { cellRectUnclamped, layoutForView } from '../render/geometry.js';
+import { rangesIntersect } from '../store/selection-geometry.js';
+import { cloneSessionChart } from '../store/sheet-object-mutators.js';
+import type { SessionChart, SessionChartKind, SpreadsheetStore } from '../store/store.js';
+import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import type { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
 import { isSheetProtected } from './protection.js';
-import { recordChartsChange } from './slice-history.js';
-
-export interface CreateSessionChartOptions extends Omit<ChartSpec, 'kind' | 'title'> {
-  id?: string;
-  kind?: SessionChartKind;
-  /** Pass `null` when the renderer should supply a localized fallback title. */
-  title?: string | null;
-  color?: string;
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
-  grouping?: ChartGrouping;
-  seriesDirection?: ChartSeriesDirection;
-  emptyCells?: ChartEmptyCellMode;
-  scatterStyle?: ChartSpec['scatterStyle'];
-  headerRow?: boolean;
-  headerColumn?: boolean;
-  gapWidth?: ChartSpec['gapWidth'];
-  overlap?: ChartSpec['overlap'];
-  firstSliceAngle?: ChartSpec['firstSliceAngle'];
-  holeSize?: ChartSpec['holeSize'];
-  palette?: readonly string[];
-  legend?: ChartLegendSpec;
-  xAxis?: ChartSpec['xAxis'];
-  yAxis?: ChartSpec['yAxis'];
-}
 
 export interface ChartMutationAuthorization {
   origin?: InteractionOrigin;
   commandId?: string;
 }
+
+export interface CreateSessionChartOptions extends Omit<ChartSpec, 'kind'> {
+  /** The workbook the chart is created in. */
+  wb: WorkbookHandle;
+  kind?: SessionChartKind;
+  /** Placement in the engine's units. Omitted, the chart takes Excel's default
+   *  frame centred in the visible grid. */
+  anchor?: ImagePlacement;
+  authorization?: ChartMutationAuthorization;
+}
+
+/** Settings to change; `source` re-splits the series from another range and
+ *  `anchor` moves or resizes the chart. */
+export type SessionChartPatch = Partial<Omit<ChartSpec, 'kind'>> & {
+  kind?: SessionChartKind;
+  source?: Range;
+  anchor?: ImagePlacement;
+};
+
+/** The cells of a series to add; each range may lie on any sheet. */
+export interface SessionChartSeriesInput {
+  /** The cell holding the series name; omitted, the series has none. */
+  name?: Range;
+  /** The series values: the Y values of a scatter chart. */
+  values: Range;
+  /** Category labels of a category chart. */
+  categories?: Range;
+  /** X values of a scatter chart. */
+  x?: Range;
+}
+
+/** Excel's default chart frame, 360 x 216 pt. */
+const DEFAULT_FRAME_CX = 4_572_000;
+const DEFAULT_FRAME_CY = 2_743_200;
 
 const chartIntent = (
   ranges: readonly Range[],
@@ -70,7 +88,8 @@ const chartIntent = (
   })),
 });
 
-const canMutateChart = (store: SpreadsheetStore, intent: OperationIntent): boolean => {
+/** Whether protection and the interaction policy allow `intent`. */
+export const canMutateChart = (store: SpreadsheetStore, intent: OperationIntent): boolean => {
   for (const effect of intent.effects) {
     if (
       effect.kind === 'cells' &&
@@ -81,23 +100,253 @@ const canMutateChart = (store: SpreadsheetStore, intent: OperationIntent): boole
   return interactionControllerFor(store)?.canExecute(intent).allowed ?? true;
 };
 
-export type SessionChartPatch = Partial<Omit<SessionChart, 'id'>>;
+/** The cells a chart occupies for protection and policy: its anchor cell and its data. */
+const chartCells = (chart: SessionChart): Range[] => {
+  const { fromRow, fromCol } = chart.nativeAnchor;
+  const host = { sheet: chart.sheet, r0: fromRow, c0: fromCol, r1: fromRow, c1: fromCol };
+  return chart.source ? [host, chart.source] : [host];
+};
 
-export interface SessionChartSeriesPoint {
-  label: string;
-  value: number;
-}
+/** Push an undo step whose replay re-checks protection and policy first. */
+const pushChartHistory = (
+  history: History | null,
+  store: SpreadsheetStore,
+  intent: OperationIntent,
+  undo: () => void,
+  redo: () => void,
+): void => {
+  if (!history || history.isReplaying()) return;
+  const guarded =
+    (origin: 'undo' | 'redo', run: () => void): (() => void) =>
+    () => {
+      if (!canMutateChart(store, { ...intent, origin })) {
+        throw new Error(`chart ${origin} blocked by protection or policy`);
+      }
+      run();
+    };
+  history.push({
+    undo: guarded('undo', undo),
+    redo: guarded('redo', redo),
+    intent: { ...intent, origin: 'redo' },
+    inverseIntent: { ...intent, origin: 'undo' },
+  });
+};
 
-const cloneSessionChart = (chart: SessionChart): SessionChart => ({
-  ...cloneChartSpec(chart),
-  source: { ...chart.source },
-});
+/** The `ChartSpec` part of a supported chart's projection. */
+const specOf = (chart: SessionChart): ChartSpec => {
+  const {
+    id: _id,
+    sheet: _sheet,
+    nativeObjectId: _objectId,
+    nativeAnchor: _anchor,
+    source: _source,
+    unsupported: _unsupported,
+    pivotChart: _pivot,
+    data: _data,
+    ...spec
+  } = chart;
+  return spec as ChartSpec;
+};
 
-const MAX_SESSION_CHART_SERIES_CELLS = 10_000;
+/** Series styles without their own colours, so a palette can take effect. */
+const withoutSeriesColors = (
+  kind: ChartSpec['kind'],
+  styles: readonly ChartSeriesStyleSpec[] | undefined,
+): ChartSeriesStyleSpec[] | undefined => styles?.map((style) => withoutSeriesColor(kind, style));
 
-function defaultChartId(range: Range, kind: SessionChartKind): string {
-  return `chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}`;
-}
+/** `current` with the fields of `patch` replaced. A palette replaces the
+ *  explicit series colours it would otherwise lose to. */
+const patchedSpec = (current: ChartSpec, patch: Partial<ChartSpec>): ChartSpec => {
+  const next: ChartSpec = { ...current, ...patch };
+  return patch.palette !== undefined && patch.seriesStyles === undefined
+    ? { ...next, seriesStyles: withoutSeriesColors(next.kind, current.seriesStyles) }
+    : next;
+};
+
+/** `style` over `base`; a series colour in `style` replaces every colour `base` stores it in. */
+const mergeSeriesStyle = (
+  kind: ChartSpec['kind'],
+  colored: ChartSeriesStyleSpec,
+  style: ChartSeriesStyleSpec,
+): ChartSeriesStyleSpec => {
+  const base = style.fill?.color === undefined ? colored : withoutSeriesColor(kind, colored);
+  return {
+    ...base,
+    ...style,
+    ...(base.fill || style.fill ? { fill: { ...base.fill, ...style.fill } } : {}),
+    ...(base.line || style.line ? { line: { ...base.line, ...style.line } } : {}),
+    ...(base.marker || style.marker ? { marker: { ...base.marker, ...style.marker } } : {}),
+  };
+};
+
+/** A created chart's target: the fields `spec` sets, laid over what Excel's
+ *  template wrote for the rest, axis and legend fields included. */
+const createdSpec = (template: ChartSpec, spec: ChartSpec): ChartSpec => {
+  const baseStyles =
+    spec.palette === undefined
+      ? template.seriesStyles
+      : withoutSeriesColors(spec.kind, template.seriesStyles);
+  const styles = (baseStyles ?? []).map((base) => {
+    const style = spec.seriesStyles?.find((entry) => entry.seriesId === base.seriesId);
+    return style ? mergeSeriesStyle(spec.kind, base, style) : base;
+  });
+  for (const style of spec.seriesStyles ?? []) {
+    if (!styles.some((entry) => entry.seriesId === style.seriesId)) styles.push(style);
+  }
+  // insertChart already split the series as `spec` asks.
+  const { seriesDirection: _direction, headerRow: _row, headerColumn: _column, ...settings } = spec;
+  const merged: ChartSpec = { ...template, ...settings, seriesStyles: styles };
+  return {
+    ...merged,
+    ...(template.legend || spec.legend ? { legend: { ...template.legend, ...spec.legend } } : {}),
+    ...(template.xAxis || spec.xAxis ? { xAxis: { ...template.xAxis, ...spec.xAxis } } : {}),
+    ...(template.yAxis || spec.yAxis ? { yAxis: { ...template.yAxis, ...spec.yAxis } } : {}),
+  };
+};
+
+const runChartOp = (
+  wb: WorkbookHandle,
+  sheet: number,
+  objectId: number,
+  info: EngineChartInfo,
+  op: ChartEngineOp,
+): boolean => {
+  switch (op.op) {
+    case 'setChartType':
+      return wb.setChartType(sheet, objectId, op.plot, op.kind, op.grouping);
+    case 'setChartSource':
+      return wb.setChartSource(
+        sheet,
+        objectId,
+        op.source,
+        op.direction,
+        op.headerRow,
+        op.headerColumn,
+      );
+    case 'setChartPlot':
+      return wb.setChartPlot(sheet, objectId, op.plot, op.patch);
+    case 'setChartDisplay':
+      return wb.setChartDisplay(sheet, objectId, op.blanksAs, op.plotVisibleOnly);
+    case 'setChartTitle':
+      return wb.setChartTitle(sheet, objectId, op.title);
+    case 'setChartLegend':
+      return wb.setChartLegend(sheet, objectId, op.position, op.overlay);
+    case 'setChartAxis': {
+      const axisId = chartAxisId(info, op.axis);
+      return axisId !== null && wb.setChartAxis(sheet, objectId, axisId, op.patch);
+    }
+    case 'setChartSeries':
+      return wb.setChartSeries(sheet, objectId, op.plot, op.seriesIdx, op.patch);
+    case 'setChartPoint':
+      return wb.setChartPoint(sheet, objectId, op.plot, op.seriesIdx, op.pointIdx, op.patch);
+    case 'setChartFilter':
+      return wb.setChartFilter(sheet, objectId, op.hiddenSeries, op.hiddenCategories);
+  }
+};
+
+/**
+ * Bring the engine chart to `target`. A type or source change rebuilds the
+ * series, so the chart is re-read after one and the rest is diffed again. The
+ * split Excel resolves for `auto` and omitted header flags is taken as reached.
+ */
+const applyChartSpec = (
+  wb: WorkbookHandle,
+  sheet: number,
+  objectId: number,
+  target: ChartSpec,
+): boolean => {
+  let goal = target;
+  const rebuilt = new Set<ChartEngineOp['op']>();
+  for (;;) {
+    const info = wb.getChart(sheet, objectId);
+    const current = info ? chartSpecFromEngine(info, wb.getChartData(sheet, objectId)) : null;
+    if (!info || !current) return false;
+    let rebuild: ChartEngineOp['op'] | null = null;
+    for (const op of chartSpecOps(info, current, goal)) {
+      if (op.op === 'setChartType' || op.op === 'setChartSource') {
+        // A second rebuild of the same kind means the engine did not reach the goal.
+        if (rebuilt.has(op.op)) return false;
+        rebuild = op.op;
+      }
+      if (!runChartOp(wb, sheet, objectId, info, op)) return false;
+      if (rebuild) break;
+    }
+    if (!rebuild) return true;
+    rebuilt.add(rebuild);
+    if (rebuild === 'setChartSource') {
+      const split = wb.getChart(sheet, objectId)?.source;
+      if (!split) return false;
+      goal = {
+        ...goal,
+        seriesDirection: split.direction === EngineSeriesDirection.Rows ? 'rows' : 'columns',
+        headerRow: split.headerRow,
+        headerColumn: split.headerColumn,
+      };
+    }
+  }
+};
+
+const sameRange = (a: Range, b: Range | undefined): boolean =>
+  b !== undefined &&
+  a.sheet === b.sheet &&
+  a.r0 === b.r0 &&
+  a.c0 === b.c0 &&
+  a.r1 === b.r1 &&
+  a.c1 === b.c1;
+
+const sourceRef = (wb: WorkbookHandle, range: Range): string =>
+  formatSheetAbsoluteRange(wb.sheetName(range.sheet), range);
+
+/** Excel's default frame centred in the visible grid, as a two-cell anchor. */
+const defaultPlacement = (store: SpreadsheetStore): ImagePlacement => {
+  const state = store.getState();
+  const { viewport } = state;
+  const fallback: ImagePlacement = {
+    anchorKind: AnchorKind.TwoCell,
+    editAs: AnchorEditAs.TwoCell,
+    row: viewport.rowStart,
+    col: viewport.colStart,
+    rowOffEmu: 0,
+    colOffEmu: 0,
+    widthEmu: DEFAULT_FRAME_CX,
+    heightEmu: DEFAULT_FRAME_CY,
+  };
+  try {
+    const layout = layoutForView(state);
+    const zoom = viewportZoom(store);
+    const first = cellRectUnclamped(layout, viewport, viewport.rowStart, viewport.colStart);
+    const last = cellRectUnclamped(
+      layout,
+      viewport,
+      viewport.rowStart + Math.max(0, viewport.rowCount - 1),
+      viewport.colStart + Math.max(0, viewport.colCount - 1),
+    );
+    const w = (DEFAULT_FRAME_CX / EMU_PER_PX) * zoom;
+    const h = (DEFAULT_FRAME_CY / EMU_PER_PX) * zoom;
+    const origin: EngineDrawingAnchor = {
+      anchorKind: AnchorKind.TwoCell,
+      editAs: AnchorEditAs.TwoCell,
+      fromRow: viewport.rowStart,
+      fromCol: viewport.colStart,
+      fromRowOff: 0,
+      fromColOff: 0,
+      toRow: 0,
+      toCol: 0,
+      toRowOff: 0,
+      toColOff: 0,
+      cx: DEFAULT_FRAME_CX,
+      cy: DEFAULT_FRAME_CY,
+    };
+    return placementForPixels(store, origin, {
+      x: Math.max(first.x, (first.x + last.x + last.w - w) / 2),
+      y: Math.max(first.y, (first.y + last.y + last.h - h) / 2),
+      w,
+      h,
+    });
+  } catch {
+    return fallback;
+  }
+};
 
 export type RibbonChartAction = SessionChartKind | 'recommended';
 
@@ -115,109 +364,85 @@ export function inferRecommendedChartKind(range: Range): SessionChartKind {
 
 export interface CreateRibbonChartFromSelectionOptions {
   store: SpreadsheetStore;
+  wb: WorkbookHandle;
   range: Range;
   /** Chart kind or `'recommended'` to auto-pick via [[inferRecommendedChartKind]]. */
   action: RibbonChartAction;
   history?: History | null;
-  /** Prefix used to derive the chart id, so different hosts can spawn parallel
-   *  overlays without colliding. Defaults to `'ribbon-chart'`. */
-  idPrefix?: string;
 }
 
-/** Spawn a session chart overlay anchored to the current selection using the
- *  same positioning heuristics every ribbon host shares. */
+/** Insert a chart of the selection the way every ribbon host does. */
 export function createRibbonChartFromSelection({
   store,
+  wb,
   range,
   action,
   history = null,
-  idPrefix = 'ribbon-chart',
 }: CreateRibbonChartFromSelectionOptions): SessionChart | null {
   const kind = action === 'recommended' ? inferRecommendedChartKind(range) : action;
-  const count = store.getState().charts.charts.length;
-  return createSessionChart(
-    store,
-    range,
-    {
-      id: `${idPrefix}-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}-${count}`,
-      kind,
-      title: null,
-      x: 340 + (count % 3) * 24,
-      y: 96 + (count % 3) * 24,
-      w: 360,
-      h: 220,
-    },
-    history,
-  );
+  return createSessionChart(store, range, { wb, kind }, history);
 }
 
-function defaultTitle(kind: SessionChartKind): string {
-  if (kind === 'bar') return 'Bar chart';
-  if (kind === 'line') return 'Line chart';
-  if (kind === 'area') return 'Area chart';
-  if (kind === 'pie') return 'Pie chart';
-  if (kind === 'doughnut') return 'Doughnut chart';
-  if (kind === 'scatter') return 'Scatter chart';
-  return 'Column chart';
-}
-
-/** Create or replace a session chart overlay for `range`. This is UI-owned
- *  until the engine exposes writable chart definitions; host apps can call
- *  the same command from ribbons, menus, or custom Quick Analysis surfaces. */
+/**
+ * Create a chart of `range` in the workbook and project it into the store.
+ * Settings the options leave out take the values Excel's template writes; an
+ * omitted title is Excel's automatic one and an empty title is none. Returns
+ * null, creating nothing, when the engine has no chart support, the sheet is
+ * protected, the policy refuses, or the engine rejects a step.
+ */
 export function createSessionChart(
   store: SpreadsheetStore,
   range: Range,
-  options: CreateSessionChartOptions = {},
+  options: CreateSessionChartOptions,
   history: History | null = null,
-  authorization: ChartMutationAuthorization = {},
 ): SessionChart | null {
-  const kind = options.kind ?? 'column';
-  const id = options.id ?? defaultChartId(range, kind);
-  const previous = sessionChartById(store.getState(), id);
+  const { wb, kind = 'column', anchor, authorization, ...settings } = options;
+  if (!wb.capabilities.charts) return null;
+  const sheet = range.sheet;
+  const placement = { ...defaultPlacement(store), ...anchor };
+  const row = placement.row ?? 0;
+  const col = placement.col ?? 0;
   const intent = chartIntent(
-    previous ? [previous.source, range] : [range],
+    [{ sheet, r0: row, c0: col, r1: row, c1: col }, range],
     'chartInsert',
     authorization,
   );
   if (!canMutateChart(store, intent)) return null;
-  const chart: SessionChart = {
-    id,
-    kind,
-    source: { ...range },
-    ...(options.grouping !== undefined ? { grouping: options.grouping } : {}),
-    ...(options.seriesDirection !== undefined ? { seriesDirection: options.seriesDirection } : {}),
-    ...(options.emptyCells !== undefined ? { emptyCells: options.emptyCells } : {}),
-    ...(options.scatterStyle !== undefined ? { scatterStyle: options.scatterStyle } : {}),
-    ...(options.headerRow !== undefined ? { headerRow: options.headerRow } : {}),
-    ...(options.headerColumn !== undefined ? { headerColumn: options.headerColumn } : {}),
-    ...(options.gapWidth !== undefined ? { gapWidth: options.gapWidth } : {}),
-    ...(options.overlap !== undefined ? { overlap: options.overlap } : {}),
-    ...(options.firstSliceAngle !== undefined ? { firstSliceAngle: options.firstSliceAngle } : {}),
-    ...(options.holeSize !== undefined ? { holeSize: options.holeSize } : {}),
-    ...(options.filter !== undefined ? { filter: options.filter } : {}),
-    ...(options.dataLabels !== undefined ? { dataLabels: options.dataLabels } : {}),
-    ...(options.seriesStyles !== undefined ? { seriesStyles: options.seriesStyles } : {}),
-    ...(options.varyColors !== undefined ? { varyColors: options.varyColors } : {}),
-    ...(options.palette !== undefined ? { palette: [...options.palette] } : {}),
-    ...(options.legend !== undefined ? { legend: { ...options.legend } } : {}),
-    ...(options.xAxis !== undefined ? { xAxis: { ...options.xAxis } } : {}),
-    ...(options.yAxis !== undefined ? { yAxis: { ...options.yAxis } } : {}),
-    ...(options.title !== null ? { title: options.title ?? defaultTitle(kind) } : {}),
-    ...(options.color !== undefined ? { color: options.color } : {}),
-    ...(options.x !== undefined ? { x: options.x } : {}),
-    ...(options.y !== undefined ? { y: options.y } : {}),
-    ...(options.w !== undefined ? { w: options.w } : {}),
-    ...(options.h !== undefined ? { h: options.h } : {}),
-  };
-  recordChartsChange(
+  const spec: ChartSpec = { ...settings, kind };
+  const objectId = wb.insertChart(sheet, {
+    ...chartInsertOptions(spec),
+    source: sourceRef(wb, range),
+    // Without a title text the template's automatic title stays until the spec is applied.
+    ...(typeof spec.title === 'string' ? { title: spec.title } : {}),
+    placement,
+  });
+  if (objectId === null) return null;
+  const info = wb.getChart(sheet, objectId);
+  const template = info ? chartSpecFromEngine(info, wb.getChartData(sheet, objectId)) : null;
+  const snapshot =
+    template && applyChartSpec(wb, sheet, objectId, createdSpec(template, spec))
+      ? wb.snapshotDrawing(sheet, objectId)
+      : null;
+  if (!snapshot) {
+    wb.removeDrawing(sheet, objectId);
+    return null;
+  }
+  const created = syncChartFromEngine(wb, store, sheet, objectId);
+  if (!created) return null;
+  pushChartHistory(
     history,
     store,
-    () => {
-      mutators.upsertChart(store, chart);
-    },
     intent,
+    () => {
+      if (!wb.removeDrawing(sheet, objectId)) throw new Error('chart create undo failed');
+      syncChartFromEngine(wb, store, sheet, objectId);
+    },
+    () => {
+      if (wb.restoreDrawing(sheet, snapshot) === null) throw new Error('chart create redo failed');
+      syncChartFromEngine(wb, store, sheet, objectId);
+    },
   );
-  return cloneSessionChart(chart);
+  return cloneSessionChart(created);
 }
 
 export function listSessionCharts(state: {
@@ -234,168 +459,272 @@ export function sessionChartById(
   return chart ? cloneSessionChart(chart) : null;
 }
 
+/** Charts whose data range intersects `range`; charts with no single data
+ *  range are never included. */
 export function sessionChartsForRange(
   state: { charts: { charts: readonly SessionChart[] } },
   range: Range,
 ): readonly SessionChart[] {
   return state.charts.charts
-    .filter((chart) => rangesIntersect(chart.source, range))
+    .filter((chart) => chart.source !== undefined && rangesIntersect(chart.source, range))
     .map(cloneSessionChart);
 }
 
-/** Remove a session chart overlay by id. */
+/**
+ * Run `edit` on a chart as one undo step that restores the chart as it was.
+ * When `edit` fails the chart is restored at once and null is returned.
+ */
+const editChart = (
+  store: SpreadsheetStore,
+  chart: SessionChart,
+  history: History | null,
+  wb: WorkbookHandle,
+  intent: OperationIntent,
+  label: string,
+  edit: () => boolean,
+): SessionChart | null => {
+  const { sheet, nativeObjectId } = chart;
+  const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
+  const before = wb.snapshotDrawing(sheet, nativeObjectId);
+  if (!before) return null;
+  const after = edit() ? wb.snapshotDrawing(sheet, nativeObjectId) : null;
+  if (!after) {
+    wb.restoreDrawing(sheet, before);
+    sync();
+    return null;
+  }
+  const updated = sync();
+  pushChartHistory(
+    history,
+    store,
+    intent,
+    () => {
+      if (wb.restoreDrawing(sheet, before) === null) throw new Error(`chart ${label} undo failed`);
+      sync();
+    },
+    () => {
+      if (wb.restoreDrawing(sheet, after) === null) throw new Error(`chart ${label} redo failed`);
+      sync();
+    },
+  );
+  return updated && cloneSessionChart(updated);
+};
+
+/** Delete one chart and its projection; Undo restores it under the same id. */
+const removeChart = (
+  store: SpreadsheetStore,
+  chart: SessionChart,
+  history: History | null,
+  wb: WorkbookHandle,
+  intent: OperationIntent,
+): boolean => {
+  const { sheet, nativeObjectId } = chart;
+  const snapshot = wb.snapshotDrawing(sheet, nativeObjectId);
+  if (!snapshot || !wb.removeDrawing(sheet, nativeObjectId)) return false;
+  syncChartFromEngine(wb, store, sheet, nativeObjectId);
+  pushChartHistory(
+    history,
+    store,
+    intent,
+    () => {
+      if (wb.restoreDrawing(sheet, snapshot) === null) throw new Error('chart delete undo failed');
+      syncChartFromEngine(wb, store, sheet, nativeObjectId);
+    },
+    () => {
+      if (!wb.removeDrawing(sheet, nativeObjectId)) throw new Error('chart delete redo failed');
+      syncChartFromEngine(wb, store, sheet, nativeObjectId);
+    },
+  );
+  return true;
+};
+
+/** Delete a chart from the workbook by id. */
 export function clearSessionChart(
   store: SpreadsheetStore,
   id: string,
-  history: History | null = null,
+  history: History | null,
+  wb: WorkbookHandle,
   authorization: ChartMutationAuthorization = {},
 ): boolean {
   const chart = sessionChartById(store.getState(), id);
-  if (!chart) return false;
-  const intent = chartIntent([chart.source], 'chartDelete', authorization);
+  if (!chart || !wb.capabilities.charts) return false;
+  const intent = chartIntent(chartCells(chart), 'chartDelete', authorization);
   if (!canMutateChart(store, intent)) return false;
-  recordChartsChange(
-    history,
-    store,
-    () => {
-      mutators.removeChart(store, id);
-    },
-    intent,
-  );
-  return true;
+  return removeChart(store, chart, history, wb, intent);
 }
 
-/** Patch placement or visual metadata for an existing session chart. */
+/**
+ * Change a chart's settings, data range or placement. A pure move or resize
+ * re-anchors the chart; any other change is undone by restoring the chart as
+ * it was. When the engine rejects a step the chart is restored and null is
+ * returned. A chart drawn as a placeholder can only be moved or resized.
+ */
 export function updateSessionChart(
   store: SpreadsheetStore,
   id: string,
   patch: SessionChartPatch,
-  history: History | null = null,
+  history: History | null,
+  wb: WorkbookHandle,
   authorization: ChartMutationAuthorization = {},
 ): SessionChart | null {
   const chart = sessionChartById(store.getState(), id);
-  if (!chart) return null;
+  if (!chart || !wb.capabilities.charts) return null;
+  const { source, anchor, ...settings } = patch;
   const intent = chartIntent(
-    patch.source ? [chart.source, patch.source] : [chart.source],
+    source ? [...chartCells(chart), source] : chartCells(chart),
     'chartUpdate',
     authorization,
   );
   if (!canMutateChart(store, intent)) return null;
-  recordChartsChange(
-    history,
-    store,
-    () => {
-      mutators.updateChart(store, id, patch);
-    },
-    intent,
-  );
-  return sessionChartById(store.getState(), id);
-}
+  const { sheet, nativeObjectId } = chart;
+  const placement = anchor
+    ? {
+        anchorKind: chart.nativeAnchor.anchorKind,
+        editAs: chart.nativeAnchor.editAs,
+        ...anchor,
+      }
+    : null;
+  const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
 
-/** Remove every session chart whose source range intersects `range`. */
-export function clearSessionChartsInRange(
-  store: SpreadsheetStore,
-  range: Range,
-  history: History | null = null,
-  authorization: ChartMutationAuthorization = {},
-): number {
-  const charts = sessionChartsForRange(store.getState(), range);
-  const count = charts.length;
-  if (count === 0) return 0;
-  const intent = chartIntent(
-    charts.map((chart) => chart.source),
-    'chartDelete',
-    authorization,
-  );
-  if (!canMutateChart(store, intent)) return 0;
-  recordChartsChange(
-    history,
-    store,
-    () => {
-      mutators.clearChartsInRange(store, range);
-    },
-    intent,
-  );
-  return count;
-}
-
-/** Build the reusable chart model from the cells covered by a session chart.
- * The adapter deliberately stops at a bounded range so a malformed or
- * accidental whole-sheet chart cannot block the UI. */
-export function sessionChartData(
-  state: State,
-  chartOrRange: SessionChart | Range,
-  options: Partial<Pick<ChartSpec, 'kind' | 'seriesDirection' | 'headerRow' | 'headerColumn'>> = {},
-): ChartData {
-  const chart = ('kind' in chartOrRange ? chartOrRange : undefined) as SessionChart | undefined;
-  const range: Range = chart ? chart.source : (chartOrRange as Range);
-  const kind = options.kind ?? chart?.kind ?? 'column';
-  const seriesDirection = options.seriesDirection ?? chart?.seriesDirection;
-  const headerRow = options.headerRow ?? chart?.headerRow;
-  const headerColumn = options.headerColumn ?? chart?.headerColumn;
-  if (range.sheet !== state.data.sheetIndex || rangeArea(range) > MAX_SESSION_CHART_SERIES_CELLS) {
-    return chartDataFromTable([], { kind, seriesDirection, headerRow, headerColumn });
+  if (Object.keys(settings).length === 0 && !source) {
+    if (!placement) return chart;
+    const before = placementForAnchor(store, chart.nativeAnchor);
+    if (!wb.setDrawingAnchor(sheet, nativeObjectId, placement)) return null;
+    const moved = sync();
+    pushChartHistory(
+      history,
+      store,
+      intent,
+      () => {
+        if (!wb.setDrawingAnchor(sheet, nativeObjectId, before)) {
+          throw new Error('chart move undo failed');
+        }
+        sync();
+      },
+      () => {
+        if (!wb.setDrawingAnchor(sheet, nativeObjectId, placement)) {
+          throw new Error('chart move redo failed');
+        }
+        sync();
+      },
+    );
+    return moved && cloneSessionChart(moved);
   }
 
-  const table: ChartTableCell[][] = [];
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    const values: ChartTableCell[] = [];
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      const value = state.data.cells.get(`${range.sheet}:${row}:${col}`)?.value;
-      if (!value || value.kind === 'blank' || value.kind === 'error') values.push(null);
-      else if (value.kind === 'number')
-        values.push(Number.isFinite(value.value) ? value.value : null);
-      else if (value.kind === 'text') values.push(value.value);
-      else values.push(value.value);
-    }
-    table.push(values);
-  }
-  return chartDataFromTable(table, { kind, seriesDirection, headerRow, headerColumn });
+  if (chart.kind === 'unsupported') return null;
+  const target = patchedSpec(specOf(chart), settings as Partial<ChartSpec>);
+  const split = chartInsertOptions(target);
+  return editChart(
+    store,
+    chart,
+    history,
+    wb,
+    intent,
+    'update',
+    () =>
+      (!placement || wb.setDrawingAnchor(sheet, nativeObjectId, placement)) &&
+      (!source ||
+        sameRange(source, chart.source) ||
+        wb.setChartSource(
+          sheet,
+          nativeObjectId,
+          sourceRef(wb, source),
+          split.direction,
+          split.headerRow,
+          split.headerColumn,
+        )) &&
+      applyChartSpec(wb, sheet, nativeObjectId, target),
+  );
 }
 
 /**
- * @deprecated Use `sessionChartData` for multi-series chart data. This helper
- * retains the original summed-column behavior for compatibility.
+ * Append a series to a chart; undo restores the chart as it was. Returns null,
+ * changing nothing, when the chart cannot be drawn, the sheet is protected, the
+ * policy refuses, or the engine rejects the references.
  */
-export function sessionChartSeries(
-  state: State,
-  chartOrRange: SessionChart | Range,
-): readonly SessionChartSeriesPoint[] {
-  const range = 'source' in chartOrRange ? chartOrRange.source : chartOrRange;
-  if (range.sheet !== state.data.sheetIndex) return [];
-  if (rangeArea(range) > MAX_SESSION_CHART_SERIES_CELLS) return [];
-  const out: SessionChartSeriesPoint[] = [];
-  if (range.r0 === range.r1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      out.push({
-        label: colLetter(col),
-        value: cellNumber(state, range.sheet, range.r0, col) ?? 0,
-      });
-    }
-    return out;
-  }
-  if (range.c0 === range.c1) {
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      out.push({
-        label: String(row + 1),
-        value: cellNumber(state, range.sheet, row, range.c0) ?? 0,
-      });
-    }
-    return out;
-  }
-  for (let col = range.c0; col <= range.c1; col += 1) {
-    let sum = 0;
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      sum += cellNumber(state, range.sheet, row, col) ?? 0;
-    }
-    out.push({ label: colLetter(col), value: sum });
-  }
-  return out;
+export function addSessionChartSeries(
+  store: SpreadsheetStore,
+  id: string,
+  series: SessionChartSeriesInput,
+  history: History | null,
+  wb: WorkbookHandle,
+  authorization: ChartMutationAuthorization = {},
+): SessionChart | null {
+  const chart = sessionChartById(store.getState(), id);
+  if (!chart || !wb.capabilities.charts || chart.kind === 'unsupported') return null;
+  const { name, values, categories, x } = series;
+  const refs = [name, values, categories, x].filter((range) => range !== undefined);
+  const intent = chartIntent([...chartCells(chart), ...refs], 'chartUpdate', authorization);
+  if (!canMutateChart(store, intent)) return null;
+  const patch: ChartSeriesPatch =
+    chart.kind === 'scatter'
+      ? { y: sourceRef(wb, values), ...(x ? { x: sourceRef(wb, x) } : {}) }
+      : {
+          values: sourceRef(wb, values),
+          ...(categories ? { categories: sourceRef(wb, categories) } : {}),
+        };
+  if (name) patch.name = sourceRef(wb, name);
+  const { sheet, nativeObjectId } = chart;
+  return editChart(
+    store,
+    chart,
+    history,
+    wb,
+    intent,
+    'series add',
+    () => wb.addChartSeries(sheet, nativeObjectId, 0, patch) !== null,
+  );
 }
 
-const cellNumber = (state: State, sheet: number, row: number, col: number): number | null => {
-  const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
-  return cell?.value.kind === 'number' && Number.isFinite(cell.value.value)
-    ? cell.value.value
-    : null;
-};
+/**
+ * Remove the series `seriesId` from a chart; undo restores the chart as it
+ * was. A chart keeps its last series: removing it returns null.
+ */
+export function removeSessionChartSeries(
+  store: SpreadsheetStore,
+  id: string,
+  seriesId: string,
+  history: History | null,
+  wb: WorkbookHandle,
+  authorization: ChartMutationAuthorization = {},
+): SessionChart | null {
+  const chart = sessionChartById(store.getState(), id);
+  const seriesIdx = chartSeriesIdx(seriesId);
+  if (!chart || seriesIdx === null || !wb.capabilities.charts || chart.kind === 'unsupported') {
+    return null;
+  }
+  const { sheet, nativeObjectId } = chart;
+  const plot = wb.getChart(sheet, nativeObjectId)?.plots[0];
+  if (!plot || plot.series.length < 2 || !plot.series.some((entry) => entry.idx === seriesIdx)) {
+    return null;
+  }
+  const intent = chartIntent(chartCells(chart), 'chartUpdate', authorization);
+  if (!canMutateChart(store, intent)) return null;
+  return editChart(store, chart, history, wb, intent, 'series remove', () =>
+    wb.removeChartSeries(sheet, nativeObjectId, 0, seriesIdx),
+  );
+}
+
+/** Delete every chart whose data range intersects `range`, as one undo step. */
+export function clearSessionChartsInRange(
+  store: SpreadsheetStore,
+  range: Range,
+  history: History | null,
+  wb: WorkbookHandle,
+  authorization: ChartMutationAuthorization = {},
+): number {
+  const charts = sessionChartsForRange(store.getState(), range);
+  if (charts.length === 0 || !wb.capabilities.charts) return 0;
+  const intent = chartIntent(charts.flatMap(chartCells), 'chartDelete', authorization);
+  if (!canMutateChart(store, intent)) return 0;
+  let count = 0;
+  history?.begin();
+  try {
+    for (const chart of charts) {
+      if (removeChart(store, chart, history, wb, intent)) count += 1;
+    }
+  } finally {
+    history?.end();
+  }
+  return count;
+}

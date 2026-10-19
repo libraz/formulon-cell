@@ -1,8 +1,10 @@
 // @vitest-environment node
 
+import { AnchorEditAs, AnchorKind, ChartInsertKind } from '@libraz/formulon';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import { deleteRows, insertCols, insertRows } from '../../../src/commands/structure.js';
+import { deleteCols, deleteRows, insertCols, insertRows } from '../../../src/commands/structure.js';
+import { hydrateChartsFromEngine } from '../../../src/engine/charts-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -148,5 +150,74 @@ describe('native row/column structure parity', () => {
     insertCols(store, wb, null, 4, 1);
     expect(store.getState().format.formats.get('0:5:4')?.fontSize).toBe(22);
     expect(store.getState().layout.colWidths.get(4)).toBe(120);
+  });
+  it('restores the charts a row delete removes and re-reads the ones it moves', () => {
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'v');
+    wb.setText({ sheet: 0, row: 1, col: 0 }, 'a');
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 1);
+    wb.setText({ sheet: 0, row: 2, col: 0 }, 'b');
+    wb.setNumber({ sheet: 0, row: 2, col: 1 }, 2);
+    const insert = (row: number, heightEmu: number): number => {
+      const id = wb.insertChart(0, {
+        kind: ChartInsertKind.Column,
+        source: 'Sheet1!$A$1:$B$3',
+        placement: {
+          anchorKind: AnchorKind.TwoCell,
+          editAs: AnchorEditAs.TwoCell,
+          row,
+          col: 4,
+          widthEmu: 1_905_000,
+          heightEmu,
+        },
+      });
+      if (id === null) throw new Error('chart was not inserted');
+      return id;
+    };
+    // Wholly inside rows 10..14, so the delete removes it; the other starts below.
+    const inside = insert(10, 380_000);
+    const below = insert(20, 380_000);
+    hydrateChartsFromEngine(wb, store, 0);
+    const charts = (): { id: number; fromRow: number }[] =>
+      store.getState().charts.charts.map((chart) => ({
+        id: chart.nativeObjectId,
+        fromRow: chart.nativeAnchor.fromRow,
+      }));
+    expect(charts()).toEqual([
+      { id: inside, fromRow: 10 },
+      { id: below, fromRow: 20 },
+    ]);
+
+    const history = new History();
+    wb.attachHistory(history);
+    deleteRows(store, wb, history, 10, 5);
+    expect(charts()).toEqual([{ id: below, fromRow: 15 }]);
+
+    history.undo();
+    expect(charts()).toEqual([
+      { id: inside, fromRow: 10 },
+      { id: below, fromRow: 20 },
+    ]);
+    expect(wb.getChart(0, inside)?.objectId).toBe(inside);
+
+    history.redo();
+    expect(charts()).toEqual([{ id: below, fromRow: 15 }]);
+  });
+
+  it('keeps a chart a column delete only cuts through', () => {
+    wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    wb.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
+    const id = wb.insertChart(0, {
+      kind: ChartInsertKind.Line,
+      source: 'Sheet1!$A$1:$A$2',
+      placement: { anchorKind: AnchorKind.TwoCell, row: 3, col: 2 },
+    });
+    if (id === null) throw new Error('chart was not inserted');
+    hydrateChartsFromEngine(wb, store, 0);
+    const history = new History();
+    wb.attachHistory(history);
+    deleteCols(store, wb, history, 3, 1);
+    expect(store.getState().charts.charts.map((chart) => chart.nativeObjectId)).toEqual([id]);
+    history.undo();
+    expect(store.getState().charts.charts.map((chart) => chart.nativeObjectId)).toEqual([id]);
   });
 });

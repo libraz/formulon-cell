@@ -81,6 +81,19 @@ export interface DataObjectsStrings {
     showValuesAsRunningTotalInRow: string;
     showValuesAsRunningTotalInColumn: string;
     showValuesAsIndex: string;
+    showValuesAsPercentOf: string;
+    showValuesAsPercentOfParentRow: string;
+    showValuesAsPercentOfParentColumn: string;
+    showValuesAsPercentOfParentTotal: string;
+    showValuesAsDifferenceFrom: string;
+    showValuesAsPercentDifferenceFrom: string;
+    showValuesAsPercentRunningTotal: string;
+    showValuesAsRankAscending: string;
+    showValuesAsRankDescending: string;
+    showValuesAsBaseField: string;
+    showValuesAsBaseItem: string;
+    showValuesAsBaseItemPrevious: string;
+    showValuesAsBaseItemNext: string;
     rowSort: string;
     columnSort: string;
     sortNone: string;
@@ -195,7 +208,6 @@ export interface DataObjectsStrings {
       formatAsTable: string;
       pivotLayouts: string;
       pivotAuthoring: string;
-      sessionCharts: string;
       chartsDrawings: string;
       chartAuthoring: string;
       externalLinks: string;
@@ -220,7 +232,6 @@ export interface DataObjectsStrings {
       formatAsTable: string;
       pivotLayouts: string;
       pivotAuthoring: string;
-      sessionCharts: string;
       chartsDrawings: string;
       mediaPickers: string;
       screenshotCurrentView: string;
@@ -303,12 +314,37 @@ export interface DataObjectsStrings {
     shapeSquare: string;
     shapeDiamond: string;
     shapeTriangle: string;
+    shapeX: string;
+    shapeStar: string;
+    shapePlus: string;
+    shapeDot: string;
+    shapeDash: string;
+    smoothLine: string;
+    titleAutomatic: string;
+    /** The automatic title of a chart with several series. */
+    chartTitle: string;
+    /** The automatic title of an axis. */
+    axisTitle: string;
     markerSize: string;
     categories: string;
     selectAll: string;
     clearAll: string;
     noSeries: string;
     noCategories: string;
+    /** Message drawn inside a chart whose type cannot be rendered. */
+    unsupportedChart: string;
+    /** Why a PivotChart's series and data range settings are disabled. */
+    pivotChartLocked: string;
+    addSeries: string;
+    removeSeries: string;
+    addSeriesConfirm: string;
+    seriesNameRef: string;
+    seriesValuesRef: string;
+    seriesXValuesRef: string;
+    seriesYValuesRef: string;
+    axisLabelsRef: string;
+    invalidReference: string;
+    lastSeriesLocked: string;
     palette: string;
     paletteOffice: string;
     paletteBlue: string;

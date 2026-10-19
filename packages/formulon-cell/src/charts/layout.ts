@@ -13,8 +13,8 @@ import {
   validateLogBase,
 } from './scales.js';
 import { type ScatterLineSample, scatterLineSegments } from './scatter-lines.js';
+import { automaticPalette } from './series-colors.js';
 import {
-  DEFAULT_PALETTE,
   dashArray,
   fillColor,
   fillOpacity,
@@ -28,7 +28,6 @@ import type {
   CategoryChartData,
   ChartAxisSpec,
   ChartData,
-  ChartEmptyCellMode,
   ChartGrouping,
   ChartKind,
   ChartPrimitive,
@@ -104,37 +103,136 @@ const primitive = (
   ...(text === undefined ? {} : { text }),
 });
 
-type ResolvedEmptyCellMode = Exclude<ChartEmptyCellMode, undefined>;
-
-/**
- * Resolve Excel's chart-specific blank-cell policy once for every layout.
- *
- * The OOXML chart rules allow span only for ordinary line charts. Stacked
- * line/area charts always treat blanks as zero, while bar, column, and
- * circular charts have no span representation in this scene model. Scatter
- * line modes retain span so a blank source point can be skipped between
- * adjacent finite points.
- */
-const resolveEmptyCellMode = (spec: ChartSpec): ResolvedEmptyCellMode => {
-  const requested = spec.emptyCells ?? 'gap';
-  if (spec.kind === 'scatter') return requested;
-  if (spec.kind === 'bar' || spec.kind === 'column' || isCircularKind(spec.kind)) {
-    return requested === 'zero' ? 'zero' : 'gap';
+/** Re-attach the engine's per-point states and series formats, which the filtered view does not carry. */
+const withPointStates = (view: PreparedChartData, source: ChartData): PreparedChartData => {
+  if (view.data.domain === 'category' && source.domain === 'category') {
+    const categoryView = view as CategoryChartView;
+    return {
+      ...categoryView,
+      data: {
+        ...categoryView.data,
+        series: categoryView.data.series.map((series, index) => {
+          const original = source.series[categoryView.originalSeriesIndices[index] ?? index];
+          const states = original?.states;
+          return {
+            ...series,
+            ...(original?.formatCode === undefined ? {} : { formatCode: original.formatCode }),
+            ...(states
+              ? { states: categoryView.originalCategoryIndices.map((i) => states[i] ?? 'value') }
+              : {}),
+          };
+        }),
+      },
+    };
   }
-  if (
-    (spec.kind === 'line' || spec.kind === 'area') &&
-    spec.grouping !== undefined &&
-    spec.grouping !== 'clustered'
-  ) {
-    return 'zero';
+  if (view.data.domain === 'xy' && source.domain === 'xy') {
+    const xyView = view as XYChartView;
+    return {
+      ...xyView,
+      data: {
+        ...xyView.data,
+        series: xyView.data.series.map((series, seriesIndex) => {
+          const original =
+            source.series[xyView.originalSeriesIndices[seriesIndex] ?? seriesIndex]?.points;
+          const sourceSeries =
+            source.series[xyView.originalSeriesIndices[seriesIndex] ?? seriesIndex];
+          return {
+            ...series,
+            ...(sourceSeries?.formatCode === undefined
+              ? {}
+              : { formatCode: sourceSeries.formatCode }),
+            ...(sourceSeries?.xFormatCode === undefined
+              ? {}
+              : { xFormatCode: sourceSeries.xFormatCode }),
+            points: series.points.map((point, pointIndex) => {
+              const state =
+                original?.[xyView.originalPointIndices[seriesIndex]?.[pointIndex] ?? pointIndex]
+                  ?.state;
+              return state === undefined ? point : { ...point, state };
+            }),
+          };
+        }),
+      },
+    };
   }
-  if (spec.kind === 'area' && requested === 'span') return 'gap';
-  return requested;
+  return view;
 };
+
+/** Series-level labels override the chart-wide labels; hidden series labels stay hidden. */
+const labelSpecFor = (
+  spec: ChartSpec,
+  series: { readonly id: string; readonly formatCode?: string },
+): ChartSpec['dataLabels'] => {
+  const labels =
+    spec.seriesStyles?.find((style) => style.seriesId === series.id)?.dataLabels ?? spec.dataLabels;
+  // The percentage part derives its own code from `numberFormat`, so only value labels inherit.
+  if (!labels || labels.showPercentage || !series.formatCode) return labels;
+  if (labels.numberFormat !== undefined && labels.numberFormat.trim().length > 0) return labels;
+  return { ...labels, numberFormat: series.formatCode };
+};
+
+const hasFormat = (code: string | undefined): code is string =>
+  code !== undefined && code.trim().length > 0 && code.trim().toLowerCase() !== 'general';
+
+/** Format numeric category labels with the engine's category format code. */
+const withCategoryFormat = (
+  view: PreparedChartData,
+  source: ChartData,
+  locale: string,
+  formatter: ChartValueFormatter | undefined,
+): PreparedChartData => {
+  if (view.data.domain !== 'category' || source.domain !== 'category') return view;
+  const code = source.categoryFormatCode;
+  if (!hasFormat(code)) return view;
+  const categoryView = view as CategoryChartView;
+  return {
+    ...categoryView,
+    data: {
+      ...categoryView.data,
+      categories: categoryView.data.categories.map((label) => {
+        const value = label.trim().length > 0 ? Number(label) : Number.NaN;
+        return Number.isFinite(value)
+          ? (formatChartValue(value, code, locale, formatter) ?? label)
+          : label;
+      }),
+    },
+  };
+};
+
+/** Default the value-axis format to the first plotted series' format code. */
+const withValueAxisFormat = (spec: ChartSpec, view: PreparedChartData): ChartSpec => {
+  if (view.data.domain === 'xy') {
+    // A scatter chart's horizontal axis follows the x values' format, its vertical one the y values'.
+    const first = view.data.series[0];
+    const linked = (axis: ChartAxisSpec | undefined, code: string | undefined) =>
+      hasFormat(code) && !((axis?.numberFormat?.trim().length ?? 0) > 0)
+        ? { ...axis, numberFormat: code }
+        : axis;
+    const xAxis = linked(spec.xAxis, first?.xFormatCode);
+    const yAxis = linked(spec.yAxis, first?.formatCode);
+    return {
+      ...spec,
+      ...(xAxis === undefined ? {} : { xAxis }),
+      ...(yAxis === undefined ? {} : { yAxis }),
+    };
+  }
+  if (view.data.domain !== 'category' || isCircularKind(spec.kind)) return spec;
+  if (spec.grouping === 'percent-stacked') return spec;
+  const code = view.data.series[0]?.formatCode;
+  if (!hasFormat(code)) return spec;
+  const key = spec.kind === 'bar' ? 'xAxis' : 'yAxis';
+  const axis = spec[key];
+  if ((axis?.numberFormat?.trim().length ?? 0) > 0) return spec;
+  return { ...spec, [key]: { ...axis, numberFormat: code } };
+};
+
+const hasDataLabels = (spec: ChartSpec): boolean =>
+  [spec.dataLabels, ...(spec.seriesStyles?.map((style) => style.dataLabels) ?? [])].some(
+    (labels) => labels !== undefined && labels.visible !== false,
+  );
 
 const dataHasValues = (
   data: ChartData,
-  emptyCells: ResolvedEmptyCellMode,
   kind: ChartKind,
   numericLogBase?: number,
   scatterLogBases?: { readonly x?: number; readonly y?: number },
@@ -154,18 +252,11 @@ const dataHasValues = (
         series.values.some((value) => value !== null && Number.isFinite(value) && value !== 0),
       );
     }
-    return data.series.some((series) =>
-      series.values.some(
-        (value) =>
-          valueIsPlottable(value) ||
-          (value === null && emptyCells === 'zero' && numericLogBase === undefined),
-      ),
-    );
+    return data.series.some((series) => series.values.some(valueIsPlottable));
   }
   return data.series.some((series) =>
     series.points.some((point) => {
-      const x = point.x === null && emptyCells === 'zero' ? 0 : point.x;
-      const y = point.y === null && emptyCells === 'zero' ? 0 : point.y;
+      const { x, y } = point;
       return (
         x !== null &&
         y !== null &&
@@ -178,19 +269,8 @@ const dataHasValues = (
   );
 };
 
-const valueFor = (value: number | null, emptyCells: ResolvedEmptyCellMode): number | null => {
-  if (value !== null && Number.isFinite(value)) return value;
-  if (value === null) return emptyCells === 'zero' ? 0 : null;
-  return null;
-};
-
-const scatterPointFor = (
-  point: XYChartData['series'][number]['points'][number],
-  emptyCells: ResolvedEmptyCellMode,
-): XYChartData['series'][number]['points'][number] => ({
-  x: point.x === null && emptyCells === 'zero' ? 0 : point.x,
-  y: point.y === null && emptyCells === 'zero' ? 0 : point.y,
-});
+const valueFor = (value: number | null): number | null =>
+  value !== null && Number.isFinite(value) ? value : null;
 
 const boundedOption = (
   value: number | undefined,
@@ -205,11 +285,67 @@ const saturatedAdd = (left: number, right: number): number => {
   return left >= 0 && right >= 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
 };
 
-const paletteFor = (spec: ChartSpec): readonly string[] =>
-  spec.palette && spec.palette.length > 0 ? spec.palette : DEFAULT_PALETTE;
+/** The spec's palette, else Excel's automatic colours in the workbook theme. */
+const paletteFor = (spec: ChartSpec, accents: readonly string[] | undefined): readonly string[] =>
+  spec.palette && spec.palette.length > 0 ? spec.palette : automaticPalette(accents);
 
 const colorFor = (palette: readonly string[], index: number): string =>
-  palette[((index % palette.length) + palette.length) % palette.length] ?? DEFAULT_PALETTE[0];
+  palette[((index % palette.length) + palette.length) % palette.length] ?? '#156082';
+
+/** A series' key colour: a line or scatter series shows its line, or its markers when it has none. */
+const keyColor = (spec: ChartSpec, style: ReturnType<typeof resolveChartStyle>): string => {
+  if (spec.kind !== 'line' && spec.kind !== 'scatter') return fillColor(style.fill, style.color);
+  const lineless = spec.kind === 'scatter' && (spec.scatterStyle ?? 'marker') === 'marker';
+  return (lineless ? style.marker.fill?.color : style.line?.color) ?? style.color;
+};
+
+/**
+ * The text a chart title shows: its own text, nothing for `''`, and for Excel's
+ * automatic title the name of a chart's only series, else `chartTitle`.
+ */
+export const chartTitleText = (
+  title: ChartSpec['title'],
+  data: ChartData,
+  chartTitle = 'Chart Title',
+): string | undefined => {
+  if (title === undefined) return undefined;
+  if (typeof title === 'string') return title.length > 0 ? title : undefined;
+  const only = data.series.length === 1 ? data.series[0]?.name : undefined;
+  return only !== undefined && only.length > 0 ? only : chartTitle;
+};
+
+/** The text an axis title shows: its own text, or `axisTitle` for Excel's automatic title. */
+export const axisTitleText = (
+  title: ChartAxisSpec['title'],
+  axisTitle = 'Axis Title',
+): string | undefined => {
+  if (title === undefined) return undefined;
+  if (typeof title === 'string') return title.length > 0 ? title : undefined;
+  return axisTitle;
+};
+
+/** Whether a line or scatter series draws Excel's smoothed line. */
+const smoothed = (spec: ChartSpec, seriesId: string): boolean =>
+  (spec.kind === 'line' || spec.kind === 'scatter') &&
+  spec.seriesStyles?.find((style) => style.seriesId === seriesId)?.smooth === true;
+
+/**
+ * Excel's smoothed line through `points`: cubic Béziers from Catmull-Rom with
+ * tension 1/6, the end points repeated as their own neighbours.
+ */
+const smoothPath = (points: readonly (readonly [number, number])[]): string => {
+  const commands = points.slice(0, 1).map(([x, y]) => `M${x},${y}`);
+  for (let index = 0; index + 1 < points.length; index += 1) {
+    const p1 = points[index] as readonly [number, number];
+    const p2 = points[index + 1] as readonly [number, number];
+    const p0 = points[index - 1] ?? p1;
+    const p3 = points[index + 2] ?? p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    commands.push(`C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${p2[0]},${p2[1]}`);
+  }
+  return commands.join(' ');
+};
 
 const categoryIdAt = (view: CategoryChartView, pointIndex: number): string =>
   view.data.categoryIds?.[pointIndex] ??
@@ -263,7 +399,35 @@ const markerAttrs = (
     ...(strokeWidth === undefined ? {} : { 'stroke-width': strokeWidth }),
     ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
   };
+  // Excel's x, star and plus are drawn by their outline alone, in the outline colour.
+  const strokedShape = (d: string) => ({
+    tag: 'path' as const,
+    attrs: {
+      d,
+      fill: 'none',
+      stroke: stroke ?? style.color,
+      'stroke-width': strokeWidth ?? 1,
+      ...(strokeOpacity === undefined ? {} : { 'stroke-opacity': strokeOpacity }),
+      ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
+    },
+  });
+  const cross = `M${x - half},${y - half} L${x + half},${y + half} M${x - half},${y + half} L${x + half},${y - half}`;
+  const upright = `M${x},${y - half} L${x},${y + half}`;
+  const bar = (width: number) => ({
+    tag: 'rect' as const,
+    attrs: { x: x - width / 2, y: y - size / 10, width, height: size / 5, ...common },
+  });
   switch (marker.shape ?? 'circle') {
+    case 'x':
+      return strokedShape(cross);
+    case 'star':
+      return strokedShape(`${cross} ${upright}`);
+    case 'plus':
+      return strokedShape(`M${x - half},${y} L${x + half},${y} ${upright}`);
+    case 'dot':
+      return bar(size / 2);
+    case 'dash':
+      return bar(size);
     case 'square':
       return {
         tag: 'rect',
@@ -286,6 +450,7 @@ const markerAttrs = (
         },
       };
     default:
+      // A circle, and a picture marker drawn as a plain one in the series colour.
       return { tag: 'circle', attrs: { cx: x, cy: y, r: half, ...common } };
   }
 };
@@ -682,6 +847,7 @@ const addAxis = (
   yAxisLabelMaxWidth = maxLabelWidth,
   xLogBase?: number,
   yLogBase?: number,
+  axisTitle?: string,
 ): void => {
   const horizontalCategory = kind === 'bar';
   if (isCircularKind(kind)) return;
@@ -1116,7 +1282,9 @@ const addAxis = (
     }
   }
 
-  if (xVisible && xAxis?.title) {
+  const xTitle = xVisible ? axisTitleText(xAxis?.title, axisTitle) : undefined;
+  const yTitle = yVisible ? axisTitleText(yAxis?.title, axisTitle) : undefined;
+  if (xTitle) {
     elements.push(
       primitive(
         'text',
@@ -1129,11 +1297,11 @@ const addAxis = (
         'axis-title',
         undefined,
         undefined,
-        xAxis.title,
+        xTitle,
       ),
     );
   }
-  if (yVisible && yAxis?.title) {
+  if (yTitle) {
     const yLabelWidth =
       yLabelPosition === 'high'
         ? 12
@@ -1169,7 +1337,7 @@ const addAxis = (
         'axis-title',
         undefined,
         undefined,
-        yAxis.title,
+        yTitle,
       ),
     );
   }
@@ -1183,13 +1351,12 @@ const addAxis = (
  */
 const effectiveStackTotals = (
   data: CategoryChartData,
-  emptyCells: ResolvedEmptyCellMode,
 ): { positive: number[]; negative: number[] } => {
   const positive = Array.from({ length: data.categories.length }, () => 0);
   const negative = Array.from({ length: data.categories.length }, () => 0);
   for (const series of data.series) {
     for (let index = 0; index < data.categories.length; index += 1) {
-      const value = valueFor(series.values[index] ?? null, emptyCells);
+      const value = valueFor(series.values[index] ?? null);
       if (value === null) continue;
       if (value >= 0) {
         positive[index] = saturatedAdd(positive[index] ?? 0, value);
@@ -1210,18 +1377,17 @@ const stableStackTotal = (
   data: CategoryChartData,
   pointIndex: number,
   positive: boolean,
-  emptyCells: ResolvedEmptyCellMode,
 ): StableStackTotal => {
   let scale = 0;
   for (const series of data.series) {
-    const value = valueFor(series.values[pointIndex] ?? null, emptyCells);
+    const value = valueFor(series.values[pointIndex] ?? null);
     if (value === null || value >= 0 !== positive) continue;
     scale = Math.max(scale, Math.abs(value));
   }
   if (!(scale > 0)) return { scale: 1, total: 0 };
   let total = 0;
   for (const series of data.series) {
-    const value = valueFor(series.values[pointIndex] ?? null, emptyCells);
+    const value = valueFor(series.values[pointIndex] ?? null);
     if (value === null || value >= 0 !== positive) continue;
     total = saturatedAdd(total, Math.abs(value) / scale);
   }
@@ -1237,13 +1403,12 @@ interface StackSegment {
 const segmentsFor = (
   data: CategoryChartData,
   grouping: ChartGrouping,
-  emptyCells: ResolvedEmptyCellMode,
 ): readonly (readonly (StackSegment | null)[])[] => {
   const stableTotals =
     grouping === 'percent-stacked'
       ? data.categories.map((_category, pointIndex) => ({
-          positive: stableStackTotal(data, pointIndex, true, emptyCells),
-          negative: stableStackTotal(data, pointIndex, false, emptyCells),
+          positive: stableStackTotal(data, pointIndex, true),
+          negative: stableStackTotal(data, pointIndex, false),
         }))
       : [];
   const result: (StackSegment | null)[][] = data.series.map(() =>
@@ -1255,7 +1420,7 @@ const segmentsFor = (
     if (!series || !target) continue;
     for (let pointIndex = 0; pointIndex < data.categories.length; pointIndex += 1) {
       const raw = series.values[pointIndex] ?? null;
-      const value = valueFor(raw, emptyCells);
+      const value = valueFor(raw);
       if (value === null) continue;
       if (grouping === 'clustered') {
         target[pointIndex] = { start: 0, end: value, value };
@@ -1273,7 +1438,7 @@ const segmentsFor = (
       let start = 0;
       for (let prior = 0; prior < seriesIndex; prior += 1) {
         const priorValue = data.series[prior]?.values[pointIndex] ?? null;
-        const normalized = valueFor(priorValue, emptyCells);
+        const normalized = valueFor(priorValue);
         if (normalized === null || normalized >= 0 !== positive) continue;
         start = saturatedAdd(start, normalized);
       }
@@ -1282,7 +1447,7 @@ const segmentsFor = (
         rendered = stableTotal.total === 0 ? 0 : value / stableTotal.scale / stableTotal.total;
         start = 0;
         for (let prior = 0; prior < seriesIndex; prior += 1) {
-          const priorValue = valueFor(data.series[prior]?.values[pointIndex] ?? null, emptyCells);
+          const priorValue = valueFor(data.series[prior]?.values[pointIndex] ?? null);
           if (priorValue === null || priorValue >= 0 !== positive) continue;
           start = saturatedAdd(
             start,
@@ -1341,8 +1506,7 @@ const addCategoryMarks = (
 ): void => {
   const data = view.data;
   const grouping = spec.grouping ?? 'clustered';
-  const emptyCells = resolveEmptyCellMode(spec);
-  const segments = segmentsFor(data, grouping, emptyCells);
+  const segments = segmentsFor(data, grouping);
   const count = Math.max(1, data.categories.length);
   const isBar = spec.kind === 'bar';
   const slot = (isBar ? plot.height : plot.width) / count;
@@ -1482,7 +1646,7 @@ const addCategoryMarks = (
           run = [];
           continue;
         }
-        if (emptyCells === 'span') continue;
+        if (series.states?.[point.pointIndex] === 'connect') continue;
         if (run.length > 0) runs.push(run);
         run = [];
       } else {
@@ -1552,11 +1716,19 @@ const addCategoryMarks = (
         const opacity = lineOpacity(style.line);
         const width = lineWidth(style.line, 2) ?? 2;
         const dash = dashArray(style.line?.dash);
+        const smooth = spec.kind === 'line' && smoothed(spec, series.id);
+        const coordinates = lineRun.map(
+          (point) =>
+            [
+              xCategory(plot, data.categories.length, point.index, categoryReverse),
+              point.value,
+            ] as const,
+        );
         elements.push(
           primitive(
-            'polyline',
+            smooth ? 'path' : 'polyline',
             {
-              points: mapped,
+              ...(smooth ? { d: smoothPath(coordinates) } : { points: mapped }),
               fill: 'none',
               stroke: style.line?.color ?? style.color,
               'stroke-width': width,
@@ -1609,7 +1781,6 @@ const addScatterMarks = (
   xDomain: Domain,
   yDomain: Domain,
   palette: readonly string[],
-  emptyCells: ResolvedEmptyCellMode,
   xLogBase?: number,
   yLogBase?: number,
 ): void => {
@@ -1664,11 +1835,11 @@ const addScatterMarks = (
       readonly y: number;
     }> = [];
     for (let pointIndex = 0; pointIndex < series.points.length; pointIndex += 1) {
-      const rawPoint = series.points[pointIndex];
-      if (!rawPoint) continue;
+      const point = series.points[pointIndex];
+      if (!point) continue;
       const originalPointIndex = view.originalPointIndices[seriesIndex]?.[pointIndex] ?? pointIndex;
       const pointId = pointIdAt(view, seriesIndex, pointIndex);
-      const point = scatterPointFor(rawPoint, emptyCells);
+      if (point.state === 'connect') continue;
       const nonFinite =
         (point.x !== null && !Number.isFinite(point.x)) ||
         (point.y !== null && !Number.isFinite(point.y));
@@ -1676,7 +1847,7 @@ const addScatterMarks = (
         (point.x !== null && Number.isFinite(point.x) && !logEligible(point.x, xLogBase)) ||
         (point.y !== null && Number.isFinite(point.y) && !logEligible(point.y, yLogBase));
       if (nonFinite || nonPositiveLog) {
-        // Non-finite values are a hard run break, including span mode.
+        // Non-finite values are a hard run break, even next to a connected gap.
         lineSamples.push({ kind: 'break', sourceIndex: originalPointIndex });
         continue;
       }
@@ -1715,37 +1886,61 @@ const addScatterMarks = (
       if (width > 0) {
         const opacity = lineOpacity(lineStyle.line);
         const dash = dashArray(lineStyle.line?.dash);
-        for (const segment of scatterLineSegments(
-          lineSamples,
-          plot,
-          emptyCells === 'span',
-          lineDomains,
-          {
-            reverseX: reversedAxis(spec.xAxis),
-            reverseY: reversedAxis(spec.yAxis),
-          },
-        )) {
-          elements.push(
-            primitive(
-              'line',
-              {
-                x1: segment.x1,
-                y1: segment.y1,
-                x2: segment.x2,
-                y2: segment.y2,
-                fill: 'none',
-                stroke: lineStyle.line?.color ?? lineStyle.color,
-                'stroke-width': width,
-                ...(opacity === undefined ? {} : { 'stroke-opacity': opacity }),
-                ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
-              },
-              'line',
-              originalSeriesIndex,
-              undefined,
-              undefined,
-              { seriesId: series.id },
-            ),
-          );
+        const stroke = {
+          fill: 'none',
+          stroke: lineStyle.line?.color ?? lineStyle.color,
+          'stroke-width': width,
+          ...(opacity === undefined ? {} : { 'stroke-opacity': opacity }),
+          ...(dash === undefined ? {} : { 'stroke-dasharray': dash }),
+        };
+        const segments = scatterLineSegments(lineSamples, plot, false, lineDomains, {
+          reverseX: reversedAxis(spec.xAxis),
+          reverseY: reversedAxis(spec.yAxis),
+        });
+        if (smoothed(spec, series.id)) {
+          // A smoothed line runs through each chain of joined segments.
+          const runs: [number, number][][] = [];
+          for (const segment of segments) {
+            const run = runs.at(-1);
+            const end = run?.at(-1);
+            if (run && end && end[0] === segment.x1 && end[1] === segment.y1) {
+              run.push([segment.x2, segment.y2]);
+            } else {
+              runs.push([
+                [segment.x1, segment.y1],
+                [segment.x2, segment.y2],
+              ]);
+            }
+          }
+          for (const run of runs) {
+            elements.push(
+              primitive(
+                'path',
+                { d: smoothPath(run), ...stroke },
+                'line',
+                originalSeriesIndex,
+                undefined,
+                undefined,
+                {
+                  seriesId: series.id,
+                },
+              ),
+            );
+          }
+        } else {
+          for (const segment of segments) {
+            elements.push(
+              primitive(
+                'line',
+                { x1: segment.x1, y1: segment.y1, x2: segment.x2, y2: segment.y2, ...stroke },
+                'line',
+                originalSeriesIndex,
+                undefined,
+                undefined,
+                { seriesId: series.id },
+              ),
+            );
+          }
         }
       }
     }
@@ -2049,7 +2244,7 @@ const addLegend = (
       );
       entries.push({
         label: series.name ?? `${originalSeriesIndex + 1}`,
-        color: fillColor(style.fill, style.color),
+        color: keyColor(spec, style),
         seriesIndex: originalSeriesIndex,
         seriesId: series.id,
       });
@@ -2067,14 +2262,14 @@ const addLegend = (
       );
       entries.push({
         label: series.name ?? `${originalSeriesIndex + 1}`,
-        color: fillColor(style.fill, style.color),
+        color: keyColor(spec, style),
         seriesIndex: originalSeriesIndex,
         seriesId: series.id,
       });
     });
   }
   if (entries.length === 0) return;
-  const position = spec.legend?.position ?? 'right';
+  const position = spec.legend?.position ?? 'bottom';
   let x = plot.x;
   let y = 12;
   let horizontal = false;
@@ -2334,6 +2529,7 @@ interface DoughnutLabelRecord {
   readonly midpointRadius: number;
   readonly text: string;
   readonly color: string;
+  readonly labelSpec: NonNullable<ChartSpec['dataLabels']>;
 }
 
 interface DoughnutLabelCandidate {
@@ -2422,12 +2618,9 @@ const addCategoryDataLabels = (
   formatter: ChartValueFormatter | undefined,
   numericLogBase?: number,
 ): void => {
-  const labelSpec = spec.dataLabels;
-  if (!labelSpec || labelSpec.visible === false) return;
   const data = view.data;
   const grouping = spec.grouping ?? 'clustered';
-  const emptyCells = resolveEmptyCellMode(spec);
-  const segments = segmentsFor(data, grouping, emptyCells);
+  const segments = segmentsFor(data, grouping);
   const isBar = spec.kind === 'bar';
   const count = Math.max(1, data.categories.length);
   const slot = (isBar ? plot.height : plot.width) / count;
@@ -2455,6 +2648,8 @@ const addCategoryDataLabels = (
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     if (!series) continue;
+    const labelSpec = labelSpecFor(spec, series);
+    if (!labelSpec || labelSpec.visible === false) continue;
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     for (let pointIndex = 0; pointIndex < data.categories.length; pointIndex += 1) {
       const raw = series.values[pointIndex] ?? null;
@@ -2593,7 +2788,7 @@ const addCategoryDataLabels = (
         originalPointIndex,
         series.id,
         pointId,
-        fillColor(style.fill, style.color),
+        keyColor(spec, style),
       );
     }
   }
@@ -2614,10 +2809,7 @@ const addScatterDataLabels = (
   xLogBase?: number,
   yLogBase?: number,
 ): void => {
-  const labelSpec = spec.dataLabels;
-  if (!labelSpec || labelSpec.visible === false) return;
   const data = view.data;
-  const emptyCells = resolveEmptyCellMode(spec);
   const xScale = (value: number): number =>
     numericProjection(
       value,
@@ -2640,11 +2832,16 @@ const addScatterDataLabels = (
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     if (!series) continue;
+    const labelSpec = labelSpecFor(spec, series);
+    if (!labelSpec || labelSpec.visible === false) continue;
+    // The X part follows the x values' format unless the labels set their own.
+    const ownCode = labelSpecFor(spec, { id: series.id })?.numberFormat;
+    const xLabelCode =
+      ownCode !== undefined && ownCode.trim().length > 0 ? ownCode : series.xFormatCode;
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     for (let pointIndex = 0; pointIndex < series.points.length; pointIndex += 1) {
-      const rawPoint = series.points[pointIndex];
-      if (!rawPoint) continue;
-      const point = scatterPointFor(rawPoint, emptyCells);
+      const point = series.points[pointIndex];
+      if (!point) continue;
       if (
         point.x === null ||
         point.y === null ||
@@ -2672,7 +2869,7 @@ const addScatterDataLabels = (
       const fullText = labelParts(
         labelSpec,
         series.name ?? String(originalSeriesIndex + 1),
-        formatChartValue(point.x, labelSpec.numberFormat, locale, formatter) ?? undefined,
+        formatChartValue(point.x, xLabelCode, locale, formatter) ?? undefined,
         point.y,
         undefined,
         locale,
@@ -2702,7 +2899,7 @@ const addScatterDataLabels = (
         originalPointIndex,
         series.id,
         pointId,
-        fillColor(style.fill, style.color),
+        keyColor(spec, style),
       );
     }
   }
@@ -2719,11 +2916,11 @@ const addPieDataLabels = (
   locale: string,
   formatter: ChartValueFormatter | undefined,
 ): void => {
-  const labelSpec = spec.dataLabels;
-  if (!labelSpec || labelSpec.visible === false) return;
   const data = view.data;
   const first = data.series[0];
   if (!first) return;
+  const labelSpec = labelSpecFor(spec, first);
+  if (!labelSpec || labelSpec.visible === false) return;
   const magnitudes = first.values.map((value) =>
     value !== null && Number.isFinite(value) ? Math.abs(value) : 0,
   );
@@ -2824,8 +3021,6 @@ const addDoughnutDataLabels = (
   locale: string,
   formatter: ChartValueFormatter | undefined,
 ): void => {
-  const labelSpec = spec.dataLabels;
-  if (!labelSpec || labelSpec.visible === false) return;
   const data = view.data;
   if (data.series.length === 0) return;
   const cx = plot.x + plot.width / 2;
@@ -2858,6 +3053,8 @@ const addDoughnutDataLabels = (
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     if (!series) continue;
+    const labelSpec = labelSpecFor(spec, series);
+    if (!labelSpec || labelSpec.visible === false) continue;
     const normalized = normalizedMagnitudes(series.values);
     if (!normalized) continue;
     const innerRadius = holeRadius + ringWidth * seriesIndex;
@@ -2906,6 +3103,7 @@ const addDoughnutDataLabels = (
         midpointRadius,
         text: fullText,
         color: fillColor(style.fill, style.color),
+        labelSpec,
       });
       start += angle;
     }
@@ -2923,7 +3121,7 @@ const addDoughnutDataLabels = (
         candidateElements,
         record.text,
         candidateAnchor,
-        labelSpec,
+        record.labelSpec,
         width,
         height,
         record.originalSeriesIndex,
@@ -2990,7 +3188,7 @@ const addDoughnutDataLabels = (
       elements,
       record.text,
       selection.anchor,
-      labelSpec,
+      record.labelSpec,
       width,
       height,
       record.originalSeriesIndex,
@@ -3017,7 +3215,7 @@ const addDataLabels = (
   categoryLogBase?: number,
   scatterLogBases?: { readonly x?: number; readonly y?: number },
 ): void => {
-  if (!spec.dataLabels || spec.dataLabels.visible === false) return;
+  if (!hasDataLabels(spec)) return;
   if (view.data.domain === 'category') {
     if (spec.kind === 'pie')
       addPieDataLabels(
@@ -3088,12 +3286,24 @@ export function layoutChart(input: {
   readonly height: number;
   readonly locale?: string;
   readonly formatValue?: ChartValueFormatter;
+  /** The workbook theme's accent1..accent6; the default Office theme's when omitted. */
+  readonly accents?: readonly string[];
+  /** The automatic title of a chart with several series, localised; "Chart Title" when omitted. */
+  readonly chartTitle?: string;
+  /** The automatic title of an axis, localised; "Axis Title" when omitted. */
+  readonly axisTitle?: string;
 }): ChartScene {
   const width = Math.max(1, finite(input.width, 320));
   const height = Math.max(1, finite(input.height, 132));
   const maxNumericLabelWidth = numericAxisLabelMaxWidth(width);
-  const { spec } = input;
-  const prepared = prepareChartData(input.data, spec);
+  const locale = input.locale ?? 'en-US';
+  const prepared = withCategoryFormat(
+    withPointStates(prepareChartData(input.data, input.spec), input.data),
+    input.data,
+    locale,
+    input.formatValue,
+  );
+  const spec = withValueAxisFormat(input.spec, prepared);
   const data = prepared.data;
   const categoryXLogBase =
     data.domain === 'category' ? categoryNumericLogBase(spec, 'x') : undefined;
@@ -3102,19 +3312,17 @@ export function layoutChart(input: {
   const scatterLogs = data.domain === 'xy' && spec.kind === 'scatter' ? scatterLogBases(spec) : {};
   const xLogBase = data.domain === 'category' ? categoryXLogBase : scatterLogs.x;
   const yLogBase = data.domain === 'category' ? categoryYLogBase : scatterLogs.y;
-  const palette = paletteFor(spec);
-  const emptyCells = resolveEmptyCellMode(spec);
+  const palette = paletteFor(spec, input.accents);
   const scatterPointEligible = (
     point: XYChartData['series'][number]['points'][number],
   ): boolean => {
-    const resolved = scatterPointFor(point, emptyCells);
     return (
-      resolved.x !== null &&
-      resolved.y !== null &&
-      Number.isFinite(resolved.x) &&
-      Number.isFinite(resolved.y) &&
-      (scatterLogs.x === undefined || resolved.x > 0) &&
-      (scatterLogs.y === undefined || resolved.y > 0)
+      point.x !== null &&
+      point.y !== null &&
+      Number.isFinite(point.x) &&
+      Number.isFinite(point.y) &&
+      (scatterLogs.x === undefined || point.x > 0) &&
+      (scatterLogs.y === undefined || point.y > 0)
     );
   };
   const elements: ChartPrimitive[] = [
@@ -3127,7 +3335,7 @@ export function layoutChart(input: {
         ? data.categories.length > 1 && (spec.kind === 'pie' || data.series.length > 0)
         : data.series.length > 1
       : data.series.length > 1);
-  const legendPosition = spec.legend?.position ?? 'right';
+  const legendPosition = spec.legend?.position ?? 'bottom';
   let left = 20;
   let right = 20;
   let top = 20;
@@ -3153,7 +3361,9 @@ export function layoutChart(input: {
       // a bottom legend. Reserve enough rows for both at compact sizes.
       bottom = Math.max(
         bottom,
-        !isCircularKind(spec.kind) && spec.xAxis?.title && axisIsVisible(spec.xAxis) ? 40 : 30,
+        !isCircularKind(spec.kind) && axisTitleText(spec.xAxis?.title) && axisIsVisible(spec.xAxis)
+          ? 40
+          : 30,
       );
     }
   }
@@ -3194,18 +3404,17 @@ export function layoutChart(input: {
           if (grouping === 'clustered') {
             return data.series.flatMap((series) =>
               series.values.flatMap((value) => {
-                const resolved = valueFor(value, emptyCells);
+                const resolved = valueFor(value);
                 return resolved === null ? [] : [resolved];
               }),
             );
           }
-          const totals = effectiveStackTotals(data, emptyCells);
+          const totals = effectiveStackTotals(data);
           return [...totals.positive, ...totals.negative];
         })()
       : data.series.flatMap((series) =>
-          series.points.flatMap((rawPoint) => {
-            if (!scatterPointEligible(rawPoint)) return [];
-            const point = scatterPointFor(rawPoint, emptyCells);
+          series.points.flatMap((point) => {
+            if (!scatterPointEligible(point)) return [];
             return point.y === null ? [] : [point.y];
           }),
         );
@@ -3214,9 +3423,8 @@ export function layoutChart(input: {
       ? yValueCandidates
       : spec.kind === 'scatter' && data.domain === 'xy'
         ? data.series.flatMap((series) =>
-            series.points.flatMap((rawPoint) => {
-              if (!scatterPointEligible(rawPoint)) return [];
-              const point = scatterPointFor(rawPoint, emptyCells);
+            series.points.flatMap((point) => {
+              if (!scatterPointEligible(point)) return [];
               return point.x === null ? [] : [point.x];
             }),
           )
@@ -3318,13 +3526,13 @@ export function layoutChart(input: {
       }
     }
   }
-  if (!isCircularKind(spec.kind) && axisIsVisible(spec.yAxis) && spec.yAxis?.title) {
+  if (!isCircularKind(spec.kind) && axisIsVisible(spec.yAxis) && axisTitleText(spec.yAxis?.title)) {
     // A rotated title still needs a horizontal gutter beside wide y tick
     // labels. Keep the historic 36px minimum for ordinary labels, then add
     // a separate reserve once labels exceed that width.
     left = Math.max(left, highYLabels ? 36 : yLabelWidth > 36 ? yLabelWidth + 32 : 36);
   }
-  if (!isCircularKind(spec.kind) && axisIsVisible(spec.xAxis) && spec.xAxis?.title)
+  if (!isCircularKind(spec.kind) && axisIsVisible(spec.xAxis) && axisTitleText(spec.xAxis?.title))
     bottom = Math.max(bottom, 32);
   if (highYLabels) {
     rightLabelGutter = Math.max(rightLabelGutter, yLabelWidth + 8);
@@ -3348,7 +3556,8 @@ export function layoutChart(input: {
     highYLabels && allocatedRightLabelGutter > 0
       ? Math.min(maxNumericLabelWidth, Math.max(12, allocatedRightLabelGutter - 6))
       : maxNumericLabelWidth;
-  if (spec.title) {
+  const title = chartTitleText(spec.title, input.data, input.chartTitle);
+  if (title) {
     elements.push(
       primitive(
         'text',
@@ -3356,7 +3565,7 @@ export function layoutChart(input: {
         'title',
         undefined,
         undefined,
-        spec.title,
+        title,
       ),
     );
   }
@@ -3369,10 +3578,10 @@ export function layoutChart(input: {
     labels = data.categories;
     const grouping = spec.grouping ?? 'clustered';
     percent = grouping === 'percent-stacked';
-    const totals = effectiveStackTotals(data, emptyCells);
+    const totals = effectiveStackTotals(data);
     const rawValues = data.series.flatMap((series) =>
       series.values.flatMap((value) => {
-        const resolved = valueFor(value, emptyCells);
+        const resolved = valueFor(value);
         return resolved === null ? [] : [resolved];
       }),
     );
@@ -3418,21 +3627,20 @@ export function layoutChart(input: {
         axisLabelWidth,
         categoryXLogBase,
         categoryYLogBase,
+        input.axisTitle,
       );
     }
   } else if (spec.kind === 'scatter') {
     const pairedPoints = data.series.flatMap((series) =>
-      series.points
-        .map((point) => scatterPointFor(point, emptyCells))
-        .filter(
-          (point) =>
-            point.x !== null &&
-            point.y !== null &&
-            Number.isFinite(point.x) &&
-            Number.isFinite(point.y) &&
-            (scatterLogs.x === undefined || point.x > 0) &&
-            (scatterLogs.y === undefined || point.y > 0),
-        ),
+      series.points.filter(
+        (point) =>
+          point.x !== null &&
+          point.y !== null &&
+          Number.isFinite(point.x) &&
+          Number.isFinite(point.y) &&
+          (scatterLogs.x === undefined || point.x > 0) &&
+          (scatterLogs.y === undefined || point.y > 0),
+      ),
     );
     const xValues = pairedPoints.flatMap((point) => (point.x === null ? [] : [point.x]));
     const yValues = pairedPoints.flatMap((point) => (point.y === null ? [] : [point.y]));
@@ -3446,7 +3654,6 @@ export function layoutChart(input: {
       xDomain,
       yDomain,
       palette,
-      emptyCells,
       scatterLogs.x,
       scatterLogs.y,
     );
@@ -3468,6 +3675,7 @@ export function layoutChart(input: {
       axisLabelWidth,
       scatterLogs.x,
       scatterLogs.y,
+      input.axisTitle,
     );
   } else {
     // A malformed domain/kind pair is still laid out safely as an empty chart.
@@ -3489,6 +3697,7 @@ export function layoutChart(input: {
       axisLabelWidth,
       undefined,
       undefined,
+      input.axisTitle,
     );
   }
 
@@ -3521,7 +3730,6 @@ export function layoutChart(input: {
   if (
     !dataHasValues(
       data,
-      emptyCells,
       spec.kind,
       data.domain === 'category'
         ? spec.kind === 'bar'
@@ -3542,5 +3750,59 @@ export function layoutChart(input: {
       ),
     );
   }
+  return { width, height, plot, elements };
+}
+
+/**
+ * Scene for a chart the engine models but cannot draw: a frame, the chart
+ * title when it has one, and a caller-supplied (localized) message.
+ */
+export function layoutUnsupportedChart(input: {
+  readonly title?: string;
+  readonly message: string;
+  readonly width: number;
+  readonly height: number;
+}): ChartScene {
+  const width = Math.max(1, finite(input.width, 320));
+  const height = Math.max(1, finite(input.height, 132));
+  const plot = { x: 0, y: 0, width, height };
+  const elements: ChartPrimitive[] = [
+    primitive('rect', { x: 0, y: 0, width, height, fill: 'transparent' }, 'background'),
+    primitive(
+      'rect',
+      {
+        x: 0.5,
+        y: 0.5,
+        width: Math.max(0, width - 1),
+        height: Math.max(0, height - 1),
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-opacity': 0.4,
+      },
+      'frame',
+    ),
+  ];
+  if (input.title) {
+    elements.push(
+      primitive(
+        'text',
+        { x: width / 2, y: 12, 'text-anchor': 'middle' },
+        'title',
+        undefined,
+        undefined,
+        input.title,
+      ),
+    );
+  }
+  elements.push(
+    primitive(
+      'text',
+      { x: width / 2, y: height / 2, 'text-anchor': 'middle' },
+      'unsupported',
+      undefined,
+      undefined,
+      input.message,
+    ),
+  );
   return { width, height, plot, elements };
 }

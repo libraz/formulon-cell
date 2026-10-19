@@ -4,8 +4,8 @@ import {
   clearSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
+import { sessionPosition } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { cellRectUnclamped, layoutForView } from '../render/geometry.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 
@@ -18,7 +18,6 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_W = 48;
 const MIN_H = 32;
 const KEYBOARD_STEP = 8;
-const EMU_PER_PX = 9525;
 
 const illustrationAuthorization = (
   commandId: string,
@@ -26,39 +25,17 @@ const illustrationAuthorization = (
 ): IllustrationMutationAuthorization => ({ origin, commandId });
 
 const renderedPosition = (
-  state: ReturnType<SpreadsheetStore['getState']>,
+  store: SpreadsheetStore,
   item: SessionIllustration,
-): { x: number; y: number; w: number; h: number } => {
-  const anchor = item.nativeAnchor;
-  if (!anchor) {
-    return {
-      x: item.x ?? 300,
-      y: item.y ?? 88,
-      w: item.w ?? 160,
-      h: item.h ?? 96,
-    };
-  }
-  try {
-    const rect = cellRectUnclamped(layoutForView(state), state.viewport, anchor.row, anchor.col);
-    const zoom =
-      state.viewport.zoom && Number.isFinite(state.viewport.zoom) && state.viewport.zoom > 0
-        ? state.viewport.zoom
-        : 1;
-    return {
-      x: rect.x + (anchor.colOffEmu / EMU_PER_PX) * zoom,
-      y: rect.y + (anchor.rowOffEmu / EMU_PER_PX) * zoom,
-      w: Math.max(1, anchor.widthEmu / EMU_PER_PX) * zoom,
-      h: Math.max(1, anchor.heightEmu / EMU_PER_PX) * zoom,
-    };
-  } catch {
-    return {
-      x: item.x ?? 300,
-      y: item.y ?? 88,
-      w: item.w ?? 160,
-      h: item.h ?? 96,
-    };
-  }
-};
+): { x: number; y: number; w: number; h: number } =>
+  item.nativeAnchor
+    ? sessionPosition(store, item.nativeAnchor)
+    : {
+        x: item.x ?? 300,
+        y: item.y ?? 88,
+        w: item.w ?? 160,
+        h: item.h ?? 96,
+      };
 
 const appendSvg = <K extends keyof SVGElementTagNameMap>(
   parent: Element,
@@ -203,7 +180,7 @@ export function attachSessionIllustrations(deps: {
     e.preventDefault();
     const startX = e.clientX;
     const startY = e.clientY;
-    const rendered = renderedPosition(store.getState(), item);
+    const rendered = renderedPosition(store, item);
     const startLeft = item.nativeAnchor ? rendered.x : (item.x ?? panel.offsetLeft);
     const startTop = item.nativeAnchor ? rendered.y : (item.y ?? panel.offsetTop);
     const startW = item.nativeAnchor ? rendered.w : (item.w ?? panel.offsetWidth);
@@ -269,7 +246,7 @@ export function attachSessionIllustrations(deps: {
     if (!delta) return;
     event.preventDefault();
     const [dx, dy] = delta;
-    const rendered = renderedPosition(store.getState(), item);
+    const rendered = renderedPosition(store, item);
     if (event.shiftKey) {
       updateSessionIllustration(
         store,
@@ -326,7 +303,7 @@ export function attachSessionIllustrations(deps: {
         projectDisabledState(panel, !editable, null);
         panel.style.cssText =
           'position:absolute;pointer-events:auto;background:transparent;box-sizing:border-box;';
-        const placement = renderedPosition(state, item);
+        const placement = renderedPosition(store, item);
         panel.style.left = `${placement.x}px`;
         panel.style.top = `${placement.y}px`;
         panel.style.width = `${placement.w}px`;

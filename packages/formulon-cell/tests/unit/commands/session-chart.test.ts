@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment node
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -7,748 +11,635 @@ import {
 import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import {
+  addSessionChartSeries,
   clearSessionChart,
   clearSessionChartsInRange,
+  createRibbonChartFromSelection,
   createSessionChart,
+  inferRecommendedChartKind,
   listSessionCharts,
+  removeSessionChartSeries,
   sessionChartById,
-  sessionChartData,
-  sessionChartSeries,
   sessionChartsForRange,
   updateSessionChart,
 } from '../../../src/commands/session-chart.js';
-import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore } from '../../../src/store/store.js';
+import {
+  hydrateChartsFromEngine,
+  refreshChartsAfterRecalc,
+} from '../../../src/engine/charts-sync.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
-const range = (r0: number, c0: number, r1: number, c1: number) =>
-  ({ sheet: 0, r0, c0, r1, c1 }) as const;
+const range = (r0: number, c0: number, r1: number, c1: number) => ({ sheet: 0, r0, c0, r1, c1 });
 
-const seedNumbers = (
-  store: ReturnType<typeof createSpreadsheetStore>,
-  entries: Array<{ row: number; col: number; value: number }>,
-): void => {
-  store.setState((s) => {
-    const cells = new Map(s.data.cells);
-    for (const e of entries) {
-      cells.set(addrKey({ sheet: 0, row: e.row, col: e.col }), {
-        value: { kind: 'number', value: e.value },
-        formula: null,
-      });
-    }
-    return { ...s, data: { ...s.data, cells } };
+const fixture = (name: string): Uint8Array =>
+  new Uint8Array(readFileSync(join(__dirname, '../../fixtures/charts', name)));
+
+/** Two labelled series over three categories in A1:C4, a second table in E1:F3. */
+const seed = (wb: WorkbookHandle): void => {
+  const rows: (string | number)[][] = [
+    ['', 'North', 'South'],
+    ['Jan', 10, 20],
+    ['Feb', 15, 25],
+    ['Mar', 12, 22],
+  ];
+  rows.forEach((cells, row) => {
+    cells.forEach((value, col) => {
+      if (typeof value === 'number') wb.setNumber({ sheet: 0, row, col }, value);
+      else if (value !== '') wb.setText({ sheet: 0, row, col }, value);
+    });
   });
+  wb.setText({ sheet: 0, row: 0, col: 4 }, 'k');
+  wb.setText({ sheet: 0, row: 0, col: 5 }, 'v');
+  wb.setText({ sheet: 0, row: 1, col: 4 }, 'x');
+  wb.setNumber({ sheet: 0, row: 1, col: 5 }, 1);
+  wb.setText({ sheet: 0, row: 2, col: 4 }, 'y');
+  wb.setNumber({ sheet: 0, row: 2, col: 5 }, 2);
 };
 
+const engineChartIds = (wb: WorkbookHandle): number[] =>
+  wb
+    .listDrawingObjects(0)
+    .filter((object) => object.kind === 2)
+    .map((object) => object.objectId);
+
 describe('session chart commands', () => {
-  it('preserves log bases and dormant linear options through type changes and history', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const chart = createSessionChart(store, range(0, 0, 2, 1), {
-      id: 'log-axes',
-      kind: 'scatter',
-      xAxis: { logBase: 2, reverseOrder: true, majorUnit: 5 },
-      yAxis: { logBase: 10, min: 1, max: 1000, crossing: 10 },
-    });
-    if (!chart) throw new Error('Chart creation was rejected');
-    expect(chart.xAxis).toEqual({ logBase: 2, reverseOrder: true, majorUnit: 5 });
-    updateSessionChart(store, chart.id, { kind: 'doughnut' }, history);
-    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.logBase).toBe(10);
-    updateSessionChart(
-      store,
-      chart.id,
-      {
-        kind: 'column',
-        yAxis: { ...chart.yAxis, logBase: 1000 },
-      },
-      history,
-    );
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
-      kind: 'doughnut',
-      yAxis: { logBase: 10, min: 1, max: 1000, crossing: 10 },
-    });
-    expect(history.redo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
+  let wb: WorkbookHandle;
+  let store: SpreadsheetStore;
+  let history: History;
+
+  beforeEach(async () => {
+    wb = await WorkbookHandle.createDefault();
+    seed(wb);
+    store = createSpreadsheetStore();
+    history = new History();
+  });
+
+  afterEach(() => {
+    wb.dispose();
+  });
+
+  it('creates the chart in the workbook and projects what the engine reports', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    if (!chart) throw new Error('chart was not created');
+
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId]);
+    expect(chart).toMatchObject({
+      id: `chart-native-0-${chart.nativeObjectId}`,
+      sheet: 0,
       kind: 'column',
-      xAxis: { logBase: 2, reverseOrder: true, majorUnit: 5 },
-      yAxis: { logBase: 1000, min: 1, max: 1000, crossing: 10 },
+      source: range(0, 0, 3, 2),
+      seriesDirection: 'columns',
+      legend: { visible: true, position: 'bottom' },
+      nativeAnchor: { anchorKind: AnchorKind.TwoCell, editAs: AnchorEditAs.TwoCell },
+    });
+    // An omitted title is Excel's automatic one, which the renderer localizes.
+    expect(chart.title).toEqual({ auto: true });
+    expect(chart.data).toMatchObject({
+      domain: 'category',
+      categories: ['Jan', 'Feb', 'Mar'],
+      series: [
+        { id: 'series-0', name: 'North', values: [10, 15, 12] },
+        { id: 'series-1', name: 'South', values: [20, 25, 22] },
+      ],
+    });
+    expect(listSessionCharts(store.getState())).toEqual([chart]);
+  });
+
+  it('centres Excel’s default frame in the visible grid unless an anchor is given', () => {
+    const centred = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    // 16 x 40 default cells of 64 x 20 px; the 480 x 288 px frame starts at (272, 256).
+    expect(centred?.nativeAnchor).toMatchObject({
+      fromCol: 4,
+      fromColOff: 16 * 9525,
+      fromRow: 12,
+      fromRowOff: 16 * 9525,
+      cx: 4_572_000,
+      cy: 2_743_200,
+    });
+
+    const placed = createSessionChart(store, range(0, 0, 3, 2), {
+      wb,
+      anchor: { row: 20, col: 8, widthEmu: 952_500, heightEmu: 476_250 },
+    });
+    expect(placed?.nativeAnchor).toMatchObject({
+      anchorKind: AnchorKind.TwoCell,
+      fromRow: 20,
+      fromCol: 8,
+      cx: 952_500,
+      cy: 476_250,
     });
   });
 
-  it('preserves axis label positions across creation, kind changes, and history', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const chart = createSessionChart(store, range(0, 0, 2, 1), {
-      id: 'positioned-labels',
-      kind: 'scatter',
-      xAxis: { labelPosition: 'high', crossing: 2, reverseOrder: true },
-      yAxis: { labelPosition: 'nextTo', title: 'Value' },
+  it('writes the settings it is given and keeps Excel’s template for the rest', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), {
+      wb,
+      kind: 'bar',
+      grouping: 'stacked',
+      title: 'Sales',
+      gapWidth: 80,
+      overlap: 100,
+      legend: { position: 'top' },
+      palette: ['#112233', '#445566'],
+      yAxis: { min: 0, max: 50 },
     });
-    if (!chart) throw new Error('Chart creation was rejected');
-    expect(chart.xAxis).toEqual({ labelPosition: 'high', crossing: 2, reverseOrder: true });
-    expect(chart.yAxis).toEqual({ labelPosition: 'nextTo', title: 'Value' });
-    updateSessionChart(store, chart.id, { kind: 'doughnut' }, history);
-    expect(sessionChartById(store.getState(), chart.id)?.xAxis?.labelPosition).toBe('high');
-    updateSessionChart(
+
+    expect(chart).toMatchObject({
+      kind: 'bar',
+      grouping: 'stacked',
+      title: 'Sales',
+      gapWidth: 80,
+      overlap: 100,
+      legend: { visible: true, position: 'top' },
+      seriesStyles: [
+        { seriesId: 'series-0', fill: { color: '#112233' } },
+        { seriesId: 'series-1', fill: { color: '#445566' } },
+      ],
+      // The template's gridlines stay where the options say nothing.
+      xAxis: { visible: true, majorGridlines: false },
+      yAxis: { visible: true, min: 0, max: 50, majorGridlines: true },
+    });
+    expect(chart?.palette).toBeUndefined();
+    const info = wb.getChart(0, chart?.nativeObjectId ?? 0);
+    expect(info?.title).toMatchObject({ text: 'Sales' });
+  });
+
+  it('stores a line series colour in its line and markers over the template’s', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), {
+      wb,
+      kind: 'line',
+      palette: ['#112233', '#445566'],
+      seriesStyles: [
+        { seriesId: 'series-1', fill: { color: '#778899' }, marker: { visible: true } },
+      ],
+    });
+    expect(chart?.seriesStyles).toMatchObject([
+      { seriesId: 'series-0', line: { color: '#112233' }, marker: { visible: false } },
+      {
+        seriesId: 'series-1',
+        line: { color: '#778899' },
+        marker: { visible: true, fill: { color: '#778899' }, line: { color: '#778899' } },
+      },
+    ]);
+    expect(chart?.seriesStyles?.every((style) => style.fill === undefined)).toBe(true);
+
+    // A new palette replaces the colours the line and markers store.
+    const updated = updateSessionChart(
+      store,
+      chart?.id ?? '',
+      { palette: ['#aa0000', '#00aa00'] },
+      new History(),
+      wb,
+    );
+    expect(updated?.seriesStyles).toMatchObject([
+      { seriesId: 'series-0', line: { color: '#aa0000' } },
+      {
+        seriesId: 'series-1',
+        line: { color: '#00aa00' },
+        marker: { fill: { color: '#00aa00' }, line: { color: '#00aa00' } },
+      },
+    ]);
+  });
+
+  it('creates nothing when the engine has no chart support', async () => {
+    const stub = await WorkbookHandle.createDefault({ preferStub: true });
+    try {
+      expect(stub.capabilities.charts).not.toBe(true);
+      expect(createSessionChart(store, range(0, 0, 3, 2), { wb: stub })).toBeNull();
+      expect(store.getState().charts.charts).toEqual([]);
+    } finally {
+      stub.dispose();
+    }
+  });
+
+  it('undoes a creation by removing the chart and redoes it under the same id', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb, kind: 'line' }, history);
+    if (!chart) throw new Error('chart was not created');
+
+    expect(history.undo()).toBe(true);
+    expect(engineChartIds(wb)).toEqual([]);
+    expect(store.getState().charts.charts).toEqual([]);
+
+    expect(history.redo()).toBe(true);
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId]);
+    expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+  });
+
+  it('applies a settings change through the engine and undoes it from a snapshot', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb, title: 'Before' });
+    if (!chart) throw new Error('chart was not created');
+
+    const updated = updateSessionChart(
+      store,
+      chart.id,
+      { title: 'After', gapWidth: 40, dataLabels: { visible: true, showValue: true } },
+      history,
+      wb,
+    );
+    expect(updated).toMatchObject({
+      title: 'After',
+      gapWidth: 40,
+      nativeObjectId: chart.nativeObjectId,
+    });
+    expect(updated?.dataLabels).toMatchObject({ visible: true, showValue: true });
+    expect(wb.getChart(0, chart.nativeObjectId)?.title).toMatchObject({ text: 'After' });
+
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+    expect(wb.getChart(0, chart.nativeObjectId)?.title).toMatchObject({ text: 'Before' });
+
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)).toEqual(updated);
+  });
+
+  it('re-reads the chart after a type change and writes the rest against the new plot', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    if (!chart) throw new Error('chart was not created');
+
+    const line = updateSessionChart(
       store,
       chart.id,
       {
-        kind: 'bar',
-        yAxis: { ...chart.yAxis, labelPosition: 'none' },
+        kind: 'line',
+        seriesStyles: [{ seriesId: 'series-1', line: { width: 3, dash: 'dash' } }],
       },
       history,
+      wb,
     );
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
-      kind: 'doughnut',
-      yAxis: { labelPosition: 'nextTo', title: 'Value' },
+    expect(line).toMatchObject({ kind: 'line', grouping: 'clustered' });
+    expect(line?.seriesStyles?.find((style) => style.seriesId === 'series-1')?.line).toMatchObject({
+      width: 3,
+      dash: 'dash',
     });
-    expect(history.redo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
-      kind: 'bar',
-      xAxis: { labelPosition: 'high', crossing: 2, reverseOrder: true },
-      yAxis: { labelPosition: 'none', title: 'Value' },
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)?.kind).toBe('column');
+  });
+
+  it('re-splits the series when the data range changes', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    if (!chart) throw new Error('chart was not created');
+
+    const moved = updateSessionChart(store, chart.id, { source: range(0, 4, 2, 5) }, history, wb);
+    expect(moved?.source).toEqual(range(0, 4, 2, 5));
+    expect(moved?.data).toMatchObject({
+      categories: ['x', 'y'],
+      series: [{ name: 'v', values: [1, 2] }],
+    });
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)?.source).toEqual(range(0, 0, 3, 2));
+  });
+
+  it('switches the series direction through the engine split', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    if (!chart) throw new Error('chart was not created');
+    const rows = updateSessionChart(store, chart.id, { seriesDirection: 'rows' }, history, wb);
+    expect(rows?.seriesDirection).toBe('rows');
+    expect(rows?.data).toMatchObject({
+      categories: ['North', 'South'],
+      series: [{ name: 'Jan' }, { name: 'Feb' }, { name: 'Mar' }],
     });
   });
 
-  it('preserves axis crossings through type changes and undo/redo', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const chart = createSessionChart(store, range(0, 0, 2, 1), {
-      id: 'crossed-axes',
-      kind: 'scatter',
-      xAxis: { crossing: 'max', reverseOrder: true, min: -10 },
-      yAxis: { crossing: 2.5, numberFormat: '0.00' },
-    });
-    if (!chart) throw new Error('Chart creation was rejected');
-    expect(chart.xAxis).toEqual({ crossing: 'max', reverseOrder: true, min: -10 });
-    expect(chart.yAxis).toEqual({ crossing: 2.5, numberFormat: '0.00' });
-    updateSessionChart(store, chart.id, { kind: 'doughnut' }, history);
-    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.crossing).toBe(2.5);
-    updateSessionChart(
-      store,
-      chart.id,
-      {
-        kind: 'bar',
-        xAxis: { ...chart.xAxis, crossing: 'min' },
-        yAxis: { ...chart.yAxis, crossing: 2 },
-      },
-      history,
-    );
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
-      kind: 'doughnut',
-      xAxis: { crossing: 'max' },
-      yAxis: { crossing: 2.5 },
-    });
-    expect(history.redo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)).toMatchObject({
-      kind: 'bar',
-      xAxis: { crossing: 'min', reverseOrder: true, min: -10 },
-      yAxis: { crossing: 2, numberFormat: '0.00' },
-    });
-  });
+  describe('series add and remove', () => {
+    /** A third series beside the A1:C4 table: West in D1:D4. */
+    const seedWest = (): void => {
+      wb.setText({ sheet: 0, row: 0, col: 3 }, 'West');
+      [30, 35, 32].forEach((value, i) => {
+        wb.setNumber({ sheet: 0, row: i + 1, col: 3 }, value);
+      });
+    };
 
-  it('keeps physical-axis reversal options through creation and history', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const chart = createSessionChart(store, range(0, 0, 2, 1), {
-      id: 'reversed-axes',
-      kind: 'scatter',
-      xAxis: { reverseOrder: true, min: -10, max: 20 },
-      yAxis: { reverseOrder: false, numberFormat: '0.00' },
-    });
-    expect(chart?.xAxis).toEqual({ reverseOrder: true, min: -10, max: 20 });
-    expect(chart?.yAxis).toEqual({ reverseOrder: false, numberFormat: '0.00' });
-    if (!chart) throw new Error('Chart creation was rejected');
-    expect(
-      updateSessionChart(
+    it('adds a series from cell references and undoes and redoes it', () => {
+      seedWest();
+      const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+      if (!chart) throw new Error('chart was not created');
+
+      const added = addSessionChartSeries(
         store,
         chart.id,
-        {
-          xAxis: { ...chart.xAxis, reverseOrder: false },
-          yAxis: { ...chart.yAxis, reverseOrder: true },
-        },
+        { name: range(0, 3, 0, 3), values: range(1, 3, 3, 3), categories: range(1, 0, 3, 0) },
         history,
-      ),
-    ).toMatchObject({
-      xAxis: { reverseOrder: false, min: -10, max: 20 },
-      yAxis: { reverseOrder: true, numberFormat: '0.00' },
-    });
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)?.xAxis?.reverseOrder).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.reverseOrder).toBe(false);
-    expect(history.redo()).toBe(true);
-    expect(sessionChartById(store.getState(), chart.id)?.xAxis?.reverseOrder).toBe(false);
-    expect(sessionChartById(store.getState(), chart.id)?.yAxis?.reverseOrder).toBe(true);
-  });
+        wb,
+      );
+      expect(added?.data).toMatchObject({
+        domain: 'category',
+        categories: ['Jan', 'Feb', 'Mar'],
+        series: [
+          { id: 'series-0', name: 'North' },
+          { id: 'series-1', name: 'South' },
+          { id: 'series-2', name: 'West', values: [30, 35, 32] },
+        ],
+      });
+      expect(wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series[2]?.values).toMatchObject({
+        formula: 'Sheet1!$D$2:$D$4',
+      });
+      expect(wb.getChartData(0, chart.nativeObjectId)?.series).toHaveLength(3);
 
-  it('preserves scatter style across creation, type changes, and history', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const chart = createSessionChart(store, range(0, 0, 2, 1), {
-      id: 'connected-scatter',
-      kind: 'scatter',
-      scatterStyle: 'lineMarker',
+      expect(history.undo()).toBe(true);
+      expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+      expect(wb.getChartData(0, chart.nativeObjectId)?.series).toHaveLength(2);
+
+      expect(history.redo()).toBe(true);
+      expect(sessionChartById(store.getState(), chart.id)).toEqual(added);
     });
-    expect(chart?.scatterStyle).toBe('lineMarker');
-    expect(updateSessionChart(store, 'connected-scatter', { kind: 'column' }, history)?.kind).toBe(
-      'column',
-    );
-    expect(sessionChartById(store.getState(), 'connected-scatter')?.scatterStyle).toBe(
-      'lineMarker',
-    );
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'connected-scatter')).toMatchObject({
-      kind: 'scatter',
-      scatterStyle: 'lineMarker',
-    });
-    expect(history.redo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'connected-scatter')?.kind).toBe('column');
-    expect(
-      updateSessionChart(
+
+    it('adds a scatter series from X and Y values', () => {
+      seedWest();
+      const chart = createSessionChart(store, range(0, 1, 3, 2), { wb, kind: 'scatter' });
+      if (!chart) throw new Error('chart was not created');
+      const before = chart.data.series.length;
+
+      const added = addSessionChartSeries(
         store,
-        'connected-scatter',
-        { kind: 'scatter', scatterStyle: 'line' },
+        chart.id,
+        { name: range(0, 3, 0, 3), values: range(1, 3, 3, 3), x: range(1, 1, 3, 1) },
         history,
-      )?.scatterStyle,
-    ).toBe('line');
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'connected-scatter')?.scatterStyle).toBe(
-      'lineMarker',
-    );
-    const implicit = createSessionChart(store, range(0, 0, 2, 1), {
-      id: 'implicit-scatter',
-      kind: 'scatter',
+        wb,
+      );
+      expect(added?.data.domain).toBe('xy');
+      expect(added?.data.series).toHaveLength(before + 1);
+      const series = added?.data.series[before];
+      expect(series?.name).toBe('West');
+      expect(series && 'points' in series ? series.points.map(({ x, y }) => [x, y]) : []).toEqual([
+        [10, 30],
+        [15, 35],
+        [12, 32],
+      ]);
     });
-    expect(implicit?.scatterStyle).toBeUndefined();
+
+    it('removes a series, keeps the last one, and undoes the removal', () => {
+      const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+      if (!chart) throw new Error('chart was not created');
+
+      const removed = removeSessionChartSeries(store, chart.id, 'series-0', history, wb);
+      expect(removed?.data.series.map((series) => series.name)).toEqual(['South']);
+      expect(wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series).toHaveLength(1);
+
+      // The last series stays.
+      expect(removeSessionChartSeries(store, chart.id, 'series-1', history, wb)).toBeNull();
+      expect(removeSessionChartSeries(store, chart.id, 'series-9', history, wb)).toBeNull();
+      expect(wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series).toHaveLength(1);
+
+      expect(history.undo()).toBe(true);
+      expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+      expect(history.redo()).toBe(true);
+      expect(sessionChartById(store.getState(), chart.id)).toEqual(removed);
+    });
+
+    it('rejects series edits on a protected sheet and without chart support', async () => {
+      seedWest();
+      const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+      if (!chart) throw new Error('chart was not created');
+      const input = { values: range(0, 3, 1, 3) };
+      setProtectedSheet(store, 0, true);
+      expect(addSessionChartSeries(store, chart.id, input, history, wb)).toBeNull();
+      expect(removeSessionChartSeries(store, chart.id, 'series-0', history, wb)).toBeNull();
+      expect(wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series).toHaveLength(2);
+      expect(history.canUndo()).toBe(false);
+      setProtectedSheet(store, 0, false);
+
+      const stub = await WorkbookHandle.createDefault({ preferStub: true });
+      try {
+        expect(addSessionChartSeries(store, chart.id, input, history, stub)).toBeNull();
+        expect(removeSessionChartSeries(store, chart.id, 'series-0', history, stub)).toBeNull();
+      } finally {
+        stub.dispose();
+      }
+      expect(listSessionCharts(store.getState())).toEqual([chart]);
+    });
+
+    it('changes nothing when the engine refuses a series', async () => {
+      const loaded = await WorkbookHandle.loadBytes(fixture('chart_pivot.xlsx'));
+      try {
+        hydrateChartsFromEngine(loaded, store, 1);
+        const [chart] = listSessionCharts(store.getState());
+        if (!chart) throw new Error('fixture chart missing');
+        const before = loaded.snapshotDrawing(1, chart.nativeObjectId);
+        // A PivotChart's series follow its PivotTable.
+        expect(
+          addSessionChartSeries(
+            store,
+            chart.id,
+            { values: { sheet: 1, r0: 0, c0: 0, r1: 2, c1: 0 } },
+            history,
+            loaded,
+          ),
+        ).toBeNull();
+        expect(loaded.snapshotDrawing(1, chart.nativeObjectId)).toEqual(before);
+        expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+        expect(history.canUndo()).toBe(false);
+      } finally {
+        loaded.dispose();
+      }
+    });
   });
 
-  it('keeps doughnut geometry and dormant settings through type changes and history', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    seedNumbers(store, [
-      { row: 0, col: 0, value: 10 },
-      { row: 0, col: 1, value: 20 },
-      { row: 1, col: 0, value: 30 },
-      { row: 1, col: 1, value: 40 },
-    ]);
-    const sourceCells = store.getState().data.cells;
-    const chart = createSessionChart(store, range(0, 0, 1, 1), {
-      id: 'rings',
-      kind: 'doughnut',
-      holeSize: 70,
-      firstSliceAngle: 90,
-      grouping: 'stacked',
-      yAxis: { min: -10, max: 50, numberFormat: '0.00' },
-      filter: { hiddenCategoryIds: ['category-1'] },
+  it('moves a chart by re-anchoring it, keeping its id and two-cell anchor', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), {
+      wb,
+      anchor: { row: 5, col: 5, widthEmu: 1_905_000, heightEmu: 952_500 },
     });
-    expect(chart?.title).toBe('Doughnut chart');
-    expect(chart?.holeSize).toBe(70);
-    if (!chart) throw new Error('Doughnut chart creation was rejected');
-    const data = sessionChartData(store.getState(), chart);
-    expect(data.domain).toBe('category');
-    expect(data.series).toHaveLength(2);
-    expect(updateSessionChart(store, 'rings', { kind: 'column' }, history)).toMatchObject({
-      kind: 'column',
-    });
-    expect(sessionChartById(store.getState(), 'rings')).toMatchObject({
-      kind: 'column',
-      holeSize: 70,
-      firstSliceAngle: 90,
-      grouping: 'stacked',
-      yAxis: { min: -10, max: 50, numberFormat: '0.00' },
-      filter: { hiddenCategoryIds: ['category-1'] },
-    });
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'rings')?.kind).toBe('doughnut');
-    expect(history.redo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'rings')?.kind).toBe('column');
-    expect(store.getState().data.cells).toBe(sourceCells);
-  });
+    if (!chart) throw new Error('chart was not created');
 
-  it('reports the replay origin consistently to a host history guard', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    createSessionChart(store, range(0, 0, 2, 2), { id: 'origin' });
-    updateSessionChart(store, 'origin', { dataLabels: { visible: true } }, history, {
-      origin: 'contextMenu',
-    });
-    const origins: string[] = [];
-    history.setGuard((entry, direction) => {
-      const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
-      origins.push(intent?.origin ?? 'missing');
-      return intent?.origin === direction;
-    });
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'origin')?.dataLabels).toBeUndefined();
-    expect(history.redo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'origin')?.dataLabels?.visible).toBe(true);
-    expect(origins).toEqual(['undo', 'redo']);
-  });
-  it('detaches nested settings from callers, patches, returned charts and history', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const hiddenSeriesIds = ['series-1'];
-    const markerFill = { color: '#123456' };
-    const pointFill = { color: '#abcdef' };
-    const styles = [
-      {
-        seriesId: 'series-0',
-        marker: { fill: markerFill },
-        points: [{ pointId: 'category-0', fill: pointFill }],
-      },
-    ];
-    const chart = createSessionChart(
+    const moved = updateSessionChart(
       store,
-      range(0, 0, 2, 2),
-      {
-        id: 'nested',
-        filter: { hiddenSeriesIds },
-        dataLabels: { visible: true, color: '#112233' },
-        seriesStyles: styles,
-      },
+      chart.id,
+      { anchor: { row: 9, col: 2, widthEmu: 2_857_500, heightEmu: 952_500 } },
       history,
+      wb,
     );
-    hiddenSeriesIds.push('series-0');
-    markerFill.color = '#000000';
-    pointFill.color = '#000000';
-    expect(sessionChartById(store.getState(), 'nested')?.filter?.hiddenSeriesIds).toEqual([
-      'series-1',
-    ]);
-    expect(
-      sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.marker?.fill?.color,
-    ).toBe('#123456');
-    const detached = chart?.seriesStyles?.[0]?.points?.[0]?.fill;
-    if (!detached) throw new Error('missing detached point style');
-    (detached as { color: string }).color = '#ffffff';
-    const patchFill = { color: '#ff0000' };
-    updateSessionChart(
-      store,
-      'nested',
-      { seriesStyles: [{ seriesId: 'series-0', fill: patchFill }] },
-      history,
-    );
-    patchFill.color = '#000000';
-    expect(sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.fill?.color).toBe(
-      '#ff0000',
-    );
-    history.undo();
-    expect(
-      sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.points?.[0]?.fill?.color,
-    ).toBe('#abcdef');
-    const list = listSessionCharts(store.getState());
-    const listMarker = list[0]?.seriesStyles?.[0]?.marker?.fill;
-    if (!listMarker) throw new Error('missing detached marker');
-    (listMarker as { color: string }).color = '#000000';
-    history.redo();
-    expect(sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.fill?.color).toBe(
-      '#ff0000',
-    );
-    history.undo();
-    expect(
-      sessionChartById(store.getState(), 'nested')?.seriesStyles?.[0]?.marker?.fill?.color,
-    ).toBe('#123456');
+    expect(moved?.nativeObjectId).toBe(chart.nativeObjectId);
+    expect(moved?.nativeAnchor).toMatchObject({
+      anchorKind: AnchorKind.TwoCell,
+      editAs: AnchorEditAs.TwoCell,
+      fromRow: 9,
+      fromCol: 2,
+      cx: 2_857_500,
+    });
+
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)?.nativeAnchor).toMatchObject({
+      anchorKind: AnchorKind.TwoCell,
+      fromRow: 5,
+      fromCol: 5,
+      cx: 1_905_000,
+    });
+    expect(history.redo()).toBe(true);
+    expect(sessionChartById(store.getState(), chart.id)?.nativeAnchor).toMatchObject({
+      fromRow: 9,
+      fromCol: 2,
+    });
   });
 
-  it('rejects chart settings, insertion, deletion and replay in a viewer', async () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+  it('deletes a chart and restores it under the same id', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    if (!chart) throw new Error('chart was not created');
+
+    expect(clearSessionChart(store, chart.id, history, wb)).toBe(true);
+    expect(engineChartIds(wb)).toEqual([]);
+    expect(listSessionCharts(store.getState())).toEqual([]);
+
+    expect(history.undo()).toBe(true);
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId]);
+    expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+
+    expect(history.redo()).toBe(true);
+    expect(engineChartIds(wb)).toEqual([]);
+  });
+
+  it('deletes the charts of a range in one undo step', () => {
+    const a = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    const b = createSessionChart(store, range(0, 4, 2, 5), { wb });
+    if (!a || !b) throw new Error('charts were not created');
+
+    expect(sessionChartsForRange(store.getState(), range(1, 1, 1, 1))).toEqual([a]);
+    expect(clearSessionChartsInRange(store, range(1, 1, 1, 1), history, wb)).toBe(1);
+    expect(listSessionCharts(store.getState()).map((chart) => chart.id)).toEqual([b.id]);
+    expect(history.undo()).toBe(true);
+    // Restored in its stacking slot, below the later chart.
+    expect(listSessionCharts(store.getState()).map((chart) => chart.id)).toEqual([a.id, b.id]);
+  });
+
+  it('rejects create, update and delete on a protected sheet', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    if (!chart) throw new Error('chart was not created');
+    setProtectedSheet(store, 0, true);
+
+    expect(createSessionChart(store, range(0, 0, 3, 2), { wb })).toBeNull();
+    expect(updateSessionChart(store, chart.id, { title: 'x' }, null, wb)).toBeNull();
+    expect(updateSessionChart(store, chart.id, { anchor: { row: 9 } }, null, wb)).toBeNull();
+    expect(clearSessionChart(store, chart.id, null, wb)).toBe(false);
+    expect(clearSessionChartsInRange(store, range(0, 0, 3, 2), null, wb)).toBe(0);
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId]);
+    expect(listSessionCharts(store.getState())).toEqual([chart]);
+  });
+
+  it('checks the policy on commands and on replay', () => {
     const controller = new InteractionController({ store, history, getWb: () => wb });
     const unregister = registerInteractionController(store, controller);
     try {
-      const chart = createSessionChart(store, range(0, 0, 2, 2), { id: 'policy' }, history);
-      expect(chart).not.toBeNull();
-      updateSessionChart(store, 'policy', { dataLabels: { visible: true } }, history);
+      const chart = createSessionChart(store, range(0, 0, 3, 2), { wb }, history);
+      if (!chart) throw new Error('chart was not created');
+      updateSessionChart(store, chart.id, { title: 'Edited' }, history, wb);
       expect(history.undo()).toBe(true);
       controller.setPolicy(viewerPolicy());
       expect(history.redo()).toBe(false);
       expect(history.undo()).toBe(false);
-      expect(
-        updateSessionChart(store, 'policy', { dataLabels: { visible: true } }, history),
-      ).toBeNull();
-      expect(clearSessionChart(store, 'policy', history)).toBe(false);
-      expect(clearSessionChartsInRange(store, range(0, 0, 2, 2), history)).toBe(0);
-      expect(createSessionChart(store, range(0, 0, 2, 2), { id: 'denied' }, history)).toBeNull();
-      expect(store.getState().charts.charts).toHaveLength(1);
-      expect(sessionChartById(store.getState(), 'policy')?.dataLabels).toBeUndefined();
+      expect(updateSessionChart(store, chart.id, { title: 'Denied' }, history, wb)).toBeNull();
+      expect(clearSessionChart(store, chart.id, history, wb)).toBe(false);
+      expect(createSessionChart(store, range(0, 0, 3, 2), { wb }, history)).toBeNull();
+      expect(engineChartIds(wb)).toEqual([chart.nativeObjectId]);
+      expect(sessionChartById(store.getState(), chart.id)?.title).toEqual({ auto: true });
     } finally {
       unregister();
       controller.dispose();
-      wb.dispose();
     }
   });
 
-  it('checks both protected sheets when a settings update moves its source', () => {
-    const store = createSpreadsheetStore();
-    createSessionChart(store, range(0, 0, 2, 2), { id: 'source' });
-    setProtectedSheet(store, 1, true);
-    expect(
-      updateSessionChart(store, 'source', { source: { ...range(0, 0, 2, 2), sheet: 1 } }),
-    ).toBeNull();
-    expect(sessionChartById(store.getState(), 'source')?.source.sheet).toBe(0);
+  it('hands out detached copies', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), {
+      wb,
+      seriesStyles: [{ seriesId: 'series-0', dataLabels: { visible: true, showValue: true } }],
+    });
+    if (!chart) throw new Error('chart was not created');
+    const style = chart.seriesStyles?.[0];
+    expect(style?.dataLabels).toBeDefined();
+    (style?.dataLabels as { showValue: boolean }).showValue = false;
+    (chart.nativeAnchor as { fromRow: number }).fromRow = 999;
+    const stored = sessionChartById(store.getState(), chart.id);
+    expect(stored?.seriesStyles?.[0]?.dataLabels?.showValue).toBe(true);
+    expect(stored?.nativeAnchor.fromRow).not.toBe(999);
   });
-  it('preserves Excel geometry options through create, update, undo and redo', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-    const chart = createSessionChart(
+
+  it('re-reads a chart over formula cells when a recalc changes their inputs', () => {
+    // H1:I3 shows v = 10 * the North values; the chart reads only the formulas.
+    wb.setText({ sheet: 0, row: 0, col: 7 }, 'k');
+    wb.setText({ sheet: 0, row: 0, col: 8 }, 'v');
+    wb.setText({ sheet: 0, row: 1, col: 7 }, 'a');
+    wb.setText({ sheet: 0, row: 2, col: 7 }, 'b');
+    wb.setFormula({ sheet: 0, row: 1, col: 8 }, '=B2*10');
+    wb.setFormula({ sheet: 0, row: 2, col: 8 }, '=B3*10');
+    const chart = createSessionChart(store, range(0, 7, 2, 8), { wb });
+    if (!chart) throw new Error('chart was not created');
+    expect(chart.data).toMatchObject({ series: [{ values: [100, 150] }] });
+    const unsubscribe = wb.subscribe((event) => {
+      if (event.kind === 'recalc') refreshChartsAfterRecalc(wb, store);
+    });
+    try {
+      wb.setNumber({ sheet: 0, row: 1, col: 1 }, 7);
+    } finally {
+      unsubscribe();
+    }
+    expect(sessionChartById(store.getState(), chart.id)?.data).toMatchObject({
+      series: [{ values: [70, 150] }],
+    });
+  });
+
+  it('projects workbook charts it cannot draw as placeholders that only move', async () => {
+    const loaded = await WorkbookHandle.loadBytes(fixture('chart_chartex.xlsx'));
+    try {
+      hydrateChartsFromEngine(loaded, store, 0);
+      const [chart] = listSessionCharts(store.getState());
+      if (!chart) throw new Error('fixture chart missing');
+      expect(chart).toMatchObject({ kind: 'unsupported', unsupported: { reason: 'chartex' } });
+      expect(chart.source).toBeUndefined();
+      expect(sessionChartsForRange(store.getState(), range(0, 0, 100, 100))).toEqual([]);
+      expect(updateSessionChart(store, chart.id, { title: 'x' }, null, loaded)).toBeNull();
+      const moved = updateSessionChart(
+        store,
+        chart.id,
+        { anchor: { row: 30, col: 1 } },
+        null,
+        loaded,
+      );
+      expect(moved?.nativeAnchor).toMatchObject({ fromRow: 30, fromCol: 1 });
+    } finally {
+      loaded.dispose();
+    }
+  });
+
+  it('restores the chart and changes nothing when the engine rejects a step', async () => {
+    const loaded = await WorkbookHandle.loadBytes(fixture('chart_pivot.xlsx'));
+    try {
+      hydrateChartsFromEngine(loaded, store, 1);
+      const [chart] = listSessionCharts(store.getState());
+      if (!chart) throw new Error('fixture chart missing');
+      expect(chart.pivotChart).toBe(true);
+      const before = loaded.snapshotDrawing(1, chart.nativeObjectId);
+      // A PivotChart's series follow the PivotTable; the engine refuses to re-split them.
+      expect(
+        updateSessionChart(
+          store,
+          chart.id,
+          {
+            title: 'Renamed',
+            seriesDirection: chart.seriesDirection === 'rows' ? 'columns' : 'rows',
+          },
+          history,
+          loaded,
+        ),
+      ).toBeNull();
+      expect(loaded.snapshotDrawing(1, chart.nativeObjectId)).toEqual(before);
+      expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+      expect(history.canUndo()).toBe(false);
+    } finally {
+      loaded.dispose();
+    }
+  });
+
+  it('inserts ribbon charts with the recommended kind', () => {
+    expect(inferRecommendedChartKind(range(0, 0, 0, 4))).toBe('line');
+    expect(inferRecommendedChartKind(range(0, 0, 4, 0))).toBe('bar');
+    expect(inferRecommendedChartKind(range(0, 0, 3, 1))).toBe('pie');
+    expect(inferRecommendedChartKind(range(0, 0, 3, 2))).toBe('column');
+    const chart = createRibbonChartFromSelection({
       store,
-      range(0, 0, 2, 2),
-      {
-        id: 'geometry',
-        gapWidth: 150,
-        overlap: -25,
-        firstSliceAngle: 90,
-      },
+      wb,
+      range: range(0, 4, 2, 5),
+      action: 'recommended',
       history,
-    );
-    expect(chart).toMatchObject({ gapWidth: 150, overlap: -25, firstSliceAngle: 90 });
-    updateSessionChart(
-      store,
-      'geometry',
-      { gapWidth: 0, overlap: 100, firstSliceAngle: 270 },
-      history,
-    );
-    expect(sessionChartById(store.getState(), 'geometry')).toMatchObject({
-      gapWidth: 0,
-      overlap: 100,
-      firstSliceAngle: 270,
     });
-    history.undo();
-    expect(sessionChartById(store.getState(), 'geometry')).toMatchObject({
-      gapWidth: 150,
-      overlap: -25,
-      firstSliceAngle: 90,
-    });
-    history.redo();
-    expect(sessionChartById(store.getState(), 'geometry')).toMatchObject({
-      gapWidth: 0,
-      overlap: 100,
-      firstSliceAngle: 270,
-    });
-  });
-  it('creates a reusable session chart overlay with stable defaults', () => {
-    const store = createSpreadsheetStore();
-    const r = range(1, 0, 5, 2);
-
-    const chart = createSessionChart(store, r, { kind: 'line' });
-
-    expect(chart).toEqual({
-      id: 'chart-0-1-0-5-2-line',
-      kind: 'line',
-      source: r,
-      title: 'Line chart',
-    });
-    expect(store.getState().charts.charts).toEqual([chart]);
-  });
-
-  it('supports Excel-style chart kinds used by the ribbon', () => {
-    const store = createSpreadsheetStore();
-
-    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'bar' })?.title).toBe('Bar chart');
-    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'area' })?.title).toBe(
-      'Area chart',
-    );
-    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'pie' })?.title).toBe('Pie chart');
-    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'scatter' })?.title).toBe(
-      'Scatter chart',
-    );
-  });
-
-  it('can leave the title unset for localized render fallbacks', () => {
-    const store = createSpreadsheetStore();
-    const chart = createSessionChart(store, range(0, 0, 2, 0), {
-      kind: 'column',
-      title: null,
-    });
-
-    expect(chart?.title).toBeUndefined();
-    expect(store.getState().charts.charts[0]?.title).toBeUndefined();
-  });
-
-  it('accepts host placement and visual options', () => {
-    const store = createSpreadsheetStore();
-    const chart = createSessionChart(store, range(0, 0, 3, 1), {
-      id: 'sales',
-      kind: 'column',
-      title: 'Sales',
-      color: '#107c10',
-      x: 24,
-      y: 40,
-      w: 480,
-      h: 280,
-    });
-
-    expect(chart).toMatchObject({
-      id: 'sales',
-      title: 'Sales',
-      color: '#107c10',
-      x: 24,
-      y: 40,
-      w: 480,
-      h: 280,
-    });
-  });
-
-  it('keeps nested chart options detached from callers and the returned command value', () => {
-    const store = createSpreadsheetStore();
-    const palette = ['#107c10', '#ed7d31'];
-    const legend = { visible: true, position: 'bottom' as const };
-    const chart = createSessionChart(store, range(0, 0, 3, 1), {
-      kind: 'column',
-      palette,
-      legend,
-      xAxis: { title: 'Month' },
-      yAxis: { min: 0, max: 100 },
-    });
-    if (!chart) throw new Error('expected chart');
-
-    palette[0] = '#000000';
-    legend.visible = false;
-    if (chart.palette) (chart.palette as string[])[0] = '#ffffff';
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      palette: ['#107c10', '#ed7d31'],
-      legend: { visible: true, position: 'bottom' },
-      xAxis: { title: 'Month' },
-      yAxis: { min: 0, max: 100 },
-    });
-
-    const patchPalette = ['#4472c4'];
-    const patch = { palette: patchPalette, legend: { visible: false } };
-    updateSessionChart(store, chart.id, patch);
-    patchPalette[0] = '#000000';
-    expect(store.getState().charts.charts[0]?.palette).toEqual(['#4472c4']);
-    expect(store.getState().charts.charts[0]?.legend).toEqual({ visible: false });
-  });
-
-  it('maps a labeled table to named category series without summing columns', () => {
-    const store = createSpreadsheetStore();
-    store.setState((s) => ({
-      ...s,
-      data: {
-        ...s.data,
-        cells: new Map([
-          [
-            addrKey({ sheet: 0, row: 0, col: 0 }),
-            { value: { kind: 'text', value: 'Month' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 0, col: 1 }),
-            { value: { kind: 'text', value: 'North' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 0, col: 2 }),
-            { value: { kind: 'text', value: 'South' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 1, col: 0 }),
-            { value: { kind: 'text', value: 'Jan' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 1, col: 1 }),
-            { value: { kind: 'number', value: 10 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 1, col: 2 }),
-            { value: { kind: 'number', value: 20 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 2, col: 0 }),
-            { value: { kind: 'text', value: 'Feb' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 2, col: 1 }),
-            { value: { kind: 'number', value: 30 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 2, col: 2 }),
-            { value: { kind: 'number', value: 40 }, formula: null },
-          ],
-        ]),
-      },
-    }));
-
-    expect(sessionChartData(store.getState(), range(0, 0, 2, 2), { kind: 'column' })).toEqual({
-      domain: 'category',
-      categories: ['Jan', 'Feb'],
-      series: [
-        { id: 'series-0', name: 'North', values: [10, 30] },
-        { id: 'series-1', name: 'South', values: [20, 40] },
-      ],
-    });
-  });
-
-  it('forwards explicit header flags from a session chart to the data adapter', () => {
-    const store = createSpreadsheetStore();
-    store.setState((s) => ({
-      ...s,
-      data: {
-        ...s.data,
-        cells: new Map([
-          [
-            addrKey({ sheet: 0, row: 0, col: 0 }),
-            { value: { kind: 'text', value: 'Category' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 0, col: 1 }),
-            { value: { kind: 'number', value: 2025 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 0, col: 2 }),
-            { value: { kind: 'number', value: 2026 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 1, col: 0 }),
-            { value: { kind: 'text', value: 'A' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 1, col: 1 }),
-            { value: { kind: 'number', value: 1 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 1, col: 2 }),
-            { value: { kind: 'number', value: 2 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 2, col: 0 }),
-            { value: { kind: 'text', value: 'B' }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 2, col: 1 }),
-            { value: { kind: 'number', value: 3 }, formula: null },
-          ],
-          [
-            addrKey({ sheet: 0, row: 2, col: 2 }),
-            { value: { kind: 'number', value: 4 }, formula: null },
-          ],
-        ]),
-      },
-    }));
-
-    const chart = createSessionChart(store, range(0, 0, 2, 2), {
-      kind: 'column',
-      seriesDirection: 'columns',
-      headerRow: true,
-      headerColumn: true,
-    });
-    if (!chart) throw new Error('expected chart');
-    expect(chart).toMatchObject({ headerRow: true, headerColumn: true });
-    expect(sessionChartData(store.getState(), chart)).toEqual({
-      domain: 'category',
-      categories: ['A', 'B'],
-      series: [
-        { id: 'series-0', name: '2025', values: [1, 3] },
-        { id: 'series-1', name: '2026', values: [2, 4] },
-      ],
-    });
-  });
-
-  it('clears charts by id or intersecting source range', () => {
-    const store = createSpreadsheetStore();
-    createSessionChart(store, range(0, 0, 3, 1), { id: 'a' });
-    createSessionChart(store, range(10, 0, 13, 1), { id: 'b' });
-
-    expect(clearSessionChart(store, 'a')).toBe(true);
-    expect(store.getState().charts.charts.map((c) => c.id)).toEqual(['b']);
-
-    expect(clearSessionChartsInRange(store, range(11, 0, 12, 1))).toBe(1);
-    expect(store.getState().charts.charts).toHaveLength(0);
-  });
-
-  it('updates placement and size by id', () => {
-    const store = createSpreadsheetStore();
-    createSessionChart(store, range(0, 0, 3, 1), { id: 'a' });
-
-    const updated = updateSessionChart(store, 'a', { x: 32, y: 48, w: 420, h: 260 });
-
-    expect(updated).toMatchObject({ id: 'a', x: 32, y: 48, w: 420, h: 260 });
-    expect(store.getState().charts.charts[0]).toMatchObject({
-      id: 'a',
-      x: 32,
-      y: 48,
-      w: 420,
-      h: 260,
-    });
-  });
-
-  it('lists, finds, and filters session charts for host object panes', () => {
-    const store = createSpreadsheetStore();
-    const a = createSessionChart(store, range(0, 0, 3, 1), { id: 'a' });
-    const b = createSessionChart(store, range(10, 0, 13, 1), { id: 'b' });
-
-    expect(listSessionCharts(store.getState())).toEqual([a, b]);
-    expect(sessionChartById(store.getState(), 'b')).toEqual(b);
-    expect(sessionChartById(store.getState(), 'missing')).toBeNull();
-    expect(sessionChartsForRange(store.getState(), range(1, 0, 2, 0))).toEqual([a]);
-    expect(updateSessionChart(store, 'missing', { title: 'No-op' })).toBeNull();
-  });
-
-  it('extracts reusable chart series from rows, columns, and table-like ranges', () => {
-    const store = createSpreadsheetStore();
-    seedNumbers(store, [
-      { row: 0, col: 0, value: 1 },
-      { row: 0, col: 1, value: 2 },
-      { row: 1, col: 0, value: 3 },
-      { row: 1, col: 1, value: 4 },
-    ]);
-    const chart = createSessionChart(store, range(0, 0, 1, 1), { id: 'matrix' });
-
-    expect(sessionChartSeries(store.getState(), range(0, 0, 0, 1))).toEqual([
-      { label: 'A', value: 1 },
-      { label: 'B', value: 2 },
-    ]);
-    expect(sessionChartSeries(store.getState(), range(0, 0, 1, 0))).toEqual([
-      { label: '1', value: 1 },
-      { label: '2', value: 3 },
-    ]);
-    if (!chart) throw new Error('expected chart to be created');
-    expect(sessionChartSeries(store.getState(), chart)).toEqual([
-      { label: 'A', value: 4 },
-      { label: 'B', value: 6 },
-    ]);
-  });
-
-  it('returns an empty series for huge chart source ranges', () => {
-    const store = createSpreadsheetStore();
-    seedNumbers(store, [{ row: 0, col: 0, value: 1 }]);
-
-    expect(sessionChartSeries(store.getState(), range(0, 0, 0, 10_000))).toEqual([]);
-    expect(sessionChartSeries(store.getState(), range(0, 0, 10_000, 1))).toEqual([]);
-  });
-
-  it('rejects create, update, and clear on protected sheets', () => {
-    const store = createSpreadsheetStore();
-    const chart = createSessionChart(store, range(0, 0, 3, 1), { id: 'a' });
-    expect(chart).not.toBeNull();
-    setProtectedSheet(store, 0, true);
-
-    expect(createSessionChart(store, range(1, 0, 4, 1), { id: 'b' })).toBeNull();
-    expect(updateSessionChart(store, 'a', { x: 32 })).toBeNull();
-    expect(clearSessionChart(store, 'a')).toBe(false);
-    expect(clearSessionChartsInRange(store, range(0, 0, 3, 1))).toBe(0);
-    expect(listSessionCharts(store.getState())).toEqual([chart]);
-  });
-
-  it('records session chart create, update, and clear in history', () => {
-    const store = createSpreadsheetStore();
-    const history = new History();
-
-    const chart = createSessionChart(store, range(0, 0, 3, 1), { id: 'a' }, history);
-    expect(chart).not.toBeNull();
-    expect(listSessionCharts(store.getState()).map((c) => c.id)).toEqual(['a']);
-    expect(history.undo()).toBe(true);
-    expect(listSessionCharts(store.getState())).toEqual([]);
-    expect(history.redo()).toBe(true);
-    expect(listSessionCharts(store.getState()).map((c) => c.id)).toEqual(['a']);
-
-    expect(updateSessionChart(store, 'a', { x: 10 }, history)).toMatchObject({ x: 10 });
-    expect(history.undo()).toBe(true);
-    expect(sessionChartById(store.getState(), 'a')?.x).toBeUndefined();
-
-    expect(clearSessionChart(store, 'a', history)).toBe(true);
-    expect(listSessionCharts(store.getState())).toEqual([]);
-    expect(history.undo()).toBe(true);
-    expect(listSessionCharts(store.getState()).map((c) => c.id)).toEqual(['a']);
+    expect(chart?.kind).toBe('pie');
+    expect(history.canUndo()).toBe(true);
   });
 });

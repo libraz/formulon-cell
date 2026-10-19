@@ -1,4 +1,5 @@
 import { parseA1Atom } from './address.js';
+import type { Range } from './types.js';
 import { formatCell } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -15,19 +16,24 @@ export function makeRangeResolver(wb: WorkbookHandle, fallbackSheet: number): Ra
   return (ref: string): string[] => resolveRangeRef(wb, ref, fallbackSheet);
 }
 
-export function resolveRangeRef(wb: WorkbookHandle, ref: string, fallbackSheet: number): string[] {
+/** The range `ref` names, on `fallbackSheet` when it has no sheet prefix; null
+ *  when it does not parse or names no sheet of the workbook. */
+export function rangeForRef(wb: WorkbookHandle, ref: string, fallbackSheet: number): Range | null {
   const parsed = parseRangeRef(ref);
-  if (!parsed) return [];
-  let sheet = fallbackSheet;
-  if (parsed.sheetName !== null) {
-    const idx = sheetIndexByName(wb, parsed.sheetName);
-    if (idx < 0) return [];
-    sheet = idx;
-  }
+  if (!parsed) return null;
+  const sheet = parsed.sheetName === null ? fallbackSheet : sheetIndexByName(wb, parsed.sheetName);
+  if (sheet < 0) return null;
+  return { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
+}
+
+export function resolveRangeRef(wb: WorkbookHandle, ref: string, fallbackSheet: number): string[] {
+  const range = rangeForRef(wb, ref, fallbackSheet);
+  if (!range) return [];
+  const { sheet } = range;
   const seen = new Set<string>();
   const out: string[] = [];
-  for (let row = parsed.r0; row <= parsed.r1; row += 1) {
-    for (let col = parsed.c0; col <= parsed.c1; col += 1) {
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
       const value = wb.getValue({ sheet, row, col });
       if (value.kind === 'blank') continue;
       const text = formatCell(value);
