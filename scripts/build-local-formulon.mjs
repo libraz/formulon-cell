@@ -24,7 +24,7 @@ run('make', [
   'wasm-threads',
   `WASM_BUILD_DIR=${single}`,
   `WASM_THREADS_BUILD_DIR=${threads}`,
-  'JOBS=4',
+  `JOBS=${process.env.FORMULON_BUILD_JOBS ?? '4'}`,
 ]);
 const staging = await mkdtemp(join(tmpdir(), 'formulon-cell-npm-'));
 const pkg = join(staging, 'package');
