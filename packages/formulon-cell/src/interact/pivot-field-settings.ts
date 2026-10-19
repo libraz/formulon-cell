@@ -1,5 +1,7 @@
 import type { PivotSourceField } from '../commands/pivot-table.js';
 import {
+  PIVOT_SHOW_AS_BASE_NEXT,
+  PIVOT_SHOW_AS_BASE_PREVIOUS,
   type PivotAggregation,
   PivotAxis,
   type PivotFilterSpec,
@@ -29,6 +31,64 @@ export type PivotValueFieldSetting = {
   aggregation?: PivotAggregation;
   numberFormat?: string;
   showValuesAs?: PivotShowValuesAsValue;
+  /** Row or column field name the show-as kind is measured along. */
+  showAsBaseField?: string;
+  /** Position in the base field's items, or a base-item sentinel. */
+  showAsBaseItem?: number;
+};
+
+const BASE_ITEM_KINDS: ReadonlySet<PivotShowValuesAsValue> = new Set([
+  PivotShowValuesAs.DifferenceFrom,
+  PivotShowValuesAs.PercentDifferenceFrom,
+  PivotShowValuesAs.PercentOf,
+]);
+
+const BASE_FIELD_KINDS: ReadonlySet<PivotShowValuesAsValue> = new Set([
+  ...BASE_ITEM_KINDS,
+  PivotShowValuesAs.PercentOfRunningTotal,
+  PivotShowValuesAs.PercentOfParent,
+  PivotShowValuesAs.RankAscending,
+  PivotShowValuesAs.RankDescending,
+]);
+
+/** Whether the engine reads a base field for this show-values-as kind. */
+export const pivotShowAsNeedsBaseField = (kind: PivotShowValuesAsValue | undefined): boolean =>
+  kind !== undefined && BASE_FIELD_KINDS.has(kind);
+
+/** Whether the engine also reads a base item for this show-values-as kind. */
+export const pivotShowAsNeedsBaseItem = (kind: PivotShowValuesAsValue | undefined): boolean =>
+  kind !== undefined && BASE_ITEM_KINDS.has(kind);
+
+/**
+ * Completes or clears the base field/item of a value-field setting so it matches what
+ * its kind needs: a missing or stale base defaults to the first eligible field and to
+ * "(previous)". `itemCount` (optional) invalidates a specific item past the field's items.
+ */
+export const resolvePivotShowAsBase = (
+  setting: PivotValueFieldSetting,
+  eligibleFields: readonly string[],
+  itemCount?: (fieldName: string) => number,
+): PivotValueFieldSetting => {
+  const { showAsBaseField: _field, showAsBaseItem: _item, ...rest } = setting;
+  if (!pivotShowAsNeedsBaseField(setting.showValuesAs)) return rest;
+  const field =
+    setting.showAsBaseField !== undefined && eligibleFields.includes(setting.showAsBaseField)
+      ? setting.showAsBaseField
+      : eligibleFields[0];
+  if (field === undefined) return rest;
+  if (!pivotShowAsNeedsBaseItem(setting.showValuesAs)) return { ...rest, showAsBaseField: field };
+  const item = setting.showAsBaseItem;
+  const keep =
+    field === setting.showAsBaseField &&
+    item !== undefined &&
+    (item === PIVOT_SHOW_AS_BASE_PREVIOUS ||
+      item === PIVOT_SHOW_AS_BASE_NEXT ||
+      (itemCount === undefined ? item >= 0 : item >= 0 && item < itemCount(field)));
+  return {
+    ...rest,
+    showAsBaseField: field,
+    showAsBaseItem: keep ? item : PIVOT_SHOW_AS_BASE_PREVIOUS,
+  };
 };
 
 export const createPivotAreaSettingsButton = (
@@ -594,12 +654,35 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
         aggregation: Number(aggregation.value) as PivotAggregation,
       });
     });
+    const eligibleBaseFields = [controls.rowSelect.value, controls.colSelect.value].filter(
+      (name) => name !== '',
+    );
+    const baseItemCount = (fieldName: string): number => options.inferFilterItems(fieldName).length;
+    const resolved = resolvePivotShowAsBase(setting, eligibleBaseFields, baseItemCount);
     const showValuesAs = createDialogSelect(
       [
         { value: String(PivotShowValuesAs.Normal), label: t.showValuesAsNormal },
-        { value: String(PivotShowValuesAs.PercentOfRow), label: t.showValuesAsPercentOfRow },
-        { value: String(PivotShowValuesAs.PercentOfCol), label: t.showValuesAsPercentOfColumn },
         { value: String(PivotShowValuesAs.PercentOfTotal), label: t.showValuesAsPercentOfTotal },
+        { value: String(PivotShowValuesAs.PercentOfCol), label: t.showValuesAsPercentOfColumn },
+        { value: String(PivotShowValuesAs.PercentOfRow), label: t.showValuesAsPercentOfRow },
+        { value: String(PivotShowValuesAs.PercentOf), label: t.showValuesAsPercentOf },
+        {
+          value: String(PivotShowValuesAs.PercentOfParentRow),
+          label: t.showValuesAsPercentOfParentRow,
+        },
+        {
+          value: String(PivotShowValuesAs.PercentOfParentCol),
+          label: t.showValuesAsPercentOfParentColumn,
+        },
+        {
+          value: String(PivotShowValuesAs.PercentOfParent),
+          label: t.showValuesAsPercentOfParentTotal,
+        },
+        { value: String(PivotShowValuesAs.DifferenceFrom), label: t.showValuesAsDifferenceFrom },
+        {
+          value: String(PivotShowValuesAs.PercentDifferenceFrom),
+          label: t.showValuesAsPercentDifferenceFrom,
+        },
         {
           value: String(PivotShowValuesAs.RunningTotalInRow),
           label: t.showValuesAsRunningTotalInRow,
@@ -608,17 +691,74 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
           value: String(PivotShowValuesAs.RunningTotalInCol),
           label: t.showValuesAsRunningTotalInColumn,
         },
+        {
+          value: String(PivotShowValuesAs.PercentOfRunningTotal),
+          label: t.showValuesAsPercentRunningTotal,
+        },
+        { value: String(PivotShowValuesAs.RankAscending), label: t.showValuesAsRankAscending },
+        { value: String(PivotShowValuesAs.RankDescending), label: t.showValuesAsRankDescending },
         { value: String(PivotShowValuesAs.Index), label: t.showValuesAsIndex },
       ],
       String(setting.showValuesAs ?? PivotShowValuesAs.Normal),
       { className: 'fc-fmtdlg__select' },
     );
+    const storeShowAs = (next: PivotValueFieldSetting): void => {
+      const after = resolvePivotShowAsBase(next, eligibleBaseFields, baseItemCount);
+      options.setValueFieldSetting(active.fieldName, after);
+      // Re-render only when the set of base controls changes, to keep focus otherwise.
+      if (
+        after.showAsBaseField !== resolved.showAsBaseField ||
+        (after.showAsBaseItem === undefined) !== (resolved.showAsBaseItem === undefined)
+      ) {
+        renderPivotFieldSettingsPanel(options);
+      }
+    };
     showValuesAs.addEventListener('change', () => {
-      options.setValueFieldSetting(active.fieldName, {
+      storeShowAs({
         ...options.selectedValueSetting(active.fieldName),
         showValuesAs: Number(showValuesAs.value) as PivotShowValuesAsValue,
       });
     });
+    const baseControls: HTMLElement[] = [];
+    if (resolved.showAsBaseField !== undefined) {
+      const baseField = createDialogSelect(
+        eligibleBaseFields.map((name) => ({ value: name, label: name })),
+        resolved.showAsBaseField,
+        { className: 'fc-fmtdlg__select' },
+      );
+      baseField.addEventListener('change', () => {
+        storeShowAs({
+          ...options.selectedValueSetting(active.fieldName),
+          showAsBaseField: baseField.value,
+          showAsBaseItem: undefined,
+        });
+      });
+      baseControls.push(settingsFieldRow(t.showValuesAsBaseField, baseField));
+    }
+    if (resolved.showAsBaseField !== undefined && resolved.showAsBaseItem !== undefined) {
+      const baseItem = createDialogSelect(
+        [
+          ...options
+            .inferFilterItems(resolved.showAsBaseField)
+            .map((name, index) => ({ value: String(index), label: name })),
+          {
+            value: String(PIVOT_SHOW_AS_BASE_PREVIOUS),
+            label: t.showValuesAsBaseItemPrevious,
+          },
+          { value: String(PIVOT_SHOW_AS_BASE_NEXT), label: t.showValuesAsBaseItemNext },
+        ],
+        String(resolved.showAsBaseItem),
+        { className: 'fc-fmtdlg__select' },
+      );
+      baseItem.addEventListener('change', () => {
+        storeShowAs({
+          ...options.selectedValueSetting(active.fieldName),
+          showAsBaseField: resolved.showAsBaseField,
+          showAsBaseItem: Number(baseItem.value),
+        });
+      });
+      baseControls.push(settingsFieldRow(t.showValuesAsBaseItem, baseItem));
+    }
     const format = document.createElement('input');
     format.type = 'text';
     format.className = 'fc-namedlg__input';
@@ -633,6 +773,7 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
     settingsControls.append(
       settingsFieldRow(t.aggregation, aggregation),
       settingsFieldRow(t.showValuesAs, showValuesAs),
+      ...baseControls,
       settingsFieldRow(t.numberFormat, format),
     );
   } else {

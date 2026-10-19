@@ -3,7 +3,13 @@ import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { pivotAggregationName } from '../engine/pivot-aggregation.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
-import { PivotAggregation, PivotAxis, PivotSortOrder } from '../engine/types.js';
+import {
+  PIVOT_SHOW_AS_BASE_NEXT,
+  PIVOT_SHOW_AS_BASE_PREVIOUS,
+  PivotAggregation,
+  PivotAxis,
+  PivotSortOrder,
+} from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -29,6 +35,10 @@ export interface PivotValueFieldSettings {
   aggregation?: PivotAggregation;
   numberFormat?: string;
   showValuesAs?: PivotShowValuesAs;
+  /** Row or column field the show-as base axis refers to. */
+  showAsBaseField?: string;
+  /** Position in `inferPivotFieldItems` of the base field, or a base-item sentinel. */
+  showAsBaseItem?: number;
 }
 
 export interface CreatePivotTableOptions {
@@ -253,6 +263,12 @@ export function createPivotTableFromRange(
     Array.from(filterItemFields).some((name) => !filterFieldNames.includes(name)) ||
     Array.from(pivotFilterFields).some((name) => !filterFieldNames.includes(name)) ||
     rowField.name === columnField?.name ||
+    Array.from(valueFieldSettings.values()).some(
+      (settings) =>
+        settings.showAsBaseField !== undefined &&
+        settings.showAsBaseField !== rowField.name &&
+        settings.showAsBaseField !== columnField?.name,
+    ) ||
     filterFields.some((field) => field?.name === rowField.name) ||
     (columnField !== undefined && filterFields.some((field) => field?.name === columnField.name))
   ) {
@@ -362,8 +378,9 @@ export function createPivotTableFromRange(
     if (!ok) return failAfterPivot('row-sort');
   }
 
+  let colPivotField = -1;
   if (columnField) {
-    const colPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
+    colPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
       sourceName: columnField.name,
       axis: PivotAxis.Col,
       subtotalTop: opts.columnSubtotalTop ?? true,
@@ -411,6 +428,38 @@ export function createPivotTableFromRange(
     }
   }
 
+  // A specific base item is a position in the base field's items, so list them first.
+  const baseFieldIndexes = new Map<string, number>([[rowField.name, rowPivotField]]);
+  if (columnField) baseFieldIndexes.set(columnField.name, colPivotField);
+  const itemsListed = new Set<string>();
+  for (const settings of valueFieldSettings.values()) {
+    const baseName = settings.showAsBaseField;
+    const baseItem = settings.showAsBaseItem;
+    if (
+      baseName === undefined ||
+      baseItem === undefined ||
+      baseItem === PIVOT_SHOW_AS_BASE_PREVIOUS ||
+      baseItem === PIVOT_SHOW_AS_BASE_NEXT ||
+      itemsListed.has(baseName)
+    ) {
+      continue;
+    }
+    itemsListed.add(baseName);
+    for (const item of inferPivotFieldItems(wb, opts.source, baseName)) {
+      if (
+        !wb.addPivotFieldItem(
+          opts.destination.sheet,
+          pivotIndex,
+          baseFieldIndexes.get(baseName) as number,
+          item,
+          true,
+        )
+      ) {
+        return failAfterPivot('base-item');
+      }
+    }
+  }
+
   for (const valueField of valueFields) {
     if (!valueField) return failAfterPivot('value-field');
     const valuePivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
@@ -431,6 +480,11 @@ export function createPivotTableFromRange(
       aggregation,
       numberFormat: numberFormat || undefined,
       showValuesAs: settings?.showValuesAs,
+      showAsBaseField:
+        settings?.showAsBaseField === undefined
+          ? undefined
+          : baseFieldIndexes.get(settings.showAsBaseField),
+      showAsBaseItem: settings?.showAsBaseItem,
     });
     if (dataField < 0) return failAfterPivot('data-field');
   }

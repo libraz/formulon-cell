@@ -10,6 +10,7 @@ import {
 } from '../../../src/commands/pivot-table.js';
 import {
   type CellValue,
+  PIVOT_SHOW_AS_BASE_PREVIOUS,
   PivotAggregation,
   PivotAxis,
   PivotFilterType,
@@ -161,6 +162,10 @@ const makeWb = () => {
           String((spec as { showValuesAs?: number }).showValuesAs ?? ''),
         ].join(':'),
       );
+      const base = spec as { showAsBaseField?: number; showAsBaseItem?: number };
+      if (base.showAsBaseField !== undefined || base.showAsBaseItem !== undefined) {
+        calls.push(`data-field-base:${spec.name}:${base.showAsBaseField}:${base.showAsBaseItem}`);
+      }
       return 0;
     },
   } as unknown as WorkbookHandle;
@@ -438,6 +443,71 @@ describe('pivot-table command helpers', () => {
     expect(calls).toContain('data-field:Average of Sales:2:2:#,##0.00:3');
     expect(calls).toContain('data-field:Count of Product:1:1:#,##0:');
     expect(calls).not.toContain('data-field:Average of Product:1:2:#,##0.00:3');
+  });
+
+  it('maps the show-as base field to its pivot field and lists base items first', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      valueField: 'Sales',
+      valueFieldSettings: [
+        {
+          fieldName: 'Sales',
+          showValuesAs: PivotShowValuesAs.PercentOf,
+          showAsBaseField: 'Region',
+          showAsBaseItem: 1,
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain('pivot-item:0:East:true');
+    expect(calls).toContain('pivot-item:0:West:true');
+    expect(calls).toContain('data-field-base:Sum of Sales:0:1');
+    expect(calls.indexOf('pivot-item:0:West:true')).toBeLessThan(
+      calls.findIndex((c) => c.startsWith('data-field:')),
+    );
+  });
+
+  it('forwards a sentinel base item without listing items and rejects a non-axis base field', () => {
+    const { wb, calls } = makeWb();
+    const source = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 };
+    const destination = { sheet: 0, row: 5, col: 0 };
+    const ok = createPivotTableFromRange(wb, {
+      source,
+      destination,
+      rowField: 'Region',
+      valueField: 'Sales',
+      valueFieldSettings: [
+        {
+          fieldName: 'Sales',
+          showValuesAs: PivotShowValuesAs.DifferenceFrom,
+          showAsBaseField: 'Region',
+          showAsBaseItem: PIVOT_SHOW_AS_BASE_PREVIOUS,
+        },
+      ],
+    });
+    expect(ok.ok).toBe(true);
+    expect(calls.some((c) => c.startsWith('pivot-item:'))).toBe(false);
+    expect(calls).toContain(`data-field-base:Sum of Sales:0:${PIVOT_SHOW_AS_BASE_PREVIOUS}`);
+
+    expect(
+      createPivotTableFromRange(wb, {
+        source,
+        destination,
+        rowField: 'Region',
+        valueField: 'Sales',
+        valueFieldSettings: [
+          {
+            fieldName: 'Sales',
+            showValuesAs: PivotShowValuesAs.RankAscending,
+            showAsBaseField: 'Product',
+          },
+        ],
+      }),
+    ).toEqual({ ok: false, reason: 'invalid-field' });
   });
 
   it('refreshes an existing pivot cache from a matching source range', () => {

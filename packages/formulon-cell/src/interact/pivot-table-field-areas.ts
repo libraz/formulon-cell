@@ -8,6 +8,7 @@ import {
   type PivotFilterConditionState,
   type PivotValueFieldSetting,
   pivotFilterConditionToSpec,
+  resolvePivotShowAsBase,
 } from './pivot-field-settings.js';
 
 export interface PivotFieldAreaSelects {
@@ -179,6 +180,10 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
       ...(setting.aggregation === undefined ? {} : { aggregation: setting.aggregation }),
       ...(numberFormat.length > 0 ? { numberFormat } : {}),
       ...(setting.showValuesAs === undefined ? {} : { showValuesAs: setting.showValuesAs }),
+      ...(setting.showAsBaseField === undefined
+        ? {}
+        : { showAsBaseField: setting.showAsBaseField }),
+      ...(setting.showAsBaseItem === undefined ? {} : { showAsBaseItem: setting.showAsBaseItem }),
     };
     if (
       next.aggregation === undefined &&
@@ -333,12 +338,17 @@ export function createPivotFieldAreas(selects: PivotFieldAreaSelects) {
       return spec ? [spec] : [];
     }),
     valueFieldSettings: selectedValueFields.map((fieldName) => {
-      const setting = selectedValueSetting(fieldName);
+      const setting = resolvePivotShowAsBase(
+        selectedValueSetting(fieldName),
+        [rowSelect.value, colSelect.value].filter((name) => name !== ''),
+      );
       return {
         fieldName,
         aggregation: setting.aggregation === undefined ? defaults.aggregation : setting.aggregation,
         numberFormat: setting.numberFormat ?? defaults.numberFormat,
         showValuesAs: setting.showValuesAs,
+        showAsBaseField: setting.showAsBaseField,
+        showAsBaseItem: setting.showAsBaseItem,
       };
     }),
   });
