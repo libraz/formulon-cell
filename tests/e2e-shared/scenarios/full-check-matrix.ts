@@ -204,7 +204,7 @@ interface SurfaceLabels {
   slicerClear: string;
   slicerClose: string;
   blank: string;
-  chartColumn: string;
+  chartClose: string;
   backstageFile: string;
   backstageInfo: string;
   backstageClose: string;
@@ -304,7 +304,7 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       slicerClear: strings.slicer.clear,
       slicerClose: strings.slicer.close,
       blank: strings.workbookObjects.pivotBlankItem,
-      chartColumn: strings.sessionCharts.columnChart,
+      chartClose: strings.sessionCharts.close,
       backstageFile: demoStrings.file,
       backstageInfo: demoStrings.info,
       backstageClose: demoStrings.close,
@@ -799,7 +799,9 @@ const runObjectsFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect(slicer.locator('.fc-slicer__chip[data-fc-value=""]').first()).toHaveText(
     labels.blank,
   );
-  await expect(chart.locator('.fc-chart__title')).toHaveText(labels.chartColumn);
+  // One untitled series takes the series name as its automatic title.
+  await expect(chart.locator('.fc-chart__title')).toHaveText('Sales');
+  await expect(chart.locator('.fc-chart__close')).toHaveAttribute('aria-label', labels.chartClose);
   await withinViewport(page, slicer);
   await withinViewport(page, chart);
 
@@ -810,7 +812,7 @@ const runObjectsFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect(slicer.locator('.fc-slicer__chip[data-fc-value=""]').first()).toHaveText(
     labels.blank,
   );
-  await expect(chart.locator('.fc-chart__title')).toHaveText(labels.chartColumn);
+  await expect(chart.locator('.fc-chart__close')).toHaveAttribute('aria-label', labels.chartClose);
   await page.keyboard.press('Escape');
   await slicer.locator('.fc-slicer__close').click();
   await chart.locator('.fc-chart__close').click();
