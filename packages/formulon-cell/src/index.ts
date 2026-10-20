@@ -559,6 +559,7 @@ export {
   showRowsAroundSelection,
 } from './commands/row-col-layout.js';
 export type {
+  ChartClip,
   ChartMutationAuthorization,
   CreateRibbonChartFromSelectionOptions,
   CreateSessionChartOptions,
@@ -571,11 +572,13 @@ export {
   arrangeSessionChart,
   clearSessionChart,
   clearSessionChartsInRange,
+  copySessionChart,
   createRibbonChartFromSelection,
   createSessionChart,
   duplicateSessionChart,
   inferRecommendedChartKind,
   listSessionCharts,
+  pasteSessionChart,
   removeSessionChartSeries,
   sessionChartById,
   sessionChartsForRange,
@@ -584,18 +587,21 @@ export {
 export type {
   CreateSessionImageOptions,
   CreateSessionShapeOptions,
+  IllustrationClip,
   SessionIllustrationArrangeAction,
   SessionIllustrationPatch,
 } from './commands/session-illustration.js';
 export {
   arrangeSessionIllustration,
   clearSessionIllustration,
+  copySessionIllustration,
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
   createSessionImage,
   createSessionShape,
   duplicateSessionIllustration,
   listSessionIllustrations,
+  pasteSessionIllustration,
   sessionIllustrationById,
   updateSessionIllustration,
 } from './commands/session-illustration.js';

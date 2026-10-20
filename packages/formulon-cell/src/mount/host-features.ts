@@ -727,6 +727,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.sessionCharts) return;
         s.sessionCharts = attachSessionCharts({
           host: input.host,
+          layer: input.grid.parentElement ?? input.host,
           store: input.store,
           getWb: input.wb,
           labels: strings.sessionCharts,
@@ -744,6 +745,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.sessionIllustrations) return;
         s.sessionIllustrations = attachSessionIllustrations({
           host: input.host,
+          layer: input.grid.parentElement ?? input.host,
           store: input.store,
           history: input.history,
           getWb: input.wb,

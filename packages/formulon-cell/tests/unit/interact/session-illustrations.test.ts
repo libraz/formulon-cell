@@ -206,10 +206,13 @@ describe('attachSessionIllustrations', () => {
     expect(overlay?.tabIndex).toBe(0);
     expect(overlay?.getAttribute('aria-roledescription')).toBe('Shape');
     if (!overlay) throw new Error('missing session illustration overlay');
+    overlay.focus();
 
     const move = fireKey(overlay, 'ArrowRight');
     expect(move.defaultPrevented).toBe(true);
     expect(store.getState().illustrations.illustrations[0]).toMatchObject({ x: 28, y: 30 });
+    // The redrawn object keeps focus, so the next key still reaches it.
+    expect(document.activeElement).toBe(host.querySelector('.fc-illustration'));
     expect(history.undo()).toBe(true);
     expect(store.getState().illustrations.illustrations[0]).toMatchObject({ x: 20, y: 30 });
     expect(history.redo()).toBe(true);
@@ -267,11 +270,12 @@ describe('attachSessionIllustrations', () => {
     fireKey(overlay, 'a');
     fireKey(overlay, 'Enter');
     fireKey(overlay, 'F2');
-    expect(fireKey(overlay, 'c', { ctrlKey: true }).defaultPrevented).toBe(true);
-    expect(fireKey(overlay, 'v', { metaKey: true }).defaultPrevented).toBe(true);
+    // The sheet's clipboard copies and pastes the selected object.
+    fireKey(overlay, 'c', { ctrlKey: true });
+    fireKey(overlay, 'v', { metaKey: true });
     fireKey(overlay, 'z', { ctrlKey: true });
     fireKey(overlay, 'Alt', { altKey: true });
-    expect(gridKeys).toEqual(['z', 'Alt']);
+    expect(gridKeys).toEqual(['c', 'v', 'z', 'Alt']);
 
     const duplicate = fireKey(overlay, 'd', { ctrlKey: true });
     expect(duplicate.defaultPrevented).toBe(true);
@@ -283,7 +287,7 @@ describe('attachSessionIllustrations', () => {
       'shape-1-copy',
     );
     expect(store.getState().ui.selectedObject?.name).toBe('Rectangle 2');
-    expect(gridKeys).toEqual(['z', 'Alt']);
+    expect(gridKeys).toEqual(['c', 'v', 'z', 'Alt']);
     expect(history.undo()).toBe(true);
     expect(store.getState().illustrations.illustrations.map((item) => item.id)).toEqual([
       'shape-1',

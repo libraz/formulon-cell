@@ -2097,6 +2097,8 @@ describe('attachSessionCharts', () => {
     expect(move.defaultPrevented).toBe(true);
     expect(pixels(panel()).x).toBeCloseTo(start.x + 8);
     expect(pixels(panel()).y).toBeCloseTo(start.y);
+    // The redrawn chart keeps focus, so the next key still reaches it.
+    expect(document.activeElement).toBe(panel());
 
     const resize = fireKey(panel(), 'ArrowDown', { shiftKey: true });
     expect(resize.defaultPrevented).toBe(true);
@@ -2257,13 +2259,14 @@ describe('attachSessionCharts', () => {
     fireKey(panel(), 'a');
     fireKey(panel(), 'Enter');
     fireKey(panel(), 'Tab');
-    expect(fireKey(panel(), 'x', { ctrlKey: true }).defaultPrevented).toBe(true);
+    // The sheet's clipboard cuts the selected chart rather than the cells.
+    fireKey(panel(), 'x', { ctrlKey: true });
     fireKey(panel(), 'y', { ctrlKey: true });
     // A chart's own buttons keep their keys from the grid too.
     const button = panel().querySelector<HTMLButtonElement>('.fc-chart__buttons button');
     if (!button) throw new Error('missing chart button');
     fireKey(button, 'Enter');
-    expect(gridKeys).toEqual(['y']);
+    expect(gridKeys).toEqual(['x', 'y']);
 
     const duplicate = fireKey(panel(), 'd', { metaKey: true });
     expect(duplicate.defaultPrevented).toBe(true);
@@ -2276,8 +2279,22 @@ describe('attachSessionCharts', () => {
     expect(store.getState().ui.selectedObject).toEqual({ id: copy.id, name: 'グラフ 2' });
     expect(history.undo()).toBe(true);
     expect(store.getState().charts.charts.map((entry) => entry.id)).toEqual([chart.id]);
+    // Undo takes the focused copy away; the keyboard goes back to the sheet.
+    expect(document.activeElement).toBe(host);
 
     host.removeEventListener('keydown', onGridKey);
+    handle.detach();
+  });
+
+  it('selects a chart another part of the sheet selects, as a paste does', () => {
+    const chart = salesTable();
+    const handle = attach({ labels: { objectName: 'グラフ {n}' } });
+
+    mutators.setSelectedObject(store, { id: chart.id, name: '' });
+    expect(panel().classList.contains('fc-chart--selected')).toBe(true);
+    expect(document.activeElement).toBe(panel());
+    expect(store.getState().ui.selectedObject).toEqual({ id: chart.id, name: 'グラフ 1' });
+
     handle.detach();
   });
 

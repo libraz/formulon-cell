@@ -18,7 +18,9 @@
     min-height: 0;
   }
 
+  /* Charts and pictures are drawn over the grid, from its top-left corner. */
   .fc-host__sheet-surface {
+    position: relative;
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;

@@ -21,22 +21,16 @@ export const INTERACTIVE = 'button, input, select, textarea, option, [contentedi
 
 const TEXT_ENTRY = 'input, textarea, select, [contenteditable="true"]';
 const MODIFIER_KEYS = new Set(['Alt', 'Control', 'Meta', 'Shift']);
-/** Ctrl or Cmd shortcuts a selected object answers instead of the cells under it. */
-const OBJECT_SHORTCUTS = new Set(['c', 'x', 'v', 'd']);
-
 /**
  * Keep a key pressed on a selected object from the grid under it, which would
- * otherwise type into, move or copy the active cell. Shortcuts the sheet owns,
- * such as Undo, still reach it.
+ * otherwise type into or move the active cell. Shortcuts the sheet owns still
+ * reach it: Undo, and Copy, Cut and Paste, which act on the selected object.
  */
 export const keepKeyFromGrid = (event: KeyboardEvent): void => {
   if (MODIFIER_KEYS.has(event.key)) return;
   if (event.target instanceof Element && event.target.closest(TEXT_ENTRY)) return;
-  const shortcut = event.ctrlKey || event.metaKey;
-  if (shortcut && !OBJECT_SHORTCUTS.has(event.key.toLowerCase())) return;
+  if ((event.ctrlKey || event.metaKey) && !isDuplicateShortcut(event)) return;
   event.stopPropagation();
-  // The browser would still fire its copy, cut or paste event at the grid.
-  if (shortcut) event.preventDefault();
 };
 
 /** Ctrl+D, or Cmd+D on a Mac: duplicate the selected object. */
@@ -45,6 +39,33 @@ export const isDuplicateShortcut = (event: KeyboardEvent): boolean =>
   !event.altKey &&
   !event.shiftKey &&
   event.key.toLowerCase() === 'd';
+
+/** The `data-*` id of the panel in `root` holding focus, before `root` is
+ *  rebuilt; undefined when focus is outside `root`. */
+export const focusedPanelId = (
+  root: HTMLElement,
+  selector: string,
+  key: string,
+): string | undefined => {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !root.contains(active)) return undefined;
+  return active.closest<HTMLElement>(selector)?.dataset[key] ?? '';
+};
+
+/** Focus the panel of object `id` in a rebuilt `root`, or `host` when the
+ *  object is gone, so the keyboard stays on the sheet. */
+export const focusPanel = (
+  root: HTMLElement,
+  selector: string,
+  key: string,
+  id: string,
+  host: HTMLElement,
+): void => {
+  const panel = Array.from(root.querySelectorAll<HTMLElement>(selector)).find(
+    (candidate) => candidate.dataset[key] === id,
+  );
+  (panel ?? host).focus({ preventScroll: true });
+};
 
 /** The frame `start` takes when `handle` is dragged by (dx, dy); a corner
  *  dragged with `keepRatio` scales the frame without changing its shape. */

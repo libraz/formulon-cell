@@ -16,6 +16,7 @@ versioning is [SemVer](https://semver.org/).
 - Right-clicking a chart, picture or shape opens its own menu instead of the cell menu, also from Shift+F10 or the context-menu key. A chart's menu offers Change Chart Type, Select Data and Format Chart Area, which open the matching settings tab, and every object can be brought to the front or sent to the back. `arrangeSessionChart` reorders a chart among its sheet's charts as one undo step. `sessionCharts` strings gain `changeChartType`, `selectData`, `formatChartArea`, `bringToFront` and `sendToBack`; `sessionIllustrations` strings gain `bringToFront` and `sendToBack`.
 - Holding Alt while moving or sizing a chart, picture or shape docks the dragged edges to the nearest gridlines.
 - Ctrl+D (Cmd+D on a Mac) duplicates the selected chart, picture or shape on top, offset from the original, and selects the copy. `duplicateSessionChart` copies a chart with every setting the engine stores, as one undo step.
+- Copy, Cut and Paste act on a selected chart, picture or shape, from the keyboard or the ribbon. Paste places the object with its top-left corner at the active cell, on any sheet, and selects it; a pasted chart keeps charting the cells it was copied from. Cut takes the object off the sheet at once. A copy of cells, or text copied in another application, replaces the copied object. `copySessionChart` / `pasteSessionChart` and `copySessionIllustration` / `pasteSessionIllustration` do the same from code, each paste as one undo step. `attachSessionCharts` and `attachSessionIllustrations` select an object another part of the sheet puts in `state.ui.selectedObject`.
 - Typed error literals such as `#N/A` and `#DIV/0!` are stored as error values, with the German and French spellings in those locales. `CoercedInput` gains an `error` kind.
 
 ### Changed
@@ -38,6 +39,8 @@ versioning is [SemVer](https://semver.org/).
 - Charts and anchored pictures scroll off with their anchor cell instead of sticking to the first visible column or row, and they pass under the headers and frozen panes.
 - Keys pressed while a chart, picture or shape is selected no longer type into, move or copy the active cell under it; Undo, Redo and other sheet shortcuts still work.
 - A duplicated imported picture is placed offset from the original instead of exactly on top of it.
+- Charts, pictures and shapes are drawn on their anchor cells; they sat one formula-bar height too high. `attachSessionCharts` and `attachSessionIllustrations` take a `layer` to draw over, whose corner is the grid's.
+- A chart, picture or shape keeps keyboard focus after it is moved or resized with the arrow keys, so the next key still reaches it, and focus returns to the sheet when Undo takes a selected object away.
 - The `workbookObjects()` extension factory duplicates, deletes and edits workbook pictures in the workbook, as the default objects pane does, instead of leaving them unchanged.
 - The long date format offered for Japanese and Chinese was missing its closing quote and displayed the date serial.
 - Loading a number format no longer drops the backslash-escaped currency symbol or the parentheses of a negative section, and date, time and custom formats keep their quoted literals and locale tags. `h:mm` is read as a time rather than a date-time.

@@ -1,4 +1,5 @@
 import { type CopyResult, copy } from '../commands/clipboard/copy.js';
+import { createDrawingClipboard } from '../commands/clipboard/drawing.js';
 import { encodeHtml } from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import {
@@ -60,8 +61,28 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   let snapshotText: string | null = null;
   let payloadRevision: number | null = null;
   let disposed = false;
+  const drawings = createDrawingClipboard({ store, wb, history });
 
   const isRestricted = (): boolean => interactionControllerFor(store)?.policy !== undefined;
+
+  /** Copy or cut the selected chart or picture instead of the cells under it.
+   *  Returns the system clipboard text, or null when nothing was taken. */
+  const takeDrawing = (mode: 'copy' | 'cut'): string | null => {
+    if (isRestricted()) return null;
+    const text = drawings.take(mode);
+    if (text === null) return null;
+    snapshot = null;
+    snapshotText = null;
+    payloadRevision = null;
+    mutators.setCopyRange(store, null);
+    if (mode === 'cut') host.focus({ preventScroll: true });
+    return text;
+  };
+
+  /** Paste the copied chart or picture when the system clipboard still holds
+   *  it; `text` is null when the clipboard cannot be read. */
+  const pasteDrawing = (text: string | null): boolean =>
+    !isRestricted() && drawings.owns(text) && drawings.paste();
 
   /** Restricted internal copies intentionally retain cell positions and values
    * only. Re-pasting them must not carry formulas, formats, or cut semantics. */
@@ -428,6 +449,13 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       e.preventDefault();
       return;
     }
+    if (s.ui.selectedObject) {
+      e.preventDefault();
+      const text = takeDrawing('copy');
+      if (text !== null) e.clipboardData?.setData('text/plain', text);
+      return;
+    }
+    drawings.clear();
     const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
     if (!r || !e.clipboardData) {
       snapshot = null;
@@ -450,12 +478,19 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const onCut = (e: ClipboardEvent): void => {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
+    if (s.ui.selectedObject) {
+      e.preventDefault();
+      const text = takeDrawing('cut');
+      if (text !== null) e.clipboardData?.setData('text/plain', text);
+      return;
+    }
     if (isRestricted()) {
       // Cut is a move operation. The restricted route has no atomic move
       // executor yet, so fail closed before touching data or the marquee.
       e.preventDefault();
       return;
     }
+    drawings.clear();
     const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
     if (!r || !e.clipboardData) {
       snapshot = null;
@@ -476,6 +511,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
     const text = e.clipboardData?.getData('text/plain') ?? '';
+    if (pasteDrawing(text)) {
+      e.preventDefault();
+      return;
+    }
     if (!hasPastePayload(text)) return;
     if (isRestricted()) {
       e.preventDefault();
@@ -524,9 +563,15 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (disposed) return;
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
+    if (kind !== 'paste' && s.ui.selectedObject) {
+      const text = takeDrawing(kind);
+      if (text !== null) await writeClipboardText(text);
+      return;
+    }
     if (kind === 'copy') {
       const controller = interactionControllerFor(store);
       if (controller?.policy?.copy === false) return;
+      drawings.clear();
       const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
       if (!r) {
         snapshot = null;
@@ -546,6 +591,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     }
     if (kind === 'cut') {
       if (isRestricted()) return;
+      drawings.clear();
       const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
       if (!r) {
         snapshot = null;
@@ -565,6 +611,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     let text = '';
     try {
       if (!navigator.clipboard?.readText) {
+        if (pasteDrawing(null)) return;
         const internal = activeInternalText();
         if (internal === null) return;
         text = internal;
@@ -573,6 +620,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       }
     } catch (err) {
       if ((store.getState().ui.copyRevision ?? 0) !== requestedRevision) return;
+      if (disposed || pasteDrawing(null)) return;
       const internal = activeInternalText();
       if (internal === null) {
         console.warn('formulon-cell: clipboard read failed', err);
@@ -586,6 +634,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (disposed) return;
     const pasteState = store.getState();
     if (pasteState.ui.editor.kind !== 'idle') return;
+    if (pasteDrawing(text)) return;
     if (!hasPastePayload(text)) return;
     if (isRestricted()) {
       const r = restrictedPaste(pasteState, text);

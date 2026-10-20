@@ -1,5 +1,6 @@
 import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import {
+  cellOrigin,
   DUPLICATE_OFFSET_PX,
   placementForPixels,
   sessionPosition,
@@ -670,108 +671,174 @@ export function duplicateSessionIllustration(
   if (!item) return null;
   if (
     isSheetProtected(state, item.sheet) ||
-    !canMutateIllustration(store, item, authorization, 'pictureDuplicate') ||
-    (item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true)
+    !canMutateIllustration(store, item, authorization, 'pictureDuplicate')
   )
     return null;
-  const copy: SessionIllustration = {
-    ...item,
-    id: duplicateId(state, id),
-    x: (item.x ?? 300) + DUPLICATE_OFFSET_PX,
-    y: (item.y ?? 88) + DUPLICATE_OFFSET_PX,
-  };
+  const clip = copySessionIllustration(store, id, wb);
+  if (!clip) return null;
   const persisted = persistentImageFromState(item);
-  let copySnapshot: Uint8Array | null = null;
-  if (persisted && wb) {
-    const source = wb.snapshotDrawing(item.sheet, persisted.nativeObjectId);
-    const newId = source ? wb.restoreDrawing(item.sheet, source, { newId: true }) : null;
-    if (newId === null) return null;
-    const at = sessionPosition(store, persisted.nativeAnchor);
-    const offset = placementForPixels(store, persisted.nativeAnchor, {
-      x: at.x + DUPLICATE_OFFSET_PX,
-      y: at.y + DUPLICATE_OFFSET_PX,
-    });
-    copySnapshot = wb.setDrawingAnchor(item.sheet, newId, offset)
-      ? wb.snapshotDrawing(item.sheet, newId)
-      : null;
-    if (!copySnapshot) {
-      wb.removeDrawing(item.sheet, newId);
-      return null;
-    }
-    Object.assign(copy as object, {
-      nativeObjectId: newId,
-      imageBytes: Uint8Array.from(persisted.imageBytes),
-      imageFormat: persisted.imageFormat,
-      nativeAnchor: nativeImageAnchor(wb, item.sheet, newId) ?? persisted.nativeAnchor,
-    });
-  } else if (persisted) {
+  const from = persisted
+    ? sessionPosition(store, persisted.nativeAnchor)
+    : { x: item.x ?? 300, y: item.y ?? 88 };
+  return placeIllustrationCopy(
+    store,
+    clip,
+    {
+      id: duplicateId(state, id),
+      sheet: item.sheet,
+      row: item.nativeAnchor?.fromRow ?? 0,
+      col: item.nativeAnchor?.fromCol ?? 0,
+    },
+    { x: from.x + DUPLICATE_OFFSET_PX, y: from.y + DUPLICATE_OFFSET_PX },
+    history,
+    wb,
+    {
+      commandId: authorization?.commandId ?? 'pictureDuplicate',
+      origin: authorization?.origin ?? 'instanceApi',
+      historyCommandId: 'pictureDuplicate',
+    },
+  );
+}
+
+/** A picture or shape as copied to the clipboard; it outlives the object it was taken from. */
+export interface IllustrationClip {
+  readonly item: SessionIllustration;
+  /** The drawing of a picture saved with the workbook. */
+  readonly drawing: Uint8Array | null;
+}
+
+/** Copy a picture or shape for a later {@link pasteSessionIllustration}; null
+ *  when it cannot be copied. */
+export function copySessionIllustration(
+  store: SpreadsheetStore,
+  id: string,
+  wb?: WorkbookHandle,
+): IllustrationClip | null {
+  const item = sessionIllustrationById(store.getState(), id);
+  if (!item || (item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true)) {
     return null;
   }
-  if (persisted && wb && copySnapshot) {
-    const redoSnapshot = copySnapshot;
-    mutators.upsertIllustration(store, copy);
-    if (history && !history.isReplaying()) {
-      const intent = imageIntent(
-        authorization?.commandId ?? 'pictureDuplicate',
-        persisted.sheet,
-        persisted.nativeAnchor.fromRow,
-        persisted.nativeAnchor.fromCol,
-        authorization?.origin ?? 'instanceApi',
-      );
-      history.push({
-        undo: () => {
-          if (
-            !canMutateIllustration(
-              store,
-              copy,
-              { origin: 'undo', commandId: 'pictureDuplicate' },
-              'pictureDuplicate',
-            )
-          )
-            throw new Error('image duplicate undo blocked by protection or policy');
-          const current = persistentImageFromState(
-            sessionIllustrationById(store.getState(), copy.id) ?? copy,
-          );
-          if (!current || !wb.removeDrawing(copy.sheet, current.nativeObjectId)) {
-            throw new Error('image duplicate undo failed');
-          }
-          mutators.removeIllustration(store, copy.id);
-        },
-        redo: () => {
-          if (
-            !canMutateIllustration(
-              store,
-              copy,
-              { origin: 'redo', commandId: 'pictureDuplicate' },
-              'pictureDuplicate',
-            )
-          )
-            throw new Error('image duplicate redo blocked by protection or policy');
-          const nativeObjectId = wb.restoreDrawing(copy.sheet, redoSnapshot);
-          if (nativeObjectId === null) throw new Error('image duplicate redo failed');
-          Object.assign(copy as object, { nativeObjectId });
-          mutators.upsertIllustration(store, copy);
-        },
-        intent: { ...intent, origin: 'redo' },
-        inverseIntent: { ...intent, origin: 'undo' },
-      });
-    }
+  const persisted = persistentImageFromState(item);
+  if (!persisted) return { item: { ...item }, drawing: null };
+  const drawing = wb?.snapshotDrawing(item.sheet, persisted.nativeObjectId) ?? null;
+  return drawing ? { item: { ...item }, drawing } : null;
+}
+
+/**
+ * Paste a copied picture or shape onto `at.sheet` with its top-left corner at
+ * cell (row, col), as the spreadsheet does. Undo removes the pasted object.
+ */
+export function pasteSessionIllustration(
+  store: SpreadsheetStore,
+  clip: IllustrationClip,
+  at: { sheet: number; row: number; col: number },
+  history: History | null = null,
+  wb?: WorkbookHandle,
+  authorization?: IllustrationMutationAuthorization,
+): SessionIllustration | null {
+  const range = { sheet: at.sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
+  if (
+    isSheetProtected(store.getState(), at.sheet) ||
+    !canMutateRange(store, range, authorization, 'picturePaste')
+  )
+    return null;
+  return placeIllustrationCopy(
+    store,
+    clip,
+    { ...at, id: duplicateId(store.getState(), clip.item.id) },
+    cellOrigin(store, at.row, at.col),
+    history,
+    wb,
+    {
+      commandId: authorization?.commandId ?? 'picturePaste',
+      origin: authorization?.origin ?? 'instanceApi',
+      historyCommandId: 'picturePaste',
+    },
+  );
+}
+
+/** Add `source` as a new object `target.id` on `target.sheet` with its top-left
+ *  corner at `to`, recorded as one undoable step. */
+const placeIllustrationCopy = (
+  store: SpreadsheetStore,
+  source: IllustrationClip,
+  target: { id: string; sheet: number; row: number; col: number },
+  to: { x: number; y: number },
+  history: History | null,
+  wb: WorkbookHandle | undefined,
+  command: { commandId: string; origin: InteractionOrigin; historyCommandId: string },
+): SessionIllustration | null => {
+  const { item } = source;
+  const copy: SessionIllustration = {
+    ...item,
+    id: target.id,
+    sheet: target.sheet,
+    x: to.x,
+    y: to.y,
+  };
+  const persisted = persistentImageFromState(item);
+  const intent = imageIntent(
+    command.commandId,
+    target.sheet,
+    target.row,
+    target.col,
+    command.origin,
+  );
+  if (!persisted) {
+    recordIllustrationChange(
+      history,
+      store,
+      () => mutators.upsertIllustration(store, copy),
+      intent,
+    );
     return copy;
   }
-  recordIllustrationChange(
-    history,
-    store,
-    () => mutators.upsertIllustration(store, copy),
-    imageIntent(
-      authorization?.commandId ?? 'pictureDuplicate',
-      item.sheet,
-      item.nativeAnchor?.fromRow ?? 0,
-      item.nativeAnchor?.fromCol ?? 0,
-      authorization?.origin ?? 'instanceApi',
-    ),
-  );
+  if (!wb || !source.drawing) return null;
+  const newId = wb.restoreDrawing(target.sheet, source.drawing, { newId: true });
+  if (newId === null) return null;
+  const placement = placementForPixels(store, persisted.nativeAnchor, to);
+  const redoSnapshot = wb.setDrawingAnchor(target.sheet, newId, placement)
+    ? wb.snapshotDrawing(target.sheet, newId)
+    : null;
+  if (!redoSnapshot) {
+    wb.removeDrawing(target.sheet, newId);
+    return null;
+  }
+  Object.assign(copy as object, {
+    nativeObjectId: newId,
+    imageBytes: Uint8Array.from(persisted.imageBytes),
+    imageFormat: persisted.imageFormat,
+    nativeAnchor: nativeImageAnchor(wb, target.sheet, newId) ?? persisted.nativeAnchor,
+  });
+  mutators.upsertIllustration(store, copy);
+  if (history && !history.isReplaying()) {
+    const commandId = command.historyCommandId;
+    history.push({
+      undo: () => {
+        if (!canMutateIllustration(store, copy, { origin: 'undo', commandId }, commandId))
+          throw new Error('image copy undo blocked by protection or policy');
+        const current = persistentImageFromState(
+          sessionIllustrationById(store.getState(), copy.id) ?? copy,
+        );
+        if (!current || !wb.removeDrawing(copy.sheet, current.nativeObjectId)) {
+          throw new Error('image copy undo failed');
+        }
+        mutators.removeIllustration(store, copy.id);
+      },
+      redo: () => {
+        if (!canMutateIllustration(store, copy, { origin: 'redo', commandId }, commandId))
+          throw new Error('image copy redo blocked by protection or policy');
+        const nativeObjectId = wb.restoreDrawing(copy.sheet, redoSnapshot);
+        if (nativeObjectId === null) throw new Error('image copy redo failed');
+        Object.assign(copy as object, { nativeObjectId });
+        mutators.upsertIllustration(store, copy);
+      },
+      intent: { ...intent, origin: 'redo' },
+      inverseIntent: { ...intent, origin: 'undo' },
+    });
+  }
   return copy;
-}
+};
 
 const reorderIllustrations = (
   illustrations: readonly SessionIllustration[],

@@ -18,6 +18,7 @@ import {
 import type { ChartSeriesStyleSpec, ChartSpec } from '../charts/types.js';
 import { syncChartFromEngine } from '../engine/charts-sync.js';
 import {
+  cellOrigin,
   DUPLICATE_OFFSET_PX,
   EMU_PER_PX,
   placementForAnchor,
@@ -634,15 +635,79 @@ export function duplicateSessionChart(
   if (!chart || !wb.capabilities.charts) return null;
   const intent = chartIntent(chartCells(chart), 'chartDuplicate', authorization);
   if (!canMutateChart(store, intent)) return null;
-  const { sheet } = chart;
-  const source = wb.snapshotDrawing(sheet, chart.nativeObjectId);
-  const objectId = source ? wb.restoreDrawing(sheet, source, { newId: true }) : null;
-  if (objectId === null) return null;
+  const source = wb.snapshotDrawing(chart.sheet, chart.nativeObjectId);
+  if (!source) return null;
   const at = sessionPosition(store, chart.nativeAnchor);
-  const placement = placementForPixels(store, chart.nativeAnchor, {
-    x: at.x + DUPLICATE_OFFSET_PX,
-    y: at.y + DUPLICATE_OFFSET_PX,
-  });
+  return placeChartCopy(
+    store,
+    wb,
+    { sheet: chart.sheet, drawing: source, anchor: chart.nativeAnchor },
+    { x: at.x + DUPLICATE_OFFSET_PX, y: at.y + DUPLICATE_OFFSET_PX },
+    intent,
+    history,
+  );
+}
+
+/** A chart as copied to the clipboard; it outlives the chart it was taken from. */
+export interface ChartClip {
+  readonly sheet: number;
+  readonly drawing: Uint8Array;
+  readonly anchor: EngineDrawingAnchor;
+}
+
+/** Copy a chart for a later {@link pasteSessionChart}; null when the engine cannot. */
+export function copySessionChart(
+  store: SpreadsheetStore,
+  id: string,
+  wb: WorkbookHandle,
+): ChartClip | null {
+  const chart = sessionChartById(store.getState(), id);
+  if (!chart || !wb.capabilities.charts) return null;
+  const drawing = wb.snapshotDrawing(chart.sheet, chart.nativeObjectId);
+  return drawing ? { sheet: chart.sheet, drawing, anchor: { ...chart.nativeAnchor } } : null;
+}
+
+/**
+ * Paste a copied chart onto `sheet` with its top-left corner at cell
+ * (row, col), as the spreadsheet does. Its data stays on the sheet it was
+ * copied from. Undo removes the pasted chart.
+ */
+export function pasteSessionChart(
+  store: SpreadsheetStore,
+  clip: ChartClip,
+  at: { sheet: number; row: number; col: number },
+  history: History | null,
+  wb: WorkbookHandle,
+  authorization: ChartMutationAuthorization = {},
+): SessionChart | null {
+  if (!wb.capabilities.charts) return null;
+  const cell = { sheet: at.sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
+  const intent = chartIntent([cell], 'chartPaste', authorization);
+  if (!canMutateChart(store, intent)) return null;
+  return placeChartCopy(
+    store,
+    wb,
+    { ...clip, sheet: at.sheet },
+    cellOrigin(store, at.row, at.col),
+    intent,
+    history,
+  );
+}
+
+/** Restore `source.drawing` onto its sheet as a new chart with its top-left
+ *  corner at `to`, recorded as one undoable step. */
+const placeChartCopy = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  source: ChartClip,
+  to: { x: number; y: number },
+  intent: OperationIntent,
+  history: History | null,
+): SessionChart | null => {
+  const { sheet } = source;
+  const objectId = wb.restoreDrawing(sheet, source.drawing, { newId: true });
+  if (objectId === null) return null;
+  const placement = placementForPixels(store, source.anchor, to);
   const snapshot = wb.setDrawingAnchor(sheet, objectId, placement)
     ? wb.snapshotDrawing(sheet, objectId)
     : null;
@@ -658,18 +723,18 @@ export function duplicateSessionChart(
     store,
     intent,
     () => {
-      if (!wb.removeDrawing(sheet, objectId)) throw new Error('chart duplicate undo failed');
+      if (!wb.removeDrawing(sheet, objectId)) throw new Error('chart copy undo failed');
       sync();
     },
     () => {
       if (wb.restoreDrawing(sheet, snapshot) === null) {
-        throw new Error('chart duplicate redo failed');
+        throw new Error('chart copy redo failed');
       }
       sync();
     },
   );
   return cloneSessionChart(copy);
-}
+};
 
 /**
  * Change a chart's settings, data range or placement. A pure move or resize

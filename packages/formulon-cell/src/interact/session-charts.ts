@@ -34,6 +34,8 @@ import {
   appendDrawingHandles,
   createObjectSelectionPublisher,
   type DrawingHandle,
+  focusedPanelId,
+  focusPanel,
   INTERACTIVE,
   isDuplicateShortcut,
   keepKeyFromGrid,
@@ -253,6 +255,9 @@ const renderChartScene = (svg: SVGSVGElement, scene: ChartScene): void => {
 
 export function attachSessionCharts(deps: {
   host: HTMLElement;
+  /** The element the charts are drawn over, whose top-left corner is the
+   *  grid's; defaults to `host`. */
+  layer?: HTMLElement;
   store: SpreadsheetStore;
   /** The workbook the charts live in; without one the overlays are read-only. */
   getWb?: () => WorkbookHandle | null;
@@ -267,7 +272,7 @@ export function attachSessionCharts(deps: {
   let labels: SessionChartLabels = { ...DEFAULT_LABELS, ...deps.labels };
   const root = document.createElement('div');
   root.className = 'fc-charts';
-  host.appendChild(root);
+  (deps.layer ?? host).appendChild(root);
   let selectedId: string | null = null;
   let settings: SessionChartSettingsHandle;
 
@@ -386,6 +391,15 @@ export function attachSessionCharts(deps: {
     if (selectedId === null) return;
     selectedId = null;
     updateSelectionClasses();
+  };
+
+  /** Take up a chart another part of the sheet selected; returns its id. */
+  const adoptSelection = (state: State, charts: readonly SessionChart[]): string | null => {
+    const wanted = state.ui.selectedObject?.id;
+    if (wanted === undefined || wanted === selectedId) return null;
+    if (!charts.some((chart) => chart.id === wanted)) return null;
+    selectedId = wanted;
+    return wanted;
   };
 
   /** Whether `target` is part of a chart or its settings, which keep the chart selected. */
@@ -636,10 +650,13 @@ export function attachSessionCharts(deps: {
     syncControllerSubscription();
     const state = store.getState();
     const visibleChartIds = new Set<string>();
+    const focusedId = focusedPanelId(root, '.fc-chart', 'chartId');
     root.replaceChildren();
     // The store keeps a sheet's charts in the workbook's stacking order.
     const charts = state.charts.charts.filter((chart) => chart.sheet === state.data.sheetIndex);
     if (selectedId !== null && !charts.some((chart) => chart.id === selectedId)) selectedId = null;
+    // A paste selects the chart it adds.
+    const adopted = adoptSelection(state, charts);
     charts.forEach((chart, index) => {
       const drawable = isDrawable(chart);
       if (drawable) visibleChartIds.add(chart.id);
@@ -770,6 +787,9 @@ export function attachSessionCharts(deps: {
     }
     // The selected chart may have been removed or given another data range.
     syncSelection();
+    // Rebuilding the panels drops focus; keep it on the chart, or on the sheet.
+    const refocus = adopted ?? focusedId;
+    if (refocus !== undefined) focusPanel(root, '.fc-chart', 'chartId', refocus, host);
   };
 
   const unsubscribe = store.subscribe(() => {

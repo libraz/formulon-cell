@@ -192,6 +192,7 @@ export const charts = (): Extension => ({
   setup(ctx) {
     const handle = attachSessionCharts({
       host: ctx.host,
+      layer: ctx.grid.parentElement ?? ctx.host,
       store: ctx.store,
       getWb: () => ctx.getWb(),
       labels: ctx.i18n.strings.sessionCharts,
@@ -214,6 +215,7 @@ export const illustrations = (): Extension => ({
   setup(ctx) {
     const handle = attachSessionIllustrations({
       host: ctx.host,
+      layer: ctx.grid.parentElement ?? ctx.host,
       store: ctx.store,
       history: ctx.history,
       getWb: () => ctx.getWb(),

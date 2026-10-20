@@ -237,6 +237,22 @@ export const sessionPosition = (
   }
 };
 
+/** Grid pixels of the top-left corner of cell (row, col) under the current view. */
+export const cellOrigin = (
+  store: SpreadsheetStore,
+  row: number,
+  col: number,
+): { x: number; y: number } => {
+  const state = store.getState();
+  try {
+    const rect = cellRectUnclamped(layoutForView(state), state.viewport, row, col);
+    return { x: rect.x, y: rect.y };
+  } catch {
+    const zoom = viewportZoom(store);
+    return { x: col * 64 * zoom, y: row * 20 * zoom };
+  }
+};
+
 /** How far a drawing's own decorations, such as sizing handles, may reach past it. */
 const DECORATION_OUTSET = 64;
 

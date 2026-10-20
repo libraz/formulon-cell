@@ -108,6 +108,20 @@ describe('mount/chrome — preset → DOM coverage', () => {
     });
   });
 
+  it('draws charts and pictures over the grid rather than over the formula bar', async () => {
+    const sheet = await mountStubSheet();
+    try {
+      const surface = sheet.host.querySelector<HTMLElement>('.fc-host__sheet-surface');
+      const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
+      expect(surface?.firstElementChild).toBe(grid);
+      // Cell positions are measured from the grid's corner, which is the surface's.
+      expect(sheet.host.querySelector('.fc-charts')?.parentElement).toBe(surface);
+      expect(sheet.host.querySelector('.fc-illustrations')?.parentElement).toBe(surface);
+    } finally {
+      sheet.dispose();
+    }
+  });
+
   it('keeps sheet workspace identity and slot order across toggle order', async () => {
     const sheet = await mountStubSheet({
       features: {

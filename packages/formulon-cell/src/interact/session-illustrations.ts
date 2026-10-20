@@ -16,6 +16,8 @@ import {
   createObjectSelectionPublisher,
   type DrawingFrame,
   type DrawingHandle,
+  focusedPanelId,
+  focusPanel,
   isDuplicateShortcut,
   keepKeyFromGrid,
   previewFrame,
@@ -211,6 +213,9 @@ const appendImage = (panel: HTMLElement, item: SessionIllustration): void => {
 
 export function attachSessionIllustrations(deps: {
   host: HTMLElement;
+  /** The element the pictures and shapes are drawn over, whose top-left corner is the
+   *  grid's; defaults to `host`. */
+  layer?: HTMLElement;
   store: SpreadsheetStore;
   history?: History | null;
   labels?: Partial<SessionIllustrationLabels>;
@@ -221,7 +226,7 @@ export function attachSessionIllustrations(deps: {
   const root = document.createElement('div');
   root.className = 'fc-illustrations';
   root.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
-  host.appendChild(root);
+  (deps.layer ?? host).appendChild(root);
   let selectedId: string | null = null;
   const selection = createObjectSelectionPublisher(store);
 
@@ -443,11 +448,19 @@ export function attachSessionIllustrations(deps: {
 
   const render = (): void => {
     const state = store.getState();
+    const focusedId = focusedPanelId(root, '.fc-illustration', 'illustrationId');
     root.replaceChildren();
     const items = state.illustrations.illustrations.filter(
       (item) => item.sheet === state.data.sheetIndex,
     );
     if (selectedId !== null && !items.some((item) => item.id === selectedId)) selectedId = null;
+    // A paste selects the object it adds.
+    const wanted = state.ui.selectedObject?.id;
+    const adopted =
+      wanted !== undefined && wanted !== selectedId && items.some((item) => item.id === wanted)
+        ? wanted
+        : null;
+    if (adopted) selectedId = adopted;
     for (const item of items) {
       const panel = document.createElement('section');
       panel.className = 'fc-illustration';
@@ -513,6 +526,11 @@ export function attachSessionIllustrations(deps: {
       root.appendChild(panel);
     }
     refreshSelection();
+    // Rebuilding the panels drops focus; keep it on the object, or on the sheet.
+    const refocus = adopted ?? focusedId;
+    if (refocus !== undefined) {
+      focusPanel(root, '.fc-illustration', 'illustrationId', refocus, host);
+    }
   };
 
   const unsubscribe = store.subscribe(() => {
