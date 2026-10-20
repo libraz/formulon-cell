@@ -202,6 +202,7 @@ export const charts = (): Extension => ({
     });
     return {
       refresh: () => handle.refresh(),
+      openSettings: (tab: Parameters<typeof handle.openSettings>[0]) => handle.openSettings(tab),
       setStrings: (next) => handle.setLabels(next.sessionCharts, ctx.i18n.locale),
       dispose: () => handle.detach(),
     };

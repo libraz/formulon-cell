@@ -58,6 +58,7 @@ import { shouldShowFontOption } from '../toolbar/ribbon/font-availability.js';
 import { localizedFormatIcon } from '../toolbar/ribbon/localized-format-icons.js';
 import { toolbarLangForLocale } from '../toolbar/ribbon/mac/locale.js';
 import { createBordersMenu } from '../toolbar/ribbon/menus/borders.js';
+import { createChartDesignMenuFactories } from '../toolbar/ribbon/menus/chart-design.js';
 import { createConditionalMenu } from '../toolbar/ribbon/menus/conditional.js';
 import { createFormulasMenuFactories } from '../toolbar/ribbon/menus/formulas.js';
 import { createHomeMenuFactories } from '../toolbar/ribbon/menus/home.js';
@@ -166,6 +167,7 @@ export function createDefaultRibbonMenus(
 
   const insertFactories = createInsertMenuFactories(ribbonMenuText);
   const pageLayoutFactories = createPageLayoutMenuFactories(ribbonMenuText);
+  const chartDesignFactories = createChartDesignMenuFactories(ribbonMenuText);
   const formulaFactories = createFormulasMenuFactories(ribbonMenuText, lang);
   const reviewFactories = createReviewMenuFactories(ribbonMenuText);
   const homeFactories = createHomeMenuFactories({
@@ -225,6 +227,10 @@ export function createDefaultRibbonMenus(
     arrange: pageLayoutFactories.createArrangeMenu,
     printArea: pageLayoutFactories.createPrintAreaMenu,
     pageBreaks: pageLayoutFactories.createPageBreaksMenu,
+
+    // Chart Design tab
+    chartAddElement: chartDesignFactories.createChartAddElementMenu,
+    chartColors: chartDesignFactories.createChartColorsMenu,
 
     // Formulas tab
     autoSum: formulaFactories.createAutoSumMenu,

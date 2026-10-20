@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   backstageMenuText,
   buildRibbonModel,
+  CHART_CONTEXTUAL_RIBBON_TABS,
   conditionalMenuText,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
@@ -102,13 +103,17 @@ describe('toolbar/ribbon-model', () => {
   it('keeps command surfaces locale-independent', () => {
     expect(ribbonCommandIds('ja')).toEqual(ribbonCommandIds('en'));
     expect(ribbonActivatableCommandIds('ja')).toEqual(ribbonActivatableCommandIds('en'));
-    expect(ribbonSurfaceCommandIds()).toEqual(ribbonCommandIds('en'));
-    expect(ribbonActivatableSurfaceCommandIds()).toEqual(ribbonActivatableCommandIds('en'));
+    // The surface is every command the ribbon can show, the chart tabs' included.
+    const contextualTabs = CHART_CONTEXTUAL_RIBBON_TABS;
+    expect(ribbonSurfaceCommandIds()).toEqual(ribbonCommandIds('en', { contextualTabs }));
+    expect(ribbonActivatableSurfaceCommandIds()).toEqual(
+      ribbonActivatableCommandIds('en', { contextualTabs }),
+    );
     expect(ribbonSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS })).toEqual(
-      ribbonCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }),
+      ribbonCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS, contextualTabs }),
     );
     expect(ribbonActivatableSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS })).toEqual(
-      ribbonActivatableCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }),
+      ribbonActivatableCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS, contextualTabs }),
     );
   });
 

@@ -77,6 +77,8 @@ export const RIBBON_MENU_FACTORY_KEYS = [
   'addIn',
   'pdf',
   'clear',
+  'chartAddElement',
+  'chartColors',
 ] as const;
 
 export type RibbonMenuFactoryKey = (typeof RIBBON_MENU_FACTORY_KEYS)[number];
@@ -135,6 +137,8 @@ export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
   dataValidation: 'menu-data-validation',
   addIn: 'menu-add-ins',
   pdf: 'menu-pdf',
+  chartAddElement: 'menu-chart-add-element',
+  chartColors: 'menu-chart-colors',
 };
 
 export const RIBBON_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
@@ -191,6 +195,8 @@ export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenu
   addIn: 'addIn',
   pdf: 'pdf',
   clearFormat: 'clear',
+  chartAddElement: 'chartAddElement',
+  chartColors: 'chartColors',
 };
 
 export const RIBBON_AUDITED_PRIMARY_ACTION_SPLIT_COMMANDS = [
@@ -233,6 +239,8 @@ export const RIBBON_AUDITED_GALLERY_COMMANDS = [
 
 export const RIBBON_AUDITED_DROPDOWN_COMMANDS = [
   'arrangeObjectsPageLayout',
+  'chartAddElement',
+  'chartColors',
   'borders',
   'calcOptions',
   'clearArrows',
@@ -319,6 +327,9 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'alignR',
   'allScripts',
   'bottomAlign',
+  'chartBringForward',
+  'chartSendBackward',
+  'chartSwitchRowColumn',
   'comma',
   'cut',
   'decDown',
@@ -376,6 +387,10 @@ export const RIBBON_DROPDOWN_COMMANDS: ReadonlySet<string> = new Set(
 );
 
 export const RIBBON_DIALOG_COMMANDS: ReadonlySet<string> = new Set([
+  'chartChangeType',
+  'chartFormatSelection',
+  'chartSelectData',
+  'chartSelectionPane',
   'pageSetup',
   'pageSetupAdvanced',
   'formatCells',

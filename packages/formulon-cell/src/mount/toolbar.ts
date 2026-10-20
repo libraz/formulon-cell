@@ -1,3 +1,4 @@
+import { selectedSessionChart } from '../commands/chart-design.js';
 import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { attachRibbonScreenTips } from '../interact/ribbon-screen-tip.js';
@@ -69,6 +70,7 @@ import {
 } from '../toolbar/ribbon/static-menus.js';
 import { projectRibbonActiveState } from '../toolbar/ribbon-active-state.js';
 import {
+  CHART_CONTEXTUAL_RIBBON_TABS,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   type RibbonTab,
@@ -342,12 +344,48 @@ export function mountToolbar(
   let borderStyle: CellBorderStyle = opts.borderStyle ?? DEFAULT_BORDER_STYLE;
   let borderColor = opts.borderColor ?? DEFAULT_BORDER_COLOR;
 
+  // Tabs a selected chart adds, and the tab to go back to once it is deselected.
+  const NO_CONTEXTUAL_TABS: readonly RibbonTab[] = [];
+  let contextualTabs = NO_CONTEXTUAL_TABS;
+  let contextualReturnTab: RibbonTab = 'home';
+  let knownChartIds: ReadonlySet<string> = new Set();
+  // Charts added in the current task: an insert or paste selects the chart it adds.
+  const freshChartIds = new Set<string>();
+  const isContextualTab = (tab: RibbonTab): boolean => CHART_CONTEXTUAL_RIBBON_TABS.includes(tab);
+
   const rehomeActiveTabForPlatform = (): void => {
     const available = opts.ribbonTabs ?? defaultRibbonTabs;
-    if (available.includes(activeTab)) return;
+    if (available.includes(activeTab) || contextualTabs.includes(activeTab)) return;
     activeTab = available[0] ?? 'home';
   };
   rehomeActiveTabForPlatform();
+
+  /** Show the chart tabs while a chart is selected; like the spreadsheet, a chart
+   *  selected as it is added opens Chart Design. True when the tabs changed. */
+  const syncContextualTabs = (current: SpreadsheetInstance | null, adopt: boolean): boolean => {
+    const state = current?.store.getState();
+    const chart = state ? selectedSessionChart(state) : null;
+    const previousIds = knownChartIds;
+    knownChartIds = new Set(state?.charts.charts.map((entry) => entry.id) ?? []);
+    for (const id of knownChartIds) {
+      if (previousIds.has(id) || !adopt) continue;
+      if (freshChartIds.size === 0) queueMicrotask(() => freshChartIds.clear());
+      freshChartIds.add(id);
+    }
+    const next = chart ? CHART_CONTEXTUAL_RIBBON_TABS : NO_CONTEXTUAL_TABS;
+    const inserted = chart !== null && freshChartIds.delete(chart.id);
+    if (next === contextualTabs && !inserted) return false;
+    contextualTabs = next;
+    const previousTab = activeTab;
+    if (inserted) {
+      if (!isContextualTab(activeTab)) contextualReturnTab = activeTab;
+      activeTab = 'chartDesign';
+    } else if (isContextualTab(activeTab) && !next.includes(activeTab)) {
+      activeTab = contextualReturnTab;
+    }
+    if (activeTab !== previousTab) opts.onTabChange?.(activeTab);
+    return true;
+  };
 
   const focusSheet =
     opts.focusSheet ??
@@ -478,6 +516,7 @@ export function mountToolbar(
         getBackstageOpen: () => backstageOpen,
         getDisplayMenuOpen: () => displayMenuOpen,
         getFormulaBarVisible: () => formulaBarVisible,
+        getContextualTabs: () => contextualTabs,
       },
       helpers: mergedHelpers,
       menus: mergedMenus,
@@ -629,6 +668,7 @@ export function mountToolbar(
     closeStaticRibbonMenus(host);
     const changed = tab !== activeTab;
     if (tab === 'file' && activeTab !== 'file') backstageReturnTab = activeTab;
+    if (isContextualTab(tab) && !isContextualTab(activeTab)) contextualReturnTab = activeTab;
     activeTab = tab;
     if (reveal && tab !== 'file' && isCollapsedMode()) ribbonPeek = true;
     projectRibbonTabs();
@@ -991,13 +1031,15 @@ export function mountToolbar(
         ? current.i18n.subscribe(() => refreshLocale(current))
         : null;
     if (current) refreshLocale(current);
+    syncContextualTabs(current, false);
     unsubStore =
       current?.store.subscribe(() => {
         const nextInstance = getInstance();
         const platformChanged = syncInheritedPlatform(nextInstance);
+        const tabsChanged = syncContextualTabs(nextInstance, true);
         syncMacInkSubscription(nextInstance);
         projectFormatToolbar();
-        if (platformChanged) renderToolbar();
+        if (platformChanged || tabsChanged) renderToolbar();
         else interactionPolicy.project();
       }) ?? null;
     unsubFunctionHistory = current

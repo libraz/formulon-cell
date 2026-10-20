@@ -11,11 +11,13 @@
 //    minimal toolbar without every feature wired up.
 
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { selectedSessionChart, switchSessionChartRowColumn } from '../../commands/chart-design.js';
 import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
 import { phoneticReadingAt, setPhoneticReading } from '../../commands/phonetic.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
+import { arrangeSessionChart } from '../../commands/session-chart.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../../commands/structure.js';
 import {
   setGridlinesVisible,
@@ -401,6 +403,19 @@ const applyGenericRibbonCommand = (
     case 'outlineHideDetail':
       hooks?.page?.outline?.('hide-detail');
       return true;
+    case 'chartSwitchRowColumn':
+    case 'chartBringForward':
+    case 'chartSendBackward': {
+      const chart = selectedSessionChart(i.store.getState());
+      if (!chart) return true;
+      if (id === 'chartSwitchRowColumn') {
+        switchSessionChartRowColumn(i.store, chart.id, i.history, i.workbook);
+      } else {
+        const action = id === 'chartBringForward' ? 'bring-forward' : 'send-backward';
+        arrangeSessionChart(i.store, chart.id, action, i.history, i.workbook);
+      }
+      return true;
+    }
     case 'drawPen':
       i.borderDraw?.deactivate();
       hooks?.drawing?.setInkMode?.('pen');

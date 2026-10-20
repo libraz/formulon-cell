@@ -53,6 +53,8 @@ export interface DynamicDropdownsCtx {
   updateLinksMenu: (menu: HTMLElement) => void;
   updatePasteMenu: (menu: HTMLElement) => void;
   updateArrangeMenu: (menu: HTMLElement) => void;
+  updateChartAddElementMenu: (menu: HTMLElement) => void;
+  updateChartColorsMenu: (menu: HTMLElement) => void;
   updatePageBreaksMenu: (menu: HTMLElement) => void;
   updatePrintAreaMenu: (menu: HTMLElement) => void;
   updateProtectMenu: (menu: HTMLElement) => void;
@@ -94,6 +96,10 @@ export interface DynamicDropdownsCtx {
   applySheetBackgroundAction: (action: 'set' | 'clear') => void | Promise<void>;
   applyPrintAreaAction: (action: PrintAreaAction) => void;
   applyArrangeAction: (action: ArrangeAction) => void;
+  /** An Add Chart Element entry for the selected chart; `more` opens its settings. */
+  applyChartElementAction: (action: string) => void;
+  /** A Change Colors palette for the selected chart. */
+  applyChartColorsAction: (preset: string) => void;
   applyUiTheme: (theme: UiTheme) => void;
   applyWorkbookTheme: (presetId: WorkbookThemePresetId) => void;
   focusSheet: () => void;
@@ -168,6 +174,8 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'page-break-action',
   'print-area-action',
   'arrange-action',
+  'chart-element',
+  'chart-colors',
   'page-theme-action',
   'workbook-theme-action',
   'sort',
@@ -261,6 +269,8 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   Record<string, DynamicDropdownMenuRefresherKey>
 > = {
   'menu-arrange-objects': 'updateArrangeMenu',
+  'menu-chart-add-element': 'updateChartAddElementMenu',
+  'menu-chart-colors': 'updateChartColorsMenu',
   'menu-calc-options': 'updateCalcOptionsMenu',
   'menu-cell-styles-home': 'updateCellStylesMenu',
   'menu-clear': 'updateClearMenu',
@@ -630,6 +640,8 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       attr: 'arrange-action',
       handler: (v) => ctx.applyArrangeAction(v as ArrangeAction),
     },
+    { attr: 'chart-element', handler: (v) => ctx.applyChartElementAction(v) },
+    { attr: 'chart-colors', handler: (v) => ctx.applyChartColorsAction(v) },
     {
       attr: 'page-theme-action',
       handler: (v) => {

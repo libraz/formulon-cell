@@ -1,3 +1,5 @@
+import { selectedSessionChart } from '../../commands/chart-design.js';
+import { arrangeSessionChart } from '../../commands/session-chart.js';
 import {
   arrangeSessionIllustration,
   createRibbonImageFromSelection,
@@ -106,6 +108,12 @@ export function createIllustrationDropdownDefaults(
         instance.openWorkbookObjects();
         return;
       }
+      const chart = selectedSessionChart(instance.store.getState());
+      if (chart) {
+        // The chart stays selected, as it does in the spreadsheet.
+        arrangeSessionChart(instance.store, chart.id, action, instance.history, instance.workbook);
+        return;
+      }
       const id = activeIllustrationId(instance);
       if (id) {
         arrangeSessionIllustration(
@@ -123,15 +131,23 @@ export function createIllustrationDropdownDefaults(
   const updateArrangeMenu =
     (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateArrangeMenu'] =>
     (menu) => {
-      const activeId = activeIllustrationId(instance);
       const state = instance.store.getState();
       const sheet = state.data.sheetIndex;
-      const visible = state.illustrations.illustrations.filter((item) => item.sheet === sheet);
+      const chart = selectedSessionChart(state);
+      // A chart is ordered among the sheet's charts, and its native order can change.
+      const visible: readonly { id: string }[] = chart
+        ? state.charts.charts.filter((item) => item.sheet === sheet)
+        : state.illustrations.illustrations.filter((item) => item.sheet === sheet);
+      const activeId = chart?.id ?? activeIllustrationId(instance);
       const activeIndex = activeId
         ? visible.findIndex((candidate) => candidate.id === activeId)
         : -1;
       const hasTarget = activeIndex >= 0;
-      const nativeTarget = hasTarget && visible[activeIndex]?.nativeObjectId !== undefined;
+      const nativeTarget =
+        !chart &&
+        hasTarget &&
+        state.illustrations.illustrations.find((item) => item.id === activeId)?.nativeObjectId !==
+          undefined;
       const atBack = !hasTarget || activeIndex === 0;
       const atFront = !hasTarget || activeIndex === visible.length - 1;
       const strings = instance.i18n.strings.ribbonMenu;

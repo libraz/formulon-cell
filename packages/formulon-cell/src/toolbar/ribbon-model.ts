@@ -15,7 +15,9 @@ export type RibbonTab =
   | 'view'
   | 'help'
   | 'automate'
-  | 'acrobat';
+  | 'acrobat'
+  | 'chartDesign'
+  | 'chartFormat';
 
 export type ToolbarLang = Locale;
 
@@ -54,6 +56,8 @@ export interface RibbonTabModel {
   id: RibbonTab;
   label: string;
   groups: RibbonGroupModel[];
+  /** Shown only while the object it edits is selected, after the other tabs. */
+  contextual?: boolean;
 }
 
 export const HOME_TILE_LAYOUT_GROUP_VARIANTS = ['styles'] as const;
@@ -95,9 +99,12 @@ export const RIBBON_TABS: readonly RibbonTab[] = [
   ...OPTIONAL_RIBBON_TABS,
 ];
 
+/** The tabs a selected chart adds to the ribbon. */
+export const CHART_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['chartDesign', 'chartFormat'];
+
 export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> =
   Object.fromEntries(
-    RIBBON_TABS.map((tab) => [
+    [...RIBBON_TABS, ...CHART_CONTEXTUAL_RIBBON_TABS].map((tab) => [
       tab,
       Object.fromEntries(
         Object.entries(dictionaries).map(([locale, strings]) => [locale, strings.ribbon.tabs[tab]]),
@@ -207,6 +214,9 @@ export interface BuildRibbonModelOptions {
    *  The catalog default is the full `RIBBON_TABS` set; `mountToolbar`
    *  applies its own standard-tab default. */
   profile?: RibbonProfile;
+  /** Contextual tabs to show after the others, such as
+   *  `CHART_CONTEXTUAL_RIBBON_TABS` while a chart is selected. */
+  contextualTabs?: readonly RibbonTab[];
 }
 
 const COMMAND_SURFACE_LANG: ToolbarLang = 'en';
@@ -766,6 +776,51 @@ export function buildRibbonModel(
       group(tr.pdf, [cmd('pdf', tr.pdf, tr.pdf, 'pdf', 'wide')]),
     ]),
   ];
+  const contextualTabs: RibbonTabModel[] = [
+    {
+      ...tab('chartDesign', [
+        group(tr.chartLayouts, [
+          cmd('chartAddElement', tr.addChartElement, tr.addChartElement, 'chartAddElement', 'wide'),
+        ]),
+        group(tr.chartStyles, [
+          cmd('chartColors', tr.changeColors, tr.changeColors, 'chartColors', 'wide'),
+        ]),
+        group(tr.chartData, [
+          cmd(
+            'chartSwitchRowColumn',
+            tr.switchRowColumn,
+            tr.switchRowColumn,
+            'chartSwitchRowColumn',
+            'wide',
+          ),
+          cmd('chartSelectData', tr.selectData, tr.selectData, 'chartSelectData', 'wide'),
+        ]),
+        group(tr.chartType, [
+          cmd('chartChangeType', tr.changeChartType, tr.changeChartType, 'chartChangeType', 'wide'),
+        ]),
+      ]),
+      contextual: true,
+    },
+    {
+      ...tab('chartFormat', [
+        group(tr.currentSelection, [
+          cmd(
+            'chartFormatSelection',
+            tr.formatSelection,
+            tr.formatSelection,
+            'formatCells',
+            'wide',
+          ),
+        ]),
+        group(tr.arrange, [
+          cmd('chartBringForward', tr.bringForward, tr.bringForward, 'bringForward', 'wide'),
+          cmd('chartSendBackward', tr.sendBackward, tr.sendBackward, 'sendBackward', 'wide'),
+          cmd('chartSelectionPane', tr.selectionPane, tr.selectionPane, 'selectionPane', 'wide'),
+        ]),
+      ]),
+      contextual: true,
+    },
+  ];
   const homeTab = allTabs.find((candidate) => candidate.id === 'home');
   if (!homeTab) return [];
   const profileLang: ToolbarLang =
@@ -779,10 +834,17 @@ export function buildRibbonModel(
   const requestedTabs =
     opts.tabs ?? (opts.profile === 'excel365Mac' ? EXCEL365_MAC_RIBBON_TABS : RIBBON_TABS);
   const tabsById = new Map(profileTabs.map((tab) => [tab.id, tab]));
-  return requestedTabs.flatMap((id) => {
-    const tab = tabsById.get(id);
-    return tab ? [tab] : [];
-  });
+  const contextualById = new Map(contextualTabs.map((tab) => [tab.id, tab]));
+  return [
+    ...requestedTabs.flatMap((id) => {
+      const tab = tabsById.get(id);
+      return tab ? [tab] : [];
+    }),
+    ...(opts.contextualTabs ?? []).flatMap((id) => {
+      const tab = contextualById.get(id);
+      return tab ? [tab] : [];
+    }),
+  ];
 }
 
 export const ribbonCommands = (
@@ -812,18 +874,24 @@ export const ribbonActivatableCommandIds = (
   opts: BuildRibbonModelOptions = {},
 ): string[] => ribbonActivatableCommands(input, opts).map((command) => command.id);
 
+/** Every tab the ribbon can show, the contextual ones included unless `opts` says otherwise. */
+const surfaceOptions = (opts: BuildRibbonModelOptions): BuildRibbonModelOptions => ({
+  contextualTabs: CHART_CONTEXTUAL_RIBBON_TABS,
+  ...opts,
+});
+
 export const ribbonSurfaceCommands = (opts: BuildRibbonModelOptions = {}): RibbonCommand[] =>
-  ribbonCommands(COMMAND_SURFACE_LANG, opts);
+  ribbonCommands(COMMAND_SURFACE_LANG, surfaceOptions(opts));
 
 export const ribbonSurfaceCommandIds = (opts: BuildRibbonModelOptions = {}): string[] =>
-  ribbonCommandIds(COMMAND_SURFACE_LANG, opts);
+  ribbonCommandIds(COMMAND_SURFACE_LANG, surfaceOptions(opts));
 
 export const ribbonActivatableSurfaceCommands = (
   opts: BuildRibbonModelOptions = {},
-): RibbonCommand[] => ribbonActivatableCommands(COMMAND_SURFACE_LANG, opts);
+): RibbonCommand[] => ribbonActivatableCommands(COMMAND_SURFACE_LANG, surfaceOptions(opts));
 
 export const ribbonActivatableSurfaceCommandIds = (opts: BuildRibbonModelOptions = {}): string[] =>
-  ribbonActivatableCommandIds(COMMAND_SURFACE_LANG, opts);
+  ribbonActivatableCommandIds(COMMAND_SURFACE_LANG, surfaceOptions(opts));
 
 export const ribbonTabCommandIds = (
   input: Strings | ToolbarLang,

@@ -29,6 +29,7 @@ import {
 import { showScriptCommandDialog } from '../toolbar/dialogs/script-command.js';
 import type { DynamicDropdownsCtx } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import { createCellsDropdownDefaults } from './dynamic-dropdown-defaults/cells.js';
+import { createChartDesignDropdownDefaults } from './dynamic-dropdown-defaults/chart-design.js';
 import { createClipboardDropdownDefaults } from './dynamic-dropdown-defaults/clipboard.js';
 import { createDataDropdownDefaults } from './dynamic-dropdown-defaults/data.js';
 import { createEditingDropdownDefaults } from './dynamic-dropdown-defaults/editing.js';
@@ -155,6 +156,7 @@ export function createDefaultDynamicDropdownsCtx(
   const reviewDefaults = createReviewDropdownDefaults(instance);
   const pageLayoutDefaults = createPageLayoutDropdownDefaults(instance);
   const viewDefaults = createViewDropdownDefaults(instance);
+  const chartDesignDefaults = createChartDesignDropdownDefaults(instance);
 
   const base: DynamicDropdownsCtx = {
     getInst: () => instance,
@@ -223,6 +225,10 @@ export function createDefaultDynamicDropdownsCtx(
     applySheetBackgroundAction: pageLayoutDefaults.applySheetBackgroundAction,
     applyPrintAreaAction: pageLayoutDefaults.applyPrintAreaAction,
     applyArrangeAction: illustrationDefaults.applyArrangeAction,
+    applyChartElementAction: chartDesignDefaults.applyChartElementAction,
+    updateChartAddElementMenu: chartDesignDefaults.updateChartAddElementMenu,
+    applyChartColorsAction: chartDesignDefaults.applyChartColorsAction,
+    updateChartColorsMenu: chartDesignDefaults.updateChartColorsMenu,
     applySortMenuAction: editingDefaults.applySortMenuAction,
     applyReviewCommentAction: reviewDefaults.applyReviewCommentAction,
     applyProtectAction: reviewDefaults.applyProtectAction,

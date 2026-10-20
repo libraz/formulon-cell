@@ -2,6 +2,7 @@ import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
 import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
+import type { SettingsTab as ChartSettingsTab } from '../interact/session-chart-settings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { AlwaysOnDialogs } from './always-on-dialogs.js';
 import type { EngineBinding } from './engine-binding.js';
@@ -35,6 +36,7 @@ export type InstanceDialogApi = Pick<
   | 'toggleWatchWindow'
   | 'openQuickAnalysis'
   | 'openWorkbookObjects'
+  | 'openChartSettings'
   | 'openPivotFieldList'
   | 'openActivePivotFieldList'
   | 'openPivotTableDialog'
@@ -166,6 +168,13 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
         return;
       }
       featureState.workbookObjects?.open();
+    },
+    openChartSettings(tab = 'elements') {
+      const userCharts = getUserHandle('charts') as
+        | (ExtensionHandle & { openSettings?: (tab: ChartSettingsTab) => boolean })
+        | undefined;
+      if (userCharts?.openSettings) return userCharts.openSettings(tab);
+      return featureState.sessionCharts?.openSettings(tab) ?? false;
     },
     openPivotFieldList(sheetIndex, pivotIndex) {
       if (isRestricted()) return false;

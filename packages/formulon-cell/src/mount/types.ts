@@ -201,6 +201,9 @@ export interface SpreadsheetInstance {
   toggleWatchWindow(): void;
   openQuickAnalysis(): void;
   openWorkbookObjects(): void;
+  /** Open the settings of the selected chart on `tab` (the chart elements by
+   *  default); false when no chart is selected. */
+  openChartSettings(tab?: import('../interact/session-chart-settings.js').SettingsTab): boolean;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
   openActivePivotFieldList(): boolean;
   openPivotTableDialog(opts?: { placement?: 'new' | 'existing' }): void;

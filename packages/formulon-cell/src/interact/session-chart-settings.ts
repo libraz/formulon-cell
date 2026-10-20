@@ -1,7 +1,11 @@
 import { seriesColorOf, withoutSeriesColor } from '../charts/engine-adapter.js';
 import { prepareChartData } from '../charts/filters.js';
 import { chartLabelPositions } from '../charts/label-options.js';
-import { automaticPalette, DEFAULT_THEME_ACCENTS } from '../charts/series-colors.js';
+import {
+  automaticPalette,
+  CHART_PALETTE_PRESETS,
+  DEFAULT_THEME_ACCENTS,
+} from '../charts/series-colors.js';
 import { resolveChartStyle } from '../charts/styles.js';
 import type {
   ChartAxisSpec,
@@ -224,11 +228,7 @@ export interface SessionChartSettingsDeps {
 const SVG_SAFE_HEX = /^#[0-9a-f]{6}$/i;
 const ALL_POINTS = '__all__';
 /** Fixed presets; `office` is the theme's accents, the default theme's here. */
-const PALETTE_PRESETS: Record<string, readonly string[]> = {
-  office: DEFAULT_THEME_ACCENTS,
-  blue: ['#1f4e78', '#5b9bd5', '#9dc3e6', '#d9eaf7', '#17365d', '#2f75b5'],
-  mono: ['#1f1f1f', '#4d4d4d', '#737373', '#999999', '#bfbfbf', '#d9d9d9'],
-};
+const PALETTE_PRESETS: Record<string, readonly string[]> = CHART_PALETTE_PRESETS;
 
 const PALETTE_LABEL_KEYS: Record<string, keyof SessionChartSettingsLabels> = {
   office: 'paletteOffice',

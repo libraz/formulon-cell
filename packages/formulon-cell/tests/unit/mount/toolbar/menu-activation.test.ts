@@ -40,7 +40,7 @@ import {
   ribbonActivatableSurfaceCommandIds,
 } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
-import { dynamicDropdownNoopOverrides, stubHelpers } from './fixtures.js';
+import { dynamicDropdownNoopOverrides, selectStoreChart, stubHelpers } from './fixtures.js';
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -171,6 +171,8 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('wires every registered dynamic ribbon dropdown to a rendered button and menu', () => {
+    // The chart tabs show only while a chart is selected.
+    selectStoreChart(sheet.instance.store);
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       ribbonTabs: RIBBON_TABS,
       dynamicDropdowns: true,
@@ -214,6 +216,8 @@ describe('Spreadsheet.mountToolbar', () => {
   }, 30_000);
 
   it('opens every dropdown and gallery command menu from primary click', () => {
+    // The chart tabs show only while a chart is selected.
+    selectStoreChart(sheet.instance.store);
     const onCommand = vi.fn();
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
@@ -432,6 +436,7 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('renders exactly the shared activatable ribbon command surface as buttons', () => {
+    selectStoreChart(sheet.instance.store);
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       ribbonTabs: RIBBON_TABS,
       helpers: stubHelpers(),
@@ -683,6 +688,8 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('keeps every registered dynamic dropdown handler key represented by default menus', () => {
+    // The chart tabs show only while a chart is selected.
+    selectStoreChart(sheet.instance.store);
     mutators.upsertCustomPivotTableStyle(sheet.instance.store, {
       id: customPivotTableStyleId('Dispatch Coverage Pivot'),
       label: 'Dispatch Coverage Pivot',

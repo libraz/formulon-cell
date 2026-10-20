@@ -20,6 +20,7 @@ import {
   focusPanel,
   isDuplicateShortcut,
   keepKeyFromGrid,
+  keepsObjectSelected,
   previewFrame,
   trackFrameDrag,
 } from './drawing-frame.js';
@@ -264,9 +265,10 @@ export function attachSessionIllustrations(deps: {
   };
 
   const menu = createObjectMenu(host);
-  /** Whether `target` is part of an object or its menu, which keep it selected. */
+  /** Whether `target` is part of an object, its menu or the ribbon, which keep it selected. */
   const insideObjects = (target: EventTarget | null): boolean =>
-    target instanceof Node && (root.contains(target) || menu.contains(target));
+    target instanceof Node &&
+    (root.contains(target) || menu.contains(target) || keepsObjectSelected(target));
 
   // Like Excel, a press anywhere else on the sheet leaves the object.
   const onDocumentPointerDown = (e: PointerEvent): void => {

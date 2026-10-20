@@ -131,3 +131,19 @@ export const automaticPalette = (accents: readonly string[] = DEFAULT_THEME_ACCE
 /** accent1..accent6 as `#rrggbb` from a theme's colours in `clrScheme` order. */
 export const accentsFromTheme = (colors: readonly number[] | undefined): string[] | undefined =>
   colors && colors.length >= 10 ? colors.slice(4, 10).map(cssColorFromArgb) : undefined;
+
+/** The palettes Change Colors offers; `office` stands for the workbook theme's accents. */
+export const CHART_PALETTE_PRESETS = {
+  office: DEFAULT_THEME_ACCENTS,
+  blue: ['#1f4e78', '#5b9bd5', '#9dc3e6', '#d9eaf7', '#17365d', '#2f75b5'],
+  mono: ['#1f1f1f', '#4d4d4d', '#737373', '#999999', '#bfbfbf', '#d9d9d9'],
+} as const satisfies Record<string, readonly string[]>;
+
+export type ChartPalettePreset = keyof typeof CHART_PALETTE_PRESETS;
+
+/** The colours of `preset` under a workbook theme whose accents are `accents`. */
+export const chartPalettePreset = (
+  preset: ChartPalettePreset,
+  accents?: readonly string[],
+): string[] =>
+  preset === 'office' ? automaticPalette(accents).slice(0, 6) : [...CHART_PALETTE_PRESETS[preset]];

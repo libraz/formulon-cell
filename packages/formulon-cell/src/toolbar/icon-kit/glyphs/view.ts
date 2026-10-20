@@ -292,6 +292,11 @@ export const VIEW_ICONS = {
     outlined(roundRect(9.8, 9.8, 11.6, 11.6, 1.2), PALETTE.infoSoft, PALETTE.info, 'regular'),
   ],
 
+  sendBackward: [
+    outlined(roundRect(9.8, 9.8, 11.6, 11.6, 1.2), PALETTE.infoSoft, PALETTE.info, 'regular'),
+    outlined(roundRect(2.6, 2.6, 11.6, 11.6, 1.2), PALETTE.paper, PALETTE.grid, 'regular'),
+  ],
+
   whatIf: [
     ...sheet({ x: 2.4, y: 3.4, w: 15.2, h: 13.6, cols: 3, rows: 3 }),
     ...cornerPlate(PALETTE.info, [

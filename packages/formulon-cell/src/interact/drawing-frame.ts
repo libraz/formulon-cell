@@ -21,6 +21,13 @@ export const INTERACTIVE = 'button, input, select, textarea, option, [contentedi
 
 const TEXT_ENTRY = 'input, textarea, select, [contenteditable="true"]';
 const MODIFIER_KEYS = new Set(['Alt', 'Control', 'Meta', 'Shift']);
+/** The ribbon and its menus, which act on the selected object rather than leave it. */
+const RIBBON_SURFACE = '.fc-tb__ribbon-shell, .fc-tb__menu, .fc-tb__submenu, .fc-tb__rb-dd';
+
+/** Whether a press on, or focus moving to, `target` keeps a selected object selected. */
+export const keepsObjectSelected = (target: EventTarget | null): boolean =>
+  target instanceof Element && target.closest(RIBBON_SURFACE) !== null;
+
 /**
  * Keep a key pressed on a selected object from the grid under it, which would
  * otherwise type into or move the active cell. Shortcuts the sheet owns still

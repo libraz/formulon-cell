@@ -128,6 +128,8 @@ export interface RibbonMenus {
   addIn?: RibbonMenuFactory;
   pdf?: RibbonMenuFactory;
   clear?: RibbonMenuFactory;
+  chartAddElement?: RibbonMenuFactory;
+  chartColors?: RibbonMenuFactory;
 }
 
 /** Renderer helpers from select-color.ts / control-dispatch.ts. These create
@@ -149,6 +151,8 @@ export interface RibbonRenderState {
   getBackstageOpen: () => boolean;
   getDisplayMenuOpen: () => boolean;
   getFormulaBarVisible: () => boolean;
+  /** Contextual tabs the selected object adds, after the others. */
+  getContextualTabs?: () => readonly RibbonTab[];
 }
 
 export interface RenderRibbonCtx {
@@ -224,13 +228,13 @@ const STACKED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set(
 const MIXED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set(HOME_MIXED_LAYOUT_GROUP_VARIANTS);
 
 const createRibbonTabButton = (
-  tab: { id: RibbonTab; label: string },
+  tab: { id: RibbonTab; label: string; contextual?: boolean },
   activeRibbonTab: RibbonTab,
 ): HTMLButtonElement => {
   return createRibbonButton({
     className: `fc-tb__ribbon-tab${tab.id === 'file' ? ' fc-tb__ribbon-tab--file' : ''}${
-      tab.id === activeRibbonTab ? ' fc-tb__ribbon-tab--active' : ''
-    }`,
+      tab.contextual ? ' fc-tb__ribbon-tab--contextual' : ''
+    }${tab.id === activeRibbonTab ? ' fc-tb__ribbon-tab--active' : ''}`,
     role: 'tab',
     ariaSelected: tab.id === activeRibbonTab,
     tabIndex: tab.id === activeRibbonTab ? 0 : -1,
@@ -444,7 +448,11 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     const ribbonDisplayOptionsText = ctx.ribbonDisplayOptionsText;
     const { createSelect, createColor, createIcon, makeSvg, chevronPath } = ctx.helpers;
     const profile = ctx.getProfile?.() ?? ctx.profile ?? 'default';
-    const model = buildRibbonModel(ctx.ribbonLang, { tabs: ctx.ribbonTabs, profile });
+    const model = buildRibbonModel(ctx.ribbonLang, {
+      tabs: ctx.ribbonTabs,
+      profile,
+      contextualTabs: ctx.state.getContextualTabs?.(),
+    });
     const shell = document.createElement('div');
     shell.className = [
       'fc-tb__ribbon-shell',

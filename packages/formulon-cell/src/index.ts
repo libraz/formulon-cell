@@ -7,6 +7,8 @@ export {
   layoutChart,
   layoutUnsupportedChart,
 } from './charts/index.js';
+export type { ChartPalettePreset } from './charts/series-colors.js';
+export { CHART_PALETTE_PRESETS, chartPalettePreset } from './charts/series-colors.js';
 export type {
   CategoryChartData,
   CategoryChartSeries,
@@ -71,6 +73,17 @@ export {
   listCustomCellStyles,
   mergeCellStylesFromWorkbook,
 } from './commands/cell-styles.js';
+export type { ChartElementAction } from './commands/chart-design.js';
+export {
+  applySessionChartColors,
+  applySessionChartElement,
+  CHART_ELEMENT_ACTIONS,
+  chartElementPatch,
+  chartElementState,
+  chartUsesPalette,
+  selectedSessionChart,
+  switchSessionChartRowColumn,
+} from './commands/chart-design.js';
 export type { CopyResult } from './commands/clipboard/copy.js';
 export { copy } from './commands/clipboard/copy.js';
 export type { CSVDelimiter, CSVEncodeOptions, CSVParseOptions } from './commands/clipboard/csv.js';
@@ -1537,6 +1550,7 @@ export type {
 } from './toolbar/ribbon-model.js';
 export {
   buildRibbonModel,
+  CHART_CONTEXTUAL_RIBBON_TABS,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   FONT_FAMILIES,

@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { addrKey } from '../../../../src/engine/address.js';
+import { mutators, type SpreadsheetStore } from '../../../../src/store/store.js';
 import type { DynamicDropdownsCtx } from '../../../../src/toolbar/ribbon/dynamic-dropdowns.js';
 import type { RibbonRenderHelpers } from '../../../../src/toolbar/ribbon/render-ribbon.js';
 import type { MountedStubSheet } from '../../../test-utils/mount.js';
@@ -18,6 +19,32 @@ export const stubHelpers = (): RibbonRenderHelpers => ({
   },
   chevronPath: 'M0 0',
 });
+
+/** Put a chart in the store and select it, so the ribbon shows the chart tabs. */
+export const selectStoreChart = (store: SpreadsheetStore, id = 'chart-native-0-1'): void => {
+  mutators.upsertChart(store, {
+    id,
+    sheet: 0,
+    nativeObjectId: 1,
+    nativeAnchor: {
+      anchorKind: 1,
+      editAs: 1,
+      fromRow: 1,
+      fromCol: 1,
+      fromRowOff: 0,
+      fromColOff: 0,
+      toRow: 10,
+      toCol: 6,
+      toRowOff: 0,
+      toColOff: 0,
+      cx: 0,
+      cy: 0,
+    },
+    kind: 'column',
+    data: { domain: 'category', categories: ['Jan'], series: [{ id: 's0', values: [1] }] },
+  });
+  mutators.setSelectedObject(store, { id, name: 'Chart 1' });
+};
 
 export const waitFor = async (predicate: () => boolean, timeoutMs = 250): Promise<void> => {
   const deadline = Date.now() + timeoutMs;
@@ -85,6 +112,10 @@ export const dynamicDropdownNoopOverrides = (): Partial<DynamicDropdownsCtx> => 
   applySheetBackgroundAction: vi.fn(),
   applyPrintAreaAction: vi.fn(),
   applyArrangeAction: vi.fn(),
+  applyChartElementAction: vi.fn(),
+  updateChartAddElementMenu: vi.fn(),
+  applyChartColorsAction: vi.fn(),
+  updateChartColorsMenu: vi.fn(),
   applyUiTheme: vi.fn(),
   applySortMenuAction: vi.fn(),
   applyFindSelectAction: vi.fn(),

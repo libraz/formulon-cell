@@ -1,7 +1,7 @@
 /** Chart-type icons, all sharing one plot frame, and the buttons beside a selected chart. */
 
 import { circle, join, line, poly, rect, sector } from '../path.js';
-import { badge, filled, funnel, outlined, stroked } from '../primitives.js';
+import { arrow, badge, filled, funnel, headed, outlined, sheet, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
@@ -134,4 +134,64 @@ export const CHART_ICONS = {
     ),
   ],
   chartFilters: [...funnel()],
+  /** Chart Design: a chart gaining an element. */
+  chartAddElement: [
+    axes(),
+    column(6, 3.4, 6, PALETTE.info),
+    column(10.4, 3.4, 10, PALETTE.accent),
+    ...badge({ glyph: 'plus', corner: 'tr' }),
+  ],
+  /** Three swatch strips, the palettes Change Colors offers. */
+  chartColors: [
+    filled(rect(3, 3.4, 5.4, 17.2), PALETTE.info),
+    filled(rect(9.3, 3.4, 5.4, 17.2), PALETTE.alt),
+    filled(rect(15.6, 3.4, 5.4, 17.2), PALETTE.accent),
+    stroked(rect(3, 3.4, 18, 17.2), PALETTE.ink, 'thin', { join: 'miter', cap: 'butt' }),
+  ],
+  /** A row and a column trading places. */
+  chartSwitchRowColumn: [
+    ...sheet({
+      x: 2.4,
+      y: 2.4,
+      w: 12.6,
+      h: 12.6,
+      cols: 3,
+      rows: 3,
+      bands: [
+        { axis: 'row', index: 0, fill: PALETTE.infoMid },
+        { axis: 'col', index: 0, fill: PALETTE.accentSoft },
+      ],
+    }),
+    ...headed({
+      shaft: 'M19.8 7.2C19.8 14.4 14.4 19.8 7.2 19.8',
+      tip: [5.4, 19.8],
+      headDir: [-1, 0],
+      color: PALETTE.info,
+    }),
+    ...headed({
+      shaft: 'M19.8 7.2v0',
+      tip: [19.8, 5.4],
+      headDir: [0, -1],
+      color: PALETTE.info,
+    }),
+  ],
+  /** The cells a chart plots, picked out of the sheet. */
+  chartSelectData: [
+    ...sheet({
+      x: 2.4,
+      y: 3.4,
+      w: 19.2,
+      h: 17.2,
+      cols: 4,
+      rows: 4,
+      bands: [{ axis: 'col', index: [1, 2], fill: PALETTE.infoMid }],
+    }),
+  ],
+  /** A chart becoming another kind. */
+  chartChangeType: [
+    axes(),
+    column(6, 3.4, 6, PALETTE.info),
+    column(10.4, 3.4, 10, PALETTE.accent),
+    ...arrow({ from: [12.6, 5.4], to: [21, 5.4], color: PALETTE.alt, head: 'solid' }),
+  ],
 } satisfies Record<string, IconDefinition>;

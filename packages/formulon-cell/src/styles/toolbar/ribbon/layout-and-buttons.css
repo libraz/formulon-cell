@@ -66,6 +66,13 @@
   content: "";
 }
 
+/* A tab a selected object adds is set apart by the accent colour, as the
+ * desktop spreadsheet sets apart its contextual tabs. */
+.fc-tb__ribbon-tab--contextual,
+.fc-tb__ribbon-tab--contextual:hover:not(:disabled) {
+  color: var(--fc-tb-accent);
+}
+
 .fc-tb__ribbon-tab:disabled {
   cursor: default;
   opacity: 0.62;

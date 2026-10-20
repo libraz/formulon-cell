@@ -39,6 +39,7 @@ import {
   INTERACTIVE,
   isDuplicateShortcut,
   keepKeyFromGrid,
+  keepsObjectSelected,
   previewFrame,
   trackFrameDrag,
 } from './drawing-frame.js';
@@ -56,6 +57,9 @@ import {
 
 export interface SessionChartsHandle {
   refresh(): void;
+  /** Open the settings of the selected chart on `tab`; false when no chart
+   *  that can be drawn is selected. */
+  openSettings(tab: SettingsTab): boolean;
   setLabels(labels: Partial<SessionChartLabels>, locale?: string): void;
   detach(): void;
 }
@@ -402,12 +406,13 @@ export function attachSessionCharts(deps: {
     return wanted;
   };
 
-  /** Whether `target` is part of a chart or its settings, which keep the chart selected. */
+  /** Whether `target` is part of a chart, its settings or the ribbon, which keep the chart selected. */
   const menu = createObjectMenu(host);
   const insideCharts = (target: EventTarget | null): boolean =>
     target instanceof Node &&
     (root.contains(target) ||
       menu.contains(target) ||
+      keepsObjectSelected(target) ||
       (target instanceof Element && target.closest('.fc-chart-settings') !== null));
 
   // Like Excel, a press anywhere else on the sheet leaves the chart.
@@ -799,6 +804,15 @@ export function attachSessionCharts(deps: {
 
   return {
     refresh: render,
+    openSettings(tab) {
+      const chart = selectedId === null ? null : sessionChartById(store.getState(), selectedId);
+      const panel = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart')).find(
+        (candidate) => candidate.dataset.chartId === chart?.id,
+      );
+      if (!chart || !panel || !isDrawable(chart)) return false;
+      openSettings(chart, panel, tab);
+      return true;
+    },
     setLabels(next, nextLocale) {
       labels = { ...labels, ...next };
       if (nextLocale) {

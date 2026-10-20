@@ -507,7 +507,7 @@ describe('toolbar/ribbon shared data', () => {
       ribbonActivatableSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS }),
     );
     const optionalEntries = ribbonActivationEntriesForCommands(
-      ribbonActivatableSurfaceCommandIds({ tabs: OPTIONAL_RIBBON_TABS }),
+      ribbonActivatableSurfaceCommandIds({ tabs: OPTIONAL_RIBBON_TABS, contextualTabs: [] }),
     );
     const standardCommands = new Set(standardEntries.map((entry) => entry.command));
     const optionalCommands = optionalEntries.map((entry) => entry.command);

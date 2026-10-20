@@ -102,6 +102,19 @@ export interface RibbonStrings {
     dataValidation: string;
     arrange: string;
     selectionPane: string;
+    chartLayouts: string;
+    chartStyles: string;
+    chartData: string;
+    chartType: string;
+    currentSelection: string;
+    addChartElement: string;
+    changeColors: string;
+    switchRowColumn: string;
+    selectData: string;
+    changeChartType: string;
+    formatSelection: string;
+    bringForward: string;
+    sendBackward: string;
     window: string;
     freeze: string;
     names: string;
@@ -300,6 +313,8 @@ export interface RibbonStrings {
       help: string;
       automate: string;
       acrobat: string;
+      chartDesign: string;
+      chartFormat: string;
     };
     /** Composed-label templates. `{name}` / `{percent}` are interpolated at use. */
     functionArgumentsTitle: string;

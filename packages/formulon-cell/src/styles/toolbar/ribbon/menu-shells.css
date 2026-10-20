@@ -124,6 +124,41 @@
   height: 18px;
 }
 
+/* Add Chart Element and Change Colors tick what the chart already shows. */
+#menu-chart-add-element .fc-tb__menu-item__icon-spacer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#menu-chart-add-element
+  .fc-tb__menu-item[aria-checked="true"]
+  .fc-tb__menu-item__icon-spacer::before,
+#menu-chart-colors .fc-tb__menu-item[aria-checked="true"]::after {
+  width: 9px;
+  height: 5px;
+  border-bottom: 2px solid var(--fc-tb-accent);
+  border-left: 2px solid var(--fc-tb-accent);
+  content: "";
+  transform: rotate(-45deg);
+}
+
+#menu-chart-colors .fc-tb__menu-item[aria-checked="true"]::after {
+  margin-left: auto;
+}
+
+/* Change Colors: the six colours of a palette before its name. */
+.fc-tb__chart-palette {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 1px;
+}
+
+.fc-tb__chart-palette-swatch {
+  width: 12px;
+  height: 14px;
+}
+
 .fc-tb__menu-item__text,
 .fc-tb__submenu-item__text {
   min-width: 0;
