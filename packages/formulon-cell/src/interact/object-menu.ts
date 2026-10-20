@@ -1,4 +1,4 @@
-import { focusMenuItem, handleMenuKeydown } from '../toolbar/menu-a11y.js';
+import { focusMenuItem, handleMenuKeydown, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
@@ -85,10 +85,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
         label.className = 'fc-ctxmenu__label';
         label.textContent = entry.label;
         button.appendChild(label);
-        if (entry.disabled) {
-          button.disabled = true;
-          button.setAttribute('aria-disabled', 'true');
-        }
+        if (entry.disabled) projectDisabledState(button, true, null);
         button.addEventListener('click', () => {
           if (button.disabled) return;
           close(true);
