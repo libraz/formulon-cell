@@ -1,5 +1,11 @@
 import type { ImagePlacement } from '@libraz/formulon';
-import { cellRect, cellRectUnclamped, layoutForView } from '../render/geometry.js';
+import {
+  bodyBandOrigin,
+  cellRectUnclamped,
+  gridOriginX,
+  gridOriginY,
+  layoutForView,
+} from '../render/geometry.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { EngineDrawingObject } from './workbook-handle-annotations.js';
@@ -168,7 +174,8 @@ export const placementForPixels = (
   }
 };
 
-/** Grid pixels of the object at `anchor` under the current view. */
+/** Grid pixels of the object at `anchor` under the current view. An object
+ *  whose anchor has scrolled off keeps its true, possibly negative, offset. */
 export const sessionPosition = (
   store: SpreadsheetStore,
   object: EngineDrawingAnchor,
@@ -176,7 +183,12 @@ export const sessionPosition = (
   const state = store.getState();
   const dimensions = dimensionsForAnchor(store, object);
   try {
-    const rect = cellRect(layoutForView(state), state.viewport, object.fromRow, object.fromCol);
+    const rect = cellRectUnclamped(
+      layoutForView(state),
+      state.viewport,
+      object.fromRow,
+      object.fromCol,
+    );
     const zoom = viewportZoom(store);
     return {
       x: rect.x + (object.fromColOff / EMU_PER_PX) * zoom,
@@ -192,5 +204,43 @@ export const sessionPosition = (
       w: Math.max(1, dimensions.widthEmu / EMU_PER_PX) * zoom,
       h: Math.max(1, dimensions.heightEmu / EMU_PER_PX) * zoom,
     };
+  }
+};
+
+/** How far a drawing's own decorations, such as sizing handles, may reach past it. */
+const DECORATION_OUTSET = 64;
+
+/** The CSS `clip-path` that hides the part of an object at `position` lying
+ *  under the headers, or under the frozen panes when its anchor scrolls; empty
+ *  when nothing is hidden. */
+export const drawingClipPath = (
+  store: SpreadsheetStore,
+  object: EngineDrawingAnchor,
+  position: { x: number; y: number; w: number; h: number },
+): string => {
+  try {
+    const state = store.getState();
+    const layout = layoutForView(state);
+    const band = bodyBandOrigin(layout, state.viewport);
+    const top = object.fromRow >= layout.freezeRows ? band.y : gridOriginY(layout);
+    const hiddenTop = top - position.y;
+    let hiddenLead: number;
+    if (layout.rtl) {
+      const edge =
+        object.fromCol >= layout.freezeCols ? band.x : layout.viewWidth - gridOriginX(layout);
+      hiddenLead = position.x + position.w - edge;
+    } else {
+      const edge = object.fromCol >= layout.freezeCols ? band.x : gridOriginX(layout);
+      hiddenLead = edge - position.x;
+    }
+    if (hiddenTop <= 0 && hiddenLead <= 0) return '';
+    const inset = (hidden: number): string =>
+      hidden > 0 ? `${hidden}px` : `-${DECORATION_OUTSET}px`;
+    const outset = `-${DECORATION_OUTSET}px`;
+    return layout.rtl
+      ? `inset(${inset(hiddenTop)} ${inset(hiddenLead)} ${outset} ${outset})`
+      : `inset(${inset(hiddenTop)} ${outset} ${outset} ${inset(hiddenLead)})`;
+  } catch {
+    return '';
   }
 };

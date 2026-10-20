@@ -4,7 +4,7 @@ import {
   clearSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
-import { sessionPosition } from '../engine/drawing-geometry.js';
+import { drawingClipPath, sessionPosition } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -36,6 +36,11 @@ const renderedPosition = (
         w: item.w ?? 160,
         h: item.h ?? 96,
       };
+
+/** A moved origin; an anchored object may sit scrolled off, so only a free
+ *  object is kept on the grid. */
+const movedOrigin = (item: SessionIllustration, value: number): number =>
+  item.nativeAnchor ? value : Math.max(0, value);
 
 const appendSvg = <K extends keyof SVGElementTagNameMap>(
   parent: Element,
@@ -193,8 +198,8 @@ export function attachSessionIllustrations(deps: {
           store,
           item.id,
           {
-            x: Math.max(0, startLeft + dx),
-            y: Math.max(0, startTop + dy),
+            x: movedOrigin(item, startLeft + dx),
+            y: movedOrigin(item, startTop + dy),
           },
           history,
           getWb() ?? undefined,
@@ -268,8 +273,8 @@ export function attachSessionIllustrations(deps: {
       store,
       item.id,
       {
-        x: Math.max(0, (item.nativeAnchor ? rendered.x : (item.x ?? panel.offsetLeft)) + dx),
-        y: Math.max(0, (item.nativeAnchor ? rendered.y : (item.y ?? panel.offsetTop)) + dy),
+        x: movedOrigin(item, (item.nativeAnchor ? rendered.x : (item.x ?? panel.offsetLeft)) + dx),
+        y: movedOrigin(item, (item.nativeAnchor ? rendered.y : (item.y ?? panel.offsetTop)) + dy),
       },
       history,
       getWb() ?? undefined,
@@ -308,6 +313,9 @@ export function attachSessionIllustrations(deps: {
         panel.style.top = `${placement.y}px`;
         panel.style.width = `${placement.w}px`;
         panel.style.height = `${placement.h}px`;
+        if (item.nativeAnchor) {
+          panel.style.clipPath = drawingClipPath(store, item.nativeAnchor, placement);
+        }
         panel.addEventListener('focus', () => {
           selectedId = item.id;
           refreshSelection();
