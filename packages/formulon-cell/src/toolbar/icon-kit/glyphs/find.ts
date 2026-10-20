@@ -60,7 +60,7 @@ const formulaMark = place(
 );
 
 export const FIND_ICONS = {
-  find: [...magnifier({ cx: 9.8, cy: 9.8, r: 7, handle: 6.4, handleColor: PALETTE.info })],
+  find: [...magnifier({ cx: 14.2, cy: 9.8, r: 7, handle: 6.4, toward: 'bl' })],
 
   // Replace: the lens over text that is being swapped for other text.
   replaceFind: [

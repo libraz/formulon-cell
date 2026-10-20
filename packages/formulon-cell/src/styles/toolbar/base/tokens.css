@@ -22,6 +22,9 @@
   --fc-tb-card: #ffffff;
   --fc-tb-fg: #111418;
   --fc-tb-fg-soft: #5a6068;
+  /* Blank-paper surfaces inside ribbon icons. */
+  --fc-tb-icon-paper: #ffffff;
+  --fc-tb-icon-mute: #f3f2f1;
   --fc-tb-line: #d9dadd;
   --fc-tb-line-soft: #edebe9;
   --fc-tb-accent: #107c41;
@@ -61,6 +64,8 @@
   --fc-tb-card: #1e2228;
   --fc-tb-fg: #ecedef;
   --fc-tb-fg-soft: #8d949c;
+  --fc-tb-icon-paper: #2b3038;
+  --fc-tb-icon-mute: #343a43;
   --fc-tb-line: #2e333a;
   --fc-tb-line-soft: #323841;
   --fc-tb-accent: var(--fc-accent, #4cc26b);

@@ -496,8 +496,9 @@ describe('toolbar/ribbon menu primitives', () => {
     ]);
     expect(insertMenu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(4);
     expect(deleteMenu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(6);
-    expect(insertMenu.querySelector('path[fill="#107c41"]')).toBeTruthy();
-    expect(deleteMenu.querySelector('path[fill="#c00000"]')).toBeTruthy();
+    // Insert draws a white arrow outlined in the reference blue; delete a red cross.
+    expect(insertMenu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
+    expect(deleteMenu.querySelector('path[stroke="#c00000"]')).toBeTruthy();
 
     expect(menusCss).toMatch(
       /#menu-insert-cells,[\s\S]*?#menu-delete-cells\s*\{[\s\S]*?min-width: 166px;/,

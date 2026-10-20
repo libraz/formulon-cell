@@ -1,6 +1,6 @@
 /** Sort and filter icons. */
 
-import { letter } from '../letters.js';
+import { letter, strokeLetter } from '../letters.js';
 import { hLine, join } from '../path.js';
 import { arrow, badge, funnel, headed, sheet, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
@@ -21,17 +21,11 @@ export const SORT_FILTER_ICONS = {
   sortAsc: [...sortKeys('A', 'Z'), ...sortArrow],
   sortDesc: [...sortKeys('Z', 'A'), ...sortArrow],
 
-  // Sort *and* filter: the cone with the direction arrow beside it.
+  // Sort *and* filter: the A-to-Z key beside the cone.
   sortFilter: [
-    ...funnel({ scale: 0.9, cx: 9.4 }),
-    ...arrow({
-      from: [20.4, 3.6],
-      to: [20.4, 20.4],
-      color: PALETTE.accent,
-      head: 'solid',
-      tail: 'solid',
-      weight: 'regular',
-    }),
+    strokeLetter('A', { height: 7.6, cx: 5.6, cy: 6.6, color: PALETTE.info }),
+    strokeLetter('Z', { height: 7.6, cx: 5.6, cy: 17.4 }),
+    ...funnel({ scale: 0.62, cx: 16 }),
   ],
   // Custom sort: the grid with a two-way arrow, no fixed direction.
   sortCustom: [

@@ -76,10 +76,14 @@ export const PALETTE = {
   info: '#2f75b5',
   infoDeep: '#1c5386',
   infoSoft: '#cfe0f2',
+  /** Highlighted cells inside a grid: the range an operation acts on. */
+  infoMid: '#84beec',
 
   /** Destructive: clear, delete, remove. */
   danger: '#c00000',
   dangerSoft: '#f5cdcd',
+  /** Cells flagged by a rule, as conditional formatting paints them. */
+  dangerMid: '#ff9198',
 
   /** Attention and annotation. */
   warn: '#ffd966',

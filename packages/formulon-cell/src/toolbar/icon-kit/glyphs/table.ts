@@ -1,7 +1,7 @@
 /** Table, pivot-table and cell-style icons. */
 
-import { rect, roundRect } from '../path.js';
-import { badge, bars, filled, headed, outlined, sheet } from '../primitives.js';
+import { hLine, join, vLine } from '../path.js';
+import { badge, brush, headed, sheet, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
@@ -16,13 +16,29 @@ const table = (box: { x: number; y: number; w: number; h: number }, header: stri
 ];
 
 const FULL = { x: 2.4, y: 3.4, w: 19.2, h: 17.2 } as const;
-const BADGED = { x: 2.4, y: 4.4, w: 16.2, h: 16.2 } as const;
+
+/** The grid the style and format commands act on: four columns by three rows. */
+const STYLED = {
+  x: 2.4,
+  y: 3.4,
+  w: 19.2,
+  h: 14.4,
+  cols: 4,
+  rows: 3,
+  rules: PALETTE.grid,
+} as const;
+
+/** The brush that lays a style down, crossing the grid's lower-right corner. */
+const styleBrush = brush({ bristle: PALETTE.info, cx: 16.4, cy: 15.6, size: 13.6, rotate: 40 });
 
 export const TABLE_ICONS = {
   table: table(FULL, PALETTE.accent),
   tableStyle: [
-    ...table(BADGED, PALETTE.info),
-    ...badge({ glyph: 'pencil', corner: 'br', tone: PALETTE.alt }),
+    ...sheet({
+      ...STYLED,
+      cells: [{ cols: [1, 2], rows: [1, 2], fill: PALETTE.infoMid, frame: PALETTE.info }],
+    }),
+    ...styleBrush,
   ],
 
   // A pivot pulls a summary out of the source grid.
@@ -71,57 +87,38 @@ export const TABLE_ICONS = {
     }),
   ],
 
-  // Format cells: the grid with the dialog's own swatch beside it.
+  // Format cells: one cell in focus, with the dimension it is sized by.
   formatCells: [
-    ...sheet({ x: 2.4, y: 4.4, w: 16.2, h: 16.2, cols: 3, rows: 3 }),
-    ...badge({ glyph: 'pencil', corner: 'br', tone: PALETTE.info }),
+    ...sheet({
+      ...STYLED,
+      cols: 3,
+      rows: 3,
+      y: 5.6,
+      h: 16,
+      cells: [{ cols: [1, 1], rows: [1, 1], fill: PALETTE.infoMid, frame: PALETTE.info }],
+    }),
+    stroked(join(hLine(9, 2.8, 6), vLine(9, 1.6, 2.4), vLine(15, 1.6, 2.4)), PALETTE.info, 'thin', {
+      cap: 'butt',
+    }),
   ],
+  // Cells a rule has flagged, picked out in the rule's colour.
   conditional: [
-    ...sheet({ x: 2.4, y: 3.4, w: 12.2, h: 17.2, cols: 1, rows: 3 }),
-    filled(rect(16.4, 4.4, 5.2, 4.4), PALETTE.scaleLow),
-    filled(rect(16.4, 9.8, 5.2, 4.4), PALETTE.scaleMid),
-    filled(rect(16.4, 15.2, 5.2, 4.4), PALETTE.scaleHigh),
+    ...sheet({
+      ...STYLED,
+      y: 4.8,
+      cells: [
+        { cols: [0, 1], rows: [0, 0], fill: PALETTE.dangerMid, frame: PALETTE.danger },
+        { cols: [0, 0], rows: [1, 1], fill: PALETTE.infoMid, frame: PALETTE.info },
+        { cols: [0, 1], rows: [2, 2], fill: PALETTE.dangerMid, frame: PALETTE.danger },
+      ],
+    }),
   ],
+  // A style brushed onto a block of cells.
   cellStyles: [
-    outlined(roundRect(2.4, 4.4, 8.6, 6.4, 1.2), PALETTE.accentSoft, PALETTE.accent, 'regular'),
-    outlined(roundRect(13, 4.4, 8.6, 6.4, 1.2), PALETTE.warnSoft, PALETTE.warnDeep, 'regular'),
-    outlined(roundRect(2.4, 13.2, 8.6, 6.4, 1.2), PALETTE.infoSoft, PALETTE.info, 'regular'),
-    outlined(roundRect(13, 13.2, 8.6, 6.4, 1.2), PALETTE.dangerSoft, PALETTE.danger, 'regular'),
-    ...bars({
-      x: 4.4,
-      y: 7.6,
-      width: 4.6,
-      widths: [1],
-      gap: 0,
-      color: PALETTE.accent,
-      weight: 'regular',
+    ...sheet({
+      ...STYLED,
+      cells: [{ cols: [0, 2], rows: [0, 1], fill: PALETTE.infoMid, frame: PALETTE.info }],
     }),
-    ...bars({
-      x: 15,
-      y: 7.6,
-      width: 4.6,
-      widths: [1],
-      gap: 0,
-      color: PALETTE.warnDeep,
-      weight: 'regular',
-    }),
-    ...bars({
-      x: 4.4,
-      y: 16.4,
-      width: 4.6,
-      widths: [1],
-      gap: 0,
-      color: PALETTE.info,
-      weight: 'regular',
-    }),
-    ...bars({
-      x: 15,
-      y: 16.4,
-      width: 4.6,
-      widths: [1],
-      gap: 0,
-      color: PALETTE.danger,
-      weight: 'regular',
-    }),
+    ...styleBrush,
   ],
 } satisfies Record<string, IconDefinition>;

@@ -9,6 +9,7 @@
  */
 
 import { RIBBON_GLYPHS } from './icon-kit/glyphs/index.js';
+import { PALETTE } from './icon-kit/tokens.js';
 import type { IconDefinition, IconSegment } from './icon-kit/types.js';
 
 export type ExcelRibbonIconSegment = IconSegment;
@@ -20,6 +21,21 @@ export type ExcelRibbonIconName = keyof typeof RIBBON_GLYPHS;
 
 export const excelRibbonIconPaths = (name: string): ExcelRibbonIconDefinition | null =>
   EXCEL_RIBBON_ICON_PATHS[name] ?? null;
+
+/** The neutral roles follow the theme: ink takes the control's text colour,
+ *  so it also greys out when the control is disabled, and the paper surfaces
+ *  take the toolbar's icon surface tokens. Every other role stays fixed. */
+const THEMED_ROLES: Readonly<Record<string, string>> = {
+  [PALETTE.ink]: 'currentColor',
+  [PALETTE.paper]: 'var(--fc-tb-icon-paper, #ffffff)',
+  [PALETTE.mute]: 'var(--fc-tb-icon-mute, #f3f2f1)',
+};
+
+const paint = (path: SVGPathElement, property: 'fill' | 'stroke', color: string): void => {
+  const themed = THEMED_ROLES[color];
+  if (themed?.startsWith('var(')) path.style.setProperty(property, themed);
+  else path.setAttribute(property, themed ?? color);
+};
 
 export const createExcelRibbonSvg = (name: string, className: string): SVGSVGElement | null => {
   const segments = excelRibbonIconPaths(name);
@@ -34,8 +50,8 @@ export const createExcelRibbonSvg = (name: string, className: string): SVGSVGEle
   for (const segment of segments) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', segment.d);
-    path.setAttribute('fill', segment.fill ?? 'none');
-    if (segment.stroke) path.setAttribute('stroke', segment.stroke);
+    paint(path, 'fill', segment.fill ?? 'none');
+    if (segment.stroke) paint(path, 'stroke', segment.stroke);
     if (segment.strokeWidth) path.setAttribute('stroke-width', segment.strokeWidth);
     if (segment.strokeLinecap) path.setAttribute('stroke-linecap', segment.strokeLinecap);
     if (segment.strokeLinejoin) path.setAttribute('stroke-linejoin', segment.strokeLinejoin);

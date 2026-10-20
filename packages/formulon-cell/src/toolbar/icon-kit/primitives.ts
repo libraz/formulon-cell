@@ -280,6 +280,69 @@ export const loopArrow = (options: {
   });
 };
 
+/**
+ * A stand-alone caret, the small up/down tick Excel pairs with a letter for
+ * grow/shrink. `width` is the span of its two arms.
+ */
+export const caret = (options: {
+  cx: number;
+  cy: number;
+  width: number;
+  pointing: 'up' | 'down';
+  color: string;
+  weight?: StrokeWeight;
+}): IconSegment => {
+  const half = options.width / 2;
+  const rise = (options.pointing === 'up' ? -1 : 1) * half * 0.6;
+  return stroked(
+    poly([
+      [options.cx - half, options.cy - rise / 2],
+      [options.cx, options.cy + rise / 2],
+      [options.cx + half, options.cy - rise / 2],
+    ]),
+    options.color,
+    options.weight ?? 'regular',
+    { join: 'miter' },
+  );
+};
+
+/**
+ * A hollow block arrow — a shaft with thickness and a triangular head — for
+ * marks that push cells aside rather than point at something.
+ */
+export const blockArrow = (options: {
+  from: Point;
+  to: Point;
+  /** Full thickness of the shaft. */
+  shaft: number;
+  /** Full width of the head across the shaft. */
+  head: number;
+  fill: string;
+  frame: string;
+}): IconSegment => {
+  const dir = direction(options.from, options.to);
+  const perp = perpendicular(dir);
+  const headLength = options.head * 0.6;
+  const neck = advance(options.to, dir, -headLength);
+  const side = (point: Point, offset: number): Point => [
+    point[0] + perp[0] * offset,
+    point[1] + perp[1] * offset,
+  ];
+  const d = poly(
+    [
+      side(options.from, options.shaft / 2),
+      side(neck, options.shaft / 2),
+      side(neck, options.head / 2),
+      options.to,
+      side(neck, -options.head / 2),
+      side(neck, -options.shaft / 2),
+      side(options.from, -options.shaft / 2),
+    ],
+    true,
+  );
+  return outlined(d, options.fill, options.frame, 'thin');
+};
+
 // ---------------------------------------------------------------------------
 // Corner badge
 // ---------------------------------------------------------------------------
@@ -503,6 +566,16 @@ export type SheetOptions = {
   surface?: string;
   rules?: string;
   bands?: readonly SheetBand[];
+  /** Highlighted cell ranges: filled under the rules, outlined over them. */
+  cells?: readonly SheetCells[];
+};
+
+export type SheetCells = {
+  /** Inclusive zero-based column and row span. */
+  cols: readonly [number, number];
+  rows: readonly [number, number];
+  fill: string;
+  frame?: string;
 };
 
 /**
@@ -531,6 +604,17 @@ export const sheet = (options: SheetOptions = {}): IconSegment[] => {
     );
   }
 
+  const cellBoxes = (options.cells ?? []).map((cell) => ({
+    cell,
+    box: rect(
+      x + colWidth * cell.cols[0],
+      y + rowHeight * cell.rows[0],
+      colWidth * (cell.cols[1] - cell.cols[0] + 1),
+      rowHeight * (cell.rows[1] - cell.rows[0] + 1),
+    ),
+  }));
+  for (const { cell, box } of cellBoxes) segments.push(filled(box, cell.fill));
+
   if (rows > 1 || cols > 1) {
     segments.push(
       stroked(
@@ -543,6 +627,12 @@ export const sheet = (options: SheetOptions = {}): IconSegment[] => {
         { cap: 'butt' },
       ),
     );
+  }
+
+  for (const { cell, box } of cellBoxes) {
+    if (cell.frame) {
+      segments.push(stroked(box, cell.frame, 'thin', { cap: 'butt', join: 'miter' }));
+    }
   }
 
   segments.push(
@@ -629,19 +719,56 @@ export const doc = (options: DocOptions = {}): IconSegment[] => {
   return segments;
 };
 
-/** A clipboard: board, clip plate, and clip tab. */
+/** A clipboard: a tan board under a grey metal clip, as the paste family draws it. */
 export const clipboard = (
   options: { surface?: string; frame?: string; clip?: string } = {},
 ): IconSegment[] => {
-  const surface = options.surface ?? PALETTE.paper;
-  const frame = options.frame ?? PALETTE.ink;
-  const clip = options.clip ?? PALETTE.tan;
+  const surface = options.surface ?? PALETTE.tan;
+  const frame = options.frame ?? PALETTE.alt;
+  const clip = options.clip ?? PALETTE.paper;
   return [
-    outlined(roundRect(4, 4, 16, 18, 1.6), surface, frame, 'regular'),
-    outlined(roundRect(7.5, 1.8, 9, 4.4, 1.2), clip, PALETTE.tanDeep, 'thin'),
-    outlined(roundRect(9.75, 1, 4.5, 2.4, 0.8), PALETTE.warnSoft, PALETTE.tanDeep, 'hairline'),
+    outlined(roundRect(4, 4, 16, 18, 1.2), surface, frame, 'regular'),
+    outlined(roundRect(7.5, 2.4, 9, 3.8, 1), clip, PALETTE.grid, 'thin'),
+    outlined(roundRect(9.9, 1, 4.2, 2.4, 1.2), clip, PALETTE.grid, 'thin'),
   ];
 };
+
+/**
+ * A paint brush: handle, metal ferrule and bristles, upright in its own box and
+ * tilted into place so the bristles land bottom-left as the format tools draw it.
+ */
+export const brush = (options: {
+  bristle: string;
+  cx: number;
+  cy: number;
+  size: number;
+  rotate?: number;
+  handle?: string;
+}): IconSegment[] =>
+  place(
+    [
+      outlined(
+        roundRect(10.6, 1, 2.8, 9, 1.4),
+        options.handle ?? PALETTE.paper,
+        PALETTE.ink,
+        'thin',
+      ),
+      outlined(rect(9.6, 10, 4.8, 3), PALETTE.mute, PALETTE.ink, 'thin'),
+      outlined(
+        'M9.6 13h4.8v2.6c0 2.6-1.4 4.4-2.4 6.4-1-2-2.4-3.8-2.4-6.4z',
+        options.bristle,
+        PALETTE.ink,
+        'thin',
+      ),
+    ],
+    {
+      box: [9.6, 1, 4.8, 21],
+      size: options.size,
+      cx: options.cx,
+      cy: options.cy,
+      rotate: options.rotate ?? 40,
+    },
+  );
 
 /** A display: screen panel and stand. */
 export const monitor = (
@@ -747,6 +874,8 @@ export const magnifier = (
     surface?: string;
     frame?: string;
     handleColor?: string;
+    /** Corner the handle points to. */
+    toward?: 'br' | 'bl';
   } = {},
 ): IconSegment[] => {
   const cx = options.cx ?? 10.4;
@@ -754,8 +883,9 @@ export const magnifier = (
   const r = options.r ?? 6;
   const handle = options.handle ?? 5.4;
   const unit = Math.SQRT1_2;
-  const start: Point = [cx + unit * r, cy + unit * r];
-  const end: Point = [start[0] + unit * handle, start[1] + unit * handle];
+  const sx = options.toward === 'bl' ? -unit : unit;
+  const start: Point = [cx + sx * r, cy + unit * r];
+  const end: Point = [start[0] + sx * handle, start[1] + unit * handle];
   return [
     outlined(
       circle(cx, cy, r),

@@ -1,39 +1,48 @@
 /** Clear-* icons: one eraser body, one badge saying what is being cleared. */
 
 import { letter } from '../letters.js';
-import { hLine, join, line, poly } from '../path.js';
+import { join, line, type Point, poly } from '../path.js';
 import { badge, bars, chainLink, outlined, sheet, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
 /**
- * The eraser, tipped over a rule it has just wiped. Sized so the badge in the
- * top-right corner never touches it.
+ * The eraser block, tipped on its edge: a pale sleeve over the rubber end.
+ * Sized so the badge in the top-right corner never touches it.
  */
-const eraser = (body: string, streak: string) => [
-  outlined(
-    poly(
-      [
-        [7.6, 4.2],
-        [18.4, 9.8],
-        [13.8, 16.4],
-        [3, 10.8],
-      ],
-      true,
-    ),
-    body,
-    PALETTE.ink,
-    'regular',
-  ),
-  stroked(line([13, 7], [8.4, 13.6]), streak, 'thin'),
-  stroked(hLine(2.6, 20.4, 18.8), PALETTE.info, 'bold'),
+const ERASER: readonly Point[] = [
+  [9.6, 3.8],
+  [19.8, 11.4],
+  [12.6, 21.2],
+  [2.4, 13.6],
 ];
 
+/** Share of the block's length taken by the rubber end. */
+const RUBBER = 0.32;
+
+const along = (from: Point, to: Point, t: number): Point => [
+  from[0] + (to[0] - from[0]) * t,
+  from[1] + (to[1] - from[1]) * t,
+];
+
+const eraser = (sleeve: string, rubber: string) => {
+  const [a, b, c, d] = ERASER as [Point, Point, Point, Point];
+  return [
+    outlined(poly(ERASER, true), sleeve, PALETTE.violet, 'regular'),
+    outlined(
+      poly([along(d, a, RUBBER), along(c, b, RUBBER), c, d], true),
+      rubber,
+      PALETTE.violet,
+      'regular',
+    ),
+  ];
+};
+
 export const CLEAR_ICONS = {
-  clear: eraser(PALETTE.paper, PALETTE.grid),
-  clearAll: [...eraser(PALETTE.violetSoft, PALETTE.violet), ...badge({ glyph: 'cross' })],
+  clear: eraser(PALETTE.paper, PALETTE.violetSoft),
+  clearAll: [...eraser(PALETTE.paper, PALETTE.violetSoft), ...badge({ glyph: 'cross' })],
   clearFormats: [
-    ...eraser(PALETTE.violetSoft, PALETTE.violet),
+    ...eraser(PALETTE.paper, PALETTE.violetSoft),
     letter('A', { height: 7.6, cx: 18.4, cy: 5.4, color: PALETTE.violet }),
   ],
   clearContents: [

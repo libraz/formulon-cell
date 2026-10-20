@@ -1,8 +1,8 @@
 /** Font, border, fill-colour and number-format icons. */
 
-import { letter } from '../letters.js';
-import { circle, join, line, poly, rect } from '../path.js';
-import { arrow, filled, outlined, sheet, stroked } from '../primitives.js';
+import { letter, strokeLetter, strokeLetterWidth } from '../letters.js';
+import { circle, ellipse, hRules, join, line, poly, rect, vRules } from '../path.js';
+import { arrow, caret, filled, outlined, place, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
@@ -12,119 +12,166 @@ const swatch = (color: string) => filled(rect(3, 18.6, 18, 3), color);
 /** Cap height used wherever a letterform sits above a swatch. */
 const CAPPED = 13.6;
 
+/** Baseline of the font-size letter, shared so grow and shrink sit on one line. */
+const SIZE_BASELINE = 20.6;
+
+/** The font-size pair: a light A with a caret at its shoulder. */
+const sizeMark = (height: number, pointing: 'up' | 'down') => [
+  strokeLetter('A', { height, cx: 9.4, cy: SIZE_BASELINE - height / 2, weight: 'bold' }),
+  caret({ cx: 18.6, cy: 4.6, width: 4.6, pointing, color: PALETTE.info, weight: 'bold' }),
+];
+
+/** Digit height of the decimal-places marks. */
+const DIGIT = 6.6;
+
+/**
+ * One row of a decimal-places mark: a point and `zeros` zeros, right-aligned
+ * on `right`, with an optional arrow coming in from the left.
+ */
+const decimalRow = (options: {
+  right: number;
+  cy: number;
+  zeros: number;
+  arrow?: 'in' | 'out';
+}) => {
+  const digit = strokeLetterWidth('zero', DIGIT);
+  const pitch = digit + 1.6;
+  const firstCx = options.right - digit / 2 - pitch * (options.zeros - 1);
+  const dotX = firstCx - digit / 2 - 1.4;
+  const segments: IconDefinition[number][] = [
+    filled(circle(dotX, options.cy + DIGIT / 2 - 0.6, 0.8), PALETTE.ink),
+    ...Array.from({ length: options.zeros }, (_, i) =>
+      strokeLetter('zero', { height: DIGIT, cx: firstCx + pitch * i, cy: options.cy }),
+    ),
+  ];
+  if (options.arrow) {
+    const tail = dotX - 7.6;
+    const head = dotX - 1.4;
+    segments.push(
+      ...arrow({
+        from: options.arrow === 'out' ? [head, options.cy] : [tail, options.cy],
+        to: options.arrow === 'out' ? [tail, options.cy] : [head, options.cy],
+        color: PALETTE.info,
+        weight: 'regular',
+      }),
+    );
+  }
+  return segments;
+};
+
+/** Paint bucket, upright in its own box; tilted into place by the fill icon. */
+const bucket = [
+  stroked('M5.9 7.4a3.5 3.5 0 0 1 7 0', PALETTE.ink, 'thin'),
+  outlined(
+    poly(
+      [
+        [3.2, 7.4],
+        [15.6, 7.4],
+        [13.4, 17],
+        [5.4, 17],
+      ],
+      true,
+    ),
+    PALETTE.paper,
+    PALETTE.ink,
+    'regular',
+  ),
+];
+
 export const FORMAT_ICONS = {
-  bold: [letter('B', { height: 17.6 })],
-  italic: [letter('I', { height: 17.6 })],
-  underline: [letter('U', { height: CAPPED, cy: 9.8 }), filled(rect(3, 19.6, 18, 1), PALETTE.ink)],
+  bold: [letter('B', { height: 17 })],
+  italic: [strokeLetter('I', { height: 16.4, weight: 'regular' })],
+  underline: [
+    strokeLetter('U', { height: CAPPED, cy: 10, weight: 'regular' }),
+    filled(rect(4.4, 19.6, 15.2, 1), PALETTE.ink),
+  ],
   underlineSingle: [
-    letter('U', { height: CAPPED, cy: 9.8 }),
-    filled(rect(3, 19.6, 18, 1), PALETTE.ink),
+    strokeLetter('U', { height: CAPPED, cy: 10, weight: 'regular' }),
+    filled(rect(4.4, 19.6, 15.2, 1), PALETTE.ink),
   ],
   underlineDouble: [
-    letter('U', { height: 12.4, cy: 9 }),
-    filled(rect(3, 17.5, 18, 1), PALETTE.ink),
-    filled(rect(3, 20.5, 18, 1), PALETTE.ink),
+    strokeLetter('U', { height: 12.4, cy: 9.2, weight: 'regular' }),
+    filled(rect(4.4, 17.5, 15.2, 1), PALETTE.ink),
+    filled(rect(4.4, 20.5, 15.2, 1), PALETTE.ink),
   ],
   strike: [
     letter('S', { height: 15.4, cy: 11.6 }),
     filled(rect(2.6, 11.2, 18.8, 1), PALETTE.danger),
   ],
 
-  fontColor: [letter('A', { height: CAPPED, cy: 9.8 }), swatch(PALETTE.danger)],
+  fontColor: [
+    strokeLetter('A', { height: CAPPED, cy: 9.6, weight: 'bold' }),
+    swatch(PALETTE.danger),
+  ],
+  // The bucket tips toward the swatch and the drop leaving its lip is the
+  // pour; the colour it lays down is the swatch, not the bucket.
   fillColor: [
-    // A bucket over the swatch, mid-pour. The handle arcs clear of the rim so
-    // the silhouette cannot be read as a bag.
-    stroked('M5.9 7.4a3.5 3.5 0 0 1 7 0', PALETTE.grid, 'thin'),
-    outlined(
-      poly(
-        [
-          [3.2, 7.4],
-          [15.6, 7.4],
-          [13.4, 17],
-          [5.4, 17],
-        ],
-        true,
-      ),
-      PALETTE.paper,
-      PALETTE.ink,
-      'regular',
-    ),
-    filled(
-      poly(
-        [
-          [4.3, 12.2],
-          [14.5, 12.2],
-          [13.4, 17],
-          [5.4, 17],
-        ],
-        true,
-      ),
-      PALETTE.warn,
-    ),
-    // The drop leaving the lip ties the bucket to the colour it lays down.
+    ...place(bucket, { box: [3.2, 3.9, 12.4, 13.1], size: 13.2, cx: 10.4, cy: 9.8, rotate: 32 }),
     filled(
       join(
-        circle(18.8, 12.6, 1.8),
+        circle(19.2, 12.8, 1.6),
         poly(
           [
-            [18.8, 8],
-            [17, 12.6],
-            [20.6, 12.6],
+            [19.2, 8.6],
+            [17.6, 12.8],
+            [20.8, 12.8],
           ],
           true,
         ),
       ),
-      PALETTE.warn,
+      PALETTE.info,
     ),
     swatch(PALETTE.warn),
   ],
-  fontGrow: [
-    letter('A', { height: 14.6, cx: 8, cy: 12 }),
-    ...arrow({ from: [18.2, 19], to: [18.2, 4.6], color: PALETTE.accent, head: 'solid' }),
-  ],
-  fontShrink: [
-    letter('A', { height: 14.6, cx: 8, cy: 12 }),
-    ...arrow({ from: [18.2, 4.6], to: [18.2, 19], color: PALETTE.accent, head: 'solid' }),
-  ],
+  fontGrow: sizeMark(15.2, 'up'),
+  fontShrink: sizeMark(12, 'down'),
 
-  borders: [...sheet({ x: 2.4, y: 2.4, w: 19.2, h: 19.2, cols: 3, rows: 3, rules: PALETTE.grid })],
-
-  currency: [
-    outlined(circle(12, 12, 9.2), PALETTE.warnSoft, PALETTE.warnDeep, 'regular'),
+  // Dotted cell edges with one solid rule: the border about to be applied.
+  borders: [
     stroked(
-      join('M8.4 7.6 12 12l3.6-4.4', 'M12 12v4.8', 'M8.8 12.6h6.4', 'M8.8 14.8h6.4'),
-      PALETTE.accentDeep,
-      'bold',
+      join(rect(2.6, 2.6, 18.8, 18.8), hRules(2.6, 12, 18.8, 0, 1), vRules(12, 2.6, 18.8, 0, 1)),
+      PALETTE.grid,
+      'regular',
+      { cap: 'butt', dash: '1 1.35' },
+    ),
+    stroked(line([2.6, 21.4], [21.4, 21.4]), PALETTE.ink, 'heavy', { cap: 'butt' }),
+  ],
+
+  // Accounting format: a banknote with the coin stack it is counted in.
+  currency: [
+    outlined(rect(2.4, 3.6, 15.2, 10.4), PALETTE.paper, PALETTE.ink, 'regular'),
+    stroked(join('M5.2 6.4v4.8', 'M14.8 6.4v4.8'), PALETTE.ink, 'thin', { cap: 'butt' }),
+    stroked(ellipse(10, 8.8, 2.6, 2.6), PALETTE.ink, 'thin'),
+    ...[18.6, 16, 13.4].map((cy) =>
+      outlined(
+        join(ellipse(17.2, cy, 4.2, 1.6), `M13 ${cy}v1.2a4.2 1.6 0 0 0 8.4 0V${cy}`),
+        PALETTE.paper,
+        PALETTE.alt,
+        'thin',
+      ),
     ),
   ],
   percent: [
-    outlined(circle(7.2, 7.2, 3.7), PALETTE.paper, PALETTE.ink, 'bold'),
-    outlined(circle(16.8, 16.8, 3.7), PALETTE.paper, PALETTE.ink, 'bold'),
-    stroked(line([19.2, 3.8], [4.8, 20.2]), PALETTE.ink, 'heavy'),
+    stroked(circle(7, 7, 3.2), PALETTE.ink, 'regular'),
+    stroked(circle(17, 17, 3.2), PALETTE.ink, 'regular'),
+    stroked(line([18.6, 3.4], [5.4, 20.6]), PALETTE.ink, 'regular'),
   ],
   // The separator itself: a bowl with a tail that tapers, rather than a
   // wedge hanging off a disc.
   comma: [
     // Kept as two paths: merged into one, the tail's winding cancels the bowl
     // where they overlap and a hairline notch shows through.
-    filled(circle(12, 8.8, 4.2), PALETTE.ink),
-    filled('M15.9 10.2c.7 4.6-1.6 8.4-6.9 11.4 3.4-3.4 5-6.9 4.7-10.4z', PALETTE.ink),
+    filled(circle(12, 7.7, 4.2), PALETTE.ink),
+    filled('M15.9 9.1c.7 4.6-1.6 8.4-6.9 11.4 3.4-3.4 5-6.9 4.7-10.4z', PALETTE.ink),
   ],
+  // Increase decimals: a place arrives in front of ".0" and it becomes ".00".
   decUp: [
-    ...decimalMark(),
-    ...arrow({ from: [18.6, 18.4], to: [18.6, 5.6], color: PALETTE.accent, head: 'solid' }),
+    ...decimalRow({ right: 18.6, cy: 7.4, zeros: 1, arrow: 'out' }),
+    ...decimalRow({ right: 18.6, cy: 16.6, zeros: 2 }),
   ],
+  // Decrease decimals: ".00" loses a place on its way to ".0".
   decDown: [
-    ...decimalMark(),
-    ...arrow({ from: [18.6, 5.6], to: [18.6, 18.4], color: PALETTE.accent, head: 'solid' }),
+    ...decimalRow({ right: 18.6, cy: 7.4, zeros: 2 }),
+    ...decimalRow({ right: 18.6, cy: 16.6, zeros: 1, arrow: 'in' }),
   ],
 } satisfies Record<string, IconDefinition>;
-
-/** The ".00" left half shared by the two decimal-place icons. */
-function decimalMark() {
-  return [
-    filled(circle(3.2, 16.6, 1.5), PALETTE.ink),
-    outlined(circle(7.8, 12.6, 2.9), 'none', PALETTE.ink, 'bold'),
-    outlined(circle(14.2, 12.6, 2.9), 'none', PALETTE.ink, 'bold'),
-  ];
-}

@@ -3,7 +3,9 @@
 import { hLine, join, line, poly, rect, roundRect } from '../path.js';
 import {
   badge,
+  brush,
   clipboard,
+  doc,
   filled,
   headed,
   outlined,
@@ -70,10 +72,8 @@ export const CLIPBOARD_ICONS = {
     }),
   ],
 
-  paste: [
-    ...clipboard(),
-    ...textLines({ x: BOARD.x + 1, y: BOARD.y + 1.4, width: BOARD.w - 2, count: 3, gap: 3.2 }),
-  ],
+  // The board with the sheet about to land on the selection.
+  paste: [...clipboard(), ...doc({ x: 11.6, y: 9.8, w: 10, h: 12.2, fold: 0 })],
   pasteFormulas: [...clipboard(), ...onBoard(formulaMark, FORMULA_BOX)],
   pasteValues: [...clipboard(), ...onBoard(valuesMark, VALUES_BOX)],
   // Rows become columns: one run turns the corner and comes back down.
@@ -118,17 +118,10 @@ export const CLIPBOARD_ICONS = {
     outlined(roundRect(10.4, 10.8, 3.2, 3.2, 1.6), PALETTE.paper, PALETTE.ink, 'thin'),
   ],
   copy: [
-    outlined(roundRect(2.5, 2.5, 13, 15, 1.4), PALETTE.mute, PALETTE.grid, 'thin'),
-    outlined(roundRect(8.5, 6.5, 13, 15, 1.4), PALETTE.paper, PALETTE.ink, 'regular'),
-    ...textLines({ x: 11, y: 11, width: 8, count: 3, gap: 3 }),
+    outlined(rect(2.6, 2.6, 11.6, 15), PALETTE.paper, PALETTE.ink, 'regular'),
+    ...doc({ x: 8.6, y: 6.4, w: 12.8, h: 15, fold: 3.6, lines: 2, lineColor: PALETTE.ink }),
   ],
-  paint: [
-    outlined(rect(9.4, 2, 5.2, 6.6), PALETTE.tan, PALETTE.tanDeep, 'thin'),
-    outlined(rect(8, 8.6, 8, 2.8), PALETTE.mute, PALETTE.grid, 'thin'),
-    outlined(roundRect(8.6, 11.4, 6.8, 5.2, 1), PALETTE.info, PALETTE.ink, 'thin'),
-    stroked('M12 16.6v3.2', PALETTE.ink, 'regular'),
-    stroked('M6 21.4c4-1.8 8-1.8 12 0', PALETTE.accent, 'bold'),
-  ],
+  paint: [...brush({ bristle: PALETTE.alt, cx: 12, cy: 12, size: 22.6, rotate: 45 })],
 
   pen: [
     filled(

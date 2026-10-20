@@ -84,6 +84,30 @@ export const sector = (
   return `M${n(cx)} ${n(cy)}L${n(start[0])} ${n(start[1])}A${n(radius)} ${n(radius)} 0 ${largeArc} ${sweep} ${n(end[0])} ${n(end[1])}z`;
 };
 
+/**
+ * Open elliptical arc between two angles, in degrees. Angles follow the SVG
+ * coordinate system: zero points right and increasing angles sweep clockwise.
+ */
+export const arc = (
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  startDegrees: number,
+  endDegrees: number,
+): string => {
+  const at = (deg: number): Point => {
+    const rad = (deg * Math.PI) / 180;
+    return [cx + rx * Math.cos(rad), cy + ry * Math.sin(rad)];
+  };
+  const [x0, y0] = at(startDegrees);
+  const [x1, y1] = at(endDegrees);
+  const span = endDegrees - startDegrees;
+  const largeArc = Math.abs(span) > 180 ? 1 : 0;
+  const sweep = span > 0 ? 1 : 0;
+  return `M${n(x0)} ${n(y0)}A${n(rx)} ${n(ry)} 0 ${largeArc} ${sweep} ${n(x1)} ${n(y1)}`;
+};
+
 /** Polyline through `points`, optionally closed. */
 export const poly = (points: readonly Point[], close = false): string => {
   const head = points[0];

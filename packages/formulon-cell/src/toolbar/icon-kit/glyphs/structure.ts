@@ -1,38 +1,72 @@
 /** Row/column/cell insertion, deletion, outlining and splitting. */
 
-import { arrow, badge, bars, type SheetBands, sheet, stroked } from '../primitives.js';
-import { OPTICAL_BADGED, PALETTE } from '../tokens.js';
+import { join, line } from '../path.js';
+import { arrow, badge, bars, blockArrow, type SheetCells, sheet, stroked } from '../primitives.js';
+import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
+/** Grid used by the insert/delete family: four columns by three rows. */
+const GRID = { x: 3.4, y: 4.4, w: 17.2, h: 15.2, cols: 4, rows: 3, rules: PALETTE.grid } as const;
+const COL_W = GRID.w / GRID.cols;
+const ROW_H = GRID.h / GRID.rows;
+
+/** Cells the command acts on, highlighted in the selection blue. */
+const target = (axis: 'row' | 'col' | 'cell'): SheetCells => ({
+  cols: axis === 'col' ? [1, 1] : axis === 'row' ? [1, 3] : [1, 2],
+  rows: axis === 'col' ? [0, 2] : [1, 1],
+  fill: PALETTE.infoMid,
+  frame: PALETTE.info,
+});
+
 /**
- * Grid box used by every badged structure icon. The badge overlaps this box's
- * corner rather than pushing it aside, so the grid stays centred.
+ * Insert pushes the existing cells aside: a hollow arrow drives into the grid
+ * along the target. Delete strikes the far end of the target out.
  */
-const BADGED_GRID = {
-  x: 12 - OPTICAL_BADGED / 2,
-  y: 12 - OPTICAL_BADGED / 2,
-  w: OPTICAL_BADGED,
-  h: OPTICAL_BADGED,
-  cols: 3,
-  rows: 3,
-} as const;
-
-/** Grid with the affected row, column or cell tinted. */
-const targeted = (axis: 'row' | 'col' | 'cell', fill: string): SheetBands =>
-  axis === 'cell'
-    ? [
-        { axis: 'row', index: 1, fill },
-        { axis: 'col', index: 1, fill },
-      ]
-    : [{ axis, index: 1, fill }];
-
-const structureIcon = (axis: 'row' | 'col' | 'cell', kind: 'add' | 'remove') => [
-  ...sheet({
-    ...BADGED_GRID,
-    bands: targeted(axis, kind === 'add' ? PALETTE.accentSoft : PALETTE.dangerSoft),
-  }),
-  ...badge({ glyph: kind === 'add' ? 'plus' : 'cross' }),
-];
+const structureIcon = (axis: 'row' | 'col' | 'cell', kind: 'add' | 'remove') => {
+  // An arrow entering from above needs the grid lowered to stay centred.
+  const top = axis === 'col' && kind === 'add' ? GRID.y + 1.6 : GRID.y;
+  const grid = sheet({ ...GRID, y: top, cells: [target(axis)] });
+  const rowMid = GRID.y + ROW_H * 1.5;
+  const colMid = GRID.x + COL_W * 1.5;
+  if (kind === 'add') {
+    return [
+      ...grid,
+      axis === 'col'
+        ? blockArrow({
+            from: [colMid, top + ROW_H * 2],
+            to: [colMid, 1.6],
+            shaft: 2.8,
+            head: 5.6,
+            fill: PALETTE.paper,
+            frame: PALETTE.info,
+          })
+        : blockArrow({
+            from: [GRID.x + COL_W * (axis === 'row' ? 3 : 2), rowMid],
+            to: [1.6, rowMid],
+            shaft: 2.8,
+            head: 5.6,
+            fill: PALETTE.paper,
+            frame: PALETTE.info,
+          }),
+    ];
+  }
+  const [cx, cy] =
+    axis === 'col'
+      ? [colMid, GRID.y + ROW_H * 2.5]
+      : [GRID.x + COL_W * (axis === 'row' ? 3.5 : 2.5), rowMid];
+  const arm = 2.6;
+  return [
+    ...grid,
+    stroked(
+      join(
+        line([cx - arm, cy - arm], [cx + arm, cy + arm]),
+        line([cx + arm, cy - arm], [cx - arm, cy + arm]),
+      ),
+      PALETTE.danger,
+      'bold',
+    ),
+  ];
+};
 
 export const STRUCTURE_ICONS = {
   insertRows: structureIcon('row', 'add'),

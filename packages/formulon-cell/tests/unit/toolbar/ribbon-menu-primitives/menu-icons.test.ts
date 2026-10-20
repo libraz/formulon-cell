@@ -153,8 +153,8 @@ describe('toolbar/ribbon menu primitives', () => {
 
       expect(icon?.querySelector('.fc-tb__menu-icon-svg')).toBeTruthy();
       // The rule under the letterform is the underline itself, so it carries
-      // the ink colour rather than an accent.
-      expect(icon?.querySelector('path[fill="#1f1f1f"]')).toBeTruthy();
+      // the themed ink colour rather than an accent.
+      expect(icon?.querySelector('path[fill="currentColor"]')).toBeTruthy();
     }
   });
 

@@ -1,8 +1,8 @@
 /** Fill-direction, series and autosum icons. */
 
-import { letter } from '../letters.js';
-import { poly } from '../path.js';
-import { arrow, bars, filled, outlined, sheet } from '../primitives.js';
+import { strokeLetter } from '../letters.js';
+import { hLine, poly } from '../path.js';
+import { arrow, bars, filled, outlined, sheet, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
@@ -23,26 +23,13 @@ const directionalFill = (
 ) => [...sheet({ ...box, cols, rows }), ...arrow({ from, to, color: PALETTE.info, head: 'solid' })];
 
 export const FILL_ICONS = {
-  autosum: [letter('sigma', { height: 18.4, color: PALETTE.info })],
+  autosum: [strokeLetter('sigma', { height: 17.4, weight: 'regular' })],
 
-  // The Fill menu's own icon: the source row spreading through the block.
+  // The Fill menu's own icon: the source row carried down through the block.
   fill: [
-    ...sheet({
-      x: 2.4,
-      y: 2.4,
-      w: 19.2,
-      h: 19.2,
-      cols: 3,
-      rows: 3,
-      bands: [{ axis: 'row', index: 0, fill: PALETTE.accentSoft }],
-    }),
-    ...arrow({
-      from: [12, 8.4],
-      to: [12, 19.2],
-      color: PALETTE.accent,
-      head: 'solid',
-      weight: 'regular',
-    }),
+    ...sheet({ x: 2.6, y: 3.4, w: 18.8, h: 17.2, cols: 1, rows: 1 }),
+    stroked(hLine(2.6, 6.8, 18.8), PALETTE.ink, 'regular', { cap: 'butt' }),
+    ...arrow({ from: [12, 9.6], to: [12, 17.8], color: PALETTE.info, weight: 'regular' }),
   ],
   fillDown: directionalFill(GRID, 2, 3, [19, 5.4], [19, 18.6]),
   fillUp: directionalFill(GRID, 2, 3, [19, 18.6], [19, 5.4]),
