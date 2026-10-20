@@ -1,4 +1,5 @@
 import { chartDataFromEngine, chartPreviewOverrides } from '../charts/engine-adapter.js';
+import { formatChartValue } from '../charts/format.js';
 import { chartTitleText, layoutChart, layoutUnsupportedChart } from '../charts/layout.js';
 import { accentsFromTheme } from '../charts/series-colors.js';
 import type { ChartData, ChartKind, ChartPrimitive, ChartScene } from '../charts/types.js';
@@ -15,6 +16,7 @@ import {
 } from '../commands/session-chart.js';
 import {
   ANCHOR_KIND_ABSOLUTE,
+  drawingClipPath,
   placementForPixels,
   sessionPosition,
 } from '../engine/drawing-geometry.js';
@@ -22,6 +24,9 @@ import { rangeForRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
+import { mutators } from '../store/store.js';
+import type { ChartSourceHighlight } from '../store/types.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { createInteractionButton } from './chip-button.js';
 import { formatSessionChartValue } from './session-chart-format.js';
 import {
@@ -40,8 +45,14 @@ export interface SessionChartsHandle {
 }
 
 export interface SessionChartLabels extends Partial<SessionChartSettingsLabels> {
-  close: string;
-  resize: string;
+  /** The buttons beside a selected chart. */
+  elementsButton: string;
+  stylesButton: string;
+  filtersButton: string;
+  /** Data point tooltip; `{series}` and `{point}` are the series and category names. */
+  pointTooltip: string;
+  /** Second tooltip line; `{value}` is the formatted value. */
+  pointValue: string;
   columnChart: string;
   barChart: string;
   lineChart: string;
@@ -60,14 +71,25 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_W = 240;
 const MIN_H = 160;
 const KEYBOARD_STEP = 8;
-/** Width and height the stylesheet takes from a chart frame for its border,
- *  header and plot padding; the scene is laid out in what remains. */
-const PLOT_INSET_W = 26;
-const PLOT_INSET_H = 57;
+/** Pointer travel before a press on a chart becomes a move. */
+const DRAG_THRESHOLD = 3;
+/** Width and height the stylesheet takes from a chart frame for its border and
+ *  plot padding; the scene is laid out in what remains. */
+const PLOT_INSET = 14;
+
+/** The sizing handles of a selected chart, by compass point. */
+const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
+type Handle = (typeof HANDLES)[number];
+
+/** Data marks that carry a tooltip of their point. */
+const POINT_ROLES = new Set(['bar', 'point', 'slice']);
 
 const DEFAULT_LABELS: SessionChartLabels = {
-  close: 'Close',
-  resize: 'Resize chart',
+  elementsButton: 'Chart Elements',
+  stylesButton: 'Chart Styles',
+  filtersButton: 'Chart Filters',
+  pointTooltip: 'Series "{series}" Point "{point}"',
+  pointValue: 'Value: {value}',
   columnChart: 'Column chart',
   barChart: 'Bar chart',
   lineChart: 'Line chart',
@@ -89,12 +111,36 @@ const SETTINGS_TAB_LABELS: Pick<
   filtersTab: chartSettingsDefaults.filtersTab,
 };
 
-const createSessionChartCloseButton = (label: string): HTMLButtonElement =>
-  createInteractionButton({
-    className: 'fc-chart__close',
-    ariaLabel: label,
-    text: '×',
-  });
+/** Elements that keep a press to themselves instead of starting a move. */
+const INTERACTIVE = 'button, input, select, textarea, option, [contenteditable="true"]';
+
+/** The frame `start` takes when `handle` is dragged by (dx, dy); a corner
+ *  dragged with `keepRatio` scales the frame without changing its shape. */
+const resizedFrame = (
+  start: { x: number; y: number; w: number; h: number },
+  handle: Handle,
+  dx: number,
+  dy: number,
+  keepRatio: boolean,
+): { x: number; y: number; w: number; h: number } => {
+  const west = handle.endsWith('w');
+  const east = handle.endsWith('e');
+  const north = handle.startsWith('n');
+  const south = handle.startsWith('s');
+  let w = Math.max(MIN_W, east ? start.w + dx : west ? start.w - dx : start.w);
+  let h = Math.max(MIN_H, south ? start.h + dy : north ? start.h - dy : start.h);
+  if (keepRatio && (east || west) && (north || south)) {
+    const scale = Math.max(w / start.w, h / start.h);
+    w = Math.max(MIN_W, start.w * scale);
+    h = Math.max(MIN_H, start.h * scale);
+  }
+  return {
+    x: west ? start.x + start.w - w : start.x,
+    y: north ? start.y + start.h - h : start.y,
+    w,
+    h,
+  };
+};
 
 const isDrawable = (chart: SessionChart): chart is SessionChartSettingsShape =>
   chart.kind !== 'unsupported';
@@ -147,6 +193,56 @@ const dataForKind = (data: ChartData, kind: ChartKind): ChartData => {
   };
 };
 
+/** The parts of a chart's data range Excel outlines while it is selected:
+ *  series names, categories (or X values) and values. */
+export const chartSourceHighlights = (chart: SessionChart): ChartSourceHighlight[] => {
+  const source = chart.source;
+  if (!source || chart.kind === 'unsupported') return [];
+  const headerRow = chart.headerRow === true;
+  const headerColumn = chart.headerColumn === true;
+  const top = source.r0 + (headerRow ? 1 : 0);
+  const left = source.c0 + (headerColumn ? 1 : 0);
+  const part = (
+    role: ChartSourceHighlight['role'],
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+  ): ChartSourceHighlight[] =>
+    r0 <= r1 && c0 <= c1 ? [{ sheet: source.sheet, r0, c0, r1, c1, role }] : [];
+  const byRows = chart.seriesDirection === 'rows';
+  const names = byRows
+    ? headerColumn
+      ? part('name', top, source.c0, source.r1, source.c0)
+      : []
+    : headerRow
+      ? part('name', source.r0, left, source.r0, source.c1)
+      : [];
+  const categories = byRows
+    ? headerRow
+      ? part('categories', source.r0, left, source.r0, source.c1)
+      : []
+    : headerColumn
+      ? part('categories', top, source.c0, source.r1, source.c0)
+      : [];
+  return [...names, ...categories, ...part('values', top, left, source.r1, source.c1)];
+};
+
+const sameHighlights = (
+  a: readonly ChartSourceHighlight[],
+  b: readonly ChartSourceHighlight[],
+): boolean =>
+  a.length === b.length &&
+  a.every(
+    (ref, i) =>
+      ref.sheet === b[i]?.sheet &&
+      ref.r0 === b[i]?.r0 &&
+      ref.c0 === b[i]?.c0 &&
+      ref.r1 === b[i]?.r1 &&
+      ref.c1 === b[i]?.c1 &&
+      ref.role === b[i]?.role,
+  );
+
 const appendChartPrimitive = (parent: SVGSVGElement, primitive: ChartPrimitive): void => {
   const element = document.createElementNS(SVG_NS, primitive.tag);
   for (const [key, value] of Object.entries(primitive.attrs)) {
@@ -176,7 +272,6 @@ export function attachSessionCharts(deps: {
   store: SpreadsheetStore;
   /** The workbook the charts live in; without one the overlays are read-only. */
   getWb?: () => WorkbookHandle | null;
-  closeLabel?: string;
   labels?: Partial<SessionChartLabels>;
   history?: History | null;
   locale?: string;
@@ -185,11 +280,7 @@ export function attachSessionCharts(deps: {
   const { host, store, history = null, getWb = (): WorkbookHandle | null => null } = deps;
   const formatValue = deps.formatValue ?? formatSessionChartValue;
   let locale = deps.locale;
-  let labels: SessionChartLabels = {
-    ...DEFAULT_LABELS,
-    ...deps.labels,
-    close: deps.closeLabel ?? deps.labels?.close ?? DEFAULT_LABELS.close,
-  };
+  let labels: SessionChartLabels = { ...DEFAULT_LABELS, ...deps.labels };
   const root = document.createElement('div');
   root.className = 'fc-charts';
   host.appendChild(root);
@@ -278,7 +369,23 @@ export function attachSessionCharts(deps: {
     },
   });
 
+  let publishingHighlight = false;
+  /** Outline the selected chart's data on the grid, as Excel does. */
+  const syncSourceHighlight = (): void => {
+    const chart = selectedId === null ? null : sessionChartById(store.getState(), selectedId);
+    const next = chart ? chartSourceHighlights(chart) : [];
+    if (sameHighlights(store.getState().ui.chartSourceRefs, next)) return;
+    // The outline is grid state only; the charts themselves do not change.
+    publishingHighlight = true;
+    try {
+      mutators.setChartSourceRefs(store, next);
+    } finally {
+      publishingHighlight = false;
+    }
+  };
+
   const updateSelectionClasses = (): void => {
+    syncSourceHighlight();
     const panels = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart'));
     for (const [index, panel] of panels.entries()) {
       const selected = panel.dataset.chartId === selectedId;
@@ -291,8 +398,30 @@ export function attachSessionCharts(deps: {
   const selectChart = (chartId: string, panel: HTMLElement): void => {
     selectedId = chartId;
     updateSelectionClasses();
-    if (document.activeElement !== panel) panel.focus();
+    if (document.activeElement !== panel) panel.focus({ preventScroll: true });
   };
+
+  const deselect = (): void => {
+    if (selectedId === null) return;
+    selectedId = null;
+    updateSelectionClasses();
+  };
+
+  /** Whether `target` is part of a chart or its settings, which keep the chart selected. */
+  const insideCharts = (target: EventTarget | null): boolean =>
+    target instanceof Node &&
+    (root.contains(target) ||
+      (target instanceof Element && target.closest('.fc-chart-settings') !== null));
+
+  // Like Excel, a press anywhere else on the sheet leaves the chart.
+  const onDocumentPointerDown = (e: PointerEvent): void => {
+    if (!insideCharts(e.target)) deselect();
+  };
+  document.addEventListener('pointerdown', onDocumentPointerDown, true);
+  const onFocusOut = (e: FocusEvent): void => {
+    if (e.relatedTarget !== null && !insideCharts(e.relatedTarget)) deselect();
+  };
+  root.addEventListener('focusout', onFocusOut);
 
   /** Move or resize a chart to grid pixels; false when the workbook refused. */
   const placeChart = (
@@ -315,14 +444,16 @@ export function attachSessionCharts(deps: {
   const canPlace = (chart: SessionChart): boolean =>
     chart.nativeAnchor.anchorKind !== ANCHOR_KIND_ABSOLUTE;
 
+  /** Drag the whole chart (`handle` omitted) or one of its sizing handles. The
+   *  frame follows the pointer and the workbook is changed once, on release. */
   const applyDrag = (
     e: PointerEvent,
     chart: SessionChart,
-    mode: 'move' | 'resize',
     panel: HTMLElement,
+    handle?: Handle,
   ): void => {
     if (e.button !== 0 || !canPlace(chart)) return;
-    e.preventDefault();
+    if (handle) e.preventDefault();
     const startX = e.clientX;
     const startY = e.clientY;
     const start = sessionPosition(store, chart.nativeAnchor);
@@ -337,11 +468,19 @@ export function attachSessionCharts(deps: {
     const onMove = (move: PointerEvent): void => {
       const dx = move.clientX - startX;
       const dy = move.clientY - startY;
-      if (mode === 'move') {
-        preview({ x: Math.max(0, start.x + dx), y: Math.max(0, start.y + dy) });
-      } else {
-        preview({ w: Math.max(MIN_W, start.w + dx), h: Math.max(MIN_H, start.h + dy) });
+      if (!latest && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      move.preventDefault();
+      if (!handle) {
+        preview({ x: start.x + dx, y: start.y + dy });
+        return;
       }
+      const frame = resizedFrame(start, handle, dx, dy, move.shiftKey);
+      preview({
+        ...(frame.x === start.x ? {} : { x: frame.x }),
+        ...(frame.y === start.y ? {} : { y: frame.y }),
+        w: frame.w,
+        h: frame.h,
+      });
     };
     const onUp = (): void => {
       window.removeEventListener('pointermove', onMove);
@@ -355,10 +494,13 @@ export function attachSessionCharts(deps: {
   const applyKeyboard = (e: KeyboardEvent, chart: SessionChart, panel: HTMLElement): void => {
     if (e.defaultPrevented) return;
     const target = e.target;
-    if (
-      target instanceof HTMLElement &&
-      target.closest('button, input, select, textarea, option, [contenteditable="true"]')
-    ) {
+    if (target instanceof HTMLElement && target.closest(INTERACTIVE)) return;
+    if (e.key === 'Escape') {
+      // An open settings surface takes Escape for itself.
+      if (settings.isOpen()) return;
+      e.preventDefault();
+      deselect();
+      host.focus({ preventScroll: true });
       return;
     }
     selectChart(chart.id, panel);
@@ -388,10 +530,54 @@ export function attachSessionCharts(deps: {
       });
       return;
     }
-    placeChart(chart, {
-      x: Math.max(0, current.x + dx),
-      y: Math.max(0, current.y + dy),
-    });
+    placeChart(chart, { x: current.x + dx, y: current.y + dy });
+  };
+
+  /** The tooltip of one data point, as Excel words it. */
+  const pointTooltip = (chart: SessionChart, seriesIndex: number, pointIndex: number): string => {
+    const { data } = chart;
+    const series = data.series[seriesIndex];
+    if (!series) return '';
+    const seriesName = series.name ?? `Series${seriesIndex + 1}`;
+    const format = (value: number | null): string =>
+      value === null
+        ? ''
+        : (formatChartValue(value, series.formatCode, locale ?? 'en-US', formatValue) ??
+          String(value));
+    let point: string;
+    let value: string;
+    if (data.domain === 'category') {
+      const raw = data.series[seriesIndex]?.values[pointIndex] ?? null;
+      point = data.categories[pointIndex] ?? String(pointIndex + 1);
+      value = format(raw);
+      if ((chart.kind === 'pie' || chart.kind === 'doughnut') && raw !== null) {
+        const values = data.series[seriesIndex]?.values ?? [];
+        const total = values.reduce<number>((sum, entry) => sum + Math.abs(entry ?? 0), 0);
+        if (total > 0) value += ` (${Math.round((Math.abs(raw) / total) * 100)}%)`;
+      }
+    } else {
+      const entry = data.series[seriesIndex]?.points[pointIndex];
+      if (!entry) return '';
+      point = entry.x === null ? String(pointIndex + 1) : format(entry.x);
+      value = `(${point}, ${format(entry.y)})`;
+    }
+    const heading = labels.pointTooltip.replace('{series}', seriesName).replace('{point}', point);
+    return `${heading}\n${labels.pointValue.replace('{value}', value)}`;
+  };
+
+  const addPointTooltips = (svg: SVGSVGElement, chart: SessionChart): void => {
+    for (const mark of Array.from(svg.querySelectorAll<SVGElement>('[data-point-index]'))) {
+      if (!POINT_ROLES.has(mark.getAttribute('data-chart-role') ?? '')) continue;
+      const text = pointTooltip(
+        chart,
+        Number(mark.getAttribute('data-series-index')),
+        Number(mark.getAttribute('data-point-index')),
+      );
+      if (!text) continue;
+      const tooltip = document.createElementNS(SVG_NS, 'title');
+      tooltip.textContent = text;
+      mark.appendChild(tooltip);
+    }
   };
 
   let subscribedController: ReturnType<typeof interactionControllerFor>;
@@ -414,10 +600,12 @@ export function attachSessionCharts(deps: {
     root.replaceChildren();
     // The store keeps a sheet's charts in the workbook's stacking order.
     const charts = state.charts.charts.filter((chart) => chart.sheet === state.data.sheetIndex);
+    if (selectedId !== null && !charts.some((chart) => chart.id === selectedId)) selectedId = null;
     charts.forEach((chart, index) => {
       const drawable = isDrawable(chart);
       if (drawable) visibleChartIds.add(chart.id);
       const position = sessionPosition(store, chart.nativeAnchor);
+      const placeable = canPlace(chart);
       const panel = document.createElement('section');
       panel.className = drawable ? 'fc-chart' : 'fc-chart fc-chart--unsupported';
       panel.dataset.chartId = chart.id;
@@ -427,105 +615,114 @@ export function attachSessionCharts(deps: {
       panel.setAttribute('aria-selected', chart.id === selectedId ? 'true' : 'false');
       panel.setAttribute(
         'aria-keyshortcuts',
-        canPlace(chart)
-          ? 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Delete Backspace'
-          : 'Delete Backspace',
+        placeable
+          ? 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Delete Backspace Escape'
+          : 'Delete Backspace Escape',
       );
-      panel.setAttribute('aria-label', chartLabel(chart, labels));
+      const label = chartLabel(chart, labels);
+      panel.setAttribute('aria-label', label);
       panel.style.left = `${position.x}px`;
       panel.style.top = `${position.y}px`;
       panel.style.width = `${position.w}px`;
       panel.style.height = `${position.h}px`;
+      panel.style.clipPath = drawingClipPath(store, chart.nativeAnchor, position);
       panel.style.zIndex = chart.id === selectedId ? String(charts.length + 1) : String(index + 1);
       panel.classList.toggle('fc-chart--selected', chart.id === selectedId);
+      panel.classList.toggle('fc-chart--fixed', !placeable);
       panel.addEventListener('focus', () => {
         selectedId = chart.id;
         updateSelectionClasses();
       });
-      panel.addEventListener('pointerdown', () => selectChart(chart.id, panel));
-      panel.addEventListener('keydown', (e) => applyKeyboard(e, chart, panel));
-
-      const header = document.createElement('div');
-      header.className = 'fc-chart__header';
-      header.addEventListener('pointerdown', (e) => {
-        if (
-          e.target instanceof Element &&
-          e.target.closest('button, input, select, textarea, option, [contenteditable="true"]')
-        ) {
-          return;
-        }
-        applyDrag(e, chart, 'move', panel);
+      panel.addEventListener('pointerdown', (e) => {
+        if (e.target instanceof Element && e.target.closest(INTERACTIVE)) return;
+        selectChart(chart.id, panel);
+        applyDrag(e, chart, panel);
       });
-      const title = document.createElement('div');
-      title.className = 'fc-chart__title';
-      title.textContent = chartLabel(chart, labels);
-      const close = createSessionChartCloseButton(labels.close);
-      close.addEventListener('click', () => removeChart(chart));
+      panel.addEventListener('keydown', (e) => applyKeyboard(e, chart, panel));
 
       const svg = document.createElementNS(SVG_NS, 'svg');
       svg.classList.add('fc-chart__plot');
       svg.setAttribute('role', 'img');
-      svg.setAttribute('aria-label', title.textContent);
-      const width = Math.max(1, position.w - PLOT_INSET_W);
-      const height = Math.max(1, position.h - PLOT_INSET_H);
+      svg.setAttribute('aria-label', label);
+      const width = Math.max(1, position.w - PLOT_INSET);
+      const height = Math.max(1, position.h - PLOT_INSET);
+      panel.appendChild(svg);
       if (drawable) {
-        const settingsButtons = document.createElement('div');
-        settingsButtons.className = 'fc-chart__settings';
-        const settingTabs: readonly {
+        renderChartScene(
+          svg,
+          layoutChart({
+            spec: chart,
+            data: chart.data,
+            width,
+            height,
+            ...(locale === undefined ? {} : { locale }),
+            formatValue,
+            chartTitle: labels.chartTitle,
+            axisTitle: labels.axisTitle,
+            // Series without a colour of their own take Excel's automatic colours in the workbook theme.
+            ...themeAccents(),
+          }),
+        );
+        addPointTooltips(svg, chart);
+        const buttons = document.createElement('div');
+        buttons.className = 'fc-chart__buttons';
+        const settingButtons: readonly {
           id: Parameters<SessionChartSettingsHandle['open']>[3];
           label: string;
+          icon: string;
         }[] = [
-          { id: 'elements', label: labels.elementsTab ?? chartSettingsDefaults.elementsTab },
-          { id: 'styles', label: labels.stylesTab ?? chartSettingsDefaults.stylesTab },
-          { id: 'filters', label: labels.filtersTab ?? chartSettingsDefaults.filtersTab },
+          { id: 'elements', label: labels.elementsButton, icon: 'chartElements' },
+          { id: 'styles', label: labels.stylesButton, icon: 'chartStyles' },
+          { id: 'filters', label: labels.filtersButton, icon: 'chartFilters' },
         ];
-        for (const item of settingTabs) {
+        for (const item of settingButtons) {
           if (!item.id) continue;
           const button = createInteractionButton({
-            className: 'fc-chart__settings-button',
+            className: 'fc-chart__button',
             ariaLabel: item.label,
-            text: item.label,
           });
+          button.title = item.label;
+          const icon = createExcelRibbonSvg(item.icon, 'fc-chart__button-icon');
+          if (icon) button.appendChild(icon);
           button.dataset.chartSettingsTab = item.id;
           button.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
             settings.open(chart, chart.data, button, item.id);
           });
-          settingsButtons.appendChild(button);
+          buttons.appendChild(button);
         }
-        header.append(title, settingsButtons, close);
+        panel.appendChild(buttons);
+        // Excel opens the chart's formatting on a double click.
+        panel.addEventListener('dblclick', (event) => {
+          if (event.target instanceof Element && event.target.closest(INTERACTIVE)) return;
+          const anchor = buttons.querySelector<HTMLButtonElement>('[data-chart-settings-tab]');
+          if (anchor) settings.open(chart, chart.data, anchor, 'elements');
+        });
+      } else {
         renderChartScene(
           svg,
-          layoutChart({
-            // The overlay header owns the title; standalone scenes render their own.
-            spec: { ...chart, title: undefined },
-            data: chart.data,
+          layoutUnsupportedChart({
+            ...(chart.unsupported?.title ? { title: chart.unsupported.title } : {}),
+            message: labels.unsupportedChart,
             width,
             height,
-            ...(locale === undefined ? {} : { locale }),
-            formatValue,
-            axisTitle: labels.axisTitle,
-            // Series without a colour of their own take Excel's automatic colours in the workbook theme.
-            ...themeAccents(),
           }),
         );
-      } else {
-        header.append(title, close);
-        // The header already shows the title, so the frame carries only the message.
-        renderChartScene(
-          svg,
-          layoutUnsupportedChart({ message: labels.unsupportedChart, width, height }),
-        );
       }
-      panel.append(header, svg);
-      if (canPlace(chart)) {
-        const resize = document.createElement('div');
-        resize.className = 'fc-chart__resize';
-        resize.setAttribute('role', 'separator');
-        resize.setAttribute('aria-label', labels.resize);
-        resize.addEventListener('pointerdown', (e) => applyDrag(e, chart, 'resize', panel));
-        panel.appendChild(resize);
+      if (placeable) {
+        for (const handle of HANDLES) {
+          const grip = document.createElement('div');
+          grip.className = 'fc-chart__handle';
+          grip.dataset.handle = handle;
+          grip.setAttribute('aria-hidden', 'true');
+          grip.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            selectChart(chart.id, panel);
+            applyDrag(e, chart, panel, handle);
+          });
+          panel.appendChild(grip);
+        }
       }
       root.appendChild(panel);
       if (drawable) settings.sync(chart, chart.data, panel);
@@ -533,9 +730,13 @@ export function attachSessionCharts(deps: {
     if (settings.isOpen() && !visibleChartIds.has(settings.chartId() ?? '')) {
       settings.close(true);
     }
+    // The selected chart may have been removed or given another data range.
+    syncSourceHighlight();
   };
 
-  const unsubscribe = store.subscribe(render);
+  const unsubscribe = store.subscribe(() => {
+    if (!publishingHighlight) render();
+  });
   render();
 
   return {
@@ -552,6 +753,9 @@ export function attachSessionCharts(deps: {
     },
     detach() {
       unsubscribe();
+      document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+      root.removeEventListener('focusout', onFocusOut);
+      if (store.getState().ui.chartSourceRefs.length > 0) mutators.setChartSourceRefs(store, []);
       unsubscribeController();
       settings.detach();
       root.remove();

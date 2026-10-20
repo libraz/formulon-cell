@@ -259,8 +259,12 @@ export const dataObjectsZh: DataObjectsStrings = {
     close: '关闭',
   },
   sessionCharts: {
-    close: '关闭',
     resize: '调整图表大小',
+    elementsButton: '图表元素',
+    stylesButton: '图表样式',
+    filtersButton: '图表筛选器',
+    pointTooltip: '系列 "{series}" 点 "{point}"',
+    pointValue: '值: {value}',
     columnChart: '柱形图',
     barChart: '条形图',
     lineChart: '折线图',

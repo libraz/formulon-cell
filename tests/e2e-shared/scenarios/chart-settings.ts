@@ -1,6 +1,15 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
+
+/** Select the chart, as a click on it does, and press one of the buttons beside it. */
+async function openChartButton(
+  chart: Locator,
+  tab: 'elements' | 'styles' | 'filters',
+): Promise<void> {
+  await chart.click({ position: { x: 8, y: 8 } });
+  await chart.locator(`.fc-chart__button[data-chart-settings-tab="${tab}"]`).click();
+}
 
 export async function runChartSettingsScenario(page: Page): Promise<void> {
   const sheet = new SpreadsheetPage(page);
@@ -61,7 +70,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   const originalFills = await bars.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute('fill')),
   );
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   const dialog = page.getByRole('dialog', { name: 'Chart settings', exact: true });
   await dialog.getByLabel('Show data labels', { exact: true }).check();
   await dialog.getByLabel('Category name', { exact: true }).check();
@@ -76,7 +85,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     originalFills,
   );
 
-  await chart.locator('[data-chart-settings-tab="filters"]').click();
+  await openChartButton(chart, 'filters');
   await expect(dialog.getByRole('tab', { name: 'Filters', exact: true })).toBeFocused();
   await dialog.getByLabel('Costs', { exact: true }).uncheck();
   await dialog.getByLabel('Feb', { exact: true }).uncheck();
@@ -94,7 +103,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   await expect(bars).toHaveCount(2);
 
-  await chart.locator('[data-chart-settings-tab="styles"]').click();
+  await openChartButton(chart, 'styles');
   await dialog.getByRole('combobox', { name: 'Point', exact: true }).selectOption('category-2');
   const pointFill = dialog
     .getByRole('textbox', { name: 'Fill color', exact: true })
@@ -107,7 +116,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     chart.locator('[data-chart-role="bar"][data-point-id="category-0"]'),
   ).toHaveAttribute('fill', originalFills[0] ?? '');
 
-  await chart.locator('[data-chart-settings-tab="styles"]').click();
+  await openChartButton(chart, 'styles');
   await dialog.getByRole('combobox', { name: 'Point', exact: true }).selectOption('category-2');
   await pointFill.fill('#00ff00');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -121,7 +130,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   await expect(styledPoint).toHaveAttribute('fill', '#ff0000');
 
-  await chart.locator('[data-chart-settings-tab="styles"]').click();
+  await openChartButton(chart, 'styles');
   await dialog.getByRole('combobox', { name: 'Point', exact: true }).selectOption('category-0');
   await dialog
     .getByRole('spinbutton', { name: 'Fill color Transparency (%)', exact: true })
@@ -129,7 +138,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   const inheritedPoint = chart.locator('[data-chart-role="bar"][data-point-id="category-0"]');
   await expect(inheritedPoint).toHaveAttribute('fill-opacity', '0.75');
-  await chart.locator('[data-chart-settings-tab="styles"]').click();
+  await openChartButton(chart, 'styles');
   await dialog
     .getByRole('combobox', { name: 'Point', exact: true })
     .selectOption({ label: 'All points' });
@@ -145,7 +154,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(styledPoint).toHaveAttribute('fill', '#ff0000');
 
   const automaticHeight = Number(await inheritedPoint.getAttribute('height'));
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   const yAxis = dialog.getByRole('group', { name: 'Y-axis', exact: true });
   await yAxis.getByRole('spinbutton', { name: 'Minimum', exact: true }).fill('0');
   await yAxis.getByRole('spinbutton', { name: 'Maximum', exact: true }).fill('20');
@@ -177,7 +186,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     Number(await styledPoint.getAttribute('x')) +
     Number(await styledPoint.getAttribute('width')) / 2;
   const plotTop = Number(await yAxisLabels.last().getAttribute('y')) - 3;
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('checkbox', { name: 'Reverse order', exact: true }).check();
   await yAxis.getByRole('checkbox', { name: 'Reverse order', exact: true }).check();
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
@@ -197,12 +206,12 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
   );
   expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(plotTop);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('checkbox', { name: 'Reverse order', exact: true }).uncheck();
   await yAxis.getByRole('checkbox', { name: 'Reverse order', exact: true }).uncheck();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(plotTop);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('checkbox', { name: 'Reverse order', exact: true }).uncheck();
   await yAxis.getByRole('checkbox', { name: 'Reverse order', exact: true }).uncheck();
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
@@ -216,7 +225,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     y: Number(await horizontalAxis.getAttribute('y1')),
   };
   const plotRight = Number(await horizontalAxis.getAttribute('x2'));
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis
     .getByRole('combobox', { name: 'Vertical axis crosses', exact: true })
     .selectOption('max');
@@ -241,13 +250,13 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
   );
   expect(Number(await verticalAxis.getAttribute('x1'))).toBeCloseTo(plotRight);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis
     .getByRole('combobox', { name: 'Vertical axis crosses', exact: true })
     .selectOption('min');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(Number(await verticalAxis.getAttribute('x1'))).toBeCloseTo(plotRight);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis
     .getByRole('combobox', { name: 'Vertical axis crosses', exact: true })
     .selectOption('auto');
@@ -259,7 +268,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   expect(Number(await horizontalAxis.getAttribute('y1'))).toBeCloseTo(automaticCrossing.y);
 
   const xCategoryLabels = chart.locator('[data-chart-role="category-label"][data-chart-axis="x"]');
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('high');
   await yAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('high');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
@@ -279,7 +288,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   await expect(yAxisLabels.first()).toHaveAttribute('text-anchor', 'start');
 
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('nextTo');
   await yAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('nextTo');
   await xAxis
@@ -298,7 +307,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
 
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('none');
   await yAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('none');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
@@ -307,12 +316,12 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(horizontalAxis).toHaveCount(1);
   await expect(verticalAxis).toHaveCount(1);
   expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('combobox', { name: 'Label position', exact: true }).selectOption('low');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(xCategoryLabels).toHaveCount(0);
 
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis
     .getByRole('combobox', { name: 'Label position', exact: true })
     .selectOption('automatic');
@@ -331,7 +340,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   expect(Number(await inheritedPoint.getAttribute('x'))).toBeCloseTo(beforeReverse.x);
   expect(Number(await inheritedPoint.getAttribute('y'))).toBeCloseTo(beforeReverse.y);
 
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await expect(
     xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }),
   ).toBeDisabled();
@@ -353,11 +362,11 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.redo(),
   );
   await expect(yAxisLabels).toHaveText(['1.0', '10.0', '100.0', '1000.0']);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await yAxis.getByRole('spinbutton', { name: 'Log base', exact: true }).fill('2');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(yAxisLabels).toHaveText(['1.0', '10.0', '100.0', '1000.0']);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
   await expect(yAxis.getByRole('spinbutton', { name: 'Major unit', exact: true })).toBeEnabled();
   await expect(yAxis.getByRole('spinbutton', { name: 'Major unit', exact: true })).toHaveValue('5');
@@ -367,7 +376,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(beforeReverse.height);
 
   const automaticWidth = Number(await inheritedPoint.getAttribute('width'));
-  await chart.locator('[data-chart-settings-tab="styles"]').click();
+  await openChartButton(chart, 'styles');
   await dialog.getByRole('spinbutton', { name: 'Gap width (%)', exact: true }).fill('0');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   expect(Number(await inheritedPoint.getAttribute('width'))).toBeGreaterThan(automaticWidth);
@@ -436,7 +445,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   expect(narrowScene.plotWidth).toBeGreaterThanOrEqual(48);
   expect(narrowScene.clipped).toEqual([]);
 
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await dialog.getByRole('combobox', { name: 'Chart type', exact: true }).selectOption('doughnut');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   const slices = chart.locator('[data-chart-role="slice"]');
@@ -448,7 +457,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     chart.locator('[data-chart-role="slice"][data-point-id="category-2"]'),
   ).toHaveAttribute('fill', '#ff0000');
   const originalSlice = await slices.first().getAttribute('d');
-  await chart.locator('[data-chart-settings-tab="styles"]').click();
+  await openChartButton(chart, 'styles');
   const holeSize = dialog.getByRole('spinbutton', { name: 'Hole size (%)', exact: true });
   await expect(holeSize).toHaveValue('50');
   await holeSize.fill('70');
@@ -485,7 +494,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(slices.first()).toHaveAttribute('d', resizedSlice ?? '');
 
   // Show every series and category again before the scatter steps.
-  await chart.locator('[data-chart-settings-tab="filters"]').click();
+  await openChartButton(chart, 'filters');
   await dialog.getByLabel('Costs', { exact: true }).check();
   await dialog.getByLabel('Feb', { exact: true }).check();
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
@@ -498,13 +507,13 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
 
   // As in Excel, a scatter keeps every series and plots text categories at X = 1, 2, 3.
   const points = chart.locator('[data-chart-role="point"]');
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await dialog.getByRole('combobox', { name: 'Chart type', exact: true }).selectOption('scatter');
   await dialog.getByRole('tab', { name: 'Styles', exact: true }).click();
   await dialog.getByRole('combobox', { name: 'Point', exact: true }).selectOption('point-1');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(slices).toHaveCount(6);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await dialog.getByRole('combobox', { name: 'Chart type', exact: true }).selectOption('scatter');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(points).toHaveCount(6);
@@ -519,7 +528,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(points).toHaveCount(6);
   const connectors = chart.locator('[data-chart-role="line"]');
   await expect(connectors).toHaveCount(0);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await dialog.getByRole('combobox', { name: 'Scatter style', exact: true }).selectOption('line');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   // Two segments per series.
@@ -535,12 +544,12 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   );
   await expect(connectors).toHaveCount(4);
   await expect(points).toHaveCount(0);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await dialog.getByRole('combobox', { name: 'Scatter style', exact: true }).selectOption('marker');
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(connectors).toHaveCount(4);
   await expect(points).toHaveCount(0);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await dialog
     .getByRole('combobox', { name: 'Scatter style', exact: true })
     .selectOption('lineMarker');
@@ -565,7 +574,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   });
   await expect(connectors).toHaveCount(2);
   await expect(points).toHaveCount(5);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await dialog.getByRole('combobox', { name: 'Empty cells', exact: true }).selectOption('span');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(connectors).toHaveCount(3);
@@ -577,7 +586,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   });
   await expect(connectors).toHaveCount(4);
   await expect(points).toHaveCount(6);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).check();
   await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).check();
   for (const axis of [xAxis, yAxis]) {
@@ -609,7 +618,7 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
     if (result.status !== 'applied') throw new Error('Log scatter source fixture was not restored');
   });
   await expect(connectors).toHaveCount(4);
-  await chart.locator('[data-chart-settings-tab="elements"]').click();
+  await openChartButton(chart, 'elements');
   await xAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
   await yAxis.getByRole('checkbox', { name: 'Logarithmic scale', exact: true }).uncheck();
   await yAxis.getByRole('spinbutton', { name: 'Minimum', exact: true }).fill('0');

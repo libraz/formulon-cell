@@ -284,8 +284,12 @@ export const dataObjectsFr: DataObjectsStrings = {
     close: 'Fermer',
   },
   sessionCharts: {
-    close: 'Fermer',
     resize: 'Redimensionner le graphique',
+    elementsButton: 'Éléments de graphique',
+    stylesButton: 'Styles du graphique',
+    filtersButton: 'Filtres du graphique',
+    pointTooltip: 'Série "{series}" Point "{point}"',
+    pointValue: 'Valeur : {value}',
     columnChart: 'Graphique en colonnes',
     barChart: 'Graphique à barres',
     lineChart: 'Graphique en courbes',

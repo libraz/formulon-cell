@@ -274,8 +274,12 @@ export const dataObjectsEn: DataObjectsStrings = {
     close: 'Close',
   },
   sessionCharts: {
-    close: 'Close',
     resize: 'Resize chart',
+    elementsButton: 'Chart Elements',
+    stylesButton: 'Chart Styles',
+    filtersButton: 'Chart Filters',
+    pointTooltip: 'Series "{series}" Point "{point}"',
+    pointValue: 'Value: {value}',
     columnChart: 'Column chart',
     barChart: 'Bar chart',
     lineChart: 'Line chart',

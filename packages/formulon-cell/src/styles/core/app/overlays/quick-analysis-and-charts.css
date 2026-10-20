@@ -154,109 +154,124 @@
 
   .fc-chart {
     position: absolute;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
     box-sizing: border-box;
     background: var(--fc-bg-elev, Canvas);
-    color: var(--fc-fg, CanvasText);
+    /* Excel draws chart text in a mid grey over the chart area. */
+    color: color-mix(in srgb, var(--fc-fg, CanvasText) 65%, var(--fc-bg-elev, Canvas));
     border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    border-radius: 2px;
-    box-shadow:
-      0 6px 14px rgba(0, 0, 0, 0.14),
-      0 1px 3px rgba(0, 0, 0, 0.12);
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
     font-family: var(--fc-font-ui, system-ui);
     pointer-events: auto;
+    cursor: default;
   }
 
   .fc-chart:focus-visible {
-    border-color: var(--fc-accent, Highlight);
-    box-shadow:
-      0 0 0 1px var(--fc-accent, Highlight),
-      0 6px 14px rgba(0, 0, 0, 0.14),
-      0 1px 3px rgba(0, 0, 0, 0.12);
     outline: none;
   }
 
   .fc-chart--selected {
-    border-color: var(--fc-accent, Highlight);
+    border-color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
   }
 
-  .fc-chart--selected::after {
-    content: "";
-    position: absolute;
-    inset: -2px;
-    border: 1px solid var(--fc-accent, Highlight);
-    border-radius: 2px;
-    pointer-events: none;
-  }
-
-  .fc-chart__header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 30px;
-    padding: 0 6px 0 10px;
-    border-bottom: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+  .fc-chart--selected:not(.fc-chart--fixed) {
     cursor: move;
-    user-select: none;
   }
 
-  .fc-chart__settings {
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: 2px;
+  .fc-chart__handle {
+    position: absolute;
+    display: none;
+    width: 9px;
+    height: 9px;
+    margin: -5px 0 0 -5px;
+    box-sizing: border-box;
+    border: 1px solid var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
+    border-radius: 50%;
+    background: var(--fc-bg-elev, Canvas);
   }
 
-  .fc-chart__settings-button {
-    min-width: 22px;
-    min-height: 22px;
-    padding: 2px 4px;
-    border: 1px solid transparent;
+  .fc-chart--selected .fc-chart__handle {
+    display: block;
+  }
+
+  .fc-chart__handle[data-handle="nw"] {
+    left: 0;
+    top: 0;
+    cursor: nwse-resize;
+  }
+  .fc-chart__handle[data-handle="n"] {
+    left: 50%;
+    top: 0;
+    cursor: ns-resize;
+  }
+  .fc-chart__handle[data-handle="ne"] {
+    left: 100%;
+    top: 0;
+    cursor: nesw-resize;
+  }
+  .fc-chart__handle[data-handle="e"] {
+    left: 100%;
+    top: 50%;
+    cursor: ew-resize;
+  }
+  .fc-chart__handle[data-handle="se"] {
+    left: 100%;
+    top: 100%;
+    cursor: nwse-resize;
+  }
+  .fc-chart__handle[data-handle="s"] {
+    left: 50%;
+    top: 100%;
+    cursor: ns-resize;
+  }
+  .fc-chart__handle[data-handle="sw"] {
+    left: 0;
+    top: 100%;
+    cursor: nesw-resize;
+  }
+  .fc-chart__handle[data-handle="w"] {
+    left: 0;
+    top: 50%;
+    cursor: ew-resize;
+  }
+
+  /* The elements / styles / filters buttons beside a selected chart. */
+  .fc-chart__buttons {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 8px);
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .fc-chart--selected .fc-chart__buttons,
+  .fc-chart:focus-within .fc-chart__buttons {
+    display: flex;
+  }
+
+  .fc-chart__button {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--fc-rule-strong, color-mix(in srgb, CanvasText 25%, transparent));
     border-radius: 2px;
-    background: transparent;
-    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
-    font: inherit;
-    font-size: 10px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
     cursor: pointer;
   }
 
-  .fc-chart__settings-button:hover,
-  .fc-chart__settings-button:focus-visible {
+  .fc-chart__button:hover,
+  .fc-chart__button:focus-visible {
     border-color: var(--fc-accent, Highlight);
     background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
-    color: var(--fc-fg, CanvasText);
     outline: none;
   }
 
-  .fc-chart__title {
-    min-width: 0;
-    flex: 1;
-    overflow: hidden;
-    font-size: 12px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .fc-chart__close {
-    width: 22px;
-    height: 22px;
-    border: 0;
-    border-radius: 2px;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .fc-chart__close:hover,
-  .fc-chart__close:focus-visible {
-    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
-    outline: none;
+  .fc-chart__button-icon {
+    width: 16px;
+    height: 16px;
   }
 
   .fc-chart-settings {
@@ -574,11 +589,12 @@
   }
 
   .fc-chart__plot {
-    flex: 1;
+    display: block;
     width: 100%;
-    min-height: 0;
-    padding: 12px;
+    height: 100%;
+    padding: 6px;
     box-sizing: border-box;
+    overflow: hidden;
   }
 
   .fc-chart--unsupported .fc-chart__plot {
@@ -589,25 +605,5 @@
     fill: currentColor;
     font-size: 12px;
     dominant-baseline: middle;
-  }
-
-  .fc-chart__resize {
-    position: absolute;
-    right: 2px;
-    bottom: 2px;
-    width: 12px;
-    height: 12px;
-    cursor: nwse-resize;
-  }
-
-  .fc-chart__resize::before {
-    content: "";
-    position: absolute;
-    right: 1px;
-    bottom: 1px;
-    width: 7px;
-    height: 7px;
-    border-right: 1px solid var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
-    border-bottom: 1px solid var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
   }
 }

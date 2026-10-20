@@ -251,8 +251,15 @@ export interface DataObjectsStrings {
     close: string;
   };
   sessionCharts: {
-    close: string;
     resize: string;
+    /** The chart button that opens the chart elements settings. */
+    elementsButton: string;
+    stylesButton: string;
+    filtersButton: string;
+    /** Data point tooltip; `{series}` and `{point}` are the series and category names. */
+    pointTooltip: string;
+    /** Second tooltip line; `{value}` is the formatted value. */
+    pointValue: string;
     columnChart: string;
     barChart: string;
     lineChart: string;

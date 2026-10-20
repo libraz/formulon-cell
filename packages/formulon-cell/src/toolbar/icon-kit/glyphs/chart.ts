@@ -1,7 +1,7 @@
-/** Chart-type icons, all sharing one plot frame. */
+/** Chart-type icons, all sharing one plot frame, and the buttons beside a selected chart. */
 
 import { circle, join, line, poly, rect, sector } from '../path.js';
-import { badge, filled, stroked } from '../primitives.js';
+import { badge, filled, funnel, outlined, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
@@ -108,4 +108,30 @@ export const CHART_ICONS = {
     filled(join(circle(7.4, 15.6, 1.7), circle(11.4, 10.4, 1.7)), PALETTE.info),
     filled(join(circle(15.2, 13.6, 1.7), circle(18.8, 6.6, 1.7)), PALETTE.alt),
   ],
+  /** The buttons Excel shows beside a selected chart: elements, styles, filters. */
+  chartElements: [stroked(join('M4 12h16', 'M12 4v16'), PALETTE.ink, 'heavy')],
+  chartStyles: [
+    stroked('M20.2 3.8 13.4 10.6', PALETTE.tanDeep, 'heavy'),
+    outlined(
+      poly(
+        [
+          [12, 9.2],
+          [14.8, 12],
+          [13, 13.8],
+          [10.2, 11],
+        ],
+        true,
+      ),
+      PALETTE.mute,
+      PALETTE.grid,
+      'thin',
+    ),
+    outlined(
+      'M10.2 11 13 13.8C12.6 17.4 9.4 20.2 3.8 20.2 6 18.6 5.4 15.8 6.8 13.4 7.6 12 8.8 11.2 10.2 11Z',
+      PALETTE.info,
+      PALETTE.infoDeep,
+      'thin',
+    ),
+  ],
+  chartFilters: [...funnel()],
 } satisfies Record<string, IconDefinition>;

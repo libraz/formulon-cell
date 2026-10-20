@@ -274,8 +274,12 @@ export const dataObjectsJa: DataObjectsStrings = {
     close: '閉じる',
   },
   sessionCharts: {
-    close: '閉じる',
     resize: 'グラフのサイズ変更',
+    elementsButton: 'グラフ要素',
+    stylesButton: 'グラフ スタイル',
+    filtersButton: 'グラフ フィルター',
+    pointTooltip: '系列 "{series}" 要素 "{point}"',
+    pointValue: '値: {value}',
     columnChart: '縦棒グラフ',
     barChart: '横棒グラフ',
     lineChart: '折れ線グラフ',

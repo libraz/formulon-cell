@@ -274,8 +274,12 @@ export const dataObjectsKo: DataObjectsStrings = {
     close: '닫기',
   },
   sessionCharts: {
-    close: '닫기',
     resize: '차트 크기 조정',
+    elementsButton: '차트 요소',
+    stylesButton: '차트 스타일',
+    filtersButton: '차트 필터',
+    pointTooltip: '계열 "{series}" 요소 "{point}"',
+    pointValue: '값: {value}',
     columnChart: '세로 막대형 차트',
     barChart: '가로 막대형 차트',
     lineChart: '꺾은선형 차트',

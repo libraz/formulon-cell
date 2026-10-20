@@ -204,7 +204,7 @@ interface SurfaceLabels {
   slicerClear: string;
   slicerClose: string;
   blank: string;
-  chartClose: string;
+  chartElements: string;
   backstageFile: string;
   backstageInfo: string;
   backstageClose: string;
@@ -304,7 +304,7 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       slicerClear: strings.slicer.clear,
       slicerClose: strings.slicer.close,
       blank: strings.workbookObjects.pivotBlankItem,
-      chartClose: strings.sessionCharts.close,
+      chartElements: strings.sessionCharts.elementsButton,
       backstageFile: demoStrings.file,
       backstageInfo: demoStrings.info,
       backstageClose: demoStrings.close,
@@ -800,8 +800,9 @@ const runObjectsFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     labels.blank,
   );
   // One untitled series takes the series name as its automatic title.
-  await expect(chart.locator('.fc-chart__title')).toHaveText('Sales');
-  await expect(chart.locator('.fc-chart__close')).toHaveAttribute('aria-label', labels.chartClose);
+  await expect(chart.locator('[data-chart-role="title"]')).toHaveText('Sales');
+  const chartElements = chart.locator('.fc-chart__button[data-chart-settings-tab="elements"]');
+  await expect(chartElements).toHaveAttribute('aria-label', labels.chartElements);
   await withinViewport(page, slicer);
   await withinViewport(page, chart);
 
@@ -812,10 +813,12 @@ const runObjectsFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect(slicer.locator('.fc-slicer__chip[data-fc-value=""]').first()).toHaveText(
     labels.blank,
   );
-  await expect(chart.locator('.fc-chart__close')).toHaveAttribute('aria-label', labels.chartClose);
+  await expect(chartElements).toHaveAttribute('aria-label', labels.chartElements);
   await page.keyboard.press('Escape');
   await slicer.locator('.fc-slicer__close').click();
-  await chart.locator('.fc-chart__close').click();
+  // A selected chart is deleted with the Delete key; it has no close button.
+  await chart.click();
+  await page.keyboard.press('Delete');
   await expect(page.locator('.fc-slicer')).toHaveCount(0);
   await expect(page.locator('.fc-chart')).toHaveCount(0);
 };

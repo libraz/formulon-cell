@@ -4,6 +4,29 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- A selected chart outlines its data on the grid in the spreadsheet's colours: series names in red, categories (or X values) in purple, values in blue. The outline is published as `state.ui.chartSourceRefs`.
+- Chart data points show a tooltip with the series, point and value; pie and doughnut slices add their share of the total. `sessionCharts` strings gain `pointTooltip` and `pointValue`.
+- Double-clicking a chart opens its settings, and Escape or a press outside the chart deselects it.
+
+### Changed
+
+- The chart frame follows the desktop spreadsheet: the title is drawn inside the chart, the frame is flat with a hairline border, a selected chart has eight sizing handles, and the elements, styles and filters buttons sit outside its right edge as icons. A chart moves from a press anywhere on it, and a Shift-dragged corner keeps its shape. `sessionCharts` strings gain `elementsButton`, `stylesButton` and `filtersButton`.
+- Automatic value axes are scaled the way the spreadsheet scales them: a twentieth of the data span is added as headroom and the bound is rounded out to a major unit of 1, 2 or 5 times a power of ten that leaves at least five intervals. A positive axis starts at zero unless the data spans less than a sixth of its maximum. The default column chart of values up to 15 now runs from 0 to 16 in steps of 2.
+- Chart titles are 14 px, and a horizontal legend is centred under or over the chart.
+- A data label that would run off the chart is moved back inside it instead of being shortened.
+
+### Removed
+
+- The chart close button, the `close` string of `sessionCharts`, and the `closeLabel` option of `attachSessionCharts`. Delete removes a selected chart.
+
+### Fixed
+
+- Charts and anchored pictures scroll off with their anchor cell instead of sticking to the first visible column or row, and they pass under the headers and frozen panes.
+
 ## 0.10.0 — 2026-10-20
 
 ### Added

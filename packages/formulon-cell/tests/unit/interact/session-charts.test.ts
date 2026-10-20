@@ -380,7 +380,7 @@ describe('attachSessionCharts', () => {
     create(range(0, 0, 1, 1), { kind: 'column', title: 'Old title' });
     const handle = attach();
     const settingsButton = host.querySelector<HTMLButtonElement>(
-      '.fc-chart__settings-button[data-chart-settings-tab="elements"]',
+      '.fc-chart__button[data-chart-settings-tab="elements"]',
     );
     expect(settingsButton).toBeTruthy();
     settingsButton?.click();
@@ -712,7 +712,7 @@ describe('attachSessionCharts', () => {
     project({ kind: 'column', title: 'Sales' });
     const handle = attach();
     const header = (): string | null | undefined =>
-      host.querySelector('.fc-chart__title')?.textContent;
+      host.querySelector('.fc-chart [data-chart-role="title"]')?.textContent;
     const automatic = (): HTMLInputElement | undefined =>
       Array.from(surface().querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(
         (input) => input.closest('.fc-chart-settings__check')?.textContent === 'Automatic title',
@@ -783,7 +783,9 @@ describe('attachSessionCharts', () => {
       },
     );
     const handle = attach({ labels: { chartTitle: 'グラフ タイトル' } });
-    expect(host.querySelector('.fc-chart__title')?.textContent).toBe('グラフ タイトル');
+    expect(host.querySelector('.fc-chart [data-chart-role="title"]')?.textContent).toBe(
+      'グラフ タイトル',
+    );
     handle.detach();
   });
 
@@ -1852,8 +1854,9 @@ describe('attachSessionCharts', () => {
       const handle = attach();
       const marks = host.querySelectorAll('.fc-chart__plot [data-series-index="0"]');
       expect(marks.length).toBeGreaterThan(0);
-      expect(host.querySelector('svg')?.textContent).not.toContain('Revenue');
-      expect(host.querySelector('.fc-chart__title')?.textContent).toBe('Revenue');
+      const titles = host.querySelectorAll('.fc-chart [data-chart-role="title"]');
+      expect(titles).toHaveLength(1);
+      expect(titles[0]?.textContent).toBe('Revenue');
       handle.detach();
     },
   );
@@ -1891,15 +1894,15 @@ describe('attachSessionCharts', () => {
   it('renders chart overlays and deletes them from the workbook', () => {
     put([[10, 20]]);
     const chart = create(range(0, 0, 0, 1), { kind: 'column', title: 'Revenue' });
-    const handle = attach({ closeLabel: '閉じる' });
+    const handle = attach();
 
-    expect(host.querySelector('.fc-chart__title')?.textContent).toBe('Revenue');
+    expect(host.querySelector('.fc-chart [data-chart-role="title"]')?.textContent).toBe('Revenue');
     expect(host.querySelector('svg rect[data-chart-role="bar"]')).toBeTruthy();
+    // Like Excel, a chart has no close button: Delete removes the selected chart.
+    expect(host.querySelector('.fc-chart__close')).toBeNull();
     host.tabIndex = -1;
 
-    const close = host.querySelector<HTMLButtonElement>('.fc-chart__close');
-    expect(close?.getAttribute('aria-label')).toBe('閉じる');
-    close?.click();
+    panel().dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
     expect(store.getState().charts.charts).toHaveLength(0);
     expect(wb.listDrawingObjects(0).map((object) => object.objectId)).not.toContain(
       chart.nativeObjectId,
@@ -1915,28 +1918,29 @@ describe('attachSessionCharts', () => {
     project({ kind: 'line' });
     const handle = attach({
       labels: {
-        close: '閉じる',
-        resize: 'グラフのサイズ変更',
         columnChart: '縦棒グラフ',
         lineChart: '折れ線グラフ',
+        elementsButton: 'グラフ要素',
       },
     });
 
-    expect(host.querySelector('.fc-chart__title')?.textContent).toBe('折れ線グラフ');
+    // An untitled chart draws no title; its kind names it for assistive technology.
+    expect(host.querySelector('.fc-chart [data-chart-role="title"]')).toBeNull();
     expect(panel().getAttribute('aria-label')).toBe('折れ線グラフ');
-    expect(host.querySelector('.fc-chart__resize')?.getAttribute('aria-label')).toBe(
-      'グラフのサイズ変更',
-    );
+    const elements = (): HTMLButtonElement | null =>
+      host.querySelector('.fc-chart__button[data-chart-settings-tab="elements"]');
+    expect(elements()?.getAttribute('aria-label')).toBe('グラフ要素');
+    expect(elements()?.title).toBe('グラフ要素');
 
-    handle.setLabels({ lineChart: '線グラフ', resize: 'サイズ変更' });
-    expect(host.querySelector('.fc-chart__title')?.textContent).toBe('線グラフ');
-    expect(host.querySelector('.fc-chart__resize')?.getAttribute('aria-label')).toBe('サイズ変更');
+    handle.setLabels({ lineChart: '線グラフ', elementsButton: '要素' });
+    expect(panel().getAttribute('aria-label')).toBe('線グラフ');
+    expect(elements()?.getAttribute('aria-label')).toBe('要素');
     handle.detach();
   });
 
   it('keeps bar and column marks inside padded slots for sparse and dense series', () => {
-    // 346 x 189 px leaves the 320 x 132 scene inside the frame's header and padding.
-    const sceneAnchor = { ...PROJECTED_ANCHOR, cx: 346 * 9525, cy: 189 * 9525 };
+    // 334 x 146 px leaves the 320 x 132 scene inside the frame's border and padding.
+    const sceneAnchor = { ...PROJECTED_ANCHOR, cx: 334 * 9525, cy: 146 * 9525 };
     for (const kind of ['bar', 'column'] as const) {
       for (const count of [1, 2, 16, 100]) {
         store = createSpreadsheetStore();
@@ -2004,19 +2008,17 @@ describe('attachSessionCharts', () => {
     put([[1, 2]]);
     create(range(0, 0, 0, 1), { kind: 'line' });
     const handle = attach();
-    const header = host.querySelector<HTMLElement>('.fc-chart__header');
-    const close = host.querySelector<HTMLButtonElement>('.fc-chart__close');
-    if (!header || !close) throw new Error('missing chart controls');
+    const plot = host.querySelector<SVGSVGElement>('.fc-chart__plot');
+    if (!plot) throw new Error('missing chart plot');
     setProtectedSheet(store, 0, true);
     const before = structuredClone(current());
     const start = pixels(panel());
 
-    firePointer(header, 'pointerdown', { clientX: 10, clientY: 10 });
+    firePointer(plot, 'pointerdown', { clientX: 10, clientY: 10 });
     firePointer(window, 'pointermove', { clientX: 45, clientY: 60 });
     firePointer(window, 'pointerup', { clientX: 45, clientY: 60 });
     fireKey(panel(), 'ArrowRight');
     fireKey(panel(), 'Delete');
-    close.click();
 
     expect(store.getState().charts.charts).toHaveLength(1);
     expect(current()).toEqual(before);
@@ -2032,16 +2034,18 @@ describe('attachSessionCharts', () => {
     create(range(0, 0, 0, 1), { kind: 'line', title: 'Trend' });
     const handle = attach();
     const start = pixels(panel());
-    const header = host.querySelector<HTMLElement>('.fc-chart__header');
-    if (!header) throw new Error('missing chart header');
-    firePointer(header, 'pointerdown', { clientX: 10, clientY: 10 });
+    // Like Excel, the chart moves from a press anywhere on it.
+    const plot = host.querySelector<SVGSVGElement>('.fc-chart__plot');
+    if (!plot) throw new Error('missing chart plot');
+    firePointer(plot, 'pointerdown', { clientX: 10, clientY: 10 });
     firePointer(window, 'pointermove', { clientX: 45, clientY: 60 });
     firePointer(window, 'pointerup', { clientX: 45, clientY: 60 });
     const moved = pixels(panel());
     expect(moved.x).toBeCloseTo(start.x + 35);
     expect(moved.y).toBeCloseTo(start.y + 50);
 
-    const resize = host.querySelector<HTMLElement>('.fc-chart__resize');
+    expect(host.querySelectorAll('.fc-chart__handle')).toHaveLength(8);
+    const resize = host.querySelector<HTMLElement>('.fc-chart__handle[data-handle="se"]');
     if (!resize) throw new Error('missing chart resize handle');
     firePointer(resize, 'pointerdown', { clientX: 100, clientY: 100 });
     firePointer(window, 'pointermove', { clientX: 180, clientY: 145 });
@@ -2119,12 +2123,12 @@ describe('attachSessionCharts', () => {
       });
       const placeholder = panel();
       expect(placeholder.classList.contains('fc-chart--unsupported')).toBe(true);
-      expect(host.querySelector('.fc-chart__title')?.textContent).toBe('cx1');
+      expect(host.querySelector('.fc-chart [data-chart-role="title"]')?.textContent).toBe('cx1');
       expect(host.querySelector('[data-chart-settings-tab]')).toBeNull();
       expect(
         host.querySelector('.fc-chart__plot [data-chart-role="unsupported"]')?.textContent,
       ).toBe('このグラフの種類は表示できません');
-      expect(host.querySelector('.fc-chart__resize')).toBeTruthy();
+      expect(host.querySelectorAll('.fc-chart__handle')).toHaveLength(8);
 
       const start = pixels(placeholder);
       fireKey(placeholder, 'ArrowDown');
@@ -2175,12 +2179,175 @@ describe('attachSessionCharts', () => {
     }
   });
 
-  it('keeps chart close button DOM on the shared interaction primitive', () => {
+  const salesTable = (): SessionChart => {
+    put([
+      ['Month', 'Sales', 'Costs'],
+      ['Jan', 10, 6],
+      ['Feb', 15, 8],
+    ]);
+    return create(range(0, 0, 2, 2), { kind: 'column', seriesDirection: 'columns' });
+  };
+
+  const drag = (target: EventTarget, dx: number, dy: number, init: PointerEventInit = {}) => {
+    firePointer(target, 'pointerdown', { clientX: 100, clientY: 100, ...init });
+    firePointer(window, 'pointermove', { clientX: 100 + dx, clientY: 100 + dy, ...init });
+    firePointer(window, 'pointerup', { clientX: 100 + dx, clientY: 100 + dy, ...init });
+  };
+
+  it('resizes from any sizing handle and keeps the shape of a shift-dragged corner', () => {
+    salesTable();
+    const handle = attach();
+    const grip = (name: string): HTMLElement => {
+      const found = host.querySelector<HTMLElement>(`.fc-chart__handle[data-handle="${name}"]`);
+      if (!found) throw new Error(`missing ${name} handle`);
+      return found;
+    };
+    const start = pixels(panel());
+
+    // A leading corner moves the origin with it.
+    drag(grip('nw'), -20, -10);
+    let frame = pixels(panel());
+    expect(frame.x).toBeCloseTo(start.x - 20);
+    expect(frame.y).toBeCloseTo(start.y - 10);
+    expect(frame.w).toBeCloseTo(start.w + 20);
+    expect(frame.h).toBeCloseTo(start.h + 10);
+
+    // An edge handle changes one dimension only.
+    const before = pixels(panel());
+    drag(grip('e'), 40, 30);
+    frame = pixels(panel());
+    expect(frame.w).toBeCloseTo(before.w + 40);
+    expect(frame.h).toBeCloseTo(before.h);
+    expect(frame.x).toBeCloseTo(before.x);
+
+    const ratio = frame.w / frame.h;
+    drag(grip('se'), 60, 0, { shiftKey: true });
+    const scaled = pixels(panel());
+    expect(scaled.w).toBeCloseTo(frame.w + 60);
+    expect(scaled.w / scaled.h).toBeCloseTo(ratio, 2);
+    handle.detach();
+  });
+
+  it('selects a chart on a click without moving it', () => {
+    salesTable();
+    const handle = attach();
+    const start = pixels(panel());
+    const plot = host.querySelector<SVGSVGElement>('.fc-chart__plot');
+    if (!plot) throw new Error('missing chart plot');
+    firePointer(plot, 'pointerdown', { clientX: 50, clientY: 50 });
+    firePointer(window, 'pointermove', { clientX: 51, clientY: 51 });
+    firePointer(window, 'pointerup', { clientX: 51, clientY: 51 });
+    expect(panel().classList.contains('fc-chart--selected')).toBe(true);
+    expect(pixels(panel())).toEqual(start);
+    expect(history.undo()).toBe(false);
+    handle.detach();
+  });
+
+  it('leaves the chart on a press elsewhere or on Escape', () => {
+    salesTable();
+    const handle = attach();
+    firePointer(panel(), 'pointerdown');
+    expect(panel().classList.contains('fc-chart--selected')).toBe(true);
+    firePointer(host, 'pointerdown');
+    expect(panel().classList.contains('fc-chart--selected')).toBe(false);
+    expect(panel().getAttribute('aria-selected')).toBe('false');
+
+    host.tabIndex = -1;
+    host.focus();
+    panel().focus();
+    expect(panel().classList.contains('fc-chart--selected')).toBe(true);
+    const escaped = fireKey(panel(), 'Escape');
+    expect(escaped.defaultPrevented).toBe(true);
+    expect(panel().classList.contains('fc-chart--selected')).toBe(false);
+    expect(document.activeElement).toBe(host);
+    handle.detach();
+  });
+
+  it('opens the chart settings on a double click', () => {
+    salesTable();
+    const handle = attach();
+    panel().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    const settings = surface();
+    expect(settings.hidden).toBe(false);
+    expect(settings.querySelector('[role="tab"][aria-selected="true"]')?.id).toBe(
+      'fc-chart-settings-tab-elements',
+    );
+    handle.detach();
+  });
+
+  it('labels each data point the way Excel words its tooltip', () => {
+    salesTable();
+    const handle = attach({
+      labels: { pointTooltip: '系列 "{series}" 要素 "{point}"', pointValue: '値: {value}' },
+    });
+    const tooltip = (series: number, point: number): string | null | undefined =>
+      host.querySelector(
+        `[data-chart-role="bar"][data-series-index="${series}"][data-point-index="${point}"] title`,
+      )?.textContent;
+    expect(tooltip(0, 0)).toBe('系列 "Sales" 要素 "Jan"\n値: 10');
+    expect(tooltip(1, 1)).toBe('系列 "Costs" 要素 "Feb"\n値: 8');
+    handle.detach();
+  });
+
+  it('gives a pie slice its share of the total', () => {
+    project(
+      { kind: 'pie' },
+      {
+        domain: 'category',
+        categories: ['A', 'B'],
+        categoryIds: ['category-0', 'category-1'],
+        series: [{ id: 'series-0', name: 'Value', values: [30, 10] }],
+      },
+    );
+    const handle = attach();
+    const slice = host.querySelector('[data-chart-role="slice"][data-point-index="0"] title');
+    expect(slice?.textContent).toBe('Series "Value" Point "A"\nValue: 30 (75%)');
+    handle.detach();
+  });
+
+  it('outlines the selected chart data by part and clears it when the chart is left', () => {
+    salesTable();
+    const handle = attach();
+    expect(store.getState().ui.chartSourceRefs).toEqual([]);
+    firePointer(panel(), 'pointerdown');
+    expect(store.getState().ui.chartSourceRefs).toEqual([
+      { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 2, role: 'name' },
+      { sheet: 0, r0: 1, c0: 0, r1: 2, c1: 0, role: 'categories' },
+      { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2, role: 'values' },
+    ]);
+    // Selecting keeps the overlay in place, so focus and pointer capture survive.
+    const selected = panel();
+    expect(selected.isConnected).toBe(true);
+    firePointer(host, 'pointerdown');
+    expect(store.getState().ui.chartSourceRefs).toEqual([]);
+    firePointer(panel(), 'pointerdown');
+    handle.detach();
+    expect(store.getState().ui.chartSourceRefs).toEqual([]);
+  });
+
+  it('scrolls a chart off with its anchor and hides it under the headers', () => {
+    salesTable();
+    const handle = attach();
+    const start = pixels(panel());
+    expect(panel().style.clipPath).toBe('');
+    // B2 anchors the chart; scrolling three columns past it carries the chart off the leading edge.
+    const anchorCol = current()?.nativeAnchor.fromCol ?? 0;
+    mutators.scrollBy(store, 0, anchorCol + 3);
+    const scrolled = pixels(panel());
+    expect(scrolled.x).toBeLessThan(start.x);
+    expect(scrolled.x).toBeLessThan(0);
+    expect(panel().style.clipPath).toMatch(/^inset\(-64px -64px -64px \d+(\.\d+)?px\)$/);
+    mutators.scrollBy(store, 0, -(anchorCol + 3));
+    expect(pixels(panel())).toEqual(start);
+    expect(panel().style.clipPath).toBe('');
+    handle.detach();
+  });
+
+  it('keeps chart button DOM on the shared interaction primitive', () => {
     const source = readFileSync(join(root, 'src/interact/session-charts.ts'), 'utf8');
 
     expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
-    expect(source).toContain('const createSessionChartCloseButton');
-    expect(source).toContain('const close = createSessionChartCloseButton(labels.close)');
+    expect(source).toContain("className: 'fc-chart__button'");
     expect(source).not.toContain("document.createElement('button')");
   });
 
@@ -2191,27 +2358,22 @@ describe('attachSessionCharts', () => {
     );
     const chartCss = css.slice(css.indexOf('.fc-chart {'));
 
-    expect(chartCss).toMatch(/\.fc-chart\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:/);
+    // A flat chart area: a hairline frame, no rounding and no shadow.
+    const frame = chartCss.slice(0, chartCss.indexOf('}'));
+    expect(frame).not.toContain('border-radius');
+    expect(frame).not.toContain('box-shadow');
+    // Round sizing handles on every edge and corner, shown only while selected.
     expect(chartCss).toMatch(
-      /\.fc-chart:focus-visible\s*\{[\s\S]*?0 0 0 1px var\(--fc-accent, Highlight\)/,
+      /\.fc-chart__handle\s*\{[\s\S]*?display: none;[\s\S]*?width: 9px;[\s\S]*?height: 9px;[\s\S]*?border-radius: 50%;/,
     );
+    expect(chartCss).toMatch(/\.fc-chart--selected \.fc-chart__handle\s*\{\s*display: block;/);
+    // The elements, styles and filters buttons stand outside the chart's right edge.
     expect(chartCss).toMatch(
-      /\.fc-chart--selected::after\s*\{[\s\S]*?inset: -2px;[\s\S]*?border: 1px solid var\(--fc-accent, Highlight\);[\s\S]*?border-radius: 2px;/,
+      /\.fc-chart__buttons\s*\{[\s\S]*?left: calc\(100% \+ 8px\);[\s\S]*?flex-direction: column;/,
     );
-    expect(chartCss).toMatch(
-      /\.fc-chart__header\s*\{[\s\S]*?min-height: 30px;[\s\S]*?padding: 0 6px 0 10px;/,
-    );
-    expect(chartCss).toMatch(
-      /\.fc-chart__close\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;[\s\S]*?border-radius: 2px;/,
-    );
-    expect(chartCss).toMatch(
-      /\.fc-chart__resize\s*\{[\s\S]*?right: 2px;[\s\S]*?bottom: 2px;[\s\S]*?width: 12px;[\s\S]*?height: 12px;/,
-    );
-    expect(chartCss).toMatch(
-      /\.fc-chart__resize::before\s*\{[\s\S]*?width: 7px;[\s\S]*?height: 7px;[\s\S]*?border-right: 1px solid/,
-    );
-    expect(chartCss).not.toContain('border-radius: var(--fc-radius-md, 6px);');
-    expect(chartCss).not.toContain('border: 1px dashed var(--fc-accent');
+    expect(chartCss).toMatch(/\.fc-chart__button\s*\{[\s\S]*?width: 26px;[\s\S]*?height: 26px;/);
+    expect(chartCss).not.toContain('.fc-chart__header');
+    expect(chartCss).not.toContain('.fc-chart__close');
   });
 
   it('keeps sparse crossing auto and invalid raw values untouched until edited', () => {

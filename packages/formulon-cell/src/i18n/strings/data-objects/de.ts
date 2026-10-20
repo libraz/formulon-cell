@@ -286,8 +286,12 @@ export const dataObjectsDe: DataObjectsStrings = {
     close: 'Schließen',
   },
   sessionCharts: {
-    close: 'Schließen',
     resize: 'Diagrammgröße ändern',
+    elementsButton: 'Diagrammelemente',
+    stylesButton: 'Diagrammformatvorlagen',
+    filtersButton: 'Diagrammfilter',
+    pointTooltip: 'Datenreihe "{series}" Punkt "{point}"',
+    pointValue: 'Wert: {value}',
     columnChart: 'Säulendiagramm',
     barChart: 'Balkendiagramm',
     lineChart: 'Liniendiagramm',

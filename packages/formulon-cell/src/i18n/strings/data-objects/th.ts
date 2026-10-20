@@ -265,8 +265,12 @@ export const dataObjectsTh: DataObjectsStrings = {
     close: 'ปิด',
   },
   sessionCharts: {
-    close: 'ปิด',
     resize: 'ปรับขนาดแผนภูมิ',
+    elementsButton: 'องค์ประกอบแผนภูมิ',
+    stylesButton: 'สไตล์แผนภูมิ',
+    filtersButton: 'ตัวกรองแผนภูมิ',
+    pointTooltip: 'ชุดข้อมูล "{series}" จุด "{point}"',
+    pointValue: 'ค่า: {value}',
     columnChart: 'แผนภูมิคอลัมน์',
     barChart: 'แผนภูมิแท่ง',
     lineChart: 'แผนภูมิเส้น',
