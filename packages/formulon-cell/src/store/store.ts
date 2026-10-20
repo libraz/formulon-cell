@@ -64,6 +64,7 @@ export const createSpreadsheetStore = () =>
       zoomBeforePreview: null,
       pageBreakDrag: null,
       editorRefs: [],
+      chartSourceRefs: [],
       r1c1: false,
       statusAggs: ['average', 'count', 'sum'],
       statusOptions: {

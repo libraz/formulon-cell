@@ -21,6 +21,7 @@ import {
   isColVisible,
   isRowVisible,
   layoutForView,
+  type Rect,
   rangeRects,
   rowGap,
   rowHeight,
@@ -47,6 +48,7 @@ import { sameRectList, trailingRect } from './grid/range-rects.js';
 import { paintTraces } from './grid/traces.js';
 import {
   paintActiveCellOutline,
+  paintChartSourceHighlight,
   paintCopyMarquee,
   paintFillHandle,
   paintFillPreview,
@@ -262,6 +264,7 @@ export class GridRenderer {
     this.paintSpills(state, theme, cols, rows);
     this.paintActive(state, theme, cols, rows);
     this.paintEditorRefs(state);
+    this.paintChartSourceRefs(state);
     this.paintTraces(state, cols, rows);
   }
 
@@ -365,34 +368,45 @@ export class GridRenderer {
     ctx.restore();
   }
 
+  /** The screen box around the visible part of `range`, or null when none of it is visible. */
+  private rangeBounds(state: ViewState, range: Range): Rect | null {
+    const rects = rangeRects(state.layout, state.viewport, range);
+    // One box around the whole range, so a 2x2 range reads as a single outline.
+    if (rects.length === 0) return null;
+    let x0 = Number.POSITIVE_INFINITY;
+    let y0 = Number.POSITIVE_INFINITY;
+    let x1 = Number.NEGATIVE_INFINITY;
+    let y1 = Number.NEGATIVE_INFINITY;
+    for (const r of rects) {
+      x0 = Math.min(x0, r.x);
+      y0 = Math.min(y0, r.y);
+      x1 = Math.max(x1, r.x + r.w);
+      y1 = Math.max(y1, r.y + r.h);
+    }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+
   private paintEditorRefs(state: ViewState): void {
     const refs = state.ui.editorRefs;
     if (!refs || refs.length === 0) return;
     const sheet = state.data.sheetIndex;
-    const ctx = this.ctx;
     for (const ref of refs) {
-      const range: Range = {
+      const bounds = this.rangeBounds(state, {
         sheet,
         r0: ref.r0,
         c0: ref.c0,
         r1: ref.r1,
         c1: ref.c1,
-      };
-      const rects = rangeRects(state.layout, state.viewport, range);
-      // The bounding box of the entire range — paint as one outline rather
-      //  than per-cell so 2x2 selections look like a single bordered box.
-      if (rects.length === 0) continue;
-      let x0 = Number.POSITIVE_INFINITY;
-      let y0 = Number.POSITIVE_INFINITY;
-      let x1 = Number.NEGATIVE_INFINITY;
-      let y1 = Number.NEGATIVE_INFINITY;
-      for (const r of rects) {
-        x0 = Math.min(x0, r.x);
-        y0 = Math.min(y0, r.y);
-        x1 = Math.max(x1, r.x + r.w);
-        y1 = Math.max(y1, r.y + r.h);
-      }
-      paintRefHighlight(ctx, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, ref.colorIndex);
+      });
+      if (bounds) paintRefHighlight(this.ctx, bounds, ref.colorIndex);
+    }
+  }
+
+  private paintChartSourceRefs(state: ViewState): void {
+    for (const ref of state.ui.chartSourceRefs ?? []) {
+      if (ref.sheet !== state.data.sheetIndex) continue;
+      const bounds = this.rangeBounds(state, ref);
+      if (bounds) paintChartSourceHighlight(this.ctx, bounds, ref.role);
     }
   }
 

@@ -84,3 +84,35 @@ export function paintRefHighlight(
   ctx.strokeRect(bounds.x + 0.5, bounds.y + 0.5, bounds.w - 1, bounds.h - 1);
   ctx.restore();
 }
+
+/** Excel's colours for the parts of a selected chart's data range. */
+const CHART_SOURCE_COLORS = {
+  name: '#e0301e',
+  categories: '#7030a0',
+  values: '#0070c0',
+} as const;
+
+/** Outline one part of the selected chart's data range, with the corner
+ *  handles Excel draws on it. */
+export function paintChartSourceHighlight(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  role: keyof typeof CHART_SOURCE_COLORS,
+): void {
+  const color = CHART_SOURCE_COLORS[role];
+  const handle = 5;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(bounds.x + 1, bounds.y + 1, bounds.w - 2, bounds.h - 2);
+  for (const [x, y] of [
+    [bounds.x, bounds.y],
+    [bounds.x + bounds.w, bounds.y],
+    [bounds.x, bounds.y + bounds.h],
+    [bounds.x + bounds.w, bounds.y + bounds.h],
+  ] as const) {
+    ctx.fillRect(x - handle / 2, y - handle / 2, handle, handle);
+  }
+  ctx.restore();
+}

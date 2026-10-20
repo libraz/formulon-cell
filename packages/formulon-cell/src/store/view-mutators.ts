@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
+  ChartSourceHighlight,
   CopyMode,
   EditorMode,
   EditorRefHighlight,
@@ -128,6 +129,10 @@ export const viewMutators = {
 
   setEditorRefs(store: SpreadsheetStore, refs: EditorRefHighlight[]): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, editorRefs: refs } }));
+  },
+
+  setChartSourceRefs(store: SpreadsheetStore, refs: ChartSourceHighlight[]): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, chartSourceRefs: refs } }));
   },
 
   setZoom(store: SpreadsheetStore, zoom: number): void {

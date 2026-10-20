@@ -113,6 +113,17 @@ export interface EditorRefHighlight {
   colorIndex: number;
 }
 
+/** One part of the selected chart's data range, outlined on the grid the way
+ *  Excel colours it: series names, categories (or X values) and values. */
+export interface ChartSourceHighlight {
+  sheet: number;
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
+  role: 'name' | 'categories' | 'values';
+}
+
 export interface PendingFormat {
   addr: Addr;
   format: Partial<CellFormat>;
@@ -182,6 +193,8 @@ export interface UiSlice {
   /** Live formula-reference highlights (desktop spreadsheets: colored borders on referenced
    *  cells while editing a formula). Empty when no formula edit is active. */
   editorRefs: EditorRefHighlight[];
+  /** The data range of the selected chart, by part; empty when no chart is selected. */
+  chartSourceRefs: ChartSourceHighlight[];
   /** Which aggregate stats appear in the status bar for the active selection. */
   statusAggs: StatusAggKey[];
   /** Excel-style right-click status bar toggles beyond aggregates. */
