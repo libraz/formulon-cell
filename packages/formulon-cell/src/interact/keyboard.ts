@@ -7,6 +7,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { selectionExtendEnd } from '../store/selection-mutators.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   clampNavigationAddr,
@@ -446,12 +447,18 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       selectionTraversalEnabled && !e.ctrlKey && !e.metaKey && !e.altKey;
     const colDir = s.ui.rightToLeft === true ? -1 : 1;
 
+    // Shift-navigation moves the extend end, not the active cell.
+    const from = shift ? selectionExtendEnd(s.selection) : a;
     if (k === 'ArrowUp')
       target =
-        meta || endModeArrow ? jumpEdge(s, a, -1, 0) : stepWithMerge(s, a, -1, 0, MAX_ROW, MAX_COL);
+        meta || endModeArrow
+          ? jumpEdge(s, from, -1, 0)
+          : stepWithMerge(s, from, -1, 0, MAX_ROW, MAX_COL);
     else if (k === 'ArrowDown')
       target =
-        meta || endModeArrow ? jumpEdge(s, a, 1, 0) : stepWithMerge(s, a, 1, 0, MAX_ROW, MAX_COL);
+        meta || endModeArrow
+          ? jumpEdge(s, from, 1, 0)
+          : stepWithMerge(s, from, 1, 0, MAX_ROW, MAX_COL);
     // Arrow keys move by what the user sees. A right-to-left sheet runs its
     // columns the other way, so the visual step and the index step take
     // opposite signs. Tab is unaffected — it advances in reading order, which
@@ -459,25 +466,25 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     else if (k === 'ArrowLeft')
       target =
         meta || endModeArrow
-          ? jumpEdge(s, a, 0, -colDir)
-          : stepWithMerge(s, a, 0, -colDir, MAX_ROW, MAX_COL);
+          ? jumpEdge(s, from, 0, -colDir)
+          : stepWithMerge(s, from, 0, -colDir, MAX_ROW, MAX_COL);
     else if (k === 'ArrowRight')
       target =
         meta || endModeArrow
-          ? jumpEdge(s, a, 0, colDir)
-          : stepWithMerge(s, a, 0, colDir, MAX_ROW, MAX_COL);
-    else if (k === 'Home') target = meta ? clamp(a, 0, 0) : clamp(a, a.row, 0);
+          ? jumpEdge(s, from, 0, colDir)
+          : stepWithMerge(s, from, 0, colDir, MAX_ROW, MAX_COL);
+    else if (k === 'Home') target = meta ? clamp(from, 0, 0) : clamp(from, from.row, 0);
     else if (k === 'End' && meta) {
-      const { row, col } = lastUsedCell(s, a.sheet);
-      target = clamp(a, row, col);
+      const { row, col } = lastUsedCell(s, from.sheet);
+      target = clamp(from, row, col);
     } else if (k === 'PageDown')
       target = e.altKey
-        ? move(a, 0, colDir * Math.max(1, s.viewport.colCount - 1))
-        : move(a, Math.max(1, s.viewport.rowCount - 1), 0);
+        ? move(from, 0, colDir * Math.max(1, s.viewport.colCount - 1))
+        : move(from, Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'PageUp')
       target = e.altKey
-        ? move(a, 0, -colDir * Math.max(1, s.viewport.colCount - 1))
-        : move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
+        ? move(from, 0, -colDir * Math.max(1, s.viewport.colCount - 1))
+        : move(from, -Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'Tab') {
       const next = nextAdvanceTarget(s, shift ? 'left' : 'right', selectionTabTraversalEnabled);
       target = next.addr;

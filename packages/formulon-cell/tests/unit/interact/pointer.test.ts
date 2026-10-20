@@ -373,7 +373,7 @@ describe('attachPointer', () => {
       const sel = store.getState().selection;
       expect(sel.range).toEqual({ sheet: 0, r0: 15, c0: 0, r1: 19, c1: 16383 });
       expect(sel.anchor).toEqual({ sheet: 0, row: 15, col: 0 });
-      expect(sel.active).toEqual({ sheet: 0, row: 19, col: 0 });
+      expect(sel.active).toEqual({ sheet: 0, row: 15, col: 0 });
     });
 
     it('Shift-click on column headers selects a contiguous column band', () => {
@@ -385,7 +385,7 @@ describe('attachPointer', () => {
       const sel = store.getState().selection;
       expect(sel.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 });
       expect(sel.anchor).toEqual({ sheet: 0, row: 0, col: 0 });
-      expect(sel.active).toEqual({ sheet: 0, row: 0, col: 2 });
+      expect(sel.active).toEqual({ sheet: 0, row: 0, col: 0 });
     });
 
     it('corner click selects the entire sheet', () => {

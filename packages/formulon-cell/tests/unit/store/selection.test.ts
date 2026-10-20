@@ -4,6 +4,7 @@ import { copy } from '../../../src/commands/clipboard/copy.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
 import { selectionContainsAddr } from '../../../src/store/selection-geometry.js';
+import { selectionExtendEnd } from '../../../src/store/selection-mutators.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const workbook = (): WorkbookHandle => ({ sheetCount: 1 }) as WorkbookHandle;
@@ -48,6 +49,19 @@ describe('store/selection — mutators', () => {
     mutators.extendRangeTo(store, { sheet: 0, row: 4, col: 5 });
     const r = store.getState().selection.range;
     expect(r).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 4, c1: 5 });
+  });
+
+  it('extendRangeTo keeps the active cell at the anchor and derives the extend end', () => {
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 10, col: 8 });
+    mutators.extendRangeTo(store, { sheet: 0, row: 14, col: 9 });
+    const sel = store.getState().selection;
+    expect(sel.active).toEqual({ sheet: 0, row: 10, col: 8 });
+    expect(selectionExtendEnd(sel)).toEqual({ sheet: 0, row: 14, col: 9 });
+    mutators.extendRangeTo(store, { sheet: 0, row: 6, col: 4 });
+    const flipped = store.getState().selection;
+    expect(flipped.active).toEqual({ sheet: 0, row: 10, col: 8 });
+    expect(selectionExtendEnd(flipped)).toEqual({ sheet: 0, row: 6, col: 4 });
   });
 
   it('extendRangeTo handles "shrink back" (target above-left of anchor)', () => {
@@ -102,13 +116,13 @@ describe('store/selection — mutators', () => {
     expect(r.c1 - r.c0).toBeGreaterThan(50);
   });
 
-  it('selectRows selects an entire row band and keeps the original anchor row', () => {
+  it('selectRows selects an entire row band and keeps the active cell at the anchor row', () => {
     const store = createSpreadsheetStore();
     mutators.selectRows(store, 7, 4);
     const s = store.getState().selection;
     expect(s.range).toEqual({ sheet: 0, r0: 4, c0: 0, r1: 7, c1: 16383 });
     expect(s.anchor).toEqual({ sheet: 0, row: 7, col: 0 });
-    expect(s.active).toEqual({ sheet: 0, row: 4, col: 0 });
+    expect(s.active).toEqual({ sheet: 0, row: 7, col: 0 });
   });
 
   it('selectCol selects the entire column across the sheet height', () => {
@@ -120,13 +134,13 @@ describe('store/selection — mutators', () => {
     expect(r.r1 - r.r0).toBeGreaterThan(50);
   });
 
-  it('selectCols selects an entire column band and keeps the original anchor column', () => {
+  it('selectCols selects an entire column band and keeps the active cell at the anchor column', () => {
     const store = createSpreadsheetStore();
     mutators.selectCols(store, 5, 2);
     const s = store.getState().selection;
     expect(s.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 5 });
     expect(s.anchor).toEqual({ sheet: 0, row: 0, col: 5 });
-    expect(s.active).toEqual({ sheet: 0, row: 0, col: 2 });
+    expect(s.active).toEqual({ sheet: 0, row: 0, col: 5 });
   });
 
   it('selectAll selects every cell on the sheet', () => {

@@ -111,7 +111,7 @@ export function paintHeaders(
     ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
     ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
-    if (isActiveCol) {
+    if (isActiveCol || isSelectedCol) {
       ctx.fillStyle = theme.accent;
       ctx.fillRect(rect.x, oy - Math.max(2, 2 / dpr), w, Math.max(2, 2 / dpr));
     }
@@ -189,7 +189,7 @@ export function paintHeaders(
     ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     ctx.fillText(rowLabel, rtl ? innerX + 8 : innerX - 8, rect.y + h / 2 + 0.5);
-    if (isActiveRow) {
+    if (isActiveRow || isSelectedRow) {
       const barW = Math.max(2, 2 / dpr);
       ctx.fillStyle = theme.accent;
       ctx.fillRect(rtl ? innerX : innerX - barW, rect.y, barW, h);

@@ -281,15 +281,47 @@ describe('attachKeyboard', () => {
       expect(store.getState().selection.active.row).toBe(0);
     });
 
-    it('Shift+Arrow extends the selection range from the anchor; active follows the cursor', () => {
+    it('Shift+Arrow extends the selection range from the anchor; active stays at the anchor', () => {
       setup();
       mutators.setActive(store, { sheet: 0, row: 5, col: 5 });
       fire(host, 'ArrowRight', { shiftKey: true });
       const sel = store.getState().selection;
-      // anchor stays at (5, 5); active is the new edge.
       expect(sel.range).toEqual({ sheet: 0, r0: 5, c0: 5, r1: 5, c1: 6 });
-      expect(sel.active).toEqual({ sheet: 0, row: 5, col: 6 });
+      expect(sel.active).toEqual({ sheet: 0, row: 5, col: 5 });
       expect(sel.anchor).toEqual({ sheet: 0, row: 5, col: 5 });
+    });
+
+    it('repeated Shift+Arrow grows from the extend end while active stays put', () => {
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 1, col: 1 }); // B2
+      for (let i = 0; i < 3; i++) fire(host, 'ArrowDown', { shiftKey: true });
+      fire(host, 'ArrowRight', { shiftKey: true });
+      const sel = store.getState().selection;
+      expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 4, c1: 2 });
+      expect(sel.active).toEqual({ sheet: 0, row: 1, col: 1 });
+    });
+
+    it('Shift+Arrow shrinks back past the anchor and flips the range', () => {
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+      fire(host, 'ArrowDown', { shiftKey: true });
+      fire(host, 'ArrowUp', { shiftKey: true });
+      fire(host, 'ArrowUp', { shiftKey: true });
+      const sel = store.getState().selection;
+      expect(sel.range).toEqual({ sheet: 0, r0: 2, c0: 3, r1: 3, c1: 3 });
+      expect(sel.active).toEqual({ sheet: 0, row: 3, col: 3 });
+    });
+
+    it('Mac Shift+Backspace collapses an extended selection to its origin', () => {
+      setup();
+      host.dataset.fcPlatform = 'mac';
+      mutators.setActive(store, { sheet: 0, row: 2, col: 2 });
+      fire(host, 'ArrowDown', { shiftKey: true });
+      fire(host, 'ArrowDown', { shiftKey: true });
+      fire(host, 'Backspace', { shiftKey: true });
+      const sel = store.getState().selection;
+      expect(sel.active).toEqual({ sheet: 0, row: 2, col: 2 });
+      expect(sel.range).toEqual({ sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 });
     });
 
     it('Tab moves right; Shift+Tab moves left', () => {
@@ -422,7 +454,7 @@ describe('attachKeyboard', () => {
       fire(host, 'PageDown', { altKey: true, shiftKey: true });
 
       const s = store.getState();
-      expect(s.selection.active).toEqual({ sheet: 0, row: 2, col: 13 });
+      expect(s.selection.active).toEqual({ sheet: 0, row: 2, col: 10 });
       expect(s.selection.range).toEqual({ sheet: 0, r0: 2, c0: 10, r1: 2, c1: 13 });
       expect(s.viewport.colStart).toBe(10);
     });

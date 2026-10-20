@@ -106,6 +106,34 @@ function makeCtxSpy(): {
 }
 
 describe('paintHeaders', () => {
+  it('draws the accent bar on every selected column and row header', () => {
+    const state = createSpreadsheetStore().getState();
+    state.selection = {
+      active: { sheet: 0, row: 1, col: 1 },
+      range: { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 },
+      anchor: { sheet: 0, row: 1, col: 1 },
+      extraRanges: [],
+    };
+    state.viewport = { rowStart: 0, rowCount: 4, colStart: 0, colCount: 4, zoom: 1, widthPx: 320 };
+    const cols = buildColLayout(state.layout, state.viewport);
+    const rows = buildRowLayout(state.layout, state.viewport);
+    const { ctx, fills } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 320, cssHeight: 160 },
+      { ...state, layout: layoutForView(state) },
+      theme(),
+      cols,
+      rows,
+    );
+
+    const bars = fills.filter((f) => f.style === '#107c41' && f.rect);
+    const colBars = bars.filter((f) => f.rect?.[3] === 2 && (f.rect?.[2] ?? 0) > 2);
+    const rowBars = bars.filter((f) => f.rect?.[2] === 2 && (f.rect?.[3] ?? 0) > 2);
+    expect(colBars).toHaveLength(2);
+    expect(rowBars).toHaveLength(2);
+  });
+
   it('uses regular idle header text and semibold selected header text', () => {
     const state = createSpreadsheetStore().getState();
     state.selection = {

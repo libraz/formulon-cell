@@ -156,6 +156,18 @@ const boundedAxisRange = (
   return permittedRange(store, range);
 };
 
+/** The moving end of a shift-extension: the corner of the primary range
+ *  opposite the active cell. The active cell stays at the origin of the
+ *  gesture, so the extend end is derived from the range instead of stored. */
+export const selectionExtendEnd = (selection: State['selection']): Addr => {
+  const { active, range } = selection;
+  return {
+    sheet: range.sheet,
+    row: active.row === range.r0 ? range.r1 : range.r0,
+    col: active.col === range.c0 ? range.c1 : range.c0,
+  };
+};
+
 /** Active cell, anchor, primary range and extra ranges. Every mutation is
  *  clamped by the store's navigation policy and expanded to cover merges. */
 export const selectionMutators = {
@@ -358,10 +370,10 @@ export const selectionMutators = {
       if (!bounded) return s;
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, next),
+        ui: clearPendingFormatOnMove(s, a),
         selection: {
           ...s.selection,
-          active: next,
+          active: a,
           anchor: a,
           range: bounded,
         },
@@ -386,9 +398,9 @@ export const selectionMutators = {
     }));
   },
 
-  selectRows(store: SpreadsheetStore, anchorRow: number, activeRow: number): void {
-    const r0 = Math.min(anchorRow, activeRow);
-    const r1 = Math.max(anchorRow, activeRow);
+  selectRows(store: SpreadsheetStore, anchorRow: number, endRow: number): void {
+    const r0 = Math.min(anchorRow, endRow);
+    const r1 = Math.max(anchorRow, endRow);
     const range = boundedAxisRange(store, 'row', r0, r1);
     if (!range) return;
     store.setState((s) => ({
@@ -397,7 +409,7 @@ export const selectionMutators = {
       selection: {
         active: {
           sheet: range.sheet,
-          row: Math.max(range.r0, Math.min(range.r1, activeRow)),
+          row: Math.max(range.r0, Math.min(range.r1, anchorRow)),
           col: range.c0,
         },
         anchor: {
@@ -426,9 +438,9 @@ export const selectionMutators = {
     }));
   },
 
-  selectCols(store: SpreadsheetStore, anchorCol: number, activeCol: number): void {
-    const c0 = Math.min(anchorCol, activeCol);
-    const c1 = Math.max(anchorCol, activeCol);
+  selectCols(store: SpreadsheetStore, anchorCol: number, endCol: number): void {
+    const c0 = Math.min(anchorCol, endCol);
+    const c1 = Math.max(anchorCol, endCol);
     const range = boundedAxisRange(store, 'col', c0, c1);
     if (!range) return;
     store.setState((s) => ({
@@ -438,7 +450,7 @@ export const selectionMutators = {
         active: {
           sheet: range.sheet,
           row: range.r0,
-          col: Math.max(range.c0, Math.min(range.c1, activeCol)),
+          col: Math.max(range.c0, Math.min(range.c1, anchorCol)),
         },
         anchor: {
           sheet: range.sheet,

@@ -129,7 +129,7 @@ export const applySelectionRectangle = (
       subtractRange(range, gesture),
     );
     return {
-      active: cloneAddr(tip),
+      active: cloneAddr(anchor),
       anchor: cloneAddr(anchor),
       range: cloneRange(gesture),
       extraRanges: extras,
