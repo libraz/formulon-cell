@@ -181,7 +181,7 @@ describe('attachViewToolbar', () => {
     const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="Views"]');
     if (!select || !saved) throw new Error('missing sheet-view controls');
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
-      'Current view',
+      'Current View',
       'Views 1',
     ]);
     select.value = saved.id;

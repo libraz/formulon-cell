@@ -646,7 +646,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(mergeItems.map((item) => item.textContent)).toEqual([
       'Merge & Center',
       'Merge Across',
-      'Merge cells',
+      'Merge Cells',
       'Unmerge Cells',
     ]);
 

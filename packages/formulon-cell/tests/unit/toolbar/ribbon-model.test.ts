@@ -870,7 +870,7 @@ describe('toolbar/ribbon-model', () => {
     expect(conditionalMenuText('ja').iconTraffic3).toBe('3 色の信号');
     expect(conditionalMenuText('en').iconStars3).toBe('3 Stars');
     expect(ribbonDisplayText('ja').label).toBe('リボンの表示オプション');
-    expect(ribbonDisplayText('en').collapsed).toBe('Show tabs only');
+    expect(ribbonDisplayText('en').collapsed).toBe('Show Tabs Only');
     expect(ribbonDisplayText('en').singleLine).toBe('Single Line Ribbon');
     expect(ribbonDisplayText('en').autoHide).toBe('Auto-hide Ribbon');
     expect(backstageMenuText('ja').back).toBe('戻る');

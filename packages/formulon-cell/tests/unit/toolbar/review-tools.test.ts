@@ -36,7 +36,7 @@ describe('toolbar/review-tools', () => {
     expect(analyzeAccessibilityCells([])).toEqual([
       {
         severity: 'info',
-        label: 'Empty sheet',
+        label: 'Empty Sheet',
         detail: 'The current sheet has no populated cells to review.',
       },
     ]);

@@ -208,8 +208,8 @@ describe('toolbar/ribbon menu primitives', () => {
     );
     expect(selectColorSource).not.toContain('テーマのフォント');
     expect(selectColorSource).not.toContain('Theme Fonts');
-    expect(selectColorSource).not.toContain('Current view');
-    expect(selectColorSource).not.toContain('Custom margins...');
+    expect(selectColorSource).not.toContain('Current View');
+    expect(selectColorSource).not.toContain('Custom Margins...');
   });
 
   it('keeps control dispatch defaults and prompt labels backed by shared strings', () => {

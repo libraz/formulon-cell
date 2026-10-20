@@ -60,7 +60,7 @@ export const workbookChromeEn: WorkbookChromeStrings = {
     zoom: 'Zoom',
     zoom100: '100%',
     views: 'Views',
-    currentView: 'Current view',
+    currentView: 'Current View',
     saveView: 'Save',
     deleteView: 'Delete',
     deleteViewRequiresActive: 'Select a saved sheet view to delete it.',

@@ -119,7 +119,7 @@ export const macEn: MacStrings = {
   },
   macInk: {
     strokeLabel: 'Ink stroke',
-    drawLabel: 'Draw ink',
+    drawLabel: 'Draw Ink',
   },
   macContextMenu: {
     cut: 'Cut',

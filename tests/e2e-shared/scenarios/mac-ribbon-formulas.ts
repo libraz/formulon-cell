@@ -121,7 +121,7 @@ export async function runMacFormulaPaletteScenario(page: Page): Promise<void> {
   const search = palette.locator('.fc-mac-formula-palette__search');
   await search.fill('ACOS');
   await palette.locator('[data-section="all"] [data-function-name="ACOS"]').click();
-  await palette.getByRole('button', { name: 'Insert function', exact: true }).click();
+  await palette.getByRole('button', { name: 'Insert Function', exact: true }).click();
   const argument = palette.locator('.fc-mac-formula-palette__argument').first();
   await expect(argument.locator('span')).toHaveText('number');
   await expect(argument.locator('small')).toHaveText('Must be a number from -1 to 1.');
@@ -341,7 +341,7 @@ export async function runMacFunctionCatalogScenario(page: Page): Promise<void> {
   await expect(py).toHaveAttribute('aria-disabled', 'true');
   await expect(py).toHaveClass(/is-unavailable/);
   await expect(
-    fxDialog.getByRole('button', { name: 'Insert function', exact: true }),
+    fxDialog.getByRole('button', { name: 'Insert Function', exact: true }),
   ).toBeDisabled();
   await expect(py).toHaveAttribute(
     'aria-description',

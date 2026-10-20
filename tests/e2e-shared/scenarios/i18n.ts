@@ -39,7 +39,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
     await expect(ribbonDisplayMenu.getByRole('menuitemradio', { name: label })).toBeVisible();
   }
   await expect(ribbonDisplayMenu).not.toContainText('Ribbon Display Options');
-  await expect(ribbonDisplayMenu).not.toContainText('Show tabs only');
+  await expect(ribbonDisplayMenu).not.toContainText('Show Tabs Only');
   await ribbonDisplayToggle.click();
   await expect(ribbonDisplayMenu).toHaveCount(0);
 
