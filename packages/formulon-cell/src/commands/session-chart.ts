@@ -2,6 +2,7 @@ import {
   AnchorEditAs,
   AnchorKind,
   type ChartSeriesPatch,
+  DrawingObjectKind,
   ChartSeriesDirection as EngineSeriesDirection,
   type ImagePlacement,
 } from '@libraz/formulon';
@@ -34,6 +35,7 @@ import type { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOrigin, OperationIntent } from './interaction-policy.js';
 import { isSheetProtected } from './protection.js';
+import type { SessionIllustrationArrangeAction } from './session-illustration.js';
 
 export interface ChartMutationAuthorization {
   origin?: InteractionOrigin;
@@ -551,6 +553,67 @@ export function clearSessionChart(
   const intent = chartIntent(chartCells(chart), 'chartDelete', authorization);
   if (!canMutateChart(store, intent)) return false;
   return removeChart(store, chart, history, wb, intent);
+}
+
+/**
+ * Move a chart in its sheet's stacking order among the sheet's charts, the way
+ * the spreadsheet's Bring to Front and Send to Back do. Returns null, changing
+ * nothing, when the chart is already there or the change is refused.
+ */
+export function arrangeSessionChart(
+  store: SpreadsheetStore,
+  id: string,
+  action: SessionIllustrationArrangeAction,
+  history: History | null,
+  wb: WorkbookHandle,
+  authorization: ChartMutationAuthorization = {},
+): SessionChart | null {
+  const chart = sessionChartById(store.getState(), id);
+  if (!chart || !wb.capabilities.charts) return null;
+  const intent = chartIntent(chartCells(chart), 'chartArrange', authorization);
+  if (!canMutateChart(store, intent)) return null;
+  const { sheet, nativeObjectId } = chart;
+  // Charts keep the slots they hold among the sheet's drawings, so pictures stay put.
+  const slots = wb
+    .listDrawingObjects(sheet)
+    .flatMap((object, index) => (object.kind === DrawingObjectKind.Chart ? [index] : []));
+  const rank = wb
+    .listDrawingObjects(sheet)
+    .filter((object) => object.kind === DrawingObjectKind.Chart)
+    .findIndex((object) => object.objectId === nativeObjectId);
+  if (rank < 0) return null;
+  const targetRank =
+    action === 'bring-front'
+      ? slots.length - 1
+      : action === 'send-back'
+        ? 0
+        : action === 'bring-forward'
+          ? Math.min(slots.length - 1, rank + 1)
+          : Math.max(0, rank - 1);
+  const from = slots[rank];
+  const to = slots[targetRank];
+  if (from === undefined || to === undefined || from === to) return null;
+  const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, nativeObjectId);
+  if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) return null;
+  const arranged = sync();
+  pushChartHistory(
+    history,
+    store,
+    intent,
+    () => {
+      if (!wb.setDrawingZOrder(sheet, nativeObjectId, from)) {
+        throw new Error('chart arrange undo failed');
+      }
+      sync();
+    },
+    () => {
+      if (!wb.setDrawingZOrder(sheet, nativeObjectId, to)) {
+        throw new Error('chart arrange redo failed');
+      }
+      sync();
+    },
+  );
+  return arranged && cloneSessionChart(arranged);
 }
 
 /**

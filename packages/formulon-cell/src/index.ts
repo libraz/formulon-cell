@@ -568,6 +568,7 @@ export type {
 } from './commands/session-chart.js';
 export {
   addSessionChartSeries,
+  arrangeSessionChart,
   clearSessionChart,
   clearSessionChartsInRange,
   createRibbonChartFromSelection,

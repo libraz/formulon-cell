@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
   InteractionController,
@@ -399,6 +399,106 @@ describe('attachSessionIllustrations', () => {
     expect(item('image-1')).toMatchObject({ w: 300, h: 200 });
 
     handle.detach();
+    host.remove();
+  });
+
+  it('docks a dragged edge to the nearest gridline while Alt is held', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    freeShape(store);
+    const handle = attachSessionIllustrations({ host, store });
+    const { viewport } = store.getState();
+    const layout = layoutForView(store.getState());
+    const span = Array.from({ length: 12 }, (_, index) => index);
+    const colEdges = span.map((col) => cellRectUnclamped(layout, viewport, 0, col).x);
+    const rowEdges = span.map((row) => cellRectUnclamped(layout, viewport, row, 0).y);
+    const nearest = (edges: number[], value: number): number =>
+      edges.reduce((best, edge) => (Math.abs(edge - value) < Math.abs(best - value) ? edge : best));
+    const drag = (target: Element, dx: number, dy: number, altKey: boolean): void => {
+      firePointer(target, 'pointerdown', { clientX: 0, clientY: 0 });
+      firePointer(window, 'pointermove', { clientX: dx, clientY: dy, altKey });
+      firePointer(window, 'pointerup', { clientX: dx, clientY: dy, altKey });
+    };
+    const item = () => store.getState().illustrations.illustrations[0];
+    const panel = (): HTMLElement => {
+      const found = host.querySelector<HTMLElement>('.fc-illustration');
+      if (!found) throw new Error('missing session illustration overlay');
+      return found;
+    };
+
+    drag(panel(), 37, 3, false);
+    expect(item()).toMatchObject({ x: 57, y: 33 });
+    drag(panel(), 0, 5, true);
+    expect(item()).toMatchObject({ x: nearest(colEdges, 57), y: nearest(rowEdges, 38) });
+    // Only the dragged corner moves; the top-left edge stays on its gridline.
+    const before = item();
+    const se = panel().querySelector('.fc-drawing-handle[data-handle="se"]');
+    if (!se || before?.x === undefined || before.y === undefined) throw new Error('missing state');
+    const right = before.x + (before.w ?? 0) + 13;
+    const bottom = before.y + (before.h ?? 0) + 7;
+    drag(se, 13, 7, true);
+    expect(item()).toMatchObject({
+      x: before.x,
+      y: before.y,
+      w: nearest(colEdges, right) - before.x,
+      h: nearest(rowEdges, bottom) - before.y,
+    });
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('opens the object menu on a right click and arranges the object from it', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    freeShape(store);
+    freeShape(store, { id: 'shape-2', shape: 'oval', x: 60 });
+    const handle = attachSessionIllustrations({ host, store, history });
+    const hostMenu = vi.fn();
+    host.addEventListener('contextmenu', hostMenu);
+    const menu = (): HTMLElement | null =>
+      document.querySelector<HTMLElement>('.fc-ctxmenu--object');
+    const first = host.querySelector<HTMLElement>('[data-illustration-id="shape-1"]');
+    if (!first) throw new Error('missing session illustration overlay');
+
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    first.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(hostMenu).not.toHaveBeenCalled();
+    expect(menu()?.getAttribute('aria-label')).toBe('Rectangle 1');
+    const items = Array.from(
+      menu()?.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item') ?? [],
+    );
+    expect(items.map((item) => [item.textContent, item.disabled])).toEqual([
+      ['Bring to Front', false],
+      ['Send to Back', true],
+    ]);
+    expect(store.getState().ui.selectedObject).toEqual({ id: 'shape-1', name: 'Rectangle 1' });
+
+    items[0]?.click();
+    expect(menu()?.style.display).toBe('none');
+    expect(store.getState().illustrations.illustrations.map((item) => item.id)).toEqual([
+      'shape-2',
+      'shape-1',
+    ]);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().illustrations.illustrations.map((item) => item.id)).toEqual([
+      'shape-1',
+      'shape-2',
+    ]);
+
+    const second = host.querySelector<HTMLElement>('[data-illustration-id="shape-2"]');
+    if (!second) throw new Error('missing second overlay');
+    fireKey(second, 'F10', { shiftKey: true });
+    expect(menu()?.style.display).toBe('block');
+    expect(menu()?.getAttribute('aria-label')).toBe('Oval 1');
+
+    host.removeEventListener('contextmenu', hostMenu);
+    handle.detach();
+    expect(menu()).toBeNull();
     host.remove();
   });
 

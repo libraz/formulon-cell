@@ -48,6 +48,29 @@ export const resizedFrame = (
   };
 };
 
+/** `frame` with the edges `handle` drags moved to their nearest gridlines. */
+const snappedFrame = (
+  frame: DrawingFrame,
+  handle: DrawingHandle,
+  snap: (axis: 'x' | 'y', value: number) => number,
+  min: { w: number; h: number },
+): DrawingFrame => {
+  let { x, y, w, h } = frame;
+  if (handle.endsWith('e')) w = Math.max(min.w, snap('x', x + w) - x);
+  if (handle.endsWith('w')) {
+    const right = x + w;
+    x = Math.min(snap('x', x), right - min.w);
+    w = right - x;
+  }
+  if (handle.startsWith('s')) h = Math.max(min.h, snap('y', y + h) - y);
+  if (handle.startsWith('n')) {
+    const bottom = y + h;
+    y = Math.min(snap('y', y), bottom - min.h);
+    h = bottom - y;
+  }
+  return { x, y, w, h };
+};
+
 /** Append the eight sizing handles to `panel`; the stylesheet shows them
  *  only while the object is selected. */
 export const appendDrawingHandles = (
@@ -81,6 +104,8 @@ export const trackFrameDrag = (
     min: { w: number; h: number };
     /** Whether a corner keeps the frame's shape for this pointer state. */
     keepRatio: (move: PointerEvent) => boolean;
+    /** The gridline nearest a value; with Alt held the dragged edges snap to it. */
+    snap?: (axis: 'x' | 'y', value: number) => number;
     preview: (patch: Partial<DrawingFrame>) => void;
     commit: (patch: Partial<DrawingFrame>) => void;
   },
@@ -94,10 +119,15 @@ export const trackFrameDrag = (
     const dy = move.clientY - startY;
     if (!latest && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
     move.preventDefault();
+    const snap = move.altKey ? options.snap : undefined;
     if (!handle) {
-      latest = { x: start.x + dx, y: start.y + dy };
+      const x = start.x + dx;
+      const y = start.y + dy;
+      // Like the spreadsheet, Alt docks the object's top-left corner to a cell.
+      latest = snap ? { x: snap('x', x), y: snap('y', y) } : { x, y };
     } else {
-      const frame = resizedFrame(start, handle, dx, dy, options.keepRatio(move), options.min);
+      let frame = resizedFrame(start, handle, dx, dy, options.keepRatio(move), options.min);
+      if (snap) frame = snappedFrame(frame, handle, snap, options.min);
       latest = {
         ...(frame.x === start.x ? {} : { x: frame.x }),
         ...(frame.y === start.y ? {} : { y: frame.y }),

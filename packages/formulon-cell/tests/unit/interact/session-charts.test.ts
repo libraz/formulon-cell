@@ -2326,6 +2326,85 @@ describe('attachSessionCharts', () => {
     expect(store.getState().ui.selectedObject).toBeNull();
   });
 
+  const fireContextMenu = (target: EventTarget, clientX = 120, clientY = 140): MouseEvent => {
+    const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX, clientY });
+    target.dispatchEvent(e);
+    return e;
+  };
+  const objectMenu = (): HTMLElement | null =>
+    document.querySelector<HTMLElement>('.fc-ctxmenu--object');
+  const menuItems = (): { id: string | undefined; label: string | null; disabled: boolean }[] =>
+    Array.from(objectMenu()?.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item') ?? []).map(
+      (item) => ({ id: item.dataset.fcAction, label: item.textContent, disabled: item.disabled }),
+    );
+
+  it('opens the chart menu on a right click instead of the cell menu', () => {
+    salesTable();
+    const second = create(range(0, 0, 2, 2), { kind: 'line', seriesDirection: 'columns' });
+    const handle = attach({ labels: { objectName: 'グラフ {n}' } });
+    const hostMenu = vi.fn();
+    host.addEventListener('contextmenu', hostMenu);
+    const [back, front] = Array.from(host.querySelectorAll<HTMLElement>('.fc-chart'));
+    if (!back || !front) throw new Error('missing charts');
+
+    const event = fireContextMenu(back);
+    expect(event.defaultPrevented).toBe(true);
+    expect(hostMenu).not.toHaveBeenCalled();
+    expect(objectMenu()?.style.display).toBe('block');
+    expect(objectMenu()?.getAttribute('aria-label')).toBe('グラフ 1');
+    expect(menuItems()).toEqual([
+      { id: 'changeChartType', label: 'Change Chart Type...', disabled: false },
+      { id: 'selectData', label: 'Select Data...', disabled: false },
+      { id: 'bringToFront', label: 'Bring to Front', disabled: false },
+      { id: 'sendToBack', label: 'Send to Back', disabled: true },
+      { id: 'formatChartArea', label: 'Format Chart Area...', disabled: false },
+    ]);
+    expect(store.getState().ui.selectedObject?.name).toBe('グラフ 1');
+    expect(document.activeElement?.textContent).toBe('Change Chart Type...');
+
+    objectMenu()?.querySelector<HTMLButtonElement>('[data-fc-action="bringToFront"]')?.click();
+    expect(objectMenu()?.style.display).toBe('none');
+    expect(
+      store
+        .getState()
+        .charts.charts.map((chart) => chart.id)
+        .at(-1),
+    ).not.toBe(second.id);
+    expect(wb.listDrawingObjects(0).at(-1)?.objectId).not.toBe(second.nativeObjectId);
+    expect(history.undo()).toBe(true);
+    expect(
+      store
+        .getState()
+        .charts.charts.map((chart) => chart.id)
+        .at(-1),
+    ).toBe(second.id);
+
+    host.removeEventListener('contextmenu', hostMenu);
+    handle.detach();
+    expect(objectMenu()).toBeNull();
+  });
+
+  it('opens settings from the chart menu and closes the menu with Escape', () => {
+    salesTable();
+    const handle = attach();
+    fireKey(panel(), 'F10', { shiftKey: true });
+    expect(objectMenu()?.style.display).toBe('block');
+    const escaped = fireKey(document.activeElement ?? panel(), 'Escape');
+    expect(escaped.defaultPrevented).toBe(true);
+    expect(objectMenu()?.style.display).toBe('none');
+    expect(document.activeElement).toBe(panel());
+    expect(panel().classList.contains('fc-chart--selected')).toBe(true);
+
+    fireContextMenu(panel());
+    objectMenu()?.querySelector<HTMLButtonElement>('[data-fc-action="selectData"]')?.click();
+    expect(host.querySelector('.fc-chart-settings')).not.toBeNull();
+    expect(
+      host.querySelector('#fc-chart-settings-tab-filters')?.getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(panel().classList.contains('fc-chart--selected')).toBe(true);
+    handle.detach();
+  });
+
   it('names the selected chart for the name box and releases it when left', () => {
     salesTable();
     const handle = attach({ labels: { objectName: 'グラフ {n}' } });

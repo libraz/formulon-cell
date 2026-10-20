@@ -13,6 +13,8 @@ versioning is [SemVer](https://semver.org/).
 - Double-clicking a chart opens its settings, and Escape or a press outside the chart deselects it.
 - A selected chart, picture or shape takes the place of the cell selection: the name box shows its name the way the spreadsheet numbers objects (`Chart 1`, `Picture 1`, `Oval 2`), the formula bar is empty, and the cell cursor, range shading, fill handle and header highlight are hidden. The selection is published as `state.ui.selectedObject`. `sessionCharts` strings gain `objectName`.
 - Pictures and shapes have their own `sessionIllustrations` strings, with the spreadsheet's object names in all seven locales. `attachSessionIllustrations` takes them as `labels` and its handle gains `setLabels`.
+- Right-clicking a chart, picture or shape opens its own menu instead of the cell menu, also from Shift+F10 or the context-menu key. A chart's menu offers Change Chart Type, Select Data and Format Chart Area, which open the matching settings tab, and every object can be brought to the front or sent to the back. `arrangeSessionChart` reorders a chart among its sheet's charts as one undo step. `sessionCharts` strings gain `changeChartType`, `selectData`, `formatChartArea`, `bringToFront` and `sendToBack`; `sessionIllustrations` strings gain `bringToFront` and `sendToBack`.
+- Holding Alt while moving or sizing a chart, picture or shape docks the dragged edges to the nearest gridlines.
 - Typed error literals such as `#N/A` and `#DIV/0!` are stored as error values, with the German and French spellings in those locales. `CoercedInput` gains an `error` kind.
 
 ### Changed

@@ -90,6 +90,55 @@ export const placementForAnchor = (
   };
 };
 
+type ViewLayoutOf = ReturnType<typeof layoutForView>;
+type ViewportOf = ReturnType<SpreadsheetStore['getState']>['viewport'];
+
+/** The column whose grid pixels hold `x`, clamped to the sheet. */
+const colAtX = (layout: ViewLayoutOf, viewport: ViewportOf, x: number, zoom: number): number => {
+  const origin = cellRectUnclamped(layout, viewport, 0, 0);
+  let col = Math.max(0, Math.floor((x - origin.x) / Math.max(1, layout.defaultColWidth * zoom)));
+  col = Math.min(16_383, col);
+  for (let i = 0; i < 16_384; i += 1) {
+    const rect = cellRectUnclamped(layout, viewport, 0, col);
+    if (x < rect.x) col = Math.max(0, col - 1);
+    else if (x >= rect.x + rect.w) col = Math.min(16_383, col + 1);
+    else break;
+  }
+  return col;
+};
+
+/** The row whose grid pixels hold `y`, clamped to the sheet. */
+const rowAtY = (layout: ViewLayoutOf, viewport: ViewportOf, y: number, zoom: number): number => {
+  const origin = cellRectUnclamped(layout, viewport, 0, 0);
+  let row = Math.max(0, Math.floor((y - origin.y) / Math.max(1, layout.defaultRowHeight * zoom)));
+  row = Math.min(1_048_575, row);
+  for (let i = 0; i < 1_048_576; i += 1) {
+    const rect = cellRectUnclamped(layout, viewport, row, 0);
+    if (y < rect.y) row = Math.max(0, row - 1);
+    else if (y >= rect.y + rect.h) row = Math.min(1_048_575, row + 1);
+    else break;
+  }
+  return row;
+};
+
+/** The gridline nearest `value` on `axis`, for objects dragged with Alt. */
+export const nearestGridline = (
+  store: SpreadsheetStore,
+  axis: 'x' | 'y',
+  value: number,
+): number => {
+  const state = store.getState();
+  const layout = layoutForView(state);
+  const zoom = viewportZoom(store);
+  const rect =
+    axis === 'x'
+      ? cellRectUnclamped(layout, state.viewport, 0, colAtX(layout, state.viewport, value, zoom))
+      : cellRectUnclamped(layout, state.viewport, rowAtY(layout, state.viewport, value, zoom), 0);
+  const start = axis === 'x' ? rect.x : rect.y;
+  const end = start + (axis === 'x' ? rect.w : rect.h);
+  return value - start <= end - value ? start : end;
+};
+
 /** `anchor` moved and resized to grid pixels; omitted values keep the anchor's. */
 export const placementForPixels = (
   store: SpreadsheetStore | undefined,
@@ -124,35 +173,13 @@ export const placementForPixels = (
     let rowOffEmu = anchor.fromRowOff;
     if (patch.x !== undefined) {
       const targetX = patch.x;
-      const origin = cellRectUnclamped(layout, state.viewport, 0, 0);
-      col = Math.max(
-        0,
-        Math.floor((targetX - origin.x) / Math.max(1, layout.defaultColWidth * zoom)),
-      );
-      col = Math.min(16_383, col);
-      for (let i = 0; i < 16_384; i += 1) {
-        const rect = cellRectUnclamped(layout, state.viewport, 0, col);
-        if (targetX < rect.x) col = Math.max(0, col - 1);
-        else if (targetX >= rect.x + rect.w) col = Math.min(16_383, col + 1);
-        else break;
-      }
+      col = colAtX(layout, state.viewport, targetX, zoom);
       const rect = cellRectUnclamped(layout, state.viewport, 0, col);
       colOffEmu = Math.max(0, Math.round(((targetX - rect.x) / zoom) * EMU_PER_PX));
     }
     if (patch.y !== undefined) {
       const targetY = patch.y;
-      const origin = cellRectUnclamped(layout, state.viewport, 0, 0);
-      row = Math.max(
-        0,
-        Math.floor((targetY - origin.y) / Math.max(1, layout.defaultRowHeight * zoom)),
-      );
-      row = Math.min(1_048_575, row);
-      for (let i = 0; i < 1_048_576; i += 1) {
-        const rect = cellRectUnclamped(layout, state.viewport, row, 0);
-        if (targetY < rect.y) row = Math.max(0, row - 1);
-        else if (targetY >= rect.y + rect.h) row = Math.min(1_048_575, row + 1);
-        else break;
-      }
+      row = rowAtY(layout, state.viewport, targetY, zoom);
       const rect = cellRectUnclamped(layout, state.viewport, row, 0);
       rowOffEmu = Math.max(0, Math.round(((targetY - rect.y) / zoom) * EMU_PER_PX));
     }

@@ -7,6 +7,7 @@ import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
   addSessionChartSeries,
+  arrangeSessionChart,
   canMutateChart,
   clearSessionChart,
   removeSessionChartSeries,
@@ -17,6 +18,7 @@ import {
 import {
   ANCHOR_KIND_ABSOLUTE,
   drawingClipPath,
+  nearestGridline,
   placementForPixels,
   sessionPosition,
 } from '../engine/drawing-geometry.js';
@@ -35,6 +37,7 @@ import {
   previewFrame,
   trackFrameDrag,
 } from './drawing-frame.js';
+import { createObjectMenu, type ObjectMenuEntry } from './object-menu.js';
 import { formatSessionChartValue } from './session-chart-format.js';
 import {
   type ChartValueFormatter,
@@ -43,6 +46,7 @@ import {
   type SessionChartSettingsHandle,
   type SessionChartSettingsLabels,
   type SessionChartSettingsShape,
+  type SettingsTab,
 } from './session-chart-settings.js';
 
 export interface SessionChartsHandle {
@@ -62,6 +66,12 @@ export interface SessionChartLabels extends Partial<SessionChartSettingsLabels> 
   pointValue: string;
   /** The name box text for a selected chart; `{n}` is its number on the sheet. */
   objectName: string;
+  /** The chart's right-click menu. */
+  changeChartType: string;
+  selectData: string;
+  formatChartArea: string;
+  bringToFront: string;
+  sendToBack: string;
   columnChart: string;
   barChart: string;
   lineChart: string;
@@ -94,6 +104,11 @@ const DEFAULT_LABELS: SessionChartLabels = {
   pointTooltip: 'Series "{series}" Point "{point}"',
   pointValue: 'Value: {value}',
   objectName: 'Chart {n}',
+  changeChartType: 'Change Chart Type...',
+  selectData: 'Select Data...',
+  formatChartArea: 'Format Chart Area...',
+  bringToFront: 'Bring to Front',
+  sendToBack: 'Send to Back',
   columnChart: 'Column chart',
   barChart: 'Bar chart',
   lineChart: 'Line chart',
@@ -371,9 +386,11 @@ export function attachSessionCharts(deps: {
   };
 
   /** Whether `target` is part of a chart or its settings, which keep the chart selected. */
+  const menu = createObjectMenu(host);
   const insideCharts = (target: EventTarget | null): boolean =>
     target instanceof Node &&
     (root.contains(target) ||
+      menu.contains(target) ||
       (target instanceof Element && target.closest('.fc-chart-settings') !== null));
 
   // Like Excel, a press anywhere else on the sheet leaves the chart.
@@ -421,11 +438,74 @@ export function attachSessionCharts(deps: {
       start: sessionPosition(store, chart.nativeAnchor),
       ...(handle ? { handle } : {}),
       min: { w: MIN_W, h: MIN_H },
+      snap: (axis, value) => nearestGridline(store, axis, value),
       keepRatio: (move) => move.shiftKey,
       preview: (patch) => previewFrame(panel, patch),
       commit: (patch) => {
         if (!placeChart(chart, patch)) render();
       },
+    });
+  };
+
+  /** Open the settings surface on `tab`, beside the chart's buttons. */
+  const openSettings = (chart: SessionChart, panel: HTMLElement, tab: SettingsTab): void => {
+    const anchor = panel.querySelector<HTMLElement>(`[data-chart-settings-tab="${tab}"]`);
+    if (anchor && isDrawable(chart)) settings.open(chart, chart.data, anchor, tab);
+  };
+
+  /** The chart's right-click menu, in the spreadsheet's order. */
+  const openMenu = (chart: SessionChart, panel: HTMLElement, x: number, y: number): void => {
+    const state = store.getState();
+    const sheetCharts = state.charts.charts.filter((entry) => entry.sheet === chart.sheet);
+    const rank = sheetCharts.findIndex((entry) => entry.id === chart.id);
+    const arrangeable = chartWorkbook() !== null && canEditChart(chart);
+    const arrange = (action: 'bring-front' | 'send-back'): void => {
+      const wb = chartWorkbook();
+      if (wb) arrangeSessionChart(store, chart.id, action, history, wb);
+    };
+    const entries: ObjectMenuEntry[] = [];
+    if (isDrawable(chart)) {
+      entries.push(
+        {
+          id: 'changeChartType',
+          label: labels.changeChartType,
+          run: () => openSettings(chart, panel, 'elements'),
+        },
+        {
+          id: 'selectData',
+          label: labels.selectData,
+          run: () => openSettings(chart, panel, 'filters'),
+        },
+        { separator: true },
+      );
+    }
+    entries.push(
+      {
+        id: 'bringToFront',
+        label: labels.bringToFront,
+        disabled: !arrangeable || rank === sheetCharts.length - 1,
+        run: () => arrange('bring-front'),
+      },
+      {
+        id: 'sendToBack',
+        label: labels.sendToBack,
+        disabled: !arrangeable || rank === 0,
+        run: () => arrange('send-back'),
+      },
+    );
+    if (isDrawable(chart)) {
+      entries.push(
+        { separator: true },
+        {
+          id: 'formatChartArea',
+          label: labels.formatChartArea,
+          run: () => openSettings(chart, panel, 'styles'),
+        },
+      );
+    }
+    menu.open(x, y, entries, {
+      label: chartObjectName(state, chart, labels),
+      restoreFocusTo: panel,
     });
   };
 
@@ -442,6 +522,12 @@ export function attachSessionCharts(deps: {
       return;
     }
     selectChart(chart.id, panel);
+    if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+      e.preventDefault();
+      const rect = panel.getBoundingClientRect();
+      openMenu(chart, panel, rect.left + 8, rect.top + 8);
+      return;
+    }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       removeChart(chart);
@@ -577,6 +663,13 @@ export function attachSessionCharts(deps: {
         applyDrag(e, chart, panel);
       });
       panel.addEventListener('keydown', (e) => applyKeyboard(e, chart, panel));
+      // The object's own menu, not the cell menu under it.
+      panel.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectChart(chart.id, panel);
+        openMenu(chart, panel, e.clientX, e.clientY);
+      });
 
       const svg = document.createElementNS(SVG_NS, 'svg');
       svg.classList.add('fc-chart__plot');
@@ -685,6 +778,7 @@ export function attachSessionCharts(deps: {
       unsubscribe();
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
       root.removeEventListener('focusout', onFocusOut);
+      menu.detach();
       selectedId = null;
       syncSelection();
       unsubscribeController();

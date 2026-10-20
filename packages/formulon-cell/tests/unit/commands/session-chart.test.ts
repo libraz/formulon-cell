@@ -12,6 +12,7 @@ import { viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import {
   addSessionChartSeries,
+  arrangeSessionChart,
   clearSessionChart,
   clearSessionChartsInRange,
   createRibbonChartFromSelection,
@@ -104,6 +105,34 @@ describe('session chart commands', () => {
       ],
     });
     expect(listSessionCharts(store.getState())).toEqual([chart]);
+  });
+
+  it('brings a chart to the front or sends it back, as one undo step', () => {
+    const charts = [0, 1, 2].map((index) =>
+      createSessionChart(store, range(0, 0, 3, 2), { wb, anchor: { row: index * 4, col: 6 } }),
+    );
+    const [first, second, third] = charts;
+    if (!first || !second || !third) throw new Error('charts were not created');
+    const order = (): number[] => listSessionCharts(store.getState()).map((c) => c.nativeObjectId);
+    expect(order()).toEqual([first, second, third].map((c) => c.nativeObjectId));
+
+    expect(arrangeSessionChart(store, first.id, 'bring-front', history, wb)).not.toBeNull();
+    expect(order()).toEqual([second, third, first].map((c) => c.nativeObjectId));
+    expect(engineChartIds(wb)).toEqual(order());
+    expect(arrangeSessionChart(store, first.id, 'bring-front', history, wb)).toBeNull();
+
+    expect(arrangeSessionChart(store, third.id, 'send-back', history, wb)).not.toBeNull();
+    expect(order()).toEqual([third, second, first].map((c) => c.nativeObjectId));
+
+    expect(history.undo()).toBe(true);
+    expect(order()).toEqual([second, third, first].map((c) => c.nativeObjectId));
+    expect(history.undo()).toBe(true);
+    expect(order()).toEqual([first, second, third].map((c) => c.nativeObjectId));
+    expect(history.redo()).toBe(true);
+    expect(engineChartIds(wb)).toEqual([second, third, first].map((c) => c.nativeObjectId));
+
+    setProtectedSheet(store, 0, true);
+    expect(arrangeSessionChart(store, second.id, 'bring-front', history, wb)).toBeNull();
   });
 
   it('centres Excel’s default frame in the visible grid unless an anchor is given', () => {

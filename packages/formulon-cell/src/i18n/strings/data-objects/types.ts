@@ -261,6 +261,12 @@ export interface DataObjectsStrings {
     pointValue: string;
     /** The name box text for a selected chart; `{n}` is its number on the sheet. */
     objectName: string;
+    /** Right-click menu of a chart. */
+    changeChartType: string;
+    selectData: string;
+    formatChartArea: string;
+    bringToFront: string;
+    sendToBack: string;
     columnChart: string;
     barChart: string;
     lineChart: string;
@@ -416,6 +422,9 @@ export interface DataObjectsStrings {
     diamondName: string;
     lineName: string;
     arrowName: string;
+    /** Right-click menu of a picture or shape. */
+    bringToFront: string;
+    sendToBack: string;
   };
   slicer: {
     /** Default panel header used when no column is bound yet. */

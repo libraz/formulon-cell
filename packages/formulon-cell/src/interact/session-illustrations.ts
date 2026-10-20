@@ -1,10 +1,11 @@
 import type { History } from '../commands/history.js';
 import type { IllustrationMutationAuthorization } from '../commands/session-illustration.js';
 import {
+  arrangeSessionIllustration,
   clearSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
-import { drawingClipPath, sessionPosition } from '../engine/drawing-geometry.js';
+import { drawingClipPath, nearestGridline, sessionPosition } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { SessionShapeKind, State } from '../store/types.js';
@@ -17,6 +18,7 @@ import {
   previewFrame,
   trackFrameDrag,
 } from './drawing-frame.js';
+import { createObjectMenu } from './object-menu.js';
 
 export interface SessionIllustrationsHandle {
   refresh(): void;
@@ -38,6 +40,9 @@ export interface SessionIllustrationLabels {
   diamondName: string;
   lineName: string;
   arrowName: string;
+  /** The object's right-click menu. */
+  bringToFront: string;
+  sendToBack: string;
 }
 
 const DEFAULT_LABELS: SessionIllustrationLabels = {
@@ -51,6 +56,8 @@ const DEFAULT_LABELS: SessionIllustrationLabels = {
   diamondName: 'Diamond {n}',
   lineName: 'Straight Connector {n}',
   arrowName: 'Straight Arrow Connector {n}',
+  bringToFront: 'Bring to Front',
+  sendToBack: 'Send to Back',
 };
 
 const SHAPE_NAME_LABEL: Record<SessionShapeKind, keyof SessionIllustrationLabels> = {
@@ -248,14 +255,18 @@ export function attachSessionIllustrations(deps: {
     refreshSelection();
   };
 
+  const menu = createObjectMenu(host);
+  /** Whether `target` is part of an object or its menu, which keep it selected. */
+  const insideObjects = (target: EventTarget | null): boolean =>
+    target instanceof Node && (root.contains(target) || menu.contains(target));
+
   // Like Excel, a press anywhere else on the sheet leaves the object.
   const onDocumentPointerDown = (e: PointerEvent): void => {
-    if (!(e.target instanceof Node && root.contains(e.target))) deselect();
+    if (!insideObjects(e.target)) deselect();
   };
   document.addEventListener('pointerdown', onDocumentPointerDown, true);
   const onFocusOut = (e: FocusEvent): void => {
-    const next = e.relatedTarget;
-    if (next !== null && !(next instanceof Node && root.contains(next))) deselect();
+    if (e.relatedTarget !== null && !insideObjects(e.relatedTarget)) deselect();
   };
   root.addEventListener('focusout', onFocusOut);
 
@@ -296,6 +307,7 @@ export function attachSessionIllustrations(deps: {
       start: renderedPosition(store, item),
       ...(handle ? { handle } : {}),
       min: { w: MIN_W, h: MIN_H },
+      snap: (axis, value) => nearestGridline(store, axis, value),
       // Excel locks a picture's aspect ratio; a shape keeps it with Shift.
       keepRatio: (move) => item.kind === 'image' || move.shiftKey,
       preview: (patch) => previewFrame(panel, patch),
@@ -307,11 +319,56 @@ export function attachSessionIllustrations(deps: {
     });
   };
 
+  /** The object's right-click menu, in the spreadsheet's order. */
+  const openMenu = (item: SessionIllustration, panel: HTMLElement, x: number, y: number): void => {
+    const state = store.getState();
+    const sheetItems = state.illustrations.illustrations.filter(
+      (entry) => entry.sheet === item.sheet,
+    );
+    const rank = sheetItems.indexOf(item);
+    const arrange = (action: 'bring-front' | 'send-back'): void => {
+      arrangeSessionIllustration(
+        store,
+        item.id,
+        action,
+        history,
+        illustrationAuthorization('sessionIllustration.arrange'),
+        getWb() ?? undefined,
+      );
+    };
+    const editable = isEditable(item);
+    menu.open(
+      x,
+      y,
+      [
+        {
+          id: 'bringToFront',
+          label: labels.bringToFront,
+          disabled: !editable || rank === sheetItems.length - 1,
+          run: () => arrange('bring-front'),
+        },
+        {
+          id: 'sendToBack',
+          label: labels.sendToBack,
+          disabled: !editable || rank === 0,
+          run: () => arrange('send-back'),
+        },
+      ],
+      { label: objectName(state, item, labels), restoreFocusTo: panel },
+    );
+  };
+
   const applyKeyboard = (event: KeyboardEvent, item: SessionIllustration, panel: HTMLElement) => {
     if (event.key === 'Escape') {
       event.preventDefault();
       deselect();
       host.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+      event.preventDefault();
+      const rect = panel.getBoundingClientRect();
+      openMenu(item, panel, rect.left + 8, rect.top + 8);
       return;
     }
     if (!isEditable(item)) return;
@@ -408,6 +465,13 @@ export function attachSessionIllustrations(deps: {
         applyDrag(event, item, panel);
       });
       panel.addEventListener('keydown', (event) => applyKeyboard(event, item, panel));
+      // The object's own menu, not the cell menu under it.
+      panel.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        select(item.id, panel);
+        openMenu(item, panel, event.clientX, event.clientY);
+      });
 
       if (item.kind === 'image') {
         appendImage(panel, item);
@@ -446,6 +510,7 @@ export function attachSessionIllustrations(deps: {
       unsubscribe();
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
       root.removeEventListener('focusout', onFocusOut);
+      menu.detach();
       selectedId = null;
       syncSelection();
       root.remove();
