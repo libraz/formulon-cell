@@ -360,8 +360,10 @@ export async function runTableOrganizationScenario(page: Page): Promise<void> {
     await page.keyboard.press('Enter');
     await expectValue(sp, 'D6', { kind: 'text', value: 'Product' });
     await expectValue(sp, 'E6', { kind: 'number', value: 10 });
+    // The pasted block stays selected with D6 active, so Enter moves down inside it.
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('textbox', { name: 'Name box', exact: true })).toHaveValue('E8');
+    await expect(page.getByRole('textbox', { name: 'Name box', exact: true })).toHaveValue('D7');
+    await expectValue(sp, 'D8', { kind: 'blank' });
     await expectValue(sp, 'E8', { kind: 'blank' });
   });
   await sp.expectNoConsoleErrors();

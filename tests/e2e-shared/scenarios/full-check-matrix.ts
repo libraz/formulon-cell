@@ -237,6 +237,7 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
         pasteSpecial: string;
         insertCopiedCells: string;
       };
+      macContextMenu: { pasteSpecial: string };
       pasteSpecialDialog: { title: string; cancel: string };
       insertCopiedCellsDialog: { title: string; cancel: string };
       pasteOptions: {
@@ -275,7 +276,11 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       contextTitle: strings.contextMenu.title,
       copy: strings.contextMenu.copy,
       paste: strings.contextMenu.paste,
-      pasteSpecial: strings.contextMenu.pasteSpecial,
+      // The Mac menu opens Paste Special as a submenu, so its label has no ellipsis.
+      pasteSpecial:
+        document.querySelector<HTMLElement>('.fc-host')?.dataset.fcPlatform === 'mac'
+          ? strings.macContextMenu.pasteSpecial
+          : strings.contextMenu.pasteSpecial,
       insertCopiedCells: strings.contextMenu.insertCopiedCells,
       pasteSpecialTitle: strings.pasteSpecialDialog.title,
       pasteCancel: strings.pasteSpecialDialog.cancel,
