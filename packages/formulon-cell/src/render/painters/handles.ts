@@ -1,38 +1,40 @@
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import { mirrorInRect, type Rect } from '../geometry.js';
+import type { Rect } from '../geometry.js';
 
-/** Active cell outline. Drawn in a separate pass after all cell text so the
- *  outline never gets clipped by neighbouring cell rects.
+/** Selection outline shared by the active cell and a multi-cell range.
  *
- *  Desktop spreadsheets paint the active cell with a crisp ~2px green border and no
- *  inner fill or outer halo. */
-export function paintActiveCellOutline(
+ *  Desktop spreadsheets paint a crisp 2px accent border that covers the
+ *  range's own gridlines plus one pixel outside them, so no gridline shows
+ *  between the border and the neighbouring cells. Drawn in a separate pass
+ *  after all cell text so neighbouring cell rects never clip it. */
+export function paintSelectionOutline(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
 ): void {
+  const left = Math.round(bounds.x);
+  const top = Math.round(bounds.y);
   ctx.save();
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 2;
   ctx.setLineDash([]);
   ctx.strokeRect(
-    Math.round(bounds.x) + 1,
-    Math.round(bounds.y) + 1,
-    Math.max(0, Math.round(bounds.w) - 2),
-    Math.max(0, Math.round(bounds.h) - 2),
+    left,
+    top,
+    Math.round(bounds.x + bounds.w) + 1 - left,
+    Math.round(bounds.y + bounds.h) + 1 - top,
   );
   ctx.restore();
 }
 
-/** Visible side length of the fill handle in CSS pixels. Desktop spreadsheets use a
- *  small accent-coloured square at the bottom-right of the active selection
- *  range; the user grabs it to drag-fill into adjacent cells. */
-export const FILL_HANDLE_SIZE = 6;
+/** Visible side length of the fill handle in CSS pixels: a 5px accent square
+ *  centred on the selection's trailing bottom gridline intersection. */
+export const FILL_HANDLE_SIZE = 5;
 
-/** Spreadsheet-style fill handle. Drawn at the selection range's bottom-right
- *  corner (or active-cell corner when selection is a single cell). The square
- *  is filled in `theme.accent` (resolves from `--fc-accent`, falls back to
- *  `#217346` when unset). */
+/** Spreadsheet-style fill handle at the selection range's trailing bottom
+ *  corner. A 1px white gap separates it from the outline on the two sides
+ *  that face into the selection. Returns the square padded by 1px on every
+ *  side, so the grab zone stays centred on the corner. */
 export function paintFillHandle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
@@ -40,14 +42,14 @@ export function paintFillHandle(
   rtl = false,
 ): Rect {
   const hs = FILL_HANDLE_SIZE;
-  // Centre the visible square on the selection's trailing bottom corner so
-  // half the handle bleeds outside it — matches the spreadsheet convention.
-  const x = mirrorInRect(bounds, bounds.x + bounds.w - hs / 2, hs, rtl);
-  const y = bounds.y + bounds.h - hs / 2;
-  const accent = theme.accent || '#0078d4';
+  const half = Math.floor(hs / 2);
+  const cornerX = Math.round(rtl ? bounds.x : bounds.x + bounds.w);
+  const x = cornerX - half;
+  const y = Math.round(bounds.y + bounds.h) - half;
+  const gapX = rtl ? x : x - 1;
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(x - 1, y - 1, hs + 2, hs + 2);
-  ctx.fillStyle = accent;
+  ctx.fillRect(gapX, y - 1, hs + 1, hs + 1);
+  ctx.fillStyle = theme.accent || '#0078d4';
   ctx.fillRect(x, y, hs, hs);
   return { x: x - 1, y: y - 1, w: hs + 2, h: hs + 2 };
 }

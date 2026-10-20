@@ -47,12 +47,12 @@ import {
 import { sameRectList, trailingRect } from './grid/range-rects.js';
 import { paintTraces } from './grid/traces.js';
 import {
-  paintActiveCellOutline,
   paintChartSourceHighlight,
   paintCopyMarquee,
   paintFillHandle,
   paintFillPreview,
   paintRefHighlight,
+  paintSelectionOutline,
   paintSpillBlocker,
   paintSpillOutline,
   paintValidationChevron,
@@ -540,9 +540,12 @@ export class GridRenderer {
       c1: a.col,
     };
     const activeRects = rangeRects(layout, viewport, activeVisualRange);
-    for (const bounds of activeRects) {
-      paintActiveCellOutline(this.ctx, bounds, theme);
-    }
+    // A multi-cell range carries the one outline; the active cell inside it is
+    // only left unshaded, as in Excel. A merge selected alone is its own range.
+    const multiCell = r.r0 !== r.r1 || r.c0 !== r.c1;
+    const rangeOutline = multiCell ? rangeRects(layout, viewport, r) : activeRects;
+    const outlineRects = sameRectList(activeRects, rangeOutline) ? activeRects : rangeOutline;
+    for (const bounds of outlineRects) paintSelectionOutline(this.ctx, bounds, theme);
 
     const activeAnchor = activeMerge
       ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
@@ -552,24 +555,6 @@ export class GridRenderer {
     if (validationBounds && shouldShowValidationChevron(fmt?.validation)) {
       const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
       setValidationChevron({ rect, row: activeAnchor.row, col: activeAnchor.col });
-    }
-
-    if (r.r0 !== r.r1 || r.c0 !== r.c1) {
-      const rects = rangeRects(layout, viewport, r);
-      // A merged selection already received its full-range active outline
-      // above. Painting the generic range outline over the same rectangle
-      // creates a darker double border, unlike desktop spreadsheets.
-      if (!sameRectList(activeRects, rects)) {
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.strokeStyle = theme.accent;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([]);
-        for (const rect of rects) {
-          ctx.strokeRect(rect.x + 1, rect.y + 1, Math.max(0, rect.w - 2), Math.max(0, rect.h - 2));
-        }
-        ctx.restore();
-      }
     }
 
     const preview = ui.fillPreview;

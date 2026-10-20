@@ -6,11 +6,11 @@ import {
 } from '../../../src/render/painters/text.js';
 import {
   FILL_HANDLE_SIZE,
-  paintActiveCellOutline,
   paintCellBorders,
   paintCellText,
   paintCopyMarquee,
   paintFillHandle,
+  paintSelectionOutline,
   paintTableHeaderChevron,
   stableTextMetricsBox,
   textBaselineY,
@@ -169,33 +169,30 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
   }) as ResolvedTheme;
 
 describe('paintFillHandle', () => {
-  it('exports a 6px size constant', () => {
-    expect(FILL_HANDLE_SIZE).toBe(6);
+  it('exports a 5px size constant', () => {
+    expect(FILL_HANDLE_SIZE).toBe(5);
   });
 
-  it('paints a white border ring then an accent square at the cell corner', () => {
+  it('centres a 5px accent square on the trailing gridline corner with an inner white gap', () => {
     const { ctx, fills } = makeCtxSpy();
-    // Cell rect at (10, 20), size 100×30. Bottom-right corner sits at (110, 50).
-    const bounds = { x: 10, y: 20, w: 100, h: 30 };
-    const hit = paintFillHandle(ctx, bounds, theme({ accent: '#0078d4' }));
+    // Bottom-right gridlines sit at x = 110, y = 50.
+    const hit = paintFillHandle(ctx, { x: 10, y: 20, w: 100, h: 30 }, theme({ accent: '#0078d4' }));
 
-    // Expect two fillRect calls — outer white halo, inner accent square.
     expect(fills).toHaveLength(2);
-    const [halo, square] = fills;
-
-    // Visible square is centred on the bottom-right corner; half-bleeds outside
-    // the cell rect. With FILL_HANDLE_SIZE=6 the inner rect starts at
-    //   x = 10 + 100 - 3 = 107
-    //   y = 20 +  30 - 3 = 47
+    const [gap, square] = fills;
     expect(square?.style).toBe('#0078d4');
-    expect(square?.rect).toEqual([107, 47, 6, 6]);
+    expect(square?.rect).toEqual([108, 48, 5, 5]);
+    // The gap only faces into the selection (top and left).
+    expect(gap?.style).toBe('#ffffff');
+    expect(gap?.rect).toEqual([107, 47, 6, 6]);
+    expect(hit).toEqual({ x: 107, y: 47, w: 7, h: 7 });
+  });
 
-    // Halo wraps the square with a 1px white border.
-    expect(halo?.style).toBe('#ffffff');
-    expect(halo?.rect).toEqual([106, 46, 8, 8]);
-
-    // Returned hit-rect spans the visible (halo) area for comfortable grabbing.
-    expect(hit).toEqual({ x: 106, y: 46, w: 8, h: 8 });
+  it('snaps fractional bounds and mirrors the gap in a right-to-left sheet', () => {
+    const { ctx, fills } = makeCtxSpy();
+    paintFillHandle(ctx, { x: 10.4, y: 20.4, w: 100, h: 29.8 }, theme({ accent: '#0078d4' }), true);
+    expect(fills[1]?.rect).toEqual([8, 48, 5, 5]);
+    expect(fills[0]?.rect).toEqual([8, 47, 6, 6]);
   });
 
   it('falls back to #0078d4 when theme.accent is empty', () => {
@@ -277,16 +274,17 @@ describe('paintCellBorders', () => {
   });
 });
 
-describe('paintActiveCellOutline', () => {
-  it('snaps the 2px active outline inside the cell bounds', () => {
+describe('paintSelectionOutline', () => {
+  it('covers the range gridlines plus one pixel outside them', () => {
     const { ctx, rects } = makeStrokeSpy();
-    paintActiveCellOutline(
+    // Gridlines snap to x = 10 / 91 and y = 21 / 45.
+    paintSelectionOutline(
       ctx,
       { x: 10.2, y: 20.7, w: 80.4, h: 24.2 },
       theme({ accent: '#107c41' }),
     );
 
-    expect(rects).toEqual([{ x: 11, y: 22, w: 78, h: 22, width: 2 }]);
+    expect(rects).toEqual([{ x: 10, y: 21, w: 82, h: 25, width: 2 }]);
   });
 });
 

@@ -186,11 +186,12 @@ describe('GridRenderer merged selection parity', () => {
     const { view } = viewParts(state);
     const [mergeRect] = rangeRects(view.layout, view.viewport, state.selection.range);
     if (!mergeRect) throw new Error('expected the merged range to be visible');
+    // The outline covers the merge's gridlines plus one pixel outside them.
     expect(spy.strokeRects[0]).toEqual([
-      mergeRect.x + 1,
-      mergeRect.y + 1,
-      mergeRect.w - 2,
-      mergeRect.h - 2,
+      mergeRect.x,
+      mergeRect.y,
+      mergeRect.w + 1,
+      mergeRect.h + 1,
     ]);
     // The selection outline is the same rectangle and must not be painted a
     // second time over the active merge outline. The chevron adds one stroke.
@@ -198,9 +199,25 @@ describe('GridRenderer merged selection parity', () => {
     expect(getValidationChevron()).toMatchObject({ row: 1, col: 1 });
     expect(getValidationChevron()?.rect.x).toBe(mergeRect.x + mergeRect.w - 18);
     expect(getFillHandleRect()).toMatchObject({
-      x: mergeRect.x + mergeRect.w - 4,
-      y: mergeRect.y + mergeRect.h - 4,
+      x: mergeRect.x + mergeRect.w - 3,
+      y: mergeRect.y + mergeRect.h - 3,
     });
+  });
+
+  it('outlines a multi-cell range once and leaves the active cell without its own outline', () => {
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    mutators.extendRangeTo(store, { sheet: 0, row: 4, col: 3 });
+    const state = store.getState();
+    const spy = canvasSpy();
+    const renderer = makeRenderer(state, spy);
+
+    paintActive(renderer, state);
+
+    const { view } = viewParts(state);
+    const [rangeRect] = rangeRects(view.layout, view.viewport, state.selection.range);
+    if (!rangeRect) throw new Error('expected the range to be visible');
+    expect(spy.strokeRects).toEqual([[rangeRect.x, rangeRect.y, rangeRect.w + 1, rangeRect.h + 1]]);
   });
 
   it('clears an inactive unfilled merge before content painting', () => {

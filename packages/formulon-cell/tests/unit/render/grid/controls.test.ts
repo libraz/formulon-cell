@@ -49,17 +49,16 @@ describe('render/grid/controls — painter → cache → hit-zone contract', () 
       const cell = { x: 100, y: 60, w: 80, h: 20 };
       const hit = paintFillHandle(ctx, cell, theme());
 
-      // The visible square is FILL_HANDLE_SIZE (6) centered on the cell's
-      // bottom-right corner. The returned rect adds the 1px white border ring
-      // on each side -> 8x8 starting one pixel earlier.
+      // The visible square is FILL_HANDLE_SIZE (5) centred on the cell's
+      // bottom-right gridline corner; the returned rect pads it by 1px.
       const hs = FILL_HANDLE_SIZE;
       const cornerX = cell.x + cell.w; // 180
       const cornerY = cell.y + cell.h; // 80
       expect(hit).toEqual({
-        x: cornerX - hs / 2 - 1, // 176
-        y: cornerY - hs / 2 - 1, // 76
-        w: hs + 2, // 8
-        h: hs + 2, // 8
+        x: cornerX - Math.floor(hs / 2) - 1, // 177
+        y: cornerY - Math.floor(hs / 2) - 1, // 77
+        w: hs + 2, // 7
+        h: hs + 2, // 7
       });
     });
 
