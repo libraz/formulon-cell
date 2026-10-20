@@ -179,9 +179,10 @@
   margin: 0 0 0 2px;
 }
 
-/* The large Paste tile also owns a split chevron. Keep its content inside
- * the 66px Excel tile instead of allowing the icon to overflow when the
- * label occupies two lines. */
+/* The large Paste tile also owns a split chevron, which Excel for Mac puts
+ * beside the icon rather than under the label. Keep its content inside the
+ * 66px Excel tile instead of allowing the icon to overflow when the label
+ * occupies two lines. */
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--clipboard .fc-tb__rb--large {
   position: relative;
   box-sizing: border-box;
@@ -197,6 +198,7 @@
   .fc-tb__ribbon-group--clipboard
   .fc-tb__rb--large
   .fc-tb__rb-icon {
+  align-self: flex-start;
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
@@ -219,9 +221,13 @@
   .fc-tb__rb--large
   > .fc-tb__rb-split-chevron {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
+  /* Right of the start-aligned 32px icon, centred on it vertically. */
+  top: 19px;
+  right: auto;
+  bottom: auto;
+  left: 36px;
   margin: 0;
+  transform: translateY(-50%);
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--font .fc-tb__ribbon-tools {
