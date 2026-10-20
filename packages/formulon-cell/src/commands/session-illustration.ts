@@ -386,6 +386,16 @@ export function createSessionImage(
   return persistedItem;
 }
 
+/** Select a picture or shape the ribbon inserted, as the spreadsheet does;
+ *  the overlay showing it names it. */
+const selectInserted = (
+  store: SpreadsheetStore,
+  item: SessionIllustration | null,
+): SessionIllustration | null => {
+  if (item) mutators.setSelectedObject(store, { id: item.id, name: '' });
+  return item;
+};
+
 export function createRibbonShapeFromSelection(
   store: SpreadsheetStore,
   range: Range,
@@ -394,7 +404,7 @@ export function createRibbonShapeFromSelection(
   authorization?: IllustrationMutationAuthorization,
 ): SessionIllustration | null {
   const count = store.getState().illustrations.illustrations.length;
-  return createSessionShape(
+  const item = createSessionShape(
     store,
     range,
     {
@@ -409,6 +419,7 @@ export function createRibbonShapeFromSelection(
     },
     history,
   );
+  return selectInserted(store, item);
 }
 
 export function createRibbonImageFromSelection(
@@ -421,7 +432,7 @@ export function createRibbonImageFromSelection(
   authorization?: IllustrationMutationAuthorization,
 ): SessionIllustration | null {
   const count = store.getState().illustrations.illustrations.length;
-  return createSessionImage(
+  const item = createSessionImage(
     store,
     range,
     {
@@ -438,6 +449,7 @@ export function createRibbonImageFromSelection(
     },
     history,
   );
+  return selectInserted(store, item);
 }
 
 export function listSessionIllustrations(state: {

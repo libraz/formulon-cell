@@ -484,6 +484,8 @@ function addChart(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult 
   const kind = actionId === 'charts-line' ? 'line' : 'column';
   const chart = createSessionChart(store, range, { wb: input.wb, kind }, input.history ?? null);
   if (!chart) return { ok: false, reason: 'unsupported' };
+  // Like the ribbon, the new chart is selected; its overlay names it.
+  mutators.setSelectedObject(store, { id: chart.id, name: '' });
   return { ok: true, kind: 'chart', count: 1 };
 }
 

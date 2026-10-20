@@ -32,7 +32,12 @@ import type { EngineChartInfo } from '../engine/workbook-handle-charts.js';
 import { cellRectUnclamped, layoutForView } from '../render/geometry.js';
 import { rangesIntersect } from '../store/selection-geometry.js';
 import { cloneSessionChart } from '../store/sheet-object-mutators.js';
-import type { SessionChart, SessionChartKind, SpreadsheetStore } from '../store/store.js';
+import {
+  mutators,
+  type SessionChart,
+  type SessionChartKind,
+  type SpreadsheetStore,
+} from '../store/store.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import type { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
@@ -376,7 +381,8 @@ export interface CreateRibbonChartFromSelectionOptions {
   history?: History | null;
 }
 
-/** Insert a chart of the selection the way every ribbon host does. */
+/** Insert a chart of the selection the way every ribbon host does, and
+ *  select it as the spreadsheet does. */
 export function createRibbonChartFromSelection({
   store,
   wb,
@@ -385,7 +391,10 @@ export function createRibbonChartFromSelection({
   history = null,
 }: CreateRibbonChartFromSelectionOptions): SessionChart | null {
   const kind = action === 'recommended' ? inferRecommendedChartKind(range) : action;
-  return createSessionChart(store, range, { wb, kind }, history);
+  const chart = createSessionChart(store, range, { wb, kind }, history);
+  // The overlay showing the chart selects it and names it.
+  if (chart) mutators.setSelectedObject(store, { id: chart.id, name: '' });
+  return chart;
 }
 
 /**

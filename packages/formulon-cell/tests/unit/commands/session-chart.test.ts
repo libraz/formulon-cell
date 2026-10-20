@@ -716,6 +716,8 @@ describe('session chart commands', () => {
       history,
     });
     expect(chart?.kind).toBe('pie');
+    // Like the spreadsheet, the inserted chart is selected.
+    expect(store.getState().ui.selectedObject?.id).toBe(chart?.id);
     expect(history.canUndo()).toBe(true);
   });
 });

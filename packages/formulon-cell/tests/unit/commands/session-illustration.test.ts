@@ -104,6 +104,8 @@ describe('session illustration commands', () => {
       w: 240,
       h: 160,
     });
+    // Each insert selects what it inserted.
+    expect(store.getState().ui.selectedObject?.id).toBe(image?.id);
   });
 
   it('lists, finds, updates, and clears session illustrations for host object panes', () => {

@@ -427,6 +427,7 @@ describe('executeQuickAnalysisAction', () => {
       expect(chart).toMatchObject({ kind: 'line', source: r });
       // The inserted chart keeps Excel's automatic title.
       expect(chart?.title).toEqual({ auto: true });
+      expect(store.getState().ui.selectedObject?.id).toBe(chart?.id);
       expect(wb.getChart(0, chart?.nativeObjectId ?? 0)).not.toBeNull();
       expect(history.undo()).toBe(true);
       expect(store.getState().charts.charts).toEqual([]);

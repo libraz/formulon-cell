@@ -41,6 +41,8 @@ export function createIllustrationDropdownDefaults(
             ? 'image/png,image/jpeg,image/gif,image/bmp'
             : 'image/*',
         });
+        // The sheet takes focus first, so the picture the insert selects can take it over.
+        instance.host.focus();
         if (result) {
           createRibbonImageFromSelection(
             instance.store as unknown as Parameters<typeof createRibbonImageFromSelection>[0],
@@ -51,7 +53,6 @@ export function createIllustrationDropdownDefaults(
             { bytes: result.bytes, wb: instance.workbook },
           );
         }
-        instance.host.focus();
         return;
       }
       const ribbonMenu = strings.ribbonMenu as typeof strings.ribbonMenu & { pictureStock: string };
@@ -78,13 +79,13 @@ export function createIllustrationDropdownDefaults(
   const buildShapeAction =
     (instance: SpreadsheetInstance): DynamicDropdownsCtx['insertShapeFromRibbon'] =>
     (shape) => {
+      instance.host.focus();
       createRibbonShapeFromSelection(
         instance.store as unknown as Parameters<typeof createRibbonShapeFromSelection>[0],
         normalizedSelectionRange(instance),
         shape,
         instance.history as unknown as Parameters<typeof createRibbonShapeFromSelection>[3],
       );
-      instance.host.focus();
     };
 
   const activeIllustrationId = (instance: SpreadsheetInstance): string | null => {

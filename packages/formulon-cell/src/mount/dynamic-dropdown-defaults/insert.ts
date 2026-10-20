@@ -93,6 +93,8 @@ const chartKindFromAction = (action: string): SessionChartKind => {
 const buildChartAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createChartFromSelection'] =>
   (kind) => {
+    // The sheet takes focus first, so the chart the insert selects can take it over.
+    instance.host.focus();
     createRibbonChartFromSelection({
       store: instance.store,
       wb: instance.workbook,
@@ -100,12 +102,13 @@ const buildChartAction =
       action: kind,
       history: instance.history,
     });
-    instance.host.focus();
   };
 
 const buildRecommendedChartAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createRecommendedChartFromSelection'] =>
   async () => {
+    // The sheet takes focus first, so the chart the insert selects can take it over.
+    instance.host.focus();
     createRibbonChartFromSelection({
       store: instance.store,
       wb: instance.workbook,
@@ -113,7 +116,6 @@ const buildRecommendedChartAction =
       action: 'recommended',
       history: instance.history,
     });
-    instance.host.focus();
   };
 
 const buildPivotTableAction =
