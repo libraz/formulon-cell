@@ -142,6 +142,8 @@ function coercedInputAsCellValue(input: CoercedInput): CellValue {
       return { kind: 'number', value: input.value };
     case 'bool':
       return { kind: 'bool', value: input.value };
+    case 'error':
+      return { kind: 'error', code: input.code, text: input.text };
     case 'text':
       return { kind: 'text', value: input.value };
     case 'blank':
@@ -375,6 +377,8 @@ function inputAsText(input: Exclude<CoercedInput, { kind: 'formula' }>): string 
       return String(input.value);
     case 'bool':
       return input.value ? 'TRUE' : 'FALSE';
+    case 'error':
+      return input.text;
     case 'text':
       return input.value;
   }

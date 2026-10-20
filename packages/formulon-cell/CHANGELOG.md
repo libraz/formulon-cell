@@ -11,6 +11,7 @@ versioning is [SemVer](https://semver.org/).
 - A selected chart outlines its data on the grid in the spreadsheet's colours: series names in red, categories (or X values) in purple, values in blue. The outline is published as `state.ui.chartSourceRefs`.
 - Chart data points show a tooltip with the series, point and value; pie and doughnut slices add their share of the total. `sessionCharts` strings gain `pointTooltip` and `pointValue`.
 - Double-clicking a chart opens its settings, and Escape or a press outside the chart deselects it.
+- Typed error literals such as `#N/A` and `#DIV/0!` are stored as error values, with the German and French spellings in those locales. `CoercedInput` gains an `error` kind.
 
 ### Changed
 
@@ -18,6 +19,7 @@ versioning is [SemVer](https://semver.org/).
 - Automatic value axes are scaled the way the spreadsheet scales them: a twentieth of the data span is added as headroom and the bound is rounded out to a major unit of 1, 2 or 5 times a power of ten that leaves at least five intervals. A positive axis starts at zero unless the data spans less than a sixth of its maximum. The default column chart of values up to 15 now runs from 0 to 16 in steps of 2.
 - Chart titles are 14 px, and a horizontal legend is centred under or over the chart.
 - A data label that would run off the chart is moved back inside it instead of being shortened.
+- Typed input is parsed the way the desktop spreadsheet parses it in each of the seven locales, checked against a capture from the desktop application. A General cell now picks up the number format the desktop spreadsheet attaches: `#,##0` for grouped numbers, `0.00E+00` for exponents, the system short date for dates, `# ?/?` for mixed fractions, and the locale's currency format with no decimals for whole amounts. Month/day (`1/5`), year/month, CJK and Japanese-era dates, date + time pairs, hour-only AM/PM times and fractional seconds are recognised, and month names follow the locale. Booleans and errors must be typed without surrounding spaces, and German and French accept only their own spellings.
 
 ### Removed
 
@@ -26,6 +28,8 @@ versioning is [SemVer](https://semver.org/).
 ### Fixed
 
 - Charts and anchored pictures scroll off with their anchor cell instead of sticking to the first visible column or row, and they pass under the headers and frozen panes.
+- The long date format offered for Japanese and Chinese was missing its closing quote and displayed the date serial.
+- Loading a number format no longer drops the backslash-escaped currency symbol or the parentheses of a negative section, and date, time and custom formats keep their quoted literals and locale tags. `h:mm` is read as a time rather than a date-time.
 
 ## 0.10.0 — 2026-10-20
 

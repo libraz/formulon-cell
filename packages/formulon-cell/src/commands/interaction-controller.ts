@@ -607,6 +607,15 @@ export class InteractionController {
           patch: { addr, value: { kind: 'bool', value: input.value }, formula: null },
           input,
         };
+      case 'error':
+        return {
+          patch: {
+            addr,
+            value: { kind: 'error', code: input.code, text: input.text },
+            formula: null,
+          },
+          input,
+        };
       case 'text':
         return {
           patch: { addr, value: { kind: 'text', value: input.value }, formula: null },
