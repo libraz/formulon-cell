@@ -33,6 +33,48 @@ const pointPairs = (points: string): [number, number][] =>
   });
 
 describe('layoutChart', () => {
+  const salesData: ChartData = {
+    domain: 'category',
+    categories: ['Jan', 'Feb', 'Mar', 'Apr'],
+    series: [
+      { id: 'sales', name: 'Sales', values: [10, 15, 8, 12] },
+      { id: 'costs', name: 'Costs', values: [6, 8, 3, 7] },
+    ],
+  };
+
+  it('scales the value axis as Excel does for the default column chart', () => {
+    const scene = sceneAt({ kind: 'column' }, salesData, 466, 274);
+    const ticks = scene.elements
+      .filter(
+        (element) => element.role === 'axis-label' && element.attrs['data-chart-axis'] === 'y',
+      )
+      .map((element) => element.text);
+    expect(ticks).toEqual(['0', '2', '4', '6', '8', '10', '12', '14', '16']);
+  });
+
+  it('centres a bottom legend under the chart', () => {
+    const width = 466;
+    const scene = sceneAt({ kind: 'column' }, salesData, width, 274);
+    const keys = scene.elements.filter(
+      (element) => element.role === 'legend' && element.tag === 'rect',
+    );
+    const labels = scene.elements.filter(
+      (element) => element.role === 'legend' && element.tag === 'text',
+    );
+    const left = Number(keys[0]?.attrs.x);
+    const last = labels[labels.length - 1];
+    const right = Number(last?.attrs.x) + Number(String(last?.text).length) * 5.8;
+    expect(Math.abs(left - (width - right))).toBeLessThan(2);
+  });
+
+  it('sets the title at 14 px above the plot', () => {
+    const scene = sceneAt({ kind: 'column', title: 'Sales' }, salesData, 466, 274);
+    const title = scene.elements.find((element) => element.role === 'title');
+    expect(title?.attrs['font-size']).toBe(14);
+    expect(title?.attrs.x).toBe(233);
+    expect(scene.plot.y).toBeGreaterThan(Number(title?.attrs.y));
+  });
+
   it('retains the default padded plot and emits readable category axes', () => {
     const data: ChartData = {
       domain: 'category',

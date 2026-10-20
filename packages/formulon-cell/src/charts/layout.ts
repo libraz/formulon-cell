@@ -3,6 +3,7 @@ import { prepareChartData } from './filters.js';
 import { formatChartValue } from './format.js';
 import { resolveChartLabelPosition } from './label-options.js';
 import {
+  automaticAxisDomain,
   formatTick,
   linearScale,
   majorTicks,
@@ -36,6 +37,12 @@ import type {
   ChartValueFormatter,
   XYChartData,
 } from './types.js';
+
+/** Excel sets a chart title at 14 pt over 9 or 10 pt chart text. */
+const TITLE_FONT_SIZE = 14;
+const TITLE_BASELINE = 16;
+/** The top margin of a plot below a title. */
+const TITLE_RESERVE = 30;
 
 const finite = (value: number, fallback: number): number =>
   Number.isFinite(value) ? value : fallback;
@@ -91,7 +98,7 @@ const primitive = (
       ? {
           fill: 'currentColor',
           'font-family': 'system-ui, sans-serif',
-          'font-size': role === 'title' ? 12 : 10,
+          'font-size': role === 'title' ? TITLE_FONT_SIZE : 10,
           ...attrs,
         }
       : attrs,
@@ -458,13 +465,14 @@ const markerAttrs = (
 interface Domain {
   min: number;
   max: number;
+  /** The major unit an automatic axis resolved along with its bounds. */
+  majorUnit?: number;
 }
 
 const axisDomain = (
   values: readonly number[],
   explicitMin: number | undefined,
   explicitMax: number | undefined,
-  includeZero: boolean,
   percent: boolean,
   logBase?: number,
 ): Domain => {
@@ -483,10 +491,6 @@ const axisDomain = (
       (current, value) => Math.max(current, value),
       Number.NEGATIVE_INFINITY,
     );
-  }
-  if (includeZero) {
-    min = Math.min(min, 0);
-    max = Math.max(max, 0);
   }
   if (percent) {
     if (min < 0 && max > 0) {
@@ -521,6 +525,12 @@ const axisDomain = (
     max = explicitMax as number;
     if (min > max) min = Math.max(-Number.MAX_VALUE, max - spanForMissingSide);
   }
+  if (!percent && (!hasExplicitMin || !hasExplicitMax)) {
+    return automaticAxisDomain(min, max, {
+      ...(hasExplicitMin ? { min } : {}),
+      ...(hasExplicitMax ? { max } : {}),
+    });
+  }
   if (min === max) {
     const padding = Math.max(Math.abs(min) * 0.1, Number.MIN_VALUE, percent ? 1 : 1);
     if (hasExplicitMin && !hasExplicitMax) max = Math.min(Number.MAX_VALUE, min + padding);
@@ -534,7 +544,7 @@ const axisDomain = (
   // the raw option for `undefined` here would leave NaN/Infinity in the
   // auto-expansion decision even though the finite flags above rejected them.
   if (!hasExplicitMin || !hasExplicitMax) {
-    const expanded = niceDomain(min, max, percent ? 4 : 5);
+    const expanded = niceDomain(min, max, 4);
     if (!hasExplicitMin) min = expanded.min;
     if (!hasExplicitMax) max = expanded.max;
   }
@@ -680,7 +690,7 @@ const axisTicks = (
   logBase?: number,
 ): readonly number[] =>
   logBase === undefined
-    ? majorTicks(domain.min, domain.max, axis?.majorUnit)
+    ? majorTicks(domain.min, domain.max, axis?.majorUnit ?? domain.majorUnit)
     : powerTicks(domain.min, domain.max, logBase);
 
 const axisTickLabel = (
@@ -2280,12 +2290,12 @@ const addLegend = (
     x = 4;
     y = plot.y + 8;
   } else if (position === 'bottom') {
-    x = plot.x;
+    x = 4;
     y = height - 5;
     horizontal = true;
   } else {
-    x = plot.x;
-    y = spec.title ? 27 : 11;
+    x = 4;
+    y = spec.title ? TITLE_RESERVE + 5 : 11;
     horizontal = true;
   }
   const availableWidth = Math.max(
@@ -2316,24 +2326,47 @@ const addLegend = (
           },
         ]
       : entries;
-  let cursor = x;
-  let row = 0;
-  visibleEntries.forEach((entry, index) => {
+  const items = visibleEntries.map((entry) => {
     const itemMaxWidth = horizontal
       ? Math.max(12, availableWidth / Math.max(1, visibleEntries.length) - 20)
       : Math.max(12, columnWidth - 11);
     const displayLabel = truncateLabel(entry.label, itemMaxWidth);
-    const itemWidth = 20 + Math.min(itemMaxWidth, textWidth(displayLabel));
-    if (horizontal && cursor !== x && cursor + itemWidth > width - 4) {
-      row += 1;
-      cursor = x;
+    return { entry, displayLabel, width: 20 + Math.min(itemMaxWidth, textWidth(displayLabel)) };
+  });
+  // A horizontal legend wraps into rows, each centred on the chart as Excel does.
+  const rows: (typeof items)[] = [];
+  if (horizontal) {
+    let rowWidth = 0;
+    for (const item of items) {
+      const current = rows[rows.length - 1];
+      if (current && rowWidth + item.width <= width - 8) {
+        current.push(item);
+        rowWidth += item.width;
+      } else {
+        rows.push([item]);
+        rowWidth = item.width;
+      }
     }
-    const itemX = horizontal ? cursor : x + Math.floor(index / verticalRows) * columnWidth;
-    const itemY = horizontal
-      ? position === 'bottom'
-        ? y - row * 14
-        : y + row * 14
-      : y + (index % verticalRows) * 14;
+  }
+  const placed = horizontal
+    ? rows.flatMap((rowItems, row) => {
+        // The trailing gap after the last label is not part of the row.
+        const rowWidth = rowItems.reduce((sum, item) => sum + item.width, 0) - 9;
+        let cursor = Math.max(4, (width - rowWidth) / 2);
+        // A bottom legend grows upwards so its first row stays nearest the plot.
+        const itemY = position === 'bottom' ? y - (rows.length - 1 - row) * 14 : y + row * 14;
+        return rowItems.map((item) => {
+          const itemX = cursor;
+          cursor += item.width;
+          return { ...item, itemX, itemY };
+        });
+      })
+    : items.map((item, index) => ({
+        ...item,
+        itemX: x + Math.floor(index / verticalRows) * columnWidth,
+        itemY: y + (index % verticalRows) * 14,
+      }));
+  for (const { entry, displayLabel, itemX, itemY } of placed) {
     elements.push(
       primitive(
         'rect',
@@ -2354,8 +2387,7 @@ const addLegend = (
         { seriesId: entry.seriesId, pointId: entry.pointId },
       ),
     );
-    if (horizontal) cursor += itemWidth;
-  });
+  }
 };
 
 interface LabelAnchor {
@@ -2437,18 +2469,25 @@ const addDataLabel = (
   const keyReservation = keySize + keyGap;
   const minimumTextWidth = fullText.length > 0 ? textWidth('…', fontSize) : 0;
   const rawX = finite(anchor.x, width / 2);
+  // Like Excel, a label that would run off the chart is moved back inside it
+  // whole; only a label wider than the room left is shortened.
+  const fitWidth = Math.min(
+    textWidth(fullText, fontSize),
+    Math.max(minimumTextWidth, width - horizontalPadding * 2 - keyReservation),
+  );
+  const keptWidth = fullText.length > 0 ? Math.max(minimumTextWidth, fitWidth) : 0;
   const minX =
     textAnchor === 'start'
       ? horizontalPadding + keyReservation
       : textAnchor === 'end'
-        ? horizontalPadding + minimumTextWidth
-        : horizontalPadding + keyReservation + minimumTextWidth / 2;
+        ? horizontalPadding + keptWidth
+        : horizontalPadding + keyReservation + keptWidth / 2;
   const maxX =
     textAnchor === 'start'
-      ? width - horizontalPadding - minimumTextWidth
+      ? width - horizontalPadding - keptWidth
       : textAnchor === 'end'
         ? width - horizontalPadding - keyReservation
-        : width - horizontalPadding - minimumTextWidth / 2;
+        : width - horizontalPadding - keptWidth / 2;
   const x = clamp(rawX, Math.min(minX, maxX), Math.max(minX, maxX));
   const sideRoom =
     textAnchor === 'start'
@@ -3336,9 +3375,10 @@ export function layoutChart(input: {
         : data.series.length > 1
       : data.series.length > 1);
   const legendPosition = spec.legend?.position ?? 'bottom';
+  const title = chartTitleText(spec.title, input.data, input.chartTitle);
   let left = 20;
   let right = 20;
-  let top = 20;
+  let top = title ? TITLE_RESERVE : 20;
   let bottom = 20;
   let rightLegendReserve = 0;
   if (hasLegend) {
@@ -3355,7 +3395,7 @@ export function layoutChart(input: {
       right += rightLegendReserve;
     }
     if (legendPosition === 'left') left += Math.min(100, Math.max(56, width * 0.24));
-    if (legendPosition === 'top') top = Math.max(top, spec.title ? 36 : 20);
+    if (legendPosition === 'top') top = Math.max(top, spec.title ? TITLE_RESERVE + 14 : 20);
     if (legendPosition === 'bottom') {
       // Category labels and an optional x-axis title occupy the space above
       // a bottom legend. Reserve enough rows for both at compact sizes.
@@ -3435,7 +3475,6 @@ export function layoutChart(input: {
           xValueCandidates,
           spec.xAxis?.min,
           spec.xAxis?.max,
-          spec.kind === 'bar',
           spec.kind === 'bar' && spec.grouping === 'percent-stacked',
           xLogBase,
         )
@@ -3489,7 +3528,6 @@ export function layoutChart(input: {
       yValueCandidates,
       spec.yAxis?.min,
       spec.yAxis?.max,
-      data.domain === 'category',
       data.domain === 'category' && spec.grouping === 'percent-stacked',
       yLogBase,
     );
@@ -3556,12 +3594,11 @@ export function layoutChart(input: {
     highYLabels && allocatedRightLabelGutter > 0
       ? Math.min(maxNumericLabelWidth, Math.max(12, allocatedRightLabelGutter - 6))
       : maxNumericLabelWidth;
-  const title = chartTitleText(spec.title, input.data, input.chartTitle);
   if (title) {
     elements.push(
       primitive(
         'text',
-        { x: width / 2, y: 12, 'text-anchor': 'middle' },
+        { x: width / 2, y: TITLE_BASELINE, 'text-anchor': 'middle' },
         'title',
         undefined,
         undefined,
@@ -3593,7 +3630,6 @@ export function layoutChart(input: {
       stackValues,
       axisSpec?.min,
       axisSpec?.max,
-      true,
       percent,
       horizontal ? categoryXLogBase : categoryYLogBase,
     );
@@ -3644,8 +3680,8 @@ export function layoutChart(input: {
     );
     const xValues = pairedPoints.flatMap((point) => (point.x === null ? [] : [point.x]));
     const yValues = pairedPoints.flatMap((point) => (point.y === null ? [] : [point.y]));
-    xDomain = axisDomain(xValues, spec.xAxis?.min, spec.xAxis?.max, false, false, scatterLogs.x);
-    yDomain = axisDomain(yValues, spec.yAxis?.min, spec.yAxis?.max, false, false, scatterLogs.y);
+    xDomain = axisDomain(xValues, spec.xAxis?.min, spec.xAxis?.max, false, scatterLogs.x);
+    yDomain = axisDomain(yValues, spec.yAxis?.min, spec.yAxis?.max, false, scatterLogs.y);
     addScatterMarks(
       elements,
       prepared as XYChartView,
@@ -3786,7 +3822,7 @@ export function layoutUnsupportedChart(input: {
     elements.push(
       primitive(
         'text',
-        { x: width / 2, y: 12, 'text-anchor': 'middle' },
+        { x: width / 2, y: TITLE_BASELINE, 'text-anchor': 'middle' },
         'title',
         undefined,
         undefined,

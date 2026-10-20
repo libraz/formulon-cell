@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  automaticAxisDomain,
+  automaticMajorUnit,
   linearScale,
   majorTicks,
   niceDomain,
@@ -12,6 +14,50 @@ import {
 } from '../../../src/charts/scales.js';
 
 describe('chart scales', () => {
+  it('picks the automatic major unit Excel picks', () => {
+    expect(automaticMajorUnit(15.75)).toBe(2);
+    expect(automaticMajorUnit(105)).toBe(20);
+    expect(automaticMajorUnit(7.35)).toBe(1);
+    expect(automaticMajorUnit(1.05)).toBeCloseTo(0.2);
+    expect(automaticMajorUnit(5)).toBe(1);
+  });
+
+  it('bounds an automatic axis the way Excel does', () => {
+    const bounds = (min: number, max: number, fixed?: { min?: number; max?: number }) => {
+      const domain = automaticAxisDomain(min, max, fixed);
+      return [domain.min, domain.max, domain.majorUnit];
+    };
+    // A twentieth of headroom, rounded out to the unit.
+    expect(bounds(3, 15)).toEqual([0, 16, 2]);
+    expect(bounds(0, 100)).toEqual([0, 120, 20]);
+    expect(bounds(0, 10)).toEqual([0, 12, 2]);
+    // A single positive value starts at zero.
+    expect(bounds(5, 5)).toEqual([0, 6, 1]);
+    // Data spanning less than a sixth of its maximum starts below the minimum.
+    expect(bounds(110, 120)).toEqual([104, 122, 2]);
+    // Negative data mirrors positive data.
+    expect(bounds(-15, -3)).toEqual([-16, 0, 2]);
+    // Data either side of zero gets headroom on both sides.
+    expect(bounds(-10, 10)).toEqual([-12, 12, 2]);
+    // A fixed side keeps its value.
+    expect(bounds(3, 15, { max: 20 })).toEqual([0, 20, 2]);
+    expect(bounds(3, 15, { min: 2 })).toEqual([2, 16, 2]);
+  });
+
+  it('keeps extreme automatic axes finite', () => {
+    for (const [min, max] of [
+      [0, Number.MAX_VALUE],
+      [-Number.MAX_VALUE, Number.MAX_VALUE],
+      [Number.MIN_VALUE, Number.MIN_VALUE],
+    ] as const) {
+      const domain = automaticAxisDomain(min, max);
+      expect(Number.isFinite(domain.min)).toBe(true);
+      expect(Number.isFinite(domain.max)).toBe(true);
+      expect(domain.max).toBeGreaterThan(domain.min);
+      expect(domain.majorUnit).toBeGreaterThan(0);
+    }
+  });
+
   it('keeps explicit tick bounds instead of expanding them', () => {
     const ticks = niceTicks(1, 9, 5);
     expect(ticks.length).toBeGreaterThan(0);

@@ -265,6 +265,72 @@ export function niceDomain(min: number, max: number, targetCount = 5): NumericDo
   };
 }
 
+/**
+ * The major unit Excel picks for an automatic axis over `span`: the largest 1,
+ * 2 or 5 times a power of ten that still divides the span into five or more
+ * intervals (0 to 16 by 2, 0 to 120 by 20).
+ */
+export function automaticMajorUnit(span: number): number {
+  if (!Number.isFinite(span) || span <= 0) return 1;
+  const power = 10 ** Math.floor(Math.log10(span / 5));
+  if (!Number.isFinite(power) || power <= 0) return span;
+  for (const multiplier of [10, 5, 2, 1]) {
+    const unit = multiplier * power;
+    if (span / unit >= 5 - 1e-9) return unit;
+  }
+  return power;
+}
+
+/**
+ * Excel's automatic bounds of a value axis over data in [`min`, `max`]. A
+ * positive axis starts at zero unless the data spans less than a sixth of its
+ * maximum, in which case it starts half the span below the minimum; a free
+ * side gets a twentieth of the span of headroom and is rounded out to the
+ * major unit. A side given in `fixed` keeps that value.
+ */
+export function automaticAxisDomain(
+  min: number,
+  max: number,
+  fixed: { readonly min?: number; readonly max?: number } = {},
+): NumericDomain & { readonly majorUnit: number } {
+  let lo = finiteOr(Math.min(min, max), 0);
+  let hi = finiteOr(Math.max(min, max), 1);
+  let padLo = true;
+  let padHi = true;
+  if (lo === 0 && hi === 0 && fixed.max === undefined) {
+    hi = 1;
+  } else if (fixed.min === undefined && lo >= 0 && hi > 0) {
+    padLo = false;
+    lo = lo === hi || (hi - lo) / hi > 1 / 6 ? 0 : lo - (hi - lo) / 2;
+  } else if (fixed.max === undefined && hi <= 0 && lo < 0) {
+    padHi = false;
+    hi = lo === hi || (hi - lo) / -lo > 1 / 6 ? 0 : hi + (hi - lo) / 2;
+  }
+  if (fixed.min !== undefined) lo = fixed.min;
+  if (fixed.max !== undefined) hi = fixed.max;
+  const span = hi - lo;
+  if (!Number.isFinite(span) || span <= 0) {
+    const nice = niceDomain(lo, hi, 5);
+    return { ...nice, majorUnit: niceStep(nice.min, nice.max, 5) };
+  }
+  // Headroom and rounding that would overflow leave the side at the data.
+  const within = (value: number, fallback: number): number =>
+    Number.isFinite(value) ? value : fallback;
+  const bottom = within(fixed.min === undefined && padLo && lo < 0 ? lo - span / 20 : lo, lo);
+  const top = within(fixed.max === undefined && padHi && hi > 0 ? hi + span / 20 : hi, hi);
+  const majorUnit = automaticMajorUnit(within(top - bottom, span));
+  const round = (value: number): number => cleanZero(Number(value.toPrecision(12)));
+  return {
+    min:
+      fixed.min === undefined ? within(round(Math.floor(bottom / majorUnit) * majorUnit), lo) : lo,
+    max:
+      fixed.max === undefined
+        ? within(round(Math.ceil(top / majorUnit - 1e-9) * majorUnit), hi)
+        : hi,
+    majorUnit,
+  };
+}
+
 /** Generate deterministic nice ticks constrained to the supplied domain. */
 export function niceTicks(min: number, max: number, targetCount = 5): readonly number[] {
   let lo = finiteOr(min, 0);
