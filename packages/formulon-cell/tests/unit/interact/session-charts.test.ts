@@ -2243,6 +2243,44 @@ describe('attachSessionCharts', () => {
     handle.detach();
   });
 
+  it('keeps keys from the grid under a selected chart and duplicates it with Ctrl+D', () => {
+    const chart = salesTable();
+    const handle = attach({ labels: { objectName: 'グラフ {n}' } });
+    const gridKeys: string[] = [];
+    const onGridKey = (e: KeyboardEvent): void => {
+      gridKeys.push(e.key);
+    };
+    host.addEventListener('keydown', onGridKey);
+    firePointer(panel(), 'pointerdown');
+    firePointer(window, 'pointerup');
+
+    fireKey(panel(), 'a');
+    fireKey(panel(), 'Enter');
+    fireKey(panel(), 'Tab');
+    expect(fireKey(panel(), 'x', { ctrlKey: true }).defaultPrevented).toBe(true);
+    fireKey(panel(), 'y', { ctrlKey: true });
+    // A chart's own buttons keep their keys from the grid too.
+    const button = panel().querySelector<HTMLButtonElement>('.fc-chart__buttons button');
+    if (!button) throw new Error('missing chart button');
+    fireKey(button, 'Enter');
+    expect(gridKeys).toEqual(['y']);
+
+    const duplicate = fireKey(panel(), 'd', { metaKey: true });
+    expect(duplicate.defaultPrevented).toBe(true);
+    const charts = store.getState().charts.charts;
+    expect(charts).toHaveLength(2);
+    const copy = charts[1];
+    if (!copy) throw new Error('chart was not duplicated');
+    expect(copy.nativeObjectId).not.toBe(chart.nativeObjectId);
+    expect((document.activeElement as HTMLElement | null)?.dataset.chartId).toBe(copy.id);
+    expect(store.getState().ui.selectedObject).toEqual({ id: copy.id, name: 'グラフ 2' });
+    expect(history.undo()).toBe(true);
+    expect(store.getState().charts.charts.map((entry) => entry.id)).toEqual([chart.id]);
+
+    host.removeEventListener('keydown', onGridKey);
+    handle.detach();
+  });
+
   it('leaves the chart on a press elsewhere or on Escape', () => {
     salesTable();
     const handle = attach();

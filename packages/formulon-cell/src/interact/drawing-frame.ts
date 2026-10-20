@@ -19,6 +19,33 @@ const DRAG_THRESHOLD = 3;
 /** Elements that keep a press to themselves instead of starting a move. */
 export const INTERACTIVE = 'button, input, select, textarea, option, [contenteditable="true"]';
 
+const TEXT_ENTRY = 'input, textarea, select, [contenteditable="true"]';
+const MODIFIER_KEYS = new Set(['Alt', 'Control', 'Meta', 'Shift']);
+/** Ctrl or Cmd shortcuts a selected object answers instead of the cells under it. */
+const OBJECT_SHORTCUTS = new Set(['c', 'x', 'v', 'd']);
+
+/**
+ * Keep a key pressed on a selected object from the grid under it, which would
+ * otherwise type into, move or copy the active cell. Shortcuts the sheet owns,
+ * such as Undo, still reach it.
+ */
+export const keepKeyFromGrid = (event: KeyboardEvent): void => {
+  if (MODIFIER_KEYS.has(event.key)) return;
+  if (event.target instanceof Element && event.target.closest(TEXT_ENTRY)) return;
+  const shortcut = event.ctrlKey || event.metaKey;
+  if (shortcut && !OBJECT_SHORTCUTS.has(event.key.toLowerCase())) return;
+  event.stopPropagation();
+  // The browser would still fire its copy, cut or paste event at the grid.
+  if (shortcut) event.preventDefault();
+};
+
+/** Ctrl+D, or Cmd+D on a Mac: duplicate the selected object. */
+export const isDuplicateShortcut = (event: KeyboardEvent): boolean =>
+  (event.ctrlKey || event.metaKey) &&
+  !event.altKey &&
+  !event.shiftKey &&
+  event.key.toLowerCase() === 'd';
+
 /** The frame `start` takes when `handle` is dragged by (dx, dy); a corner
  *  dragged with `keepRatio` scales the frame without changing its shape. */
 export const resizedFrame = (

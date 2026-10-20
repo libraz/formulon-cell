@@ -3,6 +3,7 @@ import type { IllustrationMutationAuthorization } from '../commands/session-illu
 import {
   arrangeSessionIllustration,
   clearSessionIllustration,
+  duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { drawingClipPath, nearestGridline, sessionPosition } from '../engine/drawing-geometry.js';
@@ -15,6 +16,8 @@ import {
   createObjectSelectionPublisher,
   type DrawingFrame,
   type DrawingHandle,
+  isDuplicateShortcut,
+  keepKeyFromGrid,
   previewFrame,
   trackFrameDrag,
 } from './drawing-frame.js';
@@ -269,6 +272,7 @@ export function attachSessionIllustrations(deps: {
     if (e.relatedTarget !== null && !insideObjects(e.relatedTarget)) deselect();
   };
   root.addEventListener('focusout', onFocusOut);
+  root.addEventListener('keydown', keepKeyFromGrid);
 
   const isEditable = (item: SessionIllustration): boolean =>
     item.nativeObjectId === undefined || item.nativeGeometryEditable === true;
@@ -372,6 +376,22 @@ export function attachSessionIllustrations(deps: {
       return;
     }
     if (!isEditable(item)) return;
+    if (isDuplicateShortcut(event)) {
+      event.preventDefault();
+      const copy = duplicateSessionIllustration(
+        store,
+        item.id,
+        history,
+        getWb() ?? undefined,
+        illustrationAuthorization('sessionIllustration.duplicate', 'keyboard'),
+      );
+      // Like the spreadsheet, the copy takes the selection.
+      const copyPanel = Array.from(root.querySelectorAll<HTMLElement>('.fc-illustration')).find(
+        (candidate) => candidate.dataset.illustrationId === copy?.id,
+      );
+      if (copy && copyPanel) select(copy.id, copyPanel);
+      return;
+    }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       clearSessionIllustration(
@@ -510,6 +530,7 @@ export function attachSessionIllustrations(deps: {
       unsubscribe();
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
       root.removeEventListener('focusout', onFocusOut);
+      root.removeEventListener('keydown', keepKeyFromGrid);
       menu.detach();
       selectedId = null;
       syncSelection();

@@ -18,9 +18,11 @@ import {
 import type { ChartSeriesStyleSpec, ChartSpec } from '../charts/types.js';
 import { syncChartFromEngine } from '../engine/charts-sync.js';
 import {
+  DUPLICATE_OFFSET_PX,
   EMU_PER_PX,
   placementForAnchor,
   placementForPixels,
+  sessionPosition,
   viewportZoom,
 } from '../engine/drawing-geometry.js';
 import type { EngineDrawingAnchor, Range } from '../engine/types.js';
@@ -614,6 +616,59 @@ export function arrangeSessionChart(
     },
   );
   return arranged && cloneSessionChart(arranged);
+}
+
+/**
+ * Copy a chart on top of its sheet's drawings, offset from the original, the
+ * way the spreadsheet's Duplicate does. The copy keeps every setting the
+ * engine stores. Returns null, changing nothing, when the change is refused.
+ */
+export function duplicateSessionChart(
+  store: SpreadsheetStore,
+  id: string,
+  history: History | null,
+  wb: WorkbookHandle,
+  authorization: ChartMutationAuthorization = {},
+): SessionChart | null {
+  const chart = sessionChartById(store.getState(), id);
+  if (!chart || !wb.capabilities.charts) return null;
+  const intent = chartIntent(chartCells(chart), 'chartDuplicate', authorization);
+  if (!canMutateChart(store, intent)) return null;
+  const { sheet } = chart;
+  const source = wb.snapshotDrawing(sheet, chart.nativeObjectId);
+  const objectId = source ? wb.restoreDrawing(sheet, source, { newId: true }) : null;
+  if (objectId === null) return null;
+  const at = sessionPosition(store, chart.nativeAnchor);
+  const placement = placementForPixels(store, chart.nativeAnchor, {
+    x: at.x + DUPLICATE_OFFSET_PX,
+    y: at.y + DUPLICATE_OFFSET_PX,
+  });
+  const snapshot = wb.setDrawingAnchor(sheet, objectId, placement)
+    ? wb.snapshotDrawing(sheet, objectId)
+    : null;
+  if (!snapshot) {
+    wb.removeDrawing(sheet, objectId);
+    return null;
+  }
+  const sync = (): SessionChart | null => syncChartFromEngine(wb, store, sheet, objectId);
+  const copy = sync();
+  if (!copy) return null;
+  pushChartHistory(
+    history,
+    store,
+    intent,
+    () => {
+      if (!wb.removeDrawing(sheet, objectId)) throw new Error('chart duplicate undo failed');
+      sync();
+    },
+    () => {
+      if (wb.restoreDrawing(sheet, snapshot) === null) {
+        throw new Error('chart duplicate redo failed');
+      }
+      sync();
+    },
+  );
+  return cloneSessionChart(copy);
 }
 
 /**

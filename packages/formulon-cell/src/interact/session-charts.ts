@@ -10,6 +10,7 @@ import {
   arrangeSessionChart,
   canMutateChart,
   clearSessionChart,
+  duplicateSessionChart,
   removeSessionChartSeries,
   type SessionChartSeriesInput,
   sessionChartById,
@@ -34,6 +35,8 @@ import {
   createObjectSelectionPublisher,
   type DrawingHandle,
   INTERACTIVE,
+  isDuplicateShortcut,
+  keepKeyFromGrid,
   previewFrame,
   trackFrameDrag,
 } from './drawing-frame.js';
@@ -402,6 +405,7 @@ export function attachSessionCharts(deps: {
     if (e.relatedTarget !== null && !insideCharts(e.relatedTarget)) deselect();
   };
   root.addEventListener('focusout', onFocusOut);
+  root.addEventListener('keydown', keepKeyFromGrid);
 
   /** Move or resize a chart to grid pixels; false when the workbook refused. */
   const placeChart = (
@@ -528,6 +532,17 @@ export function attachSessionCharts(deps: {
       openMenu(chart, panel, rect.left + 8, rect.top + 8);
       return;
     }
+    if (isDuplicateShortcut(e)) {
+      e.preventDefault();
+      const wb = chartWorkbook();
+      const copy = wb ? duplicateSessionChart(store, chart.id, history, wb) : null;
+      // Like the spreadsheet, the copy takes the selection.
+      const copyPanel = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart')).find(
+        (candidate) => candidate.dataset.chartId === copy?.id,
+      );
+      if (copy && copyPanel) selectChart(copy.id, copyPanel);
+      return;
+    }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       removeChart(chart);
@@ -640,7 +655,7 @@ export function attachSessionCharts(deps: {
       panel.setAttribute(
         'aria-keyshortcuts',
         placeable
-          ? 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Delete Backspace Escape'
+          ? 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Control+D Meta+D Delete Backspace Escape'
           : 'Delete Backspace Escape',
       );
       const label = chartLabel(chart, labels);
@@ -778,6 +793,7 @@ export function attachSessionCharts(deps: {
       unsubscribe();
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
       root.removeEventListener('focusout', onFocusOut);
+      root.removeEventListener('keydown', keepKeyFromGrid);
       menu.detach();
       selectedId = null;
       syncSelection();

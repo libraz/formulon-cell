@@ -1,5 +1,10 @@
 import { AnchorEditAs, AnchorKind } from '@libraz/formulon';
 import {
+  DUPLICATE_OFFSET_PX,
+  placementForPixels,
+  sessionPosition,
+} from '../engine/drawing-geometry.js';
+import {
   movePersistentImage,
   nativeImageAnchor,
   persistentImageFromState,
@@ -672,8 +677,8 @@ export function duplicateSessionIllustration(
   const copy: SessionIllustration = {
     ...item,
     id: duplicateId(state, id),
-    x: (item.x ?? 300) + 24,
-    y: (item.y ?? 88) + 24,
+    x: (item.x ?? 300) + DUPLICATE_OFFSET_PX,
+    y: (item.y ?? 88) + DUPLICATE_OFFSET_PX,
   };
   const persisted = persistentImageFromState(item);
   let copySnapshot: Uint8Array | null = null;
@@ -681,7 +686,14 @@ export function duplicateSessionIllustration(
     const source = wb.snapshotDrawing(item.sheet, persisted.nativeObjectId);
     const newId = source ? wb.restoreDrawing(item.sheet, source, { newId: true }) : null;
     if (newId === null) return null;
-    copySnapshot = wb.snapshotDrawing(item.sheet, newId);
+    const at = sessionPosition(store, persisted.nativeAnchor);
+    const offset = placementForPixels(store, persisted.nativeAnchor, {
+      x: at.x + DUPLICATE_OFFSET_PX,
+      y: at.y + DUPLICATE_OFFSET_PX,
+    });
+    copySnapshot = wb.setDrawingAnchor(item.sheet, newId, offset)
+      ? wb.snapshotDrawing(item.sheet, newId)
+      : null;
     if (!copySnapshot) {
       wb.removeDrawing(item.sheet, newId);
       return null;
@@ -690,7 +702,7 @@ export function duplicateSessionIllustration(
       nativeObjectId: newId,
       imageBytes: Uint8Array.from(persisted.imageBytes),
       imageFormat: persisted.imageFormat,
-      nativeAnchor: persisted.nativeAnchor,
+      nativeAnchor: nativeImageAnchor(wb, item.sheet, newId) ?? persisted.nativeAnchor,
     });
   } else if (persisted) {
     return null;

@@ -17,6 +17,7 @@ import {
   clearSessionChartsInRange,
   createRibbonChartFromSelection,
   createSessionChart,
+  duplicateSessionChart,
   inferRecommendedChartKind,
   listSessionCharts,
   removeSessionChartSeries,
@@ -28,6 +29,7 @@ import {
   hydrateChartsFromEngine,
   refreshChartsAfterRecalc,
 } from '../../../src/engine/charts-sync.js';
+import { sessionPosition } from '../../../src/engine/drawing-geometry.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
@@ -133,6 +135,51 @@ describe('session chart commands', () => {
 
     setProtectedSheet(store, 0, true);
     expect(arrangeSessionChart(store, second.id, 'bring-front', history, wb)).toBeNull();
+  });
+
+  it('duplicates a chart on top of the original, offset from it, as one undo step', () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), {
+      wb,
+      kind: 'line',
+      title: 'Sales',
+      anchor: { row: 2, col: 6 },
+    });
+    if (!chart) throw new Error('chart was not created');
+    const at = (id: string) => {
+      const found = sessionChartById(store.getState(), id);
+      if (!found) throw new Error(`missing chart ${id}`);
+      return sessionPosition(store, found.nativeAnchor);
+    };
+
+    const copy = duplicateSessionChart(store, chart.id, history, wb);
+    if (!copy) throw new Error('chart was not duplicated');
+
+    expect(copy.nativeObjectId).not.toBe(chart.nativeObjectId);
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId, copy.nativeObjectId]);
+    expect(copy).toMatchObject({
+      kind: 'line',
+      title: 'Sales',
+      source: chart.source,
+      legend: chart.legend,
+    });
+    expect(copy.data).toEqual(chart.data);
+    const original = at(chart.id);
+    const duplicated = at(copy.id);
+    expect(duplicated.x).toBeCloseTo(original.x + 24, 0);
+    expect(duplicated.y).toBeCloseTo(original.y + 24, 0);
+    expect(duplicated.w).toBeCloseTo(original.w, 0);
+    expect(duplicated.h).toBeCloseTo(original.h, 0);
+
+    expect(history.undo()).toBe(true);
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId]);
+    expect(listSessionCharts(store.getState()).map((c) => c.id)).toEqual([chart.id]);
+    expect(history.redo()).toBe(true);
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId, copy.nativeObjectId]);
+    expect(at(copy.id).x).toBeCloseTo(original.x + 24, 0);
+
+    setProtectedSheet(store, 0, true);
+    expect(duplicateSessionChart(store, chart.id, history, wb)).toBeNull();
+    expect(engineChartIds(wb)).toEqual([chart.nativeObjectId, copy.nativeObjectId]);
   });
 
   it('centres Excel’s default frame in the visible grid unless an anchor is given', () => {

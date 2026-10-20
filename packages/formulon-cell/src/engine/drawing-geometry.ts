@@ -17,6 +17,9 @@ const ANCHOR_KIND_TWO_CELL = 1;
 
 export const EMU_PER_PX = 9525;
 
+/** How far a duplicated chart, picture or shape sits from its original. */
+export const DUPLICATE_OFFSET_PX = 24;
+
 export const viewportZoom = (store: SpreadsheetStore | undefined): number => {
   const zoom = store?.getState().viewport.zoom;
   return zoom && Number.isFinite(zoom) && zoom > 0 ? zoom : 1;

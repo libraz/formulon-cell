@@ -573,6 +573,7 @@ export {
   clearSessionChartsInRange,
   createRibbonChartFromSelection,
   createSessionChart,
+  duplicateSessionChart,
   inferRecommendedChartKind,
   listSessionCharts,
   removeSessionChartSeries,

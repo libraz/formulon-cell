@@ -237,6 +237,63 @@ describe('attachSessionIllustrations', () => {
     handle.detach();
   });
 
+  it('keeps keys from the grid under a selected object and duplicates it with Ctrl+D', () => {
+    const host = document.createElement('div');
+    host.tabIndex = -1;
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.upsertIllustration(store, {
+      id: 'shape-1',
+      kind: 'shape',
+      shape: 'rectangle',
+      sheet: 0,
+      x: 20,
+      y: 30,
+      w: 160,
+      h: 96,
+    });
+    const handle = attachSessionIllustrations({ host, store, history });
+    const gridKeys: string[] = [];
+    const onGridKey = (e: KeyboardEvent): void => {
+      gridKeys.push(e.key);
+    };
+    host.addEventListener('keydown', onGridKey);
+    const overlay = host.querySelector<HTMLElement>('.fc-illustration');
+    if (!overlay) throw new Error('missing session illustration overlay');
+    firePointer(overlay, 'pointerdown');
+    firePointer(window, 'pointerup');
+
+    fireKey(overlay, 'a');
+    fireKey(overlay, 'Enter');
+    fireKey(overlay, 'F2');
+    expect(fireKey(overlay, 'c', { ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(fireKey(overlay, 'v', { metaKey: true }).defaultPrevented).toBe(true);
+    fireKey(overlay, 'z', { ctrlKey: true });
+    fireKey(overlay, 'Alt', { altKey: true });
+    expect(gridKeys).toEqual(['z', 'Alt']);
+
+    const duplicate = fireKey(overlay, 'd', { ctrlKey: true });
+    expect(duplicate.defaultPrevented).toBe(true);
+    expect(store.getState().illustrations.illustrations).toMatchObject([
+      { id: 'shape-1', x: 20, y: 30 },
+      { id: 'shape-1-copy', x: 44, y: 54 },
+    ]);
+    expect((document.activeElement as HTMLElement | null)?.dataset.illustrationId).toBe(
+      'shape-1-copy',
+    );
+    expect(store.getState().ui.selectedObject?.name).toBe('Rectangle 2');
+    expect(gridKeys).toEqual(['z', 'Alt']);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().illustrations.illustrations.map((item) => item.id)).toEqual([
+      'shape-1',
+    ]);
+
+    host.removeEventListener('keydown', onGridKey);
+    handle.detach();
+    host.remove();
+  });
+
   it('uses shared protection gates while moving or deleting overlays', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

@@ -13,7 +13,11 @@ import {
   sessionIllustrationById,
   updateSessionIllustration,
 } from '../../../src/commands/session-illustration.js';
-import { drawingAnchorOf, EMU_PER_PX } from '../../../src/engine/drawing-geometry.js';
+import {
+  drawingAnchorOf,
+  EMU_PER_PX,
+  sessionPosition,
+} from '../../../src/engine/drawing-geometry.js';
 import { hydrateImagesFromEngine } from '../../../src/engine/images-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
@@ -390,6 +394,45 @@ describe('session illustration commands', () => {
     } finally {
       wb?.dispose();
       first.dispose();
+    }
+  });
+
+  it('duplicates a native image offset from the original, with undo and redo', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const store = createSpreadsheetStore();
+      const history = new History();
+      const image = createSessionImage(
+        store,
+        range(2, 3, 2, 3),
+        { id: 'img-a', src: 'data:image/png;base64,x', bytes: PNG, wb, w: 40, h: 30 },
+        null,
+      );
+      if (!image?.nativeAnchor) throw new Error('image was not created');
+      const at = (id: string) => {
+        const anchor = sessionIllustrationById(store.getState(), id)?.nativeAnchor;
+        if (!anchor) throw new Error(`missing image ${id}`);
+        return sessionPosition(store, anchor);
+      };
+      const original = at('img-a');
+
+      const copy = duplicateSessionIllustration(store, 'img-a', history, wb);
+      if (!copy?.nativeObjectId) throw new Error('image was not duplicated');
+
+      const native = () => wb.listDrawingObjects(0).map((object) => object.objectId);
+      expect(native()).toEqual([image.nativeObjectId, copy.nativeObjectId]);
+      expect(at(copy.id).x).toBeCloseTo(original.x + 24, 0);
+      expect(at(copy.id).y).toBeCloseTo(original.y + 24, 0);
+      expect(at(copy.id).w).toBeCloseTo(original.w, 0);
+      expect(at('img-a')).toEqual(original);
+
+      expect(history.undo()).toBe(true);
+      expect(native()).toEqual([image.nativeObjectId]);
+      expect(history.redo()).toBe(true);
+      expect(native()).toEqual([image.nativeObjectId, copy.nativeObjectId]);
+      expect(at(copy.id).x).toBeCloseTo(original.x + 24, 0);
+    } finally {
+      wb.dispose();
     }
   });
 
