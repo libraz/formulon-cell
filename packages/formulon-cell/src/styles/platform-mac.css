@@ -16,6 +16,23 @@
   --fc-sheetbar-tab-max-width: 78px;
 }
 
+/* Light palette on Mac: the selection green and the selected-header fill
+ * measured from Excel for Mac (#217346, #f3f3f3). Dark and contrast palettes
+ * keep their own values. */
+@layer fc.theme {
+  :is(.fc-host, .fc-overlay-portal)[data-fc-platform="mac"]:is(
+    [data-fc-theme="paper"],
+    :not([data-fc-theme])
+  ) {
+    --fc-accent: #217346;
+    --fc-accent-strong: #185c37;
+    --fc-header-fg-active: #217346;
+    --fc-cell-bool-fg: #217346;
+    --fc-bg-header: #f3f3f3;
+    --fc-hover-stripe: rgba(33, 115, 70, 0.025);
+  }
+}
+
 /* The demo owns the title bar, but the selector remains here so a consumer
  * using the same toolbar chrome gets the same 40px geometry. */
 .demo[data-fc-platform="mac"] .fc-tb__titlebar {
@@ -634,16 +651,26 @@
   width: 160px;
 }
 
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles .fc-tb__ribbon-tools {
-  width: 168px;
-}
-
+/* Home's style tiles are at least the compact 60px Excel tile and grow with
+ * their two-line label: the longest word here, the narrowest two-line width
+ * in fit-ribbon.ts. The ribbon scrolls horizontally, so wider tiles stay
+ * reachable. */
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles .fc-tb__rb--wide {
-  width: 60px;
+  width: auto;
   min-width: 60px;
-  max-width: 60px;
+  max-width: none;
   padding-right: 3px;
   padding-left: 3px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--styles
+  .fc-tb__rb--wide
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  width: 54px;
+  min-width: min-content;
+  max-width: none;
 }
 
 /* In the vertical Home tiles, flex-basis controls the chevron's height.
@@ -660,46 +687,6 @@
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--cells .fc-tb__ribbon-tools {
   width: 84px;
-}
-
-/* Home's style tiles use a two-line label box. The compact 60px Excel tile is
- * enough for the short labels, but German/French and Japanese labels need a
- * wider track to keep the second line from being clipped. The ribbon itself
- * scrolls horizontally, so the extra width remains reachable at 390/640px. */
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
-  --fc-mac-table-tile-width: 60px;
-  --fc-mac-styles-tools-width: 188px;
-}
-
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles .fc-tb__ribbon-tools {
-  width: var(--fc-mac-styles-tools-width);
-}
-
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell
-  .fc-tb__ribbon-group--styles
-  > .fc-tb__ribbon-tools
-  > [data-ribbon-command="formatTableHome"] {
-  width: var(--fc-mac-table-tile-width);
-  min-width: var(--fc-mac-table-tile-width);
-  max-width: var(--fc-mac-table-tile-width);
-}
-
-/* These selectors intentionally follow the document language. The toolbar
- * host is shared by embedders and does not always carry its own lang attr. */
-:lang(ja) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
-  --fc-mac-table-tile-width: 72px;
-  --fc-mac-styles-tools-width: 200px;
-}
-
-:lang(de) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
-  --fc-mac-table-tile-width: 72px;
-  --fc-mac-styles-tools-width: 200px;
-}
-
-:lang(fr) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles {
-  --fc-mac-table-tile-width: 96px;
-  --fc-mac-styles-tools-width: 224px;
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing .fc-tb__ribbon-tools {

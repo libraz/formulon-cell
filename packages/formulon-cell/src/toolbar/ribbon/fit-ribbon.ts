@@ -40,6 +40,15 @@ const FIT_STAGES: readonly (readonly [string, (group: HTMLElement) => boolean])[
 
 const FIT_CLASSES = FIT_STAGES.map(([stage]) => stage);
 
+/** Mac Home style tiles: Excel sizes each to the narrowest width that keeps its
+ *  label on two lines. */
+const TWO_LINE_LABEL =
+  '.fc-tb__ribbon-group--styles .fc-tb__rb--wide > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron)';
+const TWO_LINE_LABELS = `:scope > .fc-tb__ribbon ${TWO_LINE_LABEL}`;
+const TWO_LINE_LABELS_IN_FIT_GROUP = FIT_CLASSES.map((stage) => `.${stage}${TWO_LINE_LABEL}`).join(
+  ', ',
+);
+
 const overflows = (panel: HTMLElement): boolean => panel.scrollWidth > panel.clientWidth + 1;
 
 const clearFit = (groups: Iterable<Element>): void => {
@@ -62,17 +71,61 @@ export const fitRibbonPanel = (panel: HTMLElement): void => {
   }
 };
 
+/** Narrowest width in `[from, to]` at which `linesAt` reports at most two lines;
+ *  `to` when none does. */
+export const twoLineLabelWidth = (
+  from: number,
+  to: number,
+  linesAt: (width: number) => number,
+): number => {
+  for (let width = Math.ceil(from); width < to; width++) {
+    if (linesAt(width) <= 2) return width;
+  }
+  return Math.ceil(to);
+};
+
+const lineCount = (label: HTMLElement): number => {
+  const range = label.ownerDocument.createRange();
+  range.selectNodeContents(label);
+  return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+};
+
+const fitTwoLineLabels = (shell: HTMLElement, enabled: boolean): void => {
+  for (const label of shell.querySelectorAll<HTMLElement>(TWO_LINE_LABELS)) {
+    label.style.removeProperty('width');
+    if (!enabled) continue;
+    const from = label.getBoundingClientRect().width;
+    if (from === 0) continue;
+    label.style.width = 'max-content';
+    const to = label.getBoundingClientRect().width;
+    if (to <= from) {
+      label.style.removeProperty('width');
+      continue;
+    }
+    const width = twoLineLabelWidth(from, to, (w) => {
+      label.style.width = `${w}px`;
+      return lineCount(label);
+    });
+    label.style.width = `${width}px`;
+  }
+};
+
 /** Refit the active panel under `root` now and whenever `root` changes width. */
 export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): void } => {
   const refit = (): void => {
     const shell = root.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-shell');
     if (!shell) return;
-    if (shell.classList.contains('fc-tb__ribbon-shell--singleLine')) {
-      clearFit(shell.querySelectorAll('.fc-tb__ribbon-group'));
-      return;
-    }
+    const singleLine = shell.classList.contains('fc-tb__ribbon-shell--singleLine');
+    clearFit(shell.querySelectorAll('.fc-tb__ribbon-group'));
+    fitTwoLineLabels(shell, root.dataset.fcPlatform === 'mac' && !singleLine);
+    if (singleLine) return;
     const panel = shell.querySelector<HTMLElement>(':scope > .fc-tb__ribbon:not([hidden])');
-    if (panel) fitRibbonPanel(panel);
+    if (!panel) return;
+    fitRibbonPanel(panel);
+    // A narrowed or condensed group lays its labels out on its own terms.
+    for (const label of panel.querySelectorAll<HTMLElement>(TWO_LINE_LABELS_IN_FIT_GROUP)) {
+      label.style.removeProperty('width');
+    }
   };
   let lastWidth = -1;
   const observer =
@@ -85,6 +138,8 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
           refit();
         });
   observer?.observe(root);
+  // Label widths depend on the loaded web font, which can settle after mount.
+  void root.ownerDocument.fonts?.ready.then(refit);
   return {
     refit,
     detach: () => observer?.disconnect(),

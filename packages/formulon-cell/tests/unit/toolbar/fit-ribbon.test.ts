@@ -5,6 +5,7 @@ import {
   RIBBON_GROUP_CONDENSED_CLASS,
   RIBBON_GROUP_ICON_ONLY_CLASS,
   RIBBON_GROUP_NARROW_CLASS,
+  twoLineLabelWidth,
 } from '../../../src/toolbar/ribbon/fit-ribbon.js';
 
 type GroupSpec = {
@@ -113,5 +114,22 @@ describe('toolbar/ribbon fit', () => {
     fit.refit();
     fit.detach();
     expect(classesOf(groups)).toEqual([[]]);
+  });
+});
+
+describe('toolbar/ribbon two-line label width', () => {
+  // A label of 120px set in words; lines = ceil(120 / width) stands in for layout.
+  const linesAt = (width: number): number => Math.ceil(120 / width);
+
+  it('returns the narrowest width that keeps the label on two lines', () => {
+    expect(twoLineLabelWidth(54, 120, linesAt)).toBe(60);
+  });
+
+  it('keeps the starting width when the label already fits on two lines', () => {
+    expect(twoLineLabelWidth(64, 120, linesAt)).toBe(64);
+  });
+
+  it('falls back to the single-line width when no narrower width fits', () => {
+    expect(twoLineLabelWidth(54, 90, () => 3)).toBe(90);
   });
 });
