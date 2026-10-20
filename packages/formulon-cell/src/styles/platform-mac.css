@@ -134,10 +134,49 @@
   > .fc-tb__ribbon-shell
   .fc-tb__ribbon-group--clipboard
   .fc-tb__ribbon-tools {
-  width: 84px;
-  grid-template-columns: 58px 26px;
+  width: max-content;
+  grid-template-columns: max-content max-content;
   grid-auto-rows: 24px;
   gap: 0;
+}
+
+/* Cut, Copy and Format Painter are icon-and-label rows beside Paste. */
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--clipboard
+  .fc-tb__rb--stacked {
+  grid-column: 2;
+  justify-content: flex-start;
+  gap: 3px;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 24px;
+  padding: 0 4px 0 2px;
+  font-size: 10px;
+  line-height: 1;
+  text-align: left;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--clipboard
+  .fc-tb__rb--stacked
+  > .fc-tb__rb-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--clipboard
+  .fc-tb__rb--stacked
+  > .fc-tb__rb-split-chevron {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 6px;
+  margin: 0 0 0 2px;
 }
 
 /* The large Paste tile also owns a split chevron. Keep its content inside
@@ -146,6 +185,7 @@
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--clipboard .fc-tb__rb--large {
   position: relative;
   box-sizing: border-box;
+  min-width: 48px;
   gap: 2px;
   padding: 3px 2px 4px;
   font-size: 10px;
@@ -167,6 +207,7 @@
   .fc-tb__ribbon-group--clipboard
   .fc-tb__rb--large
   > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  width: auto;
   min-height: 2em;
   max-height: 2em;
   line-height: 1;
@@ -651,13 +692,16 @@
   width: 160px;
 }
 
-/* Home's style tiles are at least the compact 60px Excel tile and grow with
- * their two-line label: the longest word here, the narrowest two-line width
- * in fit-ribbon.ts. The ribbon scrolls horizontally, so wider tiles stay
- * reachable. */
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--styles .fc-tb__rb--wide {
+/* Home's full-height tiles hug their label like Excel's. Style and editing
+ * labels take the narrowest two-line width (fit-ribbon.ts); the ribbon
+ * scrolls horizontally, so wider tiles stay reachable. */
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  :where([data-ribbon-panel="home"])
+  :is(.fc-tb__ribbon-group--tiles, .fc-tb__ribbon-group--editing)
+  .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
   width: auto;
-  min-width: 60px;
+  min-width: 44px;
   max-width: none;
   padding-right: 3px;
   padding-left: 3px;
@@ -665,12 +709,35 @@
 
 [data-fc-platform="mac"]
   > .fc-tb__ribbon-shell
-  .fc-tb__ribbon-group--styles
-  .fc-tb__rb--wide
+  :is(.fc-tb__ribbon-group--styles, .fc-tb__ribbon-group--editing)
+  .fc-tb__rb--wide:not(.fc-tb__rb--stacked)
   > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
   width: 54px;
   min-width: min-content;
   max-width: none;
+}
+
+/* Editing's AutoSum, Fill and Clear rows carry their chevron right after the
+ * label, as Excel does, rather than aligned to the column edge. */
+[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing .fc-tb__rb--stacked {
+  justify-self: start;
+  min-width: 0;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--editing
+  .fc-tb__rb--stacked
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  flex: 0 1 auto;
+}
+
+[data-fc-platform="mac"]
+  > .fc-tb__ribbon-shell
+  .fc-tb__ribbon-group--editing
+  .fc-tb__rb--stacked
+  > .fc-tb__rb-split-chevron {
+  margin: 0 0 0 2px;
 }
 
 /* In the vertical Home tiles, flex-basis controls the chevron's height.
@@ -683,82 +750,6 @@
   flex: 0 0 6px;
   width: 8px;
   height: 6px;
-}
-
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--cells .fc-tb__ribbon-tools {
-  width: 84px;
-}
-
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing .fc-tb__ribbon-tools {
-  width: 162px;
-  grid-template-columns: 40px 56px 56px;
-}
-
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing .fc-tb__rb--stacked {
-  width: 40px;
-  min-width: 40px;
-  max-width: 40px;
-}
-
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell
-  .fc-tb__ribbon-group--editing
-  .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
-  width: 56px;
-  min-width: 56px;
-  max-width: 56px;
-  padding-right: 2px;
-  padding-left: 2px;
-}
-
-/* The editing group has two full-height tiles after its stacked column. Keep
- * their grid tracks wide enough for translated labels; the same values also
- * ensure the button, icon, and chevron share one hit target without overlap. */
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
-  --fc-mac-sort-tile-width: 56px;
-  --fc-mac-find-tile-width: 56px;
-  --fc-mac-editing-tools-width: 162px;
-}
-
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing .fc-tb__ribbon-tools {
-  width: var(--fc-mac-editing-tools-width);
-  grid-template-columns: 40px var(--fc-mac-sort-tile-width) var(--fc-mac-find-tile-width);
-}
-
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell
-  .fc-tb__ribbon-group--editing
-  .fc-tb__ribbon-tools
-  > [data-ribbon-command="sortFilterHome"] {
-  width: var(--fc-mac-sort-tile-width);
-  min-width: var(--fc-mac-sort-tile-width);
-  max-width: var(--fc-mac-sort-tile-width);
-}
-
-[data-fc-platform="mac"]
-  > .fc-tb__ribbon-shell
-  .fc-tb__ribbon-group--editing
-  .fc-tb__ribbon-tools
-  > [data-ribbon-command="findHome"] {
-  width: var(--fc-mac-find-tile-width);
-  min-width: var(--fc-mac-find-tile-width);
-  max-width: var(--fc-mac-find-tile-width);
-}
-
-:lang(ja) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
-  --fc-mac-sort-tile-width: 60px;
-  --fc-mac-editing-tools-width: 166px;
-}
-
-:lang(de) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
-  --fc-mac-sort-tile-width: 60px;
-  --fc-mac-find-tile-width: 72px;
-  --fc-mac-editing-tools-width: 180px;
-}
-
-:lang(fr) [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--editing {
-  --fc-mac-find-tile-width: 80px;
-  --fc-mac-editing-tools-width: 184px;
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb,

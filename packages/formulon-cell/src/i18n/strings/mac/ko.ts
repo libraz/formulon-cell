@@ -139,4 +139,13 @@ export const macKo: MacStrings = {
     defineName: '이름 정의…',
     hyperlink: '하이퍼링크 삽입…',
   },
+  macHomeRibbon: {
+    conditional: '조건부 서식',
+    paste: '붙여넣기',
+    cut: '잘라내기',
+    copy: '복사',
+    formatPainter: '서식 복사',
+    cellStyles: '셀 스타일',
+    autoSum: '자동 합계',
+  },
 };

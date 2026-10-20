@@ -140,4 +140,13 @@ export const macFr: MacStrings = {
     defineName: 'Définir un nom…',
     hyperlink: 'Insérer un lien hypertexte…',
   },
+  macHomeRibbon: {
+    conditional: 'Mise en forme conditionnelle',
+    paste: 'Coller',
+    cut: 'Couper',
+    copy: 'Copier',
+    formatPainter: 'Reproduire la mise en forme',
+    cellStyles: 'Styles de cellule',
+    autoSum: 'Somme automatique',
+  },
 };

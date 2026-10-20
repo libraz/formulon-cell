@@ -15,7 +15,7 @@ export async function runMacHomeMenusScenario(page: Page): Promise<void> {
   await expect(alignment.locator('[data-ribbon-command="merge"]')).toHaveClass(
     /fc-tb__rb--stacked/,
   );
-  await expect(alignment.locator('[data-ribbon-command="wrap"]')).toContainText('Wrap text');
+  await expect(alignment.locator('[data-ribbon-command="wrap"]')).toContainText('Wrap Text');
   await expect(alignment.locator('[data-ribbon-command="merge"]')).toContainText('Merge & Center');
   const alignmentLayout = await alignment.locator('.fc-tb__ribbon-tools').evaluate((tools) => {
     const style = getComputedStyle(tools);
@@ -49,6 +49,27 @@ export async function runMacHomeMenusScenario(page: Page): Promise<void> {
   expect(alignmentLayout.mergeRow).toBeGreaterThan(alignmentLayout.wrapRow);
   expect(alignmentLayout.wrapLabelFits).toBe(true);
   expect(alignmentLayout.mergeLabelFits).toBe(true);
+
+  const home = page.locator('[data-ribbon-panel="home"]');
+  for (const [command, label] of [
+    ['cut', 'Cut'],
+    ['copy', 'Copy'],
+    ['formatPainter', 'Format'],
+    ['autosum', 'AutoSum'],
+    ['fillHome', 'Fill'],
+    ['clearFormat', 'Clear'],
+  ] as const) {
+    const button = home.locator(`.fc-tb__rb[data-ribbon-command="${command}"]`);
+    await expect(button).toHaveClass(/fc-tb__rb--stacked/);
+    await expect(button).toContainText(label);
+  }
+  for (const command of ['insertRows', 'deleteRows', 'formatCellsHome']) {
+    const button = home.locator(`.fc-tb__rb[data-ribbon-command="${command}"]`);
+    await expect(button).not.toHaveClass(/fc-tb__rb--stacked/);
+    await expect(button.locator('xpath=ancestor::section[1]')).toHaveClass(
+      /fc-tb__ribbon-group--tiles/,
+    );
+  }
 
   await sp.enter('A1', 'Formatted');
   await sp.goTo('A1');

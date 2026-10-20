@@ -660,6 +660,61 @@ describe('Mac Excel ribbon profile', () => {
     }
   });
 
+  it('lays out Mac Home clipboard, cells and editing like the desktop ribbon', () => {
+    const locales = ['en', 'ja', 'de', 'fr', 'zh', 'ko', 'th'] as const;
+    for (const locale of locales) {
+      const homeOf = (profile?: 'excel365Mac') =>
+        buildRibbonModel(locale, profile ? { profile } : {}).find((tab) => tab.id === 'home');
+      const macHome = homeOf('excel365Mac');
+      const genericHome = homeOf();
+      const commandsOf = (home: typeof macHome) =>
+        new Map(
+          home?.groups.flatMap((group) => group.commands).map((command) => [command.id, command]),
+        );
+      const mac = commandsOf(macHome);
+      const generic = commandsOf(genericHome);
+      const macLabels = dictionaries[locale].macHomeRibbon;
+
+      expect(mac.get('paste')).toMatchObject({ kind: 'large', label: macLabels.paste });
+      for (const [id, label] of [
+        ['cut', macLabels.cut],
+        ['copy', macLabels.copy],
+        ['formatPainter', macLabels.formatPainter],
+      ] as const) {
+        expect(mac.get(id), `${locale} ${id}`).toMatchObject({ kind: 'wide', layout: 'stacked' });
+        expect(mac.get(id)?.label).toBe(label);
+        expect(generic.get(id)?.kind).toBe('button');
+      }
+
+      const macCells = macHome?.groups.find(
+        (group) => group.title === dictionaries[locale].ribbon.cells,
+      );
+      expect(macCells?.variant).toBe('tiles');
+      expect(genericHome?.groups.find((group) => group.variant === 'cells')).toBeDefined();
+      for (const id of ['insertRows', 'deleteRows', 'formatCellsHome']) {
+        expect(mac.get(id), `${locale} ${id}`).toMatchObject({ kind: 'wide', layout: undefined });
+        expect(generic.get(id)?.layout).toBe('stacked');
+      }
+
+      for (const id of ['autosum', 'fillHome', 'clearFormat']) {
+        expect(mac.get(id), `${locale} ${id}`).toMatchObject({ kind: 'wide', layout: 'stacked' });
+        expect(mac.get(id)?.className ?? '').not.toContain('fc-tb__rb--mac-icon-only');
+      }
+      expect(mac.get('autosum')?.label).toBe(macLabels.autoSum);
+      expect(mac.get('conditional')?.label).toBe(macLabels.conditional);
+      expect(mac.get('cellStyles')?.label).toBe(macLabels.cellStyles);
+      expect(generic.get('paste')?.label).toBe(dictionaries[locale].ribbon.paste);
+      expect(generic.get('cellStyles')?.label).toBe(dictionaries[locale].ribbon.cellStyles);
+    }
+    expect(dictionaries.ja.macHomeRibbon).toMatchObject({
+      paste: 'ペースト',
+      formatPainter: '書式',
+      cellStyles: 'セルのスタイル',
+      autoSum: 'オート SUM',
+    });
+    expect(dictionaries.en.macHomeRibbon.formatPainter).toBe('Format');
+  });
+
   it('projects Mac checked states and contextual eligibility without accumulating titles', () => {
     const { instance, i18n, store } = testInstance();
     const host = document.createElement('div');

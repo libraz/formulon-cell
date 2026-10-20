@@ -138,4 +138,13 @@ export const macTh: MacStrings = {
     defineName: 'กำหนดชื่อ…',
     hyperlink: 'แทรกไฮเปอร์ลิงก์…',
   },
+  macHomeRibbon: {
+    conditional: 'การจัดรูปแบบตามเงื่อนไข',
+    paste: 'วาง',
+    cut: 'ตัด',
+    copy: 'คัดลอก',
+    formatPainter: 'ตัวคัดวางรูปแบบ',
+    cellStyles: 'สไตล์เซลล์',
+    autoSum: 'ผลรวมอัตโนมัติ',
+  },
 };

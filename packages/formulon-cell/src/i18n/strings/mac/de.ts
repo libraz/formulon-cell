@@ -141,4 +141,13 @@ export const macDe: MacStrings = {
     defineName: 'Namen definieren…',
     hyperlink: 'Hyperlink einfügen…',
   },
+  macHomeRibbon: {
+    conditional: 'Bedingte Formatierung',
+    paste: 'Einfügen',
+    cut: 'Ausschneiden',
+    copy: 'Kopieren',
+    formatPainter: 'Format übertragen',
+    cellStyles: 'Zellenformatvorlagen',
+    autoSum: 'AutoSumme',
+  },
 };

@@ -145,4 +145,13 @@ export const macJa: MacStrings = {
     defineName: '名前の定義...',
     hyperlink: 'ハイパーリンク...',
   },
+  macHomeRibbon: {
+    conditional: '条件付き 書式',
+    paste: 'ペースト',
+    cut: '切り取り',
+    copy: 'コピー',
+    formatPainter: '書式',
+    cellStyles: 'セルのスタイル',
+    autoSum: 'オート SUM',
+  },
 };

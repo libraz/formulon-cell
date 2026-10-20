@@ -139,4 +139,15 @@ export interface MacStrings {
     defineName: string;
     hyperlink: string;
   };
+  /** Home ribbon labels where the Mac desktop ribbon differs from the
+   * default profile's wording. */
+  macHomeRibbon: {
+    conditional: string;
+    paste: string;
+    cut: string;
+    copy: string;
+    formatPainter: string;
+    cellStyles: string;
+    autoSum: string;
+  };
 }

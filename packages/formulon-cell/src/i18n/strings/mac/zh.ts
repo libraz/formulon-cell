@@ -138,4 +138,13 @@ export const macZh: MacStrings = {
     defineName: '定义名称…',
     hyperlink: '插入超链接…',
   },
+  macHomeRibbon: {
+    conditional: '条件格式',
+    paste: '粘贴',
+    cut: '剪切',
+    copy: '复制',
+    formatPainter: '格式刷',
+    cellStyles: '单元格样式',
+    autoSum: '自动求和',
+  },
 };

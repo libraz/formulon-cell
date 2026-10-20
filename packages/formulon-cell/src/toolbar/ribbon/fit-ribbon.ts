@@ -40,14 +40,15 @@ const FIT_STAGES: readonly (readonly [string, (group: HTMLElement) => boolean])[
 
 const FIT_CLASSES = FIT_STAGES.map(([stage]) => stage);
 
-/** Mac Home style tiles: Excel sizes each to the narrowest width that keeps its
- *  label on two lines. */
+/** Mac Home style and editing tiles: Excel sizes each to the narrowest width
+ *  that keeps its label on two lines. */
 const TWO_LINE_LABEL =
-  '.fc-tb__ribbon-group--styles .fc-tb__rb--wide > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron)';
+  ':is(.fc-tb__ribbon-group--styles, .fc-tb__ribbon-group--editing) .fc-tb__rb--wide:not(.fc-tb__rb--stacked) > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron)';
 const TWO_LINE_LABELS = `:scope > .fc-tb__ribbon ${TWO_LINE_LABEL}`;
-const TWO_LINE_LABELS_IN_FIT_GROUP = FIT_CLASSES.map((stage) => `.${stage}${TWO_LINE_LABEL}`).join(
-  ', ',
-);
+// Icon-only only touches rows, so a tile keeps its fitted label there.
+const TWO_LINE_LABELS_IN_FIT_GROUP = [RIBBON_GROUP_NARROW_CLASS, RIBBON_GROUP_CONDENSED_CLASS]
+  .map((stage) => `.${stage}${TWO_LINE_LABEL}`)
+  .join(', ');
 
 const overflows = (panel: HTMLElement): boolean => panel.scrollWidth > panel.clientWidth + 1;
 
@@ -94,8 +95,12 @@ const fitTwoLineLabels = (shell: HTMLElement, enabled: boolean): void => {
   for (const label of shell.querySelectorAll<HTMLElement>(TWO_LINE_LABELS)) {
     label.style.removeProperty('width');
     if (!enabled) continue;
+    label.style.width = 'min-content';
     const from = label.getBoundingClientRect().width;
-    if (from === 0) continue;
+    if (from === 0) {
+      label.style.removeProperty('width');
+      continue;
+    }
     label.style.width = 'max-content';
     const to = label.getBoundingClientRect().width;
     if (to <= from) {

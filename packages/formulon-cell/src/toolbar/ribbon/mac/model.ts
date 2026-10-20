@@ -1,5 +1,5 @@
 import { allFunctionNames } from '../../../commands/function-categories.js';
-import { dictionaries } from '../../../i18n/strings.js';
+import { dictionaries, type Strings } from '../../../i18n/strings.js';
 import type { ExcelRibbonIconName } from '../../excel-ribbon-icons.js';
 import type {
   RibbonCommand,
@@ -688,20 +688,40 @@ const automateTab = (): RibbonTabModel =>
     ),
   ]);
 
-const MAC_HOME_ICON_ONLY_COMMAND_IDS = new Set(['autosum', 'fillHome', 'clearFormat']);
-const MAC_HOME_WIDE_STACKED_COMMAND_IDS = new Set(['wrap', 'merge']);
+/** Icon-and-label rows: Clipboard's small commands and Alignment's wrap/merge. */
+const MAC_HOME_WIDE_STACKED_COMMAND_IDS = new Set([
+  'wrap',
+  'merge',
+  'cut',
+  'copy',
+  'formatPainter',
+]);
+/** Cells commands are full-height tiles on Mac rather than rows. */
+const MAC_HOME_TILE_COMMAND_IDS = new Set(['insertRows', 'deleteRows', 'formatCellsHome']);
+const MAC_HOME_LABEL_KEYS: Readonly<Record<string, keyof Strings['macHomeRibbon']>> = {
+  paste: 'paste',
+  cut: 'cut',
+  copy: 'copy',
+  formatPainter: 'formatPainter',
+  conditional: 'conditional',
+  cellStyles: 'cellStyles',
+  autosum: 'autoSum',
+};
 
 const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonCommand => {
   const commandWithMacTitle = {
     ...candidate,
     title: candidate.title.replace(/\bCtrl\+/g, 'Cmd+'),
   };
+  const macLabelKey = MAC_HOME_LABEL_KEYS[candidate.id];
   const homeLabel =
     candidate.id === 'merge'
       ? dictionaries[lang].ribbon.mergeAndCenter
       : candidate.id === 'wrap' && lang === 'ja'
         ? '折り返して全体を表示する'
-        : undefined;
+        : macLabelKey
+          ? dictionaries[lang].macHomeRibbon[macLabelKey]
+          : undefined;
   const commandWithMacHomeLabel = homeLabel
     ? { ...commandWithMacTitle, title: homeLabel, label: homeLabel }
     : commandWithMacTitle;
@@ -712,19 +732,24 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
       layout: 'stacked',
     };
   }
-  if (!MAC_HOME_ICON_ONLY_COMMAND_IDS.has(candidate.id)) return commandWithMacHomeLabel;
-  return {
-    ...commandWithMacHomeLabel,
-    kind: 'button',
-    layout: 'stacked',
-    className: [candidate.className, 'fc-tb__rb--mac-icon-only'].filter(Boolean).join(' '),
-  };
+  if (MAC_HOME_TILE_COMMAND_IDS.has(candidate.id)) {
+    return { ...commandWithMacHomeLabel, kind: 'wide', layout: undefined };
+  }
+  return commandWithMacHomeLabel;
 };
 
 const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => ({
   ...home,
   groups: [
     ...home.groups.map((current) => {
+      if (current.variant === 'cells') {
+        // Tile layout rather than the shared stacked-rows layout.
+        return {
+          ...current,
+          variant: 'tiles',
+          commands: current.commands.map((candidate) => macHomeCommand(candidate, lang)),
+        };
+      }
       if (current.variant !== 'font') {
         return {
           ...current,

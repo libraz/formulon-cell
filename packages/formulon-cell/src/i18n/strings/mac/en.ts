@@ -139,4 +139,13 @@ export const macEn: MacStrings = {
     defineName: 'Define Name…',
     hyperlink: 'Hyperlink…',
   },
+  macHomeRibbon: {
+    conditional: 'Conditional Formatting',
+    paste: 'Paste',
+    cut: 'Cut',
+    copy: 'Copy',
+    formatPainter: 'Format',
+    cellStyles: 'Cell Styles',
+    autoSum: 'AutoSum',
+  },
 };
