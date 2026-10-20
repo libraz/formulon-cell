@@ -66,16 +66,16 @@ export const fitRibbonPanel = (panel: HTMLElement): void => {
       const group = groups[i] as HTMLElement;
       const before = group.getBoundingClientRect().width;
       const labels = stage === RIBBON_GROUP_ICON_ONLY_CLASS ? [] : tileLabels(group);
-      const saved = labels.map((label) => label.style.width);
+      const saved = labels.map((label) => [label.style.width, label.style.maxWidth] as const);
       group.classList.add(stage);
       for (const label of labels) {
         if (stage === RIBBON_GROUP_NARROW_CLASS) fitLabelToTwoLines(label);
-        else label.style.removeProperty('width');
+        else clearLabelWidth(label);
       }
       if (group.getBoundingClientRect().width >= before) {
         group.classList.remove(stage);
         labels.forEach((label, index) => {
-          label.style.width = saved[index] ?? '';
+          [label.style.width, label.style.maxWidth] = saved[index] ?? ['', ''];
         });
       }
     }
@@ -105,13 +105,21 @@ const tileLabels = (group: HTMLElement): HTMLElement[] => [
   ...group.querySelectorAll<HTMLElement>(TILE_LABELS),
 ];
 
+const clearLabelWidth = (label: HTMLElement): void => {
+  label.style.removeProperty('width');
+  label.style.removeProperty('max-width');
+};
+
+/** The fitted width overrides the stylesheet's label cap, so a label that
+ *  needs more room than the cap still gets its two lines. */
 const fitLabelToTwoLines = (label: HTMLElement): void => {
+  label.style.maxWidth = 'none';
   label.style.width = 'min-content';
   const from = label.getBoundingClientRect().width;
   label.style.width = 'max-content';
   const to = label.getBoundingClientRect().width;
   if (from === 0 || to <= from) {
-    label.style.removeProperty('width');
+    clearLabelWidth(label);
     return;
   }
   const width = twoLineLabelWidth(from, to, (w) => {
@@ -129,7 +137,7 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
     const singleLine = shell.classList.contains('fc-tb__ribbon-shell--singleLine');
     const groups = [...shell.querySelectorAll<HTMLElement>('.fc-tb__ribbon-group')];
     clearFit(groups);
-    for (const label of groups.flatMap(tileLabels)) label.style.removeProperty('width');
+    for (const label of groups.flatMap(tileLabels)) clearLabelWidth(label);
     if (root.dataset.fcPlatform === 'mac' && !singleLine) {
       for (const label of shell.querySelectorAll<HTMLElement>(TWO_LINE_LABELS)) {
         fitLabelToTwoLines(label);
@@ -137,7 +145,15 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
     }
     if (singleLine) return;
     const panel = shell.querySelector<HTMLElement>(':scope > .fc-tb__ribbon:not([hidden])');
-    if (panel) fitRibbonPanel(panel);
+    if (!panel) return;
+    // A tile label too long for two lines at its default width widens until it fits.
+    for (const group of panel.querySelectorAll<HTMLElement>(':scope > .fc-tb__ribbon-group')) {
+      if (!isTileGroup(group)) continue;
+      for (const label of tileLabels(group)) {
+        if (lineCount(label) > 2) fitLabelToTwoLines(label);
+      }
+    }
+    fitRibbonPanel(panel);
   };
   let lastWidth = -1;
   const observer =

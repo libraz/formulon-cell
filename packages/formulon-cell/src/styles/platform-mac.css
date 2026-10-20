@@ -953,17 +953,18 @@
   > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
   display: -webkit-box;
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: min-content;
   width: auto;
   max-width: 100%;
   max-height: 2.16em;
   align-self: stretch;
   overflow: hidden;
   text-overflow: ellipsis;
-  overflow-wrap: break-word;
+  overflow-wrap: normal;
   line-height: 1.08;
   white-space: normal;
-  /* The 44px family labels need character breaks to stay on two lines. */
+  /* CJK family labels need character breaks to stay on two lines; a Latin
+   * word is never split, so the tile grows to the longest one. */
   word-break: normal;
   text-wrap: wrap;
   -webkit-box-orient: vertical;
@@ -1077,7 +1078,8 @@
 
 /* German and French family names contain long compound labels. Widen only
  * those locale projections so the text remains readable at the same 9px
- * ribbon size; the panel already scrolls horizontally at compact widths. */
+ * ribbon size, and still grow a tile past it for a longer word; the panel
+ * already scrolls horizontally at compact widths. */
 [data-fc-platform="mac"]:is([lang="de"], [lang="fr"])
   > .fc-tb__ribbon-shell
   .fc-tb__ribbon-group--function-library
@@ -1093,9 +1095,9 @@
   .fc-tb__ribbon-group--function-library
   .fc-tb__ribbon-tools
   > .fc-tb__rb--stacked {
-  width: 80px;
+  width: min-content;
   min-width: 80px;
-  max-width: 80px;
+  max-width: none;
 }
 
 [data-fc-platform="mac"]:is([lang="zh"], [lang="ko"], [lang="th"])
@@ -1113,9 +1115,9 @@
   .fc-tb__ribbon-group--function-library
   .fc-tb__ribbon-tools
   > .fc-tb__rb--stacked {
-  width: 64px;
+  width: min-content;
   min-width: 64px;
-  max-width: 64px;
+  max-width: none;
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__rb--mac-checkbox {
