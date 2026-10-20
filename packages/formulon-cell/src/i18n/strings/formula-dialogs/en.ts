@@ -124,7 +124,7 @@ export const formulaDialogsEn: FormulaDialogsStrings = {
       recent: 'Recent',
       all: 'All',
       showAll: 'Show all functions',
-      insertFunction: 'Insert function',
+      insertFunction: 'Insert Function',
       result: 'Result',
       done: 'Done',
       close: 'Close',
