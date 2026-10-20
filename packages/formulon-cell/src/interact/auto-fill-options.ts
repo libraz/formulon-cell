@@ -175,6 +175,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
     try {
       wrote = fillRange(store.getState(), wb, current.src, current.dest, {
         copyOnly: mode === 'copy',
+        series: mode === 'series',
         formatting: formattingModeFor(mode),
         dateUnit: dateUnitFor(mode),
         store,

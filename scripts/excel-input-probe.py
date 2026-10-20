@@ -87,7 +87,8 @@ def _capture(elp: Any, xw: Any, tag: str, inputs: list[str], path: Path) -> None
         raise RuntimeError(f"{tag}: Excel close failed: {errors}")
 
 
-def _read_cells(path: Path, tag: str) -> dict[int, dict[str, Any]]:
+def read_sheet_cells(path: Path, tag: str) -> dict[tuple[int, int], dict[str, Any]]:
+    """Every stored cell of the first sheet as {(row, col): {t, v, code}}, 1-based."""
     z = zipfile.ZipFile(path)
     styles = ET.fromstring(z.read("xl/styles.xml"))
     custom = {int(n.get("numFmtId")): n.get("formatCode") for n in styles.findall("m:numFmts/m:numFmt", NS)}
@@ -96,11 +97,11 @@ def _read_cells(path: Path, tag: str) -> dict[int, dict[str, Any]]:
     if "xl/sharedStrings.xml" in z.namelist():
         for si in ET.fromstring(z.read("xl/sharedStrings.xml")).findall("m:si", NS):
             shared.append("".join(t.text or "" for t in si.iter(f"{{{NS['m']}}}t")))
-    cells: dict[int, dict[str, Any]] = {}
+    cells: dict[tuple[int, int], dict[str, Any]] = {}
     for c in ET.fromstring(z.read("xl/worksheets/sheet1.xml")).iter(f"{{{NS['m']}}}c"):
         ref = c.get("r") or ""
         col = re.match(r"[A-Z]+", ref)
-        if not col or col.group() != "A":
+        if not col:
             continue
         kind = c.get("t", "n")
         v = c.find("m:v", NS)
@@ -110,31 +111,44 @@ def _read_cells(path: Path, tag: str) -> dict[int, dict[str, Any]]:
         inline = c.find("m:is", NS)
         if inline is not None:
             value = "".join(t.text or "" for t in inline.iter(f"{{{NS['m']}}}t"))
+        if value is None:
+            continue
         num_fmt_id = xf_ids[int(c.get("s", 0))]
         code = custom.get(num_fmt_id) or LOCALE_BUILTIN.get(tag, {}).get(num_fmt_id) or BUILTIN.get(num_fmt_id)
         if code is None:
             raise RuntimeError(f"{tag} {ref}: unknown built-in numFmtId {num_fmt_id}")
-        cells[int(ref[len(col.group()):])] = {"t": kind, "v": value, "code": code}
+        col_index = 0
+        for ch in col.group():
+            col_index = col_index * 26 + ord(ch) - 64
+        cells[(int(ref[len(col.group()):]), col_index)] = {"t": kind, "v": value, "code": code}
     return cells
 
 
+def _read_cells(path: Path, tag: str) -> dict[int, dict[str, Any]]:
+    return {row: cell for (row, col), cell in read_sheet_cells(path, tag).items() if col == 1}
+
+
+def cell_record(cell: dict[str, Any]) -> dict[str, Any]:
+    """A stored cell as {kind, value, format?}; General is left implicit."""
+    if cell["t"] == "n":
+        record: dict[str, Any] = {"kind": "number", "value": float(cell["v"])}
+        if cell["code"] != "General":
+            record["format"] = cell["code"]
+        return record
+    if cell["t"] == "b":
+        return {"kind": "bool", "value": cell["v"] == "1"}
+    if cell["t"] == "e":
+        return {"kind": "error", "value": cell["v"]}
+    return {"kind": "text", "value": cell["v"]}
+
+
 def _case(text: str, cell: dict[str, Any] | None, year: int) -> dict[str, Any]:
-    case: dict[str, Any] = {"input": text}
     if cell is None:
         raise RuntimeError(f"no cell stored for {text!r}")
-    if cell["t"] == "n":
-        value = float(cell["v"])
-        case.update(kind="number", value=value)
-        if cell["code"] != "General":
-            case["format"] = cell["code"]
-            if 61 <= value < 2958466 and (EPOCH + dt.timedelta(days=int(value))).year == year:
-                case["currentYear"] = True
-    elif cell["t"] == "b":
-        case.update(kind="bool", value=cell["v"] == "1")
-    elif cell["t"] == "e":
-        case.update(kind="error", value=cell["v"])
-    else:
-        case.update(kind="text", value=cell["v"])
+    case: dict[str, Any] = {"input": text, **cell_record(cell)}
+    value = case["value"]
+    if "format" in case and 61 <= value < 2958466 and (EPOCH + dt.timedelta(days=int(value))).year == year:
+        case["currentYear"] = True
     return case
 
 

@@ -4,6 +4,13 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialFromDate, excelSerialToDate } from '../format/date-serial.js';
 import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import {
+  sameTextSeries,
+  type TextSeriesAtom,
+  textSeriesAtom,
+  textSeriesValue,
+} from './autofill-series.js';
+import { inputLocaleForWorkbook } from './coerce-input.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
 import type { History } from './history.js';
 import { isCellWritable } from './protection.js';
@@ -26,136 +33,11 @@ interface SourceCell {
   bool: boolean | null;
   errorCode: number | null;
   blank: boolean;
+  /** Number format family: dates step by days or months, times by hours. */
+  dateKind: 'date' | 'time' | null;
 }
 
 const MAX_FILL_RANGE_CELLS = 100_000;
-
-const FULLWIDTH_ZERO = '０'.codePointAt(0) ?? 0xff10;
-
-const toAsciiDigits = (s: string): string =>
-  [...s]
-    .map((ch) => {
-      const cp = ch.codePointAt(0) ?? 0;
-      if (cp >= 0xff10 && cp <= 0xff19) return String(cp - FULLWIDTH_ZERO);
-      return ch;
-    })
-    .join('');
-
-const toFullwidthDigits = (s: string): string =>
-  [...s]
-    .map((ch) => (ch >= '0' && ch <= '9' ? String.fromCodePoint(FULLWIDTH_ZERO + Number(ch)) : ch))
-    .join('');
-
-const formatTrailingNumber = (
-  n: number,
-  width: number,
-  fullwidth: boolean,
-  minus: '-' | '－',
-): string => {
-  const sign = n < 0 ? '-' : '';
-  const abs = Math.abs(Math.trunc(n));
-  const ascii = `${sign}${String(abs).padStart(width, '0')}`;
-  const digits = fullwidth ? toFullwidthDigits(ascii) : ascii;
-  return minus === '－' ? digits.replace('-', '－') : digits;
-};
-
-const numericFromText = (
-  s: string,
-): { prefix: string; n: number; width: number; fullwidth: boolean; minus: '-' | '－' } | null => {
-  const m = s.match(/^(.*?)([-－]?[0-9０-９]+)$/);
-  if (!m) return null;
-  const prefix = m[1] ?? '';
-  const rawDigits = m[2] ?? '';
-  const minus = rawDigits.startsWith('－') ? '－' : '-';
-  const fullwidth = /[０-９]/.test(rawDigits) && !/[0-9]/.test(rawDigits);
-  const normalized = toAsciiDigits(rawDigits.replace('－', '-'));
-  const n = Number(normalized);
-  if (!Number.isFinite(n)) return null;
-  return {
-    prefix,
-    n,
-    width: normalized.startsWith('-') ? normalized.length - 1 : normalized.length,
-    fullwidth,
-    minus,
-  };
-};
-
-/** Custom-list series — spreadsheets ship these by default. Each list represents
- *  a closed cycle that auto-fill steps through. Casing of the source is
- *  preserved by matching against the lowercased list. */
-export const CUSTOM_LISTS: readonly string[][] = [
-  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-  ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-  ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-  [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ],
-  ['日', '月', '火', '水', '木', '金', '土'],
-  ['(日)', '(月)', '(火)', '(水)', '(木)', '(金)', '(土)'],
-  ['日曜', '月曜', '火曜', '水曜', '木曜', '金曜', '土曜'],
-  ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'],
-  ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-  [
-    '１月',
-    '２月',
-    '３月',
-    '４月',
-    '５月',
-    '６月',
-    '７月',
-    '８月',
-    '９月',
-    '１０月',
-    '１１月',
-    '１２月',
-  ],
-  ['Q1', 'Q2', 'Q3', 'Q4'],
-  ['Q１', 'Q２', 'Q３', 'Q４'],
-  ['QI', 'QII', 'QIII', 'QIV'],
-  ['第1四半期', '第2四半期', '第3四半期', '第4四半期'],
-  ['第１四半期', '第２四半期', '第３四半期', '第４四半期'],
-];
-
-/** Find the custom list (if any) that contains every source value. Returns
- *  the list and the list-indices of each source cell, or null when no single
- *  list matches all of them. */
-function matchCustomList(values: string[]): { list: readonly string[]; indices: number[] } | null {
-  for (const list of CUSTOM_LISTS) {
-    const indices: number[] = [];
-    let ok = true;
-    for (const v of values) {
-      const idx = list.findIndex((item) => item.toLowerCase() === v.toLowerCase());
-      if (idx < 0) {
-        ok = false;
-        break;
-      }
-      indices.push(idx);
-    }
-    if (ok) return { list, indices };
-  }
-  return null;
-}
-
-const alphaChars = (s: string): string[] => [...s].filter((ch) => /[A-Za-z]/.test(ch));
-
-const applyAlphaCase = (value: string, source: string): string => {
-  const letters = alphaChars(source);
-  if (letters.length === 0) return value;
-  if (letters.every((ch) => ch === ch.toUpperCase())) return value.toUpperCase();
-  if (letters.every((ch) => ch === ch.toLowerCase())) return value.toLowerCase();
-  return value;
-};
 
 function readSource(state: State, src: Range): SourceCell[][] {
   const sheet = src.sheet;
@@ -174,10 +56,12 @@ function readSource(state: State, src: Range): SourceCell[][] {
           bool: null,
           errorCode: null,
           blank: true,
+          dateKind: null,
         });
         continue;
       }
       const v = cell.value;
+      const fmtKind = state.format.formats.get(addrKey({ sheet, row: r, col: c }))?.numFmt?.kind;
       row.push({
         row: r,
         col: c,
@@ -187,6 +71,12 @@ function readSource(state: State, src: Range): SourceCell[][] {
         bool: v.kind === 'bool' ? v.value : null,
         errorCode: v.kind === 'error' ? v.code : null,
         blank: v.kind === 'blank' && !cell.formula,
+        dateKind:
+          fmtKind === 'date' || fmtKind === 'datetime'
+            ? 'date'
+            : fmtKind === 'time'
+              ? 'time'
+              : null,
       });
     }
     out.push(row);
@@ -225,14 +115,16 @@ type ProjectedCell =
   | { kind: 'formula'; formula: string; source: SourceCell }
   | { kind: 'blank' };
 
-/**
- * Inspect a 1D source line and produce a series projector. Excel's default
- * AutoFill uses a least-squares linear trend for a numeric source, rather than
- * interpreting a stable ratio as a growth series. Formula slots in a mixed
- * source are tiled with shifted references; numeric slots advance by one per
- * repeated cycle and all other typed slots are copied as-is.
- */
 type DateFillUnit = 'days' | 'weekdays' | 'months' | 'years';
+
+interface ProjectionContext {
+  locale: string | undefined;
+  dateUnit?: DateFillUnit;
+  /** Fill Series: a lone number steps by one instead of repeating. */
+  series?: boolean;
+  /** -1 when filling up or left, where the line arrives reversed. */
+  sign: 1 | -1;
+}
 
 const serialToDate = (serial: number): Date => excelSerialToDate(serial) ?? new Date(Number.NaN);
 
@@ -242,13 +134,11 @@ const dateToSerial = (date: Date, fraction: number): number =>
 const daysInMonth = (year: number, month: number): number =>
   new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
-const addMonthsClamped = (date: Date, months: number): Date => {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth() + months;
-  const day = date.getUTCDate();
-  const first = new Date(Date.UTC(year, month, 1));
+const addMonthsClamped = (date: Date, months: number, endOfMonth = false): Date => {
+  const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
   const maxDay = daysInMonth(first.getUTCFullYear(), first.getUTCMonth());
-  return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(day, maxDay)));
+  const day = endOfMonth ? maxDay : Math.min(date.getUTCDate(), maxDay);
+  return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), day));
 };
 
 const addWeekdays = (date: Date, weekdays: number): Date => {
@@ -263,7 +153,12 @@ const addWeekdays = (date: Date, weekdays: number): Date => {
   return next;
 };
 
-function buildDateProjection(line: SourceCell[], unit: DateFillUnit): SeriesProjection | null {
+/** Auto Fill Options' explicit date units step from the last source cell. */
+function buildDateUnitProjection(
+  line: SourceCell[],
+  unit: DateFillUnit,
+  sign: 1 | -1,
+): SeriesProjection | null {
   if (line.length === 0 || !line.every((c) => c.numeric !== null && c.formula === null)) {
     return null;
   }
@@ -272,152 +167,198 @@ function buildDateProjection(line: SourceCell[], unit: DateFillUnit): SeriesProj
   const lastDate = serialToDate(last);
   return {
     at: (i) => {
-      if (unit === 'days') return { kind: 'number', value: last + i };
+      const step = i * sign;
+      if (unit === 'days') return { kind: 'number', value: last + step };
       const date =
         unit === 'weekdays'
-          ? addWeekdays(lastDate, i)
-          : unit === 'months'
-            ? addMonthsClamped(lastDate, i)
-            : addMonthsClamped(lastDate, i * 12);
+          ? addWeekdays(lastDate, step)
+          : addMonthsClamped(lastDate, unit === 'months' ? step : step * 12);
       return { kind: 'number', value: dateToSerial(date, fraction) };
     },
   };
 }
 
-function buildProjection(
-  line: SourceCell[],
-  dateUnit?: DateFillUnit,
-  numericCycleSign: 1 | -1 = 1,
-): SeriesProjection {
-  if (line.length === 0) {
-    return { at: () => null };
+/** Least-squares line through `ys` at x = 0..n-1, as AutoFill extends a trend. */
+const linearFit = (ys: readonly number[]): ((x: number) => number) => {
+  const n = ys.length;
+  const meanX = (n - 1) / 2;
+  const meanY = ys.reduce((sum, y) => sum + y, 0) / n;
+  let covariance = 0;
+  let variance = 0;
+  ys.forEach((y, x) => {
+    covariance += (x - meanX) * (y - meanY);
+    variance += (x - meanX) ** 2;
+  });
+  const slope = variance === 0 ? 0 : covariance / variance;
+  return (x) => meanY + slope * (x - meanX);
+};
+
+/** A run of consecutive source cells that extend as one series. `at(x)` is the
+ *  value at series position x, where the source occupies 0..length-1. */
+interface Run {
+  length: number;
+  at(x: number): ProjectedCell | null;
+}
+
+const copyRun = (cells: SourceCell[]): Run => ({
+  length: cells.length,
+  at: (x) => projectedCell(cells[x % cells.length]),
+});
+
+/** Dates with one day of the month (or all month ends) step by months; dates a
+ *  whole number of days apart step by days; any other dates repeat. */
+function dateRun(cells: SourceCell[], ctx: ProjectionContext): Run {
+  const values = cells.map((c) => c.numeric ?? 0);
+  const k = values.length;
+  const first = values[0] ?? 0;
+  if (k === 1) {
+    const unit = cells[0]?.dateKind === 'time' ? 1 / 24 : 1;
+    return { length: 1, at: (x) => ({ kind: 'number', value: first + ctx.sign * x * unit }) };
   }
-  const dateProjection = dateUnit ? buildDateProjection(line, dateUnit) : null;
-  if (dateProjection) return dateProjection;
-  // All numeric?
-  if (line.every((c) => c.numeric !== null && c.formula === null)) {
-    if (line.length === 1) {
-      const v = line[0]?.numeric ?? 0;
-      return { at: () => ({ kind: 'number', value: v }) };
-    }
-    // Fit y = intercept + slope*x for x = 0, …, n-1. This gives Excel's
-    // default linear-trend projection for irregular samples such as 1, 2, 4.
-    const n = line.length;
-    const meanX = (n - 1) / 2;
-    const meanY = line.reduce((sum, cell) => sum + (cell.numeric ?? 0), 0) / n;
-    let covariance = 0;
-    let variance = 0;
-    for (let x = 0; x < n; x += 1) {
-      const dx = x - meanX;
-      covariance += dx * ((line[x]?.numeric ?? 0) - meanY);
-      variance += dx * dx;
-    }
-    const slope = variance === 0 ? 0 : covariance / variance;
-    const intercept = meanY - slope * meanX;
+  if (cells[0]?.dateKind === 'time') {
+    const trend = linearFit(values);
+    return { length: k, at: (x) => ({ kind: 'number', value: trend(x) }) };
+  }
+  const dates = values.map(serialToDate);
+  const monthIndex = (d: Date): number => d.getUTCFullYear() * 12 + d.getUTCMonth();
+  const isMonthEnd = (d: Date): boolean =>
+    d.getUTCDate() === daysInMonth(d.getUTCFullYear(), d.getUTCMonth());
+  const months = dates.slice(1).map((d, i) => monthIndex(d) - monthIndex(dates[i] as Date));
+  const monthStep = months[0] ?? 0;
+  const endOfMonth = dates.every(isMonthEnd);
+  if (
+    monthStep !== 0 &&
+    months.every((m) => m === monthStep) &&
+    (endOfMonth || dates.every((d) => d.getUTCDate() === dates[0]?.getUTCDate()))
+  ) {
+    const anchor = dates[0] as Date;
+    const fraction = first - Math.floor(first);
     return {
-      at: (i) => ({ kind: 'number', value: intercept + slope * (n - 1 + i) }),
+      length: k,
+      at: (x) => ({
+        kind: 'number',
+        value: dateToSerial(addMonthsClamped(anchor, monthStep * x, endOfMonth), fraction),
+      }),
     };
   }
+  const days = values.slice(1).map((v, i) => Math.trunc(v - (values[i] ?? 0)));
+  const dayStep = days[0] ?? 0;
+  if (days.every((d) => d === dayStep)) {
+    const last = values[k - 1] ?? 0;
+    return { length: k, at: (x) => ({ kind: 'number', value: last + dayStep * (x - k + 1) }) };
+  }
+  return copyRun(cells);
+}
 
-  // Custom list match (e.g. Mon/Tue/Wed, Jan/Feb...) — preserves the casing
-  // of the *list*, not the source.
-  if (line.every((c) => c.text !== null && c.formula === null)) {
-    const values = line.map((c) => c.text ?? '');
-    const lm = matchCustomList(values);
-    if (lm) {
-      const lastIdx = lm.indices[lm.indices.length - 1] ?? 0;
-      const step =
-        lm.indices.length >= 2
-          ? (lastIdx - (lm.indices[0] ?? 0)) / Math.max(1, lm.indices.length - 1)
-          : 1;
-      const stepInt = lm.indices.length >= 2 ? Math.round(step) : 1;
-      return {
-        at: (i) => {
-          const target = lastIdx + stepInt * i;
-          const len = lm.list.length;
-          const idx = ((target % len) + len) % len;
-          const value = lm.list[idx] ?? '';
-          return { kind: 'text', value: applyAlphaCase(value, values[values.length - 1] ?? value) };
-        },
-      };
+function numberRun(cells: SourceCell[], ctx: ProjectionContext, lone: boolean): Run {
+  const values = cells.map((c) => c.numeric ?? 0);
+  if (values.length === 1) {
+    const v = values[0] ?? 0;
+    // A lone number repeats unless Fill Series asks for steps; inside a mixed
+    // source it steps by one per cycle.
+    const step = lone && !ctx.series ? 0 : ctx.sign;
+    return { length: 1, at: (x) => ({ kind: 'number', value: v + step * x }) };
+  }
+  const trend = linearFit(values);
+  return { length: values.length, at: (x) => ({ kind: 'number', value: trend(x) }) };
+}
+
+function textRun(cells: SourceCell[], atoms: TextSeriesAtom[], ctx: ProjectionContext): Run {
+  const shape = atoms[atoms.length - 1] as TextSeriesAtom;
+  const casing = cells[0]?.text ?? '';
+  // List positions are unwrapped so Sat, Sun steps forward by one.
+  const positions: number[] = [];
+  atoms.forEach((atom, i) => {
+    const raw = atom.kind === 'list' ? atom.index : atom.n;
+    const prev = positions[i - 1];
+    if (prev === undefined || atom.kind !== 'list') {
+      positions.push(raw);
+      return;
     }
-  }
+    const len = atom.list.length;
+    let diff = (((raw - prev) % len) + len) % len;
+    if (diff > len / 2) diff -= len;
+    positions.push(prev + diff);
+  });
+  const start = positions[0] ?? 0;
+  const trend = positions.length === 1 ? (x: number) => start + ctx.sign * x : linearFit(positions);
+  return {
+    length: atoms.length,
+    at: (x) => ({
+      kind: 'text',
+      value: textSeriesValue(shape, Math.round(trend(x)), ctx.locale, casing),
+    }),
+  };
+}
 
-  // Trailing-integer text? Need every cell to have the same prefix and a numeric tail.
-  if (line.every((c) => c.text !== null && c.formula === null)) {
-    const parsed = line.map((c) => numericFromText(c.text ?? ''));
-    if (parsed.every((p) => p !== null)) {
-      const first = parsed[0];
-      if (first && parsed.every((p) => p?.prefix === first.prefix)) {
-        if (line.length === 1) {
-          // Single cell: increment by 1 each step.
-          return {
-            at: (i) => ({
-              kind: 'text',
-              value: `${first.prefix}${formatTrailingNumber(
-                first.n + i,
-                first.width,
-                first.fullwidth,
-                first.minus,
-              )}`,
-            }),
-          };
-        }
-        let stepSum = 0;
-        for (let i = 1; i < parsed.length; i += 1) {
-          stepSum += (parsed[i]?.n ?? 0) - (parsed[i - 1]?.n ?? 0);
-        }
-        const step = stepSum / (parsed.length - 1);
-        const last = parsed[parsed.length - 1]?.n ?? 0;
-        const lastParsed = parsed[parsed.length - 1];
-        return {
-          at: (i) => ({
-            kind: 'text',
-            value: `${first.prefix}${formatTrailingNumber(
-              Math.round(last + step * i),
-              lastParsed?.width ?? first.width,
-              lastParsed?.fullwidth ?? first.fullwidth,
-              lastParsed?.minus ?? first.minus,
-            )}`,
-          }),
-        };
-      }
+type SlotKind =
+  | { type: 'number' }
+  | { type: 'date' }
+  | { type: 'text'; atom: TextSeriesAtom }
+  | { type: 'single' };
+
+const slotKind = (cell: SourceCell, locale: string | undefined): SlotKind => {
+  if (cell.formula !== null) return { type: 'single' };
+  if (cell.numeric !== null) return cell.dateKind ? { type: 'date' } : { type: 'number' };
+  if (cell.text !== null) {
+    const atom = textSeriesAtom(cell.text, locale);
+    if (atom) return { type: 'text', atom };
+  }
+  return { type: 'single' };
+};
+
+const sameRun = (a: SlotKind, b: SlotKind, cellA: SourceCell, cellB: SourceCell): boolean => {
+  if (a.type === 'text' && b.type === 'text') return sameTextSeries(a.atom, b.atom);
+  if (a.type === 'date' && b.type === 'date') return cellA.dateKind === cellB.dateKind;
+  return a.type === 'number' && b.type === 'number';
+};
+
+/**
+ * Inspect a 1D source line and produce a series projector. The line splits
+ * into runs of consecutive cells of one kind (numbers, dates, one list or one
+ * numbered text); each run extends as its own series each time the source
+ * pattern repeats, and every other cell, formulas included, repeats as-is.
+ */
+function buildProjection(line: SourceCell[], ctx: ProjectionContext): SeriesProjection {
+  if (line.length === 0) return { at: () => null };
+  if (ctx.dateUnit) {
+    const projection = buildDateUnitProjection(line, ctx.dateUnit, ctx.sign);
+    if (projection) return projection;
+  }
+  const kinds = line.map((cell) => slotKind(cell, ctx.locale));
+  const slots: { run: Run; offset: number }[] = [];
+  let start = 0;
+  while (start < line.length) {
+    const kind = kinds[start] as SlotKind;
+    let end = start + 1;
+    while (
+      end < line.length &&
+      kind.type !== 'single' &&
+      sameRun(kind, kinds[end] as SlotKind, line[start] as SourceCell, line[end] as SourceCell)
+    ) {
+      end += 1;
     }
+    const cells = line.slice(start, end);
+    const run =
+      kind.type === 'number'
+        ? numberRun(cells, ctx, line.length === 1)
+        : kind.type === 'date'
+          ? dateRun(cells, ctx)
+          : kind.type === 'text'
+            ? textRun(
+                cells,
+                kinds.slice(start, end).map((k) => (k as { atom: TextSeriesAtom }).atom),
+                ctx,
+              )
+            : copyRun(cells);
+    for (let offset = 0; offset < cells.length; offset += 1) slots.push({ run, offset });
+    start = end;
   }
-
-  // A mixed formula/value source repeats its slots. Formula refs shift from
-  // their original source address, while numeric slots advance one per cycle.
-  // This branch also handles formula-only lines, preserving formula errors as
-  // formulas rather than converting their current error result to a literal.
-  if (line.some((c) => c.formula !== null)) {
-    return {
-      at: (i) => {
-        const cycle = Math.floor((i - 1) / line.length) + 1;
-        const idx = (((i - 1) % line.length) + line.length) % line.length;
-        const c = line[idx];
-        if (!c) return null;
-        if (c.formula !== null) return { kind: 'formula', formula: c.formula, source: c };
-        if (c.numeric !== null)
-          return { kind: 'number', value: c.numeric + numericCycleSign * cycle };
-        if (c.text !== null) return { kind: 'text', value: c.text };
-        if (c.bool !== null) return { kind: 'bool', value: c.bool };
-        if (c.errorCode !== null) return { kind: 'error', code: c.errorCode };
-        return { kind: 'blank' };
-      },
-    };
-  }
-
-  // Cycle/copy for non-formula typed values.
   return {
     at: (i) => {
-      const idx = (((i - 1) % line.length) + line.length) % line.length;
-      const c = line[idx];
-      if (!c) return null;
-      if (c.numeric !== null) return { kind: 'number', value: c.numeric };
-      if (c.text !== null) return { kind: 'text', value: c.text };
-      if (c.bool !== null) return { kind: 'bool', value: c.bool };
-      if (c.errorCode !== null) return { kind: 'error', code: c.errorCode };
-      return { kind: 'blank' };
+      const cycle = Math.floor((i - 1) / line.length) + 1;
+      const slot = slots[(i - 1) % line.length];
+      return slot ? slot.run.at(slot.run.length * cycle + slot.offset) : null;
     },
   };
 }
@@ -521,6 +462,8 @@ export interface FillOptions {
   formatting?: FillFormattingMode;
   /** Explicit date-series Auto Fill option. */
   dateUnit?: DateFillUnit;
+  /** Fill Series Auto Fill option: a lone number steps by one instead of repeating. */
+  series?: boolean;
   /** Required when `formatting` should write cell formats. */
   store?: SpreadsheetStore;
 }
@@ -580,6 +523,11 @@ function applyFillRange(
   const dir = opts?.copyOnly ? 'copy' : detectDirection(src, dest);
   const sheet = src.sheet;
   const source = readSource(state, src);
+  const series = {
+    locale: inputLocaleForWorkbook(wb),
+    dateUnit: opts?.dateUnit,
+    series: opts?.series,
+  };
   const writeValues = opts?.formatting !== 'only';
   const writeFormats = opts?.store && opts.formatting !== 'without';
   let wroteValues = false;
@@ -589,7 +537,7 @@ function applyFillRange(
     const cols = src.c1 - src.c0 + 1;
     for (let c = 0; c < cols; c += 1) {
       const line: SourceCell[] = source.map((row) => row[c] as SourceCell);
-      const proj = buildProjection(line, opts?.dateUnit);
+      const proj = buildProjection(line, { ...series, sign: 1 });
       if (dir === 'down') {
         const ext = dest.r1 - src.r1;
         for (let i = 1; i <= ext; i += 1) {
@@ -602,7 +550,7 @@ function applyFillRange(
         // Up: extension index 1 is the row just above src.r0.
         const ext = src.r0 - dest.r0;
         const reversed = [...line].reverse();
-        const projUp = buildProjection(reversed, opts?.dateUnit, -1);
+        const projUp = buildProjection(reversed, { ...series, sign: -1 });
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 - i;
           const destCol = src.c0 + c;
@@ -621,7 +569,7 @@ function applyFillRange(
     const rows = src.r1 - src.r0 + 1;
     for (let r = 0; r < rows; r += 1) {
       const line: SourceCell[] = source[r] ?? [];
-      const proj = buildProjection(line, opts?.dateUnit);
+      const proj = buildProjection(line, { ...series, sign: 1 });
       if (dir === 'right') {
         const ext = dest.c1 - src.c1;
         for (let i = 1; i <= ext; i += 1) {
@@ -633,7 +581,7 @@ function applyFillRange(
       } else {
         const ext = src.c0 - dest.c0;
         const reversed = [...line].reverse();
-        const projLeft = buildProjection(reversed, opts?.dateUnit, -1);
+        const projLeft = buildProjection(reversed, { ...series, sign: -1 });
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 + r;
           const destCol = src.c0 - i;

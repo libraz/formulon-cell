@@ -5,8 +5,8 @@ import { fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { customListsFor } from './autofill-series.js';
 import { recordCommentChange } from './comment.js';
-import { CUSTOM_LISTS } from './fill.js';
 import { inferAutoFilterRange } from './filter.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
@@ -204,6 +204,7 @@ const nativeSortPermutation = (
   if (count <= 0) return [];
   if (count > MAX_NATIVE_SORT_ROWS) return null;
 
+  const builtInLists = customListsFor(localeForWorkbook(wb));
   const byKey = sortKeys.map((key) => {
     const direction = key.direction === 'desc' ? -1 : 1;
     const sortOn = key.sortOn ?? 'value';
@@ -212,7 +213,7 @@ const nativeSortPermutation = (
     }
     const ranks: number[] = [];
     for (let row = startRow; row <= range.r1; row += 1) {
-      const sortValue = sortKeyForCell(state, range.sheet, row, key);
+      const sortValue = sortKeyForCell(state, range.sheet, row, key, builtInLists);
       if (sortOn === 'cellColor' || sortOn === 'fontColor') {
         ranks.push(sortValue.match === true ? 0 : 1);
       } else {
@@ -354,8 +355,7 @@ const normalizeListKey = (value: string): string => value.trim().toLocaleLowerCa
 
 type SortValueKind = 'number' | 'text' | 'bool' | 'error' | 'blank' | 'color' | 'custom';
 
-const customListIndex = (value: string, list?: readonly string[]): number | null => {
-  const lists = list ? [list] : CUSTOM_LISTS;
+const customListIndex = (value: string, lists: readonly (readonly string[])[]): number | null => {
   const key = normalizeListKey(value);
   for (const candidate of lists) {
     const idx = candidate.findIndex((item) => normalizeListKey(item) === key);
@@ -369,6 +369,7 @@ const sortKeyForCell = (
   sheet: number,
   row: number,
   key: SortKey,
+  builtInLists: readonly (readonly string[])[],
 ): {
   kind: SortValueKind;
   n?: number;
@@ -391,7 +392,12 @@ const sortKeyForCell = (
   const v = keyCell.value;
   if (sortOn === 'customList') {
     const value = v.kind === 'text' ? v.value : v.kind === 'number' ? String(v.value) : '';
-    return { kind: 'custom', customIndex: value ? customListIndex(value, key.customList) : null };
+    return {
+      kind: 'custom',
+      customIndex: value
+        ? customListIndex(value, key.customList ? [key.customList] : builtInLists)
+        : null,
+    };
   }
   if (v.kind === 'number') return { kind: 'number', n: v.value };
   if (v.kind === 'text') return { kind: 'text', s: v.value };
@@ -550,6 +556,7 @@ export function sortRange(
   if (nativeBundle && nativeOrder === null) return false;
 
   state = hydrateSortComments(store, wb, range, start);
+  const builtInLists = customListsFor(localeForWorkbook(wb));
 
   // Snapshot the rows we'll move, including formula text so we can write it back.
   interface RowSnap {
@@ -584,7 +591,7 @@ export function sortRange(
       row: r,
       snap: {
         cells,
-        sortKeys: sortKeys.map((key) => sortKeyForCell(state, range.sheet, r, key)),
+        sortKeys: sortKeys.map((key) => sortKeyForCell(state, range.sheet, r, key, builtInLists)),
       },
     });
   }
