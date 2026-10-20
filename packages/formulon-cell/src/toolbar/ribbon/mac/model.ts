@@ -722,8 +722,13 @@ const macHomeCommand = (candidate: RibbonCommand, lang: ToolbarLang): RibbonComm
         : macLabelKey
           ? dictionaries[lang].macHomeRibbon[macLabelKey]
           : undefined;
+  // Keep any title suffix such as AutoSum's "(Σ)" after the relabelled name.
+  const macHomeTitle = (label: string): string =>
+    commandWithMacTitle.title.startsWith(candidate.label)
+      ? label + commandWithMacTitle.title.slice(candidate.label.length)
+      : label;
   const commandWithMacHomeLabel = homeLabel
-    ? { ...commandWithMacTitle, title: homeLabel, label: homeLabel }
+    ? { ...commandWithMacTitle, title: macHomeTitle(homeLabel), label: homeLabel }
     : commandWithMacTitle;
   if (MAC_HOME_WIDE_STACKED_COMMAND_IDS.has(candidate.id)) {
     return {

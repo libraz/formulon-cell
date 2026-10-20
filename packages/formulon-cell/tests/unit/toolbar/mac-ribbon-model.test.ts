@@ -701,6 +701,7 @@ describe('Mac Excel ribbon profile', () => {
         expect(mac.get(id)?.className ?? '').not.toContain('fc-tb__rb--mac-icon-only');
       }
       expect(mac.get('autosum')?.label).toBe(macLabels.autoSum);
+      expect(mac.get('autosum')?.title).toBe(`${macLabels.autoSum} (Σ)`);
       expect(mac.get('conditional')?.label).toBe(macLabels.conditional);
       expect(mac.get('cellStyles')?.label).toBe(macLabels.cellStyles);
       expect(generic.get('paste')?.label).toBe(dictionaries[locale].ribbon.paste);
