@@ -169,7 +169,7 @@ export const ribbonZh: RibbonStrings = {
     top: '顶端',
     middle: '中间',
     cellStyles: '单元格样式',
-    conditional: '条件',
+    conditional: '条件格式',
     rules: '规则',
     tracePrecedents: '追踪引用单元格',
     traceDependents: '追踪从属单元格',

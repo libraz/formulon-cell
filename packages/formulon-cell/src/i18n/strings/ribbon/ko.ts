@@ -170,7 +170,7 @@ export const ribbonKo: RibbonStrings = {
     top: '위쪽',
     middle: '가운데',
     cellStyles: '셀 스타일',
-    conditional: '조건부',
+    conditional: '조건부 서식',
     rules: '규칙',
     tracePrecedents: '참조되는 셀 추적',
     traceDependents: '참조하는 셀 추적',

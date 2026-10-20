@@ -171,7 +171,7 @@ export const ribbonDe: RibbonStrings = {
     top: 'Oben',
     middle: 'Mitte',
     cellStyles: 'Zellenformatvorlagen',
-    conditional: 'Bedingt',
+    conditional: 'Bedingte Formatierung',
     rules: 'Regeln',
     tracePrecedents: 'Spur zum Vorgänger',
     traceDependents: 'Spur zum Nachfolger',

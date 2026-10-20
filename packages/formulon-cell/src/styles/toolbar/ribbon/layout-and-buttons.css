@@ -334,7 +334,7 @@
   position: relative;
   flex-direction: column;
   gap: 2px;
-  width: 58px;
+  min-width: 58px;
   height: 66px;
   padding: 2px 2px 3px;
   font-size: 11px;
@@ -347,14 +347,13 @@
 .fc-tb__rb--large > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
   display: -webkit-box;
   flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
+  /* A label never splits a word: the button grows to the longest one. */
+  width: 54px;
+  min-width: min-content;
   min-height: 2.2em;
   max-height: 2.2em;
   overflow: hidden;
   text-overflow: ellipsis;
-  overflow-wrap: break-word;
   line-height: 1.1;
   white-space: normal;
   -webkit-box-orient: vertical;

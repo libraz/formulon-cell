@@ -384,7 +384,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const menu = host.querySelector<HTMLElement>('#menu-cell-styles-home');
     const scrollBody = menu?.querySelector<HTMLElement>(':scope > .fc-tb__cellstyle-scroll');
     expect(scrollBody?.getAttribute('role')).toBe('group');
-    expect(scrollBody?.getAttribute('aria-label')).toBe('Cell styles');
+    expect(scrollBody?.getAttribute('aria-label')).toBe('Cell Styles');
     expect(
       Array.from(
         scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__cellstyle-heading') ?? [],

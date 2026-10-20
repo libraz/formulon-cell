@@ -169,7 +169,7 @@ export const ribbonTh: RibbonStrings = {
     top: 'บน',
     middle: 'ตรงกลาง',
     cellStyles: 'สไตล์เซลล์',
-    conditional: 'ตามเงื่อนไข',
+    conditional: 'การจัดรูปแบบตามเงื่อนไข',
     rules: 'กฎ',
     tracePrecedents: 'ติดตามเซลล์ต้นแบบ',
     traceDependents: 'ติดตามเซลล์ตามแบบ',

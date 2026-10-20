@@ -171,7 +171,7 @@ export const ribbonFr: RibbonStrings = {
     top: 'Haut',
     middle: 'Milieu',
     cellStyles: 'Styles de cellule',
-    conditional: 'Conditionnel',
+    conditional: 'Mise en forme conditionnelle',
     rules: 'Règles',
     tracePrecedents: 'Repérer les antécédents',
     traceDependents: 'Repérer les dépendants',
