@@ -34,6 +34,7 @@ versioning is [SemVer](https://semver.org/).
 - Charts and anchored pictures scroll off with their anchor cell instead of sticking to the first visible column or row, and they pass under the headers and frozen panes.
 - The long date format offered for Japanese and Chinese was missing its closing quote and displayed the date serial.
 - Loading a number format no longer drops the backslash-escaped currency symbol or the parentheses of a negative section, and date, time and custom formats keep their quoted literals and locale tags. `h:mm` is read as a time rather than a date-time.
+- Number and currency formats whose negatives are parenthesized pad positive values with `_)`, as the desktop spreadsheet writes them, so positives line up with negatives.
 
 ## 0.10.0 — 2026-10-20
 

@@ -701,12 +701,13 @@ function splitFormatSections(s: string): string[] {
 
 function withNegativeSection(positive: string, style: NegativeStyle | undefined): string {
   switch (style) {
+    // `_)` pads positives by a paren's width so they align with parenthesized negatives.
     case 'parens':
-      return joinFormatSections(positive, `(${positive})`);
+      return joinFormatSections(`${positive}_)`, `(${positive})`);
     case 'red':
       return joinFormatSections(positive, `[Red]-${positive}`);
     case 'red-parens':
-      return joinFormatSections(positive, `[Red](${positive})`);
+      return joinFormatSections(`${positive}_)`, `[Red](${positive})`);
     default:
       return positive;
   }
