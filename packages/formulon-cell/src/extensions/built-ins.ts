@@ -266,11 +266,21 @@ export const workbookObjects = (): Extension => ({
         );
         panel?.focus();
       },
-      onClearSessionIllustration: (id) => clearSessionIllustration(ctx.store, id, ctx.history),
+      onClearSessionIllustration: (id) =>
+        clearSessionIllustration(ctx.store, id, ctx.history, ctx.getWb(), {
+          origin: 'contextMenu',
+          commandId: 'workbookObjects.delete',
+        }),
       onDuplicateSessionIllustration: (id) =>
-        duplicateSessionIllustration(ctx.store, id, ctx.history),
+        duplicateSessionIllustration(ctx.store, id, ctx.history, ctx.getWb(), {
+          origin: 'contextMenu',
+          commandId: 'workbookObjects.duplicate',
+        }),
       onUpdateSessionIllustration: (id, patch) =>
-        updateSessionIllustration(ctx.store, id, patch, ctx.history),
+        updateSessionIllustration(ctx.store, id, patch, ctx.history, ctx.getWb(), {
+          origin: 'contextMenu',
+          commandId: 'workbookObjects.update',
+        }),
       subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),
     });
     return {

@@ -37,6 +37,7 @@ versioning is [SemVer](https://semver.org/).
 - Charts and anchored pictures scroll off with their anchor cell instead of sticking to the first visible column or row, and they pass under the headers and frozen panes.
 - Keys pressed while a chart, picture or shape is selected no longer type into, move or copy the active cell under it; Undo, Redo and other sheet shortcuts still work.
 - A duplicated imported picture is placed offset from the original instead of exactly on top of it.
+- The `workbookObjects()` extension factory duplicates, deletes and edits workbook pictures in the workbook, as the default objects pane does, instead of leaving them unchanged.
 - The long date format offered for Japanese and Chinese was missing its closing quote and displayed the date serial.
 - Loading a number format no longer drops the backslash-escaped currency symbol or the parentheses of a negative section, and date, time and custom formats keep their quoted literals and locale tags. `h:mm` is read as a time rather than a date-time.
 - Number and currency formats whose negatives are parenthesized pad positive values with `_)`, as the desktop spreadsheet writes them, so positives line up with negatives.

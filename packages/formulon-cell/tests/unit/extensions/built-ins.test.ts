@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { createSessionImage } from '../../../src/commands/session-illustration.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   allBuiltIns,
   charts,
@@ -33,6 +35,13 @@ import {
 import { ALL_FEATURE_IDS } from '../../../src/extensions/features.js';
 import type { ExtensionContext } from '../../../src/extensions/types.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
+
+const PNG = Uint8Array.from(
+  atob(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  ),
+  (char) => char.charCodeAt(0),
+);
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -198,6 +207,46 @@ describe('built-in extension factories', () => {
       expect(fallbackViewbar.childElementCount).toBe(0);
     } finally {
       sheet.dispose();
+    }
+  });
+  it('duplicates and deletes a workbook picture from the objects pane in the workbook', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    const sheet = await mountStubSheet({
+      workbook,
+      locale: 'en',
+      features: { workbookObjects: false },
+      extensions: [workbookObjects()],
+    });
+    try {
+      const { instance, host } = sheet;
+      const image = createSessionImage(
+        instance.store,
+        { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+        { id: 'pic', src: 'data:image/png;base64,x', bytes: PNG, wb: workbook, w: 24, h: 24 },
+        null,
+      );
+      if (!image) throw new Error('picture was not created');
+      instance.openWorkbookObjects();
+      const action = (label: string): HTMLButtonElement => {
+        const found = Array.from(
+          host.ownerDocument.querySelectorAll<HTMLButtonElement>(
+            '.fc-objects__illustration-actions button',
+          ),
+        ).find((button) => button.textContent === label);
+        if (!found) throw new Error(`missing ${label} action`);
+        return found;
+      };
+
+      action('Duplicate').click();
+      expect(workbook.listDrawingObjects(0)).toHaveLength(2);
+      expect(instance.store.getState().illustrations.illustrations).toHaveLength(2);
+
+      action('Delete').click();
+      expect(workbook.listDrawingObjects(0)).toHaveLength(1);
+      expect(instance.store.getState().illustrations.illustrations).toHaveLength(1);
+    } finally {
+      sheet.dispose();
+      workbook.dispose();
     }
   });
 });
