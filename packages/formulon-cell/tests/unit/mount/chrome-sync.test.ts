@@ -131,6 +131,21 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     expect(tag.value).toBe('B2:D4');
   });
 
+  it('a selected chart or picture names itself and empties the formula bar', () => {
+    const store = sheet.instance.store;
+    sheet.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 42);
+    sheet.workbook.recalc();
+    mutators.replaceCells(store, sheet.workbook.cells(0));
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    expect(fxInput.value).toBe('42');
+    mutators.setSelectedObject(store, { id: 'chart-1', name: 'Chart 1' });
+    expect(tag.value).toBe('Chart 1');
+    expect(fxInput.value).toBe('');
+    mutators.setSelectedObject(store, null);
+    expect(tag.value).toBe('A1');
+    expect(fxInput.value).toBe('42');
+  });
+
   it('R1C1 mode swaps the name box format', () => {
     mutators.setR1C1(sheet.instance.store, true);
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 4, col: 1 });

@@ -69,9 +69,7 @@ describe('attachSessionIllustrations', () => {
     const handle = attachSessionIllustrations({
       host,
       store,
-      pictureLabel: 'Picture overlay',
-      shapeLabel: 'Shape overlay',
-      resizeLabel: 'Resize illustration',
+      labels: { picture: 'Picture overlay', shape: 'Shape overlay' },
     });
 
     const overlays = Array.from(host.querySelectorAll<HTMLElement>('.fc-illustration'));
@@ -83,12 +81,12 @@ describe('attachSessionIllustrations', () => {
     expect(host.querySelector('svg ellipse[stroke="#107c10"]')).toBeTruthy();
     expect(overlays[0]?.getAttribute('aria-roledescription')).toBe('Picture overlay');
     expect(overlays[1]?.getAttribute('aria-roledescription')).toBe('Shape overlay');
-    expect(host.querySelector('[aria-label="Resize illustration"]')).toBeTruthy();
+    expect(overlays[0]?.querySelectorAll('.fc-drawing-handle')).toHaveLength(8);
 
     handle.detach();
   });
 
-  it('does not expose English fallback labels when no overlay labels are supplied', () => {
+  it('names pictures and shapes the way Excel does, numbered among their kind', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const store = createSpreadsheetStore();
@@ -98,6 +96,8 @@ describe('attachSessionIllustrations', () => {
       sheet: 0,
       src: 'data:image/png;base64,image',
     });
+    mutators.upsertIllustration(store, { id: 'oval-1', kind: 'shape', shape: 'oval', sheet: 0 });
+    mutators.upsertIllustration(store, { id: 'oval-2', kind: 'shape', shape: 'oval', sheet: 0 });
     mutators.upsertIllustration(store, {
       id: 'shape-without-kind',
       kind: 'shape',
@@ -108,12 +108,15 @@ describe('attachSessionIllustrations', () => {
     const overlays = Array.from(host.querySelectorAll<HTMLElement>('.fc-illustration'));
 
     expect(overlays.map((overlay) => overlay.getAttribute('aria-label'))).toEqual([
-      'image-without-alt',
-      'shape-without-kind',
+      'Picture 1',
+      'Oval 1',
+      'Oval 2',
+      'Rectangle 1',
     ]);
-    expect(host.querySelector('[aria-label="Resize shape"]')).toBeNull();
-    expect(host.textContent).not.toContain('Picture');
-    expect(host.textContent).not.toContain('Shape');
+    handle.setLabels({ ovalName: '楕円 {n}' });
+    expect(
+      host.querySelectorAll<HTMLElement>('.fc-illustration')[2]?.getAttribute('aria-label'),
+    ).toBe('楕円 2');
 
     handle.detach();
   });
@@ -162,7 +165,7 @@ describe('attachSessionIllustrations', () => {
     expect(Number.parseFloat(panel.style.top)).toBeCloseTo(first.y + 10 * 2);
     expect(Number.parseFloat(panel.style.width)).toBeCloseTo(100 * 2);
     expect(Number.parseFloat(panel.style.height)).toBeCloseTo(50 * 2);
-    expect(panel.querySelector('[role="separator"]')).toBeNull();
+    expect(panel.querySelector('.fc-drawing-handle')).toBeNull();
 
     store.setState((state) => ({
       ...state,
@@ -201,7 +204,7 @@ describe('attachSessionIllustrations', () => {
     const handle = attachSessionIllustrations({ host, store, history });
     const overlay = host.querySelector<HTMLElement>('.fc-illustration');
     expect(overlay?.tabIndex).toBe(0);
-    expect(overlay?.getAttribute('aria-roledescription')).toBe('shape');
+    expect(overlay?.getAttribute('aria-roledescription')).toBe('Shape');
     if (!overlay) throw new Error('missing session illustration overlay');
 
     const move = fireKey(overlay, 'ArrowRight');
@@ -268,6 +271,148 @@ describe('attachSessionIllustrations', () => {
     ]);
 
     handle.detach();
+  });
+
+  const freeShape = (
+    store: ReturnType<typeof createSpreadsheetStore>,
+    patch: Partial<Parameters<typeof mutators.upsertIllustration>[1]> = {},
+  ): void => {
+    mutators.upsertIllustration(store, {
+      id: 'shape-1',
+      kind: 'shape',
+      shape: 'rectangle',
+      sheet: 0,
+      x: 20,
+      y: 30,
+      w: 160,
+      h: 96,
+      ...patch,
+    });
+  };
+
+  it('selects like Excel: names itself, and leaves on an outside press or Escape', () => {
+    const host = document.createElement('div');
+    host.tabIndex = -1;
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    freeShape(store, { shape: 'oval' });
+    const handle = attachSessionIllustrations({ host, store });
+    const overlay = (): HTMLElement => {
+      const found = host.querySelector<HTMLElement>('.fc-illustration');
+      if (!found) throw new Error('missing session illustration overlay');
+      return found;
+    };
+
+    firePointer(overlay(), 'pointerdown');
+    expect(overlay().classList.contains('fc-illustration--selected')).toBe(true);
+    expect(store.getState().ui.selectedObject).toEqual({ id: 'shape-1', name: 'Oval 1' });
+    firePointer(window, 'pointerup');
+
+    firePointer(host, 'pointerdown');
+    expect(overlay().classList.contains('fc-illustration--selected')).toBe(false);
+    expect(store.getState().ui.selectedObject).toBeNull();
+
+    firePointer(overlay(), 'pointerdown');
+    firePointer(window, 'pointerup');
+    const escaped = fireKey(overlay(), 'Escape');
+    expect(escaped.defaultPrevented).toBe(true);
+    expect(store.getState().ui.selectedObject).toBeNull();
+    expect(document.activeElement).toBe(host);
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('moves on a drag past the threshold and records the drag as one change', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    freeShape(store);
+    const handle = attachSessionIllustrations({ host, store, history });
+    const overlay = host.querySelector<HTMLElement>('.fc-illustration');
+    if (!overlay) throw new Error('missing session illustration overlay');
+
+    firePointer(overlay, 'pointerdown', { clientX: 100, clientY: 100 });
+    firePointer(window, 'pointermove', { clientX: 101, clientY: 101 });
+    firePointer(window, 'pointerup', { clientX: 101, clientY: 101 });
+    expect(store.getState().illustrations.illustrations[0]).toMatchObject({ x: 20, y: 30 });
+    expect(history.canUndo()).toBe(false);
+
+    const panel = host.querySelector<HTMLElement>('.fc-illustration') ?? overlay;
+    firePointer(panel, 'pointerdown', { clientX: 100, clientY: 100 });
+    firePointer(window, 'pointermove', { clientX: 110, clientY: 105 });
+    firePointer(window, 'pointermove', { clientX: 140, clientY: 120 });
+    expect(store.getState().illustrations.illustrations[0]).toMatchObject({ x: 20, y: 30 });
+    expect(panel.style.left).toBe('60px');
+    firePointer(window, 'pointerup', { clientX: 140, clientY: 120 });
+    expect(store.getState().illustrations.illustrations[0]).toMatchObject({ x: 60, y: 50 });
+    expect(history.undo()).toBe(true);
+    expect(store.getState().illustrations.illustrations[0]).toMatchObject({ x: 20, y: 30 });
+    expect(history.canUndo()).toBe(false);
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('resizes from any handle; a picture keeps its shape, a shape only with Shift', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    freeShape(store);
+    mutators.upsertIllustration(store, {
+      id: 'image-1',
+      kind: 'image',
+      sheet: 0,
+      src: 'data:image/png;base64,image',
+      x: 300,
+      y: 30,
+      w: 200,
+      h: 100,
+    });
+    const handle = attachSessionIllustrations({ host, store });
+    const grip = (id: string, name: string): HTMLElement => {
+      const found = host.querySelector<HTMLElement>(
+        `[data-illustration-id="${id}"] .fc-drawing-handle[data-handle="${name}"]`,
+      );
+      if (!found) throw new Error(`missing ${name} handle`);
+      return found;
+    };
+    const drag = (target: HTMLElement, dx: number, dy: number, shiftKey = false): void => {
+      firePointer(target, 'pointerdown', { clientX: 0, clientY: 0 });
+      firePointer(window, 'pointermove', { clientX: dx, clientY: dy, shiftKey });
+      firePointer(window, 'pointerup', { clientX: dx, clientY: dy, shiftKey });
+    };
+    const item = (id: string) =>
+      store.getState().illustrations.illustrations.find((entry) => entry.id === id);
+
+    drag(grip('shape-1', 'nw'), -20, -10);
+    expect(item('shape-1')).toMatchObject({ x: 0, y: 20, w: 180, h: 106 });
+    drag(grip('shape-1', 'se'), 180, 0);
+    expect(item('shape-1')).toMatchObject({ w: 360, h: 106 });
+    drag(grip('shape-1', 'se'), 360, 0, true);
+    expect(item('shape-1')).toMatchObject({ w: 720, h: 212 });
+
+    drag(grip('image-1', 'se'), 200, 0);
+    expect(item('image-1')).toMatchObject({ x: 300, y: 30, w: 400, h: 200 });
+    drag(grip('image-1', 'e'), -100, 0);
+    expect(item('image-1')).toMatchObject({ w: 300, h: 200 });
+
+    handle.detach();
+    host.remove();
+  });
+
+  it('leaves the name box to a chart selected by another overlay', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    freeShape(store);
+    const handle = attachSessionIllustrations({ host, store });
+    mutators.setSelectedObject(store, { id: 'chart-1', name: 'Chart 1' });
+    firePointer(host, 'pointerdown');
+    handle.detach();
+    expect(store.getState().ui.selectedObject).toEqual({ id: 'chart-1', name: 'Chart 1' });
+    host.remove();
   });
 
   it('reauthorizes illustration mutations while a viewer policy is active', async () => {

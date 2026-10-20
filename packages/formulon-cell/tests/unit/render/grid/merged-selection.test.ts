@@ -458,3 +458,25 @@ describe('GridRenderer merged selection parity', () => {
     }
   });
 });
+
+describe('GridRenderer while a chart or picture is selected', () => {
+  it('hides the cell cursor, range outline, tint and fill handle', () => {
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 });
+    const shown = canvasSpy();
+    paintActive(makeRenderer(store.getState(), shown), store.getState());
+    paintCells(makeRenderer(store.getState(), shown), store.getState());
+    expect(shown.strokeRects.length).toBeGreaterThan(0);
+    expect(shown.fills.some((fill) => fill.style === theme.accentSoft)).toBe(true);
+    expect(getFillHandleRect()).not.toBeNull();
+
+    mutators.setSelectedObject(store, { id: 'chart-1', name: 'Chart 1' });
+    const state = store.getState();
+    const hidden = canvasSpy();
+    paintActive(makeRenderer(state, hidden), state);
+    paintCells(makeRenderer(state, hidden), state);
+    expect(hidden.strokeRects).toEqual([]);
+    expect(hidden.fills.some((fill) => fill.style === theme.accentSoft)).toBe(false);
+    expect(getFillHandleRect()).toBeNull();
+  });
+});

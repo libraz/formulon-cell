@@ -141,9 +141,11 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       a,
       s.ui.r1c1 === true,
     );
-    if (document.activeElement !== tag) tag.value = ref;
+    // A selected chart or picture names itself and leaves the formula bar empty.
+    const object = s.ui.selectedObject;
+    if (document.activeElement !== tag) tag.value = object ? object.name : ref;
     const display = cellDisplayText(s, wb, a);
-    if (!getFormulaEditing()) fxInput.value = display;
+    if (!getFormulaEditing()) fxInput.value = object ? '' : display;
     activeCellMirror.setAttribute('aria-rowindex', String(a.row + 1));
     activeCellMirror.setAttribute('aria-colindex', String(a.col + 1));
     activeCellMirror.setAttribute('aria-label', display ? `${ref} ${display}` : ref);

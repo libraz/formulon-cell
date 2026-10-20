@@ -7,6 +7,7 @@ import type {
   CopyMode,
   EditorMode,
   EditorRefHighlight,
+  SelectedObject,
   State,
   StatusAggKey,
   StatusBarOptionKey,
@@ -131,8 +132,16 @@ export const viewMutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, editorRefs: refs } }));
   },
 
-  setChartSourceRefs(store: SpreadsheetStore, refs: ChartSourceHighlight[]): void {
-    store.setState((s) => ({ ...s, ui: { ...s.ui, chartSourceRefs: refs } }));
+  /** Select a chart or picture, or none; `sourceRefs` outlines a chart's data. */
+  setSelectedObject(
+    store: SpreadsheetStore,
+    object: SelectedObject | null,
+    sourceRefs: ChartSourceHighlight[] = [],
+  ): void {
+    store.setState((s) => ({
+      ...s,
+      ui: { ...s.ui, selectedObject: object, chartSourceRefs: sourceRefs },
+    }));
   },
 
   setZoom(store: SpreadsheetStore, zoom: number): void {

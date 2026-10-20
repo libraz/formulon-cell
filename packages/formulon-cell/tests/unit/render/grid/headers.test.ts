@@ -37,10 +37,12 @@ function makeCtxSpy(): {
   ctx: CanvasRenderingContext2D;
   fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }>;
   texts: Array<{ text: string; font: string; style: string }>;
+  strokes: string[];
 } {
   const fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }> =
     [];
   const texts: Array<{ text: string; font: string; style: string }> = [];
+  const strokes: string[] = [];
   let fillStyle = '';
   let strokeStyle = '';
   let lineWidth = 1;
@@ -87,7 +89,9 @@ function makeCtxSpy(): {
     closePath(): void {},
     moveTo(): void {},
     lineTo(): void {},
-    stroke(): void {},
+    stroke(): void {
+      strokes.push(strokeStyle);
+    },
     fill(): void {
       fills.push({ style: fillStyle, alpha });
     },
@@ -98,7 +102,7 @@ function makeCtxSpy(): {
       texts.push({ text, font, style: fillStyle });
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fills, texts };
+  return { ctx, fills, texts, strokes };
 }
 
 describe('paintHeaders', () => {
@@ -135,6 +139,51 @@ describe('paintHeaders', () => {
       font: '600 11.5px Aptos, sans-serif',
       style: '#107c41',
     });
+  });
+
+  it('drops the header highlight while a chart or picture is selected', () => {
+    const state = createSpreadsheetStore().getState();
+    state.selection = {
+      active: { sheet: 0, row: 1, col: 1 },
+      range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+      anchor: { sheet: 0, row: 1, col: 1 },
+      extraRanges: [],
+    };
+    state.ui = { ...state.ui, selectedObject: { id: 'chart-1', name: 'Chart 1' } };
+    state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 3, zoom: 1, widthPx: 260 };
+    const cols = buildColLayout(state.layout, state.viewport);
+    const rows = buildRowLayout(state.layout, state.viewport);
+    const { ctx, texts, fills, strokes } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 260, cssHeight: 140 },
+      { ...state, layout: layoutForView(state) },
+      theme(),
+      cols,
+      rows,
+    );
+
+    for (const label of ['B', '2']) {
+      expect(texts.find((entry) => entry.text === label)).toMatchObject({
+        font: '400 11.5px Aptos, sans-serif',
+        style: '#605e5c',
+      });
+    }
+    expect(fills.some((fill) => fill.style === '#e6e6e6')).toBe(false);
+    expect(fills.some((fill) => fill.style === '#107c41')).toBe(false);
+    expect(strokes).not.toContain('#107c41');
+
+    // The same cell without a selected object carries the accent markers.
+    const shown = makeCtxSpy();
+    paintHeaders(
+      { ctx: shown.ctx, dpr: 1, cssWidth: 260, cssHeight: 140 },
+      { ...state, ui: { ...state.ui, selectedObject: null }, layout: layoutForView(state) },
+      theme(),
+      cols,
+      rows,
+    );
+    expect(shown.strokes).toContain('#107c41');
+    expect(shown.fills.some((fill) => fill.style === '#107c41')).toBe(true);
   });
 
   it('parks the row rail and the corner chip on the right for a right-to-left sheet', () => {

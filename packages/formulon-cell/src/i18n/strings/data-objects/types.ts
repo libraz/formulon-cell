@@ -251,7 +251,6 @@ export interface DataObjectsStrings {
     close: string;
   };
   sessionCharts: {
-    resize: string;
     /** The chart button that opens the chart elements settings. */
     elementsButton: string;
     stylesButton: string;
@@ -260,6 +259,8 @@ export interface DataObjectsStrings {
     pointTooltip: string;
     /** Second tooltip line; `{value}` is the formatted value. */
     pointValue: string;
+    /** The name box text for a selected chart; `{n}` is its number on the sheet. */
+    objectName: string;
     columnChart: string;
     barChart: string;
     lineChart: string;
@@ -400,6 +401,21 @@ export interface DataObjectsStrings {
     firstSliceAngle: string;
     positionTop: string;
     positionBottom: string;
+  };
+  sessionIllustrations: {
+    /** How assistive technology names a picture and a shape. */
+    picture: string;
+    shape: string;
+    /** Name box texts for a selected picture or shape, as Excel names them;
+     *  `{n}` is the object's number among its kind on the sheet. */
+    pictureName: string;
+    rectangleName: string;
+    roundedRectangleName: string;
+    ovalName: string;
+    triangleName: string;
+    diamondName: string;
+    lineName: string;
+    arrowName: string;
   };
   slicer: {
     /** Default panel header used when no column is bound yet. */

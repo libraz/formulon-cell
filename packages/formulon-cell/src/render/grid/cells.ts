@@ -146,7 +146,8 @@ export function paintCells(
   }
 
   const rng = selection.range;
-  if (rng.r0 !== rng.r1 || rng.c0 !== rng.c1) {
+  const objectSelected = state.ui.selectedObject !== null;
+  if (!objectSelected && (rng.r0 !== rng.r1 || rng.c0 !== rng.c1)) {
     ctx.fillStyle = theme.accentSoft;
     const rects = rangeRects(layout, state.viewport, rng);
     for (const r of rects) ctx.fillRect(r.x, r.y, r.w, r.h);
@@ -154,7 +155,7 @@ export function paintCells(
   // Disjoint multi-range selection (Ctrl/Cmd+click). Paint each extra band
   // with the same accent so the user can read all members at a glance.
   const extras = selection.extraRanges;
-  if (extras && extras.length > 0) {
+  if (!objectSelected && extras && extras.length > 0) {
     ctx.fillStyle = theme.accentSoft;
     for (const er of extras) {
       if (er.r0 > er.r1 || er.c0 > er.c1) continue;

@@ -4,6 +4,7 @@
 @import "./app/overlays/auto-fill-options.css";
 @import "./app/overlays/paste-options.css";
 @import "./app/overlays/quick-analysis-and-charts.css";
+@import "./app/overlays/drawings.css";
 @import "./app/overlays/workbook-objects.css";
 @import "./app/overlays/sheet-menu.css";
 @import "./app/overlays/find-bar.css";

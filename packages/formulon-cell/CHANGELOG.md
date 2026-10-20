@@ -8,9 +8,11 @@ versioning is [SemVer](https://semver.org/).
 
 ### Added
 
-- A selected chart outlines its data on the grid in the spreadsheet's colours: series names in red, categories (or X values) in purple, values in blue. The outline is published as `state.ui.chartSourceRefs`.
+- A selected chart outlines its data on the grid in the spreadsheet's colours: series names in red, categories (or X values) in purple, values in blue. The outline is published as `state.ui.chartSourceRefs` and set, with the selected object, by `mutators.setSelectedObject`.
 - Chart data points show a tooltip with the series, point and value; pie and doughnut slices add their share of the total. `sessionCharts` strings gain `pointTooltip` and `pointValue`.
 - Double-clicking a chart opens its settings, and Escape or a press outside the chart deselects it.
+- A selected chart, picture or shape takes the place of the cell selection: the name box shows its name the way the spreadsheet numbers objects (`Chart 1`, `Picture 1`, `Oval 2`), the formula bar is empty, and the cell cursor, range shading, fill handle and header highlight are hidden. The selection is published as `state.ui.selectedObject`. `sessionCharts` strings gain `objectName`.
+- Pictures and shapes have their own `sessionIllustrations` strings, with the spreadsheet's object names in all seven locales. `attachSessionIllustrations` takes them as `labels` and its handle gains `setLabels`.
 - Typed error literals such as `#N/A` and `#DIV/0!` are stored as error values, with the German and French spellings in those locales. `CoercedInput` gains an `error` kind.
 
 ### Changed
@@ -19,11 +21,13 @@ versioning is [SemVer](https://semver.org/).
 - Automatic value axes are scaled the way the spreadsheet scales them: a twentieth of the data span is added as headroom and the bound is rounded out to a major unit of 1, 2 or 5 times a power of ten that leaves at least five intervals. A positive axis starts at zero unless the data spans less than a sixth of its maximum. The default column chart of values up to 15 now runs from 0 to 16 in steps of 2.
 - Chart titles are 14 px, and a horizontal legend is centred under or over the chart.
 - A data label that would run off the chart is moved back inside it instead of being shortened.
+- Pictures and shapes are selected and sized like charts: eight sizing handles, a press anywhere moves the object once it travels a few pixels, the frame follows the pointer and the drag is recorded as one undo step, and Escape or a press outside deselects. A picture keeps its shape from a corner; a shape keeps it with Shift.
 - Typed input is parsed the way the desktop spreadsheet parses it in each of the seven locales, checked against a capture from the desktop application. A General cell now picks up the number format the desktop spreadsheet attaches: `#,##0` for grouped numbers, `0.00E+00` for exponents, the system short date for dates, `# ?/?` for mixed fractions, and the locale's currency format with no decimals for whole amounts. Month/day (`1/5`), year/month, CJK and Japanese-era dates, date + time pairs, hour-only AM/PM times and fractional seconds are recognised, and month names follow the locale. Booleans and errors must be typed without surrounding spaces, and German and French accept only their own spellings.
 
 ### Removed
 
 - The chart close button, the `close` string of `sessionCharts`, and the `closeLabel` option of `attachSessionCharts`. Delete removes a selected chart.
+- The `closeLabel`, `pictureLabel`, `shapeLabel` and `resizeLabel` options of `attachSessionIllustrations`, and the `resize` string of `sessionCharts`.
 
 ### Fixed
 

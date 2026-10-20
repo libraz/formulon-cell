@@ -740,21 +740,23 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         input.featureRegistry.set('charts', chartHandle);
         break;
       }
-      case 'illustrations':
+      case 'illustrations': {
         if (s.sessionIllustrations) return;
         s.sessionIllustrations = attachSessionIllustrations({
           host: input.host,
           store: input.store,
           history: input.history,
           getWb: input.wb,
-          closeLabel: strings.workbookObjects.close,
-          resizeLabel: strings.sessionCharts.resize,
+          labels: strings.sessionIllustrations,
         });
-        input.featureRegistry.set(
-          'illustrations',
-          input.wrapHandle(s.sessionIllustrations, () => s.sessionIllustrations?.detach()),
+        const illustrationHandle = input.wrapHandle(s.sessionIllustrations, () =>
+          s.sessionIllustrations?.detach(),
         );
+        illustrationHandle.setStrings = (next) =>
+          s.sessionIllustrations?.setLabels(next.sessionIllustrations);
+        input.featureRegistry.set('illustrations', illustrationHandle);
         break;
+      }
       case 'errorIndicators':
         if (s.errorMenu) return;
         s.errorMenu = attachErrorMenu({

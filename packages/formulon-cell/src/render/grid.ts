@@ -528,6 +528,8 @@ export class GridRenderer {
     const r = selection.range;
     setFillHandleRect(null);
     setValidationChevron(null);
+    // A selected chart or picture replaces the cell cursor, as in Excel.
+    if (ui.selectedObject) return;
 
     const activeMerge = mergeRangeAt(state, a);
     const activeVisualRange: Range = activeMerge ?? {

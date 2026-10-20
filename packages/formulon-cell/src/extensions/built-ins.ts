@@ -216,13 +216,12 @@ export const illustrations = (): Extension => ({
       host: ctx.host,
       store: ctx.store,
       history: ctx.history,
-      closeLabel: ctx.i18n.strings.workbookObjects.close,
-      pictureLabel: ctx.i18n.strings.ribbon.pictures,
-      shapeLabel: ctx.i18n.strings.ribbon.shapes,
-      resizeLabel: ctx.i18n.strings.sessionCharts.resize,
+      getWb: () => ctx.getWb(),
+      labels: ctx.i18n.strings.sessionIllustrations,
     });
     return {
       refresh: () => handle.refresh(),
+      setStrings: (next) => handle.setLabels(next.sessionIllustrations),
       dispose: () => handle.detach(),
     };
   },

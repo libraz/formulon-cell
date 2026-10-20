@@ -177,63 +177,6 @@
     cursor: move;
   }
 
-  .fc-chart__handle {
-    position: absolute;
-    display: none;
-    width: 9px;
-    height: 9px;
-    margin: -5px 0 0 -5px;
-    box-sizing: border-box;
-    border: 1px solid var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
-    border-radius: 50%;
-    background: var(--fc-bg-elev, Canvas);
-  }
-
-  .fc-chart--selected .fc-chart__handle {
-    display: block;
-  }
-
-  .fc-chart__handle[data-handle="nw"] {
-    left: 0;
-    top: 0;
-    cursor: nwse-resize;
-  }
-  .fc-chart__handle[data-handle="n"] {
-    left: 50%;
-    top: 0;
-    cursor: ns-resize;
-  }
-  .fc-chart__handle[data-handle="ne"] {
-    left: 100%;
-    top: 0;
-    cursor: nesw-resize;
-  }
-  .fc-chart__handle[data-handle="e"] {
-    left: 100%;
-    top: 50%;
-    cursor: ew-resize;
-  }
-  .fc-chart__handle[data-handle="se"] {
-    left: 100%;
-    top: 100%;
-    cursor: nwse-resize;
-  }
-  .fc-chart__handle[data-handle="s"] {
-    left: 50%;
-    top: 100%;
-    cursor: ns-resize;
-  }
-  .fc-chart__handle[data-handle="sw"] {
-    left: 0;
-    top: 100%;
-    cursor: nesw-resize;
-  }
-  .fc-chart__handle[data-handle="w"] {
-    left: 0;
-    top: 50%;
-    cursor: ew-resize;
-  }
-
   /* The elements / styles / filters buttons beside a selected chart. */
   .fc-chart__buttons {
     position: absolute;

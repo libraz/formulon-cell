@@ -124,6 +124,14 @@ export interface ChartSourceHighlight {
   role: 'name' | 'categories' | 'values';
 }
 
+/** A chart or picture selected on the sheet, which takes the place of the
+ *  cell selection the way Excel's selected objects do. */
+export interface SelectedObject {
+  id: string;
+  /** The name the name box shows, such as "Chart 1". */
+  name: string;
+}
+
 export interface PendingFormat {
   addr: Addr;
   format: Partial<CellFormat>;
@@ -193,6 +201,8 @@ export interface UiSlice {
   /** Live formula-reference highlights (desktop spreadsheets: colored borders on referenced
    *  cells while editing a formula). Empty when no formula edit is active. */
   editorRefs: EditorRefHighlight[];
+  /** The selected chart or picture; while set, the cell cursor is hidden. */
+  selectedObject: SelectedObject | null;
   /** The data range of the selected chart, by part; empty when no chart is selected. */
   chartSourceRefs: ChartSourceHighlight[];
   /** Which aggregate stats appear in the status bar for the active selection. */

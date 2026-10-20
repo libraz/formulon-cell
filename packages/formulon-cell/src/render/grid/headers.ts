@@ -78,7 +78,9 @@ export function paintHeaders(
   ctx.textAlign = 'center';
   const r1c1 = state.ui.r1c1 === true;
   const fr = state.ui.filterRange;
-  const selectedRanges = [selection.range, ...(selection.extraRanges ?? [])];
+  // A selected chart or picture takes the highlight off the headers, as in Excel.
+  const objectSelected = state.ui.selectedObject !== null;
+  const selectedRanges = objectSelected ? [] : [selection.range, ...(selection.extraRanges ?? [])];
   const colSelected = (col: number): boolean =>
     selectedRanges.some((r) => col >= r.c0 && col <= r.c1);
   const rowSelected = (row: number): boolean =>
@@ -86,7 +88,7 @@ export function paintHeaders(
   for (const c of cols.visible) {
     const rect = cellRectIn(layout, cols, rows, firstRow, c);
     const w = cols.sizeAt.get(c) ?? 0;
-    const isActiveCol = c === active.col;
+    const isActiveCol = !objectSelected && c === active.col;
     const isSelectedCol = colSelected(c);
     if (isActiveCol) {
       ctx.fillStyle = theme.bgHeader;
@@ -164,7 +166,7 @@ export function paintHeaders(
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
-    const isActiveRow = r === active.row;
+    const isActiveRow = !objectSelected && r === active.row;
     const isSelectedRow = rowSelected(r);
     if (isActiveRow) {
       ctx.fillStyle = theme.bgHeader;
@@ -194,7 +196,7 @@ export function paintHeaders(
     }
   }
 
-  if (cols.positionAt.has(active.col)) {
+  if (!objectSelected && cols.positionAt.has(active.col)) {
     const aRect = cellRectIn(layout, cols, rows, firstRow, active.col);
     const w = cols.sizeAt.get(active.col) ?? 0;
     ctx.strokeStyle = theme.accent;
@@ -204,7 +206,7 @@ export function paintHeaders(
     ctx.lineTo(aRect.x + w, oy - 0.5);
     ctx.stroke();
   }
-  if (rows.positionAt.has(active.row)) {
+  if (!objectSelected && rows.positionAt.has(active.row)) {
     const aRect = cellRectIn(layout, cols, rows, active.row, firstCol);
     const h = rows.sizeAt.get(active.row) ?? 0;
     ctx.strokeStyle = theme.accent;

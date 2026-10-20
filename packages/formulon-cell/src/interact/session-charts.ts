@@ -24,10 +24,17 @@ import { rangeForRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
-import { mutators } from '../store/store.js';
-import type { ChartSourceHighlight } from '../store/types.js';
+import type { ChartSourceHighlight, State } from '../store/types.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { createInteractionButton } from './chip-button.js';
+import {
+  appendDrawingHandles,
+  createObjectSelectionPublisher,
+  type DrawingHandle,
+  INTERACTIVE,
+  previewFrame,
+  trackFrameDrag,
+} from './drawing-frame.js';
 import { formatSessionChartValue } from './session-chart-format.js';
 import {
   type ChartValueFormatter,
@@ -53,6 +60,8 @@ export interface SessionChartLabels extends Partial<SessionChartSettingsLabels> 
   pointTooltip: string;
   /** Second tooltip line; `{value}` is the formatted value. */
   pointValue: string;
+  /** The name box text for a selected chart; `{n}` is its number on the sheet. */
+  objectName: string;
   columnChart: string;
   barChart: string;
   lineChart: string;
@@ -71,15 +80,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_W = 240;
 const MIN_H = 160;
 const KEYBOARD_STEP = 8;
-/** Pointer travel before a press on a chart becomes a move. */
-const DRAG_THRESHOLD = 3;
 /** Width and height the stylesheet takes from a chart frame for its border and
  *  plot padding; the scene is laid out in what remains. */
 const PLOT_INSET = 14;
-
-/** The sizing handles of a selected chart, by compass point. */
-const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
-type Handle = (typeof HANDLES)[number];
 
 /** Data marks that carry a tooltip of their point. */
 const POINT_ROLES = new Set(['bar', 'point', 'slice']);
@@ -90,6 +93,7 @@ const DEFAULT_LABELS: SessionChartLabels = {
   filtersButton: 'Chart Filters',
   pointTooltip: 'Series "{series}" Point "{point}"',
   pointValue: 'Value: {value}',
+  objectName: 'Chart {n}',
   columnChart: 'Column chart',
   barChart: 'Bar chart',
   lineChart: 'Line chart',
@@ -109,37 +113,6 @@ const SETTINGS_TAB_LABELS: Pick<
   elementsTab: chartSettingsDefaults.elementsTab,
   stylesTab: chartSettingsDefaults.stylesTab,
   filtersTab: chartSettingsDefaults.filtersTab,
-};
-
-/** Elements that keep a press to themselves instead of starting a move. */
-const INTERACTIVE = 'button, input, select, textarea, option, [contenteditable="true"]';
-
-/** The frame `start` takes when `handle` is dragged by (dx, dy); a corner
- *  dragged with `keepRatio` scales the frame without changing its shape. */
-const resizedFrame = (
-  start: { x: number; y: number; w: number; h: number },
-  handle: Handle,
-  dx: number,
-  dy: number,
-  keepRatio: boolean,
-): { x: number; y: number; w: number; h: number } => {
-  const west = handle.endsWith('w');
-  const east = handle.endsWith('e');
-  const north = handle.startsWith('n');
-  const south = handle.startsWith('s');
-  let w = Math.max(MIN_W, east ? start.w + dx : west ? start.w - dx : start.w);
-  let h = Math.max(MIN_H, south ? start.h + dy : north ? start.h - dy : start.h);
-  if (keepRatio && (east || west) && (north || south)) {
-    const scale = Math.max(w / start.w, h / start.h);
-    w = Math.max(MIN_W, start.w * scale);
-    h = Math.max(MIN_H, start.h * scale);
-  }
-  return {
-    x: west ? start.x + start.w - w : start.x,
-    y: north ? start.y + start.h - h : start.y,
-    w,
-    h,
-  };
 };
 
 const isDrawable = (chart: SessionChart): chart is SessionChartSettingsShape =>
@@ -228,20 +201,13 @@ export const chartSourceHighlights = (chart: SessionChart): ChartSourceHighlight
   return [...names, ...categories, ...part('values', top, left, source.r1, source.c1)];
 };
 
-const sameHighlights = (
-  a: readonly ChartSourceHighlight[],
-  b: readonly ChartSourceHighlight[],
-): boolean =>
-  a.length === b.length &&
-  a.every(
-    (ref, i) =>
-      ref.sheet === b[i]?.sheet &&
-      ref.r0 === b[i]?.r0 &&
-      ref.c0 === b[i]?.c0 &&
-      ref.r1 === b[i]?.r1 &&
-      ref.c1 === b[i]?.c1 &&
-      ref.role === b[i]?.role,
-  );
+/** Excel's name for a chart, numbered in the order of its sheet's charts. */
+const chartObjectName = (state: State, chart: SessionChart, labels: SessionChartLabels): string => {
+  const index = state.charts.charts
+    .filter((entry) => entry.sheet === chart.sheet)
+    .findIndex((entry) => entry.id === chart.id);
+  return labels.objectName.replace('{n}', String(index + 1));
+};
 
 const appendChartPrimitive = (parent: SVGSVGElement, primitive: ChartPrimitive): void => {
   const element = document.createElementNS(SVG_NS, primitive.tag);
@@ -369,23 +335,20 @@ export function attachSessionCharts(deps: {
     },
   });
 
-  let publishingHighlight = false;
-  /** Outline the selected chart's data on the grid, as Excel does. */
-  const syncSourceHighlight = (): void => {
-    const chart = selectedId === null ? null : sessionChartById(store.getState(), selectedId);
-    const next = chart ? chartSourceHighlights(chart) : [];
-    if (sameHighlights(store.getState().ui.chartSourceRefs, next)) return;
-    // The outline is grid state only; the charts themselves do not change.
-    publishingHighlight = true;
-    try {
-      mutators.setChartSourceRefs(store, next);
-    } finally {
-      publishingHighlight = false;
-    }
+  const selection = createObjectSelectionPublisher(store);
+  /** Publish the selected chart to the name box and outline its data on the
+   *  grid, as Excel does. */
+  const syncSelection = (): void => {
+    const state = store.getState();
+    const chart = selectedId === null ? null : sessionChartById(state, selectedId);
+    selection.publish(
+      chart ? { id: chart.id, name: chartObjectName(state, chart, labels) } : null,
+      chart ? chartSourceHighlights(chart) : [],
+    );
   };
 
   const updateSelectionClasses = (): void => {
-    syncSourceHighlight();
+    syncSelection();
     const panels = Array.from(root.querySelectorAll<HTMLElement>('.fc-chart'));
     for (const [index, panel] of panels.entries()) {
       const selected = panel.dataset.chartId === selectedId;
@@ -450,45 +413,20 @@ export function attachSessionCharts(deps: {
     e: PointerEvent,
     chart: SessionChart,
     panel: HTMLElement,
-    handle?: Handle,
+    handle?: DrawingHandle,
   ): void => {
     if (e.button !== 0 || !canPlace(chart)) return;
     if (handle) e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const start = sessionPosition(store, chart.nativeAnchor);
-    let latest: { x?: number; y?: number; w?: number; h?: number } | null = null;
-    const preview = (patch: { x?: number; y?: number; w?: number; h?: number }): void => {
-      if (patch.x !== undefined) panel.style.left = `${patch.x}px`;
-      if (patch.y !== undefined) panel.style.top = `${patch.y}px`;
-      if (patch.w !== undefined) panel.style.width = `${patch.w}px`;
-      if (patch.h !== undefined) panel.style.height = `${patch.h}px`;
-      latest = patch;
-    };
-    const onMove = (move: PointerEvent): void => {
-      const dx = move.clientX - startX;
-      const dy = move.clientY - startY;
-      if (!latest && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-      move.preventDefault();
-      if (!handle) {
-        preview({ x: start.x + dx, y: start.y + dy });
-        return;
-      }
-      const frame = resizedFrame(start, handle, dx, dy, move.shiftKey);
-      preview({
-        ...(frame.x === start.x ? {} : { x: frame.x }),
-        ...(frame.y === start.y ? {} : { y: frame.y }),
-        w: frame.w,
-        h: frame.h,
-      });
-    };
-    const onUp = (): void => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      if (latest && !placeChart(chart, latest)) render();
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp, { once: true });
+    trackFrameDrag(e, {
+      start: sessionPosition(store, chart.nativeAnchor),
+      ...(handle ? { handle } : {}),
+      min: { w: MIN_W, h: MIN_H },
+      keepRatio: (move) => move.shiftKey,
+      preview: (patch) => previewFrame(panel, patch),
+      commit: (patch) => {
+        if (!placeChart(chart, patch)) render();
+      },
+    });
   };
 
   const applyKeyboard = (e: KeyboardEvent, chart: SessionChart, panel: HTMLElement): void => {
@@ -711,18 +649,10 @@ export function attachSessionCharts(deps: {
         );
       }
       if (placeable) {
-        for (const handle of HANDLES) {
-          const grip = document.createElement('div');
-          grip.className = 'fc-chart__handle';
-          grip.dataset.handle = handle;
-          grip.setAttribute('aria-hidden', 'true');
-          grip.addEventListener('pointerdown', (e) => {
-            e.stopPropagation();
-            selectChart(chart.id, panel);
-            applyDrag(e, chart, panel, handle);
-          });
-          panel.appendChild(grip);
-        }
+        appendDrawingHandles(panel, (e, handle) => {
+          selectChart(chart.id, panel);
+          applyDrag(e, chart, panel, handle);
+        });
       }
       root.appendChild(panel);
       if (drawable) settings.sync(chart, chart.data, panel);
@@ -731,11 +661,11 @@ export function attachSessionCharts(deps: {
       settings.close(true);
     }
     // The selected chart may have been removed or given another data range.
-    syncSourceHighlight();
+    syncSelection();
   };
 
   const unsubscribe = store.subscribe(() => {
-    if (!publishingHighlight) render();
+    if (!selection.publishing) render();
   });
   render();
 
@@ -755,7 +685,8 @@ export function attachSessionCharts(deps: {
       unsubscribe();
       document.removeEventListener('pointerdown', onDocumentPointerDown, true);
       root.removeEventListener('focusout', onFocusOut);
-      if (store.getState().ui.chartSourceRefs.length > 0) mutators.setChartSourceRefs(store, []);
+      selectedId = null;
+      syncSelection();
       unsubscribeController();
       settings.detach();
       root.remove();

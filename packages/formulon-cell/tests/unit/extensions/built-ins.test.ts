@@ -141,9 +141,8 @@ describe('built-in extension factories', () => {
     const source = readFileSync(join(root, 'src/extensions/built-ins.ts'), 'utf8');
 
     expect(source).toContain('labels: ctx.i18n.strings.sessionCharts');
-    expect(source).toContain('pictureLabel: ctx.i18n.strings.ribbon.pictures');
-    expect(source).toContain('shapeLabel: ctx.i18n.strings.ribbon.shapes');
-    expect(source).toContain('resizeLabel: ctx.i18n.strings.sessionCharts.resize');
+    expect(source).toContain('labels: ctx.i18n.strings.sessionIllustrations');
+    expect(source).toContain('handle.setLabels(next.sessionIllustrations)');
   });
 
   it('anchors view toolbar before the workspace and falls back before an unwrapped grid', async () => {

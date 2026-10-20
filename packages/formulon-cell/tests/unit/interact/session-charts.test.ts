@@ -2044,8 +2044,8 @@ describe('attachSessionCharts', () => {
     expect(moved.x).toBeCloseTo(start.x + 35);
     expect(moved.y).toBeCloseTo(start.y + 50);
 
-    expect(host.querySelectorAll('.fc-chart__handle')).toHaveLength(8);
-    const resize = host.querySelector<HTMLElement>('.fc-chart__handle[data-handle="se"]');
+    expect(host.querySelectorAll('.fc-drawing-handle')).toHaveLength(8);
+    const resize = host.querySelector<HTMLElement>('.fc-drawing-handle[data-handle="se"]');
     if (!resize) throw new Error('missing chart resize handle');
     firePointer(resize, 'pointerdown', { clientX: 100, clientY: 100 });
     firePointer(window, 'pointermove', { clientX: 180, clientY: 145 });
@@ -2128,7 +2128,7 @@ describe('attachSessionCharts', () => {
       expect(
         host.querySelector('.fc-chart__plot [data-chart-role="unsupported"]')?.textContent,
       ).toBe('このグラフの種類は表示できません');
-      expect(host.querySelectorAll('.fc-chart__handle')).toHaveLength(8);
+      expect(host.querySelectorAll('.fc-drawing-handle')).toHaveLength(8);
 
       const start = pixels(placeholder);
       fireKey(placeholder, 'ArrowDown');
@@ -2198,7 +2198,7 @@ describe('attachSessionCharts', () => {
     salesTable();
     const handle = attach();
     const grip = (name: string): HTMLElement => {
-      const found = host.querySelector<HTMLElement>(`.fc-chart__handle[data-handle="${name}"]`);
+      const found = host.querySelector<HTMLElement>(`.fc-drawing-handle[data-handle="${name}"]`);
       if (!found) throw new Error(`missing ${name} handle`);
       return found;
     };
@@ -2323,6 +2323,31 @@ describe('attachSessionCharts', () => {
     firePointer(panel(), 'pointerdown');
     handle.detach();
     expect(store.getState().ui.chartSourceRefs).toEqual([]);
+    expect(store.getState().ui.selectedObject).toBeNull();
+  });
+
+  it('names the selected chart for the name box and releases it when left', () => {
+    salesTable();
+    const handle = attach({ labels: { objectName: 'グラフ {n}' } });
+    expect(store.getState().ui.selectedObject).toBeNull();
+    firePointer(panel(), 'pointerdown');
+    expect(store.getState().ui.selectedObject).toEqual({
+      id: panel().dataset.chartId,
+      name: 'グラフ 1',
+    });
+    firePointer(host, 'pointerdown');
+    expect(store.getState().ui.selectedObject).toBeNull();
+    handle.detach();
+  });
+
+  it("leaves another overlay's selected object alone", () => {
+    salesTable();
+    const handle = attach();
+    mutators.setSelectedObject(store, { id: 'picture-1', name: 'Picture 1' });
+    firePointer(host, 'pointerdown');
+    expect(store.getState().ui.selectedObject).toEqual({ id: 'picture-1', name: 'Picture 1' });
+    handle.detach();
+    expect(store.getState().ui.selectedObject).toEqual({ id: 'picture-1', name: 'Picture 1' });
   });
 
   it('scrolls a chart off with its anchor and hides it under the headers', () => {
@@ -2362,11 +2387,18 @@ describe('attachSessionCharts', () => {
     const frame = chartCss.slice(0, chartCss.indexOf('}'));
     expect(frame).not.toContain('border-radius');
     expect(frame).not.toContain('box-shadow');
-    // Round sizing handles on every edge and corner, shown only while selected.
-    expect(chartCss).toMatch(
-      /\.fc-chart__handle\s*\{[\s\S]*?display: none;[\s\S]*?width: 9px;[\s\S]*?height: 9px;[\s\S]*?border-radius: 50%;/,
+    // Round sizing handles on every edge and corner, shared with pictures and
+    // shown only while selected.
+    const drawingCss = readFileSync(
+      join(root, 'src/styles/core/app/overlays/drawings.css'),
+      'utf8',
     );
-    expect(chartCss).toMatch(/\.fc-chart--selected \.fc-chart__handle\s*\{\s*display: block;/);
+    expect(drawingCss).toMatch(
+      /\.fc-drawing-handle\s*\{[\s\S]*?display: none;[\s\S]*?width: 9px;[\s\S]*?height: 9px;[\s\S]*?border-radius: 50%;/,
+    );
+    expect(drawingCss).toMatch(
+      /\.fc-chart--selected \.fc-drawing-handle,\s*\.fc-illustration--selected \.fc-drawing-handle\s*\{\s*display: block;/,
+    );
     // The elements, styles and filters buttons stand outside the chart's right edge.
     expect(chartCss).toMatch(
       /\.fc-chart__buttons\s*\{[\s\S]*?left: calc\(100% \+ 8px\);[\s\S]*?flex-direction: column;/,
