@@ -59,13 +59,13 @@ export const datePatternsForLocale = (
   const language = normalizeFormatLocale(locale).split('-')[0];
   switch (language) {
     case 'ja':
-      return { short: 'yyyy/m/d', long: 'yyyy"年"m"月"d"日', time: 'H:MM' };
+      return { short: 'yyyy/m/d', long: 'yyyy"年"m"月"d"日"', time: 'H:MM' };
     case 'de':
       return { short: 'dd.mm.yyyy', long: 'dddd, d. mmmm yyyy', time: 'HH:MM' };
     case 'fr':
       return { short: 'dd/mm/yyyy', long: 'dddd d mmmm yyyy', time: 'HH:MM' };
     case 'zh':
-      return { short: 'yyyy/m/d', long: 'yyyy"年"m"月"d"日', time: 'HH:MM' };
+      return { short: 'yyyy/m/d', long: 'yyyy"年"m"月"d"日"', time: 'HH:MM' };
     case 'ko':
       return { short: 'yyyy-mm-dd', long: 'yyyy"년" m"월" d"일"', time: 'HH:MM' };
     case 'th':

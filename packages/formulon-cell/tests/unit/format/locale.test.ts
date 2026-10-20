@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   currencySymbolForLocale,
   datePatternsForLocale,
@@ -34,6 +35,22 @@ describe('format/locale.ts — shared normalizer', () => {
     expect(datePatternsForLocale('de-DE').short).toBe('dd.mm.yyyy');
     expect(datePatternsForLocale('fr-FR').short).toBe('dd/mm/yyyy');
   });
+
+  it.each(['en-US', 'ja-JP', 'de-DE', 'fr-FR', 'zh-CN', 'ko-KR', 'th-TH'])(
+    'offers date patterns the engine accepts for %s',
+    async (locale) => {
+      const wb = await WorkbookHandle.createDefault();
+      try {
+        const patterns = datePatternsForLocale(locale);
+        for (const pattern of [patterns.short, patterns.long]) {
+          // An invalid code falls back to General, which prints the bare serial.
+          expect(wb.formatValue({ kind: 'number', value: 45296 }, pattern)).toContain('2024');
+        }
+      } finally {
+        wb.dispose();
+      }
+    },
+  );
 
   it('formats custom and malformed locale ids without throwing', () => {
     for (const locale of ['de_@@', 'custom_brand']) {
