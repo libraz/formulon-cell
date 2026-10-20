@@ -753,8 +753,7 @@
 }
 
 [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb,
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb--wide,
-[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb--mono {
+[data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--number .fc-tb__rb--wide {
   min-width: 24px;
   width: 24px;
   padding-right: 2px;

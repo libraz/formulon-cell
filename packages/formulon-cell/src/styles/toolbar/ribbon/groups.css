@@ -52,7 +52,7 @@
   gap: 3px;
   width: auto;
   min-width: 52px;
-  max-width: 112px;
+  max-width: none;
   height: 66px;
   padding: 5px 6px 3px;
   font-family: var(--fc-tb-font);
@@ -76,7 +76,8 @@
 
 /* Translated tile labels use the same two-line box in every script. Keeping
    the icon on a fixed flex track prevents long labels (especially Thai and
-   German) from collapsing the SVG to zero height. */
+   German) from collapsing the SVG to zero height. A label wraps at 98px (a
+   112px tile) but never splits a word: the tile grows to the longest one. */
 .fc-tb__ribbon-group--tiles .fc-tb__rb > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
 .fc-tb__ribbon-group--mixed
   .fc-tb__rb--wide:not(.fc-tb__rb--stacked)
@@ -84,8 +85,8 @@
   display: -webkit-box;
   flex: 0 0 auto;
   align-self: stretch;
-  min-width: 0;
-  max-width: 100%;
+  min-width: min-content;
+  max-width: 98px;
   max-height: 2.16em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -208,7 +209,7 @@
   gap: 3px;
   width: auto;
   min-width: 52px;
-  max-width: 112px;
+  max-width: none;
   height: 66px;
   padding: 5px 6px 3px;
   font-size: 10.5px;
@@ -231,18 +232,28 @@
 
 /* Width-fitting stages set by fit-ribbon when the panel is too narrow. The
    doubled class outranks the platform tile rules. Narrow: tiles wrap their
-   labels onto two lines. */
+   labels onto two lines (fit-ribbon sets each label's narrowest two-line
+   width), never narrower than their longest word. */
 .fc-tb__ribbon
   .fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow
   .fc-tb__ribbon-tools
   > .fc-tb__rb:not(.fc-tb__rb--stacked) {
   min-width: 48px;
-  max-width: 76px;
+  max-width: none;
   padding-inline: 3px;
 }
 
+.fc-tb__ribbon
+  .fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow
+  .fc-tb__ribbon-tools
+  > .fc-tb__rb:not(.fc-tb__rb--stacked)
+  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+  min-width: min-content;
+  max-width: none;
+}
+
 /* Condensed: large buttons drop to icon-and-label rows three high, in the same
-   order. */
+   order, each row as wide as its full label. */
 .fc-tb__ribbon .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed .fc-tb__ribbon-tools {
   display: grid;
   grid-auto-flow: column;
@@ -264,7 +275,7 @@
   gap: 3px;
   width: auto;
   min-width: 0;
-  max-width: 168px;
+  max-width: none;
   height: 24px;
   padding: 1px 4px;
   font-size: 10.5px;

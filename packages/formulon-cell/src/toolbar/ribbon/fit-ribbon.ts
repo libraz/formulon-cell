@@ -40,15 +40,12 @@ const FIT_STAGES: readonly (readonly [string, (group: HTMLElement) => boolean])[
 
 const FIT_CLASSES = FIT_STAGES.map(([stage]) => stage);
 
+const LABEL = 'span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron)';
+/** Labels of a group's full-height tiles. */
+const TILE_LABELS = `:scope > .fc-tb__ribbon-tools > .fc-tb__rb:not(.fc-tb__rb--stacked) > ${LABEL}`;
 /** Mac Home style and editing tiles: Excel sizes each to the narrowest width
  *  that keeps its label on two lines. */
-const TWO_LINE_LABEL =
-  ':is(.fc-tb__ribbon-group--styles, .fc-tb__ribbon-group--editing) .fc-tb__rb--wide:not(.fc-tb__rb--stacked) > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron)';
-const TWO_LINE_LABELS = `:scope > .fc-tb__ribbon ${TWO_LINE_LABEL}`;
-// Icon-only only touches rows, so a tile keeps its fitted label there.
-const TWO_LINE_LABELS_IN_FIT_GROUP = [RIBBON_GROUP_NARROW_CLASS, RIBBON_GROUP_CONDENSED_CLASS]
-  .map((stage) => `.${stage}${TWO_LINE_LABEL}`)
-  .join(', ');
+const TWO_LINE_LABELS = `:scope > .fc-tb__ribbon :is(.fc-tb__ribbon-group--styles, .fc-tb__ribbon-group--editing) .fc-tb__rb--wide:not(.fc-tb__rb--stacked) > ${LABEL}`;
 
 const overflows = (panel: HTMLElement): boolean => panel.scrollWidth > panel.clientWidth + 1;
 
@@ -56,7 +53,9 @@ const clearFit = (groups: Iterable<Element>): void => {
   for (const group of groups) group.classList.remove(...FIT_CLASSES);
 };
 
-/** Shrink the visible panel's groups, stage by stage and rightmost first, until it fits. */
+/** Shrink the visible panel's groups, stage by stage and rightmost first, until it fits.
+ *  Narrowing sets each tile label to its narrowest two-line width; condensing
+ *  drops those widths for the row layout. */
 export const fitRibbonPanel = (panel: HTMLElement): void => {
   const all = [...panel.querySelectorAll<HTMLElement>(':scope > .fc-tb__ribbon-group')];
   clearFit(all);
@@ -66,8 +65,19 @@ export const fitRibbonPanel = (panel: HTMLElement): void => {
     for (let i = groups.length - 1; i >= 0 && overflows(panel); i--) {
       const group = groups[i] as HTMLElement;
       const before = group.getBoundingClientRect().width;
+      const labels = stage === RIBBON_GROUP_ICON_ONLY_CLASS ? [] : tileLabels(group);
+      const saved = labels.map((label) => label.style.width);
       group.classList.add(stage);
-      if (group.getBoundingClientRect().width >= before) group.classList.remove(stage);
+      for (const label of labels) {
+        if (stage === RIBBON_GROUP_NARROW_CLASS) fitLabelToTwoLines(label);
+        else label.style.removeProperty('width');
+      }
+      if (group.getBoundingClientRect().width >= before) {
+        group.classList.remove(stage);
+        labels.forEach((label, index) => {
+          label.style.width = saved[index] ?? '';
+        });
+      }
     }
   }
 };
@@ -91,28 +101,24 @@ const lineCount = (label: HTMLElement): number => {
   return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
 };
 
-const fitTwoLineLabels = (shell: HTMLElement, enabled: boolean): void => {
-  for (const label of shell.querySelectorAll<HTMLElement>(TWO_LINE_LABELS)) {
+const tileLabels = (group: HTMLElement): HTMLElement[] => [
+  ...group.querySelectorAll<HTMLElement>(TILE_LABELS),
+];
+
+const fitLabelToTwoLines = (label: HTMLElement): void => {
+  label.style.width = 'min-content';
+  const from = label.getBoundingClientRect().width;
+  label.style.width = 'max-content';
+  const to = label.getBoundingClientRect().width;
+  if (from === 0 || to <= from) {
     label.style.removeProperty('width');
-    if (!enabled) continue;
-    label.style.width = 'min-content';
-    const from = label.getBoundingClientRect().width;
-    if (from === 0) {
-      label.style.removeProperty('width');
-      continue;
-    }
-    label.style.width = 'max-content';
-    const to = label.getBoundingClientRect().width;
-    if (to <= from) {
-      label.style.removeProperty('width');
-      continue;
-    }
-    const width = twoLineLabelWidth(from, to, (w) => {
-      label.style.width = `${w}px`;
-      return lineCount(label);
-    });
-    label.style.width = `${width}px`;
+    return;
   }
+  const width = twoLineLabelWidth(from, to, (w) => {
+    label.style.width = `${w}px`;
+    return lineCount(label);
+  });
+  label.style.width = `${width}px`;
 };
 
 /** Refit the active panel under `root` now and whenever `root` changes width. */
@@ -121,16 +127,17 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
     const shell = root.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-shell');
     if (!shell) return;
     const singleLine = shell.classList.contains('fc-tb__ribbon-shell--singleLine');
-    clearFit(shell.querySelectorAll('.fc-tb__ribbon-group'));
-    fitTwoLineLabels(shell, root.dataset.fcPlatform === 'mac' && !singleLine);
+    const groups = [...shell.querySelectorAll<HTMLElement>('.fc-tb__ribbon-group')];
+    clearFit(groups);
+    for (const label of groups.flatMap(tileLabels)) label.style.removeProperty('width');
+    if (root.dataset.fcPlatform === 'mac' && !singleLine) {
+      for (const label of shell.querySelectorAll<HTMLElement>(TWO_LINE_LABELS)) {
+        fitLabelToTwoLines(label);
+      }
+    }
     if (singleLine) return;
     const panel = shell.querySelector<HTMLElement>(':scope > .fc-tb__ribbon:not([hidden])');
-    if (!panel) return;
-    fitRibbonPanel(panel);
-    // A narrowed or condensed group lays its labels out on its own terms.
-    for (const label of panel.querySelectorAll<HTMLElement>(TWO_LINE_LABELS_IN_FIT_GROUP)) {
-      label.style.removeProperty('width');
-    }
+    if (panel) fitRibbonPanel(panel);
   };
   let lastWidth = -1;
   const observer =

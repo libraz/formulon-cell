@@ -166,8 +166,8 @@ describe('toolbar/ribbon-model', () => {
       'currency',
       'percent',
       'comma',
-      'decDown',
       'decUp',
+      'decDown',
     ]);
     expect(commandsByGroup.get('styles')).toEqual(['conditional', 'formatTableHome', 'cellStyles']);
     expect(commandsByGroup.get('cells')).toEqual(['insertRows', 'deleteRows', 'formatCellsHome']);
@@ -416,7 +416,11 @@ describe('toolbar/ribbon-model', () => {
       expect(() => widthFor(variant)).toThrow();
     }
     expect(groupsCss).toMatch(
-      /\.fc-tb__ribbon-group--tiles \.fc-tb__rb,[\s\S]*?width: auto;[\s\S]*?min-width: 52px;[\s\S]*?max-width: 112px;/,
+      /\.fc-tb__ribbon-group--tiles \.fc-tb__rb,[\s\S]*?width: auto;[\s\S]*?min-width: 52px;[\s\S]*?max-width: none;/,
+    );
+    // The label caps the tile at 112px yet never splits its longest word.
+    expect(groupsCss).toMatch(
+      /\.fc-tb__ribbon-group--tiles \.fc-tb__rb > span:not\(\.fc-tb__rb-icon\):not\(\.fc-tb__rb-split-chevron\),[\s\S]*?min-width: min-content;[\s\S]*?max-width: 98px;/,
     );
     expect(groupsCss).toMatch(
       /\.fc-tb__ribbon-group--mixed \.fc-tb__rb--stacked\s*\{[\s\S]*?width: auto;[\s\S]*?min-width: 84px;/,
