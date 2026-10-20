@@ -154,6 +154,10 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   await expect(styledPoint).toHaveAttribute('fill', '#ff0000');
 
   const automaticHeight = Number(await inheritedPoint.getAttribute('height'));
+  // The automatic axis ends at its top label; a bar scales with the axis maximum.
+  const automaticMax = Number(
+    await chart.locator('[data-chart-role="axis-label"][data-chart-axis="y"]').last().textContent(),
+  );
   await openChartButton(chart, 'elements');
   const yAxis = dialog.getByRole('group', { name: 'Y-axis', exact: true });
   await yAxis.getByRole('spinbutton', { name: 'Minimum', exact: true }).fill('0');
@@ -165,7 +169,9 @@ export async function runChartSettingsScenario(page: Page): Promise<void> {
   const yAxisLabels = chart.locator('[data-chart-role="axis-label"][data-chart-axis="y"]');
   await expect(yAxisLabels).toHaveText(['0.0', '5.0', '10.0', '15.0', '20.0']);
   await expect(chart.locator('[data-chart-role="axis-tick"][data-chart-axis="y"]')).toHaveCount(0);
-  expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(automaticHeight / 2);
+  expect(Number(await inheritedPoint.getAttribute('height'))).toBeCloseTo(
+    (automaticHeight * automaticMax) / 20,
+  );
   await page.evaluate(() =>
     (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
   );

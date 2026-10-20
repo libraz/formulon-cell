@@ -135,6 +135,12 @@ export async function runMacChartKindScenario(page: Page): Promise<void> {
         .charts.charts.map((chart) => chart.kind),
     );
   await expect.poll(kinds).toEqual(['area']);
+  // The inserted chart is selected and opens Chart Design, as in the spreadsheet.
+  await expect(page.locator('[data-ribbon-tab="chartDesign"]')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.locator('[data-ribbon-tab="insert"]').click();
   await page.locator('.fc-tb__rb[data-ribbon-command="mac.insert.chartPie"]').click();
   await page
     .locator('[role=menu]:not([hidden]) [data-ribbon-command="mac.insert.chartPie"]')
