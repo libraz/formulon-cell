@@ -433,6 +433,44 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
   it('unknown patterns surface as custom', () => {
     expect(formatCodeToNumFmt('???xx???')).toEqual({ kind: 'custom', pattern: '???xx???' });
   });
+
+  it('reads escaped currency symbols and escaped negative parentheses', () => {
+    expect(formatCodeToNumFmt('\\$#,##0_);[Red]\\(\\$#,##0\\)')).toEqual({
+      kind: 'currency',
+      decimals: 0,
+      symbol: '$',
+      negativeStyle: 'red-parens',
+    });
+    expect(formatCodeToNumFmt('"¥"#,##0;[Red]"¥"\\-#,##0')).toEqual({
+      kind: 'currency',
+      decimals: 0,
+      symbol: '¥',
+      negativeStyle: 'red',
+    });
+  });
+
+  it('keeps pattern codes verbatim so literals and locale tags survive', () => {
+    for (const code of [
+      'yyyy"年"m"月"d"日"',
+      '[$-411]ggge"年"m"月"d"日"',
+      'B1d\\-mmm\\-yy',
+      'm"월"\\ d"일"',
+      '0" items"',
+    ]) {
+      expect(numFmtToFormatCode(formatCodeToNumFmt(code) ?? undefined)).toBe(code);
+    }
+  });
+
+  it('classifies by date and time tokens outside literals', () => {
+    expect(formatCodeToNumFmt('h:mm')).toEqual({ kind: 'time', pattern: 'h:mm' });
+    expect(formatCodeToNumFmt('[h]:mm:ss')).toEqual({ kind: 'time', pattern: '[h]:mm:ss' });
+    expect(formatCodeToNumFmt('mmss.0')).toEqual({ kind: 'time', pattern: 'mmss.0' });
+    expect(formatCodeToNumFmt('mm-dd-yy')).toEqual({ kind: 'date', pattern: 'mm-dd-yy' });
+    expect(formatCodeToNumFmt('[$-411]ge.m.d')).toEqual({ kind: 'date', pattern: '[$-411]ge.m.d' });
+    expect(formatCodeToNumFmt('m/d/yy h:mm')).toEqual({ kind: 'datetime', pattern: 'm/d/yy h:mm' });
+    expect(formatCodeToNumFmt('0" days"')).toEqual({ kind: 'custom', pattern: '0" days"' });
+    expect(formatCodeToNumFmt('##0.0E+0')).toEqual({ kind: 'custom', pattern: '##0.0E+0' });
+  });
 });
 
 describe('buildXfRecord', () => {

@@ -565,6 +565,9 @@ export function borderRecordToFormat(rec: BorderRecord): Partial<CellFormat> {
  *  unknown patterns surface as `custom`. */
 export function formatCodeToNumFmt(code: string): NumFmt | null {
   if (!code || code === 'General') return null;
+  // Kinds that carry a pattern keep the code verbatim so quoted literals,
+  // locale tags and padding survive a load/save round trip.
+  const original = code.trim();
   const rawSections = splitFormatSections(code);
   const negativeStyle = negativeStyleFromSections(rawSections);
   const normalized = normalizeFormatCode(code);
@@ -615,7 +618,7 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
       ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
     };
   }
-  if (isSpecialFormatCode(code)) return { kind: 'special', pattern: code };
+  if (isSpecialFormatCode(code)) return { kind: 'special', pattern: original };
   // Plain fixed
   const fixMatch = probe.match(/^0(?:\.(0+))?$/);
   if (fixMatch) {
@@ -625,13 +628,26 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
       ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
     };
   }
-  // Date / time tokens
-  if (/[ymdhs]/i.test(probe)) {
-    if (/[ymd]/i.test(probe) && /[hs]/i.test(probe)) return { kind: 'datetime', pattern: code };
-    if (/[hs]/i.test(probe)) return { kind: 'time', pattern: code };
-    return { kind: 'date', pattern: code };
-  }
-  return { kind: 'custom', pattern: code };
+  const tokens = dateTimeTokens(firstFormatSection(original));
+  const hasTime = /[hs]/i.test(tokens);
+  // `m` is minutes next to hours or seconds, and a month otherwise.
+  const hasDate = /[yd]/i.test(tokens) || (/m/i.test(tokens) && !hasTime);
+  if (hasDate && hasTime) return { kind: 'datetime', pattern: original };
+  if (hasTime) return { kind: 'time', pattern: original };
+  if (hasDate) return { kind: 'date', pattern: original };
+  return { kind: 'custom', pattern: original };
+}
+
+/** The date/time tokens of one format section, without literals and tags. */
+function dateTimeTokens(section: string): string {
+  return section
+    .replace(/"[^"]*"/g, '')
+    .replace(/\\./g, '')
+    .replace(/\[([hms])+\]/gi, '$1')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/[_*]./g, '')
+    .replace(/AM\/PM|A\/P/gi, '')
+    .replace(/B[12]/g, '');
 }
 
 function isSpecialFormatCode(code: string): boolean {
@@ -751,7 +767,8 @@ function normalizeFormatCode(code: string): string {
     .replace(/\[(?:Red|Green|Blue|Black|White|Yellow|Magenta|Cyan|Color\d+)\]/gi, '')
     .replace(/"([^"]*)"/g, '$1')
     .replace(/_.|\\ /g, '')
-    .replace(/\*./g, '');
+    .replace(/\*./g, '')
+    .replace(/\\(.)/g, '$1');
 }
 
 /* ---------- Color helpers ---------- */
