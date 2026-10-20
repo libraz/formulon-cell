@@ -31,17 +31,23 @@ const VIEWPORT_PAD = 4;
  * commands, as the spreadsheet does for a selected object.
  */
 export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
+  // The menu exists only while it is open, so a closed one leaves nothing in the portal.
   const root = document.createElement('div');
   root.className = 'fc-ctxmenu fc-ctxmenu--object';
   root.setAttribute('role', 'menu');
-  root.style.display = 'none';
   root.tabIndex = -1;
-  overlayPortalFor(host).appendChild(root);
   let restoreFocusTo: HTMLElement | null = null;
 
+  const onDocumentPointerDown = (event: PointerEvent): void => {
+    if (!(event.target instanceof Node && root.contains(event.target))) close();
+  };
+  const onWindowBlur = (): void => close();
+
   const close = (restoreFocus = false): void => {
-    if (root.style.display === 'none') return;
-    root.style.display = 'none';
+    if (!root.isConnected) return;
+    document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+    window.removeEventListener('blur', onWindowBlur);
+    root.remove();
     root.replaceChildren();
     const target = restoreFocusTo;
     restoreFocusTo = null;
@@ -56,12 +62,6 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
     }
     handleMenuKeydown(event, root, { close, restoreFocusTo });
   });
-  const onDocumentPointerDown = (event: PointerEvent): void => {
-    if (!(event.target instanceof Node && root.contains(event.target))) close();
-  };
-  document.addEventListener('pointerdown', onDocumentPointerDown, true);
-  const onWindowBlur = (): void => close();
-  window.addEventListener('blur', onWindowBlur);
 
   return {
     open(x, y, entries, options) {
@@ -93,6 +93,11 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
         });
         root.appendChild(button);
       }
+      if (!root.isConnected) {
+        overlayPortalFor(host).appendChild(root);
+        document.addEventListener('pointerdown', onDocumentPointerDown, true);
+        window.addEventListener('blur', onWindowBlur);
+      }
       root.style.display = 'block';
       root.style.left = '-9999px';
       root.style.top = '-9999px';
@@ -102,12 +107,10 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
       focusMenuItem(root, 'first');
     },
     close,
-    isOpen: () => root.style.display !== 'none',
+    isOpen: () => root.isConnected,
     contains: (target) => target instanceof Node && root.contains(target),
     detach() {
-      document.removeEventListener('pointerdown', onDocumentPointerDown, true);
-      window.removeEventListener('blur', onWindowBlur);
-      root.remove();
+      close();
     },
   };
 }

@@ -2397,6 +2397,8 @@ describe('attachSessionCharts', () => {
     salesTable();
     const second = create(range(0, 0, 2, 2), { kind: 'line', seriesDirection: 'columns' });
     const handle = attach({ labels: { objectName: 'グラフ {n}' } });
+    // A menu that is not open leaves nothing in the document.
+    expect(objectMenu()).toBeNull();
     const hostMenu = vi.fn();
     host.addEventListener('contextmenu', hostMenu);
     const [back, front] = Array.from(host.querySelectorAll<HTMLElement>('.fc-chart'));
@@ -2418,7 +2420,7 @@ describe('attachSessionCharts', () => {
     expect(document.activeElement?.textContent).toBe('Change Chart Type...');
 
     objectMenu()?.querySelector<HTMLButtonElement>('[data-fc-action="bringToFront"]')?.click();
-    expect(objectMenu()?.style.display).toBe('none');
+    expect(objectMenu()).toBeNull();
     expect(
       store
         .getState()
@@ -2446,7 +2448,7 @@ describe('attachSessionCharts', () => {
     expect(objectMenu()?.style.display).toBe('block');
     const escaped = fireKey(document.activeElement ?? panel(), 'Escape');
     expect(escaped.defaultPrevented).toBe(true);
-    expect(objectMenu()?.style.display).toBe('none');
+    expect(objectMenu()).toBeNull();
     expect(document.activeElement).toBe(panel());
     expect(panel().classList.contains('fc-chart--selected')).toBe(true);
 

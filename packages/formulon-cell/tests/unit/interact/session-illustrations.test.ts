@@ -540,7 +540,7 @@ describe('attachSessionIllustrations', () => {
     expect(store.getState().ui.selectedObject).toEqual({ id: 'shape-1', name: 'Rectangle 1' });
 
     items[0]?.click();
-    expect(menu()?.style.display).toBe('none');
+    expect(menu()).toBeNull();
     expect(store.getState().illustrations.illustrations.map((item) => item.id)).toEqual([
       'shape-2',
       'shape-1',
