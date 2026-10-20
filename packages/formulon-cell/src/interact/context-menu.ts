@@ -4,7 +4,7 @@ import {
 } from '../commands/clear-contents.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
-import { clearComment } from '../commands/comment.js';
+import { clearComment, commentAt } from '../commands/comment.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
@@ -52,6 +52,7 @@ import { createContextMenuPermissions } from './context-menu-permissions.js';
 import {
   buildCellEntries,
   buildColEntries,
+  buildMacCellEntries,
   buildRowEntries,
   compactMenuEntries,
   type ItemId,
@@ -60,6 +61,7 @@ import {
   menuEntryToContextItem,
   PASTE_QUICK_IDS,
   PLAIN_INSERT_IDS,
+  toMacBandEntries,
 } from './context-menu-spec.js';
 import {
   type ContextMenuStructureContext,
@@ -260,6 +262,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
   };
 
+  const isMacPlatform = (): boolean =>
+    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+
   const activePanel = (): HTMLElement => (focusPanel === 'sub' ? sub : root);
 
   const panelItems = (panel: HTMLElement): HTMLButtonElement[] =>
@@ -323,6 +328,15 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     items[activeIndex]?.focus();
   };
 
+  /** Mac menus have one highlight that follows the pointer, so hovering a row
+   *  also moves keyboard focus onto it. */
+  const followPointer = (panel: 'root' | 'sub', btn: HTMLButtonElement): void => {
+    if (!isMacPlatform() || btn.disabled) return;
+    focusPanel = panel;
+    activeIndex = panelItems(activePanel()).indexOf(btn);
+    btn.focus({ preventScroll: true });
+  };
+
   const openSubmenu = (id: string, parentBtn: HTMLButtonElement): void => {
     cancelSubClose();
     if (openSub?.id === id) return;
@@ -378,6 +392,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       btn.addEventListener('mouseenter', () => {
         if (btn.disabled) return;
         openSubmenu(entry.id, btn);
+        followPointer(panel, btn);
       });
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -433,6 +448,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       } else {
         cancelSubClose();
       }
+      followPointer(panel, btn);
     });
     container.appendChild(btn);
     if (panel === 'root' && entry.id === 'paste') pasteBtnRef = btn;
@@ -487,20 +503,24 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     explicitDisabledSources = new WeakSet<ContextMenuItem>();
     policyDisabledSources = new WeakSet<ContextMenuItem>();
     pasteBtnRef = null;
+    const mac = isMacPlatform();
+    const activeAddr = store.getState().selection.active;
     const raw =
       kind === 'row'
         ? buildRowEntries(strings)
         : kind === 'col'
           ? buildColEntries(strings)
-          : buildCellEntries(strings);
-    const activeAddr = store.getState().selection.active;
+          : mac
+            ? buildMacCellEntries(strings, commentAt(store.getState(), activeAddr) !== null)
+            : buildCellEntries(strings);
+    const platformEntries = mac && kind !== 'cell' ? toMacBandEntries(raw, strings) : raw;
     const hasCopiedCells = !!store.getState().ui.copyRange;
     const pendingSnapshot = hasCopiedCells ? clipboard.snapshot() : null;
     const pendingCutBand =
       pendingSnapshot?.mode === 'cut' && wholeBandAxisFor(pendingSnapshot) === kind;
     const watched = !!deps.isWatched?.(activeAddr);
     const entries = compactMenuEntries(
-      raw
+      platformEntries
         .filter(
           (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
         )
@@ -550,7 +570,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (composedContext) activeContext = composedContext;
     const renderEntries = visibleItems.map(contextItemToRenderEntry);
     const visibleRootIds = contextItemIds(visibleItems);
-    if (kind === 'cell') {
+    // The Mac menu carries no mini formatting toolbar.
+    if (kind === 'cell' && !mac) {
       const allowedMini = builtInOptions?.items
         ? new Set<string>(builtInOptions.items)
         : builtInOptions
@@ -636,7 +657,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const { x, y } = clampPanelToViewport(root, clientX, clientY, { pad: VIEWPORT_PAD });
     root.style.left = `${x}px`;
     root.style.top = `${y}px`;
-    focusMenuItem(0);
+    // A Mac menu opened by the pointer starts with no row highlighted; the
+    // first arrow key then lands on the first row.
+    if (isMacPlatform() && event.type === 'contextmenu') {
+      activeIndex = -1;
+      root.focus({ preventScroll: true });
+    } else {
+      focusMenuItem(0);
+    }
   };
 
   const isOwnChromeContextTarget = (target: EventTarget | null): boolean =>
@@ -768,6 +796,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
   };
 
+  root.addEventListener('mouseleave', () => {
+    if (!visible || openSub || !isMacPlatform()) return;
+    activeIndex = -1;
+    root.focus({ preventScroll: true });
+  });
   sub.addEventListener('mouseenter', cancelSubClose);
   sub.addEventListener('mouseleave', scheduleSubClose);
 

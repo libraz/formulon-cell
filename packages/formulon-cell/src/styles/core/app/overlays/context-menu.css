@@ -8,6 +8,9 @@
   box-sizing: border-box;
   padding: 3px 18px 3px 12px;
 }
+.fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item {
+  padding: 0 10px;
+}
 
 @layer fc.app {
   .fc-ctxmenu {
@@ -394,5 +397,86 @@
 
   .fc-ctxmenu__mini-btn[data-fc-action="formatCells"]::before {
     --fc-mini-icon-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 5h11v10h-11z' fill='%23fff' stroke='%231f1f1f' stroke-width='1.1'/%3E%3Cpath d='M4.5 5h11v3h-11z' fill='%23107c41'/%3E%3Cpath d='M8 5v10M12 5v10M4.5 11.5h11' stroke='%23d9d9d9' stroke-width='1'/%3E%3Cpath d='M14 13.2h3v3h-3z' fill='%232f75b5' stroke='%231f4e79'/%3E%3C/svg%3E");
+  }
+}
+
+/* Mac platform profile: the native menu look — no icon column, a translucent
+ * rounded panel and an accent pill on the hovered row. Pill radius is the panel
+ * radius minus the panel padding so the corners stay concentric. */
+@layer fc.app {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu {
+    --fc-ctxmenu-mac-radius: 10px;
+    --fc-ctxmenu-mac-pad: 5px;
+    --fc-ctxmenu-mac-pill: color-mix(in srgb, var(--fc-accent) 70%, var(--fc-bg-elev));
+    min-width: 280px;
+    padding: var(--fc-ctxmenu-mac-pad);
+    background: color-mix(in srgb, var(--fc-bg-elev) 94%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    backdrop-filter: blur(24px) saturate(1.8);
+    border: 0.5px solid color-mix(in srgb, var(--fc-fg) 16%, transparent);
+    border-radius: var(--fc-ctxmenu-mac-radius);
+    box-shadow:
+      0 12px 36px rgba(0, 0, 0, 0.2),
+      0 2px 6px rgba(0, 0, 0, 0.08);
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Hiragino Sans", var(--fc-font-ui, system-ui), sans-serif;
+    font-size: 13px;
+    line-height: 16px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"][data-fc-theme="contrast"] .fc-ctxmenu {
+    --fc-ctxmenu-mac-pill: var(--fc-accent);
+    background: var(--fc-bg-elev);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule-strong);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 24px;
+    min-height: 24px;
+    border-radius: calc(var(--fc-ctxmenu-mac-radius) - var(--fc-ctxmenu-mac-pad));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item::before {
+    display: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item:hover:not([disabled]),
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item:focus:not([disabled]),
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item--open:not([disabled]) {
+    background: var(--fc-ctxmenu-mac-pill);
+    color: var(--fc-accent-fg);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item[disabled] {
+    color: color-mix(in srgb, var(--fc-fg) 32%, transparent);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__hint {
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: color-mix(in srgb, var(--fc-fg) 40%, transparent);
+    opacity: 1;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu__item:hover:not([disabled])
+    .fc-ctxmenu__hint,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu__item:focus:not([disabled])
+    .fc-ctxmenu__hint,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu__item--open:not([disabled])
+    .fc-ctxmenu__hint {
+    color: inherit;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item[disabled] .fc-ctxmenu__hint {
+    color: inherit;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sep {
+    margin: 5px 10px;
+    background: color-mix(in srgb, var(--fc-fg) 10%, transparent);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__arrow {
+    opacity: 0.85;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__arrow::before {
+    width: 6px;
+    height: 6px;
+    border-width: 1.6px 1.6px 0 0;
   }
 }

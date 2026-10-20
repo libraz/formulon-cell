@@ -310,6 +310,83 @@ export function buildColEntries(s: Strings): MenuEntry[] {
   ];
 }
 
+function macPasteSpecialSubmenu(s: Strings): MenuEntry {
+  const t = s.contextMenu;
+  const m = s.macContextMenu;
+  return {
+    kind: 'submenu',
+    id: 'pasteSpecialMenu',
+    label: m.pasteSpecial,
+    children: [
+      { kind: 'item', id: 'pasteAll', label: m.paste, hint: '⌘V' },
+      { kind: 'sep', id: 'psSep1' },
+      { kind: 'item', id: 'pasteFormulas', label: t.pasteFormulas },
+      { kind: 'item', id: 'pasteFormulasNumFmt', label: t.pasteFormulasNumFmt },
+      { kind: 'item', id: 'pasteTranspose', label: t.pasteTranspose },
+      { kind: 'sep', id: 'psSep2' },
+      { kind: 'item', id: 'pasteValues', label: t.pasteValues },
+      { kind: 'item', id: 'pasteValuesNumFmt', label: t.pasteValuesNumFmt },
+      { kind: 'sep', id: 'psSep3' },
+      { kind: 'item', id: 'pasteFormatsOnly', label: m.pasteFormatsOnly },
+      { kind: 'sep', id: 'psSep4' },
+      { kind: 'item', id: 'pasteSpecial', label: m.pasteSpecialDialog, hint: '^⌘V' },
+    ],
+  };
+}
+
+/** Cell menu in the Mac desktop order. A note is edited or created through
+ *  the same command, so its label (and the delete row) follow `hasNote`. */
+export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
+  const t = s.contextMenu;
+  const m = s.macContextMenu;
+  return [
+    { kind: 'item', id: 'cut', label: m.cut, hint: '⌘X' },
+    { kind: 'item', id: 'copy', label: m.copy, hint: '⌘C' },
+    { kind: 'item', id: 'paste', label: m.paste, hint: '⌘V' },
+    macPasteSpecialSubmenu(s),
+    { kind: 'sep', id: 'sep1' },
+    { kind: 'item', id: 'insertCells', label: m.insert },
+    { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedCells },
+    { kind: 'item', id: 'deleteCells', label: m.delete },
+    { kind: 'item', id: 'clear', label: m.clear },
+    { kind: 'sep', id: 'sep2' },
+    filterSubmenu(s),
+    sortSubmenu(s),
+    { kind: 'sep', id: 'sep3' },
+    { kind: 'item', id: 'insertComment', label: hasNote ? m.editNote : m.newNote },
+    ...(hasNote ? [{ kind: 'item', id: 'deleteComment', label: m.deleteNote } as const] : []),
+    { kind: 'sep', id: 'sep4' },
+    { kind: 'item', id: 'formatCells', label: m.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'editPhonetic', label: m.editPhonetic },
+    { kind: 'item', id: 'defineName', label: m.defineName },
+    { kind: 'sep', id: 'sep5' },
+    { kind: 'item', id: 'insertHyperlink', label: m.hyperlink, hint: '⌘K' },
+    { kind: 'item', id: 'openHyperlink', label: s.ribbonMenu.linkOpen },
+  ];
+}
+
+/** Row/column header menus on Mac: the default entries with the Mac clipboard
+ *  wording, no Delete-key hint and no Select All row. */
+export function toMacBandEntries(entries: readonly MenuEntry[], s: Strings): MenuEntry[] {
+  const m = s.macContextMenu;
+  const labels: Partial<Record<ItemId, string>> = {
+    cut: m.cut,
+    copy: m.copy,
+    paste: m.paste,
+    clear: m.clear,
+    formatCells: m.formatCells,
+  };
+  return entries
+    .filter((e) => !(e.kind === 'item' && e.id === 'selectAll'))
+    .map((e) => {
+      if (e.kind === 'submenu' && e.id === 'pasteSpecialMenu') return macPasteSpecialSubmenu(s);
+      if (e.kind !== 'item') return e;
+      const label = labels[e.id];
+      if (label === undefined) return e;
+      return e.id === 'clear' ? { kind: 'item', id: e.id, label } : { ...e, label };
+    });
+}
+
 export function compactMenuEntries(entries: MenuEntry[]): MenuEntry[] {
   const out: MenuEntry[] = [];
   for (const entry of entries) {

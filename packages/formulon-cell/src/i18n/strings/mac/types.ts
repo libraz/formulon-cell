@@ -119,4 +119,24 @@ export interface MacStrings {
     strokeLabel: string;
     drawLabel: string;
   };
+  /** Cell context-menu labels where the Mac desktop menu differs from the
+   * default profile's wording. */
+  macContextMenu: {
+    cut: string;
+    copy: string;
+    paste: string;
+    pasteSpecial: string;
+    pasteSpecialDialog: string;
+    pasteFormatsOnly: string;
+    insert: string;
+    delete: string;
+    clear: string;
+    newNote: string;
+    editNote: string;
+    deleteNote: string;
+    formatCells: string;
+    editPhonetic: string;
+    defineName: string;
+    hyperlink: string;
+  };
 }

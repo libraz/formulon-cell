@@ -5,8 +5,9 @@
 // Why a dedicated container rather than raw `document.body`: overlays must
 // escape the `.fc-host { contain: strict }` boundary, but appending straight
 // to `<body>` drops them out of the theme cascade. The portal carries the
-// same `data-fc-theme` as its `.fc-host`, so every overlay inside it inherits
-// paper/ink/contrast tokens through normal cascade. It stays in the light DOM
+// same `data-fc-theme` and `data-fc-platform` as its `.fc-host`, so every
+// overlay inside it inherits paper/ink/contrast tokens and platform-scoped
+// styling through normal cascade. It stays in the light DOM
 // (not a shadow root) so imperative dialog/menu code and tests can still find
 // overlays with `document.querySelector`.
 
@@ -63,6 +64,9 @@ function syncTheme(host: HTMLElement, portal: HTMLElement): void {
   const theme = host.dataset.fcTheme;
   if (theme) portal.dataset.fcTheme = theme;
   else delete portal.dataset.fcTheme;
+  const platform = host.dataset.fcPlatform;
+  if (platform) portal.dataset.fcPlatform = platform;
+  else delete portal.dataset.fcPlatform;
   if (host.lang) portal.lang = host.lang;
   else portal.removeAttribute('lang');
 }
@@ -314,8 +318,8 @@ export function overlayPortalFor(node: Element | null | undefined): HTMLElement 
   return ownerDocument.body;
 }
 
-/** Push the current `.fc-host` theme onto its portal. Called from the
- * instance's `setTheme` so paper↔ink swaps reach open/future overlays. */
+/** Push the current `.fc-host` theme and platform onto its portal. Called from
+ * the instance's `setTheme` so paper↔ink swaps reach open/future overlays. */
 export function syncOverlayPortalTheme(host: HTMLElement): void {
   const portal = portals.get(host)?.portal;
   if (portal) syncTheme(host, portal);
