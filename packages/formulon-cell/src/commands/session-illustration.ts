@@ -33,6 +33,7 @@ export interface CreateSessionShapeOptions {
   h?: number;
   color?: string;
   radius?: number;
+  /** Outline weight in points; 0 is No Outline. */
   lineWidth?: number;
   opacity?: number;
   authorization?: IllustrationMutationAuthorization;
@@ -57,9 +58,6 @@ export interface IllustrationMutationAuthorization {
   origin?: InteractionOrigin;
   commandId?: string;
 }
-
-/** The colour of a shape that has not been given one. */
-export const DEFAULT_SHAPE_COLOR = '#0f6cbd';
 
 export type SessionIllustrationPatch = Partial<Omit<SessionIllustration, 'id'>>;
 export type SessionIllustrationArrangeAction =
@@ -417,7 +415,6 @@ export function createRibbonShapeFromSelection(
       y: 88 + (count % 3) * 24,
       w: shape === 'line' || shape === 'arrow' ? 180 : 160,
       h: shape === 'line' || shape === 'arrow' ? 80 : 96,
-      color: DEFAULT_SHAPE_COLOR,
       authorization,
     },
     history,

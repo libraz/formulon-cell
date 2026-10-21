@@ -372,6 +372,17 @@ export type SessionShapeKind =
   | 'line'
   | 'arrow';
 
+/** The dash style of a shape's outline. */
+export type SessionShapeLineDash =
+  | 'solid'
+  | 'roundDot'
+  | 'squareDot'
+  | 'dash'
+  | 'dashDot'
+  | 'longDash'
+  | 'longDashDot'
+  | 'longDashDotDot';
+
 /** Illustration overlay. Pictures with a nativeObjectId are stored in the workbook. */
 export interface SessionIllustration {
   nativeObjectId?: number;
@@ -390,14 +401,16 @@ export interface SessionIllustration {
   y?: number;
   w?: number;
   h?: number;
-  /** A shape's fill colour, and its outline's while `lineColor` is unset. */
+  /** A shape's fill colour; a line's colour while `lineColor` is unset. */
   color?: string;
   /** A shape's outline colour. */
   lineColor?: string;
   radius?: number;
-  /** A shape's outline weight; 0 is No Outline. */
+  /** A shape's outline weight in points; 0 is No Outline. */
   lineWidth?: number;
-  /** A shape's fill opacity; 0 is No Fill. */
+  /** A shape's outline dash style; unset is solid. */
+  lineDash?: SessionShapeLineDash;
+  /** A shape's fill opacity, opaque when unset; 0 is No Fill. */
   opacity?: number;
 }
 

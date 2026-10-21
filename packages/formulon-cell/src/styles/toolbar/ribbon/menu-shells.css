@@ -147,6 +147,20 @@
   margin-left: auto;
 }
 
+/* Shape Outline: Weight and Dashes open beside the menu, each entry a line sample. */
+#menu-shape-outline .fc-tb__submenu--shape-outline {
+  min-width: 160px;
+}
+
+#menu-shape-outline .fc-tb__menu-item--submenu .fc-tb__menu-item__caret {
+  margin-left: auto;
+}
+
+.fc-tb__shape-line-sample {
+  flex: 0 0 64px;
+  color: var(--fc-tb-fg);
+}
+
 /* Change Colors: the six colours of a palette before its name. */
 .fc-tb__chart-palette {
   display: inline-flex;

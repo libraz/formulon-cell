@@ -106,6 +106,10 @@ export interface DynamicDropdownsCtx {
   applyShapeFillAction: (color: string) => void;
   /** A Shape Outline colour for the selected shape; `none` is No Outline. */
   applyShapeOutlineAction: (color: string) => void;
+  /** A Shape Outline > Weight entry, in points. */
+  applyShapeOutlineWeightAction: (weight: string) => void;
+  /** A Shape Outline > Dashes entry. */
+  applyShapeOutlineDashAction: (dash: string) => void;
   applyUiTheme: (theme: UiTheme) => void;
   applyWorkbookTheme: (presetId: WorkbookThemePresetId) => void;
   focusSheet: () => void;
@@ -184,6 +188,8 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'chart-colors',
   'shape-fill',
   'shape-outline',
+  'shape-outline-weight',
+  'shape-outline-dash',
   'page-theme-action',
   'workbook-theme-action',
   'sort',
@@ -261,6 +267,12 @@ const applyVerticalViewportLimit = (
     el.style.overscrollBehavior = '';
   }
 };
+
+/** Menus whose `data-format-submenu` entries open the `data-format-panel` beside them. */
+const FORMAT_SUBMENU_MENU_IDS: ReadonlySet<string> = new Set([
+  'menu-format-cells',
+  'menu-shape-outline',
+]);
 
 export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS: ReadonlySet<string> = new Set([
   ...DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS.map(datasetKeyForAttr),
@@ -440,7 +452,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     if (!menu) return;
     menu.hidden = true;
     if (menu.id === 'menu-conditional') closeDynamicConditionalSubmenus(menu);
-    if (menu.id === 'menu-format-cells') closeDynamicFormatSubmenus(menu);
+    if (FORMAT_SUBMENU_MENU_IDS.has(menu.id)) closeDynamicFormatSubmenus(menu);
     if (menu.id === MAC_FORMULAS_MORE_MENU_ID) closeDynamicMoreSubmenus(menu);
     button?.setAttribute('aria-expanded', 'false');
     if (restoreFocus) button?.focus();
@@ -654,6 +666,8 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'chart-colors', handler: (v) => ctx.applyChartColorsAction(v) },
     { attr: 'shape-fill', handler: (v) => ctx.applyShapeFillAction(v) },
     { attr: 'shape-outline', handler: (v) => ctx.applyShapeOutlineAction(v) },
+    { attr: 'shape-outline-weight', handler: (v) => ctx.applyShapeOutlineWeightAction(v) },
+    { attr: 'shape-outline-dash', handler: (v) => ctx.applyShapeOutlineDashAction(v) },
     {
       attr: 'page-theme-action',
       handler: (v) => {
@@ -753,7 +767,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     }
 
     const formatSubmenu = target?.closest<HTMLElement>('[data-format-submenu]');
-    if (formatSubmenu && menu.id === 'menu-format-cells') {
+    if (formatSubmenu && FORMAT_SUBMENU_MENU_IDS.has(menu.id)) {
       event.preventDefault();
       event.stopPropagation();
       if (isDisabledMenuControl(formatSubmenu)) return true;
@@ -826,9 +840,11 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       openDynamicMoreSubmenu(menu, trigger.dataset.functionCategorySubmenu ?? '', trigger);
       return true;
     }
-    if (menu?.id !== 'menu-conditional' && menu?.id !== 'menu-format-cells') return false;
+    if (!menu || (menu.id !== 'menu-conditional' && !FORMAT_SUBMENU_MENU_IDS.has(menu.id))) {
+      return false;
+    }
     if (menu.hidden) return false;
-    if (menu.id === 'menu-format-cells') {
+    if (FORMAT_SUBMENU_MENU_IDS.has(menu.id)) {
       const trigger = target?.closest<HTMLElement>('[data-format-submenu]');
       if (!trigger) return false;
       if (isDisabledMenuControl(trigger)) return true;
@@ -921,10 +937,14 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       });
       return event.defaultPrevented;
     }
-    if ((menu?.id !== 'menu-conditional' && menu?.id !== 'menu-format-cells') || menu.hidden) {
+    if (
+      !menu ||
+      (menu.id !== 'menu-conditional' && !FORMAT_SUBMENU_MENU_IDS.has(menu.id)) ||
+      menu.hidden
+    ) {
       return false;
     }
-    if (menu.id === 'menu-format-cells') {
+    if (FORMAT_SUBMENU_MENU_IDS.has(menu.id)) {
       const trigger = target?.closest<HTMLElement>('[data-format-submenu]');
       if (trigger && (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault();

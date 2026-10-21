@@ -12,6 +12,7 @@ import {
   duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../../../src/commands/session-illustration.js';
+import { DEFAULT_SHAPE_OUTLINE_COLOR } from '../../../src/commands/shape-format.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachSessionIllustrations } from '../../../src/interact/session-illustrations.js';
 import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
@@ -78,7 +79,12 @@ describe('attachSessionIllustrations', () => {
       'shape-1',
     ]);
     expect(host.querySelector<HTMLImageElement>('img')?.alt).toBe('Image label');
-    expect(host.querySelector('svg ellipse[stroke="#107c10"]')).toBeTruthy();
+    // The oval fills its 160 x 96 box, outlined in the default outline colour.
+    const oval = host.querySelector('svg ellipse[fill="#107c10"]');
+    expect(oval?.getAttribute('stroke')).toBe(DEFAULT_SHAPE_OUTLINE_COLOR);
+    expect(oval?.getAttribute('stroke-width')).toBe('2');
+    expect([oval?.getAttribute('rx'), oval?.getAttribute('ry')]).toEqual(['80', '48']);
+    expect(oval?.closest('svg')?.getAttribute('viewBox')).toBe('0 0 160 96');
     expect(overlays[0]?.getAttribute('aria-roledescription')).toBe('Picture overlay');
     expect(overlays[1]?.getAttribute('aria-roledescription')).toBe('Shape overlay');
     expect(overlays[0]?.querySelectorAll('.fc-drawing-handle')).toHaveLength(8);

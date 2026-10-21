@@ -1,4 +1,9 @@
-import { DEFAULT_SHAPE_COLOR } from '../commands/session-illustration.js';
+import {
+  DEFAULT_SHAPE_COLOR,
+  DEFAULT_SHAPE_LINE_WIDTH,
+  MAX_SHAPE_LINE_WIDTH,
+  shapeCornerRadius,
+} from '../commands/shape-format.js';
 import { summarizeSpreadsheetCompatibility } from '../engine/compatibility.js';
 import {
   listWorkbookObjects,
@@ -196,22 +201,23 @@ export function attachWorkbookObjectsPanel(
     radius.max = '48';
     radius.step = '1';
     radius.value = String(
-      illustration.radius ?? (illustration.shape === 'rounded-rectangle' ? 12 : 0),
+      Math.round(shapeCornerRadius(illustration, illustration.w ?? 160, illustration.h ?? 96)),
     );
+    const initialRadius = radius.value;
     const lineWidth = document.createElement('input');
     lineWidth.className = 'fc-objects__input';
     lineWidth.type = 'number';
-    lineWidth.min = '1';
-    lineWidth.max = '16';
-    lineWidth.step = '1';
-    lineWidth.value = String(illustration.lineWidth ?? 3);
+    lineWidth.min = '0';
+    lineWidth.max = String(MAX_SHAPE_LINE_WIDTH);
+    lineWidth.step = '0.25';
+    lineWidth.value = String(illustration.lineWidth ?? DEFAULT_SHAPE_LINE_WIDTH);
     const opacity = document.createElement('input');
     opacity.className = 'fc-objects__input';
     opacity.type = 'range';
     opacity.min = '0';
     opacity.max = '1';
     opacity.step = '0.05';
-    opacity.value = String(illustration.opacity ?? 0.16);
+    opacity.value = String(illustration.opacity ?? 1);
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions';
     const apply = createWorkbookObjectsActionButton(t.apply, { primary: true, type: 'submit' });
@@ -220,8 +226,11 @@ export function attachWorkbookObjectsPanel(
       event.preventDefault();
       deps.onUpdateSessionIllustration?.(illustration.id, {
         color: color.value,
-        radius: Math.max(0, Math.min(48, Number(radius.value) || 0)),
-        lineWidth: Math.max(1, Math.min(16, Number(lineWidth.value) || 1)),
+        // An untouched corner keeps following the shape's size.
+        ...(radius.value === initialRadius
+          ? {}
+          : { radius: Math.max(0, Math.min(48, Number(radius.value) || 0)) }),
+        lineWidth: Math.max(0, Math.min(MAX_SHAPE_LINE_WIDTH, Number(lineWidth.value) || 0)),
         opacity: Math.max(0, Math.min(1, Number(opacity.value) || 0)),
       });
     });

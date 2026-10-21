@@ -217,6 +217,17 @@ export interface RibbonMenusStrings {
     chartColorsMonochrome: string;
     shapeNoFill: string;
     shapeNoOutline: string;
+    shapeOutlineWeight: string;
+    shapeOutlineDashes: string;
+    shapeOutlinePoints: string;
+    shapeDashSolid: string;
+    shapeDashRoundDot: string;
+    shapeDashSquareDot: string;
+    shapeDashDash: string;
+    shapeDashDashDot: string;
+    shapeDashLongDash: string;
+    shapeDashLongDashDot: string;
+    shapeDashLongDashDotDot: string;
     arrangeRequiresObject: string;
     arrangeNativeUnsupported: string;
     arrangeAtFront: string;

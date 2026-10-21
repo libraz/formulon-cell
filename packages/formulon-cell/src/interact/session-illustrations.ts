@@ -3,12 +3,23 @@ import type { IllustrationMutationAuthorization } from '../commands/session-illu
 import {
   arrangeSessionIllustration,
   clearSessionIllustration,
-  DEFAULT_SHAPE_COLOR,
   duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
-import { shapeOutlineColor } from '../commands/shape-format.js';
-import { drawingClipPath, nearestGridline, sessionPosition } from '../engine/drawing-geometry.js';
+import {
+  shapeCornerRadius,
+  shapeDashStroke,
+  shapeFillColor,
+  shapeOutlineColor,
+  shapeOutlineDash,
+  shapeOutlineWeight,
+} from '../commands/shape-format.js';
+import {
+  drawingClipPath,
+  nearestGridline,
+  sessionPosition,
+  viewportZoom,
+} from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { SessionShapeKind, State } from '../store/types.js';
@@ -133,62 +144,63 @@ const appendSvg = <K extends keyof SVGElementTagNameMap>(
   return el;
 };
 
-const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
+/** CSS pixels per point. */
+const PX_PER_PT = 96 / 72;
+
+/** Draw the shape filling a `w` x `h` box, its outline centred on the edge the
+ *  way the spreadsheet draws it. */
+const renderShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number): void => {
   svg.replaceChildren();
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   if (!item.shape) return;
-  const outline = shapeOutlineColor(item) ?? 'none';
+  const outline = shapeOutlineColor(item);
+  const width = (shapeOutlineWeight(item) ?? 0) * PX_PER_PT;
+  const dash = shapeDashStroke(shapeOutlineDash(item), width);
+  const stroke = {
+    stroke: outline ?? 'none',
+    'stroke-width': width,
+    'stroke-dasharray': dash.dasharray,
+    'stroke-linecap': dash.linecap,
+  };
   if (item.shape === 'line' || item.shape === 'arrow') {
-    appendSvg(svg, 'line', {
-      x1: 12,
-      y1: 68,
-      x2: 148,
-      y2: 20,
-      stroke: outline,
-      'stroke-width': Math.max(1, item.lineWidth ?? 5),
-      'stroke-linecap': 'round',
-    });
-    if (item.shape === 'arrow') {
-      appendSvg(svg, 'path', {
-        d: 'M 148 20 L 132 18 L 142 34 Z',
+    // An arrowhead three line widths long ends the line at its tip.
+    const head = item.shape === 'arrow' ? Math.max(6, width * 3) : 0;
+    const length = Math.hypot(w, h) || 1;
+    const [ux, uy] = [w / length, -h / length];
+    appendSvg(svg, 'line', { x1: 0, y1: h, x2: w - ux * head, y2: -uy * head, ...stroke });
+    if (head > 0 && outline) {
+      const [bx, by] = [w - ux * head, -uy * head];
+      const [px, py] = [-uy * (head / 2), ux * (head / 2)];
+      appendSvg(svg, 'polygon', {
+        points: `${w},0 ${bx + px},${by + py} ${bx - px},${by - py}`,
         fill: outline,
       });
     }
     return;
   }
   const paint = {
-    fill: item.color ?? DEFAULT_SHAPE_COLOR,
-    'fill-opacity': item.opacity ?? 0.16,
-    stroke: outline,
-    'stroke-width': item.lineWidth ?? 3,
+    fill: shapeFillColor(item) ?? 'none',
+    'fill-opacity': item.opacity ?? 1,
+    ...stroke,
+    'stroke-linejoin': 'miter',
   };
   if (item.shape === 'oval') {
-    appendSvg(svg, 'ellipse', { cx: 80, cy: 48, rx: 68, ry: 36, ...paint });
+    appendSvg(svg, 'ellipse', { cx: w / 2, cy: h / 2, rx: w / 2, ry: h / 2, ...paint });
     return;
   }
   if (item.shape === 'triangle') {
-    appendSvg(svg, 'polygon', {
-      points: '80,12 148,84 12,84',
-      ...paint,
-      'stroke-linejoin': 'round',
-    });
+    appendSvg(svg, 'polygon', { points: `${w / 2},0 ${w},${h} 0,${h}`, ...paint });
     return;
   }
   if (item.shape === 'diamond') {
     appendSvg(svg, 'polygon', {
-      points: '80,10 150,48 80,86 10,48',
+      points: `${w / 2},0 ${w},${h / 2} ${w / 2},${h} 0,${h / 2}`,
       ...paint,
-      'stroke-linejoin': 'round',
     });
     return;
   }
-  appendSvg(svg, 'rect', {
-    x: 12,
-    y: 12,
-    width: 136,
-    height: 72,
-    rx: item.radius ?? (item.shape === 'rounded-rectangle' ? 12 : 2),
-    ...paint,
-  });
+  const rx = shapeCornerRadius(item, w, h);
+  appendSvg(svg, 'rect', { x: 0, y: 0, width: w, height: h, rx, ...paint });
 };
 
 const appendImage = (panel: HTMLElement, item: SessionIllustration): void => {
@@ -500,10 +512,12 @@ export function attachSessionIllustrations(deps: {
         appendImage(panel, item);
       } else {
         const svg = document.createElementNS(SVG_NS, 'svg');
-        svg.setAttribute('viewBox', '0 0 160 96');
         svg.setAttribute('aria-hidden', 'true');
-        svg.style.cssText = 'display:block;width:100%;height:100%;';
-        renderShape(svg, item);
+        // A frame being dragged stretches the drawing until it is redrawn.
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.style.cssText = 'display:block;width:100%;height:100%;overflow:visible;';
+        const scale = item.nativeAnchor ? viewportZoom(store) : 1;
+        renderShape(svg, item, placement.w / scale, placement.h / scale);
         panel.appendChild(svg);
       }
 

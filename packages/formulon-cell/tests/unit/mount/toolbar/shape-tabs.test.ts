@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { shapeFillColor, shapeOutlineColor } from '../../../../src/commands/shape-format.js';
+import {
+  shapeFillColor,
+  shapeOutlineColor,
+  shapeOutlineDash,
+  shapeOutlineWeight,
+} from '../../../../src/commands/shape-format.js';
 import { createIllustrationDropdownDefaults } from '../../../../src/mount/dynamic-dropdown-defaults/illustrations.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators, type SessionIllustration } from '../../../../src/store/store.js';
@@ -105,6 +110,37 @@ describe('shape and picture tabs of the ribbon', () => {
     sheet.instance.history.undo();
     expect(shapeOutlineColor(current(shape.id))).not.toBeNull();
     expect(shapeFillColor(current(shape.id))).toBeNull();
+    tb.dispose();
+  });
+
+  it('weighs and dashes the outline from the submenus of Shape Outline', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const shape = insertShape();
+
+    command('shapeOutline').click();
+    const panel = host.querySelector<HTMLElement>('[data-format-panel="weight"]');
+    expect(panel?.hidden).toBe(true);
+    pick(tb, '[data-format-submenu="weight"]');
+    expect(panel?.hidden).toBe(false);
+    expect(
+      host.querySelector('[data-shape-outline-weight="1.5"]')?.getAttribute('aria-checked'),
+    ).toBe('true');
+    pick(tb, '[data-shape-outline-weight="3"]');
+    expect(shapeOutlineWeight(current(shape.id))).toBe(3);
+
+    command('shapeOutline').click();
+    pick(tb, '[data-shape-outline-dash="dash"]');
+    expect(shapeOutlineDash(current(shape.id))).toBe('dash');
+    command('shapeOutline').click();
+    expect(
+      host.querySelector('[data-shape-outline-weight="3"]')?.getAttribute('aria-checked'),
+    ).toBe('true');
+    expect(
+      host.querySelector('[data-shape-outline-dash="dash"]')?.getAttribute('aria-checked'),
+    ).toBe('true');
     tb.dispose();
   });
 

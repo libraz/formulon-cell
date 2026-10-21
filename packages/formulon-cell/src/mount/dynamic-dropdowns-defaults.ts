@@ -234,6 +234,8 @@ export function createDefaultDynamicDropdownsCtx(
     applyShapeFillAction: shapeFormatDefaults.applyShapeFillAction,
     updateShapeFillMenu: shapeFormatDefaults.updateShapeFillMenu,
     applyShapeOutlineAction: shapeFormatDefaults.applyShapeOutlineAction,
+    applyShapeOutlineWeightAction: shapeFormatDefaults.applyShapeOutlineWeightAction,
+    applyShapeOutlineDashAction: shapeFormatDefaults.applyShapeOutlineDashAction,
     updateShapeOutlineMenu: shapeFormatDefaults.updateShapeOutlineMenu,
     applySortMenuAction: editingDefaults.applySortMenuAction,
     applyReviewCommentAction: reviewDefaults.applyReviewCommentAction,

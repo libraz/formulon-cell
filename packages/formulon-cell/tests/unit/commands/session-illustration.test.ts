@@ -91,8 +91,9 @@ describe('session illustration commands', () => {
       y: 88,
       w: 180,
       h: 80,
-      color: '#0f6cbd',
     });
+    // A new shape takes the theme's default colours until it is given its own.
+    expect(shape?.color).toBeUndefined();
     expect(image).toMatchObject({
       id: 'ribbon-image-0-0-0-1',
       kind: 'image',
