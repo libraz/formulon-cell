@@ -18,6 +18,7 @@ import {
   hydrateAutoFilterFromEngine,
   syncAutoFilterToEngine,
 } from '../../../src/engine/auto-filter-sync.js';
+import { flushFormatToEngine } from '../../../src/engine/cell-format-sync.js';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -662,7 +663,7 @@ describe('AutoFilter engine sync', () => {
     }
   });
 
-  it('round-trips a JS color mask when the native definition has no color column', async () => {
+  it('round-trips a JS color mask alongside the native color column', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.capabilities.typedAutoFilter).toBe(true);
@@ -678,6 +679,7 @@ describe('AutoFilter engine sync', () => {
       mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { fill: '#ff0000' });
       mutators.setCellFormat(store, { sheet: 0, row: 2, col: 0 }, { fill: '#00ff00' });
       mutators.setCellFormat(store, { sheet: 0, row: 3, col: 0 }, { fill: '#00ff00' });
+      flushFormatToEngine(wb, store, 0);
 
       expect(
         applyColorFilter(
@@ -690,7 +692,8 @@ describe('AutoFilter engine sync', () => {
         ),
       ).toBe(2);
       expect(store.getState().layout.hiddenRows).toEqual(new Set([2, 3]));
-      expect(wb.getAutoFilter(0)?.columns).toHaveLength(0);
+      expect(wb.getAutoFilter(0)?.columns).toHaveLength(1);
+      expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject({ colId: 0, cellColor: true });
       expect(
         wb
           .getRowLayouts(0)

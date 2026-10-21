@@ -1,5 +1,5 @@
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
-import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -553,9 +553,8 @@ export class GridRenderer {
     const activeAnchor = activeMerge
       ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
       : a;
-    const fmt = format.formats.get(addrKey(activeAnchor));
     const validationBounds = trailingRect(activeRects, layout.rtl);
-    if (validationBounds && shouldShowValidationChevron(fmt?.validation)) {
+    if (validationBounds && shouldShowValidationChevron(validationAt(format, activeAnchor))) {
       const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
       setValidationChevron({ rect, row: activeAnchor.row, col: activeAnchor.col });
     }
@@ -610,3 +609,5 @@ export {
   isPlainTextOverflowCandidate,
   VALIDATION_TRIANGLE_COLOR,
 } from './grid/hit-state.js';
+
+import { validationAt } from '../store/range-validations.js';

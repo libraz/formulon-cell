@@ -64,7 +64,7 @@ describe('executeRibbonCommentAction', () => {
 
     expect(commentAt(store.getState(), active)).toBeNull();
     expect(commentAt(store.getState(), other)).toBe('other');
-    expect(wb.setCommentEntry).toHaveBeenCalledWith(0, 1, 1, '', '');
+    expect(wb.setCommentEntry).toHaveBeenCalledWith(0, 1, 1, 'Formulon', '');
 
     expect(history.undo()).toBe(true);
     expect(commentAt(store.getState(), active)).toBe('active');
@@ -110,8 +110,8 @@ describe('executeRibbonCommentAction', () => {
     expect(commentAt(store.getState(), second)).toBeNull();
     expect(commentAt(store.getState(), otherSheet)).toBe('other sheet');
     expect(wb.setCommentEntry.mock.calls.map((call) => call.slice(0, 5))).toEqual([
-      [0, 0, 0, '', ''],
-      [0, 2, 1, '', ''],
+      [0, 0, 0, 'Formulon', ''],
+      [0, 2, 1, 'Formulon', ''],
     ]);
 
     expect(history.undo()).toBe(true);

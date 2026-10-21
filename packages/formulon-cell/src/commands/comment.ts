@@ -7,6 +7,7 @@ import type {
   EngineThreadedComment,
 } from '../engine/workbook-handle-annotations.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import type { History } from './history.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOrigin, OperationEffect } from './interaction-policy.js';
@@ -132,7 +133,7 @@ const timestamp = (): string => {
 };
 
 const ensurePerson = (wb: WorkbookHandle, author: string): string => {
-  const displayName = author.trim() || 'Formulon';
+  const displayName = author.trim() || DEFAULT_COMMENT_AUTHOR;
   const existing = wb.getPersons().find((person) => person.displayName === displayName);
   if (existing) return existing.id;
   const id = guid();
@@ -419,14 +420,15 @@ export function setComment(
   ) {
     return false;
   }
-  const author = commentAuthorAt(store.getState(), addr) ?? '';
+  const author =
+    commentAuthorAt(store.getState(), addr) ?? (text.length > 0 ? DEFAULT_COMMENT_AUTHOR : '');
   if (wb?.capabilities.comments) {
     if (wb.setCommentEntry(addr.sheet, addr.row, addr.col, author, text) === false) return false;
   }
   if (text.length === 0) {
     mutators.setCellFormat(store, addr, { comment: undefined, commentAuthor: undefined });
   } else {
-    mutators.setCellFormat(store, addr, { comment: text });
+    mutators.setCellFormat(store, addr, { comment: text, commentAuthor: author });
   }
   return true;
 }
@@ -558,7 +560,10 @@ const applyCommentSnapshot = (
     if (wb?.capabilities.comments) {
       const physical = snapshot.map((entry) => ({
         addr: entry.addr,
-        comment: entry.text === null ? null : { author: entry.author ?? '', text: entry.text },
+        comment:
+          entry.text === null
+            ? null
+            : { author: entry.author ?? DEFAULT_COMMENT_AUTHOR, text: entry.text },
       }));
       applyPhysicalCommentSnapshot(wb, physical);
     }

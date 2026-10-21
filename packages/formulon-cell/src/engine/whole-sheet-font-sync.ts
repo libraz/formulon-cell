@@ -122,6 +122,26 @@ const remapViewMemos = (
   return changed ? next : memos;
 };
 
+const remapRangeValidations = (
+  rules: State['format']['rangeValidations'],
+  mapIndex: SheetIndexMapper,
+): State['format']['rangeValidations'] => {
+  if (!rules || rules.length === 0) return rules;
+  let changed = false;
+  const next = rules.flatMap((rule) => {
+    const ranges = rule.ranges.flatMap((range) => {
+      const mapped = mapIndex(range.sheet);
+      if (mapped === null) return [];
+      if (mapped === range.sheet) return [range];
+      changed = true;
+      return [{ ...range, sheet: mapped }];
+    });
+    if (ranges.length !== rule.ranges.length) changed = true;
+    return ranges.length > 0 ? [{ ...rule, ranges }] : [];
+  });
+  return changed ? next : rules;
+};
+
 /** Rebuild both format maps from the same pre-event state. The native
  * workbook has already moved the sheets at this point, so publishing the old
  * keys even once would flush their XF records onto the wrong worksheet. */
@@ -146,7 +166,15 @@ export const remapStoreSheetStateForStructureEvent = (
       }
     }
     const memos = remapViewMemos(state.ui.sheetViewMemos, mapIndex);
-    if (!formats.changed && !overridesChanged && memos === state.ui.sheetViewMemos) return state;
+    const rangeValidations = remapRangeValidations(state.format.rangeValidations, mapIndex);
+    if (
+      !formats.changed &&
+      !overridesChanged &&
+      memos === state.ui.sheetViewMemos &&
+      rangeValidations === state.format.rangeValidations
+    ) {
+      return state;
+    }
     return {
       ...state,
       ui: memos === state.ui.sheetViewMemos ? state.ui : { ...state.ui, sheetViewMemos: memos },
@@ -154,6 +182,7 @@ export const remapStoreSheetStateForStructureEvent = (
         ...state.format,
         formats: formats.changed ? formats.map : state.format.formats,
         sheetFontOverrides: overridesChanged ? overrides : currentOverrides,
+        rangeValidations,
       },
     };
   });

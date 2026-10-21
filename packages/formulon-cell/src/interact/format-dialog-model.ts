@@ -88,6 +88,9 @@ export interface DraftState {
   validationOp: ValidationOp;
   validationA: number;
   validationB: number;
+  /** Formula limits of a loaded rule; kept until the numeric field is edited. */
+  validationAFormula?: string;
+  validationBFormula?: string;
   validationFormula: string;
   validationAllowBlank: boolean;
   validationErrorStyle: ValidationErrorStyle;

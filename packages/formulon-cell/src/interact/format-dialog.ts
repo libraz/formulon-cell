@@ -20,6 +20,7 @@ import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, dictionaryLocaleFor, type Strings } from '../i18n/strings.js';
+import { rangeValidationAt } from '../store/range-validations.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
@@ -236,9 +237,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       : active;
     const displayFormat =
       !applyDxf && dialogWb ? effectiveCellFormatWithPending(dialogWb, state, displayAddr) : null;
-    const fmt = displayFormat
+    const merged = displayFormat
       ? { ...displayFormat, ...summary.activeFormat }
       : summary.activeFormat;
+    const rangeValidation = applyDxf ? undefined : rangeValidationAt(state.format, displayAddr);
+    const fmt =
+      merged.validation || !rangeValidation ? merged : { ...merged, validation: rangeValidation };
     hydrateDraftFromFormat(draft, fmt, getFormatLocale(), localizeDialogFormula);
     borderTab.clearPendingPreset();
 

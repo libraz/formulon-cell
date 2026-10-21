@@ -40,6 +40,11 @@ const remapWorkbookSheetLayout = (
       const next = mapIndex(idx);
       if (next !== null) hiddenSheets.add(next);
     }
+    const veryHiddenSheets = new Set<number>();
+    for (const idx of s.layout.veryHiddenSheets) {
+      const next = mapIndex(idx);
+      if (next !== null) veryHiddenSheets.add(next);
+    }
     const sheetTabColors = new Map<number, string>();
     for (const [idx, color] of s.layout.sheetTabColors) {
       const next = mapIndex(idx);
@@ -64,6 +69,7 @@ const remapWorkbookSheetLayout = (
       layout: {
         ...s.layout,
         hiddenSheets,
+        veryHiddenSheets,
         sheetTabColors,
         ...(s.layout.outlineSummary ? { outlineSummary } : {}),
       },

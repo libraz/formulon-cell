@@ -9,6 +9,7 @@ import type { Addr } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending, sameFormatTarget } from '../store/pending-format.js';
+import { validationAt } from '../store/range-validations.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import {
   coerceInputForCell,
@@ -63,6 +64,7 @@ export function commitCellInput({
   const state = store.getState();
   const anchor = mergeAnchorFor(state, addr);
   const fmt = formatWithPending(state, anchor);
+  const ruleValidation = fmt?.validation ?? validationAt(state.format, anchor);
   let operation = inputOperation(raw, fmt?.numFmt?.kind === 'text');
   const controller = interactionControllerFor(store);
   let inputLocale: ReturnType<typeof inputLocaleForWorkbook>;
@@ -139,7 +141,7 @@ export function commitCellInput({
     if (controller) {
       // The controller blocks `stop` rules itself but reports neither the
       // rule's title nor non-blocking outcomes, so validate up front.
-      const validation = fmt?.validation;
+      const validation = ruleValidation;
       const outcome = validation
         ? validateCoercedInput(
             wb,
@@ -179,11 +181,11 @@ export function commitCellInput({
         mutators.setPendingFormat(store, null);
       return { status: 'applied', notice };
     }
-    const outcome = writeInputValidated(wb, anchor, raw, fmt?.validation, store, inputLocale);
+    const outcome = writeInputValidated(wb, anchor, raw, ruleValidation, store, inputLocale);
     if (!outcome.ok) {
       const alert = {
         severity: outcome.severity,
-        title: fmt?.validation?.errorTitle,
+        title: ruleValidation?.errorTitle,
         message: outcome.message,
       };
       if (outcome.severity === 'stop') return { status: 'rejected', operation, alert };

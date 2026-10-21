@@ -4,6 +4,7 @@ import type { Addr, Range } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending } from '../store/pending-format.js';
+import { validationAt } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, State } from '../store/types.js';
@@ -493,7 +494,8 @@ export class InteractionController {
         return { rejection: { addr, code: 'invalid', reason: 'number value must be finite' } };
       }
       const prepared = this.patchFromCoerced(target, input);
-      const validation = formatWithPending(state, target)?.validation;
+      const validation =
+        formatWithPending(state, target)?.validation ?? validationAt(state.format, target);
       if (validation) {
         const outcome = validateCoercedInput(wb, target, input, validation);
         if (!outcome.ok && outcome.severity === 'stop') {
@@ -509,7 +511,8 @@ export class InteractionController {
     if (change.value.kind === 'number' && !Number.isFinite(change.value.value)) {
       return { rejection: { addr, code: 'invalid', reason: 'number value must be finite' } };
     }
-    const validation = formatWithPending(state, target)?.validation;
+    const validation =
+      formatWithPending(state, target)?.validation ?? validationAt(state.format, target);
     if (formula === null && validation && change.value.kind !== 'error') {
       const outcome = validateCoercedInput(wb, target, coerceCellValue(change.value), validation);
       if (!outcome.ok && outcome.severity === 'stop') {

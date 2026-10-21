@@ -129,7 +129,8 @@ describe('hydrateProtectionFromEngine', () => {
     const map = store.getState().protection.protectedSheets;
     expect(map.has(0)).toBe(false);
     expect(map.has(1)).toBe(true);
-    expect(map.get(1)?.password).toBe('secret');
+    expect(map.get(1)?.legacyPasswordHash).toBe('secret');
+    expect(map.get(1)?.password).toBeUndefined();
     expect(map.get(1)?.passwordHash).toEqual({
       algorithmName: 'SHA-512',
       hashValue: 'hash',
@@ -205,7 +206,8 @@ describe('flushProtectionToEngine', () => {
     );
     const stored = storage.get(0);
     expect(stored?.enabled).toBe(true);
-    expect(stored?.legacyPassword).toBe('pw');
+    // The modern hash replaces the 16-bit verifier.
+    expect(stored?.legacyPassword).toBe('');
     expect(stored?.algorithmName).toBe('SHA-512');
     expect(stored?.hashValue).toBe('hash');
     expect(stored?.saltValue).toBe('salt');
@@ -231,6 +233,18 @@ describe('flushProtectionToEngine', () => {
     });
     flushProtectionToEngine(wb, 0, false);
     expect(storage.has(0)).toBe(false);
+  });
+
+  it('writes typed text as its 16-bit verifier, never as plain text', () => {
+    const { wb, storage } = makeWb({ sheetCount: 1, initial: new Map() });
+    flushProtectionToEngine(wb, 0, true, 'pw');
+    expect(storage.get(0)?.legacyPassword).toBe('CF75');
+  });
+
+  it('passes a loaded verifier through unchanged', () => {
+    const { wb, storage } = makeWb({ sheetCount: 1, initial: new Map() });
+    flushProtectionToEngine(wb, 0, true, undefined, undefined, undefined, '83AF');
+    expect(storage.get(0)?.legacyPassword).toBe('83AF');
   });
 
   it('is a no-op when the engine lacks the capability', () => {

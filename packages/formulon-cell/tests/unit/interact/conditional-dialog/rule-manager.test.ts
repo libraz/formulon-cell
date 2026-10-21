@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
+import { hydrateConditionalRulesFromEngine } from '../../../../src/engine/cf-sync.js';
+import { conditionalRuleToEngineInput, inputWithDxf } from '../../../../src/engine/cf-writeback.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../../src/i18n/strings.js';
 import {
   appendConditionalApplyFormatControls,
@@ -368,6 +371,50 @@ describe('attachConditionalDialog', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(store.getState().conditional.rules[0]).toMatchObject({ a: 10, stopIfTrue: true });
     handle.detach();
+  });
+
+  it('saves an edited loaded rule into the engine, keeping its id and priority', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const imported = {
+        kind: 'cell-value',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        op: '>',
+        a: 10,
+        apply: { fill: '#ffc7ce' },
+      } as const;
+      const input = conditionalRuleToEngineInput(imported);
+      if (!input) throw new Error('untranslatable rule');
+      wb.addConditionalFormat(0, inputWithDxf(wb, input, imported));
+      hydrateConditionalRulesFromEngine(wb, store, 0);
+      const before = wb.getConditionalFormats(0)[0];
+      expect(store.getState().conditional.rules[0]?.engineId).toBe(before?.id);
+
+      const handle = attachConditionalDialog({ host, store, getWb: () => wb });
+      handle.open({ mode: 'edit', editIndex: 0 });
+      const valueInput = document.querySelector<HTMLInputElement>(
+        '.fc-conddlg__sub input[type="text"]',
+      );
+      if (!valueInput) throw new Error('missing value input');
+      valueInput.value = '25';
+      document
+        .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const after = wb.getConditionalFormats(0);
+      expect(after).toHaveLength(1);
+      expect(after[0]).toMatchObject({
+        id: before?.id,
+        priority: before?.priority,
+        formula1: '25',
+      });
+      expect(store.getState().conditional.rules).toHaveLength(1);
+      expect(store.getState().conditional.rules[0]).toMatchObject({ a: 25 });
+      expect(store.getState().conditional.rules[0]?.engineId).toBe(before?.id);
+      handle.detach();
+    } finally {
+      wb.dispose();
+    }
   });
 
   it('edits an existing session rule through the shared rule dialog', () => {

@@ -42,9 +42,9 @@ describe('comment commands', () => {
     setComment(store, { sheet: 1, row: 0, col: 0 }, 'hidden');
 
     expect(listComments(store.getState(), 0)).toEqual([
-      { addr: { sheet: 0, row: 0, col: 0 }, text: 'A' },
-      { addr: { sheet: 0, row: 0, col: 2 }, text: 'B' },
-      { addr: { sheet: 0, row: 2, col: 1 }, text: 'C' },
+      { addr: { sheet: 0, row: 0, col: 0 }, text: 'A', author: 'Formulon' },
+      { addr: { sheet: 0, row: 0, col: 2 }, text: 'B', author: 'Formulon' },
+      { addr: { sheet: 0, row: 2, col: 1 }, text: 'C', author: 'Formulon' },
     ]);
   });
 
@@ -130,7 +130,7 @@ describe('comment commands', () => {
       },
     } as unknown as WorkbookHandle;
     setComment(store, { sheet: 0, row: 1, col: 2 }, 'note', wb);
-    expect(calls).toEqual([{ row: 1, col: 2, author: '', text: 'note' }]);
+    expect(calls).toEqual([{ row: 1, col: 2, author: 'Formulon', text: 'note' }]);
   });
 
   it('preserves loaded comment author when editing and clearing', () => {

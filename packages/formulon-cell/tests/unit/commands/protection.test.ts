@@ -170,7 +170,7 @@ describe('protection helpers', () => {
     expect(setSheetProtection).toHaveBeenNthCalledWith(1, 1, {
       enabled: true,
       sheet: true,
-      legacyPassword: 'pw',
+      legacyPassword: '',
       algorithmName: 'SHA-512',
       hashValue: 'hash',
       saltValue: 'salt',
@@ -311,7 +311,7 @@ describe('protection helpers', () => {
     expect(setSheetProtection).toHaveBeenLastCalledWith(1, {
       enabled: true,
       sheet: true,
-      legacyPassword: 'pw',
+      legacyPassword: '',
       algorithmName: 'SHA-512',
       hashValue: 'hash',
       saltValue: 'salt',

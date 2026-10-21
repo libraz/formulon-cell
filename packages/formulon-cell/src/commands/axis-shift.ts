@@ -1,6 +1,11 @@
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
-import type { CellFormat, ValueFilterCriteria } from '../store/store.js';
+import type {
+  CellFormat,
+  FilterSortSpec,
+  RangeValidation,
+  ValueFilterCriteria,
+} from '../store/store.js';
 
 export interface AxisEdit {
   at: number;
@@ -26,6 +31,8 @@ export function normalizeAxisEdit(
 export function cloneInsertedFormat(format: CellFormat): CellFormat {
   const next: CellFormat = { ...format };
   delete next.hyperlink;
+  delete next.hyperlinkLocation;
+  delete next.hyperlinkSpan;
   delete next.hyperlinkDisplay;
   delete next.hyperlinkTooltip;
   delete next.comment;
@@ -226,6 +233,58 @@ export function shiftRangeAxis(
   const max = axis === 'row' ? MAX_ROW : MAX_COL;
   if (a < 0 || b > max) return null;
   return axis === 'row' ? { ...range, r0: a, r1: b } : { ...range, c0: a, c1: b };
+}
+
+/** Re-point range-stored validation rules after a row/column insert or delete.
+ *  A range spanning the whole axis (a full column on a row edit) is unaffected;
+ *  rules whose ranges are all consumed are dropped. */
+export function shiftRangeValidations(
+  rules: readonly RangeValidation[] | undefined,
+  sheet: number,
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): RangeValidation[] | undefined {
+  if (!rules?.some((rule) => rule.ranges.some((range) => range.sheet === sheet))) {
+    return rules as RangeValidation[] | undefined;
+  }
+  const max = axis === 'row' ? MAX_ROW : MAX_COL;
+  return rules.flatMap((rule) => {
+    const ranges = rule.ranges.flatMap((range) => {
+      if (range.sheet !== sheet) return [range];
+      const lo = axis === 'row' ? range.r0 : range.c0;
+      const hi = axis === 'row' ? range.r1 : range.c1;
+      if (lo <= 0 && hi >= max) return [range];
+      const shifted = shiftRangeAxis(range, axis, split, delta);
+      return shifted ? [shifted] : [];
+    });
+    return ranges.length > 0 ? [{ ...rule, ranges }] : [];
+  });
+}
+
+export function shiftFilterSorts(
+  sorts: readonly FilterSortSpec[] | undefined,
+  sheet: number,
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): FilterSortSpec[] {
+  const out: FilterSortSpec[] = [];
+  for (const spec of sorts ?? []) {
+    if (spec.range.sheet !== sheet) {
+      out.push(spec);
+      continue;
+    }
+    const range = shiftRangeAxis(spec.range, axis, split, delta);
+    if (!range) continue;
+    const keys = spec.keys.flatMap((key) => {
+      if (axis === 'row') return [key];
+      const mapped = adjustInterval(key.byCol, key.byCol, split, delta);
+      return mapped ? [{ ...key, byCol: mapped[0] }] : [];
+    });
+    if (keys.length > 0) out.push({ range, keys });
+  }
+  return out;
 }
 
 export function shiftFilterCriteria(

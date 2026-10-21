@@ -242,7 +242,7 @@ function dataBarHasMixedPopulation(
   return undefined;
 }
 
-function dxfToApply(wb: WorkbookHandle, dxfId: number | undefined): Partial<CellFormat> {
+export function dxfToApply(wb: WorkbookHandle, dxfId: number | undefined): Partial<CellFormat> {
   if (dxfId === undefined || !wb.capabilities.conditionalFormatDxf) return {};
   const dxf = wb.getDxf(dxfId);
   if (!dxf) return {};

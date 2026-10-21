@@ -7,7 +7,8 @@ import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { customListsFor } from './autofill-series.js';
 import { recordCommentChange } from './comment.js';
-import { inferAutoFilterRange } from './filter.js';
+import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
+import { filterRangeForSort, inferAutoFilterRange, setFilterSort } from './filter.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -679,7 +680,7 @@ export function sortRange(
         addr.sheet,
         addr.row,
         addr.col,
-        format?.commentAuthor ?? '',
+        format?.commentAuthor ?? DEFAULT_COMMENT_AUTHOR,
         format?.comment ?? '',
       );
     }
@@ -688,6 +689,13 @@ export function sortRange(
     recordCommentChange(history, store, wb, [...commentTargets.values()], applyFormats);
   });
   wb.recalcAuto();
+  const filterRange = filterRangeForSort(store.getState(), range, opts.hasHeader === true);
+  if (filterRange) {
+    const keys = sortKeys
+      .filter((key) => key.sortOn === undefined || key.sortOn === 'value')
+      .map((key) => ({ byCol: key.byCol, direction: key.direction }));
+    setFilterSort(store, history, filterRange, keys, wb);
+  }
   return true;
 }
 

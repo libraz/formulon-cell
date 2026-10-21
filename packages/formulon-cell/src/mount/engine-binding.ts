@@ -4,6 +4,7 @@ import { interactionControllerFor } from '../commands/interaction-controller.js'
 import { setPivotGuardSink } from '../commands/pivot-guard.js';
 import { refreshChartsAfterRecalc, reloadChartsFromEngine } from '../engine/charts-sync.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
+import { reloadImagesFromEngine } from '../engine/images-sync.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellChangeEvent, SpreadsheetEmitter } from '../events.js';
@@ -482,6 +483,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     ) {
       getSheetTabs()?.update();
       if (e.kind !== 'sheet-add') reloadChartsFromEngine(wb, store);
+      if (e.kind === 'sheet-remove' || e.kind === 'sheet-move') reloadImagesFromEngine(wb, store);
     }
   });
 

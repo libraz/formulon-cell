@@ -150,6 +150,8 @@ type ManagedRule =
       format: string;
       range: string;
       stopIfTrue: boolean;
+      /** Store indexes of the hydrated copies of this rule, one per range. */
+      copies: number[];
     }
   | {
       source: 'session';
@@ -287,9 +289,19 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
 
   const updateCommandState = (): void => {
     const selected = currentRules[selectedRuleIndex] ?? null;
-    const canEdit = selected?.source === 'session' && !!deps.store && !!deps.onEditRule;
-    const canMutateSession = selected?.source === 'session' && !!deps.store;
-    const engineReadOnlyReason = selected?.source === 'engine' ? t.editUnavailable : null;
+    // A loaded rule is editable through its hydrated copy; one with several
+    // ranges has several copies and cannot be edited as a single rule.
+    const canEdit =
+      !!deps.store &&
+      !!deps.onEditRule &&
+      (selected?.source === 'session' ||
+        (selected?.source === 'engine' && selected.copies.length === 1));
+    const canMutateSession =
+      !!deps.store &&
+      (selected?.source === 'session' ||
+        (selected?.source === 'engine' && selected.copies.length > 0));
+    const engineReadOnlyReason =
+      selected?.source === 'engine' && selected.copies.length === 0 ? t.editUnavailable : null;
     const noSelectionReason = selected ? null : t.selectRuleActionReason;
     const mutationUnavailableReason = selected && !deps.store ? t.note : null;
     setDisabledState(
@@ -320,6 +332,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     if (managedRule.source === 'engine') {
       if (!wb) return;
       changed = wb.removeConditionalFormatAt(sheet, managedRule.index);
+      // Drop the hydrated copy too, or it keeps rendering.
+      if (changed) refreshLoadedRules();
     } else if (deps.store) {
       const store = deps.store;
       recordConditionalRulesChange(deps.history ?? null, store, () => {
@@ -336,17 +350,33 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   };
 
   const duplicateManagedRule = (managedRule: ManagedRule, visualIndex: number): void => {
-    if (managedRule.source !== 'session' || !deps.store) return;
+    if (!deps.store) return;
     const store = deps.store;
-    recordConditionalRulesChange(deps.history ?? null, store, () => {
-      store.setState((state) => {
-        const nextRules = [...state.conditional.rules];
-        const source = nextRules[managedRule.index];
-        if (!source) return state;
-        nextRules.splice(managedRule.index + 1, 0, cloneSessionRule(source));
-        return { ...state, conditional: { rules: nextRules } };
+    if (managedRule.source === 'engine') {
+      // A copy of a loaded rule is a session rule; it ranks after the loaded ones.
+      if (managedRule.copies.length === 0) return;
+      recordConditionalRulesChange(deps.history ?? null, store, () => {
+        store.setState((state) => {
+          const copies = managedRule.copies.flatMap((index) => {
+            const source = state.conditional.rules[index];
+            if (!source) return [];
+            const { engineId: _engineId, ...rest } = cloneSessionRule(source);
+            return [rest as ConditionalRule];
+          });
+          return { ...state, conditional: { rules: [...state.conditional.rules, ...copies] } };
+        });
       });
-    });
+    } else {
+      recordConditionalRulesChange(deps.history ?? null, store, () => {
+        store.setState((state) => {
+          const nextRules = [...state.conditional.rules];
+          const source = nextRules[managedRule.index];
+          if (!source) return state;
+          nextRules.splice(managedRule.index + 1, 0, cloneSessionRule(source));
+          return { ...state, conditional: { rules: nextRules } };
+        });
+      });
+    }
     onChanged?.();
     selectedRuleIndex = visualIndex + 1;
     renderTable();
@@ -456,9 +486,13 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   });
   shell.on(editRuleBtn, 'click', () => {
     const selected = currentRules[selectedRuleIndex];
-    if (selected?.source !== 'session') return;
+    if (!selected) return;
+    const target = selected.source === 'session' ? selected.index : selected.copies[0];
+    if (target === undefined || (selected.source === 'engine' && selected.copies.length !== 1)) {
+      return;
+    }
     close();
-    deps.onEditRule?.(selected.index);
+    deps.onEditRule?.(target);
   });
   shell.on(duplicateBtn, 'click', () => {
     const selected = currentRules[selectedRuleIndex];
@@ -522,6 +556,11 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         format: ruleTypeLabel(rule.type, t),
         range: formatSqref(rule.sqref),
         stopIfTrue: rule.stopIfTrue,
+        copies: rule.id
+          ? (deps.store?.getState().conditional.rules ?? []).flatMap((candidate, copyIndex) =>
+              candidate.engineId === rule.id && candidate.range.sheet === sheet ? [copyIndex] : [],
+            )
+          : [],
       })),
       ...sessionRules.map<ManagedRule>(({ rule, index }, visibleIndex) => ({
         source: 'session',
@@ -573,7 +612,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       row.tabIndex = index === selectedRuleIndex ? 0 : -1;
       row.setAttribute('aria-selected', index === selectedRuleIndex ? 'true' : 'false');
       row.classList.toggle('fc-cfrulesdlg__row--selected', index === selectedRuleIndex);
-      row.classList.toggle('fc-cfrulesdlg__row--readonly', managedRule.source === 'engine');
+      const loadedReadOnly = managedRule.source === 'engine' && managedRule.copies.length === 0;
+      row.classList.toggle('fc-cfrulesdlg__row--readonly', loadedReadOnly);
       row.addEventListener('click', () => focusRuleRow(index));
       const kind = document.createElement('td');
       kind.className = 'fc-cfrulesdlg__cell-rule';
@@ -581,7 +621,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       const format = document.createElement('td');
       format.className = 'fc-cfrulesdlg__cell-format';
       format.textContent = managedRule.format;
-      if (managedRule.source === 'engine') {
+      if (loadedReadOnly) {
         const badge = document.createElement('span');
         badge.className = 'fc-cfrulesdlg__readonly-badge';
         badge.textContent = t.readOnlyRule;
@@ -626,8 +666,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       const dup = createCfRulesDialogButton('fc-cfrulesdlg__row-duplicate', t.duplicate);
       setDisabledState(
         dup,
-        managedRule.source !== 'session' || !deps.store,
-        managedRule.source === 'engine' ? t.editUnavailable : !deps.store ? t.note : null,
+        !deps.store || loadedReadOnly,
+        loadedReadOnly ? t.editUnavailable : !deps.store ? t.note : null,
       );
       dup.dataset.ruleIndex = String(index);
       dup.addEventListener('click', () => {

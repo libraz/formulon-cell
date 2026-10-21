@@ -6,6 +6,8 @@ import {
 import type { History } from '../commands/history.js';
 import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { formatA1Range } from '../engine/address.js';
+import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
+import { rewriteLoadedConditionalRule } from '../engine/cf-writeback.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
@@ -855,6 +857,22 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     if (!rule) return;
     const newRule = rule;
     const editIndex = currentEditIndex;
+    const loaded =
+      currentMode === 'edit' && editIndex !== null
+        ? store.getState().conditional.rules[editIndex]
+        : undefined;
+    if (loaded?.engineId !== undefined) {
+      // A rule from the file is rewritten in the engine (id and priority kept)
+      // and re-read, so the store copy always matches what a save writes.
+      const wb = deps.getWb?.() ?? null;
+      const replacement = loaded.stopIfTrue === true ? { ...newRule, stopIfTrue: true } : newRule;
+      if (!wb || !rewriteLoadedConditionalRule(wb, loaded, replacement)) return;
+      hydrateConditionalRulesFromEngine(wb, store, loaded.range.sheet);
+      deps.onChanged?.();
+      renderRules();
+      api.close();
+      return;
+    }
     recordConditionalRulesChange(history, store, () => {
       if (currentMode === 'edit' && editIndex !== null) {
         store.setState((state) => {

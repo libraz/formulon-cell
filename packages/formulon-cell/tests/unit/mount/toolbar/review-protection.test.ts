@@ -5,6 +5,8 @@ import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
 import { stubHelpers, waitFor } from './fixtures.js';
 
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
 vi.setConfig({ testTimeout: 20_000 });
 
 describe('Spreadsheet.mountToolbar', () => {
@@ -71,7 +73,7 @@ describe('Spreadsheet.mountToolbar', () => {
     if (!formatCellsOption) throw new Error('Expected Format cells permission option.');
     formatCellsOption.checked = true;
     protectDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await settle();
     expect(sheet.instance.store.getState().protection.protectedSheets.has(0)).toBe(true);
     expect(sheet.instance.store.getState().protection.protectedSheets.get(0)?.password).toBe('pw');
     expect(
@@ -97,12 +99,12 @@ describe('Spreadsheet.mountToolbar', () => {
     if (!unprotectInput) throw new Error('Expected Unprotect Sheet password input.');
     unprotectInput.value = 'bad';
     unprotectDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await settle();
     expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'The password is incorrect.',
     );
     document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await settle();
     expect(sheet.instance.store.getState().protection.protectedSheets.has(0)).toBe(true);
 
     protectButton?.click();
@@ -112,7 +114,7 @@ describe('Spreadsheet.mountToolbar', () => {
     if (!unprotectRetryInput) throw new Error('Expected retry password input.');
     unprotectRetryInput.value = 'pw';
     unprotectRetryDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await settle();
     expect(sheet.instance.store.getState().protection.protectedSheets.has(0)).toBe(false);
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
@@ -218,7 +220,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const protectDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(protectDialog?.textContent).toContain('Protect Sheet');
     protectDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await Promise.resolve();
+    await settle();
     expect(sheet.instance.store.getState().protection.protectedSheets.has(0)).toBe(true);
 
     tb.dispose();

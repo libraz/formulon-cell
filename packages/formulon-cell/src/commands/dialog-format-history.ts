@@ -8,6 +8,7 @@ import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import type { Addr, SheetAxisFormatOverride, SheetFontOverride } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import type { History, HistoryEntry } from './history.js';
 
 type FormatMapSnapshot = ReadonlyMap<string, CellFormat | undefined>;
@@ -180,7 +181,9 @@ const commentsFromFormats = (
     const format = formats.get(key);
     result.set(
       key,
-      format?.comment ? { author: format.commentAuthor ?? '', text: format.comment } : null,
+      format?.comment
+        ? { author: format.commentAuthor ?? DEFAULT_COMMENT_AUTHOR, text: format.comment }
+        : null,
     );
   }
   return result;

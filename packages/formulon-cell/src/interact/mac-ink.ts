@@ -2,6 +2,7 @@ import type { History } from '../commands/history.js';
 import type { OperationIntent } from '../commands/interaction-policy.js';
 import { clearSessionIllustration, createSessionImage } from '../commands/session-illustration.js';
 import { recordIllustrationsChange } from '../commands/slice-history.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   bodyBandOrigin,
@@ -33,6 +34,8 @@ export interface MacInkInstance {
   host: HTMLElement;
   store: SpreadsheetStore;
   history?: History | null;
+  /** Workbook that stores the stroke as a picture, so ink survives a save. */
+  workbook?: WorkbookHandle | null;
   /** Optional mount command policy. Restricted embeds reject object mutation. */
   commands?: { canExecute(intent: OperationIntent): { allowed: boolean } };
   /** Source of the accessible labels; the default dictionary is used when absent. */
@@ -138,7 +141,7 @@ const pathFor = (points: readonly { x: number; y: number }[], offsetX = 0, offse
 const svgImageFor = (
   points: readonly { x: number; y: number }[],
   style: ToolStyle,
-): { src: string; x: number; y: number; w: number; h: number } => {
+): { src: string; d: string; x: number; y: number; w: number; h: number } => {
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
   const minX = Math.min(...xs);
@@ -152,7 +155,37 @@ const svgImageFor = (
   const h = Math.max(2, maxY - minY + padding * 2);
   const d = pathFor(points, x, y);
   const svg = `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${escapeXml(d)}" fill="none" stroke="${style.color}" stroke-width="${style.lineWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${style.opacity}"/></svg>`;
-  return { src: `data:image/svg+xml,${encodeURIComponent(svg)}`, x, y, w, h };
+  return { src: `data:image/svg+xml,${encodeURIComponent(svg)}`, d, x, y, w, h };
+};
+
+const RASTER_SCALE = 2;
+const MAX_RASTER_PX = 4096;
+const PNG_DATA_URL = 'data:image/png;base64,';
+
+/** The stroke as PNG bytes, or null when the host has no 2D canvas. */
+const rasterizeInk = (
+  doc: Document,
+  image: { d: string; w: number; h: number },
+  style: ToolStyle,
+): Uint8Array | null => {
+  if (typeof Path2D === 'undefined') return null;
+  const canvas = doc.createElement('canvas');
+  const scale = Math.min(RASTER_SCALE, MAX_RASTER_PX / Math.max(image.w, image.h, 1));
+  canvas.width = Math.max(1, Math.ceil(image.w * scale));
+  canvas.height = Math.max(1, Math.ceil(image.h * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.scale(scale, scale);
+  ctx.globalAlpha = style.opacity;
+  ctx.strokeStyle = style.color;
+  ctx.lineWidth = style.lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke(new Path2D(image.d));
+  const url = canvas.toDataURL('image/png');
+  if (!url.startsWith(PNG_DATA_URL)) return null;
+  const binary = atob(url.slice(PNG_DATA_URL.length));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 };
 
 const metadataFor = (item: SessionIllustration): MacInkMetadata | null => {
@@ -536,23 +569,39 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
       renderInProgress();
       return;
     }
-    recordIllustrationsChange(instance.history ?? null, instance.store, () => {
-      const created = createSessionImage(
+    const options = {
+      id,
+      src: image.src,
+      alt: inkStrings().strokeLabel,
+      x: gridRect.left - hostRect.left + image.x,
+      y: gridRect.top - hostRect.top + image.y,
+      w: image.w,
+      h: image.h,
+    };
+    const workbook = instance.workbook;
+    const bytes = workbook?.capabilities.images
+      ? rasterizeInk(instance.host.ownerDocument, image, style)
+      : null;
+    if (workbook && bytes) {
+      // The picture owns its own undo step, which removes the native object.
+      createSessionImage(
         instance.store,
         range,
         {
-          id,
-          src: image.src,
-          alt: inkStrings().strokeLabel,
-          x: gridRect.left - hostRect.left + image.x,
-          y: gridRect.top - hostRect.top + image.y,
-          w: image.w,
-          h: image.h,
+          ...options,
+          bytes,
+          wb: workbook,
+          anchorAtPixels: true,
+          extra: { macInk: metadata },
         },
-        null,
+        instance.history ?? null,
       );
-      if (created) addMetadata(instance.store, created, metadata);
-    });
+    } else {
+      recordIllustrationsChange(instance.history ?? null, instance.store, () => {
+        const created = createSessionImage(instance.store, range, options, null);
+        if (created) addMetadata(instance.store, created, metadata);
+      });
+    }
     render();
   };
 
@@ -666,7 +715,12 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
         : undefined;
       const metadata = item ? metadataFor(item) : null;
       if (id && item && metadata && canMutate(rangeForMetadata(item.sheet, metadata)))
-        clearSessionIllustration(instance.store, id, instance.history ?? null);
+        clearSessionIllustration(
+          instance.store,
+          id,
+          instance.history ?? null,
+          instance.workbook ?? undefined,
+        );
     }
   };
 

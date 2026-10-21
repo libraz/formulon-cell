@@ -2,6 +2,7 @@
 // a single pass after cell painting so headers sit above the gridlines.
 
 import { colLetter } from '../../engine/address.js';
+import { sameRange } from '../../store/selection-geometry.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
@@ -79,6 +80,11 @@ export function paintHeaders(
   ctx.textAlign = 'center';
   const r1c1 = state.ui.r1c1 === true;
   const filterRanges = state.ui.filterRanges.filter((r) => r.sheet === state.data.sheetIndex);
+  const filterSorts = (state.ui.filterSorts ?? []).filter(
+    (spec) =>
+      spec.range.sheet === state.data.sheetIndex &&
+      filterRanges.some((range) => sameRange(range, spec.range)),
+  );
   // A selected chart or picture takes the highlight off the headers, as in Excel.
   const objectSelected = state.ui.selectedObject !== null;
   const selectedRanges = objectSelected ? [] : [selection.range, ...(selection.extraRanges ?? [])];
@@ -150,16 +156,35 @@ export function paintHeaders(
       ctx.closePath();
       if (filterActive) ctx.fill();
       else ctx.stroke();
-      // Chevron triangle.
       ctx.fillStyle = filterActive ? theme.bg : theme.headerFg;
       ctx.beginPath();
       const tx = bx + bw / 2;
       const ty = cy + 1;
-      ctx.moveTo(tx - 3.5, ty - 2);
-      ctx.lineTo(tx + 3.5, ty - 2);
-      ctx.lineTo(tx, ty + 2);
-      ctx.closePath();
-      ctx.fill();
+      const sorted = filterSorts
+        .flatMap((spec) => spec.keys)
+        .find((key) => key.byCol === c)?.direction;
+      if (sorted) {
+        // Sorted column: a stemmed arrow, pointing up for ascending.
+        const up = sorted === 'asc';
+        const tip = up ? ty - 4 : ty + 4;
+        const tail = up ? ty + 4 : ty - 4;
+        const wing = up ? ty - 0.5 : ty + 0.5;
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = 1.25;
+        ctx.moveTo(tx, tail);
+        ctx.lineTo(tx, tip);
+        ctx.moveTo(tx - 3, wing);
+        ctx.lineTo(tx, tip);
+        ctx.lineTo(tx + 3, wing);
+        ctx.stroke();
+      } else {
+        // Chevron triangle.
+        ctx.moveTo(tx - 3.5, ty - 2);
+        ctx.lineTo(tx + 3.5, ty - 2);
+        ctx.lineTo(tx, ty + 2);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
     }
   }

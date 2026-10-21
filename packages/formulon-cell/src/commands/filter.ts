@@ -9,7 +9,12 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell, fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { sameRange } from '../store/selection-geometry.js';
-import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
+import type {
+  FilterSortSpec,
+  SpreadsheetStore,
+  State,
+  ValueFilterCriteria,
+} from '../store/store.js';
 import { parseLocalizedNumericInput } from './coerce-input.js';
 import { activeFilterRange, withFilterRange, withoutFilterRange } from './filter-ranges.js';
 import { formatNumber } from './format.js';
@@ -54,7 +59,14 @@ interface FilterSnapshot {
   hiddenRows: Set<number>;
   filterRanges: Range[];
   filterCriteria: ValueFilterCriteria[];
+  filterSorts: FilterSortSpec[];
 }
+
+const cloneSorts = (sorts: readonly FilterSortSpec[] | undefined): FilterSortSpec[] =>
+  (sorts ?? []).map((spec) => ({
+    range: { ...spec.range },
+    keys: spec.keys.map((key) => ({ ...key })),
+  }));
 
 const cloneRanges = (ranges: readonly Range[]): Range[] => ranges.map((range) => ({ ...range }));
 const cloneCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCriteria[] =>
@@ -123,6 +135,7 @@ function captureFilterSnapshot(state: State): FilterSnapshot {
     hiddenRows: new Set(state.layout.hiddenRows),
     filterRanges: cloneRanges(state.ui.filterRanges),
     filterCriteria: cloneCriteria(state.ui.filterCriteria),
+    filterSorts: cloneSorts(state.ui.filterSorts),
   };
 }
 
@@ -139,6 +152,7 @@ function applyFilterSnapshot(
       ...s.ui,
       filterRanges: cloneRanges(snap.filterRanges),
       filterCriteria: cloneCriteria(snap.filterCriteria),
+      filterSorts: cloneSorts(snap.filterSorts),
     },
   }));
   if (wb) {
@@ -154,6 +168,7 @@ function sameFilterSnapshot(a: FilterSnapshot, b: FilterSnapshot): boolean {
   if (!sameRangeList(a.filterRanges, b.filterRanges)) return false;
   if (a.hiddenRows.size !== b.hiddenRows.size) return false;
   if (!sameCriteriaList(a.filterCriteria, b.filterCriteria)) return false;
+  if (JSON.stringify(a.filterSorts) !== JSON.stringify(b.filterSorts)) return false;
   for (const row of a.hiddenRows) {
     if (!b.hiddenRows.has(row)) return false;
   }
@@ -402,7 +417,7 @@ function recomputeHiddenFromCriteria(
   return { hidden: next, count: next.size - baseline.size };
 }
 
-const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
+export const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
 
 /** Formulon's AutoFilter text matcher follows Excel and compares text without
  * regard to case. Keep checklist labels in their original case, but fold
@@ -918,6 +933,48 @@ function upsertCriteria(
       ...(next.color ? { color: { ...next.color } } : {}),
     },
   ];
+}
+
+/** The filter range a sort of `range` belongs to: same columns and last row,
+ *  with the header row immediately above the sorted rows. */
+export function filterRangeForSort(state: State, range: Range, hasHeader: boolean): Range | null {
+  const headerRow = hasHeader ? range.r0 : range.r0 - 1;
+  return (
+    state.ui.filterRanges.find(
+      (filter) =>
+        filter.sheet === range.sheet &&
+        filter.r0 === headerRow &&
+        filter.r1 === range.r1 &&
+        filter.c0 === range.c0 &&
+        filter.c1 === range.c1,
+    ) ?? null
+  );
+}
+
+/** Record the sort order applied inside `filterRange` (an empty `keys` clears
+ *  it), undoable with the rest of the sort. */
+export function setFilterSort(
+  store: SpreadsheetStore,
+  history: History | null,
+  filterRange: Range,
+  keys: FilterSortSpec['keys'],
+  wb?: WorkbookHandle,
+): void {
+  const before = store.getState().ui.filterSorts ?? [];
+  const next = [
+    ...before.filter((spec) => !sameRange(spec.range, filterRange)),
+    ...(keys.length > 0
+      ? [{ range: { ...filterRange }, keys: keys.map((key) => ({ ...key })) }]
+      : []),
+  ];
+  const apply = (sorts: FilterSortSpec[]): void => {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, filterSorts: sorts } }));
+    syncFilterToEngine(wb, store, filterRange);
+  };
+  apply(next);
+  if (history && !history.isReplaying()) {
+    history.push({ undo: () => apply(before), redo: () => apply(next) });
+  }
 }
 
 /** Add `range` as an autofilter region without applying any predicate.

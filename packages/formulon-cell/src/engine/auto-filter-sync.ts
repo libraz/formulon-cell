@@ -1,9 +1,21 @@
-import type { AutoFilter, AutoFilterColumn, AutoFilterEvalResult } from '@libraz/formulon';
+import type {
+  AutoFilter,
+  AutoFilterColumn,
+  AutoFilterEvalResult,
+  AutoFilterSortState,
+} from '@libraz/formulon';
 import { inputLocaleForWorkbook, parseLocalizedNumericInput } from '../commands/coerce-input.js';
-import { distinctValues } from '../commands/filter.js';
+import { distinctValues, normalizeColorKey } from '../commands/filter.js';
 import { sameRange } from '../store/selection-geometry.js';
-import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
+import type {
+  FilterSortSpec,
+  SpreadsheetStore,
+  State,
+  ValueFilterCriteria,
+} from '../store/store.js';
 import { formatA1Range } from './address.js';
+import { dxfToApply } from './cf-sync.js';
+import { dxfRecordFromApply } from './cf-writeback.js';
 import { profileTextKey } from './profile-text-semantics.js';
 import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
@@ -25,6 +37,8 @@ const conditionOperator: Record<NonNullable<ValueFilterCriteria['condition']>['o
 
 const FILTER_KIND_VALUES = 1;
 const FILTER_KIND_CUSTOM = 2;
+const FILTER_KIND_COLOR = 5;
+const SORT_BY_VALUE = 0;
 const FILTER_OPERATOR_EQUAL = 0;
 const FILTER_OPERATOR_LESS_THAN = 1;
 const FILTER_OPERATOR_LESS_THAN_OR_EQUAL = 2;
@@ -269,10 +283,81 @@ function customColumnFromCriteria(
   };
 }
 
+const dxfIdCache = new WeakMap<WorkbookHandle, Map<string, number>>();
+
+/** Color column backed by a differential style holding the filter color; null
+ * when the engine cannot author differential styles. */
+function colorColumnFromCriteria(
+  wb: WorkbookHandle | undefined,
+  colId: number,
+  color: NonNullable<ValueFilterCriteria['color']>,
+): AutoFilterColumn | null {
+  if (!wb?.capabilities.conditionalFormatDxf) return null;
+  const cell = color.kind === 'cellColor';
+  const dxf = dxfRecordFromApply(wb, cell ? { fill: color.color } : { color: color.color });
+  if (!dxf) return null;
+  // addDxf appends, so reuse the id already issued for this color.
+  const key = JSON.stringify(dxf);
+  let ids = dxfIdCache.get(wb);
+  if (!ids) {
+    ids = new Map();
+    dxfIdCache.set(wb, ids);
+  }
+  let dxfId = ids.get(key);
+  if (dxfId === undefined || !wb.getDxf(dxfId)) {
+    dxfId = wb.addDxf(dxf);
+    if (dxfId < 0) return null;
+    ids.set(key, dxfId);
+  }
+  return { ...emptyAutoFilterColumn(colId), kind: FILTER_KIND_COLOR, dxfId, cellColor: cell };
+}
+
+/** The `<sortState>` for a sort of `spec.range`'s data rows by value. */
+function sortStateFromSpec(spec: FilterSortSpec): AutoFilterSortState {
+  const { range } = spec;
+  return {
+    ref: { firstRow: range.r0 + 1, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
+    columnSort: false,
+    caseSensitive: false,
+    sortMethod: 0,
+    conditions: spec.keys.map((key) => ({
+      ref: { firstRow: range.r0 + 1, firstCol: key.byCol, lastRow: range.r1, lastCol: key.byCol },
+      descending: key.direction === 'desc',
+      sortBy: SORT_BY_VALUE,
+      customList: '',
+      dxfId: 0,
+      hasDxfId: false,
+      iconSet: 0,
+      iconId: 0,
+      hasIconId: false,
+    })),
+  };
+}
+
+/** Value sort levels of a typed `<sortState>`; color, icon and custom-list
+ *  levels have no cell-layer representation and are left out. */
+function sortSpecFromTyped(typed: AutoFilter, range: Range): FilterSortSpec | null {
+  const sort = typed.sort;
+  if (!sort || sort.columnSort) return null;
+  const keys = sort.conditions
+    .filter(
+      (condition) =>
+        condition.sortBy === SORT_BY_VALUE &&
+        condition.customList === '' &&
+        condition.ref.firstCol >= range.c0 &&
+        condition.ref.firstCol <= range.c1,
+    )
+    .map((condition) => ({
+      byCol: condition.ref.firstCol,
+      direction: condition.descending ? ('desc' as const) : ('asc' as const),
+    }));
+  return keys.length > 0 ? { range, keys } : null;
+}
+
 /** Convert the cell-layer's criteria to formulon's typed AutoFilter model.
- * Returns `null` for a color criterion when there is no imported typed
- * snapshot to carry forward; the cell layer cannot supply the engine's
- * differential-style id for a new color filter. */
+ * Returns `null` for a color criterion when the engine cannot author its
+ * differential style and there is no imported typed snapshot to carry
+ * forward. */
 export function typedAutoFilterFromState(
   state: State,
   range: Range | null,
@@ -284,12 +369,16 @@ export function typedAutoFilterFromState(
   const criteria = state.ui.filterCriteria
     .filter((entry) => sameRange(entry.range, range))
     .sort((a, b) => a.byCol - b.byCol);
-  const hasColorCriteria = criteria.some((entry) => entry.color);
-  // A color criterion has no cell-layer differential-style id. When an
-  // imported typed definition is available, retain its engine-owned columns
-  // and simply omit the new color criterion from this typed write. Without a
-  // typed snapshot the raw XML fallback below is the only safe path.
-  if (hasColorCriteria && !imported) return null;
+  const colorColumns = new Map<number, AutoFilterColumn | null>();
+  for (const entry of criteria) {
+    if (!entry.color) continue;
+    const colId = entry.byCol - range.c0;
+    colorColumns.set(colId, colorColumnFromCriteria(wb, colId, entry.color));
+  }
+  // A color criterion the engine cannot author keeps an imported typed
+  // definition's columns and omits the new one; without an imported snapshot
+  // the raw XML fallback is the only safe path.
+  if ([...colorColumns.values()].includes(null) && !imported) return null;
 
   const columns = new Map<number, AutoFilterColumn>();
   // Imported Dynamic/Top10/Icon/Color criteria are kept intact while the UI
@@ -302,9 +391,13 @@ export function typedAutoFilterFromState(
   }
 
   for (const entry of criteria) {
-    if (entry.color) continue;
     const colId = entry.byCol - range.c0;
     if (colId < 0 || colId > range.c1 - range.c0) continue;
+    if (entry.color) {
+      const column = colorColumns.get(colId);
+      if (column) columns.set(colId, column);
+      continue;
+    }
     if (entry.condition) {
       columns.set(colId, customColumnFromCriteria(colId, entry.condition));
       continue;
@@ -327,8 +420,23 @@ export function typedAutoFilterFromState(
       lastCol: range.c1,
     },
     columns: Array.from(columns.values()).sort((a, b) => a.colId - b.colId),
-    sort: imported && sameAutoFilterRange(imported.filter, range) ? imported.filter.sort : null,
+    sort: sortForRange(state, range, imported),
   };
+}
+
+function sortForRange(
+  state: State,
+  range: Range,
+  imported: ImportedTypedFilter | undefined,
+): AutoFilterSortState | null {
+  const spec = state.ui.filterSorts?.find((entry) => sameRange(entry.range, range));
+  if (spec) return sortStateFromSpec(spec);
+  // Levels the cell layer cannot show stay engine-owned until a sort replaces them.
+  const carried =
+    imported && sameAutoFilterRange(imported.filter, range) ? imported.filter.sort : null;
+  return carried?.conditions.some((condition) => condition.sortBy !== SORT_BY_VALUE)
+    ? carried
+    : null;
 }
 
 function wildcardCondition(
@@ -415,6 +523,22 @@ function localCriteriaFromTypedFilter(
       );
       criteria.push({ range, byCol, hiddenValues });
       continue;
+    }
+    if (column.kind === FILTER_KIND_COLOR && wb?.capabilities.conditionalFormatDxf) {
+      const apply = dxfToApply(wb, column.dxfId);
+      const color = column.cellColor ? apply.fill : apply.color;
+      if (color) {
+        criteria.push({
+          range,
+          byCol,
+          hiddenValues: [],
+          color: {
+            kind: column.cellColor ? 'cellColor' : 'fontColor',
+            color: normalizeColorKey(color),
+          },
+        });
+        continue;
+      }
     }
     if (column.kind === FILTER_KIND_CUSTOM && column.customCount === 1 && !column.customAnd) {
       const condition = wildcardCondition(column.op1, column.val1, locale);
@@ -693,7 +817,7 @@ function decodeTypedFilter(
   sheet: number,
   target: FilterTarget,
   typed: AutoFilter,
-): { range: Range; criteria: ValueFilterCriteria[] } {
+): { range: Range; criteria: ValueFilterCriteria[]; sort: FilterSortSpec | null } {
   const decoded = localCriteriaFromTypedFilter(
     store.getState(),
     sheet,
@@ -705,7 +829,11 @@ function decodeTypedFilter(
     filter: typed,
     unsupportedColumns: decoded.unsupportedColumns,
   });
-  return { range: decoded.range, criteria: decoded.criteria };
+  return {
+    range: decoded.range,
+    criteria: decoded.criteria,
+    sort: sortSpecFromTyped(typed, decoded.range),
+  };
 }
 
 /** Load the worksheet's AutoFilter and every table AutoFilter on `sheet` into
@@ -717,6 +845,7 @@ export function hydrateAutoFilterFromEngine(
 ): void {
   const ranges: Range[] = [];
   const criteria: ValueFilterCriteria[] = [];
+  const sorts: FilterSortSpec[] = [];
   let worksheetTyped = false;
   if (wb.capabilities.typedAutoFilter) {
     const load = (target: FilterTarget): boolean => {
@@ -728,6 +857,7 @@ export function hydrateAutoFilterFromEngine(
       const decoded = decodeTypedFilter(wb, store, sheet, target, typed);
       ranges.push(decoded.range);
       criteria.push(...decoded.criteria);
+      if (decoded.sort) sorts.push(decoded.sort);
       return true;
     };
     worksheetTyped = load(sheetFilterTarget(wb, sheet));
@@ -758,7 +888,7 @@ export function hydrateAutoFilterFromEngine(
   wb.withEngineSyncMuted(() => {
     store.setState((state) => ({
       ...state,
-      ui: { ...state.ui, filterRanges: ranges, filterCriteria: criteria },
+      ui: { ...state.ui, filterRanges: ranges, filterCriteria: criteria, filterSorts: sorts },
     }));
   });
 }

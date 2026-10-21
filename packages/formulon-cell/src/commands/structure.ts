@@ -24,6 +24,7 @@ import {
   formatHistoryBridgeFor,
   type NativeFormatSnapshot,
 } from '../engine/format-history-bridge.js';
+import { hydrateImagesFromEngine } from '../engine/images-sync.js';
 import type {
   Addr,
   CellValue,
@@ -53,12 +54,14 @@ import {
   inheritFormatsByRow,
   normalizeAxisEdit,
   shiftFilterCriteria,
+  shiftFilterSorts,
   shiftFormatsByCol,
   shiftFormatsByRow,
   shiftIndexedMap,
   shiftIndexedMapWithInheritance,
   shiftIndexedSet,
   shiftRangeAxis,
+  shiftRangeValidations,
 } from './axis-shift.js';
 import { recordFilterChange } from './filter.js';
 import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
@@ -367,6 +370,7 @@ function shiftAnchoredRanges(
           ...s.ui,
           filterRanges,
           filterCriteria: shiftFilterCriteria(s.ui.filterCriteria, sheet, axis, split, delta),
+          filterSorts: shiftFilterSorts(s.ui.filterSorts, sheet, axis, split, delta),
         },
       };
     });
@@ -684,6 +688,7 @@ function applyAxisShiftViaEngine(
     if (!ok) return false;
     wb.recalcAuto();
     hydrateChartsFromEngine(wb, store, sheet);
+    hydrateImagesFromEngine(wb, store, sheet);
     return true;
   };
 
@@ -867,6 +872,7 @@ function applyAxisShiftViaEngine(
       }
     }
     hydrateChartsFromEngine(wb, store, sheet);
+    hydrateImagesFromEngine(wb, store, sheet);
   };
 
   const rollbackRedo = (): void => {
@@ -1176,7 +1182,14 @@ function editAxis(
         const shifted = shift(s.format.formats, sheet, split, delta);
         const formats =
           kind === 'insert' ? inherit(s.format.formats, shifted, sheet, split, n) : shifted;
-        return { ...s, format: { ...s.format, formats } };
+        const rangeValidations = shiftRangeValidations(
+          s.format.rangeValidations,
+          sheet,
+          axis,
+          split,
+          delta,
+        );
+        return { ...s, format: { ...s.format, formats, rangeValidations } };
       });
     });
 

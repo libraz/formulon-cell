@@ -13,7 +13,7 @@ import type {
   SheetAxisFormatOverride,
   SheetFontOverride,
 } from '../engine/types.js';
-import type { CellFormat, CustomCellStyle } from './types/cell-format.js';
+import type { CellFormat, CustomCellStyle, RangeValidation } from './types/cell-format.js';
 import type { ConditionalRule } from './types/conditional-rule.js';
 import type { PageSetup } from './types/page-setup.js';
 
@@ -233,6 +233,9 @@ export interface UiSlice {
   /** Value-filter criteria keyed by filter range + column. Reapply uses this
    *  to recompute hidden rows after the sheet data changes. */
   filterCriteria: ValueFilterCriteria[];
+  /** Sort order last applied inside each filter range; the filter buttons show
+   *  its direction arrow and the file keeps it as the filter's `sortState`. */
+  filterSorts?: FilterSortSpec[];
   /** Visibility flag for the Watch Window panel. Session-only state — the
    *  panel itself reads `watch.watches` for content. */
   watchPanelOpen: boolean;
@@ -268,6 +271,12 @@ export interface ValueFilterCriteria {
   /** Color filter. When present, rows survive only when the target cell's fill
    *  or font color matches `color`. */
   color?: FilterColorSpec;
+}
+
+export interface FilterSortSpec {
+  range: Range;
+  /** Value sort levels, most significant first. */
+  keys: Array<{ byCol: number; direction: 'asc' | 'desc' }>;
 }
 
 export interface FilterColorSpec {
@@ -328,6 +337,10 @@ export interface FormatSlice {
   sheetAxisOverrides?: Map<number, SheetAxisFormatOverride>;
   /** Session-scoped custom named styles created from the Cell Styles gallery. */
   customCellStyles?: CustomCellStyle[];
+  /** Validation rules too large to hold per cell (whole rows/columns, big
+   *  blocks), kept by their `sqref` rectangles. A cell's own `validation`
+   *  takes precedence over these. */
+  rangeValidations?: RangeValidation[];
 }
 
 export interface MergesSlice {
@@ -569,7 +582,11 @@ export interface SheetProtectionPasswordHash {
 }
 
 export interface SheetProtectionState {
+  /** Plain text typed this session; never written to a file. */
   password?: string;
+  /** The 16-bit verifier (four hex digits) of a loaded file's `password`
+   *  attribute. */
+  legacyPasswordHash?: string;
   passwordHash?: SheetProtectionPasswordHash;
   permissions?: SheetProtectionPermissions;
 }

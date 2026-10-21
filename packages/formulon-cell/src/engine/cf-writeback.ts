@@ -137,6 +137,19 @@ function caseSensitiveTextFormula(
 const conditionalFormatKey = (sheet: number, input: ConditionalFormatInput): string =>
   JSON.stringify([sheet, input]);
 
+/** Key of the next rule translating to `input`: identical rules get distinct
+ *  keys by occurrence, so a duplicate stays a second engine rule. */
+const nextOccurrenceKey = (
+  counts: Map<string, number>,
+  sheet: number,
+  input: ConditionalFormatInput,
+): string => {
+  const base = conditionalFormatKey(sheet, input);
+  const occurrence = counts.get(base) ?? 0;
+  counts.set(base, occurrence + 1);
+  return `${base}#${occurrence}`;
+};
+
 type ConditionalFormatEntry = ReturnType<WorkbookHandle['getConditionalFormats']>[number];
 type CfColor = NonNullable<ConditionalFormatInput['colorScale']>['colors'][number];
 type CfValueObjectInput = NonNullable<ConditionalFormatInput['colorScale']>['thresholds'][number];
@@ -284,7 +297,10 @@ function hasFontDxfFields(apply: Partial<CellFormat>): boolean {
   );
 }
 
-function dxfRecordFromApply(wb: WorkbookHandle, apply: Partial<CellFormat>): DxfRecord | null {
+export function dxfRecordFromApply(
+  wb: WorkbookHandle,
+  apply: Partial<CellFormat>,
+): DxfRecord | null {
   const dxf: DxfRecord = {};
   if (hasFontDxfFields(apply)) {
     const font = fontRecordFromFormat(apply);
@@ -522,6 +538,7 @@ export function syncConditionalRulesToEngine(
   if (!wb.capabilities.conditionalFormatMutate) return { written: 0, skipped: 0 };
   let written = 0;
   let skipped = 0;
+  const occurrences = new Map<string, number>();
   for (const rule of rules) {
     if (rule.range.sheet !== sheet) continue;
     if (rule.engineId !== undefined) continue;
@@ -530,7 +547,7 @@ export function syncConditionalRulesToEngine(
       skipped += 1;
       continue;
     }
-    const key = conditionalFormatKey(sheet, input);
+    const key = nextOccurrenceKey(occurrences, sheet, input);
     if (opts.seenKeys?.has(key)) continue;
     const writeInput = inputWithDxf(wb, input, rule);
     if (wb.addConditionalFormat(sheet, writeInput) >= 0) written += 1;
@@ -561,6 +578,7 @@ export function syncTrackedConditionalRulesToEngine(
   let skipped = 0;
   let removed = 0;
   const desired = new Map<string, DesiredConditionalRule>();
+  const occurrences = new Map<string, number>();
 
   for (const rule of rules) {
     if (rule.range.sheet !== sheet) continue;
@@ -570,7 +588,7 @@ export function syncTrackedConditionalRulesToEngine(
       skipped += 1;
       continue;
     }
-    desired.set(conditionalFormatKey(sheet, input), { input, rule });
+    desired.set(nextOccurrenceKey(occurrences, sheet, input), { input, rule });
   }
 
   // Session rules rank after every rule this mount did not write, in store
@@ -649,6 +667,24 @@ export function syncTrackedConditionalRulesToEngine(
   }
 
   return { written, skipped, removed };
+}
+
+/**
+ * Replace a loaded rule (one hydrated from the file, carrying an `engineId`)
+ * by `next` in the engine. The rule keeps its id and priority. Returns false
+ * when `next` has no engine form or the engine refuses the rewrite.
+ */
+export function rewriteLoadedConditionalRule(
+  wb: WorkbookHandle,
+  previous: ConditionalRule,
+  next: ConditionalRule,
+): boolean {
+  if (!previous.engineId) return false;
+  const input = conditionalRuleToEngineInput(next);
+  if (!input) return false;
+  return rewriteEngineConditionalFormat(wb, previous.range.sheet, previous.engineId, {
+    input: inputWithDxf(wb, input, next),
+  });
 }
 
 /**

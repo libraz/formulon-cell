@@ -8,6 +8,7 @@ import { numFmtToFormatCode } from '../../engine/format-writeback.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
 import type { CellValue } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import { rangeValidationAt } from '../../store/range-validations.js';
 import { renderScale } from '../../store/render-scale.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
 import type { CellFormat } from '../../store/store.js';
@@ -550,13 +551,11 @@ export function paintCells(
       // dismisses the popover via the "Ignore" action.
       const cellKey = key;
       if (!ignored.has(cellKey)) {
+        const validation = fmt?.validation ?? rangeValidationAt(format, cellAddr);
         if (detectErrorKind(value)) {
           const hit = paintErrorTriangle(ctx, bounds, ERROR_TRIANGLE_COLOR, rtl);
           triangleHits.push({ rect: hit, addr: cellAddr, kind: 'error' });
-        } else if (
-          fmt?.validation &&
-          detectValidationViolation(value, fmt.validation, getResolver())
-        ) {
+        } else if (validation && detectValidationViolation(value, validation, getResolver())) {
           const hit = paintValidationTriangle(ctx, bounds, VALIDATION_TRIANGLE_COLOR, rtl);
           triangleHits.push({ rect: hit, addr: cellAddr, kind: 'validation' });
         }

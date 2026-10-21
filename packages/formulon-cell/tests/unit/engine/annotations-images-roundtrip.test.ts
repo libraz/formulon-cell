@@ -6,6 +6,7 @@ import {
   listThreadedComments,
   removeThreadedComment,
   resolveThread,
+  setComment,
 } from '../../../src/commands/comment.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -87,6 +88,27 @@ describe.skipIf(!canLoadWasm())('formulon 0.13 annotation and image round-trip',
           done: true,
         });
         expect(comments[1]).toMatchObject({ parentId: threadId, text: 'Done' });
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('saves a new note under the same author threaded comments use', async () => {
+    const first = await WorkbookHandle.createDefault();
+    try {
+      const store = createSpreadsheetStore();
+      expect(setComment(store, { sheet: 0, row: 1, col: 1 }, 'check this', first)).toBe(true);
+      expect(first.getComment(0, 1, 1)).toEqual({ author: 'Formulon', text: 'check this' });
+      const thread = addThreadedComment(store, { sheet: 0, row: 2, col: 2 }, 'thread', first);
+      const person = first.getPersons().find((entry) => entry.id === thread?.personId);
+      expect(person?.displayName).toBe(first.getComment(0, 1, 1)?.author);
+
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        expect(reloaded.getComment(0, 1, 1)).toEqual({ author: 'Formulon', text: 'check this' });
       } finally {
         reloaded.dispose();
       }

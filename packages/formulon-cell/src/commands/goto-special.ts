@@ -2,6 +2,7 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import { findDependents, findPrecedents } from '../engine/refs-graph.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeValidationCells, validationAt } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import type { SelectionSlice } from '../store/types.js';
@@ -421,7 +422,7 @@ const validationAddrs = (ctx: SearchContext): Addr[] => {
   const { state, sheet } = ctx;
   const areas = ctx.single ? null : ctx.selected;
   const active = state.selection.active;
-  const activeRule = state.format.formats.get(addrKey(active))?.validation;
+  const activeRule = validationAt(state.format, active);
   if (ctx.options.same && !activeRule) return [];
   const wanted = ctx.options.same ? JSON.stringify(activeRule) : null;
   const out: Addr[] = [];
@@ -431,6 +432,11 @@ const validationAddrs = (ctx: SearchContext): Addr[] => {
     if (!addr || addr.sheet !== sheet) continue;
     if (areas && !inAny(areas, addr.row, addr.col)) continue;
     if (wanted !== null && JSON.stringify(format.validation) !== wanted) continue;
+    out.push(addr);
+  }
+  for (const { addr, validation } of rangeValidationCells(state, sheet)) {
+    if (areas && !inAny(areas, addr.row, addr.col)) continue;
+    if (wanted !== null && JSON.stringify(validation) !== wanted) continue;
     out.push(addr);
   }
   return out;

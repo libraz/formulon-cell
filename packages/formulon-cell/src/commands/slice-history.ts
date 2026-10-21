@@ -14,6 +14,7 @@ import type {
   LayoutSlice,
   PageMargins,
   PageSetup,
+  RangeValidation,
   SessionIllustration,
   SlicerSpec,
   Sparkline,
@@ -37,6 +38,7 @@ export interface FormatSnapshot {
   sheetFontOverrides?: Map<number, SheetFontOverride>;
   sheetAxisOverrides?: Map<number, SheetAxisFormatOverride>;
   customCellStyles: CustomCellStyle[];
+  rangeValidations?: RangeValidation[];
 }
 const cloneSheetFontAxisSnapshot = (
   snapshot: SheetFontOverride['baseline'],
@@ -69,6 +71,11 @@ const cloneSheetAxisOverride = (override: SheetAxisFormatOverride): SheetAxisFor
   ...(override.fontPatch ? { fontPatch: { ...override.fontPatch } } : {}),
 });
 
+const cloneRangeValidation = (rule: RangeValidation): RangeValidation => ({
+  ranges: rule.ranges.map((range) => ({ ...range })),
+  validation: JSON.parse(JSON.stringify(rule.validation)) as RangeValidation['validation'],
+});
+
 const cloneCustomCellStyle = (style: CustomCellStyle): CustomCellStyle => ({
   ...style,
   format: { ...style.format },
@@ -90,6 +97,7 @@ export function captureFormatSnapshot(state: State): FormatSnapshot {
       ]),
     ),
     customCellStyles: (state.format.customCellStyles ?? []).map(cloneCustomCellStyle),
+    rangeValidations: (state.format.rangeValidations ?? []).map(cloneRangeValidation),
   };
 }
 
@@ -111,6 +119,7 @@ export function applyFormatSnapshot(store: SpreadsheetStore, snap: FormatSnapsho
         ]),
       ),
       customCellStyles: snap.customCellStyles.map(cloneCustomCellStyle),
+      rangeValidations: (snap.rangeValidations ?? []).map(cloneRangeValidation),
     },
   }));
 }
@@ -125,6 +134,7 @@ const formatSnapshotKey = (snap: FormatSnapshot): string =>
       ([a], [b]) => a - b,
     ),
     customCellStyles: snap.customCellStyles,
+    rangeValidations: snap.rangeValidations ?? [],
   });
 
 const sameFormatSnapshot = (a: FormatSnapshot, b: FormatSnapshot): boolean =>
@@ -261,6 +271,7 @@ const applyScopedFormatChange = (
   sheetFonts: Map<number, SheetFontOverride | undefined>,
   sheetAxes: Map<number, SheetAxisFormatOverride | undefined>,
   customCellStyles: CustomCellStyle[] | undefined,
+  rangeValidations: RangeValidation[] | undefined,
 ): void => {
   store.setState((state) => {
     const nextFormats = new Map(state.format.formats);
@@ -288,6 +299,9 @@ const applyScopedFormatChange = (
         ...(customCellStyles === undefined
           ? {}
           : { customCellStyles: customCellStyles.map(cloneCustomCellStyle) }),
+        ...(rangeValidations === undefined
+          ? {}
+          : { rangeValidations: rangeValidations.map(cloneRangeValidation) }),
       },
     };
   });
@@ -604,17 +618,25 @@ function recordBridgedFormatChange(
     changedAxisSheets = changedSheetAxisOverrideKeys(before, after);
     customStylesChanged =
       jsonSnapshot(before.customCellStyles) !== jsonSnapshot(after.customCellStyles);
+    const rangeValidationsChanged =
+      jsonSnapshot(before.rangeValidations ?? []) !== jsonSnapshot(after.rangeValidations ?? []);
     if (
       changedKeys.size === 0 &&
       changedFontSheets.size === 0 &&
       changedAxisSheets.size === 0 &&
-      !customStylesChanged
+      !customStylesChanged &&
+      !rangeValidationsChanged
     )
       return;
 
     affectedSheets = sheetsForFormatKeys(changedKeys);
     for (const sheet of changedFontSheets) affectedSheets.add(sheet);
     for (const sheet of changedAxisSheets) affectedSheets.add(sheet);
+    if (rangeValidationsChanged) {
+      for (const rule of [...(before.rangeValidations ?? []), ...(after.rangeValidations ?? [])]) {
+        for (const range of rule.ranges) affectedSheets.add(range.sheet);
+      }
+    }
     if (customStylesChanged) {
       for (const sheet of sheetsForCellStyles(before, after)) affectedSheets.add(sheet);
       for (const key of formatsWithCellStyle(before)) nativeKeys.add(key);
@@ -644,11 +666,19 @@ function recordBridgedFormatChange(
       ? after.customCellStyles.map(cloneCustomCellStyle)
       : undefined;
 
+    const beforeRangeValidations = rangeValidationsChanged
+      ? (before.rangeValidations ?? []).map(cloneRangeValidation)
+      : undefined;
+    const afterRangeValidations = rangeValidationsChanged
+      ? (after.rangeValidations ?? []).map(cloneRangeValidation)
+      : undefined;
+
     const replay = (
       formats: Map<string, CellFormat | undefined>,
       sheetFonts: Map<number, SheetFontOverride | undefined>,
       sheetAxes: Map<number, SheetAxisFormatOverride | undefined>,
       customStyles: CustomCellStyle[] | undefined,
+      rangeValidations: RangeValidation[] | undefined,
       native: NativeFormatSnapshot,
     ): void => {
       const immediate = captureFormatSnapshot(store.getState());
@@ -657,7 +687,14 @@ function recordBridgedFormatChange(
       let replayPublicationAttempted = false;
       try {
         bridge.withSyncMuted(() => {
-          applyScopedFormatChange(store, formats, sheetFonts, sheetAxes, customStyles);
+          applyScopedFormatChange(
+            store,
+            formats,
+            sheetFonts,
+            sheetAxes,
+            customStyles,
+            rangeValidations,
+          );
           replayPublicationAttempted = true;
           bridge.flush(affectedSheets);
           bridge.restore(native);
@@ -681,8 +718,23 @@ function recordBridgedFormatChange(
 
     history.push({
       undo: () =>
-        replay(beforeFormats, beforeSheetFonts, beforeSheetAxes, beforeStyles, beforeNative),
-      redo: () => replay(afterFormats, afterSheetFonts, afterSheetAxes, afterStyles, afterNative),
+        replay(
+          beforeFormats,
+          beforeSheetFonts,
+          beforeSheetAxes,
+          beforeStyles,
+          beforeRangeValidations,
+          beforeNative,
+        ),
+      redo: () =>
+        replay(
+          afterFormats,
+          afterSheetFonts,
+          afterSheetAxes,
+          afterStyles,
+          afterRangeValidations,
+          afterNative,
+        ),
       repeat: opts.repeat,
     });
   } catch (error) {

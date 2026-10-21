@@ -11,6 +11,7 @@ import {
   type SpreadsheetInstance,
   textToColumns,
 } from '../../index.js';
+import { rangeValidationsIntersect } from '../../store/range-validations.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
 import { showTextToColumnsDialog } from '../../toolbar/dialogs/text-to-columns.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
@@ -142,8 +143,9 @@ const updateDataValidationMenu =
   (menu) => {
     const state = instance.store.getState();
     const range = normalizedSelectionRange(instance);
-    let hasValidation = false;
+    let hasValidation = rangeValidationsIntersect(state.format, range);
     for (const [key, format] of state.format.formats) {
+      if (hasValidation) break;
       if (!format.validation) continue;
       const addr = parseAddrKey(key);
       if (addr && rangeContainsAddr(range, addr)) {

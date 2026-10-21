@@ -169,7 +169,7 @@ describe('attachCommentDialog', () => {
       expect(wrap()?.hidden).toBe(false);
       expect(dialogError()?.hidden).toBe(false);
       expect(commentAt(store.getState(), { sheet: 0, row: 1, col: 1 })).toBe('before');
-      expect(wb.getComment(0, 1, 1)).toEqual({ author: '', text: 'before' });
+      expect(wb.getComment(0, 1, 1)).toEqual({ author: 'Formulon', text: 'before' });
       expect(history.canUndo()).toBe(false);
       handle.detach();
     } finally {

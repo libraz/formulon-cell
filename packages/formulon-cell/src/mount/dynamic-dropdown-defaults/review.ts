@@ -1,10 +1,9 @@
 import {
   addAllowedEditRange,
   isWorkbookStructureProtected,
-  protectedSheetPassword,
-  protectedSheetPasswordHash,
   protectedSheetPermissions,
-  verifySheetProtectionPasswordHash,
+  sheetHasPassword,
+  verifySheetProtectionPassword,
 } from '../../commands/protection.js';
 import {
   commentAt,
@@ -128,9 +127,7 @@ const buildProtectAction =
     if (action === 'unprotect-sheet') {
       const strings = instance.i18n.strings;
       const sheet = instance.store.getState().data.sheetIndex;
-      const currentPassword = protectedSheetPassword(instance.store.getState(), sheet);
-      const currentPasswordHash = protectedSheetPasswordHash(instance.store.getState(), sheet);
-      if (currentPassword || currentPasswordHash) {
+      if (sheetHasPassword(instance.store.getState(), sheet)) {
         const password = await showUnprotectSheetDialog({
           title: strings.protection.unprotectSheet,
           password: strings.protection.password,
@@ -141,12 +138,11 @@ const buildProtectAction =
           instance.host.focus();
           return;
         }
-        const matches =
-          currentPassword !== undefined
-            ? password === currentPassword
-            : currentPasswordHash
-              ? await verifySheetProtectionPasswordHash(password, currentPasswordHash)
-              : false;
+        const matches = await verifySheetProtectionPassword(
+          instance.store.getState(),
+          sheet,
+          password,
+        );
         if (!matches) {
           await showMessage({
             title: strings.protection.unprotectSheet,

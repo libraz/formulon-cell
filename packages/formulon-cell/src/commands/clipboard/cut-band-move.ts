@@ -6,6 +6,7 @@ import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps
 import { rangeContainsRange, rangesIntersect } from '../../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import type { CellRecord } from '../cell-shift.js';
+import { DEFAULT_COMMENT_AUTHOR } from '../comment-author.js';
 import { collectAllFormulas, type FormulaRecord } from '../formula-records.js';
 import { type AxisBandMoveContext, adjustFormulaForAxisBandMove } from '../formula-refs.js';
 import type { History } from '../history.js';
@@ -341,7 +342,7 @@ function captureSourceCommentSnapshots(
     const existing = byKey.get(key);
     byKey.set(key, {
       addr,
-      author: format.commentAuthor ?? existing?.author ?? '',
+      author: format.commentAuthor ?? existing?.author ?? DEFAULT_COMMENT_AUTHOR,
       text: format.comment,
       format: cloneCellFormat(format),
     });

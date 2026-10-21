@@ -140,7 +140,7 @@ describe('engine/validation-sync — edits', () => {
     });
   });
 
-  it('coalesces identical rules across cells into one entry with N ranges', () => {
+  it('coalesces identical rules across cells into one entry with merged rectangles', () => {
     const { wb, added } = makeEngine();
     const store = createSpreadsheetStore();
     setValidation(store, [
@@ -151,8 +151,11 @@ describe('engine/validation-sync — edits', () => {
 
     syncValidationsToEngine(wb, store, 0, { strict: true });
     expect(added).toHaveLength(1);
-    const ranges = (added[0]?.payload.ranges as unknown[]) ?? [];
-    expect(ranges).toHaveLength(3);
+    // A1:B1 merges into one run; B2 is a separate run (different columns).
+    expect(added[0]?.payload.ranges).toEqual([
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+    ]);
   });
 
   it('splits distinct rules into separate entries', () => {
@@ -224,8 +227,7 @@ describe('engine/validation-sync — edits', () => {
     syncValidationsToEngine(wb, store, 0);
 
     expect(added).toHaveLength(1);
-    const ranges = added[0]?.payload.ranges as unknown[];
-    expect(ranges).toHaveLength(2); // sheet 0 row 0 col 0 + sheet 0 row 0 col 1
+    expect(added[0]?.payload.ranges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }]);
   });
 
   it('mutations on other sheets do not push to this sheet', () => {

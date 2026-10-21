@@ -4,6 +4,7 @@ import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
+import { rangeValidationsIntersect } from '../../../store/range-validations.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import { indexRibbonButtons, projectActiveState } from '../../ribbon-active-state.js';
 import { macRibbonLabelForCommand } from './labels.js';
@@ -67,6 +68,7 @@ const hasValidationInSelection = (instance: SpreadsheetInstance): boolean => {
   const { format, selection } = instance.store.getState();
   const { sheet, r0, r1, c0, c1 } = selection.range;
   const area = (r1 - r0 + 1) * (c1 - c0 + 1);
+  if (rangeValidationsIntersect(format, selection.range)) return true;
   if (area <= format.formats.size) {
     for (let row = r0; row <= r1; row += 1) {
       for (let col = c0; col <= c1; col += 1) {

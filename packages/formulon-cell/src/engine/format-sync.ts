@@ -60,12 +60,29 @@ export function hydrateCommentsAndHyperlinksFromEngine(
   }
 
   if (wb.capabilities.hyperlinks) {
-    for (const h of wb.getHyperlinks(sheet)) {
-      if (h.target.length === 0) continue;
+    const links: Array<{
+      row: number;
+      col: number;
+      lastRow?: number;
+      lastCol?: number;
+      target: string;
+      location?: string;
+      display: string;
+      tooltip: string;
+    }> =
+      (typeof wb.getHyperlinksFull === 'function' ? wb.getHyperlinksFull(sheet) : null) ??
+      wb.getHyperlinks(sheet);
+    for (const h of links) {
+      const location = h.location ?? '';
+      if (h.target.length === 0 && location.length === 0) continue;
+      const lastRow = h.lastRow ?? h.row;
+      const lastCol = h.lastCol ?? h.col;
       updates.push({
         key: addrKey({ sheet, row: h.row, col: h.col }),
         patch: {
-          hyperlink: h.target,
+          hyperlink: h.target || `#${location}`,
+          hyperlinkLocation: location || undefined,
+          hyperlinkSpan: lastRow > h.row || lastCol > h.col ? { lastRow, lastCol } : undefined,
           hyperlinkDisplay: h.display || undefined,
           hyperlinkTooltip: h.tooltip || undefined,
         },
@@ -109,14 +126,33 @@ export function syncHyperlinksToEngine(
     const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) continue;
     const { row, col } = addr;
-    const addSucceeded = wb.addHyperlink(
-      sheet,
-      row,
-      col,
-      fmt.hyperlink,
-      fmt.hyperlinkDisplay ?? '',
-      fmt.hyperlinkTooltip ?? '',
-    );
+    const location = fmt.hyperlinkLocation ?? '';
+    const target = location && fmt.hyperlink === `#${location}` ? '' : fmt.hyperlink;
+    const display = fmt.hyperlinkDisplay ?? '';
+    const tooltip = fmt.hyperlinkTooltip ?? '';
+    const span = fmt.hyperlinkSpan;
+    const addSucceeded =
+      span && wb.supportsHyperlinkRangeWrite()
+        ? wb.addHyperlinkRange(
+            sheet,
+            row,
+            col,
+            Math.max(span.lastRow, row),
+            Math.max(span.lastCol, col),
+            target,
+            display,
+            tooltip,
+            location,
+          )
+        : wb.addHyperlink(
+            sheet,
+            row,
+            col,
+            target,
+            display,
+            tooltip,
+            ...(location ? [location] : []),
+          );
     if (strict && !addSucceeded) {
       throw strictSyncError('addHyperlink', key);
     }

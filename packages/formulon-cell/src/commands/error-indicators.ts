@@ -1,6 +1,7 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { rangeValidationCells } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { type CellValidation, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
@@ -135,6 +136,9 @@ export function circleInvalidValidationData(
     if (!addr || !rangeContainsAddr(range, addr)) continue;
     candidates.push({ key, validation: format.validation });
   }
+  for (const { addr, validation } of rangeValidationCells(state, range.sheet)) {
+    if (rangeContainsAddr(range, addr)) candidates.push({ key: addrKey(addr), validation });
+  }
   candidates.sort((left, right) => {
     const leftAddr = parseAddrKey(left.key);
     const rightAddr = parseAddrKey(right.key);
@@ -164,6 +168,13 @@ export function circleInvalidValidationDataInSheet(
     if (!addr || addr.sheet !== sheet) continue;
     const value = state.data.cells.get(key)?.value ?? { kind: 'blank' as const };
     if (!cellValueViolatesValidation(value, format.validation, resolveRange)) continue;
+    keys.add(key);
+    marked += 1;
+  }
+  for (const { addr, validation } of rangeValidationCells(state, sheet)) {
+    const key = addrKey(addr);
+    const value = state.data.cells.get(key)?.value ?? { kind: 'blank' as const };
+    if (!cellValueViolatesValidation(value, validation, resolveRange)) continue;
     keys.add(key);
     marked += 1;
   }

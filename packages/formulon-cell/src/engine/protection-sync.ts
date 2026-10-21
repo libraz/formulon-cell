@@ -4,6 +4,7 @@ import {
   type SheetProtectionPermissions,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { legacySheetPasswordHash } from './protection-password.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /**
@@ -19,7 +20,7 @@ export function hydrateProtectionFromEngine(wb: WorkbookHandle, store: Spreadshe
     const p = wb.getSheetProtection(i);
     if (!p?.enabled) continue;
     mutators.setSheetProtected(store, i, true, {
-      ...(p.legacyPassword ? { password: p.legacyPassword } : {}),
+      ...(p.legacyPassword ? { legacyPasswordHash: p.legacyPassword } : {}),
       ...(sheetProtectionPasswordHashFromEngine(p)
         ? { passwordHash: sheetProtectionPasswordHashFromEngine(p) }
         : {}),
@@ -91,13 +92,18 @@ export function flushProtectionToEngine(
   password?: string,
   permissions?: SheetProtectionPermissions,
   passwordHash?: SheetProtectionPasswordHash,
+  legacyPasswordHash?: string,
 ): void {
   if (!wb.capabilities.sheetProtectionRoundtrip) return;
   if (on) {
+    // A modern hash replaces the 16-bit verifier; typed text becomes a verifier.
+    const legacyPassword = passwordHash
+      ? ''
+      : (legacyPasswordHash ?? (password ? legacySheetPasswordHash(password) : ''));
     wb.setSheetProtection(sheet, {
       enabled: true,
       sheet: true,
-      legacyPassword: password ?? '',
+      legacyPassword,
       ...(passwordHash ?? {}),
       ...(permissions ?? {}),
     });

@@ -601,10 +601,12 @@ export function computeDialogValidation(
     case 'textLength': {
       const op = draft.validationOp;
       const a = draft.validationA;
+      const aFormula = draft.validationAFormula ? { aFormula: draft.validationAFormula } : {};
       if (op === 'between' || op === 'notBetween') {
-        return { kind: k, op, a, b: draft.validationB, ...meta };
+        const bFormula = draft.validationBFormula ? { bFormula: draft.validationBFormula } : {};
+        return { kind: k, op, a, b: draft.validationB, ...aFormula, ...bFormula, ...meta };
       }
-      return { kind: k, op, a, ...meta };
+      return { kind: k, op, a, ...aFormula, ...meta };
     }
   }
 }
@@ -624,6 +626,8 @@ function hydrateValidationDraft(
     draft.validationOp = 'between';
     draft.validationA = 0;
     draft.validationB = 0;
+    draft.validationAFormula = undefined;
+    draft.validationBFormula = undefined;
     draft.validationAllowBlank = true;
     draft.validationErrorStyle = 'stop';
     draft.validationShowInputMessage = true;
@@ -680,7 +684,11 @@ function hydrateValidationDraft(
     draft.validationOp = v.op;
     draft.validationA = v.a;
     draft.validationB = v.b ?? v.a;
+    draft.validationAFormula = v.aFormula;
+    draft.validationBFormula = v.bFormula;
   } else {
+    draft.validationAFormula = undefined;
+    draft.validationBFormula = undefined;
     draft.validationOp = 'between';
     draft.validationA = 0;
     draft.validationB = 0;

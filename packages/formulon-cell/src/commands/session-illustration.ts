@@ -51,6 +51,11 @@ export interface CreateSessionImageOptions {
    * subsequent move/resize/delete operations. */
   bytes?: Uint8Array;
   wb?: WorkbookHandle;
+  /** Anchor the native picture at `x` / `y` (grid pixels) instead of the top-left
+   * of the range, so a reloaded file shows it where it was drawn. */
+  anchorAtPixels?: boolean;
+  /** Session-only fields carried on the illustration, including through redo. */
+  extra?: Record<string, unknown>;
   authorization?: IllustrationMutationAuthorization;
 }
 
@@ -214,6 +219,7 @@ export function createSessionImage(
   )
     return null;
   const item: SessionIllustration = {
+    ...(options.extra as Partial<SessionIllustration> | undefined),
     id: options.id ?? defaultImageId(range),
     kind: 'image',
     src: options.src,
@@ -234,9 +240,34 @@ export function createSessionImage(
     if (!probe) return null;
     nativeWidthEmu = Math.max(1, Math.round((options.w ?? probe.pxWidth) * 9525));
     nativeHeightEmu = Math.max(1, Math.round((options.h ?? probe.pxHeight) * 9525));
+    const placed = options.anchorAtPixels
+      ? placementForPixels(
+          store,
+          {
+            anchorKind: AnchorKind.OneCell,
+            editAs: AnchorEditAs.OneCell,
+            fromRow: range.r0,
+            fromCol: range.c0,
+            fromRowOff: 0,
+            fromColOff: 0,
+            toRow: 0,
+            toCol: 0,
+            toRowOff: 0,
+            toColOff: 0,
+            cx: nativeWidthEmu,
+            cy: nativeHeightEmu,
+          },
+          { x: options.x, y: options.y, w: options.w, h: options.h },
+        )
+      : null;
+    if (placed) {
+      nativeWidthEmu = placed.widthEmu ?? nativeWidthEmu;
+      nativeHeightEmu = placed.heightEmu ?? nativeHeightEmu;
+    }
     nativeObjectId = options.wb.insertImage(range.sheet, options.bytes, {
-      row: range.r0,
-      col: range.c0,
+      row: placed?.row ?? range.r0,
+      col: placed?.col ?? range.c0,
+      ...(placed ? { rowOffEmu: placed.rowOffEmu, colOffEmu: placed.colOffEmu } : {}),
       name: options.alt ?? '',
       descr: options.alt ?? '',
       widthEmu: nativeWidthEmu,

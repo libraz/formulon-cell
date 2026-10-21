@@ -336,6 +336,7 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     setBoundInputValidity(validationAInput, n !== null);
     if (n !== null) {
       draft.validationA = n;
+      draft.validationAFormula = undefined;
       syncControls();
     } else {
       syncValidationVisibility();
@@ -347,6 +348,7 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     setBoundInputValidity(validationBInput, n !== null);
     if (n !== null) {
       draft.validationB = n;
+      draft.validationBFormula = undefined;
       syncControls();
     } else {
       syncValidationVisibility();

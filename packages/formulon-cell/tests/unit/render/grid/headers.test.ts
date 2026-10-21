@@ -92,6 +92,7 @@ function makeCtxSpy(): {
     closePath(): void {},
     moveTo(): void {},
     lineTo(): void {},
+    quadraticCurveTo(): void {},
     stroke(): void {
       strokes.push(strokeStyle);
     },
@@ -267,5 +268,41 @@ describe('paintHeaders', () => {
     );
 
     expect(fills[1]).toMatchObject({ style: '#605e5c', alpha: 0.34 });
+  });
+
+  it('draws a sort arrow instead of the chevron on a sorted filter column', () => {
+    const paint = (sorted: boolean) => {
+      const state = createSpreadsheetStore().getState();
+      const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 };
+      state.ui = {
+        ...state.ui,
+        filterRanges: [range],
+        filterSorts: sorted ? [{ range, keys: [{ byCol: 1, direction: 'desc' }] }] : [],
+      };
+      state.viewport = {
+        rowStart: 0,
+        rowCount: 4,
+        colStart: 0,
+        colCount: 3,
+        zoom: 1,
+        widthPx: 320,
+      };
+      const cols = buildColLayout(state.layout, state.viewport);
+      const rows = buildRowLayout(state.layout, state.viewport);
+      const spy = makeCtxSpy();
+      paintHeaders(
+        { ctx: spy.ctx, dpr: 1, cssWidth: 320, cssHeight: 160 },
+        { ...state, layout: layoutForView(state) },
+        theme(),
+        cols,
+        rows,
+      );
+      return spy;
+    };
+    const plain = paint(false);
+    const sorted = paint(true);
+    // One chevron fill disappears and one arrow stroke appears for column B.
+    expect(sorted.fills.length).toBe(plain.fills.length - 1);
+    expect(sorted.strokes.length).toBe(plain.strokes.length + 1);
   });
 });

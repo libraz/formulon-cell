@@ -3,6 +3,7 @@ import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { syncValidationsToEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { subtractFromRangeValidations } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import {
   type CellValidation,
@@ -121,11 +122,24 @@ function validationMatchesEngineRule(
                 : validation.op === '>='
                   ? 6
                   : 7;
-  if (entry.op !== op || Number(entry.formula1.replace(/^=/, '')) !== validation.a) return false;
+  if (entry.op !== op || !boundMatches(entry.formula1, validation.aFormula, validation.a)) {
+    return false;
+  }
   const needsFormula2 = validation.op === 'between' || validation.op === 'notBetween';
   return (
-    !needsFormula2 || Number(entry.formula2.replace(/^=/, '')) === (validation.b ?? validation.a)
+    !needsFormula2 ||
+    boundMatches(entry.formula2, validation.bFormula, validation.b ?? validation.a)
   );
+}
+
+function boundMatches(
+  engineFormula: string,
+  formula: string | undefined,
+  constant: number,
+): boolean {
+  return formula === undefined
+    ? Number(engineFormula.replace(/^=/, '')) === constant
+    : normalizeFormula(engineFormula) === normalizeFormula(formula);
 }
 
 function normalizeFormula(formula: string): string {
@@ -229,7 +243,9 @@ export function clearValidationInRange(store: SpreadsheetStore, range: Range): n
       else formats.set(key, next);
       cleared += 1;
     }
-    return { ...s, format: { ...s.format, formats } };
+    const rangeValidations = subtractFromRangeValidations(s.format.rangeValidations, range);
+    if (rangeValidations !== s.format.rangeValidations) cleared += 1;
+    return { ...s, format: { ...s.format, formats, rangeValidations } };
   });
   return cleared;
 }
@@ -342,16 +358,16 @@ export function validateAgainst(
       if (validation.kind === 'whole' && !Number.isInteger(input.value)) {
         return reject(validation, 'expected whole number');
       }
-      return checkBounded(input.value, validation, 'number');
+      return checkBounded(input.value, validation, 'number', resolveRange);
     }
     case 'date':
     case 'time': {
       if (input.kind !== 'number') return reject(validation, `expected ${validation.kind}`);
-      return checkBounded(input.value, validation, validation.kind);
+      return checkBounded(input.value, validation, validation.kind, resolveRange);
     }
     case 'textLength': {
       const len = inputAsText(input).length;
-      return checkBounded(len, validation, 'length');
+      return checkBounded(len, validation, 'length', resolveRange);
     }
     case 'custom': {
       // Excel evaluates the custom formula and rejects when it is not TRUE.
@@ -418,9 +434,12 @@ function checkBounded(
   value: number,
   validation: BoundedValidation,
   noun: string,
+  resolveRange?: RangeResolver,
 ): ValidationOutcome {
-  const a = validation.a;
-  const b = validation.b ?? a;
+  const a = resolveBound(validation.aFormula, validation.a, resolveRange);
+  const b = resolveBound(validation.bFormula, validation.b ?? validation.a, resolveRange);
+  // A formula limit this layer cannot evaluate defers to the engine's verdict.
+  if (a === null || b === null) return { ok: true };
   let ok = true;
   switch (validation.op) {
     case 'between':
@@ -449,6 +468,21 @@ function checkBounded(
       break;
   }
   return ok ? { ok: true } : reject(validation, boundedMessage(validation.op, a, b, noun));
+}
+
+/** Numeric value of a limit: the constant, or a single-cell formula limit read
+ *  through the resolver. `null` when the formula cannot be evaluated here. */
+function resolveBound(
+  formula: string | undefined,
+  constant: number,
+  resolveRange?: RangeResolver,
+): number | null {
+  if (formula === undefined) return constant;
+  if (!resolveRange) return null;
+  const values = resolveRange(formula);
+  if (values.length !== 1 || values[0]?.trim() === '') return null;
+  const n = Number(values[0]);
+  return Number.isFinite(n) ? n : null;
 }
 
 function reject(meta: CellValidation, defaultMessage: string): ValidationOutcome {

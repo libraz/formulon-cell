@@ -568,7 +568,7 @@ interface HyperlinkRemovalPlan {
 
 type HyperlinkFormatFields = Pick<
   CellFormat,
-  'hyperlink' | 'hyperlinkDisplay' | 'hyperlinkTooltip'
+  'hyperlink' | 'hyperlinkDisplay' | 'hyperlinkTooltip' | 'hyperlinkLocation' | 'hyperlinkSpan'
 >;
 
 const hyperlinkCellInGrid = (addr: Addr): boolean =>
@@ -599,6 +599,8 @@ const hyperlinkFormatFields = (format: CellFormat): HyperlinkFormatFields => ({
   hyperlink: format.hyperlink,
   hyperlinkDisplay: format.hyperlinkDisplay,
   hyperlinkTooltip: format.hyperlinkTooltip,
+  hyperlinkLocation: format.hyperlinkLocation,
+  hyperlinkSpan: format.hyperlinkSpan,
 });
 
 const removeStoreHyperlinkFields = (
@@ -614,6 +616,8 @@ const removeStoreHyperlinkFields = (
       delete next.hyperlink;
       delete next.hyperlinkDisplay;
       delete next.hyperlinkTooltip;
+      delete next.hyperlinkLocation;
+      delete next.hyperlinkSpan;
       if (Object.keys(next).length === 0) formats.delete(key);
       else formats.set(key, next);
     }
@@ -638,6 +642,10 @@ const restoreStoreHyperlinkFields = (
         else next.hyperlinkDisplay = before.hyperlinkDisplay;
         if (before.hyperlinkTooltip === undefined) delete next.hyperlinkTooltip;
         else next.hyperlinkTooltip = before.hyperlinkTooltip;
+        if (before.hyperlinkLocation === undefined) delete next.hyperlinkLocation;
+        else next.hyperlinkLocation = before.hyperlinkLocation;
+        if (before.hyperlinkSpan === undefined) delete next.hyperlinkSpan;
+        else next.hyperlinkSpan = before.hyperlinkSpan;
         formats.set(key, next);
       }
     }

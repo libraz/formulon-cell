@@ -6,6 +6,7 @@ import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import { getValidationChevron } from '../render/grid.js';
+import { validationAt } from '../store/range-validations.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
 import { overlayPortalFor } from './overlay-portal.js';
@@ -193,8 +194,8 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
 
   const openForCell = (row: number, col: number): boolean => {
     const s = store.getState();
-    const fmt = s.format.formats.get(addrKey({ sheet: s.data.sheetIndex, row, col }));
-    if (fmt?.validation?.kind !== 'list') return false;
+    const validation = validationAt(s.format, { sheet: s.data.sheetIndex, row, col });
+    if (validation?.kind !== 'list') return false;
     const current = s.data.cells.get(addrKey({ sheet: s.data.sheetIndex, row, col }))?.value;
     const currentValue =
       current?.kind === 'text'
@@ -206,7 +207,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
               ? 'TRUE'
               : 'FALSE'
             : '';
-    const values = resolveListValues(fmt.validation, makeRangeResolver(wb, s.data.sheetIndex));
+    const values = resolveListValues(validation, makeRangeResolver(wb, s.data.sheetIndex));
     open(row, col, values, currentValue);
     return values.length > 0;
   };
@@ -227,10 +228,12 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
       return;
     }
     const s = store.getState();
-    const fmt = s.format.formats.get(
-      addrKey({ sheet: s.data.sheetIndex, row: chevron.row, col: chevron.col }),
-    );
-    if (fmt?.validation?.kind !== 'list') return;
+    const validation = validationAt(s.format, {
+      sheet: s.data.sheetIndex,
+      row: chevron.row,
+      col: chevron.col,
+    });
+    if (validation?.kind !== 'list') return;
     e.preventDefault();
     e.stopPropagation();
     // Re-anchor the active cell to the chevron's cell so subsequent picks
@@ -290,7 +293,7 @@ export function attachValidationPrompt(deps: ValidationPromptDeps): ValidationPr
   const refresh = (): void => {
     const state = store.getState();
     const addr = state.selection.active;
-    const validation = state.format.formats.get(addrKey(addr))?.validation;
+    const validation = validationAt(state.format, addr);
     const title = validation?.promptTitle?.trim() ?? '';
     const message = validation?.promptMessage?.trim() ?? '';
     if (!validation || validation.showInputMessage === false || (!title && !message)) {

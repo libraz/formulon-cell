@@ -43,6 +43,8 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
   // fresh selection, workbook, policy, and plan at invocation time.
   const {
     hyperlink: _hyperlink,
+    hyperlinkLocation: _hyperlinkLocation,
+    hyperlinkSpan: _hyperlinkSpan,
     hyperlinkDisplay: _hyperlinkDisplay,
     hyperlinkTooltip: _hyperlinkTooltip,
     comment: _comment,

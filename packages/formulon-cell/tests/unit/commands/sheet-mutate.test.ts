@@ -218,6 +218,7 @@ describe('removeSheet', () => {
       layout: {
         ...s.layout,
         hiddenSheets: new Set([2]),
+        veryHiddenSheets: new Set([2]),
         sheetTabColors: new Map([
           [0, '#c00000'],
           [2, '#70ad47'],
@@ -227,6 +228,7 @@ describe('removeSheet', () => {
     const { wb } = makeFake({ sheetCount: 3 });
     expect(removeSheet(store, wb, 1)).toBe(true);
     expect(Array.from(store.getState().layout.hiddenSheets)).toEqual([1]);
+    expect(Array.from(store.getState().layout.veryHiddenSheets)).toEqual([1]);
     expect(Array.from(store.getState().layout.sheetTabColors.entries())).toEqual([
       [0, '#c00000'],
       [1, '#70ad47'],
@@ -337,6 +339,7 @@ describe('moveSheet', () => {
       layout: {
         ...s.layout,
         hiddenSheets: new Set([0]),
+        veryHiddenSheets: new Set([0]),
         sheetTabColors: new Map([
           [0, '#c00000'],
           [2, '#4472c4'],
@@ -346,6 +349,7 @@ describe('moveSheet', () => {
     const { wb } = makeFake();
     expect(moveSheet(store, wb, 0, 2)).toBe(true);
     expect(Array.from(store.getState().layout.hiddenSheets)).toEqual([2]);
+    expect(Array.from(store.getState().layout.veryHiddenSheets)).toEqual([2]);
     expect(Array.from(store.getState().layout.sheetTabColors.entries())).toEqual([
       [2, '#c00000'],
       [1, '#4472c4'],

@@ -23,6 +23,7 @@ export const sheetSettingsMutators = {
     on: boolean,
     options?: {
       password?: string;
+      legacyPasswordHash?: string;
       passwordHash?: SheetProtectionPasswordHash;
       permissions?: SheetProtectionPermissions;
     },
@@ -32,6 +33,9 @@ export const sheetSettingsMutators = {
       if (on) {
         const entry: SheetProtectionState = {};
         if (options?.password !== undefined) entry.password = options.password;
+        if (options?.legacyPasswordHash !== undefined) {
+          entry.legacyPasswordHash = options.legacyPasswordHash;
+        }
         if (options?.passwordHash !== undefined) entry.passwordHash = { ...options.passwordHash };
         if (options?.permissions !== undefined) entry.permissions = { ...options.permissions };
         next.set(sheet, entry);

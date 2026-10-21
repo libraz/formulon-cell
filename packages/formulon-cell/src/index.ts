@@ -513,8 +513,10 @@ export {
   setWorkbookStructureProtected,
   toggleProtectedSheet,
   toggleWorkbookStructureProtected,
+  verifySheetProtectionPassword,
   verifySheetProtectionPasswordHash,
   warnProtected,
+  whenSheetPasswordsHashed,
   workbookStructurePassword,
   writableAddrs,
 } from './commands/protection.js';

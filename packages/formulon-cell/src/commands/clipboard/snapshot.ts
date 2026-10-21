@@ -74,6 +74,8 @@ const blankCell = (): ClipboardCell => ({
 
 const cloneFormat = (format: Partial<CellFormat>): CellFormat => {
   const clone: CellFormat = { ...format };
+  // A link's extent is anchored to its source cell and does not travel.
+  delete clone.hyperlinkSpan;
   if (format.borders) clone.borders = { ...format.borders };
   if (format.phonetic) clone.phonetic = format.phonetic.map((run) => ({ ...run }));
   return clone;

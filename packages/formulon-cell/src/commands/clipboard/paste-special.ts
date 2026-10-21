@@ -6,6 +6,7 @@ import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps
 import { rangeContainsRange, rangesIntersect, sameRange } from '../../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { recordCommentChange } from '../comment.js';
+import { DEFAULT_COMMENT_AUTHOR } from '../comment-author.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
@@ -803,7 +804,7 @@ export function pasteSpecial(
             write.addr.sheet,
             write.addr.row,
             write.addr.col,
-            write.author ?? '',
+            write.author ?? DEFAULT_COMMENT_AUTHOR,
             write.text ?? '',
           );
         }

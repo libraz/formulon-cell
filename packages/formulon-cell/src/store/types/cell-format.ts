@@ -1,4 +1,4 @@
-import type { PhoneticProperties, PhoneticRun } from '../../engine/types.js';
+import type { PhoneticProperties, PhoneticRun, Range } from '../../engine/types.js';
 
 export type NumFmt =
   | { kind: 'general' }
@@ -157,6 +157,11 @@ export interface CellFormat {
   hyperlinkDisplay?: string;
   /** Optional hyperlink tooltip from the engine. Preserved for xlsx round-trip. */
   hyperlinkTooltip?: string;
+  /** In-document destination (`Sheet2!A1`, a defined name). A location-only
+   *  link keeps `hyperlink` as `#<location>` so link checks stay uniform. */
+  hyperlinkLocation?: string;
+  /** Bottom-right of a multi-cell link anchored at this cell (inclusive). */
+  hyperlinkSpan?: { lastRow: number; lastCol: number };
   /** Free-form note attached to the cell. Surfaced as a small triangle
    *  marker + hover tooltip; not exported to .xlsx for now. */
   comment?: string;
@@ -219,14 +224,34 @@ export interface ValidationMeta {
  *  string in the OOXML formula1 slot. */
 export type ValidationListSource = string[] | { ref: string };
 
+/** Limits written as formulas (`=A1`, `=TODAY()+7`) instead of constants. The
+ *  paired `a` / `b` hold 0 so numeric consumers stay total; the formula text
+ *  (no leading `=`) is what the engine evaluates and the file stores. */
+export interface ValidationBoundFormulas {
+  aFormula?: string;
+  bFormula?: string;
+}
+
 /** Discriminated union — `kind` mirrors the OOXML `type` ordinal:
  *  list (3), whole (1), decimal (2), date (4), time (5), textLength (6),
  *  custom (7). */
 export type CellValidation =
   | ({ kind: 'list'; source: ValidationListSource } & ValidationMeta)
-  | ({ kind: 'whole'; op: ValidationOp; a: number; b?: number } & ValidationMeta)
-  | ({ kind: 'decimal'; op: ValidationOp; a: number; b?: number } & ValidationMeta)
-  | ({ kind: 'date'; op: ValidationOp; a: number; b?: number } & ValidationMeta)
-  | ({ kind: 'time'; op: ValidationOp; a: number; b?: number } & ValidationMeta)
-  | ({ kind: 'textLength'; op: ValidationOp; a: number; b?: number } & ValidationMeta)
+  | ({ kind: 'whole'; op: ValidationOp; a: number; b?: number } & ValidationBoundFormulas &
+      ValidationMeta)
+  | ({ kind: 'decimal'; op: ValidationOp; a: number; b?: number } & ValidationBoundFormulas &
+      ValidationMeta)
+  | ({ kind: 'date'; op: ValidationOp; a: number; b?: number } & ValidationBoundFormulas &
+      ValidationMeta)
+  | ({ kind: 'time'; op: ValidationOp; a: number; b?: number } & ValidationBoundFormulas &
+      ValidationMeta)
+  | ({ kind: 'textLength'; op: ValidationOp; a: number; b?: number } & ValidationBoundFormulas &
+      ValidationMeta)
   | ({ kind: 'custom'; formula: string } & ValidationMeta);
+
+/** A validation rule that covers whole rows/columns or other large blocks. It
+ *  is kept by its `sqref` rectangles instead of one format entry per cell. */
+export interface RangeValidation {
+  ranges: Range[];
+  validation: CellValidation;
+}

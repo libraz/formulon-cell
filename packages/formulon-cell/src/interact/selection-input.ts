@@ -14,6 +14,7 @@ import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
+import { validationAt } from '../store/range-validations.js';
 import { rangeArea, subtractRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
@@ -168,19 +169,20 @@ export function writeSelectionInput(
           continue;
         }
         plan.push({ target });
-        if (!fmt?.validation || !isCellWritable(state, target)) continue;
+        const validation = fmt?.validation ?? validationAt(state.format, target);
+        if (!validation || !isCellWritable(state, target)) continue;
         const outcome = validateCoercedInput(
           wb,
           target,
           coerceInputForCell(state, target, raw, inputLocale, wb),
-          fmt.validation,
+          validation,
         );
         if (!outcome.ok && outcome.severity === 'stop') {
           return {
             status: 'rejected',
             outcome: {
               severity: 'stop',
-              title: fmt.validation.errorTitle,
+              title: validation.errorTitle,
               message: outcome.message,
             },
           };

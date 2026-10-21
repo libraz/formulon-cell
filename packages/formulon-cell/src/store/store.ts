@@ -80,6 +80,7 @@ export const createSpreadsheetStore = () =>
       },
       filterRanges: [],
       filterCriteria: [],
+      filterSorts: [],
       watchPanelOpen: false,
       sheetBackgroundImages: new Map(),
     },

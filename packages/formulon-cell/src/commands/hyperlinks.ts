@@ -73,10 +73,16 @@ export function setHyperlink(
   const prev = store.getState().format.formats.get(addrKey(addr));
   const display = options.display ?? prev?.hyperlinkDisplay;
   const tooltip = options.tooltip ?? prev?.hyperlinkTooltip;
+  const keep = next.length > 0;
+  // `#Sheet2!A1` addresses a place in the document; an unchanged target keeps
+  // the location and span it was loaded with.
+  const location = next === prev?.hyperlink ? prev.hyperlinkLocation : undefined;
   mutators.setRangeFormat(store, range, {
-    hyperlink: next.length > 0 ? next : undefined,
-    hyperlinkDisplay: next.length > 0 ? display : undefined,
-    hyperlinkTooltip: next.length > 0 ? tooltip : undefined,
+    hyperlink: keep ? next : undefined,
+    hyperlinkLocation: keep ? (next.startsWith('#') ? next.slice(1) : location) : undefined,
+    hyperlinkSpan: keep ? prev?.hyperlinkSpan : undefined,
+    hyperlinkDisplay: keep ? display : undefined,
+    hyperlinkTooltip: keep ? tooltip : undefined,
   });
   if (workbook) flushFormatToEngine(workbook, store, addr.sheet);
 }
@@ -94,6 +100,8 @@ export function clearHyperlink(
   const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
   mutators.setRangeFormat(store, range, {
     hyperlink: undefined,
+    hyperlinkLocation: undefined,
+    hyperlinkSpan: undefined,
     hyperlinkDisplay: undefined,
     hyperlinkTooltip: undefined,
   });

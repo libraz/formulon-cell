@@ -1,15 +1,16 @@
+import { isWideValidation } from '../store/range-validations.js';
 import type {
   CellFormat,
   CellValidation,
   SpreadsheetStore,
+  ValidationBoundFormulas,
   ValidationErrorStyle,
   ValidationMeta,
   ValidationOp,
 } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
 import type { EngineSyncOptions } from './cell-format-sync.js';
-import { parseRangeRef } from './range-resolver.js';
-import type { Range } from './types.js';
+import type { Addr, Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /** OOXML validation `type` ordinal — 0 none, 1 whole, 2 decimal, 3 list,
@@ -79,11 +80,18 @@ export function hydrateValidationsFromEngine(
 
   store.setState((s) => {
     const formats = new Map(s.format.formats);
+    const wide = (s.format.rangeValidations ?? []).filter((rule) =>
+      rule.ranges.some((range) => range.sheet !== sheet),
+    );
     for (const v of entries) {
       const decoded = decodeValidation(v);
       if (!decoded) continue;
-      for (const r of v.ranges) {
-        if (r.sheet !== sheet) continue;
+      const ranges = v.ranges.filter((r) => r.sheet === sheet);
+      if (isWideValidation(ranges)) {
+        wide.push({ ranges, validation: decoded });
+        continue;
+      }
+      for (const r of ranges) {
         for (let row = r.r0; row <= r.r1; row += 1) {
           for (let col = r.c0; col <= r.c1; col += 1) {
             const k = addrKey({ sheet, row, col });
@@ -94,16 +102,16 @@ export function hydrateValidationsFromEngine(
         }
       }
     }
-    return { ...s, format: { ...s.format, formats } };
+    return { ...s, format: { ...s.format, formats, rangeValidations: wide } };
   });
 }
 
 /**
  * Replace the engine's data-validation rules on `sheet` with whatever
  * FormatSlice currently asserts. Cells sharing identical validation config
- * (same kind/op/values/messages) coalesce into one rule with multiple
- * single-cell ranges to keep rule count low. No-op when the capability flag
- * is off.
+ * (same kind/op/values/messages) coalesce into one rule whose ranges are the
+ * merged rectangles of those cells; range-stored rules go out as they are.
+ * No-op when the capability flag is off.
  */
 export function syncValidationsToEngine(
   wb: WorkbookHandle,
@@ -113,26 +121,33 @@ export function syncValidationsToEngine(
 ): void {
   if (!wb.capabilities.dataValidation) return;
   const strict = options?.strict === true;
-  const buckets = new Map<string, { validation: CellValidation; ranges: Range[] }>();
+  const buckets = new Map<string, { validation: CellValidation; cells: Addr[] }>();
   const formats = store.getState().format.formats;
   for (const [key, fmt] of formats) {
     if (!fmt.validation) continue;
     const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) continue;
-    const { row, col } = addr;
     const sig = JSON.stringify(fmt.validation);
     let bucket = buckets.get(sig);
     if (!bucket) {
-      bucket = { validation: fmt.validation, ranges: [] };
+      bucket = { validation: fmt.validation, cells: [] };
       buckets.set(sig, bucket);
     }
-    bucket.ranges.push({ sheet, r0: row, c0: col, r1: row, c1: col });
+    bucket.cells.push(addr);
+  }
+  const rules: Array<{ validation: CellValidation; ranges: Range[] }> = [];
+  for (const { validation, cells } of buckets.values()) {
+    rules.push({ validation, ranges: coalesceCells(sheet, cells) });
+  }
+  for (const rule of store.getState().format.rangeValidations ?? []) {
+    const ranges = rule.ranges.filter((range) => range.sheet === sheet);
+    if (ranges.length > 0) rules.push({ validation: rule.validation, ranges });
   }
   const clearSucceeded = wb.clearValidations(sheet);
   if (strict && !clearSucceeded) {
     throw strictSyncError('clearValidations', `sheet:${sheet}`);
   }
-  for (const { validation, ranges } of buckets.values()) {
+  for (const { validation, ranges } of rules) {
     if (ranges.length === 0) continue;
     const encoded = encodeValidation(validation, ranges);
     const address = ranges[0]
@@ -147,6 +162,53 @@ export function syncValidationsToEngine(
       throw strictSyncError('addValidationEntry', address);
     }
   }
+}
+
+/** Merge cells into rectangles: horizontal runs per row, then identical runs
+ *  on consecutive rows stack into one block. */
+function coalesceCells(sheet: number, cells: readonly Addr[]): Range[] {
+  const byRow = new Map<number, number[]>();
+  for (const { row, col } of cells) {
+    const cols = byRow.get(row);
+    if (cols) cols.push(col);
+    else byRow.set(row, [col]);
+  }
+  const open = new Map<string, Range>();
+  const out: Range[] = [];
+  let prevRow = -2;
+  for (const row of [...byRow.keys()].sort((a, b) => a - b)) {
+    const cols = (byRow.get(row) as number[]).sort((a, b) => a - b);
+    const next = new Map<string, Range>();
+    let c0 = cols[0] as number;
+    let c1 = c0;
+    const flush = (): void => {
+      const runKey = `${c0}:${c1}`;
+      const stacked = row === prevRow + 1 ? open.get(runKey) : undefined;
+      if (stacked) {
+        const grown = { ...stacked, r1: row };
+        next.set(runKey, grown);
+        out[out.indexOf(stacked)] = grown;
+      } else {
+        const fresh: Range = { sheet, r0: row, c0, r1: row, c1 };
+        next.set(runKey, fresh);
+        out.push(fresh);
+      }
+    };
+    for (const col of cols.slice(1)) {
+      if (col === c1 + 1) {
+        c1 = col;
+        continue;
+      }
+      flush();
+      c0 = col;
+      c1 = col;
+    }
+    flush();
+    open.clear();
+    for (const [k, v] of next) open.set(k, v);
+    prevRow = row;
+  }
+  return out;
 }
 
 interface EngineValidationEntry {
@@ -190,7 +252,7 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
     case DV_TYPE_LIST: {
       const literal = parseInlineList(v.formula1);
       if (literal) return { kind: 'list', source: literal, ...meta };
-      const ref = parseRangeRefSource(v.formula1);
+      const ref = parseListFormulaSource(v.formula1);
       if (ref) return { kind: 'list', source: { ref }, ...meta };
       return null;
     }
@@ -203,14 +265,18 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
       const kind = ordinalToBoundedKind(v.type);
       if (!kind) return null;
       const op = OP_FROM_ORDINAL[v.op] ?? '=';
-      const a = parseNumberFormula(v.formula1);
-      if (a === null) return null;
-      const b = v.formula2 ? parseNumberFormula(v.formula2) : null;
+      const f1 = stripEquals(v.formula1);
+      if (!f1) return null;
+      const a = parseNumberFormula(f1);
+      const bounds: ValidationBoundFormulas = a === null ? { aFormula: f1 } : {};
       if (op === 'between' || op === 'notBetween') {
-        if (b === null) return null;
-        return { kind, op, a, b, ...meta };
+        const f2 = stripEquals(v.formula2);
+        if (!f2) return null;
+        const b = parseNumberFormula(f2);
+        if (b === null) bounds.bFormula = f2;
+        return { kind, op, a: a ?? 0, b: b ?? 0, ...bounds, ...meta };
       }
-      return { kind, op, a, ...meta };
+      return { kind, op, a: a ?? 0, ...bounds, ...meta };
     }
   }
 }
@@ -265,9 +331,9 @@ function encodeValidation(
     default: {
       const type = DV_TYPE[validation.kind];
       const op = OP_ORDINAL[validation.op];
-      const formula1 = String(validation.a);
+      const formula1 = validation.aFormula ?? String(validation.a);
       const needsB = validation.op === 'between' || validation.op === 'notBetween';
-      const formula2 = needsB ? String(validation.b ?? validation.a) : '';
+      const formula2 = needsB ? (validation.bFormula ?? String(validation.b ?? validation.a)) : '';
       return {
         ranges,
         type,
@@ -312,13 +378,15 @@ function encodeMeta(validation: ValidationMeta): {
   };
 }
 
-/** Parse spreadsheet-style inline list literals. Returns null when the source
- *  string is empty, a range reference, or otherwise unparseable. */
+/** Parse an inline list literal (`"a,b,c"`). Returns null for anything else:
+ *  a range, a defined name or a formula all stay formulas. */
 function parseInlineList(formula: string): string[] | null {
   const trimmed = formula.trim().replace(/^=/, '');
   if (!trimmed) return null;
-  if (/[!$:]/.test(trimmed)) return null;
-  const inner = trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed.slice(1, -1) : trimmed;
+  const quoted = trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"');
+  // A bare `a,b` is a literal only when it cannot be a function call.
+  if (!quoted && (!trimmed.includes(',') || /[!$:()]/.test(trimmed))) return null;
+  const inner = quoted ? trimmed.slice(1, -1) : trimmed;
   const parts = inner
     .split(',')
     .map((s) => s.trim())
@@ -326,19 +394,19 @@ function parseInlineList(formula: string): string[] | null {
   return parts.length > 0 ? parts : null;
 }
 
-/** Pull out a range reference (Sheet1!$A$1:$A$10 or $A$1:$A$10) from formula1
- *  for list-kind DV. Returns the cleaned ref (no leading `=`) when it parses
- *  as an A1-style range, otherwise null. */
-function parseRangeRefSource(formula: string): string | null {
-  const trimmed = formula.trim().replace(/^=/, '');
-  if (!trimmed) return null;
-  // Reject inline-string literals so this never claims a list of values.
-  if (trimmed.startsWith('"')) return null;
-  return parseRangeRef(trimmed) ? trimmed : null;
+/** List source that is not a literal: an A1 range, a defined name or a formula
+ *  such as `INDIRECT(...)`, returned without the leading `=`. */
+function parseListFormulaSource(formula: string): string | null {
+  const trimmed = stripEquals(formula);
+  return trimmed || null;
+}
+
+function stripEquals(formula: string): string {
+  return formula.trim().replace(/^=/, '').trim();
 }
 
 function parseNumberFormula(formula: string): number | null {
-  const t = formula.trim().replace(/^=/, '');
+  const t = stripEquals(formula);
   if (!t) return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : null;

@@ -3,6 +3,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import { hydrateConditionalRulesFromEngine } from '../../../src/engine/cf-sync.js';
+import { conditionalRuleToEngineInput, inputWithDxf } from '../../../src/engine/cf-writeback.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachCfRulesDialog } from '../../../src/interact/cf-rules-dialog.js';
@@ -750,6 +752,74 @@ describe('attachCfRulesDialog', () => {
         expect(wb.getConditionalFormats(0)).toMatchObject([
           { type: 17, priority: 4, stopIfTrue: true },
         ]);
+        handle.detach();
+      } finally {
+        wb.dispose();
+      }
+    });
+  });
+
+  describe('rules loaded from a file', () => {
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+
+    const loadedWorkbook = async () => {
+      const wb = await WorkbookHandle.createDefault();
+      const store = createSpreadsheetStore();
+      const imported = { kind: 'blanks', range, apply: { bold: true } } as const;
+      const input = conditionalRuleToEngineInput(imported);
+      if (!input) throw new Error('untranslatable rule');
+      wb.addConditionalFormat(0, inputWithDxf(wb, input, imported));
+      hydrateConditionalRulesFromEngine(wb, store, 0);
+      return { wb, store };
+    };
+
+    it('edits and duplicates a loaded rule instead of marking it read-only', async () => {
+      const { wb, store } = await loadedWorkbook();
+      try {
+        const edited: number[] = [];
+        const handle = attachCfRulesDialog({
+          host,
+          getWb: () => wb,
+          getActiveSheet: () => 0,
+          store,
+          onEditRule: (index) => edited.push(index),
+        });
+        handle.open();
+        const edit = document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__edit');
+        const duplicate = document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__duplicate');
+        expect(edit?.disabled).toBe(false);
+        expect(duplicate?.disabled).toBe(false);
+        expect(document.querySelector('.fc-cfrulesdlg__readonly-badge')).toBeNull();
+
+        edit?.click();
+        expect(edited).toEqual([0]);
+
+        handle.open();
+        document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__duplicate')?.click();
+        const rules = store.getState().conditional.rules;
+        expect(rules).toHaveLength(2);
+        expect(rules[0]?.engineId).toBeTruthy();
+        expect(rules[1]?.engineId).toBeUndefined();
+        handle.detach();
+      } finally {
+        wb.dispose();
+      }
+    });
+
+    it('removing a loaded rule drops its hydrated copy from the store', async () => {
+      const { wb, store } = await loadedWorkbook();
+      try {
+        const handle = attachCfRulesDialog({
+          host,
+          getWb: () => wb,
+          getActiveSheet: () => 0,
+          store,
+        });
+        handle.open();
+        expect(store.getState().conditional.rules).toHaveLength(1);
+        document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__delete')?.click();
+        expect(wb.getConditionalFormats(0)).toHaveLength(0);
+        expect(store.getState().conditional.rules).toHaveLength(0);
         handle.detach();
       } finally {
         wb.dispose();

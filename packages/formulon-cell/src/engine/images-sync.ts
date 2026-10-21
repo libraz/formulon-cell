@@ -104,6 +104,22 @@ export function hydrateImagesFromEngine(
   }
 }
 
+/** Rebuild every native picture projection after sheets moved or were removed:
+ * their stored sheet indexes are stale on every sheet, not just the active one.
+ * Other sheets re-project when they are next shown. */
+export function reloadImagesFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
+  if (!wb.capabilities.images) return;
+  store.setState((state) => {
+    const illustrations = state.illustrations.illustrations.filter(
+      (item) => item.nativeObjectId === undefined,
+    );
+    return illustrations.length === state.illustrations.illustrations.length
+      ? state
+      : { ...state, illustrations: { illustrations } };
+  });
+  hydrateImagesFromEngine(wb, store, store.getState().data.sheetIndex);
+}
+
 export function persistentImageFromState(item: SessionIllustration): PersistedSessionImage | null {
   const candidate = item as PersistedSessionImage;
   return candidate.nativeObjectId && candidate.imageBytes && candidate.nativeAnchor

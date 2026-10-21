@@ -11,6 +11,7 @@ import type { Addr, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import { currencySymbolForLocale } from '../format/locale.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
+import { subtractFromRangeValidations } from '../store/range-validations.js';
 import {
   isWholeColumnRange,
   isWholeRowRange,
@@ -1095,7 +1096,13 @@ const operationsForFormatPatch = (patch: Partial<CellFormat>): Set<InteractionOp
   const operations = new Set<InteractionOperation>();
   for (const key of Object.keys(patch) as Array<keyof CellFormat>) {
     if (key === 'comment' || key === 'commentAuthor') operations.add('comment');
-    else if (key === 'hyperlink' || key === 'hyperlinkDisplay' || key === 'hyperlinkTooltip') {
+    else if (
+      key === 'hyperlink' ||
+      key === 'hyperlinkDisplay' ||
+      key === 'hyperlinkTooltip' ||
+      key === 'hyperlinkLocation' ||
+      key === 'hyperlinkSpan'
+    ) {
       operations.add('hyperlink');
     } else if (key === 'validation') operations.add('validation');
     else operations.add('format');
@@ -1132,6 +1139,9 @@ const mergeActionCellFormat = (
         else next.hyperlinkTooltip = previous.hyperlinkTooltip;
       }
     } else {
+      delete next.hyperlinkSpan;
+      if (hyperlink?.startsWith('#')) next.hyperlinkLocation = hyperlink.slice(1);
+      else delete next.hyperlinkLocation;
       if (!Object.hasOwn(patch, 'hyperlinkDisplay')) delete next.hyperlinkDisplay;
       if (!Object.hasOwn(patch, 'hyperlinkTooltip')) delete next.hyperlinkTooltip;
     }
@@ -1245,9 +1255,16 @@ export function applySelectionFormatAction(
       if (next) formats.set(key, next);
       else formats.delete(key);
     }
+    // A new or cleared rule replaces any range-stored rule it overlaps.
+    let rangeValidations = current.format.rangeValidations;
+    if (Object.hasOwn(action.patch, 'validation')) {
+      for (const range of plan.ranges) {
+        rangeValidations = subtractFromRangeValidations(rangeValidations, range);
+      }
+    }
     return {
       ...current,
-      format: { ...current.format, formats },
+      format: { ...current.format, formats, rangeValidations },
       ui: { ...current.ui, pendingFormat: null },
     };
   });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { ensureMacInk, getMacInk, type MacInkController } from '../../../src/interact/mac-ink.js';
 import { cellRectUnclamped, layoutForView } from '../../../src/render/geometry.js';
 import {
@@ -357,5 +358,84 @@ describe('Mac ink controller', () => {
     expect(history.undo()).toBe(true);
     expect(store.getState().illustrations.illustrations).toHaveLength(1);
     expect(attached.getTool()).toBe('eraser');
+  });
+
+  describe('saved with the workbook', () => {
+    const PNG_BASE64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+    beforeEach(() => {
+      vi.stubGlobal('Path2D', class {});
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+        () =>
+          ({
+            scale: vi.fn(),
+            stroke: vi.fn(),
+          }) as unknown as CanvasRenderingContext2D,
+      );
+      vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
+        `data:image/png;base64,${PNG_BASE64}`,
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    it('stores a stroke as a PNG picture that undo and the eraser remove', async () => {
+      const workbook = await WorkbookHandle.createDefault();
+      try {
+        const history = new History();
+        workbook.attachHistory(history);
+        controller = ensureMacInk({ host, store, history, workbook });
+        controller?.activate('pen-red');
+        const input = host.querySelector<SVGSVGElement>('.fc-mac-ink__input');
+        if (!input) throw new Error('missing Mac ink input layer');
+        firePointer(input, 'pointerdown', { clientX: 48, clientY: 30 });
+        firePointer(input, 'pointermove', { clientX: 84, clientY: 42 });
+        firePointer(input, 'pointerup', { clientX: 84, clientY: 42 });
+
+        const pictures = workbook.listDrawingObjects(0).filter((object) => object.kind === 0);
+        expect(pictures).toHaveLength(1);
+        const item = store.getState().illustrations.illustrations[0] as
+          | (SessionIllustration & { macInk?: unknown; nativeObjectId?: number })
+          | undefined;
+        expect(item?.nativeObjectId).toBe(pictures[0]?.objectId);
+        expect(item?.macInk).toMatchObject({ tool: 'pen-red' });
+        expect(workbook.getImage(0, item?.nativeObjectId ?? 0)?.bytes.length).toBeGreaterThan(0);
+
+        const restored = await WorkbookHandle.loadBytes(workbook.save());
+        try {
+          expect(restored.listDrawingObjects(0).filter((object) => object.kind === 0)).toHaveLength(
+            1,
+          );
+        } finally {
+          restored.dispose();
+        }
+
+        history.undo();
+        expect(workbook.listDrawingObjects(0).filter((object) => object.kind === 0)).toHaveLength(
+          0,
+        );
+        expect(store.getState().illustrations.illustrations).toHaveLength(0);
+        history.redo();
+        const redone = store.getState().illustrations.illustrations[0] as
+          | (SessionIllustration & { macInk?: unknown })
+          | undefined;
+        expect(redone?.macInk).toMatchObject({ tool: 'pen-red' });
+
+        controller?.deactivate();
+        controller?.activate('eraser');
+        const stroke = host.querySelector<SVGPathElement>('[data-fc-mac-ink-id]');
+        if (!stroke) throw new Error('missing rendered ink stroke');
+        firePointer(stroke, 'pointerdown', { clientX: 48, clientY: 30 });
+        expect(workbook.listDrawingObjects(0).filter((object) => object.kind === 0)).toHaveLength(
+          0,
+        );
+      } finally {
+        workbook.dispose();
+      }
+    });
   });
 });

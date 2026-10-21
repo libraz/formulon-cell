@@ -464,10 +464,11 @@ export abstract class WorkbookHandleAnnotationsMethods {
     target: string,
     display = '',
     tooltip = '',
+    location = '',
   ): boolean {
     assertAlive(this);
     if (!this.capabilities.hyperlinks) return false;
-    const s = wb(this).addHyperlink(sheet, row, col, target, display, tooltip, '');
+    const s = wb(this).addHyperlink(sheet, row, col, target, display, tooltip, location);
     return s.ok;
   }
 

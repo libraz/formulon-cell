@@ -7,6 +7,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { subtractFromRangeValidations } from '../store/range-validations.js';
 import {
   rangesIntersect,
   selectionContainsAddr,
@@ -336,9 +337,15 @@ const clearPlannedFormats = (
       pending !== undefined &&
       selectionContainsAddr(selection, pending.addr) &&
       isCellWritable(state, pending.addr);
+    let rangeValidations = state.format.rangeValidations;
+    if (!visualOnly) {
+      for (const range of plan.ranges) {
+        rangeValidations = subtractFromRangeValidations(rangeValidations, range);
+      }
+    }
     return {
       ...state,
-      format: { ...state.format, formats },
+      format: { ...state.format, formats, rangeValidations },
       ui: { ...state.ui, ...(pendingSelected ? { pendingFormat: null } : {}) },
     };
   });
@@ -354,6 +361,8 @@ const clearPlannedHyperlinks = (store: SpreadsheetStore, plan: SelectionClearPla
       if (!current || !addr || !isCellWritable(state, addr)) continue;
       const {
         hyperlink: _hyperlink,
+        hyperlinkLocation: _location,
+        hyperlinkSpan: _span,
         hyperlinkDisplay: _display,
         hyperlinkTooltip: _tooltip,
         ...next
