@@ -380,7 +380,11 @@ describe('attachGoToDialog', () => {
     );
     expect(css).toMatch(/\.fc-goto__radio\s*\{[\s\S]*?padding: 2px 4px;[\s\S]*?border-radius: 0;/);
     expect(css).toMatch(/\.fc-goto__radio:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
-    expect(css).toMatch(/\.fc-goto__value-filters\s*\{[\s\S]*?border-radius: 2px;/);
+    // The value-type checkboxes are one indented, unframed column under Formulas.
+    expect(css).toMatch(
+      /\.fc-goto__value-filters\s*\{[\s\S]*?padding: 0 0 0 20px;[\s\S]*?border: 0;/,
+    );
+    expect(css).toMatch(/\.fc-goto \.fc-goto__panel\s*\{[\s\S]*?height: auto;/);
     expect(css).toMatch(/\.fc-goto__check\s*\{[\s\S]*?padding: 2px 4px;[\s\S]*?border-radius: 0;/);
     expect(css).toMatch(/\.fc-goto__check:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
     expect(css).not.toContain('background: var(--fc-accent-soft');
