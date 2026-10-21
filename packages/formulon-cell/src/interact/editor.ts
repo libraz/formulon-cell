@@ -20,6 +20,7 @@ import {
   type AutocompleteHandle,
   type AutocompleteLabels,
   attachAutocomplete,
+  collectAutocompleteNames,
   pickListValues,
 } from './autocomplete.js';
 import {
@@ -763,6 +764,8 @@ export class InlineEditor {
       input,
       onAfterInsert: () => syncEditorRefs(this.deps.store, input.value),
       getTables: () => this.deps.wb.getTables(),
+      getNames: () =>
+        collectAutocompleteNames(this.deps.wb.definedNames(), this.deps.wb.getTables(), addr.sheet),
       editingAddr: addr,
       getColumnValues: (sheet, col, beforeRow) =>
         pickListValues(this.deps.wb.cells(sheet), col, beforeRow),

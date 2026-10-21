@@ -37,6 +37,30 @@ export interface AutocompleteTable {
   columns: string[];
 }
 
+/** A defined or table name offered next to function names. `detail` is the
+ *  secondary line (the name's refers-to text). */
+export interface AutocompleteName {
+  name: string;
+  detail: string;
+}
+
+/** Names usable from `sheetIndex`: workbook-scoped and that sheet's own names,
+ *  plus table names. Names scoped to another sheet are excluded. */
+export function collectAutocompleteNames(
+  definedNames: Iterable<{ name: string; formula: string; localSheetId: number }>,
+  tables: readonly AutocompleteTable[],
+  sheetIndex: number,
+): AutocompleteName[] {
+  const out: AutocompleteName[] = [];
+  for (const dn of definedNames) {
+    if (!dn.name.trim()) continue;
+    if (dn.localSheetId !== -1 && dn.localSheetId !== sheetIndex) continue;
+    out.push({ name: dn.name, detail: dn.formula.startsWith('=') ? dn.formula : `=${dn.formula}` });
+  }
+  for (const t of tables) out.push({ name: t.name, detail: t.columns.join(', ') });
+  return out;
+}
+
 export interface AutocompleteDeps {
   /** The textarea/input being edited. */
   input: HTMLInputElement | HTMLTextAreaElement;
@@ -46,6 +70,9 @@ export interface AutocompleteDeps {
   /** Snapshot of available tables for structured-ref completion. Returning
    *  `[]` (or omitting) disables the `Table[…` path; functions still complete. */
   getTables?: () => readonly AutocompleteTable[];
+  /** Defined and table names suggested alongside functions in formulas; build
+   *  the list with `collectAutocompleteNames`. Omit to disable. */
+  getNames?: () => readonly AutocompleteName[];
   /** Upper-cased custom function names to merge into the function-suggestion
    *  list. Pulled from `inst.formula.list()` so consumer registrations
    *  appear alongside the engine's built-ins. */
@@ -90,7 +117,10 @@ interface SuggestionContext {
    *  for refs and `${match}(` for functions. */
   insertSuffix: string;
   /** The kind drives display labels and badges. */
-  kind: 'function' | 'tableColumn' | 'column' | 'history';
+  kind: 'function' | 'tableColumn' | 'column' | 'history' | 'name';
+  /** Per-match kind and detail when the list mixes functions and names. */
+  kinds?: SuggestionContext['kind'][];
+  details?: string[];
 }
 
 interface AutocompleteItemButtonInput {
@@ -102,14 +132,19 @@ interface AutocompleteItemButtonInput {
 }
 
 function autocompleteBadgeText(kind: SuggestionContext['kind']): string {
+  if (kind === 'name') return 'nm';
   return kind === 'function' ? 'fx' : kind === 'tableColumn' ? 'tbl' : 'list';
 }
 
 function createAutocompleteItemButton(input: AutocompleteItemButtonInput): HTMLButtonElement {
   const item = createInteractionButton({
-    className: input.active
-      ? 'fc-autocomplete__item fc-autocomplete__item--active'
-      : 'fc-autocomplete__item',
+    className: [
+      'fc-autocomplete__item',
+      input.kind === 'name' ? 'fc-autocomplete__item--name' : '',
+      input.active ? 'fc-autocomplete__item--active' : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
     role: 'option',
     selected: input.active,
     tabIndex: -1,
@@ -190,18 +225,21 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     root.replaceChildren();
     for (let i = 0; i < ctx.matches.length; i += 1) {
       const pick = ctx.matches[i] ?? '';
+      const kind = ctx.kinds?.[i] ?? ctx.kind;
       let detail = labels.pickFromList;
-      if (ctx.kind === 'function') {
+      if (kind === 'name') {
+        detail = ctx.details?.[i] ?? '';
+      } else if (kind === 'function') {
         const canonical = deps.resolveFunctionName?.(pick) ?? pick.toLocaleUpperCase();
         const sig = FUNCTION_SIGNATURES[canonical] ?? deps.getCustomFunctionArgs?.(canonical);
         const separator = deps.getListSeparator?.() === ';' ? ';' : ',';
         detail = sig ? `${pick}(${sig.join(`${separator} `)})` : labels.customFunction;
-      } else if (ctx.kind === 'tableColumn') {
+      } else if (kind === 'tableColumn') {
         detail = labels.structuredTableColumn;
       }
       const item = createAutocompleteItemButton({
         id: `${rootId}-option-${i}`,
-        kind: ctx.kind,
+        kind,
         label: pick,
         detail,
         active: i === highlight,
@@ -254,7 +292,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     if (!pick) return false;
     const before = input.value.slice(0, ctx.tokenStart);
     const after = input.value.slice(ctx.tokenEnd);
-    const insert = `${pick}${ctx.insertSuffix}`;
+    const insert = ctx.kinds?.[highlight] === 'name' ? pick : `${pick}${ctx.insertSuffix}`;
     input.value = before + insert + after;
     const caret = before.length + insert.length;
     input.setSelectionRange(caret, caret);
@@ -301,7 +339,8 @@ function computeContext(
   const fnNames = displayNames ?? engineNames;
   const fn = suggestFunctions(text, caret, 8, fnNames ? { names: fnNames } : undefined);
   const custom = suggestCustomFunctions(text, caret, deps.getCustomFunctions?.() ?? []);
-  if (!fn && !custom) return null;
+  const names = suggestNames(text, caret, deps.getNames?.() ?? []);
+  if (!fn && !custom && !names) return null;
   // Merge custom names ahead of built-ins so user code surfaces first.
   const seen = new Set<string>();
   const merged: string[] = [];
@@ -315,7 +354,24 @@ function computeContext(
     seen.add(n);
     merged.push(n);
   }
-  const tokenStart = fn?.tokenStart ?? custom?.tokenStart ?? caret;
+  const tokenStart = fn?.tokenStart ?? custom?.tokenStart ?? names?.tokenStart ?? caret;
+  if (names) {
+    // Functions and names share one alphabetical list, as the desktop app does.
+    const entries = [
+      ...merged.map((label) => ({ label, kind: 'function' as const, detail: '' })),
+      ...names.matches.map((n) => ({ label: n.name, kind: 'name' as const, detail: n.detail })),
+    ].sort((a, b) => compareCaseless(a.label, b.label));
+    const top = entries.slice(0, 8);
+    return {
+      matches: top.map((e) => e.label),
+      tokenStart,
+      tokenEnd: caret,
+      insertSuffix: '(',
+      kind: 'function',
+      kinds: top.map((e) => e.kind),
+      details: top.map((e) => e.detail),
+    };
+  }
   return {
     matches: merged.slice(0, 8),
     tokenStart,
@@ -413,6 +469,36 @@ function suggestCustomFunctions(
   const matches = names.filter((n) => n.toLocaleUpperCase().startsWith(upper)).slice(0, 8);
   if (matches.length === 0) return null;
   return { token, tokenStart, matches };
+}
+
+const compareCaseless = (a: string, b: string): number => {
+  const x = a.toLocaleLowerCase();
+  const y = b.toLocaleLowerCase();
+  return x < y ? -1 : x > y ? 1 : 0;
+};
+
+/** Filter defined/table names against the partial token at `caret`. The match
+ *  is a case-insensitive prefix, so Japanese names work the same way. */
+function suggestNames(
+  text: string,
+  caret: number,
+  names: readonly AutocompleteName[],
+): { tokenStart: number; matches: AutocompleteName[] } | null {
+  if (!text.startsWith('=') || names.length === 0) return null;
+  let i = caret - 1;
+  while (i >= 0 && /[\p{L}\p{N}_.\\]/u.test(text[i] ?? '')) i -= 1;
+  const tokenStart = i + 1;
+  const token = text.slice(tokenStart, caret);
+  if (token.length < 1 || !/^[\p{L}_\\]/u.test(token)) return null;
+  const upper = token.toLocaleUpperCase();
+  const seen = new Set<string>();
+  const matches = names.filter((n) => {
+    const key = n.name.toLocaleUpperCase();
+    if (!key.startsWith(upper) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return matches.length === 0 ? null : { tokenStart, matches };
 }
 
 const NAME_RE = /[A-Za-z_][A-Za-z0-9_]*$/;

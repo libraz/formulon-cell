@@ -1,7 +1,9 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import type { History } from '../commands/history.js';
 import {
   definedNameDisplayFormula,
   isValidDefinedName,
+  recordDefinedNamesChange,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
 import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
@@ -14,7 +16,14 @@ import { overlayPortalFor } from '../interact/overlay-portal.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { createHostButton } from './chrome-buttons.js';
-import { formatSelectionRef, lookupDefinedName, parseCellRef, parseRangeRef } from './ref-utils.js';
+import {
+  formatSelectionRef,
+  nameForRange,
+  rangeDefinedNames,
+  resolveAreaText,
+  type SheetRange,
+  splitAreas,
+} from './ref-utils.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
 
 interface AttachChromeSyncInput {
@@ -25,9 +34,13 @@ interface AttachChromeSyncInput {
   getSheetTabs: () => SheetTabsController | null;
   getStrings: () => Strings;
   getWb: () => WorkbookHandle;
+  /** Shared undo history; names defined from the box are recorded on it. */
+  getHistory?: () => History | null;
   grid: HTMLElement;
   host: HTMLElement;
   invalidate: () => void;
+  /** Surfaces a modal-style notice such as the invalid-reference message. */
+  onAlert?: (outcome: { severity: 'stop'; message: string }) => void;
   store: SpreadsheetStore;
   tag: HTMLInputElement;
   emitter: SpreadsheetEmitter;
@@ -97,10 +110,12 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     getFormulaEditing,
     getSheetTabs,
     getStrings,
+    getHistory,
     getWb,
     grid,
     host,
     invalidate,
+    onAlert,
     store,
     tag,
   } = input;
@@ -122,10 +137,14 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   grid.setAttribute('aria-colcount', String(MAX_COL + 1));
   grid.setAttribute('aria-multiselectable', 'true');
 
-  const updateChrome = (): void => {
-    const wb = getWb();
+  /** The address, or the defined name when the selection is exactly a named range. */
+  const nameBoxText = (ref: string): string => {
     const s = store.getState();
-    host.dataset.fcWorkbookView = s.ui.workbookView;
+    if (s.selection.extraRanges?.length) return ref;
+    return nameForRange(getWb(), s.data.sheetIndex, s.selection.range) ?? ref;
+  };
+
+  const selectionRef = (s: State): string => {
     const a = s.selection.active;
     const range = s.selection.range;
     const merge = s.merges.byAnchor.get(`${a.sheet}:${a.row}:${a.col}`);
@@ -136,14 +155,22 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       merge.c0 === range.c0 &&
       merge.r1 === range.r1 &&
       merge.c1 === range.c1;
-    const ref = formatSelectionRef(
+    return formatSelectionRef(
       logicalCell ? { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col } : range,
       a,
       s.ui.r1c1 === true,
     );
+  };
+
+  const updateChrome = (): void => {
+    const wb = getWb();
+    const s = store.getState();
+    host.dataset.fcWorkbookView = s.ui.workbookView;
+    const a = s.selection.active;
+    const ref = selectionRef(s);
     // A selected chart or picture names itself and leaves the formula bar empty.
     const object = s.ui.selectedObject;
-    if (document.activeElement !== tag) tag.value = object ? object.name : ref;
+    if (document.activeElement !== tag) tag.value = object ? object.name : nameBoxText(ref);
     const display = cellDisplayText(s, wb, a);
     if (!getFormulaEditing()) fxInput.value = object ? '' : display;
     activeCellMirror.setAttribute('aria-rowindex', String(a.row + 1));
@@ -202,20 +229,6 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   };
 
   let nameMenu: HTMLDivElement | null = null;
-  const definedNameRows = (): { name: string; formula: string; localSheetId: number }[] => {
-    const activeSheet = store.getState().data.sheetIndex;
-    const rows = new Map<string, { name: string; formula: string; localSheetId: number }>();
-    for (const dn of getWb().definedNames()) {
-      if (!dn.name.trim() || !dn.formula.trim()) continue;
-      if (dn.localSheetId !== -1 && dn.localSheetId !== activeSheet) continue;
-      const key = dn.name.toLowerCase();
-      const existing = rows.get(key);
-      if (existing && existing.localSheetId === activeSheet) continue;
-      rows.set(key, { name: dn.name, formula: dn.formula, localSheetId: dn.localSheetId });
-    }
-    return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
-  };
-
   const closeNameMenu = (): void => {
     nameMenu?.remove();
     nameMenu = null;
@@ -223,53 +236,38 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     document.removeEventListener('keydown', onNameMenuDocKey, true);
   };
 
-  const resolveNameBoxRange = (
-    raw: string,
-    sheetIdx: number,
-  ): { sheet: number; r0: number; c0: number; r1: number; c1: number } | null => {
-    const asRange = (range: { r0: number; c0: number; r1: number; c1: number }) => ({
-      sheet: sheetIdx,
-      ...range,
-    });
-    const asCell = (cell: { row: number; col: number }) => ({
-      sheet: sheetIdx,
-      r0: cell.row,
-      c0: cell.col,
-      r1: cell.row,
-      c1: cell.col,
-    });
-    const range = parseRangeRef(raw);
-    if (range) return asRange(range);
-    const parsed = parseCellRef(raw);
-    if (parsed) return asCell(parsed);
-    const dn = lookupDefinedName(getWb(), raw.trim(), sheetIdx);
-    if (!dn) return null;
-    const subRange = parseRangeRef(dn);
-    if (subRange) return asRange(subRange);
-    const subCell = parseCellRef(dn);
-    return subCell ? asCell(subCell) : null;
+  const resolveNameBoxAreas = (raw: string): SheetRange[] | null => {
+    const wb = getWb();
+    const sheetIdx = store.getState().data.sheetIndex;
+    const areas: SheetRange[] = [];
+    for (const text of splitAreas(raw)) {
+      const area = resolveAreaText(wb, text, sheetIdx);
+      if (!area) return null;
+      areas.push(area);
+    }
+    const first = areas[0];
+    if (!first || areas.some((area) => area.sheet !== first.sheet)) return null;
+    return areas;
   };
 
   const applyNameBoxValue = (raw: string): boolean => {
-    const sheetIdx = store.getState().data.sheetIndex;
-    const range = resolveNameBoxRange(raw, sheetIdx);
-    if (!range) return false;
-    const collapsed = range.r0 === range.r1 && range.c0 === range.c1;
-    if (collapsed) {
-      mutators.setActive(store, {
-        sheet: sheetIdx,
-        row: range.r0,
-        col: range.c0,
-      });
+    const areas = resolveNameBoxAreas(raw);
+    const first = areas?.[0];
+    if (!areas || !first) return false;
+    const sheetIdx = first.sheet;
+    if (sheetIdx !== store.getState().data.sheetIndex) {
+      const tabs = getSheetTabs();
+      if (tabs) tabs.switchSheet(sheetIdx);
+      else mutators.setSheetIndex(store, sheetIdx);
+      if (store.getState().data.sheetIndex !== sheetIdx) return false;
+    }
+    if (areas.length === 1 && first.r0 === first.r1 && first.c0 === first.c1) {
+      mutators.setActive(store, { sheet: sheetIdx, row: first.r0, col: first.c0 });
     } else {
+      const start = { sheet: sheetIdx, row: first.r0, col: first.c0 };
       store.setState((s) => ({
         ...s,
-        selection: {
-          active: { sheet: sheetIdx, row: range.r0, col: range.c0 },
-          anchor: { sheet: sheetIdx, row: range.r0, col: range.c0 },
-          range,
-          extraRanges: [],
-        },
+        selection: { active: start, anchor: start, range: first, extraRanges: areas.slice(1) },
       }));
     }
     host.focus();
@@ -280,17 +278,24 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     if (!isValidDefinedName(raw)) return false;
     const wb = getWb();
     const state = store.getState();
-    const formula = selectionFormula(wb.sheetName(state.data.sheetIndex), state.selection.range);
-    const result = upsertDefinedName(wb, raw, formula);
+    const formula = selectionFormula(
+      wb.sheetName(state.selection.range.sheet),
+      state.selection.range,
+    );
+    const result = recordDefinedNamesChange(getHistory?.() ?? null, wb, () =>
+      upsertDefinedName(wb, raw, formula),
+    );
     if (!result.ok) return false;
     host.focus();
     return true;
   };
 
   const addNameBoxValue = (raw: string): boolean => {
+    const areas = resolveNameBoxAreas(raw);
+    const range = areas?.[0];
+    if (areas?.length !== 1 || !range) return false;
     const sheetIdx = store.getState().data.sheetIndex;
-    const range = resolveNameBoxRange(raw, sheetIdx);
-    if (!range) return false;
+    if (range.sheet !== sheetIdx) return false;
     const collapsed = range.r0 === range.r1 && range.c0 === range.c1;
     if (collapsed) {
       mutators.addExtraCell(store, { sheet: sheetIdx, row: range.r0, col: range.c0 });
@@ -298,6 +303,14 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       mutators.addExtraRange(store, range, { sheet: sheetIdx, row: range.r0, col: range.c0 });
     }
     return true;
+  };
+
+  /** Tell the user the entry is unusable, then put the box back as it was. */
+  const rejectNameBoxValue = (): void => {
+    onAlert?.({ severity: 'stop', message: getStrings().a11y.nameBoxInvalidReference });
+    tag.value = nameBoxText(selectionRef(store.getState()));
+    tag.focus();
+    tag.select();
   };
 
   function onNameMenuDocPointer(e: PointerEvent): void {
@@ -341,7 +354,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   }
 
   const openNameMenu = (): void => {
-    const rows = definedNameRows();
+    const rows = rangeDefinedNames(getWb(), store.getState().data.sheetIndex);
     closeNameMenu();
     const menu = document.createElement('div');
     menu.className = 'fc-namebox-menu';
@@ -399,7 +412,8 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     } else if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
-      if (!applyNameBoxValue(tag.value)) defineNameBoxValue(tag.value);
+      const raw = tag.value;
+      if (!applyNameBoxValue(raw) && !defineNameBoxValue(raw)) rejectNameBoxValue();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();

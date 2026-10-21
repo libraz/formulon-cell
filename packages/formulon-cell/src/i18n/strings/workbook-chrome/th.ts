@@ -95,6 +95,7 @@ export const workbookChromeTh: WorkbookChromeStrings = {
   },
   a11y: {
     nameBox: 'กล่องชื่อ',
+    nameBoxInvalidReference: 'การอ้างอิงหรือชื่อที่ป้อนไม่ถูกต้อง',
     formulaBar: 'แถบสูตร',
     cancelFormulaEdit: 'ยกเลิกการแก้ไขสูตร',
     enterFormula: 'ป้อนสูตร',

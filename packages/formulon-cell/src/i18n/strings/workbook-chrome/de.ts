@@ -96,6 +96,7 @@ export const workbookChromeDe: WorkbookChromeStrings = {
   },
   a11y: {
     nameBox: 'Namensfeld',
+    nameBoxInvalidReference: 'Der eingegebene Bezug oder Name ist ungültig.',
     formulaBar: 'Bearbeitungsleiste',
     cancelFormulaEdit: 'Formelbearbeitung abbrechen',
     enterFormula: 'Formel eingeben',

@@ -99,6 +99,7 @@ export interface WorkbookChromeStrings {
   };
   a11y: {
     nameBox: string;
+    nameBoxInvalidReference: string;
     formulaBar: string;
     cancelFormulaEdit: string;
     enterFormula: string;

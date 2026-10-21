@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   attachAutocomplete,
+  collectAutocompleteNames,
   pickListValues,
   suggestColumnHistory,
   suggestStructuredRef,
@@ -276,5 +277,57 @@ describe('attachAutocomplete labels', () => {
     );
     expect(css).not.toContain('text-transform: uppercase');
     expect(css).not.toContain('box-shadow: var(--fc-shadow-8)');
+  });
+});
+
+describe('attachAutocomplete defined names', () => {
+  const setup = (value: string, names: ReturnType<typeof collectAutocompleteNames>) => {
+    const input = document.createElement('textarea');
+    input.value = value;
+    document.body.appendChild(input);
+    input.setSelectionRange(value.length, value.length);
+    const handle = attachAutocomplete({
+      input,
+      getNames: () => names,
+      getFunctionNames: () => ['SUMIF', 'SUM'],
+    });
+    handle.refresh();
+    return { input, handle };
+  };
+
+  it('scopes names to the sheet and includes table names', () => {
+    const names = collectAutocompleteNames(
+      [
+        { name: 'SumRate', formula: 'Sheet1!$A$1', localSheetId: -1 },
+        { name: 'SumLocal', formula: 'Sheet1!$A$2', localSheetId: 0 },
+        { name: 'SumOther', formula: 'Sheet2!$A$1', localSheetId: 1 },
+      ],
+      [{ name: 'SumTable', columns: ['a'] }],
+      0,
+    );
+    expect(names.map((n) => n.name)).toEqual(['SumRate', 'SumLocal', 'SumTable']);
+  });
+
+  it('lists names with functions alphabetically and inserts the bare name', () => {
+    const { input, handle } = setup('=su', [{ name: 'SumRate', detail: '=Sheet1!$A$1' }]);
+    const items = [...document.querySelectorAll<HTMLElement>('.fc-autocomplete__item')];
+    expect(items.map((i) => i.querySelector('.fc-autocomplete__name')?.textContent)).toEqual([
+      'SUM',
+      'SUMIF',
+      'SumRate',
+    ]);
+    expect(items[2]?.classList.contains('fc-autocomplete__item--name')).toBe(true);
+    handle.move(-1);
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=SumRate');
+    handle.detach();
+    input.remove();
+  });
+
+  it('matches Japanese names by prefix', () => {
+    const { input, handle } = setup('=売', [{ name: '売上', detail: '=Sheet1!$A$1' }]);
+    expect(document.querySelector('.fc-autocomplete__name')?.textContent).toBe('売上');
+    handle.detach();
+    input.remove();
   });
 });

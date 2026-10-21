@@ -95,6 +95,7 @@ export const workbookChromeJa: WorkbookChromeStrings = {
   },
   a11y: {
     nameBox: '名前ボックス',
+    nameBoxInvalidReference: '参照または名前が正しくありません。',
     formulaBar: '数式バー',
     cancelFormulaEdit: '数式の編集をキャンセル',
     enterFormula: '数式を入力',

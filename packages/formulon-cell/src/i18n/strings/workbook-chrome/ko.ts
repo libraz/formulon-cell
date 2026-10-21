@@ -96,6 +96,7 @@ export const workbookChromeKo: WorkbookChromeStrings = {
   },
   a11y: {
     nameBox: '이름 상자',
+    nameBoxInvalidReference: '입력한 참조 또는 이름이 올바르지 않습니다.',
     formulaBar: '수식 입력줄',
     cancelFormulaEdit: '수식 편집 취소',
     enterFormula: '수식 입력',

@@ -57,6 +57,150 @@ export function lookupDefinedName(
   return workbookScoped;
 }
 
+export interface SheetRange {
+  sheet: number;
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
+}
+
+/** Split `Sheet2!A1` / `'My Sheet'!A1` into the unquoted sheet name and the
+ *  remaining reference. `sheet` is null when there is no qualifier. */
+export function splitSheetQualifier(text: string): { sheet: string | null; ref: string } {
+  const t = text.trim();
+  if (t.startsWith("'")) {
+    let i = 1;
+    while (i < t.length) {
+      if (t[i] === "'") {
+        if (t[i + 1] === "'") i += 2;
+        else break;
+      } else i += 1;
+    }
+    if (t[i + 1] === '!') {
+      return { sheet: t.slice(1, i).replace(/''/g, "'"), ref: t.slice(i + 2) };
+    }
+    return { sheet: null, ref: t };
+  }
+  const bang = t.indexOf('!');
+  if (bang < 0) return { sheet: null, ref: t };
+  return { sheet: t.slice(0, bang), ref: t.slice(bang + 1) };
+}
+
+/** Split `A1,C3:D4` on commas that sit outside a quoted sheet name. */
+export function splitAreas(raw: string): string[] {
+  const out: string[] = [];
+  let quoted = false;
+  let start = 0;
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (ch === "'") quoted = !quoted;
+    else if (ch === ',' && !quoted) {
+      out.push(raw.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(raw.slice(start));
+  return out;
+}
+
+function sheetIndexByName(wb: WorkbookHandle, name: string): number | null {
+  const q = name.toLowerCase();
+  for (let i = 0; i < wb.sheetCount; i += 1) {
+    if (wb.sheetName(i).toLowerCase() === q) return i;
+  }
+  return null;
+}
+
+/** Resolve a (possibly sheet-qualified) cell or range reference. Unqualified
+ *  references land on `fallbackSheet`. Names are not followed. */
+export function resolveRangeText(
+  wb: WorkbookHandle,
+  text: string,
+  fallbackSheet: number,
+): SheetRange | null {
+  const { sheet: sheetName, ref } = splitSheetQualifier(text.replace(/^=/, ''));
+  const sheet = sheetName === null ? fallbackSheet : sheetIndexByName(wb, sheetName);
+  if (sheet === null) return null;
+  const clean = ref.replace(/\$/g, '');
+  const range = parseRangeRef(clean);
+  if (range) return { sheet, ...range };
+  const cell = parseCellRef(clean);
+  return cell ? { sheet, r0: cell.row, c0: cell.col, r1: cell.row, c1: cell.col } : null;
+}
+
+/** Defined names visible from `sheetIndex` (workbook scope plus that sheet's
+ *  own), each with the range it refers to; names that do not refer to a plain
+ *  range (constants, formulas) are left out. Sorted case-insensitively. */
+export function rangeDefinedNames(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+): { name: string; formula: string; localSheetId: number; range: SheetRange }[] {
+  const byKey = new Map<
+    string,
+    { name: string; formula: string; localSheetId: number; range: SheetRange }
+  >();
+  for (const dn of wb.definedNames()) {
+    if (!dn.name.trim() || !dn.formula.trim()) continue;
+    if (dn.localSheetId !== -1 && dn.localSheetId !== sheetIndex) continue;
+    const range = resolveRangeText(wb, dn.formula, sheetIndex);
+    if (!range) continue;
+    const key = dn.name.toLowerCase();
+    const existing = byKey.get(key);
+    // A name scoped to the active sheet shadows a workbook-scoped twin.
+    if (existing && existing.localSheetId === sheetIndex) continue;
+    byKey.set(key, { name: dn.name, formula: dn.formula, localSheetId: dn.localSheetId, range });
+  }
+  return [...byKey.values()].sort((a, b) =>
+    a.name.toLowerCase() < b.name.toLowerCase()
+      ? -1
+      : a.name.toLowerCase() > b.name.toLowerCase()
+        ? 1
+        : 0,
+  );
+}
+
+/** Name shown in the Name Box for a selection that matches a named range
+ *  exactly: a sheet-scoped name first, then the first workbook name in sorted
+ *  order. */
+export function nameForRange(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+  range: SheetRange,
+): string | null {
+  let workbookName: string | null = null;
+  for (const dn of rangeDefinedNames(wb, sheetIndex)) {
+    const r = dn.range;
+    if (
+      r.sheet !== range.sheet ||
+      r.r0 !== range.r0 ||
+      r.c0 !== range.c0 ||
+      r.r1 !== range.r1 ||
+      r.c1 !== range.c1
+    ) {
+      continue;
+    }
+    if (dn.localSheetId === sheetIndex) return dn.name;
+    workbookName ??= dn.name;
+  }
+  return workbookName;
+}
+
+/** Resolve one Name Box area: a defined name, then a (sheet-qualified)
+ *  reference. Names win over column-like text such as `TAX`. */
+export function resolveAreaText(
+  wb: WorkbookHandle,
+  text: string,
+  sheetIndex: number,
+): SheetRange | null {
+  const t = text.trim();
+  if (!t) return null;
+  const q = t.toLowerCase();
+  const named = rangeDefinedNames(wb, sheetIndex).find((dn) => dn.name.toLowerCase() === q);
+  if (named) return named.range;
+  return resolveRangeText(wb, t, sheetIndex);
+}
+
 export function parseCellRef(raw: string): { row: number; col: number } | null {
   const trimmed = raw.trim().toUpperCase();
   // R1C1 form: e.g. "R5C2"

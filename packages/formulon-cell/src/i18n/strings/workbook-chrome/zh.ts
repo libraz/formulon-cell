@@ -95,6 +95,7 @@ export const workbookChromeZh: WorkbookChromeStrings = {
   },
   a11y: {
     nameBox: '名称框',
+    nameBoxInvalidReference: '您输入的引用或名称无效。',
     formulaBar: '编辑栏',
     cancelFormulaEdit: '取消编辑公式',
     enterFormula: '输入公式',

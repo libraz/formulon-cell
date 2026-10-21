@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
+import { History } from '../../../src/commands/history.js';
+import { SpreadsheetEmitter } from '../../../src/events.js';
+import { defaultStrings } from '../../../src/i18n/strings.js';
+import { attachChromeSync } from '../../../src/mount/chrome-sync.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
 
@@ -468,6 +471,140 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     }
 
     expect(calls).toEqual([]);
+  });
+
+  const stubNames = (entries: { name: string; formula: string; localSheetId: number }[]): void => {
+    const wb = sheet.workbook as unknown as { definedNames: () => Iterable<unknown> };
+    wb.definedNames = function* () {
+      yield* entries;
+    };
+  };
+  /** A second chrome-sync bound to its own name box, so the mounted one stays out of the way. */
+  const standaloneChrome = (
+    extra: Partial<Parameters<typeof attachChromeSync>[0]>,
+  ): { controller: ReturnType<typeof attachChromeSync>; ownTag: HTMLInputElement } => {
+    const ownTag = document.createElement('input');
+    document.body.appendChild(ownTag);
+    const controller = attachChromeSync({
+      a11y: document.createElement('div'),
+      a11yLive: document.createElement('div'),
+      emitter: new SpreadsheetEmitter(),
+      fxInput: document.createElement('textarea'),
+      getFormulaEditing: () => false,
+      getSheetTabs: () => null,
+      getStrings: () => defaultStrings,
+      getWb: () => sheet.workbook,
+      grid: document.createElement('div'),
+      host: sheet.host,
+      invalidate: () => {},
+      store: sheet.instance.store,
+      tag: ownTag,
+      ...extra,
+    });
+    return { controller, ownTag };
+  };
+  const pressEnter = (value: string, target: HTMLInputElement = tag): void => {
+    target.focus();
+    target.value = value;
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  };
+
+  it('Enter on a cross-sheet name switches sheet and selects its range', () => {
+    sheet.workbook.addSheet('My Sheet');
+    stubNames([{ name: 'Remote', formula: "'My Sheet'!$A$1:$B$3", localSheetId: -1 }]);
+    pressEnter('remote');
+    const state = sheet.instance.store.getState();
+    expect(state.data.sheetIndex).toBe(1);
+    expect(state.selection.range).toEqual({ sheet: 1, r0: 0, c0: 0, r1: 2, c1: 1 });
+  });
+
+  it('Enter on a sheet-qualified address jumps to that sheet', () => {
+    sheet.workbook.addSheet('Sheet2');
+    pressEnter('sheet2!B4');
+    const state = sheet.instance.store.getState();
+    expect(state.data.sheetIndex).toBe(1);
+    expect(state.selection.active).toEqual({ sheet: 1, row: 3, col: 1 });
+  });
+
+  it('Enter on a multi-area entry fills extraRanges and activates the first cell', () => {
+    pressEnter('A1,C3:D4');
+    const sel = sheet.instance.store.getState().selection;
+    expect(sel.active).toEqual({ sheet: 0, row: 0, col: 0 });
+    expect(sel.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    expect(sel.extraRanges).toEqual([{ sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 }]);
+  });
+
+  it('shows the name when the selection exactly matches a named range', () => {
+    stubNames([
+      { name: 'Zeta', formula: 'Sheet1!$A$1:$B$2', localSheetId: -1 },
+      { name: 'alpha', formula: 'Sheet1!$A$1:$B$2', localSheetId: -1 },
+      { name: 'Scoped', formula: 'Sheet1!$A$1:$B$2', localSheetId: 0 },
+    ]);
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    expect(tag.value).toBe('Scoped');
+    stubNames([
+      { name: 'Zeta', formula: 'Sheet1!$A$1:$B$2', localSheetId: -1 },
+      { name: 'alpha', formula: 'Sheet1!$A$1:$B$2', localSheetId: -1 },
+    ]);
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    expect(tag.value).toBe('alpha');
+  });
+
+  it('the dropdown lists only range names, sorted case-insensitively', () => {
+    stubNames([
+      { name: 'beta', formula: 'Sheet1!$A$1', localSheetId: -1 },
+      { name: 'Tax', formula: '0.08', localSheetId: -1 },
+      { name: 'Calc', formula: 'SUM(Sheet1!$A$1:$A$3)', localSheetId: -1 },
+      { name: 'Alpha', formula: 'Sheet1!$B$1', localSheetId: -1 },
+    ]);
+    tag.focus();
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', bubbles: true }));
+    const items = [...document.querySelectorAll('.fc-namebox-menu [role="option"]')];
+    expect(items.map((el) => el.textContent)).toEqual(['Alpha', 'beta']);
+  });
+
+  it('Enter with an unusable entry alerts, restores the box and keeps focus', () => {
+    const alerts: string[] = [];
+    const { controller, ownTag } = standaloneChrome({
+      getStrings: () =>
+        ({ a11y: { nameBox: 'Name box', nameBoxInvalidReference: 'bad ref' } }) as never,
+      onAlert: (o) => alerts.push(o.message),
+    });
+    pressEnter('Sheet9!A1', ownTag);
+    expect(alerts).toEqual(['bad ref']);
+    expect(ownTag.value).toBe('A1');
+    expect(document.activeElement).toBe(ownTag);
+    controller.detach();
+    ownTag.remove();
+  });
+
+  it('defining a name from the box is undoable', () => {
+    Object.defineProperty(sheet.workbook, 'capabilities', {
+      configurable: true,
+      value: { ...sheet.workbook.capabilities, definedNameMutate: true },
+    });
+    const store = new Map<string, string>();
+    const wb = sheet.workbook as unknown as {
+      setDefinedNameEntry(name: string, formula: string): boolean;
+      definedNames: () => Iterable<unknown>;
+    };
+    wb.setDefinedNameEntry = (name, formula) => {
+      if (formula) store.set(name, formula);
+      else store.delete(name);
+      return true;
+    };
+    wb.definedNames = function* () {
+      for (const [name, formula] of store) yield { name, formula, localSheetId: -1 };
+    };
+    const history = new History();
+    const { controller, ownTag } = standaloneChrome({ getHistory: () => history });
+    pressEnter('Fresh', ownTag);
+    expect(store.get('Fresh')).toBe('=Sheet1!$A$1');
+    history.undo();
+    expect(store.has('Fresh')).toBe(false);
+    controller.detach();
+    ownTag.remove();
   });
 
   it('Enter on garbage input leaves the selection alone', () => {

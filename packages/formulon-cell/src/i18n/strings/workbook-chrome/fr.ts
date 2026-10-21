@@ -96,6 +96,7 @@ export const workbookChromeFr: WorkbookChromeStrings = {
   },
   a11y: {
     nameBox: 'Zone Nom',
+    nameBoxInvalidReference: "La référence ou le nom saisi n'est pas valide.",
     formulaBar: 'Barre de formule',
     cancelFormulaEdit: 'Annuler la modification de la formule',
     enterFormula: 'Entrer une formule',

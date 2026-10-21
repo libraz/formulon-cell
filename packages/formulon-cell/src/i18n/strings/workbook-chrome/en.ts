@@ -95,6 +95,7 @@ export const workbookChromeEn: WorkbookChromeStrings = {
   },
   a11y: {
     nameBox: 'Name box',
+    nameBoxInvalidReference: 'The reference or name you entered is not valid.',
     formulaBar: 'Formula bar',
     cancelFormulaEdit: 'Cancel formula edit',
     enterFormula: 'Enter formula',
