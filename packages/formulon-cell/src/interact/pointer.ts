@@ -36,6 +36,7 @@ import {
 } from '../render/geometry.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
 import { getOutlineToggleHits } from '../render/grid.js';
+import { renderScale } from '../store/render-scale.js';
 import {
   isWholeColumnRange,
   isWholeRowRange,
@@ -689,14 +690,15 @@ export function attachPointer(
         return;
       }
       case 'col-resize': {
+        // Screen px → canonical px; the mutator snaps and clamps.
         const w = drag.rtl ? drag.leadingEdge - x : x - drag.leadingEdge;
-        mutators.setColWidth(store, drag.col, w);
+        mutators.setColWidth(store, drag.col, Math.round(w) / renderScale(s.layout, s.viewport));
         host.style.cursor = 'col-resize';
         return;
       }
       case 'row-resize': {
         const h = y - drag.topEdge;
-        mutators.setRowHeight(store, drag.row, h);
+        mutators.setRowHeight(store, drag.row, Math.round(h) / renderScale(s.layout, s.viewport));
         host.style.cursor = 'row-resize';
         return;
       }

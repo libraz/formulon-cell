@@ -1,4 +1,5 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { navigationPolicyFor } from './navigation-policy.js';
 
@@ -50,8 +51,10 @@ export function attachWheel(deps: WheelDeps): () => void {
     }
     const state = store.getState();
     const layout = state.layout;
-    const rh = Math.max(1, layout.defaultRowHeight);
-    const cw = Math.max(1, layout.defaultColWidth);
+    // Step thresholds are screen px, matching the wheel delta.
+    const scale = renderScale(layout, state.viewport);
+    const rh = Math.max(1, layout.defaultRowHeight * scale);
+    const cw = Math.max(1, layout.defaultColWidth * scale);
     // A right-to-left sheet advances its columns leftwards, so a rightward
     // scroll gesture has to walk the column index backwards.
     const dirX = state.ui.rightToLeft === true ? -1 : 1;
