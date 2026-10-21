@@ -9,8 +9,10 @@ import {
 import type { Addr, PhoneticRun, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { KanaForm } from '../format/kana.js';
+import { formatWithPending } from '../store/pending-format.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { applySelectionFormatPatchWhere } from './format.js';
 
 /** The guide's readings run together, which is what a single-field editor
  *  shows and what OOXML's whole-cell form carries. */
@@ -48,7 +50,17 @@ export function setPhoneticReading(
   const format = store.getState().format.formats.get(addrKey(addr));
   writePhoneticProperties(wb, addr, { phonetic, phoneticProperties: format?.phoneticProperties });
   mutators.setCellFormat(store, addr, { phonetic });
+  if (phonetic) showPhoneticOn(store, wb, addr);
   return true;
+}
+
+/** Editing a reading shows the guide, as the desktop spreadsheet does. A
+ *  formula cell cannot hold the flag, so it is left as it is. */
+function showPhoneticOn(store: SpreadsheetStore, wb: WorkbookHandle, addr: Addr): void {
+  if (!wb.capabilities.showPhonetic) return;
+  if (store.getState().data.cells.get(addrKey(addr))?.formula != null) return;
+  if (!wb.setCellShowPhonetic(addr.sheet, addr.row, addr.col, true)) return;
+  mutators.setCellFormat(store, addr, { showPhonetic: true });
 }
 
 /** Prefer the engine's own view of the guide it just stored. An engine with no
@@ -112,4 +124,26 @@ export function setPhoneticSettings(
     changed++;
   }
   return changed;
+}
+
+/** Whether Show Phonetic is on for `addr`, pending format included. */
+export const showPhoneticAt = (store: SpreadsheetStore, addr: Addr): boolean =>
+  formatWithPending(store.getState(), addr)?.showPhonetic === true;
+
+/**
+ * Toggle Show Phonetic over the selection. The active cell decides the
+ * direction, as in the desktop spreadsheet, and the flag lands on constants
+ * and blanks only: the engine drops it on formula cells. Returns false when
+ * nothing changed.
+ */
+export function toggleShowPhonetic(store: SpreadsheetStore, wb: WorkbookHandle | null): boolean {
+  if (wb && !wb.capabilities.showPhonetic) return false;
+  const state = store.getState();
+  const show = !showPhoneticAt(store, state.selection.active);
+  return applySelectionFormatPatchWhere(
+    state,
+    store,
+    { showPhonetic: show },
+    (addr) => state.data.cells.get(addrKey(addr))?.formula == null,
+  );
 }

@@ -65,7 +65,9 @@ const makeFake = (
     getCellPhoneticRuns: () => RUNS,
     setCellPhoneticRuns: () => true,
     getCellPhoneticProperties: (s: number, r: number, c: number) =>
-      stored.get(`${s}:${r}:${c}`) ?? { fontId: 0, type: 0, alignment: 0 },
+      stored.has(`${s}:${r}:${c}`)
+        ? { ...stored.get(`${s}:${r}:${c}`), present: true }
+        : { fontId: 0, type: 0, alignment: 0, present: false },
     setCellPhoneticProperties(s: number, r: number, c: number, properties: PhoneticProperties) {
       writes.push({ addr: `${s}:${r}:${c}`, properties });
       stored.set(`${s}:${r}:${c}`, properties);
@@ -119,11 +121,20 @@ describe('engine/cell-format-sync — phonetic properties', () => {
     expect(writes).toEqual([]);
   });
 
-  it('hydrates stored properties and treats the all-zero triple as unset', () => {
+  it('hydrates stored properties and treats an absent element as unset', () => {
     const stored = new Map([['0:0:0', FULL_LEFT]]);
     const store = createSpreadsheetStore();
     hydrateCellFormatsFromEngine(makeFake({ stored }).wb, store, 0);
     expect(store.getState().format.formats.get(addrKey(A1))?.phoneticProperties).toEqual(FULL_LEFT);
+
+    const zero = createSpreadsheetStore();
+    const explicit = new Map([['0:0:0', { fontId: 0, type: 0, alignment: 0 }]]);
+    hydrateCellFormatsFromEngine(makeFake({ stored: explicit }).wb, zero, 0);
+    expect(zero.getState().format.formats.get(addrKey(A1))?.phoneticProperties).toEqual({
+      fontId: 0,
+      type: 0,
+      alignment: 0,
+    });
 
     const blank = createSpreadsheetStore();
     hydrateCellFormatsFromEngine(makeFake().wb, blank, 0);
@@ -193,7 +204,12 @@ describe('new phonetic guides', () => {
     wb.setText(addr, '漢字');
     mutators.replaceCells(store, wb.cells(0));
     expect(setPhoneticReading(store, wb, addr, 'カンジ', '')).toBe(true);
-    expect(wb.getCellPhoneticProperties(0, 0, 0)).toEqual({ fontId: 0, type: 1, alignment: 1 });
+    expect(wb.getCellPhoneticProperties(0, 0, 0)).toEqual({
+      fontId: 0,
+      type: 1,
+      alignment: 1,
+      present: true,
+    });
     wb.dispose();
   });
 });

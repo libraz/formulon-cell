@@ -1,6 +1,7 @@
 import { parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
+import { phoneticGuideSize } from '../engine/phonetic-sync.js';
 /** Content-fit column widths and row heights. Every autofit entry point — header
  *  double-click, the structure commands, the ribbon AutoFit items and the
  *  public `autofitColWidth` / `autofitRowHeight` helpers — measures here.
@@ -122,7 +123,12 @@ export function computeAutofitRowHeight(
       locale,
       format?.indent,
     );
-    const height = Math.ceil(lines * lineHeight + 8);
+    // A shown phonetic guide sits above the first line and needs room of its own.
+    const guide =
+      format?.showPhonetic && format.phonetic?.length && !formulaDisplay
+        ? phoneticGuideSize(font.size)
+        : 0;
+    const height = Math.ceil(lines * lineHeight + 8 + guide);
     if (height > max) max = height;
   }
 

@@ -87,6 +87,7 @@ export interface DynamicDropdownsCtx {
   ) => void;
   applyClearAction: (action: string) => void | Promise<void>;
   applyUnderlineAction: (action: string) => void | Promise<void>;
+  applyPhoneticAction: (action: string) => void | Promise<void>;
   applyWrapAction: (action: string) => void | Promise<void>;
   applyMergeAction: (action: string) => void;
   applyFreezeAction: (action: string) => void;
@@ -174,6 +175,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'fill',
   'clear',
   'underline-action',
+  'phonetic-action',
   'wrap-action',
   'merge-action',
   'freeze',
@@ -645,6 +647,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     },
     { attr: 'clear', handler: (v) => ctx.applyClearAction(v) },
     { attr: 'underline-action', handler: (v) => ctx.applyUnderlineAction(v) },
+    { attr: 'phonetic-action', handler: (v) => ctx.applyPhoneticAction(v) },
     { attr: 'wrap-action', handler: (v) => ctx.applyWrapAction(v) },
     { attr: 'merge-action', handler: (v) => ctx.applyMergeAction(v) },
     { attr: 'freeze', handler: (v) => ctx.applyFreezeAction(v) },

@@ -761,8 +761,7 @@ const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => 
           commands: current.commands.map((candidate) => macHomeCommand(candidate, lang)),
         };
       }
-      const isPhonetic = (id: string): boolean =>
-        id === 'editPhonetic' || id === 'phoneticSettings';
+      const isPhonetic = (id: string): boolean => id === 'showPhonetic';
       const phonetic = current.commands.filter((candidate) => isPhonetic(candidate.id));
       return {
         ...current,

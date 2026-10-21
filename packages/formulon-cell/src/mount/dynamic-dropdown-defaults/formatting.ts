@@ -1,4 +1,5 @@
 import { applySelectionFormatPatch, withSelectionFormatOrigin } from '../../commands/format.js';
+import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import {
   recordRepeatableFormatChange,
   type SpreadsheetInstance,
@@ -7,6 +8,7 @@ import {
 } from '../../index.js';
 import { formatWithPending } from '../../store/pending-format.js';
 import { applyMergeAction } from '../../toolbar/merge-action.js';
+import { openPhoneticEditor, openPhoneticSettings } from '../../toolbar/phonetic-actions.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 
 const buildUnderlineAction =
@@ -21,6 +23,28 @@ const buildUnderlineAction =
       );
     });
     instance.host.focus();
+  };
+
+const buildPhoneticAction =
+  (
+    instance: SpreadsheetInstance,
+    env: { refreshCells: () => void; focusSheet: () => void },
+  ): DynamicDropdownsCtx['applyPhoneticAction'] =>
+  (action) => {
+    const phonetic = { inst: instance, text: instance.i18n.strings.ribbon, ...env };
+    if (action === 'edit') openPhoneticEditor(phonetic);
+    else if (action === 'settings') openPhoneticSettings(phonetic);
+    else if (action === 'show') {
+      recordRepeatableFormatChange(instance.history, instance.store, () => {
+        withSelectionFormatOrigin(
+          instance.store,
+          'ribbon',
+          () => toggleShowPhonetic(instance.store, instance.workbook),
+          'showPhonetic',
+        );
+      });
+      env.focusSheet();
+    }
   };
 
 const buildWrapAction =
@@ -159,6 +183,7 @@ const updateCurrencyMenu =
 type FormattingDropdownDefaults = Pick<
   DynamicDropdownsCtx,
   | 'applyUnderlineAction'
+  | 'applyPhoneticAction'
   | 'applyWrapAction'
   | 'applyMergeAction'
   | 'applyTextOrientationAction'
@@ -170,9 +195,11 @@ type FormattingDropdownDefaults = Pick<
 
 export function createFormattingDropdownDefaults(
   instance: SpreadsheetInstance,
+  env: { refreshCells: () => void; focusSheet: () => void },
 ): FormattingDropdownDefaults {
   return {
     applyUnderlineAction: buildUnderlineAction(instance),
+    applyPhoneticAction: buildPhoneticAction(instance, env),
     applyWrapAction: buildWrapAction(instance),
     applyMergeAction: buildMergeAction(instance),
     applyTextOrientationAction: buildTextOrientation(instance),

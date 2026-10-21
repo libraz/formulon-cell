@@ -1,5 +1,9 @@
 import { formatNumber } from '../../commands/format.js';
-import { phoneticAlignment, phoneticKanaForm } from '../../engine/phonetic-sync.js';
+import {
+  phoneticAlignment,
+  phoneticGuideSize,
+  phoneticKanaForm,
+} from '../../engine/phonetic-sync.js';
 import { formatCell, formatScientificNumber } from '../../engine/value.js';
 import { convertKana } from '../../format/kana.js';
 import { normalizeFormatLocale } from '../../format/locale.js';
@@ -501,7 +505,8 @@ export function paintCellText({
   // whole-cell reading an engine without a per-run surface reports, or a guide
   // left over from a longer value — sits over the whole text instead.
   // `phoneticProperties` picks the kana form and the alignment over the span.
-  if (format?.phonetic?.length && !isFormulaDisplay) {
+  // The guide is drawn only while Show Phonetic is on for the cell.
+  if (format?.showPhonetic && format.phonetic?.length && !isFormulaDisplay) {
     const textLeft =
       align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
     const spans = format.phonetic.map((run) => {
@@ -513,7 +518,7 @@ export function paintCellText({
     });
     const kana = phoneticKanaForm(format.phoneticProperties);
     const alignment = phoneticAlignment(format.phoneticProperties);
-    const phoneticSize = Math.max(6, Math.round(drawFontSize * 0.52));
+    const phoneticSize = phoneticGuideSize(drawFontSize);
     ctx.save();
     ctx.font = cellFontCss(font, phoneticSize);
     ctx.textBaseline = 'alphabetic';

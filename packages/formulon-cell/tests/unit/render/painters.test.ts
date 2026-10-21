@@ -497,12 +497,30 @@ describe('paintCellText font strictness', () => {
       formula: null,
       isActive: false,
       isInRange: false,
-      format: { phonetic: [{ start: 0, end: 2, text: 'かんじ' }] },
+      format: { showPhonetic: true, phonetic: [{ start: 0, end: 2, text: 'かんじ' }] },
     });
     expect(spy.fills.map((fill) => fill.text)).toEqual(['カンジ', '漢字']);
     expect(spy.fills[0]?.font).toContain('7px');
     expect(spy.fills[0]?.y).toBeLessThan(spy.fills[1]?.y ?? Infinity);
   });
+
+  it.each([undefined, false])(
+    'draws no phonetic guide while Show Phonetic is %s',
+    (showPhonetic) => {
+      const spy = makeTextSpy();
+      paintCellText({
+        ctx: spy.ctx,
+        bounds: { x: 0, y: 0, w: 100, h: 24 },
+        theme: theme({ textCell: 13 }),
+        value: { kind: 'text', value: '漢字' },
+        formula: null,
+        isActive: false,
+        isInRange: false,
+        format: { showPhonetic, phonetic: [{ start: 0, end: 2, text: 'かんじ' }] },
+      });
+      expect(spy.fills.map((fill) => fill.text)).toEqual(['漢字']);
+    },
+  );
 
   it('places each phonetic run over the span it annotates, in katakana by default', () => {
     const spy = makeTextSpy();
@@ -515,6 +533,7 @@ describe('paintCellText font strictness', () => {
       isActive: false,
       isInRange: false,
       format: {
+        showPhonetic: true,
         phonetic: [
           { start: 0, end: 2, text: 'とうきょう' },
           { start: 2, end: 3, text: 'と' },
@@ -541,12 +560,12 @@ describe('paintCellText font strictness', () => {
     paintCellText({
       ...base,
       ctx: spy.ctx,
-      format: { phonetic: [{ start: 0, end: 0, text: 'とうきょうと' }] },
+      format: { showPhonetic: true, phonetic: [{ start: 0, end: 0, text: 'とうきょうと' }] },
     });
     paintCellText({
       ...base,
       ctx: spanned.ctx,
-      format: { phonetic: [{ start: 0, end: 3, text: 'とうきょうと' }] },
+      format: { showPhonetic: true, phonetic: [{ start: 0, end: 3, text: 'とうきょうと' }] },
     });
     expect(spy.fills[0]?.x).toBe(spanned.fills[0]?.x);
   });

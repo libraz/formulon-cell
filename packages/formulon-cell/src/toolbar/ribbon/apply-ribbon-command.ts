@@ -14,12 +14,6 @@ import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { selectedSessionChart, switchSessionChartRowColumn } from '../../commands/chart-design.js';
 import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
-import {
-  phoneticReadingAt,
-  phoneticSettingsAt,
-  setPhoneticReading,
-  setPhoneticSettings,
-} from '../../commands/phonetic.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
 import { arrangeSessionChart } from '../../commands/session-chart.js';
@@ -43,11 +37,10 @@ import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
-import { showPhoneticSettingsDialog } from '../dialogs/phonetic-settings.js';
-import { showPrompt } from '../dialogs/prompt.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 import { applyMergeAction } from '../merge-action.js';
+import { openPhoneticEditor, openPhoneticSettings } from '../phonetic-actions.js';
 import { projectActiveState } from '../ribbon-active-state.js';
 import { FONT_SIZES, type ToolbarText } from '../ribbon-model.js';
 import {
@@ -222,7 +215,7 @@ const applyGenericRibbonCommand = (
       withSelectionFormatOrigin(
         store,
         'ribbon',
-        () => formatMutator(state, store),
+        () => formatMutator(state, store, i.workbook),
         policyCommandId,
       ),
     );
@@ -314,55 +307,22 @@ const applyGenericRibbonCommand = (
         ),
       );
       return true;
-    case 'editPhonetic': {
-      if (!i.workbook?.capabilities.phonetic) return true;
-      const addr = state.selection.active;
-      const initial = phoneticReadingAt(i.store, addr);
-      void showPrompt({
-        title: deps.text.phoneticDialogTitle,
-        label: deps.text.phoneticDialogLabel,
-        initial,
-        okLabel: deps.text.ok,
-        cancelLabel: deps.text.cancel,
-      }).then((phonetic) => {
-        const workbook = i.workbook;
-        if (phonetic === null || !workbook) return;
-        if (!setPhoneticReading(i.store, workbook, addr, phonetic, initial)) return;
-        runtime.refreshCells();
-        runtime.focusSheet();
+    case 'editPhonetic':
+      openPhoneticEditor({
+        inst: i,
+        text: deps.text,
+        refreshCells: runtime.refreshCells,
+        focusSheet: runtime.focusSheet,
       });
       return true;
-    }
-    case 'phoneticSettings': {
-      const workbook = i.workbook;
-      if (!workbook?.capabilities.phoneticProperties) return true;
-      const text = deps.text;
-      void showPhoneticSettingsDialog({
-        title: text.phoneticSettings,
-        typeLabel: text.phoneticType,
-        alignmentLabel: text.phoneticAlignment,
-        typeOptions: [
-          { value: 'hiragana', label: text.phoneticHiragana },
-          { value: 'katakana', label: text.phoneticKatakana },
-          { value: 'halfKatakana', label: text.phoneticHalfKatakana },
-        ],
-        alignmentOptions: [
-          { value: 'normal', label: text.phoneticAlignNormal },
-          { value: 'left', label: text.phoneticAlignLeft },
-          { value: 'center', label: text.phoneticAlignCenter },
-          { value: 'distributed', label: text.phoneticAlignDistributed },
-        ],
-        initial: phoneticSettingsAt(i.store, state.selection.active),
-        okLabel: text.ok,
-        cancelLabel: text.cancel,
-      }).then((settings) => {
-        if (settings === null) return;
-        setPhoneticSettings(i.store, workbook, range, settings);
-        runtime.refreshCells();
-        runtime.focusSheet();
+    case 'phoneticSettings':
+      openPhoneticSettings({
+        inst: i,
+        text: deps.text,
+        refreshCells: runtime.refreshCells,
+        focusSheet: runtime.focusSheet,
       });
       return true;
-    }
     case 'merge': {
       const anchorAt0 = state.merges.byAnchor.get(`${range.sheet}:${range.r0}:${range.c0}`);
       const isExactMerge =

@@ -557,7 +557,7 @@ describe('Mac Excel ribbon profile', () => {
     const fontIds = macFont?.commands.map((command) => command.id) ?? [];
     expect(genericFont?.commands.some((command) => command.id === 'strike')).toBe(true);
     expect(fontIds).not.toContain('strike');
-    expect(fontIds.indexOf('editPhonetic')).toBeGreaterThan(fontIds.indexOf('fontColor'));
+    expect(fontIds.indexOf('showPhonetic')).toBeGreaterThan(fontIds.indexOf('fontColor'));
     expect(home?.groups.at(-1)?.commands.map((command) => command.id)).toEqual(['mac.home.addins']);
     expect(findCommand('home', 'mac.home.addins')).toMatchObject({
       disabled: true,

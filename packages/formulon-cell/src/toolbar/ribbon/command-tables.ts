@@ -19,11 +19,16 @@ import {
   toggleUnderline,
   toggleWrap,
 } from '../../commands/format.js';
+import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { SpreadsheetStore } from '../../store/store.js';
 
 type RibbonState = ReturnType<SpreadsheetStore['getState']>;
-export type RibbonFormatMutator = (state: RibbonState, store: SpreadsheetStore) => void;
+export type RibbonFormatMutator = (
+  state: RibbonState,
+  store: SpreadsheetStore,
+  workbook?: SpreadsheetInstance['workbook'],
+) => void;
 
 /** Plain "open this dialog / panel" buttons. Each value is a thunk over the
  *  instance to keep the lookup callable with one argument from the dispatcher. */
@@ -99,6 +104,7 @@ export const RIBBON_FORMAT_MUTATORS: Readonly<Record<string, RibbonFormatMutator
   italic: (s, store) => toggleItalic(s, store),
   underline: (s, store) => toggleUnderline(s, store),
   strike: (s, store) => toggleStrike(s, store),
+  showPhonetic: (_s, store, workbook) => toggleShowPhonetic(store, workbook ?? null),
   currency: (s, store) => cycleCurrency(s, store),
   percent: (s, store) => cyclePercent(s, store),
   comma: (s, store) => setNumFmt(s, store, { kind: 'fixed', decimals: 2, thousands: true }),

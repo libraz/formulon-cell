@@ -147,7 +147,10 @@ export function createDefaultDynamicDropdownsCtx(
   const focusSheet = opts.focusSheet ?? ((): void => instance.host.focus());
   const illustrationDefaults = createIllustrationDropdownDefaults(instance);
   const clipboardDefaults = createClipboardDropdownDefaults(instance);
-  const formattingDefaults = createFormattingDropdownDefaults(instance);
+  const formattingDefaults = createFormattingDropdownDefaults(instance, {
+    refreshCells: () => opts.refreshCells?.(),
+    focusSheet,
+  });
   const cellDefaults = createCellsDropdownDefaults(instance, opts);
   const editingDefaults = createEditingDropdownDefaults(instance);
   const formulaDefaults = createFormulasDropdownDefaults(instance);
@@ -197,6 +200,7 @@ export function createDefaultDynamicDropdownsCtx(
     applyFillDirection: editingDefaults.applyFillDirection,
     applyClearAction: editingDefaults.applyClearAction,
     applyUnderlineAction: formattingDefaults.applyUnderlineAction,
+    applyPhoneticAction: formattingDefaults.applyPhoneticAction,
     applyWrapAction: formattingDefaults.applyWrapAction,
     applyMergeAction: formattingDefaults.applyMergeAction,
     applyFreezeAction: viewDefaults.applyFreezeAction,

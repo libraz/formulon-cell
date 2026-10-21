@@ -119,6 +119,9 @@ export interface CellFormat {
   /** How the phonetic guide renders: kana form and alignment. Absent means the
    *  guide shows as stored. */
   phoneticProperties?: PhoneticProperties;
+  /** Show Phonetic: the guide is drawn only while this is on. Held on
+   *  constants and blanks; the engine drops it on formula cells. */
+  showPhonetic?: boolean;
   align?: CellAlign;
   /** Vertical alignment. Default is 'bottom'. */
   vAlign?: CellVAlign;

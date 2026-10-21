@@ -33,6 +33,7 @@ export interface ActiveState {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  showPhonetic: boolean;
   strike: boolean;
   alignLeft: boolean;
   alignCenter: boolean;
@@ -92,6 +93,7 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   bold: false,
   italic: false,
   underline: false,
+  showPhonetic: false,
   strike: false,
   alignLeft: false,
   alignCenter: false,
@@ -183,6 +185,7 @@ export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = ne
   ['bold', 'bold'],
   ['italic', 'italic'],
   ['underline', 'underline'],
+  ['showPhonetic', 'showPhonetic'],
   ['strike', 'strike'],
   ['alignL', 'alignLeft'],
   ['alignC', 'alignCenter'],
@@ -365,6 +368,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     bold: !!f?.bold,
     italic: !!f?.italic,
     underline: !!f?.underline,
+    showPhonetic: f?.showPhonetic === true,
     strike: !!f?.strike,
     alignLeft: f?.align === 'left',
     alignCenter: f?.align === 'center',

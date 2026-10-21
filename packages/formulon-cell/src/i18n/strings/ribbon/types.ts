@@ -34,7 +34,9 @@ export interface RibbonStrings {
     italic: string;
     underline: string;
     strikethrough: string;
-    phonetic: string;
+    showPhonetic: string;
+    phoneticShow: string;
+    phoneticEdit: string;
     phoneticDialogTitle: string;
     phoneticDialogLabel: string;
     phoneticSettings: string;

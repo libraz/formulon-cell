@@ -30,6 +30,10 @@ export const phoneticKanaForm = (properties: PhoneticProperties | undefined): Ka
 export const phoneticAlignment = (properties: PhoneticProperties | undefined): PhoneticAlignment =>
   PHONETIC_ALIGNMENTS[properties?.alignment ?? 1] ?? 'normal';
 
+/** Font size of a guide over text drawn at `fontSize`. */
+export const phoneticGuideSize = (fontSize: number): number =>
+  Math.max(6, Math.round(fontSize * 0.52));
+
 /** Engine properties for a kana form and alignment, keeping `fontId`. */
 export const phoneticPropertiesFor = (
   form: Exclude<KanaForm, 'asStored'>,
@@ -41,10 +45,8 @@ export const phoneticPropertiesFor = (
   alignment: PHONETIC_ALIGNMENTS.indexOf(alignment),
 });
 
-/**
- * Read how a cell's guide renders. The all-zero triple is what the engine
- * reports for a guide with no `<phoneticPr>`, so it hydrates as "unset".
- */
+/** Read how a cell's guide renders; a guide with no `<phoneticPr>` hydrates as
+ *  "unset" rather than as the all-zero triple the engine resolves it to. */
 export function readPhoneticProperties(
   wb: WorkbookHandle,
   addr: Addr,
@@ -52,8 +54,19 @@ export function readPhoneticProperties(
   if (!wb.capabilities.phoneticProperties) return undefined;
   const properties = wb.getCellPhoneticProperties(addr.sheet, addr.row, addr.col);
   if (properties === null) return undefined;
-  const { fontId, type, alignment } = properties;
-  return fontId === 0 && type === 0 && alignment === 0 ? undefined : properties;
+  const { present, fontId, type, alignment } = properties;
+  return present ? { fontId, type, alignment } : undefined;
+}
+
+/** Add the cell's Show Phonetic flag to a hydrate patch; off is the absence. */
+export function withShowPhonetic(
+  wb: WorkbookHandle,
+  addr: Addr,
+  patch: Partial<CellFormat>,
+): Partial<CellFormat> {
+  if (!wb.capabilities.showPhonetic) return patch;
+  if (wb.getCellShowPhonetic(addr.sheet, addr.row, addr.col) === true) patch.showPhonetic = true;
+  return patch;
 }
 
 /** Add the cell's guide properties to a hydrate patch that carries its runs. */
@@ -87,4 +100,21 @@ export function writePhoneticProperties(
   if (!format.phonetic?.length || !wb.capabilities.phoneticProperties) return true;
   const properties = format.phoneticProperties ?? DEFAULT_PHONETIC_PROPERTIES;
   return wb.setCellPhoneticProperties(addr.sheet, addr.row, addr.col, properties);
+}
+
+/**
+ * Bring a cell's Show Phonetic flag in line with its format. The engine keeps
+ * the flag on constants and blanks only, so a formula cell is left alone.
+ * Returns false only when the engine refused a write.
+ */
+export function writeShowPhonetic(
+  wb: WorkbookHandle,
+  addr: Addr,
+  format: Pick<CellFormat, 'showPhonetic'>,
+  isFormula: boolean,
+): boolean {
+  if (isFormula || !wb.capabilities.showPhonetic) return true;
+  const show = format.showPhonetic === true;
+  if (wb.getCellShowPhonetic(addr.sheet, addr.row, addr.col) === show) return true;
+  return wb.setCellShowPhonetic(addr.sheet, addr.row, addr.col, show);
 }

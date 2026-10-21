@@ -454,6 +454,36 @@ export function applySelectionFormatPatch(
   );
 }
 
+/** Apply `patch` to the selection's cells that `accept` lets through: the
+ *  planned cells plus any occupied cell of the selected ranges, so an axis
+ *  selection reaches its data and not only its authored formats. */
+export function applySelectionFormatPatchWhere(
+  state: State,
+  store: SpreadsheetStore,
+  patch: Partial<CellFormat>,
+  accept: (addr: Addr) => boolean,
+  options: SelectionFormatOptions = {},
+): boolean {
+  const plan = selectionPlan(state);
+  if (!plan) return false;
+  const picked = new Map<string, Addr>();
+  for (const addr of plan.cells) picked.set(addrKey(addr), addr);
+  for (const key of state.data.cells.keys()) {
+    const addr = parseAddrKey(key);
+    if (addr && selectionIncludes(plan.ranges, addr)) picked.set(key, addr);
+  }
+  const cells = [...picked.values()].filter(accept);
+  if (cells.length === 0) return false;
+  return commitSelectionFormatEntries(
+    state,
+    store,
+    plan.ranges,
+    cells,
+    cells.map((addr) => ({ addr, patch })),
+    options,
+  );
+}
+
 const sparseSelectionPlan = (
   state: State,
   store: SpreadsheetStore,

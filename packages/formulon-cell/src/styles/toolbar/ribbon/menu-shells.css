@@ -797,6 +797,35 @@
   background: var(--fc-tb-ribbon-hover);
 }
 
+#menu-phonetic {
+  min-width: 220px;
+  padding: 5px 0;
+  border-color: #c8c8c8;
+  border-radius: 3px;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.15),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+#menu-phonetic .fc-tb__menu-item {
+  min-height: 27px;
+  gap: 8px;
+  padding: 3px 12px 3px 20px;
+}
+
+#menu-phonetic .fc-tb__menu-icon,
+#menu-phonetic .fc-tb__menu-icon-svg,
+#menu-phonetic .fc-tb__menu-item__icon-spacer {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+
+#menu-phonetic .fc-tb__menu-item:hover,
+#menu-phonetic .fc-tb__menu-item:focus-visible {
+  background: var(--fc-tb-ribbon-hover);
+}
+
 #menu-text-orientation {
   min-width: 168px;
   padding: 5px 0;

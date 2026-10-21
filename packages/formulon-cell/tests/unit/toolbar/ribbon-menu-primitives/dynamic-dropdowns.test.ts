@@ -63,6 +63,7 @@ describe('toolbar/ribbon menu primitives', () => {
       applyFillDirection: vi.fn(),
       applyClearAction: vi.fn(),
       applyUnderlineAction: vi.fn(),
+      applyPhoneticAction: vi.fn(),
       applyWrapAction: vi.fn(),
       applyMergeAction: vi.fn(),
       applyFreezeAction: vi.fn(),

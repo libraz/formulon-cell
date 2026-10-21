@@ -205,6 +205,7 @@ export function createDefaultRibbonMenus(
     copy: homeFactories.createCopyMenu,
     borders: buildBorders,
     underline: homeFactories.createUnderlineMenu,
+    phonetic: homeFactories.createPhoneticMenu,
     wrap: homeFactories.createWrapMenu,
     merge: homeFactories.createMergeMenu,
     textOrientation: buildTextOrientation,

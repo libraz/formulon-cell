@@ -78,6 +78,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   insertComment: 'comment',
   deleteComment: 'comment',
   insertHyperlink: 'hyperlink',
+  showPhonetic: 'format',
   editPhonetic: 'format',
   phoneticSettings: 'format',
   protect: 'protection',

@@ -37,6 +37,7 @@ export interface HomeMenuDeps {
 export interface HomeMenuFactories {
   createCopyMenu: () => HTMLDivElement;
   createUnderlineMenu: () => HTMLDivElement;
+  createPhoneticMenu: () => HTMLDivElement;
   createWrapMenu: () => HTMLDivElement;
   createMergeMenu: () => HTMLDivElement;
   createFreezeMenu: () => HTMLDivElement;
@@ -161,6 +162,16 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     menu.append(
       menuIconButton(t.underlineSingle, 'underlineAction', 'single', 'underline-single'),
       menuIconButton(t.underlineDouble, 'underlineAction', 'double', 'underline-double'),
+    );
+    return menu;
+  };
+
+  const createPhoneticMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-phonetic');
+    menu.append(
+      menuPresetButton(ribbonText.phoneticShow, 'phoneticAction', 'show', menuIconSpacer()),
+      menuPresetButton(ribbonText.phoneticEdit, 'phoneticAction', 'edit', menuIconSpacer()),
+      menuPresetButton(ribbonText.phoneticSettings, 'phoneticAction', 'settings', menuIconSpacer()),
     );
     return menu;
   };
@@ -355,6 +366,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   return {
     createCopyMenu,
     createUnderlineMenu,
+    createPhoneticMenu,
     createWrapMenu,
     createMergeMenu,
     createFreezeMenu,

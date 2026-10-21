@@ -91,6 +91,7 @@ export interface RibbonMenus {
   links?: RibbonMenuFactory;
   borders?: RibbonMenuFactory;
   underline?: RibbonMenuFactory;
+  phonetic?: RibbonMenuFactory;
   wrap?: RibbonMenuFactory;
   merge?: RibbonMenuFactory;
   textOrientation?: RibbonMenuFactory;

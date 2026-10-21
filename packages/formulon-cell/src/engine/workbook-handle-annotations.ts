@@ -8,7 +8,13 @@ import type {
   Person,
   ThreadedComment,
 } from '@libraz/formulon';
-import type { EngineCapabilities, PhoneticProperties, PhoneticRun, Workbook } from './types.js';
+import type {
+  EngineCapabilities,
+  PhoneticProperties,
+  PhoneticPropertiesRead,
+  PhoneticRun,
+  Workbook,
+} from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
@@ -107,12 +113,33 @@ export abstract class WorkbookHandleAnnotationsMethods {
 
   /** Read how the cell's guide renders. Returns null when the engine has no
    *  property surface. */
-  getCellPhoneticProperties(sheet: number, row: number, col: number): PhoneticProperties | null {
+  getCellPhoneticProperties(
+    sheet: number,
+    row: number,
+    col: number,
+  ): PhoneticPropertiesRead | null {
     assertAlive(this);
     if (!this.capabilities.phoneticProperties) return null;
     const r = wb(this).getCellPhoneticProperties(sheet, row, col);
     if (!r.status.ok) return null;
-    return { fontId: r.fontId, type: r.type, alignment: r.alignment };
+    return { fontId: r.fontId, type: r.type, alignment: r.alignment, present: r.present };
+  }
+
+  /** Read the cell's "Show Phonetic" flag. Null when the engine has no such
+   *  surface. */
+  getCellShowPhonetic(sheet: number, row: number, col: number): boolean | null {
+    assertAlive(this);
+    if (!this.capabilities.showPhonetic) return null;
+    const r = wb(this).getCellShowPhonetic(sheet, row, col);
+    return r.status.ok ? r.show : null;
+  }
+
+  /** Set the cell's "Show Phonetic" display flag. The engine keeps it on
+   *  constants and blanks only, and it survives value writes. */
+  setCellShowPhonetic(sheet: number, row: number, col: number, show: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.showPhonetic) return false;
+    return wb(this).setCellShowPhonetic(sheet, row, col, show).ok;
   }
 
   /** Store how the cell's guide renders. The engine drops the properties when

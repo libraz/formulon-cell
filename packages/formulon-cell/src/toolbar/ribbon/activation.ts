@@ -40,6 +40,7 @@ export const RIBBON_MENU_FACTORY_KEYS = [
   'links',
   'borders',
   'underline',
+  'phonetic',
   'wrap',
   'merge',
   'textOrientation',
@@ -101,6 +102,7 @@ export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
   fillHome: 'menu-fill',
   clearFormat: 'menu-clear',
   underline: 'menu-underline',
+  showPhonetic: 'menu-phonetic',
   wrap: 'menu-wrap',
   merge: 'menu-merge',
   freeze: 'menu-freeze',
@@ -158,6 +160,7 @@ export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenu
   linksData: 'links',
   borders: 'borders',
   underline: 'underline',
+  showPhonetic: 'phonetic',
   wrap: 'wrap',
   merge: 'merge',
   textOrientation: 'textOrientation',
@@ -231,7 +234,7 @@ export const RIBBON_AUDITED_PRIMARY_ACTION_SPLIT_COMMANDS = [
   'watchView',
 ] as const;
 
-export const RIBBON_AUDITED_SPLIT_TOGGLE_COMMANDS = ['underline'] as const;
+export const RIBBON_AUDITED_SPLIT_TOGGLE_COMMANDS = ['underline', 'showPhonetic'] as const;
 
 export const RIBBON_AUDITED_GALLERY_COMMANDS = [
   'conditional',
@@ -274,6 +277,7 @@ export const RIBBON_AUDITED_DROPDOWN_COMMANDS = [
 export const RIBBON_INTENTIONAL_NON_RENDERED_COMMANDS = [
   'drawBorder',
   'drawBorderGrid',
+  'editPhonetic',
   'eraseBorder',
   'formatCells',
   'fxInsert',
@@ -281,6 +285,7 @@ export const RIBBON_INTENTIONAL_NON_RENDERED_COMMANDS = [
   'gotoSpecialHome',
   'links',
   'moreBorders',
+  'phoneticSettings',
   'rules',
 ] as const;
 
