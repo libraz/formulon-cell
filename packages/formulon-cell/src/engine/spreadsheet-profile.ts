@@ -1,3 +1,4 @@
+import { type BuiltInLocale, builtInLocaleFor } from '../i18n/locales.js';
 import type { ExcelProfileId, SpreadsheetProfileId } from './types.js';
 
 /** Raw ids are strings at the compatibility boundary so older engines can be
@@ -39,3 +40,32 @@ export const engineProfileToPublic = (
 
 export const publicProfileToEngine = (profileId: SpreadsheetProfileId): ExcelProfileId =>
   PUBLIC_TO_ENGINE[profileId];
+
+/** Desktop platform whose defaults and screen geometry a workbook follows. */
+export type SpreadsheetPlatform = 'mac' | 'default';
+
+/** The locale suffixes that have a corresponding formulon profile. */
+export type ProfileLocale = 'ja_JP' | 'en_US' | 'de_DE' | 'fr_FR' | 'zh_CN' | 'ko_KR' | 'th_TH';
+
+export const PROFILE_SUFFIX_FOR_LOCALE: Readonly<Record<BuiltInLocale, ProfileLocale>> = {
+  ja: 'ja_JP',
+  en: 'en_US',
+  de: 'de_DE',
+  fr: 'fr_FR',
+  zh: 'zh_CN',
+  ko: 'ko_KR',
+  th: 'th_TH',
+};
+
+/** Engine profile id for `locale` on `platform`. A tag outside the built-in
+ *  languages resolves by its language subtag, else to en_US, so every locale
+ *  has an id for new-workbook defaults. */
+export const engineProfileIdFor = (
+  locale: string,
+  platform: SpreadsheetPlatform,
+): ExcelProfileId => {
+  const language = builtInLocaleFor(locale);
+  const suffix = language ? PROFILE_SUFFIX_FOR_LOCALE[language] : 'en_US';
+  const prefix = platform === 'mac' ? 'mac' : 'windows';
+  return publicProfileToEngine(`${prefix}-${suffix}`);
+};

@@ -35,6 +35,7 @@ type RawWorkbook = {
     defaultRowHeight: number;
     hasDefaultColWidth: boolean;
     hasDefaultRowHeight: boolean;
+    effectiveDefaultColWidth: number;
   };
   setSheetFormatDefaults(
     sheet: number,
@@ -114,13 +115,15 @@ describe('WorkbookHandle geometry round-trip', () => {
       const raw = rawWorkbook(wb);
       const defaults = raw.getSheetFormatDefaults(0);
       expect(defaults.status.ok).toBe(true);
-      const expectedColDefault = raw.columnCharsToPt(0, 0, 8.43);
+      const expectedColDefault = raw.columnCharsToPt(0, 0, defaults.effectiveDefaultColWidth);
       expect(expectedColDefault.status.ok).toBe(true);
       const defaultLayout = wb.getSheetDefaultLayoutPx(0);
       expect(defaultLayout?.defaultColWidth).toBeCloseTo(expectedColDefault.value * (96 / 72), 8);
+      // New default-profile books state the row height Windows writes for Calibri 11.
+      expect(defaults.hasDefaultRowHeight).toBe(true);
       const freshRowHeight = raw.getRowHeightPt(0, 0);
       expect(freshRowHeight.status.ok).toBe(true);
-      expect(freshRowHeight.value).toBeCloseTo(102 / 7, 8);
+      expect(freshRowHeight.value).toBe(15);
       expect(defaultLayout?.defaultRowHeight).toBeCloseTo(freshRowHeight.value * (96 / 72), 8);
 
       const rawColumn = raw

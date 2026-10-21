@@ -1,4 +1,5 @@
 import { GeometryMode } from '@libraz/formulon';
+import { macDefaultColumnPt, macMdw, macPtToRaw, macRawToPt } from './mac-column-model.js';
 import type { EngineCapabilities, Range, Workbook } from './types.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -6,6 +7,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
   wb: Workbook;
+  geometryPlatform?: WorkbookHandle['geometryPlatform'];
   assertAlive(): void;
 };
 
@@ -52,8 +54,31 @@ function optionalFlag(value: unknown): boolean | undefined {
   return undefined;
 }
 
+function usesMacColumnModel(handle: unknown): boolean {
+  return internals(handle).geometryPlatform === 'mac';
+}
+
+/** Mac maximum digit width of `sheet`'s raw Normal font, or null when the
+ *  engine cannot report it. */
+function macSheetMdw(handle: unknown, sheet: number): number | null {
+  const getWidthModel = wb(handle).getWidthModel;
+  if (typeof getWidthModel !== 'function') return null;
+  try {
+    const model = getWidthModel.call(wb(handle), sheet, GeometryMode.Display);
+    if (!model.status.ok || !Number.isFinite(model.normalFontSize)) return null;
+    const mdw = macMdw(model.normalFontName, model.normalFontSize);
+    return mdw > 0 ? mdw : null;
+  } catch {
+    return null;
+  }
+}
+
 function columnCharsToPx(handle: unknown, sheet: number, chars: number): number | null {
   if (!Number.isFinite(chars)) return null;
+  if (usesMacColumnModel(handle)) {
+    const mdw = macSheetMdw(handle, sheet);
+    return mdw === null ? null : macRawToPt(chars, mdw) * CSS_PX_PER_POINT;
+  }
   try {
     const result = wb(handle).columnCharsToPt(sheet, GeometryMode.Display, chars);
     if (!result.status.ok || !Number.isFinite(result.value)) return null;
@@ -65,6 +90,10 @@ function columnCharsToPx(handle: unknown, sheet: number, chars: number): number 
 
 function columnPxToChars(handle: unknown, sheet: number, width: number): number | null {
   if (!Number.isFinite(width)) return null;
+  if (usesMacColumnModel(handle)) {
+    const mdw = macSheetMdw(handle, sheet);
+    return mdw === null ? null : macPtToRaw(width * POINTS_PER_CSS_PX, mdw);
+  }
   try {
     const result = wb(handle).columnPtToChars(
       sheet,
@@ -95,7 +124,8 @@ export abstract class WorkbookHandleLayoutMethods {
   /** Persist a column-width override on `[first, last]` for `sheet`.
    *  No-op (returns false) when the engine doesn't expose `setColumnWidth`
    *  — i.e. the stub fallback. The UI store stays the source of truth in
-   *  that case so paint still reflects the drag. The public width is CSS px;
+   *  that case so paint still reflects the drag. The public width is
+   *  canonical CSS px under the handle's `geometryPlatform` column model;
    *  formulon's geometry-aware engines store the native character width. */
   setColumnWidth(sheet: number, first: number, last: number, width: number): boolean {
     assertAlive(this);
@@ -157,9 +187,11 @@ export abstract class WorkbookHandleLayoutMethods {
     return out;
   }
 
-  /** Return sheet defaults in the store's CSS-pixel units. The engine's
-   *  implicit default uses 8.43 characters / 102/7 points. Null means the
-   *  engine lacks geometry support or a native read/conversion failed. */
+  /** Return sheet defaults in the store's CSS-pixel units. Columns follow the
+   *  `geometryPlatform` model: Mac derives an unstated default from
+   *  `baseColWidth`, the default profile uses the engine's effective width.
+   *  Rows without a stated default use 102/7 points. Null means the engine
+   *  lacks geometry support or a native read/conversion failed. */
   getSheetDefaultLayoutPx(
     sheet: number,
   ): { defaultColWidth: number; defaultRowHeight: number } | null {
@@ -173,8 +205,17 @@ export abstract class WorkbookHandleLayoutMethods {
     }
     if (!defaults.status.ok) return null;
 
-    const chars = defaults.hasDefaultColWidth ? defaults.defaultColWidth : 8.43;
-    const colWidth = columnCharsToPx(this, sheet, chars);
+    let colWidth: number | null;
+    if (usesMacColumnModel(this) && !defaults.hasDefaultColWidth) {
+      const mdw = macSheetMdw(this, sheet);
+      colWidth =
+        mdw === null ? null : macDefaultColumnPt(defaults.baseColWidth, mdw) * CSS_PX_PER_POINT;
+    } else {
+      const chars = defaults.hasDefaultColWidth
+        ? defaults.defaultColWidth
+        : defaults.effectiveDefaultColWidth;
+      colWidth = columnCharsToPx(this, sheet, chars);
+    }
     const rowPoints = defaults.hasDefaultRowHeight ? defaults.defaultRowHeight : 102 / 7;
     if (colWidth === null || !Number.isFinite(rowPoints)) return null;
     const rowHeight = rowPoints * CSS_PX_PER_POINT;

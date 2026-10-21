@@ -1,4 +1,5 @@
 import type { History } from '../commands/history.js';
+import { builtInLocaleFor } from '../i18n/locales.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
 import { detectCapabilities } from './capabilities.js';
@@ -11,6 +12,7 @@ import {
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { numberValue } from './result.js';
+import { engineProfileIdFor, type SpreadsheetPlatform } from './spreadsheet-profile.js';
 import { StoreMirror } from './store-mirror.js';
 import type {
   Addr,
@@ -125,15 +127,38 @@ const sameCellSnapshot = (a: CellSnapshot, b: CellSnapshot): boolean =>
 /** `<calcPr calcMode>` code for Manual. */
 const CALC_MODE_MANUAL = 1;
 
+/** Mac Excel's 12 pt new-workbook family per language; others use Aptos Narrow. */
+const MAC_DEFAULT_FONT_FAMILY: Readonly<Record<string, string>> = {
+  ja: '游ゴシック',
+  zh: '等线',
+  ko: '맑은 고딕',
+  th: 'Tahoma',
+};
+
 /** Excel's Japanese UI creates new workbooks with Yu Gothic while the
  * non-Japanese baseline remains Calibri 11 for compatibility with existing
- * formulon workbooks. */
+ * formulon workbooks. On `'mac'` it is Mac Excel's 12 pt family for the
+ * language. */
 export const defaultFontForLocale = (
   locale: string | undefined,
-): Pick<FontRecord, 'name' | 'size'> => ({
-  name: locale?.toLowerCase().startsWith('ja') ? '游ゴシック' : 'Calibri',
-  size: 11,
-});
+  platform: SpreadsheetPlatform = 'default',
+): Pick<FontRecord, 'name' | 'size'> => {
+  if (platform === 'mac') {
+    const language = locale === undefined ? null : builtInLocaleFor(locale);
+    return { name: (language && MAC_DEFAULT_FONT_FAMILY[language]) || 'Aptos Narrow', size: 12 };
+  }
+  return {
+    name: locale?.toLowerCase().startsWith('ja') ? '游ゴシック' : 'Calibri',
+    size: 11,
+  };
+};
+
+/** Default row height Windows Excel writes for a new workbook's Normal font,
+ *  keyed by `name size`. Fonts outside the table leave the engine default. */
+const WINDOWS_DEFAULT_ROW_HEIGHT_PT: ReadonlyMap<string, number> = new Map([
+  ['Calibri 11', 15],
+  ['游ゴシック 11', 18.75],
+]);
 
 /**
  * Boundary between the WASM Workbook and the rest of the UI. Nothing else
@@ -141,6 +166,11 @@ export const defaultFontForLocale = (
  */
 export class WorkbookHandle {
   readonly capabilities: EngineCapabilities;
+
+  /** Platform whose column-width model converts between store px and the
+   *  engine's raw widths. Set by `createDefault` and by the mount, whose
+   *  `ui.platform` wins over the value a host-created handle carries. */
+  geometryPlatform: SpreadsheetPlatform = 'default';
 
   private readonly module: FormulonModule;
 
@@ -195,18 +225,42 @@ export class WorkbookHandle {
     this.capabilities = detectCapabilities(wb);
   }
 
+  /** Create a new workbook with the defaults `platform`'s desktop spreadsheet
+   *  gives one for `locale`. A Mac book takes the engine's measured Mac
+   *  profile (font, row height, base column width); a default-profile book
+   *  states the locale font and the row height Windows writes for it. */
   static async createDefault(
-    opts: LoadOptions & { locale?: string } = {},
+    opts: LoadOptions & { locale?: string; platform?: SpreadsheetPlatform } = {},
   ): Promise<WorkbookHandle> {
-    const { locale, ...loadOptions } = opts;
+    const { locale, platform = 'default', ...loadOptions } = opts;
     const module = await loadFormulon(loadOptions);
+    if (platform === 'mac') {
+      const profiled = module.Workbook.createForProfile(engineProfileIdFor(locale ?? 'en', 'mac'));
+      if (profiled.isValid()) {
+        const handle = new WorkbookHandle(module, profiled);
+        handle.geometryPlatform = 'mac';
+        return handle;
+      }
+      profiled.delete();
+    }
     const wb = module.Workbook.createDefault();
     const handle = new WorkbookHandle(module, wb);
-    const font = defaultFontForLocale(locale);
+    handle.geometryPlatform = platform;
+    const font = defaultFontForLocale(locale, platform);
     // Stating font 0 is what makes an untouched cell save with the locale font;
     // an engine that cannot restate its default falls back to naming the font
     // on every cell that carries a format, leaving unformatted cells behind.
     if (!handle.setWorkbookDefaultFont(font)) handle.localeDefaultFont = font;
+    const rowHeight =
+      platform === 'default'
+        ? WINDOWS_DEFAULT_ROW_HEIGHT_PT.get(`${font.name} ${font.size}`)
+        : undefined;
+    if (rowHeight !== undefined && handle.canStateSheetFormatDefaults()) {
+      handle.wb.setSheetFormatDefaults(0, {
+        defaultRowHeight: rowHeight,
+        hasDefaultRowHeight: true,
+      });
+    }
     return handle;
   }
 
@@ -282,6 +336,7 @@ export class WorkbookHandle {
     const s = this.wb.addSheet(proposed);
     if (!s.ok) return -1;
     const idx = numberValue(this.wb.sheetCount(), 'sheetCount') - 1;
+    this.copyFirstSheetFormatDefaults(idx);
     this.emit({ kind: 'sheet-add', index: idx, name: proposed });
     return idx;
   }
@@ -318,6 +373,26 @@ export class WorkbookHandle {
     if (!s.ok) return false;
     this.emit({ kind: 'sheet-move', from, to });
     return true;
+  }
+
+  /** The engine seeds new-workbook format defaults on sheet 0 only; give an
+   *  added sheet the same base column width and default row height. */
+  private copyFirstSheetFormatDefaults(sheet: number): void {
+    if (sheet <= 0 || !this.canStateSheetFormatDefaults()) return;
+    const first = this.wb.getSheetFormatDefaults(0);
+    if (!first.status.ok) return;
+    this.wb.setSheetFormatDefaults(sheet, {
+      baseColWidth: first.baseColWidth,
+      ...(first.hasDefaultRowHeight
+        ? { defaultRowHeight: first.defaultRowHeight, hasDefaultRowHeight: true }
+        : {}),
+    });
+  }
+
+  private canStateSheetFormatDefaults(): boolean {
+    return (
+      this.capabilities.geometry === true && typeof this.wb.setSheetFormatDefaults === 'function'
+    );
   }
 
   private uniqueSheetName(): string {

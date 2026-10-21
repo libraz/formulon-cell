@@ -3,6 +3,37 @@ import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
+type AxisDefaults = Pick<LayoutSlice, 'defaultColWidth' | 'defaultRowHeight'>;
+
+/** Canonical size defaults when the engine reports no sheet geometry: Mac
+ *  75 pt × 20 pt, default profile 48 pt × 15 pt. */
+const MAC_AXIS_DEFAULTS: AxisDefaults = { defaultColWidth: 100, defaultRowHeight: 80 / 3 };
+const DEFAULT_AXIS_DEFAULTS: AxisDefaults = { defaultColWidth: 64, defaultRowHeight: 20 };
+
+const engineAxisDefaults = (wb: WorkbookHandle, sheet: number): AxisDefaults | null =>
+  typeof wb.getSheetDefaultLayoutPx === 'function' ? wb.getSheetDefaultLayoutPx(sheet) : null;
+
+const platformAxisDefaults = (wb: WorkbookHandle): AxisDefaults =>
+  wb.geometryPlatform === 'mac' ? MAC_AXIS_DEFAULTS : DEFAULT_AXIS_DEFAULTS;
+
+type ColumnLayouts = ReturnType<WorkbookHandle['getColumnLayouts']>;
+type RowLayouts = ReturnType<WorkbookHandle['getRowLayouts']>;
+
+const addColumnWidths = (widths: Map<number, number>, cols: ColumnLayouts): Map<number, number> => {
+  for (const c of cols) {
+    if (!(c.width > 0 && c.hasWidth !== false)) continue;
+    for (let col = c.first; col <= c.last; col += 1) widths.set(col, c.width);
+  }
+  return widths;
+};
+
+const addRowHeights = (heights: Map<number, number>, rows: RowLayouts): Map<number, number> => {
+  for (const r of rows) {
+    if (r.height > 0 && r.hasHeight !== false) heights.set(r.row, r.height);
+  }
+  return heights;
+};
+
 /**
  * Replace the active sheet's layout from engine-side overrides for `sheet`.
  * Called after loading a workbook and when switching sheets
@@ -21,8 +52,8 @@ export function hydrateLayoutFromEngine(
 ): void {
   const cols = wb.getColumnLayouts(sheet);
   const rows = wb.getRowLayouts(sheet);
-  const defaults =
-    typeof wb.getSheetDefaultLayoutPx === 'function' ? wb.getSheetDefaultLayoutPx(sheet) : null;
+  const engineDefaults = engineAxisDefaults(wb, sheet);
+  const defaults = engineDefaults ?? platformAxisDefaults(wb);
   const view = wb.getSheetView(sheet);
   const hasAxisLayouts =
     wb.capabilities.colRowSize || wb.capabilities.hiddenRowsCols || wb.capabilities.outlines;
@@ -50,37 +81,36 @@ export function hydrateLayoutFromEngine(
     !hasAxisLayouts &&
     cols.length === 0 &&
     rows.length === 0 &&
-    defaults === null &&
+    engineDefaults === null &&
     view === null &&
     hiddenSheets.size === 0
   ) {
+    store.setState((s) => ({ ...s, layout: { ...s.layout, ...defaults } }));
     return;
   }
 
   store.setState((s) => {
-    const colWidths = new Map(hasAxisLayouts ? [] : s.layout.colWidths);
+    const colWidths = addColumnWidths(new Map(hasAxisLayouts ? [] : s.layout.colWidths), cols);
     const hiddenCols = new Set(hasAxisLayouts ? [] : s.layout.hiddenCols);
     const outlineCols = new Map(hasAxisLayouts ? [] : s.layout.outlineCols);
     for (const c of cols) {
       for (let col = c.first; col <= c.last; col += 1) {
-        if (c.width > 0 && c.hasWidth !== false) colWidths.set(col, c.width);
         if (c.hidden) hiddenCols.add(col);
         if (c.outlineLevel > 0) outlineCols.set(col, c.outlineLevel);
       }
     }
 
-    const rowHeights = new Map(hasAxisLayouts ? [] : s.layout.rowHeights);
+    const rowHeights = addRowHeights(new Map(hasAxisLayouts ? [] : s.layout.rowHeights), rows);
     const hiddenRows = new Set(hasAxisLayouts ? [] : s.layout.hiddenRows);
     const outlineRows = new Map(hasAxisLayouts ? [] : s.layout.outlineRows);
     for (const r of rows) {
-      if (r.height > 0 && r.hasHeight !== false) rowHeights.set(r.row, r.height);
       if (r.hidden) hiddenRows.add(r.row);
       if (r.outlineLevel > 0) outlineRows.set(r.row, r.outlineLevel);
     }
 
     const layout = {
       ...s.layout,
-      ...(defaults ?? {}),
+      ...defaults,
       colWidths,
       rowHeights,
       hiddenCols,
@@ -128,6 +158,26 @@ export function hydrateLayoutFromEngine(
         : s.ui,
     };
   });
+}
+
+/**
+ * Re-read `sheet`'s default sizes and column/row size overrides into the store,
+ * e.g. after `wb.geometryPlatform` changed the column model. Zoom, view flags,
+ * freeze panes, hidden flags and outlines are left as they are.
+ */
+export function rehydrateAxisLayout(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
+  const defaults = engineAxisDefaults(wb, sheet) ?? platformAxisDefaults(wb);
+  const sizes = wb.capabilities.colRowSize
+    ? {
+        colWidths: addColumnWidths(new Map(), wb.getColumnLayouts(sheet)),
+        rowHeights: addRowHeights(new Map(), wb.getRowLayouts(sheet)),
+      }
+    : {};
+  store.setState((s) => ({ ...s, layout: { ...s.layout, ...defaults, ...sizes } }));
 }
 
 /**

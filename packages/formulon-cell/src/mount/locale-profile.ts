@@ -1,21 +1,15 @@
+import {
+  engineProfileIdFor,
+  engineProfileToPublic,
+  PROFILE_SUFFIX_FOR_LOCALE,
+  type ProfileLocale,
+  type SpreadsheetPlatform,
+} from '../engine/spreadsheet-profile.js';
 import type { SpreadsheetProfileId } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type BuiltInLocale, builtInLocaleFor } from '../i18n/locales.js';
+import { builtInLocaleFor } from '../i18n/locales.js';
 
-/** The seven dictionaries that have a corresponding formulon profile. */
-type ProfileLocale = 'ja_JP' | 'en_US' | 'de_DE' | 'fr_FR' | 'zh_CN' | 'ko_KR' | 'th_TH';
-
-const PROFILE_SUFFIX_FOR_LOCALE: Record<BuiltInLocale, ProfileLocale> = {
-  ja: 'ja_JP',
-  en: 'en_US',
-  de: 'de_DE',
-  fr: 'fr_FR',
-  zh: 'zh_CN',
-  ko: 'ko_KR',
-  th: 'th_TH',
-};
-
-export type LocaleProfilePlatform = 'mac' | 'default';
+export type LocaleProfilePlatform = SpreadsheetPlatform;
 
 /**
  * Resolve a UI locale to the locale suffix used by Excel profile ids.
@@ -48,10 +42,8 @@ export function spreadsheetProfileForLocale(
   locale: string,
   platform: LocaleProfilePlatform,
 ): SpreadsheetProfileId | null {
-  const suffix = profileLocaleForUiLocale(locale);
-  if (!suffix) return null;
-  const prefix = platform === 'mac' ? 'mac' : 'windows';
-  return `${prefix}-${suffix}` as SpreadsheetProfileId;
+  if (!profileLocaleForUiLocale(locale)) return null;
+  return engineProfileToPublic(engineProfileIdFor(locale, platform));
 }
 
 export interface SyncLocaleProfileOptions {
