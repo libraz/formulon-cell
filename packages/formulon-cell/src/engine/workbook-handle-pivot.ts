@@ -1,10 +1,5 @@
 import { pivotAggregationName } from './pivot-aggregation.js';
-import {
-  ENGLISH_PIVOT_CAPTIONS,
-  localizePivotCaption,
-  PIVOT_CELL_KIND,
-  type PivotCaptions,
-} from './pivot-captions.js';
+import { PIVOT_CELL_KIND } from './pivot-cell-kind.js';
 import type { PivotMutationWorkbook } from './pivot-mutation.js';
 import type {
   Addr,
@@ -57,8 +52,6 @@ function assertAlive(handle: unknown): void {
   internals(handle).assertAlive();
 }
 
-const pivotCaptionsByHandle = new WeakMap<object, PivotCaptions>();
-
 /** Cache index of `fieldName`. When the engine cannot tie the report to its
  *  cache, a name found in exactly one cache stands in. */
 function cacheFieldIndex(handle: WorkbookHandlePivotMethods, cacheId: number, fieldName: string) {
@@ -89,17 +82,6 @@ export abstract class WorkbookHandlePivotMethods {
   declare readonly capabilities: EngineCapabilities;
   declare readonly sheetCount: number;
   abstract getValue(addr: Addr): CellValue;
-
-  /** Set the UI-language wording `pivotCells` translates engine captions into;
-   *  `null` restores the engine's English. */
-  setPivotCaptions(captions: PivotCaptions | null): void {
-    if (captions) pivotCaptionsByHandle.set(this, captions);
-    else pivotCaptionsByHandle.delete(this);
-  }
-
-  pivotCaptions(): PivotCaptions {
-    return pivotCaptionsByHandle.get(this) ?? ENGLISH_PIVOT_CAPTIONS;
-  }
 
   /** Whether any PivotTable on `range`'s sheet occupies a cell of `range`. */
   pivotOverlapsRange(range: Range): boolean {
@@ -183,21 +165,13 @@ export abstract class WorkbookHandlePivotMethods {
     if (!this.capabilities.pivotTables) return;
     const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
     if (n === null) return;
-    const captions = this.pivotCaptions();
     for (let i = 0; i < n; i += 1) {
       const layout = pivotWb(this).pivotLayout(sheet, i);
       if (!layout.status.ok) continue;
       for (const cell of layout.cells) {
         const value = fromEngineValue(cell.value);
         if (value.kind === 'blank') continue;
-        const shown =
-          value.kind === 'text'
-            ? {
-                kind: 'text' as const,
-                value: localizePivotCaption(cell.kind, value.value, captions),
-              }
-            : value;
-        yield pivotCellEntry(this, sheet, i, cell, shown);
+        yield pivotCellEntry(this, sheet, i, cell, value);
       }
     }
   }

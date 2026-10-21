@@ -1,4 +1,4 @@
-import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-captions.js';
+import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-data-field-name.js';
 import {
   type PivotAggregation,
   PivotAxis,

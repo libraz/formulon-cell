@@ -81,14 +81,7 @@ export const dataObjectsZh: DataObjectsStrings = {
     stdDevP: '总体标准偏差',
     variance: '方差',
     varianceP: '总体方差',
-    pivotCaptions: {
-      rowLabels: '行标签',
-      columnLabels: '列标签',
-      grandTotal: '总计',
-      blank: '(空白)',
-      subtotal: '{item} 汇总',
-      cannotChange: '无法更改数据透视表的这一部分。',
-    },
+    cannotChange: '无法更改数据透视表的这一部分。',
     dataFieldNaming: {
       template: '{prefix} {field}',
       sum: 'Sum of',

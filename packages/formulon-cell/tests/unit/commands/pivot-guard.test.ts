@@ -46,7 +46,7 @@ describe('PivotTable edit guard', () => {
     });
     expect(result).toMatchObject({
       status: 'rejected',
-      alert: { severity: 'stop', message: en.pivotTableDialog.pivotCaptions.cannotChange },
+      alert: { severity: 'stop', message: en.pivotTableDialog.cannotChange },
     });
     expect([...wb.pivotCells(0)].map((c) => c.value)).toEqual(before);
 
@@ -63,7 +63,7 @@ describe('PivotTable edit guard', () => {
 
   it('shows the alert in the UI language', async () => {
     const { wb, store } = await setup();
-    wb.setPivotCaptions(ja.pivotTableDialog.pivotCaptions);
+    setPivotGuardSink(wb, () => undefined, ja.pivotTableDialog.cannotChange);
     const result = commitCellInput({
       store,
       wb,
@@ -85,7 +85,7 @@ describe('PivotTable edit guard', () => {
     mutators.setRange(store, { sheet: 0, r0: 4, c0: 0, r1: 9, c1: 1 });
     const result = clearSelectedContents({ store, workbook: wb });
     expect(result.status).toBe('rejected');
-    expect(alerts).toEqual([en.pivotTableDialog.pivotCaptions.cannotChange]);
+    expect(alerts).toEqual([en.pivotTableDialog.cannotChange]);
     expect([...wb.pivotCells(0)].length).toBeGreaterThan(0);
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'Region' });
 

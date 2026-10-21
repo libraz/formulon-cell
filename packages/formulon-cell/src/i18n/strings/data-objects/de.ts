@@ -86,14 +86,7 @@ export const dataObjectsDe: DataObjectsStrings = {
     stdDevP: 'StdDevp',
     variance: 'Var',
     varianceP: 'Varp',
-    pivotCaptions: {
-      rowLabels: 'Zeilenbeschriftungen',
-      columnLabels: 'Spaltenbeschriftungen',
-      grandTotal: 'Gesamtergebnis',
-      blank: '(leer)',
-      subtotal: '{item} Ergebnis',
-      cannotChange: 'Dieser Teil eines PivotTable-Berichts kann nicht geändert werden.',
-    },
+    cannotChange: 'Dieser Teil eines PivotTable-Berichts kann nicht geändert werden.',
     dataFieldNaming: {
       template: '{prefix} {field}',
       sum: 'Sum of',

@@ -1,6 +1,6 @@
 import { formatA1Range } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
-import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-captions.js';
+import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-data-field-name.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
 import {

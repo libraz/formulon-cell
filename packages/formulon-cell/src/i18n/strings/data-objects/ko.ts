@@ -81,14 +81,7 @@ export const dataObjectsKo: DataObjectsStrings = {
     stdDevP: 'StdDevp',
     variance: 'Var',
     varianceP: 'Varp',
-    pivotCaptions: {
-      rowLabels: 'Row Labels',
-      columnLabels: 'Column Labels',
-      grandTotal: 'Grand Total',
-      blank: '(blank)',
-      subtotal: '{item} Total',
-      cannotChange: 'Cannot change this part of a PivotTable report.',
-    },
+    cannotChange: 'Cannot change this part of a PivotTable report.',
     dataFieldNaming: {
       template: '{prefix} {field}',
       sum: 'Sum of',

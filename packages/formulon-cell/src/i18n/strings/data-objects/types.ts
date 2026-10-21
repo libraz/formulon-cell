@@ -79,14 +79,8 @@ export interface DataObjectsStrings {
     stdDevP: string;
     variance: string;
     varianceP: string;
-    pivotCaptions: {
-      rowLabels: string;
-      columnLabels: string;
-      grandTotal: string;
-      blank: string;
-      subtotal: string;
-      cannotChange: string;
-    };
+    /** Alert shown when an edit would write over a PivotTable cell. */
+    cannotChange: string;
     dataFieldNaming: {
       template: string;
       sum: string;

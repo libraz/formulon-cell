@@ -153,8 +153,11 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       })
     : null;
 
-  setPivotGuardSink(wb, (alert) => validationAlert?.show(alert));
-  wb.setPivotCaptions(strings.pivotTableDialog.pivotCaptions);
+  setPivotGuardSink(
+    wb,
+    (alert) => validationAlert?.show(alert),
+    strings.pivotTableDialog.cannotChange,
+  );
 
   const editor = new InlineEditor({
     host,

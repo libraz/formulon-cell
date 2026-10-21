@@ -82,14 +82,7 @@ export const dataObjectsJa: DataObjectsStrings = {
     stdDevP: '標準偏差',
     variance: '標本分散',
     varianceP: '分散',
-    pivotCaptions: {
-      rowLabels: '行ラベル',
-      columnLabels: '列ラベル',
-      grandTotal: '総計',
-      blank: '(空白)',
-      subtotal: '{item} 集計',
-      cannotChange: 'ピボットテーブルのこの部分は変更できません。',
-    },
+    cannotChange: 'ピボットテーブルのこの部分は変更できません。',
     dataFieldNaming: {
       template: '{prefix} / {field}',
       sum: '合計',

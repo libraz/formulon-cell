@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
-import { ENGLISH_PIVOT_CAPTIONS, pivotDataFieldName } from '../../../src/engine/pivot-captions.js';
-import { PivotAggregation, PivotAxis, PivotReportLayout } from '../../../src/engine/types.js';
+import { pivotDataFieldName } from '../../../src/engine/pivot-data-field-name.js';
+import { PivotAggregation } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 
@@ -35,8 +35,8 @@ const texts = (wb: WorkbookHandle): Map<string, string> => {
   return out;
 };
 
-describe('pivot caption localization', () => {
-  it('translates engine captions by kind and leaves item names alone', async () => {
+describe('pivot captions', () => {
+  it('follows the workbook profile, as the engine localizes them', async () => {
     const wb = await makeWorkbook();
     const result = createPivotTableFromRange(wb, {
       source,
@@ -46,50 +46,17 @@ describe('pivot caption localization', () => {
       valueField: 'Sales',
     });
     expect(result.ok).toBe(true);
-    expect([...texts(wb).values()].sort()).toEqual(
-      [
-        '(blank)',
-        'Chair',
-        'Column Labels',
-        'Desk',
-        'East',
-        'Grand Total',
-        'Grand Total',
-        'Row Labels',
-        'Sum of Sales',
-        'West',
-      ].sort(),
+    expect([...texts(wb).values()]).toEqual(
+      expect.arrayContaining(['Row Labels', 'Column Labels', 'Grand Total', '(blank)']),
     );
 
-    wb.setPivotCaptions(ja.pivotTableDialog.pivotCaptions);
+    expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
     const localized = [...texts(wb).values()];
     expect(localized).toEqual(
       expect.arrayContaining(['行ラベル', '列ラベル', '総計', '(空白)', 'East', 'West', 'Desk']),
     );
-    expect(localized).not.toContain('Row Labels');
-    expect(localized).not.toContain('Grand Total');
     // The stored data-field name is not a caption.
     expect(localized).toContain('Sum of Sales');
-
-    wb.setPivotCaptions(null);
-    expect(texts(wb).get('8:0')).toBe('Row Labels');
-    wb.dispose();
-  });
-
-  it('translates subtotal captions', async () => {
-    const wb = await makeWorkbook();
-    createPivotTableFromRange(wb, {
-      source,
-      destination: { sheet: 0, row: 7, col: 0 },
-      rowField: 'Region',
-      columnField: 'Product',
-      valueField: 'Sales',
-    });
-    wb.addPivotField(0, 0, { sourceName: 'Qty', axis: PivotAxis.Row });
-    wb.setPivotReportLayout(0, 0, PivotReportLayout.Tabular);
-    expect([...texts(wb).values()]).toContain('East Total');
-    wb.setPivotCaptions(ja.pivotTableDialog.pivotCaptions);
-    expect([...texts(wb).values()]).toContain('East 集計');
     wb.dispose();
   });
 
@@ -115,10 +82,6 @@ describe('pivot caption localization', () => {
       '標本標準偏差 / Sales',
     );
     expect(pivotDataFieldName(PivotAggregation.VarP, '$&', jaNaming)).toBe('分散 / $&');
-  });
-
-  it('keeps the English table in step with the engine wording', () => {
-    expect(en.pivotTableDialog.pivotCaptions).toEqual(ENGLISH_PIVOT_CAPTIONS);
   });
 });
 

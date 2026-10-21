@@ -85,14 +85,7 @@ export const dataObjectsFr: DataObjectsStrings = {
     stdDevP: 'StdDevp',
     variance: 'Var',
     varianceP: 'Varp',
-    pivotCaptions: {
-      rowLabels: 'Étiquettes de lignes',
-      columnLabels: 'Étiquettes de colonnes',
-      grandTotal: 'Total général',
-      blank: '(vide)',
-      subtotal: '{item} Total',
-      cannotChange: "Impossible de modifier cette partie d'un rapport de tableau croisé dynamique.",
-    },
+    cannotChange: "Impossible de modifier cette partie d'un rapport de tableau croisé dynamique.",
     dataFieldNaming: {
       template: '{prefix} {field}',
       sum: 'Sum of',

@@ -9,16 +9,23 @@ export interface PivotGuardAlert {
 
 type PivotGuardSink = (alert: PivotGuardAlert) => void;
 
-const sinks = new WeakMap<WorkbookHandle, PivotGuardSink>();
+const ENGLISH_MESSAGE = 'Cannot change this part of a PivotTable report.';
 
-/** Route `blockPivotEdit` alerts for `wb` to the host's alert surface. */
-export function setPivotGuardSink(wb: WorkbookHandle, sink: PivotGuardSink | null): void {
-  if (sink) sinks.set(wb, sink);
-  else sinks.delete(wb);
+const guards = new WeakMap<WorkbookHandle, { sink: PivotGuardSink; message: string }>();
+
+/** Route `blockPivotEdit` alerts for `wb` to the host's alert surface, worded
+ *  in the UI language. */
+export function setPivotGuardSink(
+  wb: WorkbookHandle,
+  sink: PivotGuardSink | null,
+  message = ENGLISH_MESSAGE,
+): void {
+  if (sink) guards.set(wb, { sink, message });
+  else guards.delete(wb);
 }
 
 export function pivotGuardAlert(wb: WorkbookHandle): PivotGuardAlert {
-  return { severity: 'stop', message: wb.pivotCaptions().cannotChange };
+  return { severity: 'stop', message: guards.get(wb)?.message ?? ENGLISH_MESSAGE };
 }
 
 /** Whether a PivotTable report occupies any cell of `range`. */
@@ -30,6 +37,6 @@ export function pivotOccupies(wb: WorkbookHandle, range: Range): boolean {
  *  returns true when the caller must leave the sheet untouched. */
 export function blockPivotEdit(wb: WorkbookHandle, range: Range): boolean {
   if (!pivotOccupies(wb, range)) return false;
-  sinks.get(wb)?.(pivotGuardAlert(wb));
+  guards.get(wb)?.sink(pivotGuardAlert(wb));
   return true;
 }
