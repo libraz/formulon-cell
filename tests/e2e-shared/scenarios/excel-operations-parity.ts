@@ -17,6 +17,7 @@ async function clickColumnHeader(
                 headerRowHeight: number;
                 defaultColWidth: number;
                 colWidths: Map<number, number>;
+                screenScale?: number;
               };
               viewport: { zoom: number };
             };
@@ -26,12 +27,13 @@ async function clickColumnHeader(
     ).__fcInst;
     if (!instance) throw new Error('window.__fcInst is not available');
     const { layout, viewport } = instance.store.getState();
-    const zoom = viewport.zoom;
-    let x = layout.headerColWidth * zoom;
+    // Headers are chrome px; cell sizes are canonical px scaled like renderScale.
+    const scale = viewport.zoom * (layout.screenScale ?? 1);
+    let x = layout.headerColWidth;
     for (let index = 0; index < targetCol; index += 1)
-      x += (layout.colWidths.get(index) ?? layout.defaultColWidth) * zoom;
-    x += ((layout.colWidths.get(targetCol) ?? layout.defaultColWidth) * zoom) / 2;
-    return { x, y: (layout.headerRowHeight * zoom) / 2 };
+      x += (layout.colWidths.get(index) ?? layout.defaultColWidth) * scale;
+    x += ((layout.colWidths.get(targetCol) ?? layout.defaultColWidth) * scale) / 2;
+    return { x, y: layout.headerRowHeight / 2 };
   }, col);
   await page.locator('.fc-host__canvas').first().click({ position, button });
 }
@@ -341,6 +343,7 @@ async function clickRowHeader(
                 headerRowHeight: number;
                 defaultRowHeight: number;
                 rowHeights: Map<number, number>;
+                screenScale?: number;
               };
               viewport: { zoom: number };
             };
@@ -350,12 +353,13 @@ async function clickRowHeader(
     ).__fcInst;
     if (!instance) throw new Error('window.__fcInst is not available');
     const { layout, viewport } = instance.store.getState();
-    const zoom = viewport.zoom;
-    let y = layout.headerRowHeight * zoom;
+    // Headers are chrome px; cell sizes are canonical px scaled like renderScale.
+    const scale = viewport.zoom * (layout.screenScale ?? 1);
+    let y = layout.headerRowHeight;
     for (let index = 0; index < targetRow; index += 1)
-      y += (layout.rowHeights.get(index) ?? layout.defaultRowHeight) * zoom;
-    y += ((layout.rowHeights.get(targetRow) ?? layout.defaultRowHeight) * zoom) / 2;
-    return { x: (layout.headerColWidth * zoom) / 2, y };
+      y += (layout.rowHeights.get(index) ?? layout.defaultRowHeight) * scale;
+    y += ((layout.rowHeights.get(targetRow) ?? layout.defaultRowHeight) * scale) / 2;
+    return { x: layout.headerColWidth / 2, y };
   }, row);
   await page.locator('.fc-host__canvas').first().click({ position, button });
 }

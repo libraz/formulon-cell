@@ -11,6 +11,8 @@ export async function runSelectionFormat(
   const errors = sheet.collectConsoleErrors();
   await sheet.mount({ locale, platform });
   await sheet.expectNoStub();
+  // New workbooks default to 11 pt on the default profile and 12 pt on Mac.
+  const baseSize = platform === 'mac' ? 12 : 11;
   const seeded = await page.evaluate(() => {
     const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
     return instance.applyChanges([
@@ -91,7 +93,7 @@ export async function runSelectionFormat(
       [0, 0],
       [1048575, 2],
     ],
-    [18, 18, 11, 11],
+    [18, 18, baseSize, baseSize],
   );
   await undo();
   await expectSizes(
@@ -99,7 +101,7 @@ export async function runSelectionFormat(
       [0, 1],
       [1048575, 1],
     ],
-    [11, 11],
+    [baseSize, baseSize],
   );
   expect(
     await page.evaluate(() =>
@@ -117,10 +119,10 @@ export async function runSelectionFormat(
       [1, 16383],
       [3, 16383],
     ],
-    [18, 11, 11],
+    [18, baseSize, baseSize],
   );
   await undo();
-  await expectSizes([[2, 16383]], [11]);
+  await expectSizes([[2, 16383]], [baseSize]);
 
   for (const axis of ['row', 'col'] as const) {
     await header(axis, 1);
@@ -142,9 +144,9 @@ export async function runSelectionFormat(
             [1048575, 0],
             [1048575, 4],
           ];
-    await expectSizes(points, [20, 20, 20, 11, 11]);
+    await expectSizes(points, [20, 20, 20, baseSize, baseSize]);
     await undo();
-    await expectSizes(points, [11, 11, 11, 11, 11]);
+    await expectSizes(points, [baseSize, baseSize, baseSize, baseSize, baseSize]);
     for (const modifier of ['Control', 'Meta'] as const) {
       await header(axis, 1);
       await header(axis, 3, modifier);
@@ -161,9 +163,9 @@ export async function runSelectionFormat(
               [1048575, 3],
               [1048575, 2],
             ];
-      await expectSizes(bands, [18, 18, 11]);
+      await expectSizes(bands, [18, 18, baseSize]);
       await undo();
-      await expectSizes(bands, [11, 11, 11]);
+      await expectSizes(bands, [baseSize, baseSize, baseSize]);
       await header(axis, 1);
       if (axis === 'row') await header(axis, 8, 'Shift');
       await clickCell(1, 1, modifier);
@@ -182,9 +184,9 @@ export async function runSelectionFormat(
               [1, 1],
               [1048575, 2],
             ];
-      await expectSizes(perforated, [18, 18, 11, 11]);
+      await expectSizes(perforated, [18, 18, baseSize, baseSize]);
       await undo();
-      await expectSizes(perforated, [11, 11, 11, 11]);
+      await expectSizes(perforated, [baseSize, baseSize, baseSize, baseSize]);
     }
   }
 
@@ -198,7 +200,7 @@ export async function runSelectionFormat(
         [2, 2],
         [1, 1],
       ],
-      [24, 24, 11],
+      [24, 24, baseSize],
     );
     await undo();
     await page.locator('.fc-host__grid').first().focus();
@@ -211,7 +213,7 @@ export async function runSelectionFormat(
         [2, 3],
         [1, 1],
       ],
-      [24, 24, 24, 11],
+      [24, 24, 24, baseSize],
     );
     await undo();
     await clickCell(0, 0);
@@ -224,7 +226,7 @@ export async function runSelectionFormat(
         [2, 2],
         [1, 1],
       ],
-      [24, 24, 11],
+      [24, 24, baseSize],
     );
     await undo();
   }
@@ -241,7 +243,7 @@ export async function runSelectionFormat(
       [1, 1],
       [3, 3],
     ],
-    [24, 24, 24, 11],
+    [24, 24, 24, baseSize],
   );
   await undo();
 
@@ -265,9 +267,9 @@ export async function runSelectionFormat(
             [1048575, 1],
             [1048575, 2],
           ];
-    await expectSizes(points, [16, 11]);
+    await expectSizes(points, [16, baseSize]);
     await undo();
-    await expectSizes(points, [11, 11]);
+    await expectSizes(points, [baseSize, baseSize]);
   }
 
   await header('col', 1);
@@ -317,10 +319,10 @@ export async function runSelectionFormat(
     }
   }, moduleUrl);
   expect(saved.slice(0, 2)).toEqual([
-    { size: 11, family: 'Arial', bold: true },
-    { size: 11, family: 'Arial', bold: true },
+    { size: baseSize, family: 'Arial', bold: true },
+    { size: baseSize, family: 'Arial', bold: true },
   ]);
-  expect(saved[2]).toMatchObject({ size: 11, bold: false });
+  expect(saved[2]).toMatchObject({ size: baseSize, bold: false });
   expect(
     await page.evaluate(
       () =>

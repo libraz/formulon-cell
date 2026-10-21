@@ -1,23 +1,14 @@
 import { expect, type Page } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
-import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
+import { gridCellCenter, SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac'): Promise<void> {
   const spreadsheet = new SpreadsheetPage(page);
   await spreadsheet.mount({ locale: 'ja', platform });
   await spreadsheet.expectNoStub();
-  const grid = page.locator('.fc-host__grid').first();
   const clickA1 = async (): Promise<void> => {
-    const position = await page.evaluate(() => {
-      const { layout } = (
-        window as unknown as { __fcInst: SpreadsheetInstance }
-      ).__fcInst.store.getState();
-      return {
-        x: layout.headerColWidth + layout.defaultColWidth / 2,
-        y: layout.headerRowHeight + layout.defaultRowHeight / 2,
-      };
-    });
-    await grid.click({ position });
+    const point = await gridCellCenter(page, 0, 0);
+    await page.mouse.click(point.x, point.y);
   };
   await clickA1();
   await page.keyboard.press('F2');
@@ -43,7 +34,8 @@ export async function runWholeSheetFont(page: Page, platform: 'default' | 'mac')
       { row, col },
     );
   const originalSize = await nativeSize();
-  expect(originalSize).toBe(11);
+  // A new ja workbook uses 游ゴシック 11 on the default profile, 12 on Mac.
+  expect(originalSize).toBe(platform === 'mac' ? 12 : 11);
 
   // The top-left header corner is the user's select-all entry point.
   await page

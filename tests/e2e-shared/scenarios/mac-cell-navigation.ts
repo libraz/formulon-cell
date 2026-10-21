@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 const selection = (page: Page) =>
@@ -186,11 +187,11 @@ export async function runMacFormulaBarPointerReferences(page: Page): Promise<voi
   await sp.goTo('C1');
   const fx = page.locator('.fc-host__formulabar-input');
   await fx.fill('=SUM(');
-  const grid = await page.locator('.fc-host__grid').boundingBox();
-  if (!grid) throw new Error('Grid has no bounds');
-  await page.mouse.move(grid.x + 26 + 75 / 2, grid.y + 20 + 20 / 2);
+  const a1 = await gridCellCenter(page, 0, 0);
+  const b2 = await gridCellCenter(page, 1, 1);
+  await page.mouse.move(a1.x, a1.y);
   await page.mouse.down();
-  await page.mouse.move(grid.x + 26 + 75 * 1.5, grid.y + 20 + 20 * 1.5, { steps: 8 });
+  await page.mouse.move(b2.x, b2.y, { steps: 8 });
   await page.mouse.up();
   await expect(fx).toBeFocused();
   await expect(fx).toHaveValue('=SUM(A1:B2');

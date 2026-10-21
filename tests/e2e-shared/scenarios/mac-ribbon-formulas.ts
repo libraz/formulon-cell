@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
+import { gridCellCenter } from '../pages/SpreadsheetPage.js';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export async function runMacEditingPaletteScenario(
@@ -139,9 +140,8 @@ export async function runMacFormulaPaletteScenario(page: Page): Promise<void> {
   await expect(palette.locator('[data-role="preview-value"]')).toHaveText('0');
   await expect.poll(() => sp.readValue('A1')).toEqual({ kind: 'number', value: 1 });
   await palette.getByRole('button', { name: 'Select range', exact: true }).click();
-  const editingGrid = await grid.boundingBox();
-  if (!editingGrid) throw new Error('Missing editing grid geometry.');
-  await page.mouse.click(editingGrid.x + 26 + 75 * 1.5, editingGrid.y + 20 + 20 * 1.5);
+  const b2 = await gridCellCenter(page, 1, 1);
+  await page.mouse.click(b2.x, b2.y);
   await expect(field).toHaveValue('B2');
   await expect.poll(() => sp.formulaBarValue()).toBe('=ACOS(B2)');
   await expect(page.locator('.fc-host__formulabar-tag')).toHaveValue('A1');

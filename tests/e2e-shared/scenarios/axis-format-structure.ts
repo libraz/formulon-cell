@@ -11,6 +11,8 @@ export async function runAxisFormatStructure(
   const sheet = new UserJourneyPage(page);
   await sheet.mount({ locale, platform });
   await sheet.expectNoStub();
+  // New workbooks default to 11 pt on the default profile and 12 pt on Mac.
+  const baseSize = platform === 'mac' ? 12 : 11;
   const header = async (axis: 'row' | 'col', index: number) => {
     const box = await page.locator('.fc-host__grid').first().boundingBox();
     if (!box) throw new Error('Missing grid');
@@ -57,24 +59,24 @@ export async function runAxisFormatStructure(
     for (const operation of ['insert', 'delete'] as const) {
       await header(axis, 3);
       await chooseSize(18);
-      await expectSizes(axis, [2, 3, 4], [11, 18, 11]);
+      await expectSizes(axis, [2, 3, 4], [baseSize, 18, baseSize]);
       await header(axis, 2);
       const kind = axis === 'row' ? 'rows' : 'cols';
       if (operation === 'insert') await sheet.insertRowsOrColumns(kind);
       else await sheet.deleteRowsOrColumns(kind);
       const shifted = operation === 'insert' ? 4 : 2;
-      await expectSizes(axis, [shifted, 3], [18, 11]);
+      await expectSizes(axis, [shifted, 3], [18, baseSize]);
       await header(axis === 'row' ? 'col' : 'row', 6);
       await chooseSize(24);
-      await expectSizes(axis, [shifted, 3], [18, 11]);
+      await expectSizes(axis, [shifted, 3], [18, baseSize]);
       await history('undo');
       await history('undo');
-      await expectSizes(axis, [2, 3, 4], [11, 18, 11]);
+      await expectSizes(axis, [2, 3, 4], [baseSize, 18, baseSize]);
       await history('redo');
-      await expectSizes(axis, [shifted, 3], [18, 11]);
+      await expectSizes(axis, [shifted, 3], [18, baseSize]);
       await history('undo');
       await history('undo');
-      await expectSizes(axis, [2, 3, 4], [11, 11, 11]);
+      await expectSizes(axis, [2, 3, 4], [baseSize, baseSize, baseSize]);
     }
   }
   await sheet.expectNoConsoleErrors();

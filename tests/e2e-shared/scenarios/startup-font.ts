@@ -2,6 +2,19 @@ import { expect, type Page } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
+/** Blank-workbook defaults per platform: canonical row px, workbook font and
+ *  painted text px. Mac renders 1 pt = 1 screen px. */
+const STARTUP = {
+  default: {
+    ja: { rowHeight: 25, font: { name: '游ゴシック', size: 11 }, textPx: 11 * (96 / 72) },
+    en: { rowHeight: 20, font: { name: 'Calibri', size: 11 }, textPx: 11 * (96 / 72) },
+  },
+  mac: {
+    ja: { rowHeight: 80 / 3, font: { name: '游ゴシック', size: 12 }, textPx: 12 },
+    en: { rowHeight: 64 / 3, font: { name: 'Aptos Narrow', size: 12 }, textPx: 12 },
+  },
+} as const;
+
 type FontProbeWindow = Window & {
   __fcInst: SpreadsheetInstance;
   __startupText: Record<string, { font: string; width: number }>;
@@ -31,7 +44,9 @@ export async function runStartupFont(
   await spreadsheet.mount({ fixture: null, locale, platform });
   await spreadsheet.expectNoStub();
   await page.waitForFunction(() => (window as unknown as FontProbeWindow).__startupText.REYKJAVÍK);
-  const fontName = locale === 'ja' ? '游ゴシック' : 'Calibri';
+  const expected = STARTUP[platform][locale];
+  const fontName = expected.font.name;
+  const fontSize = String(expected.font.size);
   const startup = await page.evaluate(() => {
     const probe = window as unknown as FontProbeWindow;
     const instance = probe.__fcInst;
@@ -44,9 +59,9 @@ export async function runStartupFont(
       corner: { x: state.layout.headerColWidth + 12, y: state.layout.headerRowHeight + 8 },
     };
   });
-  expect(startup.font).toEqual({ name: fontName, size: 11 });
+  expect(startup.font).toEqual(expected.font);
   await expect(page.locator('[data-ribbon-select="fontSize"] .fc-tb__rb-dd__value')).toHaveText(
-    '11',
+    fontSize,
   );
   await expect(page.locator('[data-ribbon-command="fontFamily"] button').first()).toContainText(
     fontName,
@@ -54,7 +69,7 @@ export async function runStartupFont(
   for (const [col, width] of [112, 80, 104, 128].entries()) {
     expect(startup.widths[col]).toBeCloseTo(width, 1);
   }
-  expect(startup.rowHeight).toBeCloseTo(19.428571, 4);
+  expect(startup.rowHeight).toBeCloseTo(expected.rowHeight, 4);
   for (const [text, col] of [
     ['ITEM', 0],
     ['LONDON', 0],
@@ -67,7 +82,7 @@ export async function runStartupFont(
     expect(draw.font).toContain(fontName);
     expect(draw.font).toContain('sans-serif');
     expect(draw.width).toBeLessThan((startup.widths[col] ?? 0) - 8);
-    expect(Number.parseFloat(draw.font)).toBeCloseTo(11 * (96 / 72), 3);
+    expect(Number.parseFloat(draw.font)).toBeCloseTo(expected.textPx, 3);
   }
   await page.locator('.fc-host__grid').first().click({ position: startup.corner });
   await page.keyboard.press('F2');
@@ -79,7 +94,7 @@ export async function runStartupFont(
   });
   expect(editing.family).toContain(fontName);
   expect(editing.family).toContain('sans-serif');
-  expect(editing.size).toBeCloseTo(11 * (96 / 72), 3);
+  expect(editing.size).toBeCloseTo(expected.textPx, 3);
   await page.keyboard.press('Escape');
 
   // Drive the real demo callback through File > New after a UI locale change.
@@ -115,7 +130,7 @@ export async function runStartupFont(
     await page.evaluate(
       () => (window as unknown as FontProbeWindow).__fcInst.workbook.workbookDisplayFont,
     ),
-  ).toEqual({ name: fontName, size: 11 });
+  ).toEqual(expected.font);
   await page
     .locator(platform === 'mac' ? '.demo__quick .demo__brand-mark' : '[data-ribbon-tab="file"]')
     .click();
@@ -145,12 +160,12 @@ export async function runStartupFont(
   });
   expect(replacement).toEqual({
     locale: nextLocale,
-    font: { name: nextLocale === 'ja' ? '游ゴシック' : 'Calibri', size: 11 },
+    font: STARTUP[platform][nextLocale].font,
     disposeCount: 1,
     value: { kind: 'blank' },
   });
   await expect(page.locator('[data-ribbon-select="fontSize"] .fc-tb__rb-dd__value')).toHaveText(
-    '11',
+    String(STARTUP[platform][nextLocale].font.size),
   );
   await spreadsheet.expectNoStub();
   expect(errors.read()).toEqual([]);
