@@ -483,10 +483,22 @@ const hasNonBlankInCol = (
   return false;
 };
 
-/** Infer the Excel Current Region for a Filter toggle. Explicit multi-cell
+/** Infer the Excel Current Region for a Filter toggle. A selection inside a
+ *  table resolves to that table. Explicit multi-cell
  *  selections are honored as-is; a single active cell expands to the
  *  surrounding contiguous non-blank block bounded by blank rows/columns. */
 export function inferAutoFilterRange(state: State, range: Range = state.selection.range): Range {
+  // Inside a table the filter belongs to the table, whatever surrounds it.
+  const table = state.tables.tables.find(
+    (t) =>
+      t.showHeader &&
+      t.range.sheet === range.sheet &&
+      range.r0 >= t.range.r0 &&
+      range.r1 <= t.range.r1 &&
+      range.c0 >= t.range.c0 &&
+      range.c1 <= t.range.c1,
+  );
+  if (table) return { ...table.range };
   if (range.r0 !== range.r1 || range.c0 !== range.c1) return { ...range };
   const sheet = range.sheet;
   const row = range.r0;

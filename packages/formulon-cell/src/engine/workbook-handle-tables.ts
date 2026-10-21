@@ -30,6 +30,18 @@ type AutoFilterWorkbook = Workbook & {
   evaluateAutoFilter?: (sheet: number) => AutoFilterEvalResult;
 };
 
+type TableAutoFilterWorkbook = Workbook & {
+  getTableAutoFilter?: (table: number) => {
+    status: { ok: boolean };
+    autoFilter: AutoFilter | null;
+  };
+  setTableAutoFilter?: (table: number, filter: AutoFilter) => { ok: boolean };
+  removeTableAutoFilter?: (table: number) => { ok: boolean };
+  applyTableAutoFilter?: (table: number) => { ok: boolean };
+  clearTableAutoFilter?: (table: number) => { ok: boolean };
+  evaluateTableAutoFilter?: (table: number) => AutoFilterEvalResult;
+};
+
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleTablesMethods {}
 }
@@ -136,6 +148,52 @@ export abstract class WorkbookHandleTablesMethods {
     return result?.status.ok ? result : null;
   }
 
+  /** Read a table's own typed AutoFilter by workbook-wide table index (the
+   * `index` of {@link getTables}). `null` means the table has none. */
+  getTableAutoFilter(table: number): AutoFilter | null {
+    assertAlive(this);
+    if (!this.capabilities.typedTableAutoFilter) return null;
+    const result = (wb(this) as TableAutoFilterWorkbook).getTableAutoFilter?.(table);
+    return result?.status.ok ? result.autoFilter : null;
+  }
+
+  /** Replace a table's AutoFilter. Row visibility is unchanged; follow with
+   * {@link applyTableAutoFilter} to hide the excluded rows. */
+  setTableAutoFilter(table: number, filter: AutoFilter): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedTableAutoFilter) return false;
+    return (wb(this) as TableAutoFilterWorkbook).setTableAutoFilter?.(table, filter)?.ok === true;
+  }
+
+  /** Remove a table's AutoFilter (its header buttons). Row visibility is unchanged. */
+  removeTableAutoFilter(table: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedTableAutoFilter) return false;
+    return (wb(this) as TableAutoFilterWorkbook).removeTableAutoFilter?.(table)?.ok === true;
+  }
+
+  /** Apply a table's AutoFilter and update native row visibility. */
+  applyTableAutoFilter(table: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedTableAutoFilter) return false;
+    return (wb(this) as TableAutoFilterWorkbook).applyTableAutoFilter?.(table)?.ok === true;
+  }
+
+  /** Drop every criterion of a table's AutoFilter and show all its body rows. */
+  clearTableAutoFilter(table: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.typedTableAutoFilter) return false;
+    return (wb(this) as TableAutoFilterWorkbook).clearTableAutoFilter?.(table)?.ok === true;
+  }
+
+  /** Evaluate a table's AutoFilter without changing native visibility. */
+  evaluateTableAutoFilter(table: number): AutoFilterEvalResult | null {
+    assertAlive(this);
+    if (!this.capabilities.typedTableAutoFilter) return null;
+    const result = (wb(this) as TableAutoFilterWorkbook).evaluateTableAutoFilter?.(table);
+    return result?.status.ok ? result : null;
+  }
+
   /** Creates an OOXML worksheet table and returns its index, or -1 when the
    * loaded engine predates table authoring support. */
   createTable(input: TableInput): number {
@@ -168,6 +226,8 @@ export abstract class WorkbookHandleTablesMethods {
    *  we surface it as a badge count + listing for the status bar. Empty array
    *  on the stub. */
   getTables(): {
+    /** Workbook-wide table index, as taken by the table AutoFilter methods. */
+    index: number;
     name: string;
     displayName: string;
     ref: string;
@@ -180,6 +240,7 @@ export abstract class WorkbookHandleTablesMethods {
     if (!count.status.ok) return [];
     const n = count.value;
     const out: {
+      index: number;
       name: string;
       displayName: string;
       ref: string;
@@ -191,6 +252,7 @@ export abstract class WorkbookHandleTablesMethods {
       if (!e.status.ok || !e.name || !e.displayName || !e.ref || e.sheetIndex === undefined)
         continue;
       out.push({
+        index: i,
         name: e.name,
         displayName: e.displayName,
         ref: e.ref,

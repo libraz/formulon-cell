@@ -490,6 +490,20 @@ export interface PhoneticRun {
   readonly text: string;
 }
 
+/**
+ * How a cell's phonetic guide renders (OOXML `<phoneticPr>`). `fontId` indexes
+ * the workbook font table; `type` is the kana form (0 half-width katakana,
+ * 1 full-width katakana, 2 hiragana, 3 no conversion) and `alignment` how the
+ * reading sits over its span (0 no control, 1 left, 2 center, 3 distributed).
+ * The all-zero triple is what the engine reports for a guide with no
+ * `<phoneticPr>` element.
+ */
+export interface PhoneticProperties {
+  readonly fontId: number;
+  readonly type: number;
+  readonly alignment: number;
+}
+
 /** Tagged value the UI displays. Mirrors the six error sentinels. */
 export type CellValue =
   | { readonly kind: 'blank' }
@@ -506,6 +520,8 @@ export type CellValue =
  *  required for round-tripping that feature is present. */
 export interface EngineCapabilities {
   readonly typedAutoFilter?: boolean;
+  /** Table-level typed AutoFilter (`getTableAutoFilter` and friends). */
+  readonly typedTableAutoFilter?: boolean;
   readonly validationEvaluation?: boolean;
   readonly threadedComments?: boolean;
   readonly drawings?: boolean;
@@ -544,6 +560,9 @@ export interface EngineCapabilities {
   /** Phonetic guides read and written span by span, so a partially annotated
    *  cell survives a round-trip instead of collapsing into one reading. */
   readonly phoneticRuns?: boolean;
+  /** Per-cell guide rendering properties (`<phoneticPr>`): kana form,
+   *  alignment and font. */
+  readonly phoneticProperties?: boolean;
   /** `setDefaultFont` — states font 0, the record an unstyled cell resolves
    *  to. Without it a new workbook keeps the engine's seeded default. */
   readonly defaultFont?: boolean;
@@ -568,6 +587,8 @@ export interface EngineCapabilities {
   readonly geometry?: boolean;
   /** Clear an explicit row height so the row follows its sheet default. */
   readonly rowHeightClear?: boolean;
+  /** Clear explicit column widths so the columns follow their sheet default. */
+  readonly columnWidthClear?: boolean;
   /** Resolve theme, indexed and automatic style colours to ARGB. */
   readonly colorResolution?: boolean;
   /** `setSheetFreeze`. */
@@ -576,6 +597,10 @@ export interface EngineCapabilities {
   readonly sheetView?: boolean;
   /** `setSheetZoom`. */
   readonly sheetZoom: boolean;
+  /** `setSheetViewMode`. */
+  readonly sheetViewMode?: boolean;
+  /** `setSheetTabSelected`. */
+  readonly sheetTabSelected?: boolean;
   /** `setSheetTabHidden` — the two-state view of tab visibility. */
   readonly sheetTabHidden: boolean;
   /** `setSheetVisibility` three-state tab visibility. Required to state

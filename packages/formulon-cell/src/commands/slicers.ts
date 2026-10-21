@@ -2,7 +2,7 @@ import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
-import { applyFilterColumns, clearFilter, distinctValues, type FilterPredicate } from './filter.js';
+import { applyValueFilter, clearFilter, distinctValues } from './filter.js';
 
 export interface CreateSlicerOptions {
   id?: string;
@@ -127,10 +127,12 @@ export function recomputeSlicerFilters(store: SpreadsheetStore, workbook: Workbo
     );
 
   // Group every slicer by its range so each range's columns are ANDed in a
-  // single pass. A range with no active selection is fully revealed.
+  // single pass. A range with no active selection is fully revealed. Each
+  // selection becomes a value criterion on the range's filter, so a table
+  // slicer filters through the table's own criteria.
   const groups = new Map<
     string,
-    { range: Range; cols: Array<{ byCol: number; predicate: FilterPredicate }> }
+    { range: Range; cols: Array<{ byCol: number; wanted: Set<string> }> }
   >();
   const order: string[] = [];
   for (const entry of resolved) {
@@ -142,36 +144,27 @@ export function recomputeSlicerFilters(store: SpreadsheetStore, workbook: Workbo
       order.push(key);
     }
     if (entry.selected.length === 0) continue;
-    const wanted = new Set(entry.selected);
-    group.cols.push({
-      byCol: entry.byCol,
-      predicate: (cell) => wanted.has(cellToKey(cell?.value)),
-    });
+    group.cols.push({ byCol: entry.byCol, wanted: new Set(entry.selected) });
   }
 
   let hiddenCount = 0;
   for (const key of order) {
     const group = groups.get(key);
     if (!group) continue;
-    if (group.cols.length === 0) {
-      clearFilter(store.getState(), store, group.range);
-      continue;
+    clearFilter(store.getState(), store, group.range);
+    // Each call reports the range's total under the criteria applied so far.
+    let groupHidden = 0;
+    for (const { byCol, wanted } of group.cols) {
+      const state = store.getState();
+      const hiddenValues = distinctValues(state, group.range, byCol).filter((v) => !wanted.has(v));
+      groupHidden = applyValueFilter(state, store, group.range, byCol, hiddenValues);
     }
-    hiddenCount += applyFilterColumns(store.getState(), store, group.range, group.cols);
+    hiddenCount += groupHidden;
   }
   return hiddenCount;
 }
 
 const rangeKey = (r: Range): string => `${r.sheet}:${r.r0}:${r.c0}:${r.r1}:${r.c1}`;
-
-const cellToKey = (v: unknown): string => {
-  if (!v || typeof v !== 'object') return '';
-  const cv = v as { kind: string; value?: unknown };
-  if (cv.kind === 'number') return String(cv.value);
-  if (cv.kind === 'text') return String(cv.value ?? '');
-  if (cv.kind === 'bool') return cv.value ? 'TRUE' : 'FALSE';
-  return '';
-};
 
 const nextSlicerId = (store: SpreadsheetStore, tableName: string, column: string): string => {
   const base = `slicer-${slug(tableName)}-${slug(column)}`;
