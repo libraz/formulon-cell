@@ -37,6 +37,9 @@ const makeDataTransfer = () => {
   };
 };
 
+const SOURCE_HEADERS = ['Region', 'Sales', 'Qty', 'Channel', 'Segment'];
+const ENGINE_AGGREGATION_NAMES = ['Sum', 'Count', 'Average', 'Max', 'Min'];
+
 const makeWb = () => {
   const calls: string[] = [];
   const wb = {
@@ -92,7 +95,8 @@ const makeWb = () => {
     },
     addPivotField: (_sheet: number, _pivot: number, spec: { sourceName: string; axis: number }) => {
       calls.push(`pivot-field:${spec.sourceName}:${spec.axis}`);
-      return 0;
+      // Pivot fields are numbered in the order they are added.
+      return calls.filter((c) => c.startsWith('pivot-field:')).length - 1;
     },
     addPivotFieldItem: (
       _sheet: number,
@@ -133,12 +137,22 @@ const makeWb = () => {
     addPivotDataField: (
       _sheet: number,
       _pivot: number,
-      spec: { name: string; aggregation: number; numberFormat?: string; showValuesAs?: number },
+      spec: {
+        name?: string;
+        fieldIndex: number;
+        aggregation: number;
+        numberFormat?: string;
+        showValuesAs?: number;
+      },
     ) => {
-      calls.push(`data-field:${spec.name}`);
+      // An empty name is named by the engine, as "<aggregation> of <field>".
+      const name =
+        spec.name ||
+        `${ENGINE_AGGREGATION_NAMES[spec.aggregation]} of ${SOURCE_HEADERS[spec.fieldIndex]}`;
+      calls.push(`data-field:${name}`);
       calls.push(`data-field-agg:${spec.aggregation}`);
-      calls.push(`data-field-format:${spec.name}:${spec.numberFormat ?? ''}`);
-      calls.push(`data-field-show:${spec.name}:${spec.showValuesAs ?? ''}`);
+      calls.push(`data-field-format:${name}:${spec.numberFormat ?? ''}`);
+      calls.push(`data-field-show:${name}:${spec.showValuesAs ?? ''}`);
       return 0;
     },
   } as unknown as WorkbookHandle;
