@@ -552,6 +552,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'ribbonMenu',
     'block',
   ),
+  shell(
+    'toolbar.phoneticSettings',
+    'toolbar/dialogs/phonetic-settings.ts',
+    'showPhoneticSettingsDialog',
+    'ribbonMenu',
+    'block',
+  ),
   shell('toolbar.prompt', 'toolbar/dialogs/prompt.ts', 'showPrompt', 'ribbonMenu', 'block'),
   shell(
     'toolbar.protection',

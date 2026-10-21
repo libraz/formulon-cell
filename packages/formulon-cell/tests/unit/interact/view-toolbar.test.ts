@@ -22,12 +22,14 @@ const fakeWb = () =>
     },
     setSheetFreeze: vi.fn(),
     setSheetZoom: vi.fn(),
+    setSheetViewMode: vi.fn(),
     setSheetShowGridLines: vi.fn(),
     setSheetShowRowColHeaders: vi.fn(),
     setSheetShowZeros: vi.fn(),
   }) as unknown as WorkbookHandle & {
     setSheetFreeze: ReturnType<typeof vi.fn>;
     setSheetZoom: ReturnType<typeof vi.fn>;
+    setSheetViewMode: ReturnType<typeof vi.fn>;
     setSheetShowGridLines: ReturnType<typeof vi.fn>;
     setSheetShowRowColHeaders: ReturnType<typeof vi.fn>;
     setSheetShowZeros: ReturnType<typeof vi.fn>;
@@ -75,6 +77,7 @@ describe('attachViewToolbar', () => {
     r1c1?.click();
 
     expect(store.getState().ui.workbookView).toBe('pageBreakPreview');
+    expect(wb.setSheetViewMode).toHaveBeenLastCalledWith(0, 'pageBreakPreview');
     expect(pageBreak?.getAttribute('aria-pressed')).toBe('true');
     expect(normal?.getAttribute('aria-pressed')).toBe('false');
     expect(store.getState().ui.showGridLines).toBe(false);

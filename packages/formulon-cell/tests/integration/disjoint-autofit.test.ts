@@ -73,21 +73,16 @@ describe('native multi-range AutoFit layout history', () => {
 
       expect(history.undo()).toBe(true);
       const afterColumnUndo = hydratedLayout(workbook);
-      expect(afterColumnUndo.colWidths.get(0)).toBeCloseTo(
-        store.getState().layout.defaultColWidth,
-        8,
-      );
-      expect(afterColumnUndo.colWidths.get(2)).toBeCloseTo(
-        store.getState().layout.defaultColWidth,
-        8,
-      );
+      // Undo clears the widths, so the columns follow the sheet default again.
+      expect(afterColumnUndo.colWidths.has(0)).toBe(false);
+      expect(afterColumnUndo.colWidths.has(2)).toBe(false);
       expect(afterColumnUndo.rowHeights.get(0)).toBeCloseTo(rowZeroHeight ?? 0, 8);
       expect(afterColumnUndo.rowHeights.get(2)).toBeCloseTo(rowTwoHeight ?? 0, 8);
 
       expect(history.undo()).toBe(true);
       const afterRowUndo = hydratedLayout(workbook);
-      expect(afterRowUndo.colWidths.get(0)).toBeCloseTo(store.getState().layout.defaultColWidth, 8);
-      expect(afterRowUndo.colWidths.get(2)).toBeCloseTo(store.getState().layout.defaultColWidth, 8);
+      expect(afterRowUndo.colWidths.has(0)).toBe(false);
+      expect(afterRowUndo.colWidths.has(2)).toBe(false);
       expect(afterRowUndo.rowHeights.has(0)).toBe(false);
       expect(afterRowUndo.rowHeights.has(2)).toBe(false);
 
