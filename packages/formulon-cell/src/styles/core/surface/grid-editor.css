@@ -21,19 +21,21 @@
     position: absolute;
     z-index: 2;
     box-sizing: border-box;
-    /* 1.5px padding + 1.5px border = 3px text inset, matching the canvas
-     * painter's padX so the caret/text doesn't jump on commit. */
-    padding: 4px 1.5px;
+    /* The frame starts a pixel outside the cell, so 2px border + 2px padding
+     * leave the 3px text inset of the canvas painter's padX and the caret/text
+     * doesn't jump on commit. */
+    padding: 4.5px 2px;
     margin: 0;
     /* Sheet background by default; the editor overrides it with the cell's own
      * fill when there is one. */
     background: var(--fc-bg);
     color: var(--fc-fg);
-    /* The border sits inside the cell rect (border-box), so the editor covers
-     * exactly the cell it stands in for. Deliberately no radius and no drop
-     * ring: both spill past the cell edges onto the neighbours and make
-     * in-place editing read as a floating input hovering over the grid. */
-    border: 1.5px solid var(--fc-accent);
+    /* The border lies exactly on the selection outline (the editor frame is
+     * placed over the cell's gridlines and one pixel outside them), so editing
+     * keeps the same 2px frame. Deliberately no radius and no drop ring: both
+     * spill onto the neighbours and make in-place editing read as a floating
+     * input hovering over the grid. */
+    border: 2px solid var(--fc-accent);
     font: inherit;
     font-family: var(--fc-font-ui);
     font-size: var(--fc-text-cell);

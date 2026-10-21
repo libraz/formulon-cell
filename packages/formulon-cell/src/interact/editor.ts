@@ -6,7 +6,7 @@ import { dblClickRange, extractRefs, rotateRefAt } from '../commands/refs.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
+import { bodyBandOrigin, cellRectUnclamped, layoutForView, type Rect } from '../render/geometry.js';
 import {
   cellFontFamily,
   cellTextVerticalOffset,
@@ -76,6 +76,20 @@ export interface EditorDeps {
   getCustomFunctions?: () => readonly string[];
   getCustomFunctionArgs?: (name: string) => readonly string[] | undefined;
 }
+
+/** The editor's frame for a cell: its 2px border lies exactly where the
+ *  selection outline is painted, over the cell's gridlines and one pixel
+ *  outside them, so editing keeps the same frame. */
+const editorFrame = (cell: Rect): Rect => {
+  const x = Math.round(cell.x);
+  const y = Math.round(cell.y);
+  return {
+    x: x - 1,
+    y: y - 1,
+    w: Math.round(cell.x + cell.w) - x + 3,
+    h: Math.round(cell.y + cell.h) - y + 3,
+  };
+};
 
 /**
  * Inline cell editor — a single-line `<input>` floated over the active
@@ -834,7 +848,9 @@ export class InlineEditor {
     if (!this.input || !this.editingAddr) return;
     const s = this.deps.store.getState();
     const layout = layoutForView(s);
-    const r = cellRectUnclamped(layout, s.viewport, this.editingAddr.row, this.editingAddr.col);
+    const r = editorFrame(
+      cellRectUnclamped(layout, s.viewport, this.editingAddr.row, this.editingAddr.col),
+    );
     // Reset to the cell width first so the editor can shrink back as content
     //  is deleted, then measure the natural content width.
     this.input.style.width = `${r.w}px`;
@@ -932,7 +948,8 @@ export class InlineEditor {
   private position(a: Addr): void {
     const s = this.deps.store.getState();
     const layout = layoutForView(s);
-    const r = cellRectUnclamped(layout, s.viewport, a.row, a.col);
+    const cell = cellRectUnclamped(layout, s.viewport, a.row, a.col);
+    const r = editorFrame(cell);
     if (!this.input) return;
     // A cell scrolled off the leading edge sits behind the frozen band and the
     // headers. Park the editor outside the grid's clip rect instead of letting
@@ -941,8 +958,8 @@ export class InlineEditor {
     // spreadsheet does.
     const band = bodyBandOrigin(layout, s.viewport);
     const scrolledOut =
-      (a.row >= s.layout.freezeRows && r.y < band.y) ||
-      (a.col >= s.layout.freezeCols && (layout.rtl ? r.x + r.w > band.x : r.x < band.x));
+      (a.row >= s.layout.freezeRows && cell.y < band.y) ||
+      (a.col >= s.layout.freezeCols && (layout.rtl ? cell.x + cell.w > band.x : cell.x < band.x));
     this.input.style.left = scrolledOut ? `${-r.w - 4}px` : `${r.x}px`;
     this.input.style.top = scrolledOut ? `${-r.h - 4}px` : `${r.y}px`;
     this.input.style.width = `${r.w}px`;

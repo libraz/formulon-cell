@@ -138,11 +138,12 @@ describe('InlineEditor', () => {
     const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
     // Test fixture pins layout to (headerCol=52, headerRow=30,
     // defaultColW=104, defaultRowH=28). Cell (1, 1): x=52+104=156,
-    // y=30+28=58, w=104, h=28.
-    expect(input.style.left).toBe('156px');
-    expect(input.style.top).toBe('58px');
-    expect(input.style.width).toBe('104px');
-    expect(input.style.height).toBe('28px');
+    // y=30+28=58, w=104, h=28. The frame lies on the selection outline: over
+    // the cell's gridlines and one pixel outside them.
+    expect(input.style.left).toBe('155px');
+    expect(input.style.top).toBe('57px');
+    expect(input.style.width).toBe('107px');
+    expect(input.style.height).toBe('31px');
   });
 
   it('scales the editing glyph and vertical alignment with viewport zoom', () => {
@@ -214,15 +215,15 @@ describe('InlineEditor', () => {
     mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
     editor.begin('hi');
     const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
-    expect(input.style.top).toBe(`${30 + 5 * 28}px`);
+    expect(input.style.top).toBe(`${30 + 5 * 28 - 1}px`);
 
     mutators.scrollBy(store, 2, 0);
     // Two rows scrolled away → the cell (and the editor) climb two rows.
-    expect(input.style.top).toBe(`${30 + 3 * 28}px`);
-    expect(input.style.left).toBe('156px');
+    expect(input.style.top).toBe(`${30 + 3 * 28 - 1}px`);
+    expect(input.style.left).toBe('155px');
 
     mutators.scrollBy(store, 0, 1);
-    expect(input.style.left).toBe(`${52 + 0 * 104}px`);
+    expect(input.style.left).toBe(`${52 + 0 * 104 - 1}px`);
   });
 
   it('parks the editor outside the grid once its cell scrolls off the leading edge', () => {
@@ -235,14 +236,14 @@ describe('InlineEditor', () => {
     // over the column headers, and it keeps its size so it can come back.
     expect(Number.parseFloat(input.style.top)).toBeLessThan(0);
     expect(Number.parseFloat(input.style.left)).toBeLessThan(0);
-    expect(input.style.height).toBe('28px');
+    expect(input.style.height).toBe('31px');
     // The edit is still live — value and editor mode survive the trip.
     expect(input.value).toBe('hi');
     expect(editor.isActive()).toBe(true);
 
     mutators.scrollBy(store, -4, 0);
-    expect(input.style.top).toBe('58px');
-    expect(input.style.left).toBe('156px');
+    expect(input.style.top).toBe('57px');
+    expect(input.style.left).toBe('155px');
   });
 
   it('keeps the editor on a frozen cell in place while the body scrolls', () => {
