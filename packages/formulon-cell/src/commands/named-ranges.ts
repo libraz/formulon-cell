@@ -1,5 +1,7 @@
 import { colFromLetters, colLetter, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
-import type { Addr } from '../engine/types.js';
+import { rangeForRef } from '../engine/range-resolver.js';
+import type { Addr, CellValue } from '../engine/types.js';
+import { formatCell, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import type { History } from './history.js';
@@ -51,21 +53,65 @@ const looksLikeCellRef = (name: string): boolean => {
   return false;
 };
 
+/** Fold fullwidth ASCII (U+FF01-FF5E), the wave dash and the fullwidth yen to their ASCII-range forms. */
+const foldName = (raw: string): string => {
+  let out = '';
+  for (const ch of raw) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code >= 0xff01 && code <= 0xff5e) out += String.fromCharCode(code - 0xfee0);
+    else if (code === 0x301c) out += '~';
+    else if (code === 0xffe5) out += '¥';
+    else out += ch;
+  }
+  return out;
+};
+
+const FIRST_ASCII = /^[A-Za-z_\\]$/;
+const REST_ASCII = /^[A-Za-z0-9_.?\\]$/;
+const BLOCKED_NON_ASCII = /^[\s\p{Z}\p{Cc}\p{Sc}、]$/u;
+
+/** Whether `ch` (one code point of folded text) may appear at `first` / later positions. */
+const isNameChar = (ch: string, first: boolean): boolean => {
+  if ((ch.codePointAt(0) ?? 0) < 0x80) return (first ? FIRST_ASCII : REST_ASCII).test(ch);
+  if (BLOCKED_NON_ASCII.test(ch)) return false;
+  return !(first && ch === '。');
+};
+
+const isReservedName = (name: string): boolean =>
+  /^(?:true|false|[rc])$/i.test(name) || looksLikeCellRef(name);
+
 /**
- * Validate a workbook-scoped defined name against spreadsheet naming rules:
- * the first character must be a letter, underscore, or backslash; the rest may
- * add digits and periods; and the name may not be a cell reference (A1 or R1C1
- * style), a bare `R`/`C`, contain spaces/illegal characters, or exceed 255
- * characters.
+ * Validate a defined name against spreadsheet naming rules. Surrounding
+ * whitespace is trimmed and fullwidth ASCII is folded before checking, so
+ * `Ａ１` is the cell reference A1. The name may not be TRUE/FALSE, a bare
+ * `R`/`C`, an A1 or R1C1 reference, or longer than 255 characters; ASCII
+ * punctuation, whitespace, currency symbols and `、` are rejected anywhere.
  */
 export function isValidDefinedName(raw: string): boolean {
-  const name = raw.trim();
+  const name = foldName(raw.trim());
   if (!name || name.length > 255) return false;
-  if (!/^[A-Za-z_\\][A-Za-z0-9_.\\]*$/.test(name)) return false;
-  // Bare R/C are reserved for row/column shorthand in R1C1 mode.
-  if (/^[RC]$/i.test(name)) return false;
-  if (looksLikeCellRef(name)) return false;
+  if (isReservedName(name)) return false;
+  let first = true;
+  for (const ch of name) {
+    if (!isNameChar(ch, first)) return false;
+    first = false;
+  }
   return true;
+}
+
+/** Case- and width-insensitive key of a defined name, for duplicate checks. */
+const nameKey = (name: string): string => foldName(name.trim()).toLowerCase();
+
+/** Whether two names are the same defined name (ignoring case and width). */
+export const isSameDefinedName = (a: string, b: string): boolean => nameKey(a) === nameKey(b);
+
+/** Whether `wb` already has a name equal to `name` (ignoring case and width) in the given scope. */
+export function definedNameExists(wb: WorkbookHandle, name: string, localSheetId = -1): boolean {
+  const key = nameKey(name);
+  for (const entry of wb.definedNames()) {
+    if (entry.localSheetId === localSheetId && nameKey(entry.name) === key) return true;
+  }
+  return false;
 }
 
 const absRangeRef = (r0: number, c0: number, r1: number, c1: number): string =>
@@ -79,17 +125,15 @@ const cellText = (state: State, sheet: number, row: number, col: number): string
   return '';
 };
 
-const sanitizeName = (raw: string, fallback: string): string => {
-  const compact = raw
-    .trim()
-    .replace(/\s+/g, '_')
-    .replace(/[^A-Za-z0-9_.\\]/g, '_');
-  const base = compact || fallback;
-  const prefixed = /^[A-Za-z_\\]/.test(base) ? base : `_${base}`;
-  // A label like "A1" sanitizes to a valid identifier but collides with a cell
-  // reference, which the engine (and spreadsheets) reject as a name — prefix it
-  // so "Create from Selection" always yields a usable name.
-  return looksLikeCellRef(prefixed) ? `_${prefixed}` : prefixed;
+/** Turn arbitrary label text into a name that passes `isValidDefinedName`. */
+export const sanitizeName = (raw: string, fallback: string): string => {
+  const folded = foldName(raw.trim()).replace(/\s+/g, '_');
+  let body = '';
+  for (const ch of folded) body += isNameChar(ch, false) ? ch : '_';
+  body = (body || foldName(fallback)).slice(0, 254);
+  const prefixed = isNameChar([...body][0] ?? '', true) ? body : `_${body}`;
+  // A label like "A1" or "TRUE" is a valid identifier but not a usable name.
+  return isReservedName(prefixed) ? `_${prefixed}` : prefixed;
 };
 
 const uniqueName = (base: string, used: Set<string>): string => {
@@ -159,6 +203,63 @@ export function recordDefinedNamesChange<T>(
 /** A stored defined-name formula as name lists show it: with a leading `=`. */
 export function definedNameDisplayFormula(formula: string): string {
   return formula && !formula.startsWith('=') ? `=${formula}` : formula;
+}
+
+const MAX_VALUE_TEXT = 64;
+const NUMBER_LITERAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+const STRING_LITERAL = /^"(?:[^"]|"")*"$/;
+
+const quoteText = (text: string): string => `"${text.replace(/"/g, '""')}"`;
+
+const arrayElementText = (v: CellValue): string =>
+  v.kind === 'text' ? quoteText(v.value) : v.kind === 'blank' ? '""' : formatCell(v);
+
+const truncateValueText = (text: string): string =>
+  text.length > MAX_VALUE_TEXT ? `${text.slice(0, MAX_VALUE_TEXT)}…` : text;
+
+/**
+ * The Name Manager "Value" text of a defined name: constants as written,
+ * a single-cell reference as the cell's display value, a multi-cell range in
+ * array form (`{"a","b";"c","d"}`), and other formulas as evaluated by the
+ * engine. Empty when nothing can be shown.
+ */
+export function definedNameValueText(wb: WorkbookHandle, entry: DefinedNameEntry): string {
+  const body = entry.formula.trim().replace(/^=/, '').trim();
+  if (!body) return '';
+  if (NUMBER_LITERAL.test(body)) return formatCell({ kind: 'number', value: Number(body) });
+  if (STRING_LITERAL.test(body)) return body;
+  if (/^(?:true|false)$/i.test(body)) return body.toUpperCase();
+  const ownSheet = Math.max(entry.localSheetId, 0);
+  const range = rangeForRef(wb, body, ownSheet);
+  if (range) {
+    const { sheet } = range;
+    if (range.r0 === range.r1 && range.c0 === range.c1) {
+      return formatCell(wb.getValue({ sheet, row: range.r0, col: range.c0 }));
+    }
+    const rows: string[] = [];
+    let used = 0;
+    for (let row = range.r0; row <= range.r1 && used <= MAX_VALUE_TEXT; row += 1) {
+      const cols: string[] = [];
+      for (let col = range.c0; col <= range.c1 && used <= MAX_VALUE_TEXT; col += 1) {
+        const text = arrayElementText(wb.getValue({ sheet, row, col }));
+        cols.push(text);
+        used += text.length + 1;
+      }
+      rows.push(cols.join(','));
+    }
+    return truncateValueText(`{${rows.join(';')}}`);
+  }
+  if (!wb.capabilities.formulaTextEvaluation || typeof wb.evaluateFormulaText !== 'function') {
+    return '';
+  }
+  try {
+    const result = wb.evaluateFormulaText({ sheet: ownSheet, row: 0, col: 0 }, `=${body}`);
+    if (!result.status.ok) return '';
+    const value = fromEngineValue(result.value);
+    return truncateValueText(value.kind === 'text' ? quoteText(value.value) : formatCell(value));
+  } catch {
+    return '';
+  }
 }
 
 /** Snapshot workbook- and sheet-scoped defined names into a stable array. */

@@ -2,15 +2,21 @@ import type { History } from '../commands/history.js';
 import {
   type DefinedNameEntry,
   definedNameDisplayFormula,
+  definedNameExists,
+  definedNameValueText,
   deleteDefinedName,
+  isSameDefinedName,
+  isValidDefinedName,
   recordDefinedNamesChange,
+  sanitizeName,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
-import { resolveRangeRef } from '../engine/range-resolver.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import {
   appendDialogButton,
   appendDialogIconButton,
@@ -30,6 +36,8 @@ export interface NamedRangeDialogDeps {
   history?: History | null;
   strings?: Strings;
   getSelectedRangeFormula?: () => string;
+  /** Current selection; seeds the New Name form (Refers To and suggested name). */
+  getSelection?: () => { active: Addr; range: Range };
   subscribeToRangeChanges?: (listener: () => void) => () => void;
   /** Called after a defined-name mutation writes through to the engine so the
    *  host can re-project recalculated cells into the store. */
@@ -234,10 +242,10 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   formulaInput.autocomplete = 'off';
   formulaInput.spellcheck = false;
   formRow.append(
-    makeEditorRow(t.nameHeader, nameInput),
-    makeEditorRow(t.scopeHeader, scopeSelect),
-    makeEditorRow(t.commentHeader, commentInput),
-    makeEditorRow(t.formulaHeader, formulaInput),
+    makeEditorRow(t.nameLabel, nameInput),
+    makeEditorRow(t.scopeLabel, scopeSelect),
+    makeEditorRow(t.commentLabel, commentInput),
+    makeEditorRow(t.formulaLabel, formulaInput),
   );
   if (rangePickerOptions) {
     attachRangePickerButton(formulaInput, {
@@ -315,6 +323,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   let filterMenu: HTMLDivElement | null = null;
   let editorMode: 'new' | 'edit' = 'new';
   let pendingDeleteName: DefinedNameEntry | null = null;
+  let editingEntry: DefinedNameEntry | null = null;
 
   const setReadOnlyState = (
     el: HTMLElement & { disabled?: boolean },
@@ -416,7 +425,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       name.textContent = entry.name;
       const value = document.createElement('span');
       value.className = 'fc-namedlg__row-value';
-      value.textContent = definedNameValueText(entry.formula);
+      value.textContent = definedNameValueText(wb, entry);
       const formulaCell = document.createElement('span');
       formulaCell.className = 'fc-namedlg__row-formula';
       formulaCell.textContent = definedNameDisplayFormula(entry.formula);
@@ -492,17 +501,12 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       case 'scope':
         return scopeLabel(entry.localSheetId);
       case 'value':
-        return definedNameValueText(entry.formula);
+        return definedNameValueText(wb, entry);
       case 'comment':
         return '';
       default:
         return entry.name;
     }
-  };
-
-  const definedNameValueText = (formula: string): string => {
-    const values = resolveRangeRef(wb, formula, 0);
-    return values.length > 0 ? values.join(', ') : t.valueUnavailable;
   };
 
   const scopeLabel = (localSheetId: number): string =>
@@ -616,6 +620,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     editorShell.close();
     clearError();
     if (shell.isOpen()) panel.focus();
+    else host.focus();
   }
 
   const openEditor = (mode: 'new' | 'edit'): void => {
@@ -628,15 +633,46 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     editorShell.setAriaLabel(title);
     scopeSelect.replaceChildren();
     appendDialogSelectOptions(scopeSelect, scopeOptions());
-    nameInput.value = entry?.name ?? '';
+    editingEntry = entry ?? null;
+    scopeSelect.disabled = mode === 'edit';
     scopeSelect.value = String(entry?.localSheetId ?? -1);
     commentInput.value = '';
-    formulaInput.value = definedNameDisplayFormula(entry?.formula ?? '');
+    if (entry) {
+      nameInput.value = entry.name;
+      formulaInput.value = definedNameDisplayFormula(entry.formula);
+    } else {
+      const seed = newNameSeed();
+      nameInput.value = seed.name;
+      formulaInput.value = seed.formula;
+    }
     clearError();
     editorShell.open();
     requestAnimationFrame(() => {
       focusAndSelectInput(nameInput);
     });
+  };
+
+  const newNameSeed = (): { name: string; formula: string } => {
+    const selection = deps.getSelection?.();
+    if (!selection) return { name: '', formula: deps.getSelectedRangeFormula?.() ?? '' };
+    const { active, range } = selection;
+    const formula = `=${formatSheetAbsoluteRange(wb.sheetName(range.sheet), range)}`;
+    const textAt = (row: number, col: number): string => {
+      if (row < 0 || col < 0) return '';
+      const v = wb.getValue({ sheet: active.sheet, row, col });
+      return v.kind === 'text' ? v.value.trim() : '';
+    };
+    const suggest = (text: string): string => {
+      if (!text) return '';
+      if (isValidDefinedName(text)) return text;
+      const cleaned = sanitizeName(text, '');
+      return isValidDefinedName(cleaned) ? cleaned : '';
+    };
+    const name =
+      suggest(textAt(active.row, active.col)) ||
+      suggest(textAt(active.row, active.col - 1)) ||
+      suggest(textAt(active.row - 1, active.col));
+    return { name, formula };
   };
 
   const loadSelectedNameIntoForm = (): void => {
@@ -701,6 +737,30 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     quickInput.focus();
   };
 
+  /** Add `name`; when renaming, drop the entry it replaces so no copy is left behind. */
+  const replaceDefinedName = (
+    previous: DefinedNameEntry | null,
+    name: string,
+    formula: string,
+    scope: number,
+  ): ReturnType<typeof upsertDefinedName> => {
+    const renamed = previous !== null && previous.name !== name.trim();
+    // A case-only rename addresses the same engine entry, so the old one goes first.
+    const caseOnly = renamed && isSameDefinedName(previous.name, name);
+    if (renamed && caseOnly) deleteDefinedName(wb, previous.name, scope);
+    const result = upsertDefinedName(wb, name, formula, scope);
+    if (!result.ok && renamed && caseOnly) {
+      upsertDefinedName(wb, previous.name, previous.formula, scope);
+    }
+    if (renamed && !caseOnly) {
+      if (result.ok && !deleteDefinedName(wb, previous.name, scope).ok) {
+        deleteDefinedName(wb, result.entry.name, scope);
+        return { ok: false, reason: 'engine-failed' };
+      }
+    }
+    return result;
+  };
+
   const onSubmit = (e: SubmitEvent): void => {
     e.preventDefault();
     e.stopPropagation();
@@ -711,8 +771,16 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       focusAndSelectInput(nameInput);
       return;
     }
+    const scope = selectedScopeId();
+    const previous = editorMode === 'edit' ? editingEntry : null;
+    const isSameEntry = previous !== null && isSameDefinedName(previous.name, name);
+    if (!isSameEntry && definedNameExists(wb, name, scope)) {
+      showError(t.errorDuplicateName);
+      focusAndSelectInput(nameInput);
+      return;
+    }
     const result = recordDefinedNamesChange(history, wb, () =>
-      upsertDefinedName(wb, name, formula, selectedScopeId()),
+      replaceDefinedName(previous, name, formula, scope),
     );
     if (!result.ok) {
       showError(errorMessageFor(result.reason, t));
@@ -726,7 +794,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     commentInput.value = '';
     editorShell.close();
     renderList();
-    if (editorMode === 'new') newBtn.focus();
+    if (!shell.isOpen()) host.focus();
+    else if (editorMode === 'new') newBtn.focus();
     else focusNameRow(selectedNameIndex);
   };
 
@@ -814,9 +883,13 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       });
     },
     openNew(): void {
-      api.open();
-      if (!wb.capabilities.definedNameMutate) return;
-      requestAnimationFrame(() => openEditor('new'));
+      if (!wb.capabilities.definedNameMutate) {
+        api.open();
+        return;
+      }
+      refreshFormState();
+      renderList();
+      openEditor('new');
     },
     close(): void {
       closeFilterMenu();

@@ -12,6 +12,11 @@ export interface FormulaDialogsStrings {
     scopeHeader: string;
     /** Name Manager column header. */
     commentHeader: string;
+    /** New/Edit Name field labels. */
+    nameLabel: string;
+    scopeLabel: string;
+    commentLabel: string;
+    formulaLabel: string;
     empty: string;
     /** Read-only fallback note shown when the engine doesn't support write. */
     note: string;
@@ -34,11 +39,12 @@ export interface FormulaDialogsStrings {
     /** Name Manager "Delete" action label. */
     deleteButton: string;
     workbookScope: string;
-    valueUnavailable: string;
     /** Inline error: empty or invalid name. */
     errorEmptyName: string;
     /** Inline error: name violates spreadsheet naming rules. */
     errorInvalidName: string;
+    /** Inline error: a name with this scope already exists. */
+    errorDuplicateName: string;
     /** Inline error: empty formula/ref. */
     errorEmptyFormula: string;
     /** Inline error: engine refused the write. */

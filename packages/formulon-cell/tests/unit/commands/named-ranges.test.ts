@@ -3,6 +3,8 @@ import { History } from '../../../src/commands/history.js';
 import {
   createDefinedNamesFromSelection,
   definedNameDisplayFormula,
+  definedNameExists,
+  definedNameValueText,
   deleteDefinedName,
   insertDefinedNameFormula,
   isValidDefinedName,
@@ -180,6 +182,143 @@ describe('named range commands', () => {
     expect(isValidDefinedName('R')).toBe(false);
     expect(isValidDefinedName('a b')).toBe(false);
     expect(isValidDefinedName('a'.repeat(256))).toBe(false);
+  });
+
+  it.each([
+    '売上',
+    '税率',
+    'a?b',
+    'ｱｲｳ',
+    '売上1',
+    '_x.y',
+    '\\ab',
+    'a\\b',
+    '①',
+    'ー長',
+    'Ⅳ',
+    '々',
+    '々々',
+    'A1売',
+    'é',
+    'ä1',
+    '×a',
+    '→a',
+    '😀a',
+    'a😀',
+    'ａｂｃ',
+    'Sheet1',
+    '「a',
+    '・a',
+    'a・b',
+    '・',
+    '“a',
+    '…a',
+    '†a',
+    '『a',
+    'ａ．ｂ.',
+    'a。b',
+    '  売上\u3000',
+    '売上１',
+    'abcd１',
+    'ａ１ｂ',
+    'x１y',
+    '_１',
+  ])('accepts %j as a defined name', (name) => {
+    expect(isValidDefinedName(name)).toBe(true);
+  });
+
+  it.each([
+    '?ab',
+    'Ａ１',
+    '1売上',
+    '売 上',
+    '.ab',
+    'ＲＣ',
+    'r',
+    '売上!',
+    'a\u3000b',
+    '、a',
+    'a、b',
+    '＋a',
+    'a＋b',
+    '１a',
+    'a１',
+    'Tax２０２６',
+    '€a',
+    'a-b',
+    'a$b',
+    'a@b',
+    'a%b',
+    '～a',
+    '。a',
+    '¥a',
+    'a¥',
+    '£a',
+    '〜a',
+    '￥a',
+    'FALSE',
+    'true',
+    'ab\u3000c',
+    '$a',
+    '（a',
+    'a）',
+    '',
+    '   ',
+  ])('rejects %j as a defined name', (name) => {
+    expect(isValidDefinedName(name)).toBe(false);
+  });
+
+  it('keeps Japanese labels when creating names from the selection', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    seedText(store, 0, 0, '売上 合計');
+    seedText(store, 0, 1, 'TRUE');
+    seedText(store, 0, 2, '1月');
+    seedText(store, 0, 3, 'a-b');
+    setRange(store, 0, 0, 2, 3);
+    const result = createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
+    expect(result.ok && result.entries.map((e) => e.name)).toEqual([
+      '売上_合計',
+      '_TRUE',
+      '_1月',
+      'a_b',
+    ]);
+    if (result.ok) for (const e of result.entries) expect(isValidDefinedName(e.name)).toBe(true);
+  });
+
+  it('detects duplicate names within a scope ignoring case and width', () => {
+    const { wb } = makeWb();
+    expect(definedNameExists(wb, 'taxrate')).toBe(true);
+    expect(definedNameExists(wb, 'ＴａｘＲａｔｅ')).toBe(true);
+    expect(definedNameExists(wb, 'TaxRate', 0)).toBe(false);
+    expect(definedNameExists(wb, 'Other')).toBe(false);
+  });
+
+  it('renders the Value text the way Name Manager does', () => {
+    const cells: Record<string, unknown> = {
+      '0:0:0': { kind: 'text', value: 'a' },
+      '0:0:1': { kind: 'number', value: 2 },
+      '0:1:0': { kind: 'text', value: 'c' },
+      '0:1:1': { kind: 'number', value: 4 },
+      '1:0:0': { kind: 'number', value: 9 },
+    };
+    const wb = {
+      capabilities: {},
+      sheetCount: 2,
+      sheetName: (i: number) => (i === 0 ? 'Sheet1' : 'My Sheet'),
+      getValue: (a: Addr) => cells[`${a.sheet}:${a.row}:${a.col}`] ?? { kind: 'blank' },
+    } as unknown as WorkbookHandle;
+    const text = (formula: string, localSheetId = -1): string =>
+      definedNameValueText(wb, { name: 'N', formula, localSheetId });
+    expect(text('=0.08')).toBe('0.08');
+    expect(text('="abc"')).toBe('"abc"');
+    expect(text('=true')).toBe('TRUE');
+    expect(text('=Sheet1!$A$1')).toBe('a');
+    expect(text('=Sheet1!$A$1:$B$2')).toBe('{"a",2;"c",4}');
+    expect(text("='My Sheet'!$A$1")).toBe('9');
+    expect(text('=$A$1', 1)).toBe('9');
+    expect(text('=SUM(Sheet1!A1)')).toBe('');
+    expect(text('=Sheet1!$A$1:$Z$100').endsWith('…')).toBe(true);
   });
 
   it('sanitizes header labels that collide with cell references (H-33)', () => {

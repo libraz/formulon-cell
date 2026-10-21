@@ -201,7 +201,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照先"]',
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
     );
     expect(nameField?.getAttribute('aria-label')).toBeTruthy();
     expect(formulaField?.getAttribute('aria-label')).toBeTruthy();
@@ -237,7 +237,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="範囲"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照先"]',
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
     );
 
     if (nameField) nameField.value = 'LocalRate';
@@ -261,7 +261,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照先"]',
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
     );
     if (nameField) nameField.value = 'Discount';
     if (formulaField) formulaField.value = '=Sheet1!$B$1';
@@ -283,13 +283,107 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb } = makeMutableWb();
     const handle = attachNamedRangeDialog({ host, wb });
     handle.openNew();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
 
     const manager = document.querySelector<HTMLElement>('.fc-namedlg');
     const editor = document.querySelector<HTMLElement>('.fc-namedlg-editor');
-    expect(manager?.hidden).toBe(false);
+    expect(manager?.hidden).toBe(true);
     expect(editor?.hidden).toBe(false);
     expect(editor?.getAttribute('aria-label')).toBe('新しい名前');
+    handle.detach();
+  });
+
+  const editorFields = (): {
+    name: HTMLInputElement;
+    scope: HTMLSelectElement;
+    formula: HTMLInputElement;
+    form: HTMLFormElement;
+    error: HTMLElement;
+  } => ({
+    name: document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="名前"]',
+    ) as HTMLInputElement,
+    scope: document.querySelector<HTMLSelectElement>(
+      '.fc-namedlg-editor__input[aria-label="範囲"]',
+    ) as HTMLSelectElement,
+    formula: document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
+    ) as HTMLInputElement,
+    form: document.querySelector('.fc-namedlg-editor__form') as HTMLFormElement,
+    error: document.querySelector('.fc-namedlg-editor .fc-namedlg__error') as HTMLElement,
+  });
+
+  it('refuses a duplicate name instead of overwriting it', () => {
+    const { wb, registry, calls } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+    document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
+    const f = editorFields();
+    f.name.value = 'ｔａｘｒａｔｅ';
+    f.formula.value = '=Sheet1!$B$1';
+    f.form.requestSubmit();
+    expect(calls).toEqual([]);
+    expect(f.error.textContent).toBe(
+      '入力した名前は既に存在します。一意の名前を入力してください。',
+    );
+    f.name.value = 'a-b';
+    f.form.requestSubmit();
+    expect(f.error.textContent).toBe('入力した名前は無効です。');
+    handle.detach();
+  });
+
+  it('Edit replaces the renamed entry in one undo step with the scope locked', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const history = new History();
+    const handle = attachNamedRangeDialog({ host, wb, history });
+    handle.open();
+    document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button')[1]?.click();
+    const f = editorFields();
+    expect(f.scope.disabled).toBe(true);
+    f.name.value = 'VatRate';
+    f.form.requestSubmit();
+    expect([...registry.keys()]).toEqual(['VatRate']);
+    history.undo();
+    expect([...registry.keys()]).toEqual(['TaxRate']);
+    handle.detach();
+  });
+
+  it('seeds the New Name form from the selection', () => {
+    const { wb, values } = makeMutableWb();
+    values.set('0:1:0', { kind: 'text', value: '売上 合計' });
+    const selection = {
+      active: { sheet: 0, row: 1, col: 1 },
+      range: { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 },
+    };
+    const handle = attachNamedRangeDialog({ host, wb, getSelection: () => selection });
+    handle.openNew();
+    let f = editorFields();
+    expect(f.formula.value).toBe('=Sheet1!$B$2:$C$3');
+    expect(f.name.value).toBe('売上_合計');
+    handle.close();
+    values.set('0:1:1', { kind: 'text', value: 'Rate' });
+    handle.openNew();
+    f = editorFields();
+    expect(f.name.value).toBe('Rate');
+    handle.detach();
+  });
+
+  it('shows multi-cell ranges in array form in the Value column', () => {
+    const { wb, registry, values } = makeMutableWb();
+    registry.set('Pair', '=Sheet1!$A$1:$B$2');
+    registry.set('Rate', '=0.08');
+    values.set('0:0:0', { kind: 'text', value: 'a' });
+    values.set('0:0:1', { kind: 'number', value: 1 });
+    values.set('0:1:0', { kind: 'text', value: 'b' });
+    values.set('0:1:1', { kind: 'number', value: 2 });
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+    const shown = Array.from(
+      document.querySelectorAll('.fc-namedlg__row-value'),
+      (c) => c.textContent,
+    );
+    expect(shown).toEqual(['{"a",1;"b",2}', '0.08']);
     handle.detach();
   });
 
@@ -303,7 +397,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照先"]',
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
     );
     if (nameField) nameField.value = 'TaxRate';
     if (formulaField) formulaField.value = '=Sheet1!$A$1';
@@ -330,7 +424,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
     );
     expect(actions.map((button) => button.textContent)).toEqual([
-      '新規...',
+      '新規作成...',
       '編集...',
       '削除',
       'フィルター',
@@ -338,11 +432,11 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const headers = Array.from(
       document.querySelectorAll<HTMLElement>('.fc-namedlg__head span'),
     ).map((cell) => cell.textContent);
-    expect(headers).toEqual(['名前', '値', '参照先', '範囲', 'コメント']);
+    expect(headers).toEqual(['名前', '値', '参照範囲', '範囲', 'コメント']);
     const rowCells = Array.from(
       document.querySelectorAll<HTMLElement>('.fc-namedlg__item span'),
     ).map((cell) => cell.textContent);
-    expect(rowCells).toEqual(['TaxRate', '-', '=Sheet1!$A$1', 'ブック', '']);
+    expect(rowCells).toEqual(['TaxRate', '', '=Sheet1!$A$1', 'ブック', '']);
     handle.detach();
   });
 
@@ -373,7 +467,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
     )[1]?.click();
     expect(
-      document.querySelector<HTMLInputElement>('.fc-namedlg-editor__input[aria-label="参照先"]')
+      document.querySelector<HTMLInputElement>('.fc-namedlg-editor__input[aria-label="参照範囲"]')
         ?.value,
     ).toBe('=Sheet1!$A$1');
     handle.detach();
@@ -422,7 +516,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照先"]',
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
     );
     expect(nameField?.value).toBe('TaxRate');
     expect(formulaField?.value).toBe('=Sheet1!$A$1');
@@ -490,7 +584,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '[data-range-picker="named-range-editor-refers-to"]',
     );
     const editorInput = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照先"]',
+      '.fc-namedlg-editor__input[aria-label="参照範囲"]',
     );
     editorButton?.click();
     expect(quickButton?.getAttribute('aria-pressed')).toBe('false');
