@@ -3,6 +3,7 @@ import {
   type SpreadsheetCompatibilityStatus,
   summarizeSpreadsheetCompatibility,
 } from '../engine/compatibility.js';
+import { type FileLossEntry, fileLossEntries } from '../engine/file-diagnostics.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 
@@ -62,6 +63,26 @@ export const spreadsheetCompatibilityDetail = (
   strings: WorkbookObjectsStrings,
 ): string => strings.compatibilityDetails[COMPATIBILITY_LABEL_KEYS[id]];
 
+const lossReportItem = (
+  entry: FileLossEntry,
+  strings: WorkbookObjectsStrings,
+): SpreadsheetCompatibilityReportItem => ({
+  severity: 'warning',
+  label: `${strings.lossLabels[entry.id]} · ${entry.phase === 'load' ? strings.lossOnLoad : strings.lossOnSave}`,
+  detail: strings.lossOccurrences.replace('{n}', String(entry.count)),
+});
+
+/** Concrete engine-reported losses (load counters, then the last save's) as
+ *  warning rows with occurrence counts; empty when nothing was lost. */
+export const buildFileLossReport = (
+  wb: WorkbookHandle,
+  strings: WorkbookObjectsStrings,
+): SpreadsheetCompatibilityReportItem[] => {
+  const load = wb.loadDiagnostics?.();
+  if (!load) return [];
+  return fileLossEntries(load, wb.lastSaveDiagnostics()).map((e) => lossReportItem(e, strings));
+};
+
 export const spreadsheetCompatibilityStatusLabel = (
   status: SpreadsheetCompatibilityStatus,
   strings: WorkbookObjectsStrings,
@@ -93,7 +114,7 @@ export const buildSpreadsheetCompatibilityReport = (
       detail: entry.count === undefined ? detail : `${detail} (${entry.count})`,
     };
   });
-  return [banner, ...rows];
+  return [banner, ...buildFileLossReport(wb, strings), ...rows];
 };
 
 export const compatibilityLabelKey = (

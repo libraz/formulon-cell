@@ -23,6 +23,7 @@ import { createWorkbookObjectsActionButton, pivotEditField } from './workbook-ob
 import { type PivotEditorContext, renderPivotEditForm } from './workbook-objects-pivot-editor.js';
 
 export {
+  buildFileLossReport,
   buildSpreadsheetCompatibilityReport,
   type SpreadsheetCompatibilityReportItem,
   spreadsheetCompatibilityDetail,

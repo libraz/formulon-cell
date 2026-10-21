@@ -1,9 +1,18 @@
+import type { SaveDiagnosticsResult } from '@libraz/formulon';
 import type { History } from '../commands/history.js';
 import { builtInLocaleFor } from '../i18n/locales.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
 import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
+import {
+  emptyLoadDiagnostics,
+  emptySaveDiagnostics,
+  type LoadDiagnostics,
+  loadDiagnosticsFromEngine,
+  type SaveDiagnostics,
+  saveDiagnosticsFromEngine,
+} from './file-diagnostics.js';
 import {
   canonicalizeFormulaForEngine,
   localeOrdinalForSpreadsheetProfile,
@@ -101,6 +110,9 @@ export interface CellPatchAtomicResult {
 
 const UNDO_LIMIT = 100;
 
+/** `WorkbookFormat` ordinals accepted by the engine's `saveWithDiagnostics`. */
+const SAVE_FORMAT_ORDINAL = { xlsx: 1, xlsb: 2 } as const;
+
 const sameCellValue = (a: CellValue, b: CellValue): boolean => {
   if (a.kind !== b.kind) return false;
   switch (a.kind) {
@@ -180,6 +192,8 @@ export class WorkbookHandle {
 
   private disposed = false;
   private recoveryFailure: Error | null = null;
+  private loadLosses: LoadDiagnostics = emptyLoadDiagnostics();
+  private saveLosses: SaveDiagnostics = emptySaveDiagnostics();
   private nextAtomicBatchId = 1;
 
   /** Per-cell inverse history. Each setX pushes one entry; undo replays
@@ -272,7 +286,11 @@ export class WorkbookHandle {
       wb.delete();
       throw new Error(`formulon loadBytes failed: ${msg}`);
     }
-    return new WorkbookHandle(module, wb);
+    const handle = new WorkbookHandle(module, wb);
+    if (typeof wb.readDiagnostics === 'function') {
+      handle.loadLosses = loadDiagnosticsFromEngine(wb.readDiagnostics());
+    }
+    return handle;
   }
 
   /** True when the JS fallback stub is providing the engine surface. */
@@ -958,10 +976,34 @@ export class WorkbookHandle {
   }
 
   save(): Uint8Array {
+    return this.saveWithDiagnostics().bytes;
+  }
+
+  /** Loss counters captured when the file was read. All zero for workbooks
+   *  not loaded from bytes and on engines without `readDiagnostics`. */
+  loadDiagnostics(): LoadDiagnostics {
+    return { ...this.loadLosses };
+  }
+
+  /** Loss counters of the most recent save; all zero before the first one. */
+  lastSaveDiagnostics(): SaveDiagnostics {
+    return { ...this.saveLosses };
+  }
+
+  /** Serialize the workbook and report what the writer dropped or deferred.
+   *  Engines without `saveWithDiagnostics` save plainly and report zeros. */
+  saveWithDiagnostics(format: 'xlsx' | 'xlsb' = 'xlsx'): {
+    bytes: Uint8Array;
+    diagnostics: SaveDiagnostics;
+  } {
     this.assertAlive();
-    const r = this.wb.save();
-    if (!r.status.ok || !r.bytes) throw new Error(`save: ${r.status.message}`);
-    return r.bytes;
+    const raw =
+      typeof this.wb.saveWithDiagnostics === 'function'
+        ? this.wb.saveWithDiagnostics(SAVE_FORMAT_ORDINAL[format])
+        : this.wb.save();
+    if (!raw.status.ok || !raw.bytes) throw new Error(`save: ${raw.status.message}`);
+    this.saveLosses = saveDiagnosticsFromEngine(raw as Partial<SaveDiagnosticsResult>);
+    return { bytes: raw.bytes, diagnostics: { ...this.saveLosses } };
   }
 
   /** External-link records carried by the workbook in `<externalReferences>`

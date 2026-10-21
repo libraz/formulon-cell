@@ -823,6 +823,14 @@ export {
   spreadsheetCompatibilityStatus,
   summarizeSpreadsheetCompatibility,
 } from './engine/compatibility.js';
+export type {
+  FileLossEntry,
+  FileLossId,
+  FileLossPhase,
+  LoadDiagnostics,
+  SaveDiagnostics,
+} from './engine/file-diagnostics.js';
+export { fileLossEntries, hasLoadLosses } from './engine/file-diagnostics.js';
 export type { LocaleOrdinal } from './engine/function-locale.js';
 export { canonicalizeFormula, localizeFormula } from './engine/function-locale.js';
 export { LOCALE_TAGS, localeTag, mergeFunctionMetadata } from './engine/function-metadata.js';
@@ -1210,6 +1218,7 @@ export type {
 } from './interact/workbook-objects.js';
 export {
   attachWorkbookObjectsPanel,
+  buildFileLossReport,
   buildSpreadsheetCompatibilityReport,
   spreadsheetCompatibilityDetail,
   spreadsheetCompatibilityLabel,

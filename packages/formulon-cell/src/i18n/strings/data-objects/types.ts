@@ -267,6 +267,23 @@ export interface DataObjectsStrings {
       chartAuthoring: string;
       externalLinks: string;
     };
+    /** Engine-reported file losses, keyed by `FileLossId`. */
+    lossLabels: {
+      undecodedFormula: string;
+      undecodedDefinedName: string;
+      undecodedPart: string;
+      skippedFeature: string;
+      unknownContentType: string;
+      downgradedFormula: string;
+      deferredFeature: string;
+      droppedPart: string;
+      droppedRelationship: string;
+      renumberedPart: string;
+    };
+    lossOnLoad: string;
+    lossOnSave: string;
+    /** Occurrence count line; `{n}` is the count. */
+    lossOccurrences: string;
     compatibility: string;
     writable: string;
     readOnly: string;
