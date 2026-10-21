@@ -79,6 +79,12 @@ const snapshotRibbonSecondaryMenu = async (
   const button = page.locator(`[data-ribbon-command="${opts.command}"]`).first();
   await expect(button).toHaveAttribute('data-ribbon-menu-id', opts.menuId);
   await expect(button).toHaveAttribute('data-ribbon-activation', opts.activation);
+  // The API open inherits the previous Escape's keyboard modality, which would show a focus
+  // screen tip; press blank ribbon space first so the menu opens as a chevron click would.
+  const rail = page.locator('.fc-tb__ribbon:not([hidden])').first();
+  const railBox = await rail.boundingBox();
+  if (!railBox) throw new Error('Missing ribbon rail');
+  await page.mouse.click(railBox.x + railBox.width - 80, railBox.y + railBox.height / 2);
   await page.evaluate(({ command, menuId }) => {
     const button = document.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
     const toolbar = (
@@ -575,7 +581,7 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
     activation: 'splitPrimary',
   });
   await page.locator('[data-ribbon-command="namedRanges"]').click();
-  const nameManager = page.getByRole('dialog', { name: '名前 マネージャー' });
+  const nameManager = page.getByRole('dialog', { name: '名前の管理' });
   await expect(nameManager).toBeVisible();
   await snapshotPage(page, 'excel-chrome-formulas-name-manager-dialog-1440');
   await nameManager.getByRole('button', { name: '閉じる', exact: true }).click();
