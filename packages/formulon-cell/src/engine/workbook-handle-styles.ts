@@ -55,6 +55,21 @@ function wb(handle: unknown): Workbook {
   return internals(handle).wb;
 }
 
+/** Theme read per handle; the engine theme only changes through the setters
+ *  below, and painting resolves a theme-linked font for every visible cell. */
+const themeCache = new WeakMap<object, ThemeResult | null>();
+
+function readTheme(handle: WorkbookHandleStylesMethods): ThemeResult | null {
+  if (themeCache.has(handle)) return themeCache.get(handle) ?? null;
+  const native = wb(handle) as unknown as {
+    getTheme?: () => ThemeResult;
+  };
+  const result = typeof native.getTheme === 'function' ? native.getTheme() : null;
+  const theme = result?.status.ok ? result : null;
+  themeCache.set(handle, theme);
+  return theme;
+}
+
 function resolveArgb(handle: unknown, spec: ColorSpec, context: number): number | null {
   const capabilities = (handle as { capabilities?: EngineCapabilities }).capabilities;
   if (spec.kind === 0 || !capabilities?.colorResolution) return null;
@@ -341,7 +356,7 @@ export abstract class WorkbookHandleStylesMethods {
     if (!record) return null;
     let resolved = record;
     if (record.scheme === 1 || record.scheme === 2) {
-      const theme = this.getWorkbookTheme();
+      const theme = this.capabilities.workbookTheme ? readTheme(this) : null;
       const eastAsian = record.hasCharset && record.charset !== 0;
       const themeName =
         record.scheme === 1
@@ -431,12 +446,8 @@ export abstract class WorkbookHandleStylesMethods {
   getWorkbookTheme(): ThemeResult | null {
     assertAlive(this);
     if (!this.capabilities.workbookTheme) return null;
-    const native = wb(this) as unknown as {
-      getTheme?: () => ThemeResult;
-    };
-    if (typeof native.getTheme !== 'function') return null;
-    const result = native.getTheme();
-    if (!result.status.ok) return null;
+    const result = readTheme(this);
+    if (!result) return null;
     return {
       ...result,
       status: { ...result.status },
@@ -458,6 +469,7 @@ export abstract class WorkbookHandleStylesMethods {
       setThemeColors?: (next: number[]) => { ok: boolean };
     };
     if (typeof native.setThemeColors !== 'function') return false;
+    themeCache.delete(this);
     return native.setThemeColors([...colors]).ok;
   }
 
@@ -474,6 +486,7 @@ export abstract class WorkbookHandleStylesMethods {
       setThemeFonts?: (next: ThemeFonts) => { ok: boolean };
     };
     if (typeof native.setThemeFonts !== 'function') return false;
+    themeCache.delete(this);
     return native.setThemeFonts({ ...fonts }).ok;
   }
 
