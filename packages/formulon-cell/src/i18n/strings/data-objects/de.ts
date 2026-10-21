@@ -290,7 +290,7 @@ export const dataObjectsDe: DataObjectsStrings = {
       undecodedFormula: 'Nicht lesbare Formeln',
       undecodedDefinedName: 'Nicht lesbare definierte Namen',
       undecodedPart: 'Nicht lesbare Teile',
-      skippedFeature: 'Wegen ungültigem Bezug übersprungene Elemente',
+      skippedFeature: 'Wegen ungültigen Bezugs übersprungene Elemente',
       unknownContentType: 'Teile mit unbekanntem Inhaltstyp',
       downgradedFormula: 'Nur als Werte gespeicherte Formeln',
       deferredFeature: 'Nicht gespeicherte Tabellenblattfunktionen',
