@@ -14,6 +14,7 @@ import {
   setZoomScale,
   toggleStatusAggregate,
 } from '../../../src/commands/view.js';
+import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 describe('view commands', () => {
@@ -127,5 +128,27 @@ describe('view commands', () => {
 
     toggleStatusAggregate(store, 'average');
     expect(store.getState().ui.statusAggs).toEqual(['max', 'average']);
+  });
+
+  it('saves the view mode and preview zoom on the active sheet', () => {
+    const store = createSpreadsheetStore();
+    const modes: [number, string][] = [];
+    const zooms: [number, number][] = [];
+    const wb = {
+      setSheetViewMode: (sheet: number, mode: string) => modes.push([sheet, mode]),
+      setSheetZoom: (sheet: number, pct: number) => zooms.push([sheet, pct]),
+    } as unknown as WorkbookHandle;
+
+    setWorkbookView(store, 'pageBreakPreview', wb);
+    setWorkbookView(store, 'normal', wb);
+
+    expect(modes).toEqual([
+      [0, 'pageBreakPreview'],
+      [0, 'normal'],
+    ]);
+    expect(zooms).toEqual([
+      [0, Math.round(PAGE_BREAK_PREVIEW_ZOOM * 100)],
+      [0, 100],
+    ]);
   });
 });

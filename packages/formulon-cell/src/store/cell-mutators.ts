@@ -46,13 +46,23 @@ export const cellMutators = {
           colStart: s.viewport.colStart,
           freezeOriginRow: s.layout.freezeOriginRow ?? 0,
           freezeOriginCol: s.layout.freezeOriginCol ?? 0,
+          workbookView: s.ui.workbookView,
+          zoomBeforePreview: s.ui.zoomBeforePreview ?? null,
         });
       }
       const memo = switching ? memos.get(idx) : undefined;
       return {
         ...s,
         data: { ...s.data, sheetIndex: idx, cells: new Map() },
-        ui: { ...s.ui, pendingFormat: null, sheetViewMemos: memos },
+        ui: {
+          ...s.ui,
+          pendingFormat: null,
+          sheetViewMemos: memos,
+          ...(switching && {
+            workbookView: memo?.workbookView ?? 'normal',
+            zoomBeforePreview: memo?.zoomBeforePreview ?? null,
+          }),
+        },
         selection: memo?.selection ?? {
           active: { sheet: idx, row: 0, col: 0 },
           anchor: { sheet: idx, row: 0, col: 0 },

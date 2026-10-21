@@ -29,6 +29,14 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
     expect(wb.clearRowHeight(0, 0)).toBe(false);
   });
 
+  it('clearColumnWidth and sheet view setters no-op on stub', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    expect(wb.capabilities.columnWidthClear).toBe(false);
+    expect(wb.clearColumnWidth(0, 0, 0)).toBe(false);
+    expect(wb.setSheetViewMode(0, 'pageLayout')).toBe(false);
+    expect(wb.setSheetTabSelected(0, true)).toBe(false);
+  });
+
   it('getColumnLayouts returns [] on stub', async () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     expect(wb.getColumnLayouts(0)).toEqual([]);

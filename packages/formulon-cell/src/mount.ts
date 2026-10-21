@@ -19,7 +19,7 @@ import {
   type SyncedConditionalRuleMap,
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
-import { rehydrateAxisLayout } from './engine/layout-sync.js';
+import { rehydrateAxisLayout, syncSheetTabSelected } from './engine/layout-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
 import { resolveSpreadsheetUiOptions } from './extensions/index.js';
@@ -1109,6 +1109,7 @@ export const Spreadsheet = {
           navigation.options?.range?.sheet ??
           Math.min(store.getState().data.sheetIndex, Math.max(0, wb.sheetCount - 1));
         mutators.setSheetIndex(store, nextSheet);
+        syncSheetTabSelected(wb, nextSheet);
         // Per-sheet selection and scroll belong to the previous workbook.
         store.setState((state) => ({ ...state, ui: { ...state.ui, sheetViewMemos: undefined } }));
         mutators.clearIllustrations(store);

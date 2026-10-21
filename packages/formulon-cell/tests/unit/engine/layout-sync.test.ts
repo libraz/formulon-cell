@@ -4,6 +4,7 @@ import {
   hydrateLayoutFromEngine,
   syncLayoutSizesToEngine,
   syncLayoutToEngine,
+  syncSheetTabSelected,
 } from '../../../src/engine/layout-sync.js';
 import { SheetVisibility } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -71,6 +72,7 @@ interface SetRowOutlineCall {
 
 interface FakeSheetView {
   zoomScale: number;
+  viewMode?: string;
   freezeRows: number;
   freezeCols: number;
   tabHidden: boolean;
@@ -97,6 +99,8 @@ interface FakeWb {
   colCalls: SetColCall[];
   rowCalls: SetRowCall[];
   clearRowCalls: ClearRowCall[];
+  clearColCalls: { sheet: number; first: number; last: number }[];
+  tabSelectedCalls: { sheet: number; selected: boolean }[];
   freezeCalls: SetFreezeCall[];
   colHiddenCalls: SetColHiddenCall[];
   rowHiddenCalls: SetRowHiddenCall[];
@@ -115,6 +119,8 @@ const makeFake = (opts: {
   sheetVisibility?: boolean;
   geometry?: boolean;
   rowHeightClear?: boolean;
+  columnWidthClear?: boolean;
+  sheetTabSelected?: boolean;
   sheetCount?: number;
   cols?: FakeColLayout[];
   rows?: FakeRowLayout[];
@@ -125,6 +131,8 @@ const makeFake = (opts: {
   const colCalls: SetColCall[] = [];
   const rowCalls: SetRowCall[] = [];
   const clearRowCalls: ClearRowCall[] = [];
+  const clearColCalls: { sheet: number; first: number; last: number }[] = [];
+  const tabSelectedCalls: { sheet: number; selected: boolean }[] = [];
   const freezeCalls: SetFreezeCall[] = [];
   const colHiddenCalls: SetColHiddenCall[] = [];
   const rowHiddenCalls: SetRowHiddenCall[] = [];
@@ -144,6 +152,8 @@ const makeFake = (opts: {
       sheetVisibility: opts.sheetVisibility ?? false,
       geometry: opts.geometry ?? false,
       rowHeightClear: opts.rowHeightClear ?? false,
+      columnWidthClear: opts.columnWidthClear ?? false,
+      sheetTabSelected: opts.sheetTabSelected ?? false,
     },
     sheetCount: opts.sheetCount ?? 1,
     getColumnLayouts: () => opts.cols ?? [],
@@ -157,6 +167,14 @@ const makeFake = (opts: {
     setRowHeight: (sheet: number, row: number, height: number) => {
       rowCalls.push({ sheet, row, height });
       return opts.colRowSize;
+    },
+    clearColumnWidth: (sheet: number, first: number, last: number) => {
+      clearColCalls.push({ sheet, first, last });
+      return opts.columnWidthClear ?? false;
+    },
+    setSheetTabSelected: (sheet: number, selected: boolean) => {
+      tabSelectedCalls.push({ sheet, selected });
+      return true;
     },
     clearRowHeight: (sheet: number, row: number) => {
       clearRowCalls.push({ sheet, row });
@@ -198,6 +216,8 @@ const makeFake = (opts: {
     colCalls,
     rowCalls,
     clearRowCalls,
+    clearColCalls,
+    tabSelectedCalls,
     freezeCalls,
     colHiddenCalls,
     rowHiddenCalls,
@@ -381,6 +401,55 @@ describe('hydrateLayoutFromEngine', () => {
   });
 });
 
+describe('sheet view mode and tab selection', () => {
+  it('hydrates the sheet view mode from the engine', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeFake({
+      colRowSize: true,
+      view: {
+        zoomScale: 100,
+        freezeRows: 0,
+        freezeCols: 0,
+        tabHidden: false,
+        viewMode: 'pageLayout',
+      },
+    });
+    hydrateLayoutFromEngine(wb, store, 0);
+    expect(store.getState().ui.workbookView).toBe('pageLayout');
+  });
+
+  it('keeps the remembered mode when the adapter reports none', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({ ...s, ui: { ...s.ui, workbookView: 'pageBreakPreview' } }));
+    const { wb } = makeFake({
+      colRowSize: true,
+      view: { zoomScale: 100, freezeRows: 0, freezeCols: 0, tabHidden: false },
+    });
+    hydrateLayoutFromEngine(wb, store, 0);
+    expect(store.getState().ui.workbookView).toBe('pageBreakPreview');
+  });
+
+  it('marks only the active sheet tab as selected', () => {
+    const { wb, tabSelectedCalls } = makeFake({
+      colRowSize: true,
+      sheetTabSelected: true,
+      sheetCount: 3,
+    });
+    syncSheetTabSelected(wb, 1);
+    expect(tabSelectedCalls).toEqual([
+      { sheet: 0, selected: false },
+      { sheet: 1, selected: true },
+      { sheet: 2, selected: false },
+    ]);
+  });
+
+  it('skips tab selection on engines without the setter', () => {
+    const { wb, tabSelectedCalls } = makeFake({ colRowSize: true, sheetCount: 2 });
+    syncSheetTabSelected(wb, 0);
+    expect(tabSelectedCalls).toEqual([]);
+  });
+});
+
 describe('syncLayoutSizesToEngine', () => {
   it('writes only the columns whose width changed', () => {
     const store = createSpreadsheetStore();
@@ -472,6 +541,42 @@ describe('syncLayoutSizesToEngine', () => {
 
     expect(clearRowCalls).toEqual([{ sheet: 0, row: 3 }]);
     expect(rowCalls).toEqual([]);
+  });
+
+  it('clears a removed column width when the engine supports it', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, colWidths: new Map([[2, 120]]) },
+    }));
+    const before = captureLayoutSnapshot(store.getState());
+    store.setState((s) => ({ ...s, layout: { ...s.layout, colWidths: new Map() } }));
+    const after = captureLayoutSnapshot(store.getState());
+    const { wb, colCalls, clearColCalls } = makeFake({ colRowSize: true, columnWidthClear: true });
+
+    syncLayoutSizesToEngine(wb, store.getState().layout, 0, before, after);
+
+    expect(clearColCalls).toEqual([{ sheet: 0, first: 2, last: 2 }]);
+    expect(colCalls).toEqual([]);
+  });
+
+  it('keeps the default-width write fallback for old adapters', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, colWidths: new Map([[2, 120]]) },
+    }));
+    const before = captureLayoutSnapshot(store.getState());
+    store.setState((s) => ({ ...s, layout: { ...s.layout, colWidths: new Map() } }));
+    const after = captureLayoutSnapshot(store.getState());
+    const { wb, colCalls, clearColCalls } = makeFake({ colRowSize: true });
+
+    syncLayoutSizesToEngine(wb, store.getState().layout, 0, before, after);
+
+    expect(clearColCalls).toEqual([]);
+    expect(colCalls).toEqual([
+      { sheet: 0, first: 2, last: 2, width: store.getState().layout.defaultColWidth },
+    ]);
   });
 
   it('keeps the default-height write fallback for old adapters', () => {

@@ -1,4 +1,5 @@
 import { GeometryMode } from '@libraz/formulon';
+import type { WorkbookViewMode } from '../store/types.js';
 import { macDefaultColumnPt, macMdw, macPtToRaw, macRawToPt } from './mac-column-model.js';
 import type { EngineCapabilities, Range, Workbook } from './types.js';
 import { SheetVisibility } from './types.js';
@@ -118,6 +119,11 @@ function sheetVisibilityOf(view: { tabHidden: number; visibility?: number }): Sh
   return SheetVisibility.Visible;
 }
 
+/** Map the engine's `<sheetView view>` string; unknown values read as normal. */
+function workbookViewOf(viewMode: string | undefined): WorkbookViewMode {
+  return viewMode === 'pageBreakPreview' || viewMode === 'pageLayout' ? viewMode : 'normal';
+}
+
 export abstract class WorkbookHandleLayoutMethods {
   declare readonly capabilities: EngineCapabilities;
 
@@ -147,6 +153,17 @@ export abstract class WorkbookHandleLayoutMethods {
     if (!Number.isFinite(nativeHeight)) return false;
     const s = wb(this).setRowHeight(sheet, row, nativeHeight);
     return s.ok;
+  }
+
+  /** Remove explicit column-width overrides on `[first, last]` so the columns
+   *  follow their sheet default. Older engines have no clear operation and
+   *  return false. */
+  clearColumnWidth(sheet: number, first: number, last: number): boolean {
+    assertAlive(this);
+    if (this.capabilities.columnWidthClear !== true) return false;
+    const clear = wb(this).clearColumnWidth;
+    if (typeof clear !== 'function') return false;
+    return clear.call(wb(this), sheet, first, last).ok;
   }
 
   /** Remove an explicit row-height override so the row follows its sheet
@@ -307,6 +324,8 @@ export abstract class WorkbookHandleLayoutMethods {
     showRowColHeaders: boolean;
     showZeros: boolean;
     rightToLeft: boolean;
+    /** Absent when the engine cannot write the mode, so there is nothing to read back. */
+    viewMode?: WorkbookViewMode;
   } | null {
     assertAlive(this);
     if (!this.capabilities.sheetView) return null;
@@ -323,7 +342,23 @@ export abstract class WorkbookHandleLayoutMethods {
       showRowColHeaders: r.view.showRowColHeaders !== 0,
       showZeros: r.view.showZeros !== 0,
       rightToLeft: r.view.rightToLeft !== 0,
+      viewMode: this.capabilities.sheetViewMode ? workbookViewOf(r.view.viewMode) : undefined,
     };
+  }
+
+  /** Persist the sheet's view mode (`<sheetView view="...">`). No-op under
+   *  engines without the setter. */
+  setSheetViewMode(sheet: number, mode: WorkbookViewMode): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetViewMode) return false;
+    return wb(this).setSheetViewMode(sheet, mode === 'normal' ? '' : mode).ok;
+  }
+
+  /** Mark `sheet`'s tab as selected or not (`<sheetView tabSelected>`). */
+  setSheetTabSelected(sheet: number, selected: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetTabSelected) return false;
+    return wb(this).setSheetTabSelected(sheet, selected).ok;
   }
 
   setSheetShowGridLines(sheet: number, show: boolean): boolean {

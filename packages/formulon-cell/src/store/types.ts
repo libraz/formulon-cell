@@ -233,13 +233,15 @@ export interface UiSlice {
   sheetViewMemos?: ReadonlyMap<number, SheetViewMemo>;
 }
 
-/** Per-sheet selection, scroll position and frozen-band origin. */
+/** Per-sheet selection, scroll position, frozen-band origin and view mode. */
 export interface SheetViewMemo {
   selection: SelectionSlice;
   rowStart: number;
   colStart: number;
   freezeOriginRow: number;
   freezeOriginCol: number;
+  workbookView: WorkbookViewMode;
+  zoomBeforePreview: number | null;
 }
 
 export interface ValueFilterCriteria {

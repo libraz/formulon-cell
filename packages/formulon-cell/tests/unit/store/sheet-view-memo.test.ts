@@ -33,4 +33,18 @@ describe('setSheetIndex view memo', () => {
     mutators.setSheetIndex(store, 1);
     expect(store.getState().selection.active).toEqual({ sheet: 1, row: 1, col: 1 });
   });
+
+  it('keeps the workbook view mode per sheet', () => {
+    const store = createSpreadsheetStore();
+    mutators.setWorkbookView(store, 'pageLayout');
+
+    mutators.setSheetIndex(store, 1);
+    expect(store.getState().ui.workbookView).toBe('normal');
+    mutators.setWorkbookView(store, 'pageBreakPreview');
+
+    mutators.setSheetIndex(store, 0);
+    expect(store.getState().ui.workbookView).toBe('pageLayout');
+    mutators.setSheetIndex(store, 1);
+    expect(store.getState().ui.workbookView).toBe('pageBreakPreview');
+  });
 });

@@ -48,6 +48,9 @@ export interface StatusBarDeps {
    *  (1.0 = 100%). The status bar clamps UI input to the store's supported
    *  [0.5, 4] range before calling this. */
   onZoomChange?: (zoom: number) => void;
+  /** Applies a status-bar view-mode click. Defaults to a store-only switch;
+   *  hosts with an engine pass one that also saves the mode on the sheet. */
+  onViewModeChange?: (mode: WorkbookViewMode) => void;
 }
 
 export type StatusBarUploadStatus = 'saved' | 'saving' | 'error' | null;
@@ -170,19 +173,23 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   macroRecording.className = 'fc-host__statusbar-macro';
   macroRecording.style.display = 'none';
 
+  const setViewMode = (mode: WorkbookViewMode): void => {
+    if (deps.onViewModeChange) deps.onViewModeChange(mode);
+    else mutators.setWorkbookView(store, mode);
+  };
   const viewShortcuts = document.createElement('span');
   viewShortcuts.className = 'fc-host__statusbar-views';
   const viewButtons: Record<WorkbookViewMode, HTMLButtonElement> = {
     normal: createStatusBarViewButton('normal', () => {
-      mutators.setWorkbookView(store, 'normal');
+      setViewMode('normal');
       refresh();
     }),
     pageLayout: createStatusBarViewButton('pageLayout', () => {
-      mutators.setWorkbookView(store, 'pageLayout');
+      setViewMode('pageLayout');
       refresh();
     }),
     pageBreakPreview: createStatusBarViewButton('pageBreakPreview', () => {
-      mutators.setWorkbookView(store, 'pageBreakPreview');
+      setViewMode('pageBreakPreview');
       refresh();
     }),
   };

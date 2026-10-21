@@ -138,15 +138,15 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     applyChanged();
   });
   normalView.addEventListener('click', () => {
-    setWorkbookView(store, 'normal');
+    setWorkbookView(store, 'normal', wb);
     applyChanged();
   });
   pageLayoutView.addEventListener('click', () => {
-    setWorkbookView(store, 'pageLayout');
+    setWorkbookView(store, 'pageLayout', wb);
     applyChanged();
   });
   pageBreakPreview.addEventListener('click', () => {
-    setWorkbookView(store, 'pageBreakPreview');
+    setWorkbookView(store, 'pageBreakPreview', wb);
     applyChanged();
   });
   freezeNone.addEventListener('click', () => {

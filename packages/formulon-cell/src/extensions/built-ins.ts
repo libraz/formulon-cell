@@ -23,7 +23,7 @@ import {
   duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
-import { setSheetZoom } from '../commands/view.js';
+import { setSheetZoom, setWorkbookView } from '../commands/view.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
@@ -133,6 +133,10 @@ export const statusBar = (): Extension => ({
       },
       onZoomChange: (zoom) => {
         setSheetZoom(ctx.store, zoom, ctx.getWb());
+        ctx.invalidate();
+      },
+      onViewModeChange: (mode) => {
+        setWorkbookView(ctx.store, mode, ctx.getWb());
         ctx.invalidate();
       },
     });

@@ -154,10 +154,18 @@ export function hydrateLayoutFromEngine(
             showZeros: view.showZeros !== false,
             // Unlike the three above, this one defaults to off.
             rightToLeft: view.rightToLeft === true,
+            // Adapters without the field keep the sheet's remembered mode.
+            workbookView: view.viewMode ?? s.ui.workbookView,
           }
         : s.ui,
     };
   });
+}
+
+/** Mark only the `active` sheet's tab as selected so a saved file reopens on it. */
+export function syncSheetTabSelected(wb: WorkbookHandle, active: number): void {
+  if (!wb.capabilities.sheetTabSelected) return;
+  for (let i = 0; i < wb.sheetCount; i += 1) wb.setSheetTabSelected(i, i === active);
 }
 
 /**
@@ -187,10 +195,8 @@ export function rehydrateAxisLayout(
  * frozen panes). Each sub-sync is gated on its own capability flag so
  * partial engines (and the stub) only take the calls they support.
  *
- * Removed column entries are written as the layout default because formulon
- * still has no column-clear operation. Removed row entries use formulon's
- * clear operation when available, and retain the default-write fallback for
- * older adapters.
+ * Removed column and row entries use formulon's clear operations when
+ * available, and retain the default-write fallback for older adapters.
  */
 export function syncLayoutToEngine(
   wb: WorkbookHandle,
@@ -207,7 +213,15 @@ export function syncLayoutToEngine(
       const b = before.colWidths.get(col);
       const a = after.colWidths.get(col);
       if (b === a) continue;
-      wb.setColumnWidth(sheet, col, col, a ?? layout.defaultColWidth);
+      if (
+        a === undefined &&
+        wb.capabilities.columnWidthClear === true &&
+        typeof wb.clearColumnWidth === 'function'
+      ) {
+        wb.clearColumnWidth(sheet, col, col);
+      } else {
+        wb.setColumnWidth(sheet, col, col, a ?? layout.defaultColWidth);
+      }
     }
 
     const rowKeys = new Set<number>();

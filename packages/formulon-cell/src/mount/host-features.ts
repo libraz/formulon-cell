@@ -7,7 +7,7 @@ import {
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
-import { setSheetZoom } from '../commands/view.js';
+import { setSheetZoom, setWorkbookView } from '../commands/view.js';
 import { formatA1Range } from '../engine/address.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
@@ -609,6 +609,10 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           },
           onZoomChange: (zoom) => {
             setSheetZoom(input.store, zoom, input.wb());
+            input.renderer.invalidate();
+          },
+          onViewModeChange: (mode) => {
+            setWorkbookView(input.store, mode, input.wb());
             input.renderer.invalidate();
           },
         });

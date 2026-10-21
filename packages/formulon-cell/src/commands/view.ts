@@ -97,21 +97,27 @@ export const PAGE_BREAK_PREVIEW_ZOOM = 0.6;
  * Opening Page Break Preview zooms out far enough to read a whole page and
  * remembers the zoom it replaced; leaving the preview puts that zoom back.
  * Page Layout keeps whatever zoom is in force — its own page framing already
- * tells the user where the paper ends.
+ * tells the user where the paper ends. With `wb` supplied the mode is saved
+ * on the active sheet, so it round-trips through .xlsx.
  */
-export function setWorkbookView(store: SpreadsheetStore, mode: WorkbookViewMode): void {
+export function setWorkbookView(
+  store: SpreadsheetStore,
+  mode: WorkbookViewMode,
+  wb?: WorkbookHandle,
+): void {
   const previous = store.getState().ui.workbookView;
   if (previous === mode) return;
   if (mode === 'pageBreakPreview') {
     const zoom = store.getState().viewport.zoom;
     store.setState((s) => ({ ...s, ui: { ...s.ui, zoomBeforePreview: zoom } }));
-    mutators.setZoom(store, PAGE_BREAK_PREVIEW_ZOOM);
+    setSheetZoom(store, PAGE_BREAK_PREVIEW_ZOOM, wb);
   } else if (previous === 'pageBreakPreview') {
     const restore = store.getState().ui.zoomBeforePreview;
-    if (restore && restore > 0) mutators.setZoom(store, restore);
+    if (restore && restore > 0) setSheetZoom(store, restore, wb);
     store.setState((s) => ({ ...s, ui: { ...s.ui, zoomBeforePreview: null } }));
   }
   mutators.setWorkbookView(store, mode);
+  wb?.setSheetViewMode(store.getState().data.sheetIndex, mode);
 }
 
 /** Set zoom as a decimal scale. Values are clamped by the store to 50..400%. */
