@@ -6,6 +6,7 @@ import {
 } from '../engine/axis-format-sync.js';
 import { cellFormatFromXf, effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
+import { accountingNumFmtWithDecimals } from '../engine/format-writeback.js';
 import type { Addr, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import { currencySymbolForLocale } from '../format/locale.js';
@@ -916,6 +917,9 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
       if (cur.kind === 'percent') {
         return { numFmt: { kind: 'percent', decimals: clampDecimals(cur.decimals + delta) } };
       }
+      if (cur.kind === 'accounting') {
+        return { numFmt: accountingNumFmtWithDecimals(cur, clampDecimals(cur.decimals + delta)) };
+      }
       return {};
     };
     applyAxisFormatPatch(state, store, plan, {}, {}, resolveDecimals);
@@ -937,6 +941,8 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
       };
     } else if (cur.kind === 'percent') {
       nextFmt = { kind: 'percent', decimals: clampDecimals(cur.decimals + delta) };
+    } else if (cur.kind === 'accounting') {
+      nextFmt = accountingNumFmtWithDecimals(cur, clampDecimals(cur.decimals + delta));
     }
     if (nextFmt) entries.push({ addr, patch: { numFmt: nextFmt } });
   }

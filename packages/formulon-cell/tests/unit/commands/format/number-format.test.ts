@@ -89,6 +89,26 @@ describe('bumpDecimals', () => {
     });
   });
 
+  it('walks accounting decimals and rewrites a loaded code in place', () => {
+    const pattern = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "€"_-;_-@_-';
+    setNumFmt(store.getState(), store, { kind: 'accounting', decimals: 2, symbol: '€', pattern });
+    bumpDecimals(store.getState(), store, -1);
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+      kind: 'accounting',
+      decimals: 1,
+      symbol: '€',
+      pattern: '_-* #,##0.0\\ "€"_-;\\-* #,##0.0\\ "€"_-;_-* "-"?\\ "€"_-;_-@_-',
+    });
+    bumpDecimals(store.getState(), store, -1);
+    bumpDecimals(store.getState(), store, -1);
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+      kind: 'accounting',
+      decimals: 0,
+      symbol: '€',
+      pattern: '_-* #,##0\\ "€"_-;\\-* #,##0\\ "€"_-;_-* "-"\\ "€"_-;_-@_-',
+    });
+  });
+
   it('walks percent decimals', () => {
     setNumFmt(store.getState(), store, { kind: 'percent', decimals: 0 });
     bumpDecimals(store.getState(), store, 1);

@@ -402,9 +402,9 @@ describe('applyCellStyle', () => {
     expect(lockedHistory.repeatLast()).toBe(false);
 
     const huge = createSpreadsheetStore();
-    expect(
-      applyCellStyle(huge, null, { sheet: 0, r0: 0, c0: 0, r1: 100_000, c1: 1 }, 'good'),
-    ).toBeUndefined();
+    expect(applyCellStyle(huge, null, { sheet: 0, r0: 0, c0: 0, r1: 100_000, c1: 1 }, 'good')).toBe(
+      false,
+    );
     expect(huge.getState().format.formats.size).toBe(0);
   });
 

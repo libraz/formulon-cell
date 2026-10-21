@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { cellStyleFallbackFormat } from '../../../src/commands/cell-styles.js';
+import { applyCellStyle, cellStyleFallbackFormat } from '../../../src/commands/cell-styles.js';
 import { accountingFormatCode, numFmtToFormatCode } from '../../../src/engine/format-writeback.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { spreadsheetProfileForLocale } from '../../../src/mount/locale-profile.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 // Accounting codes and number-style codes per locale, as the desktop
 // spreadsheet reports them (decimal and group separators in en-US form).
@@ -67,6 +68,14 @@ describe('accounting formats follow the workbook locale', () => {
           numFmtToFormatCode(cellStyleFallbackFormat(id, 'default', locale).numFmt, wb);
         expect(code('comma')).toBe(excel.comma);
         expect(code('currency0')).toBe(excel.currency0);
+      });
+
+      it('applies the Comma style in the workbook locale', () => {
+        const store = createSpreadsheetStore();
+        const range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+        applyCellStyle(store, null, range, 'comma', { getWorkbook: () => wb });
+        const numFmt = store.getState().format.formats.get('0:0:0')?.numFmt;
+        expect(numFmtToFormatCode(numFmt, wb)).toBe(excel.comma);
       });
     });
   }

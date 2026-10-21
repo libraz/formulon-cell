@@ -436,6 +436,7 @@ const applyCellStyleToRange = (
   history: History | null,
   range: Range,
   patch: Partial<CellFormat>,
+  workbook: WorkbookHandle | null,
   repeat: () => void,
 ): boolean => {
   const state = store.getState();
@@ -452,7 +453,7 @@ const applyCellStyleToRange = (
   return recordDialogFormatChange({
     history,
     store,
-    workbook: null,
+    workbook,
     sheet: range.sheet,
     targets: plan.cells,
     pendingBefore: state.ui.pendingFormat,
@@ -590,19 +591,28 @@ export function filterCellStyleFormat(
 
 /** Apply a named style to `range`. Wraps the format mutation in a single
  *  history entry so Cmd+Z reverts the whole gallery click. The `normal`
- *  style is a clear — it strips every format field instead of merging. */
+ *  style is a clear — it strips every format field instead of merging.
+ *  With `context.getWorkbook`, the style follows the workbook's own style and
+ *  locale (the number styles differ per locale); without it, en-US. */
 export function applyCellStyle(
   store: SpreadsheetStore,
   history: History | null,
   range: Range,
   id: CellStyleId,
-): void {
-  const def = STYLE_BY_ID.get(id);
-  if (!def) return;
-  const patch = formatForGroups(def.format, cellStyleGroups(def));
+  context: CellStyleCommandContext = {},
+): boolean {
+  const style = STYLE_BY_ID.has(id) ? resolvedCellStyle(store.getState(), id) : null;
+  if (!style) return false;
+  const workbook = context.getWorkbook?.() ?? null;
+  const payload = resolveWorkbookStyleFormat(
+    workbook,
+    style,
+    context.getFallbackProfile?.() ?? 'default',
+  );
+  const patch = formatForGroups(payload, style.groups);
   patch.cellStyle = id === 'normal' ? undefined : id;
-  applyCellStyleToRange(store, history, range, patch, () => {
-    applyCellStyle(store, history, store.getState().selection.range, id);
+  return applyCellStyleToRange(store, history, range, patch, workbook, () => {
+    applyCellStyle(store, history, store.getState().selection.range, id, context);
   });
 }
 
@@ -611,22 +621,18 @@ export function applyCellStyleByName(
   history: History | null,
   range: Range,
   id: string,
+  context: CellStyleCommandContext = {},
 ): boolean {
   if (STYLE_BY_ID.has(id as CellStyleId)) {
-    const builtin = STYLE_BY_ID.get(id as CellStyleId);
-    if (!builtin) return false;
-    const patch = formatForGroups(builtin.format, cellStyleGroups(builtin));
-    patch.cellStyle = builtin.id === 'normal' ? undefined : builtin.id;
-    return applyCellStyleToRange(store, history, range, patch, () => {
-      applyCellStyle(store, history, store.getState().selection.range, builtin.id);
-    });
+    return applyCellStyle(store, history, range, id as CellStyleId, context);
   }
   const custom = customCellStyleById(store.getState(), id);
   if (!custom) return false;
   const patch = formatForGroups(custom.format, cellStyleGroups(custom));
   patch.cellStyle = custom.label;
-  return applyCellStyleToRange(store, history, range, patch, () => {
-    applyCellStyleByName(store, history, store.getState().selection.range, id);
+  const workbook = context.getWorkbook?.() ?? null;
+  return applyCellStyleToRange(store, history, range, patch, workbook, () => {
+    applyCellStyleByName(store, history, store.getState().selection.range, id, context);
   });
 }
 

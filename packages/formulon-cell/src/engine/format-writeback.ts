@@ -265,13 +265,32 @@ export function accountingFormatCode(
   const template =
     templates?.getNumFmtCode(symbol ? ACCOUNTING_SYMBOL_ID : ACCOUNTING_NO_SYMBOL_ID) ||
     (symbol ? DEFAULT_ACCOUNTING_TEMPLATE : DEFAULT_ACCOUNTING_TEMPLATE.replaceAll('"$"', ''));
-  const dec = '0'.repeat(decimals);
-  const code = template
-    .replaceAll('#,##0.00', dec ? `#,##0.${dec}` : '#,##0')
-    .replaceAll('"-"??', `"-"${'?'.repeat(decimals)}`);
+  const code = withAccountingDecimals(template, decimals);
   // The template's own currency is its only quoted literal besides the zero dash.
   const templateSymbol = [...code.matchAll(/"([^"]*)"/g)].find((m) => m[1] !== '-')?.[0];
   return templateSymbol ? code.replaceAll(templateSymbol, `"${symbol.replaceAll('"', '')}"`) : code;
+}
+
+/** Rewrite every amount and zero dash of an accounting code to `decimals` places. */
+function withAccountingDecimals(code: string, decimals: number): string {
+  const dec = '0'.repeat(decimals);
+  return code
+    .replace(/#,##0(?:\.0+)?/g, dec ? `#,##0.${dec}` : '#,##0')
+    .replace(/"-"\?*/g, `"-"${'?'.repeat(decimals)}`);
+}
+
+/** The accounting format `fmt` with `decimals` places, keeping its code's layout. */
+export function accountingNumFmtWithDecimals(
+  fmt: Extract<NumFmt, { kind: 'accounting' }>,
+  decimals: number,
+): NumFmt {
+  return {
+    ...fmt,
+    decimals,
+    ...(fmt.pattern === undefined
+      ? {}
+      : { pattern: withAccountingDecimals(fmt.pattern, decimals) }),
+  };
 }
 
 /** Translate a UI NumFmt to the format-code string spreadsheets persist. Returns
