@@ -41,7 +41,7 @@ npm install @libraz/formulon-cell zustand
 
 `zustand` is a peer dependency so the host can read the same store the chrome subscribes to.
 
-The default WASM engine in formulon 0.16.1 is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; there is no silent fallback. Node.js integrations require Node 22 or later. The in-memory stub engine is opt-in through `preferStub: true`, for tests and explicit demos only.
+The default WASM engine in formulon 0.17.0 is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; there is no silent fallback. Node.js integrations require Node 22 or later. The in-memory stub engine is opt-in through `preferStub: true`, for tests and explicit demos only.
 
 ## Quick start
 

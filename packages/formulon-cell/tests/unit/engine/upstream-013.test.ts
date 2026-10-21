@@ -10,7 +10,7 @@ describe('formulon 0.13 integration', () => {
       const first = await WorkbookHandle.createDefault();
       try {
         expect(first.isStub).toBe(false);
-        expect(first.version).toBe('0.16.1');
+        expect(first.version).toBe('0.17.0');
         first.withBatchedRecalc(() => {
           for (let row = 0; row < 3; row += 1) first.setNumber(addr(row), 0);
           first.setFormula(addr(3), `=SUBTOTAL(${code},A1:A3)`);

@@ -13,7 +13,6 @@ export interface IndexResult {
  * engine exposes them:
  *
  * - `pivotCacheFieldSharedItemValue` reads a shared item by cache index;
- * - `pivotCacheId` finds the cache bound to a projected PivotTable.
  *
  * Every required method comes from the upstream `Workbook` declaration. This
  * deliberately avoids re-declaring copied signatures, which used to turn
@@ -26,5 +25,4 @@ export interface PivotMutationWorkbook extends Workbook {
     fieldIdx: number,
     itemIdx: number,
   ) => { status: Status; value: Value };
-  pivotCacheId?: (sheet: number, pivotIdx: number) => IndexResult;
 }
