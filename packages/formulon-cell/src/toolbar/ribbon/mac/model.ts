@@ -761,14 +761,16 @@ const macHomeTab = (home: RibbonTabModel, lang: ToolbarLang): RibbonTabModel => 
           commands: current.commands.map((candidate) => macHomeCommand(candidate, lang)),
         };
       }
-      const phonetic = current.commands.find((candidate) => candidate.id === 'editPhonetic');
+      const isPhonetic = (id: string): boolean =>
+        id === 'editPhonetic' || id === 'phoneticSettings';
+      const phonetic = current.commands.filter((candidate) => isPhonetic(candidate.id));
       return {
         ...current,
         commands: [
           ...current.commands
-            .filter((candidate) => candidate.id !== 'strike' && candidate.id !== 'editPhonetic')
+            .filter((candidate) => candidate.id !== 'strike' && !isPhonetic(candidate.id))
             .map((candidate) => macHomeCommand(candidate, lang)),
-          ...(phonetic ? [macHomeCommand(phonetic, lang)] : []),
+          ...phonetic.map((candidate) => macHomeCommand(candidate, lang)),
         ],
       };
     }),

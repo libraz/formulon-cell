@@ -359,6 +359,7 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'outlineShowDetail',
   'outlineUngroup',
   'percent',
+  'phoneticSettings',
   'precedents',
   'previousCommentReview',
   'print',

@@ -33,6 +33,7 @@ import {
   readingOrderToTextDirection,
   textRotationToCellRotation,
 } from './format-writeback.js';
+import { withPhoneticProperties, writePhoneticProperties } from './phonetic-sync.js';
 import type {
   Addr,
   CellValue,
@@ -379,6 +380,9 @@ export function syncCellFormatsToEngine(
         throw strictSyncError('setCellPhonetic', key);
       }
     }
+    if (!writePhoneticProperties(wb, { sheet, row, col }, fmt) && strict) {
+      throw strictSyncError('setCellPhoneticProperties', key);
+    }
     current.add(key);
   }
   // Reset cells that were formatted before but no longer are — the cleared
@@ -423,13 +427,21 @@ export function hydrateCellFormatsFromEngine(
     const phonetic = readPhoneticRuns(wb, c.addr, c.value);
     const xfIndex = wb.getCellXfIndex(sheet, c.addr.row, c.addr.col);
     if (xfIndex === null || xfIndex <= 0) {
-      if (phonetic) updates.push({ key: addrKey(c.addr), patch: { phonetic } });
+      if (phonetic) {
+        updates.push({
+          key: addrKey(c.addr),
+          patch: withPhoneticProperties(wb, c.addr, { phonetic }),
+        });
+      }
       continue;
     }
     const xf = wb.getCellXf(xfIndex);
     if (!xf) continue;
     const patch = cellFormatFromXf(wb, xf, workbookDefaultFont, styleKeys);
-    if (phonetic) patch.phonetic = phonetic;
+    if (phonetic) {
+      patch.phonetic = phonetic;
+      withPhoneticProperties(wb, c.addr, patch);
+    }
     if (Object.keys(patch).length > 0) {
       updates.push({ key: addrKey(c.addr), patch });
     }

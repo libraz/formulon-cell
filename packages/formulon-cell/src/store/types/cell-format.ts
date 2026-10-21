@@ -1,4 +1,4 @@
-import type { PhoneticRun } from '../../engine/types.js';
+import type { PhoneticProperties, PhoneticRun } from '../../engine/types.js';
 
 export type NumFmt =
   | { kind: 'general' }
@@ -116,6 +116,9 @@ export interface CellFormat {
    *  `<rPh>` block. A guide that reads the whole cell is a single run; a
    *  partially annotated cell keeps one run per annotated span. */
   phonetic?: readonly PhoneticRun[];
+  /** How the phonetic guide renders: kana form and alignment. Absent means the
+   *  guide shows as stored. */
+  phoneticProperties?: PhoneticProperties;
   align?: CellAlign;
   /** Vertical alignment. Default is 'bottom'. */
   vAlign?: CellVAlign;

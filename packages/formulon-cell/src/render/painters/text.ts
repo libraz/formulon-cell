@@ -1,5 +1,7 @@
 import { formatNumber } from '../../commands/format.js';
+import { phoneticAlignment, phoneticKanaForm } from '../../engine/phonetic-sync.js';
 import { formatCell, formatScientificNumber } from '../../engine/value.js';
+import { convertKana } from '../../format/kana.js';
 import { normalizeFormatLocale } from '../../format/locale.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
@@ -493,28 +495,51 @@ export function paintCellText({
   ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
 
   // A phonetic guide (Japanese furigana/ruby) is stored separately from the
-  // cell value by OOXML, one run per annotated span. Each reading is centred
-  // over the span it annotates, measured in the base font before the ruby font
-  // is selected; a run whose span does not land inside the drawn text — the
+  // cell value by OOXML, one run per annotated span. Each reading sits over
+  // the span it annotates, measured in the base font before the ruby font is
+  // selected; a run whose span does not land inside the drawn text — the
   // whole-cell reading an engine without a per-run surface reports, or a guide
-  // left over from a longer value — centres over the whole text instead.
+  // left over from a longer value — sits over the whole text instead.
+  // `phoneticProperties` picks the kana form and the alignment over the span.
   if (format?.phonetic?.length && !isFormulaDisplay) {
     const textLeft =
       align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
-    const centers = format.phonetic.map((run) => {
+    const spans = format.phonetic.map((run) => {
       const start = Math.max(0, Math.min(run.start, text.length));
       const end = Math.max(start, Math.min(run.end, text.length));
-      if (end === start) return textLeft + metrics.width / 2;
+      if (end === start) return { left: textLeft, width: metrics.width };
       const before = start === 0 ? 0 : ctx.measureText(text.slice(0, start)).width;
-      return textLeft + before + ctx.measureText(text.slice(start, end)).width / 2;
+      return { left: textLeft + before, width: ctx.measureText(text.slice(start, end)).width };
     });
+    const kana = phoneticKanaForm(format.phoneticProperties);
+    const alignment = phoneticAlignment(format.phoneticProperties);
     const phoneticSize = Math.max(6, Math.round(drawFontSize * 0.52));
     ctx.save();
     ctx.font = cellFontCss(font, phoneticSize);
-    ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
+    const rubyY = ty - box.ascent - 1;
     for (const [i, run] of format.phonetic.entries()) {
-      ctx.fillText(run.text, centers[i] ?? textLeft, ty - box.ascent - 1);
+      const span = spans[i] ?? { left: textLeft, width: metrics.width };
+      const reading = convertKana(run.text, kana);
+      const chars = [...reading];
+      if (alignment === 'left') {
+        ctx.textAlign = 'left';
+        ctx.fillText(reading, span.left, rubyY);
+      } else if (
+        alignment === 'distributed' &&
+        chars.length > 1 &&
+        ctx.measureText(reading).width < span.width
+      ) {
+        // Each character takes an equal slot of the span.
+        ctx.textAlign = 'center';
+        const slot = span.width / chars.length;
+        for (const [k, ch] of chars.entries()) {
+          ctx.fillText(ch, span.left + slot * (k + 0.5), rubyY);
+        }
+      } else {
+        ctx.textAlign = 'center';
+        ctx.fillText(reading, span.left + span.width / 2, rubyY);
+      }
     }
     ctx.restore();
   }

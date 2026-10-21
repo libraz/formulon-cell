@@ -499,12 +499,12 @@ describe('paintCellText font strictness', () => {
       isInRange: false,
       format: { phonetic: [{ start: 0, end: 2, text: 'かんじ' }] },
     });
-    expect(spy.fills.map((fill) => fill.text)).toEqual(['かんじ', '漢字']);
+    expect(spy.fills.map((fill) => fill.text)).toEqual(['カンジ', '漢字']);
     expect(spy.fills[0]?.font).toContain('7px');
     expect(spy.fills[0]?.y).toBeLessThan(spy.fills[1]?.y ?? Infinity);
   });
 
-  it('centres each phonetic run over the span it annotates', () => {
+  it('places each phonetic run over the span it annotates, in katakana by default', () => {
     const spy = makeTextSpy();
     paintCellText({
       ctx: spy.ctx,
@@ -521,12 +521,12 @@ describe('paintCellText font strictness', () => {
         ],
       },
     });
-    expect(spy.fills.map((fill) => fill.text)).toEqual(['とうきょう', 'と', '東京都']);
+    expect(spy.fills.map((fill) => fill.text)).toEqual(['トウキョウ', 'ト', '東京都']);
     // The second run annotates a later span, so its reading sits to the right.
     expect(spy.fills[0]?.x ?? 0).toBeLessThan(spy.fills[1]?.x ?? 0);
   });
 
-  it('centres a run with no usable span over the whole text', () => {
+  it('places a run with no usable span over the whole text', () => {
     const spy = makeTextSpy();
     const bounds = { x: 0, y: 0, w: 200, h: 24 };
     const base = {

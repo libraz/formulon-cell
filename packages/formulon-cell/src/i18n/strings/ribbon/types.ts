@@ -37,6 +37,16 @@ export interface RibbonStrings {
     phonetic: string;
     phoneticDialogTitle: string;
     phoneticDialogLabel: string;
+    phoneticSettings: string;
+    phoneticType: string;
+    phoneticAlignment: string;
+    phoneticHiragana: string;
+    phoneticKatakana: string;
+    phoneticHalfKatakana: string;
+    phoneticAlignNormal: string;
+    phoneticAlignLeft: string;
+    phoneticAlignCenter: string;
+    phoneticAlignDistributed: string;
     ok: string;
     cancel: string;
     fontColor: string;

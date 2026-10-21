@@ -347,6 +347,7 @@ export function buildRibbonModel(
           cmd('underline', 'U', `${tr.underline} (Ctrl+U)`, 'underline'),
           cmd('strike', 'S', tr.strikethrough, 'strike'),
           cmd('editPhonetic', 'あ', tr.phonetic),
+          cmd('phoneticSettings', 'あ…', tr.phoneticSettings),
           cmd('borders', tr.borders, tr.borders, 'borders'),
           colorCmd('fillColor', tr.fillColor, tr.fillColor, 'fillColor'),
           colorCmd('fontColor', tr.fontColor, tr.fontColor, 'fontColor'),

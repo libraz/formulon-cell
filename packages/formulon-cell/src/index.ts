@@ -438,7 +438,14 @@ export {
   setPrintTitleRows,
   togglePageOrientation,
 } from './commands/page-setup.js';
-export { phoneticReading, phoneticReadingAt, setPhoneticReading } from './commands/phonetic.js';
+export {
+  type PhoneticSettings,
+  phoneticReading,
+  phoneticReadingAt,
+  phoneticSettingsAt,
+  setPhoneticReading,
+  setPhoneticSettings,
+} from './commands/phonetic.js';
 export type {
   CreatePivotTableOptions,
   CreatePivotTableResult,
@@ -899,6 +906,7 @@ export type {
   LocaleFacts,
   LocaleFactsResult,
   MergedFunctionMetadataResult,
+  PhoneticProperties,
   PhoneticRun,
   PivotCell,
   PivotDataFieldSpec,

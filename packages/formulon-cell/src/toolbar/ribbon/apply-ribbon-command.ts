@@ -14,7 +14,12 @@ import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { selectedSessionChart, switchSessionChartRowColumn } from '../../commands/chart-design.js';
 import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
-import { phoneticReadingAt, setPhoneticReading } from '../../commands/phonetic.js';
+import {
+  phoneticReadingAt,
+  phoneticSettingsAt,
+  setPhoneticReading,
+  setPhoneticSettings,
+} from '../../commands/phonetic.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
 import { arrangeSessionChart } from '../../commands/session-chart.js';
@@ -38,6 +43,7 @@ import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
+import { showPhoneticSettingsDialog } from '../dialogs/phonetic-settings.js';
 import { showPrompt } from '../dialogs/prompt.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
@@ -231,7 +237,7 @@ const applyGenericRibbonCommand = (
   }
   const viewMode = RIBBON_VIEW_MODES[id];
   if (viewMode) {
-    setWorkbookView(i.store, viewMode);
+    setWorkbookView(i.store, viewMode, i.workbook);
     runtime.projectFormatToolbar();
     runtime.focusSheet();
     return true;
@@ -322,6 +328,36 @@ const applyGenericRibbonCommand = (
         const workbook = i.workbook;
         if (phonetic === null || !workbook) return;
         if (!setPhoneticReading(i.store, workbook, addr, phonetic, initial)) return;
+        runtime.refreshCells();
+        runtime.focusSheet();
+      });
+      return true;
+    }
+    case 'phoneticSettings': {
+      const workbook = i.workbook;
+      if (!workbook?.capabilities.phoneticProperties) return true;
+      const text = deps.text;
+      void showPhoneticSettingsDialog({
+        title: text.phoneticSettings,
+        typeLabel: text.phoneticType,
+        alignmentLabel: text.phoneticAlignment,
+        typeOptions: [
+          { value: 'hiragana', label: text.phoneticHiragana },
+          { value: 'katakana', label: text.phoneticKatakana },
+          { value: 'halfKatakana', label: text.phoneticHalfKatakana },
+        ],
+        alignmentOptions: [
+          { value: 'normal', label: text.phoneticAlignNormal },
+          { value: 'left', label: text.phoneticAlignLeft },
+          { value: 'center', label: text.phoneticAlignCenter },
+          { value: 'distributed', label: text.phoneticAlignDistributed },
+        ],
+        initial: phoneticSettingsAt(i.store, state.selection.active),
+        okLabel: text.ok,
+        cancelLabel: text.cancel,
+      }).then((settings) => {
+        if (settings === null) return;
+        setPhoneticSettings(i.store, workbook, range, settings);
         runtime.refreshCells();
         runtime.focusSheet();
       });

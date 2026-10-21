@@ -147,6 +147,7 @@ describe('toolbar/ribbon-model', () => {
       'underline',
       'strike',
       'editPhonetic',
+      'phoneticSettings',
       'borders',
       'fillColor',
       'fontColor',

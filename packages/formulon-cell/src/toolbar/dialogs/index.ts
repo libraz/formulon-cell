@@ -38,6 +38,10 @@ export {
 } from './format-as-table.js';
 export { type PageScaleDialogOptions, showPageScaleDialog } from './page-scale.js';
 export {
+  type PhoneticSettingsDialogOptions,
+  showPhoneticSettingsDialog,
+} from './phonetic-settings.js';
+export {
   type ConfirmOptions,
   type MessageOptions,
   type NumberPromptOptions,

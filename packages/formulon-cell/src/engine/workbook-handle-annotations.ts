@@ -8,7 +8,7 @@ import type {
   Person,
   ThreadedComment,
 } from '@libraz/formulon';
-import type { EngineCapabilities, PhoneticRun, Workbook } from './types.js';
+import type { EngineCapabilities, PhoneticProperties, PhoneticRun, Workbook } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
@@ -103,6 +103,33 @@ export abstract class WorkbookHandleAnnotationsMethods {
       col,
       runs.map((run) => ({ sb: run.start, eb: run.end, text: run.text })),
     ).ok;
+  }
+
+  /** Read how the cell's guide renders. Returns null when the engine has no
+   *  property surface. */
+  getCellPhoneticProperties(sheet: number, row: number, col: number): PhoneticProperties | null {
+    assertAlive(this);
+    if (!this.capabilities.phoneticProperties) return null;
+    const r = wb(this).getCellPhoneticProperties(sheet, row, col);
+    if (!r.status.ok) return null;
+    return { fontId: r.fontId, type: r.type, alignment: r.alignment };
+  }
+
+  /** Store how the cell's guide renders. The engine drops the properties when
+   *  the cell's value is written again, so call this after the value. */
+  setCellPhoneticProperties(
+    sheet: number,
+    row: number,
+    col: number,
+    properties: PhoneticProperties,
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.phoneticProperties) return false;
+    return wb(this).setCellPhoneticProperties(sheet, row, col, {
+      fontId: properties.fontId,
+      type: properties.type,
+      alignment: properties.alignment,
+    }).ok;
   }
 
   /** Read the cell comment at `(sheet, row, col)`. Returns null when the
