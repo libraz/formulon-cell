@@ -1,6 +1,7 @@
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
+import { renderScale } from './render-scale.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
   ChartSourceHighlight,
@@ -12,6 +13,15 @@ import type {
   StatusAggKey,
   StatusBarOptionKey,
 } from './types.js';
+
+/** Row height ceiling: 409 pt in canonical CSS px. */
+const MAX_ROW_HEIGHT_PX = (409 * 96) / 72;
+
+/** Round canonical px to whole screen px under the layout's screen scale. */
+const snapToScreenPx = (layout: State['layout'], px: number): number => {
+  const s = renderScale(layout);
+  return Math.round(px * s) / s;
+};
 
 /** UI chrome flags, viewport scroll/zoom, freeze panes and row/column sizes. */
 export const viewMutators = {
@@ -218,7 +228,7 @@ export const viewMutators = {
   setColWidth(store: SpreadsheetStore, col: number, px: number): void {
     store.setState((s) => {
       const colWidths = new Map(s.layout.colWidths);
-      colWidths.set(col, Math.max(28, Math.min(800, px)));
+      colWidths.set(col, Math.max(28, Math.min(800, snapToScreenPx(s.layout, px))));
       return { ...s, layout: { ...s.layout, colWidths } };
     });
   },
@@ -226,7 +236,7 @@ export const viewMutators = {
   setRowHeight(store: SpreadsheetStore, row: number, px: number): void {
     store.setState((s) => {
       const rowHeights = new Map(s.layout.rowHeights);
-      rowHeights.set(row, Math.max(16, Math.min(400, px)));
+      rowHeights.set(row, Math.max(16, Math.min(MAX_ROW_HEIGHT_PX, snapToScreenPx(s.layout, px))));
       return { ...s, layout: { ...s.layout, rowHeights } };
     });
   },

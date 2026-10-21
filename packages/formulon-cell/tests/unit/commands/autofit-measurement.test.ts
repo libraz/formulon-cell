@@ -39,6 +39,9 @@ import {
   type CellFormatActionDeps,
 } from '../../../src/toolbar/ribbon/cell-format-action.js';
 
+/** The layout mutator's row ceiling: 409 pt in canonical px. */
+const MAX_ROW_HEIGHT_PX = (409 * 96) / 72;
+
 type Seed = [row: number, col: number, value: string | number, formula?: string];
 
 const storeWith = (cells: Seed[]): SpreadsheetStore => {
@@ -191,7 +194,7 @@ describe('computeAutofitRowHeight', () => {
     const tall = storeWith([[0, 0, 'a\n'.repeat(40)]]);
     expect(computeAutofitRowHeight(tall.getState(), 0, null)).toBe(705);
     autofitRowsHeight(tall, null, 0, 0);
-    expect(tall.getState().layout.rowHeights.get(0)).toBe(400);
+    expect(tall.getState().layout.rowHeights.get(0)).toBe(MAX_ROW_HEIGHT_PX);
   });
 
   it('uses the renderer padding and indent width contract for wrapped AutoFit', () => {
@@ -289,7 +292,7 @@ describe('ribbon Format > AutoFit', () => {
       [1, 5, 'y\ny\ny\ny'],
     ]);
     await run('row-autofit', store, { r0: 0, c0: 0, r1: 1, c1: 2 });
-    expect(store.getState().layout.rowHeights.get(0)).toBe(400);
+    expect(store.getState().layout.rowHeights.get(0)).toBe(MAX_ROW_HEIGHT_PX);
     expect(store.getState().layout.rowHeights.get(1)).toBe(20);
   });
 
@@ -302,17 +305,17 @@ describe('ribbon Format > AutoFit', () => {
       [2, 0, 'this cell is outside the second selected span'],
     ]);
     const workbookDisplayFont = { name: 'Calibri', size: 11 } as const;
-    // Measurement is intentionally unclamped (the raw value is 407px here);
-    // the layout mutator's 400px Excel-compatible ceiling is the stored value.
+    // Measurement is intentionally unclamped; the layout mutator's 409 pt
+    // ceiling is what the store keeps.
     const expectedFirst = Math.min(
-      400,
+      MAX_ROW_HEIGHT_PX,
       computeAutofitRowHeight(store.getState(), 0, null, {
         span: { from: 0, to: 0 },
         workbookDisplayFont,
       }),
     );
     const expectedSecond = Math.min(
-      400,
+      MAX_ROW_HEIGHT_PX,
       computeAutofitRowHeight(store.getState(), 2, null, {
         span: { from: 2, to: 2 },
         workbookDisplayFont,

@@ -92,6 +92,9 @@ export interface LayoutSlice {
   veryHiddenSheets: Set<number>;
   /** Sheet tab fill colors keyed by sheet index, matching Excel's Tab Color affordance. */
   sheetTabColors: Map<number, string>;
+  /** Platform screen px per canonical CSS px (Mac 0.75). Absent means 1.
+   *  Composes with zoom through `renderScale`. */
+  screenScale?: number;
 }
 
 /** Snapshot of every populated cell on the active sheet. The store does not
