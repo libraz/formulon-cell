@@ -1,4 +1,4 @@
-import { hyperlinkAt, isSafeHyperlinkTarget } from '../../commands/hyperlinks.js';
+import { hyperlinkAt, isFollowableHyperlinkTarget } from '../../commands/hyperlinks.js';
 import {
   createRibbonChartFromSelection,
   executeRibbonHyperlinkAction,
@@ -44,7 +44,7 @@ const buildLinksAction =
       return;
     }
     if (result.kind === 'open-url') {
-      window.open(result.url, '_blank', 'noopener,noreferrer');
+      instance.followActiveHyperlink();
       instance.host.focus();
       return;
     }
@@ -61,7 +61,7 @@ const updateLinksMenu =
     const state = instance.store.getState();
     const target = hyperlinkAt(state, state.selection.active);
     const hasHyperlink = target !== null;
-    const canOpenHyperlink = hasHyperlink && isSafeHyperlinkTarget(target);
+    const canOpenHyperlink = hasHyperlink && isFollowableHyperlinkTarget(target);
     const disabledReason = instance.i18n.strings.ribbonMenu.linkNoHyperlink;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-link-action]')) {
       const action = button.dataset.linkAction;

@@ -7,7 +7,7 @@ import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment, commentAt } from '../commands/comment.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
 import type { History } from '../commands/history.js';
-import { hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
+import { hyperlinkAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import type {
   CellBatchCommand,
@@ -619,7 +619,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       const target = hyperlinkAt(s, s.selection.active);
       setContextMenuItemDisabled(
         openHyperlink,
-        target === null || !isSafeHyperlinkTarget(target),
+        target === null || !isFollowableHyperlinkTarget(target),
         strings.ribbonMenu.linkNoHyperlink,
       );
     }
@@ -1000,7 +1000,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'openHyperlink': {
         const target = hyperlinkAt(state, state.selection.active);
-        if (!target || !isSafeHyperlinkTarget(target)) return;
+        if (!target || !isFollowableHyperlinkTarget(target)) return;
         deps.onOpenHyperlink?.(target);
         return;
       }

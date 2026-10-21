@@ -273,6 +273,17 @@ describe('attachGoToDialog', () => {
     handle.detach();
   });
 
+  it('Go To scrolls a far-away reference into view', () => {
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    handle.open('go-to');
+    typeReference('C800');
+    okBtn()?.click();
+    const { viewport } = store.getState();
+    expect(viewport.rowStart).toBeGreaterThan(0);
+    expect(viewport.rowStart + viewport.rowCount).toBeGreaterThan(799);
+    handle.detach();
+  });
+
   it('Go To switches sheet for a sheet-qualified reference', () => {
     wb.addSheet('My Sheet');
     const handle = attachGoToDialog({ host, store, getWb: () => wb });

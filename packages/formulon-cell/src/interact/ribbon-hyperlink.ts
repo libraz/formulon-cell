@@ -4,7 +4,11 @@
 // clear the hyperlink on the active cell, or surface a "no link here" report.
 
 import type { History } from '../commands/history.js';
-import { clearHyperlink, hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
+import {
+  clearHyperlink,
+  hyperlinkAt,
+  isFollowableHyperlinkTarget,
+} from '../commands/hyperlinks.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -59,7 +63,7 @@ export const executeRibbonHyperlinkAction = (
   }
   if (action === 'open') {
     const url = target.trim();
-    if (!isSafeHyperlinkTarget(url)) {
+    if (!isFollowableHyperlinkTarget(url)) {
       return {
         kind: 'report',
         report: {

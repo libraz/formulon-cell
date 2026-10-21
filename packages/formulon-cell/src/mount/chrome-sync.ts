@@ -13,6 +13,7 @@ import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
+import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
@@ -271,6 +272,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
         selection: { active: start, anchor: start, range: first, extraRanges: areas.slice(1) },
       }));
     }
+    scrollActiveIntoView(store, store.getState().selection.active);
     host.focus();
     return true;
   };

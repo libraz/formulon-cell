@@ -1,4 +1,4 @@
-import { isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
+import { hyperlinkCoverAt, isFollowableHyperlinkTarget } from '../commands/hyperlinks.js';
 import { addrKey } from '../engine/address.js';
 import { hitTest, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -18,7 +18,6 @@ export interface HoverHandle {
 /**
  * Owns:
  *  - Comment tooltip overlay — shown when hovering a cell with `format.comment`.
- *  - Hyperlink activation — Ctrl/Cmd-click opens `format.hyperlink` in a new tab.
  *  - Cursor adjustments — `pointer` cursor over hyperlink cells while modifier
  *    is held (spreadsheet convention).
  */
@@ -50,8 +49,16 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     col: number,
   ): { hyperlink?: string; hyperlinkTooltip?: string; comment?: string } | null => {
     const s = store.getState();
-    const fmt = s.format.formats.get(addrKey({ sheet: s.data.sheetIndex, row, col }));
-    return fmt ?? null;
+    const addr = { sheet: s.data.sheetIndex, row, col };
+    const fmt = s.format.formats.get(addrKey(addr));
+    // A cell inside a multi-cell link answers with the link's anchor.
+    const link = hyperlinkCoverAt(s, addr)?.fmt;
+    if (!link) return fmt ?? null;
+    return {
+      ...fmt,
+      hyperlink: link.hyperlink || `#${link.hyperlinkLocation}`,
+      hyperlinkTooltip: link.hyperlinkTooltip,
+    };
   };
 
   const onMove = (e: PointerEvent): void => {
@@ -72,7 +79,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       tip.hidden = true;
     }
     grid.style.cursor =
-      fmt?.hyperlink && modifier && isSafeHyperlinkTarget(fmt.hyperlink) ? 'pointer' : '';
+      fmt?.hyperlink && modifier && isFollowableHyperlinkTarget(fmt.hyperlink) ? 'pointer' : '';
   };
 
   const onLeave = (): void => {
@@ -85,19 +92,6 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     grid.style.cursor = '';
   };
 
-  const onClick = (e: MouseEvent): void => {
-    if (!(e.ctrlKey || e.metaKey)) return;
-    const at = cellAt(e);
-    if (!at) return;
-    const fmt = cellFormatAt(at.row, at.col);
-    if (!fmt?.hyperlink) return;
-    const target = fmt.hyperlink.trim();
-    if (!isSafeHyperlinkTarget(target)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    ownerWindow?.open(target, '_blank', 'noopener,noreferrer');
-  };
-
   const onModifier = (e: KeyboardEvent): void => {
     modifier = e.ctrlKey || e.metaKey;
     if (!modifier) grid.style.cursor = '';
@@ -105,7 +99,6 @@ export function attachHover(deps: HoverDeps): HoverHandle {
 
   grid.addEventListener('pointermove', onMove);
   grid.addEventListener('pointerleave', onLeave);
-  grid.addEventListener('click', onClick, true);
   ownerWindow?.addEventListener('keydown', onModifier);
   ownerWindow?.addEventListener('keyup', onModifier);
   ownerDocument.addEventListener('scroll', onViewportChange, true);
@@ -115,7 +108,6 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     detach() {
       grid.removeEventListener('pointermove', onMove);
       grid.removeEventListener('pointerleave', onLeave);
-      grid.removeEventListener('click', onClick, true);
       ownerWindow?.removeEventListener('keydown', onModifier);
       ownerWindow?.removeEventListener('keyup', onModifier);
       ownerDocument.removeEventListener('scroll', onViewportChange, true);

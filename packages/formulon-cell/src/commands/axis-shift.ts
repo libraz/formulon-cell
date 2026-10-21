@@ -235,6 +235,53 @@ export function shiftRangeAxis(
   return axis === 'row' ? { ...range, r0: a, r1: b } : { ...range, c0: a, c1: b };
 }
 
+/** Re-point multi-cell hyperlink spans after a row/column insert or delete.
+ *  `src` holds the formats before the shift and `shifted` the ones after it.
+ *  Inserting inside a span grows it, deleting inside shrinks it, and a link
+ *  whose anchor row/column is deleted moves to the first surviving cell. */
+export function shiftHyperlinkSpans(
+  src: ReadonlyMap<string, CellFormat>,
+  shifted: Map<string, CellFormat>,
+  sheet: number,
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): Map<string, CellFormat> {
+  let out = shifted;
+  for (const [key, fmt] of src) {
+    const span = fmt.hyperlinkSpan;
+    if (!span || !fmt.hyperlink) continue;
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    const at = axis === 'row' ? addr.row : addr.col;
+    const last = axis === 'row' ? span.lastRow : span.lastCol;
+    const interval = adjustInterval(at, last, split, delta);
+    if (!interval) continue;
+    const row = axis === 'row' ? interval[0] : addr.row;
+    const col = axis === 'col' ? interval[0] : addr.col;
+    const lastRow = axis === 'row' ? interval[1] : span.lastRow;
+    const lastCol = axis === 'col' ? interval[1] : span.lastCol;
+    const nextSpan = lastRow > row || lastCol > col ? { lastRow, lastCol } : undefined;
+    const nextKey = addrKey({ sheet, row, col });
+    const anchorKept = adjustInterval(at, at, split, delta) !== null;
+    if (out === shifted) out = new Map(shifted);
+    const base = out.get(nextKey);
+    if (anchorKept && !base) continue;
+    const next: CellFormat = { ...(base ?? {}) };
+    if (!anchorKept) {
+      // The anchor was deleted: carry the link to the first surviving cell.
+      next.hyperlink = fmt.hyperlink;
+      if (fmt.hyperlinkLocation !== undefined) next.hyperlinkLocation = fmt.hyperlinkLocation;
+      if (fmt.hyperlinkDisplay !== undefined) next.hyperlinkDisplay = fmt.hyperlinkDisplay;
+      if (fmt.hyperlinkTooltip !== undefined) next.hyperlinkTooltip = fmt.hyperlinkTooltip;
+    }
+    if (nextSpan) next.hyperlinkSpan = nextSpan;
+    else delete next.hyperlinkSpan;
+    out.set(nextKey, next);
+  }
+  return out;
+}
+
 /** Re-point range-stored validation rules after a row/column insert or delete.
  *  A range spanning the whole axis (a full column on a row edit) is unaffected;
  *  rules whose ranges are all consumed are dropped. */

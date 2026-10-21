@@ -243,6 +243,16 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     expect(a).toEqual({ sheet: 0, row: 4, col: 2 });
   });
 
+  it('Enter on a far-away ref scrolls it into view', () => {
+    tag.focus();
+    tag.value = 'B900';
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const { viewport } = sheet.instance.store.getState();
+    expect(viewport.rowStart).toBeGreaterThan(0);
+    expect(viewport.rowStart).toBeLessThanOrEqual(899);
+    expect(viewport.rowStart + viewport.rowCount).toBeGreaterThan(899);
+  });
+
   it('Enter on an A1:B3 range expands the selection range', () => {
     tag.focus();
     tag.value = 'A1:B3';

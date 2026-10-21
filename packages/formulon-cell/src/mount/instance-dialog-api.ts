@@ -1,3 +1,4 @@
+import { hyperlinkAt } from '../commands/hyperlinks.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
@@ -19,6 +20,7 @@ export type InstanceDialogApi = Pick<
   | 'openEvaluateFormulaDialog'
   | 'openFunctionArguments'
   | 'openHyperlinkDialog'
+  | 'followActiveHyperlink'
   | 'openCommentDialog'
   | 'openFindReplace'
   | 'closeFindReplace'
@@ -96,6 +98,11 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
     },
     openHyperlinkDialog() {
       featureState.hyperlinkDialog?.open();
+    },
+    followActiveHyperlink() {
+      const state = store.getState();
+      const target = hyperlinkAt(state, state.selection.active);
+      return target !== null && getBinding().followHyperlink(target);
     },
     openCommentDialog(options) {
       featureState.commentDialog?.open(options);

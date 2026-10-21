@@ -30,6 +30,10 @@ describe('executeRibbonHyperlinkAction', () => {
     });
   });
 
+  it('opens in-document targets through the same route', () => {
+    expect(runOpen('#Sheet2!A1')).toEqual({ kind: 'open-url', url: '#Sheet2!A1' });
+  });
+
   it('refuses unsafe targets through the ribbon route', () => {
     const result = runOpen('javascript:alert(1)');
     expect(result.kind).toBe('report');

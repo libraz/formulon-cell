@@ -3,7 +3,7 @@ import { fillDestFor, fillRange } from '../commands/fill.js';
 import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
 import { headerFilterRanges } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
-import { hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
+import { hyperlinkAt, isInDocumentHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import {
@@ -51,6 +51,7 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import { followHyperlink, type HyperlinkFollowDeps } from './hyperlink-follow.js';
 import {
   isNavigationAddrAllowed,
   navigationBoundsFor,
@@ -179,6 +180,8 @@ export function attachPointer(
   getEditor: () => RangeInsertTarget | null = () => null,
   /** Locale and theme font that header double-click autofit measures with. */
   getAutofitOptions: () => AutofitOptions = () => ({}),
+  /** Sheet activation and invalid-target reporting for in-document links. */
+  hyperlinkFollow: Pick<HyperlinkFollowDeps, 'activateSheet' | 'onInvalidTarget'> = {},
 ): () => void {
   let drag: DragMode = { kind: 'none' };
   const unsubscribeSheetChange = store.subscribe((state) => {
@@ -636,8 +639,8 @@ export function attachPointer(
           const url = hyperlinkAt(s, rawAddr);
           if (url) {
             e.preventDefault();
-            openHyperlink(url);
-            mutators.setActive(store, addr);
+            const followed = followHyperlink({ store, wb, ...hyperlinkFollow }, url);
+            if (!followed || !isInDocumentHyperlinkTarget(url)) mutators.setActive(store, addr);
             drag = { kind: 'none' };
             return;
           }
@@ -973,16 +976,4 @@ export function attachPointer(
     host.removeEventListener('dblclick', onDblClick);
     host.style.cursor = '';
   };
-}
-
-/**
- * Opens a hyperlink in a new tab. Restricted to safe protocols (http(s)://,
- * mailto:, tel:) so a hostile cell value can't smuggle a `javascript:` URL.
- */
-function openHyperlink(url: string): void {
-  const trimmed = url.trim();
-  if (trimmed.length === 0) return;
-  if (!isSafeHyperlinkTarget(trimmed)) return;
-  if (typeof window === 'undefined' || typeof window.open !== 'function') return;
-  window.open(trimmed, '_blank', 'noopener,noreferrer');
 }

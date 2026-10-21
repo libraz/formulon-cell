@@ -2,7 +2,7 @@ import { addrKey, parseAddrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 export interface HyperlinkEntry {
@@ -17,9 +17,57 @@ export interface SetHyperlinkOptions {
   tooltip?: string;
 }
 
+interface SpanAnchor {
+  sheet: number;
+  row: number;
+  col: number;
+  fmt: CellFormat;
+}
+
+// Span anchors per formats map; the store replaces the map on every change.
+const spanAnchorCache = new WeakMap<ReadonlyMap<string, CellFormat>, SpanAnchor[]>();
+
+function spanAnchors(formats: ReadonlyMap<string, CellFormat>): SpanAnchor[] {
+  let anchors = spanAnchorCache.get(formats);
+  if (anchors) return anchors;
+  anchors = [];
+  for (const [key, fmt] of formats) {
+    if (!fmt.hyperlinkSpan || !(fmt.hyperlink || fmt.hyperlinkLocation)) continue;
+    const addr = parseAddrKey(key);
+    if (addr) anchors.push({ ...addr, fmt });
+  }
+  spanAnchorCache.set(formats, anchors);
+  return anchors;
+}
+
+/** The cell and format carrying the hyperlink that covers `addr`: the cell
+ *  itself, or the anchor of a multi-cell link whose span contains it. */
+export function hyperlinkCoverAt(state: State, addr: Addr): { addr: Addr; fmt: CellFormat } | null {
+  const formats = state.format.formats;
+  const own = formats.get(addrKey(addr));
+  if (own && (own.hyperlink || own.hyperlinkLocation)) return { addr, fmt: own };
+  for (const a of spanAnchors(formats)) {
+    const span = a.fmt.hyperlinkSpan;
+    if (
+      span &&
+      a.sheet === addr.sheet &&
+      addr.row >= a.row &&
+      addr.row <= span.lastRow &&
+      addr.col >= a.col &&
+      addr.col <= span.lastCol
+    ) {
+      return { addr: { sheet: a.sheet, row: a.row, col: a.col }, fmt: a.fmt };
+    }
+  }
+  return null;
+}
+
+/** The link target covering `addr`. A location-only link reads as `#<location>`. */
 export function hyperlinkAt(state: State, addr: Addr): string | null {
-  const target = state.format.formats.get(addrKey(addr))?.hyperlink;
-  return target && target.length > 0 ? target : null;
+  const fmt = hyperlinkCoverAt(state, addr)?.fmt;
+  if (!fmt) return null;
+  if (fmt.hyperlink && fmt.hyperlink.length > 0) return fmt.hyperlink;
+  return fmt.hyperlinkLocation ? `#${fmt.hyperlinkLocation}` : null;
 }
 
 /** Whether `url` may be followed from the UI: only http(s), mailto and tel,
@@ -32,6 +80,17 @@ export function isSafeHyperlinkTarget(url: string): boolean {
     lower.startsWith('mailto:') ||
     lower.startsWith('tel:')
   );
+}
+
+/** Whether `target` addresses a place in this document (`#Sheet2!A1`, `#Name`). */
+export function isInDocumentHyperlinkTarget(target: string): boolean {
+  const t = target.trim();
+  return t.startsWith('#') && t.length > 1;
+}
+
+/** Whether the UI can follow `target`: a safe external URL or an in-document location. */
+export function isFollowableHyperlinkTarget(target: string): boolean {
+  return isSafeHyperlinkTarget(target) || isInDocumentHyperlinkTarget(target);
 }
 
 export function listHyperlinks(state: State, sheet = state.data.sheetIndex): HyperlinkEntry[] {
@@ -92,12 +151,20 @@ export function clearHyperlink(
   addr: Addr,
   workbook?: WorkbookHandle,
 ): void {
-  if (!isCellWritable(store.getState(), addr)) {
-    warnProtected(addr);
+  const cover = hyperlinkCoverAt(store.getState(), addr);
+  if (!cover) return;
+  const anchor = cover.addr;
+  if (!isCellWritable(store.getState(), anchor)) {
+    warnProtected(anchor);
     return;
   }
-  if (hyperlinkAt(store.getState(), addr) === null) return;
-  const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+  const range = {
+    sheet: anchor.sheet,
+    r0: anchor.row,
+    c0: anchor.col,
+    r1: anchor.row,
+    c1: anchor.col,
+  };
   mutators.setRangeFormat(store, range, {
     hyperlink: undefined,
     hyperlinkLocation: undefined,
@@ -105,5 +172,5 @@ export function clearHyperlink(
     hyperlinkDisplay: undefined,
     hyperlinkTooltip: undefined,
   });
-  if (workbook) flushFormatToEngine(workbook, store, addr.sheet);
+  if (workbook) flushFormatToEngine(workbook, store, anchor.sheet);
 }

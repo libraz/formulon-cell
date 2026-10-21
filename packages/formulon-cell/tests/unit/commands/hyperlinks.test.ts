@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   clearHyperlink,
   hyperlinkAt,
+  hyperlinkCoverAt,
+  isFollowableHyperlinkTarget,
   isSafeHyperlinkTarget,
   listEngineHyperlinks,
   listHyperlinks,
@@ -9,7 +11,7 @@ import {
 } from '../../../src/commands/hyperlinks.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('hyperlink commands', () => {
   it('sets, reads, lists, and clears store-backed hyperlinks', () => {
@@ -171,5 +173,40 @@ describe('isSafeHyperlinkTarget', () => {
     ]) {
       expect(isSafeHyperlinkTarget(url)).toBe(false);
     }
+  });
+
+  it('answers for every cell of a range link and clears it from any of them', () => {
+    const store = createSpreadsheetStore();
+    const anchor = { sheet: 0, row: 1, col: 1 };
+    setHyperlink(store, anchor, 'https://span.example');
+    mutators.setRangeFormat(
+      store,
+      { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+      { hyperlinkSpan: { lastRow: 3, lastCol: 2 } },
+    );
+
+    expect(hyperlinkAt(store.getState(), { sheet: 0, row: 3, col: 2 })).toBe(
+      'https://span.example',
+    );
+    expect(hyperlinkCoverAt(store.getState(), { sheet: 0, row: 2, col: 2 })?.addr).toEqual(anchor);
+    expect(hyperlinkAt(store.getState(), { sheet: 0, row: 4, col: 2 })).toBeNull();
+    expect(hyperlinkAt(store.getState(), { sheet: 1, row: 2, col: 2 })).toBeNull();
+
+    clearHyperlink(store, { sheet: 0, row: 3, col: 2 });
+    expect(hyperlinkAt(store.getState(), anchor)).toBeNull();
+    expect(hyperlinkAt(store.getState(), { sheet: 0, row: 3, col: 2 })).toBeNull();
+  });
+
+  it('reads a location-only link as an in-document target', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { hyperlinkLocation: 'Sheet2!B2' });
+    expect(hyperlinkAt(store.getState(), { sheet: 0, row: 0, col: 0 })).toBe('#Sheet2!B2');
+  });
+
+  it('treats #-prefixed targets as followable but not javascript:', () => {
+    expect(isFollowableHyperlinkTarget('#Sheet2!A1')).toBe(true);
+    expect(isFollowableHyperlinkTarget(' #Name ')).toBe(true);
+    expect(isFollowableHyperlinkTarget('#')).toBe(false);
+    expect(isFollowableHyperlinkTarget('javascript:alert(1)')).toBe(false);
   });
 });

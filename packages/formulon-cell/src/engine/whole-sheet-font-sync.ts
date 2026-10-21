@@ -4,6 +4,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import { type AxisStructureShift, remapAxisSnapshot } from './axis-structure-remap.js';
 import { fontCssPxToPoints } from './font-units.js';
 import type {
+  Addr,
   CellXf,
   Range,
   SheetFontAxisSnapshot,
@@ -142,6 +143,82 @@ const remapRangeValidations = (
   return changed ? next : rules;
 };
 
+const remapAddrKeySet = (
+  current: ReadonlySet<string>,
+  mapIndex: SheetIndexMapper,
+): Set<string> | null => {
+  const next = new Set<string>();
+  let changed = false;
+  for (const key of current) {
+    const addr = parseAddrKey(key);
+    if (!addr) {
+      next.add(key);
+      continue;
+    }
+    const sheet = mapIndex(addr.sheet);
+    if (sheet === null) {
+      changed = true;
+      continue;
+    }
+    if (sheet !== addr.sheet) changed = true;
+    next.add(addrKey({ ...addr, sheet }));
+  }
+  return changed ? next : null;
+};
+
+/** Session-only objects hold a sheet index but are not re-read from the
+ *  engine, so a sheet move or removal has to carry them along. Returns the
+ *  same state when nothing refers to a moved or removed sheet. */
+const remapSessionObjects = (state: State, mapIndex: SheetIndexMapper): State => {
+  let next = state;
+  const moved = (sheet: number): boolean => mapIndex(sheet) !== sheet;
+
+  if (state.illustrations.illustrations.some((item) => moved(item.sheet))) {
+    const illustrations = state.illustrations.illustrations.flatMap((item) => {
+      const sheet = mapIndex(item.sheet);
+      if (sheet === null) return [];
+      return [sheet === item.sheet ? item : { ...item, sheet }];
+    });
+    next = { ...next, illustrations: { illustrations } };
+  }
+
+  const sparklines = remapAddressMap(state.sparkline.sparklines, mapIndex);
+  if (sparklines.changed) next = { ...next, sparkline: { sparklines: sparklines.map } };
+
+  const mapAddr = (addr: Addr): Addr | null => {
+    const sheet = mapIndex(addr.sheet);
+    return sheet === null ? null : sheet === addr.sheet ? addr : { ...addr, sheet };
+  };
+  if (state.watch.watches.some((addr) => moved(addr.sheet))) {
+    const watches = state.watch.watches.flatMap((addr) => {
+      const mapped = mapAddr(addr);
+      return mapped ? [mapped] : [];
+    });
+    next = { ...next, watch: { watches } };
+  }
+  if (state.traces.items.some((item) => moved(item.from.sheet) || moved(item.to.sheet))) {
+    const items = state.traces.items.flatMap((item) => {
+      const from = mapAddr(item.from);
+      const to = mapAddr(item.to);
+      return from && to ? [{ ...item, from, to }] : [];
+    });
+    next = { ...next, traces: { items } };
+  }
+
+  const ignoredErrors = remapAddrKeySet(state.errorIndicators.ignoredErrors, mapIndex);
+  const validationCircles = remapAddrKeySet(state.errorIndicators.validationCircles, mapIndex);
+  if (ignoredErrors || validationCircles) {
+    next = {
+      ...next,
+      errorIndicators: {
+        ignoredErrors: ignoredErrors ?? state.errorIndicators.ignoredErrors,
+        validationCircles: validationCircles ?? state.errorIndicators.validationCircles,
+      },
+    };
+  }
+  return next;
+};
+
 /** Rebuild both format maps from the same pre-event state. The native
  * workbook has already moved the sheets at this point, so publishing the old
  * keys even once would flush their XF records onto the wrong worksheet. */
@@ -167,16 +244,18 @@ export const remapStoreSheetStateForStructureEvent = (
     }
     const memos = remapViewMemos(state.ui.sheetViewMemos, mapIndex);
     const rangeValidations = remapRangeValidations(state.format.rangeValidations, mapIndex);
+    const session = remapSessionObjects(state, mapIndex);
     if (
       !formats.changed &&
       !overridesChanged &&
       memos === state.ui.sheetViewMemos &&
-      rangeValidations === state.format.rangeValidations
+      rangeValidations === state.format.rangeValidations &&
+      session === state
     ) {
       return state;
     }
     return {
-      ...state,
+      ...session,
       ui: memos === state.ui.sheetViewMemos ? state.ui : { ...state.ui, sheetViewMemos: memos },
       format: {
         ...state.format,

@@ -57,6 +57,7 @@ import {
   shiftFilterSorts,
   shiftFormatsByCol,
   shiftFormatsByRow,
+  shiftHyperlinkSpans,
   shiftIndexedMap,
   shiftIndexedMapWithInheritance,
   shiftIndexedSet,
@@ -75,7 +76,9 @@ import {
   recordLayoutChange,
   recordMergesChange,
   recordMergesChangeWithEngine,
+  recordSparklineChange,
 } from './slice-history.js';
+import { shiftSparklinesForAxisEdit } from './sparkline.js';
 
 interface CellRecord {
   addr: Addr;
@@ -326,6 +329,22 @@ function shiftAnchoredRanges(
         rules.push({ ...rule, range: shifted });
       }
       return { ...s, conditional: { rules } };
+    });
+  });
+
+  // Sparklines: host cells move with their rows/columns and sources follow data.
+  recordSparklineChange(history, store, () => {
+    store.setState((s) => {
+      if (s.sparkline.sparklines.size === 0) return s;
+      const sparklines = shiftSparklinesForAxisEdit(
+        s.sparkline.sparklines,
+        sheet,
+        wb.sheetName(sheet),
+        axis,
+        split,
+        delta,
+      );
+      return { ...s, sparkline: { sparklines } };
     });
   });
 
@@ -1180,8 +1199,9 @@ function editAxis(
         const shift = axis === 'row' ? shiftFormatsByRow : shiftFormatsByCol;
         const inherit = axis === 'row' ? inheritFormatsByRow : inheritFormatsByCol;
         const shifted = shift(s.format.formats, sheet, split, delta);
-        const formats =
+        const inherited =
           kind === 'insert' ? inherit(s.format.formats, shifted, sheet, split, n) : shifted;
+        const formats = shiftHyperlinkSpans(s.format.formats, inherited, sheet, axis, split, delta);
         const rangeValidations = shiftRangeValidations(
           s.format.rangeValidations,
           sheet,

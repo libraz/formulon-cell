@@ -827,6 +827,62 @@ describe('attachPointer', () => {
       openSpy.mockRestore();
     });
 
+    it('Cmd/Ctrl+click on an in-document link selects its destination instead of opening a tab', () => {
+      setHyperlink(1, 1, '#D10');
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 200, 70, { ctrlKey: true });
+      fireUp(host, 200, 70);
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 9, col: 3 });
+      openSpy.mockRestore();
+    });
+
+    it('follows a link stored only as a location', () => {
+      store.setState((s) => {
+        const formats = new Map(s.format.formats);
+        formats.set(addrKey({ sheet: 0, row: 1, col: 1 }), { hyperlinkLocation: 'A7' });
+        return { ...s, format: { ...s.format, formats } };
+      });
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 200, 70, { ctrlKey: true });
+      fireUp(host, 200, 70);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 6, col: 0 });
+    });
+
+    it('follows a range link from any cell of its span', () => {
+      store.setState((s) => {
+        const formats = new Map(s.format.formats);
+        formats.set(addrKey({ sheet: 0, row: 1, col: 0 }), {
+          hyperlink: 'https://example.com/span',
+          hyperlinkSpan: { lastRow: 2, lastCol: 2 },
+        });
+        return { ...s, format: { ...s.format, formats } };
+      });
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 300, 100, { ctrlKey: true });
+      fireUp(host, 300, 100);
+      expect(openSpy).toHaveBeenCalledWith(
+        'https://example.com/span',
+        '_blank',
+        'noopener,noreferrer',
+      );
+      openSpy.mockRestore();
+    });
+
+    it('reports an in-document link that does not resolve', () => {
+      setHyperlink(1, 1, '#NoSuchName');
+      const onInvalidTarget = vi.fn();
+      detach = attachPointer(host, store, wb, undefined, null, undefined, undefined, {
+        onInvalidTarget,
+      });
+      fireDown(host, 200, 70, { ctrlKey: true });
+      fireUp(host, 200, 70);
+      expect(onInvalidTarget).toHaveBeenCalledTimes(1);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+    });
+
     it('accepts mailto: links', () => {
       setHyperlink(1, 1, 'mailto:hi@example.com');
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);

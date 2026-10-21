@@ -76,13 +76,28 @@ export function hydrateValidationsFromEngine(
 ): void {
   if (!wb.capabilities.dataValidation) return;
   const entries = wb.getValidationsForSheet(sheet);
-  if (entries.length === 0) return;
 
+  // The engine is authoritative: rules it no longer holds for this sheet go.
   store.setState((s) => {
-    const formats = new Map(s.format.formats);
-    const wide = (s.format.rangeValidations ?? []).filter((rule) =>
-      rule.ranges.some((range) => range.sheet !== sheet),
+    const formats = new Map<string, CellFormat>();
+    let stale = false;
+    for (const [key, fmt] of s.format.formats) {
+      if (!fmt.validation || parseAddrKey(key)?.sheet !== sheet) {
+        formats.set(key, fmt);
+        continue;
+      }
+      stale = true;
+      const { validation: _stale, ...rest } = fmt;
+      if (Object.keys(rest).length > 0) formats.set(key, rest);
+    }
+    const wide = (s.format.rangeValidations ?? []).flatMap((rule) => {
+      const ranges = rule.ranges.filter((range) => range.sheet !== sheet);
+      return ranges.length > 0 ? [{ ...rule, ranges }] : [];
+    });
+    const staleWide = (s.format.rangeValidations ?? []).some((rule) =>
+      rule.ranges.some((range) => range.sheet === sheet),
     );
+    if (entries.length === 0 && !stale && !staleWide) return s;
     for (const v of entries) {
       const decoded = decodeValidation(v);
       if (!decoded) continue;

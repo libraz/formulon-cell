@@ -9,7 +9,9 @@ import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/stor
 import type { OutlineSummary } from '../store/types.js';
 import type { History } from './history.js';
 import { isWorkbookStructureProtected } from './protection.js';
-import { recordLayoutChangeWithEngine } from './slice-history.js';
+import { recordLayoutChangeWithEngine, recordSparklineChange } from './slice-history.js';
+import { findSlicerTable } from './slicers.js';
+import { renameSheetInSparklineSources } from './sparkline.js';
 
 const shiftedAfterRemove = (idx: number, removed: number): number | null => {
   if (idx === removed) return null;
@@ -78,6 +80,14 @@ const remapWorkbookSheetLayout = (
   });
 };
 
+/** Slicers name a table, which goes away with its sheet. */
+const pruneOrphanSlicers = (store: SpreadsheetStore, wb: WorkbookHandle): void => {
+  if (typeof wb.getTables !== 'function') return;
+  for (const spec of store.getState().slicers.slicers) {
+    if (!findSlicerTable(wb, spec.tableName)) mutators.removeSlicer(store, spec.id);
+  }
+};
+
 const warnWorkbookStructureProtected = (op: string): void => {
   // eslint-disable-next-line no-console
   console.warn(`formulon-cell: ${op} blocked — workbook structure is protected`);
@@ -133,15 +143,33 @@ export function renameSheet(
   const beforeName = 'sheetName' in wb ? wb.sheetName(idx) : null;
   const ok = wb.renameSheet(idx, name);
   if (!ok) return false;
-  if (beforeName && history && !history.isReplaying()) {
-    history.push({
-      undo: () => {
-        wb.renameSheet(idx, beforeName);
-      },
-      redo: () => {
-        wb.renameSheet(idx, name);
-      },
-    });
+  history?.begin();
+  try {
+    if (store && beforeName) {
+      // Sparkline sources name their sheet, so they follow the rename.
+      recordSparklineChange(history ?? null, store, () => {
+        store.setState((s) => {
+          const sparklines = renameSheetInSparklineSources(
+            s.sparkline.sparklines,
+            beforeName,
+            name,
+          );
+          return sparklines ? { ...s, sparkline: { sparklines } } : s;
+        });
+      });
+    }
+    if (beforeName && history && !history.isReplaying()) {
+      history.push({
+        undo: () => {
+          wb.renameSheet(idx, beforeName);
+        },
+        redo: () => {
+          wb.renameSheet(idx, name);
+        },
+      });
+    }
+  } finally {
+    history?.end();
   }
   return true;
 }
@@ -161,6 +189,7 @@ export function removeSheet(store: SpreadsheetStore, wb: WorkbookHandle, idx: nu
   const ok = wb.removeSheet(idx);
   if (!ok) return false;
   remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, idx), wb);
+  pruneOrphanSlicers(store, wb);
 
   const cur = store.getState().data.sheetIndex;
   if (idx < cur) {

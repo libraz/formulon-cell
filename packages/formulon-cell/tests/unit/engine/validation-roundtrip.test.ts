@@ -146,4 +146,46 @@ describe.skipIf(!canLoadWasm())('data validation round-trip', () => {
       wb.dispose();
     }
   });
+
+  it('drops validations the engine no longer holds for the sheet', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      wb.addValidationEntry(0, entry([[0, 0, 0, 0]], { formula1: '0', formula2: '9' }));
+      wb.addValidationEntry(0, entry([[0, 2, 1048575, 2]], { formula1: '0', formula2: '9' }));
+      const store = createSpreadsheetStore();
+      hydrateValidationsFromEngine(wb, store, 0);
+      const cell = { sheet: 0, row: 0, col: 0 };
+      expect(validationAt(store.getState().format, cell)).toBeDefined();
+      expect(store.getState().format.rangeValidations).toHaveLength(1);
+
+      wb.clearValidations(0);
+      hydrateValidationsFromEngine(wb, store, 0);
+
+      const fmt = store.getState().format;
+      expect(validationAt(fmt, cell)).toBeUndefined();
+      expect(fmt.formats.size).toBe(0);
+      expect(fmt.rangeValidations ?? []).toHaveLength(0);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('keeps other cell formats and other sheets rules while clearing stale ones', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const store = createSpreadsheetStore();
+      store.setState((s) => {
+        const formats = new Map(s.format.formats);
+        formats.set('0:0:0', { bold: true, validation: { kind: 'custom', formula: 'TRUE' } });
+        formats.set('1:0:0', { validation: { kind: 'custom', formula: 'TRUE' } });
+        return { ...s, format: { ...s.format, formats } };
+      });
+      hydrateValidationsFromEngine(wb, store, 0);
+      const formats = store.getState().format.formats;
+      expect(formats.get('0:0:0')).toEqual({ bold: true });
+      expect(formats.get('1:0:0')?.validation).toBeDefined();
+    } finally {
+      wb.dispose();
+    }
+  });
 });

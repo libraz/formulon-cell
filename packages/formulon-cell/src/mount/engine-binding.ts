@@ -20,6 +20,7 @@ import type {
 } from '../interact/context-menu-options.js';
 import { InlineEditor } from '../interact/editor.js';
 import { attachFindReplace } from '../interact/find-replace.js';
+import { followHyperlink, type HyperlinkFollowDeps } from '../interact/hyperlink-follow.js';
 import { attachKeyboard } from '../interact/keyboard.js';
 import { attachPageBandEditor } from '../interact/page-band-editor.js';
 import { attachPasteOptions } from '../interact/paste-options.js';
@@ -51,6 +52,8 @@ export interface EngineBinding {
   quickAnalysis: ReturnType<typeof attachQuickAnalysis> | null;
   clipboardH: ReturnType<typeof attachClipboard> | null;
   contextMenu: ExtensionHandle | null;
+  /** Follow a hyperlink target: select an in-document location or open an external URL. */
+  followHyperlink: (target: string) => boolean;
   unbind: () => void;
 }
 
@@ -160,6 +163,30 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     strings.pivotTableDialog.cannotChange,
   );
 
+  const activateSheet = (sheet: number): boolean => {
+    if (
+      store.getState().layout.hiddenSheets.has(sheet) ||
+      store.getState().layout.veryHiddenSheets.has(sheet)
+    )
+      return false;
+    const tabs = getSheetTabs();
+    if (tabs) {
+      tabs.switchSheet(sheet);
+      return store.getState().data.sheetIndex === sheet;
+    }
+    mutators.setSheetIndex(store, sheet);
+    if (store.getState().data.sheetIndex !== sheet) return false;
+    hydrateActiveSheetFromEngine(wb, store);
+    updateChrome();
+    renderer.invalidate();
+    return true;
+  };
+  const hyperlinkFollow: Pick<HyperlinkFollowDeps, 'activateSheet' | 'onInvalidTarget'> = {
+    activateSheet,
+    onInvalidTarget: () =>
+      validationAlert?.show({ severity: 'stop', message: strings.goToDialog.invalidReference }),
+  };
+
   const editor = new InlineEditor({
     host,
     grid,
@@ -193,6 +220,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       workbookDisplayFont: wb.workbookDisplayFont,
       workbook: wb,
     }),
+    hyperlinkFollow,
   );
   // Header / footer slots are only reachable in Page Layout view, but the
   // listener is cheap and stateless until one is clicked.
@@ -281,7 +309,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         onFormatDialog: () => getFormatDialog()?.open(),
         onPasteSpecial: () => pasteSpecialDialog?.open(),
         onInsertHyperlink: () => getHyperlinkDialog()?.open(),
-        onOpenHyperlink: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
+        onOpenHyperlink: (url) => {
+          followHyperlink({ store, wb, ...hyperlinkFollow }, url);
+        },
         onEditComment: () => getCommentDialog()?.open(),
         onDefineName: () => getNamedRangeDialog()?.open(),
         onOpenPivotFieldList: getWorkbookObjects
@@ -328,24 +358,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         strings,
         history,
         getLocale,
-        onActivateSheet: (sheet) => {
-          if (
-            store.getState().layout.hiddenSheets.has(sheet) ||
-            store.getState().layout.veryHiddenSheets.has(sheet)
-          )
-            return false;
-          const tabs = getSheetTabs();
-          if (tabs) {
-            tabs.switchSheet(sheet);
-            return store.getState().data.sheetIndex === sheet;
-          }
-          mutators.setSheetIndex(store, sheet);
-          if (store.getState().data.sheetIndex !== sheet) return false;
-          hydrateActiveSheetFromEngine(wb, store);
-          updateChrome();
-          renderer.invalidate();
-          return true;
-        },
+        onActivateSheet: activateSheet,
         onAfterCommit: refreshCells,
       })
     : null;
@@ -497,6 +510,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     quickAnalysis,
     clipboardH,
     contextMenu,
+    followHyperlink: (target) => followHyperlink({ store, wb, ...hyperlinkFollow }, target),
     unbind: () => {
       detachPtr();
       pageBandEditor.detach();

@@ -147,7 +147,7 @@ describe('attachHover', () => {
     handle.detach();
   });
 
-  it('Ctrl+click on a hyperlink cell calls window.open and is preventDefault-ed', () => {
+  it('leaves Ctrl+click to the pointer layer, which follows the link once', () => {
     mutators.setCellFormat(
       store,
       { sheet: 0, row: 1, col: 1 },
@@ -164,9 +164,8 @@ describe('attachHover', () => {
       cancelable: true,
     });
     grid.dispatchEvent(evt);
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith('https://example.test/', '_blank', 'noopener,noreferrer');
-    expect(evt.defaultPrevented).toBe(true);
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(evt.defaultPrevented).toBe(false);
     openSpy.mockRestore();
     handle.detach();
   });
@@ -197,6 +196,33 @@ describe('attachHover', () => {
     }
     expect(openSpy).not.toHaveBeenCalled();
     openSpy.mockRestore();
+    handle.detach();
+  });
+
+  it('advertises in-document links and every cell of a range link as clickable', () => {
+    mutators.setCellFormat(store, { sheet: 0, row: 1, col: 1 }, { hyperlink: '#Sheet2!A1' });
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 4, col: 0 },
+      {
+        hyperlink: 'https://example.test/',
+        hyperlinkTooltip: 'span tip',
+        hyperlinkSpan: { lastRow: 5, lastCol: 2 },
+      },
+    );
+    const handle = attachHover({ grid, store });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control', ctrlKey: true }));
+    const move = (row: number, col: number): void => {
+      const { x, y } = cellPoint(store, row, col);
+      grid.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y }));
+    };
+    move(1, 1);
+    expect(grid.style.cursor).toBe('pointer');
+    move(5, 2);
+    expect(grid.style.cursor).toBe('pointer');
+    expect(tip()?.textContent).toBe('span tip');
+    move(6, 2);
+    expect(grid.style.cursor).toBe('');
     handle.detach();
   });
 

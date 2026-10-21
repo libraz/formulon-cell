@@ -16,6 +16,7 @@ import {
   isNavigationAddrAllowed,
   navigationPolicyFor,
   nextTabStop,
+  scrollActiveIntoView,
 } from './navigation-policy.js';
 import { nextAdvanceTarget } from './selection-navigation.js';
 
@@ -91,34 +92,6 @@ function lastUsedCell(s: State, sheet: number): { row: number; col: number } {
     if (formatHasContent(format)) visit(key);
   }
   return { row: maxRow, col: maxCol };
-}
-
-function scrollActiveIntoView(store: SpreadsheetStore, addr: Addr): void {
-  store.setState((s) => {
-    if (addr.sheet !== s.data.sheetIndex) return s;
-    const rowStartMin = frozenRowEnd(s.layout);
-    const colStartMin = frozenColEnd(s.layout);
-    const maxRowStart = Math.max(rowStartMin, MAX_ROW + 1 - s.viewport.rowCount);
-    const maxColStart = Math.max(colStartMin, MAX_COL + 1 - s.viewport.colCount);
-    let rowStart = s.viewport.rowStart;
-    let colStart = s.viewport.colStart;
-    const visibleRowStart = Math.max(rowStart, frozenRowEnd(s.layout));
-    const visibleColStart = Math.max(colStart, frozenColEnd(s.layout));
-    const visibleRowEnd = rowStart + s.viewport.rowCount - 1;
-    const visibleColEnd = colStart + s.viewport.colCount - 1;
-    if (addr.row >= frozenRowEnd(s.layout)) {
-      if (addr.row < visibleRowStart) rowStart = addr.row;
-      else if (addr.row > visibleRowEnd) rowStart = addr.row - s.viewport.rowCount + 1;
-    }
-    if (addr.col >= frozenColEnd(s.layout)) {
-      if (addr.col < visibleColStart) colStart = addr.col;
-      else if (addr.col > visibleColEnd) colStart = addr.col - s.viewport.colCount + 1;
-    }
-    rowStart = Math.min(maxRowStart, Math.max(rowStartMin, rowStart));
-    colStart = Math.min(maxColStart, Math.max(colStartMin, colStart));
-    if (rowStart === s.viewport.rowStart && colStart === s.viewport.colStart) return s;
-    return { ...s, viewport: { ...s.viewport, rowStart, colStart } };
-  });
 }
 
 export interface KeyboardDeps {

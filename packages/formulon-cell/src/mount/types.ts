@@ -180,6 +180,8 @@ export interface SpreadsheetInstance {
   openEvaluateFormulaDialog(): void;
   openFunctionArguments(seedName?: string, options?: FxDialogOpenOptions): void;
   openHyperlinkDialog(): void;
+  /** Follow the hyperlink on the active cell as Ctrl/Cmd+click does; false when there is none. */
+  followActiveHyperlink(): boolean;
   openCommentDialog(options?: { mode?: 'note' | 'thread' }): void;
   openDefineNameDialog(): void;
   openFindReplace(tab?: 'find' | 'replace'): void;

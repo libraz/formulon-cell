@@ -22,6 +22,7 @@ import {
   clampNavigationAddr,
   clampNavigationRange,
   isNavigationAddrAllowed,
+  scrollActiveIntoView,
   syncNavigationViewport,
 } from './navigation-policy.js';
 import { attachRangePickerButton } from './range-picker-control.js';
@@ -378,6 +379,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       },
     }));
     syncNavigationViewport(store);
+    scrollActiveIntoView(store, target);
     const text = formatReference(areas);
     const recents = (recentReferences.get(store) ?? []).filter(
       (prev) => formatReference(prev) !== text,

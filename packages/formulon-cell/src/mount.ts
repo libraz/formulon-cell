@@ -1127,6 +1127,12 @@ export const Spreadsheet = {
           conditional: { rules: [] },
           // Overlays name the previous workbook's tables.
           tables: { ...state.tables, tables: [] },
+          // Session objects point into the previous workbook's cells and tables.
+          sparkline: { sparklines: new Map() },
+          slicers: { slicers: [] },
+          watch: { watches: [] },
+          traces: { items: [] },
+          errorIndicators: { ignoredErrors: new Set(), validationCircles: new Set() },
           ui: { ...state.ui, pendingFormat: null },
         }));
         hydrateActiveSheet();
