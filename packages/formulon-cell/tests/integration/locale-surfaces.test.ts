@@ -413,10 +413,10 @@ afterEach(() => {
 });
 
 describe('seven-language locale surface manifest', () => {
-  it('keeps all 52 dictionary sections complete and placeholder-compatible', () => {
+  it('keeps all 55 dictionary sections complete and placeholder-compatible', () => {
     expect(LOCALE_SURFACE_LOCALES).toHaveLength(7);
     expect(Object.keys(dictionaries).sort()).toEqual([...LOCALE_SURFACE_LOCALES].sort());
-    expect(Object.keys(dictionaries.en)).toHaveLength(52);
+    expect(Object.keys(dictionaries.en)).toHaveLength(55);
     expect(Object.keys(dictionaries.en).sort()).toEqual([...LOCALE_SURFACE_SECTIONS].sort());
 
     const baseline = stringLeaves(dictionaries.en);
