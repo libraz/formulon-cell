@@ -1,5 +1,6 @@
 import { addrKey } from '../engine/address.js';
 import { cellFormatFromXf } from '../engine/cell-format-sync.js';
+import { localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { CellXf, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
@@ -15,6 +16,7 @@ import {
   type CellStyleFormatGroup,
   type CellStyleId,
   EXCEL365_MAC_STYLE_OVERRIDES,
+  numberStyleNumFmt,
 } from './cell-style-catalog.js';
 import { recordDialogFormatChange } from './dialog-format-history.js';
 import { applyFormatPatch, applySelectionFormatAction, planSelectionFormat } from './format.js';
@@ -66,10 +68,13 @@ export const cellStyleFallbackProfileForPlatform = (
 export function cellStyleFallbackFormat(
   id: CellStyleId,
   profile: CellStyleFallbackProfile = 'default',
+  locale = 'en-US',
 ): Partial<CellFormat> {
   const style = STYLE_BY_ID.get(id);
   const format = { ...(style?.format ?? {}) };
   if (profile === 'excel365Mac') Object.assign(format, EXCEL365_MAC_STYLE_OVERRIDES[id] ?? {});
+  const numFmt = numberStyleNumFmt(id, locale);
+  if (numFmt) format.numFmt = numFmt;
   return format;
 }
 
@@ -384,7 +389,7 @@ const resolveWorkbookStyleFormat = (
   const fallback =
     style.builtinId === undefined
       ? { ...style.format }
-      : cellStyleFallbackFormat(style.id as CellStyleId, profile);
+      : cellStyleFallbackFormat(style.id as CellStyleId, profile, localeForWorkbook(workbook));
   if (!workbook?.capabilities.cellStyles) return fallback;
   const named = workbook.getNamedCellStyles();
   const native =

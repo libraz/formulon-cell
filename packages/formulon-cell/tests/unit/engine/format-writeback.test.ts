@@ -423,11 +423,31 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
 
   it('reads spreadsheet accounting formats with spacing/fill directives', () => {
     const code = numFmtToFormatCode({ kind: 'accounting', decimals: 2, symbol: '$' });
+    expect(code).toBe('_("$"* #,##0.00_);_("$"* \\(#,##0.00\\);_("$"* "-"??_);_(@_)');
     expect(formatCodeToNumFmt(code ?? '')).toEqual({
       kind: 'accounting',
       decimals: 2,
       symbol: '$',
+      pattern: code,
     });
+  });
+
+  it('reads trailing and absent accounting symbols and keeps the code verbatim', () => {
+    const trailing = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "€"_-;_-@_-';
+    expect(formatCodeToNumFmt(trailing)).toEqual({
+      kind: 'accounting',
+      decimals: 2,
+      symbol: '€',
+      pattern: trailing,
+    });
+    const comma = '_(* #,##0_);_(* \\(#,##0\\);_(* "-"_);_(@_)';
+    expect(formatCodeToNumFmt(comma)).toEqual({
+      kind: 'accounting',
+      decimals: 0,
+      symbol: '',
+      pattern: comma,
+    });
+    expect(numFmtToFormatCode(formatCodeToNumFmt(trailing) ?? undefined)).toBe(trailing);
   });
 
   it('unknown patterns surface as custom', () => {

@@ -699,7 +699,7 @@ function buildXfForFormat(
   if (fillIndex < 0) return null;
   const borderIndex = wb.addBorderRecord(borderRecordFromFormat(fmt));
   if (borderIndex < 0) return null;
-  const code = numFmtToFormatCode(fmt.numFmt);
+  const code = numFmtToFormatCode(fmt.numFmt, wb);
   let numFmtId = BUILTIN_NUM_FMT_GENERAL;
   if (code !== null) {
     const id = wb.addNumFmtCode(code);

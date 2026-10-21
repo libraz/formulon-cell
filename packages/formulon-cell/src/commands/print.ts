@@ -758,7 +758,7 @@ export function buildPrintDocument(
     // A store-side number-format edit can briefly lead the mirror. Format the
     // value directly in that case; otherwise the workbook renderer accounts
     // for inherited styles, date systems, and display overflow.
-    const ownFormatCode = format?.numFmt ? numFmtToFormatCode(format.numFmt) : null;
+    const ownFormatCode = format?.numFmt ? numFmtToFormatCode(format.numFmt, wb) : null;
     if (ownFormatCode && typeof wb.formatValueForDisplay === 'function') {
       return wb.formatValueForDisplay(snap.value, ownFormatCode);
     }

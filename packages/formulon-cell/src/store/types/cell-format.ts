@@ -11,7 +11,9 @@ export type NumFmt =
     }
   | { kind: 'percent'; decimals: number }
   | { kind: 'scientific'; decimals: number }
-  | { kind: 'accounting'; decimals: number; symbol?: string }
+  /** `pattern` is the exact code a loaded or locale-built accounting format
+   *  carries; without it the writer builds one from the workbook's template. */
+  | { kind: 'accounting'; decimals: number; symbol?: string; pattern?: string }
   | { kind: 'date'; pattern: string }
   | { kind: 'time'; pattern: string }
   | { kind: 'datetime'; pattern: string }

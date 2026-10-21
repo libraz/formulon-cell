@@ -264,7 +264,7 @@ function hasFontDxfFields(apply: Partial<CellFormat>): boolean {
   );
 }
 
-function dxfRecordFromApply(apply: Partial<CellFormat>): DxfRecord | null {
+function dxfRecordFromApply(wb: WorkbookHandle, apply: Partial<CellFormat>): DxfRecord | null {
   const dxf: DxfRecord = {};
   if (hasFontDxfFields(apply)) {
     const font = fontRecordFromFormat(apply);
@@ -278,7 +278,7 @@ function dxfRecordFromApply(apply: Partial<CellFormat>): DxfRecord | null {
     dxf.fill = fillRecordFromFormat(apply);
   }
   if (apply.borders !== undefined) dxf.border = borderRecordFromFormat(apply);
-  const formatCode = numFmtToFormatCode(apply.numFmt);
+  const formatCode = numFmtToFormatCode(apply.numFmt, wb);
   if (formatCode) dxf.numFmt = { numFmtId: 0, formatCode };
   return Object.keys(dxf).length > 0 ? dxf : null;
 }
@@ -289,7 +289,7 @@ function inputWithDxf(
   rule: ConditionalRule,
 ): ConditionalFormatInput {
   if (!wb.capabilities.conditionalFormatDxf) return input;
-  const dxf = dxfRecordFromApply(ruleApply(rule));
+  const dxf = dxfRecordFromApply(wb, ruleApply(rule));
   if (!dxf) return input;
   const dxfId = wb.addDxf(dxf);
   return dxfId >= 0 ? { ...input, dxfId } : input;

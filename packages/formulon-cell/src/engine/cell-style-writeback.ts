@@ -12,6 +12,7 @@ import {
 } from '../commands/cell-styles.js';
 import type { CellFormat, State } from '../store/store.js';
 import { cellFormatFromXf } from './cell-format-sync.js';
+import { localeForWorkbook } from './profile-text-semantics.js';
 import type { CellXf } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -77,7 +78,7 @@ export function cellStyleKeyForOoxmlName(name: string): string {
  *  stable order. Styles nothing references are not written — Excel keeps the
  *  full built-in gallery in every file, but emitting every unused entry would
  *  bloat a workbook the user never styled. */
-export function collectNamedStyles(state: State): NamedStyleRegistration[] {
+export function collectNamedStyles(state: State, locale = 'en-US'): NamedStyleRegistration[] {
   const keys = new Set<string>();
   const materialized = new Map<string, Partial<CellFormat>[]>();
   for (const fmt of state.format.formats.values()) {
@@ -96,7 +97,7 @@ export function collectNamedStyles(state: State): NamedStyleRegistration[] {
       const projected = candidates.map((candidate) => formatForCellStyleGroups(candidate, groups));
       const profiles: readonly CellStyleFallbackProfile[] = ['default', 'excel365Mac'];
       const profile = profiles.find((candidateProfile) => {
-        const fallback = cellStyleFallbackFormat(builtin.id, candidateProfile);
+        const fallback = cellStyleFallbackFormat(builtin.id, candidateProfile, locale);
         return (
           projected.length > 0 &&
           projected.every((candidate) => stylePayloadMatches(candidate, fallback, groups))
@@ -107,8 +108,8 @@ export function collectNamedStyles(state: State): NamedStyleRegistration[] {
         name: ooxmlNameFor(builtin.id, builtin.label),
         builtinId: builtin.builtinId ?? null,
         format: profile
-          ? cellStyleFallbackFormat(builtin.id, profile)
-          : cellStyleFallbackFormat(builtin.id, 'default'),
+          ? cellStyleFallbackFormat(builtin.id, profile, locale)
+          : cellStyleFallbackFormat(builtin.id, 'default', locale),
         groups,
       });
       continue;
@@ -136,7 +137,10 @@ export function resolveNamedStyleXfs(
   ids: ReadonlyMap<string, number>,
 ): ReadonlyMap<string, NamedStyleXfResolution> {
   const registrations = new Map(
-    collectNamedStyles(state).map((registration) => [registration.key, registration]),
+    collectNamedStyles(state, localeForWorkbook(wb)).map((registration) => [
+      registration.key,
+      registration,
+    ]),
   );
   const resolved = new Map<string, NamedStyleXfResolution>();
   if (!wb.capabilities.cellStyles || typeof wb.getNamedCellStyles !== 'function') return resolved;
@@ -193,7 +197,7 @@ export function planNamedCellStylesToEngine(
     return { styleXfIds, commit: () => undefined };
   }
 
-  const registrations = collectNamedStyles(state);
+  const registrations = collectNamedStyles(state, localeForWorkbook(wb));
   // Rollback must see the entire catalog, including entries hidden from the
   // gallery; a same-name write replaces those entries too.
   const named =
@@ -336,7 +340,7 @@ export function syncNamedCellStylesToEngine(
 ): Map<string, number> {
   const resolved = new Map<string, number>();
   if (!wb.capabilities.cellStyleMutate) return resolved;
-  const registrations = collectNamedStyles(state);
+  const registrations = collectNamedStyles(state, localeForWorkbook(wb));
   // Rollback must see the entire catalog, including entries hidden from the
   // gallery; a same-name write replaces those entries too.
   const named =

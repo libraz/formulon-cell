@@ -425,7 +425,7 @@ export function paintCells(
         // mirror flush reaches the native XF table. Format that value directly
         // with formulon; loaded/inherited formats can use the workbook cell
         // renderer, which also applies its date system and effective XF.
-        const formatCode = fmt?.numFmt ? numFmtToFormatCode(fmt.numFmt) : null;
+        const formatCode = fmt?.numFmt ? numFmtToFormatCode(fmt.numFmt, wb) : null;
         if (formatCode && !overlay && typeof wb.formatValueForDisplay === 'function') {
           nativeDisplay = wb.formatValueForDisplay(value, formatCode);
         } else if (

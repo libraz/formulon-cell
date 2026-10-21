@@ -1,7 +1,8 @@
 /** Built-in cell style presets: ids, format payloads, builtin metadata, gallery groups, and platform overrides. */
 
 import { fontPointsToCssPx } from '../engine/font-units.js';
-import type { CellFormat } from '../store/store.js';
+import { currencySymbolForLocale, normalizeFormatLocale } from '../format/locale.js';
+import type { CellFormat, NumFmt } from '../store/store.js';
 
 /** Built-in named cell styles. Each style is a partial CellFormat that
  *  `applyCellStyle` merges into the active range via `setRangeFormat`. The
@@ -307,12 +308,12 @@ const CELL_STYLE_DEFS: readonly CellStyleDef[] = [
   {
     id: 'currency',
     label: 'Currency',
-    format: { numFmt: { kind: 'currency', decimals: 2, symbol: '$' } },
+    format: { numFmt: { kind: 'accounting', decimals: 2, symbol: '$' } },
   },
   {
     id: 'currency0',
     label: 'Currency [0]',
-    format: { numFmt: { kind: 'currency', decimals: 0, symbol: '$' } },
+    format: { numFmt: { kind: 'accounting', decimals: 0, symbol: '$' } },
   },
   {
     id: 'percent',
@@ -322,12 +323,12 @@ const CELL_STYLE_DEFS: readonly CellStyleDef[] = [
   {
     id: 'comma',
     label: 'Comma',
-    format: { numFmt: { kind: 'fixed', decimals: 2, thousands: true } },
+    format: { numFmt: { kind: 'accounting', decimals: 2, symbol: '' } },
   },
   {
     id: 'comma0',
     label: 'Comma [0]',
-    format: { numFmt: { kind: 'fixed', decimals: 0, thousands: true } },
+    format: { numFmt: { kind: 'accounting', decimals: 0, symbol: '' } },
   },
 ];
 
@@ -481,3 +482,28 @@ export const EXCEL365_MAC_STYLE_OVERRIDES: Partial<Record<CellStyleId, Partial<C
   accent6_40: { color: '#000000', fill: '#b5e6a2' },
   accent6_60: { color: '#000000', fill: '#8ed973' },
 };
+
+/** Number formats of the built-in number styles in `locale`. The desktop
+ *  spreadsheet gives them accounting formats, except in Japanese, where they
+ *  are red-minus number and currency formats. */
+export function numberStyleNumFmt(id: CellStyleId, locale: string): NumFmt | undefined {
+  const decimals = id === 'comma0' || id === 'currency0' ? 0 : 2;
+  const japanese = normalizeFormatLocale(locale).split('-')[0] === 'ja';
+  switch (id) {
+    case 'comma':
+    case 'comma0':
+      return japanese
+        ? { kind: 'fixed', decimals, thousands: true, negativeStyle: 'red' }
+        : { kind: 'accounting', decimals, symbol: '' };
+    case 'currency':
+    case 'currency0': {
+      const symbol = currencySymbolForLocale(locale);
+      if (!japanese) return { kind: 'accounting', decimals, symbol };
+      // The symbol precedes the minus sign, which the currency kind cannot express.
+      const body = decimals ? '#,##0.00' : '#,##0';
+      return { kind: 'custom', pattern: `"${symbol}"${body};[Red]"${symbol}"\\-${body}` };
+    }
+    default:
+      return undefined;
+  }
+}
