@@ -4,6 +4,7 @@ import {
   phoneticAlignment,
   phoneticKanaForm,
   phoneticPropertiesFor,
+  writePhoneticProperties,
 } from '../engine/phonetic-sync.js';
 import type { Addr, PhoneticRun, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -43,7 +44,10 @@ export function setPhoneticReading(
   // The engine spans the cell text itself, so the whole-cell entry point is
   // what turns a typed reading into a run without the host measuring anything.
   if (!wb.setCellPhonetic(addr.sheet, addr.row, addr.col, reading)) return false;
-  mutators.setCellFormat(store, addr, { phonetic: readBackGuide(store, wb, addr, reading) });
+  const phonetic = readBackGuide(store, wb, addr, reading);
+  const format = store.getState().format.formats.get(addrKey(addr));
+  writePhoneticProperties(wb, addr, { phonetic, phoneticProperties: format?.phoneticProperties });
+  mutators.setCellFormat(store, addr, { phonetic });
   return true;
 }
 

@@ -181,3 +181,19 @@ describe('commands/phonetic — settings', () => {
     expect(setPhoneticSettings(store, wb, range, { form: 'katakana', alignment: 'left' })).toBe(0);
   });
 });
+
+describe('new phonetic guides', () => {
+  it('states the desktop default instead of the engine unset state', async () => {
+    const { WorkbookHandle } = await import('../../../src/engine/workbook-handle.js');
+    const { createSpreadsheetStore, mutators } = await import('../../../src/store/store.js');
+    const { setPhoneticReading } = await import('../../../src/commands/phonetic.js');
+    const wb = await WorkbookHandle.createDefault();
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    wb.setText(addr, '漢字');
+    mutators.replaceCells(store, wb.cells(0));
+    expect(setPhoneticReading(store, wb, addr, 'カンジ', '')).toBe(true);
+    expect(wb.getCellPhoneticProperties(0, 0, 0)).toEqual({ fontId: 0, type: 1, alignment: 1 });
+    wb.dispose();
+  });
+});

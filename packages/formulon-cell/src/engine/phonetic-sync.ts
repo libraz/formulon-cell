@@ -67,16 +67,24 @@ export function withPhoneticProperties(
   return patch;
 }
 
+/** What a new guide gets: the schema default the desktop spreadsheet writes.
+ *  The engine's unset state is half-width katakana, so it is stated outright. */
+export const DEFAULT_PHONETIC_PROPERTIES: PhoneticProperties = phoneticPropertiesFor(
+  'katakana',
+  'left',
+);
+
 /**
- * Write a cell's guide properties after its runs. Returns false only when the
- * engine refused a write; a cell with nothing to state is a no-op.
+ * Write a cell's guide properties after its runs, the default ones when the
+ * cell has none. Returns false only when the engine refused a write; a cell
+ * without runs is a no-op.
  */
 export function writePhoneticProperties(
   wb: WorkbookHandle,
   addr: Addr,
   format: Pick<CellFormat, 'phonetic' | 'phoneticProperties'>,
 ): boolean {
-  const properties = format.phoneticProperties;
-  if (!properties || !format.phonetic?.length || !wb.capabilities.phoneticProperties) return true;
+  if (!format.phonetic?.length || !wb.capabilities.phoneticProperties) return true;
+  const properties = format.phoneticProperties ?? DEFAULT_PHONETIC_PROPERTIES;
   return wb.setCellPhoneticProperties(addr.sheet, addr.row, addr.col, properties);
 }

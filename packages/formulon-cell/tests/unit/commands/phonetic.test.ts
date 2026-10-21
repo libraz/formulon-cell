@@ -22,6 +22,7 @@ const makeFake = (opts: { runs?: boolean; text?: string } = {}) => {
   const log: string[] = [];
   let guide: PhoneticRun[] = TOKYO;
   const fake = {
+    capabilities: { phoneticProperties: false },
     setCellPhonetic(_s: number, _r: number, _c: number, reading: string): boolean {
       log.push(reading);
       guide = reading ? [{ start: 0, end: (opts.text ?? '東京都').length, text: reading }] : [];
