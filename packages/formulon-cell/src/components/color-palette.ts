@@ -2,80 +2,84 @@
  * Shared color palette — the spreadsheet-standard "Office" color picker.
  *
  * A single source of truth for every color surface (ribbon font/fill color,
- * border line color, the Format Cells dialog swatches). The data mirrors the
- * default "Office" document theme: a 10-column theme grid (one base row plus
- * five tint/shade rows) and a 10-color standard row.
+ * border line color, the Format Cells dialog swatches). The theme grid shows a
+ * workbook theme's ten colours, each over five tint/shade rows, and a 10-color
+ * standard row follows; the default theme stands in until a theme is given.
  *
  * The component is framework-agnostic vanilla DOM so the core, the React
  * wrapper and the Vue wrapper all consume the exact same widget.
  */
 
+import { argbFromCssColor, cssColorFromArgb, tintCssColor } from '../engine/theme-color.js';
+
 /** One column of the theme grid: a base color and its five tint/shade steps. */
 export interface ThemeColorColumn {
-  /** Human-readable role, e.g. "Blue, Accent 1". */
+  /** The colour's role in the theme, e.g. "Accent 1". */
   readonly name: string;
   /** Base color hex (the top row of the theme grid). */
   readonly base: string;
   /** Five tint/shade variants, ordered top → bottom as shown in the grid. */
   readonly variants: readonly string[];
+  /** Each variant's name, e.g. "Accent 1, Lighter 80%". */
+  readonly variantNames: readonly string[];
 }
 
+/** The variants of a base colour by its luminance, as tints top to bottom. */
+const variantTints = (base: string): readonly number[] => {
+  const argb = argbFromCssColor(base) ?? 0;
+  const channels = [(argb >>> 16) & 0xff, (argb >>> 8) & 0xff, argb & 0xff];
+  const lum = (Math.max(...channels) + Math.min(...channels)) / 510;
+  if (lum === 0) return [0.5, 0.35, 0.25, 0.15, 0.05];
+  if (lum === 1) return [-0.05, -0.15, -0.25, -0.35, -0.5];
+  if (lum < 0.2) return [0.9, 0.75, 0.5, 0.25, 0.1];
+  if (lum > 0.8) return [-0.1, -0.25, -0.5, -0.75, -0.9];
+  return [0.8, 0.6, 0.4, -0.25, -0.5];
+};
+
+const variantName = (tint: number): string =>
+  `${tint > 0 ? 'Lighter' : 'Darker'} ${Math.round(Math.abs(tint) * 100)}%`;
+
+/** The grid's columns in clrScheme slots (dk1, lt1, dk2, lt2, accent1..6), with their roles. */
+const GRID_SLOTS: readonly (readonly [slot: number, role: string])[] = [
+  [1, 'Background 1'],
+  [0, 'Text 1'],
+  [3, 'Background 2'],
+  [2, 'Text 2'],
+  [4, 'Accent 1'],
+  [5, 'Accent 2'],
+  [6, 'Accent 3'],
+  [7, 'Accent 4'],
+  [8, 'Accent 5'],
+  [9, 'Accent 6'],
+];
+
+/** The default theme's colours in clrScheme order. */
+const DEFAULT_THEME_COLORS: readonly number[] = [
+  0xff000000, 0xffffffff, 0xff0e2841, 0xffe8e8e8, 0xff156082, 0xffe97132, 0xff196b24, 0xff0f9ed5,
+  0xffa02b93, 0xff4ea72e,
+];
+
 /**
- * The ten columns of the "Office" theme. Variant values are the canonical
- * Excel tint/shade steps for each base color.
+ * The theme grid of a workbook theme's ARGB colours in clrScheme order: each
+ * background, text and accent colour over its five variants, tinted as the
+ * spreadsheet paints them. Falls back to the default theme for a short list.
  */
-export const THEME_COLOR_COLUMNS: readonly ThemeColorColumn[] = [
-  {
-    name: 'White, Background 1',
-    base: '#ffffff',
-    variants: ['#f2f2f2', '#d9d9d9', '#bfbfbf', '#a6a6a6', '#808080'],
-  },
-  {
-    name: 'Black, Text 1',
-    base: '#000000',
-    variants: ['#808080', '#595959', '#404040', '#262626', '#0d0d0d'],
-  },
-  {
-    name: 'Light Gray, Background 2',
-    base: '#e7e6e6',
-    variants: ['#d0cece', '#aeaaaa', '#767171', '#3b3838', '#161616'],
-  },
-  {
-    name: 'Dark Blue, Text 2',
-    base: '#44546a',
-    variants: ['#d6dce5', '#adb9ca', '#8497b0', '#333f4f', '#222a35'],
-  },
-  {
-    name: 'Blue, Accent 1',
-    base: '#4472c4',
-    variants: ['#d9e2f3', '#b4c7e7', '#8eaadb', '#2f5496', '#1f3864'],
-  },
-  {
-    name: 'Orange, Accent 2',
-    base: '#ed7d31',
-    variants: ['#fbe5d5', '#f8cbad', '#f4b183', '#c55a11', '#843c0c'],
-  },
-  {
-    name: 'Gray, Accent 3',
-    base: '#a5a5a5',
-    variants: ['#ededed', '#dbdbdb', '#c9c9c9', '#7b7b7b', '#525252'],
-  },
-  {
-    name: 'Gold, Accent 4',
-    base: '#ffc000',
-    variants: ['#fff2cc', '#ffe599', '#ffd966', '#bf8f00', '#7f6000'],
-  },
-  {
-    name: 'Blue, Accent 5',
-    base: '#5b9bd5',
-    variants: ['#ddebf7', '#bdd7ee', '#9dc3e6', '#2e74b5', '#1f4e78'],
-  },
-  {
-    name: 'Green, Accent 6',
-    base: '#70ad47',
-    variants: ['#e2efda', '#c5e0b3', '#a8d08d', '#548235', '#375623'],
-  },
-] as const;
+export function themeColorColumns(colors: readonly number[] | undefined): ThemeColorColumn[] {
+  const source = colors && colors.length >= 10 ? colors : DEFAULT_THEME_COLORS;
+  return GRID_SLOTS.map(([slot, role]) => {
+    const base = cssColorFromArgb(source[slot] ?? 0);
+    const tints = variantTints(base);
+    return {
+      name: role,
+      base,
+      variants: tints.map((tint) => tintCssColor(base, tint) ?? base),
+      variantNames: tints.map((tint) => `${role}, ${variantName(tint)}`),
+    };
+  });
+}
+
+/** The theme grid of the default theme. */
+export const THEME_COLOR_COLUMNS: readonly ThemeColorColumn[] = themeColorColumns(undefined);
 
 /** The ten "Standard Colors" shown below the theme grid. */
 export const STANDARD_COLORS: readonly string[] = [
@@ -118,6 +122,8 @@ export interface ColorPaletteOptions {
   readonly themeLabel: string;
   /** Heading for the standard row, e.g. "Standard Colors". */
   readonly standardLabel: string;
+  /** The theme grid, from `themeColorColumns`; the default theme's when unset. */
+  readonly theme?: readonly ThemeColorColumn[];
   /** Currently selected color; the matching swatch is highlighted. */
   readonly value?: string | null;
   /** When set, renders an "Automatic" button above the theme grid. */
@@ -141,6 +147,47 @@ export interface ColorPaletteHandle {
   setValue(color: string | null): void;
   /** Move keyboard focus to the selected swatch, or the first swatch. */
   focus(): void;
+}
+
+/** The theme grid's colours and names row-major: the bases, then each variant row. */
+const themeGridCells = (
+  columns: readonly ThemeColorColumn[],
+): (readonly [color: string, name: string])[] => [
+  ...columns.map((column) => [column.base, column.name] as const),
+  ...[0, 1, 2, 3, 4].flatMap((row) =>
+    columns.map(
+      (column) =>
+        [column.variants[row] ?? column.base, column.variantNames[row] ?? column.name] as const,
+    ),
+  ),
+];
+
+const swatchLabel = (color: string, name: string): string => (name ? `${name} (${color})` : color);
+
+/**
+ * Show `columns` in the theme grid of every palette under `root`, for a workbook
+ * whose theme changed after the palette was built. A swatch value copied into
+ * another `data-` attribute of the swatch moves with it.
+ */
+export function syncColorPaletteTheme(
+  root: ParentNode,
+  columns: readonly ThemeColorColumn[],
+): void {
+  const cells = themeGridCells(columns);
+  for (const grid of root.querySelectorAll<HTMLElement>('.fc-colorpalette__grid--theme')) {
+    grid.querySelectorAll<HTMLButtonElement>('.fc-colorpalette__swatch').forEach((swatch, i) => {
+      const cell = cells[i];
+      if (!cell) return;
+      const color = normalizeHex(cell[0]);
+      const previous = swatch.dataset.color;
+      for (const key of Object.keys(swatch.dataset)) {
+        if (swatch.dataset[key] === previous) swatch.dataset[key] = color;
+      }
+      swatch.style.backgroundColor = color;
+      swatch.title = swatchLabel(color, cell[1]);
+      swatch.setAttribute('aria-label', swatch.title);
+    });
+  }
 }
 
 /** A multi-hue ring — the "More Colors" affordance. */
@@ -236,15 +283,17 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
     swatch.dataset.color = normalized;
     swatch.style.backgroundColor = normalized;
     swatch.setAttribute('aria-pressed', 'false');
-    const label = name ? `${name} (${normalized})` : normalized;
+    const label = swatchLabel(normalized, name);
     swatch.title = label;
     swatch.setAttribute('aria-label', label);
     const index = swatches.length;
+    // The colour is read at the click: a theme change rewrites the swatch.
     swatch.addEventListener('click', () => {
-      selected = normalized;
+      const color = swatch.dataset.color ?? normalized;
+      selected = color;
       syncSelection();
       syncRoving();
-      options.onPick(normalized);
+      options.onPick(color);
     });
     swatch.addEventListener('keydown', (event) => onSwatchKeydown(event, index));
     swatches.push(swatch);
@@ -289,19 +338,12 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
 
   const themeGrid = document.createElement('div');
   themeGrid.className = 'fc-colorpalette__grid fc-colorpalette__grid--theme';
-  // Row 0: base colors.
-  for (const column of THEME_COLOR_COLUMNS) {
-    const cell = makeSwatch(column.base, column.name);
-    cell.classList.add('fc-colorpalette__swatch--base');
-    themeGrid.appendChild(cell);
-  }
-  // Rows 1–5: tint/shade variants, kept column-major in the source data but
-  // appended row-major so the flat `swatches` array stays grid-aligned.
-  for (let row = 0; row < 5; row += 1) {
-    for (const column of THEME_COLOR_COLUMNS) {
-      const variant = column.variants[row];
-      if (variant) themeGrid.appendChild(makeSwatch(variant, column.name));
+  for (const [color, name] of themeGridCells(options.theme ?? THEME_COLOR_COLUMNS)) {
+    const cell = makeSwatch(color, name);
+    if (themeGrid.childElementCount < PALETTE_COLUMNS) {
+      cell.classList.add('fc-colorpalette__swatch--base');
     }
+    themeGrid.appendChild(cell);
   }
   root.appendChild(themeGrid);
 

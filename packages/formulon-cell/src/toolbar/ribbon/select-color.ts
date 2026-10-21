@@ -4,7 +4,7 @@ import type { Locale } from '../../i18n/strings.js';
 // value, font availability, color palette) and produces the DOM elements that
 // renderRibbon mounts.
 
-import { createColorPalette } from '../../components/color-palette.js';
+import { createColorPalette, themeColorColumns } from '../../components/color-palette.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { RibbonCommand } from '../ribbon-model.js';
 import { createRibbonButton } from './button.js';
@@ -513,6 +513,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         standardLabel: ribbonText.standardColors,
         moreColorsLabel: ribbonText.moreColors,
         ariaLabel: command.title,
+        theme: themeColorColumns(getInst()?.workbook.getTheme()?.colors),
         value: currentRibbonControlValue(command.id),
         highContrastOnlyLabel: command.id === 'fillColor' ? ribbonText.highContrastOnly : null,
         automatic:

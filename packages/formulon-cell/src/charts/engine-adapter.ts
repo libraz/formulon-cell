@@ -53,7 +53,8 @@ import {
   ChartPointState as EngineChartPointState,
   ChartSeriesDirection as EngineChartSeriesDirection,
 } from '@libraz/formulon';
-import { argbFromCssColor, autoSeriesColor, cssColorFromArgb } from './series-colors.js';
+import { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
+import { autoSeriesColor } from './series-colors.js';
 import type {
   ChartAxisSpec,
   ChartData,
@@ -75,7 +76,7 @@ import type {
   ChartSpec,
 } from './types.js';
 
-export { argbFromCssColor, cssColorFromArgb } from './series-colors.js';
+export { argbFromCssColor, cssColorFromArgb } from '../engine/theme-color.js';
 
 /** Why an engine chart has no `ChartSpec` projection. */
 export type UnsupportedChartReason = 'chartex' | 'multi-plot' | 'plot-type';

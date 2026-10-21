@@ -12,6 +12,7 @@ import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAt, mergeWillLoseData } from '../commands/merge.js';
 import { recordFormatChange } from '../commands/slice-history.js';
+import { syncColorPaletteTheme, themeColorColumns } from '../components/color-palette.js';
 import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { CellValue, Range } from '../engine/types.js';
@@ -586,6 +587,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const api: FormatDialogHandle = {
     open(tab?: TabId, options?: FormatDialogOpenOptions): void {
       applyDxf = options?.mode === 'dxf' ? (options.onApplyDxf ?? null) : null;
+      syncColorPaletteTheme(overlay, themeColorColumns(getWb()?.getTheme()?.colors));
       hydrateFromActive(options?.initialFormat);
       setDialogMode(options?.mode);
       if (tab && tabButtons.has(tab)) setActiveTab(tab);

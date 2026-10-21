@@ -11,7 +11,11 @@ import {
   shapeOutlineDash,
   shapeOutlineWeight,
 } from '../../commands/shape-format.js';
-import { normalizeHex } from '../../components/color-palette.js';
+import {
+  normalizeHex,
+  syncColorPaletteTheme,
+  themeColorColumns,
+} from '../../components/color-palette.js';
 import type { SpreadsheetInstance } from '../../index.js';
 import type { SessionIllustration, SessionShapeLineDash } from '../../store/store.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
@@ -85,6 +89,9 @@ export function createShapeFormatDropdownDefaults(
     return item?.kind === 'shape' ? item : null;
   };
 
+  const syncTheme = (menu: HTMLElement): void =>
+    syncColorPaletteTheme(menu, themeColorColumns(instance.workbook.getTheme()?.colors));
+
   return {
     applyShapeFillAction(value) {
       const item = selectedShape();
@@ -98,6 +105,7 @@ export function createShapeFormatDropdownDefaults(
       );
     },
     updateShapeFillMenu(menu) {
+      syncTheme(menu);
       const item = selectedShape();
       const fillable = item !== null && shapeHasFill(item);
       projectColorMenu(menu, 'shapeFill', item ? shapeFillColor(item) : null, !fillable);
@@ -136,6 +144,7 @@ export function createShapeFormatDropdownDefaults(
       );
     },
     updateShapeOutlineMenu(menu) {
+      syncTheme(menu);
       const item = selectedShape();
       projectColorMenu(menu, 'shapeOutline', item ? shapeOutlineColor(item) : null, !item);
       const weight = item ? shapeOutlineWeight(item) : null;

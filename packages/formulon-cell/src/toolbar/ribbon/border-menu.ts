@@ -4,8 +4,8 @@
 // the grid) and exposes two submenus for the line color & line style
 // brush settings.
 
+import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
 import { type CellBorderStyle, type SpreadsheetInstance, setBorderPreset } from '../../index.js';
-
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import { RIBBON_BORDERS_MENU_ID } from './activation.js';
 
@@ -125,6 +125,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     const btn = getBorderBtn();
     if (!menu) return;
     refreshBorderMenuState();
+    syncColorPaletteTheme(menu, themeColorColumns(ctx.getInst()?.workbook.getTheme()?.colors));
     menu.hidden = false;
     btn?.setAttribute('aria-expanded', 'true');
     focusMenuItem(menu);

@@ -174,7 +174,7 @@ describe('attachFormatDialog', () => {
   it('uses a cached formula result before consulting the workbook', () => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 7.25 }, '=A1*2');
     const getValue = vi.fn(() => ({ kind: 'number' as const, value: 99 }));
-    const wb = { getValue } as unknown as WorkbookHandle;
+    const wb = { getValue, getTheme: () => null } as unknown as WorkbookHandle;
     const handle = attachFormatDialog({ host, store, getWb: () => wb });
     handle.open();
 
@@ -187,7 +187,7 @@ describe('attachFormatDialog', () => {
 
   it('falls back to the workbook value when the active cell is not cached', () => {
     const getValue = vi.fn(() => ({ kind: 'number' as const, value: 42.75 }));
-    const wb = { getValue } as unknown as WorkbookHandle;
+    const wb = { getValue, getTheme: () => null } as unknown as WorkbookHandle;
     const handle = attachFormatDialog({ host, store, getWb: () => wb });
     handle.open();
 

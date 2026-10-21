@@ -46,6 +46,7 @@ export const mergeWorkbook = (): WorkbookHandle =>
     setBlank: () => undefined,
     setText: () => undefined,
     getValue: () => ({ kind: 'blank' }),
+    getTheme: () => null,
   }) as unknown as WorkbookHandle;
 
 export const seedText = (

@@ -8,7 +8,9 @@ import {
   normalizeHex,
   PALETTE_COLUMNS,
   STANDARD_COLORS,
+  syncColorPaletteTheme,
   THEME_COLOR_COLUMNS,
+  themeColorColumns,
 } from '../../../src/components/color-palette.js';
 
 const swatches = (root: HTMLElement): HTMLButtonElement[] => [
@@ -28,7 +30,7 @@ describe('color palette', () => {
       themeLabel: 'Theme Colors',
       standardLabel: 'Standard Colors',
       ariaLabel: 'Font color',
-      value: '#4472c4',
+      value: '#156082',
       onPick: vi.fn(),
     });
 
@@ -39,14 +41,19 @@ describe('color palette', () => {
     );
     expect(
       palette.el
-        .querySelector<HTMLButtonElement>('[data-color="#4472c4"]')
+        .querySelector<HTMLButtonElement>('[data-color="#156082"]')
         ?.getAttribute('aria-pressed'),
     ).toBe('true');
     expect(
       palette.el
-        .querySelector<HTMLButtonElement>('[data-color="#4472c4"]')
+        .querySelector<HTMLButtonElement>('[data-color="#156082"]')
         ?.getAttribute('aria-label'),
-    ).toBe('Blue, Accent 1 (#4472c4)');
+    ).toBe('Accent 1 (#156082)');
+    expect(
+      palette.el
+        .querySelector<HTMLButtonElement>('[data-color="#c0e6f5"]')
+        ?.getAttribute('aria-label'),
+    ).toBe('Accent 1, Lighter 80% (#c0e6f5)');
   });
 
   it('picks swatches, updates selected state, and normalizes setValue input', () => {
@@ -64,11 +71,11 @@ describe('color palette', () => {
     expect(onPick).toHaveBeenCalledWith('#ff0000');
     expect(red?.getAttribute('aria-pressed')).toBe('true');
 
-    palette.setValue('70AD47');
+    palette.setValue('4EA72E');
 
     expect(
       palette.el
-        .querySelector<HTMLButtonElement>('[data-color="#70ad47"]')
+        .querySelector<HTMLButtonElement>('[data-color="#4ea72e"]')
         ?.getAttribute('aria-pressed'),
     ).toBe('true');
     expect(red?.getAttribute('aria-pressed')).toBe('false');
@@ -174,5 +181,40 @@ describe('color palette', () => {
     );
     expect(paletteCss).toMatch(/\.fc-colorpalette__action--more\s*\{[\s\S]*?margin: 6px -4px 0;/);
     expect(paletteCss).not.toContain('background: var(--fc-accent-soft');
+  });
+
+  it('tints the theme the way the spreadsheet paints each variant', () => {
+    const [background1, text1, background2, text2, accent1] = themeColorColumns(undefined);
+    // Cell colours the spreadsheet reports for the default theme at these tints.
+    expect(accent1?.variants).toEqual(['#c0e6f5', '#83cceb', '#44b3e1', '#104861', '#0b3040']);
+    expect(background1?.variants.slice(0, 1)).toEqual(['#f2f2f2']);
+    expect(background1?.variants.at(-1)).toBe('#808080');
+    expect(text1?.variants.slice(0, 2)).toEqual(['#808080', '#595959']);
+    expect(background2?.variants.slice(0, 3)).toEqual(['#d0d0d0', '#adadad', '#747474']);
+    expect(background2?.variants.at(-1)).toBe('#161616');
+    expect([text2?.variants[0], text2?.variants[2]]).toEqual(['#dae9f8', '#4d93d9']);
+  });
+
+  it('shows a changed workbook theme in a palette already built', () => {
+    const onPick = vi.fn();
+    const palette = createColorPalette({
+      themeLabel: 'Theme Colors',
+      standardLabel: 'Standard Colors',
+      onPick,
+    });
+    const accent1 = swatches(palette.el)[4];
+    if (accent1) accent1.dataset.shapeFill = accent1.dataset.color;
+    const gray = [
+      0xff000000, 0xffffffff, 0xff262626, 0xfff2f2f2, 0xff7f7f7f, 0xffa6a6a6, 0xff595959,
+      0xffbfbfbf, 0xffd9d9d9, 0xff404040,
+    ];
+
+    syncColorPaletteTheme(palette.el, themeColorColumns(gray));
+
+    expect(accent1?.dataset.color).toBe('#7f7f7f');
+    expect(accent1?.dataset.shapeFill).toBe('#7f7f7f');
+    expect(accent1?.getAttribute('aria-label')).toBe('Accent 1 (#7f7f7f)');
+    accent1?.click();
+    expect(onPick).toHaveBeenCalledWith('#7f7f7f');
   });
 });

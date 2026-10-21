@@ -798,7 +798,9 @@ export {
   normalizeHex,
   PALETTE_COLUMNS,
   STANDARD_COLORS,
+  syncColorPaletteTheme,
   THEME_COLOR_COLUMNS,
+  themeColorColumns,
 } from './components/color-palette.js';
 export { colLetter, formatA1Cell, formatA1Range, parseA1Atom } from './engine/address.js';
 export { hydrateThreadedCommentsFromEngine } from './engine/annotations-sync.js';
