@@ -36,6 +36,9 @@ const SCREEN_TIP_GAP = 8;
 const SCREEN_TIP_FALLBACK_WIDTH = 320;
 const SCREEN_TIP_FALLBACK_HEIGHT = 40;
 const SCREEN_TIP_DISMISS_DELAY_MS = 180;
+
+const isFocusVisible = (node: EventTarget | null): boolean =>
+  node instanceof Element && node.matches(':focus-visible');
 let nextTipId = 0;
 
 const isElement = (value: EventTarget | null): value is Element =>
@@ -334,7 +337,8 @@ export function attachRibbonScreenTips(options: RibbonScreenTipsOptions): Ribbon
 
   const onFocusIn = (event: FocusEvent): void => {
     const target = candidateFor(host, event.target);
-    if (target) schedule(target, true);
+    // Programmatic focus (a menu focusing its first item) shows no tip; keyboard focus does.
+    if (target && isFocusVisible(event.target)) schedule(target, true);
   };
 
   const onFocusOut = (event: FocusEvent): void => {

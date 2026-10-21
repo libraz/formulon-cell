@@ -23,6 +23,12 @@ const pointer = (
     new PointerEvent(type, { bubbles: true, relatedTarget: relatedTarget ?? null }),
   );
 
+/** Real focus so `:focus-visible` matches, then a focusin even when focus is already there. */
+const keyboardFocus = (el: HTMLElement): void => {
+  el.focus();
+  el.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+};
+
 describe('ribbon screen tips', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -98,7 +104,7 @@ describe('ribbon screen tips', () => {
     document.body.appendChild(host);
     const handle = attachRibbonScreenTips({ host, getPlatform: () => 'mac' });
 
-    button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    keyboardFocus(button);
     const tip = document.querySelector<HTMLElement>('[role="tooltip"]');
     expect(tip?.textContent).toBe('コピー\n⌘C');
     expect(button.getAttribute('aria-describedby')).toBe(`validation-message ${tip?.id}`);
@@ -110,6 +116,18 @@ describe('ribbon screen tips', () => {
     handle.detach();
   });
 
+  it('shows no tip for focus that is not keyboard-visible', () => {
+    const host = document.createElement('div');
+    const button = makeButton('Chart');
+    host.appendChild(button);
+    document.body.appendChild(host);
+    const handle = attachRibbonScreenTips({ host, delayMs: 0 });
+    button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    expect(document.querySelector<HTMLElement>('[role="tooltip"]')?.hidden ?? true).toBe(true);
+    expect(button.getAttribute('title')).toBe('Chart');
+    handle.detach();
+  });
+
   it('keeps a title/description update made while the custom tip is open', () => {
     const host = document.createElement('div');
     host.lang = 'de';
@@ -117,7 +135,7 @@ describe('ribbon screen tips', () => {
     host.appendChild(button);
     document.body.appendChild(host);
     const handle = attachRibbonScreenTips({ host, delayMs: 0 });
-    button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    keyboardFocus(button);
     const tip = document.querySelector<HTMLElement>('[role="tooltip"]');
     expect(tip?.lang).toBe('de');
 
@@ -182,7 +200,7 @@ describe('ribbon screen tips', () => {
     host.appendChild(button);
     document.body.appendChild(host);
     const handle = attachRibbonScreenTips({ host, delayMs: 0 });
-    button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    keyboardFocus(button);
     const tip = document.querySelector<HTMLElement>('[role="tooltip"]');
     expect(tip?.hidden).toBe(false);
     button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
@@ -236,12 +254,12 @@ describe('ribbon screen tips', () => {
     pointer('pointerout', button, document.body);
     vi.advanceTimersByTime(180);
     expect(tip?.hidden).toBe(true);
-    button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    keyboardFocus(button);
     expect(tip?.hidden).toBe(false);
     document.dispatchEvent(new Event('scroll'));
     expect(tip?.hidden).toBe(true);
 
-    button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    keyboardFocus(button);
     const replacement = makeButton('Format cells');
     host.replaceChildren(replacement);
     await Promise.resolve();
