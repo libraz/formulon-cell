@@ -33,13 +33,19 @@ export const cellMutators = {
   /** Switch the active sheet index. Cells must be re-hydrated separately
    *  via `replaceCells` after calling this. The sheet being left keeps its
    *  selection and scroll; a sheet visited for the first time starts at A1. */
-  setSheetIndex(store: SpreadsheetStore, idx: number): void {
+  setSheetIndex(
+    store: SpreadsheetStore,
+    idx: number,
+    opts: { discardCurrent?: boolean } = {},
+  ): void {
     const fixedRange = navigationBoundsFor(store);
     if (fixedRange && fixedRange.sheet !== idx) return;
     store.setState((s) => {
-      const switching = idx !== s.data.sheetIndex;
+      const switching = opts.discardCurrent === true || idx !== s.data.sheetIndex;
       const memos = new Map(s.ui.sheetViewMemos);
-      if (switching) {
+      // `discardCurrent`: the sheet being left was removed, so its state has
+      // no home and must not overwrite the memo of the sheet now at `idx`.
+      if (switching && !opts.discardCurrent) {
         memos.set(s.data.sheetIndex, {
           selection: s.selection,
           rowStart: s.viewport.rowStart,
@@ -83,6 +89,27 @@ export const cellMutators = {
       };
     });
     syncNavigationViewport(store);
+  },
+
+  /** Follow the active sheet to `idx` after a move or remove renumbered it.
+   *  The sheet is the same, so its live selection and scroll stay. */
+  renumberActiveSheet(store: SpreadsheetStore, idx: number): void {
+    store.setState((s) => {
+      if (s.data.sheetIndex === idx) return s;
+      const sel = s.selection;
+      return {
+        ...s,
+        data: { ...s.data, sheetIndex: idx },
+        selection: {
+          active: { ...sel.active, sheet: idx },
+          anchor: { ...sel.anchor, sheet: idx },
+          range: { ...sel.range, sheet: idx },
+          ...(sel.extraRanges && {
+            extraRanges: sel.extraRanges.map((r) => ({ ...r, sheet: idx })),
+          }),
+        },
+      };
+    });
   },
 
   /** Merge a partial format into the cell at `addr`. Pass `null` to clear. */

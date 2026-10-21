@@ -1,4 +1,5 @@
 import type { SpreadsheetStore, State } from '../store/store.js';
+import type { SheetViewMemo } from '../store/types.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import { type AxisStructureShift, remapAxisSnapshot } from './axis-structure-remap.js';
 import { fontCssPxToPoints } from './font-units.js';
@@ -88,6 +89,39 @@ const remapAddressMap = <T>(
   return { map: next, changed };
 };
 
+/** Each sheet keeps its remembered selection and scroll across a move or remove. */
+const remapViewMemos = (
+  memos: ReadonlyMap<number, SheetViewMemo> | undefined,
+  mapIndex: SheetIndexMapper,
+): ReadonlyMap<number, SheetViewMemo> | undefined => {
+  if (!memos) return memos;
+  let changed = false;
+  const next = new Map<number, SheetViewMemo>();
+  for (const [index, memo] of memos) {
+    const mapped = mapIndex(index);
+    if (mapped !== index) changed = true;
+    if (mapped === null) continue;
+    const sel = memo.selection;
+    next.set(
+      mapped,
+      mapped === index
+        ? memo
+        : {
+            ...memo,
+            selection: {
+              active: { ...sel.active, sheet: mapped },
+              anchor: { ...sel.anchor, sheet: mapped },
+              range: { ...sel.range, sheet: mapped },
+              ...(sel.extraRanges && {
+                extraRanges: sel.extraRanges.map((r) => ({ ...r, sheet: mapped })),
+              }),
+            },
+          },
+    );
+  }
+  return changed ? next : memos;
+};
+
 /** Rebuild both format maps from the same pre-event state. The native
  * workbook has already moved the sheets at this point, so publishing the old
  * keys even once would flush their XF records onto the wrong worksheet. */
@@ -111,9 +145,11 @@ export const remapStoreSheetStateForStructureEvent = (
         overrides.set(mapped, override);
       }
     }
-    if (!formats.changed && !overridesChanged) return state;
+    const memos = remapViewMemos(state.ui.sheetViewMemos, mapIndex);
+    if (!formats.changed && !overridesChanged && memos === state.ui.sheetViewMemos) return state;
     return {
       ...state,
+      ui: memos === state.ui.sheetViewMemos ? state.ui : { ...state.ui, sheetViewMemos: memos },
       format: {
         ...state.format,
         formats: formats.changed ? formats.map : state.format.formats,

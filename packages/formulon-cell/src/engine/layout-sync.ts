@@ -162,10 +162,9 @@ export function hydrateLayoutFromEngine(
   });
 }
 
-/** Mark only the `active` sheet's tab as selected so a saved file reopens on it. */
-export function syncSheetTabSelected(wb: WorkbookHandle, active: number): void {
-  if (!wb.capabilities.sheetTabSelected) return;
-  for (let i = 0; i < wb.sheetCount; i += 1) wb.setSheetTabSelected(i, i === active);
+/** Make `active` the sheet a saved file reopens on. */
+export function syncActiveSheet(wb: WorkbookHandle, active: number): void {
+  if (wb.capabilities.activeSheet && wb.activeSheet() !== active) wb.setActiveSheet(active);
 }
 
 /**

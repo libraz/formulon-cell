@@ -1,4 +1,5 @@
 import { SheetVisibility } from '../engine/types.js';
+import { nearestVisibleSheet } from '../engine/view-state-sync.js';
 import {
   hasWholeSheetFontStoreBinding,
   remapStoreSheetStateForStructureEvent,
@@ -131,7 +132,8 @@ export function renameSheet(
 /** Remove the sheet at `idx`. When the active sheet is affected, the store's
  *  `sheetIndex` is corrected to point at a still-valid neighbor:
  *  - removing an index *before* the active: active shifts down by 1
- *  - removing the active itself: select max(idx - 1, 0)
+ *  - removing the active itself: the next visible sheet to the right, else the
+ *    nearest visible one on the left
  *  - removing an index *after* the active: no change
  *  The selection is reset to A1 on the new active sheet. Returns false when
  *  the removal is rejected (e.g. trying to remove the last sheet) or when
@@ -144,12 +146,11 @@ export function removeSheet(store: SpreadsheetStore, wb: WorkbookHandle, idx: nu
   remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, idx), wb);
 
   const cur = store.getState().data.sheetIndex;
-  let next = cur;
-  if (idx < cur) next = cur - 1;
-  else if (idx === cur) next = Math.max(idx - 1, 0);
-  // idx > cur: no change.
-  if (next !== cur) {
-    mutators.setSheetIndex(store, next);
+  if (idx < cur) {
+    mutators.renumberActiveSheet(store, cur - 1);
+  } else if (idx === cur) {
+    const next = nearestVisibleSheet(wb.sheetCount, store.getState().layout.hiddenSheets, idx);
+    mutators.setSheetIndex(store, next < 0 ? cur : next, { discardCurrent: true });
   }
   return true;
 }
@@ -172,38 +173,24 @@ export function moveSheet(
   remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to), wb);
 
   const cur = store.getState().data.sheetIndex;
-  let next = cur;
-  if (cur === from) next = to;
-  else if (from < cur && to >= cur) next = cur - 1;
-  else if (from > cur && to <= cur) next = cur + 1;
-  if (next !== cur) {
-    mutators.setSheetIndex(store, next);
-  }
+  mutators.renumberActiveSheet(store, shiftedAfterMove(cur, from, to));
   const afterActive = store.getState().data.sheetIndex;
   if (history && !history.isReplaying()) {
     history.push({
       undo: () => {
         if (!wb.moveSheet(to, from)) return;
         remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, to, from), wb);
-        mutators.setSheetIndex(store, beforeActive);
+        mutators.renumberActiveSheet(store, beforeActive);
       },
       redo: () => {
         if (!wb.moveSheet(from, to)) return;
         remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to), wb);
-        mutators.setSheetIndex(store, afterActive);
+        mutators.renumberActiveSheet(store, afterActive);
       },
     });
   }
   return true;
 }
-
-const firstVisibleSheet = (n: number, hidden: ReadonlySet<number>, skip: number): number => {
-  for (let i = 0; i < n; i += 1) {
-    if (i === skip) continue;
-    if (!hidden.has(i)) return i;
-  }
-  return 0;
-};
 
 /**
  * Move `idx`'s tab to one of the three visibility states. Refuses to hide the
@@ -272,7 +259,8 @@ export function setSheetTabVisibility(
   // After hiding the active sheet, hop to the next visible one.
   const after = store.getState();
   if (!toVisible && after.data.sheetIndex === idx) {
-    mutators.setSheetIndex(store, firstVisibleSheet(n, after.layout.hiddenSheets, idx));
+    const next = nearestVisibleSheet(n, after.layout.hiddenSheets, idx);
+    if (next >= 0) mutators.setSheetIndex(store, next);
   }
   return true;
 }

@@ -191,8 +191,8 @@ export const PIVOT_SHOW_AS_BASE_PREVIOUS = 1048828;
 export const PIVOT_SHOW_AS_BASE_NEXT = 1048829;
 
 export interface PivotDataFieldSpec {
-  /** Deterministic display name, normally `<aggregation> of <field>`. The
-   * adapter supplies a stable fallback when an older caller omits it. */
+  /** Display name (the GETPIVOTDATA key). Omit it to have the engine name the
+   * field from the workbook profile, e.g. "Sum of Sales" or "合計 / Sales". */
   readonly name?: string;
   readonly fieldIndex: number;
   readonly aggregation: PivotAggregation;
@@ -504,6 +504,12 @@ export interface PhoneticProperties {
   readonly alignment: number;
 }
 
+/** Guide properties as read back from the engine: `present` is false when the
+ *  triple is only what an absent `<phoneticPr>` resolves to. */
+export interface PhoneticPropertiesRead extends PhoneticProperties {
+  readonly present: boolean;
+}
+
 /** Tagged value the UI displays. Mirrors the six error sentinels. */
 export type CellValue =
   | { readonly kind: 'blank' }
@@ -563,6 +569,8 @@ export interface EngineCapabilities {
   /** Per-cell guide rendering properties (`<phoneticPr>`): kana form,
    *  alignment and font. */
   readonly phoneticProperties?: boolean;
+  /** Per-cell "Show Phonetic" display flag (`<c ph>`). */
+  readonly showPhonetic?: boolean;
   /** `setDefaultFont` — states font 0, the record an unstyled cell resolves
    *  to. Without it a new workbook keeps the engine's seeded default. */
   readonly defaultFont?: boolean;
@@ -601,6 +609,12 @@ export interface EngineCapabilities {
   readonly sheetViewMode?: boolean;
   /** `setSheetTabSelected`. */
   readonly sheetTabSelected?: boolean;
+  /** `activeSheet` + `setActiveSheet` — the workbook's open-on sheet. */
+  readonly activeSheet?: boolean;
+  /** `getSheetSelection` + `setSheetSelection` — the saved active cell and ranges. */
+  readonly sheetSelection?: boolean;
+  /** `setSheetTopLeft` + `setSheetPaneTopLeft` — the saved scroll origin. */
+  readonly sheetScroll?: boolean;
   /** `setSheetTabHidden` — the two-state view of tab visibility. */
   readonly sheetTabHidden: boolean;
   /** `setSheetVisibility` three-state tab visibility. Required to state
@@ -690,6 +704,9 @@ export interface EngineCapabilities {
    *  index rather than its label. Required to express the blank member of a
    *  pivot axis, which has no label to be named by. */
   readonly pivotItemByCacheIndex?: boolean;
+  /** Read-back of a pivot's stored definition: cache id, name, grand totals,
+   *  axis field order, per-field settings and items, and data fields. */
+  readonly pivotDefinitionRead?: boolean;
   /** Pivot cache worksheet source metadata read/write. */
   readonly pivotCacheSource: boolean;
   /** Pivot compact / tabular / outline report layout read/write. */

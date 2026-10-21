@@ -8,7 +8,7 @@ import {
 } from '../commands/named-ranges.js';
 import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formulaForEdit } from '../engine/edit-seed.js';
-import { syncSheetTabSelected } from '../engine/layout-sync.js';
+import { syncActiveSheet } from '../engine/layout-sync.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
@@ -440,7 +440,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const sheetChanged = s.data.sheetIndex !== lastSheetIdx;
     if (sheetChanged) {
       lastSheetIdx = s.data.sheetIndex;
-      syncSheetTabSelected(getWb(), lastSheetIdx);
+      syncActiveSheet(getWb(), lastSheetIdx);
     }
     if (sheetChanged || s.layout.hiddenSheets !== lastHiddenSheets) {
       lastHiddenSheets = s.layout.hiddenSheets;
@@ -458,7 +458,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     updateChrome();
   });
 
-  syncSheetTabSelected(getWb(), lastSheetIdx);
+  syncActiveSheet(getWb(), lastSheetIdx);
   updateChrome();
 
   return {

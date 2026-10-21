@@ -187,12 +187,12 @@ describe('removeSheet', () => {
     expect(store.getState().data.sheetIndex).toBe(1);
   });
 
-  it('removing the active sheet selects max(idx-1, 0)', () => {
+  it('removing the active sheet keeps the index its right neighbour slides into', () => {
     const store = createSpreadsheetStore();
     setActive(store, 1);
     const { wb } = makeFake({ sheetCount: 3 });
     expect(removeSheet(store, wb, 1)).toBe(true);
-    expect(store.getState().data.sheetIndex).toBe(0);
+    expect(store.getState().data.sheetIndex).toBe(1);
   });
 
   it('removing index > active leaves active untouched', () => {
@@ -476,12 +476,12 @@ describe('setSheetHidden', () => {
     expect(store.getState().layout.hiddenSheets.has(1)).toBe(false);
   });
 
-  it('hiding the active sheet hops to the next visible one', () => {
+  it('hiding the active sheet hops to the next visible one on its right', () => {
     const store = createSpreadsheetStore();
     setActive(store, 1);
     const { wb } = makeHiddenFake({ sheetCount: 3 });
     expect(setSheetHidden(store, wb, null, 1, true)).toBe(true);
-    expect(store.getState().data.sheetIndex).toBe(0);
+    expect(store.getState().data.sheetIndex).toBe(2);
   });
 
   it('unhide flips the flag back and emits the engine call', () => {

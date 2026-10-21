@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { captureLayoutSnapshot } from '../../../src/commands/slice-history.js';
 import {
   hydrateLayoutFromEngine,
+  syncActiveSheet,
   syncLayoutSizesToEngine,
   syncLayoutToEngine,
-  syncSheetTabSelected,
 } from '../../../src/engine/layout-sync.js';
 import { SheetVisibility } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -100,7 +100,7 @@ interface FakeWb {
   rowCalls: SetRowCall[];
   clearRowCalls: ClearRowCall[];
   clearColCalls: { sheet: number; first: number; last: number }[];
-  tabSelectedCalls: { sheet: number; selected: boolean }[];
+  activeSheetCalls: number[];
   freezeCalls: SetFreezeCall[];
   colHiddenCalls: SetColHiddenCall[];
   rowHiddenCalls: SetRowHiddenCall[];
@@ -120,7 +120,7 @@ const makeFake = (opts: {
   geometry?: boolean;
   rowHeightClear?: boolean;
   columnWidthClear?: boolean;
-  sheetTabSelected?: boolean;
+  activeSheet?: boolean;
   sheetCount?: number;
   cols?: FakeColLayout[];
   rows?: FakeRowLayout[];
@@ -132,7 +132,8 @@ const makeFake = (opts: {
   const rowCalls: SetRowCall[] = [];
   const clearRowCalls: ClearRowCall[] = [];
   const clearColCalls: { sheet: number; first: number; last: number }[] = [];
-  const tabSelectedCalls: { sheet: number; selected: boolean }[] = [];
+  const activeSheetCalls: number[] = [];
+  let activeSheetIndex = 0;
   const freezeCalls: SetFreezeCall[] = [];
   const colHiddenCalls: SetColHiddenCall[] = [];
   const rowHiddenCalls: SetRowHiddenCall[] = [];
@@ -153,7 +154,7 @@ const makeFake = (opts: {
       geometry: opts.geometry ?? false,
       rowHeightClear: opts.rowHeightClear ?? false,
       columnWidthClear: opts.columnWidthClear ?? false,
-      sheetTabSelected: opts.sheetTabSelected ?? false,
+      activeSheet: opts.activeSheet ?? false,
     },
     sheetCount: opts.sheetCount ?? 1,
     getColumnLayouts: () => opts.cols ?? [],
@@ -172,8 +173,10 @@ const makeFake = (opts: {
       clearColCalls.push({ sheet, first, last });
       return opts.columnWidthClear ?? false;
     },
-    setSheetTabSelected: (sheet: number, selected: boolean) => {
-      tabSelectedCalls.push({ sheet, selected });
+    activeSheet: () => activeSheetIndex,
+    setActiveSheet: (sheet: number) => {
+      activeSheetCalls.push(sheet);
+      activeSheetIndex = sheet;
       return true;
     },
     clearRowHeight: (sheet: number, row: number) => {
@@ -217,7 +220,7 @@ const makeFake = (opts: {
     rowCalls,
     clearRowCalls,
     clearColCalls,
-    tabSelectedCalls,
+    activeSheetCalls,
     freezeCalls,
     colHiddenCalls,
     rowHiddenCalls,
@@ -429,24 +432,21 @@ describe('sheet view mode and tab selection', () => {
     expect(store.getState().ui.workbookView).toBe('pageBreakPreview');
   });
 
-  it('marks only the active sheet tab as selected', () => {
-    const { wb, tabSelectedCalls } = makeFake({
+  it('makes the active sheet the open-on sheet once', () => {
+    const { wb, activeSheetCalls } = makeFake({
       colRowSize: true,
-      sheetTabSelected: true,
+      activeSheet: true,
       sheetCount: 3,
     });
-    syncSheetTabSelected(wb, 1);
-    expect(tabSelectedCalls).toEqual([
-      { sheet: 0, selected: false },
-      { sheet: 1, selected: true },
-      { sheet: 2, selected: false },
-    ]);
+    syncActiveSheet(wb, 1);
+    syncActiveSheet(wb, 1);
+    expect(activeSheetCalls).toEqual([1]);
   });
 
-  it('skips tab selection on engines without the setter', () => {
-    const { wb, tabSelectedCalls } = makeFake({ colRowSize: true, sheetCount: 2 });
-    syncSheetTabSelected(wb, 0);
-    expect(tabSelectedCalls).toEqual([]);
+  it('skips the active-sheet write on engines without the setter', () => {
+    const { wb, activeSheetCalls } = makeFake({ colRowSize: true, sheetCount: 2 });
+    syncActiveSheet(wb, 1);
+    expect(activeSheetCalls).toEqual([]);
   });
 });
 

@@ -19,7 +19,8 @@ import {
   type SyncedConditionalRuleMap,
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
-import { rehydrateAxisLayout, syncSheetTabSelected } from './engine/layout-sync.js';
+import { rehydrateAxisLayout, syncActiveSheet } from './engine/layout-sync.js';
+import { hydrateViewStateFromEngine } from './engine/view-state-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
 import { resolveSpreadsheetUiOptions } from './extensions/index.js';
@@ -312,6 +313,7 @@ export const Spreadsheet = {
     attachWorkbookHistory(wb, history);
     history.clear();
 
+    hydrateViewStateFromEngine(wb, store, { followActiveSheet: !opts.viewport?.range });
     hydrateActiveSheetFromEngine(wb, store);
     hydrateWorkbookMetadataFromEngine(wb, store);
     wb.attachStore(store);
@@ -1109,9 +1111,11 @@ export const Spreadsheet = {
           navigation.options?.range?.sheet ??
           Math.min(store.getState().data.sheetIndex, Math.max(0, wb.sheetCount - 1));
         mutators.setSheetIndex(store, nextSheet);
-        syncSheetTabSelected(wb, nextSheet);
-        // Per-sheet selection and scroll belong to the previous workbook.
+        // Per-sheet selection and scroll belong to the previous workbook; the
+        // incoming one brings its own saved view.
         store.setState((state) => ({ ...state, ui: { ...state.ui, sheetViewMemos: undefined } }));
+        hydrateViewStateFromEngine(wb, store, { followActiveSheet: !navigation.options?.range });
+        syncActiveSheet(wb, store.getState().data.sheetIndex);
         mutators.clearIllustrations(store);
         store.setState((state) => ({
           ...state,

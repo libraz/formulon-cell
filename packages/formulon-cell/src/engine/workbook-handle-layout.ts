@@ -326,6 +326,12 @@ export abstract class WorkbookHandleLayoutMethods {
     rightToLeft: boolean;
     /** Absent when the engine cannot write the mode, so there is nothing to read back. */
     viewMode?: WorkbookViewMode;
+    /** Scroll origin (`topLeftCell`); the frozen band's first cell when frozen. */
+    topLeftRow?: number;
+    topLeftCol?: number;
+    /** First visible cell of the scrolling pane of a frozen view. */
+    paneTopLeftRow?: number;
+    paneTopLeftCol?: number;
   } | null {
     assertAlive(this);
     if (!this.capabilities.sheetView) return null;
@@ -343,6 +349,10 @@ export abstract class WorkbookHandleLayoutMethods {
       showZeros: r.view.showZeros !== 0,
       rightToLeft: r.view.rightToLeft !== 0,
       viewMode: this.capabilities.sheetViewMode ? workbookViewOf(r.view.viewMode) : undefined,
+      topLeftRow: r.view.topLeftRow,
+      topLeftCol: r.view.topLeftCol,
+      paneTopLeftRow: r.view.paneTopLeftRow,
+      paneTopLeftCol: r.view.paneTopLeftCol,
     };
   }
 
@@ -359,6 +369,78 @@ export abstract class WorkbookHandleLayoutMethods {
     assertAlive(this);
     if (!this.capabilities.sheetTabSelected) return false;
     return wb(this).setSheetTabSelected(sheet, selected).ok;
+  }
+
+  /** Index of the sheet the workbook opens on, or null when the engine has no
+   *  active-sheet record. */
+  activeSheet(): number | null {
+    assertAlive(this);
+    if (!this.capabilities.activeSheet) return null;
+    const r = wb(this).activeSheet();
+    return r.status.ok ? r.index : null;
+  }
+
+  /** Make `sheet` the open-on sheet. Rejected for hidden or out-of-range sheets. */
+  setActiveSheet(sheet: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.activeSheet) return false;
+    return wb(this).setActiveSheet(sheet).ok;
+  }
+
+  /** The selection saved for `sheet`'s active pane; null without engine support. */
+  getSheetSelection(sheet: number): {
+    activeRow: number;
+    activeCol: number;
+    ranges: Range[];
+  } | null {
+    assertAlive(this);
+    if (!this.capabilities.sheetSelection) return null;
+    const r = wb(this).getSheetSelection(sheet);
+    if (!r.status.ok) return null;
+    return {
+      activeRow: r.activeRow,
+      activeCol: r.activeCol,
+      ranges: r.ranges.map((m) => ({
+        sheet,
+        r0: m.firstRow,
+        c0: m.firstCol,
+        r1: m.lastRow,
+        c1: m.lastCol,
+      })),
+    };
+  }
+
+  /** Replace the selection saved for `sheet`'s active pane. */
+  setSheetSelection(
+    sheet: number,
+    selection: { activeRow: number; activeCol: number; ranges: readonly Range[] },
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetSelection) return false;
+    return wb(this).setSheetSelection(sheet, {
+      activeRow: selection.activeRow,
+      activeCol: selection.activeCol,
+      ranges: selection.ranges.map((r) => ({
+        firstRow: r.r0,
+        firstCol: r.c0,
+        lastRow: r.r1,
+        lastCol: r.c1,
+      })),
+    }).ok;
+  }
+
+  /** Set the saved scroll origin (`<sheetView topLeftCell>`). */
+  setSheetTopLeft(sheet: number, row: number, col: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetScroll) return false;
+    return wb(this).setSheetTopLeft(sheet, row, col).ok;
+  }
+
+  /** Set the first visible cell of a frozen view's scrolling pane. */
+  setSheetPaneTopLeft(sheet: number, row: number, col: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetScroll) return false;
+    return wb(this).setSheetPaneTopLeft(sheet, row, col).ok;
   }
 
   setSheetShowGridLines(sheet: number, show: boolean): boolean {

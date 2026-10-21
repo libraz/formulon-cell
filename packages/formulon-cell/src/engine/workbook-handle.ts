@@ -994,6 +994,7 @@ export class WorkbookHandle {
     diagnostics: SaveDiagnostics;
   } {
     this.assertAlive();
+    this.storeMirror.flushViewState();
     const raw =
       typeof this.wb.saveWithDiagnostics === 'function'
         ? this.wb.saveWithDiagnostics(SAVE_FORMAT_ORDINAL[format])

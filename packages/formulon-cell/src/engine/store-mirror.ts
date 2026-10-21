@@ -17,6 +17,7 @@ import {
 } from './format-history-bridge.js';
 import { syncPageSetupToEngine } from './print-sync.js';
 import type { SheetAxisFormatOverride, SheetFontOverride } from './types.js';
+import { syncViewStateToEngine } from './view-state-sync.js';
 import { bindWholeSheetFontStore } from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -276,6 +277,13 @@ export class StoreMirror {
   detach(expectedStore: SpreadsheetStore): void {
     if (this.boundStore !== expectedStore) return;
     this.attach(null);
+  }
+
+  /** Write the bound store's active sheet, selection and scroll origin to the
+   *  engine so a save captures them. Called ahead of each save rather than on
+   *  every scroll or selection change. */
+  flushViewState(): void {
+    if (this.boundStore) syncViewStateToEngine(this.handle, this.boundStore);
   }
 
   withMuted<T>(fn: () => T): T {
