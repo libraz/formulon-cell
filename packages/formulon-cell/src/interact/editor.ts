@@ -13,6 +13,7 @@ import {
   cssCellFontSize,
   fontSizeWithVerticalAlign,
 } from '../render/painters/text.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
@@ -961,8 +962,9 @@ export class InlineEditor {
     // spreadsheet does.
     const band = bodyBandOrigin(layout, s.viewport);
     const scrolledOut =
-      (a.row >= s.layout.freezeRows && cell.y < band.y) ||
-      (a.col >= s.layout.freezeCols && (layout.rtl ? cell.x + cell.w > band.x : cell.x < band.x));
+      (a.row >= frozenRowEnd(s.layout) && cell.y < band.y) ||
+      (a.col >= frozenColEnd(s.layout) &&
+        (layout.rtl ? cell.x + cell.w > band.x : cell.x < band.x));
     this.input.style.left = scrolledOut ? `${-r.w - 4}px` : `${r.x}px`;
     this.input.style.top = scrolledOut ? `${-r.h - 4}px` : `${r.y}px`;
     this.input.style.width = `${r.w}px`;

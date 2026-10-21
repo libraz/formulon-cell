@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
-import { setFreezePanes } from '../../../../src/commands/row-col-layout.js';
+import { setColsWidth, setFreezePanes } from '../../../../src/commands/row-col-layout.js';
 import { setSheetZoom } from '../../../../src/commands/view.js';
 import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
@@ -13,37 +13,33 @@ describe('setFreezePanes', () => {
   });
 
   it('updates layout freeze rows and cols', () => {
-    setFreezePanes(store, null, 2, 3);
+    setFreezePanes(store, 2, 3);
     const layout = store.getState().layout;
     expect(layout.freezeRows).toBe(2);
     expect(layout.freezeCols).toBe(3);
   });
 
-  it('round-trips through history including hidden sets', () => {
-    // Pre-populate hidden rows so we can confirm they survive undo (the bug
-    // the consolidated wrapper exists to prevent).
+  it('is not an undo step and leaves other layout state alone', () => {
     store.setState((s) => ({
       ...s,
       layout: { ...s.layout, hiddenRows: new Set([7]) },
     }));
     const h = new History();
 
-    setFreezePanes(store, h, 1, 1);
+    setFreezePanes(store, 1, 1);
     expect(store.getState().layout.freezeRows).toBe(1);
-    expect(Array.from(store.getState().layout.hiddenRows)).toEqual([7]);
-
-    h.undo();
-    expect(store.getState().layout.freezeRows).toBe(0);
-    expect(Array.from(store.getState().layout.hiddenRows)).toEqual([7]);
-
-    h.redo();
-    expect(store.getState().layout.freezeRows).toBe(1);
+    expect(h.canUndo()).toBe(false);
     expect(Array.from(store.getState().layout.hiddenRows)).toEqual([7]);
   });
 
-  it('passes through without history', () => {
-    setFreezePanes(store, null, 0, 0);
-    expect(store.getState().layout.freezeRows).toBe(0);
+  it('keeps a freeze made after a layout edit when that edit is undone', () => {
+    const h = new History();
+    setColsWidth(store, h, 0, 0, 100);
+    setFreezePanes(store, 1, 1);
+    h.undo();
+    expect(store.getState().layout.freezeRows).toBe(1);
+    expect(store.getState().layout.freezeCols).toBe(1);
+    expect(store.getState().layout.colWidths.has(0)).toBe(false);
   });
 
   it('forwards the freeze change to the workbook engine when capability is on', () => {
@@ -55,23 +51,12 @@ describe('setFreezePanes', () => {
         return true;
       },
     } as unknown as WorkbookHandle;
-    const h = new History();
 
-    setFreezePanes(store, h, 2, 3, wb);
+    setFreezePanes(store, 2, 3, wb);
     expect(calls).toEqual([{ sheet: 0, rows: 2, cols: 3 }]);
 
-    h.undo();
+    setFreezePanes(store, 0, 0, wb);
     expect(calls.at(-1)).toEqual({ sheet: 0, rows: 0, cols: 0 });
-
-    h.redo();
-    expect(calls.at(-1)).toEqual({ sheet: 0, rows: 2, cols: 3 });
-  });
-
-  it('still updates the store when wb is omitted (legacy callers)', () => {
-    const h = new History();
-    setFreezePanes(store, h, 1, 0);
-    expect(store.getState().layout.freezeRows).toBe(1);
-    expect(store.getState().layout.freezeCols).toBe(0);
   });
 });
 

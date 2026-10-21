@@ -152,6 +152,7 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     fgStrong: '#000',
     rule: '#ccc',
     ruleStrong: '#999',
+    freezeRule: '#9b9b9b',
     accent: '#0078d4',
     accentSoft: 'rgba(0,120,212,0.1)',
     cellErrorFg: '#c00',

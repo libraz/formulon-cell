@@ -281,8 +281,7 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.view.zeros', label: 'Zero Values' },
   ]),
   'mac.view.freeze': menu([
-    { id: 'mac.view.freeze', label: 'Freeze Panes' },
-    { id: 'mac.view.freeze.off', label: 'Unfreeze Panes' },
+    { id: 'mac.view.freeze', label: 'Freeze Panes', labelJa: 'ウィンドウ枠の固定' },
     { id: 'mac.view.freeze.firstRow', label: 'Freeze Top Row' },
     { id: 'mac.view.freeze.firstColumn', label: 'Freeze First Column' },
   ]),

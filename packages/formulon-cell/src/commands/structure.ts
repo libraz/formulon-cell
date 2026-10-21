@@ -193,6 +193,38 @@ function writeAxisShiftedCells(
   }
 }
 
+/** Move the frozen band with the cells: rows or columns inserted above/left of
+ *  it push it along, ones inserted inside grow it, deleted ones shrink it. */
+function shiftFreezeBand(
+  store: SpreadsheetStore,
+  history: History | null,
+  axis: 'row' | 'col',
+  kind: 'insert' | 'delete',
+  split: number,
+  n: number,
+): void {
+  const layout = store.getState().layout;
+  const row = axis === 'row';
+  const count = row ? layout.freezeRows : layout.freezeCols;
+  if (count === 0) return;
+  const origin = (row ? layout.freezeOriginRow : layout.freezeOriginCol) ?? 0;
+  const end = origin + count;
+  const edge = (e: number): number =>
+    kind === 'insert' ? (split < e ? e + n : e) : e <= split ? e : e >= split + n ? e - n : split;
+  const nextOrigin = edge(origin);
+  const nextCount = edge(end) - nextOrigin;
+  const apply = (o: number, c: number): void =>
+    applyLayoutPatch(
+      store,
+      row
+        ? { freezeRows: c, freezeOriginRow: c > 0 ? o : 0 }
+        : { freezeCols: c, freezeOriginCol: c > 0 ? o : 0 },
+    );
+  apply(nextOrigin, nextCount);
+  if (!history || history.isReplaying()) return;
+  history.push({ undo: () => apply(origin, count), redo: () => apply(nextOrigin, nextCount) });
+}
+
 function applyLayoutPatch(store: SpreadsheetStore, patch: Partial<LayoutSlice>): void {
   store.setState((s) => ({ ...s, layout: { ...s.layout, ...patch } }));
 }
@@ -1146,24 +1178,19 @@ function editAxis(
       });
     });
 
-    // 4. shift layout (sizes, hidden set, outline levels, freeze count).
+    // 4. shift layout (sizes, hidden set, outline levels) and the frozen band.
     recordLayoutChange(history, store, () => {
       const before = captureLayoutSnapshot(store.getState());
       const row = axis === 'row';
       const sizes = row ? before.rowHeights : before.colWidths;
       const hidden = row ? before.hiddenRows : before.hiddenCols;
       const outline = row ? before.outlineRows : before.outlineCols;
-      const freeze = row ? before.freezeRows : before.freezeCols;
       const nextSizes =
         kind === 'insert'
           ? shiftIndexedMapWithInheritance(sizes, split, delta, n, max)
           : shiftIndexedMap(sizes, split, delta, max);
       const nextHidden = shiftIndexedSet(hidden, split, delta, max);
       const nextOutline = shiftIndexedMap(outline, split, delta, max);
-      let nextFreeze = freeze;
-      if (freeze > split) {
-        nextFreeze = kind === 'insert' ? freeze + n : Math.max(split, freeze - n);
-      }
       applyLayoutPatch(
         store,
         row
@@ -1171,16 +1198,15 @@ function editAxis(
               rowHeights: nextSizes,
               hiddenRows: nextHidden,
               outlineRows: nextOutline,
-              freezeRows: nextFreeze,
             }
           : {
               colWidths: nextSizes,
               hiddenCols: nextHidden,
               outlineCols: nextOutline,
-              freezeCols: nextFreeze,
             },
       );
     });
+    shiftFreezeBand(store, history, axis, kind, split, n);
 
     // 5. re-point merges, conditional formats, and the autofilter region.
     shiftAnchoredRanges(store, wb, history, sheet, axis, split, delta, nativeAxisOp);

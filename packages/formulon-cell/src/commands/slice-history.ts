@@ -433,6 +433,8 @@ export function recordIllustrationsChange(
 export interface LayoutSnapshot {
   colWidths: Map<number, number>;
   rowHeights: Map<number, number>;
+  /** Engine-sync input only: freezing is not an undo step, so history neither
+   *  compares nor restores these. */
   freezeRows: number;
   freezeCols: number;
   hiddenRows: Set<number>;
@@ -471,8 +473,6 @@ export function applyLayoutSnapshot(store: SpreadsheetStore, snap: LayoutSnapsho
       ...s.layout,
       colWidths: new Map(snap.colWidths),
       rowHeights: new Map(snap.rowHeights),
-      freezeRows: snap.freezeRows,
-      freezeCols: snap.freezeCols,
       hiddenRows: new Set(snap.hiddenRows),
       hiddenCols: new Set(snap.hiddenCols),
       outlineRows: new Map(snap.outlineRows),
@@ -498,8 +498,6 @@ const sameNumberStringMap = (a: Map<number, string>, b: Map<number, string>): bo
 const sameLayoutSnapshot = (a: LayoutSnapshot, b: LayoutSnapshot): boolean =>
   sameNumberMap(a.colWidths, b.colWidths) &&
   sameNumberMap(a.rowHeights, b.rowHeights) &&
-  a.freezeRows === b.freezeRows &&
-  a.freezeCols === b.freezeCols &&
   sameNumberSet(a.hiddenRows, b.hiddenRows) &&
   sameNumberSet(a.hiddenCols, b.hiddenCols) &&
   sameNumberMap(a.outlineRows, b.outlineRows) &&

@@ -1,5 +1,5 @@
 import type { History } from '../commands/history.js';
-import { setFreezePanes } from '../commands/row-col-layout.js';
+import { applyFreezeMode } from '../commands/row-col-layout.js';
 import { activateSheetView, deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
 import {
   setGridlinesVisible,
@@ -43,7 +43,7 @@ function createViewToolbarButton(className: string): HTMLButtonElement {
 }
 
 export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
-  const { toolbar, store, history } = deps;
+  const { toolbar, store } = deps;
   let strings = deps.strings ?? defaultStrings;
   let wb = deps.wb;
 
@@ -150,20 +150,19 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     applyChanged();
   });
   freezeNone.addEventListener('click', () => {
-    setFreezePanes(store, history, 0, 0, wb);
+    applyFreezeMode(store, 'none', wb);
     applyChanged();
   });
   freezeTop.addEventListener('click', () => {
-    setFreezePanes(store, history, 1, 0, wb);
+    applyFreezeMode(store, 'topRow', wb);
     applyChanged();
   });
   freezeFirst.addEventListener('click', () => {
-    setFreezePanes(store, history, 0, 1, wb);
+    applyFreezeMode(store, 'firstColumn', wb);
     applyChanged();
   });
   freezePanes.addEventListener('click', () => {
-    const active = store.getState().selection.active;
-    setFreezePanes(store, history, active.row, active.col, wb);
+    applyFreezeMode(store, 'panes', wb);
     applyChanged();
   });
   zoomSelect.addEventListener('change', () => {

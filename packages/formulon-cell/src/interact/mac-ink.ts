@@ -12,6 +12,7 @@ import {
   layoutForView,
   type ViewLayout,
 } from '../render/geometry.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
 import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
 
@@ -287,8 +288,8 @@ const clipBoundsFor = (
 };
 
 const paneForAnchor = (layout: ViewLayout, anchor: InkPoint): InkPane => {
-  const frozenRow = anchor.row < layout.freezeRows;
-  const frozenCol = anchor.col < layout.freezeCols;
+  const frozenRow = anchor.row < frozenRowEnd(layout);
+  const frozenCol = anchor.col < frozenColEnd(layout);
   if (frozenRow && frozenCol) return 'corner';
   if (frozenRow) return 'frozen-rows';
   if (frozenCol) return 'frozen-cols';

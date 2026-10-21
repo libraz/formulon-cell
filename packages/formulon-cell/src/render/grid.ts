@@ -4,6 +4,7 @@ import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../en
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import type { State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
@@ -182,12 +183,12 @@ export class GridRenderer {
     );
     const firstRow = Math.max(
       viewport.rowStart,
-      layout.freezeRows,
+      frozenRowEnd(layout),
       viewport.navigationRange?.r0 ?? 0,
     );
     const firstCol = Math.max(
       viewport.colStart,
-      layout.freezeCols,
+      frozenColEnd(layout),
       viewport.navigationRange?.c0 ?? 0,
     );
     const lastRow = (viewport.navigationRange?.r1 ?? MAX_ROW) + 1;

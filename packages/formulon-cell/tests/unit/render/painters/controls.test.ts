@@ -9,6 +9,7 @@ function makeTheme(over: Partial<ResolvedTheme> = {}): ResolvedTheme {
     fg: '#1f1f1f',
     rule: '#dddddd',
     ruleStrong: '#888888',
+    freezeRule: '#9b9b9b',
     accent: '#0a8',
     accentFg: '#ffffff',
     headerBg: '#f5f5f5',

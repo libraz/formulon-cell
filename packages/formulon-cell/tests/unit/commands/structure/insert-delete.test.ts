@@ -57,6 +57,19 @@ describe('insertRows', () => {
     expect(layout.freezeRows).toBe(3); // 2 was > atRow=1 → 2+1
   });
 
+  it('moves the frozen band when rows are inserted or deleted above it', () => {
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, freezeRows: 3, freezeOriginRow: 10 },
+    }));
+    insertRows(store, wb, null, 4, 2);
+    expect(store.getState().layout).toMatchObject({ freezeRows: 3, freezeOriginRow: 12 });
+    deleteRows(store, wb, null, 4, 1);
+    expect(store.getState().layout).toMatchObject({ freezeRows: 3, freezeOriginRow: 11 });
+    insertRows(store, wb, null, 12, 1);
+    expect(store.getState().layout).toMatchObject({ freezeRows: 4, freezeOriginRow: 11 });
+  });
+
   it('does not shift freeze when atRow >= freezeRows', () => {
     store.setState((s) => ({
       ...s,

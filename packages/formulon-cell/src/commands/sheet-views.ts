@@ -1,4 +1,5 @@
 import type { Range } from '../engine/types.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import type { History } from './history.js';
 
@@ -32,7 +33,7 @@ export interface SheetView {
    *  state survive switching between sheet views. */
   filterCriteria?: readonly ValueFilterCriteria[];
   /** Frozen-pane configuration. Default = neither row nor col frozen. */
-  freeze?: { rows: number; cols: number };
+  freeze?: { rows: number; cols: number; originRow?: number; originCol?: number };
   /** Active sort key (single-column, like the basic single-column sort UX). */
   sort?: SheetViewSort;
   /** Hidden rows / columns at capture time. Indices are 0-based. */
@@ -47,6 +48,8 @@ export interface SheetViewSnapshotInput {
   filterCriteria?: readonly ValueFilterCriteria[];
   freezeRows: number;
   freezeCols: number;
+  freezeOriginRow?: number;
+  freezeOriginCol?: number;
   hiddenRows: ReadonlySet<number>;
   hiddenCols: ReadonlySet<number>;
   sort?: SheetViewSort;
@@ -74,7 +77,12 @@ export function captureSheetView(
   if (input.filterRange) view.filterRange = input.filterRange;
   if (input.filterCriteria?.length) view.filterCriteria = cloneFilterCriteria(input.filterCriteria);
   if (input.freezeRows > 0 || input.freezeCols > 0) {
-    view.freeze = { rows: input.freezeRows, cols: input.freezeCols };
+    view.freeze = {
+      rows: input.freezeRows,
+      cols: input.freezeCols,
+      originRow: input.freezeOriginRow ?? 0,
+      originCol: input.freezeOriginCol ?? 0,
+    };
   }
   if (input.sort) view.sort = input.sort;
   if (input.hiddenRows.size > 0) {
@@ -94,6 +102,8 @@ export interface SheetViewPatch {
   filterCriteria: ValueFilterCriteria[];
   freezeRows: number;
   freezeCols: number;
+  freezeOriginRow: number;
+  freezeOriginCol: number;
   hiddenRows: number[];
   hiddenCols: number[];
   sort: SheetViewSort | null;
@@ -107,6 +117,8 @@ export function applySheetView(view: SheetView): SheetViewPatch {
     filterCriteria: cloneFilterCriteria(view.filterCriteria ?? []),
     freezeRows: view.freeze?.rows ?? 0,
     freezeCols: view.freeze?.cols ?? 0,
+    freezeOriginRow: view.freeze?.originRow ?? 0,
+    freezeOriginCol: view.freeze?.originCol ?? 0,
     hiddenRows: [...(view.hiddenRows ?? [])],
     hiddenCols: [...(view.hiddenCols ?? [])],
     sort: view.sort ?? null,
@@ -208,6 +220,8 @@ export function saveSheetView(
     filterCriteria: state.ui.filterCriteria,
     freezeRows: state.layout.freezeRows,
     freezeCols: state.layout.freezeCols,
+    freezeOriginRow: state.layout.freezeOriginRow,
+    freezeOriginCol: state.layout.freezeOriginCol,
     hiddenRows: state.layout.hiddenRows,
     hiddenCols: state.layout.hiddenCols,
     sort,
@@ -228,23 +242,28 @@ export function activateSheetView(store: SpreadsheetStore, id: string): SheetVie
   if (!view) return { ok: false, reason: 'not-found' };
   const patch = applySheetView(view);
   if (patch.sheet !== state.data.sheetIndex) return { ok: false, reason: 'different-sheet' };
-  store.setState((s) => ({
-    ...s,
-    layout: {
+  store.setState((s) => {
+    const layout = {
       ...s.layout,
       freezeRows: Math.max(0, Math.floor(patch.freezeRows)),
       freezeCols: Math.max(0, Math.floor(patch.freezeCols)),
+      freezeOriginRow: Math.max(0, Math.floor(patch.freezeOriginRow)),
+      freezeOriginCol: Math.max(0, Math.floor(patch.freezeOriginCol)),
       hiddenRows: new Set(patch.hiddenRows),
       hiddenCols: new Set(patch.hiddenCols),
-    },
-    viewport: {
-      ...s.viewport,
-      rowStart: Math.max(Math.max(0, Math.floor(patch.freezeRows)), s.viewport.rowStart),
-      colStart: Math.max(Math.max(0, Math.floor(patch.freezeCols)), s.viewport.colStart),
-    },
-    ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
-    sheetViews: { ...s.sheetViews, activeViewId: id },
-  }));
+    };
+    return {
+      ...s,
+      layout,
+      viewport: {
+        ...s.viewport,
+        rowStart: Math.max(frozenRowEnd(layout), s.viewport.rowStart),
+        colStart: Math.max(frozenColEnd(layout), s.viewport.colStart),
+      },
+      ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
+      sheetViews: { ...s.sheetViews, activeViewId: id },
+    };
+  });
   return { ok: true, view };
 }
 

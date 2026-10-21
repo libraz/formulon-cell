@@ -353,6 +353,17 @@ describe('attachKeyboard', () => {
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
     });
 
+    it('Home and Ctrl+Home land on the first unfrozen cell of a frozen band', () => {
+      setup();
+      mutators.setFreezePanes(store, 5, 2, { row: 9, col: 1 });
+      mutators.setActive(store, { sheet: 0, row: 20, col: 8 });
+      fire(host, 'Home');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 20, col: 3 });
+      mutators.setActive(store, { sheet: 0, row: 20, col: 8 });
+      fire(host, 'Home', { ctrlKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 14, col: 3 });
+    });
+
     it('Ctrl+End jumps to last populated cell on the active sheet', () => {
       setup();
       seed(store, wb, [

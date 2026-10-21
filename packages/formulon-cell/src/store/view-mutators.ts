@@ -1,6 +1,7 @@
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
+import { frozenColEnd, frozenColStart, frozenRowEnd, frozenRowStart } from './freeze-band.js';
 import { renderScale } from './render-scale.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
@@ -172,8 +173,8 @@ export const viewMutators = {
         return s;
       }
       const bounds = navigationBoundsFor(store);
-      const minRowStart = Math.max(s.layout.freezeRows, bounds?.r0 ?? 0);
-      const minColStart = Math.max(s.layout.freezeCols, bounds?.c0 ?? 0);
+      const minRowStart = Math.max(frozenRowEnd(s.layout), bounds?.r0 ?? 0);
+      const minColStart = Math.max(frozenColEnd(s.layout), bounds?.c0 ?? 0);
       const maxRowStart = bounds
         ? Math.max(minRowStart, bounds.r1 + 1 - rows)
         : Math.max(minRowStart, MAX_ROW + 1 - rows);
@@ -246,8 +247,8 @@ export const viewMutators = {
     // viewport disappears off the right/bottom.
     store.setState((s) => {
       const bounds = navigationBoundsFor(store);
-      const minRowStart = Math.max(s.layout.freezeRows, bounds?.r0 ?? 0);
-      const minColStart = Math.max(s.layout.freezeCols, bounds?.c0 ?? 0);
+      const minRowStart = Math.max(frozenRowEnd(s.layout), bounds?.r0 ?? 0);
+      const minColStart = Math.max(frozenColEnd(s.layout), bounds?.c0 ?? 0);
       const maxRowStart = bounds
         ? Math.max(minRowStart, bounds.r1 + 1 - s.viewport.rowCount)
         : Math.max(minRowStart, MAX_ROW + 1 - s.viewport.rowCount);
@@ -265,20 +266,41 @@ export const viewMutators = {
     });
   },
 
-  /** Pin the first `rows` rows / `cols` columns. Pass 0/0 to unfreeze.
-   *  Scrolls past the frozen zone if the body viewport is currently inside it. */
-  setFreezePanes(store: SpreadsheetStore, rows: number, cols: number): void {
+  /** Pin `rows` rows / `cols` columns starting at `origin` (default A1). Pass
+   *  0/0 to unfreeze. Freezing scrolls the body past the band; unfreezing an
+   *  axis scrolls it to the band's first row/column so nothing jumps. */
+  setFreezePanes(
+    store: SpreadsheetStore,
+    rows: number,
+    cols: number,
+    origin: { row: number; col: number } = { row: 0, col: 0 },
+  ): void {
     const fr = Math.max(0, Math.floor(rows));
     const fc = Math.max(0, Math.floor(cols));
-    store.setState((s) => ({
-      ...s,
-      layout: { ...s.layout, freezeRows: fr, freezeCols: fc },
-      viewport: {
-        ...s.viewport,
-        rowStart: Math.max(fr, s.viewport.rowStart),
-        colStart: Math.max(fc, s.viewport.colStart),
-      },
-    }));
+    store.setState((s) => {
+      const freezeOriginRow = fr > 0 ? Math.max(0, Math.floor(origin.row)) : 0;
+      const freezeOriginCol = fc > 0 ? Math.max(0, Math.floor(origin.col)) : 0;
+      const layout = {
+        ...s.layout,
+        freezeRows: fr,
+        freezeCols: fc,
+        freezeOriginRow,
+        freezeOriginCol,
+      };
+      const fromRow =
+        fr === 0 && s.layout.freezeRows > 0 ? frozenRowStart(s.layout) : s.viewport.rowStart;
+      const fromCol =
+        fc === 0 && s.layout.freezeCols > 0 ? frozenColStart(s.layout) : s.viewport.colStart;
+      return {
+        ...s,
+        layout,
+        viewport: {
+          ...s.viewport,
+          rowStart: Math.max(frozenRowEnd(layout), fromRow),
+          colStart: Math.max(frozenColEnd(layout), fromCol),
+        },
+      };
+    });
     syncNavigationViewport(store);
   },
 };

@@ -2,7 +2,14 @@
 // sit above the cell rectangles but below the active selection outline.
 
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import { type AxisLayout, cellRectIn, gridOriginX, mirrorX, type ViewState } from '../geometry.js';
+import {
+  type AxisLayout,
+  cellRectIn,
+  gridOriginX,
+  gridOriginY,
+  mirrorX,
+  type ViewState,
+} from '../geometry.js';
 import { type ChromePaintContext, ruleWidth } from './chrome-context.js';
 
 export function paintGridLines(
@@ -65,12 +72,13 @@ export function paintFreezeDividers(
   const { layout } = state;
   if (layout.freezeRows === 0 && layout.freezeCols === 0) return;
   const { ctx, dpr, cssWidth, cssHeight } = pc;
-  ctx.strokeStyle = theme.ruleStrong;
-  ctx.lineWidth = 1.5 / dpr;
-  const align = 0.5 / dpr;
+  const width = ruleWidth(dpr);
+  ctx.strokeStyle = theme.freezeRule;
+  ctx.lineWidth = width;
+  const align = width / 2;
   ctx.beginPath();
   if (layout.freezeRows > 0) {
-    const yy = Math.round(layout.headerRowHeight + rows.frozenTotal) + align;
+    const yy = Math.round(gridOriginY(layout) + rows.frozenTotal) + align;
     ctx.moveTo(0, yy);
     ctx.lineTo(cssWidth, yy);
   }

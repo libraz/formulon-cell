@@ -69,6 +69,10 @@ export interface LayoutSlice {
   freezeRows: number;
   /** Number of cols pinned at the left. 0 = none. */
   freezeCols: number;
+  /** First row of the frozen band (the scroll origin at freeze time). Absent = 0. */
+  freezeOriginRow?: number;
+  /** First column of the frozen band. Absent = 0. */
+  freezeOriginCol?: number;
   /** Rows hidden by the user. Geometry returns height 0; renderer skips them. */
   hiddenRows: Set<number>;
   hiddenCols: Set<number>;
@@ -224,6 +228,18 @@ export interface UiSlice {
   /** Excel-style sheet background image URLs keyed by sheet index. These are
    *  painted behind cells for on-screen use and intentionally excluded from print. */
   sheetBackgroundImages: Map<number, string>;
+  /** Selection and scroll left behind on each sheet that is not active, so
+   *  returning to it restores the same view. Absent entry = never visited. */
+  sheetViewMemos?: ReadonlyMap<number, SheetViewMemo>;
+}
+
+/** Per-sheet selection, scroll position and frozen-band origin. */
+export interface SheetViewMemo {
+  selection: SelectionSlice;
+  rowStart: number;
+  colStart: number;
+  freezeOriginRow: number;
+  freezeOriginCol: number;
 }
 
 export interface ValueFilterCriteria {

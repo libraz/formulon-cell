@@ -12,6 +12,7 @@ import {
   cssCellFontSize,
   fontSizeWithVerticalAlign,
 } from '../render/painters/text.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { renderScale } from '../store/render-scale.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -62,8 +63,8 @@ export function attachFormulaDraftMirror(deps: FormulaDraftMirrorDeps): FormulaD
     );
     const band = bodyBandOrigin(layout, state.viewport);
     const behindFrozenBand =
-      (mirrorState.anchor.row >= state.layout.freezeRows && rect.y < band.y) ||
-      (mirrorState.anchor.col >= state.layout.freezeCols &&
+      (mirrorState.anchor.row >= frozenRowEnd(state.layout) && rect.y < band.y) ||
+      (mirrorState.anchor.col >= frozenColEnd(state.layout) &&
         (layout.rtl ? rect.x + rect.w > band.x : rect.x < band.x));
     const gridRect = grid.getBoundingClientRect();
     const width = grid.clientWidth || gridRect.width;

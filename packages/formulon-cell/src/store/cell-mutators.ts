@@ -31,21 +31,47 @@ export const cellMutators = {
   },
 
   /** Switch the active sheet index. Cells must be re-hydrated separately
-   *  via `replaceCells` after calling this. Resets selection to A1 on the
-   *  new sheet. */
+   *  via `replaceCells` after calling this. The sheet being left keeps its
+   *  selection and scroll; a sheet visited for the first time starts at A1. */
   setSheetIndex(store: SpreadsheetStore, idx: number): void {
     const fixedRange = navigationBoundsFor(store);
     if (fixedRange && fixedRange.sheet !== idx) return;
-    store.setState((s) => ({
-      ...s,
-      data: { ...s.data, sheetIndex: idx, cells: new Map() },
-      ui: { ...s.ui, pendingFormat: null },
-      selection: {
-        active: { sheet: idx, row: 0, col: 0 },
-        anchor: { sheet: idx, row: 0, col: 0 },
-        range: { sheet: idx, r0: 0, c0: 0, r1: 0, c1: 0 },
-      },
-    }));
+    store.setState((s) => {
+      const switching = idx !== s.data.sheetIndex;
+      const memos = new Map(s.ui.sheetViewMemos);
+      if (switching) {
+        memos.set(s.data.sheetIndex, {
+          selection: s.selection,
+          rowStart: s.viewport.rowStart,
+          colStart: s.viewport.colStart,
+          freezeOriginRow: s.layout.freezeOriginRow ?? 0,
+          freezeOriginCol: s.layout.freezeOriginCol ?? 0,
+        });
+      }
+      const memo = switching ? memos.get(idx) : undefined;
+      return {
+        ...s,
+        data: { ...s.data, sheetIndex: idx, cells: new Map() },
+        ui: { ...s.ui, pendingFormat: null, sheetViewMemos: memos },
+        selection: memo?.selection ?? {
+          active: { sheet: idx, row: 0, col: 0 },
+          anchor: { sheet: idx, row: 0, col: 0 },
+          range: { sheet: idx, r0: 0, c0: 0, r1: 0, c1: 0 },
+        },
+        ...(switching && {
+          layout: {
+            ...s.layout,
+            freezeOriginRow: memo?.freezeOriginRow ?? 0,
+            freezeOriginCol: memo?.freezeOriginCol ?? 0,
+          },
+          viewport: {
+            ...s.viewport,
+            rowStart: memo?.rowStart ?? 0,
+            colStart: memo?.colStart ?? 0,
+          },
+        }),
+      };
+    });
     syncNavigationViewport(store);
   },
 

@@ -222,6 +222,18 @@ export const projectMacRibbonState = (
     }
   }
 
+  // The Freeze menu's first item doubles as Unfreeze while panes are frozen.
+  for (const button of buttons.get('mac.view.freeze') ?? []) {
+    if (!button.closest('.fc-tb__menu')) continue;
+    button.dataset.freezeLabel ??= button.textContent ?? '';
+    const label = active.frozen
+      ? macRibbonLabelForCommand('mac.view.freeze.off', lang)
+      : button.dataset.freezeLabel;
+    button.textContent = label;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+  }
+
   for (const id of MAC_POLICY_PROJECTED_COMMANDS) {
     const decision = canExecuteBuiltIn(instance.store, id, 'ribbon');
     const contextualReason = contextualDisabledReason(instance, id);

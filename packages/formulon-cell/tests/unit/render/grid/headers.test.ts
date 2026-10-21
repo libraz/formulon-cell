@@ -16,6 +16,7 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     fgStrong: '#11100f',
     rule: '#d9d9d9',
     ruleStrong: '#bfbfbf',
+    freezeRule: '#9b9b9b',
     accent: '#107c41',
     accentFg: '#fff',
     accentSoft: 'rgba(16,124,65,0.12)',

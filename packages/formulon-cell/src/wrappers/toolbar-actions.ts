@@ -10,10 +10,12 @@ import { recordRecentFunction } from '../commands/function-history.js';
 import {
   addSheet,
   applyConditionalPresetAction,
+  applyFreezeMode,
   autoSum,
   deleteCells,
   deleteCols,
   deleteRows,
+  type FreezeMode,
   hiddenInSelection,
   hideCols,
   hideRows,
@@ -23,7 +25,6 @@ import {
   mutators,
   recordConditionalRulesChange,
   removeSheet,
-  setFreezePanes,
   showColsAroundSelection,
   showRowsAroundSelection,
 } from '../index.js';
@@ -34,7 +35,7 @@ export type AutoSumAction = AutoSumFunction | 'MORE';
 
 export type { MergeAction };
 
-export type FreezeAction = 'none' | 'topRow' | 'firstColumn' | 'panes';
+export type FreezeAction = FreezeMode;
 
 export type PasteAction =
   | 'paste'
@@ -157,26 +158,7 @@ export const handleFreezeAction = (
   action: FreezeAction,
 ): void => {
   if (!instance) return;
-  const s = instance.store.getState();
-  if (action === 'none') {
-    setFreezePanes(instance.store, instance.history, 0, 0, instance.workbook);
-    return;
-  }
-  if (action === 'topRow') {
-    setFreezePanes(instance.store, instance.history, 1, 0, instance.workbook);
-    return;
-  }
-  if (action === 'firstColumn') {
-    setFreezePanes(instance.store, instance.history, 0, 1, instance.workbook);
-    return;
-  }
-  const a = s.selection.active;
-  // When the cursor is at A1 freeze just the top row — matches Excel's
-  // "Freeze Panes" default which freezes everything above + left of the
-  // active cell.
-  const rows = a.row === 0 && a.col === 0 ? 1 : a.row;
-  const cols = a.row === 0 && a.col === 0 ? 0 : a.col;
-  setFreezePanes(instance.store, instance.history, rows, cols, instance.workbook);
+  applyFreezeMode(instance.store, action, instance.workbook);
 };
 
 /** AutoSum from the toolbar. The "MORE" sentinel opens the function

@@ -7,6 +7,7 @@ import type {
 import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
+import { frozenColEnd, frozenRowEnd } from './freeze-band.js';
 import { rangesIntersect } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
@@ -325,22 +326,27 @@ export const sheetObjectMutators = {
     patch: SheetViewPatch,
     activeViewId: string | null = null,
   ): void {
-    store.setState((s) => ({
-      ...s,
-      layout: {
+    store.setState((s) => {
+      const layout = {
         ...s.layout,
         freezeRows: Math.max(0, Math.floor(patch.freezeRows)),
         freezeCols: Math.max(0, Math.floor(patch.freezeCols)),
+        freezeOriginRow: Math.max(0, Math.floor(patch.freezeOriginRow)),
+        freezeOriginCol: Math.max(0, Math.floor(patch.freezeOriginCol)),
         hiddenRows: new Set(patch.hiddenRows),
         hiddenCols: new Set(patch.hiddenCols),
-      },
-      viewport: {
-        ...s.viewport,
-        rowStart: Math.max(Math.max(0, Math.floor(patch.freezeRows)), s.viewport.rowStart),
-        colStart: Math.max(Math.max(0, Math.floor(patch.freezeCols)), s.viewport.colStart),
-      },
-      ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
-      sheetViews: { ...s.sheetViews, activeViewId },
-    }));
+      };
+      return {
+        ...s,
+        layout,
+        viewport: {
+          ...s.viewport,
+          rowStart: Math.max(frozenRowEnd(layout), s.viewport.rowStart),
+          colStart: Math.max(frozenColEnd(layout), s.viewport.colStart),
+        },
+        ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
+        sheetViews: { ...s.sheetViews, activeViewId },
+      };
+    });
   },
 };

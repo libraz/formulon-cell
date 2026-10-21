@@ -1,12 +1,14 @@
 import { clearSelectedContents } from '../commands/clear-contents.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { currentRegion, formatHasContent, isPopulated } from '../commands/current-region.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
-import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { selectionExtendEnd } from '../store/selection-mutators.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
@@ -28,62 +30,6 @@ const clamp = (a: Addr, row: number, col: number): Addr => ({
   row: Math.max(0, Math.min(MAX_ROW, row)),
   col: Math.max(0, Math.min(MAX_COL, col)),
 });
-
-const formatHasContent = (format: object | undefined): boolean =>
-  format !== undefined && Object.keys(format).length > 0;
-
-const isPopulated = (s: State, sheet: number, row: number, col: number): boolean => {
-  const key = addrKey({ sheet, row, col });
-  return s.data.cells.has(key) || formatHasContent(s.format.formats.get(key));
-};
-
-/** Excel's Current Region: expand from the active cell through adjacent
- * non-empty rows and columns. It is intentionally based on model content
- * (including format-only cells), matching the same definition Ctrl+Arrow
- * uses in this module. */
-function currentRegion(
-  s: State,
-  a: Addr,
-): { sheet: number; r0: number; c0: number; r1: number; c1: number } | null {
-  if (!isPopulated(s, a.sheet, a.row, a.col)) return null;
-  let r0 = a.row;
-  let r1 = a.row;
-  let c0 = a.col;
-  let c1 = a.col;
-  let changed = true;
-  const rowHasContent = (row: number): boolean => {
-    for (let col = c0; col <= c1; col += 1) {
-      if (isPopulated(s, a.sheet, row, col)) return true;
-    }
-    return false;
-  };
-  const colHasContent = (col: number): boolean => {
-    for (let row = r0; row <= r1; row += 1) {
-      if (isPopulated(s, a.sheet, row, col)) return true;
-    }
-    return false;
-  };
-  while (changed) {
-    changed = false;
-    while (r0 > 0 && rowHasContent(r0 - 1)) {
-      r0 -= 1;
-      changed = true;
-    }
-    while (r1 < MAX_ROW && rowHasContent(r1 + 1)) {
-      r1 += 1;
-      changed = true;
-    }
-    while (c0 > 0 && colHasContent(c0 - 1)) {
-      c0 -= 1;
-      changed = true;
-    }
-    while (c1 < MAX_COL && colHasContent(c1 + 1)) {
-      c1 += 1;
-      changed = true;
-    }
-  }
-  return { sheet: a.sheet, r0, c0, r1, c1 };
-}
 
 /**
  * Spreadsheet-style Ctrl+Arrow jump. Three behaviors based on neighbor state:
@@ -150,21 +96,21 @@ function lastUsedCell(s: State, sheet: number): { row: number; col: number } {
 function scrollActiveIntoView(store: SpreadsheetStore, addr: Addr): void {
   store.setState((s) => {
     if (addr.sheet !== s.data.sheetIndex) return s;
-    const rowStartMin = s.layout.freezeRows;
-    const colStartMin = s.layout.freezeCols;
+    const rowStartMin = frozenRowEnd(s.layout);
+    const colStartMin = frozenColEnd(s.layout);
     const maxRowStart = Math.max(rowStartMin, MAX_ROW + 1 - s.viewport.rowCount);
     const maxColStart = Math.max(colStartMin, MAX_COL + 1 - s.viewport.colCount);
     let rowStart = s.viewport.rowStart;
     let colStart = s.viewport.colStart;
-    const visibleRowStart = Math.max(rowStart, s.layout.freezeRows);
-    const visibleColStart = Math.max(colStart, s.layout.freezeCols);
+    const visibleRowStart = Math.max(rowStart, frozenRowEnd(s.layout));
+    const visibleColStart = Math.max(colStart, frozenColEnd(s.layout));
     const visibleRowEnd = rowStart + s.viewport.rowCount - 1;
     const visibleColEnd = colStart + s.viewport.colCount - 1;
-    if (addr.row >= s.layout.freezeRows) {
+    if (addr.row >= frozenRowEnd(s.layout)) {
       if (addr.row < visibleRowStart) rowStart = addr.row;
       else if (addr.row > visibleRowEnd) rowStart = addr.row - s.viewport.rowCount + 1;
     }
-    if (addr.col >= s.layout.freezeCols) {
+    if (addr.col >= frozenColEnd(s.layout)) {
       if (addr.col < visibleColStart) colStart = addr.col;
       else if (addr.col > visibleColEnd) colStart = addr.col - s.viewport.colCount + 1;
     }
@@ -473,7 +419,10 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
         meta || endModeArrow
           ? jumpEdge(s, from, 0, colDir)
           : stepWithMerge(s, from, 0, colDir, MAX_ROW, MAX_COL);
-    else if (k === 'Home') target = meta ? clamp(from, 0, 0) : clamp(from, from.row, 0);
+    else if (k === 'Home')
+      target = meta
+        ? clamp(from, frozenRowEnd(s.layout), frozenColEnd(s.layout))
+        : clamp(from, from.row, frozenColEnd(s.layout));
     else if (k === 'End' && meta) {
       const { row, col } = lastUsedCell(s, from.sheet);
       target = clamp(from, row, col);

@@ -2,6 +2,7 @@ import { interactionControllerFor } from '../commands/interaction-controller.js'
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import {
   rangeContainsAddr,
   rangeContainsRange,
@@ -426,8 +427,8 @@ export function syncNavigationViewport(store: SpreadsheetStore): void {
       current?.c0 === bounds?.c0 &&
       current?.r1 === bounds?.r1 &&
       current?.c1 === bounds?.c1;
-    const minRow = Math.max(state.layout.freezeRows, bounds?.r0 ?? 0);
-    const minCol = Math.max(state.layout.freezeCols, bounds?.c0 ?? 0);
+    const minRow = Math.max(frozenRowEnd(state.layout), bounds?.r0 ?? 0);
+    const minCol = Math.max(frozenColEnd(state.layout), bounds?.c0 ?? 0);
     const maxRow = bounds
       ? Math.max(minRow, bounds.r1 + 1 - state.viewport.rowCount)
       : Math.max(minRow, MAX_ROW + 1 - state.viewport.rowCount);

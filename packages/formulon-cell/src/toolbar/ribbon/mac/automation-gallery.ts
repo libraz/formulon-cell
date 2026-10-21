@@ -3,7 +3,7 @@ import type {
   InteractionOperation,
   OperationIntent,
 } from '../../../commands/interaction-policy.js';
-import { setFreezePanes, showCols, showRows } from '../../../commands/row-col-layout.js';
+import { applyFreezeMode, showCols, showRows } from '../../../commands/row-col-layout.js';
 import { recordTablesChange } from '../../../commands/slice-history.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../engine/address.js';
 import { parseRangeRef } from '../../../engine/range-resolver.js';
@@ -538,23 +538,9 @@ const runAllRowsColumns = (instance: SpreadsheetInstance): void => {
 };
 
 const runFreezeSelection = (instance: SpreadsheetInstance): void => {
-  const selection = normalizedRange(instance.store.getState().selection.range);
-  const token = beginAuthorizedHistory(instance, (origin) => [
-    {
-      operation: 'format',
-      origin,
-      commandId: 'mac.automate.freezeSelection',
-      effects: [{ kind: 'range', range: { ...selection } }],
-    },
-  ]);
-  if (!token) return;
-  commitOrAbort(instance, token, 'Freeze selection rollback failed.', () => {
-    setFreezePanes(instance.store, instance.history, selection.r0, selection.c0, instance.workbook);
-  });
-  markResult(instance, 'mac.automate.freezeSelection', {
-    rows: selection.r0,
-    cols: selection.c0,
-  });
+  applyFreezeMode(instance.store, 'panes', instance.workbook);
+  const { freezeRows, freezeCols } = instance.store.getState().layout;
+  markResult(instance, 'mac.automate.freezeSelection', { rows: freezeRows, cols: freezeCols });
 };
 
 const runMakeSubtable = (instance: SpreadsheetInstance): void => {

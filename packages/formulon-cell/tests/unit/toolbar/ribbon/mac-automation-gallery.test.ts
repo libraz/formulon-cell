@@ -288,21 +288,13 @@ describe('Mac automation gallery', () => {
       ?.click();
   });
 
-  it('freezes, undoes, and redoes through one restricted policy transaction', async () => {
+  it('freezes at the active cell, outside the undo stack and regardless of policy', async () => {
     const native = await makeNativeInstance(host);
     const { instance, workbook, store, history } = native;
-    mutators.setRange(store, { sheet: 0, r0: 2, c0: 1, r1: 4, c1: 3 });
+    mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
     expect(workbook.isStub).toBe(false);
     expect(workbook.capabilities.freeze).toBe(true);
-    const origins: string[] = [];
-    native.controller.setPolicy({
-      defaultOperation: 'deny',
-      operations: { format: true },
-      restrict: ({ intent }) => {
-        origins.push(intent.origin);
-        return true;
-      },
-    });
+    native.controller.setPolicy({ defaultOperation: 'deny' });
 
     await runMacAutomationScript(instance, 'freezeSelection');
 
@@ -310,67 +302,8 @@ describe('Mac automation gallery', () => {
     expect(store.getState().layout.freezeCols).toBe(1);
     expect(workbook.getSheetView(0)?.freezeRows).toBe(2);
     expect(workbook.getSheetView(0)?.freezeCols).toBe(1);
-    expect(history.canUndo()).toBe(true);
-    expect(origins).toEqual(['ribbon', 'undo', 'redo']);
-
-    expect(history.undo()).toBe(true);
-    expect(store.getState().layout.freezeRows).toBe(0);
-    expect(store.getState().layout.freezeCols).toBe(0);
-    expect(workbook.getSheetView(0)?.freezeRows).toBe(0);
-    expect(workbook.getSheetView(0)?.freezeCols).toBe(0);
-
-    expect(history.redo()).toBe(true);
-    expect(store.getState().layout.freezeRows).toBe(2);
-    expect(store.getState().layout.freezeCols).toBe(1);
-    expect(workbook.getSheetView(0)?.freezeRows).toBe(2);
-    expect(workbook.getSheetView(0)?.freezeCols).toBe(1);
-  });
-
-  it('denies an inverse Freeze policy before mutation or history creation', async () => {
-    const native = await makeNativeInstance(host);
-    const { instance, workbook, store, history } = native;
-    mutators.setRange(store, { sheet: 0, r0: 2, c0: 1, r1: 4, c1: 3 });
-    native.controller.setPolicy({
-      defaultOperation: 'deny',
-      operations: { format: true },
-      restrict: ({ intent }) => intent.origin !== 'undo',
-    });
-
-    await runMacAutomationScript(instance, 'freezeSelection');
-
-    expect(store.getState().layout.freezeRows).toBe(0);
-    expect(store.getState().layout.freezeCols).toBe(0);
-    expect(workbook.getSheetView(0)?.freezeRows).toBe(0);
-    expect(workbook.getSheetView(0)?.freezeCols).toBe(0);
     expect(history.canUndo()).toBe(false);
-    expect(host.dataset.fcMacAutomationResult).toBeUndefined();
-  });
-
-  it('reports Freeze rollback failures with both original and rollback errors', async () => {
-    const native = await makeNativeInstance(host);
-    const { instance, workbook, store, history, controller } = native;
-    mutators.setRange(store, { sheet: 0, r0: 2, c0: 1, r1: 4, c1: 3 });
-    controller.setPolicy({ defaultOperation: 'deny', operations: { format: true } });
-    workbook.setSheetFreeze = () => {
-      throw new Error('native freeze failed');
-    };
-    history.abort = () => {
-      throw new Error('history rollback failed');
-    };
-
-    let caught: unknown;
-    try {
-      await runMacAutomationScript(instance, 'freezeSelection');
-    } catch (error) {
-      caught = error;
-    }
-
-    expect(caught).toBeInstanceOf(AggregateError);
-    const aggregate = caught as AggregateError;
-    expect(aggregate.errors).toHaveLength(2);
-    expect((aggregate.errors[0] as Error).message).toBe('native freeze failed');
-    expect((aggregate.errors[1] as Error).message).toBe('history rollback failed');
-    expect(host.dataset.fcMacAutomationResult).toBeUndefined();
+    expect(host.dataset.fcMacAutomationResult).toBe(JSON.stringify({ rows: 2, cols: 1 }));
   });
 
   it('authorizes show-all-rows-and-columns replay for both resize operations', async () => {

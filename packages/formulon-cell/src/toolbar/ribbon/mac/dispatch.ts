@@ -172,7 +172,6 @@ const operations = [
   'mac.page.printArea.clear',
   'mac.page.pageBreaks',
   'mac.view.freeze',
-  'mac.view.freeze.off',
   'mac.view.freeze.firstRow',
   'mac.view.freeze.firstColumn',
   'mac.insert.newComment',
@@ -412,9 +411,9 @@ export function dispatchMacRibbonCommand(
       case 'mac.page.break.reset':
         return ctx.applyPageBreakAction('reset-all');
       case 'mac.view.freeze':
-        return ctx.applyFreezeAction('selection');
-      case 'mac.view.freeze.off':
-        return ctx.applyFreezeAction('off');
+        return ctx.applyFreezeAction(
+          state.layout.freezeRows > 0 || state.layout.freezeCols > 0 ? 'off' : 'selection',
+        );
       case 'mac.view.freeze.firstRow':
         return ctx.applyFreezeAction('row');
       case 'mac.view.freeze.firstColumn':

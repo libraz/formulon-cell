@@ -1,6 +1,13 @@
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { syncLayoutToEngine } from '../engine/layout-sync.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import {
+  frozenColEnd,
+  frozenColStart,
+  frozenRowEnd,
+  frozenRowStart,
+} from '../store/freeze-band.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import {
   type AutofitOptions,
@@ -10,7 +17,7 @@ import {
 } from './autofit-measurement.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
-import { recordLayoutChangeWithEngine } from './slice-history.js';
+import { captureLayoutSnapshot, recordLayoutChangeWithEngine } from './slice-history.js';
 
 const MAX_MATERIALIZED_LAYOUT_ROWS = 100_000;
 const MAX_AUTOFIT_AXIS_SPAN_PAIRS = 100_000;
@@ -416,19 +423,67 @@ export function hiddenInSelection(
   return out.sort((left, right) => left - right);
 }
 
-/** Pin `rows` rows / `cols` cols. One Cmd+Z reverts the freeze change.
- *  Pass `null` for `history` to skip recording. When `wb` is supplied and
- *  `capabilities.freeze` is on, the change is also pushed to the engine so
- *  it round-trips through .xlsx save/load. Store + engine writes share one
- *  history entry so undo/redo moves both sides in lockstep. */
+/** Pin `rows` rows / `cols` cols whose first row/column is `origin` (default
+ *  A1). Freezing is a view setting, not an undo step. When `wb` is supplied
+ *  the counts are pushed to the engine so they round-trip through .xlsx. */
 export function setFreezePanes(
   store: SpreadsheetStore,
-  history: History | null,
   rows: number,
   cols: number,
   wb?: WorkbookHandle,
+  origin?: { row: number; col: number },
 ): void {
-  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
-    mutators.setFreezePanes(store, rows, cols);
-  });
+  const sheet = store.getState().data.sheetIndex;
+  const before = captureLayoutSnapshot(store.getState());
+  mutators.setFreezePanes(store, rows, cols, origin);
+  if (!wb) return;
+  const after = captureLayoutSnapshot(store.getState());
+  syncLayoutToEngine(wb, store.getState().layout, sheet, before, after);
+}
+
+export type FreezeMode = 'none' | 'topRow' | 'firstColumn' | 'panes';
+
+/** Freeze (or unfreeze) the way the desktop spreadsheet does: the band starts
+ *  at the top-left visible cell, and "Freeze Panes" splits at the active
+ *  cell, or at the middle of the window when the active cell is the top-left. */
+export function applyFreezeMode(
+  store: SpreadsheetStore,
+  mode: FreezeMode,
+  wb?: WorkbookHandle,
+): void {
+  if (mode === 'none') {
+    setFreezePanes(store, 0, 0, wb);
+    return;
+  }
+  const { layout, viewport, selection } = store.getState();
+  let originRow = frozenRowEnd(layout) > 0 ? frozenRowStart(layout) : viewport.rowStart;
+  let originCol = frozenColEnd(layout) > 0 ? frozenColStart(layout) : viewport.colStart;
+  let rows = 1;
+  let cols = 0;
+  if (mode === 'firstColumn') {
+    rows = 0;
+    cols = 1;
+  } else if (mode === 'panes') {
+    const a = selection.active;
+    // An active cell that is scrolled out of view becomes the top-left first.
+    if (a.row < originRow || a.col < originCol) {
+      originRow = a.row;
+      originCol = a.col;
+    }
+    if (a.row === originRow && a.col === originCol) {
+      rows = Math.max(1, Math.floor(viewport.rowCount / 2));
+      cols = Math.max(1, Math.floor(viewport.colCount / 2));
+    } else {
+      rows = a.row - originRow;
+      cols = a.col - originCol;
+    }
+  }
+  if (mode === 'panes') {
+    // The band starts where the window starts, so the window moves with it.
+    store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: originRow, colStart: originCol },
+    }));
+  }
+  setFreezePanes(store, rows, cols, wb, { row: originRow, col: originCol });
 }

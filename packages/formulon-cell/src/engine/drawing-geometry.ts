@@ -6,6 +6,7 @@ import {
   gridOriginY,
   layoutForView,
 } from '../render/geometry.js';
+import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { EngineDrawingAnchor } from './types.js';
@@ -275,15 +276,15 @@ export const drawingClipPath = (
     const state = store.getState();
     const layout = layoutForView(state);
     const band = bodyBandOrigin(layout, state.viewport);
-    const top = object.fromRow >= layout.freezeRows ? band.y : gridOriginY(layout);
+    const top = object.fromRow >= frozenRowEnd(layout) ? band.y : gridOriginY(layout);
     const hiddenTop = top - position.y;
     let hiddenLead: number;
     if (layout.rtl) {
       const edge =
-        object.fromCol >= layout.freezeCols ? band.x : layout.viewWidth - gridOriginX(layout);
+        object.fromCol >= frozenColEnd(layout) ? band.x : layout.viewWidth - gridOriginX(layout);
       hiddenLead = position.x + position.w - edge;
     } else {
-      const edge = object.fromCol >= layout.freezeCols ? band.x : gridOriginX(layout);
+      const edge = object.fromCol >= frozenColEnd(layout) ? band.x : gridOriginX(layout);
       hiddenLead = edge - position.x;
     }
     if (hiddenTop <= 0 && hiddenLead <= 0) return '';

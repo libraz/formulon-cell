@@ -33,7 +33,7 @@ describe('captureSheetView', () => {
 
   it('records freeze when either axis is engaged', () => {
     const v = captureSheetView('v1', 'X', { ...baseSnap, freezeRows: 1 });
-    expect(v.freeze).toEqual({ rows: 1, cols: 0 });
+    expect(v.freeze).toEqual({ rows: 1, cols: 0, originRow: 0, originCol: 0 });
   });
 
   it('records sorted hiddenRows/Cols', () => {
@@ -64,6 +64,8 @@ describe('applySheetView', () => {
       filterCriteria: [],
       freezeRows: 0,
       freezeCols: 0,
+      freezeOriginRow: 0,
+      freezeOriginCol: 0,
       hiddenRows: [],
       hiddenCols: [],
       sort: null,
@@ -95,6 +97,8 @@ describe('applySheetView', () => {
       filterCriteria: snap.filterCriteria,
       freezeRows: 1,
       freezeCols: 0,
+      freezeOriginRow: 0,
+      freezeOriginCol: 0,
       hiddenRows: [2],
       hiddenCols: [],
       sort: snap.sort,
@@ -193,6 +197,20 @@ describe('store-backed sheet views', () => {
     expect(state.layout.freezeCols).toBe(1);
     expect([...state.layout.hiddenRows]).toEqual([6]);
     expect([...state.layout.hiddenCols]).toEqual([2]);
+  });
+
+  it('saves and restores the frozen band origin with the counts', () => {
+    const store = createSpreadsheetStore();
+    mutators.setFreezePanes(store, 5, 2, { row: 9, col: 1 });
+    saveSheetView(store, 'v1', 'Scrolled');
+    mutators.setFreezePanes(store, 0, 0);
+
+    activateSheetView(store, 'v1');
+
+    const { layout, viewport } = store.getState();
+    expect([layout.freezeRows, layout.freezeCols]).toEqual([5, 2]);
+    expect([layout.freezeOriginRow, layout.freezeOriginCol]).toEqual([9, 1]);
+    expect([viewport.rowStart, viewport.colStart]).toEqual([14, 3]);
   });
 
   it('rejects missing or other-sheet views and deletes registered views', () => {

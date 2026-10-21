@@ -88,7 +88,7 @@ describe('snapshot helpers', () => {
     expect(Array.from(snap.sheetTabColors.entries())).toEqual([[1, '#c00000']]);
   });
 
-  it('applyLayoutSnapshot restores all fields', () => {
+  it('applyLayoutSnapshot restores everything but the freeze panes', () => {
     store.setState((s) => ({
       ...s,
       layout: {
@@ -105,7 +105,8 @@ describe('snapshot helpers', () => {
     }));
     applyLayoutSnapshot(store, snap);
     const layout = store.getState().layout;
-    expect(layout.freezeRows).toBe(2);
+    // Freezing is not an undo step: restoring a snapshot leaves it alone.
+    expect(layout.freezeRows).toBe(0);
     expect(Array.from(layout.hiddenRows)).toEqual([1]);
     expect(Array.from(layout.sheetTabColors.entries())).toEqual([[0, '#4472c4']]);
   });

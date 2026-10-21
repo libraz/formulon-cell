@@ -333,13 +333,13 @@ describe('toolbar/ribbon-active-state', () => {
     const { instance } = sheet;
     expect(projectActiveState(instance).frozen).toBe(false);
 
-    setFreezePanes(instance.store, null, 1, 0);
+    setFreezePanes(instance.store, 1, 0);
     expect(projectActiveState(instance).frozen).toBe(true);
 
-    setFreezePanes(instance.store, null, 0, 0);
+    setFreezePanes(instance.store, 0, 0);
     expect(projectActiveState(instance).frozen).toBe(false);
 
-    setFreezePanes(instance.store, null, 0, 2);
+    setFreezePanes(instance.store, 0, 2);
     expect(projectActiveState(instance).frozen).toBe(true);
   });
 

@@ -14,6 +14,8 @@ export interface ResolvedTheme {
   fgStrong: string;
   rule: string;
   ruleStrong: string;
+  /** Freeze-pane divider. */
+  freezeRule: string;
   accent: string;
   accentFg: string;
   accentSoft: string;
@@ -74,6 +76,7 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
 
     rule: v('--fc-rule', '#e2dccd'),
     ruleStrong: v('--fc-rule-strong', '#cdc6b3'),
+    freezeRule: v('--fc-freeze-rule', '#9b9b9b'),
 
     accent: v('--fc-accent', '#d83a14'),
     accentFg: v('--fc-accent-fg', '#ffffff'),
