@@ -168,6 +168,21 @@ function importedFiltersFor(wb: WorkbookHandle): Map<string, ImportedTypedFilter
   return filters;
 }
 
+/** Drop the imported definition of the removed table `index` and re-key the
+ * later tables, whose workbook-wide indexes shift down by one. */
+export function forgetTableAutoFilterImport(wb: WorkbookHandle, index: number): void {
+  const filters = importedFiltersFor(wb);
+  const shifted: [string, ImportedTypedFilter][] = [];
+  for (const [key, imported] of filters) {
+    if (!key.startsWith('table:')) continue;
+    const table = Number(key.slice('table:'.length));
+    if (table < index) continue;
+    filters.delete(key);
+    if (table > index) shifted.push([`table:${table - 1}`, imported]);
+  }
+  for (const [key, imported] of shifted) filters.set(key, imported);
+}
+
 /** Escape a UI contains value for formulon's Excel wildcard matcher. The
  * tilde must be escaped first so the escapes added for `*` and `?` remain
  * intact when the pattern is evaluated by the engine. */

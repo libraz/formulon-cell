@@ -1,16 +1,14 @@
-import { formatA1Range } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangeArea } from '../store/selection-geometry.js';
+import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { withFilterRange } from './filter-ranges.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
 import { recordTablesChange } from './slice-history.js';
 
-/** UI-only "Format As Table" overlay. Native workbook tables have a full
- * engine model, but this layer can decorate a plain range while writable
- * table APIs are unavailable. */
+/** "Format As Table" overlay. With a table-authoring engine every overlay is
+ * backed by an engine table of the same `name`, which the store mirror keeps
+ * in step; without one it decorates a plain range for the session only. */
 export type TableStyle = 'light' | 'medium' | 'dark';
 
 /** Built-in table-style hues — one column per swatch in the style gallery,
@@ -108,9 +106,11 @@ export function tableStyleSwatch(
 export interface TableOverlay {
   /** Stable id used by mutators / pointer routing. */
   id: string;
-  /** Source of the overlay. Loaded workbook tables are engine-backed/read-only;
-   *  session tables are visual authoring overlays created by the UI. */
+  /** Source of the overlay. Engine overlays are backed by the engine table
+   *  `name`; session overlays exist only in the UI (no table-authoring engine). */
   source: 'engine' | 'session';
+  /** Engine table name backing an engine overlay. */
+  name?: string;
   /** Range covered by the table including the header row and (optionally)
    *  the total row. */
   range: Range;
@@ -139,8 +139,8 @@ export interface FormatAsTableOptions {
   banded?: boolean;
   firstCol?: boolean;
   lastCol?: boolean;
-  /** When the active engine supports it, persist a real OOXML ListObject in
-   * addition to the visual overlay. */
+  /** When the active engine supports it, back the overlay with an OOXML
+   * table. The store mirror of the workbook's attached store creates it. */
   workbook?: WorkbookHandle;
 }
 
@@ -157,14 +157,20 @@ const isNonEmptyTextValue = (value: CellValue): boolean =>
 
 const isNonBlankValue = (value: CellValue): boolean => value.kind !== 'blank';
 
-const tableStyleName = (style: TableStyle): string =>
+/** Built-in engine style name written for a `TableStyle`. */
+export const tableStyleName = (style: TableStyle): string =>
   style === 'light'
     ? 'TableStyleLight9'
     : style === 'dark'
       ? 'TableStyleDark1'
       : 'TableStyleMedium2';
 
-const tableColumns = (workbook: WorkbookHandle, range: Range, hasHeaders: boolean): string[] => {
+/** Unique column names for a table over `range`, from its header row when present. */
+export const tableColumns = (
+  workbook: Pick<WorkbookHandle, 'getValue'>,
+  range: Range,
+  hasHeaders: boolean,
+): string[] => {
   const used = new Set<string>();
   const columns: string[] = [];
   for (let col = range.c0; col <= range.c1; col += 1) {
@@ -184,8 +190,9 @@ const tableColumns = (workbook: WorkbookHandle, range: Range, hasHeaders: boolea
   return columns;
 };
 
-const nextTableName = (workbook: WorkbookHandle): string => {
+const nextTableName = (workbook: WorkbookHandle, overlays: readonly TableOverlay[]): string => {
   const existing = new Set(workbook.getTables().map((table) => table.name.toLocaleLowerCase()));
+  for (const overlay of overlays) if (overlay.name) existing.add(overlay.name.toLocaleLowerCase());
   let n = 1;
   while (existing.has(`table${n}`)) n += 1;
   return `Table${n}`;
@@ -307,12 +314,17 @@ export function defaultTableOverlay(id: string, range: Range): TableOverlay {
   };
 }
 
+/** True when `range` would overlap a table other than `id`; tables cannot overlap. */
+const overlapsOtherTable = (store: SpreadsheetStore, id: string, range: Range): boolean =>
+  store.getState().tables.tables.some((t) => t.id !== id && rangesIntersect(t.range, range));
+
 function defaultTableId(range: Range): string {
   return `table-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}`;
 }
 
-/** Apply a session Format-as-Table overlay to `range` and return the stored
- *  overlay. This stays UI-level until the engine exposes writable table APIs. */
+/** Apply a Format-as-Table overlay to `range` and return the stored overlay.
+ *  With a table-authoring engine the overlay is engine-backed under a fresh
+ *  table name; null over another table or when the engine refused it. */
 export function formatAsTable(
   store: SpreadsheetStore,
   range: Range,
@@ -320,46 +332,34 @@ export function formatAsTable(
 ): TableOverlay | null {
   if (blockedByProtection(store, range.sheet, 'formatAsTable')) return null;
   const { workbook, ...overlayOptions } = options;
+  if (overlapsOtherTable(store, overlayOptions.id ?? defaultTableId(range), range)) return null;
+  const engineBacked = workbook?.capabilities?.tableMutate === true;
   const overlay: TableOverlay = {
     ...defaultTableOverlay(overlayOptions.id ?? defaultTableId(range), range),
     ...overlayOptions,
     id: overlayOptions.id ?? defaultTableId(range),
-    source: 'session',
+    source: engineBacked ? 'engine' : 'session',
+    ...(engineBacked && workbook
+      ? { name: nextTableName(workbook, store.getState().tables.tables) }
+      : {}),
     range,
   };
   mutators.upsertTableOverlay(store, overlay);
-  if (workbook?.capabilities?.tableMutate) {
-    const name = nextTableName(workbook);
-    const index = workbook.createTable({
-      sheetIndex: range.sheet,
-      ref: formatA1Range(range, { collapse: false }),
-      name,
-      displayName: name,
-      columns: tableColumns(workbook, range, overlay.showHeader),
-      styleName: tableStyleName(overlay.style),
-      headerRow: overlay.showHeader,
-      totalsRow: overlay.showTotal,
-    });
-    // The engine gives a new table its own AutoFilter; show its buttons now.
-    const filter =
-      index >= 0 && workbook.capabilities.typedTableAutoFilter
-        ? workbook.getTableAutoFilter(index)
-        : null;
-    if (filter) {
-      const filterRange: Range = {
-        sheet: range.sheet,
-        r0: filter.range.firstRow,
-        c0: filter.range.firstCol,
-        r1: filter.range.lastRow,
-        c1: filter.range.lastCol,
-      };
-      store.setState((s) => ({
-        ...s,
-        ui: { ...s.ui, filterRanges: withFilterRange(s, filterRange) },
-      }));
-    }
+  return tableOverlayById(store.getState(), overlay.id) === overlay ? overlay : null;
+}
+
+/** Overlay options for a built-in style id or a custom table style id. */
+export function tableStyleOptionsById(
+  state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
+  styleId: string,
+  color?: string,
+  variant: CustomTableStyle['variant'] = 'banded',
+): Pick<TableOverlay, 'style' | 'color' | 'banded' | 'firstCol'> {
+  const custom = customTableStyleById(state, styleId);
+  if (custom) {
+    return { style: custom.style, color: custom.color, ...tableVariantOptions(custom.variant) };
   }
-  return overlay;
+  return { style: styleId as TableStyle, color, ...tableVariantOptions(variant) };
 }
 
 export function formatAsTableByStyleId(
@@ -373,19 +373,8 @@ export function formatAsTableByStyleId(
     'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook'
   > = {},
 ): TableOverlay | null {
-  const custom = customTableStyleById(store.getState(), styleId);
-  if (custom) {
-    return formatAsTable(store, range, {
-      style: custom.style,
-      color: custom.color,
-      ...tableVariantOptions(custom.variant),
-      ...options,
-    });
-  }
   return formatAsTable(store, range, {
-    style: styleId as TableStyle,
-    color,
-    ...tableVariantOptions(variant),
+    ...tableStyleOptionsById(store.getState(), styleId, color, variant),
     ...options,
   });
 }
@@ -506,29 +495,31 @@ export function tableOverlayAt(
   return tableForCell(state.tables.tables, sheet, row, col);
 }
 
-/** Patch a session table overlay and return the updated overlay. Engine-backed
- *  overlays are intentionally read-only at this layer. */
+/** Patch a table overlay and return the updated overlay; the store mirror
+ *  carries the change to an engine-backed table. Null when the new range
+ *  overlaps another table or the engine refused the change. */
 export function updateTableOverlay(
   store: SpreadsheetStore,
   id: string,
   patch: TableOverlayPatch,
 ): TableOverlay | null {
   const current = tableOverlayById(store.getState(), id);
-  if (current?.source !== 'session') return null;
+  if (!current) return null;
   if (blockedByProtection(store, current.range.sheet, 'updateTableOverlay')) return null;
-  const next: TableOverlay = { ...current, ...patch, id: current.id, source: 'session' };
+  if (patch.range && overlapsOtherTable(store, id, patch.range)) return null;
+  const next: TableOverlay = { ...current, ...patch, id: current.id, source: current.source };
   mutators.upsertTableOverlay(store, next);
-  return next;
+  return tableOverlayById(store.getState(), id) === next ? next : null;
 }
 
-/** Remove a session Format-as-Table overlay by id. */
+/** Remove a Format-as-Table overlay by id. */
 export function clearTable(store: SpreadsheetStore, id: string): void {
   const current = tableOverlayById(store.getState(), id);
   if (current && blockedByProtection(store, current.range.sheet, 'clearTable')) return;
   mutators.removeTableOverlay(store, id);
 }
 
-/** Remove every session table overlay that intersects `range`. */
+/** Remove every table overlay that intersects `range`. */
 export function clearTablesInRange(store: SpreadsheetStore, range: Range): void {
   if (blockedByProtection(store, range.sheet, 'clearTablesInRange')) return;
   mutators.clearTableOverlaysInRange(store, range);

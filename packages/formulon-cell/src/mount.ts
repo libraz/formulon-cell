@@ -1125,6 +1125,8 @@ export const Spreadsheet = {
           ...state,
           format: { formats: new Map(), customCellStyles: [] },
           conditional: { rules: [] },
+          // Overlays name the previous workbook's tables.
+          tables: { ...state.tables, tables: [] },
           ui: { ...state.ui, pendingFormat: null },
         }));
         hydrateActiveSheet();

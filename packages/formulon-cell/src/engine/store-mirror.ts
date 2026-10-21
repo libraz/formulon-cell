@@ -16,6 +16,7 @@ import {
   unregisterFormatHistoryBridge,
 } from './format-history-bridge.js';
 import { syncPageSetupToEngine } from './print-sync.js';
+import { TableMirror } from './table-mirror.js';
 import type { SheetAxisFormatOverride, SheetFontOverride } from './types.js';
 import { syncViewStateToEngine } from './view-state-sync.js';
 import { bindWholeSheetFontStore } from './whole-sheet-font-sync.js';
@@ -133,10 +134,14 @@ const sameHiddenRows = (
   return true;
 };
 
-/** Mirrors a bound mount store's formats, AutoFilter and page-setup slices
- *  into the engine as they change. */
+/** Mirrors a bound mount store's formats, tables, AutoFilter and page-setup
+ *  slices into the engine as they change. */
 export class StoreMirror {
-  constructor(private readonly handle: WorkbookHandle) {}
+  constructor(private readonly handle: WorkbookHandle) {
+    this.tables = new TableMirror(handle);
+  }
+
+  private readonly tables: TableMirror;
 
   /** Optional mount store whose AutoFilter and page-setup slices are mirrored
    * into the engine as they change. Keeping this association at the adapter
@@ -218,6 +223,10 @@ export class StoreMirror {
       remapAxisFormatOverrides(store, mapIndex);
     });
     this.unsubscribeBoundStore = store.subscribe((state) => {
+      // Tables go first: creating or removing one edits the filter ranges in
+      // a nested notification, which mirrors every slice from the newer state.
+      if (this.storeSyncMuted > 0) this.tables.rebase(store.getState().tables.tables);
+      else if (this.tables.sync(store)) return;
       associatePaginationEngine(state, this.handle);
       const nextFormats = state.format.formats;
       const formatSheets = changedFormatSheets(this.lastFormatEntries, nextFormats);
@@ -308,5 +317,6 @@ export class StoreMirror {
     this.lastHiddenRows = state?.layout.hiddenRows ?? null;
     this.lastHiddenRowsSheet = state?.data.sheetIndex ?? null;
     this.lastPageSetupMap = state?.pageSetup.setupBySheet ?? null;
+    this.tables.rebase(state?.tables.tables ?? null);
   }
 }

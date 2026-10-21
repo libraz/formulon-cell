@@ -4,7 +4,8 @@ import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-type TableReader = Pick<WorkbookHandle, 'getTables'>;
+type TableReader = Pick<WorkbookHandle, 'getTables'> &
+  Partial<Pick<WorkbookHandle, 'withEngineSyncMuted'>>;
 
 function tableId(name: string, sheet: number, ref: string): string {
   const safe = `${name || 'Table'}-${sheet}-${ref}`.replace(/[^A-Za-z0-9_-]+/g, '-');
@@ -23,10 +24,8 @@ function tableRange(sheet: number, ref: string): Range | null {
   };
 }
 
-/** Convert loaded spreadsheet ListObjects into renderer table overlays. The engine
- *  currently exposes table metadata as read-only, so these overlays are also
- *  read-only: they give users the full spreadsheet visual affordance for loaded
- *  files while session-created Format-as-Table overlays stay separate. */
+/** Convert the engine's worksheet tables into engine-backed overlays. The
+ *  engine reports no table style, so the look is the default one. */
 export function tableOverlaysFromEngine(wb: TableReader): TableOverlay[] {
   const out: TableOverlay[] = [];
   for (const table of wb.getTables()) {
@@ -35,6 +34,7 @@ export function tableOverlaysFromEngine(wb: TableReader): TableOverlay[] {
     out.push({
       id: tableId(table.displayName || table.name, table.sheetIndex, table.ref),
       source: 'engine',
+      name: table.name,
       range,
       style: 'medium',
       showHeader: true,
@@ -45,6 +45,11 @@ export function tableOverlaysFromEngine(wb: TableReader): TableOverlay[] {
   return out;
 }
 
+/** Load the engine's tables into the store without echoing them back; known
+ *  tables keep the look the user gave them. */
 export function hydrateTableOverlaysFromEngine(wb: TableReader, store: SpreadsheetStore): void {
-  mutators.replaceEngineTableOverlays(store, tableOverlaysFromEngine(wb));
+  const hydrate = (): void =>
+    mutators.replaceEngineTableOverlays(store, tableOverlaysFromEngine(wb));
+  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
+  else hydrate();
 }

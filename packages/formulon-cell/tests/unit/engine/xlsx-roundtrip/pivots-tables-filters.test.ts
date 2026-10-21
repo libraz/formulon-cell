@@ -87,6 +87,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
       seedTableCells(first);
 
       const store = createSpreadsheetStore();
+      first.attachStore(store);
       const overlay = formatAsTable(store, range, { workbook: first, style: 'medium' });
       expect(overlay).not.toBeNull();
 
@@ -114,8 +115,10 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
     try {
       if (!authored.capabilities.tableMutate) return;
       seedTableCells(authored);
+      const store = createSpreadsheetStore();
+      authored.attachStore(store);
       formatAsTable(
-        createSpreadsheetStore(),
+        store,
         { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
         {
           workbook: authored,

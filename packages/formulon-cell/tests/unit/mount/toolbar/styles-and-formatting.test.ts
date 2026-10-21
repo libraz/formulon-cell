@@ -344,6 +344,27 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(activeStyleButton?.getAttribute('aria-checked')).toBe('true');
     expect(activeStyleButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
 
+    // Inside the table, a gallery pick restyles it instead of creating another.
+    const lightButton = host.querySelector<HTMLButtonElement>(
+      '[data-table-style="light"][data-table-color="#ed7d31"][data-table-variant="firstCol"]',
+    );
+    expect(lightButton).toBeTruthy();
+    const restyle = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(restyle, 'target', { value: lightButton });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(restyle)).toBe(true);
+    await Promise.resolve();
+    expect(sheet.instance.store.getState().tables.tables).toMatchObject([
+      {
+        range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
+        style: 'light',
+        color: '#ed7d31',
+        banded: false,
+        firstCol: true,
+      },
+    ]);
+    sheet.instance.history.undo();
+    expect(sheet.instance.store.getState().tables.tables).toMatchObject([{ style: 'dark' }]);
+
     tb.dispose();
   });
 

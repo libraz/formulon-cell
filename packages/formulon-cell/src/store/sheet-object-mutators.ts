@@ -242,7 +242,7 @@ export const sheetObjectMutators = {
 
   removeTableOverlay(store: SpreadsheetStore, id: string): void {
     store.setState((s) => {
-      const next = s.tables.tables.filter((t) => t.source === 'engine' || t.id !== id);
+      const next = s.tables.tables.filter((t) => t.id !== id);
       if (next.length === s.tables.tables.length) return s;
       return { ...s, tables: { ...s.tables, tables: next } };
     });
@@ -250,18 +250,27 @@ export const sheetObjectMutators = {
 
   clearTableOverlaysInRange(store: SpreadsheetStore, range: Range): void {
     store.setState((s) => {
-      const next = s.tables.tables.filter(
-        (t) => t.source === 'engine' || !rangesIntersect(t.range, range),
-      );
+      const next = s.tables.tables.filter((t) => !rangesIntersect(t.range, range));
       if (next.length === s.tables.tables.length) return s;
       return { ...s, tables: { ...s.tables, tables: next } };
     });
   },
 
+  /** Replace the engine overlays with `tables`. An overlay already known
+   *  under the same table name keeps its id and look; the engine supplies the
+   *  range only, since it cannot report a table's style. */
   replaceEngineTableOverlays(store: SpreadsheetStore, tables: readonly TableOverlay[]): void {
     store.setState((s) => {
+      const known = new Map<string, TableOverlay>();
+      for (const t of s.tables.tables) {
+        if (t.source === 'engine' && t.name) known.set(t.name.toLocaleLowerCase(), t);
+      }
+      const engine = tables.map((t) => {
+        const previous = t.name ? known.get(t.name.toLocaleLowerCase()) : undefined;
+        return previous ? { ...previous, name: t.name, range: t.range } : t;
+      });
       const session = s.tables.tables.filter((t) => t.source !== 'engine');
-      return { ...s, tables: { ...s.tables, tables: [...tables, ...session] } };
+      return { ...s, tables: { ...s.tables, tables: [...engine, ...session] } };
     });
   },
 

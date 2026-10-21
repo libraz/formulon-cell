@@ -15,7 +15,9 @@ import {
   inferTableHasHeaders,
   pivotTableStyleAssignment,
   tableOverlayAt,
+  tableStyleOptionsById,
   tableVariantFromOptions,
+  updateTableOverlay,
 } from '../../commands/format-as-table.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
@@ -138,7 +140,22 @@ const buildConditionalMenuAction =
 const buildTableStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createTableFromSelection'] =>
   (style = 'medium', color, variant = 'banded') => {
-    void showCreateTableDialog(instance, { style, color, variant });
+    const state = instance.store.getState();
+    const active = state.selection.active;
+    const table = tableOverlayAt(state, active.sheet, active.row, active.col);
+    if (!table) {
+      void showCreateTableDialog(instance, { style, color, variant });
+      return;
+    }
+    // Inside a table the gallery restyles it, as the desktop spreadsheet does.
+    recordTablesChange(instance.history, instance.store, () => {
+      updateTableOverlay(
+        instance.store,
+        table.id,
+        tableStyleOptionsById(state, style, color, variant),
+      );
+    });
+    instance.host.focus();
   };
 
 const updateTableStylesMenu =

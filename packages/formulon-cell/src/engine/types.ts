@@ -33,6 +33,7 @@ export type {
   Status,
   StringResult,
   TableInput,
+  TableUpdateInput,
   Value,
   Workbook,
 } from '@libraz/formulon';

@@ -132,6 +132,7 @@ describe('several AutoFilters on one sheet', () => {
     try {
       seed(wb);
       const store = hydratedStore(wb);
+      wb.attachStore(store);
       expect(store.getState().ui.filterRanges).toEqual([]);
       expect(formatAsTable(store, salesRange, { workbook: wb })).not.toBeNull();
       expect(wb.getTableAutoFilter(0)).not.toBeNull();

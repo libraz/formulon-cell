@@ -236,26 +236,23 @@ describe('formatAsTable command helpers', () => {
     expect(store.getState().tables.tables).toEqual([overlay]);
   });
 
-  it('also creates an OOXML table when the engine exposes table authoring', () => {
+  it('backs the overlay with a fresh engine table name when the engine authors tables', () => {
     const store = createSpreadsheetStore();
     const createTable = vi.fn(() => 0);
     const workbook = {
       capabilities: { tableMutate: true },
       createTable,
-      getTables: () => [],
-      getValue: headerWorkbook({ '0:0': 'Product', '0:1': 'Amount' }).getValue,
+      getTables: () => [{ name: 'Table1' }],
     } as never;
-    formatAsTable(store, range(0, 0, 3, 1), { workbook });
-    expect(createTable).toHaveBeenCalledWith({
-      sheetIndex: 0,
-      ref: 'A1:B4',
-      name: 'Table1',
-      displayName: 'Table1',
-      columns: ['Product', 'Amount'],
-      styleName: 'TableStyleMedium2',
-      headerRow: true,
-      totalsRow: false,
+    mutators.upsertTableOverlay(store, {
+      ...defaultTableOverlay('pending', range(10, 0, 12, 1)),
+      source: 'engine',
+      name: 'Table2',
     });
+    const overlay = formatAsTable(store, range(0, 0, 3, 1), { workbook });
+    expect(overlay).toMatchObject({ source: 'engine', name: 'Table3' });
+    // The store mirror of the attached store writes the engine table.
+    expect(createTable).not.toHaveBeenCalled();
   });
 
   it('clearTable removes by id', () => {
@@ -297,7 +294,7 @@ describe('formatAsTable command helpers', () => {
     expect(tableOverlayAt(state, 0, 8, 1)).toEqual(engine);
   });
 
-  it('updates session overlays without mutating read-only engine overlays', () => {
+  it('updates session and engine overlays alike', () => {
     const store = createSpreadsheetStore();
     const session = formatAsTable(store, range(0, 0, 3, 2), { id: 'session' });
     expect(session).not.toBeNull();
@@ -311,7 +308,11 @@ describe('formatAsTable command helpers', () => {
       },
     ]);
 
-    expect(updateTableOverlay(store, 'engine', { banded: false })).toBeNull();
+    expect(updateTableOverlay(store, 'engine', { banded: false })).toMatchObject({
+      id: 'engine',
+      source: 'engine',
+      banded: false,
+    });
     const updated = updateTableOverlay(store, 'session', { style: 'light', showTotal: true });
 
     expect(updated).toMatchObject({
@@ -320,7 +321,7 @@ describe('formatAsTable command helpers', () => {
       style: 'light',
       showTotal: true,
     });
-    expect(tableOverlayById(store.getState(), 'engine')?.banded).toBe(true);
+    expect(tableOverlayById(store.getState(), 'engine')?.banded).toBe(false);
     expect(updateTableOverlay(store, 'missing', { style: 'dark' })).toBeNull();
   });
 

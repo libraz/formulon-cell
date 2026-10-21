@@ -28,13 +28,14 @@ const reader = {
 };
 
 describe('table sync', () => {
-  it('maps engine workbook tables to read-only renderer overlays', () => {
+  it('maps engine workbook tables to engine-backed overlays', () => {
     const overlays = tableOverlaysFromEngine(reader);
 
     expect(overlays).toEqual([
       {
         id: 'engine-table-Sales-Table-1-B2-D6',
         source: 'engine',
+        name: 'Table1',
         range: { sheet: 1, r0: 1, c0: 1, r1: 5, c1: 3 },
         style: 'medium',
         showHeader: true,
@@ -71,7 +72,7 @@ describe('table sync', () => {
     ]);
   });
 
-  it('keeps loaded workbook table overlays when clearing session overlays', () => {
+  it('clears loaded workbook table overlays like session overlays', () => {
     const store = createSpreadsheetStore();
     hydrateTableOverlaysFromEngine(reader, store);
     mutators.upsertTableOverlay(store, {
@@ -86,15 +87,33 @@ describe('table sync', () => {
 
     mutators.clearTableOverlaysInRange(store, { sheet: 1, r0: 1, c0: 1, r1: 5, c1: 3 });
 
+    expect(store.getState().tables.tables).toEqual([]);
+  });
+
+  it('keeps the look of a known table across a rehydrate', () => {
+    const store = createSpreadsheetStore();
+    hydrateTableOverlaysFromEngine(reader, store);
+    const [loaded] = store.getState().tables.tables;
+    if (!loaded) throw new Error('expected a loaded table');
+    mutators.upsertTableOverlay(store, {
+      ...loaded,
+      style: 'dark',
+      color: '#70ad47',
+      banded: false,
+    });
+    const moved = {
+      getTables: () => [{ ...reader.getTables()[0], ref: 'B2:D8' } as never],
+    };
+
+    hydrateTableOverlaysFromEngine(moved, store);
+
     expect(store.getState().tables.tables).toEqual([
       {
-        id: 'engine-table-Sales-Table-1-B2-D6',
-        source: 'engine',
-        range: { sheet: 1, r0: 1, c0: 1, r1: 5, c1: 3 },
-        style: 'medium',
-        showHeader: true,
-        showTotal: false,
-        banded: true,
+        ...loaded,
+        style: 'dark',
+        color: '#70ad47',
+        banded: false,
+        range: { sheet: 1, r0: 1, c0: 1, r1: 7, c1: 3 },
       },
     ]);
   });

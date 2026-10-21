@@ -1,6 +1,13 @@
 import type { AutoFilter, AutoFilterEvalResult } from '@libraz/formulon';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
-import type { Addr, CellValue, EngineCapabilities, TableInput, Workbook } from './types.js';
+import type {
+  Addr,
+  CellValue,
+  EngineCapabilities,
+  TableInput,
+  TableUpdateInput,
+  Workbook,
+} from './types.js';
 import { formatCell } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -12,10 +19,7 @@ type WorkbookHandleInternals = {
 
 type TableAuthoringWorkbook = Workbook & {
   createTable?: (input: TableInput) => { status: { ok: boolean }; index: number };
-  updateTable?: (
-    index: number,
-    input: Pick<TableInput, 'ref' | 'styleName' | 'headerRow' | 'totalsRow'>,
-  ) => { ok: boolean };
+  updateTable?: (index: number, input: TableUpdateInput) => { ok: boolean };
   removeTable?: (index: number) => { ok: boolean };
 };
 
@@ -203,10 +207,9 @@ export abstract class WorkbookHandleTablesMethods {
     return result?.status.ok ? result.index : -1;
   }
 
-  updateTable(
-    index: number,
-    input: Pick<TableInput, 'ref' | 'styleName' | 'headerRow' | 'totalsRow'>,
-  ): boolean {
+  /** Partially update the table at `index`; omitted fields keep their value.
+   * A new `ref` must keep the table's column count. */
+  updateTable(index: number, input: TableUpdateInput): boolean {
     assertAlive(this);
     return (
       this.capabilities.tableMutate === true &&
@@ -214,6 +217,7 @@ export abstract class WorkbookHandleTablesMethods {
     );
   }
 
+  /** Remove the table at `index`; later tables shift down by one. */
   removeTable(index: number): boolean {
     assertAlive(this);
     return (
@@ -222,9 +226,8 @@ export abstract class WorkbookHandleTablesMethods {
     );
   }
 
-  /** Snapshot of every spreadsheet Table on the workbook. Read-only in the engine —
-   *  we surface it as a badge count + listing for the status bar. Empty array
-   *  on the stub. */
+  /** Snapshot of every spreadsheet Table on the workbook, in index order.
+   *  Empty array on the stub. */
   getTables(): {
     /** Workbook-wide table index, as taken by the table AutoFilter methods. */
     index: number;
