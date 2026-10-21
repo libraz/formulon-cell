@@ -157,7 +157,7 @@ describe('integration: filter range', () => {
     const { instance } = sheet;
     const range = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 };
     applyFilter(instance.store.getState(), instance.store, range, 0, () => true);
-    expect(instance.store.getState().ui.filterRange).toEqual(range);
+    expect(instance.store.getState().ui.filterRanges).toEqual([range]);
   });
 
   it('clearFilter without a range reveals every hidden row', () => {
@@ -167,13 +167,13 @@ describe('integration: filter range', () => {
     expect(instance.store.getState().layout.hiddenRows.size).toBe(4);
     clearFilter(instance.store.getState(), instance.store);
     expect(instance.store.getState().layout.hiddenRows.size).toBe(0);
-    expect(instance.store.getState().ui.filterRange).toBeNull();
+    expect(instance.store.getState().ui.filterRanges).toEqual([]);
   });
 
   it('setAutoFilter writes ui.filterRange without changing hiddenRows', () => {
     const { instance } = sheet;
     setAutoFilter(instance.store, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 });
-    expect(instance.store.getState().ui.filterRange).not.toBeNull();
+    expect(instance.store.getState().ui.filterRanges).not.toEqual([]);
     expect(instance.store.getState().layout.hiddenRows.size).toBe(0);
   });
 

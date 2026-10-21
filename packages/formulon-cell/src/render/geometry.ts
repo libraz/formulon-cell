@@ -24,7 +24,7 @@ export type HitZone =
   | { kind: 'corner' }
   | { kind: 'col-resize'; col: number }
   | { kind: 'row-resize'; row: number }
-  | { kind: 'col-filter-btn'; col: number };
+  | { kind: 'col-filter-btn'; col: number; range: Range };
 
 const RESIZE_SLACK = 4;
 /** Chevron sits flush with the right edge of the header cell, just inboard of
@@ -496,14 +496,15 @@ export function isRowVisible(layout: LayoutSlice, viewport: ViewportSlice, row: 
 
 /** Rich hit-test that resolves headers, resize edges, the corner chip, and
  *  cells. Returns null only when the point is past the last visible col/row.
- *  When `filterRange` is supplied, a chevron hot-zone is returned for the
- *  rightmost ~18px (excluding the resize slack) of headers inside the range. */
+ *  For headers inside one of `filterRanges`, the rightmost ~18px (excluding
+ *  the resize slack) is a chevron hot-zone naming the first range covering
+ *  that column. */
 export function hitZone(
   layout: ViewLayout,
   viewport: ViewportSlice,
   screenX: number,
   y: number,
-  filterRange?: Range | null,
+  filterRanges: readonly Range[] = [],
   opts?: { resizeHandles?: boolean },
 ): HitZone | null {
   // Everything below reasons in laid-out space, where column A is always
@@ -536,10 +537,13 @@ export function hitZone(
     ) {
       return { kind: 'col-resize', col: found.col - 1 };
     }
-    if (filterRange && found.col >= filterRange.c0 && found.col <= filterRange.c1) {
+    const filterRange = filterRanges.find((r) => found.col >= r.c0 && found.col <= r.c1);
+    if (filterRange) {
       const btnRight = found.rightEdge - RESIZE_SLACK;
       const btnLeft = btnRight - FILTER_BTN_SIZE;
-      if (x >= btnLeft && x < btnRight) return { kind: 'col-filter-btn', col: found.col };
+      if (x >= btnLeft && x < btnRight) {
+        return { kind: 'col-filter-btn', col: found.col, range: filterRange };
+      }
     }
     return { kind: 'col-header', col: found.col };
   }

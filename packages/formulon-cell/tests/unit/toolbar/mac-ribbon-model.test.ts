@@ -769,7 +769,7 @@ describe('Mac Excel ribbon profile', () => {
       ...state,
       ui: {
         ...state.ui,
-        filterRange: range,
+        filterRanges: [range],
         filterCriteria: [{ range, byCol: 0, hiddenValues: ['hidden'] }],
       },
       traces: {

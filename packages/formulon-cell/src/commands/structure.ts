@@ -354,17 +354,19 @@ function shiftAnchoredRanges(
   // Autofilter region + per-column criteria.
   recordFilterChange(history, store, () => {
     store.setState((s) => {
-      const fr = s.ui.filterRange;
-      if (!fr || fr.sheet !== sheet) return s;
-      const shifted = shiftRangeAxis(fr, axis, split, delta);
+      if (!s.ui.filterRanges.some((range) => range.sheet === sheet)) return s;
+      // A filter whose rows or columns were all deleted goes away with them.
+      const filterRanges = s.ui.filterRanges.flatMap((range) => {
+        if (range.sheet !== sheet) return [range];
+        const shifted = shiftRangeAxis(range, axis, split, delta);
+        return shifted ? [shifted] : [];
+      });
       return {
         ...s,
         ui: {
           ...s.ui,
-          filterRange: shifted,
-          filterCriteria: shifted
-            ? shiftFilterCriteria(s.ui.filterCriteria, sheet, axis, split, delta)
-            : [],
+          filterRanges,
+          filterCriteria: shiftFilterCriteria(s.ui.filterCriteria, sheet, axis, split, delta),
         },
       };
     });

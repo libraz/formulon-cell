@@ -639,7 +639,7 @@ export function unsupportedMetadataBlocksBand(
 
   if (
     state.conditional.rules.some((rule) => sheets.has(rule.range.sheet)) ||
-    (state.ui.filterRange !== null && sheets.has(state.ui.filterRange.sheet)) ||
+    state.ui.filterRanges.some((range) => sheets.has(range.sheet)) ||
     state.tables.tables.some((table) => sheets.has(table.range.sheet)) ||
     state.charts.charts.some((chart) => sheets.has(chart.sheet)) ||
     state.illustrations.illustrations.some((item) => sheets.has(item.sheet)) ||

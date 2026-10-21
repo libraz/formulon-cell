@@ -7,6 +7,7 @@ import {
   reapplyFilters,
   recordFilterChange,
 } from '../commands/filter.js';
+import { activeFilterRange } from '../commands/filter-ranges.js';
 import {
   cycleBorders,
   setAlign,
@@ -118,7 +119,7 @@ export function runContextMenuFormatSortItem(
       return true;
     }
     case 'filterClear': {
-      const range = boundRowsToData(store, state.ui.filterRange ?? inferAutoFilterRange(state));
+      const range = boundRowsToData(store, activeFilterRange(state) ?? inferAutoFilterRange(state));
       recordFilterChange(history, store, () => clearFilter(store.getState(), store, range, wb), wb);
       ctx.afterCommit();
       return true;
@@ -129,7 +130,7 @@ export function runContextMenuFormatSortItem(
       return true;
     }
     case 'filterByValue': {
-      const range = boundRowsToData(store, state.ui.filterRange ?? inferAutoFilterRange(state));
+      const range = boundRowsToData(store, activeFilterRange(state) ?? inferAutoFilterRange(state));
       const byCol = state.selection.active.col;
       const keep = filterValueKey(state.data.cells.get(addrKey(state.selection.active))?.value);
       const locale = localeForWorkbook(wb);

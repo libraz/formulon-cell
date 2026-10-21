@@ -1,5 +1,6 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
+import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
@@ -130,7 +131,7 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
     )
       return strings.commentNone;
   }
-  if (id === 'mac.data.clear' && !state.ui.filterRange) {
+  if (id === 'mac.data.clear' && !activeFilterRange(state)) {
     return MAC_CONTEXT_LABELS.filterRangeRequired[lang];
   }
   if (id === 'mac.data.reapply' && state.ui.filterCriteria.length === 0) {

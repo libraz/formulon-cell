@@ -2,7 +2,7 @@ import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
-import { applyValueFilter, clearFilter, distinctValues } from './filter.js';
+import { applyValueFilter, distinctValues, resetFilterCriteria } from './filter.js';
 
 export interface CreateSlicerOptions {
   id?: string;
@@ -151,7 +151,8 @@ export function recomputeSlicerFilters(store: SpreadsheetStore, workbook: Workbo
   for (const key of order) {
     const group = groups.get(key);
     if (!group) continue;
-    clearFilter(store.getState(), store, group.range);
+    // Reset rather than clear, so the range's own filter (a table's) survives.
+    resetFilterCriteria(store, group.range);
     // Each call reports the range's total under the criteria applied so far.
     let groupHidden = 0;
     for (const { byCol, wanted } of group.cols) {

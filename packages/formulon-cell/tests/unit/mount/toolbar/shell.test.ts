@@ -175,13 +175,15 @@ describe('Spreadsheet.mountToolbar', () => {
     document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     expect(tb.applyCommand('filter')).toBe(true);
-    expect(sheet.instance.store.getState().ui.filterRange).toEqual({
-      sheet: 0,
-      r0: 0,
-      c0: 0,
-      r1: 2,
-      c1: 1,
-    });
+    expect(sheet.instance.store.getState().ui.filterRanges).toEqual([
+      {
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 2,
+        c1: 1,
+      },
+    ]);
 
     tb.dispose();
   });

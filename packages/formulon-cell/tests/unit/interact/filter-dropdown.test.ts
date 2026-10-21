@@ -190,27 +190,27 @@ describe('attachFilterDropdown', () => {
     document.querySelector<HTMLButtonElement>('.fc-filter-dropdown__apply')?.click();
 
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
     expect(store.getState().ui.filterCriteria).toEqual([{ range, byCol: 0, hiddenValues: ['B'] }]);
     expect(history.canUndo()).toBe(true);
 
     history.undo();
     expect(store.getState().layout.hiddenRows.size).toBe(0);
-    expect(store.getState().ui.filterRange).toBeNull();
+    expect(store.getState().ui.filterRanges).toEqual([]);
     expect(store.getState().ui.filterCriteria).toEqual([]);
 
     history.redo();
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
 
     handle.open(range, 0, { x: 10, y: 20, h: 24 });
     document.querySelector<HTMLButtonElement>('.fc-filter-dropdown__clear')?.click();
     expect(store.getState().layout.hiddenRows.size).toBe(0);
-    expect(store.getState().ui.filterRange).toBeNull();
+    expect(store.getState().ui.filterRanges).toEqual([]);
 
     history.undo();
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
     handle.detach();
   });
 

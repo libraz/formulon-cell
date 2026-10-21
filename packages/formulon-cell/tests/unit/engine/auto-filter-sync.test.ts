@@ -124,7 +124,7 @@ describe('AutoFilter engine sync', () => {
       ...state,
       ui: {
         ...state.ui,
-        filterRange: range,
+        filterRanges: [range],
         filterCriteria: [
           { range, byCol: 0, hiddenValues: ['West'] },
           { range, byCol: 1, hiddenValues: [], condition: { op: 'contains', value: 'x&y' } },
@@ -132,7 +132,7 @@ describe('AutoFilter engine sync', () => {
       },
     }));
 
-    expect(autoFilterXmlFromState(store.getState(), 0)).toBe(
+    expect(autoFilterXmlFromState(store.getState(), range)).toBe(
       '<autoFilter ref="A1:B4"><filterColumn colId="0"><filters blank="1"><filter val="East"/></filters></filterColumn><filterColumn colId="1"><customFilters><customFilter operator="equal" val="*x&amp;y*"/></customFilters></filterColumn></autoFilter>',
     );
   });
@@ -162,7 +162,7 @@ describe('AutoFilter engine sync', () => {
 
     hydrateAutoFilterFromEngine(fake, store, 0);
     expect(muted).toBe(1);
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
     expect(syncAutoFilterToEngine(fake, store.getState(), 0)).toBe(true);
 
     const unavailable = { capabilities: { autoFilter: false } } as unknown as WorkbookHandle;
@@ -179,13 +179,15 @@ describe('AutoFilter engine sync', () => {
     } as unknown as WorkbookHandle;
 
     hydrateAutoFilterFromEngine(fake, store, 0);
-    expect(store.getState().ui.filterRange).toEqual({
-      sheet: 0,
-      r0: 2,
-      c0: 2,
-      r1: 8,
-      c1: 4,
-    });
+    expect(store.getState().ui.filterRanges).toEqual([
+      {
+        sheet: 0,
+        r0: 2,
+        c0: 2,
+        r1: 8,
+        c1: 4,
+      },
+    ]);
     expect(store.getState().ui.filterCriteria).toEqual([]);
   });
 
@@ -207,7 +209,7 @@ describe('AutoFilter engine sync', () => {
         ...state,
         ui: {
           ...state.ui,
-          filterRange: typedRange,
+          filterRanges: [typedRange],
           filterCriteria: [{ range: typedRange, byCol: 0, hiddenValues: ['West'] }],
         },
       }));
@@ -231,7 +233,7 @@ describe('AutoFilter engine sync', () => {
         seedText(restoredStore, 3, 0, 'East');
         hydrateLayoutFromEngine(restored, restoredStore, 0);
         hydrateAutoFilterFromEngine(restored, restoredStore, 0);
-        expect(restoredStore.getState().ui.filterRange).toEqual(typedRange);
+        expect(restoredStore.getState().ui.filterRanges).toEqual([typedRange]);
         expect(restoredStore.getState().ui.filterCriteria).toEqual([
           { range: typedRange, byCol: 0, hiddenValues: ['West'] },
         ]);
@@ -261,7 +263,7 @@ describe('AutoFilter engine sync', () => {
         ...state,
         ui: {
           ...state.ui,
-          filterRange: typedRange,
+          filterRanges: [typedRange],
           filterCriteria: [
             {
               range: typedRange,
@@ -316,7 +318,7 @@ describe('AutoFilter engine sync', () => {
         ...state,
         ui: {
           ...state.ui,
-          filterRange: typedRange,
+          filterRanges: [typedRange],
           filterCriteria: [
             {
               range: typedRange,
@@ -337,7 +339,7 @@ describe('AutoFilter engine sync', () => {
       // The native matcher must see the escaped pattern: only the literal
       // `*`, `?`, and `~` row matches.
       expect(wb.evaluateAutoFilter(0)?.match).toEqual([true, false, false, false]);
-      expect(autoFilterXmlFromState(store.getState(), 0)).toContain('val="*a~*b~?~~*"');
+      expect(autoFilterXmlFromState(store.getState(), typedRange)).toContain('val="*a~*b~?~~*"');
 
       const restored = await WorkbookHandle.loadBytes(wb.save());
       try {
@@ -379,7 +381,7 @@ describe('AutoFilter engine sync', () => {
         val1: 'a~*b~?~~',
       });
       expect(wb.evaluateAutoFilter(0)?.match).toEqual([true, false, false, false]);
-      expect(autoFilterXmlFromState(store.getState(), 0)).toContain('val="a~*b~?~~"');
+      expect(autoFilterXmlFromState(store.getState(), typedRange)).toContain('val="a~*b~?~~"');
       hydrateAutoFilterFromEngine(wb, store, 0);
       expect(store.getState().ui.filterCriteria).toEqual([
         {
@@ -733,7 +735,7 @@ describe('AutoFilter engine sync', () => {
         ...state,
         ui: {
           ...state.ui,
-          filterRange,
+          filterRanges: [filterRange],
           filterCriteria: [{ range: filterRange, byCol: 0, hiddenValues: ['West'] }],
         },
       }));
@@ -804,7 +806,7 @@ describe('AutoFilter engine sync', () => {
         ...state,
         ui: {
           ...state.ui,
-          filterRange,
+          filterRanges: [filterRange],
           filterCriteria: [{ range: filterRange, byCol: 0, hiddenValues: ['West'] }],
         },
       }));

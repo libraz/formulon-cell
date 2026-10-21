@@ -403,34 +403,52 @@ describe('hitZone', () => {
     expect(z).toEqual({ kind: 'cell', row: 3, col: 2 });
   });
 
-  it('returns "col-filter-btn" near the right edge of a header inside filterRange', () => {
+  it('returns "col-filter-btn" near the right edge of a header inside a filter range', () => {
     const layout = makeLayout();
     const viewport = makeViewport();
     // Col 0 right edge = 150. Resize slack = 4 → 146..150 is col-resize.
     // Filter btn is the next 14 px inboard: 132..146.
     const fr = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 2 };
-    const z = hitZone(layout, viewport, 140, 5, fr);
-    expect(z).toEqual({ kind: 'col-filter-btn', col: 0 });
+    const z = hitZone(layout, viewport, 140, 5, [fr]);
+    expect(z).toEqual({ kind: 'col-filter-btn', col: 0, range: fr });
   });
 
-  it('still returns "col-resize" at the very right edge even when filterRange is set', () => {
+  it('reports the chevron of the filter range covering the hit column', () => {
+    const layout = makeLayout();
+    const viewport = makeViewport();
+    // Col 1 spans 150..250; its chevron sits at 232..246.
+    const first = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 };
+    const second = { sheet: 0, r0: 0, c0: 1, r1: 5, c1: 2 };
+    expect(hitZone(layout, viewport, 140, 5, [first, second])).toEqual({
+      kind: 'col-filter-btn',
+      col: 0,
+      range: first,
+    });
+    expect(hitZone(layout, viewport, 240, 5, [first, second])).toEqual({
+      kind: 'col-filter-btn',
+      col: 1,
+      range: second,
+    });
+  });
+
+  it('still returns "col-resize" at the very right edge even when a filter range is set', () => {
     const layout = makeLayout();
     const viewport = makeViewport();
     const fr = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 2 };
-    const z = hitZone(layout, viewport, 149, 5, fr);
+    const z = hitZone(layout, viewport, 149, 5, [fr]);
     expect(z).toEqual({ kind: 'col-resize', col: 0 });
   });
 
-  it('does not surface filter button outside filterRange columns', () => {
+  it('does not surface filter button outside filter range columns', () => {
     const layout = makeLayout();
     const viewport = makeViewport();
     // Filter range covers col 0 only — col 1's right edge stays a regular header.
     const fr = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 };
-    const z = hitZone(layout, viewport, 240, 5, fr); // col 1 mid
+    const z = hitZone(layout, viewport, 240, 5, [fr]); // col 1 mid
     expect(z).toEqual({ kind: 'col-header', col: 1 });
   });
 
-  it('skips filter button when no filterRange is provided (legacy 4-arg call)', () => {
+  it('skips filter button when no filter ranges are provided (4-arg call)', () => {
     const layout = makeLayout();
     const viewport = makeViewport();
     const z = hitZone(layout, viewport, 140, 5);

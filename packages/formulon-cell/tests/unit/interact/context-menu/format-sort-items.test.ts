@@ -253,7 +253,7 @@ describe('attachContextMenu', () => {
         { row: 3, col: 0, value: 'A' },
       ]);
       setRange(store, 1, 0, 1, 0);
-      mutators.setFilterRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 });
+      mutators.setFilterRanges(store, [{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }]);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       const openFilterMenu = (): void => {
         fireContextMenu(host, 60, 50);

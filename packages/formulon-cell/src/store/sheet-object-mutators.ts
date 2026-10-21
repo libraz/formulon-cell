@@ -344,7 +344,7 @@ export const sheetObjectMutators = {
           rowStart: Math.max(frozenRowEnd(layout), s.viewport.rowStart),
           colStart: Math.max(frozenColEnd(layout), s.viewport.colStart),
         },
-        ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
+        ui: { ...s.ui, filterRanges: patch.filterRanges, filterCriteria: patch.filterCriteria },
         sheetViews: { ...s.sheetViews, activeViewId },
       };
     });

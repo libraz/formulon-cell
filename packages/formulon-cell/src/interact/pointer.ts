@@ -1,6 +1,7 @@
 import type { AutofitOptions } from '../commands/autofit-measurement.js';
 import { fillDestFor, fillRange } from '../commands/fill.js';
 import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
+import { headerFilterRanges } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isSafeHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -197,7 +198,7 @@ export function attachPointer(
       drag = { kind: 'none' };
       return;
     }
-    const zone = hitZone(geometryLayout(s), s.viewport, x, y, s.ui.filterRange);
+    const zone = hitZone(geometryLayout(s), s.viewport, x, y, headerFilterRanges(s));
     if (!zone) return;
 
     if (marquee.axis === 'cell') {
@@ -497,7 +498,7 @@ export function attachPointer(
     }
 
     const layout = geometryLayout(s);
-    const zone = hitZone(layout, s.viewport, x, y, s.ui.filterRange);
+    const zone = hitZone(layout, s.viewport, x, y, headerFilterRanges(s));
     if (!zone) return;
 
     // Range-insert: keep focus on the editor (preventDefault avoids the
@@ -545,26 +546,23 @@ export function attachPointer(
         // Bubble out a CustomEvent so the chrome layer (mount.ts) can open
         // the filter dropdown anchored under the chevron.
         e.preventDefault();
-        const fr = s.ui.filterRange;
-        if (fr) {
-          const rect = host.getBoundingClientRect();
-          host.dispatchEvent(
-            new CustomEvent('fc:openfilter', {
-              bubbles: true,
-              detail: {
-                range: fr,
-                col: zone.col,
-                anchor: {
-                  x: e.clientX - rect.left,
-                  y: gridOriginY(geometryLayout(s)) - s.layout.headerRowHeight,
-                  h: s.layout.headerRowHeight,
-                  clientX: e.clientX,
-                  clientY: e.clientY,
-                },
+        const rect = host.getBoundingClientRect();
+        host.dispatchEvent(
+          new CustomEvent('fc:openfilter', {
+            bubbles: true,
+            detail: {
+              range: zone.range,
+              col: zone.col,
+              anchor: {
+                x: e.clientX - rect.left,
+                y: gridOriginY(geometryLayout(s)) - s.layout.headerRowHeight,
+                h: s.layout.headerRowHeight,
+                clientX: e.clientX,
+                clientY: e.clientY,
               },
-            }),
-          );
-        }
+            },
+          }),
+        );
         drag = { kind: 'none' };
         return;
       }

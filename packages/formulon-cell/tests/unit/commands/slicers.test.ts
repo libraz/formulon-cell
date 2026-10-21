@@ -121,6 +121,6 @@ describe('slicer commands', () => {
     expect(recomputeSlicerFilters(store, wb)).toBe(1);
 
     expect(store.getState().layout.hiddenRows).toEqual(new Set([2]));
-    expect(store.getState().ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
+    expect(store.getState().ui.filterRanges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }]);
   });
 });

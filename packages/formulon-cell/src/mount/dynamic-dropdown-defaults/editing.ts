@@ -1,5 +1,6 @@
 import { parseAddrKey } from '../../engine/address.js';
 import {
+  activeFilterRange,
   applyAdvancedFilter,
   colLetter,
   conditionalRulesForRange,
@@ -505,7 +506,7 @@ const updateSortMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateSortMenu'] =>
   (menu) => {
     const state = instance.store.getState();
-    const hasFilterRange = state.ui.filterRange !== null;
+    const hasFilterRange = activeFilterRange(state) !== null;
     const hasFilterCriteria = state.ui.filterCriteria.length > 0;
     const strings = instance.i18n.strings.ribbonMenu;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-sort]')) {

@@ -164,7 +164,7 @@ describe('attachViewToolbar', () => {
       onChanged: invalidate,
     });
 
-    mutators.setFilterRange(store, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
+    mutators.setFilterRanges(store, [{ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 }]);
     mutators.setFreezePanes(store, 2, 1);
     const deleteButton = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Delete"]');
     expect(deleteButton?.disabled).toBe(true);
@@ -179,7 +179,7 @@ describe('attachViewToolbar', () => {
     const saved = store.getState().sheetViews.views[0];
     expect(saved).toMatchObject({ name: 'Views 1', freeze: { rows: 2, cols: 1 } });
 
-    mutators.setFilterRange(store, null);
+    mutators.setFilterRanges(store, []);
     mutators.setFreezePanes(store, 0, 0);
     const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="Views"]');
     if (!select || !saved) throw new Error('missing sheet-view controls');
@@ -191,7 +191,7 @@ describe('attachViewToolbar', () => {
     select.dispatchEvent(new Event('change'));
     expect(store.getState().sheetViews.activeViewId).toBe(saved.id);
     expect(store.getState().layout.freezeRows).toBe(2);
-    expect(store.getState().ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
+    expect(store.getState().ui.filterRanges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 }]);
     expect(deleteButton?.disabled).toBe(false);
     expect(deleteButton?.dataset.disabledReason).toBeUndefined();
     expect(deleteButton?.hasAttribute('aria-description')).toBe(false);

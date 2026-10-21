@@ -76,7 +76,7 @@ describe('filter commands', () => {
     seedNumber(store, 1, 0, 1);
     const range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 2 };
     applyFilter(store.getState(), store, range, 0, () => true);
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
   });
 
   it('applies text and number condition filters', () => {
@@ -174,7 +174,7 @@ describe('filter commands', () => {
     const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
     setAutoFilter(store, range);
     const s = store.getState();
-    expect(s.ui.filterRange).toEqual(range);
+    expect(s.ui.filterRanges).toEqual([range]);
     expect(s.layout.hiddenRows.size).toBe(0);
   });
 
@@ -212,7 +212,7 @@ describe('filter commands', () => {
     clearFilter(store.getState(), store);
     const s = store.getState();
     expect(s.layout.hiddenRows.size).toBe(0);
-    expect(s.ui.filterRange).toBeNull();
+    expect(s.ui.filterRanges).toEqual([]);
   });
 
   it('clearFilter(range) clears filterRange only when the range matches', () => {
@@ -221,12 +221,12 @@ describe('filter commands', () => {
     applyFilter(store.getState(), store, range, 0, () => true);
     // Same range — clears.
     clearFilter(store.getState(), store, range);
-    expect(store.getState().ui.filterRange).toBeNull();
+    expect(store.getState().ui.filterRanges).toEqual([]);
 
     // Re-apply, then clear with a different range — filterRange survives.
     applyFilter(store.getState(), store, range, 0, () => true);
     clearFilter(store.getState(), store, { sheet: 0, r0: 5, c0: 5, r1: 5, c1: 5 });
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
   });
 
   it('records filter range and hidden rows as one undoable action', () => {
@@ -243,16 +243,16 @@ describe('filter commands', () => {
       }),
     );
 
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
     expect(store.getState().layout.hiddenRows.has(1)).toBe(true);
     expect(history.canUndo()).toBe(true);
 
     history.undo();
-    expect(store.getState().ui.filterRange).toBeNull();
+    expect(store.getState().ui.filterRanges).toEqual([]);
     expect(store.getState().layout.hiddenRows.size).toBe(0);
 
     history.redo();
-    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
     expect(store.getState().layout.hiddenRows.has(1)).toBe(true);
   });
 
@@ -335,7 +335,7 @@ describe('filter commands', () => {
     const hidden = filterBySelectedCellValue(store.getState(), store);
 
     expect(hidden).toBe(1);
-    expect(store.getState().ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
+    expect(store.getState().ui.filterRanges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }]);
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
     expect(store.getState().layout.hiddenRows.has(1)).toBe(false);
     expect(store.getState().layout.hiddenRows.has(3)).toBe(false);
@@ -368,7 +368,7 @@ describe('filter commands', () => {
     expect(s.layout.hiddenRows.has(1)).toBe(false);
     expect(s.layout.hiddenRows.has(2)).toBe(false);
     expect(s.layout.hiddenRows.has(3)).toBe(true);
-    expect(s.ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 });
+    expect(s.ui.filterRanges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }]);
   });
 
   it('supports Excel-style wildcards in advanced filter text criteria', () => {
@@ -557,7 +557,7 @@ describe('filter commands', () => {
 
     const state = store.getState();
     expect(hidden).toBe(0);
-    expect(state.ui.filterRange).toEqual(range);
+    expect(state.ui.filterRanges).toEqual([range]);
     expect(state.layout.hiddenRows.size).toBe(0);
   });
 
@@ -569,7 +569,7 @@ describe('filter commands', () => {
 
     const state = store.getState();
     expect(hidden).toBe(0);
-    expect(state.ui.filterRange).toEqual(range);
+    expect(state.ui.filterRanges).toEqual([range]);
     expect(state.ui.filterCriteria).toEqual([]);
     expect(state.layout.hiddenRows.size).toBe(0);
   });
@@ -616,7 +616,7 @@ describe('filter commands', () => {
 
     expect(hidden).toBe(0);
     expect(copied).toBe(0);
-    expect(store.getState().ui.filterRange).toEqual(listRange);
+    expect(store.getState().ui.filterRanges).toEqual([listRange]);
     expect(store.getState().layout.hiddenRows.size).toBe(0);
   });
 

@@ -23,7 +23,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
 
 const autoFilterSignature = (state: State): string =>
   JSON.stringify({
-    range: state.ui.filterRange,
+    ranges: state.ui.filterRanges,
     criteria: state.ui.filterCriteria.map((entry) => ({
       range: entry.range,
       byCol: entry.byCol,

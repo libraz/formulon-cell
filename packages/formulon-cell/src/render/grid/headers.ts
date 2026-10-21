@@ -78,7 +78,7 @@ export function paintHeaders(
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   const r1c1 = state.ui.r1c1 === true;
-  const fr = state.ui.filterRange;
+  const filterRanges = state.ui.filterRanges.filter((r) => r.sheet === state.data.sheetIndex);
   // A selected chart or picture takes the highlight off the headers, as in Excel.
   const objectSelected = state.ui.selectedObject !== null;
   const selectedRanges = objectSelected ? [] : [selection.range, ...(selection.extraRanges ?? [])];
@@ -119,8 +119,8 @@ export function paintHeaders(
     }
 
     // Autofilter chevron — small ▼ in the right edge of the header for any
-    // column inside the active filter range.
-    if (fr && c >= fr.c0 && c <= fr.c1 && w >= 28) {
+    // column inside a filter range.
+    if (w >= 28 && filterRanges.some((fr) => c >= fr.c0 && c <= fr.c1)) {
       // The chevron hugs the column's trailing edge, which the mirror puts on
       // the physical left of the header cell for a right-to-left sheet.
       const btnLeft = rtl ? rect.x + 4 : rect.x + w - 4 - 14;

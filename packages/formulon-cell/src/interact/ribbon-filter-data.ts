@@ -12,6 +12,7 @@ import {
   recordFilterChange,
   setAutoFilter,
 } from '../commands/filter.js';
+import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -53,7 +54,8 @@ export const toggleAutoFilterFromSelection = (
     history,
     store,
     () => {
-      if (state.ui.filterRange) clearFilter(state, store, state.ui.filterRange, wb);
+      const active = activeFilterRange(state);
+      if (active) clearFilter(state, store, active, wb);
       else setAutoFilter(store, inferAutoFilterRange(state), wb);
     },
     wb,
@@ -80,12 +82,17 @@ export const executeRibbonFilterDataAction = (
   }
   if (action === 'clear') {
     const wb = deps.getWb?.();
-    recordFilterChange(
-      history,
-      store,
-      () => clearFilter(state, store, state.ui.filterRange ?? undefined, wb),
-      wb,
-    );
+    const active = activeFilterRange(state);
+    // With no filter at all, Clear reveals every row; otherwise it never
+    // reaches past the active filter into another table's.
+    if (active || state.ui.filterRanges.length === 0) {
+      recordFilterChange(
+        history,
+        store,
+        () => clearFilter(state, store, active ?? undefined, wb),
+        wb,
+      );
+    }
     return { kind: 'mutated' };
   }
   if (action === 'reapply') {
@@ -104,15 +111,19 @@ export const executeRibbonFilterDataAction = (
     return { kind: 'mutated' };
   }
   if (action === 'advanced') {
-    return { kind: 'open-advanced', range: state.ui.filterRange ?? inferAutoFilterRange(state) };
+    return {
+      kind: 'open-advanced',
+      range: activeFilterRange(state) ?? inferAutoFilterRange(state),
+    };
   }
-  const range = state.ui.filterRange ?? inferAutoFilterRange(state);
+  const active = activeFilterRange(state);
+  const range = active ?? inferAutoFilterRange(state);
   const wb = deps.getWb?.();
   recordFilterChange(
     history,
     store,
     () => {
-      if (!state.ui.filterRange) setAutoFilter(store, range, wb);
+      if (!active) setAutoFilter(store, range, wb);
     },
     wb,
   );

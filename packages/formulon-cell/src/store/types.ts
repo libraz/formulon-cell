@@ -216,9 +216,9 @@ export interface UiSlice {
   statusAggs: StatusAggKey[];
   /** Excel-style right-click status bar toggles beyond aggregates. */
   statusOptions: StatusBarOptions;
-  /** Range with autofilter enabled. Header row inside this range paints a
-   *  small filter button (▼). null = no autofilter. */
-  filterRange: Range | null;
+  /** Every AutoFilter range on the active sheet: the worksheet's own one (at
+   *  most one) plus one per table. Each header row paints filter buttons. */
+  filterRanges: Range[];
   /** Value-filter criteria keyed by filter range + column. Reapply uses this
    *  to recompute hidden rows after the sheet data changes. */
   filterCriteria: ValueFilterCriteria[];

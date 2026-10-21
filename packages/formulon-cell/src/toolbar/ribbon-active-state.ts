@@ -1,5 +1,6 @@
 import { activeCellStyleId } from '../commands/cell-styles.js';
 import { commentAt } from '../commands/comment.js';
+import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { BorderPreset as CommandBorderPreset } from '../commands/format.js';
 import { tableForCell } from '../commands/format-as-table.js';
 import { mergeAt } from '../commands/merge.js';
@@ -397,7 +398,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     commaStyle: f?.numFmt?.kind === 'fixed' && f.numFmt.thousands === true,
     numberFormat: numberFormatOf(f?.numFmt),
     frozen: s.layout.freezeRows > 0 || s.layout.freezeCols > 0,
-    filterOn: s.ui.filterRange != null,
+    filterOn: activeFilterRange(s) !== null,
     rowsHidden: hiddenInSelection(s.layout, 'row', r.r0, r.r1).length > 0,
     colsHidden: hiddenInSelection(s.layout, 'col', r.c0, r.c1).length > 0,
     protected: inst.isSheetProtected(),

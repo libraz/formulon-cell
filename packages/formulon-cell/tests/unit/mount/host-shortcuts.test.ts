@@ -210,11 +210,11 @@ describe('mount/host-shortcuts', () => {
   it('Ctrl+Shift+L toggles the selected range auto-filter', () => {
     const e = key({ key: 'l', ctrlKey: true, shiftKey: true });
     s.handler(e);
-    expect(s.store.getState().ui.filterRange).toEqual(s.store.getState().selection.range);
+    expect(s.store.getState().ui.filterRanges).toEqual([s.store.getState().selection.range]);
     expect(e.defaultPrevented).toBe(true);
 
     s.handler(key({ key: 'l', ctrlKey: true, shiftKey: true }));
-    expect(s.store.getState().ui.filterRange).toBeNull();
+    expect(s.store.getState().ui.filterRanges).toEqual([]);
     expect(s.invalidate).toHaveBeenCalledTimes(2);
   });
 

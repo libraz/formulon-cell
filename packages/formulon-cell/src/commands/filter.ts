@@ -11,6 +11,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
 import { parseLocalizedNumericInput } from './coerce-input.js';
+import { activeFilterRange, withFilterRange, withoutFilterRange } from './filter-ranges.js';
 import { formatNumber } from './format.js';
 import type { History } from './history.js';
 
@@ -51,11 +52,11 @@ const canonicalNumericCriterion = (raw: string, locale: string): string => {
 
 interface FilterSnapshot {
   hiddenRows: Set<number>;
-  filterRange: Range | null;
+  filterRanges: Range[];
   filterCriteria: ValueFilterCriteria[];
 }
 
-const cloneRange = (range: Range | null): Range | null => (range ? { ...range } : null);
+const cloneRanges = (ranges: readonly Range[]): Range[] => ranges.map((range) => ({ ...range }));
 const cloneCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCriteria[] =>
   criteria.map((c) => ({
     range: { ...c.range },
@@ -76,15 +77,22 @@ const dataRowCount = (range: Range): number => Math.max(0, range.r1 - range.r0);
 const canEvaluateFilterRange = (range: Range): boolean =>
   dataRowCount(range) <= MAX_EXACT_FILTER_ROWS;
 
-function syncFilterToEngine(wb: WorkbookHandle | undefined, store: SpreadsheetStore): void {
+/** Mirror the store's filters on `range`'s sheet to the engine. With `range`,
+ *  only that filter is rewritten; removed filters are reconciled either way. */
+function syncFilterToEngine(
+  wb: WorkbookHandle | undefined,
+  store: SpreadsheetStore,
+  range?: Range,
+): void {
   if (!wb) return;
   const state = store.getState();
   syncAutoFilterToEngine(
     wb,
     state,
-    state.ui.filterRange?.sheet ?? state.data.sheetIndex,
+    range?.sheet ?? state.data.sheetIndex,
     store,
     localeForWorkbook(wb),
+    range,
   );
 }
 
@@ -104,7 +112,7 @@ function stampFilterRangeWithoutCriteria(store: SpreadsheetStore, range: Range):
     layout: { ...s.layout, hiddenRows: clearHiddenRowsInRange(s.layout.hiddenRows, range) },
     ui: {
       ...s.ui,
-      filterRange: { ...range },
+      filterRanges: withFilterRange(s, range),
       filterCriteria: filterCriteriaAfterClear(s.ui.filterCriteria, range),
     },
   }));
@@ -113,7 +121,7 @@ function stampFilterRangeWithoutCriteria(store: SpreadsheetStore, range: Range):
 function captureFilterSnapshot(state: State): FilterSnapshot {
   return {
     hiddenRows: new Set(state.layout.hiddenRows),
-    filterRange: cloneRange(state.ui.filterRange),
+    filterRanges: cloneRanges(state.ui.filterRanges),
     filterCriteria: cloneCriteria(state.ui.filterCriteria),
   };
 }
@@ -129,7 +137,7 @@ function applyFilterSnapshot(
     layout: { ...s.layout, hiddenRows: new Set(snap.hiddenRows) },
     ui: {
       ...s.ui,
-      filterRange: cloneRange(snap.filterRange),
+      filterRanges: cloneRanges(snap.filterRanges),
       filterCriteria: cloneCriteria(snap.filterCriteria),
     },
   }));
@@ -138,12 +146,12 @@ function applyFilterSnapshot(
   }
 }
 
-function sameOptionalRange(a: Range | null, b: Range | null): boolean {
-  return a === b || (!!a && !!b && sameRange(a, b));
+function sameRangeList(a: readonly Range[], b: readonly Range[]): boolean {
+  return a.length === b.length && a.every((range, i) => sameRange(range, b[i] as Range));
 }
 
 function sameFilterSnapshot(a: FilterSnapshot, b: FilterSnapshot): boolean {
-  if (!sameOptionalRange(a.filterRange, b.filterRange)) return false;
+  if (!sameRangeList(a.filterRanges, b.filterRanges)) return false;
   if (a.hiddenRows.size !== b.hiddenRows.size) return false;
   if (!sameCriteriaList(a.filterCriteria, b.filterCriteria)) return false;
   for (const row of a.hiddenRows) {
@@ -196,7 +204,7 @@ export function recordFilterChange<T>(
  *  Excel-style replace semantics: rows previously hidden inside `range` are
  *  revealed first, so re-filtering the same range never accumulates stale
  *  hides. Hidden rows live in `layout.hiddenRows` (UI-only — engine state is
- *  untouched). The range is also stamped onto `ui.filterRange` so the column
+ *  untouched). The range is also added to `ui.filterRanges` so the column
  *  headers paint the autofilter chevron. */
 export function applyFilter(
   state: State,
@@ -221,7 +229,7 @@ export function applyFilterColumns(
     store.setState((s) => ({
       ...s,
       layout: { ...s.layout, hiddenRows: clearHiddenRowsInRange(s.layout.hiddenRows, range) },
-      ui: { ...s.ui, filterRange: { ...range } },
+      ui: { ...s.ui, filterRanges: withFilterRange(s, range) },
     }));
     return 0;
   }
@@ -240,7 +248,7 @@ export function applyFilterColumns(
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: newHidden },
-    ui: { ...s.ui, filterRange: { ...range } },
+    ui: { ...s.ui, filterRanges: withFilterRange(s, range) },
   }));
   return hiddenCount;
 }
@@ -255,7 +263,7 @@ export function applyValueFilter(
 ): number {
   if (!canEvaluateFilterRange(range)) {
     stampFilterRangeWithoutCriteria(store, range);
-    syncFilterToEngine(wb, store);
+    syncFilterToEngine(wb, store, range);
     return 0;
   }
   const locale = localeForWorkbook(wb);
@@ -287,9 +295,9 @@ export function applyValueFilter(
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: hidden },
-    ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
+    ui: { ...s.ui, filterRanges: withFilterRange(s, range), filterCriteria: criteria },
   }));
-  syncFilterToEngine(wb, store);
+  syncFilterToEngine(wb, store, range);
   return count;
 }
 
@@ -303,7 +311,7 @@ export function applyConditionFilter(
 ): number {
   if (!canEvaluateFilterRange(range)) {
     stampFilterRangeWithoutCriteria(store, range);
-    syncFilterToEngine(wb, store);
+    syncFilterToEngine(wb, store, range);
     return 0;
   }
   const locale = localeForWorkbook(wb);
@@ -320,9 +328,9 @@ export function applyConditionFilter(
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: hidden },
-    ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
+    ui: { ...s.ui, filterRanges: withFilterRange(s, range), filterCriteria: criteria },
   }));
-  syncFilterToEngine(wb, store);
+  syncFilterToEngine(wb, store, range);
   return count;
 }
 
@@ -336,7 +344,7 @@ export function applyColorFilter(
 ): number {
   if (!canEvaluateFilterRange(range)) {
     stampFilterRangeWithoutCriteria(store, range);
-    syncFilterToEngine(wb, store);
+    syncFilterToEngine(wb, store, range);
     return 0;
   }
   const criteria = upsertCriteria(state.ui.filterCriteria, {
@@ -349,9 +357,9 @@ export function applyColorFilter(
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: hidden },
-    ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
+    ui: { ...s.ui, filterRanges: withFilterRange(s, range), filterCriteria: criteria },
   }));
-  syncFilterToEngine(wb, store);
+  syncFilterToEngine(wb, store, range);
   return count;
 }
 
@@ -420,7 +428,7 @@ function colorMatches(
 export function filterBySelectedCellValue(
   state: State,
   store: SpreadsheetStore,
-  range: Range = state.ui.filterRange ?? inferAutoFilterRange(state),
+  range: Range = activeFilterRange(state) ?? inferAutoFilterRange(state),
   wb?: WorkbookHandle,
 ): number {
   const active = state.selection.active;
@@ -563,7 +571,7 @@ export function applyAdvancedFilter(
 ): number {
   if (!canEvaluateFilterRange(listRange)) {
     stampFilterRangeWithoutCriteria(store, listRange);
-    syncFilterToEngine(wb, store);
+    syncFilterToEngine(wb, store, listRange);
     return 0;
   }
   const locale = localeForWorkbook(wb);
@@ -596,9 +604,9 @@ export function applyAdvancedFilter(
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: nextHidden },
-    ui: { ...s.ui, filterRange: { ...listRange } },
+    ui: { ...s.ui, filterRanges: withFilterRange(s, listRange) },
   }));
-  syncFilterToEngine(wb, store);
+  syncFilterToEngine(wb, store, listRange);
   return hiddenCount;
 }
 
@@ -912,21 +920,17 @@ function upsertCriteria(
   ];
 }
 
-/** Mark `range` as the active autofilter region without applying any predicate.
+/** Add `range` as an autofilter region without applying any predicate.
  *  Headers in the range paint the chevron so the user can open the dropdown
  *  per column. Equivalent to the "Filter" toggle (Ctrl+Shift+L). */
-export function setAutoFilter(
-  store: SpreadsheetStore,
-  range: Range | null,
-  wb?: WorkbookHandle,
-): void {
-  store.setState((s) => ({ ...s, ui: { ...s.ui, filterRange: range ? { ...range } : null } }));
-  syncFilterToEngine(wb, store);
+export function setAutoFilter(store: SpreadsheetStore, range: Range, wb?: WorkbookHandle): void {
+  store.setState((s) => ({ ...s, ui: { ...s.ui, filterRanges: withFilterRange(s, range) } }));
+  syncFilterToEngine(wb, store, range);
 }
 
-/** Reveal all rows in `range` (or all rows when range is omitted). Also clears
- *  `ui.filterRange` when `range` matches the active autofilter region (or when
- *  no range is supplied). */
+/** Reveal all rows in `range` (or all rows when range is omitted). Also removes
+ *  the filter range matching `range` from `ui.filterRanges` (or every filter
+ *  range when no range is supplied). */
 export function clearFilter(
   state: State,
   store: SpreadsheetStore,
@@ -934,27 +938,26 @@ export function clearFilter(
   wb?: WorkbookHandle,
 ): void {
   const next = range ? clearHiddenRowsInRange(state.layout.hiddenRows, range) : new Set<number>();
-  store.setState((s) => {
-    const fr = s.ui.filterRange;
-    const clearFr =
-      !range ||
-      (fr != null &&
-        fr.sheet === range.sheet &&
-        fr.r0 === range.r0 &&
-        fr.r1 === range.r1 &&
-        fr.c0 === range.c0 &&
-        fr.c1 === range.c1);
-    return {
-      ...s,
-      layout: { ...s.layout, hiddenRows: next },
-      ui: {
-        ...s.ui,
-        ...(clearFr ? { filterRange: null } : {}),
-        filterCriteria: filterCriteriaAfterClear(s.ui.filterCriteria, range),
-      },
-    };
-  });
-  syncFilterToEngine(wb, store);
+  store.setState((s) => ({
+    ...s,
+    layout: { ...s.layout, hiddenRows: next },
+    ui: {
+      ...s.ui,
+      filterRanges: range ? withoutFilterRange(s.ui.filterRanges, range) : [],
+      filterCriteria: filterCriteriaAfterClear(s.ui.filterCriteria, range),
+    },
+  }));
+  syncFilterToEngine(wb, store, range);
+}
+
+/** Reveal `range`'s rows and drop its criteria, leaving its filter buttons
+ *  (present or not) as they are. */
+export function resetFilterCriteria(store: SpreadsheetStore, range: Range): void {
+  store.setState((s) => ({
+    ...s,
+    layout: { ...s.layout, hiddenRows: clearHiddenRowsInRange(s.layout.hiddenRows, range) },
+    ui: { ...s.ui, filterCriteria: filterCriteriaAfterClear(s.ui.filterCriteria, range) },
+  }));
 }
 
 function filterCriteriaAfterClear(

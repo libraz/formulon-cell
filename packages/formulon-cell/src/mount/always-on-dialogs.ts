@@ -2,6 +2,7 @@
 // `MountOptions.features`. Dialogs without a `setStrings` hook are rebuilt on
 // locale change so their captured strings stay fresh.
 
+import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -112,7 +113,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
     openFilterAtHeader(range, col) {
       const s = store.getState();
       const layout = layoutForView(s);
-      const targetRange = range ?? s.ui.filterRange ?? s.selection.range;
+      const targetRange = range ?? activeFilterRange(s) ?? s.selection.range;
       const targetCol = Math.min(
         Math.max(col ?? s.selection.active.col, targetRange.c0),
         targetRange.c1,

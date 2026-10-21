@@ -169,7 +169,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
 
         const restored = createSpreadsheetStore();
         hydrateAutoFilterFromEngine(reloaded, restored, 0);
-        expect(restored.getState().ui.filterRange).toEqual(range);
+        expect(restored.getState().ui.filterRanges).toEqual([range]);
       } finally {
         reloaded.dispose();
       }
@@ -197,7 +197,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         expect(reloaded.getSheetAutoFilterXml(0) ?? '').toBe('');
         const restored = createSpreadsheetStore();
         hydrateAutoFilterFromEngine(reloaded, restored, 0);
-        expect(restored.getState().ui.filterRange).toBeNull();
+        expect(restored.getState().ui.filterRanges).toEqual([]);
       } finally {
         reloaded.dispose();
       }

@@ -518,7 +518,7 @@ describe('attachPointer', () => {
       store.setState((s) => ({
         ...s,
         layout: { ...s.layout, colWidths: new Map() },
-        ui: { ...s.ui, filterRange: { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 } },
+        ui: { ...s.ui, filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 }] },
       }));
       detach = attachPointer(host, store, wb);
       fireDblClick(host, 154, 10);
@@ -850,7 +850,7 @@ describe('attachPointer', () => {
       r1: number;
       c1: number;
     }): void => {
-      store.setState((s) => ({ ...s, ui: { ...s.ui, filterRange: range } }));
+      store.setState((s) => ({ ...s, ui: { ...s.ui, filterRanges: [range] } }));
     };
 
     it('clicking the chevron in a filterRange column dispatches fc:openfilter', () => {

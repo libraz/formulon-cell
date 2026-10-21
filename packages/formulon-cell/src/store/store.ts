@@ -78,7 +78,7 @@ export const createSpreadsheetStore = () =>
         zoom: true,
         zoomSlider: true,
       },
-      filterRange: null,
+      filterRanges: [],
       filterCriteria: [],
       watchPanelOpen: false,
       sheetBackgroundImages: new Map(),

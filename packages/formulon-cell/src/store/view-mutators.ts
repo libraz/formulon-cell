@@ -135,8 +135,8 @@ export const viewMutators = {
     }));
   },
 
-  setFilterRange(store: SpreadsheetStore, range: Range | null): void {
-    store.setState((s) => ({ ...s, ui: { ...s.ui, filterRange: range } }));
+  setFilterRanges(store: SpreadsheetStore, ranges: readonly Range[]): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, filterRanges: ranges.map((r) => ({ ...r })) } }));
   },
 
   setEditorRefs(store: SpreadsheetStore, refs: EditorRefHighlight[]): void {

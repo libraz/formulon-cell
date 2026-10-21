@@ -87,7 +87,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
 
     const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
-    mutators.setFilterRange(sheet.instance.store, range);
+    mutators.setFilterRanges(sheet.instance.store, [range]);
     sortButton?.click();
     expect(filterButton?.getAttribute('aria-pressed')).toBe('true');
     expect(filterButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
@@ -150,20 +150,22 @@ describe('Spreadsheet.mountToolbar', () => {
     };
 
     await clickSort('filter');
-    expect(sheet.instance.store.getState().ui.filterRange).toEqual({
-      sheet: 0,
-      r0: 0,
-      c0: 0,
-      r1: 2,
-      c1: 1,
-    });
+    expect(sheet.instance.store.getState().ui.filterRanges).toEqual([
+      {
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 2,
+        c1: 1,
+      },
+    ]);
 
     await clickSort('filter-by-value');
     expect(sheet.instance.store.getState().layout.hiddenRows.has(1)).toBe(true);
     expect(sheet.instance.store.getState().layout.hiddenRows.has(2)).toBe(false);
 
     await clickSort('filter-clear');
-    expect(sheet.instance.store.getState().ui.filterRange).toBeNull();
+    expect(sheet.instance.store.getState().ui.filterRanges).toEqual([]);
     expect(sheet.instance.store.getState().layout.hiddenRows.has(1)).toBe(false);
 
     await clickSort('filter-advanced');

@@ -18,7 +18,7 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const baseSnap: SheetViewSnapshotInput = {
   sheet: 0,
-  filterRange: null,
+  filterRanges: [],
   freezeRows: 0,
   freezeCols: 0,
   hiddenRows: new Set(),
@@ -46,11 +46,11 @@ describe('captureSheetView', () => {
     expect(v.hiddenCols).toEqual([4, 5]);
   });
 
-  it('captures filterRange and sort verbatim', () => {
+  it('captures filterRanges and sort verbatim', () => {
     const range = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 3 };
     const sort = { column: 'B', direction: 'asc' as const };
-    const v = captureSheetView('v1', 'X', { ...baseSnap, filterRange: range, sort });
-    expect(v.filterRange).toEqual(range);
+    const v = captureSheetView('v1', 'X', { ...baseSnap, filterRanges: [range], sort });
+    expect(v.filterRanges).toEqual([range]);
     expect(v.sort).toEqual(sort);
   });
 });
@@ -60,7 +60,7 @@ describe('applySheetView', () => {
     const view: SheetView = { id: 'v1', name: 'X', sheet: 0 };
     expect(applySheetView(view)).toEqual({
       sheet: 0,
-      filterRange: null,
+      filterRanges: [],
       filterCriteria: [],
       freezeRows: 0,
       freezeCols: 0,
@@ -75,7 +75,7 @@ describe('applySheetView', () => {
   it('round-trips capture → apply', () => {
     const snap: SheetViewSnapshotInput = {
       sheet: 0,
-      filterRange: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 2 },
+      filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 9, c1: 2 }],
       filterCriteria: [
         {
           range: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 2 },
@@ -93,7 +93,7 @@ describe('applySheetView', () => {
     const patch = applySheetView(v);
     expect(patch).toEqual({
       sheet: 0,
-      filterRange: snap.filterRange,
+      filterRanges: snap.filterRanges,
       filterCriteria: snap.filterCriteria,
       freezeRows: 1,
       freezeCols: 0,
@@ -138,7 +138,7 @@ describe('store-backed sheet views', () => {
   it('saves the current view settings into the store', () => {
     const store = createSpreadsheetStore();
     const range = { sheet: 0, r0: 0, c0: 0, r1: 10, c1: 2 };
-    mutators.setFilterRange(store, range);
+    mutators.setFilterRanges(store, [range]);
     applyValueFilter(store.getState(), store, range, 1, ['Closed']);
     mutators.setFreezePanes(store, 1, 2);
     store.setState((s) => ({
@@ -156,7 +156,7 @@ describe('store-backed sheet views', () => {
       id: 'v1',
       name: 'Review',
       sheet: 0,
-      filterRange: range,
+      filterRanges: [range],
       filterCriteria: [{ range, byCol: 1, hiddenValues: ['Closed'] }],
       freeze: { rows: 1, cols: 2 },
       hiddenRows: [2, 4],
@@ -178,7 +178,7 @@ describe('store-backed sheet views', () => {
     }));
     saveSheetView(store, 'v2', 'Filtered');
 
-    mutators.setFilterRange(store, null);
+    mutators.setFilterRanges(store, []);
     mutators.setFreezePanes(store, 0, 0);
     store.setState((s) => ({
       ...s,
@@ -191,7 +191,7 @@ describe('store-backed sheet views', () => {
 
     expect(result.ok).toBe(true);
     expect(state.sheetViews.activeViewId).toBe('v2');
-    expect(state.ui.filterRange).toEqual(range);
+    expect(state.ui.filterRanges).toEqual([range]);
     expect(state.ui.filterCriteria).toEqual([{ range, byCol: 1, hiddenValues: ['Closed'] }]);
     expect(state.layout.freezeRows).toBe(2);
     expect(state.layout.freezeCols).toBe(1);

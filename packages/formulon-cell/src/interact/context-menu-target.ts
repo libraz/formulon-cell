@@ -20,7 +20,7 @@ export const resolveContextMenuTarget = (
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const s = store.getState();
-  const zone = hitZone(layoutForView(s), s.viewport, x, y, null, { resizeHandles: false });
+  const zone = hitZone(layoutForView(s), s.viewport, x, y, [], { resizeHandles: false });
   const fallback = { kind: 'cell' as const, cell: { ...s.selection.active } };
   if (!zone) return fallback;
   const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];

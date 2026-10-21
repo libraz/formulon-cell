@@ -73,40 +73,44 @@ const tableFilterTarget = (wb: WorkbookHandle, table: number): FilterTarget => (
   evaluate: () => wb.evaluateTableAutoFilter(table),
 });
 
-/** The table whose ref is exactly `range`: Excel keeps a table's AutoFilter
- * separate from the worksheet's, so a filter over a table header belongs to
- * the table. */
-function tableFilterTargetForRange(wb: WorkbookHandle, range: Range): FilterTarget | null {
-  if (!wb.capabilities.typedTableAutoFilter) return null;
-  for (const table of wb.getTables()) {
-    if (table.sheetIndex !== range.sheet) continue;
-    const parsed = parseRangeRef(table.ref);
-    if (
-      parsed &&
-      parsed.r0 === range.r0 &&
-      parsed.c0 === range.c0 &&
-      parsed.r1 === range.r1 &&
-      parsed.c1 === range.c1
-    ) {
-      return tableFilterTarget(wb, table.index);
+/** One engine AutoFilter slot on a sheet and the store range driving it, or
+ * null when the store has no filter there. Excel keeps a table's AutoFilter
+ * separate from the worksheet's, so a range on a table's header row and
+ * columns belongs to that table (its filter skips a totals row); the remaining
+ * range is the worksheet's own. */
+interface FilterSlot {
+  target: FilterTarget;
+  table: boolean;
+  range: Range | null;
+}
+
+function filterSlotsForSheet(wb: WorkbookHandle, state: State, sheet: number): FilterSlot[] {
+  const ranges = state.ui.filterRanges.filter((range) => range.sheet === sheet);
+  const claimed = new Set<Range>();
+  const slots: FilterSlot[] = [];
+  if (wb.capabilities.typedTableAutoFilter) {
+    for (const table of wb.getTables()) {
+      if (table.sheetIndex !== sheet) continue;
+      const parsed = parseRangeRef(table.ref);
+      const range = parsed
+        ? (ranges.find(
+            (r) =>
+              r.r0 === parsed.r0 && r.c0 === parsed.c0 && r.c1 === parsed.c1 && r.r1 <= parsed.r1,
+          ) ?? null)
+        : null;
+      if (range) claimed.add(range);
+      slots.push({ target: tableFilterTarget(wb, table.index), table: true, range });
     }
   }
-  return null;
+  slots.push({
+    target: sheetFilterTarget(wb, sheet),
+    table: false,
+    range: ranges.find((range) => !claimed.has(range)) ?? null,
+  });
+  return slots;
 }
 
 const importedTypedFilters = new WeakMap<WorkbookHandle, Map<string, ImportedTypedFilter>>();
-/** The definition currently mirroring the store's filter range, per sheet.
- * A switch between a sheet filter and a table filter removes the old one. */
-const routedFilterTargets = new WeakMap<WorkbookHandle, Map<number, FilterTarget>>();
-
-function routedTargetsFor(wb: WorkbookHandle): Map<number, FilterTarget> {
-  let targets = routedFilterTargets.get(wb);
-  if (!targets) {
-    targets = new Map();
-    routedFilterTargets.set(wb, targets);
-  }
-  return targets;
-}
 
 const emptyAutoFilterColumn = (colId: number): AutoFilterColumn => ({
   colId,
@@ -256,13 +260,12 @@ function customColumnFromCriteria(
  * differential-style id for a new color filter. */
 export function typedAutoFilterFromState(
   state: State,
-  sheet: number,
+  range: Range | null,
   imported?: ImportedTypedFilter,
   locale = 'en-US',
   wb?: WorkbookHandle,
 ): AutoFilter | null {
-  const range = state.ui.filterRange;
-  if (!range || range.sheet !== sheet) return null;
+  if (!range) return null;
   const criteria = state.ui.filterCriteria
     .filter((entry) => sameRange(entry.range, range))
     .sort((a, b) => a.byCol - b.byCol);
@@ -416,12 +419,11 @@ function localCriteriaFromTypedFilter(
  * leaves them out rather than emitting a misleading OOXML definition. */
 export function autoFilterXmlFromState(
   state: State,
-  sheet: number,
+  range: Range | null,
   locale = 'en-US',
   wb?: WorkbookHandle,
 ): string {
-  const range = state.ui.filterRange;
-  if (!range || range.sheet !== sheet) return '';
+  if (!range) return '';
   const criteria = state.ui.filterCriteria
     .filter((entry) => sameRange(entry.range, range))
     .sort((a, b) => a.byCol - b.byCol);
@@ -476,14 +478,13 @@ export function syncNativeAutoFilterVisibility(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
-  range?: Range | null,
+  target: Range,
   filter: FilterTarget = sheetFilterTarget(wb, sheet),
 ): boolean {
   if (!wb.capabilities.typedAutoFilter) return false;
   if (typeof wb.evaluateAutoFilter !== 'function') return false;
-  const target = range ?? store.getState().ui.filterRange;
   const evaluated = filter.evaluate();
-  if (!target || !evaluated) return false;
+  if (!evaluated) return false;
   const nextHidden = new Set(store.getState().layout.hiddenRows);
   for (let row = target.r0 + 1; row <= target.r1; row += 1) nextHidden.delete(row);
   for (let i = 0; i < evaluated.match.length; i += 1) {
@@ -539,95 +540,88 @@ function syncStoreOwnedAutoFilterVisibility(
   return true;
 }
 
-/** Writes the current sheet's AutoFilter through the typed 0.13 API when the
- * criteria are representable. The raw XML seam remains the deliberate
- * fallback for color filters and engines that predate typed AutoFilter. */
-export function syncAutoFilterToEngine(
+const emptyTypedFilter = (range: Range): AutoFilter => ({
+  range: { firstRow: range.r0, firstCol: range.c0, lastRow: range.r1, lastCol: range.c1 },
+  columns: [],
+  sort: null,
+});
+
+/** True when the engine still holds a definition in `slot`'s place. */
+function engineHoldsFilter(wb: WorkbookHandle, sheet: number, slot: FilterSlot): boolean {
+  if (slot.target.get()) return true;
+  if (slot.table || !wb.capabilities.autoFilter) return false;
+  return typeof wb.getSheetAutoFilterXml === 'function' && wb.getSheetAutoFilterXml(sheet) !== null;
+}
+
+/** Drop an engine filter the store no longer has. Clearing it exposes its
+ * rows in the engine, so they are re-synced from the store mask, where other
+ * filters over the same rows may still hide them. */
+function removeFilterTarget(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore | undefined,
+  sheet: number,
+  target: FilterTarget,
+): boolean {
+  const existing = target.get();
+  const cleared = target.clear();
+  const removed = target.remove();
+  importedFiltersFor(wb).delete(target.key);
+  if (store && existing && wb.capabilities.hiddenRowsCols) {
+    const hidden = store.getState().layout.hiddenRows;
+    for (let row = existing.range.firstRow + 1; row <= existing.range.lastRow; row += 1) {
+      wb.setRowHidden(sheet, row, hidden.has(row));
+    }
+  }
+  return cleared && removed;
+}
+
+/** Write one range through the typed API. Returns null when the criteria need
+ * the worksheet's raw-XML fallback; a table has none, so criteria the typed
+ * model cannot carry (color) stay with the cell layer over an empty filter. */
+function writeTypedFilter(
   wb: WorkbookHandle,
   state: State,
   sheet: number,
+  slot: FilterSlot,
+  range: Range,
   store?: SpreadsheetStore,
-  locale = inputLocaleForWorkbook(wb) ?? 'en-US',
-): boolean {
-  if (wb.capabilities.typedAutoFilter) {
-    const range = state.ui.filterRange;
-    const routed = routedTargetsFor(wb);
-    const previous = routed.get(sheet);
-    if (!range || range.sheet !== sheet) {
-      // A table filter is removed on its own; the worksheet's own filter may
-      // coexist with it and is not the UI's to drop.
-      const target = previous ?? sheetFilterTarget(wb, sheet);
-      const cleared = target.clear();
-      const removed = target.remove();
-      importedFiltersFor(wb).delete(target.key);
-      routed.delete(sheet);
-      if (store) {
-        const nextHidden = new Set(store.getState().layout.hiddenRows);
-        if (range) {
-          for (let row = range.r0 + 1; row <= range.r1; row += 1) nextHidden.delete(row);
-          store.setState((current) => ({
-            ...current,
-            layout: { ...current.layout, hiddenRows: nextHidden },
-          }));
-        }
-      }
-      return cleared && removed;
+): boolean | null {
+  const imported = importedFiltersFor(wb).get(slot.target.key);
+  const filter =
+    typedAutoFilterFromState(state, range, imported, inputLocaleForWorkbook(wb) ?? 'en-US', wb) ??
+    (slot.table ? emptyTypedFilter(range) : null);
+  if (!filter) return null;
+  const criteriaForRange = state.ui.filterCriteria.filter((entry) => sameRange(entry.range, range));
+  const hasColorCriteria = criteriaForRange.some((entry) => entry.color !== undefined);
+  const set = slot.target.set(filter);
+  const applied = set && slot.target.apply();
+  if (applied && store) {
+    // Advanced filters and slicers own hiddenRows directly and intentionally
+    // leave filterCriteria empty. Color criteria are also evaluated by the
+    // cell layer. Apply imported/native columns first, then merge their
+    // matches with the store mask before the workbook is saved.
+    if (criteriaForRange.length === 0 || hasColorCriteria) {
+      syncStoreOwnedAutoFilterVisibility(wb, store, sheet, range, slot.target);
+    } else {
+      syncNativeAutoFilterVisibility(wb, store, sheet, range, slot.target);
     }
-    const table = tableFilterTargetForRange(wb, range);
-    const target = table ?? sheetFilterTarget(wb, sheet);
-    if (previous && previous.key !== target.key) {
-      previous.clear();
-      previous.remove();
-      importedFiltersFor(wb).delete(previous.key);
-    }
-    routed.set(sheet, target);
-    const imported = importedFiltersFor(wb).get(target.key);
-    // A table has no raw-XML fallback, so criteria the typed model cannot
-    // carry (color) stay with the cell layer over an otherwise empty filter.
-    const filter =
-      typedAutoFilterFromState(state, sheet, imported, inputLocaleForWorkbook(wb) ?? 'en-US', wb) ??
-      (table
-        ? {
-            range: {
-              firstRow: range.r0,
-              firstCol: range.c0,
-              lastRow: range.r1,
-              lastCol: range.c1,
-            },
-            columns: [],
-            sort: null,
-          }
-        : null);
-    if (filter) {
-      const criteriaForRange = state.ui.filterCriteria.filter((entry) =>
-        sameRange(entry.range, range),
-      );
-      const hasColorCriteria = state.ui.filterCriteria.some(
-        (entry) => sameRange(entry.range, range) && entry.color !== undefined,
-      );
-      const set = target.set(filter);
-      const applied = set && target.apply();
-      if (applied && store) {
-        // Advanced filters and slicers own hiddenRows directly and intentionally
-        // leave filterCriteria empty. Color criteria are also evaluated by the
-        // cell layer. Apply imported/native columns first, then merge their
-        // matches with the store mask before the workbook is saved.
-        if (criteriaForRange.length === 0 || hasColorCriteria) {
-          syncStoreOwnedAutoFilterVisibility(wb, store, sheet, range, target);
-        } else {
-          syncNativeAutoFilterVisibility(wb, store, sheet, range, target);
-        }
-      }
-      return set && applied;
-    }
-    // A color filter has no cell-layer differential-style id. Let the mature
-    // XML serializer preserve the representable portions and keep JS
-    // evaluation authoritative for the color part.
   }
+  return set && applied;
+}
+
+/** Write the worksheet filter through the raw XML seam; an empty definition
+ * removes it. */
+function writeXmlFilter(
+  wb: WorkbookHandle,
+  state: State,
+  sheet: number,
+  range: Range | null,
+  store: SpreadsheetStore | undefined,
+  locale: string,
+): boolean {
   if (!wb.capabilities.autoFilter) return false;
-  const set = wb.setSheetAutoFilterXml(sheet, autoFilterXmlFromState(state, sheet, locale, wb));
-  if (set && store && state.ui.filterRange?.sheet === sheet) {
-    const range = state.ui.filterRange;
+  const set = wb.setSheetAutoFilterXml(sheet, autoFilterXmlFromState(state, range, locale, wb));
+  if (set && store && range) {
     const criteriaForRange = state.ui.filterCriteria.filter((entry) =>
       sameRange(entry.range, range),
     );
@@ -641,14 +635,50 @@ export function syncAutoFilterToEngine(
   return set;
 }
 
-/** Decode an engine-owned typed definition into the store's filter state. */
-function hydrateTypedFilter(
+/** Reconcile every AutoFilter on `sheet` (the worksheet's own and each
+ * table's) with the store's filter ranges: a slot with a range is written and
+ * applied, a slot without one is removed from the engine. `only` limits the
+ * writes to that range; removals are reconciled either way. Representable
+ * criteria go through the typed API; the raw XML seam remains the fallback
+ * for worksheet color filters and engines that predate typed AutoFilter. */
+export function syncAutoFilterToEngine(
+  wb: WorkbookHandle,
+  state: State,
+  sheet: number,
+  store?: SpreadsheetStore,
+  locale = inputLocaleForWorkbook(wb) ?? 'en-US',
+  only?: Range,
+): boolean {
+  const slots = filterSlotsForSheet(wb, state, sheet);
+  if (!wb.capabilities.typedAutoFilter) {
+    const range = slots.find((slot) => !slot.table)?.range ?? null;
+    return writeXmlFilter(wb, state, sheet, range, store, locale);
+  }
+  let ok = true;
+  // Removals first, so a later apply re-hides rows a removed filter exposed.
+  for (const slot of slots) {
+    if (slot.range || !engineHoldsFilter(wb, sheet, slot)) continue;
+    ok = removeFilterTarget(wb, store, sheet, slot.target) && ok;
+  }
+  for (const slot of slots) {
+    const range = slot.range;
+    if (!range || (only && !sameRange(only, range))) continue;
+    const written =
+      writeTypedFilter(wb, state, sheet, slot, range, store) ??
+      writeXmlFilter(wb, state, sheet, range, store, locale);
+    ok = written && ok;
+  }
+  return ok;
+}
+
+/** Decode an engine-owned typed definition into store filter state. */
+function decodeTypedFilter(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
   target: FilterTarget,
   typed: AutoFilter,
-): void {
+): { range: Range; criteria: ValueFilterCriteria[] } {
   const decoded = localCriteriaFromTypedFilter(
     store.getState(),
     sheet,
@@ -660,65 +690,60 @@ function hydrateTypedFilter(
     filter: typed,
     unsupportedColumns: decoded.unsupportedColumns,
   });
-  routedTargetsFor(wb).set(sheet, target);
-  wb.withEngineSyncMuted(() => {
-    store.setState((current) => ({
-      ...current,
-      ui: {
-        ...current.ui,
-        filterRange: decoded.range,
-        filterCriteria: decoded.criteria,
-      },
-    }));
-  });
+  return { range: decoded.range, criteria: decoded.criteria };
 }
 
+/** Load the worksheet's AutoFilter and every table AutoFilter on `sheet` into
+ * `ui.filterRanges` / `ui.filterCriteria`. */
 export function hydrateAutoFilterFromEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
 ): void {
+  const ranges: Range[] = [];
+  const criteria: ValueFilterCriteria[] = [];
+  let worksheetTyped = false;
   if (wb.capabilities.typedAutoFilter) {
-    const target = sheetFilterTarget(wb, sheet);
-    const typed = target.get();
-    if (typed) {
-      hydrateTypedFilter(wb, store, sheet, target, typed);
-      // Row visibility is hydrated from the engine's saved row-layout flags by
-      // hydrateLayoutFromEngine. Re-evaluating the definition here would
-      // overwrite an intentional saved snapshot, such as a reapply undo or a
-      // color/advanced filter whose rows are owned by the cell layer.
-      return;
-    }
-    importedFiltersFor(wb).delete(target.key);
-    routedTargetsFor(wb).delete(sheet);
-    // Without a worksheet filter, a table's own filter owns the header buttons.
+    const load = (target: FilterTarget): boolean => {
+      const typed = target.get();
+      if (!typed) {
+        importedFiltersFor(wb).delete(target.key);
+        return false;
+      }
+      const decoded = decodeTypedFilter(wb, store, sheet, target, typed);
+      ranges.push(decoded.range);
+      criteria.push(...decoded.criteria);
+      return true;
+    };
+    worksheetTyped = load(sheetFilterTarget(wb, sheet));
     if (wb.capabilities.typedTableAutoFilter) {
       for (const table of wb.getTables()) {
-        if (table.sheetIndex !== sheet) continue;
-        const tableTarget = tableFilterTarget(wb, table.index);
-        const tableFilter = tableTarget.get();
-        if (!tableFilter) continue;
-        hydrateTypedFilter(wb, store, sheet, tableTarget, tableFilter);
-        return;
+        if (table.sheetIndex === sheet) load(tableFilterTarget(wb, table.index));
       }
     }
-    // A typed read can fail for an opaque imported criterion. Fall through to
-    // the raw XML seam so the filter range remains visible and engine-owned
-    // criteria stay intact until a UI mutation replaces them.
+    // Row visibility is hydrated from the engine's saved row-layout flags by
+    // hydrateLayoutFromEngine. Re-evaluating the definitions here would
+    // overwrite an intentional saved snapshot, such as a reapply undo or a
+    // color/advanced filter whose rows are owned by the cell layer.
   }
-  if (!wb.capabilities.autoFilter || typeof wb.getSheetAutoFilterXml !== 'function') return;
-  const xml = wb.getSheetAutoFilterXml(sheet);
-  if (xml === null) return;
-  const range = autoFilterRangeFromXml(xml, sheet);
+  // A typed read can fail for an opaque imported criterion. The raw XML seam
+  // keeps the worksheet filter's range visible, with its criteria left
+  // engine-owned until a UI mutation replaces them.
+  let xml: string | null = null;
+  if (
+    !worksheetTyped &&
+    wb.capabilities.autoFilter &&
+    typeof wb.getSheetAutoFilterXml === 'function'
+  ) {
+    xml = wb.getSheetAutoFilterXml(sheet);
+    const range = xml === null ? null : autoFilterRangeFromXml(xml, sheet);
+    if (range) ranges.push(range);
+  }
+  if (!wb.capabilities.typedAutoFilter && xml === null) return;
   wb.withEngineSyncMuted(() => {
     store.setState((state) => ({
       ...state,
-      ui: {
-        ...state.ui,
-        filterRange: range,
-        // Criteria remain engine-owned until a UI interaction replaces them.
-        filterCriteria: [],
-      },
+      ui: { ...state.ui, filterRanges: ranges, filterCriteria: criteria },
     }));
   });
 }

@@ -3,6 +3,7 @@ import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { withFilterRange } from './filter-ranges.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
 import { recordTablesChange } from './slice-history.js';
@@ -329,7 +330,7 @@ export function formatAsTable(
   mutators.upsertTableOverlay(store, overlay);
   if (workbook?.capabilities?.tableMutate) {
     const name = nextTableName(workbook);
-    workbook.createTable({
+    const index = workbook.createTable({
       sheetIndex: range.sheet,
       ref: formatA1Range(range, { collapse: false }),
       name,
@@ -339,6 +340,24 @@ export function formatAsTable(
       headerRow: overlay.showHeader,
       totalsRow: overlay.showTotal,
     });
+    // The engine gives a new table its own AutoFilter; show its buttons now.
+    const filter =
+      index >= 0 && workbook.capabilities.typedTableAutoFilter
+        ? workbook.getTableAutoFilter(index)
+        : null;
+    if (filter) {
+      const filterRange: Range = {
+        sheet: range.sheet,
+        r0: filter.range.firstRow,
+        c0: filter.range.firstCol,
+        r1: filter.range.lastRow,
+        c1: filter.range.lastCol,
+      };
+      store.setState((s) => ({
+        ...s,
+        ui: { ...s.ui, filterRanges: withFilterRange(s, filterRange) },
+      }));
+    }
   }
   return overlay;
 }

@@ -3,6 +3,7 @@ import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction } from '../commands/fill.js';
 import { clearFilter, recordFilterChange, setAutoFilter } from '../commands/filter.js';
+import { activeFilterRange } from '../commands/filter-ranges.js';
 import {
   applySelectionFormatPatch,
   setNumFmt,
@@ -356,7 +357,8 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (restricted) return;
       recordFilterChange(input.history, input.store, () => {
         const state = input.store.getState();
-        if (state.ui.filterRange) clearFilter(state, input.store, state.ui.filterRange);
+        const active = activeFilterRange(state);
+        if (active) clearFilter(state, input.store, active);
         else setAutoFilter(input.store, state.selection.range);
       });
       input.invalidate();

@@ -60,7 +60,7 @@ const storeWith = (cells: Seed[]): SpreadsheetStore => {
 const withFilter = (store: SpreadsheetStore): void =>
   store.setState((s) => ({
     ...s,
-    ui: { ...s.ui, filterRange: { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 } },
+    ui: { ...s.ui, filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 }] },
   }));
 
 /** Deterministic 2d context: 7px per character, recording what was measured. */
@@ -277,7 +277,7 @@ describe('ribbon Format > AutoFit', () => {
     ]);
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, filterRange: { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 1 } },
+      ui: { ...s.ui, filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 5, c1: 1 }] },
     }));
     const { history } = await run('col-autofit', store, { r0: 0, c0: 0, r1: 2, c1: 1 });
     expect(store.getState().layout.colWidths.get(0)).toBe(48);
@@ -492,7 +492,7 @@ describe('TABLE_HEADER_RESERVED_WIDTH', () => {
 describe('FILTER_DROPDOWN_RESERVED_WIDTH', () => {
   const filterState = () => {
     const state = createSpreadsheetStore().getState();
-    state.ui = { ...state.ui, filterRange: { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 } };
+    state.ui = { ...state.ui, filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 }] };
     state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 3, zoom: 1, widthPx: 300 };
     return state;
   };
@@ -501,11 +501,12 @@ describe('FILTER_DROPDOWN_RESERVED_WIDTH', () => {
     const state = filterState();
     const layout = layoutForView(state);
     const colRight = gridOriginX(layout) + state.layout.defaultColWidth;
-    const fr = state.ui.filterRange;
+    const fr = state.ui.filterRanges;
     const buttonLeft = colRight - FILTER_DROPDOWN_RESERVED_WIDTH;
     expect(hitZone(layout, state.viewport, buttonLeft, 10, fr)).toEqual({
       kind: 'col-filter-btn',
       col: 0,
+      range: fr[0],
     });
     expect(hitZone(layout, state.viewport, buttonLeft - 1, 10, fr)).toEqual({
       kind: 'col-header',

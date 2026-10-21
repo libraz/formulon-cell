@@ -249,11 +249,11 @@ function formatForMeasurement(
 
 // One trailing allowance per header cell: the wider of the filter and table buttons.
 function headerButtonWidth(state: State, sheet: number, row: number, col: number): number {
-  const fr = state.ui.filterRange;
-  const filter =
-    fr && fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1
-      ? FILTER_DROPDOWN_RESERVED_WIDTH
-      : 0;
+  const filter = state.ui.filterRanges.some(
+    (fr) => fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1,
+  )
+    ? FILTER_DROPDOWN_RESERVED_WIDTH
+    : 0;
   const table = tableForCell(state.tables.tables, sheet, row, col);
   const chevron = table && isHeaderRow(table, row, col) ? TABLE_HEADER_RESERVED_WIDTH : 0;
   return Math.max(filter, chevron);

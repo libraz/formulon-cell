@@ -347,7 +347,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
           ...state,
           ui: {
             ...state.ui,
-            filterRange: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+            filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 }],
           },
         }));
         expect(wb.getSheetAutoFilterXml(0)).toContain('A1:C3');

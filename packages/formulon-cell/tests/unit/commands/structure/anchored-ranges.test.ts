@@ -90,7 +90,7 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
       ...s,
       ui: {
         ...s.ui,
-        filterRange: { sheet: 0, r0: 0, c0: 1, r1: 4, c1: 3 },
+        filterRanges: [{ sheet: 0, r0: 0, c0: 1, r1: 4, c1: 3 }],
         filterCriteria: [
           { range: { sheet: 0, r0: 0, c0: 1, r1: 4, c1: 3 }, byCol: 2, hiddenValues: ['x'] },
         ],
@@ -98,7 +98,7 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
     }));
     insertCols(store, wb, null, 0, 1); // insert one col at 0 → everything shifts right
     const ui = store.getState().ui;
-    expect(ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 4, c1: 4 });
+    expect(ui.filterRanges).toEqual([{ sheet: 0, r0: 0, c0: 2, r1: 4, c1: 4 }]);
     expect(ui.filterCriteria[0]?.byCol).toBe(3);
     expect(ui.filterCriteria[0]?.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 4, c1: 4 });
   });
@@ -182,10 +182,10 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
   it('clears the autofilter when its whole region is deleted', () => {
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, filterRange: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 }, filterCriteria: [] },
+      ui: { ...s.ui, filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 }], filterCriteria: [] },
     }));
     deleteRows(store, wb, null, 0, 5); // removes rows 0..4
-    expect(store.getState().ui.filterRange).toBeNull();
+    expect(store.getState().ui.filterRanges).toEqual([]);
   });
 
   it('drops a filter criterion whose column is deleted and shrinks the region', () => {
@@ -193,7 +193,7 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
       ...s,
       ui: {
         ...s.ui,
-        filterRange: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 3 },
+        filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 3 }],
         filterCriteria: [
           { range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 3 }, byCol: 2, hiddenValues: [] },
         ],
@@ -201,7 +201,7 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
     }));
     deleteCols(store, wb, null, 2, 1); // removes col 2 (the criterion's column)
     expect(store.getState().ui.filterCriteria).toHaveLength(0);
-    expect(store.getState().ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 });
+    expect(store.getState().ui.filterRanges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 }]);
   });
 
   it('round-trips merge + conditional shifts through history undo/redo', () => {

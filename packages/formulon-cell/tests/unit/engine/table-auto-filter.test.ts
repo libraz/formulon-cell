@@ -53,7 +53,7 @@ describe('table-level AutoFilter', () => {
     try {
       expect(wb.capabilities.typedTableAutoFilter).toBe(true);
       const store = hydratedStore(wb);
-      expect(store.getState().ui.filterRange).toEqual(tableRange);
+      expect(store.getState().ui.filterRanges).toEqual([tableRange]);
       applyValueFilter(store.getState(), store, tableRange, 1, ['West'], wb);
       expect(wb.getAutoFilter(0)).toBeNull();
 
@@ -61,7 +61,7 @@ describe('table-level AutoFilter', () => {
       try {
         const restoredStore = hydratedStore(restored);
         expect(restored.getAutoFilter(0)).toBeNull();
-        expect(restoredStore.getState().ui.filterRange).toEqual(tableRange);
+        expect(restoredStore.getState().ui.filterRanges).toEqual([tableRange]);
         expect(restoredStore.getState().ui.filterCriteria).toEqual([
           { range: tableRange, byCol: 1, hiddenValues: ['West'] },
         ]);
@@ -97,17 +97,17 @@ describe('table-level AutoFilter', () => {
       const store = hydratedStore(wb);
       const history = new History();
       // A table starts with its filter buttons shown.
-      expect(store.getState().ui.filterRange).toEqual(tableRange);
+      expect(store.getState().ui.filterRanges).toEqual([tableRange]);
       expect(wb.getTableAutoFilter(0)).not.toBeNull();
       mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
 
       toggleAutoFilterFromSelection(store, history, () => wb);
-      expect(store.getState().ui.filterRange).toBeNull();
+      expect(store.getState().ui.filterRanges).toEqual([]);
       expect(wb.getTableAutoFilter(0)).toBeNull();
       expect(wb.getAutoFilter(0)).toBeNull();
 
       toggleAutoFilterFromSelection(store, history, () => wb);
-      expect(store.getState().ui.filterRange).toEqual(tableRange);
+      expect(store.getState().ui.filterRanges).toEqual([tableRange]);
       expect(wb.getTableAutoFilter(0)).not.toBeNull();
       expect(wb.getAutoFilter(0)).toBeNull();
     } finally {
@@ -123,14 +123,15 @@ describe('table-level AutoFilter', () => {
       wb.setText({ sheet: 0, row: 1, col: 4 }, 'x');
       wb.setText({ sheet: 0, row: 2, col: 4 }, 'y');
       const store = hydratedStore(wb);
-      store.setState((s) => ({ ...s, ui: { ...s.ui, filterRange: sheetRange } }));
+      store.setState((s) => ({ ...s, ui: { ...s.ui, filterRanges: [tableRange, sheetRange] } }));
       expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
       expect(wb.getAutoFilter(0)).not.toBeNull();
-
-      store.setState((s) => ({ ...s, ui: { ...s.ui, filterRange: tableRange } }));
-      expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
       expect(wb.getTableAutoFilter(0)).not.toBeNull();
-      // Moving the UI filter to the table drops the sheet filter it owned.
+
+      store.setState((s) => ({ ...s, ui: { ...s.ui, filterRanges: [tableRange] } }));
+      expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
+      // Dropping the sheet filter from the store removes only that filter.
+      expect(wb.getTableAutoFilter(0)).not.toBeNull();
       expect(wb.getAutoFilter(0)).toBeNull();
     } finally {
       wb.dispose();

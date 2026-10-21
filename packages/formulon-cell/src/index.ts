@@ -206,6 +206,7 @@ export {
   recordFilterChange,
   setAutoFilter,
 } from './commands/filter.js';
+export { activeFilterRange, filterRangeAt } from './commands/filter-ranges.js';
 export type { FindMatch, FindOptions } from './commands/find.js';
 export {
   applySubstitution,

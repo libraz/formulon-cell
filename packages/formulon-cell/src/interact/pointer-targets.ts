@@ -1,3 +1,4 @@
+import { headerFilterRanges } from '../commands/filter-ranges.js';
 import { hitZone, layoutForView } from '../render/geometry.js';
 import {
   getPageBandHits,
@@ -71,7 +72,7 @@ export const pageBandAt = (s: State, x: number, y: number): PageBandHit | null =
  *  break dragged across the header rail still has a target. */
 export const indexAt = (s: State, x: number, y: number): { row: number; col: number } | null => {
   const layout = layoutForView(s);
-  const zone = hitZone(layout, s.viewport, x, y, null, { resizeHandles: false });
+  const zone = hitZone(layout, s.viewport, x, y, [], { resizeHandles: false });
   if (!zone) return null;
   if (zone.kind === 'cell') return { row: zone.row, col: zone.col };
   if (zone.kind === 'row-header') return { row: zone.row, col: s.selection.active.col };
@@ -119,7 +120,7 @@ export function updateCursor(
     return;
   }
   const s = store.getState();
-  const zone = hitZone(layoutForView(s), s.viewport, x, y, s.ui.filterRange);
+  const zone = hitZone(layoutForView(s), s.viewport, x, y, headerFilterRanges(s));
   if (!zone) {
     host.style.cursor = '';
     return;

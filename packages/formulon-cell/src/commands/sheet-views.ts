@@ -27,8 +27,8 @@ export interface SheetView {
   name: string;
   /** Sheet the view applies to (0-indexed). */
   sheet: number;
-  /** Optional autofilter rect mirrored from `ui.filterRange`. */
-  filterRange?: Range;
+  /** AutoFilter ranges mirrored from `ui.filterRanges`. */
+  filterRanges?: Range[];
   /** Value-filter criteria captured with the view so Reapply and dropdown
    *  state survive switching between sheet views. */
   filterCriteria?: readonly ValueFilterCriteria[];
@@ -44,7 +44,7 @@ export interface SheetView {
 /** Snapshot input — the subset of store state a view should preserve. */
 export interface SheetViewSnapshotInput {
   sheet: number;
-  filterRange: Range | null;
+  filterRanges: readonly Range[];
   filterCriteria?: readonly ValueFilterCriteria[];
   freezeRows: number;
   freezeCols: number;
@@ -54,6 +54,8 @@ export interface SheetViewSnapshotInput {
   hiddenCols: ReadonlySet<number>;
   sort?: SheetViewSort;
 }
+
+const cloneRange = (range: Range): Range => ({ ...range });
 
 const cloneFilterCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCriteria[] =>
   criteria.map((criterion) => ({
@@ -74,7 +76,7 @@ export function captureSheetView(
     name,
     sheet: input.sheet,
   };
-  if (input.filterRange) view.filterRange = input.filterRange;
+  if (input.filterRanges.length) view.filterRanges = input.filterRanges.map(cloneRange);
   if (input.filterCriteria?.length) view.filterCriteria = cloneFilterCriteria(input.filterCriteria);
   if (input.freezeRows > 0 || input.freezeCols > 0) {
     view.freeze = {
@@ -98,7 +100,7 @@ export function captureSheetView(
  *  these fields and calls the existing layout / filter / freeze setters. */
 export interface SheetViewPatch {
   sheet: number;
-  filterRange: Range | null;
+  filterRanges: Range[];
   filterCriteria: ValueFilterCriteria[];
   freezeRows: number;
   freezeCols: number;
@@ -113,7 +115,7 @@ export interface SheetViewPatch {
 export function applySheetView(view: SheetView): SheetViewPatch {
   return {
     sheet: view.sheet,
-    filterRange: view.filterRange ?? null,
+    filterRanges: (view.filterRanges ?? []).map(cloneRange),
     filterCriteria: cloneFilterCriteria(view.filterCriteria ?? []),
     freezeRows: view.freeze?.rows ?? 0,
     freezeCols: view.freeze?.cols ?? 0,
@@ -154,11 +156,9 @@ interface SheetViewsSnapshot {
   activeViewId: string | null;
 }
 
-const cloneRange = (range: Range): Range => ({ ...range });
-
 const cloneSheetView = (view: SheetView): SheetView => ({
   ...view,
-  ...(view.filterRange ? { filterRange: cloneRange(view.filterRange) } : {}),
+  ...(view.filterRanges ? { filterRanges: view.filterRanges.map(cloneRange) } : {}),
   ...(view.filterCriteria ? { filterCriteria: cloneFilterCriteria(view.filterCriteria) } : {}),
   ...(view.freeze ? { freeze: { ...view.freeze } } : {}),
   ...(view.sort ? { sort: { ...view.sort } } : {}),
@@ -216,7 +216,7 @@ export function saveSheetView(
   const state = store.getState();
   const view = captureSheetView(id, name, {
     sheet: state.data.sheetIndex,
-    filterRange: state.ui.filterRange,
+    filterRanges: state.ui.filterRanges,
     filterCriteria: state.ui.filterCriteria,
     freezeRows: state.layout.freezeRows,
     freezeCols: state.layout.freezeCols,
@@ -260,7 +260,7 @@ export function activateSheetView(store: SpreadsheetStore, id: string): SheetVie
         rowStart: Math.max(frozenRowEnd(layout), s.viewport.rowStart),
         colStart: Math.max(frozenColEnd(layout), s.viewport.colStart),
       },
-      ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
+      ui: { ...s.ui, filterRanges: patch.filterRanges, filterCriteria: patch.filterCriteria },
       sheetViews: { ...s.sheetViews, activeViewId: id },
     };
   });
