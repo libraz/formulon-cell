@@ -38,7 +38,7 @@
     border: 2px solid var(--fc-accent);
     font: inherit;
     font-family: var(--fc-font-ui);
-    font-size: var(--fc-text-cell);
+    font-size: var(--fc-cell-text-size);
     line-height: 1.25;
     outline: none;
     overflow: hidden;

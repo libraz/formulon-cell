@@ -62,6 +62,8 @@
 
     /* Sizing scale — small + dense, but never cramped. */
     --fc-text-cell: 13px;
+    /* Canonical cell text size; the grid scales it by the platform render scale. */
+    --fc-cell-text-size: var(--fc-text-cell);
     --fc-text-header: 11px;
     --fc-text-formula: 13px;
     --fc-text-rail: 11px;

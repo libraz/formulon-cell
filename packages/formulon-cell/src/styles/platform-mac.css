@@ -9,6 +9,8 @@
   --fc-font-ui-fallback:
     -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Segoe UI", sans-serif;
   --fc-text-cell: 12px;
+  /* 12 pt canonical; the 0.75 screen scale paints it at 12 px. */
+  --fc-cell-text-size: 16px;
   --fc-formulabar-namebox-width: 87px;
   --fc-formulabar-height: 28px;
   --fc-sheetbar-height: 26px;

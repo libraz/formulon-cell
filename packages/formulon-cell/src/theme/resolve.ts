@@ -103,7 +103,7 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     fontMono: v('--fc-font-mono', DEFAULT_CELL_FONT_THEME.fontMono),
 
     textCell: num(
-      v('--fc-text-cell', `${DEFAULT_CELL_FONT_THEME.textCell}px`),
+      v('--fc-cell-text-size', v('--fc-text-cell', `${DEFAULT_CELL_FONT_THEME.textCell}px`)),
       DEFAULT_CELL_FONT_THEME.textCell,
     ),
     textHeader: num(v('--fc-text-header', '11.5px'), 11.5),

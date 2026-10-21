@@ -234,7 +234,7 @@ const onSave = (): void => {
 };
 
 const onNewWorkbook = async (): Promise<void> => {
-  const wb = await WorkbookHandle.createDefault({ locale: locale.value });
+  const wb = await WorkbookHandle.createDefault({ locale: locale.value, platform: platform.value });
   if (!demoAlive) {
     wb.dispose();
     return;

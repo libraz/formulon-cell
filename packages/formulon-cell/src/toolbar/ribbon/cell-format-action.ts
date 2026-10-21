@@ -25,6 +25,7 @@ import {
   showRows,
   type ToolbarMenuText,
 } from '../../index.js';
+import { renderScale } from '../../store/render-scale.js';
 
 type CellFormatMenuText = ToolbarMenuText & {
   rowHeightLabel: string;
@@ -161,13 +162,16 @@ export const applyCellFormatAction = async (
     return;
   }
   if (action === 'row-height') {
-    const n = await deps.promptDimension(
+    // The dialog speaks the screen px the user sees; the store keeps canonical px.
+    const scale = renderScale(i.store.getState().layout);
+    const typed = await deps.promptDimension(
       t.rowHeight,
       t.rowHeightLabel,
-      i.store.getState().layout.defaultRowHeight,
+      i.store.getState().layout.defaultRowHeight * scale,
       409,
     );
-    if (n === null) return;
+    if (typed === null) return;
+    const n = typed / scale;
     recordLayoutChange(i.history, i.store, () => {
       for (let row = range.r0; row <= range.r1; row += 1) {
         mutators.setRowHeight(i.store, row, n);
@@ -190,13 +194,15 @@ export const applyCellFormatAction = async (
     return;
   }
   if (action === 'col-width') {
-    const n = await deps.promptDimension(
+    const scale = renderScale(i.store.getState().layout);
+    const typed = await deps.promptDimension(
       t.colWidth,
       t.colWidthLabel,
-      i.store.getState().layout.defaultColWidth,
+      i.store.getState().layout.defaultColWidth * scale,
       2048,
     );
-    if (n === null) return;
+    if (typed === null) return;
+    const n = typed / scale;
     recordLayoutChange(i.history, i.store, () => {
       for (let col = range.c0; col <= range.c1; col += 1) {
         mutators.setColWidth(i.store, col, n);

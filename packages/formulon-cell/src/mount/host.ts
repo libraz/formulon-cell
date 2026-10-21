@@ -68,19 +68,19 @@ export function renderMountError(
   host.replaceChildren(panel);
 }
 
-export function applyPlatformLayoutDefaults(
+/** Apply the platform's grid chrome: the screen scale the grid renders at and
+ *  the row-header width. Never touches cell sizes, which come from the
+ *  workbook, so it is safe on every `setUi`. */
+export function applyPlatformChrome(
   store: ReturnType<typeof createSpreadsheetStore>,
   platform: ReturnType<typeof resolveSpreadsheetUiOptions>['platform'],
 ): void {
-  const defaults =
+  const chrome =
     platform === 'mac'
-      ? { defaultColWidth: 75, headerColWidth: 26 }
-      : {
-          defaultColWidth: 64,
-          headerColWidth: 32,
-        };
+      ? { screenScale: 0.75, headerColWidth: 26 }
+      : { screenScale: 1, headerColWidth: 32 };
   store.setState((state) => ({
     ...state,
-    layout: { ...state.layout, ...defaults },
+    layout: { ...state.layout, ...chrome },
   }));
 }

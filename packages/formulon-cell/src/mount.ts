@@ -19,6 +19,7 @@ import {
   type SyncedConditionalRuleMap,
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
+import { rehydrateAxisLayout } from './engine/layout-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
 import { resolveSpreadsheetUiOptions } from './extensions/index.js';
@@ -44,7 +45,7 @@ import { resolveMountFlags } from './mount/feature-flags.js';
 import { attachFormulaBarController } from './mount/formula-bar.js';
 import { attachFormulaDraftMirror } from './mount/formula-draft-mirror.js';
 import {
-  applyPlatformLayoutDefaults,
+  applyPlatformChrome,
   prepareMountHost,
   releaseMountHost,
   renderMountError,
@@ -218,7 +219,10 @@ export const Spreadsheet = {
       wb.dispose();
     };
     try {
-      wb = opts.workbook ?? (await WorkbookHandle.createDefault({ locale: i18n.locale }));
+      wb =
+        opts.workbook ??
+        (await WorkbookHandle.createDefault({ locale: i18n.locale, platform: ui.platform }));
+      wb.geometryPlatform = ui.platform;
       // The engine profile is workbook state and is not persisted in files.
       // Select it before a seed writes formulas so seeded values use the same
       // host semantics as the first hydrated paint.
@@ -286,7 +290,7 @@ export const Spreadsheet = {
     const store = createSpreadsheetStore();
     if (opts.viewport?.range) mutators.setSheetIndex(store, opts.viewport.range.sheet);
     mutators.setTheme(store, initialTheme);
-    applyPlatformLayoutDefaults(store, ui.platform);
+    applyPlatformChrome(store, ui.platform);
 
     // Upload status / macro recording start off in the status-bar chooser
     // because most hosts never drive them. The first value a host reports
@@ -871,8 +875,19 @@ export const Spreadsheet = {
         }
         ui = nextUi;
         host.dataset.fcPlatform = ui.platform;
-        applyPlatformLayoutDefaults(store, ui.platform);
+        if (platformChanged) wb.geometryPlatform = ui.platform;
+        applyPlatformChrome(store, ui.platform);
+        if (platformChanged) {
+          const sheetIndex = store.getState().data.sheetIndex;
+          if (sheetIndex >= 0 && sheetIndex < wb.sheetCount) {
+            rehydrateAxisLayout(wb, store, sheetIndex);
+          }
+          // History snapshots hold column px projected by the previous
+          // platform's width model; replaying them would write wrong widths.
+          history.clear();
+        }
         if (profileChanged) refreshCells();
+        if (platformChanged) renderer.invalidate();
         instance.setFeatures({ ...ui.features, ...opts.features });
         if (platformChanged && flags.fxDialog && !featureState.fxDialog) {
           attachHostFeature('fxDialog');
@@ -1069,6 +1084,7 @@ export const Spreadsheet = {
         // A rejected profile leaves the current workbook and its store
         // untouched because detachment happens only after this call.
         syncLocaleProfile(next, i18n.locale, ui.platform, { throwOnFailure: true });
+        next.geometryPlatform = ui.platform;
         discardMacPalette();
         // A Draw stroke belongs to the current workbook. Cancel it before
         // detaching the old engine so a late pointerup cannot commit points

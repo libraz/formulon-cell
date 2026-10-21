@@ -594,7 +594,10 @@ export const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] 
 export const createInitialDemoWorkbook = async (
   search = globalThis.location?.search ?? '',
 ): Promise<WorkbookHandle> => {
-  const wb = await WorkbookHandle.createDefault({ locale: resolveInitialLocale(search) });
+  const wb = await WorkbookHandle.createDefault({
+    locale: resolveInitialLocale(search),
+    platform: resolveInitialPlatform(search),
+  });
   if (new URLSearchParams(search).get('fixture') !== 'empty') {
     seedDemoWorkbook(wb);
     const seededColumnWidths = [112, 80, 104, 128];

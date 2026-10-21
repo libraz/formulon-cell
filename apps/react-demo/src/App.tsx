@@ -226,7 +226,7 @@ export const App = (): ReactElement => {
   }, [bookName, instance]);
 
   const onNewWorkbook = useCallback(async () => {
-    const wb = await WorkbookHandle.createDefault({ locale });
+    const wb = await WorkbookHandle.createDefault({ locale, platform });
     if (!aliveRef.current) {
       wb.dispose();
       return;
@@ -259,7 +259,7 @@ export const App = (): ReactElement => {
     setBookName('Book1');
     setLog([]);
     setRibbonTab('home');
-  }, [commandText.openFailed, commandText.workbook, instance, locale]);
+  }, [commandText.openFailed, commandText.workbook, instance, locale, platform]);
 
   const onOpen = useCallback(
     async (file: File) => {

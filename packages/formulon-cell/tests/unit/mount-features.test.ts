@@ -329,16 +329,12 @@ describe('Spreadsheet feature registry', () => {
     });
     instance.openFunctionArguments('SUM');
 
-    const state = instance.store.getState();
     expect(mirror.getAttribute('aria-hidden')).toBe('true');
     expect(mirror.hidden).toBe(false);
     expect(mirror.textContent?.startsWith('=')).toBe(true);
-    expect(mirror.style.left).toBe(
-      `${state.layout.headerColWidth + state.layout.defaultColWidth * 2}px`,
-    );
-    expect(mirror.style.top).toBe(
-      `${state.layout.headerRowHeight + state.layout.defaultRowHeight * 2}px`,
-    );
+    // Mac stub grid: 26 px row header, 75 × 20 screen px cells.
+    expect(mirror.style.left).toBe(`${26 + 75 * 2}px`);
+    expect(mirror.style.top).toBe(`${20 + 20 * 2}px`);
     expect(mirror.style.background).not.toBe('');
     expect(mirror.style.color).not.toBe('');
 

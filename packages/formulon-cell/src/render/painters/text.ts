@@ -118,7 +118,7 @@ export const cssCellFontSize = (
   size: number | undefined,
   verticalAlign: CellFormat['fontVertAlign'] | undefined,
   zoom = 1,
-  fallback = 'var(--fc-text-cell)',
+  fallback = 'var(--fc-cell-text-size)',
 ): string => {
   const factor = visualZoom(zoom) * (verticalAlign ? 0.7 : 1);
   if (size !== undefined && Number.isFinite(size)) return `${size * factor}px`;

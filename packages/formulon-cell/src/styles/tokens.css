@@ -116,6 +116,9 @@
 
     /* === SIZING === */
     --fc-text-cell: initial;
+    /* Canonical cell text size, scaled with the grid (canvas text, in-cell
+     * editor). Defaults to --fc-text-cell. */
+    --fc-cell-text-size: initial;
     --fc-text-header: initial;
     --fc-text-formula: initial;
     --fc-text-rail: initial;
