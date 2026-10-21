@@ -1,6 +1,7 @@
 import type { PaginationResult } from '@libraz/formulon';
 import { parseAddrKey } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { renderScale } from '../store/render-scale.js';
 // Page pagination for the Page Layout and Page Break Preview workbook views.
 //
 // `print.ts` owns the same split for the printed document; this module reuses
@@ -44,7 +45,7 @@ export interface SheetPagination {
   /** Page margins, converted from inches at the current scale. */
   marginPx: { top: number; right: number; bottom: number; left: number };
   /** Sheet pixels per printed inch at the current scale. Multiply by the
-   *  viewport zoom to get screen pixels — the rulers measure with this. */
+   *  render scale to get screen pixels — the rulers measure with this. */
   pxPerInch: number;
   /** Number of pages that actually carry content. */
   pageCount: number;
@@ -475,7 +476,7 @@ export interface PageLayoutGaps {
 /**
  * Leading gutters that turn the continuous grid into a stack of pages, keyed
  * by the row / column that opens each page and already multiplied by the
- * viewport zoom. The first page contributes only its own leading margin; every
+ * render scale. The first page contributes only its own leading margin; every
  * page after it also carries the previous page's trailing margin and the grey
  * strip between the two.
  */
@@ -486,7 +487,7 @@ export function pageLayoutGaps(
 ): PageLayoutGaps {
   const pagination = paginationFor(state, sheet, opts);
   const setup = getPageSetup(state, sheet);
-  const zoom = state.viewport.zoom > 0 ? state.viewport.zoom : 1;
+  const zoom = renderScale(state.layout, state.viewport);
   const m = pagination.marginPx;
   const pageGapRows = new Map<number, number>();
   const pageGapCols = new Map<number, number>();

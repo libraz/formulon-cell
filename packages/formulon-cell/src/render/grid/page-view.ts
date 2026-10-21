@@ -12,6 +12,7 @@ import {
   pageNumberOf,
   type SheetPagination,
 } from '../../commands/pagination.js';
+import { renderScale } from '../../store/render-scale.js';
 import type { PageSetup } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
@@ -256,7 +257,7 @@ function pageAxes(
   cols: AxisLayout,
   rows: AxisLayout,
 ): PageAxes {
-  const zoom = state.viewport.zoom > 0 ? state.viewport.zoom : 1;
+  const zoom = renderScale(state.layout, state.viewport);
   const m = pagination.marginPx;
   return {
     rowRuns: runsFor(rows, pagination.rowBands, gridOriginY(state.layout)),
@@ -556,7 +557,7 @@ export function paintPageRulers(
   const band = rulerTop(layout);
   if (band <= 0) return;
   const axes = pageAxes(state, pagination, cols, rows);
-  const zoom = state.viewport.zoom > 0 ? state.viewport.zoom : 1;
+  const zoom = renderScale(state.layout, state.viewport);
   const pxPerInch = pagination.pxPerInch * zoom;
   const pxPerUnit = unit === 'cm' ? pxPerInch / CM_PER_INCH : pxPerInch;
   const handles: RulerHandle[] = [];

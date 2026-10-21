@@ -8,6 +8,7 @@ import { numFmtToFormatCode } from '../../engine/format-writeback.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
 import type { CellValue } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import { renderScale } from '../../store/render-scale.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
@@ -456,7 +457,7 @@ export function paintCells(
         displayOverride,
         locale,
         rtl,
-        zoom: state.viewport.zoom,
+        zoom: renderScale(state.layout, state.viewport),
       };
 
       // Static format fill OR overlay fill — both painted via paintCellFill,

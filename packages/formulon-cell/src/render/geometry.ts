@@ -1,6 +1,7 @@
 import { pageLayoutGaps } from '../commands/pagination.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
+import { renderScale } from '../store/render-scale.js';
 import type { LayoutSlice, State, UiSlice, ViewportSlice } from '../store/store.js';
 
 export interface Rect {
@@ -24,10 +25,6 @@ const RESIZE_SLACK = 4;
  *  the col-resize handle. ~14px wide for a comfortable click target. */
 export const FILTER_BTN_SIZE = 14;
 export const FILTER_BTN_INSET = 4;
-
-function viewportZoom(viewport?: ViewportSlice): number {
-  return viewport?.zoom && Number.isFinite(viewport.zoom) ? viewport.zoom : 1;
-}
 
 function viewportRowStart(layout: LayoutSlice, viewport: ViewportSlice): number {
   return Math.max(layout.freezeRows, viewport.rowStart, viewport.navigationRange?.r0 ?? 0);
@@ -55,12 +52,12 @@ function viewportColEnd(viewport: ViewportSlice): number {
 
 export function colWidth(layout: LayoutSlice, col: number, viewport?: ViewportSlice): number {
   if (layout.hiddenCols.has(col)) return 0;
-  return (layout.colWidths.get(col) ?? layout.defaultColWidth) * viewportZoom(viewport);
+  return (layout.colWidths.get(col) ?? layout.defaultColWidth) * renderScale(layout, viewport);
 }
 
 export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportSlice): number {
   if (layout.hiddenRows.has(row)) return 0;
-  return (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * viewportZoom(viewport);
+  return (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * renderScale(layout, viewport);
 }
 
 /** Return the geometry layout for the current view. Excel's "Headings" view
@@ -88,7 +85,7 @@ export interface ViewLayout extends PagedLayout {
  *  leading pixels before the row / column that opens a page, so all existing
  *  geometry — cell rects, hit-testing, the inline editor's anchor — keeps
  *  working unchanged. Both maps are absent in every other view, and their
- *  values are already multiplied by the viewport zoom. */
+ *  values are already multiplied by the render scale. */
 export interface PagedLayout extends LayoutSlice {
   pageGapRows?: ReadonlyMap<number, number>;
   pageGapCols?: ReadonlyMap<number, number>;
