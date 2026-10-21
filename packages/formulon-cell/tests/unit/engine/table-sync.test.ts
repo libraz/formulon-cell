@@ -9,6 +9,7 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 const reader = {
   getTables: () => [
     {
+      index: 0,
       name: 'Table1',
       displayName: 'Sales Table',
       ref: 'B2:D6',
@@ -16,6 +17,7 @@ const reader = {
       columns: ['Region', 'Sales', 'Margin'],
     },
     {
+      index: 1,
       name: 'Broken',
       displayName: 'Broken',
       ref: 'not-a-range',
