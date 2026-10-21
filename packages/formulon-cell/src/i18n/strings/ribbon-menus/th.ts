@@ -216,6 +216,8 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     chartColorsColorful: 'หลากสี',
     chartColorsBlue: 'น้ำเงิน',
     chartColorsMonochrome: 'สีเดียว',
+    shapeNoFill: 'ไม่มีการเติม',
+    shapeNoOutline: 'ไม่มีเส้นกรอบ',
     arrangeRequiresObject: 'เลือกวัตถุที่จะจัดเรียง',
     arrangeNativeUnsupported: 'กลไกไม่สามารถบันทึกลำดับการซ้อนกันของรูปภาพได้',
     arrangeAtFront: 'วัตถุที่เลือกอยู่ด้านหน้าอยู่แล้ว',

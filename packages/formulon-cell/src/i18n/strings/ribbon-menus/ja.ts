@@ -218,6 +218,8 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     chartColorsColorful: 'カラフル',
     chartColorsBlue: '青',
     chartColorsMonochrome: 'モノクロ',
+    shapeNoFill: '塗りつぶしなし',
+    shapeNoOutline: '枠線なし',
     arrangeRequiresObject: '整列するオブジェクトを選択してください。',
     arrangeNativeUnsupported: 'エンジンが画像の重なり順の保存に対応していません。',
     arrangeAtFront: '選択したオブジェクトは既に最前面にあります。',

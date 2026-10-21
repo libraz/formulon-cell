@@ -1,5 +1,6 @@
 import { selectedSessionChart } from '../commands/chart-design.js';
 import { subscribeRecentFunctions } from '../commands/function-history.js';
+import { selectedSessionIllustration } from '../commands/session-illustration.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { attachRibbonScreenTips } from '../interact/ribbon-screen-tip.js';
 import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
@@ -29,7 +30,7 @@ import { interactionControllerFor } from '../commands/interaction-controller.js'
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensions/ui-options.js';
 import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-ink.js';
-import type { CellBorderStyle } from '../store/types.js';
+import type { CellBorderStyle, State } from '../store/types.js';
 import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
@@ -71,9 +72,12 @@ import {
 import { projectRibbonActiveState } from '../toolbar/ribbon-active-state.js';
 import {
   CHART_CONTEXTUAL_RIBBON_TABS,
+  CONTEXTUAL_RIBBON_TABS,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
+  PICTURE_CONTEXTUAL_RIBBON_TABS,
   type RibbonTab,
+  SHAPE_CONTEXTUAL_RIBBON_TABS,
   type ToolbarLang,
   type ToolbarText,
   toolbarText,
@@ -344,14 +348,14 @@ export function mountToolbar(
   let borderStyle: CellBorderStyle = opts.borderStyle ?? DEFAULT_BORDER_STYLE;
   let borderColor = opts.borderColor ?? DEFAULT_BORDER_COLOR;
 
-  // Tabs a selected chart adds, and the tab to go back to once it is deselected.
+  // Tabs a selected chart, shape or picture adds, and the tab to go back to once it is deselected.
   const NO_CONTEXTUAL_TABS: readonly RibbonTab[] = [];
   let contextualTabs = NO_CONTEXTUAL_TABS;
   let contextualReturnTab: RibbonTab = 'home';
-  let knownChartIds: ReadonlySet<string> = new Set();
-  // Charts added in the current task: an insert or paste selects the chart it adds.
-  const freshChartIds = new Set<string>();
-  const isContextualTab = (tab: RibbonTab): boolean => CHART_CONTEXTUAL_RIBBON_TABS.includes(tab);
+  let knownObjectIds: ReadonlySet<string> = new Set();
+  // Objects added in the current task: an insert or paste selects the object it adds.
+  const freshObjectIds = new Set<string>();
+  const isContextualTab = (tab: RibbonTab): boolean => CONTEXTUAL_RIBBON_TABS.includes(tab);
 
   const rehomeActiveTabForPlatform = (): void => {
     const available = opts.ribbonTabs ?? defaultRibbonTabs;
@@ -360,26 +364,41 @@ export function mountToolbar(
   };
   rehomeActiveTabForPlatform();
 
-  /** Show the chart tabs while a chart is selected; like the spreadsheet, a chart
-   *  selected as it is added opens Chart Design. True when the tabs changed. */
+  /** The tabs of the selected object, as one of the shared lists so that an
+   *  unchanged selection compares equal. */
+  const selectedObjectTabs = (state: State): readonly RibbonTab[] => {
+    if (selectedSessionChart(state)) return CHART_CONTEXTUAL_RIBBON_TABS;
+    const item = selectedSessionIllustration(state);
+    if (!item) return NO_CONTEXTUAL_TABS;
+    return item.kind === 'image' ? PICTURE_CONTEXTUAL_RIBBON_TABS : SHAPE_CONTEXTUAL_RIBBON_TABS;
+  };
+
+  /** Show the tabs of the selected chart, shape or picture; like the
+   *  spreadsheet, an object selected as it is added opens its first tab.
+   *  True when the tabs changed. */
   const syncContextualTabs = (current: SpreadsheetInstance | null, adopt: boolean): boolean => {
     const state = current?.store.getState();
-    const chart = state ? selectedSessionChart(state) : null;
-    const previousIds = knownChartIds;
-    knownChartIds = new Set(state?.charts.charts.map((entry) => entry.id) ?? []);
-    for (const id of knownChartIds) {
+    const previousIds = knownObjectIds;
+    knownObjectIds = new Set(
+      state
+        ? [...state.charts.charts, ...state.illustrations.illustrations].map((entry) => entry.id)
+        : [],
+    );
+    for (const id of knownObjectIds) {
       if (previousIds.has(id) || !adopt) continue;
-      if (freshChartIds.size === 0) queueMicrotask(() => freshChartIds.clear());
-      freshChartIds.add(id);
+      if (freshObjectIds.size === 0) queueMicrotask(() => freshObjectIds.clear());
+      freshObjectIds.add(id);
     }
-    const next = chart ? CHART_CONTEXTUAL_RIBBON_TABS : NO_CONTEXTUAL_TABS;
-    const inserted = chart !== null && freshChartIds.delete(chart.id);
+    const next = state ? selectedObjectTabs(state) : NO_CONTEXTUAL_TABS;
+    const selectedId = state?.ui.selectedObject?.id;
+    const inserted =
+      next !== NO_CONTEXTUAL_TABS && selectedId !== undefined && freshObjectIds.delete(selectedId);
     if (next === contextualTabs && !inserted) return false;
     contextualTabs = next;
     const previousTab = activeTab;
     if (inserted) {
       if (!isContextualTab(activeTab)) contextualReturnTab = activeTab;
-      activeTab = 'chartDesign';
+      activeTab = next[0] ?? activeTab;
     } else if (isContextualTab(activeTab) && !next.includes(activeTab)) {
       activeTab = contextualReturnTab;
     }

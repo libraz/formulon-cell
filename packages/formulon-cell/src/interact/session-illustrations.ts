@@ -3,9 +3,11 @@ import type { IllustrationMutationAuthorization } from '../commands/session-illu
 import {
   arrangeSessionIllustration,
   clearSessionIllustration,
+  DEFAULT_SHAPE_COLOR,
   duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
+import { shapeOutlineColor } from '../commands/shape-format.js';
 import { drawingClipPath, nearestGridline, sessionPosition } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
@@ -133,48 +135,40 @@ const appendSvg = <K extends keyof SVGElementTagNameMap>(
 
 const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
   svg.replaceChildren();
-  const color = item.color ?? '#0f6cbd';
-  const opacity = item.opacity ?? 0.16;
-  const lineWidth = item.lineWidth ?? 3;
   if (!item.shape) return;
+  const outline = shapeOutlineColor(item) ?? 'none';
   if (item.shape === 'line' || item.shape === 'arrow') {
     appendSvg(svg, 'line', {
       x1: 12,
       y1: 68,
       x2: 148,
       y2: 20,
-      stroke: color,
+      stroke: outline,
       'stroke-width': Math.max(1, item.lineWidth ?? 5),
       'stroke-linecap': 'round',
     });
     if (item.shape === 'arrow') {
       appendSvg(svg, 'path', {
         d: 'M 148 20 L 132 18 L 142 34 Z',
-        fill: color,
+        fill: outline,
       });
     }
     return;
   }
+  const paint = {
+    fill: item.color ?? DEFAULT_SHAPE_COLOR,
+    'fill-opacity': item.opacity ?? 0.16,
+    stroke: outline,
+    'stroke-width': item.lineWidth ?? 3,
+  };
   if (item.shape === 'oval') {
-    appendSvg(svg, 'ellipse', {
-      cx: 80,
-      cy: 48,
-      rx: 68,
-      ry: 36,
-      fill: color,
-      'fill-opacity': opacity,
-      stroke: color,
-      'stroke-width': lineWidth,
-    });
+    appendSvg(svg, 'ellipse', { cx: 80, cy: 48, rx: 68, ry: 36, ...paint });
     return;
   }
   if (item.shape === 'triangle') {
     appendSvg(svg, 'polygon', {
       points: '80,12 148,84 12,84',
-      fill: color,
-      'fill-opacity': opacity,
-      stroke: color,
-      'stroke-width': lineWidth,
+      ...paint,
       'stroke-linejoin': 'round',
     });
     return;
@@ -182,10 +176,7 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
   if (item.shape === 'diamond') {
     appendSvg(svg, 'polygon', {
       points: '80,10 150,48 80,86 10,48',
-      fill: color,
-      'fill-opacity': opacity,
-      stroke: color,
-      'stroke-width': lineWidth,
+      ...paint,
       'stroke-linejoin': 'round',
     });
     return;
@@ -196,10 +187,7 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
     width: 136,
     height: 72,
     rx: item.radius ?? (item.shape === 'rounded-rectangle' ? 12 : 2),
-    fill: color,
-    'fill-opacity': opacity,
-    stroke: color,
-    'stroke-width': lineWidth,
+    ...paint,
   });
 };
 
@@ -456,13 +444,13 @@ export function attachSessionIllustrations(deps: {
       (item) => item.sheet === state.data.sheetIndex,
     );
     if (selectedId !== null && !items.some((item) => item.id === selectedId)) selectedId = null;
-    // A paste selects the object it adds.
+    // A paste selects the object it adds; selecting another object leaves this one.
     const wanted = state.ui.selectedObject?.id;
-    const adopted =
-      wanted !== undefined && wanted !== selectedId && items.some((item) => item.id === wanted)
-        ? wanted
-        : null;
-    if (adopted) selectedId = adopted;
+    const changed = wanted !== undefined && wanted !== selectedId;
+    const adopted = changed && items.some((item) => item.id === wanted) ? wanted : null;
+    // Another object took the selection, and the focus with it.
+    const left = changed && adopted === null && selectedId !== null;
+    if (changed) selectedId = adopted;
     for (const item of items) {
       const panel = document.createElement('section');
       panel.className = 'fc-illustration';
@@ -529,7 +517,7 @@ export function attachSessionIllustrations(deps: {
     }
     refreshSelection();
     // Rebuilding the panels drops focus; keep it on the object, or on the sheet.
-    const refocus = adopted ?? focusedId;
+    const refocus = adopted ?? (left ? undefined : focusedId);
     if (refocus !== undefined) {
       focusPanel(root, '.fc-illustration', 'illustrationId', refocus, host);
     }

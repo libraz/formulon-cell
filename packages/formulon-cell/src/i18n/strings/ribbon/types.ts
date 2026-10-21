@@ -115,6 +115,9 @@ export interface RibbonStrings {
     formatSelection: string;
     bringForward: string;
     sendBackward: string;
+    shapeStyles: string;
+    shapeFill: string;
+    shapeOutline: string;
     window: string;
     freeze: string;
     names: string;
@@ -315,6 +318,8 @@ export interface RibbonStrings {
       acrobat: string;
       chartDesign: string;
       chartFormat: string;
+      shapeFormat: string;
+      pictureFormat: string;
     };
     /** Composed-label templates. `{name}` / `{percent}` are interpolated at use. */
     functionArgumentsTitle: string;

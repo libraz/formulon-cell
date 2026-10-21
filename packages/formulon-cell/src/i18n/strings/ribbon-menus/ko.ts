@@ -218,6 +218,8 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     chartColorsColorful: '색상형',
     chartColorsBlue: '파랑',
     chartColorsMonochrome: '단색',
+    shapeNoFill: '채우기 없음',
+    shapeNoOutline: '윤곽선 없음',
     arrangeRequiresObject: '정렬할 개체를 선택하세요.',
     arrangeNativeUnsupported: '엔진에서 그림 겹치기 순서를 저장할 수 없습니다.',
     arrangeAtFront: '선택한 개체가 이미 맨 앞에 있습니다.',

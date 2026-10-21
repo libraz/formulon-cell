@@ -40,7 +40,7 @@ import {
   ribbonActivatableSurfaceCommandIds,
 } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
-import { dynamicDropdownNoopOverrides, selectStoreChart, stubHelpers } from './fixtures.js';
+import { CONTEXTUAL_SELECTIONS, dynamicDropdownNoopOverrides, stubHelpers } from './fixtures.js';
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -171,84 +171,90 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('wires every registered dynamic ribbon dropdown to a rendered button and menu', () => {
-    // The chart tabs show only while a chart is selected.
-    selectStoreChart(sheet.instance.store);
-    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
-      ribbonTabs: RIBBON_TABS,
-      dynamicDropdowns: true,
-      helpers: stubHelpers(),
-    });
-    expect(Array.from(tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []).sort()).toEqual(
-      Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort(),
-    );
+    // A contextual tab shows only while its kind of object is selected.
+    const rendered = new Set<string>();
+    for (const select of CONTEXTUAL_SELECTIONS) {
+      select(sheet.instance.store);
+      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+        ribbonTabs: RIBBON_TABS,
+        dynamicDropdowns: true,
+        helpers: stubHelpers(),
+      });
+      expect(Array.from(tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []).sort()).toEqual(
+        Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort(),
+      );
+
+      for (const [command, menuId] of Object.entries(RIBBON_DROPDOWN_MENU_FOR_COMMAND)) {
+        const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+        if (!button) continue;
+        rendered.add(command);
+        const menu = host.querySelector<HTMLDivElement>(`#${menuId}`);
+        expect(menu, `${command} menu`).toBeTruthy();
+        expect(button.dataset.ribbonMenuId, `${command} menu id metadata`).toBe(menuId);
+        expect(button.getAttribute('aria-haspopup'), `${command} aria-haspopup`).toBe('menu');
+        expect(
+          button.querySelector('.fc-tb__rb-split-chevron'),
+          `${command} renders dropdown affordance`,
+        ).toBeTruthy();
+        expect(tb.dropdownsApi?.dynamicDropdownSpecForButton(button)).toEqual({
+          command,
+          menuId,
+        });
+        expect(tb.dropdownsApi?.dynamicDropdownSpecForMenu(menu as HTMLDivElement)).toEqual({
+          command,
+          menuId,
+        });
+
+        tb.dropdownsApi?.openDynamicRibbonDropdown({ command, menuId }, button);
+        expect(menu?.hidden, `${command} opens ${menuId}`).toBe(false);
+        expect(button.getAttribute('aria-expanded'), `${command} aria-expanded`).toBe('true');
+        tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
+        expect(menu?.hidden, `${command} closes ${menuId}`).toBe(true);
+      }
+      tb.dispose();
+    }
     expect(new Set(Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND)).size).toBe(
       Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND).length,
     );
-
-    for (const [command, menuId] of Object.entries(RIBBON_DROPDOWN_MENU_FOR_COMMAND)) {
-      const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
-      const menu = host.querySelector<HTMLDivElement>(`#${menuId}`);
-      expect(button, `${command} button`).toBeTruthy();
-      expect(menu, `${command} menu`).toBeTruthy();
-      expect(button?.dataset.ribbonMenuId, `${command} menu id metadata`).toBe(menuId);
-      expect(button?.getAttribute('aria-haspopup'), `${command} aria-haspopup`).toBe('menu');
-      expect(
-        button?.querySelector('.fc-tb__rb-split-chevron'),
-        `${command} renders dropdown affordance`,
-      ).toBeTruthy();
-      expect(tb.dropdownsApi?.dynamicDropdownSpecForButton(button as HTMLButtonElement)).toEqual({
-        command,
-        menuId,
-      });
-      expect(tb.dropdownsApi?.dynamicDropdownSpecForMenu(menu as HTMLDivElement)).toEqual({
-        command,
-        menuId,
-      });
-
-      tb.dropdownsApi?.openDynamicRibbonDropdown({ command, menuId }, button as HTMLButtonElement);
-      expect(menu?.hidden, `${command} opens ${menuId}`).toBe(false);
-      expect(button?.getAttribute('aria-expanded'), `${command} aria-expanded`).toBe('true');
-      tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
-      expect(menu?.hidden, `${command} closes ${menuId}`).toBe(true);
-    }
-
-    tb.dispose();
+    expect([...rendered].sort()).toEqual(Object.keys(RIBBON_DROPDOWN_MENU_FOR_COMMAND).sort());
   }, 30_000);
 
   it('opens every dropdown and gallery command menu from primary click', () => {
-    // The chart tabs show only while a chart is selected.
-    selectStoreChart(sheet.instance.store);
-    const onCommand = vi.fn();
-    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
-      dynamicDropdowns: true,
-      helpers: stubHelpers(),
-      onCommand,
-    });
-    const misses: string[] = [];
+    // A contextual tab shows only while its kind of object is selected.
+    const misses = new Set<string>(
+      Array.from(RIBBON_DYNAMIC_MENU_FIRST_COMMANDS, (c) => `${c}:missing`),
+    );
+    for (const select of CONTEXTUAL_SELECTIONS) {
+      select(sheet.instance.store);
+      const onCommand = vi.fn();
+      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+        dynamicDropdowns: true,
+        helpers: stubHelpers(),
+        onCommand,
+      });
 
-    for (const command of RIBBON_DYNAMIC_MENU_FIRST_COMMANDS) {
-      const menuId = RIBBON_DROPDOWN_MENU_FOR_COMMAND[command];
-      if (!menuId) {
-        misses.push(`${command}:menu-map`);
-        continue;
+      for (const command of RIBBON_DYNAMIC_MENU_FIRST_COMMANDS) {
+        const menuId = RIBBON_DROPDOWN_MENU_FOR_COMMAND[command];
+        if (!menuId) {
+          misses.add(`${command}:menu-map`);
+          continue;
+        }
+        const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+        const menu = host.querySelector<HTMLDivElement>(`#${menuId}`);
+        if (!button || !menu) continue;
+        misses.delete(`${command}:missing`);
+        onCommand.mockClear();
+        tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
+        button.click();
+        if (menu.hidden) misses.add(`${command}:closed`);
+        if (button.getAttribute('aria-expanded') !== 'true') misses.add(`${command}:aria`);
+        if (onCommand.mock.calls.length > 0) misses.add(`${command}:command`);
+        tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
       }
-      const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
-      const menu = host.querySelector<HTMLDivElement>(`#${menuId}`);
-      if (!button || !menu) {
-        misses.push(`${command}:missing`);
-        continue;
-      }
-      onCommand.mockClear();
-      tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
-      button.click();
-      if (menu.hidden) misses.push(`${command}:closed`);
-      if (button.getAttribute('aria-expanded') !== 'true') misses.push(`${command}:aria`);
-      if (onCommand.mock.calls.length > 0) misses.push(`${command}:command`);
-      tb.dropdownsApi?.closeDynamicRibbonDropdown({ command, menuId });
+      tb.dispose();
     }
 
-    expect(misses).toEqual([]);
-    tb.dispose();
+    expect([...misses]).toEqual([]);
   });
 
   it('opens every externally owned ribbon menu from primary click', () => {
@@ -436,20 +442,23 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('renders exactly the shared activatable ribbon command surface as buttons', () => {
-    selectStoreChart(sheet.instance.store);
-    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
-      ribbonTabs: RIBBON_TABS,
-      helpers: stubHelpers(),
-    });
-    const renderedButtonCommands = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('button[data-ribbon-command]'),
-    )
-      .map((button) => button.dataset.ribbonCommand ?? '')
-      .sort();
-    const expectedButtonCommands = ribbonActivatableSurfaceCommandIds().sort();
+    // A contextual tab shows only while its kind of object is selected.
+    const rendered = new Set<string>();
+    for (const select of CONTEXTUAL_SELECTIONS) {
+      select(sheet.instance.store);
+      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+        ribbonTabs: RIBBON_TABS,
+        helpers: stubHelpers(),
+      });
+      for (const button of host.querySelectorAll<HTMLButtonElement>(
+        'button[data-ribbon-command]',
+      )) {
+        rendered.add(button.dataset.ribbonCommand ?? '');
+      }
+      tb.dispose();
+    }
 
-    expect(renderedButtonCommands).toEqual(expectedButtonCommands);
-    tb.dispose();
+    expect([...rendered].sort()).toEqual([...new Set(ribbonActivatableSurfaceCommandIds())].sort());
   });
 
   it('renders disabled activation commands with disabled accessibility state', () => {
@@ -688,8 +697,6 @@ describe('Spreadsheet.mountToolbar', () => {
   });
 
   it('keeps every registered dynamic dropdown handler key represented by default menus', () => {
-    // The chart tabs show only while a chart is selected.
-    selectStoreChart(sheet.instance.store);
     mutators.upsertCustomPivotTableStyle(sheet.instance.store, {
       id: customPivotTableStyleId('Dispatch Coverage Pivot'),
       label: 'Dispatch Coverage Pivot',
@@ -697,26 +704,29 @@ describe('Spreadsheet.mountToolbar', () => {
       color: '#70ad47',
       variant: 'bandedFirstCol',
     });
-    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
-      ribbonTabs: RIBBON_TABS,
-      dynamicDropdowns: true,
-      helpers: stubHelpers(),
-    });
     const renderedKeys = new Set<string>();
-
-    for (const menuId of tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []) {
-      const menu = host.querySelector<HTMLElement>(`#${menuId}`);
-      if (!menu) continue;
-      for (const element of menu.querySelectorAll<HTMLElement>('*')) {
-        for (const key of Object.keys(element.dataset)) renderedKeys.add(key);
+    // A contextual tab shows only while its kind of object is selected.
+    for (const select of CONTEXTUAL_SELECTIONS) {
+      select(sheet.instance.store);
+      const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+        ribbonTabs: RIBBON_TABS,
+        dynamicDropdowns: true,
+        helpers: stubHelpers(),
+      });
+      for (const menuId of tb.dropdownsApi?.DYNAMIC_RIBBON_DROPDOWN_IDS ?? []) {
+        const menu = host.querySelector<HTMLElement>(`#${menuId}`);
+        if (!menu) continue;
+        for (const element of menu.querySelectorAll<HTMLElement>('*')) {
+          for (const key of Object.keys(element.dataset)) renderedKeys.add(key);
+        }
       }
+      tb.dispose();
     }
 
     const missing = Array.from(DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS)
       .filter((key) => !renderedKeys.has(key))
       .sort();
     expect(missing).toEqual([]);
-    tb.dispose();
   });
 
   it('keeps rendered ribbon menus out of plain text-only fallback items', () => {

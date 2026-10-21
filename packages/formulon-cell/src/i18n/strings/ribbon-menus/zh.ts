@@ -216,6 +216,8 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     chartColorsColorful: '彩色',
     chartColorsBlue: '蓝色',
     chartColorsMonochrome: '单色',
+    shapeNoFill: '无填充',
+    shapeNoOutline: '无轮廓',
     arrangeRequiresObject: '请选择要排列的对象。',
     arrangeNativeUnsupported: '引擎无法保存图片的堆叠顺序。',
     arrangeAtFront: '所选对象已经位于最前面。',

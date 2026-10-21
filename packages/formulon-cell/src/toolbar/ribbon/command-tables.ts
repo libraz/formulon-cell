@@ -50,7 +50,7 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   fx: (i) => i.openFunctionArguments(),
   workbookObjectsView: (i) => i.openWorkbookObjects(),
   selectionPanePageLayout: (i) => i.openWorkbookObjects(),
-  chartSelectionPane: (i) => i.openWorkbookObjects(),
+  objectSelectionPane: (i) => i.openWorkbookObjects(),
   chartChangeType: (i) => i.openChartSettings('elements'),
   chartSelectData: (i) => i.openChartSettings('filters'),
   chartFormatSelection: (i) => i.openChartSettings('styles'),

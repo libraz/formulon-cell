@@ -223,6 +223,8 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     chartColorsColorful: 'Farbig',
     chartColorsBlue: 'Blau',
     chartColorsMonochrome: 'Monochrom',
+    shapeNoFill: 'Keine Füllung',
+    shapeNoOutline: 'Keine Kontur',
     arrangeRequiresObject: 'Wählen Sie ein anzuordnendes Objekt aus.',
     arrangeNativeUnsupported: 'Die Engine kann die Stapelreihenfolge von Bildern nicht speichern.',
     arrangeAtFront: 'Das ausgewählte Objekt befindet sich bereits im Vordergrund.',

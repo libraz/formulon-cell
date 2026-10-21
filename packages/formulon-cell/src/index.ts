@@ -612,12 +612,23 @@ export {
   createRibbonShapeFromSelection,
   createSessionImage,
   createSessionShape,
+  DEFAULT_SHAPE_COLOR,
   duplicateSessionIllustration,
   listSessionIllustrations,
   pasteSessionIllustration,
+  selectedSessionIllustration,
   sessionIllustrationById,
   updateSessionIllustration,
 } from './commands/session-illustration.js';
+export {
+  applySessionShapeFill,
+  applySessionShapeOutline,
+  shapeFillColor,
+  shapeFillPatch,
+  shapeHasFill,
+  shapeOutlineColor,
+  shapeOutlinePatch,
+} from './commands/shape-format.js';
 export {
   addSheet,
   moveSheet,
@@ -1551,6 +1562,7 @@ export type {
 export {
   buildRibbonModel,
   CHART_CONTEXTUAL_RIBBON_TABS,
+  CONTEXTUAL_RIBBON_TABS,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   FONT_FAMILIES,
@@ -1561,6 +1573,7 @@ export {
   isRibbonActivatableCommand,
   matchesRibbonShortcut,
   OPTIONAL_RIBBON_TABS,
+  PICTURE_CONTEXTUAL_RIBBON_TABS,
   RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
   RIBBON_TABS,
@@ -1574,6 +1587,7 @@ export {
   ribbonSurfaceCommands,
   ribbonTabCommandIds,
   ribbonTabLabel,
+  SHAPE_CONTEXTUAL_RIBBON_TABS,
   toolbarText,
 } from './toolbar/ribbon-model.js';
 export type {

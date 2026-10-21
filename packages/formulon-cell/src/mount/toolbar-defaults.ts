@@ -66,6 +66,7 @@ import { createInsertMenuFactories } from '../toolbar/ribbon/menus/insert.js';
 import { createPageLayoutMenuFactories } from '../toolbar/ribbon/menus/page-layout.js';
 import { createPasteMenu } from '../toolbar/ribbon/menus/paste.js';
 import { createReviewMenuFactories } from '../toolbar/ribbon/menus/review.js';
+import { createShapeFormatMenuFactories } from '../toolbar/ribbon/menus/shape-format.js';
 import { createStylesMenuFactories } from '../toolbar/ribbon/menus/styles.js';
 import { createTextOrientationMenu } from '../toolbar/ribbon/menus/text-orientation.js';
 import type { RibbonMenus, RibbonRenderHelpers } from '../toolbar/ribbon/render-ribbon.js';
@@ -168,6 +169,7 @@ export function createDefaultRibbonMenus(
   const insertFactories = createInsertMenuFactories(ribbonMenuText);
   const pageLayoutFactories = createPageLayoutMenuFactories(ribbonMenuText);
   const chartDesignFactories = createChartDesignMenuFactories(ribbonMenuText);
+  const shapeFormatFactories = createShapeFormatMenuFactories(ribbonText, ribbonMenuText);
   const formulaFactories = createFormulasMenuFactories(ribbonMenuText, lang);
   const reviewFactories = createReviewMenuFactories(ribbonMenuText);
   const homeFactories = createHomeMenuFactories({
@@ -231,6 +233,10 @@ export function createDefaultRibbonMenus(
     // Chart Design tab
     chartAddElement: chartDesignFactories.createChartAddElementMenu,
     chartColors: chartDesignFactories.createChartColorsMenu,
+
+    // Shape Format tab
+    shapeFill: shapeFormatFactories.createShapeFillMenu,
+    shapeOutline: shapeFormatFactories.createShapeOutlineMenu,
 
     // Formulas tab
     autoSum: formulaFactories.createAutoSumMenu,

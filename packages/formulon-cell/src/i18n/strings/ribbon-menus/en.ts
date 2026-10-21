@@ -218,6 +218,8 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     chartColorsColorful: 'Colorful',
     chartColorsBlue: 'Blue',
     chartColorsMonochrome: 'Monochromatic',
+    shapeNoFill: 'No Fill',
+    shapeNoOutline: 'No Outline',
     arrangeRequiresObject: 'Select an object to arrange.',
     arrangeNativeUnsupported: 'The engine cannot save picture stacking order.',
     arrangeAtFront: 'The selected object is already at the front.',

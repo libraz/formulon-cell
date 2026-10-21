@@ -17,7 +17,9 @@ export type RibbonTab =
   | 'automate'
   | 'acrobat'
   | 'chartDesign'
-  | 'chartFormat';
+  | 'chartFormat'
+  | 'shapeFormat'
+  | 'pictureFormat';
 
 export type ToolbarLang = Locale;
 
@@ -101,10 +103,21 @@ export const RIBBON_TABS: readonly RibbonTab[] = [
 
 /** The tabs a selected chart adds to the ribbon. */
 export const CHART_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['chartDesign', 'chartFormat'];
+/** The tab a selected shape adds to the ribbon. */
+export const SHAPE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['shapeFormat'];
+/** The tab a selected picture adds to the ribbon. */
+export const PICTURE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['pictureFormat'];
+/** Every contextual tab. Only one object is selected at a time, so the
+ *  ribbon shows at most one of these sets. */
+export const CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = [
+  ...CHART_CONTEXTUAL_RIBBON_TABS,
+  ...SHAPE_CONTEXTUAL_RIBBON_TABS,
+  ...PICTURE_CONTEXTUAL_RIBBON_TABS,
+];
 
 export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> =
   Object.fromEntries(
-    [...RIBBON_TABS, ...CHART_CONTEXTUAL_RIBBON_TABS].map((tab) => [
+    [...RIBBON_TABS, ...CONTEXTUAL_RIBBON_TABS].map((tab) => [
       tab,
       Object.fromEntries(
         Object.entries(dictionaries).map(([locale, strings]) => [locale, strings.ribbon.tabs[tab]]),
@@ -776,6 +789,13 @@ export function buildRibbonModel(
       group(tr.pdf, [cmd('pdf', tr.pdf, tr.pdf, 'pdf', 'wide')]),
     ]),
   ];
+  // The Arrange group every object format tab shares; it acts on the selected object.
+  const objectArrange = (): RibbonGroupModel =>
+    group(tr.arrange, [
+      cmd('objectBringForward', tr.bringForward, tr.bringForward, 'bringForward', 'wide'),
+      cmd('objectSendBackward', tr.sendBackward, tr.sendBackward, 'sendBackward', 'wide'),
+      cmd('objectSelectionPane', tr.selectionPane, tr.selectionPane, 'selectionPane', 'wide'),
+    ]);
   const contextualTabs: RibbonTabModel[] = [
     {
       ...tab('chartDesign', [
@@ -812,14 +832,21 @@ export function buildRibbonModel(
             'wide',
           ),
         ]),
-        group(tr.arrange, [
-          cmd('chartBringForward', tr.bringForward, tr.bringForward, 'bringForward', 'wide'),
-          cmd('chartSendBackward', tr.sendBackward, tr.sendBackward, 'sendBackward', 'wide'),
-          cmd('chartSelectionPane', tr.selectionPane, tr.selectionPane, 'selectionPane', 'wide'),
-        ]),
+        objectArrange(),
       ]),
       contextual: true,
     },
+    {
+      ...tab('shapeFormat', [
+        group(tr.shapeStyles, [
+          cmd('shapeFill', tr.shapeFill, tr.shapeFill, 'shapeFill', 'wide'),
+          cmd('shapeOutline', tr.shapeOutline, tr.shapeOutline, 'shapeOutline', 'wide'),
+        ]),
+        objectArrange(),
+      ]),
+      contextual: true,
+    },
+    { ...tab('pictureFormat', [objectArrange()]), contextual: true },
   ];
   const homeTab = allTabs.find((candidate) => candidate.id === 'home');
   if (!homeTab) return [];
@@ -876,7 +903,7 @@ export const ribbonActivatableCommandIds = (
 
 /** Every tab the ribbon can show, the contextual ones included unless `opts` says otherwise. */
 const surfaceOptions = (opts: BuildRibbonModelOptions): BuildRibbonModelOptions => ({
-  contextualTabs: CHART_CONTEXTUAL_RIBBON_TABS,
+  contextualTabs: CONTEXTUAL_RIBBON_TABS,
   ...opts,
 });
 

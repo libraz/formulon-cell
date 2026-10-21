@@ -1,3 +1,4 @@
+import { DEFAULT_SHAPE_COLOR } from '../commands/session-illustration.js';
 import { summarizeSpreadsheetCompatibility } from '../engine/compatibility.js';
 import {
   listWorkbookObjects,
@@ -187,7 +188,7 @@ export function attachWorkbookObjectsPanel(
     const color = document.createElement('input');
     color.className = 'fc-objects__input fc-objects__color-input';
     color.type = 'color';
-    color.value = illustration.color ?? '#0f6cbd';
+    color.value = illustration.color ?? DEFAULT_SHAPE_COLOR;
     const radius = document.createElement('input');
     radius.className = 'fc-objects__input';
     radius.type = 'number';

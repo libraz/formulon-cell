@@ -46,6 +46,25 @@ export const selectStoreChart = (store: SpreadsheetStore, id = 'chart-native-0-1
   mutators.setSelectedObject(store, { id, name: 'Chart 1' });
 };
 
+/** Put a rectangle in the store and select it, so the ribbon shows the Shape Format tab. */
+export const selectStoreShape = (store: SpreadsheetStore, id = 'shape-test'): void => {
+  mutators.upsertIllustration(store, { id, kind: 'shape', shape: 'rectangle', sheet: 0 });
+  mutators.setSelectedObject(store, { id, name: 'Rectangle 1' });
+};
+
+/** Put a picture in the store and select it, so the ribbon shows the Picture Format tab. */
+export const selectStorePicture = (store: SpreadsheetStore, id = 'picture-test'): void => {
+  mutators.upsertIllustration(store, { id, kind: 'image', src: 'data:,', sheet: 0 });
+  mutators.setSelectedObject(store, { id, name: 'Picture 1' });
+};
+
+/** One selection per set of contextual tabs; together they show every tab the ribbon has. */
+export const CONTEXTUAL_SELECTIONS: readonly ((store: SpreadsheetStore) => void)[] = [
+  selectStoreChart,
+  selectStoreShape,
+  selectStorePicture,
+];
+
 export const waitFor = async (predicate: () => boolean, timeoutMs = 250): Promise<void> => {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
@@ -116,6 +135,10 @@ export const dynamicDropdownNoopOverrides = (): Partial<DynamicDropdownsCtx> => 
   updateChartAddElementMenu: vi.fn(),
   applyChartColorsAction: vi.fn(),
   updateChartColorsMenu: vi.fn(),
+  applyShapeFillAction: vi.fn(),
+  updateShapeFillMenu: vi.fn(),
+  applyShapeOutlineAction: vi.fn(),
+  updateShapeOutlineMenu: vi.fn(),
   applyUiTheme: vi.fn(),
   applySortMenuAction: vi.fn(),
   applyFindSelectAction: vi.fn(),

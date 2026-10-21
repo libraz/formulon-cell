@@ -41,6 +41,7 @@ import { showInstanceReport } from './dynamic-dropdown-defaults/menu-feedback.js
 import { createPageLayoutDropdownDefaults } from './dynamic-dropdown-defaults/page-layout.js';
 import { createReviewDropdownDefaults } from './dynamic-dropdown-defaults/review.js';
 import { normalizedSelectionRange } from './dynamic-dropdown-defaults/selection.js';
+import { createShapeFormatDropdownDefaults } from './dynamic-dropdown-defaults/shape-format.js';
 import { createStylesDropdownDefaults } from './dynamic-dropdown-defaults/styles.js';
 import { createViewDropdownDefaults } from './dynamic-dropdown-defaults/view.js';
 
@@ -157,6 +158,7 @@ export function createDefaultDynamicDropdownsCtx(
   const pageLayoutDefaults = createPageLayoutDropdownDefaults(instance);
   const viewDefaults = createViewDropdownDefaults(instance);
   const chartDesignDefaults = createChartDesignDropdownDefaults(instance);
+  const shapeFormatDefaults = createShapeFormatDropdownDefaults(instance);
 
   const base: DynamicDropdownsCtx = {
     getInst: () => instance,
@@ -229,6 +231,10 @@ export function createDefaultDynamicDropdownsCtx(
     updateChartAddElementMenu: chartDesignDefaults.updateChartAddElementMenu,
     applyChartColorsAction: chartDesignDefaults.applyChartColorsAction,
     updateChartColorsMenu: chartDesignDefaults.updateChartColorsMenu,
+    applyShapeFillAction: shapeFormatDefaults.applyShapeFillAction,
+    updateShapeFillMenu: shapeFormatDefaults.updateShapeFillMenu,
+    applyShapeOutlineAction: shapeFormatDefaults.applyShapeOutlineAction,
+    updateShapeOutlineMenu: shapeFormatDefaults.updateShapeOutlineMenu,
     applySortMenuAction: editingDefaults.applySortMenuAction,
     applyReviewCommentAction: reviewDefaults.applyReviewCommentAction,
     applyProtectAction: reviewDefaults.applyProtectAction,

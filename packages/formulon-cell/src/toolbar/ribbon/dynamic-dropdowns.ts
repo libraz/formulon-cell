@@ -55,6 +55,8 @@ export interface DynamicDropdownsCtx {
   updateArrangeMenu: (menu: HTMLElement) => void;
   updateChartAddElementMenu: (menu: HTMLElement) => void;
   updateChartColorsMenu: (menu: HTMLElement) => void;
+  updateShapeFillMenu: (menu: HTMLElement) => void;
+  updateShapeOutlineMenu: (menu: HTMLElement) => void;
   updatePageBreaksMenu: (menu: HTMLElement) => void;
   updatePrintAreaMenu: (menu: HTMLElement) => void;
   updateProtectMenu: (menu: HTMLElement) => void;
@@ -100,6 +102,10 @@ export interface DynamicDropdownsCtx {
   applyChartElementAction: (action: string) => void;
   /** A Change Colors palette for the selected chart. */
   applyChartColorsAction: (preset: string) => void;
+  /** A Shape Fill colour for the selected shape; `none` is No Fill. */
+  applyShapeFillAction: (color: string) => void;
+  /** A Shape Outline colour for the selected shape; `none` is No Outline. */
+  applyShapeOutlineAction: (color: string) => void;
   applyUiTheme: (theme: UiTheme) => void;
   applyWorkbookTheme: (presetId: WorkbookThemePresetId) => void;
   focusSheet: () => void;
@@ -176,6 +182,8 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'arrange-action',
   'chart-element',
   'chart-colors',
+  'shape-fill',
+  'shape-outline',
   'page-theme-action',
   'workbook-theme-action',
   'sort',
@@ -271,6 +279,8 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-arrange-objects': 'updateArrangeMenu',
   'menu-chart-add-element': 'updateChartAddElementMenu',
   'menu-chart-colors': 'updateChartColorsMenu',
+  'menu-shape-fill': 'updateShapeFillMenu',
+  'menu-shape-outline': 'updateShapeOutlineMenu',
   'menu-calc-options': 'updateCalcOptionsMenu',
   'menu-cell-styles-home': 'updateCellStylesMenu',
   'menu-clear': 'updateClearMenu',
@@ -642,6 +652,8 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     },
     { attr: 'chart-element', handler: (v) => ctx.applyChartElementAction(v) },
     { attr: 'chart-colors', handler: (v) => ctx.applyChartColorsAction(v) },
+    { attr: 'shape-fill', handler: (v) => ctx.applyShapeFillAction(v) },
+    { attr: 'shape-outline', handler: (v) => ctx.applyShapeOutlineAction(v) },
     {
       attr: 'page-theme-action',
       handler: (v) => {

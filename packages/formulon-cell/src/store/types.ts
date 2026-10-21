@@ -390,9 +390,14 @@ export interface SessionIllustration {
   y?: number;
   w?: number;
   h?: number;
+  /** A shape's fill colour, and its outline's while `lineColor` is unset. */
   color?: string;
+  /** A shape's outline colour. */
+  lineColor?: string;
   radius?: number;
+  /** A shape's outline weight; 0 is No Outline. */
   lineWidth?: number;
+  /** A shape's fill opacity; 0 is No Fill. */
   opacity?: number;
 }
 

@@ -58,6 +58,9 @@ export interface IllustrationMutationAuthorization {
   commandId?: string;
 }
 
+/** The colour of a shape that has not been given one. */
+export const DEFAULT_SHAPE_COLOR = '#0f6cbd';
+
 export type SessionIllustrationPatch = Partial<Omit<SessionIllustration, 'id'>>;
 export type SessionIllustrationArrangeAction =
   | 'bring-forward'
@@ -414,7 +417,7 @@ export function createRibbonShapeFromSelection(
       y: 88 + (count % 3) * 24,
       w: shape === 'line' || shape === 'arrow' ? 180 : 160,
       h: shape === 'line' || shape === 'arrow' ? 80 : 96,
-      color: '#0f6cbd',
+      color: DEFAULT_SHAPE_COLOR,
       authorization,
     },
     history,
@@ -463,6 +466,17 @@ export function sessionIllustrationById(
   id: string,
 ): SessionIllustration | null {
   return state.illustrations.illustrations.find((item) => item.id === id) ?? null;
+}
+
+/** The picture or shape selected on the active sheet, or null when none is selected. */
+export function selectedSessionIllustration(state: {
+  data: { sheetIndex: number };
+  ui: { selectedObject: { id: string } | null };
+  illustrations: { illustrations: readonly SessionIllustration[] };
+}): SessionIllustration | null {
+  const id = state.ui.selectedObject?.id;
+  const item = id === undefined ? null : sessionIllustrationById(state, id);
+  return item && item.sheet === state.data.sheetIndex ? item : null;
 }
 
 export function clearSessionIllustration(

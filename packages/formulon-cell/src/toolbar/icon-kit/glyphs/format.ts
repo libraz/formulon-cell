@@ -1,7 +1,7 @@
 /** Font, border, fill-colour and number-format icons. */
 
 import { letter, strokeLetter, strokeLetterWidth } from '../letters.js';
-import { circle, ellipse, hRules, join, line, poly, rect, vRules } from '../path.js';
+import { circle, ellipse, hRules, join, line, poly, rect, roundRect, vRules } from '../path.js';
 import { arrow, caret, filled, outlined, place, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
@@ -122,6 +122,15 @@ export const FORMAT_ICONS = {
       PALETTE.info,
     ),
     swatch(PALETTE.warn),
+  ],
+  // A shape over the colour its fill or its outline takes.
+  shapeFill: [
+    outlined(roundRect(3.4, 3.4, 17.2, 11.8, 2.4), PALETTE.warn, PALETTE.ink, 'regular'),
+    swatch(PALETTE.warn),
+  ],
+  shapeOutline: [
+    outlined(roundRect(4, 4, 16, 10.6, 2), PALETTE.paper, PALETTE.info, 'heavy'),
+    swatch(PALETTE.info),
   ],
   fontGrow: sizeMark(15.2, 'up'),
   fontShrink: sizeMark(12, 'down'),

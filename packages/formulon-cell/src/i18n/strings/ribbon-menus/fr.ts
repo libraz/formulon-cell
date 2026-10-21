@@ -220,6 +220,8 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     chartColorsColorful: 'En couleur',
     chartColorsBlue: 'Bleu',
     chartColorsMonochrome: 'Monochrome',
+    shapeNoFill: 'Aucun remplissage',
+    shapeNoOutline: 'Sans contour',
     arrangeRequiresObject: 'Sélectionnez un objet à organiser.',
     arrangeNativeUnsupported: 'Le moteur ne peut pas enregistrer l’ordre d’empilement des images.',
     arrangeAtFront: 'L’objet sélectionné est déjà au premier plan.',

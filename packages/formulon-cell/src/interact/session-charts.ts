@@ -397,11 +397,15 @@ export function attachSessionCharts(deps: {
     updateSelectionClasses();
   };
 
-  /** Take up a chart another part of the sheet selected; returns its id. */
+  /** Take up a chart another part of the sheet selected, and leave the chart
+   *  when another object is selected; returns the id taken up. */
   const adoptSelection = (state: State, charts: readonly SessionChart[]): string | null => {
     const wanted = state.ui.selectedObject?.id;
     if (wanted === undefined || wanted === selectedId) return null;
-    if (!charts.some((chart) => chart.id === wanted)) return null;
+    if (!charts.some((chart) => chart.id === wanted)) {
+      selectedId = null;
+      return null;
+    }
     selectedId = wanted;
     return wanted;
   };
@@ -661,7 +665,10 @@ export function attachSessionCharts(deps: {
     const charts = state.charts.charts.filter((chart) => chart.sheet === state.data.sheetIndex);
     if (selectedId !== null && !charts.some((chart) => chart.id === selectedId)) selectedId = null;
     // A paste selects the chart it adds.
+    const held = selectedId;
     const adopted = adoptSelection(state, charts);
+    // Another object took the selection, and the focus with it.
+    const left = held !== null && selectedId === null;
     charts.forEach((chart, index) => {
       const drawable = isDrawable(chart);
       if (drawable) visibleChartIds.add(chart.id);
@@ -793,7 +800,7 @@ export function attachSessionCharts(deps: {
     // The selected chart may have been removed or given another data range.
     syncSelection();
     // Rebuilding the panels drops focus; keep it on the chart, or on the sheet.
-    const refocus = adopted ?? focusedId;
+    const refocus = adopted ?? (left ? undefined : focusedId);
     if (refocus !== undefined) focusPanel(root, '.fc-chart', 'chartId', refocus, host);
   };
 

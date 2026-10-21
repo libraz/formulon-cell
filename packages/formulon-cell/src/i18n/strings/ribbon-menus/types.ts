@@ -215,6 +215,8 @@ export interface RibbonMenusStrings {
     chartColorsColorful: string;
     chartColorsBlue: string;
     chartColorsMonochrome: string;
+    shapeNoFill: string;
+    shapeNoOutline: string;
     arrangeRequiresObject: string;
     arrangeNativeUnsupported: string;
     arrangeAtFront: string;

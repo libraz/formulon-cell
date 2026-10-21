@@ -18,6 +18,10 @@ import { phoneticReadingAt, setPhoneticReading } from '../../commands/phonetic.j
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
 import { arrangeSessionChart } from '../../commands/session-chart.js';
+import {
+  arrangeSessionIllustration,
+  selectedSessionIllustration,
+} from '../../commands/session-illustration.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../../commands/structure.js';
 import {
   setGridlinesVisible,
@@ -403,16 +407,27 @@ const applyGenericRibbonCommand = (
     case 'outlineHideDetail':
       hooks?.page?.outline?.('hide-detail');
       return true;
-    case 'chartSwitchRowColumn':
-    case 'chartBringForward':
-    case 'chartSendBackward': {
+    case 'chartSwitchRowColumn': {
       const chart = selectedSessionChart(i.store.getState());
-      if (!chart) return true;
-      if (id === 'chartSwitchRowColumn') {
-        switchSessionChartRowColumn(i.store, chart.id, i.history, i.workbook);
-      } else {
-        const action = id === 'chartBringForward' ? 'bring-forward' : 'send-backward';
-        arrangeSessionChart(i.store, chart.id, action, i.history, i.workbook);
+      if (chart) switchSessionChartRowColumn(i.store, chart.id, i.history, i.workbook);
+      return true;
+    }
+    case 'objectBringForward':
+    case 'objectSendBackward': {
+      const action = id === 'objectBringForward' ? 'bring-forward' : 'send-backward';
+      const state = i.store.getState();
+      const chart = selectedSessionChart(state);
+      const item = chart ? null : selectedSessionIllustration(state);
+      if (chart) arrangeSessionChart(i.store, chart.id, action, i.history, i.workbook);
+      else if (item) {
+        arrangeSessionIllustration(
+          i.store,
+          item.id,
+          action,
+          i.history,
+          { origin: 'ribbon', commandId: id },
+          i.workbook,
+        );
       }
       return true;
     }
