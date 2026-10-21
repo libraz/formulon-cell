@@ -634,7 +634,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     scopeSelect.replaceChildren();
     appendDialogSelectOptions(scopeSelect, scopeOptions());
     editingEntry = entry ?? null;
-    scopeSelect.disabled = mode === 'edit';
+    projectDisabledState(scopeSelect, mode === 'edit', null);
     scopeSelect.value = String(entry?.localSheetId ?? -1);
     commentInput.value = '';
     if (entry) {
