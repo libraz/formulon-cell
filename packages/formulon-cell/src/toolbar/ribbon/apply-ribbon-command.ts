@@ -13,6 +13,7 @@
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { selectedSessionChart, switchSessionChartRowColumn } from '../../commands/chart-design.js';
 import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
+import { setOutlineSummaryPosition } from '../../commands/outline.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
@@ -35,6 +36,7 @@ import {
 import { fontPointsToCssPx } from '../../engine/font-units.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
+import { outlineSummaryFor } from '../../store/outline-summary.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
 import type { SessionShapeKind } from '../illustration-types.js';
@@ -403,6 +405,17 @@ const applyGenericRibbonCommand = (
     case 'outlineHideDetail':
       hooks?.page?.outline?.('hide-detail');
       return true;
+    case 'outlineSummaryBelow':
+    case 'outlineSummaryRight': {
+      const summary = outlineSummaryFor(state.layout, state.data.sheetIndex);
+      setOutlineSummaryPosition(
+        i.store,
+        id === 'outlineSummaryBelow' ? { below: !summary.below } : { right: !summary.right },
+      );
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    }
     case 'chartSwitchRowColumn': {
       const chart = selectedSessionChart(i.store.getState());
       if (chart) switchSessionChartRowColumn(i.store, chart.id, i.history, i.workbook);

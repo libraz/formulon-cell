@@ -213,6 +213,8 @@ export const ribbonEn: RibbonStrings = {
     ungroupOutline: 'Ungroup',
     showDetail: 'Show Detail',
     hideDetail: 'Hide Detail',
+    summaryRowsBelow: 'Summary Rows Below Detail',
+    summaryColsRight: 'Summary Columns to Right of Detail',
     showRows: 'Show Rows',
     hideRows: 'Hide Rows',
     showCols: 'Show Cols',

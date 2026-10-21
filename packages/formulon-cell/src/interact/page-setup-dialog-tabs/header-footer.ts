@@ -45,6 +45,12 @@ export function createHeaderFooterTab(
   };
   const headerTriple = makeTriple(t.headerLabel);
   const footerTriple = makeTriple(t.footerLabel);
+  // First-page and even-page sections share the same three-slot editor and
+  // appear only while their option is checked.
+  const firstHeaderTriple = makeTriple(t.firstPageHeader);
+  const firstFooterTriple = makeTriple(t.firstPageFooter);
+  const evenHeaderTriple = makeTriple(t.evenPageHeader);
+  const evenFooterTriple = makeTriple(t.evenPageFooter);
 
   const makeHeaderFooterPresetRow = (
     label: string,
@@ -160,12 +166,26 @@ export function createHeaderFooterTab(
   );
   headerFooterOptionsRow.append(headerFooterOptionsTitle, headerFooterOptionsValue);
 
+  const syncVariantRows = (): void => {
+    firstHeaderTriple.legendRow.hidden = !differentFirstPage.input.checked;
+    firstFooterTriple.legendRow.hidden = !differentFirstPage.input.checked;
+    evenHeaderTriple.legendRow.hidden = !differentOddEven.input.checked;
+    evenFooterTriple.legendRow.hidden = !differentOddEven.input.checked;
+  };
+  on(differentFirstPage.input, 'change', syncVariantRows);
+  on(differentOddEven.input, 'change', syncVariantRows);
+  syncVariantRows();
+
   panel.append(
     headerPreset.row,
     headerTriple.legendRow,
     footerPreset.row,
     footerTriple.legendRow,
     headerFooterOptionsRow,
+    firstHeaderTriple.legendRow,
+    firstFooterTriple.legendRow,
+    evenHeaderTriple.legendRow,
+    evenFooterTriple.legendRow,
   );
 
   return {
@@ -176,8 +196,21 @@ export function createHeaderFooterTab(
       footerTriple.leftInput.value = setup.footerLeft ?? '';
       footerTriple.centerInput.value = setup.footerCenter ?? '';
       footerTriple.rightInput.value = setup.footerRight ?? '';
+      firstHeaderTriple.leftInput.value = setup.firstHeaderLeft ?? '';
+      firstHeaderTriple.centerInput.value = setup.firstHeaderCenter ?? '';
+      firstHeaderTriple.rightInput.value = setup.firstHeaderRight ?? '';
+      firstFooterTriple.leftInput.value = setup.firstFooterLeft ?? '';
+      firstFooterTriple.centerInput.value = setup.firstFooterCenter ?? '';
+      firstFooterTriple.rightInput.value = setup.firstFooterRight ?? '';
+      evenHeaderTriple.leftInput.value = setup.evenHeaderLeft ?? '';
+      evenHeaderTriple.centerInput.value = setup.evenHeaderCenter ?? '';
+      evenHeaderTriple.rightInput.value = setup.evenHeaderRight ?? '';
+      evenFooterTriple.leftInput.value = setup.evenFooterLeft ?? '';
+      evenFooterTriple.centerInput.value = setup.evenFooterCenter ?? '';
+      evenFooterTriple.rightInput.value = setup.evenFooterRight ?? '';
       differentOddEven.input.checked = setup.differentOddEvenPages === true;
       differentFirstPage.input.checked = setup.differentFirstPage === true;
+      syncVariantRows();
       scaleWithDocument.input.checked = setup.scaleHeaderFooterWithDocument !== false;
       alignWithMargins.input.checked = setup.alignHeaderFooterWithMargins !== false;
       headerPreset.select.value =
@@ -217,6 +250,18 @@ export function createHeaderFooterTab(
         footerLeft: footerTriple.leftInput.value,
         footerCenter: footerTriple.centerInput.value,
         footerRight: footerTriple.rightInput.value,
+        firstHeaderLeft: firstHeaderTriple.leftInput.value,
+        firstHeaderCenter: firstHeaderTriple.centerInput.value,
+        firstHeaderRight: firstHeaderTriple.rightInput.value,
+        firstFooterLeft: firstFooterTriple.leftInput.value,
+        firstFooterCenter: firstFooterTriple.centerInput.value,
+        firstFooterRight: firstFooterTriple.rightInput.value,
+        evenHeaderLeft: evenHeaderTriple.leftInput.value,
+        evenHeaderCenter: evenHeaderTriple.centerInput.value,
+        evenHeaderRight: evenHeaderTriple.rightInput.value,
+        evenFooterLeft: evenFooterTriple.leftInput.value,
+        evenFooterCenter: evenFooterTriple.centerInput.value,
+        evenFooterRight: evenFooterTriple.rightInput.value,
         differentOddEvenPages: differentOddEven.input.checked,
         differentFirstPage: differentFirstPage.input.checked,
         scaleHeaderFooterWithDocument: scaleWithDocument.input.checked,

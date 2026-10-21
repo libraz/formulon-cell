@@ -149,6 +149,10 @@ describe('hydratePageSetupFromEngine', () => {
       headerFooter: {
         oddHeader: '&CQuarterly report',
         oddFooter: '&RPage &P',
+        evenHeader: '&LEven left',
+        evenFooter: '',
+        firstHeader: '&CFirst title',
+        firstFooter: '&RFirst &P',
         differentOddEven: false,
         differentFirst: true,
         scaleWithDoc: false,
@@ -174,6 +178,10 @@ describe('hydratePageSetupFromEngine', () => {
     expect(setup.headerCenter).toBe('Quarterly report');
     expect(setup.footerRight).toBe('Page &P');
     expect(setup.differentFirstPage).toBe(true);
+    expect(setup.firstHeaderCenter).toBe('First title');
+    expect(setup.firstFooterRight).toBe('First &P');
+    expect(setup.evenHeaderLeft).toBe('Even left');
+    expect(setup.evenFooterCenter).toBeUndefined();
     expect(setup.scaleHeaderFooterWithDocument).toBe(false);
     expect(setup.printArea).toBe('A1:F20');
     expect(setup.printTitleRows).toBe('1:2');
@@ -364,6 +372,10 @@ describe('syncPageSetupToEngine', () => {
               scale: 0.5,
               headerCenter: 'Title',
               footerRight: 'Page &P',
+              firstHeaderCenter: 'Cover',
+              evenFooterLeft: 'Even &P',
+              differentFirstPage: true,
+              differentOddEvenPages: true,
               printArea: 'A1:D10',
               printTitleRows: '1:1',
               manualPageBreakRows: [10],
@@ -379,7 +391,16 @@ describe('syncPageSetupToEngine', () => {
 
     expect(writes.pageSetup).toMatchObject({ orientation: 2, paperSize: 8, scale: 50 });
     expect(writes.printOptions).toMatchObject({ gridLines: true, headings: false });
-    expect(writes.headerFooter).toMatchObject({ oddHeader: '&CTitle', oddFooter: '&RPage &P' });
+    expect(writes.headerFooter).toMatchObject({
+      oddHeader: '&CTitle',
+      oddFooter: '&RPage &P',
+      firstHeader: '&CCover',
+      firstFooter: '',
+      evenHeader: '',
+      evenFooter: '&LEven &P',
+      differentFirst: true,
+      differentOddEven: true,
+    });
     expect(writes.printArea).toBe('A1:D10');
     expect(writes.printTitles).toEqual(['1:1', '']);
     expect(writes.breaks).toEqual({ rows: [10], cols: [4] });

@@ -11,6 +11,7 @@ import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../engine/font-units.js';
 import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount.js';
+import { outlineSummaryFor } from '../store/outline-summary.js';
 import { rangesIntersect } from '../store/selection-geometry.js';
 import type {
   CellBorderStyle,
@@ -80,6 +81,8 @@ export interface ActiveState {
   printGridlines: boolean;
   printHeadings: boolean;
   formulasVisible: boolean;
+  outlineSummaryBelow: boolean;
+  outlineSummaryRight: boolean;
   zerosVisible: boolean;
   rightToLeft: boolean;
   workbookView: WorkbookViewMode;
@@ -135,6 +138,8 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   printGridlines: false,
   printHeadings: false,
   formulasVisible: false,
+  outlineSummaryBelow: true,
+  outlineSummaryRight: true,
   zerosVisible: true,
   rightToLeft: false,
   workbookView: 'normal',
@@ -207,6 +212,8 @@ export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = ne
   ['viewGridlines', 'gridlinesVisible'],
   ['viewHeadings', 'headingsVisible'],
   ['viewFormulas', 'formulasVisible'],
+  ['outlineSummaryBelow', 'outlineSummaryBelow'],
+  ['outlineSummaryRight', 'outlineSummaryRight'],
   ['viewZeros', 'zerosVisible'],
   ['viewRightToLeft', 'rightToLeft'],
   ['viewR1C1', 'r1c1'],
@@ -365,6 +372,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
   );
   const activeTable = tableForCell(s.tables.tables, a.sheet, a.row, a.col);
   const setup = pageSetupForSheet(s, s.data.sheetIndex);
+  const outlineSummary = outlineSummaryFor(s.layout, s.data.sheetIndex);
   return {
     bold: !!f?.bold,
     italic: !!f?.italic,
@@ -420,6 +428,8 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     printGridlines: setup.showGridlines === true,
     printHeadings: setup.showHeadings === true,
     formulasVisible: !!s.ui.showFormulas,
+    outlineSummaryBelow: outlineSummary.below,
+    outlineSummaryRight: outlineSummary.right,
     zerosVisible: s.ui.showZeros !== false,
     rightToLeft: s.ui.rightToLeft === true,
     workbookView: s.ui.workbookView,

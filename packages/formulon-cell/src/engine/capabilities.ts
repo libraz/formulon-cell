@@ -249,6 +249,7 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
       'setSheetPrintTitles',
     ),
     printSettingsXml: all('getSheetPageSetupXml', 'setSheetPageSetupXml'),
+    sheetPrXml: all('getSheetSheetPrXml', 'setSheetSheetPrXml'),
     pageBreaks: all(
       'getSheetRowBreaks',
       'getSheetColBreaks',

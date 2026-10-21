@@ -149,6 +149,10 @@ export function readHeaderFooter(xml: string): EngineHeaderFooter {
   return {
     oddHeader: xmlSectionText(el, 'oddHeader'),
     oddFooter: xmlSectionText(el, 'oddFooter'),
+    evenHeader: xmlSectionText(el, 'evenHeader'),
+    evenFooter: xmlSectionText(el, 'evenFooter'),
+    firstHeader: xmlSectionText(el, 'firstHeader'),
+    firstFooter: xmlSectionText(el, 'firstFooter'),
     differentOddEven: xmlFlag(el, 'differentOddEven', false),
     differentFirst: xmlFlag(el, 'differentFirst', false),
     scaleWithDoc: xmlFlag(el, 'scaleWithDoc', true),

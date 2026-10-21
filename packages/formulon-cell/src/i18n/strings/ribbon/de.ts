@@ -214,6 +214,8 @@ export const ribbonDe: RibbonStrings = {
     ungroupOutline: 'Gruppierung aufheben',
     showDetail: 'Detail anzeigen',
     hideDetail: 'Detail ausblenden',
+    summaryRowsBelow: 'Zusammenfassende Zeilen unterhalb von Detaildaten',
+    summaryColsRight: 'Zusammenfassende Spalten rechts neben Detaildaten',
     showRows: 'Zeilen einblenden',
     hideRows: 'Zeilen ausblenden',
     showCols: 'Spalten einblenden',

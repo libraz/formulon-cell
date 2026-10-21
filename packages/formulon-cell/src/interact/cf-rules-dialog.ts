@@ -1,6 +1,8 @@
 import type { History } from '../commands/history.js';
 import { recordConditionalRulesChange } from '../commands/slice-history.js';
 import { formatA1Range } from '../engine/address.js';
+import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
+import { rewriteEngineConditionalFormat } from '../engine/cf-writeback.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -141,6 +143,8 @@ type ManagedRule =
   | {
       source: 'engine';
       index: number;
+      id: string;
+      priorityValue: number;
       priority: string;
       rule: string;
       format: string;
@@ -261,6 +265,26 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     projectDisabledState(button, disabled, reason, { datasetKey: 'disabledReason' });
   };
 
+  /** Why `managedRule` cannot swap with its visual neighbour, or null when it can.
+   *  Engine and session rules form two groups that never swap across the seam. */
+  const moveBlockedReason = (
+    managedRule: ManagedRule,
+    visualIndex: number,
+    delta: -1 | 1,
+  ): string | null => {
+    if (managedRule.source === 'session' && !deps.store) return t.note;
+    if (managedRule.source === 'engine' && !getWb()) return t.editUnavailable;
+    const neighbor = currentRules[visualIndex + delta];
+    if (neighbor?.source === managedRule.source) return null;
+    return delta < 0 ? t.moveUpUnavailable : t.moveDownUnavailable;
+  };
+
+  /** Re-read the sheet's loaded rules into the store after an engine-side rewrite. */
+  const refreshLoadedRules = (): void => {
+    const wb = getWb();
+    if (wb && deps.store) hydrateConditionalRulesFromEngine(wb, deps.store, getActiveSheet());
+  };
+
   const updateCommandState = (): void => {
     const selected = currentRules[selectedRuleIndex] ?? null;
     const canEdit = selected?.source === 'session' && !!deps.store && !!deps.onEditRule;
@@ -279,29 +303,13 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       noSelectionReason ?? engineReadOnlyReason ?? mutationUnavailableReason,
     );
     setDisabledState(deleteBtn, !selected, t.selectRuleActionReason);
-    const moveUpDisabled = !canMutateSession || selected.index <= 0;
-    setDisabledState(
-      moveUpBtn,
-      moveUpDisabled,
-      !selected
-        ? t.selectRuleActionReason
-        : (engineReadOnlyReason ??
-            mutationUnavailableReason ??
-            (selected.index <= 0 ? t.moveUpUnavailable : null)),
-    );
-    const moveDownDisabled =
-      !canMutateSession ||
-      selected.index >= (deps.store?.getState().conditional.rules.length ?? 0) - 1;
+    const upReason = selected ? moveBlockedReason(selected, selectedRuleIndex, -1) : null;
+    setDisabledState(moveUpBtn, !selected || upReason !== null, upReason ?? noSelectionReason);
+    const downReason = selected ? moveBlockedReason(selected, selectedRuleIndex, 1) : null;
     setDisabledState(
       moveDownBtn,
-      moveDownDisabled,
-      !selected
-        ? t.selectRuleActionReason
-        : (engineReadOnlyReason ??
-            mutationUnavailableReason ??
-            (selected.index >= (deps.store?.getState().conditional.rules.length ?? 0) - 1
-              ? t.moveDownUnavailable
-              : null)),
+      !selected || downReason !== null,
+      downReason ?? noSelectionReason,
     );
   };
 
@@ -346,19 +354,37 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   };
 
   const moveManagedRule = (managedRule: ManagedRule, visualIndex: number, delta: -1 | 1): void => {
-    if (managedRule.source !== 'session' || !deps.store) return;
-    const store = deps.store;
-    const nextIndex = managedRule.index + delta;
-    if (nextIndex < 0 || nextIndex >= store.getState().conditional.rules.length) return;
-    recordConditionalRulesChange(deps.history ?? null, store, () => {
-      store.setState((state) => {
-        const nextRules = [...state.conditional.rules];
-        const [source] = nextRules.splice(managedRule.index, 1);
-        if (!source) return state;
-        nextRules.splice(nextIndex, 0, source);
-        return { ...state, conditional: { rules: nextRules } };
+    const neighbor = currentRules[visualIndex + delta];
+    if (!neighbor || neighbor.source !== managedRule.source) return;
+    if (managedRule.source === 'engine' && neighbor.source === 'engine') {
+      const wb = getWb();
+      if (!wb) return;
+      const sheet = getActiveSheet();
+      const moved =
+        rewriteEngineConditionalFormat(wb, sheet, managedRule.id, {
+          priority: neighbor.priorityValue,
+        }) &&
+        rewriteEngineConditionalFormat(wb, sheet, neighbor.id, {
+          priority: managedRule.priorityValue,
+        });
+      if (!moved) return;
+      refreshLoadedRules();
+    } else if (managedRule.source === 'session' && neighbor.source === 'session' && deps.store) {
+      const store = deps.store;
+      recordConditionalRulesChange(deps.history ?? null, store, () => {
+        store.setState((state) => {
+          const nextRules = [...state.conditional.rules];
+          const first = nextRules[managedRule.index];
+          const second = nextRules[neighbor.index];
+          if (!first || !second) return state;
+          nextRules[managedRule.index] = second;
+          nextRules[neighbor.index] = first;
+          return { ...state, conditional: { rules: nextRules } };
+        });
       });
-    });
+    } else {
+      return;
+    }
     onChanged?.();
     selectedRuleIndex = Math.max(0, Math.min(currentRules.length - 1, visualIndex + delta));
     renderTable();
@@ -370,17 +396,29 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     visualIndex: number,
     stopIfTrue: boolean,
   ): void => {
-    if (managedRule.source !== 'session' || !deps.store) return;
-    const store = deps.store;
-    recordConditionalRulesChange(deps.history ?? null, store, () => {
-      store.setState((state) => {
-        const source = state.conditional.rules[managedRule.index];
-        if (!source) return state;
-        const nextRules = [...state.conditional.rules];
-        nextRules[managedRule.index] = { ...source, stopIfTrue };
-        return { ...state, conditional: { rules: nextRules } };
+    if (managedRule.source === 'engine') {
+      const wb = getWb();
+      if (
+        !wb ||
+        !rewriteEngineConditionalFormat(wb, getActiveSheet(), managedRule.id, { stopIfTrue })
+      ) {
+        return;
+      }
+      refreshLoadedRules();
+    } else if (deps.store) {
+      const store = deps.store;
+      recordConditionalRulesChange(deps.history ?? null, store, () => {
+        store.setState((state) => {
+          const source = state.conditional.rules[managedRule.index];
+          if (!source) return state;
+          const nextRules = [...state.conditional.rules];
+          nextRules[managedRule.index] = { ...source, stopIfTrue };
+          return { ...state, conditional: { rules: nextRules } };
+        });
       });
-    });
+    } else {
+      return;
+    }
     onChanged?.();
     selectedRuleIndex = visualIndex;
     renderTable();
@@ -451,6 +489,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     const scopeSelection = scopeSelect.value === 'selection' ? deps.getSelectionRange?.() : null;
     const engineRules = (wb?.getConditionalFormats(sheet) ?? [])
       .map((rule, index) => ({ rule, index }))
+      .sort((a, b) => a.rule.priority - b.rule.priority || a.index - b.index)
       .filter(
         ({ rule }) =>
           !scopeSelection ||
@@ -476,6 +515,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       ...engineRules.map<ManagedRule>(({ rule, index }) => ({
         source: 'engine',
         index,
+        id: rule.id,
+        priorityValue: rule.priority,
         priority: String(rule.priority),
         rule: ruleTypeLabel(rule.type, t),
         format: ruleTypeLabel(rule.type, t),
@@ -558,7 +599,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       stopCheckbox.checked = managedRule.stopIfTrue;
       setDisabledState(
         stopCheckbox,
-        managedRule.source !== 'session' || !deps.store,
+        managedRule.source === 'engine' ? !wb : !deps.store,
         managedRule.source === 'engine' ? t.stopIfTrueUnavailable : !deps.store ? t.note : null,
       );
       stopCheckbox.addEventListener('change', () => {
@@ -569,35 +610,15 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       const actions = document.createElement('td');
       actions.className = 'fc-cfrulesdlg__cell-actions';
       const moveUp = createCfRulesDialogButton('fc-cfrulesdlg__row-move-up', t.moveUp);
-      setDisabledState(
-        moveUp,
-        managedRule.source !== 'session' || !deps.store || managedRule.index <= 0,
-        managedRule.source === 'engine'
-          ? t.editUnavailable
-          : !deps.store
-            ? t.note
-            : managedRule.index <= 0
-              ? t.moveUpUnavailable
-              : null,
-      );
+      const upReason = moveBlockedReason(managedRule, index, -1);
+      setDisabledState(moveUp, upReason !== null, upReason);
       moveUp.dataset.ruleIndex = String(index);
       moveUp.addEventListener('click', () => {
         moveManagedRule(managedRule, index, -1);
       });
       const moveDown = createCfRulesDialogButton('fc-cfrulesdlg__row-move-down', t.moveDown);
-      setDisabledState(
-        moveDown,
-        managedRule.source !== 'session' ||
-          !deps.store ||
-          managedRule.index >= deps.store.getState().conditional.rules.length - 1,
-        managedRule.source === 'engine'
-          ? t.editUnavailable
-          : !deps.store
-            ? t.note
-            : managedRule.index >= deps.store.getState().conditional.rules.length - 1
-              ? t.moveDownUnavailable
-              : null,
-      );
+      const downReason = moveBlockedReason(managedRule, index, 1);
+      setDisabledState(moveDown, downReason !== null, downReason);
       moveDown.dataset.ruleIndex = String(index);
       moveDown.addEventListener('click', () => {
         moveManagedRule(managedRule, index, 1);

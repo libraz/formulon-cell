@@ -217,6 +217,8 @@ export interface RibbonStrings {
     ungroupOutline: string;
     showDetail: string;
     hideDetail: string;
+    summaryRowsBelow: string;
+    summaryColsRight: string;
     showRows: string;
     hideRows: string;
     showCols: string;

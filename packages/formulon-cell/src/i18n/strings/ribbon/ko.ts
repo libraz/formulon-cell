@@ -213,6 +213,8 @@ export const ribbonKo: RibbonStrings = {
     ungroupOutline: '그룹 해제',
     showDetail: '세부 정보 표시',
     hideDetail: '세부 정보 숨기기',
+    summaryRowsBelow: '세부 정보 아래에 요약 행',
+    summaryColsRight: '세부 정보 오른쪽에 요약 열',
     showRows: '행 숨기기 취소',
     hideRows: '행 숨기기',
     showCols: '열 숨기기 취소',

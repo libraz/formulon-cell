@@ -6,6 +6,7 @@ import {
 } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
+import type { OutlineSummary } from '../store/types.js';
 import type { History } from './history.js';
 import { isWorkbookStructureProtected } from './protection.js';
 import { recordLayoutChangeWithEngine } from './slice-history.js';
@@ -44,6 +45,11 @@ const remapWorkbookSheetLayout = (
       const next = mapIndex(idx);
       if (next !== null) sheetTabColors.set(next, color);
     }
+    const outlineSummary = new Map<number, OutlineSummary>();
+    for (const [idx, summary] of s.layout.outlineSummary ?? []) {
+      const next = mapIndex(idx);
+      if (next !== null) outlineSummary.set(next, summary);
+    }
     const protectedSheets = new Map<number, { password?: string }>();
     for (const [idx, protection] of s.protection.protectedSheets) {
       const next = mapIndex(idx);
@@ -55,7 +61,12 @@ const remapWorkbookSheetLayout = (
     });
     return {
       ...s,
-      layout: { ...s.layout, hiddenSheets, sheetTabColors },
+      layout: {
+        ...s.layout,
+        hiddenSheets,
+        sheetTabColors,
+        ...(s.layout.outlineSummary ? { outlineSummary } : {}),
+      },
       protection: { ...s.protection, protectedSheets, allowedEditRanges },
     };
   });

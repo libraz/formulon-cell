@@ -860,7 +860,9 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         store.setState((state) => {
           if (!state.conditional.rules[editIndex]) return state;
           const rules = [...state.conditional.rules];
-          rules[editIndex] = newRule;
+          const previous = rules[editIndex];
+          rules[editIndex] =
+            previous?.stopIfTrue === true ? { ...newRule, stopIfTrue: true } : newRule;
           return { ...state, conditional: { rules } };
         });
       } else {

@@ -3,6 +3,7 @@ import { iconSetSlotCount } from '../render/conditional.js';
 import type { ConditionalIconSet, SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, ConditionalRule, ConditionalScalePoint } from '../store/types.js';
 import { addrKey } from './address.js';
+import { TIME_PERIOD } from './cf-writeback.js';
 import {
   borderRecordToFormat,
   fillRecordToFormat,
@@ -47,6 +48,7 @@ const ENGINE_RULE_TYPE = {
   notContainsBlanks: 12,
   containsErrors: 13,
   notContainsErrors: 14,
+  timePeriod: 15,
   duplicateValues: 16,
   uniqueValues: 17,
 } as const;
@@ -58,6 +60,14 @@ const VALUE_OBJECT_TYPE = {
   min: 3,
   max: 4,
 } as const;
+
+type DatePeriod = Extract<ConditionalRule, { kind: 'date-occurring' }>['period'];
+const DATE_PERIOD_BY_ORDINAL: ReadonlyMap<number, DatePeriod> = new Map(
+  (Object.entries(TIME_PERIOD) as [DatePeriod, number][]).map(([period, ordinal]) => [
+    ordinal,
+    period,
+  ]),
+);
 
 const ENGINE_DATA_BAR_DIRECTIONS = ['context', 'left-to-right', 'right-to-left'] as const;
 type DataBarDirection = (typeof ENGINE_DATA_BAR_DIRECTIONS)[number];
@@ -316,6 +326,9 @@ function engineConditionalFormatToRules(
       out.push({ ...common, kind: 'errors', range, apply });
     } else if (entry.type === ENGINE_RULE_TYPE.notContainsErrors) {
       out.push({ ...common, kind: 'no-errors', range, apply });
+    } else if (entry.type === ENGINE_RULE_TYPE.timePeriod) {
+      const period = DATE_PERIOD_BY_ORDINAL.get(entry.timePeriod ?? -1);
+      if (period) out.push({ ...common, kind: 'date-occurring', range, period, apply });
     } else if (entry.type === ENGINE_RULE_TYPE.duplicateValues) {
       out.push({ ...common, kind: 'duplicates', range, apply });
     } else if (entry.type === ENGINE_RULE_TYPE.uniqueValues) {

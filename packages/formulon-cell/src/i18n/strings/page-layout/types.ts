@@ -59,6 +59,10 @@ export interface PageLayoutStrings {
     footerWorkbookPath: string;
     differentOddEvenPages: string;
     differentFirstPage: string;
+    firstPageHeader: string;
+    firstPageFooter: string;
+    evenPageHeader: string;
+    evenPageFooter: string;
     scaleWithDocument: string;
     alignWithPageMargins: string;
     /** Placeholder for the left header/footer slot. */

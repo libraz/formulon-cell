@@ -29,9 +29,27 @@ const RULE_TYPE = {
   notContainsBlanks: 12,
   containsErrors: 13,
   notContainsErrors: 14,
+  timePeriod: 15,
   duplicateValues: 16,
   uniqueValues: 17,
 } as const;
+
+/** `formulon::cf::TimePeriod` ordinals. */
+export const TIME_PERIOD: Record<
+  Extract<ConditionalRule, { kind: 'date-occurring' }>['period'],
+  number
+> = {
+  today: 0,
+  yesterday: 1,
+  tomorrow: 2,
+  last7: 3,
+  'this-week': 4,
+  'last-week': 5,
+  'next-week': 6,
+  'this-month': 7,
+  'last-month': 8,
+  'next-month': 9,
+};
 
 const VALUE_OBJECT_TYPE = {
   number: 0,
@@ -131,6 +149,8 @@ export interface SyncedConditionalRule {
   readonly sheet: number;
   index: number;
   readonly id?: string;
+  /** Priority requested when the engine entry was written. */
+  readonly priority?: number;
   readonly input: ConditionalFormatInput;
 }
 
@@ -283,7 +303,7 @@ function dxfRecordFromApply(wb: WorkbookHandle, apply: Partial<CellFormat>): Dxf
   return Object.keys(dxf).length > 0 ? dxf : null;
 }
 
-function inputWithDxf(
+export function inputWithDxf(
   wb: WorkbookHandle,
   input: ConditionalFormatInput,
   rule: ConditionalRule,
@@ -300,7 +320,6 @@ function inputWithDxf(
  * `addConditionalFormat` input so its predicate and range round-trip through
  * .xlsx. Returns `null` for rules the engine cannot author:
  *
- * - `date-occurring` — the `timePeriod` ordinal set isn't stable in this API.
  * - `formula` rules that carry a comparator-prefix predicate (`>10`) rather
  *   than a full `=`-expression.
  * - `icon-set` rules with fewer than N-1 thresholds for an N-icon set.
@@ -310,6 +329,11 @@ function inputWithDxf(
  * format record through the workbook handle.
  */
 export function conditionalRuleToEngineInput(rule: ConditionalRule): ConditionalFormatInput | null {
+  const input = conditionalRuleBodyToEngineInput(rule);
+  return input && rule.stopIfTrue === true ? { ...input, stopIfTrue: true } : input;
+}
+
+function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFormatInput | null {
   const sqref = sqrefOf(rule);
   switch (rule.kind) {
     case 'cell-value': {
@@ -474,9 +498,8 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
         },
       };
     }
-    default:
-      // date-occurring
-      return null;
+    case 'date-occurring':
+      return { sqref, type: RULE_TYPE.timePeriod, timePeriod: TIME_PERIOD[rule.period] };
   }
 }
 
@@ -550,11 +573,38 @@ export function syncTrackedConditionalRulesToEngine(
     desired.set(conditionalFormatKey(sheet, input), { input, rule });
   }
 
+  // Session rules rank after every rule this mount did not write, in store
+  // order, so reordering the store reorders the engine priorities.
+  let currentFormats = wb.getConditionalFormats(sheet);
+  const trackedIndexes = new Set<number>();
+  for (const value of opts.tracked.values()) {
+    if (value.sheet !== sheet) continue;
+    const index = trackedEntryIndex(currentFormats, value);
+    if (index >= 0) trackedIndexes.add(index);
+  }
+  let basePriority = 0;
+  currentFormats.forEach((entry, index) => {
+    if (!trackedIndexes.has(index)) basePriority = Math.max(basePriority, entry.priority);
+  });
+  // A rule keeps its written priority while the order stays ascending, so
+  // deleting one rule does not rewrite every rule after it.
+  const desiredPriority = new Map<string, number>();
+  let previousPriority = basePriority;
+  for (const key of desired.keys()) {
+    const kept = opts.tracked.get(key)?.priority;
+    previousPriority = kept !== undefined && kept > previousPriority ? kept : previousPriority + 1;
+    desiredPriority.set(key, previousPriority);
+  }
+
   const stale = [...opts.tracked.entries()]
-    .filter(([key, value]) => value.sheet === sheet && !desired.has(key))
+    .filter(
+      ([key, value]) =>
+        value.sheet === sheet &&
+        (!desired.has(key) ||
+          (value.priority !== undefined && value.priority !== desiredPriority.get(key))),
+    )
     .sort((a, b) => b[1].index - a[1].index);
 
-  let currentFormats = stale.length > 0 ? wb.getConditionalFormats(sheet) : [];
   for (const [key, value] of stale) {
     const removeIndex = trackedEntryIndex(currentFormats, value);
     if (removeIndex < 0) {
@@ -574,7 +624,8 @@ export function syncTrackedConditionalRulesToEngine(
 
   for (const [key, { input, rule }] of desired) {
     if (opts.tracked.has(key)) continue;
-    const writeInput = inputWithDxf(wb, input, rule);
+    const priority = desiredPriority.get(key);
+    const writeInput = { ...inputWithDxf(wb, input, rule), ...(priority ? { priority } : {}) };
     const addedIndex = wb.addConditionalFormat(sheet, writeInput);
     if (addedIndex < 0) {
       skipped += 1;
@@ -589,6 +640,7 @@ export function syncTrackedConditionalRulesToEngine(
       sheet,
       index,
       ...(id ? { id } : {}),
+      ...(priority ? { priority } : {}),
       // The engine fills defaults (gte, min/max lengths, icon floors, etc.)
       // while adding a rule. Keep that normalized snapshot for the no-id
       // fallback; stable non-empty ids remain authoritative on later edits.
@@ -597,4 +649,35 @@ export function syncTrackedConditionalRulesToEngine(
   }
 
   return { written, skipped, removed };
+}
+
+/**
+ * Replace the engine rule `id` on `sheet` by removing it and adding it back,
+ * the only way to change a loaded rule. The id and priority are kept unless
+ * `change` overrides them; `change.input` replaces the rule body wholesale.
+ * Restores the original entry and returns false when the re-add fails.
+ */
+export function rewriteEngineConditionalFormat(
+  wb: WorkbookHandle,
+  sheet: number,
+  id: string,
+  change: { priority?: number; stopIfTrue?: boolean; input?: ConditionalFormatInput },
+): boolean {
+  if (!wb.capabilities.conditionalFormatMutate) return false;
+  const entries = wb.getConditionalFormats(sheet);
+  const index = entries.findIndex((entry) => entry.id === id);
+  const entry = entries[index];
+  if (!entry) return false;
+  const original = entry as unknown as ConditionalFormatInput;
+  const body = change.input ?? original;
+  const next: ConditionalFormatInput = {
+    ...body,
+    id,
+    priority: change.priority ?? entry.priority,
+    stopIfTrue: change.stopIfTrue ?? entry.stopIfTrue,
+  };
+  if (!wb.removeConditionalFormatAt(sheet, index)) return false;
+  if (wb.addConditionalFormat(sheet, next) >= 0) return true;
+  wb.addConditionalFormat(sheet, original);
+  return false;
 }

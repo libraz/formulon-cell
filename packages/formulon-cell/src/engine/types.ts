@@ -335,6 +335,10 @@ export interface EnginePrintOptions {
 export interface EngineHeaderFooter {
   readonly oddHeader: string;
   readonly oddFooter: string;
+  readonly evenHeader: string;
+  readonly evenFooter: string;
+  readonly firstHeader: string;
+  readonly firstFooter: string;
   readonly differentOddEven: boolean;
   readonly differentFirst: boolean;
   readonly scaleWithDoc: boolean;
@@ -720,6 +724,9 @@ export interface EngineCapabilities {
    *  only what the paginator needs; the attributes beside it are preserved on
    *  a load and save but can be authored only through the fragment. */
   readonly printSettingsXml?: boolean;
+  /** Raw worksheet `<sheetPr>` fragment read/write, which carries the tab
+   *  colour and the outline summary position. */
+  readonly sheetPrXml?: boolean;
   /** Manual page-break read/write on both axes. Separate from `printSettings`
    *  because the break table lives on the worksheet rather than in the print
    *  elements. */

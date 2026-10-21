@@ -6,6 +6,12 @@ import {
   readPageSetupExtras,
   readPrintOptions,
 } from './page-setup-xml.js';
+import {
+  type EngineSheetPr,
+  type EngineSheetPrInput,
+  mergeSheetPrFragment,
+  readSheetPr,
+} from './sheet-pr-xml.js';
 import type {
   EngineCapabilities,
   EngineHeaderFooter,
@@ -43,6 +49,10 @@ export type EnginePageSetupInput = Partial<{
 export type EngineHeaderFooterInput = Partial<{
   oddHeader: string;
   oddFooter: string;
+  evenHeader: string;
+  evenFooter: string;
+  firstHeader: string;
+  firstFooter: string;
   differentOddEven: boolean;
   differentFirst: boolean;
   scaleWithDoc: boolean;
@@ -243,6 +253,27 @@ export abstract class WorkbookHandlePrintMethods {
     assertAlive(this);
     if (!this.capabilities.printSettings) return false;
     return wb(this).setSheetHeaderFooter(sheet, headerFooter).ok;
+  }
+
+  /** Tab colour and outline summary position from the raw `<sheetPr>` fragment,
+   *  or null when the engine does not expose it. */
+  getSheetPr(sheet: number): EngineSheetPr | null {
+    assertAlive(this);
+    if (!this.capabilities.sheetPrXml) return null;
+    const r = wb(this).getSheetSheetPrXml(sheet);
+    return r.status.ok ? readSheetPr(r.xml) : null;
+  }
+
+  /** Merge a tab colour and/or outline summary position into `<sheetPr>`. The
+   *  rest of the fragment (code name, filter mode, fit-to-page, ...) is kept. */
+  setSheetPr(sheet: number, change: EngineSheetPrInput): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetPrXml) return false;
+    const current = wb(this).getSheetSheetPrXml(sheet);
+    if (!current.status.ok) return false;
+    const next = mergeSheetPrFragment(current.xml, change);
+    if (next === null) return false;
+    return next === current.xml || wb(this).setSheetSheetPrXml(sheet, next).ok;
   }
 
   /** `_xlnm.Print_Area` as comma-separated A1 ranges; empty when unset. */

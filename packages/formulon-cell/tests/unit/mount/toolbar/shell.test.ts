@@ -156,6 +156,17 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().layout.hiddenRows.has(0)).toBe(true);
     expect(tb.applyCommand('outlineShowDetail')).toBe(true);
     expect(sheet.instance.store.getState().layout.hiddenRows.has(0)).toBe(false);
+    expect(tb.applyCommand('outlineSummaryBelow')).toBe(true);
+    expect(tb.applyCommand('outlineSummaryRight')).toBe(true);
+    expect(sheet.instance.store.getState().layout.outlineSummary?.get(0)).toEqual({
+      below: false,
+      right: false,
+    });
+    expect(tb.applyCommand('outlineSummaryBelow')).toBe(true);
+    expect(sheet.instance.store.getState().layout.outlineSummary?.get(0)).toEqual({
+      below: true,
+      right: false,
+    });
 
     expect(tb.applyCommand('sheetViewSave')).toBe(true);
     expect(sheet.instance.store.getState().sheetViews.views).toHaveLength(1);

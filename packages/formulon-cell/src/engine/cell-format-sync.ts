@@ -11,6 +11,7 @@ import { syncAxisFormatOverrides } from './axis-format-sync.js';
 import { type AxisStructureShift, mapAxisAddress } from './axis-structure-remap.js';
 import {
   cellStyleKeysByXfId,
+  importedCustomCellStyles,
   type NamedStyleXfResolution,
   planNamedCellStylesToEngine,
   resolveNamedStyleXfs,
@@ -437,6 +438,17 @@ export function hydrateCellFormatsFromEngine(
   if (!wb.capabilities.cellFormatting) return;
   const workbookDefaultFont = wb.workbookDefaultFont;
   const styleKeys = cellStyleKeysByXfId(wb);
+  const known = new Set((store.getState().format.customCellStyles ?? []).map((s) => s.id));
+  const imported = importedCustomCellStyles(wb).filter((style) => !known.has(style.id));
+  if (imported.length > 0) {
+    store.setState((s) => ({
+      ...s,
+      format: {
+        ...s.format,
+        customCellStyles: [...(s.format.customCellStyles ?? []), ...imported],
+      },
+    }));
+  }
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
   const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
   for (const c of physicalCells) {
@@ -1202,6 +1214,13 @@ function resolveXfForFormat(
   }
   const xfId = mappedXfId;
   return wb.addXfRecord(xfId === undefined ? record : { ...record, xfId });
+}
+
+/** Publish the named-style catalog without touching any cell, for a style-list
+ *  change on a store whose cells need no rewrite. */
+export function syncNamedStyleCatalogToEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
+  if (!wb.capabilities.cellFormatting) return;
+  syncNamedCellStylesToEngine(wb, store.getState(), (format) => resolveStyleXf(wb, format));
 }
 
 /** Resolve a named style's own formatting to a `<cellStyleXfs>` row. */

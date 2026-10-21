@@ -52,6 +52,20 @@ export interface PageSetup {
   footerLeft?: string;
   footerCenter?: string;
   footerRight?: string;
+  /** Header / footer text for the first page, used when `differentFirstPage`
+   *  is on, and for even pages, used when `differentOddEvenPages` is on. */
+  firstHeaderLeft?: string;
+  firstHeaderCenter?: string;
+  firstHeaderRight?: string;
+  firstFooterLeft?: string;
+  firstFooterCenter?: string;
+  firstFooterRight?: string;
+  evenHeaderLeft?: string;
+  evenHeaderCenter?: string;
+  evenHeaderRight?: string;
+  evenFooterLeft?: string;
+  evenFooterCenter?: string;
+  evenFooterRight?: string;
   /** Header/Footer tab options. */
   differentOddEvenPages?: boolean;
   differentFirstPage?: boolean;

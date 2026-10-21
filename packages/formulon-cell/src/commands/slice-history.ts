@@ -984,6 +984,18 @@ const samePageSetup = (a: PageSetup, b: PageSetup): boolean =>
   a.footerLeft === b.footerLeft &&
   a.footerCenter === b.footerCenter &&
   a.footerRight === b.footerRight &&
+  a.firstHeaderLeft === b.firstHeaderLeft &&
+  a.firstHeaderCenter === b.firstHeaderCenter &&
+  a.firstHeaderRight === b.firstHeaderRight &&
+  a.firstFooterLeft === b.firstFooterLeft &&
+  a.firstFooterCenter === b.firstFooterCenter &&
+  a.firstFooterRight === b.firstFooterRight &&
+  a.evenHeaderLeft === b.evenHeaderLeft &&
+  a.evenHeaderCenter === b.evenHeaderCenter &&
+  a.evenHeaderRight === b.evenHeaderRight &&
+  a.evenFooterLeft === b.evenFooterLeft &&
+  a.evenFooterCenter === b.evenFooterCenter &&
+  a.evenFooterRight === b.evenFooterRight &&
   a.differentOddEvenPages === b.differentOddEvenPages &&
   a.differentFirstPage === b.differentFirstPage &&
   a.scaleHeaderFooterWithDocument === b.scaleHeaderFooterWithDocument &&

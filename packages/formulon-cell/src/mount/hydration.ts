@@ -10,6 +10,7 @@ import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from '../engine/passthrough-sync.js';
 import { hydratePageSetupFromEngine } from '../engine/print-sync.js';
 import { hydrateProtectionFromEngine } from '../engine/protection-sync.js';
+import { hydrateSheetPrFromEngine } from '../engine/sheet-pr-sync.js';
 import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -57,6 +58,7 @@ export function hydrateWorkbookMetadataFromEngine(
     hydrateThreadedCommentsFromEngine(wb, store, sheet);
   }
   hydrateProtectionFromEngine(wb, store);
+  hydrateSheetPrFromEngine(wb, store);
   hydrateTableOverlaysFromEngine(wb, store);
 }
 

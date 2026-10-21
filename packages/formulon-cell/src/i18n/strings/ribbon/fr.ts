@@ -214,6 +214,8 @@ export const ribbonFr: RibbonStrings = {
     ungroupOutline: 'Dissocier',
     showDetail: 'Afficher les détails',
     hideDetail: 'Masquer les détails',
+    summaryRowsBelow: 'Lignes de synthèse sous le détail',
+    summaryColsRight: 'Colonnes de synthèse à droite du détail',
     showRows: 'Afficher les lignes',
     hideRows: 'Masquer les lignes',
     showCols: 'Afficher les colonnes',

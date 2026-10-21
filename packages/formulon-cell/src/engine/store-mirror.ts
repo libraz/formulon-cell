@@ -1,5 +1,6 @@
 import { associatePaginationEngine } from '../commands/pagination.js';
 import type { CellFormat, PageSetup, SpreadsheetStore, State } from '../store/store.js';
+import type { OutlineSummary } from '../store/types.js';
 import { parseAddrKey } from './address.js';
 import { syncAutoFilterToEngine, syncHiddenRowsToEngine } from './auto-filter-sync.js';
 import { remapActiveAxisFormatOverrides, remapAxisFormatOverrides } from './axis-format-sync.js';
@@ -8,6 +9,7 @@ import {
   flushFormatToEngine,
   remapSyncedFormatKeys,
   restoreSyncedFormatKeyMembership,
+  syncNamedStyleCatalogToEngine,
 } from './cell-format-sync.js';
 import {
   createFormatHistoryBridge,
@@ -16,6 +18,7 @@ import {
   unregisterFormatHistoryBridge,
 } from './format-history-bridge.js';
 import { syncPageSetupToEngine } from './print-sync.js';
+import { syncSheetPrToEngine } from './sheet-pr-sync.js';
 import { TableMirror } from './table-mirror.js';
 import type { SheetAxisFormatOverride, SheetFontOverride } from './types.js';
 import { syncViewStateToEngine } from './view-state-sync.js';
@@ -72,9 +75,26 @@ const sheetsWithCellStyles = (formats: ReadonlyMap<string, CellFormat>): Set<num
     const sheet = formatSheetFromKey(key);
     if (sheet !== null) sheets.add(sheet);
   }
-  if (sheets.size === 0) sheets.add(0);
   return sheets;
 };
+
+const changedMapKeys = <V>(
+  previous: ReadonlyMap<number, V> | undefined,
+  next: ReadonlyMap<number, V> | undefined,
+  same: (a: V, b: V) => boolean = Object.is,
+): Set<number> => {
+  const changed = new Set<number>();
+  if (previous === next) return changed;
+  for (const [key, value] of next ?? []) {
+    const before = previous?.get(key);
+    if (before === undefined || !same(before, value)) changed.add(key);
+  }
+  for (const key of previous?.keys() ?? []) if (!next?.has(key)) changed.add(key);
+  return changed;
+};
+
+const sameOutlineSummary = (a: OutlineSummary, b: OutlineSummary): boolean =>
+  a.below === b.below && a.right === b.right;
 
 const sameSheetFontOverride = (
   before: SheetFontOverride | undefined,
@@ -194,6 +214,12 @@ export class StoreMirror {
    *  cell that references one, so its identity is tracked independently. */
   private lastCustomCellStyles: State['format']['customCellStyles'] | null = null;
 
+  /** Tab colours and outline summary positions feed `<sheetPr>`; both are
+   *  compared per sheet because either map is replaced on every edit. */
+  private lastSheetTabColors: ReadonlyMap<number, string> | undefined;
+
+  private lastOutlineSummary: ReadonlyMap<number, OutlineSummary> | undefined;
+
   private storeSyncMuted = 0;
 
   attach(store: SpreadsheetStore | null): void {
@@ -246,6 +272,8 @@ export class StoreMirror {
       }
       const stylesChanged = (state.format.customCellStyles ?? null) !== this.lastCustomCellStyles;
       if (stylesChanged) {
+        // Only sheets whose cells reference a style are rewritten; flushing any
+        // other sheet would clear validations and hyperlinks it never hydrated.
         for (const sheet of sheetsWithCellStyles(nextFormats)) formatSheets.add(sheet);
       }
       // Advance all baselines even while hydration is muted. The state that
@@ -254,6 +282,16 @@ export class StoreMirror {
       this.lastSheetFontOverrides = nextSheetFontOverrides;
       this.lastSheetAxisOverrides = nextSheetAxisOverrides;
       this.lastCustomCellStyles = state.format.customCellStyles ?? null;
+      const sheetPrSheets = changedMapKeys(this.lastSheetTabColors, state.layout.sheetTabColors);
+      for (const sheet of changedMapKeys(
+        this.lastOutlineSummary,
+        state.layout.outlineSummary,
+        sameOutlineSummary,
+      )) {
+        sheetPrSheets.add(sheet);
+      }
+      this.lastSheetTabColors = state.layout.sheetTabColors;
+      this.lastOutlineSummary = state.layout.outlineSummary;
       const nextFilter = autoFilterSignature(state);
       const filterChanged = nextFilter !== this.lastAutoFilterSignature;
       if (filterChanged) this.lastAutoFilterSignature = nextFilter;
@@ -269,6 +307,10 @@ export class StoreMirror {
       if (this.storeSyncMuted > 0) return;
       for (const sheet of formatSheets) {
         if (sheet < this.handle.sheetCount) flushFormatToEngine(this.handle, store, sheet);
+      }
+      if (stylesChanged) syncNamedStyleCatalogToEngine(this.handle, store);
+      for (const sheet of sheetPrSheets) {
+        if (sheet < this.handle.sheetCount) syncSheetPrToEngine(this.handle, store, sheet);
       }
       if (filterChanged) syncAutoFilterToEngine(this.handle, state, state.data.sheetIndex, store);
       if (hiddenRowsChanged && previousHiddenRows && !filterChanged) {
@@ -313,6 +355,8 @@ export class StoreMirror {
     this.lastSheetFontOverrides = state?.format.sheetFontOverrides ?? null;
     this.lastSheetAxisOverrides = state?.format.sheetAxisOverrides ?? null;
     this.lastCustomCellStyles = state?.format.customCellStyles ?? null;
+    this.lastSheetTabColors = state?.layout.sheetTabColors;
+    this.lastOutlineSummary = state?.layout.outlineSummary;
     this.lastAutoFilterSignature = state ? autoFilterSignature(state) : '';
     this.lastHiddenRows = state?.layout.hiddenRows ?? null;
     this.lastHiddenRowsSheet = state?.data.sheetIndex ?? null;

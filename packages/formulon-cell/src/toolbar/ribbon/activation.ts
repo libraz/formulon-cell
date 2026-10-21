@@ -452,6 +452,8 @@ export const RIBBON_TOGGLE_COMMANDS: ReadonlySet<string> = new Set([
   'viewGridlines',
   'viewHeadings',
   'viewFormulas',
+  'outlineSummaryBelow',
+  'outlineSummaryRight',
   'viewFormulaBar',
   'viewR1C1',
   'viewZeros',

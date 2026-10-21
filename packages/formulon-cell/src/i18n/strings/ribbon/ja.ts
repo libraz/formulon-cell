@@ -214,6 +214,8 @@ export const ribbonJa: RibbonStrings = {
     ungroupOutline: 'グループ解除',
     showDetail: '詳細の表示',
     hideDetail: '詳細を表示しない',
+    summaryRowsBelow: '詳細データの下に集計行を挿入する',
+    summaryColsRight: '詳細データの右に集計列を挿入する',
     showRows: '行の再表示',
     hideRows: '行を表示しない',
     showCols: '列の再表示',

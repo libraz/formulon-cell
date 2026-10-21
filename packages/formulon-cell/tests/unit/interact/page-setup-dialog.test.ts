@@ -656,6 +656,47 @@ describe('attachPageSetupDialog', () => {
     handle.detach();
   });
 
+  it('Header/Footer tab shows first-page and even-page editors only while their option is on', () => {
+    mutators.setPageSetup(store, 0, { evenFooterRight: 'Even &P', firstHeaderCenter: 'Cover' });
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('headerFooter')?.click();
+
+    const rowOf = (label: string): HTMLElement | null =>
+      inputByLabel(label)?.closest<HTMLElement>('.fc-pgsetup__triple') ?? null;
+    expect(rowOf('First Page Header Center')?.hidden).toBe(true);
+    expect(rowOf('Even Page Footer Right')?.hidden).toBe(true);
+
+    const first = inputByLabel('Different first page');
+    const oddEven = inputByLabel('Different odd and even pages');
+    if (!first || !oddEven) throw new Error('header/footer option checkboxes missing');
+    first.checked = true;
+    first.dispatchEvent(new Event('change', { bubbles: true }));
+    oddEven.checked = true;
+    oddEven.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(rowOf('First Page Header Center')?.hidden).toBe(false);
+    expect(rowOf('Even Page Footer Right')?.hidden).toBe(false);
+    expect(inputByLabel('First Page Header Center')?.value).toBe('Cover');
+    expect(inputByLabel('Even Page Footer Right')?.value).toBe('Even &P');
+
+    const evenHeader = inputByLabel('Even Page Header Left');
+    const firstFooter = inputByLabel('First Page Footer Right');
+    if (!evenHeader || !firstFooter) throw new Error('variant editors missing');
+    evenHeader.value = 'Left of even';
+    firstFooter.value = 'Page &P';
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+    expect(getPageSetup(store.getState(), 0)).toMatchObject({
+      differentFirstPage: true,
+      differentOddEvenPages: true,
+      firstHeaderCenter: 'Cover',
+      firstFooterRight: 'Page &P',
+      evenHeaderLeft: 'Left of even',
+      evenFooterRight: 'Even &P',
+    });
+    handle.detach();
+  });
+
   it('Custom Header button focuses the direct left-header input without applying a preset', () => {
     const handle = attachPageSetupDialog({ host, store, strings: en });
     handle.open();

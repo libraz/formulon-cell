@@ -251,6 +251,19 @@ export function hydratePageSetupFromEngine(
     patch.footerLeft = footer.left || undefined;
     patch.footerCenter = footer.center || undefined;
     patch.footerRight = footer.right || undefined;
+    for (const [prefix, headerText, footerText] of [
+      ['first', headerFooter.firstHeader, headerFooter.firstFooter],
+      ['even', headerFooter.evenHeader, headerFooter.evenFooter],
+    ] as const) {
+      const extraHeader = splitHeaderFooter(headerText);
+      const extraFooter = splitHeaderFooter(footerText);
+      patch[`${prefix}HeaderLeft`] = extraHeader.left || undefined;
+      patch[`${prefix}HeaderCenter`] = extraHeader.center || undefined;
+      patch[`${prefix}HeaderRight`] = extraHeader.right || undefined;
+      patch[`${prefix}FooterLeft`] = extraFooter.left || undefined;
+      patch[`${prefix}FooterCenter`] = extraFooter.center || undefined;
+      patch[`${prefix}FooterRight`] = extraFooter.right || undefined;
+    }
     patch.differentOddEvenPages = headerFooter.differentOddEven;
     patch.differentFirstPage = headerFooter.differentFirst;
     patch.scaleHeaderFooterWithDocument = headerFooter.scaleWithDoc;
@@ -357,6 +370,26 @@ export function syncPageSetupToEngine(
       left: setup.footerLeft ?? '',
       center: setup.footerCenter ?? '',
       right: setup.footerRight ?? '',
+    }),
+    evenHeader: joinHeaderFooter({
+      left: setup.evenHeaderLeft ?? '',
+      center: setup.evenHeaderCenter ?? '',
+      right: setup.evenHeaderRight ?? '',
+    }),
+    evenFooter: joinHeaderFooter({
+      left: setup.evenFooterLeft ?? '',
+      center: setup.evenFooterCenter ?? '',
+      right: setup.evenFooterRight ?? '',
+    }),
+    firstHeader: joinHeaderFooter({
+      left: setup.firstHeaderLeft ?? '',
+      center: setup.firstHeaderCenter ?? '',
+      right: setup.firstHeaderRight ?? '',
+    }),
+    firstFooter: joinHeaderFooter({
+      left: setup.firstFooterLeft ?? '',
+      center: setup.firstFooterCenter ?? '',
+      right: setup.firstFooterRight ?? '',
     }),
     differentOddEven: setup.differentOddEvenPages === true,
     differentFirst: setup.differentFirstPage === true,

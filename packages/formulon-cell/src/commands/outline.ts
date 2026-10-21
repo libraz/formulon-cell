@@ -1,5 +1,6 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
+import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
+import type { OutlineSummary } from '../store/types.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
 import { recordLayoutChangeWithEngine } from './slice-history.js';
@@ -47,6 +48,17 @@ const setColOutline = (store: SpreadsheetStore, next: Map<number, number>): void
     },
   }));
 };
+
+/** Place the active sheet's outline summary rows below / above and summary
+ *  columns right / left of their detail. */
+export function setOutlineSummaryPosition(
+  store: SpreadsheetStore,
+  patch: Partial<OutlineSummary>,
+): void {
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'setOutlineSummaryPosition')) return;
+  mutators.setOutlineSummary(store, sheet, patch);
+}
 
 /** Increase outline level by 1 for rows in `[r0, r1]`. Caps at level 7. */
 export function groupRows(

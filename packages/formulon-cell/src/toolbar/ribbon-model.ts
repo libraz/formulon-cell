@@ -656,6 +656,8 @@ export function buildRibbonModel(
         cmd('outlineUngroup', tr.ungroupOutline, outlineTitle('ungroup'), 'outlineUngroup', 'wide'),
         cmd('outlineShowDetail', tr.showDetail, outlineTitle('show'), 'outlineShow', 'wide'),
         cmd('outlineHideDetail', tr.hideDetail, outlineTitle('hide'), 'outlineHide', 'wide'),
+        cmd('outlineSummaryBelow', tr.summaryRowsBelow, tr.summaryRowsBelow, 'outlineHide', 'wide'),
+        cmd('outlineSummaryRight', tr.summaryColsRight, tr.summaryColsRight, 'outlineShow', 'wide'),
       ]),
     ]),
     tab('review', [

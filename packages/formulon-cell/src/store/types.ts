@@ -57,6 +57,14 @@ export interface SelectionSlice {
   extraRanges?: Range[];
 }
 
+/** Where an outline's summary row / column sits relative to its detail. */
+export interface OutlineSummary {
+  /** Summary rows sit below the detail rows (the default). */
+  below: boolean;
+  /** Summary columns sit to the right of the detail columns (the default). */
+  right: boolean;
+}
+
 export interface LayoutSlice {
   /** Sheet 0 column widths in CSS pixels, indexed by col. */
   colWidths: Map<number, number>;
@@ -96,6 +104,9 @@ export interface LayoutSlice {
   veryHiddenSheets: Set<number>;
   /** Sheet tab fill colors keyed by sheet index, matching Excel's Tab Color affordance. */
   sheetTabColors: Map<number, string>;
+  /** Outline summary position per sheet index. A sheet with no entry uses the
+   *  defaults: summary rows below the detail, summary columns to its right. */
+  outlineSummary?: Map<number, OutlineSummary>;
   /** Platform screen px per canonical CSS px (Mac 0.75). Absent means 1.
    *  Composes with zoom through `renderScale`. */
   screenScale?: number;

@@ -352,6 +352,24 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('keeps Stop If True when a session rule is edited', () => {
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>',
+      a: 10,
+      apply: { fill: '#ffc7ce' },
+      stopIfTrue: true,
+    });
+    const handle = attachConditionalDialog({ host, store });
+    handle.open({ mode: 'edit', editIndex: 0 });
+    document
+      .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(store.getState().conditional.rules[0]).toMatchObject({ a: 10, stopIfTrue: true });
+    handle.detach();
+  });
+
   it('edits an existing session rule through the shared rule dialog', () => {
     const history = new History();
     mutators.addConditionalRule(store, {

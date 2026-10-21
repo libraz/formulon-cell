@@ -212,6 +212,8 @@ export const ribbonTh: RibbonStrings = {
     ungroupOutline: 'ยกเลิกการจัดกลุ่ม',
     showDetail: 'แสดงรายละเอียด',
     hideDetail: 'ซ่อนรายละเอียด',
+    summaryRowsBelow: 'แถวสรุปด้านล่างรายละเอียด',
+    summaryColsRight: 'คอลัมน์สรุปด้านขวาของรายละเอียด',
     showRows: 'ยกเลิกการซ่อนแถว',
     hideRows: 'ซ่อนแถว',
     showCols: 'ยกเลิกการซ่อนคอลัมน์',

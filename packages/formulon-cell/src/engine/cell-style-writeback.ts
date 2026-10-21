@@ -5,12 +5,13 @@ import {
   type CellStyleId,
   cellStyleFallbackFormat,
   cellStyleGroups,
+  customCellStyleId,
   formatForCellStyleGroups,
   getCellStyle,
   stylePayloadMatches,
   stylePayloadMatchesNative,
 } from '../commands/cell-styles.js';
-import type { CellFormat, State } from '../store/store.js';
+import type { CellFormat, CustomCellStyle, State } from '../store/store.js';
 import { cellFormatFromXf } from './cell-format-sync.js';
 import { localeForWorkbook } from './profile-text-semantics.js';
 import type { CellXf } from './types.js';
@@ -74,10 +75,10 @@ export function cellStyleKeyForOoxmlName(name: string): string {
   return name;
 }
 
-/** Every named style referenced by at least one cell on the sheet set, in a
- *  stable order. Styles nothing references are not written — Excel keeps the
- *  full built-in gallery in every file, but emitting every unused entry would
- *  bloat a workbook the user never styled. */
+/** Every named style referenced by at least one cell, plus every custom style
+ *  the user defined, in a stable order. Unused built-ins are not written —
+ *  the desktop spreadsheet keeps the full gallery in every file, but emitting
+ *  each unused entry would bloat a workbook the user never styled. */
 export function collectNamedStyles(state: State, locale = 'en-US'): NamedStyleRegistration[] {
   const keys = new Set<string>();
   const materialized = new Map<string, Partial<CellFormat>[]>();
@@ -124,6 +125,16 @@ export function collectNamedStyles(state: State, locale = 'en-US'): NamedStyleRe
         groups: cellStyleGroups(custom),
       });
     }
+  }
+  for (const custom of state.format.customCellStyles ?? []) {
+    if (keys.has(custom.label) || getCellStyle(custom.label as CellStyleId)) continue;
+    out.push({
+      key: custom.label,
+      name: custom.label,
+      builtinId: null,
+      format: custom.format,
+      groups: cellStyleGroups(custom),
+    });
   }
   return out;
 }
@@ -411,6 +422,28 @@ export function cellStyleKeysByXfId(wb: WorkbookHandle): Map<number, string> {
     if (!out.has(style.xfId)) {
       out.set(style.xfId, builtin?.id ?? cellStyleKeyForOoxmlName(style.name));
     }
+  }
+  return out;
+}
+
+/** Named styles the workbook carries that the built-in gallery does not know,
+ *  as custom styles. Cells hydrate against these by name, so the store must
+ *  hold them for a later flush to keep each cell's `xfId`. */
+export function importedCustomCellStyles(wb: WorkbookHandle): CustomCellStyle[] {
+  const out: CustomCellStyle[] = [];
+  if (!wb.capabilities.cellStyles) return out;
+  const normalId = getCellStyle('normal')?.builtinId;
+  for (const style of wb.getNamedCellStyles()) {
+    if (style.xfId === NORMAL_STYLE_XF_ID || style.builtinId === normalId) continue;
+    if (CELL_STYLES.some((entry) => entry.builtinId === style.builtinId)) continue;
+    if (cellStyleKeyForOoxmlName(style.name) !== style.name) continue;
+    const xf = wb.getCellStyleXf(style.xfId);
+    if (!xf) continue;
+    out.push({
+      id: customCellStyleId(style.name),
+      label: style.name,
+      format: cellFormatFromXf(wb, xf, wb.workbookDefaultFont),
+    });
   }
   return out;
 }

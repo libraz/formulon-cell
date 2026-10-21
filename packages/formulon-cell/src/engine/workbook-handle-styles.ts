@@ -347,6 +347,13 @@ export abstract class WorkbookHandleStylesMethods {
     return record;
   }
 
+  /** Resolve a theme, indexed or automatic colour to opaque ARGB against the
+   *  workbook theme and palette; null when the engine cannot resolve it. */
+  resolveColorArgb(spec: ColorSpec, context = 0): number | null {
+    assertAlive(this);
+    return resolveArgb(this, spec, context);
+  }
+
   /** Resolve a font record's theme, indexed, or automatic colour for display
    *  while retaining its raw selector. Theme-linked font names are projected
    *  from the current workbook theme for rendering; the returned `scheme`

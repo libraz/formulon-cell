@@ -1,4 +1,5 @@
 import { isColGroupCollapsed, isRowGroupCollapsed } from '../../commands/outline.js';
+import { outlineSummaryFor } from '../../store/outline-summary.js';
 import type { Sparkline } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
@@ -115,6 +116,7 @@ export function paintOutlineGutters(
   const ox = gridOriginX(layout);
   const oy = gridOriginY(layout);
   const rtl = layout.rtl;
+  const summary = outlineSummaryFor(layout, state.data.sheetIndex);
   // Both gutters sit outboard of their header strip, so the row gutter follows
   // the row rail to the far right on a right-to-left sheet, and its brackets
   // grow inwards from that edge.
@@ -159,20 +161,23 @@ export function paintOutlineGutters(
           ctx.beginPath();
           ctx.moveTo(slotCx + 0.5, top);
           ctx.lineTo(slotCx + 0.5, bottom);
-          // Foot tick on the bottom (the "summary row" side), pointing at the
-          // data area.
-          ctx.moveTo(slotCx + 0.5, bottom - 0.5);
-          ctx.lineTo(slotCx + (rtl ? -4.5 : 5.5), bottom - 0.5);
+          // Foot tick on the summary side, pointing at the data area.
+          const footY = summary.below ? bottom - 0.5 : top + 0.5;
+          ctx.moveTo(slotCx + 0.5, footY);
+          ctx.lineTo(slotCx + (rtl ? -4.5 : 5.5), footY);
           ctx.stroke();
           const collapsed = isRowGroupCollapsed(layout, r0, r1);
-          // Toggle sits on the row that should remain visible — typically the
-          // row just below the band on desktop default ("summary below"). If
-          // there is no such row visible, render at the bottom edge of the run.
-          const summaryRow = r1 + 1;
+          // Toggle sits on the row that should remain visible: the row just
+          // below the band by default, just above it when the summary rows
+          // sit above the detail. If there is no such row visible, render at
+          // the run's edge.
+          const summaryRow = summary.below ? r1 + 1 : r0 - 1;
           const summaryY =
             rows.positionAt.has(summaryRow) && !layout.hiddenRows.has(summaryRow)
               ? oy + (rows.positionAt.get(summaryRow) ?? 0) + (rows.sizeAt.get(summaryRow) ?? 0) / 2
-              : bottom + TOGGLE_SIZE / 2 + 2;
+              : summary.below
+                ? bottom + TOGGLE_SIZE / 2 + 2
+                : top - TOGGLE_SIZE / 2 - 2;
           const rect = paintToggle(ctx, theme, slotCx, summaryY, collapsed);
           hits.push({ axis: 'row', level: lvl, i0: r0, i1: r1, rect });
           runStartIdx = -1;
@@ -213,7 +218,10 @@ export function paintOutlineGutters(
           );
           const left = Math.min(startX, endX);
           const right = Math.max(startX, endX);
-          const footX = rtl ? left + 0.5 : right - 0.5;
+          // The summary column's side: logical right is the screen's right,
+          // or its left on a mirrored sheet.
+          const summaryOnRight = summary.right !== rtl;
+          const footX = summaryOnRight ? right - 0.5 : left + 0.5;
           ctx.strokeStyle = theme.rule;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -223,7 +231,7 @@ export function paintOutlineGutters(
           ctx.lineTo(footX, slotCy + 5.5);
           ctx.stroke();
           const collapsed = isColGroupCollapsed(layout, c0, c1);
-          const summaryCol = c1 + 1;
+          const summaryCol = summary.right ? c1 + 1 : c0 - 1;
           const summaryX =
             cols.positionAt.has(summaryCol) && !layout.hiddenCols.has(summaryCol)
               ? mirrorX(
@@ -232,9 +240,9 @@ export function paintOutlineGutters(
                     (cols.positionAt.get(summaryCol) ?? 0) +
                     (cols.sizeAt.get(summaryCol) ?? 0) / 2,
                 )
-              : rtl
-                ? left - TOGGLE_SIZE / 2 - 2
-                : right + TOGGLE_SIZE / 2 + 2;
+              : summaryOnRight
+                ? right + TOGGLE_SIZE / 2 + 2
+                : left - TOGGLE_SIZE / 2 - 2;
           const rect = paintToggle(ctx, theme, summaryX, slotCy, collapsed);
           hits.push({ axis: 'col', level: lvl, i0: c0, i1: c1, rect });
           runStartIdx = -1;

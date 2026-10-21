@@ -388,15 +388,33 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
     });
   });
 
-  it('returns null for date-occurring rules the engine cannot author', () => {
+  it('maps date-occurring periods onto the engine time-period ordinals', () => {
+    const periods = [
+      'today',
+      'yesterday',
+      'tomorrow',
+      'last7',
+      'this-week',
+      'last-week',
+      'next-week',
+      'this-month',
+      'last-month',
+      'next-month',
+    ] as const;
+    periods.forEach((period, ordinal) => {
+      expect(
+        conditionalRuleToEngineInput({ kind: 'date-occurring', range, period, apply: {} }),
+      ).toMatchObject({ type: 15, timePeriod: ordinal });
+    });
+  });
+
+  it('carries stopIfTrue onto the engine input', () => {
     expect(
-      conditionalRuleToEngineInput({
-        kind: 'date-occurring',
-        range,
-        period: 'today',
-        apply: {},
-      }),
-    ).toBeNull();
+      conditionalRuleToEngineInput({ kind: 'blanks', range, apply: {}, stopIfTrue: true }),
+    ).toMatchObject({ type: 11, stopIfTrue: true });
+    expect(conditionalRuleToEngineInput({ kind: 'blanks', range, apply: {} })).not.toHaveProperty(
+      'stopIfTrue',
+    );
   });
 
   it('returns null for icon sets with fewer than N-1 thresholds', () => {

@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachCfRulesDialog } from '../../../src/interact/cf-rules-dialog.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -155,10 +155,8 @@ describe('attachCfRulesDialog', () => {
       '.fc-cfrulesdlg__table tbody tr:first-child .fc-cfrulesdlg__cell-stop input',
     );
     expect(firstStop?.checked).toBe(true);
-    expect(firstStop?.disabled).toBe(true);
-    expect(firstStop?.dataset.disabledReason).toBe(
-      defaultStrings.cfRulesDialog.stopIfTrueUnavailable,
-    );
+    expect(firstStop?.disabled).toBe(false);
+    expect(firstStop?.dataset.disabledReason).toBeUndefined();
 
     handle.detach();
   });
@@ -268,7 +266,7 @@ describe('attachCfRulesDialog', () => {
     const rowMoveUp = rows[0]?.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__row-move-up');
     expect(rowDuplicate?.dataset.disabledReason).toBe(defaultStrings.cfRulesDialog.editUnavailable);
     expect(rowMoveUp?.getAttribute('aria-description')).toBe(
-      defaultStrings.cfRulesDialog.editUnavailable,
+      defaultStrings.cfRulesDialog.moveUpUnavailable,
     );
 
     rows[1]?.click();
@@ -704,5 +702,58 @@ describe('attachCfRulesDialog', () => {
       /\.fc-cfrulesdlg__table tbody tr\[aria-selected="true"\]\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
     );
     expect(css).not.toContain('background: var(--fc-accent-soft');
+  });
+
+  describe('with the real engine', () => {
+    const sqref = [{ firstRow: 0, firstCol: 0, lastRow: 3, lastCol: 0 }];
+
+    it('reorders loaded rules by rewriting their priorities and keeps their stopIfTrue', async () => {
+      const wb = await WorkbookHandle.createDefault();
+      try {
+        wb.addConditionalFormat(0, { sqref, type: 17, priority: 1, stopIfTrue: true });
+        wb.addConditionalFormat(0, { sqref, type: 16, priority: 2 });
+        const handle = attachCfRulesDialog({
+          host,
+          getWb: () => wb,
+          getActiveSheet: () => 0,
+          store: createSpreadsheetStore(),
+        });
+        handle.open();
+        document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__move-down')?.click();
+
+        const byPriority = [...wb.getConditionalFormats(0)].sort((a, b) => a.priority - b.priority);
+        expect(byPriority.map((e) => [e.type, e.priority, e.stopIfTrue])).toEqual([
+          [16, 1, false],
+          [17, 2, true],
+        ]);
+        handle.detach();
+      } finally {
+        wb.dispose();
+      }
+    });
+
+    it('toggles Stop If True on a loaded rule through the engine', async () => {
+      const wb = await WorkbookHandle.createDefault();
+      try {
+        wb.addConditionalFormat(0, { sqref, type: 17, priority: 4 });
+        const handle = attachCfRulesDialog({
+          host,
+          getWb: () => wb,
+          getActiveSheet: () => 0,
+          store: createSpreadsheetStore(),
+        });
+        handle.open();
+        const box = document.querySelector<HTMLInputElement>('.fc-cfrulesdlg__cell-stop input');
+        if (!box) throw new Error('missing checkbox');
+        box.checked = true;
+        box.dispatchEvent(new Event('change'));
+        expect(wb.getConditionalFormats(0)).toMatchObject([
+          { type: 17, priority: 4, stopIfTrue: true },
+        ]);
+        handle.detach();
+      } finally {
+        wb.dispose();
+      }
+    });
   });
 });

@@ -1,6 +1,8 @@
 import type { Range } from '../engine/types.js';
+import { DEFAULT_OUTLINE_SUMMARY } from './outline-summary.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
+  OutlineSummary,
   PageSetup,
   SheetProtectionPasswordHash,
   SheetProtectionPermissions,
@@ -135,6 +137,18 @@ export const sheetSettingsMutators = {
         sheetTabColors.delete(sheet);
       }
       return { ...s, layout: { ...s.layout, sheetTabColors } };
+    });
+  },
+
+  /** Set where a sheet's outline summary rows / columns sit. A sheet back at
+   *  the defaults (below, right) drops its entry. */
+  setOutlineSummary(store: SpreadsheetStore, sheet: number, patch: Partial<OutlineSummary>): void {
+    store.setState((s) => {
+      const outlineSummary = new Map(s.layout.outlineSummary);
+      const next = { ...DEFAULT_OUTLINE_SUMMARY, ...outlineSummary.get(sheet), ...patch };
+      if (next.below && next.right) outlineSummary.delete(sheet);
+      else outlineSummary.set(sheet, next);
+      return { ...s, layout: { ...s.layout, outlineSummary } };
     });
   },
 };

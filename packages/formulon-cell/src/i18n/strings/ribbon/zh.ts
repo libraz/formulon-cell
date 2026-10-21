@@ -212,6 +212,8 @@ export const ribbonZh: RibbonStrings = {
     ungroupOutline: '取消组合',
     showDetail: '显示详细信息',
     hideDetail: '隐藏详细信息',
+    summaryRowsBelow: '明细数据的下方显示摘要行',
+    summaryColsRight: '明细数据的右侧显示摘要列',
     showRows: '取消隐藏行',
     hideRows: '隐藏行',
     showCols: '取消隐藏列',
