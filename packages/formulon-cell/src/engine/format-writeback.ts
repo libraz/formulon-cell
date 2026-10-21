@@ -265,31 +265,29 @@ export function accountingFormatCode(
   const template =
     templates?.getNumFmtCode(symbol ? ACCOUNTING_SYMBOL_ID : ACCOUNTING_NO_SYMBOL_ID) ||
     (symbol ? DEFAULT_ACCOUNTING_TEMPLATE : DEFAULT_ACCOUNTING_TEMPLATE.replaceAll('"$"', ''));
-  const code = withAccountingDecimals(template, decimals);
+  const code = withDecimalPlaces(template, decimals);
   // The template's own currency is its only quoted literal besides the zero dash.
   const templateSymbol = [...code.matchAll(/"([^"]*)"/g)].find((m) => m[1] !== '-')?.[0];
   return templateSymbol ? code.replaceAll(templateSymbol, `"${symbol.replaceAll('"', '')}"`) : code;
 }
 
-/** Rewrite every amount and zero dash of an accounting code to `decimals` places. */
-function withAccountingDecimals(code: string, decimals: number): string {
+/** Rewrite every amount (and an accounting zero dash) of a code to `decimals` places. */
+function withDecimalPlaces(code: string, decimals: number): string {
   const dec = '0'.repeat(decimals);
   return code
     .replace(/#,##0(?:\.0+)?/g, dec ? `#,##0.${dec}` : '#,##0')
     .replace(/"-"\?*/g, `"-"${'?'.repeat(decimals)}`);
 }
 
-/** The accounting format `fmt` with `decimals` places, keeping its code's layout. */
-export function accountingNumFmtWithDecimals(
-  fmt: Extract<NumFmt, { kind: 'accounting' }>,
+/** The currency or accounting format `fmt` with `decimals` places, keeping its code's layout. */
+export function numFmtWithDecimals<T extends Extract<NumFmt, { kind: 'currency' | 'accounting' }>>(
+  fmt: T,
   decimals: number,
-): NumFmt {
+): T {
   return {
     ...fmt,
     decimals,
-    ...(fmt.pattern === undefined
-      ? {}
-      : { pattern: withAccountingDecimals(fmt.pattern, decimals) }),
+    ...(fmt.pattern === undefined ? {} : { pattern: withDecimalPlaces(fmt.pattern, decimals) }),
   };
 }
 
@@ -308,6 +306,7 @@ export function numFmtToFormatCode(
       return withNegativeSection(fmt.thousands ? `#,##${body}` : body, fmt.negativeStyle);
     }
     case 'currency': {
+      if (fmt.pattern !== undefined) return fmt.pattern;
       const dec = '0'.repeat(fmt.decimals);
       const body = dec ? `0.${dec}` : '0';
       const sym = fmt.symbol ?? '$';
@@ -659,6 +658,7 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
       decimals: curMatch[3] ? curMatch[3].length : 0,
       symbol,
       ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+      pattern: original,
     };
   }
   // Fixed with thousands

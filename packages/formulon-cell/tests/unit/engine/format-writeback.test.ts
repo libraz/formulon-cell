@@ -375,6 +375,7 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
       decimals: 0,
       symbol: '¥',
       ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+      pattern: code,
     });
   });
 
@@ -418,6 +419,7 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
       decimals: 0,
       symbol: '¥',
       negativeStyle: 'red',
+      pattern: '[$¥-411]#,##0;[Red]-[$¥-411]#,##0',
     });
   });
 
@@ -460,13 +462,17 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
       decimals: 0,
       symbol: '$',
       negativeStyle: 'red-parens',
+      pattern: '\\$#,##0_);[Red]\\(\\$#,##0\\)',
     });
-    expect(formatCodeToNumFmt('"¥"#,##0;[Red]"¥"\\-#,##0')).toEqual({
+    const yen = '"¥"#,##0;[Red]"¥"\\-#,##0';
+    expect(formatCodeToNumFmt(yen)).toEqual({
       kind: 'currency',
       decimals: 0,
       symbol: '¥',
       negativeStyle: 'red',
+      pattern: yen,
     });
+    expect(numFmtToFormatCode(formatCodeToNumFmt(yen) ?? undefined)).toBe(yen);
   });
 
   it('keeps pattern codes verbatim so literals and locale tags survive', () => {

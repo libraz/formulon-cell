@@ -499,9 +499,15 @@ export function numberStyleNumFmt(id: CellStyleId, locale: string): NumFmt | und
     case 'currency0': {
       const symbol = currencySymbolForLocale(locale);
       if (!japanese) return { kind: 'accounting', decimals, symbol };
-      // The symbol precedes the minus sign, which the currency kind cannot express.
+      // The symbol precedes the minus sign, which only the code itself expresses.
       const body = decimals ? '#,##0.00' : '#,##0';
-      return { kind: 'custom', pattern: `"${symbol}"${body};[Red]"${symbol}"\\-${body}` };
+      return {
+        kind: 'currency',
+        decimals,
+        symbol,
+        negativeStyle: 'red',
+        pattern: `"${symbol}"${body};[Red]"${symbol}"\\-${body}`,
+      };
     }
     default:
       return undefined;

@@ -8,6 +8,8 @@ export type NumFmt =
       decimals: number;
       symbol?: string;
       negativeStyle?: NegativeStyle;
+      /** Exact code of a loaded format, kept so its layout survives a save. */
+      pattern?: string;
     }
   | { kind: 'percent'; decimals: number }
   | { kind: 'scientific'; decimals: number }

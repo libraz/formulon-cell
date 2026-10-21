@@ -109,6 +109,24 @@ describe('bumpDecimals', () => {
     });
   });
 
+  it('steps a loaded currency code without changing its layout', () => {
+    setNumFmt(store.getState(), store, {
+      kind: 'currency',
+      decimals: 0,
+      symbol: '¥',
+      negativeStyle: 'red',
+      pattern: '"¥"#,##0;[Red]"¥"\\-#,##0',
+    });
+    bumpDecimals(store.getState(), store, 1);
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+      kind: 'currency',
+      decimals: 1,
+      symbol: '¥',
+      negativeStyle: 'red',
+      pattern: '"¥"#,##0.0;[Red]"¥"\\-#,##0.0',
+    });
+  });
+
   it('walks percent decimals', () => {
     setNumFmt(store.getState(), store, { kind: 'percent', decimals: 0 });
     bumpDecimals(store.getState(), store, 1);
