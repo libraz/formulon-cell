@@ -11,9 +11,9 @@ import {
   cellTextVerticalOffset,
   cssCellFontSize,
   fontSizeWithVerticalAlign,
-  visualZoom,
 } from '../render/painters/text.js';
 import { formatWithPending } from '../store/pending-format.js';
+import { renderScale } from '../store/render-scale.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 export interface FormulaDraftMirrorDeps {
@@ -89,7 +89,7 @@ export function attachFormulaDraftMirror(deps: FormulaDraftMirrorDeps): FormulaD
       format?.fontFamily,
       'var(--fc-font-ui, system-ui, sans-serif)',
     );
-    const zoom = visualZoom(state.viewport.zoom);
+    const zoom = renderScale(state.layout, state.viewport);
     el.style.fontSize = cssCellFontSize(format?.fontSize, format?.fontVertAlign, zoom);
     const visualSize =
       format?.fontSize !== undefined && Number.isFinite(format.fontSize)

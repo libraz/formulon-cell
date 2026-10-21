@@ -6,6 +6,7 @@ import {
   gridOriginY,
   layoutForView,
 } from '../render/geometry.js';
+import { renderScale } from '../store/render-scale.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { EngineDrawingObject } from './workbook-handle-annotations.js';
@@ -20,9 +21,11 @@ export const EMU_PER_PX = 9525;
 /** How far a duplicated chart, picture or shape sits from its original. */
 export const DUPLICATE_OFFSET_PX = 24;
 
+/** Canonical → screen px factor of the current view; 1 without a store. */
 export const viewportZoom = (store: SpreadsheetStore | undefined): number => {
-  const zoom = store?.getState().viewport.zoom;
-  return zoom && Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  if (!store) return 1;
+  const { layout, viewport } = store.getState();
+  return renderScale(layout, viewport);
 };
 
 /** The anchor fields of a drawing object, as the store keeps them. */
@@ -228,9 +231,10 @@ export const sessionPosition = (
     };
   } catch {
     const zoom = viewportZoom(store);
+    const { defaultColWidth, defaultRowHeight } = state.layout;
     return {
-      x: (object.fromCol * 64 + object.fromColOff / EMU_PER_PX) * zoom,
-      y: (object.fromRow * 20 + object.fromRowOff / EMU_PER_PX) * zoom,
+      x: (object.fromCol * defaultColWidth + object.fromColOff / EMU_PER_PX) * zoom,
+      y: (object.fromRow * defaultRowHeight + object.fromRowOff / EMU_PER_PX) * zoom,
       w: Math.max(1, dimensions.widthEmu / EMU_PER_PX) * zoom,
       h: Math.max(1, dimensions.heightEmu / EMU_PER_PX) * zoom,
     };
@@ -249,7 +253,10 @@ export const cellOrigin = (
     return { x: rect.x, y: rect.y };
   } catch {
     const zoom = viewportZoom(store);
-    return { x: col * 64 * zoom, y: row * 20 * zoom };
+    return {
+      x: col * state.layout.defaultColWidth * zoom,
+      y: row * state.layout.defaultRowHeight * zoom,
+    };
   }
 };
 

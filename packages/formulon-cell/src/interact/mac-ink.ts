@@ -12,6 +12,7 @@ import {
   layoutForView,
   type ViewLayout,
 } from '../render/geometry.js';
+import { renderScale } from '../store/render-scale.js';
 import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
 
 /** The drawing tools exposed by the Mac Draw tab. */
@@ -438,7 +439,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
       d: pathFor(points),
       fill: 'none',
       stroke: style.color,
-      'stroke-width': style.lineWidth * (state.viewport.zoom || 1),
+      'stroke-width': style.lineWidth * renderScale(state.layout, state.viewport),
       opacity: style.opacity,
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
@@ -468,7 +469,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
         d: pathFor(points),
         fill: 'none',
         stroke: style.color,
-        'stroke-width': style.lineWidth * (state.viewport.zoom || 1),
+        'stroke-width': style.lineWidth * renderScale(state.layout, state.viewport),
         opacity: style.opacity,
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',

@@ -12,8 +12,8 @@ import {
   cellTextVerticalOffset,
   cssCellFontSize,
   fontSizeWithVerticalAlign,
-  visualZoom,
 } from '../render/painters/text.js';
+import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
 import {
@@ -657,8 +657,8 @@ export class InlineEditor {
       this.input.style.minHeight = '';
     } else {
       // Spreadsheets grow the editor downward; mirror that with a min-height bump.
-      const baseRow = this.deps.store.getState().layout.defaultRowHeight;
-      this.input.style.minHeight = `${baseRow * lines}px`;
+      const { layout, viewport } = this.deps.store.getState();
+      this.input.style.minHeight = `${layout.defaultRowHeight * renderScale(layout, viewport) * lines}px`;
     }
     this.refreshWidth();
   }
@@ -908,7 +908,7 @@ export class InlineEditor {
     if (!this.input || !this.editingAddr) return;
     const state = this.deps.store.getState();
     const fmt = effectiveCellFormatWithPending(this.deps.wb, state, this.editingAddr);
-    const zoom = visualZoom(state.viewport.zoom);
+    const zoom = renderScale(state.layout, state.viewport);
     // Cell colors stay explicit when authored; a missing family falls through
     // to the host UI stack so an unavailable workbook font cannot switch the
     // editor to the browser's default serif face.
