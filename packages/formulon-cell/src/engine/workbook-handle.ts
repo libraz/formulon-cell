@@ -184,6 +184,9 @@ export class WorkbookHandle {
    *  `ui.platform` wins over the value a host-created handle carries. */
   geometryPlatform: SpreadsheetPlatform = 'default';
 
+  /** Windows default row height `createDefault` stated, repeated on added sheets. */
+  private newSheetRowHeight: number | undefined;
+
   private readonly module: FormulonModule;
 
   private readonly wb: Workbook;
@@ -269,11 +272,9 @@ export class WorkbookHandle {
       platform === 'default'
         ? WINDOWS_DEFAULT_ROW_HEIGHT_PT.get(`${font.name} ${font.size}`)
         : undefined;
-    if (rowHeight !== undefined && handle.canStateSheetFormatDefaults()) {
-      handle.wb.setSheetFormatDefaults(0, {
-        defaultRowHeight: rowHeight,
-        hasDefaultRowHeight: true,
-      });
+    if (rowHeight !== undefined) {
+      handle.newSheetRowHeight = rowHeight;
+      handle.stateNewSheetRowHeight(0);
     }
     return handle;
   }
@@ -354,7 +355,7 @@ export class WorkbookHandle {
     const s = this.wb.addSheet(proposed);
     if (!s.ok) return -1;
     const idx = numberValue(this.wb.sheetCount(), 'sheetCount') - 1;
-    this.copyFirstSheetFormatDefaults(idx);
+    this.stateNewSheetRowHeight(idx);
     this.emit({ kind: 'sheet-add', index: idx, name: proposed });
     return idx;
   }
@@ -393,17 +394,13 @@ export class WorkbookHandle {
     return true;
   }
 
-  /** The engine seeds new-workbook format defaults on sheet 0 only; give an
-   *  added sheet the same base column width and default row height. */
-  private copyFirstSheetFormatDefaults(sheet: number): void {
-    if (sheet <= 0 || !this.canStateSheetFormatDefaults()) return;
-    const first = this.wb.getSheetFormatDefaults(0);
-    if (!first.status.ok) return;
+  /** The engine gives sheets added to a Mac-profile book their profile
+   *  defaults; the Windows row height `createDefault` states is ours to repeat. */
+  private stateNewSheetRowHeight(sheet: number): void {
+    if (this.newSheetRowHeight === undefined || !this.canStateSheetFormatDefaults()) return;
     this.wb.setSheetFormatDefaults(sheet, {
-      baseColWidth: first.baseColWidth,
-      ...(first.hasDefaultRowHeight
-        ? { defaultRowHeight: first.defaultRowHeight, hasDefaultRowHeight: true }
-        : {}),
+      defaultRowHeight: this.newSheetRowHeight,
+      hasDefaultRowHeight: true,
     });
   }
 

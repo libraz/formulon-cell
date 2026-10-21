@@ -88,7 +88,8 @@ describe('Spreadsheet platform switch', () => {
 
     instance.setUi({ platform: 'default' });
     expect(workbook.geometryPlatform).toBe('default');
-    expect(layout().defaultColWidth).toBeCloseTo(82.87, 2);
+    // Windows reads base 10 with 游ゴシック 12 (9 px MDW): 97 px rounded up to 104 px.
+    expect(layout().defaultColWidth).toBe(104);
     expect(layout().screenScale).toBe(1);
     expect(instance.history.canUndo()).toBe(false);
     expect(instance.history.canRedo()).toBe(false);

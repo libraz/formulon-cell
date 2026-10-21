@@ -143,8 +143,24 @@ describe('WorkbookHandle.createDefault platform', () => {
     try {
       expect(rawWorkbook(ja).getRowHeightPt(0, 0).value).toBe(18.75);
       expect(ja.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBe(25);
+      // 游ゴシック 11, base 8: 69 px rounded up to 72 px (8.38 characters).
+      expect(ja.getSheetDefaultLayoutPx(0)?.defaultColWidth).toBe(72);
     } finally {
       ja.dispose();
+    }
+  });
+
+  it('adds bare sheets to a loaded book', async () => {
+    const created = await WorkbookHandle.createDefault({ locale: 'en' });
+    const loaded = await WorkbookHandle.loadBytes(created.save());
+    created.dispose();
+    try {
+      expect(loaded.addSheet()).toBe(1);
+      const raw = rawWorkbook(loaded);
+      expect(raw.getSheetFormatDefaults(0).hasDefaultRowHeight).toBe(true);
+      expect(raw.getSheetFormatDefaults(1).hasDefaultRowHeight).toBe(false);
+    } finally {
+      loaded.dispose();
     }
   });
 
@@ -166,7 +182,8 @@ describe('WorkbookHandle.createDefault platform', () => {
       wb.geometryPlatform = 'default';
       rehydrateAxisLayout(wb, store, 0);
       let state = store.getState();
-      expect(state.layout.defaultColWidth).toBeCloseTo(82.87, 2);
+      // Windows reads base 10 with 游ゴシック 12 (9 px MDW): 97 px rounded up to 104 px.
+      expect(state.layout.defaultColWidth).toBe(104);
       expect(state.layout.defaultRowHeight).toBeCloseTo(80 / 3, 8);
       expect(state.layout.colWidths.get(1)).not.toBe(112);
       expect(state.layout.freezeRows).toBe(2);
