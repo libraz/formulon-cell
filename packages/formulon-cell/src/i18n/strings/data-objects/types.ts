@@ -81,20 +81,6 @@ export interface DataObjectsStrings {
     varianceP: string;
     /** Alert shown when an edit would write over a PivotTable cell. */
     cannotChange: string;
-    dataFieldNaming: {
-      template: string;
-      sum: string;
-      count: string;
-      average: string;
-      max: string;
-      min: string;
-      product: string;
-      countNumbers: string;
-      stdDev: string;
-      stdDevP: string;
-      variance: string;
-      varianceP: string;
-    };
     showValuesAs: string;
     showValuesAsNormal: string;
     showValuesAsPercentOfRow: string;
@@ -162,6 +148,7 @@ export interface DataObjectsStrings {
     pivotAreaColumns: string;
     pivotAreaFilters: string;
     pivotAreaValues: string;
+    pivotAreaNone: string;
     pivotAggregation: string;
     pivotAggregateSum: string;
     pivotAggregateCount: string;

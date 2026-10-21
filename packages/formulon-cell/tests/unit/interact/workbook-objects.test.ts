@@ -55,6 +55,7 @@ const wbWithObjects = () => {
         columns: ['Name'],
       },
     ],
+    getPivotDefinition: () => null,
     getPivotTables: () => [
       {
         sheetIndex: 0,
@@ -679,7 +680,8 @@ describe('attachWorkbookObjectsPanel', () => {
     form?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
     expect(calls).toContain(`data-set:0:0:0:1:${PivotAggregation.Average}:#,##0.00`);
-    expect(dataSpecs[0]?.name).toBe('Average of Sales');
+    // Left unnamed so the engine names it from the workbook profile.
+    expect(dataSpecs[0]?.name).toBeUndefined();
     expect(calls).not.toContain('format:0:0:1:#,##0.00');
     handle.detach();
   });

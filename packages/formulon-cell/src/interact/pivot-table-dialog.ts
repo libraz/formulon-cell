@@ -442,7 +442,6 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
         valueFields: areas.valueFields,
         valueFieldSettings,
         aggregation,
-        dataFieldNaming: strings.pivotTableDialog.dataFieldNaming,
         rowSort: rowSortSelect.value as 'none' | 'asc' | 'desc',
         columnSort: colSortSelect.value as 'none' | 'asc' | 'desc',
         rowSubtotalTop: rowSubtotalTop.checked,

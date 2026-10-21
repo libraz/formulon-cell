@@ -214,6 +214,22 @@ describe('detectCapabilities', () => {
     expect(detectCapabilities(full).pivotTables).toBe(true);
   });
 
+  it('pivotDefinitionRead requires every definition read-back', () => {
+    const keys = [
+      'pivotCacheId',
+      'pivotName',
+      'pivotGetGrandTotals',
+      'pivotRowFieldOrder',
+      'pivotColFieldOrder',
+      'pivotFieldAt',
+      'pivotFieldItemCount',
+      'pivotFieldItemAt',
+      'pivotDataFieldAt',
+    ];
+    expect(detectCapabilities(makeWb(keys.slice(1))).pivotDefinitionRead).toBe(false);
+    expect(detectCapabilities(makeWb(keys)).pivotDefinitionRead).toBe(true);
+  });
+
   it('pivotTableMutate requires the low-level cache, table, field, data-field, and filter surface', () => {
     const partial = makeWb(['pivotCacheCount', 'pivotCreate']);
     expect(detectCapabilities(partial).pivotTableMutate).toBe(false);

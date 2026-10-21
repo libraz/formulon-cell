@@ -1,4 +1,3 @@
-import { pivotAggregationName } from './pivot-aggregation.js';
 import { PIVOT_CELL_KIND } from './pivot-cell-kind.js';
 import type { PivotMutationWorkbook } from './pivot-mutation.js';
 import type {
@@ -21,6 +20,7 @@ import {
   PivotAxis,
   PivotFilterType,
   PivotFilterValueKind,
+  PivotShowValuesAs,
   type PivotSortOrder,
 } from './types.js';
 import { fromEngineValue } from './value.js';
@@ -38,6 +38,56 @@ type WorkbookHandleInternals = {
 export interface PivotFieldItem {
   readonly label: string;
   readonly cacheIndex: number;
+}
+
+/** One member of a pivot field's item list, as stored on the report. */
+export interface PivotItemDefinition {
+  /** The item's own label; empty for an item bound only by cache index. */
+  readonly label: string;
+  /** Index into the bound cache field's shared items, -1 for a label-only item. */
+  readonly cacheIndex: number;
+  readonly visible: boolean;
+}
+
+/** A pivot field as stored on the report, whichever axis (if any) it sits on. */
+export interface PivotFieldDefinition {
+  readonly index: number;
+  readonly sourceName: string;
+  readonly customName: string;
+  /** Null for a field that sits on no axis. */
+  readonly axis: PivotAxis | null;
+  readonly subtotalTop: boolean;
+  /** Number format code, empty for none. */
+  readonly numberFormat: string;
+  readonly cacheFieldIndex: number;
+  readonly sortOrder: PivotSortOrder;
+  readonly sortByField: string;
+  readonly dateGroup: {
+    readonly granularity: PivotDateGrouping;
+    readonly calendar: PivotCalendar;
+    readonly startYear: number;
+    readonly endYear: number;
+    readonly intervalDays: number;
+    readonly startSerial: number;
+    readonly endSerial: number;
+  } | null;
+  readonly items: readonly PivotItemDefinition[];
+}
+
+/** The stored definition of a PivotTable, read back from the engine. */
+export interface PivotDefinition {
+  readonly name: string;
+  readonly cacheId: number;
+  readonly grandTotals: { readonly rows: boolean; readonly cols: boolean };
+  readonly layout: PivotReportLayout | null;
+  /** Pivot field indices of the row / column axes, in display order. */
+  readonly rowFieldOrder: readonly number[];
+  readonly colFieldOrder: readonly number[];
+  readonly fields: readonly PivotFieldDefinition[];
+  /** Value fields in display order; `fieldIndex` is a pivot field index. */
+  readonly dataFields: readonly PivotDataFieldSpec[];
+  /** Filters added in this session; a filter block read from a file is not listed. */
+  readonly filters: readonly PivotFilterSpec[];
 }
 
 declare module './workbook-handle.js' {
@@ -102,6 +152,30 @@ export abstract class WorkbookHandlePivotMethods {
       }
     }
     return false;
+  }
+
+  /** Rectangle each PivotTable of `sheet` occupies, by pivot index. */
+  pivotBounds(sheet: number): { pivotIndex: number; range: Range }[] {
+    assertAlive(this);
+    if (!this.capabilities.pivotTables) return [];
+    const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+    if (n === null) return [];
+    const out: { pivotIndex: number; range: Range }[] = [];
+    for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+      const layout = pivotWb(this).pivotLayout(sheet, pivotIndex);
+      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
+      out.push({
+        pivotIndex,
+        range: {
+          sheet,
+          r0: layout.top,
+          c0: layout.left,
+          r1: layout.top + layout.rows - 1,
+          c1: layout.left + layout.cols - 1,
+        },
+      });
+    }
+    return out;
   }
 
   /** The PivotTable layout cell at `addr`, or null outside every report.
@@ -445,6 +519,139 @@ export abstract class WorkbookHandlePivotMethods {
     if (!wb.pivotCacheId) return -1;
     const r = wb.pivotCacheId(sheet, pivotIdx);
     return r.status.ok ? r.index : -1;
+  }
+
+  /** The PivotTable's stored name, or null when it cannot be read. */
+  pivotTableName(sheet: number, pivotIdx: number): string | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    const r = pivotWb(this).pivotName(sheet, pivotIdx);
+    return r.status.ok ? r.value : null;
+  }
+
+  getPivotTableGrandTotals(
+    sheet: number,
+    pivotIdx: number,
+  ): { rows: boolean; cols: boolean } | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    const r = pivotWb(this).pivotGetGrandTotals(sheet, pivotIdx);
+    return r.status.ok ? { rows: r.rows, cols: r.cols } : null;
+  }
+
+  /** Pivot field indices on the row axis, in display order; null when unreadable. */
+  pivotRowFieldOrder(sheet: number, pivotIdx: number): number[] | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    const r = pivotWb(this).pivotRowFieldOrder(sheet, pivotIdx);
+    return r.status.ok ? [...r.indices] : null;
+  }
+
+  /** Pivot field indices on the column axis, in display order; null when unreadable. */
+  pivotColFieldOrder(sheet: number, pivotIdx: number): number[] | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    const r = pivotWb(this).pivotColFieldOrder(sheet, pivotIdx);
+    return r.status.ok ? [...r.indices] : null;
+  }
+
+  getPivotField(sheet: number, pivotIdx: number, fieldIdx: number): PivotFieldDefinition | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    const wb = pivotWb(this);
+    const r = wb.pivotFieldAt(sheet, pivotIdx, fieldIdx);
+    if (!r.status.ok) return null;
+    const items: PivotItemDefinition[] = [];
+    const itemCount = unwrapNumberResult(wb.pivotFieldItemCount(sheet, pivotIdx, fieldIdx)) ?? 0;
+    for (let i = 0; i < itemCount; i += 1) {
+      const item = wb.pivotFieldItemAt(sheet, pivotIdx, fieldIdx, i);
+      if (!item.status.ok) continue;
+      items.push({ label: item.name, cacheIndex: item.cacheIndex, visible: item.visible });
+    }
+    return {
+      index: fieldIdx,
+      sourceName: r.sourceName,
+      customName: r.customName,
+      axis: isPivotAxis(r.axis) ? r.axis : null,
+      subtotalTop: r.subtotalTop,
+      numberFormat: pivotNumberFormatCode(this, r.numberFormat),
+      cacheFieldIndex: r.cacheFieldIndex,
+      sortOrder: r.sortOrder as PivotSortOrder,
+      sortByField: r.sortByField,
+      dateGroup: r.hasDateGroup
+        ? {
+            granularity: r.dateGranularity as PivotDateGrouping,
+            calendar: r.dateCalendar as PivotCalendar,
+            startYear: r.dateStartYear,
+            endYear: r.dateEndYear,
+            intervalDays: r.dateIntervalDays,
+            startSerial: r.dateStartSerial,
+            endSerial: r.dateEndSerial,
+          }
+        : null,
+      items,
+    };
+  }
+
+  getPivotDataField(
+    sheet: number,
+    pivotIdx: number,
+    dataFieldIdx: number,
+  ): PivotDataFieldSpec | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    const r = pivotWb(this).pivotDataFieldAt(sheet, pivotIdx, dataFieldIdx);
+    if (!r.status.ok) return null;
+    const numberFormat = pivotNumberFormatCode(this, r.numberFormat);
+    return {
+      name: r.name,
+      fieldIndex: r.fieldIndex,
+      aggregation: r.aggregation as PivotAggregation,
+      ...(numberFormat ? { numberFormat } : {}),
+      ...(r.showAs !== PivotShowValuesAs.Normal ? { showValuesAs: r.showAs } : {}),
+      ...(r.showAsBaseField >= 0 ? { showAsBaseField: r.showAsBaseField } : {}),
+      ...(r.showAsBaseItem >= 0 ? { showAsBaseItem: r.showAsBaseItem } : {}),
+    };
+  }
+
+  /** The whole stored definition of a PivotTable, or null when the engine
+   *  cannot read it back (older engine, or a pivot that does not exist). */
+  getPivotDefinition(sheet: number, pivotIdx: number): PivotDefinition | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotDefinitionRead) return null;
+    const name = this.pivotTableName(sheet, pivotIdx);
+    const grandTotals = this.getPivotTableGrandTotals(sheet, pivotIdx);
+    const rowFieldOrder = this.pivotRowFieldOrder(sheet, pivotIdx);
+    const colFieldOrder = this.pivotColFieldOrder(sheet, pivotIdx);
+    const cacheId = this.pivotTableCacheId(sheet, pivotIdx);
+    if (name === null || !grandTotals || !rowFieldOrder || !colFieldOrder || cacheId < 0) {
+      return null;
+    }
+    const fields: PivotFieldDefinition[] = [];
+    const fieldCount = this.pivotFieldCount(sheet, pivotIdx);
+    for (let i = 0; i < fieldCount; i += 1) {
+      const field = this.getPivotField(sheet, pivotIdx, i);
+      if (!field) return null;
+      fields.push(field);
+    }
+    const dataFields: PivotDataFieldSpec[] = [];
+    const dataFieldCount = this.pivotDataFieldCount(sheet, pivotIdx);
+    for (let i = 0; i < dataFieldCount; i += 1) {
+      const dataField = this.getPivotDataField(sheet, pivotIdx, i);
+      if (!dataField) return null;
+      dataFields.push(dataField);
+    }
+    return {
+      name,
+      cacheId,
+      grandTotals,
+      layout: this.getPivotReportLayout(sheet, pivotIdx),
+      rowFieldOrder,
+      colFieldOrder,
+      fields,
+      dataFields,
+      filters: pivotFilterSpecs(this, sheet, pivotIdx),
+    };
   }
 
   removePivotTable(sheet: number, pivotIdx: number): boolean {
@@ -946,10 +1153,9 @@ function toEnginePivotDataFieldSpec(
     if (registered === null) return null;
     numberFormat = registered || undefined;
   }
-  const name =
-    spec.name?.trim() || `${pivotAggregationName(spec.aggregation)} of field ${spec.fieldIndex}`;
   return {
-    name,
+    // An empty name has the engine name the field from the workbook profile.
+    name: spec.name?.trim() ?? '',
     fieldIndex: spec.fieldIndex,
     aggregation: spec.aggregation,
     ...(numberFormat !== undefined ? { numberFormat } : {}),

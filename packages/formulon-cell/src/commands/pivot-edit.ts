@@ -1,4 +1,3 @@
-import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-data-field-name.js';
 import {
   type PivotAggregation,
   PivotAxis,
@@ -34,8 +33,53 @@ export interface PivotEdit {
   fields: readonly PivotEditField[];
   /** Replacement for the pivot's filters, or null to leave them untouched. */
   filters: readonly PivotFilterSpec[] | null;
-  /** UI-language wording for value-field names; English when omitted. */
-  dataFieldNaming?: PivotDataFieldNaming;
+  /** The data fields as read back from the engine. When given, edits keep each
+   *  field's name, show-as and order, and are written as one replacement list;
+   *  when omitted, value fields overwrite the existing data fields by position. */
+  dataFields?: readonly PivotDataFieldSpec[];
+}
+
+/** Key-order-independent form of a data-field list, for comparing it. */
+const canonicalSpecs = (specs: readonly PivotDataFieldSpec[]): string =>
+  JSON.stringify(specs.map((spec) => Object.entries(spec).sort(([a], [b]) => (a < b ? -1 : 1))));
+
+/** The data-field list after applying the form's value-field settings: a
+ *  field's first data field takes the edited aggregation and format, data
+ *  fields of fields moved off the Value axis drop out, and newly valued
+ *  fields append. A name survives unless the aggregation changed, in which
+ *  case the engine names it afresh. */
+function editedDataFields(
+  current: readonly PivotDataFieldSpec[],
+  fields: readonly PivotEditField[],
+): PivotDataFieldSpec[] {
+  const byIndex = new Map(fields.map((field) => [field.fieldIndex, field]));
+  const edited = new Set<number>();
+  const next: PivotDataFieldSpec[] = [];
+  for (const dataField of current) {
+    const field = byIndex.get(dataField.fieldIndex);
+    if (field && field.axis !== PivotAxis.Value) continue;
+    if (!field || edited.has(dataField.fieldIndex)) {
+      next.push(dataField);
+      continue;
+    }
+    edited.add(dataField.fieldIndex);
+    const { numberFormat: _format, name, ...rest } = dataField;
+    next.push({
+      ...rest,
+      ...(field.aggregation === dataField.aggregation && name ? { name } : {}),
+      aggregation: field.aggregation,
+      ...(field.numberFormat.length > 0 ? { numberFormat: field.numberFormat } : {}),
+    });
+  }
+  for (const field of fields) {
+    if (field.axis !== PivotAxis.Value || edited.has(field.fieldIndex)) continue;
+    next.push({
+      fieldIndex: field.fieldIndex,
+      aggregation: field.aggregation,
+      ...(field.numberFormat.length > 0 ? { numberFormat: field.numberFormat } : {}),
+    });
+  }
+  return next;
 }
 
 /** Write a pivot edit back to the engine. Every step runs even when an earlier
@@ -47,7 +91,6 @@ export function applyPivotEdit(
     pivotIndex: number;
     rows: number;
     cols: number;
-    fields: readonly string[];
   },
   edit: PivotEdit,
 ): boolean {
@@ -82,25 +125,30 @@ export function applyPivotEdit(
     wb.setPivotColFieldOrder(sheetIndex, pivotIndex, colFieldOrder);
   const dataFieldCount = wb.pivotDataFieldCount(sheetIndex, pivotIndex);
   let nextDataFieldIndex = 0;
-  const valueFieldsUpdated = edit.fields.every((field) => {
-    if (field.axis !== PivotAxis.Value) return true;
-    const spec: PivotDataFieldSpec = {
-      name: pivotDataFieldName(
-        field.aggregation,
-        pivot.fields[field.fieldIndex] ?? `field ${field.fieldIndex}`,
-        edit.dataFieldNaming,
-      ),
-      fieldIndex: field.fieldIndex,
-      aggregation: field.aggregation,
-      ...(field.numberFormat.length > 0 ? { numberFormat: field.numberFormat } : {}),
-    };
-    const dataFieldIndex = nextDataFieldIndex;
-    nextDataFieldIndex += 1;
-    if (dataFieldIndex < dataFieldCount) {
-      return wb.setPivotDataField(sheetIndex, pivotIndex, dataFieldIndex, spec);
-    }
-    return wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0;
-  });
+  const replaceDataFields = (current: readonly PivotDataFieldSpec[]): boolean => {
+    const next = editedDataFields(current, edit.fields);
+    if (canonicalSpecs(next) === canonicalSpecs(current)) return true;
+    return (
+      wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
+      next.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0)
+    );
+  };
+  const valueFieldsUpdated = edit.dataFields
+    ? replaceDataFields(edit.dataFields)
+    : edit.fields.every((field) => {
+        if (field.axis !== PivotAxis.Value) return true;
+        const spec: PivotDataFieldSpec = {
+          fieldIndex: field.fieldIndex,
+          aggregation: field.aggregation,
+          ...(field.numberFormat.length > 0 ? { numberFormat: field.numberFormat } : {}),
+        };
+        const dataFieldIndex = nextDataFieldIndex;
+        nextDataFieldIndex += 1;
+        if (dataFieldIndex < dataFieldCount) {
+          return wb.setPivotDataField(sheetIndex, pivotIndex, dataFieldIndex, spec);
+        }
+        return wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0;
+      });
   const filterItemsUpdated = edit.fields.every((field) => {
     if (field.axis !== PivotAxis.Page) return true;
     if (!wb.clearPivotFieldItems(sheetIndex, pivotIndex, field.fieldIndex)) return false;

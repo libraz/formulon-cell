@@ -465,7 +465,7 @@ describe('WorkbookHandle PivotTable projection', () => {
       }),
     ).toBe(0);
     expect(dataSpec).toMatchObject({
-      name: 'Average of field 1',
+      name: '',
       numberFormat: '164',
       showAs: 3,
     });

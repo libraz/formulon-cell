@@ -150,12 +150,12 @@ const makeWb = () => {
     addPivotDataField: (
       _sheet: number,
       _pivot: number,
-      spec: { name: string; fieldIndex: number; aggregation: number; numberFormat?: string },
+      spec: { name?: string; fieldIndex: number; aggregation: number; numberFormat?: string },
     ) => {
       calls.push(
         [
           'data-field',
-          spec.name,
+          spec.name ?? '',
           String(spec.fieldIndex),
           String(spec.aggregation),
           spec.numberFormat ?? '',
@@ -164,7 +164,9 @@ const makeWb = () => {
       );
       const base = spec as { showAsBaseField?: number; showAsBaseItem?: number };
       if (base.showAsBaseField !== undefined || base.showAsBaseItem !== undefined) {
-        calls.push(`data-field-base:${spec.name}:${base.showAsBaseField}:${base.showAsBaseItem}`);
+        calls.push(
+          `data-field-base:${spec.name ?? ''}:${base.showAsBaseField}:${base.showAsBaseItem}`,
+        );
       }
       return 0;
     },
@@ -235,7 +237,7 @@ describe('pivot-table command helpers', () => {
     expect(calls).toContain(`sort:1:${PivotSortOrder.Descending}:`);
     expect(calls).toContain('pivot-field:Product:1');
     expect(calls).toContain('pivot-field:Sales:2');
-    expect(calls).toContain('data-field:Sum of Sales:2:0:#,##0:');
+    expect(calls).toContain('data-field::2:0:#,##0:');
   });
 
   it('projects source row and column labels through the real WASM engine', async () => {
@@ -414,8 +416,8 @@ describe('pivot-table command helpers', () => {
     expect(result.ok).toBe(true);
     expect(calls).toContain('pivot-field:Sales:2');
     expect(calls).toContain('pivot-field:Product:2');
-    expect(calls).toContain('data-field:Count of Sales:2:1::');
-    expect(calls).toContain('data-field:Count of Product:1:1::');
+    expect(calls).toContain('data-field::2:1::');
+    expect(calls).toContain('data-field::1:1::');
   });
 
   it('applies value field aggregation and number format per field', () => {
@@ -440,9 +442,9 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(calls).toContain('data-field:Average of Sales:2:2:#,##0.00:3');
-    expect(calls).toContain('data-field:Count of Product:1:1:#,##0:');
-    expect(calls).not.toContain('data-field:Average of Product:1:2:#,##0.00:3');
+    expect(calls).toContain('data-field::2:2:#,##0.00:3');
+    expect(calls).toContain('data-field::1:1:#,##0:');
+    expect(calls).not.toContain('data-field::1:2:#,##0.00:3');
   });
 
   it('maps the show-as base field to its pivot field and lists base items first', () => {
@@ -465,7 +467,7 @@ describe('pivot-table command helpers', () => {
     expect(result.ok).toBe(true);
     expect(calls).toContain('pivot-item:0:East:true');
     expect(calls).toContain('pivot-item:0:West:true');
-    expect(calls).toContain('data-field-base:Sum of Sales:0:1');
+    expect(calls).toContain('data-field-base::0:1');
     expect(calls.indexOf('pivot-item:0:West:true')).toBeLessThan(
       calls.findIndex((c) => c.startsWith('data-field:')),
     );
@@ -491,7 +493,7 @@ describe('pivot-table command helpers', () => {
     });
     expect(ok.ok).toBe(true);
     expect(calls.some((c) => c.startsWith('pivot-item:'))).toBe(false);
-    expect(calls).toContain(`data-field-base:Sum of Sales:0:${PIVOT_SHOW_AS_BASE_PREVIOUS}`);
+    expect(calls).toContain(`data-field-base::0:${PIVOT_SHOW_AS_BASE_PREVIOUS}`);
 
     expect(
       createPivotTableFromRange(wb, {

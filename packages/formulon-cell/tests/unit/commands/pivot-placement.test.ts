@@ -7,7 +7,6 @@ import {
 } from '../../../src/commands/pivot-table.js';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { ja } from '../../../src/i18n/strings.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const setup = async () => {
@@ -40,7 +39,6 @@ const strings = {
   recommendedPivotTables: 'Recommended',
   pivotAuthoringDetail: 'Detail',
   workbookStructureProtectedBlocked: 'Protected',
-  dataFieldNaming: ja.pivotTableDialog.dataFieldNaming,
 };
 
 describe('pivot source for a single cell', () => {
@@ -136,6 +134,8 @@ describe('new-sheet placement', () => {
 describe('ribbon one-click', () => {
   it('lands on the same default destination as the dialog', async () => {
     const { wb, store } = await setup();
+    // The engine names the value field from the workbook profile.
+    expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
     mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
     const result = executeRibbonPivotTableAction({
       store,

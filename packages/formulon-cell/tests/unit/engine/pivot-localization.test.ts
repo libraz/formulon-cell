@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
-import { pivotDataFieldName } from '../../../src/engine/pivot-data-field-name.js';
 import { PivotAggregation } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { en, ja } from '../../../src/i18n/strings.js';
 
 const makeWorkbook = async (): Promise<WorkbookHandle> => {
   const wb = await WorkbookHandle.createDefault();
@@ -60,28 +58,36 @@ describe('pivot captions', () => {
     wb.dispose();
   });
 
-  it('names new value fields in the UI language', async () => {
+  it('names new value fields from the workbook profile', async () => {
+    const wb = await makeWorkbook();
+    expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
+    createPivotTableFromRange(wb, {
+      source,
+      destination: { sheet: 0, row: 7, col: 0 },
+      rowField: 'Region',
+      valueField: 'Sales',
+    });
+    expect([...texts(wb).values()]).toContain('合計 / Sales');
+    expect(wb.getPivotDefinition(0, 0)?.dataFields[0]?.name).toBe('合計 / Sales');
+    wb.dispose();
+  });
+
+  it('names a field per aggregation when the name is omitted', async () => {
     const wb = await makeWorkbook();
     createPivotTableFromRange(wb, {
       source,
       destination: { sheet: 0, row: 7, col: 0 },
       rowField: 'Region',
       valueField: 'Sales',
-      dataFieldNaming: ja.pivotTableDialog.dataFieldNaming,
     });
-    expect([...texts(wb).values()]).toContain('合計 / Sales');
+    const spec = { fieldIndex: 2, aggregation: PivotAggregation.StdDevP };
+    expect(wb.addPivotDataField(0, 0, spec)).toBeGreaterThan(0);
+    expect(
+      wb.addPivotDataField(0, 0, { ...spec, aggregation: PivotAggregation.CountNumbers }),
+    ).toBeGreaterThan(0);
+    const names = wb.getPivotDefinition(0, 0)?.dataFields.map((d) => d.name);
+    expect(names).toEqual(['Sum of Sales', 'StdDevp of Sales', 'Count of Sales']);
     wb.dispose();
-  });
-
-  it('formats every aggregation name', () => {
-    const naming = en.pivotTableDialog.dataFieldNaming;
-    expect(pivotDataFieldName(PivotAggregation.StdDevP, 'Sales', naming)).toBe('StdDevp of Sales');
-    expect(pivotDataFieldName(PivotAggregation.CountNumbers, 'Sales')).toBe('Count of Sales');
-    const jaNaming = ja.pivotTableDialog.dataFieldNaming;
-    expect(pivotDataFieldName(PivotAggregation.StdDev, 'Sales', jaNaming)).toBe(
-      '標本標準偏差 / Sales',
-    );
-    expect(pivotDataFieldName(PivotAggregation.VarP, '$&', jaNaming)).toBe('分散 / $&');
   });
 });
 

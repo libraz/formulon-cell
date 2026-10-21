@@ -1,6 +1,5 @@
 import { formatA1Range } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
-import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-data-field-name.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
 import {
@@ -11,6 +10,7 @@ import {
   PivotSortOrder,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { currentRegion } from './current-region.js';
@@ -56,8 +56,6 @@ export interface CreatePivotTableOptions {
   valueFields?: readonly string[];
   valueFieldSettings?: readonly PivotValueFieldSettings[];
   aggregation?: PivotAggregation;
-  /** UI-language wording for new value-field names; English when omitted. */
-  dataFieldNaming?: PivotDataFieldNaming;
   rowSort?: PivotSortDirection;
   columnSort?: PivotSortDirection;
   rowSubtotalTop?: boolean;
@@ -364,12 +362,39 @@ export function createPivotTableFromRange(
     return failAfterPivot('grand-totals');
   }
 
-  const rowPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
-    sourceName: rowField.name,
-    axis: PivotAxis.Row,
-    subtotalTop: opts.rowSubtotalTop ?? true,
-  });
-  if (rowPivotField < 0) return failAfterPivot('row-field');
+  // The engine binds pivot field i to cache field i, so fields go in cache
+  // order and any the report does not use pad the gap as value-axis fields
+  // that carry no data field.
+  const roles = new Map<string, PivotAxis>();
+  roles.set(rowField.name, PivotAxis.Row);
+  if (columnField) roles.set(columnField.name, PivotAxis.Col);
+  for (const filterField of filterFields) {
+    if (filterField) roles.set(filterField.name, PivotAxis.Page);
+  }
+  for (const valueField of valueFields) {
+    if (valueField && !roles.has(valueField.name)) roles.set(valueField.name, PivotAxis.Value);
+  }
+  const lastUsedIndex = Math.max(...[...roles.keys()].map((name) => byName.get(name)?.index ?? 0));
+  const roleSteps = {
+    [PivotAxis.Row]: 'row-field',
+    [PivotAxis.Col]: 'col-field',
+    [PivotAxis.Page]: 'filter-field',
+    [PivotAxis.Value]: 'value-field',
+  } as const;
+  const pivotFieldByName = new Map<string, number>();
+  for (const field of fields) {
+    if (field.index > lastUsedIndex) break;
+    const axis = roles.get(field.name) ?? PivotAxis.Value;
+    const pivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
+      sourceName: field.name,
+      axis,
+      ...(axis === PivotAxis.Row ? { subtotalTop: opts.rowSubtotalTop ?? true } : {}),
+      ...(axis === PivotAxis.Col ? { subtotalTop: opts.columnSubtotalTop ?? true } : {}),
+    });
+    if (pivotField < 0) return failAfterPivot(roleSteps[axis]);
+    pivotFieldByName.set(field.name, pivotField);
+  }
+  const rowPivotField = pivotFieldByName.get(rowField.name) as number;
   if (opts.rowSort && opts.rowSort !== 'none') {
     const ok = wb.setPivotFieldSort(
       opts.destination.sheet,
@@ -381,33 +406,21 @@ export function createPivotTableFromRange(
     if (!ok) return failAfterPivot('row-sort');
   }
 
-  let colPivotField = -1;
-  if (columnField) {
-    colPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
-      sourceName: columnField.name,
-      axis: PivotAxis.Col,
-      subtotalTop: opts.columnSubtotalTop ?? true,
-    });
-    if (colPivotField < 0) return failAfterPivot('col-field');
-    if (opts.columnSort && opts.columnSort !== 'none') {
-      const ok = wb.setPivotFieldSort(
-        opts.destination.sheet,
-        pivotIndex,
-        colPivotField,
-        opts.columnSort === 'asc' ? PivotSortOrder.Ascending : PivotSortOrder.Descending,
-        '',
-      );
-      if (!ok) return failAfterPivot('col-sort');
-    }
+  const colPivotField = columnField ? (pivotFieldByName.get(columnField.name) as number) : -1;
+  if (columnField && opts.columnSort && opts.columnSort !== 'none') {
+    const ok = wb.setPivotFieldSort(
+      opts.destination.sheet,
+      pivotIndex,
+      colPivotField,
+      opts.columnSort === 'asc' ? PivotSortOrder.Ascending : PivotSortOrder.Descending,
+      '',
+    );
+    if (!ok) return failAfterPivot('col-sort');
   }
 
   for (const filterField of filterFields) {
     if (!filterField) return failAfterPivot('filter-field');
-    const filterPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
-      sourceName: filterField.name,
-      axis: PivotAxis.Page,
-    });
-    if (filterPivotField < 0) return failAfterPivot('filter-field');
+    const filterPivotField = pivotFieldByName.get(filterField.name) as number;
     for (const item of opts.filterItems?.filter((entry) => entry.fieldName === filterField.name) ??
       []) {
       if (
@@ -465,11 +478,6 @@ export function createPivotTableFromRange(
 
   for (const valueField of valueFields) {
     if (!valueField) return failAfterPivot('value-field');
-    const valuePivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
-      sourceName: valueField.name,
-      axis: PivotAxis.Value,
-    });
-    if (valuePivotField < 0) return failAfterPivot('value-field');
     const settings = valueFieldSettings.get(valueField.name);
     const aggregation =
       settings?.aggregation ??
@@ -477,9 +485,9 @@ export function createPivotTableFromRange(
       (valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count);
     const numberFormat = settings?.numberFormat?.trim() || opts.valueNumberFormat?.trim();
 
+    // Left unnamed, the engine names the field from the workbook profile.
     const dataField = wb.addPivotDataField(opts.destination.sheet, pivotIndex, {
-      name: pivotDataFieldName(aggregation, valueField.name, opts.dataFieldNaming),
-      fieldIndex: valueField.index,
+      fieldIndex: pivotFieldByName.get(valueField.name) as number,
       aggregation,
       numberFormat: numberFormat || undefined,
       showValuesAs: settings?.showValuesAs,
@@ -697,6 +705,118 @@ export function createPivotTableAtPlacement(
   return { ok: true, cacheId: result.cacheId, pivotIndex: result.pivotIndex, destination };
 }
 
+/** Rebuild a report on its original pivot cache from a stored definition.
+ *  Pivot field `i` binds to cache field `i`, so every field is re-added in
+ *  order; a field that sat on no axis returns as a value-axis field without a
+ *  data field. Returns the new pivot index, or -1 on failure. */
+export function recreatePivotTable(
+  wb: WorkbookHandle,
+  sheet: number,
+  anchor: { row: number; col: number },
+  definition: PivotDefinition,
+): number {
+  const pivotIndex = wb.createPivotTable(sheet, definition.name, definition.cacheId, anchor);
+  if (pivotIndex < 0) return -1;
+  const rebuild = (): boolean => {
+    const { grandTotals, layout } = definition;
+    if (!wb.setPivotTableGrandTotals(sheet, pivotIndex, grandTotals.rows, grandTotals.cols)) {
+      return false;
+    }
+    if (layout !== null && !wb.setPivotReportLayout(sheet, pivotIndex, layout)) return false;
+    for (const field of definition.fields) {
+      const added = wb.addPivotField(sheet, pivotIndex, {
+        sourceName: field.sourceName,
+        ...(field.customName ? { customName: field.customName } : {}),
+        axis: field.axis ?? PivotAxis.Value,
+        subtotalTop: field.subtotalTop,
+        ...(field.numberFormat ? { numberFormat: field.numberFormat } : {}),
+      });
+      if (added !== field.index) return false;
+      if (!wb.setPivotFieldSort(sheet, pivotIndex, added, field.sortOrder, field.sortByField)) {
+        return false;
+      }
+      if (field.dateGroup) {
+        const { granularity, calendar, ...bounds } = field.dateGroup;
+        if (!wb.setPivotFieldDateGroup(sheet, pivotIndex, added, granularity, calendar, bounds)) {
+          return false;
+        }
+      }
+      for (const item of field.items) {
+        const placed =
+          item.cacheIndex >= 0 && wb.capabilities.pivotItemByCacheIndex
+            ? wb.addPivotFieldItemAt(sheet, pivotIndex, added, item.cacheIndex, item.visible)
+            : wb.addPivotFieldItem(sheet, pivotIndex, added, item.label, item.visible);
+        if (!placed) return false;
+      }
+    }
+    return (
+      wb.setPivotRowFieldOrder(sheet, pivotIndex, definition.rowFieldOrder) &&
+      wb.setPivotColFieldOrder(sheet, pivotIndex, definition.colFieldOrder) &&
+      definition.dataFields.every((spec) => wb.addPivotDataField(sheet, pivotIndex, spec) >= 0) &&
+      definition.filters.every((filter) => wb.addPivotFilter(sheet, pivotIndex, filter))
+    );
+  };
+  if (rebuild()) return pivotIndex;
+  wb.removePivotTable(sheet, pivotIndex);
+  return -1;
+}
+
+export interface DeletePivotTablesDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  history?: History | null;
+}
+
+/** Remove whole reports as one undo step. Undo rebuilds each report from the
+ *  definition read back before removal; the pivot cache stays in the
+ *  workbook meanwhile. False, with nothing removed, when a definition cannot
+ *  be read back (so the removal could not be undone). */
+export function deletePivotTables(
+  deps: DeletePivotTablesDeps,
+  sheet: number,
+  pivots: readonly { pivotIndex: number; range: Range }[],
+): boolean {
+  const { store, workbook: wb } = deps;
+  const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
+  const ascending = [...pivots].sort((a, b) => a.pivotIndex - b.pivotIndex);
+  const captured: { definition: PivotDefinition; anchor: { row: number; col: number } }[] = [];
+  for (const { pivotIndex, range } of ascending) {
+    const definition = wb.getPivotDefinition(sheet, pivotIndex);
+    if (!definition) return false;
+    // The extent starts at the filter block, which sits above the anchor with
+    // one blank row between them.
+    const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
+    captured.push({
+      definition,
+      anchor: { row: range.r0 + (filterRows > 0 ? filterRows + 1 : 0), col: range.c0 },
+    });
+  }
+  const refresh = (): void => {
+    if (store.getState().data.sheetIndex === sheet) {
+      mutators.replaceCells(store, wb.cells(sheet));
+    }
+  };
+  // Highest index first so the lower ones stay valid while removing.
+  const removeAll = (indices: readonly number[]): void => {
+    for (const index of [...indices].sort((a, b) => b - a)) wb.removePivotTable(sheet, index);
+    refresh();
+  };
+  removeAll(ascending.map((pivot) => pivot.pivotIndex));
+  if (history) {
+    let restored: number[] = [];
+    history.push({
+      undo: () => {
+        restored = captured
+          .map(({ definition, anchor }) => recreatePivotTable(wb, sheet, anchor, definition))
+          .filter((index) => index >= 0);
+        refresh();
+      },
+      redo: () => removeAll(restored),
+    });
+  }
+  return true;
+}
+
 export type RibbonPivotTableAction =
   | 'dialog'
   | 'recommended'
@@ -733,8 +853,6 @@ export interface RibbonPivotTableActionStrings {
   recommendedPivotTables: string;
   pivotAuthoringDetail: string;
   workbookStructureProtectedBlocked: string;
-  /** UI-language wording for the new value field's name. */
-  dataFieldNaming?: PivotDataFieldNaming;
 }
 
 export interface ExecuteRibbonPivotTableActionDeps {
@@ -848,7 +966,6 @@ export const executeRibbonPivotTableAction = (
       rowField: rowField.name,
       valueField: valueField.name,
       aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,
-      dataFieldNaming: strings.dataFieldNaming,
     },
     'new-sheet',
   );

@@ -7,6 +7,7 @@ import {
   PivotReportLayout,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import type { Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -38,6 +39,58 @@ export interface PivotEditorContext {
   onApplied(): void;
 }
 
+const AXIS_NONE = 'none';
+
+/** One field of the edit form: its stored settings, or a guess when the
+ *  engine cannot read the definition back. */
+interface PivotEditorField {
+  index: number;
+  sourceName: string;
+  label: string;
+  /** Null for a field that sits on no axis. */
+  axis: PivotAxis | null;
+  aggregation: PivotAggregation;
+  numberFormat: string;
+  items: { label: string; cacheIndex?: number; visible: boolean }[];
+}
+
+/** Fields in the order the report shows them: row axis, column axis, then the rest. */
+function definitionEditorFields(
+  definition: PivotDefinition,
+  inferredItems: (sourceName: string) => PivotEditorField['items'],
+): PivotEditorField[] {
+  const order = [
+    ...new Set([
+      ...definition.rowFieldOrder,
+      ...definition.colFieldOrder,
+      ...definition.fields.map((field) => field.index),
+    ]),
+  ];
+  const out: PivotEditorField[] = [];
+  for (const index of order) {
+    const field = definition.fields[index];
+    if (!field) continue;
+    const dataField = definition.dataFields.find((d) => d.fieldIndex === index);
+    out.push({
+      index,
+      sourceName: field.sourceName,
+      label: field.customName || field.sourceName,
+      axis: field.axis,
+      aggregation: dataField?.aggregation ?? PivotAggregation.Sum,
+      numberFormat: dataField?.numberFormat ?? '',
+      items:
+        field.items.length > 0
+          ? field.items.map((item) => ({
+              label: item.label,
+              ...(item.cacheIndex >= 0 ? { cacheIndex: item.cacheIndex } : {}),
+              visible: item.visible,
+            }))
+          : inferredItems(field.sourceName),
+    });
+  }
+  return out;
+}
+
 export function renderPivotEditForm(
   ctx: PivotEditorContext,
   pivot: {
@@ -59,20 +112,40 @@ export function renderPivotEditForm(
   const form = document.createElement('form');
   form.className = 'fc-objects__pivot-edit';
   form.setAttribute('aria-label', fieldListOnly ? t.pivotFieldList : t.editPivotTable);
+  const inferredItemsOf = (sourceName: string): PivotEditorField['items'] => {
+    const labels = pivot.fieldItems?.[sourceName] ?? [];
+    const indexes = pivot.fieldItemIndexes?.[sourceName] ?? [];
+    return labels.map((label, position) => {
+      const cacheIndex = indexes[position];
+      return { label, ...(cacheIndex !== undefined ? { cacheIndex } : {}), visible: true };
+    });
+  };
+  const definition = wb.getPivotDefinition(pivot.sheetIndex, pivot.pivotIndex);
+  const editorFields: PivotEditorField[] = definition
+    ? definitionEditorFields(definition, inferredItemsOf)
+    : pivot.fields.map((sourceName, index) => ({
+        index,
+        sourceName,
+        label: sourceName,
+        axis: index === 0 ? PivotAxis.Row : PivotAxis.Value,
+        aggregation: PivotAggregation.Sum,
+        numberFormat: '',
+        items: inferredItemsOf(sourceName),
+      }));
   const name = document.createElement('input');
   name.className = 'fc-objects__input';
   name.type = 'text';
-  name.value = `${t.pivot} ${pivot.pivotIndex + 1}`;
+  name.value = definition?.name ?? `${t.pivot} ${pivot.pivotIndex + 1}`;
   const anchor = document.createElement('input');
   anchor.className = 'fc-objects__input';
   anchor.type = 'text';
   anchor.value = formatA1Cell(pivot.top, pivot.left);
   const rowTotals = document.createElement('input');
   rowTotals.type = 'checkbox';
-  rowTotals.checked = true;
+  rowTotals.checked = definition?.grandTotals.rows ?? true;
   const colTotals = document.createElement('input');
   colTotals.type = 'checkbox';
-  colTotals.checked = true;
+  colTotals.checked = definition?.grandTotals.cols ?? true;
   const layoutSelect = createDialogSelect(
     [
       { value: String(PivotReportLayout.Compact), label: t.pivotReportLayoutCompact },
@@ -118,8 +191,8 @@ export function renderPivotEditForm(
   ];
   const filterConditions = new Map<number, PivotFilterConditionState>();
   for (const spec of (pivot as { pivotFilters?: readonly PivotFilterSpec[] }).pivotFilters ?? []) {
-    const fieldIndex = pivot.fields.indexOf(spec.fieldName);
-    if (fieldIndex < 0 || filterConditions.has(fieldIndex)) continue;
+    const fieldIndex = editorFields.find((field) => field.sourceName === spec.fieldName)?.index;
+    if (fieldIndex === undefined || filterConditions.has(fieldIndex)) continue;
     const condition = pivotFilterSpecToCondition(spec);
     if (condition) filterConditions.set(fieldIndex, condition);
   }
@@ -133,7 +206,9 @@ export function renderPivotEditForm(
     filterChecklist: HTMLElement | null;
     filterCondition(): PivotFilterConditionState | undefined;
   }[] = [];
-  for (const [index, field] of pivot.fields.entries()) {
+  for (const model of editorFields) {
+    const { index } = model;
+    const field = model.label;
     if (fieldListOnly) {
       const item = document.createElement('label');
       item.className = 'fc-objects__pivot-field-list-item';
@@ -146,20 +221,24 @@ export function renderPivotEditForm(
       item.append(check, document.createTextNode(field));
       availableFields.appendChild(item);
     }
+    // The engine cannot take a field back off its axis, so "not in report"
+    // is offered only to a field that is not on one yet.
     const select = createDialogSelect(
-      axisOptions,
+      model.axis === null
+        ? [...axisOptions, { value: AXIS_NONE, label: t.pivotAreaNone }]
+        : axisOptions,
       filterConditions.has(index)
         ? String(PivotAxis.Page)
-        : index === 0
-          ? String(PivotAxis.Row)
-          : String(PivotAxis.Value),
+        : model.axis === null
+          ? AXIS_NONE
+          : String(model.axis),
       { className: 'fc-objects__input' },
     );
     select.dataset.pivotFieldIndex = String(index);
     const row = document.createElement('div');
     row.className = 'fc-objects__pivot-field-row';
     row.appendChild(pivotEditField(field, select));
-    const aggregation = createDialogSelect(aggregationOptions, String(PivotAggregation.Sum), {
+    const aggregation = createDialogSelect(aggregationOptions, String(model.aggregation), {
       className: 'fc-objects__input',
     });
     aggregation.dataset.pivotAggregationFieldIndex = String(index);
@@ -167,15 +246,17 @@ export function renderPivotEditForm(
     numberFormat.className = 'fc-objects__input';
     numberFormat.type = 'text';
     numberFormat.placeholder = t.pivotNumberFormatPlaceholder;
+    numberFormat.value = model.numberFormat;
     numberFormat.dataset.pivotNumberFormatFieldIndex = String(index);
     const filterItems = document.createElement('textarea');
     filterItems.className = 'fc-objects__input';
     filterItems.rows = 3;
     filterItems.placeholder = t.pivotFilterItemsPlaceholder;
     filterItems.dataset.pivotFilterItemsFieldIndex = String(index);
-    const inferredItems = pivot.fieldItems?.[field] ?? [];
-    const inferredIndexes = pivot.fieldItemIndexes?.[field] ?? [];
-    if (fieldListOnly && inferredItems.length > 0) filterItems.value = inferredItems.join('\n');
+    const items = model.items;
+    if (fieldListOnly && items.length > 0) {
+      filterItems.value = items.map((item) => item.label).join('\n');
+    }
     const syncFilterCondition = (condition: PivotFilterConditionState): void => {
       if (condition.kind === 'none' || !condition.value.trim()) filterConditions.delete(index);
       else filterConditions.set(index, condition);
@@ -213,16 +294,17 @@ export function renderPivotEditForm(
     const filterChecklist = document.createElement('div');
     filterChecklist.className = 'fc-objects__pivot-filter-items';
     filterChecklist.dataset.pivotFilterChecklistFieldIndex = String(index);
-    for (const [position, itemName] of inferredItems.entries()) {
+    for (const item of items) {
+      const itemName = item.label;
       const check = document.createElement('input');
       check.type = 'checkbox';
-      check.checked = true;
+      check.checked = item.visible;
       check.value = itemName;
       // The blank member has no label to be matched by, so the filter can
       // only name it by its cache index. Carry the index for every item and
       // the writeback never has to guess which form to use.
-      const cacheIndex = inferredIndexes[position];
-      if (cacheIndex !== undefined) check.dataset.pivotItemCacheIndex = String(cacheIndex);
+      if (item.cacheIndex !== undefined)
+        check.dataset.pivotItemCacheIndex = String(item.cacheIndex);
       const checkLabel = document.createElement('label');
       checkLabel.className = 'fc-objects__pivot-field-list-item';
       checkLabel.append(check, document.createTextNode(itemName || t.pivotBlankItem));
@@ -239,7 +321,7 @@ export function renderPivotEditForm(
     filterSettings.className = 'fc-objects__pivot-value-settings';
     filterSettings.hidden = select.value !== String(PivotAxis.Page);
     filterSettings.appendChild(
-      inferredItems.length > 0
+      items.length > 0
         ? pivotEditField(t.pivotFilterItems, filterChecklist)
         : pivotEditField(t.pivotFilterItems, filterItems),
     );
@@ -255,7 +337,7 @@ export function renderPivotEditForm(
       aggregationSelect: aggregation,
       numberFormatInput: numberFormat,
       filterItemsInput: filterItems,
-      filterChecklist: inferredItems.length > 0 ? filterChecklist : null,
+      filterChecklist: items.length > 0 ? filterChecklist : null,
       filterCondition: () => filterConditions.get(index),
     });
     row.appendChild(settings);
@@ -306,36 +388,38 @@ export function renderPivotEditForm(
       rowGrandTotals: rowTotals.checked,
       colGrandTotals: colTotals.checked,
       layout: Number(layoutSelect.value) as PivotReportLayout,
-      dataFieldNaming: strings.pivotTableDialog.dataFieldNaming,
-      fields: valueFieldSettings.map((field) => ({
-        fieldIndex: field.fieldIndex,
-        axis: Number(field.axisSelect.value) as PivotAxis,
-        aggregation: Number(field.aggregationSelect.value) as PivotAggregation,
-        numberFormat: field.numberFormatInput.value.trim(),
-        filterItems: field.filterItemsInput.value
-          .split(/\r?\n/)
-          .map((item) => item.trim())
-          .filter(Boolean),
-        filterChecklist: field.filterChecklist
-          ? Array.from(
-              field.filterChecklist.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
-            ).map((item) => {
-              const cacheIndex = Number.parseInt(item.dataset.pivotItemCacheIndex ?? '', 10);
-              return {
-                value: item.value,
-                checked: item.checked,
-                ...(Number.isFinite(cacheIndex) ? { cacheIndex } : {}),
-              };
-            })
-          : null,
-      })),
+      ...(definition ? { dataFields: definition.dataFields } : {}),
+      fields: valueFieldSettings
+        .filter((field) => field.axisSelect.value !== AXIS_NONE)
+        .map((field) => ({
+          fieldIndex: field.fieldIndex,
+          axis: Number(field.axisSelect.value) as PivotAxis,
+          aggregation: Number(field.aggregationSelect.value) as PivotAggregation,
+          numberFormat: field.numberFormatInput.value.trim(),
+          filterItems: field.filterItemsInput.value
+            .split(/\r?\n/)
+            .map((item) => item.trim())
+            .filter(Boolean),
+          filterChecklist: field.filterChecklist
+            ? Array.from(
+                field.filterChecklist.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+              ).map((item) => {
+                const cacheIndex = Number.parseInt(item.dataset.pivotItemCacheIndex ?? '', 10);
+                return {
+                  value: item.value,
+                  checked: item.checked,
+                  ...(Number.isFinite(cacheIndex) ? { cacheIndex } : {}),
+                };
+              })
+            : null,
+        })),
       filters:
         dirtyFilterSettings.length === 0
           ? null
           : dirtyFilterSettings
               .map((field) =>
                 pivotFilterConditionToSpec(
-                  pivot.fields[field.fieldIndex] ?? '',
+                  editorFields.find((model) => model.index === field.fieldIndex)?.sourceName ?? '',
                   field.filterCondition(),
                 ),
               )

@@ -78,11 +78,11 @@ describe('PivotTable edit guard', () => {
     wb.dispose();
   });
 
-  it('rejects Delete over a report and alerts through the sink', async () => {
+  it('rejects Delete over part of a report and alerts through the sink', async () => {
     const { wb, store } = await setup();
     const alerts: string[] = [];
     setPivotGuardSink(wb, (alert) => alerts.push(alert.message));
-    mutators.setRange(store, { sheet: 0, r0: 4, c0: 0, r1: 9, c1: 1 });
+    mutators.setRange(store, { sheet: 0, r0: 4, c0: 0, r1: 6, c1: 1 });
     const result = clearSelectedContents({ store, workbook: wb });
     expect(result.status).toBe('rejected');
     expect(alerts).toEqual([en.pivotTableDialog.cannotChange]);

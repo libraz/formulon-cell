@@ -5,8 +5,13 @@ import { selectionContainsAddr, selectionCoversRange } from '../store/selection-
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { History } from './history.js';
 import { InteractionController, interactionControllerFor } from './interaction-controller.js';
-import type { ChangeBatchResult, InteractionOrigin } from './interaction-policy.js';
-import { blockPivotEdit, pivotGuardAlert } from './pivot-guard.js';
+import {
+  type ChangeBatchResult,
+  type InteractionOrigin,
+  operationPermission,
+} from './interaction-policy.js';
+import { alertPivotEdit, pivotGuardAlert, planPivotSelection } from './pivot-guard.js';
+import { deletePivotTables } from './pivot-table.js';
 
 /** The part of the interaction controller used by clear-contents callers. */
 export type ClearContentsCommands = Pick<InteractionController, 'execute' | 'policy'> & {
@@ -88,15 +93,53 @@ const emptyResult = (revision = 0): ChangeBatchResult => ({
 export const clearSelectedContents = (options: ClearSelectedContentsOptions): ChangeBatchResult => {
   const { store, workbook } = options;
   const commands = options.commands ?? interactionControllerFor(store);
-  const { range, extraRanges } = store.getState().selection;
-  if ([range, ...(extraRanges ?? [])].some((selected) => blockPivotEdit(workbook, selected))) {
+  const pivotPlan = planPivotSelection(workbook, store.getState().selection);
+  // A host policy that restricts which cells are editable cannot vouch for a
+  // whole report, so only an unrestricted clear may remove one.
+  const mayDeletePivots =
+    !commands?.policy ||
+    (operationPermission(commands.policy, 'clear') && !commands.policy.editable);
+  const rejectPivotEdit = (): ChangeBatchResult => {
+    alertPivotEdit(workbook);
     return {
       status: 'rejected',
       applied: [],
       rejected: [{ code: 'protected', reason: pivotGuardAlert(workbook).message }],
       revision: commands?.revision ?? 0,
     };
+  };
+  if (pivotPlan.partial || (pivotPlan.whole.length > 0 && !mayDeletePivots)) {
+    return rejectPivotEdit();
   }
+  // Deleting a whole report and clearing the rest of the selection undo together.
+  const history = options.history && !options.history.isReplaying() ? options.history : null;
+  const txn = pivotPlan.whole.length > 0 ? history?.begin() : undefined;
+  if (pivotPlan.whole.length > 0) {
+    const removed = deletePivotTables(
+      { store, workbook, history },
+      store.getState().selection.range.sheet,
+      pivotPlan.whole,
+    );
+    if (!removed) {
+      if (history && txn) history.end(txn);
+      return rejectPivotEdit();
+    }
+  }
+  const cleared = clearCollectedContents(options, commands);
+  if (history && txn) {
+    if (cleared.status === 'rejected') history.abort(txn);
+    else history.end(txn);
+  }
+  return cleared.status === 'noop' && pivotPlan.whole.length > 0
+    ? { ...cleared, status: 'applied' }
+    : cleared;
+};
+
+const clearCollectedContents = (
+  options: ClearSelectedContentsOptions,
+  commands: ClearContentsCommands | undefined,
+): ChangeBatchResult => {
+  const { store, workbook } = options;
   const addresses = collectSelectedContentAddresses(store, workbook);
   if (addresses.length === 0) return emptyResult(commands?.revision ?? 0);
 

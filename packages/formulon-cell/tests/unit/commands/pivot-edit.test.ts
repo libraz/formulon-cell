@@ -9,10 +9,11 @@ import {
   PivotAxis,
   type PivotFilterSpec,
   PivotReportLayout,
+  PivotShowValuesAs,
 } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
-const pivot = { sheetIndex: 1, pivotIndex: 2, rows: 5, cols: 4, fields: ['Region', 'Sales'] };
+const pivot = { sheetIndex: 1, pivotIndex: 2, rows: 5, cols: 4 };
 
 const field = (over: Partial<PivotEditField> & { fieldIndex: number }): PivotEditField => ({
   axis: PivotAxis.Row,
@@ -56,6 +57,7 @@ const fakeWorkbook = (
     setPivotColFieldOrder: record('colOrder'),
     pivotDataFieldCount: () => opts.dataFieldCount ?? 0,
     setPivotDataField: record('setData'),
+    clearPivotDataFields: record('clearData'),
     addPivotDataField: (...args: unknown[]) => {
       calls.push(['addData', ...args]);
       return failing.has('addData') ? -1 : 0;
@@ -201,5 +203,67 @@ describe('applyPivotEdit', () => {
       ['clearFilters', 1, 2],
       ['addFilter', 1, 2, spec],
     ]);
+  });
+
+  it('rewrites the data fields from their read-back, keeping names and show-as', () => {
+    const existing = [
+      {
+        name: 'Total',
+        fieldIndex: 1,
+        aggregation: PivotAggregation.Sum,
+        showValuesAs: PivotShowValuesAs.PercentOfTotal,
+      },
+      { name: 'Qty count', fieldIndex: 2, aggregation: PivotAggregation.Count },
+      { name: 'Sales again', fieldIndex: 1, aggregation: PivotAggregation.Max },
+    ];
+    const { wb, calls } = fakeWorkbook({ dataFieldCount: 3 });
+    const ok = applyPivotEdit(
+      wb,
+      pivot,
+      edit({
+        fieldListOnly: true,
+        dataFields: existing,
+        fields: [
+          field({
+            fieldIndex: 1,
+            axis: PivotAxis.Value,
+            aggregation: PivotAggregation.Average,
+            numberFormat: '0.0',
+          }),
+          field({ fieldIndex: 2, axis: PivotAxis.Row }),
+          field({ fieldIndex: 3, axis: PivotAxis.Value, aggregation: PivotAggregation.Min }),
+        ],
+      }),
+    );
+    expect(ok).toBe(true);
+    const data = calls.filter(([name]) => name === 'clearData' || name === 'addData');
+    expect(data.map((call) => call[0])).toEqual(['clearData', 'addData', 'addData', 'addData']);
+    // A changed aggregation drops the old name so the engine names it afresh.
+    expect(data[1]?.[3]).toEqual({
+      fieldIndex: 1,
+      aggregation: PivotAggregation.Average,
+      showValuesAs: PivotShowValuesAs.PercentOfTotal,
+      numberFormat: '0.0',
+    });
+    // Further data fields of the same field and the moved-off field's are kept or dropped as is.
+    expect(data[2]?.[3]).toEqual(existing[2]);
+    expect(data[3]?.[3]).toEqual({ fieldIndex: 3, aggregation: PivotAggregation.Min });
+  });
+
+  it('leaves the data fields alone when the form changes nothing about them', () => {
+    const existing = [{ name: 'Total', fieldIndex: 1, aggregation: PivotAggregation.Sum }];
+    const { wb, names } = fakeWorkbook({ dataFieldCount: 1 });
+    const ok = applyPivotEdit(
+      wb,
+      pivot,
+      edit({
+        fieldListOnly: true,
+        dataFields: existing,
+        fields: [field({ fieldIndex: 1, axis: PivotAxis.Value })],
+      }),
+    );
+    expect(ok).toBe(true);
+    expect(names()).not.toContain('clearData');
+    expect(names()).not.toContain('addData');
   });
 });
