@@ -2,7 +2,25 @@ import { expect, type Page } from '@playwright/test';
 
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-const snapshotDemo = async (page: Page, name: string): Promise<void> => {
+interface SnapshotOptions {
+  /** Leave the pointer where it is: the shot shows a submenu opened by hover. */
+  keepPointer?: boolean;
+}
+
+/** Move the pointer off the page and wait out the ribbon screen tip, which
+ *  any `[title]` control under a resting pointer opens after its delay. */
+const parkPointer = async (page: Page): Promise<void> => {
+  await page.mouse.move(-1, -1);
+  await expect(page.locator('.fc-tb__screen-tip:visible')).toHaveCount(0);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+};
+
+const snapshotDemo = async (
+  page: Page,
+  name: string,
+  opts: SnapshotOptions = {},
+): Promise<void> => {
+  if (!opts.keepPointer) await parkPointer(page);
   await expect(page.locator('.demo')).toHaveScreenshot(`${name}.png`, {
     animations: 'disabled',
     caret: 'hide',
@@ -10,7 +28,12 @@ const snapshotDemo = async (page: Page, name: string): Promise<void> => {
   });
 };
 
-const snapshotPage = async (page: Page, name: string): Promise<void> => {
+const snapshotPage = async (
+  page: Page,
+  name: string,
+  opts: SnapshotOptions = {},
+): Promise<void> => {
+  if (!opts.keepPointer) await parkPointer(page);
   await expect(page).toHaveScreenshot(`${name}.png`, {
     animations: 'disabled',
     caret: 'hide',
@@ -333,7 +356,9 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await expect(page.locator('#menu-conditional')).toBeVisible();
   await page.locator('#menu-conditional [data-cf-submenu="dataBar"]').hover();
   await expect(page.locator('#menu-conditional [data-cf-panel="dataBar"]')).toBeVisible();
-  await snapshotPage(page, 'excel-chrome-home-conditional-formatting-menu-1440');
+  await snapshotPage(page, 'excel-chrome-home-conditional-formatting-menu-1440', {
+    keepPointer: true,
+  });
   await page.keyboard.press('Escape');
   await page.locator('[data-ribbon-command="conditional"]').click();
   await expect(page.locator('#menu-conditional')).toBeVisible();
@@ -438,7 +463,9 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await contextMenu.locator('[data-fc-submenu="pasteSpecialMenu"]').hover();
   const pasteSpecialSubmenu = page.locator('.fc-ctxmenu__sub');
   await expect(pasteSpecialSubmenu).toBeVisible();
-  await snapshotPage(page, 'excel-chrome-cell-context-paste-special-submenu-1440');
+  await snapshotPage(page, 'excel-chrome-cell-context-paste-special-submenu-1440', {
+    keepPointer: true,
+  });
   await pasteSpecialSubmenu.locator('[data-fc-action="pasteSpecial"]').click();
   await expect(contextMenu).toBeHidden();
   const pasteSpecialDialog = page.getByRole('dialog', { name: '形式を選択して貼り付け' });
