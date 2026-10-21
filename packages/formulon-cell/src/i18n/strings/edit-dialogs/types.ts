@@ -112,36 +112,45 @@ export interface EditDialogsStrings {
     replacedCount: string;
   };
   goToDialog: {
-    /** Modal title — shown in the header bar and the aria-label. */
+    /** Go To Special modal title (header and aria-label). */
     title: string;
+    /** Go To modal title. */
     goToTitle: string;
+    /** Legend of the Go to list of names and recent references. */
+    goToLabel: string;
     reference: string;
     referencePlaceholder: string;
     invalidReference: string;
-    /** Section legend above the scope radios. */
-    scopeLabel: string;
-    /** "Active sheet" radio — sweeps every cell on the current sheet. */
-    scopeSheet: string;
-    /** "Current selection" radio — sweeps only inside the active selection
-     *  rectangle. Auto-disabled when the selection is a single cell. */
-    scopeSelection: string;
-    scopeSelectionRequiresMultiCell: string;
-    /** Section legend above the category radios. */
-    kindLabel: string;
-    kindBlanks: string;
-    kindNonBlanks: string;
-    kindFormulas: string;
+    /** Button that opens Go To Special from Go To. */
+    special: string;
+    kindComments: string;
     kindConstants: string;
+    kindFormulas: string;
     kindNumbers: string;
     kindText: string;
     kindLogical: string;
     kindErrors: string;
-    kindDataValidation: string;
+    kindBlanks: string;
+    kindCurrentRegion: string;
+    kindCurrentArray: string;
+    kindRowDifferences: string;
+    kindColumnDifferences: string;
+    kindPrecedents: string;
+    kindDependents: string;
+    kindDirectOnly: string;
+    kindAllLevels: string;
+    kindLastCell: string;
+    kindVisibleCells: string;
     kindConditionalFormat: string;
-    valueFilterLabel: string;
-    /** Inline status when the predicate yields zero matches. The dialog
-     *  stays open so the user can adjust the kind. */
+    kindDataValidation: string;
+    /** Sub-radio for Conditional formats / Data validation: every cell with a rule. */
+    ruleAll: string;
+    /** Sub-radio: only cells whose rules match the active cell. */
+    ruleSame: string;
+    /** Alert text when the search finds nothing. */
     noResults: string;
+    /** Alert text when the result exceeds the selection cap. */
+    selectionTooLarge: string;
     cancel: string;
     ok: string;
   };

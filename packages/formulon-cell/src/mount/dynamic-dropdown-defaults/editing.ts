@@ -264,6 +264,7 @@ const buildFindSelectAction =
         findSelect: strings.ribbon.findSelect,
         findNoMatches: strings.ribbonMenu.findNoMatches,
         commentNone: strings.ribbonMenu.commentNone,
+        selectionTooLarge: strings.goToDialog.selectionTooLarge,
       },
     });
     if (result.kind === 'open-find') {

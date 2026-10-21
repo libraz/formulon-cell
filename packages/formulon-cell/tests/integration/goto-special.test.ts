@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { boundingRange, findMatchingCells } from '../../src/commands/goto-special.js';
+import { boundingRange, findMatchingRanges } from '../../src/commands/goto-special.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
 
@@ -33,51 +33,42 @@ describe('integration: go-to-special', () => {
 
   afterEach(() => sheet.dispose());
 
+  const rects = (
+    kind: Parameters<typeof findMatchingRanges>[2],
+  ): string[] | 'none' | 'too-large' => {
+    const result = findMatchingRanges(sheet.workbook, sheet.instance.store, kind);
+    return result.status === 'found'
+      ? result.ranges.map((r) => `${r.r0}:${r.c0}-${r.r1}:${r.c1}`)
+      : result.status;
+  };
+
   it('formulas: returns only cells holding a formula', () => {
-    const { instance, workbook } = sheet;
-    const hits = findMatchingCells(workbook, instance.store, 'sheet', 'formulas');
-    expect(hits).toEqual([{ sheet: 0, row: 1, col: 2 }]);
+    expect(rects('formulas')).toEqual(['1:2-1:2']);
   });
 
   it('constants: returns numbers + text but excludes the formula', () => {
-    const { instance, workbook } = sheet;
-    const hits = findMatchingCells(workbook, instance.store, 'sheet', 'constants');
-    // 6 constants: A1, A2, A3 (numbers) + B1, B3 (text) + C1 (text sentinel
-    // counts as a constant since it's a typed string, not a live formula).
-    expect(hits.length).toBe(6);
-    expect(hits.some((a) => a.row === 1 && a.col === 2)).toBe(false);
+    // A1:A3 numbers, B1 + B3 text, C1 text sentinel (a typed string, not a live formula).
+    expect(rects('constants')).toEqual(['0:0-0:2', '1:0-1:0', '2:0-2:1']);
   });
 
   it('numbers: returns only number-valued cells', () => {
-    const { instance, workbook } = sheet;
-    const hits = findMatchingCells(workbook, instance.store, 'sheet', 'numbers');
-    const cols = hits.map((h) => `${h.row}:${h.col}`).sort();
-    // A1, A2, A3 — plus C2 (formula evaluates to a number = 3).
-    expect(cols).toEqual(['0:0', '1:0', '1:2', '2:0']);
+    // A1:A3 plus C2 (a formula evaluating to 3).
+    expect(rects('numbers')).toEqual(['0:0-2:0', '1:2-1:2']);
   });
 
   it('text: returns plain text cells but excludes error sentinels', () => {
-    const { instance, workbook } = sheet;
-    const hits = findMatchingCells(workbook, instance.store, 'sheet', 'text');
     // B1 + B3. C1 is "#REF!" — typed text, but classed as error.
-    const keys = hits.map((h) => `${h.row}:${h.col}`).sort();
-    expect(keys).toEqual(['0:1', '2:1']);
+    expect(rects('text')).toEqual(['0:1-0:1', '2:1-2:1']);
   });
 
   it('errors: matches typed error sentinels', () => {
-    const { instance, workbook } = sheet;
-    const hits = findMatchingCells(workbook, instance.store, 'sheet', 'errors');
-    expect(hits).toEqual([{ sheet: 0, row: 0, col: 2 }]);
+    expect(rects('errors')).toEqual(['0:2-0:2']);
   });
 
-  it('blanks scoped to selection: surfaces empty interior cells', () => {
-    const { instance, workbook } = sheet;
-    // Selection over the full 3x3 grid.
-    mutators.setRange(instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
-    const hits = findMatchingCells(workbook, instance.store, 'selection', 'blanks');
+  it('blanks scoped to a selection: surfaces empty interior cells', () => {
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
     // B2 and C3 are the two empty cells in the rectangle.
-    const keys = hits.map((h) => `${h.row}:${h.col}`).sort();
-    expect(keys).toEqual(['1:1', '2:2']);
+    expect(rects('blanks')).toEqual(['1:1-1:1', '2:2-2:2']);
   });
 
   it('boundingRange: encloses the matches', () => {

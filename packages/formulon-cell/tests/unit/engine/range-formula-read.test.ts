@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findMatchingCells } from '../../../src/commands/goto-special.js';
+import { findMatchingRanges } from '../../../src/commands/goto-special.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -20,9 +20,10 @@ describe('native range and formula reads', () => {
       );
       const store = createSpreadsheetStore();
       mutators.setRange(store, range);
-      expect(
-        findMatchingCells(wb, store, 'selection', 'constants').map((addr) => addr.row),
-      ).toEqual([3, 8, 40, 100]);
+      const constants = findMatchingRanges(wb, store, 'constants');
+      expect(constants.status === 'found' ? constants.ranges.map((r) => r.r0) : []).toEqual([
+        3, 8, 40, 100,
+      ]);
       expect(() => Array.from(wb.cellsInRange(range, 0))).toThrow(RangeError);
     } finally {
       wb.dispose();
@@ -41,8 +42,15 @@ describe('native range and formula reads', () => {
       mutators.setRange(store, range);
       mutators.setCellFormat(store, addr, { validation: { kind: 'list', source: ['a'] } });
       mutators.addConditionalRule(store, { kind: 'data-bar', range, color: '#638ec6' });
-      expect(findMatchingCells(wb, store, 'selection', 'data-validation')).toEqual([addr]);
-      expect(findMatchingCells(wb, store, 'selection', 'conditional-format')).toEqual([addr]);
+      const cell = { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 };
+      expect(findMatchingRanges(wb, store, 'data-validation')).toEqual({
+        status: 'found',
+        ranges: [cell],
+      });
+      expect(findMatchingRanges(wb, store, 'conditional-format')).toEqual({
+        status: 'found',
+        ranges: [range],
+      });
     } finally {
       wb.dispose();
     }

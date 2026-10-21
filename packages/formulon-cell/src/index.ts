@@ -291,8 +291,9 @@ export {
 } from './commands/format-as-table.js';
 export type {
   ExecuteRibbonFindActionDeps,
-  GoToScope,
   GoToSpecialKind,
+  GoToSpecialOptions,
+  GoToSpecialResult,
   GoToSpecialValueFilters,
   RibbonFindAction,
   RibbonFindActionReport,
@@ -302,8 +303,9 @@ export type {
 export {
   boundingRange,
   executeRibbonFindAction,
-  findMatchingCells,
+  findMatchingRanges,
   selectionFromMatches,
+  selectionFromRanges,
 } from './commands/goto-special.js';
 export type {
   HistoryEntry,
@@ -557,7 +559,9 @@ export type {
   RibbonProtectionReport,
 } from './commands/ribbon-protection.js';
 export { executeRibbonProtectionAction } from './commands/ribbon-protection.js';
+export type { FreezeMode } from './commands/row-col-layout.js';
 export {
+  applyFreezeMode,
   autofitColsWidth,
   autofitRowsHeight,
   hiddenInSelection,

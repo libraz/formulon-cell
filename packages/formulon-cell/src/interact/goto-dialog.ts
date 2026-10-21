@@ -1,19 +1,20 @@
 import {
-  findMatchingCells,
-  type GoToScope,
+  findMatchingRanges,
   type GoToSpecialKind,
-  type GoToSpecialValueFilters,
-  selectionFromMatches,
+  type GoToSpecialOptions,
+  selectionFromRanges,
 } from '../commands/goto-special.js';
 import { formatA1Range } from '../engine/address.js';
-import { parseRangeRef } from '../engine/range-resolver.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { rangeDefinedNames, resolveAreaText, splitAreas } from '../mount/ref-utils.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
   appendDialogFrame,
+  createDialogButton,
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
@@ -24,6 +25,7 @@ import {
   syncNavigationViewport,
 } from './navigation-policy.js';
 import { attachRangePickerButton } from './range-picker-control.js';
+import { attachValidationAlert } from './validation.js';
 
 export interface GoToDialogDeps {
   host: HTMLElement;
@@ -40,29 +42,44 @@ export interface GoToDialogHandle {
   detach(): void;
 }
 
-const KINDS: readonly GoToSpecialKind[] = [
-  'blanks',
-  'non-blanks',
-  'formulas',
+/** Dialog options in the desktop two-column order. */
+const LEFT_KINDS: readonly GoToSpecialKind[] = [
+  'comments',
   'constants',
-  'numbers',
-  'text',
-  'errors',
-  'data-validation',
+  'formulas',
+  'blanks',
+  'current-region',
+  'current-array',
+];
+const RIGHT_KINDS: readonly GoToSpecialKind[] = [
+  'row-differences',
+  'column-differences',
+  'precedents',
+  'dependents',
+  'last-cell',
+  'visible-cells',
   'conditional-format',
+  'data-validation',
 ];
 
+const MAX_RECENT_REFERENCES = 4;
+
+/** Areas last jumped to through the dialog, newest first, per mount. */
+const recentReferences = new WeakMap<SpreadsheetStore, Range[][]>();
+
+const quoteSheetName = (name: string): string =>
+  /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`;
+
 /**
- * Spreadsheet-style "Go To Special" dialog. Lets the user pick a category
- * (blanks, formulas, errors, validation, …) and rewrites the selection to the
- * bounding range of every matching cell on the active sheet (or just inside
- * the current selection when one is provided).
+ * Spreadsheet-style Go To / Go To Special dialog. Go To jumps to names,
+ * recent references or typed (multi-area, sheet-qualified) references; its
+ * Special button switches to the category picker, which selects every
+ * matching cell as merged rectangles.
  *
  * Lifecycle mirrors the other modals: `attach…()` mounts a hidden overlay on
  * the host; `open()` shows it, `close()` hides it, `detach()` tears it down.
- * The OK button runs the predicate; on no matches an inline status message is
- * shown and the dialog stays open. On 1+ matches the selection jumps to the
- * bounding rect and the dialog closes.
+ * A Go To Special search with no hits (or too many) closes the dialog and
+ * raises a modal alert, leaving the selection unchanged.
  */
 export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const { host, store, getWb } = deps;
@@ -82,8 +99,29 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     title: t.title,
     panelClasses: ['fc-fmtdlg__panel', 'fc-goto__panel'],
   });
+  const alertDialog = attachValidationAlert({
+    host,
+    labels: {
+      ok: strings.formatDialog.ok,
+      stop: strings.formatDialog.validationErrorStop,
+      warning: strings.formatDialog.validationErrorWarning,
+      information: strings.formatDialog.validationErrorInfo,
+    },
+  });
 
-  // ── Direct reference (normal Go To) ───────────────────────────────────
+  // ── Go To: names and recent references ────────────────────────────────
+  const listLegend = document.createElement('div');
+  listLegend.className = 'fc-goto__legend';
+  listLegend.textContent = t.goToLabel;
+  body.appendChild(listLegend);
+
+  const targetList = document.createElement('div');
+  targetList.className = 'fc-goto__kinds fc-goto__targets';
+  targetList.setAttribute('role', 'listbox');
+  targetList.setAttribute('aria-label', t.goToLabel);
+  body.appendChild(targetList);
+
+  // ── Go To: direct reference ───────────────────────────────────────────
   const referenceRow = document.createElement('label');
   referenceRow.className = 'fc-goto__reference';
   const referenceLabel = document.createElement('span');
@@ -102,93 +140,70 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   });
   body.appendChild(referenceRow);
 
-  // ── Scope (only meaningful when current selection is multi-cell) ───────
-  const scopeLegend = document.createElement('div');
-  scopeLegend.className = 'fc-goto__legend';
-  scopeLegend.textContent = t.scopeLabel;
-  body.appendChild(scopeLegend);
+  // ── Go To Special: category radios in two columns ─────────────────────
+  const kindList = document.createElement('div');
+  kindList.className = 'fc-goto__kinds';
+  body.appendChild(kindList);
+  const leftColumn = document.createElement('div');
+  const rightColumn = document.createElement('div');
+  kindList.append(leftColumn, rightColumn);
 
-  const scopeGroup = document.createElement('div');
-  scopeGroup.className = 'fc-goto__scope';
-  scopeGroup.setAttribute('role', 'radiogroup');
-  scopeGroup.setAttribute('aria-label', t.scopeLabel);
-  body.appendChild(scopeGroup);
-
-  const scopeName = `fc-goto-scope-${Math.random().toString(36).slice(2, 8)}`;
-  const makeScopeRadio = (value: GoToScope, label: string): HTMLInputElement => {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const kindName = `fc-goto-kind-${suffix}`;
+  const kindLabels: Record<string, string> = {
+    comments: t.kindComments,
+    constants: t.kindConstants,
+    formulas: t.kindFormulas,
+    blanks: t.kindBlanks,
+    'current-region': t.kindCurrentRegion,
+    'current-array': t.kindCurrentArray,
+    'row-differences': t.kindRowDifferences,
+    'column-differences': t.kindColumnDifferences,
+    precedents: t.kindPrecedents,
+    dependents: t.kindDependents,
+    'last-cell': t.kindLastCell,
+    'visible-cells': t.kindVisibleCells,
+    'conditional-format': t.kindConditionalFormat,
+    'data-validation': t.kindDataValidation,
+  };
+  const makeRadio = (
+    parent: HTMLElement,
+    name: string,
+    value: string,
+    label: string,
+    sub?: 'levels' | 'rule',
+  ): HTMLInputElement => {
     const wrap = document.createElement('label');
     wrap.className = 'fc-goto__radio';
     const input = document.createElement('input');
     input.type = 'radio';
-    input.name = scopeName;
+    input.name = name;
     input.value = value;
+    if (sub) {
+      input.dataset.sub = sub;
+      wrap.style.paddingInlineStart = '20px';
+    }
     const span = document.createElement('span');
     span.textContent = label;
     wrap.append(input, span);
-    scopeGroup.appendChild(wrap);
+    parent.appendChild(wrap);
     return input;
   };
-  const scopeSheet = makeScopeRadio('sheet', t.scopeSheet);
-  const scopeSelection = makeScopeRadio('selection', t.scopeSelection);
-  scopeSheet.checked = true;
 
-  // ── Kind list ──────────────────────────────────────────────────────────
-  const kindLegend = document.createElement('div');
-  kindLegend.className = 'fc-goto__legend';
-  kindLegend.textContent = t.kindLabel;
-  body.appendChild(kindLegend);
-
-  const kindList = document.createElement('div');
-  kindList.className = 'fc-goto__kinds';
-  kindList.setAttribute('role', 'radiogroup');
-  kindList.setAttribute('aria-label', t.kindLabel);
-  body.appendChild(kindList);
-
-  const kindName = `fc-goto-kind-${Math.random().toString(36).slice(2, 8)}`;
-  const kindLabels: Record<GoToSpecialKind, string> = {
-    blanks: t.kindBlanks,
-    'non-blanks': t.kindNonBlanks,
-    formulas: t.kindFormulas,
-    constants: t.kindConstants,
-    numbers: t.kindNumbers,
-    text: t.kindText,
-    errors: t.kindErrors,
-    'data-validation': t.kindDataValidation,
-    'conditional-format': t.kindConditionalFormat,
-  };
   const kindInputs = new Map<GoToSpecialKind, HTMLInputElement>();
-  for (const k of KINDS) {
-    const wrap = document.createElement('label');
-    wrap.className = 'fc-goto__radio';
-    const input = document.createElement('input');
-    input.type = 'radio';
-    input.name = kindName;
-    input.value = k;
-    const span = document.createElement('span');
-    span.textContent = kindLabels[k];
-    wrap.append(input, span);
-    kindList.appendChild(wrap);
-    kindInputs.set(k, input);
-  }
-  // Default selection — spreadsheets open with `constants` highlighted; we mirror that.
-  (kindInputs.get('constants') as HTMLInputElement).checked = true;
+  const addKind = (parent: HTMLElement, kind: GoToSpecialKind): void => {
+    kindInputs.set(kind, makeRadio(parent, kindName, kind, kindLabels[kind] as string));
+  };
 
-  // Excel shows value-type checkboxes when either Formulas or Constants is
-  // selected. They let the user narrow the match to number/text/logical/error
-  // results without changing the top-level category.
-  const valueFilters = document.createElement('fieldset');
+  // Excel shows the value-type checkboxes beneath Formulas; they narrow
+  // Constants and Formulas alike.
+  const valueFilters = document.createElement('div');
   valueFilters.className = 'fc-goto__value-filters';
-  const valueLegend = document.createElement('legend');
-  valueLegend.textContent = t.valueFilterLabel;
-  valueFilters.appendChild(valueLegend);
-  body.appendChild(valueFilters);
-
-  const makeValueFilter = (key: keyof GoToSpecialValueFilters, label: string): HTMLInputElement => {
+  const makeValueFilter = (label: string): HTMLInputElement => {
     const wrap = document.createElement('label');
     wrap.className = 'fc-goto__check';
     const input = document.createElement('input');
     input.type = 'checkbox';
-    input.value = key;
     input.checked = true;
     const span = document.createElement('span');
     span.textContent = label;
@@ -197,13 +212,51 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     return input;
   };
   const valueFilterInputs = {
-    numbers: makeValueFilter('numbers', t.kindNumbers),
-    text: makeValueFilter('text', t.kindText),
-    logical: makeValueFilter('logical', t.kindLogical),
-    errors: makeValueFilter('errors', t.kindErrors),
+    numbers: makeValueFilter(t.kindNumbers),
+    text: makeValueFilter(t.kindText),
+    logical: makeValueFilter(t.kindLogical),
+    errors: makeValueFilter(t.kindErrors),
   };
+  for (const [key, input] of Object.entries(valueFilterInputs)) input.value = key;
 
-  // Inline status (shown when a search returns zero results).
+  for (const kind of LEFT_KINDS) {
+    addKind(leftColumn, kind);
+    if (kind === 'formulas') leftColumn.appendChild(valueFilters);
+  }
+
+  const levelName = `fc-goto-level-${suffix}`;
+  const ruleName = `fc-goto-rule-${suffix}`;
+  const levelInputs = {
+    direct: makeRadio(
+      document.createElement('div'),
+      levelName,
+      'direct',
+      t.kindDirectOnly,
+      'levels',
+    ),
+    all: makeRadio(document.createElement('div'), levelName, 'all', t.kindAllLevels, 'levels'),
+  };
+  const ruleInputs = {
+    all: makeRadio(document.createElement('div'), ruleName, 'all', t.ruleAll, 'rule'),
+    same: makeRadio(document.createElement('div'), ruleName, 'same', t.ruleSame, 'rule'),
+  };
+  for (const kind of RIGHT_KINDS) {
+    addKind(rightColumn, kind);
+    if (kind === 'dependents') {
+      for (const input of Object.values(levelInputs))
+        rightColumn.appendChild(input.parentElement as Node);
+    }
+    if (kind === 'data-validation') {
+      for (const input of Object.values(ruleInputs))
+        rightColumn.appendChild(input.parentElement as Node);
+    }
+  }
+  // Defaults: constants, direct precedents/dependents, every rule cell.
+  (kindInputs.get('constants') as HTMLInputElement).checked = true;
+  levelInputs.direct.checked = true;
+  ruleInputs.all.checked = true;
+
+  // Inline status (shown for an invalid reference).
   const statusLine = document.createElement('div');
   statusLine.className = 'fc-goto__status';
   statusLine.setAttribute('role', 'status');
@@ -214,169 +267,211 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     cancelLabel: t.cancel,
     okLabel: t.ok,
   });
-
-  const isSelectionMulti = (): boolean => {
-    const r = store.getState().selection.range;
-    return r.r1 > r.r0 || r.c1 > r.c0;
-  };
-
-  const syncScopeAvailability = (): void => {
-    const multi = isSelectionMulti();
-    // Disable selection scope when only one cell is selected — matching the
-    // spreadsheet convention, which silently widens to "active sheet" in
-    // that case.
-    const reason = multi ? null : t.scopeSelectionRequiresMultiCell;
-    projectDisabledState(scopeSelection, !multi, reason, { datasetKey: 'disabledReason' });
-    const scopeSelectionLabel = scopeSelection.closest<HTMLElement>('label');
-    if (scopeSelectionLabel) {
-      projectDisabledReason(scopeSelectionLabel, reason, {
-        ariaDescription: false,
-        titlePrefix: t.scopeSelection,
-      });
-    }
-    if (!multi) {
-      scopeSheet.checked = true;
-    }
-  };
+  const specialBtn = createDialogButton({ label: t.special, variant: 'secondary' });
+  footer.insertBefore(specialBtn, footer.firstChild);
 
   const getCheckedKind = (): GoToSpecialKind => {
     for (const [k, input] of kindInputs) if (input.checked) return k;
     return 'constants';
   };
-  const getValueFilters = (kind: GoToSpecialKind): GoToSpecialValueFilters | undefined => {
-    if (kind !== 'formulas' && kind !== 'constants') return undefined;
-    return {
-      numbers: valueFilterInputs.numbers.checked,
-      text: valueFilterInputs.text.checked,
-      logical: valueFilterInputs.logical.checked,
-      errors: valueFilterInputs.errors.checked,
-    };
-  };
-  const getCheckedScope = (): GoToScope => (scopeSelection.checked ? 'selection' : 'sheet');
-  const sheetIndexByName = (name: string): number => {
-    const target = name.toLowerCase();
-    const wb = getWb();
-    for (let i = 0; i < wb.sheetCount; i += 1) {
-      if (wb.sheetName(i).toLowerCase() === target) return i;
+  const getOptions = (kind: GoToSpecialKind): GoToSpecialOptions => {
+    if (kind === 'formulas' || kind === 'constants') {
+      return {
+        filters: {
+          numbers: valueFilterInputs.numbers.checked,
+          text: valueFilterInputs.text.checked,
+          logical: valueFilterInputs.logical.checked,
+          errors: valueFilterInputs.errors.checked,
+        },
+      };
     }
-    return -1;
+    if (kind === 'precedents' || kind === 'dependents')
+      return { allLevels: levelInputs.all.checked };
+    if (kind === 'conditional-format' || kind === 'data-validation') {
+      return { same: ruleInputs.same.checked };
+    }
+    return {};
+  };
+
+  /** Resolve the typed text into areas on a single sheet; null when any part is invalid. */
+  const resolveReference = (text: string): Range[] | null => {
+    const wb = getWb();
+    const current = store.getState().data.sheetIndex;
+    const areas: Range[] = [];
+    for (const part of splitAreas(text)) {
+      const area = resolveAreaText(wb, part, current);
+      if (!area) return null;
+      areas.push(area);
+    }
+    const sheet = areas[0]?.sheet;
+    if (sheet === undefined || areas.some((a) => a.sheet !== sheet)) return null;
+    // A Go To reference is an explicit host/user target. Reject a partially
+    // out-of-bounds rectangle instead of silently clamping it.
+    const allowed = areas.every(
+      (a) =>
+        isNavigationAddrAllowed(store, { sheet, row: a.r0, col: a.c0 }) &&
+        isNavigationAddrAllowed(store, { sheet, row: a.r1, col: a.c1 }),
+    );
+    if (!allowed) return null;
+    const clamped = areas.map((a) => clampNavigationRange(store, a));
+    return clamped.every((a): a is Range => a !== null) ? clamped : null;
+  };
+
+  /** `$A$1` on the active sheet, `Sheet2!$A$1` elsewhere; areas joined by commas. */
+  const formatReference = (areas: readonly Range[]): string => {
+    const current = store.getState().data.sheetIndex;
+    const wb = getWb();
+    return areas
+      .map((a) => {
+        const ref = formatA1Range(a, { absolute: true });
+        return a.sheet === current ? ref : `${quoteSheetName(wb.sheetName(a.sheet))}!${ref}`;
+      })
+      .join(',');
+  };
+
+  const fillReference = (text: string): void => {
+    referenceInput.value = text;
+    statusLine.textContent = '';
+    referenceInput.focus();
+    referenceInput.select();
+  };
+
+  const renderTargets = (): void => {
+    targetList.replaceChildren();
+    const entries: string[] = [];
+    for (const dn of rangeDefinedNames(getWb(), store.getState().data.sheetIndex)) {
+      entries.push(dn.name);
+    }
+    for (const areas of recentReferences.get(store) ?? []) entries.push(formatReference(areas));
+    for (const text of entries) {
+      const item = createDialogButton({ label: text, baseClass: 'fc-goto__radio' });
+      item.setAttribute('role', 'option');
+      item.addEventListener('click', () => fillReference(text));
+      item.addEventListener('dblclick', () => {
+        fillReference(text);
+        onOk();
+      });
+      targetList.appendChild(item);
+    }
+    targetList.hidden = entries.length === 0;
+    listLegend.hidden = entries.length === 0;
   };
 
   const goToReference = (): boolean => {
-    const parsed = parseRangeRef(referenceInput.value);
-    if (!parsed) {
-      statusLine.textContent = t.invalidReference;
-      return false;
-    }
-    const currentSheet = store.getState().data.sheetIndex;
-    const sheet = parsed.sheetName == null ? currentSheet : sheetIndexByName(parsed.sheetName);
-    if (sheet < 0) {
-      statusLine.textContent = t.invalidReference;
-      return false;
-    }
-    const active = { sheet, row: parsed.r0, col: parsed.c0 };
-    const end = { sheet, row: parsed.r1, col: parsed.c1 };
-    // A Go To reference is an explicit host/user target. Reject a partially
-    // out-of-bounds rectangle instead of silently selecting its last in-range
-    // corner, which is especially surprising in a fixed input form.
-    if (!isNavigationAddrAllowed(store, active) || !isNavigationAddrAllowed(store, end)) {
-      statusLine.textContent = t.invalidReference;
-      return false;
-    }
-    const range = clampNavigationRange(store, {
-      sheet,
-      r0: parsed.r0,
-      c0: parsed.c0,
-      r1: parsed.r1,
-      c1: parsed.c1,
-    });
-    const target = clampNavigationAddr(store, active);
-    if (!range || !target) {
+    const areas = resolveReference(referenceInput.value);
+    const [first, ...rest] = areas ?? [];
+    const target = first
+      ? clampNavigationAddr(store, { sheet: first.sheet, row: first.r0, col: first.c0 })
+      : null;
+    if (!areas || !first || !target) {
       statusLine.textContent = t.invalidReference;
       return false;
     }
     store.setState((s) => ({
       ...s,
-      data: { ...s.data, sheetIndex: sheet },
+      data: { ...s.data, sheetIndex: first.sheet },
       selection: {
         active: target,
         anchor: target,
-        range,
-        extraRanges: [],
+        range: first,
+        extraRanges: rest,
       },
     }));
     syncNavigationViewport(store);
+    const text = formatReference(areas);
+    const recents = (recentReferences.get(store) ?? []).filter(
+      (prev) => formatReference(prev) !== text,
+    );
+    recentReferences.set(store, [areas, ...recents].slice(0, MAX_RECENT_REFERENCES));
     api.close();
     return true;
   };
 
+  const goToSpecial = (): void => {
+    const kind = getCheckedKind();
+    const wb = getWb();
+    const result = findMatchingRanges(wb, store, kind, getOptions(kind));
+    const ranges =
+      result.status === 'found'
+        ? result.ranges
+            .map((r) => clampNavigationRange(store, r))
+            .filter((r): r is Range => r !== null)
+        : [];
+    api.close();
+    if (result.status === 'too-large') {
+      alertDialog.show({ severity: 'stop', title: t.title, message: t.selectionTooLarge });
+      return;
+    }
+    if (ranges.length === 0) {
+      alertDialog.show({ severity: 'stop', title: t.title, message: t.noResults });
+      return;
+    }
+    store.setState((s) => ({ ...s, selection: selectionFromRanges(ranges) }));
+  };
+
   const onOk = (): void => {
     statusLine.textContent = '';
-    if (mode === 'go-to') {
-      goToReference();
-      return;
-    }
-    const kind = getCheckedKind();
-    const scope = getCheckedScope();
-    const wb = getWb();
-    const matches = findMatchingCells(wb, store, scope, kind, getValueFilters(kind)).filter(
-      (addr) => isNavigationAddrAllowed(store, addr),
-    );
-    if (matches.length === 0) {
-      statusLine.textContent = t.noResults;
-      return;
-    }
-    store.setState((s) => ({
-      ...s,
-      selection: selectionFromMatches(matches),
-    }));
-    api.close();
+    if (mode === 'go-to') goToReference();
+    else goToSpecial();
   };
 
-  const syncValueFilters = (): void => {
+  const syncEnabled = (): void => {
     const kind = getCheckedKind();
-    valueFilters.hidden = mode === 'go-to' || (kind !== 'formulas' && kind !== 'constants');
+    const filtered = kind === 'formulas' || kind === 'constants';
+    for (const input of Object.values(valueFilterInputs))
+      projectDisabledState(input, !filtered, null);
+    const traced = kind === 'precedents' || kind === 'dependents';
+    for (const input of Object.values(levelInputs)) projectDisabledState(input, !traced, null);
+    const ruled = kind === 'conditional-format' || kind === 'data-validation';
+    for (const input of Object.values(ruleInputs)) projectDisabledState(input, !ruled, null);
   };
 
-  for (const input of kindInputs.values()) {
-    shell.on(input, 'change', syncValueFilters);
-  }
+  for (const input of kindInputs.values()) shell.on(input, 'change', syncEnabled);
+
+  const showMode = (next: 'go-to' | 'special'): void => {
+    mode = next;
+    statusLine.textContent = '';
+    const normal = mode === 'go-to';
+    header.textContent = normal ? t.goToTitle : t.title;
+    shell.setAriaLabel(normal ? t.goToTitle : t.title);
+    referenceRow.hidden = !normal;
+    specialBtn.hidden = !normal;
+    kindList.hidden = normal;
+    if (normal) renderTargets();
+    else {
+      targetList.hidden = true;
+      listLegend.hidden = true;
+      syncEnabled();
+    }
+  };
 
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', () => api.close());
+  shell.on(specialBtn, 'click', () => {
+    showMode('special');
+    kindInputs.get(getCheckedKind())?.focus();
+  });
   // Enter on any control inside the modal commits — matches the spreadsheet
   // convention. Escape and backdrop dismissals are handled by the shell.
   shell.on(shell.overlay, 'keydown', (e) => {
-    if ((e as KeyboardEvent).key === 'Enter') {
-      e.preventDefault();
-      onOk();
-    }
+    if ((e as KeyboardEvent).key !== 'Enter') return;
+    // Buttons keep their own click behavior.
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    onOk();
   });
 
   const api: GoToDialogHandle = {
     open(nextMode = 'special'): void {
-      mode = nextMode;
-      statusLine.textContent = '';
-      const normal = mode === 'go-to';
-      header.textContent = normal ? t.goToTitle : t.title;
-      shell.setAriaLabel(normal ? t.goToTitle : t.title);
-      referenceRow.hidden = !normal;
-      scopeLegend.hidden = normal;
-      scopeGroup.hidden = normal;
-      kindLegend.hidden = normal;
-      kindList.hidden = normal;
-      syncValueFilters();
-      referenceInput.value = normal ? '' : referenceInput.value;
-      syncScopeAvailability();
-      if (!normal && isSelectionMulti()) scopeSelection.checked = true;
+      showMode(nextMode);
+      if (nextMode === 'go-to') referenceInput.value = '';
       shell.open();
       deferInitialFocus(shell.overlay, () => {
-        if (normal) {
+        if (nextMode === 'go-to') {
           referenceInput.focus();
           return;
         }
-        const first = kindInputs.values().next().value;
-        if (first) first.focus();
+        kindInputs.get(getCheckedKind())?.focus();
       });
     },
     close(): void {
@@ -384,6 +479,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       host.focus();
     },
     detach(): void {
+      alertDialog.detach();
       shell.dispose();
     },
   };
