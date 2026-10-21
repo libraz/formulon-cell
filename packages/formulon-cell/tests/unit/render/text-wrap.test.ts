@@ -29,6 +29,8 @@ const theme: ResolvedTheme = {
   cellNumFg: '#000',
   cellBoolFg: '#060',
   hoverStripe: 'rgba(0,0,0,0.04)',
+  headerBg: '#eee',
+  headerRule: '#ccc',
   headerFg: '#666',
   headerFgActive: '#000',
   pageBackdrop: '#999',

@@ -217,7 +217,11 @@ describe('GridRenderer merged selection parity', () => {
     const { view } = viewParts(state);
     const [rangeRect] = rangeRects(view.layout, view.viewport, state.selection.range);
     if (!rangeRect) throw new Error('expected the range to be visible');
-    expect(spy.strokeRects).toEqual([[rangeRect.x, rangeRect.y, rangeRect.w + 1, rangeRect.h + 1]]);
+    // A 1px sheet-coloured gap inside the border, then the border itself.
+    expect(spy.strokeRects).toEqual([
+      [rangeRect.x + 1.5, rangeRect.y + 1.5, rangeRect.w - 2, rangeRect.h - 2],
+      [rangeRect.x, rangeRect.y, rangeRect.w + 1, rangeRect.h + 1],
+    ]);
   });
 
   it('clears an inactive unfilled merge before content painting', () => {

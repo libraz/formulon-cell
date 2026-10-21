@@ -5,25 +5,29 @@ import type { Rect } from '../geometry.js';
  *
  *  Desktop spreadsheets paint a crisp 2px accent border that covers the
  *  range's own gridlines plus one pixel outside them, so no gridline shows
- *  between the border and the neighbouring cells. Drawn in a separate pass
- *  after all cell text so neighbouring cell rects never clip it. */
+ *  between the border and the neighbouring cells. A shaded range keeps a
+ *  1px sheet-coloured gap inside the border (`inset`). Drawn in a separate
+ *  pass after all cell text so neighbouring cell rects never clip it. */
 export function paintSelectionOutline(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
+  inset = false,
 ): void {
   const left = Math.round(bounds.x);
   const top = Math.round(bounds.y);
+  const right = Math.round(bounds.x + bounds.w);
+  const bottom = Math.round(bounds.y + bounds.h);
   ctx.save();
+  ctx.setLineDash([]);
+  if (inset && right - left > 3 && bottom - top > 3) {
+    ctx.strokeStyle = theme.bg;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(left + 1.5, top + 1.5, right - left - 2, bottom - top - 2);
+  }
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 2;
-  ctx.setLineDash([]);
-  ctx.strokeRect(
-    left,
-    top,
-    Math.round(bounds.x + bounds.w) + 1 - left,
-    Math.round(bounds.y + bounds.h) + 1 - top,
-  );
+  ctx.strokeRect(left, top, right + 1 - left, bottom + 1 - top);
   ctx.restore();
 }
 

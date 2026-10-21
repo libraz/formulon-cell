@@ -13,7 +13,7 @@ import {
   type ViewState,
 } from '../geometry.js';
 import { paintOutlineGutters } from '../painters/controls.js';
-import type { ChromePaintContext } from './chrome-context.js';
+import { type ChromePaintContext, ruleWidth } from './chrome-context.js';
 import { setOutlineToggles } from './hit-state.js';
 
 export function paintHeaders(
@@ -42,7 +42,7 @@ export function paintHeaders(
   const labelLeftX = rtl ? cssWidth - ox : rulerLeft(layout) + layout.outlineRowGutter;
   const innerX = rtl ? cssWidth - ox : ox;
 
-  ctx.fillStyle = theme.bgRail;
+  ctx.fillStyle = theme.headerBg;
   ctx.fillRect(railLeftX, 0, ox, oy);
   ctx.save();
   ctx.fillStyle = theme.headerFg;
@@ -57,13 +57,14 @@ export function paintHeaders(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = theme.bgRail;
+  ctx.fillStyle = theme.headerBg;
   ctx.fillRect(rtl ? 0 : ox, 0, cssWidth - ox, oy);
   ctx.fillRect(railLeftX, oy, ox, cssHeight - oy);
 
   ctx.strokeStyle = theme.ruleStrong;
-  ctx.lineWidth = 1 / dpr;
-  const align = 0.5 / dpr;
+  const width = ruleWidth(dpr);
+  ctx.lineWidth = width;
+  const align = width / 2;
   ctx.beginPath();
   ctx.moveTo(0, Math.round(oy) + align);
   ctx.lineTo(cssWidth, Math.round(oy) + align);
@@ -97,8 +98,8 @@ export function paintHeaders(
       ctx.fillStyle = theme.bgHeader;
       ctx.fillRect(rect.x, labelTopY, w, layout.headerRowHeight);
     }
-    ctx.strokeStyle = theme.rule;
-    ctx.lineWidth = 1 / dpr;
+    ctx.strokeStyle = theme.headerRule;
+    ctx.lineWidth = width;
     ctx.beginPath();
     ctx.moveTo(Math.round(rect.x + w) + align, labelTopY);
     ctx.lineTo(Math.round(rect.x + w) + align, oy);
@@ -111,9 +112,10 @@ export function paintHeaders(
     ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
     ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
+    // The accent bar covers the rule under the header and one pixel above it.
     if (isActiveCol || isSelectedCol) {
       ctx.fillStyle = theme.accent;
-      ctx.fillRect(rect.x, oy - Math.max(2, 2 / dpr), w, Math.max(2, 2 / dpr));
+      ctx.fillRect(rect.x, Math.round(oy) - 1, w, 2);
     }
 
     // Autofilter chevron — small ▼ in the right edge of the header for any
@@ -175,8 +177,8 @@ export function paintHeaders(
       ctx.fillStyle = theme.bgHeader;
       ctx.fillRect(labelLeftX, rect.y, layout.headerColWidth, h);
     }
-    ctx.strokeStyle = theme.rule;
-    ctx.lineWidth = 1 / dpr;
+    ctx.strokeStyle = theme.headerRule;
+    ctx.lineWidth = width;
     ctx.beginPath();
     ctx.moveTo(labelLeftX, Math.round(rect.y + h) + align);
     ctx.lineTo(labelLeftX + layout.headerColWidth, Math.round(rect.y + h) + align);
@@ -190,32 +192,9 @@ export function paintHeaders(
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     ctx.fillText(rowLabel, rtl ? innerX + 8 : innerX - 8, rect.y + h / 2 + 0.5);
     if (isActiveRow || isSelectedRow) {
-      const barW = Math.max(2, 2 / dpr);
       ctx.fillStyle = theme.accent;
-      ctx.fillRect(rtl ? innerX : innerX - barW, rect.y, barW, h);
+      ctx.fillRect(Math.round(innerX) - 1, rect.y, 2, h);
     }
-  }
-
-  if (!objectSelected && cols.positionAt.has(active.col)) {
-    const aRect = cellRectIn(layout, cols, rows, firstRow, active.col);
-    const w = cols.sizeAt.get(active.col) ?? 0;
-    ctx.strokeStyle = theme.accent;
-    ctx.lineWidth = 1.5 / dpr;
-    ctx.beginPath();
-    ctx.moveTo(aRect.x, oy - 0.5);
-    ctx.lineTo(aRect.x + w, oy - 0.5);
-    ctx.stroke();
-  }
-  if (!objectSelected && rows.positionAt.has(active.row)) {
-    const aRect = cellRectIn(layout, cols, rows, active.row, firstCol);
-    const h = rows.sizeAt.get(active.row) ?? 0;
-    ctx.strokeStyle = theme.accent;
-    ctx.lineWidth = 1.5 / dpr;
-    ctx.beginPath();
-    const markX = rtl ? innerX + 0.5 : innerX - 0.5;
-    ctx.moveTo(markX, aRect.y);
-    ctx.lineTo(markX, aRect.y + h);
-    ctx.stroke();
   }
 
   // Bracket gutters for outline groups.

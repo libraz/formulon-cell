@@ -27,6 +27,8 @@ const theme = {
   cellBoolFg: '#060',
   cellNumFg: '#000',
   hoverStripe: 'rgba(0,0,0,0.04)',
+  headerBg: '#eee',
+  headerRule: '#ccc',
   headerFg: '#666',
   headerFgActive: '#000',
   pageBackdrop: '#aaa',

@@ -22,6 +22,10 @@ export interface ResolvedTheme {
   cellBoolFg: string;
   cellNumFg: string;
   hoverStripe: string;
+  /** Row and column header fill. */
+  headerBg: string;
+  /** Rule between two header cells. */
+  headerRule: string;
   headerFg: string;
   headerFgActive: string;
 
@@ -81,6 +85,8 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     cellNumFg: v('--fc-cell-num-fg', '#0a0c10'),
 
     hoverStripe: v('--fc-hover-stripe', 'rgba(21,23,28,0.025)'),
+    headerBg: v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
+    headerRule: v('--fc-header-rule', v('--fc-rule', '#e2dccd')),
     headerFg: v('--fc-header-fg', '#6f6a5d'),
     headerFgActive: v('--fc-header-fg-active', '#15171c'),
 

@@ -3,7 +3,7 @@
 
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import { type AxisLayout, cellRectIn, gridOriginX, mirrorX, type ViewState } from '../geometry.js';
-import type { ChromePaintContext } from './chrome-context.js';
+import { type ChromePaintContext, ruleWidth } from './chrome-context.js';
 
 export function paintGridLines(
   pc: ChromePaintContext,
@@ -14,10 +14,11 @@ export function paintGridLines(
 ): void {
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const { layout } = state;
-  const align = 0.5 / dpr;
+  const width = ruleWidth(dpr);
+  const align = width / 2;
 
   ctx.strokeStyle = theme.rule;
-  ctx.lineWidth = 1 / dpr;
+  ctx.lineWidth = width;
   ctx.beginPath();
 
   const firstRow = rows.visible[0] ?? 0;

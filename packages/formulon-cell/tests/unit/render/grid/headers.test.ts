@@ -24,6 +24,8 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     cellBoolFg: '#107c41',
     cellNumFg: '#11100f',
     hoverStripe: 'rgba(16,124,65,0.025)',
+    headerBg: '#faf9f8',
+    headerRule: '#d9d9d9',
     headerFg: '#605e5c',
     headerFgActive: '#107c41',
     fontUi: 'Aptos, sans-serif',
@@ -210,8 +212,13 @@ describe('paintHeaders', () => {
       cols,
       rows,
     );
-    expect(shown.strokes).toContain('#107c41');
-    expect(shown.fills.some((fill) => fill.style === '#107c41')).toBe(true);
+    // The accent bars cover the rule beside the header and one pixel inside it.
+    const view = layoutForView(state);
+    const bars = shown.fills.filter((fill) => fill.style === '#107c41').map((fill) => fill.rect);
+    const oy = Math.round(view.headerRowHeight);
+    const ox = Math.round(view.headerColWidth);
+    expect(bars.some((rect) => rect?.[1] === oy - 1 && rect[3] === 2)).toBe(true);
+    expect(bars.some((rect) => rect?.[0] === ox - 1 && rect[2] === 2)).toBe(true);
   });
 
   it('parks the row rail and the corner chip on the right for a right-to-left sheet', () => {

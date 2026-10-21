@@ -16,9 +16,10 @@
   --fc-sheetbar-tab-max-width: 78px;
 }
 
-/* Light palette on Mac: the selection green and the selected-header fill
- * measured from Excel for Mac (#217346, #f3f3f3). Dark and contrast palettes
- * keep their own values. */
+/* Light palette on Mac, measured from Excel for Mac: the selection green, the
+ * header fills and rules, the gridlines and the range shading (a 22% darkening,
+ * so gridlines under it stay visible). Dark and contrast palettes keep their own
+ * values. */
 @layer fc.theme {
   :is(.fc-host, .fc-overlay-portal)[data-fc-platform="mac"]:is(
     [data-fc-theme="paper"],
@@ -29,6 +30,12 @@
     --fc-header-fg-active: #217346;
     --fc-cell-bool-fg: #217346;
     --fc-bg-header: #f3f3f3;
+    --fc-header-bg: #fafafa;
+    --fc-header-rule: #efefef;
+    --fc-header-fg: #5e5e5e;
+    --fc-rule: #d4d4d4;
+    --fc-rule-strong: #bcbbba;
+    --fc-accent-soft: rgba(0, 0, 0, 0.224);
     --fc-hover-stripe: rgba(33, 115, 70, 0.025);
   }
 }

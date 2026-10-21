@@ -545,7 +545,9 @@ export class GridRenderer {
     const multiCell = r.r0 !== r.r1 || r.c0 !== r.c1;
     const rangeOutline = multiCell ? rangeRects(layout, viewport, r) : activeRects;
     const outlineRects = sameRectList(activeRects, rangeOutline) ? activeRects : rangeOutline;
-    for (const bounds of outlineRects) paintSelectionOutline(this.ctx, bounds, theme);
+    for (const bounds of outlineRects) {
+      paintSelectionOutline(this.ctx, bounds, theme, outlineRects !== activeRects);
+    }
 
     const activeAnchor = activeMerge
       ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }

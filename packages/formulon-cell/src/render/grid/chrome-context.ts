@@ -8,3 +8,7 @@ export interface ChromePaintContext {
   cssWidth: number;
   cssHeight: number;
 }
+
+/** A one-CSS-pixel rule, snapped to whole device pixels, as the spreadsheet
+ *  draws gridlines at every display scale. */
+export const ruleWidth = (dpr: number): number => Math.max(1, Math.round(dpr)) / dpr;
