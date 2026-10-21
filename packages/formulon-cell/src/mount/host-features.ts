@@ -18,7 +18,7 @@ import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
 import { attachArgHelper } from '../interact/arg-helper.js';
-import { attachAutocomplete } from '../interact/autocomplete.js';
+import { attachAutocomplete, collectAutocompleteNames } from '../interact/autocomplete.js';
 import { attachBorderDraw, type BorderDrawHandle } from '../interact/border-draw.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
@@ -496,6 +496,10 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           strings,
           getSelectedRangeFormula: () =>
             `=${formatA1Range(input.store.getState().selection.range)}`,
+          getSelection: () => {
+            const { active, range } = input.store.getState().selection;
+            return { active, range };
+          },
           subscribeToRangeChanges: (listener) => input.store.subscribe(listener),
           onAfterMutate: () =>
             mutators.replaceCells(
@@ -533,6 +537,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           store: input.store,
           wb: input.wb(),
           strings,
+          history: input.history,
           onAfterCreate: () => {
             mutators.replaceCells(
               input.store,
@@ -808,6 +813,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           input: input.fxInput,
           onAfterInsert: () => input.getFormulaBar().syncFxRefs(),
           getTables: () => input.wb().getTables(),
+          getNames: () =>
+            collectAutocompleteNames(
+              input.wb().definedNames(),
+              input.wb().getTables(),
+              input.store.getState().selection.active.sheet,
+            ),
           getCustomFunctions: () => input.formulaRegistry.list(),
           getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
           getFunctionNames: () => input.wb().functionNames(),

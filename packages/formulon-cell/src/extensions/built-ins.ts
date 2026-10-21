@@ -240,6 +240,7 @@ export const pivotTableDialog = (): Extension => ({
       store: ctx.store,
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
+      history: ctx.history,
       onAfterCreate: () => refreshCells(ctx),
       invalidate: () => ctx.invalidate(),
     });

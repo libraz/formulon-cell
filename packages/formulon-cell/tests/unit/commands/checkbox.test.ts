@@ -66,6 +66,7 @@ describe('paintCheckbox', () => {
     fg: '#222222',
     accent: '#1f7ae0',
     ruleStrong: '#888888',
+    freezeRule: '#9b9b9b',
     ruleSoft: '#cccccc',
   } as unknown as ResolvedTheme;
 

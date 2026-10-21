@@ -149,6 +149,7 @@ const buildPivotTableAction =
         recommendedPivotTables: strings.ribbonMenu.recommendedPivotTables,
         pivotAuthoringDetail: strings.workbookObjects.compatibilityDetails.pivotAuthoring,
         workbookStructureProtectedBlocked: strings.ribbonMenu.workbookStructureProtectedBlocked,
+        dataFieldNaming: strings.pivotTableDialog.dataFieldNaming,
       },
     });
     if (result.kind === 'open-dialog') {

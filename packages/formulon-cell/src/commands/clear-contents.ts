@@ -6,6 +6,7 @@ import type { SpreadsheetStore, State } from '../store/store.js';
 import { History } from './history.js';
 import { InteractionController, interactionControllerFor } from './interaction-controller.js';
 import type { ChangeBatchResult, InteractionOrigin } from './interaction-policy.js';
+import { blockPivotEdit, pivotGuardAlert } from './pivot-guard.js';
 
 /** The part of the interaction controller used by clear-contents callers. */
 export type ClearContentsCommands = Pick<InteractionController, 'execute' | 'policy'> & {
@@ -87,6 +88,15 @@ const emptyResult = (revision = 0): ChangeBatchResult => ({
 export const clearSelectedContents = (options: ClearSelectedContentsOptions): ChangeBatchResult => {
   const { store, workbook } = options;
   const commands = options.commands ?? interactionControllerFor(store);
+  const { range, extraRanges } = store.getState().selection;
+  if ([range, ...(extraRanges ?? [])].some((selected) => blockPivotEdit(workbook, selected))) {
+    return {
+      status: 'rejected',
+      applied: [],
+      rejected: [{ code: 'protected', reason: pivotGuardAlert(workbook).message }],
+      revision: commands?.revision ?? 0,
+    };
+  }
   const addresses = collectSelectedContentAddresses(store, workbook);
   if (addresses.length === 0) return emptyResult(commands?.revision ?? 0);
 

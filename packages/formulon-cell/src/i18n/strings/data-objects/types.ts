@@ -73,6 +73,34 @@ export interface DataObjectsStrings {
     average: string;
     max: string;
     min: string;
+    product: string;
+    countNumbers: string;
+    stdDev: string;
+    stdDevP: string;
+    variance: string;
+    varianceP: string;
+    pivotCaptions: {
+      rowLabels: string;
+      columnLabels: string;
+      grandTotal: string;
+      blank: string;
+      subtotal: string;
+      cannotChange: string;
+    };
+    dataFieldNaming: {
+      template: string;
+      sum: string;
+      count: string;
+      average: string;
+      max: string;
+      min: string;
+      product: string;
+      countNumbers: string;
+      stdDev: string;
+      stdDevP: string;
+      variance: string;
+      varianceP: string;
+    };
     showValuesAs: string;
     showValuesAsNormal: string;
     showValuesAsPercentOfRow: string;
@@ -146,6 +174,12 @@ export interface DataObjectsStrings {
     pivotAggregateAverage: string;
     pivotAggregateMax: string;
     pivotAggregateMin: string;
+    pivotAggregateProduct: string;
+    pivotAggregateCountNumbers: string;
+    pivotAggregateStdDev: string;
+    pivotAggregateStdDevP: string;
+    pivotAggregateVariance: string;
+    pivotAggregateVarianceP: string;
     pivotNumberFormat: string;
     pivotNumberFormatPlaceholder: string;
     pivotFilterItems: string;

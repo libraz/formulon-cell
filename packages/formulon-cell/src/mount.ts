@@ -451,6 +451,7 @@ export const Spreadsheet = {
         getLocale: () => i18n.locale,
         getNamedRangeDialog: () => featureState.namedRangeDialog,
         getPivotTableDialog: () => featureState.pivotTableDialog,
+        getWorkbookObjects: () => featureState.workbookObjects,
         getSessionCharts: () => featureState.sessionCharts,
         getSheetTabs: () => sheetTabsController,
         grid,
@@ -1108,6 +1109,8 @@ export const Spreadsheet = {
           navigation.options?.range?.sheet ??
           Math.min(store.getState().data.sheetIndex, Math.max(0, wb.sheetCount - 1));
         mutators.setSheetIndex(store, nextSheet);
+        // Per-sheet selection and scroll belong to the previous workbook.
+        store.setState((state) => ({ ...state, ui: { ...state.ui, sheetViewMemos: undefined } }));
         mutators.clearIllustrations(store);
         store.setState((state) => ({
           ...state,

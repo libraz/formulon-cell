@@ -66,6 +66,13 @@ export const gridPopupsDe: GridPopupsStrings = {
     pasteSpecialRequiresCopiedCells:
       'Kopieren oder schneiden Sie Zellen aus, bevor Sie diese Einfügeoption verwenden.',
     editPhonetic: 'Phonetischen Leitfaden bearbeiten…',
+    pivotRefresh: 'Aktualisieren',
+    pivotSort: 'Sortieren',
+    pivotSortAsc: 'Von A bis Z sortieren',
+    pivotSortDesc: 'Von Z bis A sortieren',
+    pivotValueFieldSettings: 'Wertfeldeinstellungen…',
+    pivotFieldSettings: 'Feldeinstellungen…',
+    pivotShowFieldList: 'Feldliste anzeigen',
     phoneticDialogTitle: 'Phonetischer Leitfaden',
     phoneticDialogLabel: 'Lesung',
     ok: 'OK',

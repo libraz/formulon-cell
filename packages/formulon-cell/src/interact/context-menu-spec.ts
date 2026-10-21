@@ -58,11 +58,16 @@ export type ItemId =
   | 'insertHyperlink'
   | 'openHyperlink'
   | 'editPhonetic'
-  | 'toggleWatch';
+  | 'toggleWatch'
+  | 'pivotRefresh'
+  | 'pivotSortAsc'
+  | 'pivotSortDesc'
+  | 'pivotFieldSettings'
+  | 'pivotShowFieldList';
 
 /** Menu-level IDs are also stable composition targets. They are not commands
  * themselves; selecting one selects the corresponding nested item tree. */
-export type MenuContainerId = 'pasteSpecialMenu' | 'filterMenu' | 'sortMenu';
+export type MenuContainerId = 'pasteSpecialMenu' | 'filterMenu' | 'sortMenu' | 'pivotSortMenu';
 
 export type ContextMenuItemId = ItemId | MenuContainerId;
 
@@ -138,6 +143,11 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'openHyperlink',
   'editPhonetic',
   'toggleWatch',
+  'pivotRefresh',
+  'pivotSortAsc',
+  'pivotSortDesc',
+  'pivotFieldSettings',
+  'pivotShowFieldList',
 ];
 
 const BUILTIN_ITEM_ID_SET: ReadonlySet<string> = new Set(BUILTIN_ITEM_IDS);
@@ -179,6 +189,7 @@ export const SUBMENU_ICON_ACTION: Record<string, string> = {
   pasteSpecialMenu: 'pasteSpecial',
   filterMenu: 'filter',
   sortMenu: 'sort',
+  pivotSortMenu: 'sort',
 };
 
 function pasteSpecialSubmenu(s: Strings): MenuEntry {
@@ -259,6 +270,53 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'toggleWatch', label: t.addWatch },
     { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
   ];
+}
+
+/** What the pivot menu needs to know about the clicked report cell. */
+export interface PivotMenuTarget {
+  /** A cell showing a computed value rather than a label. */
+  isValue: boolean;
+  /** The report can be refreshed from its source. */
+  canRefresh: boolean;
+  /** The cell's source field can be sorted. */
+  canSort: boolean;
+  /** The field list panel can be opened. */
+  canOpenFieldList: boolean;
+}
+
+/** Cell menu for a PivotTable report cell, in the desktop order. Only items
+ *  with a backing command are listed. */
+export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntry[] {
+  const t = s.contextMenu;
+  const entries: MenuEntry[] = [
+    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
+    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    { kind: 'sep', id: 'pvSep1' },
+  ];
+  if (target.canRefresh) entries.push({ kind: 'item', id: 'pivotRefresh', label: t.pivotRefresh });
+  if (target.canSort) {
+    entries.push({
+      kind: 'submenu',
+      id: 'pivotSortMenu',
+      label: t.pivotSort,
+      children: [
+        { kind: 'item', id: 'pivotSortAsc', label: t.pivotSortAsc },
+        { kind: 'item', id: 'pivotSortDesc', label: t.pivotSortDesc },
+      ],
+    });
+  }
+  if (target.canOpenFieldList) {
+    entries.push(
+      { kind: 'sep', id: 'pvSep2' },
+      {
+        kind: 'item',
+        id: 'pivotFieldSettings',
+        label: target.isValue ? t.pivotValueFieldSettings : t.pivotFieldSettings,
+      },
+      { kind: 'item', id: 'pivotShowFieldList', label: t.pivotShowFieldList },
+    );
+  }
+  return entries;
 }
 
 export function buildRowEntries(s: Strings): MenuEntry[] {

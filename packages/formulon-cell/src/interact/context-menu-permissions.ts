@@ -125,7 +125,9 @@ export function createContextMenuPermissions(
     if (id === 'filterClear' || id === 'filterReapply' || id === 'filterByValue') {
       return 'filter';
     }
-    if (id === 'sortAsc' || id === 'sortDesc') return 'sort';
+    if (id === 'sortAsc' || id === 'sortDesc' || id === 'pivotSortAsc' || id === 'pivotSortDesc') {
+      return 'sort';
+    }
     if (id === 'rowHide' || id === 'rowUnhide') return 'resizeRows';
     if (id === 'colHide' || id === 'colUnhide') return 'resizeColumns';
     if (id === 'rowGroup' || id === 'rowUngroup') return 'insertRows';

@@ -18,6 +18,7 @@ import {
 } from './coerce-input.js';
 import { interactionControllerFor, nativeAxisFontFormatFor } from './interaction-controller.js';
 import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
+import { pivotGuardAlert, pivotOccupies } from './pivot-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 export type CellInputOperation = 'valueEdit' | 'formulaEdit';
@@ -107,6 +108,17 @@ export function commitCellInput({
           }
           return Object.keys(inherited).length > 0 ? inherited : undefined;
         })();
+    if (
+      pivotOccupies(wb, {
+        sheet: anchor.sheet,
+        r0: anchor.row,
+        c0: anchor.col,
+        r1: anchor.row,
+        c1: anchor.col,
+      })
+    ) {
+      return { status: 'rejected', operation, alert: pivotGuardAlert(wb) };
+    }
     const mergeCells = mergeCellsFor(state, addr);
     if (mergeCells === null) {
       return {

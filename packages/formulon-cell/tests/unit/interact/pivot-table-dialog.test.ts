@@ -47,8 +47,13 @@ const makeWb = () => {
       calls.push('add-sheet');
       return 1;
     },
+    moveSheet: (from: number, to: number) => {
+      calls.push(`move-sheet:${from}:${to}`);
+      return true;
+    },
     cells: function* () {},
     getPivotTables: () => [],
+    getTables: () => [],
     getValue: ({ row, col }: { row: number; col: number }) => {
       if (row === 0 && col === 0) return text('Region');
       if (row === 0 && col === 1) return text('Sales');
@@ -229,6 +234,12 @@ describe('attachPivotTableDialog', () => {
       'Average',
       'Max',
       'Min',
+      'Product',
+      'Count Numbers',
+      'StdDev',
+      'StdDevp',
+      'Var',
+      'Varp',
     ]);
     expect(Array.from(selects[5]?.options ?? []).map((option) => option.value)).toEqual([
       'none',
@@ -345,9 +356,11 @@ describe('attachPivotTableDialog', () => {
     form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
     expect(calls).toContain('add-sheet');
+    // The new sheet takes the source sheet's slot and the report lands at A3.
+    expect(calls).toContain('move-sheet:1:0');
     expect(calls).toContain('pivot');
-    expect(store.getState().data.sheetIndex).toBe(1);
-    expect(store.getState().selection.active).toEqual({ sheet: 1, row: 0, col: 0 });
+    expect(store.getState().data.sheetIndex).toBe(0);
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 0 });
     handle.detach();
   });
 

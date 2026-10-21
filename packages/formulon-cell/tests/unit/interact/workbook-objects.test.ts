@@ -536,6 +536,12 @@ describe('attachWorkbookObjectsPanel', () => {
       ['2', 'Average'],
       ['3', 'Max'],
       ['4', 'Min'],
+      ['5', 'Product'],
+      ['6', 'Count Numbers'],
+      ['7', 'StdDev'],
+      ['8', 'StdDevp'],
+      ['9', 'Var'],
+      ['10', 'Varp'],
     ]);
     regionField.value = '3';
     salesField.value = '1';

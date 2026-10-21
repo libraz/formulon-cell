@@ -1,4 +1,10 @@
 import { pivotAggregationName } from './pivot-aggregation.js';
+import {
+  ENGLISH_PIVOT_CAPTIONS,
+  localizePivotCaption,
+  PIVOT_CELL_KIND,
+  type PivotCaptions,
+} from './pivot-captions.js';
 import type { PivotMutationWorkbook } from './pivot-mutation.js';
 import type {
   Addr,
@@ -12,6 +18,7 @@ import type {
   PivotFilterSpec,
   PivotReportLayout,
   PivotWorksheetSource,
+  Range,
   Workbook,
 } from './types.js';
 import {
@@ -50,6 +57,23 @@ function assertAlive(handle: unknown): void {
   internals(handle).assertAlive();
 }
 
+const pivotCaptionsByHandle = new WeakMap<object, PivotCaptions>();
+
+/** Cache index of `fieldName`. When the engine cannot tie the report to its
+ *  cache, a name found in exactly one cache stands in. */
+function cacheFieldIndex(handle: WorkbookHandlePivotMethods, cacheId: number, fieldName: string) {
+  if (cacheId >= 0) return handle.pivotCacheFieldNames(cacheId).indexOf(fieldName);
+  let found = -1;
+  let matches = 0;
+  for (const id of handle.pivotCacheIds()) {
+    const index = handle.pivotCacheFieldNames(id).indexOf(fieldName);
+    if (index < 0) continue;
+    found = index;
+    matches += 1;
+  }
+  return matches === 1 ? found : -1;
+}
+
 function pivotWb(handle: unknown): PivotMutationWorkbook {
   return internals(handle).wb as PivotMutationWorkbook;
 }
@@ -66,6 +90,84 @@ export abstract class WorkbookHandlePivotMethods {
   declare readonly sheetCount: number;
   abstract getValue(addr: Addr): CellValue;
 
+  /** Set the UI-language wording `pivotCells` translates engine captions into;
+   *  `null` restores the engine's English. */
+  setPivotCaptions(captions: PivotCaptions | null): void {
+    if (captions) pivotCaptionsByHandle.set(this, captions);
+    else pivotCaptionsByHandle.delete(this);
+  }
+
+  pivotCaptions(): PivotCaptions {
+    return pivotCaptionsByHandle.get(this) ?? ENGLISH_PIVOT_CAPTIONS;
+  }
+
+  /** Whether any PivotTable on `range`'s sheet occupies a cell of `range`. */
+  pivotOverlapsRange(range: Range): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotTables) return false;
+    const n = unwrapNumberResult(pivotWb(this).pivotCount(range.sheet));
+    if (n === null) return false;
+    for (let i = 0; i < n; i += 1) {
+      const layout = pivotWb(this).pivotLayout(range.sheet, i);
+      if (!layout.status.ok) continue;
+      if (
+        range.r0 < layout.top + layout.rows &&
+        range.r1 >= layout.top &&
+        range.c0 < layout.left + layout.cols &&
+        range.c1 >= layout.left
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The PivotTable layout cell at `addr`, or null outside every report.
+   *  `fieldIndex` is the cache index of the cell's source field, -1 when the
+   *  cell belongs to no source field (captions, data-field names). */
+  pivotCellInfo(addr: Addr): {
+    pivotIndex: number;
+    kind: number;
+    fieldName: string;
+    fieldIndex: number;
+    /** Cache bound to the report, -1 when the engine cannot say. */
+    cacheId: number;
+    isValue: boolean;
+  } | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotTables) return null;
+    const n = unwrapNumberResult(pivotWb(this).pivotCount(addr.sheet));
+    if (n === null) return null;
+    for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+      const layout = pivotWb(this).pivotLayout(addr.sheet, pivotIndex);
+      if (!layout.status.ok) continue;
+      if (
+        addr.row < layout.top ||
+        addr.row >= layout.top + layout.rows ||
+        addr.col < layout.left ||
+        addr.col >= layout.left + layout.cols
+      ) {
+        continue;
+      }
+      const cell = layout.cells.find((c) => c.row === addr.row && c.col === addr.col);
+      const kind = cell?.kind ?? PIVOT_CELL_KIND.Blank;
+      const fieldName = cell?.fieldName ?? '';
+      const mutable = this.capabilities.pivotTableMutate;
+      const cacheId = mutable ? this.pivotTableCacheId(addr.sheet, pivotIndex) : -1;
+      return {
+        pivotIndex,
+        kind,
+        fieldName,
+        fieldIndex: mutable && fieldName ? cacheFieldIndex(this, cacheId, fieldName) : -1,
+        cacheId,
+        isValue:
+          kind === PIVOT_CELL_KIND.Data ||
+          (!!cell && fromEngineValue(cell.value).kind === 'number'),
+      };
+    }
+    return null;
+  }
+
   /** Iterate over evaluated PivotTable layout cells on a sheet. The engine
    *  returns sparse cells; blanks are skipped so existing empty-grid behavior
    *  remains unchanged. */
@@ -81,13 +183,21 @@ export abstract class WorkbookHandlePivotMethods {
     if (!this.capabilities.pivotTables) return;
     const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
     if (n === null) return;
+    const captions = this.pivotCaptions();
     for (let i = 0; i < n; i += 1) {
       const layout = pivotWb(this).pivotLayout(sheet, i);
       if (!layout.status.ok) continue;
       for (const cell of layout.cells) {
         const value = fromEngineValue(cell.value);
         if (value.kind === 'blank') continue;
-        yield pivotCellEntry(this, sheet, i, cell, value);
+        const shown =
+          value.kind === 'text'
+            ? {
+                kind: 'text' as const,
+                value: localizePivotCaption(cell.kind, value.value, captions),
+              }
+            : value;
+        yield pivotCellEntry(this, sheet, i, cell, shown);
       }
     }
   }

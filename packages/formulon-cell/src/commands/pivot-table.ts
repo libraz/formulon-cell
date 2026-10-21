@@ -1,6 +1,6 @@
 import { formatA1Range } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
-import { pivotAggregationName } from '../engine/pivot-aggregation.js';
+import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-captions.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
 import {
@@ -13,8 +13,9 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { currentRegion } from './current-region.js';
 import type { History } from './history.js';
-import { addSheet } from './sheet-mutate.js';
+import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
 
 export interface PivotSourceField {
   name: string;
@@ -55,6 +56,8 @@ export interface CreatePivotTableOptions {
   valueFields?: readonly string[];
   valueFieldSettings?: readonly PivotValueFieldSettings[];
   aggregation?: PivotAggregation;
+  /** UI-language wording for new value-field names; English when omitted. */
+  dataFieldNaming?: PivotDataFieldNaming;
   rowSort?: PivotSortDirection;
   columnSort?: PivotSortDirection;
   rowSubtotalTop?: boolean;
@@ -475,7 +478,7 @@ export function createPivotTableFromRange(
     const numberFormat = settings?.numberFormat?.trim() || opts.valueNumberFormat?.trim();
 
     const dataField = wb.addPivotDataField(opts.destination.sheet, pivotIndex, {
-      name: `${pivotAggregationName(aggregation)} of ${valueField.name}`,
+      name: pivotDataFieldName(aggregation, valueField.name, opts.dataFieldNaming),
       fieldIndex: valueField.index,
       aggregation,
       numberFormat: numberFormat || undefined,
@@ -581,6 +584,119 @@ export function refreshPivotTable(
   return refreshPivotCacheFromRange(wb, { cacheId, source });
 }
 
+/** Where a new report lands: a fresh sheet inserted before the source sheet
+ *  (report at A3), or a cell of the source sheet. */
+export type PivotPlacement = 'new-sheet' | { row: number; col: number };
+
+export const PIVOT_NEW_SHEET_ANCHOR = { row: 2, col: 0 } as const;
+
+export type CreatePlacedPivotResult =
+  | {
+      ok: true;
+      cacheId: number;
+      pivotIndex: number;
+      destination: { sheet: number; row: number; col: number };
+    }
+  | {
+      ok: false;
+      reason: 'sheet-failed' | 'unsupported' | 'invalid-range' | 'invalid-field' | 'engine-failed';
+      step?: string;
+    };
+
+export interface CreatePlacedPivotDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  history?: History | null;
+}
+
+/** Source range for a new report: the selection, or for a single cell the
+ *  Table containing it or else its current region. */
+export function pivotSourceForSelection(store: SpreadsheetStore, wb: WorkbookHandle): Range {
+  const state = store.getState();
+  const { range } = state.selection;
+  if (range.r0 !== range.r1 || range.c0 !== range.c1) return range;
+  for (const table of wb.getTables()) {
+    if (table.sheetIndex !== range.sheet) continue;
+    const parsed = parseRangeRef(table.ref);
+    if (
+      parsed &&
+      range.r0 >= parsed.r0 &&
+      range.r0 <= parsed.r1 &&
+      range.c0 >= parsed.c0 &&
+      range.c0 <= parsed.c1
+    ) {
+      return { sheet: range.sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
+    }
+  }
+  return currentRegion(state, { sheet: range.sheet, row: range.r0, col: range.c0 }) ?? range;
+}
+
+/** Create a report at `placement` as one undo step (the new sheet, its
+ *  position and the report revert together). */
+export function createPivotTableAtPlacement(
+  deps: CreatePlacedPivotDeps,
+  opts: Omit<CreatePivotTableOptions, 'destination'>,
+  placement: PivotPlacement,
+): CreatePlacedPivotResult {
+  const { store, workbook: wb } = deps;
+  const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
+  const txn = history?.begin();
+  let source = opts.source;
+  let destination = {
+    sheet: source.sheet,
+    ...(placement === 'new-sheet' ? PIVOT_NEW_SHEET_ANCHOR : placement),
+  };
+  let addedSheet = -1;
+  if (placement === 'new-sheet') {
+    addedSheet = addSheet(store, wb, history);
+    if (addedSheet < 0) {
+      if (history && txn) history.end(txn);
+      return { ok: false, reason: 'sheet-failed' };
+    }
+    // The new sheet takes the source sheet's slot, pushing the source right.
+    if (moveSheet(store, wb, addedSheet, source.sheet, history)) {
+      destination = { ...destination, sheet: source.sheet };
+      source = { ...source, sheet: source.sheet + 1 };
+    } else {
+      destination = { ...destination, sheet: addedSheet };
+    }
+  }
+  const create = (): CreatePivotTableResult =>
+    createPivotTableFromRange(wb, { ...opts, source, destination });
+  const result = create();
+  if (!result.ok) {
+    if (history && txn) {
+      if (addedSheet >= 0) history.abort(txn);
+      else history.end(txn);
+    } else if (addedSheet >= 0) {
+      removeSheet(store, wb, addedSheet);
+    }
+    return result;
+  }
+  if (history && txn) {
+    let current = result;
+    const refresh = (): void => {
+      if (store.getState().data.sheetIndex === destination.sheet) {
+        mutators.replaceCells(store, wb.cells(destination.sheet));
+      }
+    };
+    history.push({
+      undo: () => {
+        wb.removePivotTable(destination.sheet, current.pivotIndex);
+        wb.removePivotCache(current.cacheId);
+        refresh();
+      },
+      redo: () => {
+        const again = create();
+        if (again.ok) current = again;
+        refresh();
+      },
+    });
+    history.end(txn);
+  }
+  return { ok: true, cacheId: result.cacheId, pivotIndex: result.pivotIndex, destination };
+}
+
 export type RibbonPivotTableAction =
   | 'dialog'
   | 'recommended'
@@ -617,6 +733,8 @@ export interface RibbonPivotTableActionStrings {
   recommendedPivotTables: string;
   pivotAuthoringDetail: string;
   workbookStructureProtectedBlocked: string;
+  /** UI-language wording for the new value field's name. */
+  dataFieldNaming?: PivotDataFieldNaming;
 }
 
 export interface ExecuteRibbonPivotTableActionDeps {
@@ -707,7 +825,7 @@ export const executeRibbonPivotTableAction = (
       },
     };
   }
-  const source = store.getState().selection.range;
+  const source = pivotSourceForSelection(store, workbook);
   const fields = inferPivotSourceFields(workbook, source);
   const valueField = fields.find((field) => field.numericCount > 0) ?? fields.at(-1);
   const rowField = fields.find((field) => field.name !== valueField?.name) ?? fields[0];
@@ -722,43 +840,39 @@ export const executeRibbonPivotTableAction = (
       },
     };
   }
-  let destinationSheet = source.sheet;
-  if (action === 'new-sheet') {
-    const added = addSheet(store, workbook, history);
-    if (added < 0) {
-      return {
-        kind: 'report',
-        report: {
-          title: strings.pivotTableNewSheet,
-          items: [
-            {
-              severity: 'warning',
-              label: strings.pivotTable,
-              detail: strings.workbookStructureProtectedBlocked,
-            },
-          ],
-        },
-      };
-    }
-    destinationSheet = added;
-  }
-  const destination =
-    action === 'new-sheet'
-      ? { sheet: destinationSheet, row: 0, col: 0 }
-      : { sheet: destinationSheet, row: source.r1 + 3, col: source.c0 };
-  const result = createPivotTableFromRange(workbook, {
-    source,
-    destination,
-    name: `PivotTable${workbook.getPivotTables().length + 1}`,
-    rowField: rowField.name,
-    valueField: valueField.name,
-    aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,
-  });
+  const result = createPivotTableAtPlacement(
+    { store, workbook, history },
+    {
+      source,
+      name: `PivotTable${workbook.getPivotTables().length + 1}`,
+      rowField: rowField.name,
+      valueField: valueField.name,
+      aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,
+      dataFieldNaming: strings.dataFieldNaming,
+    },
+    'new-sheet',
+  );
   if (result.ok) {
-    mutators.replaceCells(store, workbook.cells(destinationSheet));
-    mutators.setSheetIndex(store, destinationSheet);
+    const { destination } = result;
+    mutators.replaceCells(store, workbook.cells(destination.sheet));
+    mutators.setSheetIndex(store, destination.sheet);
     mutators.setActive(store, destination);
-    return { kind: 'created', destinationSheet, destination };
+    return { kind: 'created', destinationSheet: destination.sheet, destination };
+  }
+  if (result.reason === 'sheet-failed') {
+    return {
+      kind: 'report',
+      report: {
+        title: strings.pivotTableNewSheet,
+        items: [
+          {
+            severity: 'warning',
+            label: strings.pivotTable,
+            detail: strings.workbookStructureProtectedBlocked,
+          },
+        ],
+      },
+    };
   }
   return {
     kind: 'report',

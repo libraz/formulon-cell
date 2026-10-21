@@ -66,6 +66,13 @@ export const gridPopupsFr: GridPopupsStrings = {
     pasteSpecialRequiresCopiedCells:
       'Copiez ou coupez des cellules avant d’utiliser cette option de collage.',
     editPhonetic: 'Modifier le guide phonétique…',
+    pivotRefresh: 'Actualiser',
+    pivotSort: 'Trier',
+    pivotSortAsc: 'Trier de A à Z',
+    pivotSortDesc: 'Trier de Z à A',
+    pivotValueFieldSettings: 'Paramètres des champs de valeurs…',
+    pivotFieldSettings: 'Paramètres de champ…',
+    pivotShowFieldList: 'Afficher la liste de champs',
     phoneticDialogTitle: 'Guide phonétique',
     phoneticDialogLabel: 'Lecture',
     ok: 'OK',

@@ -109,6 +109,12 @@ export function renderPivotEditForm(
     { value: String(PivotAggregation.Average), label: t.pivotAggregateAverage },
     { value: String(PivotAggregation.Max), label: t.pivotAggregateMax },
     { value: String(PivotAggregation.Min), label: t.pivotAggregateMin },
+    { value: String(PivotAggregation.Product), label: t.pivotAggregateProduct },
+    { value: String(PivotAggregation.CountNumbers), label: t.pivotAggregateCountNumbers },
+    { value: String(PivotAggregation.StdDev), label: t.pivotAggregateStdDev },
+    { value: String(PivotAggregation.StdDevP), label: t.pivotAggregateStdDevP },
+    { value: String(PivotAggregation.Var), label: t.pivotAggregateVariance },
+    { value: String(PivotAggregation.VarP), label: t.pivotAggregateVarianceP },
   ];
   const filterConditions = new Map<number, PivotFilterConditionState>();
   for (const spec of (pivot as { pivotFilters?: readonly PivotFilterSpec[] }).pivotFilters ?? []) {
@@ -300,6 +306,7 @@ export function renderPivotEditForm(
       rowGrandTotals: rowTotals.checked,
       colGrandTotals: colTotals.checked,
       layout: Number(layoutSelect.value) as PivotReportLayout,
+      dataFieldNaming: strings.pivotTableDialog.dataFieldNaming,
       fields: valueFieldSettings.map((field) => ({
         fieldIndex: field.fieldIndex,
         axis: Number(field.axisSelect.value) as PivotAxis,

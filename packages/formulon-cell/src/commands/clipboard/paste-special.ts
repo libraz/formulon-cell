@@ -8,6 +8,7 @@ import { type CellFormat, mutators, type SpreadsheetStore, type State } from '..
 import { recordCommentChange } from '../comment.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
+import { blockPivotEdit } from '../pivot-guard.js';
 import { isCellWritable } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import {
@@ -456,6 +457,7 @@ export function pasteSpecial(
   const current = store.getState();
   const checked = preflight(current, snap, resolvedDestination, opt.what, opt.transpose);
   if (!checked) return null;
+  if (blockPivotEdit(wb, checked.destination)) return null;
 
   // Excel treats cutting and pasting back onto the exact source rectangle as a
   // no-op while consuming the cut marquee. In particular, do not clear and

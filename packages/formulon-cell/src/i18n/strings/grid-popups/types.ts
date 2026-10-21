@@ -65,6 +65,13 @@ export interface GridPopupsStrings {
     clipboardUnavailable: string;
     pasteSpecialRequiresCopiedCells: string;
     editPhonetic: string;
+    pivotRefresh: string;
+    pivotSort: string;
+    pivotSortAsc: string;
+    pivotSortDesc: string;
+    pivotValueFieldSettings: string;
+    pivotFieldSettings: string;
+    pivotShowFieldList: string;
     phoneticDialogTitle: string;
     phoneticDialogLabel: string;
     ok: string;

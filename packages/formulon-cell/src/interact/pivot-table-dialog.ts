@@ -1,11 +1,12 @@
+import type { History } from '../commands/history.js';
 import {
-  createPivotTableFromRange,
+  createPivotTableAtPlacement,
   inferPivotFieldItems,
   inferPivotSourceFields,
   type PivotSourceField,
+  pivotSourceForSelection,
 } from '../commands/pivot-table.js';
 import { isWorkbookStructureProtected } from '../commands/protection.js';
-import { addSheet } from '../commands/sheet-mutate.js';
 import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import { PivotAggregation } from '../engine/types.js';
@@ -26,6 +27,7 @@ export interface PivotTableDialogDeps {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   strings?: Strings;
+  history?: History | null;
   onAfterCreate?: () => void;
   invalidate?: () => void;
 }
@@ -175,7 +177,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   const sourceRangeLabel = (range: SheetRange): string =>
     formatSheetAbsoluteRange(wb.sheetName(range.sheet), range);
 
-  const selectedRangeLabel = (): string => sourceRangeLabel(store.getState().selection.range);
+  const selectedRangeLabel = (): string => sourceRangeLabel(pivotSourceForSelection(store, wb));
 
   const activeCellLabel = (): string => {
     const active = store.getState().selection.active;
@@ -309,7 +311,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     error.hidden = true;
     error.textContent = '';
 
-    const range = store.getState().selection.range;
+    const range = pivotSourceForSelection(store, wb);
     body.replaceChildren();
 
     sourceInput.value = sourceInput.value || sourceRangeLabel(range);
@@ -323,6 +325,12 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       { value: String(PivotAggregation.Average), label: t.average },
       { value: String(PivotAggregation.Max), label: t.max },
       { value: String(PivotAggregation.Min), label: t.min },
+      { value: String(PivotAggregation.Product), label: t.product },
+      { value: String(PivotAggregation.CountNumbers), label: t.countNumbers },
+      { value: String(PivotAggregation.StdDev), label: t.stdDev },
+      { value: String(PivotAggregation.StdDevP), label: t.stdDevP },
+      { value: String(PivotAggregation.Var), label: t.variance },
+      { value: String(PivotAggregation.VarP), label: t.varianceP },
     ]);
     rowSortSelect.replaceChildren();
     colSortSelect.replaceChildren();
@@ -404,61 +412,57 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       return;
     }
     const useNewWorksheet = newWorksheetInput.checked;
-    const dest = useNewWorksheet ? { row: 0, col: 0 } : parseA1Atom(destInput.value);
-    if (!dest) {
+    const dest = useNewWorksheet ? null : parseA1Atom(destInput.value);
+    if (!useNewWorksheet && !dest) {
       showError(strings.pivotTableDialog.invalidDestination);
       destInput.focus();
       return;
     }
-    let destinationSheet = range.sheet;
-    if (useNewWorksheet) {
-      if (isWorkbookStructureProtected(store.getState())) {
-        showError(strings.ribbonMenu.workbookStructureProtectedBlocked);
-        return;
-      }
-      const added = addSheet(store, wb);
-      if (added < 0) {
-        showError(strings.pivotTableDialog.engineFailed);
-        return;
-      }
-      destinationSheet = added;
+    if (useNewWorksheet && isWorkbookStructureProtected(store.getState())) {
+      showError(strings.ribbonMenu.workbookStructureProtectedBlocked);
+      return;
     }
     const aggregation = Number(aggSelect.value) as PivotAggregation;
     const { filterItems, pivotFilters, valueFieldSettings } = areas.toCreateSpec({
       aggregation,
       numberFormat: numberFormatInput.value,
     });
-    const result = createPivotTableFromRange(wb, {
-      source: range,
-      destination: { sheet: destinationSheet, row: dest.row, col: dest.col },
-      name: nameInput.value,
-      rowField: rowSelect.value,
-      columnField: colSelect.value || undefined,
-      filterField: filterSelect.value || undefined,
-      filterFields: areas.filterFields,
-      filterItems,
-      pivotFilters,
-      valueField: valueSelect.value,
-      valueFields: areas.valueFields,
-      valueFieldSettings,
-      aggregation,
-      rowSort: rowSortSelect.value as 'none' | 'asc' | 'desc',
-      columnSort: colSortSelect.value as 'none' | 'asc' | 'desc',
-      rowSubtotalTop: rowSubtotalTop.checked,
-      columnSubtotalTop: colSubtotalTop.checked,
-      valueNumberFormat: numberFormatInput.value,
-      showRowGrandTotals: rowTotals.checked,
-      showColumnGrandTotals: colTotals.checked,
-    });
+    const result = createPivotTableAtPlacement(
+      { store, workbook: wb, history: deps.history },
+      {
+        source: range,
+        name: nameInput.value,
+        rowField: rowSelect.value,
+        columnField: colSelect.value || undefined,
+        filterField: filterSelect.value || undefined,
+        filterFields: areas.filterFields,
+        filterItems,
+        pivotFilters,
+        valueField: valueSelect.value,
+        valueFields: areas.valueFields,
+        valueFieldSettings,
+        aggregation,
+        dataFieldNaming: strings.pivotTableDialog.dataFieldNaming,
+        rowSort: rowSortSelect.value as 'none' | 'asc' | 'desc',
+        columnSort: colSortSelect.value as 'none' | 'asc' | 'desc',
+        rowSubtotalTop: rowSubtotalTop.checked,
+        columnSubtotalTop: colSubtotalTop.checked,
+        valueNumberFormat: numberFormatInput.value,
+        showRowGrandTotals: rowTotals.checked,
+        showColumnGrandTotals: colTotals.checked,
+      },
+      dest ?? 'new-sheet',
+    );
     if (!result.ok) {
       showError(strings.pivotTableDialog.engineFailed);
       return;
     }
-    if (destinationSheet !== store.getState().data.sheetIndex) {
-      mutators.replaceCells(store, wb.cells(destinationSheet));
-      mutators.setSheetIndex(store, destinationSheet);
+    const { destination } = result;
+    if (destination.sheet !== store.getState().data.sheetIndex) {
+      mutators.replaceCells(store, wb.cells(destination.sheet));
+      mutators.setSheetIndex(store, destination.sheet);
     }
-    mutators.setActive(store, { sheet: destinationSheet, row: dest.row, col: dest.col });
+    mutators.setActive(store, destination);
     deps.onAfterCreate?.();
     deps.invalidate?.();
     close();

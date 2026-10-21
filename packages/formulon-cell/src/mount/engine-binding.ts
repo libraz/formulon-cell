@@ -1,6 +1,7 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { setPivotGuardSink } from '../commands/pivot-guard.js';
 import { refreshChartsAfterRecalc, reloadChartsFromEngine } from '../engine/charts-sync.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr, CellValue } from '../engine/types.js';
@@ -67,6 +68,9 @@ interface AttachEngineBindingInput {
   getHyperlinkDialog: () => { open(): void } | null;
   getNamedRangeDialog: () => { open(): void } | null;
   getPivotTableDialog: () => { open(): void } | null;
+  getWorkbookObjects?: () => {
+    openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
+  } | null;
   getSessionCharts: () => unknown | null;
   getSheetTabs: () => SheetTabsController | null;
   grid: HTMLElement;
@@ -117,6 +121,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     getLocale,
     getNamedRangeDialog,
     getPivotTableDialog,
+    getWorkbookObjects,
     getSessionCharts,
     getSheetTabs,
     grid,
@@ -147,6 +152,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         },
       })
     : null;
+
+  setPivotGuardSink(wb, (alert) => validationAlert?.show(alert));
+  wb.setPivotCaptions(strings.pivotTableDialog.pivotCaptions);
 
   const editor = new InlineEditor({
     host,
@@ -272,6 +280,11 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         onOpenHyperlink: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
         onEditComment: () => getCommentDialog()?.open(),
         onDefineName: () => getNamedRangeDialog()?.open(),
+        onOpenPivotFieldList: getWorkbookObjects
+          ? (sheetIndex, pivotIndex) => {
+              getWorkbookObjects()?.openPivotFieldList(sheetIndex, pivotIndex);
+            }
+          : undefined,
         getClipboardSnapshot: clipboardH ? () => clipboardH.getSnapshot() : undefined,
         onToggleWatch: flags.watchWindow
           ? (addr) => {
@@ -492,6 +505,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       validation?.detach();
       validationPrompt?.detach();
       validationAlert?.detach();
+      setPivotGuardSink(wb, null);
       quickAnalysis?.detach();
       grid.removeEventListener('dblclick', onDblClick);
       unsubWb();

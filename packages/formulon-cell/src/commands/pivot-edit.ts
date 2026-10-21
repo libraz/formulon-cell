@@ -1,4 +1,4 @@
-import { pivotAggregationName } from '../engine/pivot-aggregation.js';
+import { type PivotDataFieldNaming, pivotDataFieldName } from '../engine/pivot-captions.js';
 import {
   type PivotAggregation,
   PivotAxis,
@@ -34,6 +34,8 @@ export interface PivotEdit {
   fields: readonly PivotEditField[];
   /** Replacement for the pivot's filters, or null to leave them untouched. */
   filters: readonly PivotFilterSpec[] | null;
+  /** UI-language wording for value-field names; English when omitted. */
+  dataFieldNaming?: PivotDataFieldNaming;
 }
 
 /** Write a pivot edit back to the engine. Every step runs even when an earlier
@@ -83,7 +85,11 @@ export function applyPivotEdit(
   const valueFieldsUpdated = edit.fields.every((field) => {
     if (field.axis !== PivotAxis.Value) return true;
     const spec: PivotDataFieldSpec = {
-      name: `${pivotAggregationName(field.aggregation)} of ${pivot.fields[field.fieldIndex] ?? `field ${field.fieldIndex}`}`,
+      name: pivotDataFieldName(
+        field.aggregation,
+        pivot.fields[field.fieldIndex] ?? `field ${field.fieldIndex}`,
+        edit.dataFieldNaming,
+      ),
       fieldIndex: field.fieldIndex,
       aggregation: field.aggregation,
       ...(field.numberFormat.length > 0 ? { numberFormat: field.numberFormat } : {}),

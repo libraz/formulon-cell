@@ -65,6 +65,13 @@ export const gridPopupsJa: GridPopupsStrings = {
     pasteSpecialRequiresCopiedCells:
       'この貼り付けオプションを使うには、先にセルをコピーまたは切り取ってください。',
     editPhonetic: 'ふりがなの編集…',
+    pivotRefresh: '更新',
+    pivotSort: '並べ替え',
+    pivotSortAsc: '昇順',
+    pivotSortDesc: '降順',
+    pivotValueFieldSettings: '値フィールドの設定…',
+    pivotFieldSettings: 'フィールドの設定…',
+    pivotShowFieldList: 'フィールド リストを表示する',
     phoneticDialogTitle: 'ふりがなの編集',
     phoneticDialogLabel: 'ふりがな',
     ok: 'OK',

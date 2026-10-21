@@ -15,9 +15,10 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from '../commands/interaction-policy.js';
+import { refreshPivotTable } from '../commands/pivot-table.js';
 import { hiddenInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
-import type { Addr } from '../engine/types.js';
+import { type Addr, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -53,6 +54,7 @@ import {
   buildCellEntries,
   buildColEntries,
   buildMacCellEntries,
+  buildPivotEntries,
   buildRowEntries,
   compactMenuEntries,
   type ItemId,
@@ -114,6 +116,9 @@ export interface ContextMenuDeps {
   onToggleWatch?: (addr: Addr) => void;
   /** Returns true when the active cell is currently watched. */
   isWatched?: (addr: Addr) => boolean;
+  /** Called for the pivot menu's field-list entries. When omitted those entries
+   *  are hidden. */
+  onOpenPivotFieldList?: (sheetIndex: number, pivotIndex: number) => void;
   /** Optional composed menu contract. Omitted preserves the legacy menu. */
   options?: ContextMenuOptions;
   /** Shared authorization/execution service for restricted embeds. */
@@ -213,6 +218,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   let openSub: { id: string; parentBtn: HTMLButtonElement } | null = null;
   let subCloseTimer: ReturnType<typeof setTimeout> | null = null;
   let activeContext: ContextMenuContext | null = null;
+  let activePivot:
+    | (NonNullable<ReturnType<WorkbookHandle['pivotCellInfo']>> & { sheet: number })
+    | null = null;
   let activeTarget: MenuTarget | null = null;
   let activeEvent: MouseEvent | KeyboardEvent | null = null;
   const activeItemSources = new Map<string, ContextMenuItem>();
@@ -505,15 +513,24 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     pasteBtnRef = null;
     const mac = isMacPlatform();
     const activeAddr = store.getState().selection.active;
-    const raw =
-      kind === 'row'
+    const pivot = kind === 'cell' ? wb.pivotCellInfo(activeAddr) : null;
+    activePivot = pivot ? { ...pivot, sheet: activeAddr.sheet } : null;
+    const raw = pivot
+      ? buildPivotEntries(strings, {
+          isValue: pivot.isValue,
+          canRefresh: pivot.cacheId >= 0,
+          canSort: pivot.fieldIndex >= 0 && !pivot.isValue,
+          canOpenFieldList: !!deps.onOpenPivotFieldList,
+        })
+      : kind === 'row'
         ? buildRowEntries(strings)
         : kind === 'col'
           ? buildColEntries(strings)
           : mac
             ? buildMacCellEntries(strings, commentAt(store.getState(), activeAddr) !== null)
             : buildCellEntries(strings);
-    const platformEntries = mac && kind !== 'cell' ? toMacBandEntries(raw, strings) : raw;
+    const platformEntries =
+      mac && (kind !== 'cell' || pivot) ? toMacBandEntries(raw, strings) : raw;
     const hasCopiedCells = !!store.getState().ui.copyRange;
     const pendingSnapshot = hasCopiedCells ? clipboard.snapshot() : null;
     const pendingCutBand =
@@ -571,7 +588,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const renderEntries = visibleItems.map(contextItemToRenderEntry);
     const visibleRootIds = contextItemIds(visibleItems);
     // The Mac menu carries no mini formatting toolbar.
-    if (kind === 'cell' && !mac) {
+    if (kind === 'cell' && !mac && !pivot) {
       const allowedMini = builtInOptions?.items
         ? new Set<string>(builtInOptions.items)
         : builtInOptions
@@ -902,6 +919,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     clipboard,
   };
 
+  const refreshPivotCells = (sheet: number): void => {
+    mutators.replaceCells(store, wb.cells(sheet));
+    deps.onAfterCommit?.();
+  };
+
   function run(id: string): void {
     if (!isBuiltinItemId(id)) return;
     if (!decisionForItem(id).allowed) return;
@@ -984,6 +1006,37 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'toggleWatch': {
         deps.onToggleWatch?.(state.selection.active);
+        return;
+      }
+      case 'pivotRefresh': {
+        if (!activePivot) return;
+        const result = refreshPivotTable(wb, {
+          sheet: activePivot.sheet,
+          pivotIndex: activePivot.pivotIndex,
+        });
+        if (result.ok) refreshPivotCells(activePivot.sheet);
+        return;
+      }
+      case 'pivotSortAsc':
+      case 'pivotSortDesc': {
+        if (!activePivot || activePivot.fieldIndex < 0) return;
+        const order = id === 'pivotSortAsc' ? PivotSortOrder.Ascending : PivotSortOrder.Descending;
+        if (
+          wb.setPivotFieldSort(
+            activePivot.sheet,
+            activePivot.pivotIndex,
+            activePivot.fieldIndex,
+            order,
+            '',
+          )
+        ) {
+          refreshPivotCells(activePivot.sheet);
+        }
+        return;
+      }
+      case 'pivotFieldSettings':
+      case 'pivotShowFieldList': {
+        if (activePivot) deps.onOpenPivotFieldList?.(activePivot.sheet, activePivot.pivotIndex);
         return;
       }
     }
