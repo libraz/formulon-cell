@@ -59,6 +59,15 @@ function wb(handle: unknown): Workbook {
  *  below, and painting resolves a theme-linked font for every visible cell. */
 const themeCache = new WeakMap<object, ThemeResult | null>();
 
+/** ISO 15924 theme script a font `charset` selects; any other charset takes the latin face. */
+const SCRIPT_FOR_CHARSET: ReadonlyMap<number, string> = new Map([
+  [128, 'Jpan'],
+  [129, 'Hang'],
+  [134, 'Hans'],
+  [136, 'Hant'],
+  [222, 'Thai'],
+]);
+
 function readTheme(handle: WorkbookHandleStylesMethods): ThemeResult | null {
   if (themeCache.has(handle)) return themeCache.get(handle) ?? null;
   const native = wb(handle) as unknown as {
@@ -364,15 +373,16 @@ export abstract class WorkbookHandleStylesMethods {
     let resolved = record;
     if (record.scheme === 1 || record.scheme === 2) {
       const theme = this.capabilities.workbookTheme ? readTheme(this) : null;
-      const eastAsian = record.hasCharset && record.charset !== 0;
-      const themeName =
-        record.scheme === 1
-          ? eastAsian
-            ? theme?.fonts.majorEastAsian
-            : theme?.fonts.majorLatin
-          : eastAsian
-            ? theme?.fonts.minorEastAsian
-            : theme?.fonts.minorLatin;
+      const major = record.scheme === 1;
+      const script =
+        record.hasCharset && record.charset !== undefined
+          ? SCRIPT_FOR_CHARSET.get(record.charset)
+          : undefined;
+      const scriptFace = script
+        ? (major ? theme?.majorScripts : theme?.minorScripts)?.find((s) => s.script === script)
+            ?.typeface
+        : undefined;
+      const themeName = scriptFace || (major ? theme?.fonts.majorLatin : theme?.fonts.minorLatin);
       if (themeName) resolved = { ...resolved, name: themeName };
     }
     if (!record.color) return resolved;
@@ -460,6 +470,8 @@ export abstract class WorkbookHandleStylesMethods {
       status: { ...result.status },
       colors: [...result.colors],
       fonts: { ...result.fonts },
+      majorScripts: result.majorScripts.map((s) => ({ ...s })),
+      minorScripts: result.minorScripts.map((s) => ({ ...s })),
     };
   }
 
