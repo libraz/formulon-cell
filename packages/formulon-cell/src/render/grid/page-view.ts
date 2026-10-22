@@ -68,9 +68,7 @@ function nativePageForBand(
   axis: 'row' | 'col',
 ): NonNullable<SheetPagination['native']>['pages'][number] | undefined {
   return pagination.native?.pages.find((page) =>
-    axis === 'row'
-      ? page.firstRow === band.start && page.lastRow === band.end
-      : page.firstCol === band.start && page.lastCol === band.end,
+    axis === 'row' ? page.firstRow === band.start : page.firstCol === band.start,
   );
 }
 

@@ -3,6 +3,7 @@ import {
   PAGE_GUTTER_PX,
   pageBoxPx,
   pageLayoutGaps,
+  pageNumberOf,
   paginationFor,
 } from '../../../src/commands/pagination.js';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
@@ -215,6 +216,36 @@ describe('Mac pagination', () => {
         }
         expect(width).toBeLessThanOrEqual(pagination.pagePx.width);
       }
+    } finally {
+      wb.dispose();
+    }
+  });
+});
+
+describe('native pagination preview extension', () => {
+  it('fills the last printed page with the blank rows that follow the content', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const store = createSpreadsheetStore();
+    try {
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+      store.setState((s) => {
+        const cells = new Map(s.data.cells);
+        cells.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+          value: { kind: 'number', value: 1 },
+          formula: null,
+        });
+        return { ...s, data: { ...s.data, cells } };
+      });
+
+      const pagination = paginationFor(store.getState(), 0, { engine: wb, throughRow: 200 });
+      const first = pagination.rowBands[0];
+      if (!first) throw new Error('expected a first row band');
+      const rowHeight = store.getState().layout.defaultRowHeight;
+      expect(first.start).toBe(0);
+      // The page holds as many default rows as its printable height allows.
+      expect(first.end).toBe(Math.floor(pagination.pagePx.height / rowHeight) - 1);
+      expect(pageNumberOf(pagination, 0, 0)).toBe(1);
+      expect(pagination.rowBands[1]?.start).toBe(first.end + 1);
     } finally {
       wb.dispose();
     }

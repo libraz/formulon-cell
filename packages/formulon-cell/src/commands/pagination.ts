@@ -90,11 +90,7 @@ export function pageNumberOf(
   const col = cols[colBand];
   if (pagination.native && row && col) {
     const nativeIndex = pagination.native.pages.findIndex(
-      (page) =>
-        page.firstRow === row.start &&
-        page.lastRow === row.end &&
-        page.firstCol === col.start &&
-        page.lastCol === col.end,
+      (page) => page.firstRow === row.start && page.firstCol === col.start,
     );
     if (nativeIndex >= 0) return nativeIndex + 1;
     return 0;
@@ -230,24 +226,60 @@ function extendNativeBands(
   content: number,
   through: number | undefined,
   pageBudget: number,
+  lastPageRoom: number,
 ): AxisBand[] {
   const target = reach(through, content);
   if (bands.length === 0) return bands;
   const last = bands[bands.length - 1];
   if (!last || last.end >= target) return bands;
-  const from = last.end + 1;
   const hidden = axis === 'row' ? state.layout.hiddenRows : state.layout.hiddenCols;
   const defaultSize = axis === 'row' ? state.layout.defaultRowHeight : state.layout.defaultColWidth;
   const sizes = axis === 'row' ? state.layout.rowHeights : state.layout.colWidths;
   const manual = axis === 'row' ? setup.manualPageBreakRows : setup.manualPageBreakCols;
+  const sizeOf = (index: number): number =>
+    hidden.has(index) ? 0 : (sizes.get(index) ?? defaultSize);
+  // Blank tracks past the content fill the last printed page before a new
+  // one starts, as the desktop Page Layout view lays them out. A print area
+  // bounds what prints, so its last page keeps its own extent.
+  let end = last.end;
+  if (!setup.printArea) {
+    const breaks = new Set(manual ?? []);
+    let room = lastPageRoom;
+    while (end < target && !breaks.has(end + 1) && sizeOf(end + 1) <= room) {
+      room -= sizeOf(end + 1);
+      end += 1;
+    }
+  }
+  const grown = end === last.end ? bands : [...bands.slice(0, -1), { ...last, end }];
+  if (end >= target) return grown;
   const tail = splitAxisIntoBands({
-    from,
+    from: end + 1,
     to: target,
     budget: Math.max(defaultSize, pageBudget),
     manualBreaks: manual,
-    sizeOf: (index) => (hidden.has(index) ? 0 : (sizes.get(index) ?? defaultSize)),
+    sizeOf,
   });
-  return bands.concat(tail);
+  return grown.concat(tail);
+}
+
+/** Unscaled px left on the printable area after the native page that opens
+ *  at `start`, print titles included in what the page already holds. */
+function nativePageRoom(
+  native: PaginationResult,
+  start: number,
+  axis: 'row' | 'col',
+  scale: number,
+): number {
+  const page = native.pages.find((candidate) =>
+    axis === 'row' ? candidate.firstRow === start : candidate.firstCol === start,
+  );
+  if (!page) return 0;
+  const printableOrigin = axis === 'row' ? native.printable.y : native.printable.x;
+  const printableExtent = axis === 'row' ? native.printable.height : native.printable.width;
+  const origin = axis === 'row' ? page.originYPt : page.originXPt;
+  const extent = axis === 'row' ? page.heightPt : page.widthPt;
+  const titles = Math.max(0, origin - printableOrigin);
+  return (Math.max(0, printableExtent - titles - extent) * CSS_PX_PER_POINT) / scale;
 }
 
 function nativePagination(
@@ -289,6 +321,7 @@ function nativePagination(
     content.row,
     opts.throughRow,
     pagePx.height,
+    nativePageRoom(native, rowBands.at(-1)?.start ?? origin.row, 'row', scale),
   );
   const cols = extendNativeBands(
     colBands,
@@ -298,6 +331,7 @@ function nativePagination(
     content.col,
     opts.throughCol,
     pagePx.width,
+    nativePageRoom(native, colBands.at(-1)?.start ?? origin.col, 'col', scale),
   );
   return {
     sheet,
@@ -517,9 +551,7 @@ export function pageLayoutGaps(
   const nativeOrigin = (axis: 'row' | 'col', band: AxisBand): number | null => {
     if (!pagination.native) return null;
     const page = pagination.native.pages.find((candidate) =>
-      axis === 'row'
-        ? candidate.firstRow === band.start && candidate.lastRow === band.end
-        : candidate.firstCol === band.start && candidate.lastCol === band.end,
+      axis === 'row' ? candidate.firstRow === band.start : candidate.firstCol === band.start,
     );
     const printableOrigin =
       axis === 'row' ? pagination.native.printable.y : pagination.native.printable.x;
