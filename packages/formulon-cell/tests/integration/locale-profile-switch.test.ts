@@ -25,6 +25,8 @@ describe('integration: locale profile switching', () => {
     ['fr-FR', 'fr_FR'],
     ['de_DE', 'de_DE'],
     ['zh-CN', 'zh_CN'],
+    ['zh-TW', 'zh_TW'],
+    ['zh_HK', 'zh_TW'],
     ['ko-KR', 'ko_KR'],
     ['th-TH', 'th_TH'],
   ] as const)('maps %s to the seven-locale profile suffix %s', (locale, suffix) => {
@@ -49,7 +51,7 @@ describe('integration: locale profile switching', () => {
     expect(recalc).not.toHaveBeenCalled();
   });
 
-  it.each(['de-brand', 'de_@@', 'de-Latn-DE', 'de-DE-posix'])(
+  it.each(['de-brand', 'de_@@', 'de-Latn-DE', 'de-DE-posix', 'zh-Hant-TW', 'zh-Hans-CN'])(
     'does not override a custom or malformed German locale: %s',
     (locale) => {
       const recalc = vi.fn();

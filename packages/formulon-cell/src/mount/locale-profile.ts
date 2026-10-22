@@ -3,6 +3,7 @@ import {
   engineProfileToPublic,
   PROFILE_SUFFIX_FOR_LOCALE,
   type ProfileLocale,
+  profileLocaleFor,
   type SpreadsheetPlatform,
 } from '../engine/spreadsheet-profile.js';
 import type { SpreadsheetProfileId } from '../engine/types.js';
@@ -31,7 +32,7 @@ export function profileLocaleForUiLocale(locale: string): ProfileLocale | null {
     const region = parsed.region;
     if (!region || parsed.script) return null;
     if (parsed.baseName.toLowerCase() !== `${mapped}-${region.toLowerCase()}`) return null;
-    return PROFILE_SUFFIX_FOR_LOCALE[mapped];
+    return profileLocaleFor(locale);
   } catch {
     return null;
   }

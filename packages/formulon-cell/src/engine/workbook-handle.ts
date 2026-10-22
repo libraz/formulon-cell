@@ -1,6 +1,5 @@
 import type { SaveDiagnosticsResult } from '@libraz/formulon';
 import type { History } from '../commands/history.js';
-import { builtInLocaleFor } from '../i18n/locales.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
 import { detectCapabilities } from './capabilities.js';
@@ -21,7 +20,12 @@ import {
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { numberValue } from './result.js';
-import { engineProfileIdFor, type SpreadsheetPlatform } from './spreadsheet-profile.js';
+import {
+  engineProfileIdFor,
+  type ProfileLocale,
+  profileLocaleFor,
+  type SpreadsheetPlatform,
+} from './spreadsheet-profile.js';
 import { StoreMirror } from './store-mirror.js';
 import type {
   Addr,
@@ -139,12 +143,13 @@ const sameCellSnapshot = (a: CellSnapshot, b: CellSnapshot): boolean =>
 /** `<calcPr calcMode>` code for Manual. */
 const CALC_MODE_MANUAL = 1;
 
-/** Mac Excel's 12 pt new-workbook family per language; others use Aptos Narrow. */
-const MAC_DEFAULT_FONT_FAMILY: Readonly<Record<string, string>> = {
-  ja: '游ゴシック',
-  zh: '等线',
-  ko: '맑은 고딕',
-  th: 'Tahoma',
+/** Mac Excel's 12 pt new-workbook family per profile locale; others use Aptos Narrow. */
+const MAC_DEFAULT_FONT_FAMILY: Readonly<Partial<Record<ProfileLocale, string>>> = {
+  ja_JP: '游ゴシック',
+  zh_CN: '等线',
+  zh_TW: '新細明體',
+  ko_KR: '맑은 고딕',
+  th_TH: 'Tahoma',
 };
 
 /** Excel's Japanese UI creates new workbooks with Yu Gothic while the
@@ -156,8 +161,9 @@ export const defaultFontForLocale = (
   platform: SpreadsheetPlatform = 'default',
 ): Pick<FontRecord, 'name' | 'size'> => {
   if (platform === 'mac') {
-    const language = locale === undefined ? null : builtInLocaleFor(locale);
-    return { name: (language && MAC_DEFAULT_FONT_FAMILY[language]) || 'Aptos Narrow', size: 12 };
+    const family =
+      locale === undefined ? undefined : MAC_DEFAULT_FONT_FAMILY[profileLocaleFor(locale)];
+    return { name: family ?? 'Aptos Narrow', size: 12 };
   }
   return {
     name: locale?.toLowerCase().startsWith('ja') ? '游ゴシック' : 'Calibri',

@@ -95,6 +95,7 @@ const PROFILE_LOCALE_TO_INPUT_LOCALE: Readonly<Record<string, string>> = {
   '-de_DE': 'de-DE',
   '-fr_FR': 'fr-FR',
   '-zh_CN': 'zh-CN',
+  '-zh_TW': 'zh-TW',
   '-ko_KR': 'ko-KR',
   '-th_TH': 'th-TH',
 };

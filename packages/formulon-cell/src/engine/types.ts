@@ -113,6 +113,7 @@ export type SpreadsheetProfileId =
   | 'windows-de_DE'
   | 'windows-fr_FR'
   | 'windows-zh_CN'
+  | 'windows-zh_TW'
   | 'windows-ko_KR'
   | 'windows-th_TH'
   | 'mac-ja_JP'
@@ -120,6 +121,7 @@ export type SpreadsheetProfileId =
   | 'mac-de_DE'
   | 'mac-fr_FR'
   | 'mac-zh_CN'
+  | 'mac-zh_TW'
   | 'mac-ko_KR'
   | 'mac-th_TH';
 

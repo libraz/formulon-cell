@@ -187,6 +187,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       if (suffix === 'de_DE') return 'de-DE';
       if (suffix === 'fr_FR') return 'fr-FR';
       if (suffix === 'zh_CN') return 'zh-CN';
+      if (suffix === 'zh_TW') return 'zh-TW';
       if (suffix === 'ko_KR') return 'ko-KR';
       if (suffix === 'th_TH') return 'th-TH';
     } catch {
