@@ -11,8 +11,8 @@
  * {@link UNKNOWN_FAMILY_EM}. Font names are matched after NFKC and case folding.
  */
 
-/** Padding Mac Excel adds to a `baseColWidth` default column, in points. */
-const DEFAULT_COLUMN_PADDING_PT = 5;
+/** Padding Mac Excel adds to every column's digit cells, in points. */
+export const MAC_COLUMN_PADDING_PT = 5;
 
 /** OOXML stores column widths in 1/256 character steps. */
 const RAW_WIDTH_STEPS = 256;
@@ -73,5 +73,5 @@ export function macPtToRaw(pt: number, mdw: number): number {
 
 /** Width in points of a default column on a sheet that states no `defaultColWidth`. */
 export function macDefaultColumnPt(baseColWidth: number, mdw: number): number {
-  return baseColWidth * mdw + DEFAULT_COLUMN_PADDING_PT;
+  return baseColWidth * mdw + MAC_COLUMN_PADDING_PT;
 }

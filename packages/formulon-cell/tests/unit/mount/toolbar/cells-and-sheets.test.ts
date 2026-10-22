@@ -537,7 +537,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const input = dialog?.querySelector<HTMLInputElement>('input');
     expect(input).toBeTruthy();
     if (!input) throw new Error('Row height prompt input was not rendered');
-    input.value = '48';
+    // The dialog takes points; 36 pt is 48 px at 96 DPI.
+    input.value = '36';
     dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     await Promise.resolve();
     await Promise.resolve();
@@ -572,7 +573,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const colInput = colDialog?.querySelector<HTMLInputElement>('input');
     expect(colInput).toBeTruthy();
     if (!colInput) throw new Error('Column width prompt input was not rendered');
-    colInput.value = '96';
+    // The dialog takes characters; 13 Calibri 11 digits plus padding is 96 px.
+    colInput.value = '13';
     colDialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     await Promise.resolve();
     await Promise.resolve();

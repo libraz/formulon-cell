@@ -1,3 +1,4 @@
+import { runColumnWidthDialog, runRowHeightDialog } from '../../commands/row-col-dimension.js';
 import {
   autofitColsWidthForRanges,
   autofitRowsHeightForRanges,
@@ -25,7 +26,6 @@ import {
   showRows,
   type ToolbarMenuText,
 } from '../../index.js';
-import { renderScale } from '../../store/render-scale.js';
 
 type CellFormatMenuText = ToolbarMenuText & {
   rowHeightLabel: string;
@@ -53,7 +53,7 @@ export interface CellFormatActionDeps {
   promptDimension: (
     title: string,
     label: string,
-    initial: number,
+    initial: number | undefined,
     max: number,
   ) => Promise<number | null>;
   renderSheetTabs: () => void;
@@ -162,21 +162,12 @@ export const applyCellFormatAction = async (
     return;
   }
   if (action === 'row-height') {
-    // The dialog speaks the screen px the user sees; the store keeps canonical px.
-    const scale = renderScale(i.store.getState().layout);
-    const typed = await deps.promptDimension(
-      t.rowHeight,
-      t.rowHeightLabel,
-      i.store.getState().layout.defaultRowHeight * scale,
-      409,
-    );
-    if (typed === null) return;
-    const n = typed / scale;
-    recordLayoutChange(i.history, i.store, () => {
-      for (let row = range.r0; row <= range.r1; row += 1) {
-        mutators.setRowHeight(i.store, row, n);
-        i.workbook.setRowHeight(range.sheet, row, n);
-      }
+    await runRowHeightDialog({
+      store: i.store,
+      history: i.history,
+      wb: i.workbook,
+      range,
+      prompt: (initial, max) => deps.promptDimension(t.rowHeight, t.rowHeightLabel, initial, max),
     });
     return;
   }
@@ -194,23 +185,14 @@ export const applyCellFormatAction = async (
     return;
   }
   if (action === 'col-width') {
-    const scale = renderScale(i.store.getState().layout);
-    const typed = await deps.promptDimension(
-      t.colWidth,
-      t.colWidthLabel,
-      i.store.getState().layout.defaultColWidth * scale,
-      2048,
-    );
-    if (typed === null) return;
-    const n = typed / scale;
-    recordLayoutChange(i.history, i.store, () => {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        mutators.setColWidth(i.store, col, n);
-        i.workbook.setColumnWidth(range.sheet, col, col, n);
-      }
+    await runColumnWidthDialog({
+      store: i.store,
+      history: i.history,
+      wb: i.workbook,
+      range,
+      prompt: (initial, max) => deps.promptDimension(t.colWidth, t.colWidthLabel, initial, max),
     });
-    // NOTE: original code intentionally (or accidentally) falls through to
-    // `col-autofit` here — preserved verbatim.
+    return;
   }
   if (action === 'col-autofit') {
     autofitColsWidthForRanges(

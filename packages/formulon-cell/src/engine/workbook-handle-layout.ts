@@ -1,6 +1,13 @@
-import { GeometryMode } from '@libraz/formulon';
+import { GeometryMode, type WidthModelResult } from '@libraz/formulon';
 import type { WorkbookViewMode } from '../store/types.js';
-import { macDefaultColumnPt, macMdw, macPtToRaw, macRawToPt } from './mac-column-model.js';
+import { displayCharsForScreenPx, screenPxForDisplayChars } from './column-display-width.js';
+import {
+  MAC_COLUMN_PADDING_PT,
+  macDefaultColumnPt,
+  macMdw,
+  macPtToRaw,
+  macRawToPt,
+} from './mac-column-model.js';
 import { macDefaultRowPt } from './mac-row-model.js';
 import type { EngineCapabilities, Range, Workbook } from './types.js';
 import { SheetVisibility } from './types.js';
@@ -15,6 +22,11 @@ type WorkbookHandleInternals = {
 
 const CSS_PX_PER_POINT = 96 / 72;
 const POINTS_PER_CSS_PX = 72 / 96;
+
+/** Calibri 11's screen digit width and padding (96-DPI px), used when the
+ *  engine reports no width model. */
+const FALLBACK_DIGIT_WIDTH_PX = 7;
+const FALLBACK_COLUMN_PADDING_PX = 5;
 
 type LayoutCol = {
   first: number;
@@ -60,17 +72,44 @@ function usesMacColumnModel(handle: unknown): boolean {
   return internals(handle).geometryPlatform === 'mac';
 }
 
-/** `sheet`'s raw Normal font, or null when the engine cannot report it. */
-function sheetNormalFont(handle: unknown, sheet: number): { name: string; size: number } | null {
+/** `sheet`'s display width model, or null when the engine cannot report it. */
+function displayWidthModel(handle: unknown, sheet: number): WidthModelResult | null {
   const getWidthModel = wb(handle).getWidthModel;
   if (typeof getWidthModel !== 'function') return null;
   try {
     const model = getWidthModel.call(wb(handle), sheet, GeometryMode.Display);
-    if (!model.status.ok || !Number.isFinite(model.normalFontSize)) return null;
-    return { name: model.normalFontName, size: model.normalFontSize };
+    return model.status.ok ? model : null;
   } catch {
     return null;
   }
+}
+
+/** `sheet`'s raw Normal font, or null when the engine cannot report it. */
+function sheetNormalFont(handle: unknown, sheet: number): { name: string; size: number } | null {
+  const model = displayWidthModel(handle, sheet);
+  if (!model || !Number.isFinite(model.normalFontSize)) return null;
+  return { name: model.normalFontName, size: model.normalFontSize };
+}
+
+/** CSS px per platform screen pixel: 1 at 96 DPI, 4/3 where Mac draws 1 pt as 1 px. */
+function cssPxPerScreenPx(handle: unknown): number {
+  return usesMacColumnModel(handle) ? CSS_PX_PER_POINT : 1;
+}
+
+/** `sheet`'s digit width and column padding in platform screen pixels. */
+function screenColumnMetrics(handle: unknown, sheet: number): { mdw: number; padding: number } {
+  if (usesMacColumnModel(handle)) {
+    return {
+      mdw: macSheetMdw(handle, sheet) ?? FALLBACK_DIGIT_WIDTH_PX,
+      padding: MAC_COLUMN_PADDING_PT,
+    };
+  }
+  const model = displayWidthModel(handle, sheet);
+  if (!model) return { mdw: FALLBACK_DIGIT_WIDTH_PX, padding: FALLBACK_COLUMN_PADDING_PX };
+  return {
+    mdw: Math.round(model.pointsPerChar * CSS_PX_PER_POINT),
+    padding: Math.round(model.paddingPt * CSS_PX_PER_POINT),
+  };
 }
 
 /** Mac maximum digit width of `sheet`'s raw Normal font, or null when the
@@ -249,6 +288,34 @@ export abstract class WorkbookHandleLayoutMethods {
     const rowHeight = rowPoints * CSS_PX_PER_POINT;
     if (!Number.isFinite(rowHeight)) return null;
     return { defaultColWidth: colWidth, defaultRowHeight: rowHeight };
+  }
+
+  /** Width a column `widthPx` CSS px wide shows in the Column Width dialog,
+   *  in characters of `sheet`'s Normal font. */
+  columnDisplayChars(sheet: number, widthPx: number): number {
+    assertAlive(this);
+    const { mdw, padding } = screenColumnMetrics(this, sheet);
+    return displayCharsForScreenPx(widthPx / cssPxPerScreenPx(this), mdw, padding);
+  }
+
+  /** CSS px of a column the Column Width dialog sets to `chars`, snapped to
+   *  whole screen pixels. */
+  columnPxForDisplayChars(sheet: number, chars: number): number {
+    assertAlive(this);
+    const { mdw, padding } = screenColumnMetrics(this, sheet);
+    return screenPxForDisplayChars(chars, mdw, padding) * cssPxPerScreenPx(this);
+  }
+
+  /** Height a row `heightPx` CSS px tall shows in the Row Height dialog, in points. */
+  rowDisplayPt(heightPx: number): number {
+    return Math.round(heightPx * POINTS_PER_CSS_PX * 100) / 100;
+  }
+
+  /** CSS px of a row the Row Height dialog sets to `pt`, snapped to whole
+   *  screen pixels. */
+  rowPxForDisplayPt(pt: number): number {
+    const perScreenPx = cssPxPerScreenPx(this);
+    return Math.round((pt * CSS_PX_PER_POINT) / perScreenPx) * perScreenPx;
   }
 
   /** Persist frozen-pane counts on `sheet`. No-op (returns false) under stub. */

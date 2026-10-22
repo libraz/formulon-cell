@@ -3,7 +3,8 @@ import { showNumberPrompt } from './prompt.js';
 export interface DimensionDialogOptions {
   title: string;
   label: string;
-  initial: number;
+  /** Undefined leaves the field empty, as for a selection of mixed sizes. */
+  initial?: number;
   max: number;
   okLabel: string;
   cancelLabel: string;
@@ -15,7 +16,7 @@ export const showDimensionDialog = (opts: DimensionDialogOptions): Promise<numbe
     title: opts.title,
     label: opts.label,
     initial: opts.initial,
-    min: 1,
+    min: 0,
     max: opts.max,
     step: 1,
     okLabel: opts.okLabel,
