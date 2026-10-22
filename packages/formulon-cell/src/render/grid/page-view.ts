@@ -39,7 +39,18 @@ interface BandRun {
   opens: boolean;
   /** The run reaches the band's last index, so the trailing margin follows. */
   closes: boolean;
+  /** Screen span of the page's paper, when the run reaches a page edge. */
+  paperStart?: number;
+  paperEnd?: number;
 }
+
+/** Paper edge before a run: its placed paper, else the leading margin. */
+const paperStartOf = (run: BandRun, lead: number): number =>
+  run.paperStart ?? (run.opens ? run.start - lead : run.start);
+
+/** Paper edge after a run: its placed paper, else the trailing margin. */
+const paperEndOf = (run: BandRun, trail: number): number =>
+  run.paperEnd ?? (run.closes ? run.end + trail : run.end);
 
 const CSS_PX_PER_POINT = 96 / 72;
 
@@ -190,8 +201,8 @@ function segmentsFor(runs: readonly BandRun[], leadMargin: number, trailMargin: 
   const segments: Segment[] = [];
   let cursor = Number.NEGATIVE_INFINITY;
   for (const run of runs) {
-    const paperStart = run.opens ? run.start - leadMargin : run.start;
-    const paperEnd = run.closes ? run.end + trailMargin : run.end;
+    const paperStart = paperStartOf(run, leadMargin);
+    const paperEnd = paperEndOf(run, trailMargin);
     if (cursor > Number.NEGATIVE_INFINITY && paperStart > cursor) {
       segments.push({ start: cursor, end: paperStart, kind: 'gutter' });
     }
@@ -213,8 +224,8 @@ function paperRects(
 ): Rect[] {
   const rects: Rect[] = [];
   for (const rowRun of rowRuns) {
-    const top = rowRun.opens ? rowRun.start - margins.top : rowRun.start;
-    const bottom = rowRun.closes ? rowRun.end + margins.bottom : rowRun.end;
+    const top = paperStartOf(rowRun, margins.top);
+    const bottom = paperEndOf(rowRun, margins.bottom);
     for (const colRun of colRuns) {
       const rowBand = pagination?.rowBands[rowRun.band];
       const colBand = pagination?.colBands[colRun.band];
@@ -233,8 +244,8 @@ function paperRects(
           continue;
         }
       }
-      const left = colRun.opens ? colRun.start - margins.left : colRun.start;
-      const right = colRun.closes ? colRun.end + margins.right : colRun.end;
+      const left = paperStartOf(colRun, margins.left);
+      const right = paperEndOf(colRun, margins.right);
       rects.push({ x: left, y: top, w: right - left, h: bottom - top });
     }
   }
@@ -251,6 +262,43 @@ interface PageAxes {
   zoom: number;
 }
 
+/** Unscaled extent of the tracks `band` lays out, hidden ones excluded. */
+function bandExtent(state: ViewState, band: AxisBand, axis: 'row' | 'col'): number {
+  const layout = state.layout;
+  const hidden = axis === 'row' ? layout.hiddenRows : layout.hiddenCols;
+  const sizes = axis === 'row' ? layout.rowHeights : layout.colWidths;
+  const fallback = axis === 'row' ? layout.defaultRowHeight : layout.defaultColWidth;
+  let extent = 0;
+  for (let index = band.start; index <= band.end; index += 1) {
+    if (!hidden.has(index)) extent += sizes.get(index) ?? fallback;
+  }
+  return extent;
+}
+
+/** Seat each run that reaches a page edge on a whole sheet of paper: `lead`
+ *  before the band's first track and the rest of `paper` after it, so a page
+ *  whose tracks fall short of the printable size still shows its full sheet.
+ *  All sizes are unscaled; native pages place their own paper. */
+function placePaper(
+  runs: BandRun[],
+  bands: readonly AxisBand[],
+  state: ViewState,
+  axis: 'row' | 'col',
+  zoom: number,
+  lead: number,
+  trail: number,
+  paper: number,
+): void {
+  for (const run of runs) {
+    const band = bands[run.band];
+    if (!band || !(run.opens || run.closes)) continue;
+    const extent = bandExtent(state, band, axis) * zoom;
+    const bandStart = run.opens ? run.start : run.end - extent;
+    run.paperStart = bandStart - lead * zoom;
+    run.paperEnd = Math.max(run.paperStart + paper * zoom, bandStart + extent + trail * zoom);
+  }
+}
+
 function pageAxes(
   state: ViewState,
   pagination: SheetPagination,
@@ -259,9 +307,17 @@ function pageAxes(
 ): PageAxes {
   const zoom = renderScale(state.layout, state.viewport);
   const m = pagination.marginPx;
+  const rowRuns = runsFor(rows, pagination.rowBands, gridOriginY(state.layout));
+  const colRuns = runsFor(cols, pagination.colBands, gridOriginX(state.layout));
+  if (!pagination.native) {
+    const paperHeight = pagination.pagePx.height + m.top + m.bottom;
+    const paperWidth = pagination.pagePx.width + m.left + m.right;
+    placePaper(rowRuns, pagination.rowBands, state, 'row', zoom, m.top, m.bottom, paperHeight);
+    placePaper(colRuns, pagination.colBands, state, 'col', zoom, m.left, m.right, paperWidth);
+  }
   return {
-    rowRuns: runsFor(rows, pagination.rowBands, gridOriginY(state.layout)),
-    colRuns: runsFor(cols, pagination.colBands, gridOriginX(state.layout)),
+    rowRuns,
+    colRuns,
     margins: {
       top: m.top * zoom,
       right: m.right * zoom,
@@ -449,16 +505,18 @@ function paintPageBands(
       const nativeMarginBottom = pagination.native
         ? pagination.native.margins.bottom * nativeFactor
         : axes.margins.bottom;
-      const left = nativeRect ? nativeRect.x + nativeMarginLeft : colRun.start;
-      const width = nativeRect
-        ? Math.max(0, nativeRect.w - nativeMarginLeft - nativeMarginRight)
-        : colRun.end - colRun.start;
+      const paperLeft = nativeRect ? nativeRect.x : paperStartOf(colRun, axes.margins.left);
+      const paperRight = nativeRect
+        ? nativeRect.x + nativeRect.w
+        : paperEndOf(colRun, axes.margins.right);
+      const left = paperLeft + nativeMarginLeft;
+      const width = Math.max(0, paperRight - paperLeft - nativeMarginLeft - nativeMarginRight);
       if (width < 90) continue;
       const bands: { kind: PageBandHit['kind']; y: number }[] = [];
       if (rowRun.opens && nativeMarginTop >= BAND_HEIGHT) {
         bands.push({
           kind: 'header',
-          y: nativeRect ? nativeRect.y + 4 : rowRun.start - axes.margins.top + 4,
+          y: nativeRect ? nativeRect.y + 4 : paperStartOf(rowRun, axes.margins.top) + 4,
         });
       }
       if (rowRun.closes && nativeMarginBottom >= BAND_HEIGHT) {
@@ -466,7 +524,7 @@ function paintPageBands(
           kind: 'footer',
           y: nativeRect
             ? nativeRect.y + nativeRect.h - nativeMarginBottom - BAND_HEIGHT - 4
-            : rowRun.end + axes.margins.bottom - BAND_HEIGHT - 4,
+            : paperEndOf(rowRun, axes.margins.bottom) - BAND_HEIGHT - 4,
         });
       }
       for (const band of bands) {
@@ -598,8 +656,8 @@ export function paintPageRulers(
       const nativeSpan = pagination.native
         ? nativeAxisPaperSpan(pagination, run, horizontal ? 'col' : 'row', zoom, runs)
         : null;
-      const paperStart = nativeSpan ? nativeSpan.start : run.opens ? run.start - lead : run.start;
-      const paperEnd = nativeSpan ? nativeSpan.end : run.closes ? run.end + trail : run.end;
+      const paperStart = nativeSpan ? nativeSpan.start : paperStartOf(run, lead);
+      const paperEnd = nativeSpan ? nativeSpan.end : paperEndOf(run, trail);
       const contentStart = run.start;
       const contentEnd = run.end;
       const fill = (from: number, to: number, colour: string): void => {

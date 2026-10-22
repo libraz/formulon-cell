@@ -551,12 +551,12 @@ export function pageLayoutGaps(
     const previousOrigin = previous ? nativeOrigin('row', previous) : null;
     const currentOrigin = nativeOrigin('row', band);
     const lead =
-      i === 0
+      previous === undefined
         ? m.top +
           ((currentOrigin === null ? 0 : currentOrigin - (pagination.native?.printable.y ?? 0)) *
             (96 / 72)) /
             pagination.scale
-        : nativePaper && previous
+        : nativePaper
           ? Math.max(
               0,
               nativePaper.height +
@@ -565,7 +565,10 @@ export function pageLayoutGaps(
                   : 0) -
                 axisExtent('row', previous),
             )
-          : m.bottom + m.top;
+          : Math.max(
+              m.bottom + m.top,
+              pagination.pagePx.height + m.top + m.bottom - axisExtent('row', previous),
+            );
     pageGapRows.set(band.start, lead * zoom + (i === 0 ? 0 : PAGE_GUTTER_PX));
   });
   pagination.colBands.forEach((band, i) => {
@@ -573,12 +576,12 @@ export function pageLayoutGaps(
     const previousOrigin = previous ? nativeOrigin('col', previous) : null;
     const currentOrigin = nativeOrigin('col', band);
     const lead =
-      i === 0
+      previous === undefined
         ? m.left +
           ((currentOrigin === null ? 0 : currentOrigin - (pagination.native?.printable.x ?? 0)) *
             (96 / 72)) /
             pagination.scale
-        : nativePaper && previous
+        : nativePaper
           ? Math.max(
               0,
               nativePaper.width +
@@ -587,7 +590,10 @@ export function pageLayoutGaps(
                   : 0) -
                 axisExtent('col', previous),
             )
-          : m.right + m.left;
+          : Math.max(
+              m.right + m.left,
+              pagination.pagePx.width + m.left + m.right - axisExtent('col', previous),
+            );
     pageGapCols.set(band.start, lead * zoom + (i === 0 ? 0 : PAGE_GUTTER_PX));
   });
   return { pageGapRows, pageGapCols };

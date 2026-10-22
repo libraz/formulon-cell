@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   bandIndexAt,
+  PAGE_GUTTER_PX,
   pageLayoutGaps,
   pageNumberOf,
   paginationFor,
@@ -180,6 +181,26 @@ describe('pageLayoutGaps', () => {
     expect(first && pageGapRows.get(first.start)).toBeCloseTo(pagination.marginPx.top, 5);
     expect(second && pageGapRows.get(second.start)).toBeGreaterThan(
       pagination.marginPx.top + pagination.marginPx.bottom,
+    );
+  });
+
+  it('fills the rest of a page that its columns fall short of', () => {
+    const store = createSpreadsheetStore();
+    seed(store, 0, 40);
+    const state = store.getState();
+    const pagination = paginationFor(state, 0);
+    const { pageGapCols } = pageLayoutGaps(state, 0);
+
+    const first = pagination.colBands[0];
+    const second = pagination.colBands[1];
+    if (!first || !second) throw new Error('expected two column pages');
+    const extent = (first.end - first.start + 1) * state.layout.defaultColWidth;
+    expect(extent).toBeLessThan(pagination.pagePx.width);
+    const m = pagination.marginPx;
+    // The rest of the first sheet, the gutter, then the next sheet's left margin.
+    expect(pageGapCols.get(second.start)).toBeCloseTo(
+      pagination.pagePx.width + m.left + m.right - extent + PAGE_GUTTER_PX,
+      5,
     );
   });
 
