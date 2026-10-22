@@ -173,6 +173,22 @@ describe('attachContextMenu', () => {
       expect(onFormatDialog).toHaveBeenCalled();
     });
 
+    it('Row Height… prompts in points and applies the height to the selected rows', async () => {
+      setRange(store, 1, 0, 2, 16383);
+      detach = attachContextMenu({ host, store, wb, strings: en });
+      fireContextMenu(host, 10, 70);
+      item('rowHeight')?.click();
+      const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+      const input = dialog?.querySelector<HTMLInputElement>('input');
+      if (!input) throw new Error('Row height prompt input was not rendered');
+      expect(dialog?.textContent).toContain(en.ribbonMenu.rowHeightLabel);
+      expect(input.value).toBe('15');
+      input.value = '30';
+      dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+      await vi.waitFor(() => expect(store.getState().layout.rowHeights.get(2)).toBe(40));
+      expect(store.getState().layout.rowHeights.get(1)).toBe(40);
+    });
+
     it('enables Open Hyperlink only for a safe hyperlink at the active cell', () => {
       const onOpenHyperlink = vi.fn();
       detach = attachContextMenu({ host, store, wb, onOpenHyperlink });

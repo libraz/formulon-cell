@@ -314,6 +314,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         },
         onEditComment: () => getCommentDialog()?.open(),
         onDefineName: () => getNamedRangeDialog()?.open(),
+        getLocale,
         onOpenPivotFieldList: getWorkbookObjects
           ? (sheetIndex, pivotIndex) => {
               getWorkbookObjects()?.openPivotFieldList(sheetIndex, pivotIndex);

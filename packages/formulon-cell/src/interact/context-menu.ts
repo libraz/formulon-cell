@@ -16,12 +16,14 @@ import type {
   PermissionDecision,
 } from '../commands/interaction-policy.js';
 import { refreshPivotTable } from '../commands/pivot-table.js';
+import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { type Addr, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { canReadClipboard, createContextMenuClipboard } from './context-menu-clipboard.js';
 import {
@@ -94,6 +96,8 @@ export interface ContextMenuDeps {
   /** Called when the user clicks "Define Name…". When omitted the entry is
    *  hidden. */
   onDefineName?: () => void;
+  /** Locale the Row Height / Column Width dialogs parse numbers with. */
+  getLocale?: () => string;
   /** Returns the structured clipboard snapshot used by the Paste Special
    *  submenu's quick-paste actions. When it returns null those entries are
    *  disabled and only the "Paste Special…" dialog entry stays usable. */
@@ -979,6 +983,26 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'rowHeight':
       case 'colWidth': {
+        const rows = id === 'rowHeight';
+        const title = rows ? strings.ribbonMenu.rowHeight : strings.ribbonMenu.colWidth;
+        const label = rows ? strings.ribbonMenu.rowHeightLabel : strings.ribbonMenu.colWidthLabel;
+        const run = rows ? runRowHeightDialog : runColumnWidthDialog;
+        void run({
+          store,
+          history,
+          wb,
+          range: state.selection.range,
+          prompt: (initial, max) =>
+            showDimensionDialog({
+              title,
+              label,
+              initial,
+              max,
+              okLabel: strings.hyperlinkDialog.ok,
+              cancelLabel: strings.hyperlinkDialog.cancel,
+              locale: deps.getLocale,
+            }),
+        });
         return;
       }
       case 'selectAll': {

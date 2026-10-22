@@ -723,6 +723,7 @@ export const contextMenu = (): Extension => ({
       onInsertHyperlink: () => callOpen('hyperlink'),
       onEditComment: () => callOpen('commentDialog'),
       onDefineName: () => callOpen('namedRanges'),
+      getLocale: () => ctx.i18n.locale,
       getClipboardSnapshot,
     });
     return {
@@ -741,6 +742,7 @@ export const contextMenu = (): Extension => ({
           onInsertHyperlink: () => callOpen('hyperlink'),
           onEditComment: () => callOpen('commentDialog'),
           onDefineName: () => callOpen('namedRanges'),
+          getLocale: () => ctx.i18n.locale,
           getClipboardSnapshot,
         });
       },
