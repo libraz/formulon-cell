@@ -5,6 +5,7 @@ import {
   pageLayoutGaps,
   paginationFor,
 } from '../../../src/commands/pagination.js';
+import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
 import { syncPageSetupToEngine } from '../../../src/engine/print-sync.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, getPageSetup, mutators } from '../../../src/store/store.js';
@@ -180,6 +181,40 @@ describe('native pagination integration', () => {
           state.viewport.zoom,
         5,
       );
+    } finally {
+      wb.dispose();
+    }
+  });
+});
+
+describe('Mac pagination', () => {
+  it('breaks columns on the store widths instead of the Windows print model', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'ja', platform: 'mac' });
+    const store = createSpreadsheetStore();
+    try {
+      hydrateLayoutFromEngine(wb, store, 0);
+      store.setState((s) => {
+        const cells = new Map(s.data.cells);
+        for (let col = 0; col < 30; col += 1) {
+          wb.setNumber({ sheet: 0, row: 0, col }, col);
+          cells.set(addrKey({ sheet: 0, row: 0, col }), {
+            value: { kind: 'number', value: col },
+            formula: null,
+          });
+        }
+        return { ...s, data: { ...s.data, cells } };
+      });
+
+      const pagination = paginationFor(store.getState(), 0, { engine: wb });
+      expect(pagination.native).toBeUndefined();
+      const { colWidths, defaultColWidth } = store.getState().layout;
+      for (const band of pagination.colBands) {
+        let width = 0;
+        for (let col = band.start; col <= band.end; col += 1) {
+          width += colWidths.get(col) ?? defaultColWidth;
+        }
+        expect(width).toBeLessThanOrEqual(pagination.pagePx.width);
+      }
     } finally {
       wb.dispose();
     }

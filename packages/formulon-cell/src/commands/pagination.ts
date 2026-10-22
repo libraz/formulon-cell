@@ -316,10 +316,19 @@ function nativePagination(
   };
 }
 
+/** The engine whose native page breaks apply. Those follow the Windows print
+ *  column model; a Mac sheet breaks on its own point widths, which the
+ *  store's px already carry. */
+function nativePaginationEngine(state: State, opts: PaginateOptions): WorkbookHandle | null {
+  const engine = opts.engine ?? paginationEngines.get(state);
+  if (engine?.capabilities.detailedPagination !== true) return null;
+  return engine.geometryPlatform === 'mac' ? null : engine;
+}
+
 function paginate(state: State, sheet: number, opts: PaginateOptions): SheetPagination {
   const setup = getPageSetup(state, sheet);
-  const engine = opts.engine ?? paginationEngines.get(state);
-  if (engine?.capabilities.detailedPagination === true) {
+  const engine = nativePaginationEngine(state, opts);
+  if (engine) {
     const native = engine.paginateSheet(sheet);
     if (native) {
       const detailed =
@@ -436,10 +445,8 @@ export function paginationFor(
   // a host may write through the handle while calculation is manual). There
   // is no public native revision counter, so do not memoise this path and
   // risk reusing stale page placements.
+  if (nativePaginationEngine(state, opts)) return paginate(state, sheet, opts);
   const engine = opts.engine ?? paginationEngines.get(state);
-  if (engine?.capabilities.detailedPagination === true) {
-    return paginate(state, sheet, opts);
-  }
   const key = [
     sheet,
     state.layout,
