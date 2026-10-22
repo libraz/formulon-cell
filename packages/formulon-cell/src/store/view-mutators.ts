@@ -24,6 +24,9 @@ const snapToScreenPx = (layout: State['layout'], px: number): number => {
   return Math.round(px * s) / s;
 };
 
+/** One screen pixel in canonical px: the narrowest visible row or column. */
+const minScreenPx = (layout: State['layout']): number => 1 / renderScale(layout);
+
 /** UI chrome flags, viewport scroll/zoom, freeze panes and row/column sizes. */
 export const viewMutators = {
   setEditor(store: SpreadsheetStore, mode: EditorMode): void {
@@ -229,7 +232,10 @@ export const viewMutators = {
   setColWidth(store: SpreadsheetStore, col: number, px: number): void {
     store.setState((s) => {
       const colWidths = new Map(s.layout.colWidths);
-      colWidths.set(col, Math.max(28, Math.min(800, snapToScreenPx(s.layout, px))));
+      colWidths.set(
+        col,
+        Math.max(minScreenPx(s.layout), Math.min(800, snapToScreenPx(s.layout, px))),
+      );
       return { ...s, layout: { ...s.layout, colWidths } };
     });
   },
@@ -237,7 +243,10 @@ export const viewMutators = {
   setRowHeight(store: SpreadsheetStore, row: number, px: number): void {
     store.setState((s) => {
       const rowHeights = new Map(s.layout.rowHeights);
-      rowHeights.set(row, Math.max(16, Math.min(MAX_ROW_HEIGHT_PX, snapToScreenPx(s.layout, px))));
+      rowHeights.set(
+        row,
+        Math.max(minScreenPx(s.layout), Math.min(MAX_ROW_HEIGHT_PX, snapToScreenPx(s.layout, px))),
+      );
       return { ...s, layout: { ...s.layout, rowHeights } };
     });
   },

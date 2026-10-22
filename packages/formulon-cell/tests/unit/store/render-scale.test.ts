@@ -56,12 +56,12 @@ describe('store/setColWidth + setRowHeight — whole screen px', () => {
     expect(store.getState().layout.rowHeights.get(0)).toBe(124 / 3);
   });
 
-  it('keeps the existing minimums', () => {
+  it('floors sizes at one screen pixel', () => {
     const store = withScale(0.75);
-    mutators.setColWidth(store, 0, 1);
-    mutators.setRowHeight(store, 0, 1);
-    expect(store.getState().layout.colWidths.get(0)).toBe(28);
-    expect(store.getState().layout.rowHeights.get(0)).toBe(16);
+    mutators.setColWidth(store, 0, 0.2);
+    mutators.setRowHeight(store, 0, 0.2);
+    expect(store.getState().layout.colWidths.get(0)).toBe(4 / 3);
+    expect(store.getState().layout.rowHeights.get(0)).toBe(4 / 3);
   });
 
   it('caps row height at 409 pt', () => {
