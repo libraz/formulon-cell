@@ -1,6 +1,7 @@
 import { GeometryMode } from '@libraz/formulon';
 import type { WorkbookViewMode } from '../store/types.js';
 import { macDefaultColumnPt, macMdw, macPtToRaw, macRawToPt } from './mac-column-model.js';
+import { macDefaultRowPt } from './mac-row-model.js';
 import type { EngineCapabilities, Range, Workbook } from './types.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -59,19 +60,26 @@ function usesMacColumnModel(handle: unknown): boolean {
   return internals(handle).geometryPlatform === 'mac';
 }
 
-/** Mac maximum digit width of `sheet`'s raw Normal font, or null when the
- *  engine cannot report it. */
-function macSheetMdw(handle: unknown, sheet: number): number | null {
+/** `sheet`'s raw Normal font, or null when the engine cannot report it. */
+function sheetNormalFont(handle: unknown, sheet: number): { name: string; size: number } | null {
   const getWidthModel = wb(handle).getWidthModel;
   if (typeof getWidthModel !== 'function') return null;
   try {
     const model = getWidthModel.call(wb(handle), sheet, GeometryMode.Display);
     if (!model.status.ok || !Number.isFinite(model.normalFontSize)) return null;
-    const mdw = macMdw(model.normalFontName, model.normalFontSize);
-    return mdw > 0 ? mdw : null;
+    return { name: model.normalFontName, size: model.normalFontSize };
   } catch {
     return null;
   }
+}
+
+/** Mac maximum digit width of `sheet`'s raw Normal font, or null when the
+ *  engine cannot report it. */
+function macSheetMdw(handle: unknown, sheet: number): number | null {
+  const font = sheetNormalFont(handle, sheet);
+  if (!font) return null;
+  const mdw = macMdw(font.name, font.size);
+  return mdw > 0 ? mdw : null;
 }
 
 function columnCharsToPx(handle: unknown, sheet: number, chars: number): number | null {
@@ -207,7 +215,8 @@ export abstract class WorkbookHandleLayoutMethods {
   /** Return sheet defaults in the store's CSS-pixel units. Columns follow the
    *  `geometryPlatform` model: Mac derives an unstated default from
    *  `baseColWidth`, the default profile uses the engine's effective width.
-   *  Rows without a stated default use 102/7 points. Null means the engine
+   *  Mac rows take the Normal font's height when it is tabulated; otherwise
+   *  rows without a stated default use 102/7 points. Null means the engine
    *  lacks geometry support or a native read/conversion failed. */
   getSheetDefaultLayoutPx(
     sheet: number,
@@ -233,7 +242,9 @@ export abstract class WorkbookHandleLayoutMethods {
         : defaults.effectiveDefaultColWidth;
       colWidth = columnCharsToPx(this, sheet, chars);
     }
-    const rowPoints = defaults.hasDefaultRowHeight ? defaults.defaultRowHeight : 102 / 7;
+    const statedRowPoints = defaults.hasDefaultRowHeight ? defaults.defaultRowHeight : 102 / 7;
+    const font = usesMacColumnModel(this) ? sheetNormalFont(this, sheet) : null;
+    const rowPoints = (font && macDefaultRowPt(font.name, font.size)) ?? statedRowPoints;
     if (colWidth === null || !Number.isFinite(rowPoints)) return null;
     const rowHeight = rowPoints * CSS_PX_PER_POINT;
     if (!Number.isFinite(rowHeight)) return null;
