@@ -16,6 +16,7 @@ import type {
   SessionIllustration,
   SlicerSpec,
   Sparkline,
+  TablesSlice,
 } from './types.js';
 
 /** Detach the nested settings and anchor; `data` is never mutated in place, so
@@ -257,8 +258,8 @@ export const sheetObjectMutators = {
   },
 
   /** Replace the engine overlays with `tables`. An overlay already known
-   *  under the same table name keeps its id and look; the engine supplies the
-   *  range only, since it cannot report a table's style. */
+   *  under the same table name keeps its id; it keeps its look as well when
+   *  the engine reported none (`styleName` unset). */
   replaceEngineTableOverlays(store: SpreadsheetStore, tables: readonly TableOverlay[]): void {
     store.setState((s) => {
       const known = new Map<string, TableOverlay>();
@@ -267,11 +268,21 @@ export const sheetObjectMutators = {
       }
       const engine = tables.map((t) => {
         const previous = t.name ? known.get(t.name.toLocaleLowerCase()) : undefined;
-        return previous ? { ...previous, name: t.name, range: t.range } : t;
+        if (!previous) return t;
+        if (t.styleName === undefined) return { ...previous, name: t.name, range: t.range };
+        return { ...t, id: previous.id };
       });
       const session = s.tables.tables.filter((t) => t.source !== 'engine');
       return { ...s, tables: { ...s.tables, tables: [...engine, ...session] } };
     });
+  },
+
+  /** Replace the custom styles and PivotTable assignments with what the engine holds. */
+  replaceTableStyles(
+    store: SpreadsheetStore,
+    styles: Pick<TablesSlice, 'customTableStyles' | 'customPivotTableStyles' | 'pivotTableStyles'>,
+  ): void {
+    store.setState((s) => ({ ...s, tables: { ...s.tables, ...styles } }));
   },
 
   upsertCustomTableStyle(store: SpreadsheetStore, style: CustomTableStyle): void {

@@ -228,6 +228,7 @@ export interface RibbonMenusStrings {
     shapeDashLongDashDotDot: string;
     arrangeRequiresObject: string;
     arrangeNativeUnsupported: string;
+    shapeArrowNotSaved: string;
     arrangeAtFront: string;
     arrangeAtBack: string;
     underlineSingle: string;
@@ -339,6 +340,14 @@ export interface RibbonMenusStrings {
     allowEditRangesDialogTitle: string;
     allowEditRangesDialogRange: string;
     allowEditRangesDialogInvalid: string;
+    allowEditRangesDialogTitleLabel: string;
+    allowedRangeUnlockTitle: string;
+    allowEditRangesNewButton: string;
+    allowEditRangesModifyButton: string;
+    allowEditRangesDeleteButton: string;
+    allowEditRangesEmpty: string;
+    protectWorkbookDialogTitle: string;
+    unprotectWorkbookDialogTitle: string;
     allowedEditRangeAddedStatus: string;
     allowedEditRangesClearedStatus: string;
     protectSheetAlreadyProtected: string;
@@ -346,6 +355,7 @@ export interface RibbonMenusStrings {
     protectWorkbookAlreadyProtected: string;
     unprotectWorkbookRequiresProtected: string;
     allowEditRangesClearRequiresAny: string;
+    allowEditRangesRequiresUnprotected: string;
     lockCell: string;
     unlockCell: string;
     cellsLockedStatus: string;

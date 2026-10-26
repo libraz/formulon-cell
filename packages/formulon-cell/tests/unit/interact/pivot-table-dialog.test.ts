@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { type CellValue, PivotShowValuesAs } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -91,6 +91,10 @@ const makeWb = () => {
     removePivotTable: () => true,
     setPivotTableGrandTotals: (_sheet: number, _pivot: number, rows: boolean, cols: boolean) => {
       calls.push(`grand:${rows}:${cols}`);
+      return true;
+    },
+    setPivotFieldAxis: (_sheet: number, _pivot: number, field: number, axis: number | null) => {
+      calls.push(`pivot-field-axis:${field}:${axis}`);
       return true;
     },
     addPivotField: (_sheet: number, _pivot: number, spec: { sourceName: string; axis: number }) => {
@@ -473,6 +477,21 @@ describe('attachPivotTableDialog', () => {
     nextSalesField.dispatchEvent(new Event('change', { bubbles: true }));
     expect(valueSelect.value).toBe('Qty');
     expect(document.querySelector('.fc-pivotdlg__area-grid')?.textContent).toContain('Sales');
+    handle.detach();
+  });
+
+  it('scans the source range once, not on every control change', () => {
+    const { wb } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+    handle.open();
+    const read = vi.spyOn(wb, 'getValue');
+    const selects = Array.from(document.querySelectorAll<HTMLSelectElement>('select'));
+    for (const select of selects.slice(0, 3)) {
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    expect(read).not.toHaveBeenCalled();
     handle.detach();
   });
 

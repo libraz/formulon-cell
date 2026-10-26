@@ -18,6 +18,11 @@ describe('showAllowEditRangeDialog', () => {
         range: 'Range',
         invalid: 'Enter a range such as A1:B10.',
         rangePickerLabel: 'Select range',
+        titleLabel: 'Title',
+        password: 'Password',
+        passwordPlaceholder: 'Optional',
+        confirmPassword: 'Re-enter password',
+        passwordMismatch: 'The password confirmation does not match.',
         ok: 'OK',
         cancel: 'Cancel',
       },
@@ -46,7 +51,7 @@ describe('showAllowEditRangeDialog', () => {
     expect(input?.value).toBe('C3:C8');
 
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    await expect(promise).resolves.toBe('C3:C8');
+    await expect(promise).resolves.toEqual({ range: 'C3:C8', title: '' });
     expect(document.querySelector('.fc-fmtdlg--range-picking')).toBeNull();
   });
 });
@@ -73,5 +78,66 @@ describe('showUnprotectSheetDialog', () => {
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
 
     await expect(promise).resolves.toBe('pw');
+  });
+});
+
+describe('showAllowEditRangeDialog password field', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  const open = (hasPassword: boolean) =>
+    showAllowEditRangeDialog({
+      strings: {
+        title: 'Allow Users to Edit Ranges',
+        range: 'Range',
+        invalid: 'Enter a range such as A1:B10.',
+        rangePickerLabel: 'Select range',
+        titleLabel: 'Title',
+        password: 'Password',
+        passwordPlaceholder: 'Optional',
+        confirmPassword: 'Re-enter password',
+        passwordMismatch: 'The password confirmation does not match.',
+        ok: 'OK',
+        cancel: 'Cancel',
+      },
+      initialRange: 'A1',
+      hasPassword,
+      pickRange: () => 'A1',
+      validateRange: () => true,
+      subscribeToRangeChanges: () => () => undefined,
+    });
+  const passwordInputs = (): HTMLInputElement[] =>
+    Array.from(document.querySelectorAll<HTMLInputElement>('input[type="password"]'));
+  const type = (input: HTMLInputElement, value: string): void => {
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const confirm = (): void =>
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+  it('leaves the password unchanged when the field was never touched', async () => {
+    const promise = open(true);
+    expect(passwordInputs().every((input) => input.value !== '')).toBe(true);
+    confirm();
+    await expect(promise).resolves.toEqual({ range: 'A1', title: '' });
+  });
+
+  it('removes the password when the field is cleared', async () => {
+    const promise = open(true);
+    type(passwordInputs()[0] as HTMLInputElement, '');
+    confirm();
+    await expect(promise).resolves.toEqual({ range: 'A1', title: '', password: null });
+  });
+
+  it('sets a new password only when both fields match', async () => {
+    const promise = open(true);
+    const [password, again] = passwordInputs() as [HTMLInputElement, HTMLInputElement];
+    type(password, 'fresh');
+    confirm();
+    expect(document.querySelector('.fc-tb__dlg')).toBeTruthy();
+    type(again, 'fresh');
+    confirm();
+    await expect(promise).resolves.toEqual({ range: 'A1', title: '', password: 'fresh' });
   });
 });

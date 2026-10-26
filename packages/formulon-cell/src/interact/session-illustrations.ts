@@ -2,6 +2,7 @@ import type { History } from '../commands/history.js';
 import type { IllustrationMutationAuthorization } from '../commands/session-illustration.js';
 import {
   arrangeSessionIllustration,
+  canDeleteIllustration,
   clearSessionIllustration,
   duplicateSessionIllustration,
   updateSessionIllustration,
@@ -20,6 +21,8 @@ import {
   sessionPosition,
   viewportZoom,
 } from '../engine/drawing-geometry.js';
+import { DEFAULT_ILLUSTRATION_FRAME } from '../engine/shapes-sync.js';
+import { argbFromCssColor } from '../engine/theme-color.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { SessionShapeKind, State } from '../store/types.js';
@@ -122,10 +125,10 @@ const renderedPosition = (
   item.nativeAnchor
     ? sessionPosition(store, item.nativeAnchor)
     : {
-        x: item.x ?? 300,
-        y: item.y ?? 88,
-        w: item.w ?? 160,
-        h: item.h ?? 96,
+        x: item.x ?? DEFAULT_ILLUSTRATION_FRAME.x,
+        y: item.y ?? DEFAULT_ILLUSTRATION_FRAME.y,
+        w: item.w ?? DEFAULT_ILLUSTRATION_FRAME.w,
+        h: item.h ?? DEFAULT_ILLUSTRATION_FRAME.h,
       };
 
 /** A moved origin; an anchored object may sit scrolled off, so only a free
@@ -149,7 +152,7 @@ const PX_PER_PT = 96 / 72;
 
 /** Draw the shape filling a `w` x `h` box, its outline centred on the edge the
  *  way the spreadsheet draws it. */
-const renderShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number): void => {
+const drawShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number): void => {
   svg.replaceChildren();
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   if (!item.shape) return;
@@ -166,13 +169,14 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h
     // An arrowhead three line widths long ends the line at its tip.
     const head = item.shape === 'arrow' ? Math.max(6, width * 3) : 0;
     const length = Math.hypot(w, h) || 1;
-    const [ux, uy] = [w / length, -h / length];
-    appendSvg(svg, 'line', { x1: 0, y1: h, x2: w - ux * head, y2: -uy * head, ...stroke });
+    const [ux, uy] = [w / length, h / length];
+    // A line runs from the top-left corner of its box to the bottom-right, as the file stores it.
+    const [bx, by] = [w - ux * head, h - uy * head];
+    appendSvg(svg, 'line', { x1: 0, y1: 0, x2: bx, y2: by, ...stroke });
     if (head > 0 && outline) {
-      const [bx, by] = [w - ux * head, -uy * head];
       const [px, py] = [-uy * (head / 2), ux * (head / 2)];
       appendSvg(svg, 'polygon', {
-        points: `${w},0 ${bx + px},${by + py} ${bx - px},${by - py}`,
+        points: `${w},${h} ${bx + px},${by + py} ${bx - px},${by - py}`,
         fill: outline,
       });
     }
@@ -201,6 +205,38 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h
   }
   const rx = shapeCornerRadius(item, w, h);
   appendSvg(svg, 'rect', { x: 0, y: 0, width: w, height: h, rx, ...paint });
+};
+
+/** Text colour that reads on `fill`; black on no fill. */
+const textColorOn = (fill: string | null): string => {
+  const argb = fill ? argbFromCssColor(fill) : null;
+  if (argb === null) return '#000';
+  const [r, g, b] = [(argb >>> 16) & 0xff, (argb >>> 8) & 0xff, argb & 0xff];
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140 ? '#fff' : '#000';
+};
+
+/** Centre the shape's text lines in its `w` x `h` box. */
+const drawShapeText = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number) => {
+  if (!item.text || item.shape === 'line' || item.shape === 'arrow') return;
+  const lines = item.text.split('\n');
+  const size = 14;
+  const text = appendSvg(svg, 'text', {
+    x: w / 2,
+    y: h / 2 - ((lines.length - 1) * size * 1.2) / 2,
+    'text-anchor': 'middle',
+    'dominant-baseline': 'central',
+    'font-size': size,
+    fill: textColorOn(shapeFillColor(item)),
+  });
+  for (const [index, line] of lines.entries()) {
+    const span = appendSvg(text, 'tspan', { x: w / 2, dy: index === 0 ? 0 : size * 1.2 });
+    span.textContent = line;
+  }
+};
+
+const renderShape = (svg: SVGSVGElement, item: SessionIllustration, w: number, h: number): void => {
+  drawShape(svg, item, w, h);
+  drawShapeText(svg, item, w, h);
 };
 
 const appendImage = (panel: HTMLElement, item: SessionIllustration): void => {
@@ -348,6 +384,8 @@ export function attachSessionIllustrations(deps: {
       );
     };
     const editable = isEditable(item);
+    // The engine orders pictures only; a saved shape keeps its slot.
+    const orderable = editable && !(item.kind === 'shape' && item.nativeObjectId !== undefined);
     menu.open(
       x,
       y,
@@ -355,13 +393,13 @@ export function attachSessionIllustrations(deps: {
         {
           id: 'bringToFront',
           label: labels.bringToFront,
-          disabled: !editable || rank === sheetItems.length - 1,
+          disabled: !orderable || rank === sheetItems.length - 1,
           run: () => arrange('bring-front'),
         },
         {
           id: 'sendToBack',
           label: labels.sendToBack,
-          disabled: !editable || rank === 0,
+          disabled: !orderable || rank === 0,
           run: () => arrange('send-back'),
         },
       ],
@@ -382,6 +420,19 @@ export function attachSessionIllustrations(deps: {
       openMenu(item, panel, rect.left + 8, rect.top + 8);
       return;
     }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      if (!canDeleteIllustration(item)) return;
+      clearSessionIllustration(
+        store,
+        item.id,
+        history,
+        getWb() ?? undefined,
+        illustrationAuthorization('sessionIllustration.delete', 'keyboard'),
+      );
+      host.focus({ preventScroll: true });
+      return;
+    }
     if (!isEditable(item)) return;
     if (isDuplicateShortcut(event)) {
       event.preventDefault();
@@ -397,18 +448,6 @@ export function attachSessionIllustrations(deps: {
         (candidate) => candidate.dataset.illustrationId === copy?.id,
       );
       if (copy && copyPanel) select(copy.id, copyPanel);
-      return;
-    }
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault();
-      clearSessionIllustration(
-        store,
-        item.id,
-        history,
-        getWb() ?? undefined,
-        illustrationAuthorization('sessionIllustration.delete', 'keyboard'),
-      );
-      host.focus({ preventScroll: true });
       return;
     }
     const deltas: Record<string, [number, number]> = {

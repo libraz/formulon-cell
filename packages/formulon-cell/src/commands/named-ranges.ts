@@ -12,6 +12,16 @@ export interface DefinedNameEntry {
   formula: string;
   /** -1 means workbook scope; otherwise a 0-based sheet index. */
   localSheetId: number;
+  /** The note the Name Manager shows; absent when empty. */
+  comment?: string;
+  /** Hidden from the Name Manager and name lists, but still resolvable in formulas. */
+  hidden?: boolean;
+}
+
+/** Attributes written next to a name's formula; an omitted key is left as is. */
+export interface DefinedNameAttrs {
+  comment?: string;
+  hidden?: boolean;
 }
 
 export type DefinedNameMutationResult =
@@ -151,7 +161,7 @@ const captureDefinedNamesSnapshot = (wb: WorkbookHandle): DefinedNamesSnapshot =
   new Map(
     [...wb.definedNames()].map((entry) => [
       `${entry.localSheetId}:${entry.name.toLowerCase()}`,
-      { name: entry.name, formula: entry.formula, localSheetId: entry.localSheetId },
+      { ...entry },
     ]),
   );
 
@@ -163,7 +173,9 @@ const sameDefinedNamesSnapshot = (a: DefinedNamesSnapshot, b: DefinedNamesSnapsh
       !other ||
       other.name !== entry.name ||
       other.formula !== entry.formula ||
-      other.localSheetId !== entry.localSheetId
+      other.localSheetId !== entry.localSheetId ||
+      (other.comment ?? '') !== (entry.comment ?? '') ||
+      !!other.hidden !== !!entry.hidden
     ) {
       return false;
     }
@@ -178,6 +190,12 @@ const applyDefinedNamesSnapshot = (wb: WorkbookHandle, snap: DefinedNamesSnapsho
   }
   for (const entry of snap.values()) {
     wb.setDefinedNameEntry(entry.name, entry.formula, entry.localSheetId);
+    if (wb.capabilities.definedNameAttrs) {
+      wb.setDefinedNameAttrs(entry.name, entry.localSheetId, {
+        comment: entry.comment ?? '',
+        hidden: !!entry.hidden,
+      });
+    }
   }
   // Undo/redo of a name change must recompute dependents too.
   wb.recalcAuto();
@@ -273,6 +291,7 @@ export function upsertDefinedName(
   name: string,
   formula: string,
   localSheetId = -1,
+  attrs: DefinedNameAttrs = {},
 ): DefinedNameMutationResult {
   const trimmedName = name.trim();
   const trimmedFormula = formula.trim();
@@ -283,12 +302,31 @@ export function upsertDefinedName(
   if (!wb.setDefinedNameEntry(trimmedName, trimmedFormula, localSheetId)) {
     return { ok: false, reason: 'engine-failed' };
   }
+  if (
+    wb.capabilities.definedNameAttrs &&
+    (attrs.comment !== undefined || attrs.hidden !== undefined) &&
+    !wb.setDefinedNameAttrs(trimmedName, localSheetId, attrs)
+  ) {
+    return { ok: false, reason: 'engine-failed' };
+  }
   // Defining/redefining a name changes what `=MyRange` resolves to — recompute
   // so dependent cells and a subsequent save reflect the new target.
   wb.recalcAuto();
   // The engine stores the formula without its leading `=`, as `definedNames()` reads it back.
   const stored = trimmedFormula.replace(/^=/, '');
-  return { ok: true, entry: { name: trimmedName, formula: stored, localSheetId } };
+  const written = [...wb.definedNames()].find(
+    (e) => e.localSheetId === localSheetId && isSameDefinedName(e.name, trimmedName),
+  );
+  return {
+    ok: true,
+    entry: {
+      name: trimmedName,
+      formula: stored,
+      localSheetId,
+      ...(written?.comment ? { comment: written.comment } : {}),
+      ...(written?.hidden ? { hidden: true } : {}),
+    },
+  };
 }
 
 /** Remove a workbook- or sheet-scoped defined name. */

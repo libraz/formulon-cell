@@ -127,11 +127,11 @@ describe('row classification', () => {
 
   it('isBandedRow alternates between data rows', () => {
     // r0=0 (header), r1=5 (total). Data rows: 1, 2, 3, 4.
-    // Banded = every other from data start (row 1 → "even" no, row 2 → "odd" yes).
-    expect(isBandedRow(t, 1, 0)).toBe(false);
-    expect(isBandedRow(t, 2, 0)).toBe(true);
-    expect(isBandedRow(t, 3, 0)).toBe(false);
-    expect(isBandedRow(t, 4, 0)).toBe(true);
+    // The first data row takes the first stripe.
+    expect(isBandedRow(t, 1, 0)).toBe(true);
+    expect(isBandedRow(t, 2, 0)).toBe(false);
+    expect(isBandedRow(t, 3, 0)).toBe(true);
+    expect(isBandedRow(t, 4, 0)).toBe(false);
   });
 
   it('isBandedRow excludes header + total rows', () => {
@@ -228,7 +228,7 @@ describe('formatAsTable command helpers', () => {
       source: 'session',
       range: range(0, 0, 3, 2),
       style: 'dark',
-      color: '#5b9bd5',
+      color: '#4472c4',
       showHeader: true,
       showTotal: true,
       banded: true,

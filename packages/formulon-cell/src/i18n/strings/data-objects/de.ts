@@ -145,8 +145,6 @@ export const dataObjectsDe: DataObjectsStrings = {
     createPivotTable: 'PivotTable erstellen...',
     editPivotTable: 'Bearbeiten',
     pivotFieldList: 'PivotTable-Felder',
-    pivotFieldListCheckboxReadOnly:
-      'Verwenden Sie die Steuerelemente für den Feldbereich unten, um PivotTable-Felder zu verschieben.',
     backToWorkbookObjects: 'Zurück zu den Arbeitsmappenobjekten',
     pivotAvailableFields: 'Wählen Sie Felder für den Bericht aus',
     pivotName: 'Name',
@@ -157,6 +155,12 @@ export const dataObjectsDe: DataObjectsStrings = {
     pivotAreaFilters: 'Filter',
     pivotAreaValues: 'Werte',
     pivotAreaNone: 'Nicht im Bericht',
+    pivotSubtotals: 'Teilergebnisse',
+    pivotSubtotalAutomatic: 'Automatisch',
+    pivotSubtotalNone: 'Keine',
+    pivotSubtotalCustom: 'Benutzerdefiniert',
+    pivotSubtotalCustomEmpty:
+      'Wählen Sie mindestens eine Funktion für das benutzerdefinierte Teilergebnis oder wählen Sie Automatisch.',
     pivotAggregation: 'Zusammenfassen nach',
     pivotAggregateSum: 'Summe',
     pivotAggregateCount: 'Anzahl',
@@ -183,6 +187,8 @@ export const dataObjectsDe: DataObjectsStrings = {
     objectSelect: 'Auswählen',
     objectDuplicate: 'Duplizieren',
     objectDelete: 'Löschen',
+    shapeLocked:
+      'Der Editor kann diese Form nicht neu zeichnen. Sie lässt sich verschieben, aber nicht löschen, kopieren oder umformatieren.',
     shapeColor: 'Formfarbe',
     shapeRadius: 'Eckenradius',
     shapeLineWidth: 'Linienbreite',
@@ -219,12 +225,17 @@ export const dataObjectsDe: DataObjectsStrings = {
       comments: 'Kommentare',
       threadedComments: 'Kommentare mit Threads',
       images: 'Bilder',
+      shapes: 'Formen',
+      sparklines: 'Sparklines',
+      slicers: 'Tabellen-Datenschnitte',
       workbookTheme: 'Arbeitsmappendesign',
       phonetic: 'Lautschrift',
       definedNames: 'Definierte Namen',
       namedCellStyles: 'Benannte Zellformatvorlagen',
       autoFilter: 'AutoFilter',
       sheetProtection: 'Blattschutz',
+      workbookProtection: 'Arbeitsmappenschutz',
+      protectedRanges: 'Geschützte Bereiche',
       sheetViews: 'Blattansichten',
       pageSetup: 'Seite einrichten',
       loadedTables: 'Geladene Tabellen',
@@ -249,7 +260,13 @@ export const dataObjectsDe: DataObjectsStrings = {
       threadedComments:
         'Kommentare, Antworten, Personen und Auflösungsstatus werden in XLSX gespeichert, wenn die Engine Kommentare mit Threads unterstützt.',
       images:
-        'Wenn die Engine Bilder unterstützt, können neu eingefügte Bilder bearbeitet und in XLSX gespeichert werden. Geladene Bilder sind schreibgeschützt; das native Neuanordnen von Bildern ist nicht verfügbar. Formen bleiben Sitzungsüberlagerungen.',
+        'Wenn die Engine Bilder unterstützt, können neu eingefügte Bilder bearbeitet und in XLSX gespeichert werden. Geladene Bilder sind schreibgeschützt; das native Neuanordnen von Bildern ist nicht verfügbar.',
+      shapes:
+        'Rechtecke, abgerundete Rechtecke, Ovale, Dreiecke, Rauten und Linien werden in XLSX gespeichert. Pfeile, Strichstile und teilweise Transparenz lassen sich nicht speichern; diese Optionen sind für gespeicherte Formen nicht verfügbar. Geladene Formen, die der Editor nicht zeichnen kann, erscheinen als gestrichelte Umrisse.',
+      sparklines:
+        'Sparkline-Gruppen werden aus XLSX geladen und mit Farben, Markierungen, Achsen und weiteren Gruppeneinstellungen bearbeitet und gespeichert.',
+      slicers:
+        'Tabellen-Datenschnitte werden aus XLSX geladen, bearbeitet und gespeichert. Die ausgewählten Elemente liegen im Tabellenfilter.',
       workbookTheme:
         'Designfarben und große/kleine Schriftarten können unabhängig vom Erscheinungsbild der Anwendung bearbeitet werden.',
       phonetic:
@@ -261,6 +278,10 @@ export const dataObjectsDe: DataObjectsStrings = {
       autoFilter: 'Gespeicherte AutoFilter-Definitionen erfordern Lese-/Schreib-APIs der Engine.',
       sheetProtection:
         'Der Schutzstatus der Benutzeroberfläche kann gehostet und zurückübertragen werden, wenn Engine-Metadaten verfügbar sind.',
+      workbookProtection:
+        'Der Schutz der Arbeitsmappenstruktur kann gehostet und mit seinem Kennwort-Hash zurückübertragen werden.',
+      protectedRanges:
+        'Zulässige Bearbeitungsbereiche können gehostet und mit ihren Kennwort-Hashes zurückübertragen werden.',
       sheetViews:
         'Blattansichten können für die aktuelle Sitzung in der Benutzeroberfläche erfasst und wiederhergestellt werden.',
       pageSetup:

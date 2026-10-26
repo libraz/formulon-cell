@@ -196,12 +196,26 @@ export function inferPivotSourceFields(wb: WorkbookHandle, range: Range): PivotS
   return fields;
 }
 
+/** Whether the worksheet column behind a cache field holds numbers. False
+ *  when the cache has no readable worksheet source. */
+export function pivotCacheFieldIsNumeric(
+  wb: WorkbookHandle,
+  cacheId: number,
+  cacheFieldIndex: number,
+): boolean {
+  const range = pivotCacheWorksheetSourceRange(wb, cacheId);
+  if (!range) return false;
+  const field = inferPivotSourceFields(wb, range)[cacheFieldIndex];
+  return (field?.numericCount ?? 0) > 0;
+}
+
 export function inferPivotFieldItems(
   wb: WorkbookHandle,
   range: Range,
   fieldName: string,
+  fields: readonly PivotSourceField[] = inferPivotSourceFields(wb, range),
 ): string[] {
-  const field = inferPivotSourceFields(wb, range).find((candidate) => candidate.name === fieldName);
+  const field = fields.find((candidate) => candidate.name === fieldName);
   if (!field) return [];
   const seen = new Set<string>();
   const items: string[] = [];
@@ -362,9 +376,8 @@ export function createPivotTableFromRange(
     return failAfterPivot('grand-totals');
   }
 
-  // The engine binds pivot field i to cache field i, so fields go in cache
-  // order and any the report does not use pad the gap as value-axis fields
-  // that carry no data field.
+  // Pivot field i binds to cache field i, so every cache field is added in
+  // order; the ones the report does not use are then taken off their axis.
   const roles = new Map<string, PivotAxis>();
   roles.set(rowField.name, PivotAxis.Row);
   if (columnField) roles.set(columnField.name, PivotAxis.Col);
@@ -374,7 +387,6 @@ export function createPivotTableFromRange(
   for (const valueField of valueFields) {
     if (valueField && !roles.has(valueField.name)) roles.set(valueField.name, PivotAxis.Value);
   }
-  const lastUsedIndex = Math.max(...[...roles.keys()].map((name) => byName.get(name)?.index ?? 0));
   const roleSteps = {
     [PivotAxis.Row]: 'row-field',
     [PivotAxis.Col]: 'col-field',
@@ -383,8 +395,8 @@ export function createPivotTableFromRange(
   } as const;
   const pivotFieldByName = new Map<string, number>();
   for (const field of fields) {
-    if (field.index > lastUsedIndex) break;
-    const axis = roles.get(field.name) ?? PivotAxis.Value;
+    const used = roles.get(field.name);
+    const axis = used ?? PivotAxis.Value;
     const pivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
       sourceName: field.name,
       axis,
@@ -392,6 +404,12 @@ export function createPivotTableFromRange(
       ...(axis === PivotAxis.Col ? { subtotalTop: opts.columnSubtotalTop ?? true } : {}),
     });
     if (pivotField < 0) return failAfterPivot(roleSteps[axis]);
+    if (
+      used === undefined &&
+      !wb.setPivotFieldAxis(opts.destination.sheet, pivotIndex, pivotField, null)
+    ) {
+      return failAfterPivot(roleSteps[axis]);
+    }
     pivotFieldByName.set(field.name, pivotField);
   }
   const rowPivotField = pivotFieldByName.get(rowField.name) as number;
@@ -707,8 +725,10 @@ export function createPivotTableAtPlacement(
 
 /** Rebuild a report on its original pivot cache from a stored definition.
  *  Pivot field `i` binds to cache field `i`, so every field is re-added in
- *  order; a field that sat on no axis returns as a value-axis field without a
- *  data field. Returns the new pivot index, or -1 on failure. */
+ *  order; a field that sat on no axis is taken back off its axis. The engine
+ *  cannot express a field with neither the automatic subtotal nor custom ones,
+ *  so that state returns as automatic. Returns the new pivot index, or -1 on
+ *  failure. */
 export function recreatePivotTable(
   wb: WorkbookHandle,
   sheet: number,
@@ -732,6 +752,12 @@ export function recreatePivotTable(
         ...(field.numberFormat ? { numberFormat: field.numberFormat } : {}),
       });
       if (added !== field.index) return false;
+      if (field.axis === null && !wb.setPivotFieldAxis(sheet, pivotIndex, added, null)) {
+        return false;
+      }
+      for (const fn of field.subtotalFns) {
+        if (!wb.addPivotFieldSubtotalFn(sheet, pivotIndex, added, fn)) return false;
+      }
       if (!wb.setPivotFieldSort(sheet, pivotIndex, added, field.sortOrder, field.sortByField)) {
         return false;
       }
@@ -753,7 +779,12 @@ export function recreatePivotTable(
       wb.setPivotRowFieldOrder(sheet, pivotIndex, definition.rowFieldOrder) &&
       wb.setPivotColFieldOrder(sheet, pivotIndex, definition.colFieldOrder) &&
       definition.dataFields.every((spec) => wb.addPivotDataField(sheet, pivotIndex, spec) >= 0) &&
-      definition.filters.every((filter) => wb.addPivotFilter(sheet, pivotIndex, filter))
+      definition.filters.every((filter) => wb.addPivotFilter(sheet, pivotIndex, filter)) &&
+      (definition.style === null ||
+        wb.setPivotStyleInfo(sheet, pivotIndex, {
+          ...definition.style,
+          name: definition.style.name || undefined,
+        }))
     );
   };
   if (rebuild()) return pivotIndex;

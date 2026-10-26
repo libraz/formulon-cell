@@ -140,8 +140,6 @@ export const dataObjectsJa: DataObjectsStrings = {
     createPivotTable: 'ピボットテーブルの作成...',
     editPivotTable: '編集',
     pivotFieldList: 'ピボットテーブルのフィールド',
-    pivotFieldListCheckboxReadOnly:
-      'ピボットテーブル フィールドの移動は下のフィールド エリアで操作してください。',
     backToWorkbookObjects: 'ブック オブジェクトに戻る',
     pivotAvailableFields: 'レポートに追加するフィールドを選択',
     pivotName: '名前',
@@ -152,6 +150,12 @@ export const dataObjectsJa: DataObjectsStrings = {
     pivotAreaFilters: 'フィルター',
     pivotAreaValues: '値',
     pivotAreaNone: 'レポートに含めない',
+    pivotSubtotals: '小計',
+    pivotSubtotalAutomatic: '自動',
+    pivotSubtotalNone: 'なし',
+    pivotSubtotalCustom: 'ユーザー設定',
+    pivotSubtotalCustomEmpty:
+      'ユーザー設定の小計には関数を 1 つ以上選択するか、[自動] を選択してください。',
     pivotAggregation: '集計方法',
     pivotAggregateSum: '合計',
     pivotAggregateCount: 'データの個数',
@@ -178,6 +182,8 @@ export const dataObjectsJa: DataObjectsStrings = {
     objectSelect: '選択',
     objectDuplicate: '複製',
     objectDelete: '削除',
+    shapeLocked:
+      'この図形はエディターで再描画できないため、移動のみ可能で、削除・コピー・書式変更はできません。',
     shapeColor: '図形の色',
     shapeRadius: '角丸半径',
     shapeLineWidth: '線の太さ',
@@ -214,12 +220,17 @@ export const dataObjectsJa: DataObjectsStrings = {
       comments: 'コメント',
       threadedComments: 'スレッドコメント',
       images: '画像',
+      shapes: '図形',
+      sparklines: 'スパークライン',
+      slicers: 'テーブルスライサー',
       workbookTheme: 'ブックのテーマ',
       phonetic: 'ふりがな',
       definedNames: '名前定義',
       namedCellStyles: '名前付きセル スタイル',
       autoFilter: 'オートフィルター',
       sheetProtection: 'シート保護',
+      workbookProtection: 'ブック保護',
+      protectedRanges: '保護された範囲',
       sheetViews: 'シート ビュー',
       pageSetup: 'ページ設定',
       loadedTables: '読み込み済みテーブル',
@@ -244,7 +255,13 @@ export const dataObjectsJa: DataObjectsStrings = {
       threadedComments:
         'エンジンが対応している場合、コメント、返信、作成者、解決状態をXLSXに保存できます。',
       images:
-        'エンジンが画像に対応している場合、新規挿入した画像を編集してXLSXに保存できます。読み込んだ画像は閲覧のみで、画像の重なり順変更には未対応です。図形はセッション内の表示です。',
+        'エンジンが画像に対応している場合、新規挿入した画像を編集してXLSXに保存できます。読み込んだ画像は閲覧のみで、画像の重なり順変更には未対応です。',
+      shapes:
+        '四角形・角丸四角形・楕円・三角形・ひし形・線はXLSXに保存されます。矢印、破線の種類、部分的な透明度は保存できないため、保存される図形ではこれらの操作を使用できません。エディターが描画できない読み込み済みの図形は破線の枠で表示されます。',
+      sparklines:
+        'スパークラインのグループはXLSXから読み込み、色・マーカー・軸などのグループ設定とともに編集して保存できます。',
+      slicers:
+        'テーブルスライサーはXLSXから読み込み、編集して保存できます。選択した項目はテーブルのフィルターに保存されます。',
       workbookTheme: 'アプリの外観とは別に、ブックのテーマ色と見出し・本文用の書体を編集できます。',
       phonetic: 'ふりがなは OOXML の rPh / phoneticPr を読み書きするエンジン API が必要です。',
       definedNames:
@@ -254,6 +271,8 @@ export const dataObjectsJa: DataObjectsStrings = {
       autoFilter: '保存されるオートフィルター定義にはエンジンの読書き API が必要です。',
       sheetProtection:
         '保護状態は UI セッションで保持でき、エンジンにメタデータがある場合は保存時に往復できます。',
+      workbookProtection: 'ブック構造の保護はパスワードのハッシュとともに保存時に往復できます。',
+      protectedRanges: '編集許可範囲はパスワードのハッシュとともに保存時に往復できます。',
       sheetViews: 'シート ビューは現在のセッション内で保存して復元できます。',
       pageSetup:
         'エンジンが印刷設定を公開している場合、印刷の向き、用紙、拡大縮小、余白、印刷オプション、ヘッダー / フッター、印刷範囲、印刷タイトル、手動の改ページを保存時に往復できます。',

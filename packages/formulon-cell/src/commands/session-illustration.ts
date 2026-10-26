@@ -71,6 +71,21 @@ export type SessionIllustrationArrangeAction =
   | 'bring-front'
   | 'send-back';
 
+/** A picture whose anchor the engine cannot change. A shape in that state can
+ *  still be restyled and deleted. */
+const isGeometryLockedPicture = (item: SessionIllustration): boolean =>
+  item.kind === 'image' &&
+  item.nativeObjectId !== undefined &&
+  item.nativeGeometryEditable !== true;
+
+/** Whether the illustration can be deleted. A shape drawn only as its
+ *  bounding box cannot be put back faithfully by an undo, so it stays. */
+export const canDeleteIllustration = (item: SessionIllustration): boolean =>
+  !isGeometryLockedPicture(item) && !item.nativeLocked;
+
+/** Whether the illustration can be copied; the same objects can be deleted. */
+export const canDuplicateIllustration = canDeleteIllustration;
+
 const imageIntent = (
   commandId: string,
   sheet: number,
@@ -519,7 +534,7 @@ export function clearSessionIllustration(
   if (
     isSheetProtected(store.getState(), item.sheet) ||
     !canMutateIllustration(store, item, authorization, 'pictureDelete') ||
-    (item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true)
+    !canDeleteIllustration(item)
   )
     return false;
   const persisted = persistentImageFromState(item);
@@ -605,7 +620,7 @@ export function updateSessionIllustration(
   if (
     isSheetProtected(store.getState(), item.sheet) ||
     !canMutateIllustration(store, item, authorization, 'pictureUpdate') ||
-    (item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true)
+    isGeometryLockedPicture(item)
   )
     return null;
   const persisted = persistentImageFromState(item);
@@ -730,9 +745,8 @@ export function duplicateSessionIllustration(
     return null;
   const clip = copySessionIllustration(store, id, wb);
   if (!clip) return null;
-  const persisted = persistentImageFromState(item);
-  const from = persisted
-    ? sessionPosition(store, persisted.nativeAnchor)
+  const from = item.nativeAnchor
+    ? sessionPosition(store, item.nativeAnchor)
     : { x: item.x ?? 300, y: item.y ?? 88 };
   return placeIllustrationCopy(
     store,
@@ -769,9 +783,7 @@ export function copySessionIllustration(
   wb?: WorkbookHandle,
 ): IllustrationClip | null {
   const item = sessionIllustrationById(store.getState(), id);
-  if (!item || (item.nativeObjectId !== undefined && item.nativeGeometryEditable !== true)) {
-    return null;
-  }
+  if (!item || !canDuplicateIllustration(item)) return null;
   const persisted = persistentImageFromState(item);
   if (!persisted) return { item: { ...item }, drawing: null };
   const drawing = wb?.snapshotDrawing(item.sheet, persisted.nativeObjectId) ?? null;
@@ -811,6 +823,11 @@ export function pasteSessionIllustration(
   );
 }
 
+const sizeOf = (store: SpreadsheetStore, anchor: EngineDrawingAnchor): { w: number; h: number } => {
+  const { w, h } = sessionPosition(store, anchor);
+  return { w, h };
+};
+
 /** Add `source` as a new object `target.id` on `target.sheet` with its top-left
  *  corner at `to`, recorded as one undoable step. */
 const placeIllustrationCopy = (
@@ -823,14 +840,23 @@ const placeIllustrationCopy = (
   command: { commandId: string; origin: InteractionOrigin; historyCommandId: string },
 ): SessionIllustration | null => {
   const { item } = source;
+  const persisted = persistentImageFromState(item);
   const copy: SessionIllustration = {
     ...item,
     id: target.id,
     sheet: target.sheet,
     x: to.x,
     y: to.y,
+    // A copied shape is a new engine shape, anchored where it is placed.
+    ...(item.kind === 'shape' && item.nativeObjectId !== undefined
+      ? {
+          ...(item.nativeAnchor ? sizeOf(store, item.nativeAnchor) : {}),
+          nativeObjectId: undefined,
+          nativeAnchor: undefined,
+          nativeGeometryEditable: undefined,
+        }
+      : {}),
   };
-  const persisted = persistentImageFromState(item);
   const intent = imageIntent(
     command.commandId,
     target.sheet,
@@ -938,7 +964,12 @@ const nativeZTarget = (
   const from = objects.findIndex((object) => object.objectId === item.nativeObjectId);
   if (from < 0) return null;
   const rank = arranged
-    .filter((candidate) => candidate.sheet === item.sheet && candidate.nativeObjectId !== undefined)
+    .filter(
+      (candidate) =>
+        candidate.sheet === item.sheet &&
+        candidate.kind === 'image' &&
+        candidate.nativeObjectId !== undefined,
+    )
     .findIndex((candidate) => candidate.id === item.id);
   const slots = objects.flatMap((object, index) => (object.imageFormat !== 0 ? [index] : []));
   const to = slots[rank];
@@ -971,7 +1002,8 @@ export function arrangeSessionIllustration(
     authorization?.origin ?? 'instanceApi',
   );
   if (item.nativeObjectId !== undefined) {
-    if (!wb?.capabilities.drawings) return null;
+    // The engine orders pictures and charts only; a saved shape keeps its slot.
+    if (item.kind === 'shape' || !wb?.capabilities.drawings) return null;
     const z = nativeZTarget(wb, item, arranged);
     if (!z || !wb.setDrawingZOrder(item.sheet, item.nativeObjectId, z.to)) return null;
     const before = state.illustrations.illustrations;

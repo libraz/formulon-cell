@@ -47,13 +47,13 @@ export interface AutocompleteName {
 /** Names usable from `sheetIndex`: workbook-scoped and that sheet's own names,
  *  plus table names. Names scoped to another sheet are excluded. */
 export function collectAutocompleteNames(
-  definedNames: Iterable<{ name: string; formula: string; localSheetId: number }>,
+  definedNames: Iterable<{ name: string; formula: string; localSheetId: number; hidden?: boolean }>,
   tables: readonly AutocompleteTable[],
   sheetIndex: number,
 ): AutocompleteName[] {
   const out: AutocompleteName[] = [];
   for (const dn of definedNames) {
-    if (!dn.name.trim()) continue;
+    if (!dn.name.trim() || dn.hidden) continue;
     if (dn.localSheetId !== -1 && dn.localSheetId !== sheetIndex) continue;
     out.push({ name: dn.name, detail: dn.formula.startsWith('=') ? dn.formula : `=${dn.formula}` });
   }

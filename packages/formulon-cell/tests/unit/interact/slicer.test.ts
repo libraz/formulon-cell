@@ -176,6 +176,40 @@ describe('attachSlicer', () => {
     handle.detach();
   });
 
+  it('places an anchored panel from its anchor, so it follows the scroll', () => {
+    const handle = attachSlicer({ host, store, getWb: () => wb });
+    mutators.addSlicer(store, {
+      id: 'anchored',
+      tableName: 'Sales',
+      column: 'Region',
+      selected: [],
+      x: -500,
+      y: -500,
+      nativeAnchor: {
+        anchorKind: 1,
+        editAs: 0,
+        fromRow: 6,
+        fromCol: 2,
+        fromRowOff: 0,
+        fromColOff: 0,
+        toRow: 16,
+        toCol: 5,
+        toRowOff: 0,
+        toColOff: 0,
+        cx: 0,
+        cy: 0,
+      },
+    });
+    const panel = () => host.querySelector<HTMLElement>('.fc-slicer');
+    const top = Number.parseFloat(panel()?.style.top ?? 'NaN');
+    expect(top).toBeGreaterThanOrEqual(0);
+    expect(Number.parseFloat(panel()?.style.height ?? '0')).toBeGreaterThan(0);
+
+    store.setState((state) => ({ ...state, viewport: { ...state.viewport, rowStart: 3 } }));
+    expect(Number.parseFloat(panel()?.style.top ?? 'NaN')).toBeLessThan(top);
+    handle.detach();
+  });
+
   it('localizes the blank chip while preserving its empty filter key', () => {
     seedCell(store, 0, 4, 0, { kind: 'blank' });
     const blankWb = makeFakeWb({

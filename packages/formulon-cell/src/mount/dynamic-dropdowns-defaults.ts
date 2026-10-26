@@ -249,6 +249,7 @@ export function createDefaultDynamicDropdownsCtx(
     chartKindFromAction: insertDefaults.chartKindFromAction,
     insertPictureFromRibbon: illustrationDefaults.insertPictureFromRibbon,
     insertShapeFromRibbon: illustrationDefaults.insertShapeFromRibbon,
+    updateShapesInsertMenu: illustrationDefaults.updateShapesInsertMenu,
     insertScreenshotFromRibbon: illustrationDefaults.insertScreenshotFromRibbon,
     applyScriptAction: buildScriptAction(instance),
     applyPdfAction: buildPdfAction(instance),

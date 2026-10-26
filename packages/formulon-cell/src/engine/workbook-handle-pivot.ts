@@ -57,6 +57,10 @@ export interface PivotFieldDefinition {
   /** Null for a field that sits on no axis. */
   readonly axis: PivotAxis | null;
   readonly subtotalTop: boolean;
+  /** Whether the automatic subtotal shows; false whenever `subtotalFns` is non-empty. */
+  readonly defaultSubtotal: boolean;
+  /** Custom subtotal functions that replace the automatic one. */
+  readonly subtotalFns: readonly PivotAggregation[];
   /** Number format code, empty for none. */
   readonly numberFormat: string;
   readonly cacheFieldIndex: number;
@@ -74,6 +78,9 @@ export interface PivotFieldDefinition {
   readonly items: readonly PivotItemDefinition[];
 }
 
+/** Table style and toggles of a PivotTable. */
+export type PivotStyleDefinition = Required<import('@libraz/formulon').PivotStyleInfo>;
+
 /** The stored definition of a PivotTable, read back from the engine. */
 export interface PivotDefinition {
   readonly name: string;
@@ -86,8 +93,12 @@ export interface PivotDefinition {
   readonly fields: readonly PivotFieldDefinition[];
   /** Value fields in display order; `fieldIndex` is a pivot field index. */
   readonly dataFields: readonly PivotDataFieldSpec[];
-  /** Filters added in this session; a filter block read from a file is not listed. */
+  /** Listed filters: those added in this session and the loaded caption, value,
+   *  top-N and date ones. Other loaded kinds are kept verbatim by the engine and
+   *  survive `clearPivotFilters`, but are not listed. */
   readonly filters: readonly PivotFilterSpec[];
+  /** Table style, null when the definition has no style element. */
+  readonly style: PivotStyleDefinition | null;
 }
 
 declare module './workbook-handle.js' {
@@ -132,6 +143,7 @@ export abstract class WorkbookHandlePivotMethods {
   declare readonly capabilities: EngineCapabilities;
   declare readonly sheetCount: number;
   abstract getValue(addr: Addr): CellValue;
+  abstract getPivotStyleInfo(sheet: number, pivotIndex: number): PivotStyleDefinition | null;
 
   /** Whether any PivotTable on `range`'s sheet occupies a cell of `range`. */
   pivotOverlapsRange(range: Range): boolean {
@@ -574,6 +586,8 @@ export abstract class WorkbookHandlePivotMethods {
       customName: r.customName,
       axis: isPivotAxis(r.axis) ? r.axis : null,
       subtotalTop: r.subtotalTop,
+      defaultSubtotal: r.defaultSubtotal,
+      subtotalFns: [...r.subtotalFns],
       numberFormat: pivotNumberFormatCode(this, r.numberFormat),
       cacheFieldIndex: r.cacheFieldIndex,
       sortOrder: r.sortOrder as PivotSortOrder,
@@ -651,6 +665,7 @@ export abstract class WorkbookHandlePivotMethods {
       fields,
       dataFields,
       filters: pivotFilterSpecs(this, sheet, pivotIdx),
+      style: this.getPivotStyleInfo(sheet, pivotIdx),
     };
   }
 
@@ -728,10 +743,17 @@ export abstract class WorkbookHandlePivotMethods {
     return pivotWb(this).pivotFieldClear(sheet, pivotIdx).ok;
   }
 
-  setPivotFieldAxis(sheet: number, pivotIdx: number, fieldIdx: number, axis: PivotAxis): boolean {
+  /** Move a field onto `axis`; null takes it off every axis, dropping its data
+   *  fields and the filters naming it. */
+  setPivotFieldAxis(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    axis: PivotAxis | null,
+  ): boolean {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
-    return pivotWb(this).pivotFieldSetAxis(sheet, pivotIdx, fieldIdx, axis).ok;
+    return pivotWb(this).pivotFieldSetAxis(sheet, pivotIdx, fieldIdx, axis ?? -1).ok;
   }
 
   setPivotFieldSort(

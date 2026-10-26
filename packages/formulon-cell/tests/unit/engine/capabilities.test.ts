@@ -24,6 +24,34 @@ describe('detectCapabilities', () => {
         .rowStyleRanges,
     ).toBe(true);
   });
+  it('probes shapes, sparklines and slicers by their whole method set', () => {
+    const drawings = [
+      'listDrawingObjects',
+      'setDrawingAnchor',
+      'setDrawingZOrder',
+      'snapshotDrawing',
+      'restoreDrawing',
+      'removeDrawing',
+    ];
+    const shapes = ['listShapes', 'insertShape', 'updateShape', 'removeShape'];
+    expect(detectCapabilities(makeWb(shapes)).shapes).toBe(false);
+    expect(detectCapabilities(makeWb([...drawings, ...shapes])).shapes).toBe(true);
+    expect(detectCapabilities(makeWb([...drawings, 'listShapes'])).shapes).toBe(false);
+
+    const sparklines = [
+      'listSparklineGroups',
+      'addSparklineGroup',
+      'updateSparklineGroup',
+      'setSparklineGroupSparklines',
+      'removeSparklineGroup',
+    ];
+    expect(detectCapabilities(makeWb(sparklines)).sparklines).toBe(true);
+    expect(detectCapabilities(makeWb(sparklines.slice(1))).sparklines).toBe(false);
+
+    const slicers = ['listSlicers', 'addSlicer', 'updateSlicer', 'removeSlicer'];
+    expect(detectCapabilities(makeWb(slicers)).slicers).toBe(true);
+    expect(detectCapabilities(makeWb(slicers.slice(1))).slicers).toBe(false);
+  });
   it('detects clearing direct XF independently for older engine bundles', () => {
     expect(detectCapabilities(makeWb(['setCellXfIndex'])).cellFormattingClear).toBe(false);
     expect(detectCapabilities(makeWb(['clearCellXfIndex'])).cellFormattingClear).toBe(true);

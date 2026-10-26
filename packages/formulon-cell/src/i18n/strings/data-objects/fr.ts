@@ -143,8 +143,6 @@ export const dataObjectsFr: DataObjectsStrings = {
     createPivotTable: 'Créer un tableau croisé dynamique...',
     editPivotTable: 'Modifier',
     pivotFieldList: 'Champs de tableau croisé dynamique',
-    pivotFieldListCheckboxReadOnly:
-      'Utilisez les commandes de zone de champs ci-dessous pour déplacer les champs du tableau croisé dynamique.',
     backToWorkbookObjects: 'Retour aux objets du classeur',
     pivotAvailableFields: 'Choisissez les champs à ajouter au rapport',
     pivotName: 'Nom',
@@ -155,6 +153,12 @@ export const dataObjectsFr: DataObjectsStrings = {
     pivotAreaFilters: 'Filtres',
     pivotAreaValues: 'Valeurs',
     pivotAreaNone: 'Absent du rapport',
+    pivotSubtotals: 'Sous-totaux',
+    pivotSubtotalAutomatic: 'Automatique',
+    pivotSubtotalNone: 'Aucun',
+    pivotSubtotalCustom: 'Personnalisé',
+    pivotSubtotalCustomEmpty:
+      'Sélectionnez au moins une fonction pour le sous-total personnalisé, ou choisissez Automatique.',
     pivotAggregation: 'Résumer par',
     pivotAggregateSum: 'Somme',
     pivotAggregateCount: 'Nombre',
@@ -181,6 +185,8 @@ export const dataObjectsFr: DataObjectsStrings = {
     objectSelect: 'Sélectionner',
     objectDuplicate: 'Dupliquer',
     objectDelete: 'Supprimer',
+    shapeLocked:
+      'L’éditeur ne sait pas redessiner cette forme : elle peut être déplacée, mais pas supprimée, copiée ni remise en forme.',
     shapeColor: 'Couleur de forme',
     shapeRadius: 'Rayon des angles',
     shapeLineWidth: 'Épaisseur de ligne',
@@ -217,12 +223,17 @@ export const dataObjectsFr: DataObjectsStrings = {
       comments: 'Commentaires',
       threadedComments: 'Commentaires avec conversation',
       images: 'Images',
+      shapes: 'Formes',
+      sparklines: 'Graphiques sparkline',
+      slicers: 'Segments de tableau',
       workbookTheme: 'Thème du classeur',
       phonetic: 'Guides phonétiques',
       definedNames: 'Noms définis',
       namedCellStyles: 'Styles de cellule nommés',
       autoFilter: 'Filtre automatique',
       sheetProtection: 'Protection de la feuille',
+      workbookProtection: 'Protection du classeur',
+      protectedRanges: 'Plages protégées',
       sheetViews: 'Affichages de feuille',
       pageSetup: 'Mise en page',
       loadedTables: 'Tableaux chargés',
@@ -247,7 +258,13 @@ export const dataObjectsFr: DataObjectsStrings = {
       threadedComments:
         'Les commentaires, réponses, personnes et résolutions sont enregistrés dans XLSX lorsque le moteur prend en charge les commentaires avec conversation.',
       images:
-        'Lorsque le moteur prend en charge les images, les images nouvellement insérées peuvent être modifiées et enregistrées dans XLSX. Les images chargées sont en lecture seule ; le réordonnancement natif des images n’est pas disponible. Les formes restent des superpositions de session.',
+        'Lorsque le moteur prend en charge les images, les images nouvellement insérées peuvent être modifiées et enregistrées dans XLSX. Les images chargées sont en lecture seule ; le réordonnancement natif des images n’est pas disponible.',
+      shapes:
+        'Les rectangles, rectangles arrondis, ovales, triangles, losanges et lignes sont enregistrés dans XLSX. Les flèches, les styles de tirets et la transparence partielle ne peuvent pas l’être ; ces options sont donc indisponibles pour les formes enregistrées. Les formes chargées que l’éditeur ne sait pas dessiner apparaissent en contour pointillé.',
+      sparklines:
+        'Les groupes de graphiques sparkline sont chargés depuis XLSX, puis modifiés et enregistrés avec leurs couleurs, marqueurs, axes et autres réglages de groupe.',
+      slicers:
+        'Les segments de tableau sont chargés depuis XLSX, puis modifiés et enregistrés. Les éléments sélectionnés sont conservés dans le filtre du tableau.',
       workbookTheme:
         'Les couleurs du thème et les polices principales/secondaires peuvent être modifiées indépendamment de l’apparence de l’application.',
       phonetic:
@@ -260,6 +277,10 @@ export const dataObjectsFr: DataObjectsStrings = {
         'Les définitions de filtre automatique persistantes nécessitent des API de lecture/écriture du moteur.',
       sheetProtection:
         'L’état de protection de l’interface peut être hébergé et conservé à l’aller-retour lorsque les métadonnées du moteur sont disponibles.',
+      workbookProtection:
+        'La protection de la structure du classeur peut être hébergée et conservée à l’aller-retour avec son hachage de mot de passe.',
+      protectedRanges:
+        'Les plages de modification autorisées peuvent être hébergées et conservées à l’aller-retour avec leurs hachages de mot de passe.',
       sheetViews:
         'Les affichages de feuille peuvent être capturés et restaurés dans l’interface pour la session actuelle.',
       pageSetup:

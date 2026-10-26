@@ -34,6 +34,7 @@ import {
 } from './activation.js';
 import { createRibbonButton } from './button.js';
 import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/menus.js';
+import { createTableNameInput } from './table-design.js';
 
 export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
 
@@ -518,6 +519,12 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
           }
           if (c.kind === 'select') {
             tools.appendChild(createSelect(c));
+            continue;
+          }
+          if (c.kind === 'input') {
+            tools.appendChild(
+              createTableNameInput(c, { getInst: ctx.getInst, text: ctx.ribbonText }),
+            );
             continue;
           }
           if (c.kind === 'color') {

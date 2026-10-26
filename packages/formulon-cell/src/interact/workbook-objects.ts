@@ -1,4 +1,8 @@
 import {
+  canDeleteIllustration,
+  canDuplicateIllustration,
+} from '../commands/session-illustration.js';
+import {
   DEFAULT_SHAPE_COLOR,
   DEFAULT_SHAPE_LINE_WIDTH,
   MAX_SHAPE_LINE_WIDTH,
@@ -159,8 +163,10 @@ export function attachWorkbookObjectsPanel(
     li: HTMLLIElement,
     illustration: SessionIllustration,
   ): void => {
-    const readOnly =
-      illustration.nativeObjectId !== undefined && illustration.nativeGeometryEditable !== true;
+    const locked = illustration.kind === 'shape' && illustration.nativeLocked === true;
+    const reason = locked
+      ? strings.workbookObjects.shapeLocked
+      : strings.workbookObjects.compatibilityDetails.images;
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions fc-objects__illustration-actions';
     const select = createWorkbookObjectsActionButton(strings.workbookObjects.objectSelect);
@@ -168,11 +174,7 @@ export function attachWorkbookObjectsPanel(
     actions.appendChild(select);
     if (deps.onDuplicateSessionIllustration) {
       const duplicate = createWorkbookObjectsActionButton(strings.workbookObjects.objectDuplicate);
-      projectDisabledState(
-        duplicate,
-        readOnly,
-        strings.workbookObjects.compatibilityDetails.images,
-      );
+      projectDisabledState(duplicate, !canDuplicateIllustration(illustration), reason);
       duplicate.addEventListener('click', () =>
         deps.onDuplicateSessionIllustration?.(illustration.id),
       );
@@ -180,7 +182,7 @@ export function attachWorkbookObjectsPanel(
     }
     if (deps.onClearSessionIllustration) {
       const remove = createWorkbookObjectsActionButton(strings.workbookObjects.objectDelete);
-      projectDisabledState(remove, readOnly, strings.workbookObjects.compatibilityDetails.images);
+      projectDisabledState(remove, !canDeleteIllustration(illustration), reason);
       remove.addEventListener('click', () => deps.onClearSessionIllustration?.(illustration.id));
       actions.appendChild(remove);
     }
@@ -217,18 +219,32 @@ export function attachWorkbookObjectsPanel(
     opacity.type = 'range';
     opacity.min = '0';
     opacity.max = '1';
-    opacity.step = '0.05';
-    opacity.value = String(illustration.opacity ?? 1);
+    // The file holds a fill or none, never a partly transparent one.
+    const saved = illustration.nativeObjectId !== undefined;
+    opacity.step = saved ? '1' : '0.05';
+    opacity.value = String(
+      saved ? (illustration.opacity === 0 ? 0 : 1) : (illustration.opacity ?? 1),
+    );
+    // The file has no corner radius either.
+    projectDisabledState(radius, saved, null);
+    const locked = illustration.nativeLocked === true;
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions';
     const apply = createWorkbookObjectsActionButton(t.apply, { primary: true, type: 'submit' });
     actions.appendChild(apply);
+    if (locked) {
+      // A shape drawn only as its box has no style of its own.
+      for (const input of [color, radius, lineWidth, opacity, apply]) {
+        projectDisabledState(input, true, t.shapeLocked);
+      }
+    }
     form.addEventListener('submit', (event) => {
       event.preventDefault();
+      if (locked) return;
       deps.onUpdateSessionIllustration?.(illustration.id, {
         color: color.value,
         // An untouched corner keeps following the shape's size.
-        ...(radius.value === initialRadius
+        ...(saved || radius.value === initialRadius
           ? {}
           : { radius: Math.max(0, Math.min(48, Number(radius.value) || 0)) }),
         lineWidth: Math.max(0, Math.min(MAX_SHAPE_LINE_WIDTH, Number(lineWidth.value) || 0)),

@@ -129,17 +129,21 @@ export function resolveRangeText(
   return cell ? { sheet, r0: cell.row, c0: cell.col, r1: cell.row, c1: cell.col } : null;
 }
 
+export interface RangeDefinedName {
+  name: string;
+  formula: string;
+  localSheetId: number;
+  range: SheetRange;
+  /** Hidden names still resolve; name lists skip them. */
+  hidden?: boolean;
+}
+
 /** Defined names visible from `sheetIndex` (workbook scope plus that sheet's
  *  own), each with the range it refers to; names that do not refer to a plain
- *  range (constants, formulas) are left out. Sorted case-insensitively. */
-export function rangeDefinedNames(
-  wb: WorkbookHandle,
-  sheetIndex: number,
-): { name: string; formula: string; localSheetId: number; range: SheetRange }[] {
-  const byKey = new Map<
-    string,
-    { name: string; formula: string; localSheetId: number; range: SheetRange }
-  >();
+ *  range (constants, formulas) are left out. Hidden names are included and
+ *  flagged. Sorted case-insensitively. */
+export function rangeDefinedNames(wb: WorkbookHandle, sheetIndex: number): RangeDefinedName[] {
+  const byKey = new Map<string, RangeDefinedName>();
   for (const dn of wb.definedNames()) {
     if (!dn.name.trim() || !dn.formula.trim()) continue;
     if (dn.localSheetId !== -1 && dn.localSheetId !== sheetIndex) continue;
@@ -149,7 +153,13 @@ export function rangeDefinedNames(
     const existing = byKey.get(key);
     // A name scoped to the active sheet shadows a workbook-scoped twin.
     if (existing && existing.localSheetId === sheetIndex) continue;
-    byKey.set(key, { name: dn.name, formula: dn.formula, localSheetId: dn.localSheetId, range });
+    byKey.set(key, {
+      name: dn.name,
+      formula: dn.formula,
+      localSheetId: dn.localSheetId,
+      range,
+      ...(dn.hidden ? { hidden: true } : {}),
+    });
   }
   return [...byKey.values()].sort((a, b) =>
     a.name.toLowerCase() < b.name.toLowerCase()
@@ -170,6 +180,7 @@ export function nameForRange(
 ): string | null {
   let workbookName: string | null = null;
   for (const dn of rangeDefinedNames(wb, sheetIndex)) {
+    if (dn.hidden) continue;
     const r = dn.range;
     if (
       r.sheet !== range.sheet ||

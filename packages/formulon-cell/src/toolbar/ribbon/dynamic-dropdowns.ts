@@ -57,6 +57,8 @@ export interface DynamicDropdownsCtx {
   updateChartColorsMenu: (menu: HTMLElement) => void;
   updateShapeFillMenu: (menu: HTMLElement) => void;
   updateShapeOutlineMenu: (menu: HTMLElement) => void;
+  /** Optional so hosts built before it keep working; the menu then stays as built. */
+  updateShapesInsertMenu?: (menu: HTMLElement) => void;
   updatePageBreaksMenu: (menu: HTMLElement) => void;
   updatePrintAreaMenu: (menu: HTMLElement) => void;
   updateProtectMenu: (menu: HTMLElement) => void;
@@ -284,7 +286,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS: ReadonlySet<string> =
 ]);
 
 export type DynamicDropdownMenuRefresherKey = {
-  [K in keyof DynamicDropdownsCtx]: K extends `update${string}Menu` ? K : never;
+  [K in keyof DynamicDropdownsCtx]-?: K extends `update${string}Menu` ? K : never;
 }[keyof DynamicDropdownsCtx];
 
 export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
@@ -295,6 +297,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-chart-colors': 'updateChartColorsMenu',
   'menu-shape-fill': 'updateShapeFillMenu',
   'menu-shape-outline': 'updateShapeOutlineMenu',
+  'menu-shapes-insert': 'updateShapesInsertMenu',
   'menu-calc-options': 'updateCalcOptionsMenu',
   'menu-cell-styles-home': 'updateCellStylesMenu',
   'menu-clear': 'updateClearMenu',
@@ -353,7 +356,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   const menuRefreshers: Readonly<Record<string, (menu: HTMLElement) => void>> = Object.fromEntries(
     Object.entries(DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS).map(([menuId, key]) => [
       menuId,
-      (menu: HTMLElement) => ctx[key](menu),
+      (menu: HTMLElement) => ctx[key]?.(menu),
     ]),
   );
 

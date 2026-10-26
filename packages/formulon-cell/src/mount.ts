@@ -7,6 +7,7 @@ import {
 import { PrintResourceLimitError, printSheet } from './commands/print.js';
 import {
   isSheetProtected,
+  registerAllowedRangeUnlockUi,
   setProtectedSheet,
   toggleProtectedSheet,
 } from './commands/protection.js';
@@ -71,6 +72,7 @@ import { createInstanceDialogApi } from './mount/instance-dialog-api.js';
 import { syncLocaleProfile } from './mount/locale-profile.js';
 import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
 import { createPrinterProfiles } from './mount/printer-profiles.js';
+import { createAllowedRangeUnlockUi } from './mount/range-unlock-ui.js';
 import { createRibbonHost } from './mount/ribbon-host.js';
 import {
   attachSheetTabsController,
@@ -327,6 +329,10 @@ export const Spreadsheet = {
     });
     commands.setPolicy(opts.policy);
     const unregisterCommands = registerInteractionController(store, commands);
+    const unregisterRangeUnlockUi = registerAllowedRangeUnlockUi(
+      store,
+      createAllowedRangeUnlockUi(() => i18n.strings),
+    );
     dispatchPassthroughSummary();
 
     function dispatchPassthroughSummary(): void {
@@ -1125,6 +1131,8 @@ export const Spreadsheet = {
           ...state,
           format: { formats: new Map(), customCellStyles: [] },
           conditional: { rules: [] },
+          // Protection, allowed ranges and their unlocks belong to the previous workbook.
+          protection: { protectedSheets: new Map(), allowedEditRanges: [] },
           // Overlays name the previous workbook's tables.
           tables: { ...state.tables, tables: [] },
           // Session objects point into the previous workbook's cells and tables.
@@ -1170,6 +1178,7 @@ export const Spreadsheet = {
         cleanup(discardMacPalette);
         cleanup(formulaBar.discardFx);
         cleanup(unregisterCommands);
+        cleanup(unregisterRangeUnlockUi);
         cleanup(() => commands.dispose());
         cleanup(() => navigation.dispose());
         cleanup(() => wb.detachStore(store));

@@ -53,11 +53,17 @@ export {
 } from './prompt.js';
 export {
   type AllowEditRangeDialogOptions,
+  type AllowEditRangeDialogResult,
   type AllowEditRangeDialogStrings,
+  type AllowEditRangesManagerRow,
+  type AllowEditRangesManagerStrings,
   type ProtectSheetDialogResult,
   type ProtectSheetDialogStrings,
+  type ProtectWorkbookDialogStrings,
   showAllowEditRangeDialog,
+  showAllowEditRangesManagerDialog,
   showProtectSheetDialog,
+  showProtectWorkbookDialog,
   showUnprotectSheetDialog,
   type UnprotectSheetDialogStrings,
 } from './protection.js';

@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { defaultTableOverlay } from '../../../../src/commands/format-as-table.js';
 import { addrKey } from '../../../../src/engine/address.js';
 import { mutators, type SpreadsheetStore } from '../../../../src/store/store.js';
 import type { DynamicDropdownsCtx } from '../../../../src/toolbar/ribbon/dynamic-dropdowns.js';
@@ -58,8 +59,25 @@ export const selectStorePicture = (store: SpreadsheetStore, id = 'picture-test')
   mutators.setSelectedObject(store, { id, name: 'Picture 1' });
 };
 
+/** Put a table over the active cell, so the ribbon shows the Table Design tab while no object is selected. */
+export const selectStoreTable = (store: SpreadsheetStore): void => {
+  const { active } = store.getState().selection;
+  mutators.upsertTableOverlay(store, {
+    ...defaultTableOverlay('table-test', {
+      sheet: active.sheet,
+      r0: active.row,
+      c0: active.col,
+      r1: active.row + 2,
+      c1: active.col + 1,
+    }),
+    source: 'engine',
+    name: 'Table1',
+  });
+};
+
 /** One selection per set of contextual tabs; together they show every tab the ribbon has. */
 export const CONTEXTUAL_SELECTIONS: readonly ((store: SpreadsheetStore) => void)[] = [
+  selectStoreTable,
   selectStoreChart,
   selectStoreShape,
   selectStorePicture,
@@ -141,6 +159,7 @@ export const dynamicDropdownNoopOverrides = (): Partial<DynamicDropdownsCtx> => 
   applyShapeOutlineWeightAction: vi.fn(),
   applyShapeOutlineDashAction: vi.fn(),
   updateShapeOutlineMenu: vi.fn(),
+  updateShapesInsertMenu: vi.fn(),
   applyUiTheme: vi.fn(),
   applySortMenuAction: vi.fn(),
   applyFindSelectAction: vi.fn(),

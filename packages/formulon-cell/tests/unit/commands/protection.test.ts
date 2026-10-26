@@ -4,9 +4,7 @@ import { writeInput, writeInputValidated } from '../../../src/commands/coerce-in
 import { setFillColor, setNumFmt, toggleBold } from '../../../src/commands/format.js';
 import { History } from '../../../src/commands/history.js';
 import {
-  addAllowedEditRange,
   allowedEditRangesForSheet,
-  clearAllowedEditRanges,
   gateProtection,
   isAddrInAllowedEditRange,
   isCellLocked,
@@ -205,11 +203,10 @@ describe('protection helpers', () => {
     const b: Addr = { sheet: 0, row: 4, col: 4 };
     mutators.setSheetProtected(store, 0, true);
 
-    const id = addAllowedEditRange(
-      store,
-      { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 },
-      { title: 'Input range' },
-    );
+    const id = mutators.addAllowedEditRange(store, {
+      title: 'Input range',
+      range: { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 },
+    });
 
     expect(id).toMatch(/^allowed-edit-/);
     expect(isAddrInAllowedEditRange(store.getState(), a)).toBe(true);
@@ -217,7 +214,7 @@ describe('protection helpers', () => {
     expect(isCellWritable(store.getState(), b)).toBe(false);
     expect(allowedEditRangesForSheet(store.getState(), 0)).toHaveLength(1);
 
-    clearAllowedEditRanges(store, 0);
+    mutators.clearAllowedEditRanges(store, 0);
     expect(isCellWritable(store.getState(), a)).toBe(false);
   });
 
@@ -235,7 +232,10 @@ describe('protection helpers', () => {
         permissions: { autoFilter: true, insertRows: false },
       });
       setWorkbookStructureProtected(store, true, { password: 'book' });
-      addAllowedEditRange(store, { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 }, { title: 'Input' });
+      mutators.addAllowedEditRange(store, {
+        title: 'Input',
+        range: { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 },
+      });
     });
 
     expect(isSheetProtected(store.getState(), 0)).toBe(true);
@@ -333,7 +333,10 @@ describe('protection helpers', () => {
   it('gateProtection returns the range when any cell is allowed by edit ranges', () => {
     mutators.setSheetProtected(store, 0, true);
     const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
-    addAllowedEditRange(store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 });
+    mutators.addAllowedEditRange(store, {
+      title: 'One',
+      range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+    });
     expect(gateProtection(store.getState(), range)).toEqual(range);
   });
 
@@ -347,7 +350,10 @@ describe('protection helpers', () => {
     expect(gateProtection(store.getState(), range)).toEqual(range);
 
     mutators.setCellFormat(store, { sheet: 0, row: 500000, col: 2 }, null);
-    addAllowedEditRange(store, { sheet: 0, r0: 900000, c0: 2, r1: 900000, c1: 2 });
+    mutators.addAllowedEditRange(store, {
+      title: 'Far',
+      range: { sheet: 0, r0: 900000, c0: 2, r1: 900000, c1: 2 },
+    });
     expect(gateProtection(store.getState(), range)).toEqual(range);
   });
 

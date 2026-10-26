@@ -832,3 +832,29 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     expect(css).toMatch(/\.fc-namedlg-confirm__buttons\s*\{[\s\S]*?gap: 6px;/);
   });
 });
+
+describe('Name Manager comment field', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  const commentDisabled = (definedNameAttrs: boolean): boolean | undefined => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const { wb } = makeMutableWb();
+    (wb.capabilities as { definedNameAttrs?: boolean }).definedNameAttrs = definedNameAttrs;
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+    const field = document.querySelector<HTMLTextAreaElement>('textarea.fc-namedlg-editor__input');
+    handle.detach();
+    return field?.disabled;
+  };
+
+  it('is disabled when the engine cannot store a name note', () => {
+    expect(commentDisabled(false)).toBe(true);
+  });
+
+  it('is editable when it can', () => {
+    expect(commentDisabled(true)).toBe(false);
+  });
+});

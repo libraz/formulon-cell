@@ -1,4 +1,5 @@
 import {
+  isBandedCol,
   isBandedRow,
   isFirstCol,
   isHeaderRow,
@@ -22,7 +23,7 @@ export function tableCellFormat(
     return { fill: swatch.header, color: swatch.headerText, bold: true };
   }
   const edge = isFirstCol(table, row, col) || isLastCol(table, row, col);
-  if (isBandedRow(table, row, col)) {
+  if (isBandedRow(table, row, col) || isBandedCol(table, row, col)) {
     return edge ? { fill: swatch.band, bold: true } : { fill: swatch.band };
   }
   if (edge) return { bold: true };

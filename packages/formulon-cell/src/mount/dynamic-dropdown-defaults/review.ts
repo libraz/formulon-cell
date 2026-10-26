@@ -1,24 +1,38 @@
 import {
   addAllowedEditRange,
+  allowedEditRangeHasPassword,
+  allowedEditRangesForSheet,
+  isSheetProtected,
   isWorkbookStructureProtected,
   protectedSheetPermissions,
+  removeAllowedEditRange,
+  setWorkbookStructureProtected,
   sheetHasPassword,
+  updateAllowedEditRange,
+  verifyAllowedEditRangePassword,
   verifySheetProtectionPassword,
+  verifyWorkbookStructurePassword,
+  workbookStructureHasPassword,
 } from '../../commands/protection.js';
+import {
+  allowedEditRangeAreas,
+  areasFromSqref,
+  sqrefFromAreas,
+} from '../../engine/protection-sync.js';
 import {
   commentAt,
   executeRibbonCommentAction,
   executeRibbonProtectionAction,
   formatA1Range,
   listComments,
-  parseA1Range,
   type SpreadsheetInstance,
-  setWorkbookStructureProtected,
 } from '../../index.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
   showAllowEditRangeDialog,
+  showAllowEditRangesManagerDialog,
   showProtectSheetDialog,
+  showProtectWorkbookDialog,
   showUnprotectSheetDialog,
 } from '../../toolbar/dialogs/protection.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
@@ -53,6 +67,130 @@ const updateReviewCommentsMenu =
       setMenuControlDisabled(button, disabled, reason);
     }
   };
+
+/** Ask for the password guarding a protected object; true when it is
+ *  unguarded or the typed one verifies, with a message on a wrong password. */
+const confirmUnlock = async (
+  instance: SpreadsheetInstance,
+  title: string,
+  guarded: boolean,
+  verify: (password: string) => Promise<boolean>,
+): Promise<boolean> => {
+  if (!guarded) return true;
+  const strings = instance.i18n.strings;
+  const password = await showUnprotectSheetDialog({
+    title,
+    password: strings.protection.password,
+    ok: strings.pageSetup.ok,
+    cancel: strings.pageSetup.cancel,
+  });
+  if (password === null) return false;
+  if (await verify(password)) return true;
+  await showMessage({
+    title,
+    message: strings.ribbonMenu.workbookIncorrectPassword,
+    okLabel: strings.pageSetup.ok,
+  });
+  return false;
+};
+
+/** Whether the password of the allowed edit range `id` was entered (or none is set). */
+const unlockAllowedRange = (instance: SpreadsheetInstance, id: string): Promise<boolean> =>
+  confirmUnlock(
+    instance,
+    instance.i18n.strings.ribbonMenu.allowEditRangesDialogTitle,
+    allowedEditRangeHasPassword(instance.store.getState(), id),
+    (password) => verifyAllowedEditRangePassword(instance.store.getState(), id, password),
+  );
+
+/** The Allow Users to Edit Ranges list for the active sheet, with New, Modify
+ *  and Delete. Changing or deleting a password-guarded range asks for its password. */
+const openAllowEditRangesManager = async (instance: SpreadsheetInstance): Promise<void> => {
+  const strings = instance.i18n.strings;
+  const menu = strings.ribbonMenu;
+  const sheet = (): number => instance.store.getState().data.sheetIndex;
+  const edit = async (id: string | null): Promise<void> => {
+    const state = instance.store.getState();
+    const current = id ? state.protection.allowedEditRanges.find((e) => e.id === id) : undefined;
+    const selection = normalizedSelectionRange(instance);
+    const parseAreas = (text: string) => areasFromSqref(text.replace(/,/g, ' '), sheet());
+    const pivotStrings = strings.pivotTableDialog as typeof strings.pivotTableDialog & {
+      rangePickerSelect: string;
+    };
+    const result = await showAllowEditRangeDialog({
+      strings: {
+        title: menu.allowEditRangesDialogTitle,
+        range: menu.allowEditRangesDialogRange,
+        invalid: menu.allowEditRangesDialogInvalid,
+        rangePickerLabel: pivotStrings.rangePickerSelect,
+        titleLabel: menu.allowEditRangesDialogTitleLabel,
+        password: strings.protection.password,
+        passwordPlaceholder: strings.protection.passwordPlaceholder,
+        confirmPassword: strings.protection.confirmPassword,
+        passwordMismatch: strings.protection.passwordMismatch,
+        ok: strings.pageSetup.ok,
+        cancel: strings.pageSetup.cancel,
+      },
+      initialRange: current
+        ? sqrefFromAreas(allowedEditRangeAreas(current))
+        : formatA1Range(selection),
+      initialTitle: current?.title,
+      hasPassword: !!current && allowedEditRangeHasPassword(state, current.id),
+      pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
+      validateRange: (value) => parseAreas(value) !== null,
+      subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+    });
+    if (result === null) return;
+    const [range = selection, ...extraAreas] = parseAreas(result.range) ?? [];
+    const workbook = instance.workbook;
+    if (current) {
+      updateAllowedEditRange(
+        instance.store,
+        current.id,
+        {
+          title: result.title,
+          range,
+          extraAreas,
+          ...(result.password !== undefined ? { password: result.password } : {}),
+        },
+        { workbook },
+      );
+    } else {
+      addAllowedEditRange(instance.store, range, {
+        title: result.title || sqrefFromAreas([range, ...extraAreas]),
+        extraAreas,
+        password: result.password ?? undefined,
+        workbook,
+      });
+    }
+  };
+  const guard = (id: string): Promise<boolean> => unlockAllowedRange(instance, id);
+  await showAllowEditRangesManagerDialog({
+    strings: {
+      title: menu.allowEditRangesDialogTitle,
+      newButton: menu.allowEditRangesNewButton,
+      modifyButton: menu.allowEditRangesModifyButton,
+      deleteButton: menu.allowEditRangesDeleteButton,
+      close: strings.pageSetup.ok,
+      empty: menu.allowEditRangesEmpty,
+    },
+    rows: () =>
+      allowedEditRangesForSheet(instance.store.getState(), sheet()).map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        ref: sqrefFromAreas(allowedEditRangeAreas(entry)),
+      })),
+    onNew: () => edit(null),
+    onModify: async (id) => {
+      if (await guard(id)) await edit(id);
+    },
+    onDelete: async (id) => {
+      if (await guard(id)) {
+        removeAllowedEditRange(instance.store, id, { workbook: instance.workbook });
+      }
+    },
+  });
+};
 
 const buildProtectAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyProtectAction'] =>
@@ -162,55 +300,64 @@ const buildProtectAction =
       return;
     }
     if (action === 'protect-workbook' || action === 'unprotect-workbook') {
-      setWorkbookStructureProtected(instance.store, action === 'protect-workbook');
+      const strings = instance.i18n.strings;
+      const workbook = instance.workbook;
+      if (action === 'protect-workbook') {
+        const result = await showProtectWorkbookDialog({
+          title: strings.ribbonMenu.protectWorkbookDialogTitle,
+          password: strings.protection.password,
+          passwordPlaceholder: strings.protection.passwordPlaceholder,
+          confirmPassword: strings.protection.confirmPassword,
+          passwordMismatch: strings.protection.passwordMismatch,
+          ok: strings.pageSetup.ok,
+          cancel: strings.pageSetup.cancel,
+        });
+        if (result) {
+          setWorkbookStructureProtected(instance.store, true, {
+            password: result.password,
+            workbook,
+          });
+        }
+      } else if (
+        await confirmUnlock(
+          instance,
+          strings.ribbonMenu.unprotectWorkbookDialogTitle,
+          workbookStructureHasPassword(instance.store.getState()),
+          (password) => verifyWorkbookStructurePassword(instance.store.getState(), password),
+        )
+      ) {
+        setWorkbookStructureProtected(instance.store, false, { workbook });
+      }
       instance.host.focus();
       return;
     }
     if (action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges') {
       const strings = instance.i18n.strings;
-      if (action === 'allow-edit-ranges') {
-        const selection = normalizedSelectionRange(instance);
-        const sheetName = instance.workbook.sheetName(selection.sheet);
-        const pivotStrings = strings.pivotTableDialog as typeof strings.pivotTableDialog & {
-          rangePickerSelect: string;
-        };
-        const result = await showAllowEditRangeDialog({
-          strings: {
-            title: strings.ribbonMenu.allowEditRangesDialogTitle,
-            range: strings.ribbonMenu.allowEditRangesDialogRange,
-            invalid: strings.ribbonMenu.allowEditRangesDialogInvalid,
-            rangePickerLabel: pivotStrings.rangePickerSelect,
-            ok: strings.pageSetup.ok,
-            cancel: strings.pageSetup.cancel,
-          },
-          initialRange: formatA1Range(selection),
-          pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
-          validateRange: (value) => parseA1Range(value, selection.sheet, sheetName) !== null,
-          subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
-        });
-        if (result === null) {
-          instance.host.focus();
-          return;
-        }
-        const range = parseA1Range(result, selection.sheet, sheetName) ?? selection;
-        const rangeText = formatA1Range(range);
-        addAllowedEditRange(instance.store, range, { title: rangeText });
-        const report = {
-          title: strings.ribbonMenu.allowEditRangesDialogTitle,
-          items: [
-            {
-              severity: 'info' as const,
-              label: strings.ribbonMenu.allowEditRangesCommand,
-              detail: strings.ribbonMenu.allowedEditRangeAddedStatus.replace('{range}', rangeText),
-            },
-          ],
-        };
-        await showInstanceReport(instance, report.title, report.items);
+      // Allowed ranges are fixed while the sheet is protected, as on desktop.
+      if (isSheetProtected(instance.store.getState(), instance.store.getState().data.sheetIndex)) {
         instance.host.focus();
         return;
       }
+      if (action === 'allow-edit-ranges') {
+        await openAllowEditRangesManager(instance);
+        instance.host.focus();
+        return;
+      }
+      // Clearing every range asks for each guarded range's password first.
+      const sheetRanges = allowedEditRangesForSheet(
+        instance.store.getState(),
+        instance.store.getState().data.sheetIndex,
+      );
+      for (const entry of sheetRanges) {
+        const guarded = allowedEditRangeHasPassword(instance.store.getState(), entry.id);
+        if (guarded && !(await unlockAllowedRange(instance, entry.id))) {
+          instance.host.focus();
+          return;
+        }
+      }
       const report = executeRibbonProtectionAction({
         store: instance.store,
+        workbook: instance.workbook,
         action: 'clear-allowed-edit-ranges',
         strings: {
           allowEditRangesDialogTitle: strings.ribbonMenu.allowEditRangesDialogTitle,
@@ -218,6 +365,7 @@ const buildProtectAction =
           allowEditRangesClearCommand: strings.ribbonMenu.allowEditRangesClearCommand,
           allowedEditRangeAddedStatus: strings.ribbonMenu.allowedEditRangeAddedStatus,
           allowedEditRangesClearedStatus: strings.ribbonMenu.allowedEditRangesClearedStatus,
+          allowEditRangesRequiresUnprotected: strings.ribbonMenu.allowEditRangesRequiresUnprotected,
         },
       });
       await showInstanceReport(instance, report.title, report.items);
@@ -230,7 +378,7 @@ const updateProtectMenu =
     const state = instance.store.getState();
     const sheetProtected = state.protection.protectedSheets.has(state.data.sheetIndex);
     const workbookProtected = isWorkbookStructureProtected(state);
-    const hasAllowedRanges = state.protection.allowedEditRanges.length > 0;
+    const hasAllowedRanges = allowedEditRangesForSheet(state, state.data.sheetIndex).length > 0;
     const strings = instance.i18n.strings.ribbonMenu;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-protect-action]')) {
       const action = button.dataset.protectAction;
@@ -239,6 +387,8 @@ const updateProtectMenu =
         (action === 'unprotect-sheet' && !sheetProtected) ||
         (action === 'protect-workbook' && workbookProtected) ||
         (action === 'unprotect-workbook' && !workbookProtected) ||
+        ((action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges') &&
+          sheetProtected) ||
         (action === 'clear-allowed-edit-ranges' && !hasAllowedRanges);
       const reason =
         action === 'protect-sheet'
@@ -249,9 +399,12 @@ const updateProtectMenu =
               ? strings.protectWorkbookAlreadyProtected
               : action === 'unprotect-workbook'
                 ? strings.unprotectWorkbookRequiresProtected
-                : action === 'clear-allowed-edit-ranges'
-                  ? strings.allowEditRangesClearRequiresAny
-                  : undefined;
+                : (action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges') &&
+                    sheetProtected
+                  ? strings.allowEditRangesRequiresUnprotected
+                  : action === 'clear-allowed-edit-ranges'
+                    ? strings.allowEditRangesClearRequiresAny
+                    : undefined;
       setMenuControlDisabled(button, disabled, reason);
     }
   };

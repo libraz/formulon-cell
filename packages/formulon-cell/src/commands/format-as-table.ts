@@ -1,3 +1,4 @@
+import { defaultTotals } from '../engine/table-totals-defaults.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
@@ -25,7 +26,7 @@ export const TABLE_STYLE_COLORS: readonly string[] = [
 
 /** Fallback hue for overlays created before the gallery existed, or loaded
  *  from the engine without an explicit color. */
-export const DEFAULT_TABLE_COLOR = '#5b9bd5';
+export const DEFAULT_TABLE_COLOR = '#4472c4';
 
 const parseHex = (hex: string): [number, number, number] => {
   const h = hex.replace('#', '');
@@ -103,6 +104,27 @@ export function tableStyleSwatch(
   };
 }
 
+/** Totals-row function of a table column; the engine's `ST_TotalsRowFunction`. */
+export type TableTotalsFunction =
+  | 'none'
+  | 'sum'
+  | 'min'
+  | 'max'
+  | 'average'
+  | 'count'
+  | 'countNums'
+  | 'stdDev'
+  | 'var'
+  | 'custom';
+
+/** Totals-row settings of one table column. `formula` (no leading `=`) is the
+ *  `custom` function's formula; `label` shows when the function is `none`. */
+export interface TableColumnTotals {
+  function: TableTotalsFunction;
+  label?: string;
+  formula?: string;
+}
+
 export interface TableOverlay {
   /** Stable id used by mutators / pointer routing. */
   id: string;
@@ -128,6 +150,14 @@ export interface TableOverlay {
   firstCol?: boolean;
   /** Emphasize the last column with bold text. Defaults to false. */
   lastCol?: boolean;
+  /** Column stripes of the engine table; carried so a loaded table keeps it. */
+  colStripes?: boolean;
+  /** Totals-row settings by column, left to right; engine overlays only. */
+  totals?: readonly TableColumnTotals[];
+  /** Exact engine style name (built-in or custom) the look was read from or
+   *  written as. Absent means the name derived from `style` and `color`; an
+   *  empty string means the table has no style. */
+  styleName?: string;
 }
 
 export interface FormatAsTableOptions {
@@ -139,6 +169,9 @@ export interface FormatAsTableOptions {
   banded?: boolean;
   firstCol?: boolean;
   lastCol?: boolean;
+  styleName?: string;
+  /** Label a new total row carries in its first column; defaults to `Total`. */
+  totalsLabel?: string;
   /** When the active engine supports it, back the overlay with an OOXML
    * table. The store mirror of the workbook's attached store creates it. */
   workbook?: WorkbookHandle;
@@ -157,13 +190,55 @@ const isNonEmptyTextValue = (value: CellValue): boolean =>
 
 const isNonBlankValue = (value: CellValue): boolean => value.kind !== 'blank';
 
-/** Built-in engine style name written for a `TableStyle`. */
-export const tableStyleName = (style: TableStyle): string =>
-  style === 'light'
-    ? 'TableStyleLight9'
-    : style === 'dark'
-      ? 'TableStyleDark1'
-      : 'TableStyleMedium2';
+const BUILTIN_STYLE_PREFIX: Record<TableStyle, string> = {
+  light: 'TableStyleLight',
+  medium: 'TableStyleMedium',
+  dark: 'TableStyleDark',
+};
+const BUILTIN_STYLE_COUNT: Record<TableStyle, number> = { light: 21, medium: 28, dark: 11 };
+
+/** Index into `TABLE_STYLE_COLORS` nearest to `color`: no color, then the six accents. */
+const paletteIndex = (color: string): number => {
+  const [r, g, b] = parseHex(color);
+  let best = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  TABLE_STYLE_COLORS.forEach((swatch, i) => {
+    const [pr, pg, pb] = parseHex(swatch);
+    const distance = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+    if (distance < bestDistance) {
+      best = i;
+      bestDistance = distance;
+    }
+  });
+  return best;
+};
+
+/** Built-in engine style name for a gallery family and hue: the first block
+ *  of each family, one style per palette column. */
+export const tableStyleName = (style: TableStyle, color: string = DEFAULT_TABLE_COLOR): string =>
+  `${BUILTIN_STYLE_PREFIX[style]}${paletteIndex(color) + 1}`;
+
+/** Gallery family and hue of a built-in engine style name; null for any
+ *  other name. Every block of a family maps onto its palette columns. */
+export const parseTableStyleName = (name: string): { style: TableStyle; color: string } | null => {
+  for (const style of ['light', 'medium', 'dark'] as const) {
+    const prefix = BUILTIN_STYLE_PREFIX[style];
+    if (!name.startsWith(prefix)) continue;
+    const digits = name.slice(prefix.length);
+    if (!/^[1-9]\d*$/.test(digits)) return null;
+    const n = Number(digits);
+    if (n > BUILTIN_STYLE_COUNT[style]) return null;
+    // Dark8-11 follow the neutral / accent1+2 / accent3+4 / accent5+6 pairs; take the first of each.
+    const column = style === 'dark' && n > 7 ? ([0, 1, 3, 5][n - 8] ?? 0) : (n - 1) % 7;
+    return { style, color: TABLE_STYLE_COLORS[column] ?? DEFAULT_TABLE_COLOR };
+  }
+  return null;
+};
+
+/** Engine style name an overlay is written as. */
+export const overlayStyleName = (
+  table: Pick<TableOverlay, 'style' | 'color' | 'styleName'>,
+): string => table.styleName ?? tableStyleName(table.style, table.color);
 
 /** Unique column names for a table over `range`, from its header row when present. */
 export const tableColumns = (
@@ -296,9 +371,31 @@ export function tableVariantOptions(variant: CustomTableStyle['variant']): {
 export type TableOverlayPatch = Partial<
   Pick<
     TableOverlay,
-    'range' | 'style' | 'color' | 'showHeader' | 'showTotal' | 'banded' | 'firstCol' | 'lastCol'
+    | 'range'
+    | 'style'
+    | 'color'
+    | 'showHeader'
+    | 'showTotal'
+    | 'banded'
+    | 'firstCol'
+    | 'lastCol'
+    | 'colStripes'
+    | 'totals'
+    | 'styleName'
+    | 'name'
   >
 >;
+
+/** The stored overlay `written` became, or null when the store dropped or reverted it. The
+ *  store mirror may re-read the totals the engine settled on, which is not a refusal. */
+function storedOverlay(store: SpreadsheetStore, written: TableOverlay): TableOverlay | null {
+  const stored = tableOverlayById(store.getState(), written.id);
+  if (stored === written) return stored;
+  if (!stored) return null;
+  return JSON.stringify({ ...stored, totals: 0 }) === JSON.stringify({ ...written, totals: 0 })
+    ? stored
+    : null;
+}
 
 /** Default factory — keeps the construction site small. */
 export function defaultTableOverlay(id: string, range: Range): TableOverlay {
@@ -331,7 +428,7 @@ export function formatAsTable(
   options: FormatAsTableOptions = {},
 ): TableOverlay | null {
   if (blockedByProtection(store, range.sheet, 'formatAsTable')) return null;
-  const { workbook, ...overlayOptions } = options;
+  const { workbook, totalsLabel = 'Total', ...overlayOptions } = options;
   if (overlapsOtherTable(store, overlayOptions.id ?? defaultTableId(range), range)) return null;
   const engineBacked = workbook?.capabilities?.tableMutate === true;
   const overlay: TableOverlay = {
@@ -344,8 +441,18 @@ export function formatAsTable(
       : {}),
     range,
   };
+  // A new total row starts with the desktop defaults, the label in the caller's language.
+  if (overlay.showTotal && engineBacked && workbook) {
+    overlay.totals = defaultTotals(
+      workbook,
+      range,
+      overlay.showHeader,
+      range.c1 - range.c0 + 1,
+      totalsLabel,
+    );
+  }
   mutators.upsertTableOverlay(store, overlay);
-  return tableOverlayById(store.getState(), overlay.id) === overlay ? overlay : null;
+  return storedOverlay(store, overlay);
 }
 
 /** Overlay options for a built-in style id or a custom table style id. */
@@ -354,12 +461,22 @@ export function tableStyleOptionsById(
   styleId: string,
   color?: string,
   variant: CustomTableStyle['variant'] = 'banded',
-): Pick<TableOverlay, 'style' | 'color' | 'banded' | 'firstCol'> {
+): Pick<TableOverlay, 'style' | 'color' | 'banded' | 'firstCol' | 'styleName'> {
   const custom = customTableStyleById(state, styleId);
   if (custom) {
-    return { style: custom.style, color: custom.color, ...tableVariantOptions(custom.variant) };
+    return {
+      style: custom.style,
+      color: custom.color,
+      styleName: custom.label,
+      ...tableVariantOptions(custom.variant),
+    };
   }
-  return { style: styleId as TableStyle, color, ...tableVariantOptions(variant) };
+  return {
+    style: styleId as TableStyle,
+    color,
+    styleName: undefined,
+    ...tableVariantOptions(variant),
+  };
 }
 
 export function formatAsTableByStyleId(
@@ -370,7 +487,7 @@ export function formatAsTableByStyleId(
   variant: CustomTableStyle['variant'] = 'banded',
   options: Pick<
     FormatAsTableOptions,
-    'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook'
+    'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook' | 'totalsLabel'
   > = {},
 ): TableOverlay | null {
   return formatAsTable(store, range, {
@@ -495,6 +612,36 @@ export function tableOverlayAt(
   return tableForCell(state.tables.tables, sheet, row, col);
 }
 
+/** Why a table cannot take `name`: `invalid` for a name the spreadsheet
+ *  forbids, `duplicate` for one another table already uses. */
+export type TableNameError = 'invalid' | 'duplicate';
+
+const TABLE_NAME_PATTERN = /^[\p{L}_\\][\p{L}\p{N}_.\\]*$/u;
+const CELL_REFERENCE_PATTERN = /^(?:[A-Za-z]{1,3}\d+|[Rr]\d*[Cc]\d*|[RrCc])$/;
+const MAX_TABLE_NAME_LENGTH = 255;
+
+/** Check `name` as a new name for table `id`; null when it is acceptable. */
+export function tableNameError(
+  store: SpreadsheetStore,
+  id: string,
+  name: string,
+): TableNameError | null {
+  const trimmed = name.trim();
+  if (
+    !trimmed ||
+    trimmed.length > MAX_TABLE_NAME_LENGTH ||
+    !TABLE_NAME_PATTERN.test(trimmed) ||
+    CELL_REFERENCE_PATTERN.test(trimmed)
+  ) {
+    return 'invalid';
+  }
+  const key = trimmed.toLocaleLowerCase();
+  const taken = store
+    .getState()
+    .tables.tables.some((t) => t.id !== id && t.name?.toLocaleLowerCase() === key);
+  return taken ? 'duplicate' : null;
+}
+
 /** Patch a table overlay and return the updated overlay; the store mirror
  *  carries the change to an engine-backed table. Null when the new range
  *  overlaps another table or the engine refused the change. */
@@ -507,9 +654,19 @@ export function updateTableOverlay(
   if (!current) return null;
   if (blockedByProtection(store, current.range.sheet, 'updateTableOverlay')) return null;
   if (patch.range && overlapsOtherTable(store, id, patch.range)) return null;
-  const next: TableOverlay = { ...current, ...patch, id: current.id, source: current.source };
+  const { name, ...rest } = patch;
+  if (name !== undefined && current.source === 'engine' && tableNameError(store, id, name)) {
+    return null;
+  }
+  const next: TableOverlay = {
+    ...current,
+    ...rest,
+    ...(name !== undefined && current.source === 'engine' ? { name: name.trim() } : {}),
+    id: current.id,
+    source: current.source,
+  };
   mutators.upsertTableOverlay(store, next);
-  return tableOverlayById(store.getState(), id) === next ? next : null;
+  return storedOverlay(store, next);
 }
 
 /** Remove a Format-as-Table overlay by id. */
@@ -563,9 +720,31 @@ export function isBandedRow(t: TableOverlay, row: number, col: number): boolean 
   if (isHeaderRow(t, row, col)) return false;
   if (isTotalRow(t, row, col)) return false;
   if (row < t.range.r0 || row > t.range.r1) return false;
-  // First data row is "even" — paint zebra on every other row from there.
+  // The first data row takes the first stripe, as the built-in styles define it.
   const dataStart = t.showHeader ? t.range.r0 + 1 : t.range.r0;
-  return ((row - dataStart) & 1) === 1;
+  return ((row - dataStart) & 1) === 0;
+}
+
+/** True when the column should paint with the alternate stripe fill. Header
+ *  and total rows are excluded. */
+export function isBandedCol(t: TableOverlay, row: number, col: number): boolean {
+  if (!t.colStripes) return false;
+  if (col < t.range.c0 || col > t.range.c1) return false;
+  if (row < t.range.r0 || row > t.range.r1) return false;
+  if (isHeaderRow(t, row, col) || isTotalRow(t, row, col)) return false;
+  return ((col - t.range.c0) & 1) === 0;
+}
+
+/** The totals-row cell at (row, col) as its engine table and zero-based column; null elsewhere. */
+export function totalsCellAt(
+  state: { tables: { tables: readonly TableOverlay[] } },
+  sheet: number,
+  row: number,
+  col: number,
+): { table: TableOverlay; column: number } | null {
+  const table = tableOverlayAt(state, sheet, row, col);
+  if (table?.source !== 'engine' || !isTotalRow(table, row, col)) return null;
+  return { table, column: col - table.range.c0 };
 }
 
 /** Find the table overlay (if any) that contains a given cell. Tables

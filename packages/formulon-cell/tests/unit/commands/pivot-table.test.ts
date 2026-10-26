@@ -114,6 +114,10 @@ const makeWb = () => {
       calls.push(`grand:${rows}:${cols}`);
       return true;
     },
+    setPivotFieldAxis: (_sheet: number, _pivot: number, field: number, axis: number | null) => {
+      calls.push(`pivot-field-axis:${field}:${axis}`);
+      return true;
+    },
     addPivotField: (
       _sheet: number,
       _pivot: number,

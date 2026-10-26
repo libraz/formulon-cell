@@ -9,6 +9,7 @@ import {
 import { isWorkbookStructureProtected } from '../commands/protection.js';
 import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
+import type { Range as EngineRange } from '../engine/types.js';
 import { PivotAggregation } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -206,7 +207,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       fields,
       inferFilterItems: (fieldName) => {
         const range = rangeFromSourceInput();
-        return range ? inferPivotFieldItems(wb, range, fieldName) : [];
+        return range ? inferPivotFieldItems(wb, range, fieldName, sourceFieldsFor(range)) : [];
       },
     });
 
@@ -272,6 +273,15 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     return el;
   };
 
+  // Scanning the source range is the costly part; redo it only when the range itself changes.
+  let sourceFields: { key: string; fields: PivotSourceField[] } | null = null;
+  const sourceFieldsFor = (range: EngineRange): PivotSourceField[] => {
+    const key = JSON.stringify(range);
+    if (sourceFields?.key !== key)
+      sourceFields = { key, fields: inferPivotSourceFields(wb, range) };
+    return sourceFields.fields;
+  };
+
   const configureForSource = (): void => {
     const t = strings.pivotTableDialog;
     error.hidden = true;
@@ -282,7 +292,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       setOkDisabled(true, t.invalidRange);
       return;
     }
-    const fields = inferPivotSourceFields(wb, range);
+    const fields = sourceFieldsFor(range);
     if (!wb.capabilities.pivotTableMutate) {
       showError(t.unsupported);
       setOkDisabled(true, t.unsupported);

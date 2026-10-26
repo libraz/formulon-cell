@@ -10,7 +10,11 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 /** One field's settings as submitted from the pivot edit form. */
 export interface PivotEditField {
   fieldIndex: number;
-  axis: PivotAxis;
+  /** Null takes the field out of the report. */
+  axis: PivotAxis | null;
+  /** Custom subtotal functions to write (empty for the automatic subtotal), or
+   *  omitted to leave the field's subtotals untouched. */
+  subtotalFns?: readonly PivotAggregation[];
   /** Used when `axis` is Value. */
   aggregation: PivotAggregation;
   /** Used when `axis` is Value; empty means no explicit format. */
@@ -45,8 +49,8 @@ const canonicalSpecs = (specs: readonly PivotDataFieldSpec[]): string =>
 
 /** The data-field list after applying the form's value-field settings: a
  *  field's first data field takes the edited aggregation and format, data
- *  fields of fields moved off the Value axis drop out, and newly valued
- *  fields append. A name survives unless the aggregation changed, in which
+ *  fields of fields moved off the Value axis (or out of the report) drop out,
+ *  and newly valued fields append. A name survives unless the aggregation changed, in which
  *  case the engine names it afresh. */
 function editedDataFields(
   current: readonly PivotDataFieldSpec[],
@@ -110,9 +114,26 @@ export function applyPivotEdit(
     wb.setPivotTableGrandTotals(sheetIndex, pivotIndex, edit.rowGrandTotals, edit.colGrandTotals);
   const layoutUpdated =
     fieldListOnly || wb.setPivotReportLayout(sheetIndex, pivotIndex, edit.layout);
-  const fieldsUpdated = edit.fields.every((field) =>
-    wb.setPivotFieldAxis(sheetIndex, pivotIndex, field.fieldIndex, field.axis),
-  );
+  // Taking a field out of the report makes the engine drop its data fields
+  // and filters; a field already out is left alone so nothing else is touched.
+  const fieldsUpdated = edit.fields.every((field) => {
+    if (
+      field.axis === null &&
+      wb.getPivotField(sheetIndex, pivotIndex, field.fieldIndex)?.axis === null
+    ) {
+      return true;
+    }
+    return wb.setPivotFieldAxis(sheetIndex, pivotIndex, field.fieldIndex, field.axis);
+  });
+  const subtotalsUpdated = edit.fields.every((field) => {
+    if (!field.subtotalFns) return true;
+    return (
+      wb.clearPivotFieldSubtotalFns(sheetIndex, pivotIndex, field.fieldIndex) &&
+      field.subtotalFns.every((fn) =>
+        wb.addPivotFieldSubtotalFn(sheetIndex, pivotIndex, field.fieldIndex, fn),
+      )
+    );
+  });
   const rowFieldOrder = edit.fields
     .filter((field) => field.axis === PivotAxis.Row)
     .map((field) => field.fieldIndex);
@@ -198,6 +219,7 @@ export function applyPivotEdit(
     layoutUpdated &&
     fieldsUpdated &&
     axisOrdersUpdated &&
+    subtotalsUpdated &&
     valueFieldsUpdated &&
     filterItemsUpdated &&
     pivotFiltersUpdated

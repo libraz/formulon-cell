@@ -255,8 +255,8 @@ export function paintOutlineGutters(
   return hits;
 }
 
-const DEFAULT_SPARKLINE_COLOR = '#0078d4';
-const DEFAULT_NEGATIVE_COLOR = '#d24545';
+export const DEFAULT_SPARKLINE_COLOR = '#0078d4';
+export const DEFAULT_NEGATIVE_COLOR = '#d24545';
 
 /** Inline mini-chart drawn inside a single cell rect. `values` is the resolved
  *  numeric series for `spec.source`; non-numeric source cells are filtered by

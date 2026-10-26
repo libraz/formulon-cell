@@ -8,6 +8,7 @@ import {
   resolveSlicerSpec,
   setSlicerSelected,
 } from '../commands/slicers.js';
+import { drawingClipPath, sessionPosition } from '../engine/drawing-geometry.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
@@ -75,6 +76,22 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
   let strings = deps.strings ?? defaultStrings;
   const panels = new Map<string, PanelEntry>();
 
+  /** Position a panel: from its anchor when it has one, so it scrolls with the
+   *  sheet like other drawings, else at its stored offset. */
+  const place = (root: HTMLElement, spec: SlicerSpec): void => {
+    if (!spec.nativeAnchor) {
+      root.style.left = `${spec.x ?? DEFAULT_OFFSET_X}px`;
+      root.style.top = `${spec.y ?? DEFAULT_OFFSET_Y}px`;
+      return;
+    }
+    const frame = sessionPosition(store, spec.nativeAnchor);
+    root.style.left = `${frame.x}px`;
+    root.style.top = `${frame.y}px`;
+    root.style.width = `${frame.w}px`;
+    root.style.height = `${frame.h}px`;
+    root.style.clipPath = drawingClipPath(store, spec.nativeAnchor, frame);
+  };
+
   const buildPanel = (spec: SlicerSpec): PanelEntry => {
     const root = document.createElement('div');
     root.className = 'fc-slicer';
@@ -82,14 +99,13 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     root.setAttribute('role', 'region');
     root.setAttribute('aria-label', `${strings.slicer.title}: ${spec.column}`);
     root.style.position = 'absolute';
-    root.style.left = `${spec.x ?? DEFAULT_OFFSET_X}px`;
-    root.style.top = `${spec.y ?? DEFAULT_OFFSET_Y}px`;
+    place(root, spec);
 
     const header = document.createElement('div');
     header.className = 'fc-slicer__header';
     const title = document.createElement('span');
     title.className = 'fc-slicer__title';
-    title.textContent = spec.column;
+    title.textContent = spec.caption || spec.column;
     const actions = document.createElement('span');
     actions.className = 'fc-slicer__actions';
     const clearBtn = appendDialogButton(actions, {
@@ -246,13 +262,23 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
         panels.set(spec.id, entry);
       } else {
         // Keep the title in sync — column may change via updateSlicer.
-        entry.title.textContent = spec.column;
+        entry.title.textContent = spec.caption || spec.column;
         entry.root.setAttribute('aria-label', `${strings.slicer.title}: ${spec.column}`);
         entry.body.setAttribute('aria-label', spec.column);
-        entry.root.style.left = `${spec.x ?? DEFAULT_OFFSET_X}px`;
-        entry.root.style.top = `${spec.y ?? DEFAULT_OFFSET_Y}px`;
+        place(entry.root, spec);
       }
+      // A slicer stored with a sheet shows only on that sheet.
+      entry.root.hidden =
+        spec.sheet !== undefined && spec.sheet !== store.getState().data.sheetIndex;
       renderChips(entry, spec);
+    }
+  };
+
+  /** Move the panels to the current view without rebuilding their chips. */
+  const placeAll = (): void => {
+    for (const spec of store.getState().slicers.slicers) {
+      const entry = panels.get(spec.id);
+      if (entry) place(entry.root, spec);
     }
   };
 
@@ -266,6 +292,8 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
   let lastSlicers = store.getState().slicers.slicers;
   let lastCells = store.getState().data.cells;
   let lastSheet = store.getState().data.sheetIndex;
+  let lastViewport = store.getState().viewport;
+  let lastLayout = store.getState().layout;
   const unsub = store.subscribe(() => {
     const s = store.getState();
     const slicersChanged = s.slicers.slicers !== lastSlicers;
@@ -275,6 +303,9 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     if (cellsChanged) lastCells = s.data.cells;
     if (sheetChanged) lastSheet = s.data.sheetIndex;
     if (slicersChanged || cellsChanged || sheetChanged) renderAll();
+    else if (s.viewport !== lastViewport || s.layout !== lastLayout) placeAll();
+    lastViewport = s.viewport;
+    lastLayout = s.layout;
   });
 
   // Initial paint for any pre-existing slicers (e.g. restored from a

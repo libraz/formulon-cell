@@ -130,6 +130,32 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.byId['chart-authoring'].reason).toContain('moved, resized and deleted');
   });
 
+  it('marks shapes, sparklines and slicers writable once the engine models them', () => {
+    const wb = (capabilities: Record<string, boolean>) =>
+      ({
+        capabilities: { ...baseCaps, ...capabilities },
+        getPassthroughs: () => [],
+        getTables: () => [],
+        getPivotTables: () => [],
+      }) as unknown as WorkbookHandle;
+
+    const on = summarizeSpreadsheetCompatibility(
+      wb({ shapes: true, sparklines: true, slicers: true }),
+    );
+    expect(on.byId.shapes.status).toBe('writable');
+    expect(on.byId.shapes.reason).toContain('cannot be saved');
+    expect(on.byId.shapes.reason).toContain('rounded rectangles');
+    expect(on.byId.sparklines.status).toBe('writable');
+    expect(on.byId.slicers.status).toBe('writable');
+
+    const off = summarizeSpreadsheetCompatibility(wb({}));
+    expect([off.byId.shapes, off.byId.sparklines, off.byId.slicers].map((i) => i.status)).toEqual([
+      'session',
+      'session',
+      'session',
+    ]);
+  });
+
   it('surfaces scoped defined names as an engine capability', () => {
     const wb = {
       capabilities: {

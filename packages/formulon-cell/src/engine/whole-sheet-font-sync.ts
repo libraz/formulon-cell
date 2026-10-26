@@ -182,6 +182,16 @@ const remapSessionObjects = (state: State, mapIndex: SheetIndexMapper): State =>
     next = { ...next, illustrations: { illustrations } };
   }
 
+  if (state.slicers.slicers.some((spec) => spec.sheet !== undefined && moved(spec.sheet))) {
+    const slicers = state.slicers.slicers.flatMap((spec) => {
+      if (spec.sheet === undefined) return [spec];
+      const sheet = mapIndex(spec.sheet);
+      if (sheet === null) return [];
+      return [sheet === spec.sheet ? spec : { ...spec, sheet }];
+    });
+    next = { ...next, slicers: { slicers } };
+  }
+
   const sparklines = remapAddressMap(state.sparkline.sparklines, mapIndex);
   if (sparklines.changed) next = { ...next, sparkline: { sparklines: sparklines.map } };
 

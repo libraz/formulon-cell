@@ -1,14 +1,42 @@
-import type { Range } from '../engine/types.js';
 import { DEFAULT_OUTLINE_SUMMARY } from './outline-summary.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
+  AllowedEditRange,
   OutlineSummary,
   PageSetup,
+  ProtectionSlice,
   SheetProtectionPasswordHash,
   SheetProtectionPermissions,
   SheetProtectionState,
+  WorkbookStructureProtectionState,
 } from './types.js';
 import { defaultPageSetup } from './types.js';
+
+const withoutSheetUnlocks = (
+  protection: ProtectionSlice,
+  sheet: number,
+): ReadonlySet<string> | undefined => {
+  const unlocked = protection.unlockedAllowedRanges;
+  if (!unlocked?.size) return unlocked;
+  const sheetIds = new Set(
+    protection.allowedEditRanges.filter((e) => e.range.sheet === sheet).map((e) => e.id),
+  );
+  return new Set([...unlocked].filter((id) => !sheetIds.has(id)));
+};
+
+const setRangeUnlocked = (store: SpreadsheetStore, id: string, unlocked: boolean): void => {
+  store.setState((s) => {
+    const current = s.protection.unlockedAllowedRanges ?? new Set<string>();
+    if (current.has(id) === unlocked) return s;
+    const next = new Set(current);
+    if (unlocked) next.add(id);
+    else next.delete(id);
+    return { ...s, protection: { ...s.protection, unlockedAllowedRanges: next } };
+  });
+};
+
+export const newAllowedEditRangeId = (): string =>
+  `allowed-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 /** Per-sheet and workbook settings: protection, allowed-edit ranges, page
  *  setup and sheet tab colors. */
@@ -44,7 +72,18 @@ export const sheetSettingsMutators = {
       } else {
         return s;
       }
-      return { ...s, protection: { ...s.protection, protectedSheets: next } };
+      // Unprotecting ends the session unlocks of that sheet's ranges.
+      const unlockedAllowedRanges = on
+        ? s.protection.unlockedAllowedRanges
+        : withoutSheetUnlocks(s.protection, sheet);
+      return {
+        ...s,
+        protection: {
+          ...s.protection,
+          protectedSheets: next,
+          ...(unlockedAllowedRanges ? { unlockedAllowedRanges } : {}),
+        },
+      };
     });
   },
 
@@ -55,14 +94,18 @@ export const sheetSettingsMutators = {
   setWorkbookStructureProtected(
     store: SpreadsheetStore,
     on: boolean,
-    options?: { password?: string },
+    options?: WorkbookStructureProtectionState,
   ): void {
     store.setState((s) => {
       const current = s.protection.workbookStructure;
       if (on) {
-        const next: { password?: string } = {};
+        const next: WorkbookStructureProtectionState = {};
         if (options?.password !== undefined) next.password = options.password;
-        if (current && current.password === next.password) return s;
+        if (options?.legacyPasswordHash !== undefined) {
+          next.legacyPasswordHash = options.legacyPasswordHash;
+        }
+        if (options?.passwordHash !== undefined) next.passwordHash = { ...options.passwordHash };
+        if (current && JSON.stringify(current) === JSON.stringify(next)) return s;
         return { ...s, protection: { ...s.protection, workbookStructure: next } };
       }
       if (!current) return s;
@@ -73,18 +116,11 @@ export const sheetSettingsMutators = {
 
   addAllowedEditRange(
     store: SpreadsheetStore,
-    entry: { id?: string; title: string; range: Range; password?: string },
+    entry: Omit<AllowedEditRange, 'id'> & { id?: string },
   ): string {
-    const id =
-      entry.id ??
-      `allowed-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = entry.id ?? newAllowedEditRangeId();
     store.setState((s) => {
-      const nextEntry = {
-        id,
-        title: entry.title,
-        range: entry.range,
-        ...(entry.password !== undefined ? { password: entry.password } : {}),
-      };
+      const nextEntry: AllowedEditRange = { ...entry, id };
       const next = s.protection.allowedEditRanges.filter((r) => r.id !== id);
       return {
         ...s,
@@ -92,6 +128,44 @@ export const sheetSettingsMutators = {
       };
     });
     return id;
+  },
+
+  /** Replace one entry in place, keeping its position. A no-op for an unknown id. */
+  replaceAllowedEditRange(store: SpreadsheetStore, entry: AllowedEditRange): void {
+    store.setState((s) => {
+      const at = s.protection.allowedEditRanges.findIndex((r) => r.id === entry.id);
+      if (at < 0) return s;
+      const next = [...s.protection.allowedEditRanges];
+      next[at] = entry;
+      return { ...s, protection: { ...s.protection, allowedEditRanges: next } };
+    });
+  },
+
+  removeAllowedEditRange(store: SpreadsheetStore, id: string): void {
+    store.setState((s) => {
+      const next = s.protection.allowedEditRanges.filter((r) => r.id !== id);
+      if (next.length === s.protection.allowedEditRanges.length) return s;
+      return { ...s, protection: { ...s.protection, allowedEditRanges: next } };
+    });
+    setRangeUnlocked(store, id, false);
+  },
+
+  /** Mark a password-guarded range unlocked (or locked again) for this session. */
+  setAllowedEditRangeUnlocked: setRangeUnlocked,
+
+  /** Replace every entry of `sheet` with `entries`, leaving other sheets alone. */
+  setAllowedEditRangesForSheet(
+    store: SpreadsheetStore,
+    sheet: number,
+    entries: readonly AllowedEditRange[],
+  ): void {
+    store.setState((s) => {
+      const others = s.protection.allowedEditRanges.filter((r) => r.range.sheet !== sheet);
+      return {
+        ...s,
+        protection: { ...s.protection, allowedEditRanges: [...others, ...entries] },
+      };
+    });
   },
 
   clearAllowedEditRanges(store: SpreadsheetStore, sheet?: number): void {

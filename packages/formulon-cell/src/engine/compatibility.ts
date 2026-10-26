@@ -15,12 +15,17 @@ export type SpreadsheetCompatibilityId =
   | 'comments'
   | 'threaded-comments'
   | 'images'
+  | 'shapes'
+  | 'sparklines'
+  | 'slicers'
   | 'workbook-theme'
   | 'phonetic'
   | 'defined-names'
   | 'named-cell-styles'
   | 'auto-filter'
   | 'sheet-protection'
+  | 'workbook-protection'
+  | 'protected-ranges'
   | 'sheet-views'
   | 'page-setup'
   | 'loaded-tables'
@@ -127,6 +132,30 @@ export function summarizeSpreadsheetCompatibility(
         : 'Pictures are available as session overlays.',
     },
     {
+      id: 'shapes',
+      label: 'Shapes',
+      status: c.shapes ? 'writable' : 'session',
+      reason: c.shapes
+        ? 'Rectangles, rounded rectangles, ovals, triangles, diamonds and lines are saved with the workbook; arrows, dash styles and partial transparency cannot be saved.'
+        : 'Shapes are available as session overlays.',
+    },
+    {
+      id: 'sparklines',
+      label: 'Sparklines',
+      status: c.sparklines ? 'writable' : 'session',
+      reason: c.sparklines
+        ? 'Sparkline groups are loaded, edited and saved with the workbook.'
+        : 'Sparklines are available as session overlays.',
+    },
+    {
+      id: 'slicers',
+      label: 'Table slicers',
+      status: c.slicers ? 'writable' : 'session',
+      reason: c.slicers
+        ? 'Table slicers are loaded, edited and saved with the workbook; the selection lives in the table filter.'
+        : 'Slicers are available as session overlays.',
+    },
+    {
       id: 'workbook-theme',
       label: 'Workbook theme',
       status: c.workbookTheme ? 'writable' : 'unsupported',
@@ -227,6 +256,22 @@ export function summarizeSpreadsheetCompatibility(
       reason: c.sheetProtectionRoundtrip
         ? 'Sheet protection metadata can round-trip through the engine.'
         : 'Protection UI state can be hosted for the session, but engine writeback is unavailable.',
+    },
+    {
+      id: 'workbook-protection',
+      label: 'Workbook protection',
+      status: c.workbookProtectionRoundtrip ? 'writable' : 'session',
+      reason: c.workbookProtectionRoundtrip
+        ? 'Workbook structure protection and its password hash can round-trip through the engine.'
+        : 'Workbook structure protection can be hosted for the session, but engine writeback is unavailable.',
+    },
+    {
+      id: 'protected-ranges',
+      label: 'Protected ranges',
+      status: c.protectedRanges ? 'writable' : 'session',
+      reason: c.protectedRanges
+        ? 'Allowed edit ranges, their password hashes and security descriptors can round-trip through the engine.'
+        : 'Allowed edit ranges can be hosted for the session, but engine writeback is unavailable.',
     },
     {
       id: 'sheet-views',

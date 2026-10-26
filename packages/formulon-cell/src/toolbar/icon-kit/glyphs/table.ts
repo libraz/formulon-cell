@@ -31,6 +31,10 @@ const STYLED = {
 /** The brush that lays a style down, crossing the grid's lower-right corner. */
 const styleBrush = brush({ bristle: PALETTE.info, cx: 16.4, cy: 15.6, size: 13.6, rotate: 40 });
 
+/** A four-by-four table with the region a Table Design option switches on picked out. */
+const option = (bands: NonNullable<Parameters<typeof sheet>[0]>['bands']) =>
+  sheet({ x: 2.4, y: 3.4, w: 19.2, h: 17.2, cols: 4, rows: 4, bands });
+
 export const TABLE_ICONS = {
   table: table(FULL, PALETTE.accent),
   tableStyle: [
@@ -40,6 +44,20 @@ export const TABLE_ICONS = {
     }),
     ...styleBrush,
   ],
+
+  // Table Design options: the header, total, stripe or edge band each one adds.
+  tableHeaderRow: option([{ axis: 'row', index: 0, fill: PALETTE.accent }]),
+  tableTotalRow: option([{ axis: 'row', index: 3, fill: PALETTE.accent }]),
+  tableBandedRows: option([
+    { axis: 'row', index: 1, fill: PALETTE.infoSoft },
+    { axis: 'row', index: 3, fill: PALETTE.infoSoft },
+  ]),
+  tableBandedColumns: option([
+    { axis: 'col', index: 1, fill: PALETTE.infoSoft },
+    { axis: 'col', index: 3, fill: PALETTE.infoSoft },
+  ]),
+  tableFirstColumn: option([{ axis: 'col', index: 0, fill: PALETTE.accent }]),
+  tableLastColumn: option([{ axis: 'col', index: 3, fill: PALETTE.accent }]),
 
   // A pivot pulls a summary out of the source grid.
   pivotTable: [

@@ -85,6 +85,7 @@ describe('toolbar/ribbon menu primitives', () => {
       applyShapeOutlineWeightAction: vi.fn(),
       applyShapeOutlineDashAction: vi.fn(),
       updateShapeOutlineMenu: vi.fn(),
+      updateShapesInsertMenu: vi.fn(),
       applyUiTheme: vi.fn(),
       applyWorkbookTheme: vi.fn(),
       focusSheet: vi.fn(),

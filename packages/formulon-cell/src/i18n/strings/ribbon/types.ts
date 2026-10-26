@@ -130,6 +130,21 @@ export interface RibbonStrings {
     shapeStyles: string;
     shapeFill: string;
     shapeOutline: string;
+    tableProperties: string;
+    tableName: string;
+    tableStyleOptions: string;
+    headerRow: string;
+    totalRow: string;
+    bandedRows: string;
+    bandedColumns: string;
+    firstColumn: string;
+    lastColumn: string;
+    tableTotalsNone: string;
+    tableNameInvalid: string;
+    tableNameDuplicate: string;
+    tableSessionOnly: string;
+    tableShiftBlocked: string;
+    tableTotalsFunction: string;
     window: string;
     freeze: string;
     names: string;
@@ -334,6 +349,7 @@ export interface RibbonStrings {
       chartFormat: string;
       shapeFormat: string;
       pictureFormat: string;
+      tableDesign: string;
     };
     /** Composed-label templates. `{name}` / `{percent}` are interpolated at use. */
     functionArgumentsTitle: string;

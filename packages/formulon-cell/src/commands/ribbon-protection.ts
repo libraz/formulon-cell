@@ -5,9 +5,10 @@
 // they can drop straight onto their ribbon-report shell.
 
 import { formatA1Range } from '../engine/address.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { addAllowedEditRange, clearAllowedEditRanges } from './protection.js';
+import { addAllowedEditRange, clearAllowedEditRanges, isSheetProtected } from './protection.js';
 
 type ProtectionStrings = Pick<
   Strings['ribbonMenu'],
@@ -16,6 +17,7 @@ type ProtectionStrings = Pick<
   | 'allowEditRangesClearCommand'
   | 'allowedEditRangeAddedStatus'
   | 'allowedEditRangesClearedStatus'
+  | 'allowEditRangesRequiresUnprotected'
 >;
 
 export type RibbonProtectionAction = 'allow-edit-range' | 'clear-allowed-edit-ranges';
@@ -27,6 +29,8 @@ export interface RibbonProtectionReport {
 
 export interface ExecuteRibbonProtectionActionDeps {
   store: SpreadsheetStore;
+  /** When given, range changes are written through to the engine. */
+  workbook?: WorkbookHandle;
   action: RibbonProtectionAction;
   strings: ProtectionStrings;
 }
@@ -37,12 +41,25 @@ export interface ExecuteRibbonProtectionActionDeps {
 export const executeRibbonProtectionAction = (
   deps: ExecuteRibbonProtectionActionDeps,
 ): RibbonProtectionReport => {
-  const { store, action, strings } = deps;
+  const { store, workbook, action, strings } = deps;
   const state = store.getState();
   const range = state.selection.range;
+  const sheet = action === 'allow-edit-range' ? range.sheet : state.data.sheetIndex;
+  if (isSheetProtected(state, sheet)) {
+    return {
+      title: strings.allowEditRangesDialogTitle,
+      items: [
+        {
+          severity: 'warning',
+          label: strings.allowEditRangesCommand,
+          detail: strings.allowEditRangesRequiresUnprotected,
+        },
+      ],
+    };
+  }
   if (action === 'allow-edit-range') {
     const rangeText = formatA1Range(range);
-    addAllowedEditRange(store, range, { title: rangeText });
+    addAllowedEditRange(store, range, { title: rangeText, workbook });
     return {
       title: strings.allowEditRangesDialogTitle,
       items: [
@@ -54,7 +71,7 @@ export const executeRibbonProtectionAction = (
       ],
     };
   }
-  clearAllowedEditRanges(store, state.data.sheetIndex);
+  clearAllowedEditRanges(store, state.data.sheetIndex, { workbook });
   return {
     title: strings.allowEditRangesDialogTitle,
     items: [

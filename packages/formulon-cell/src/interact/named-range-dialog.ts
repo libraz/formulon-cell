@@ -399,7 +399,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       button.dataset.sortDir = selected ? sortDir : '';
     }
     const canMutate = wb.capabilities.definedNameMutate;
-    const allRows = [...wb.definedNames()];
+    const allRows = [...wb.definedNames()].filter((entry) => !entry.hidden);
     currentRows = allRows.filter((entry) => {
       if (activeFilter === 'errors') return hasFormulaError(entry.formula);
       if (activeFilter === 'noErrors') return !hasFormulaError(entry.formula);
@@ -434,7 +434,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       scope.textContent = scopeLabel(entry.localSheetId);
       const comment = document.createElement('span');
       comment.className = 'fc-namedlg__row-comment';
-      comment.textContent = '';
+      comment.textContent = entry.comment ?? '';
       item.addEventListener('click', () => {
         selectedNameIndex = rowIndex;
         updateRowSelection();
@@ -503,7 +503,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       case 'value':
         return definedNameValueText(wb, entry);
       case 'comment':
-        return '';
+        return entry.comment ?? '';
       default:
         return entry.name;
     }
@@ -636,7 +636,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     editingEntry = entry ?? null;
     projectDisabledState(scopeSelect, mode === 'edit', null);
     scopeSelect.value = String(entry?.localSheetId ?? -1);
-    commentInput.value = '';
+    commentInput.value = entry?.comment ?? '';
     if (entry) {
       nameInput.value = entry.name;
       formulaInput.value = definedNameDisplayFormula(entry.formula);
@@ -743,14 +743,17 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     name: string,
     formula: string,
     scope: number,
+    comment: string,
   ): ReturnType<typeof upsertDefinedName> => {
     const renamed = previous !== null && previous.name !== name.trim();
     // A case-only rename addresses the same engine entry, so the old one goes first.
     const caseOnly = renamed && isSameDefinedName(previous.name, name);
     if (renamed && caseOnly) deleteDefinedName(wb, previous.name, scope);
-    const result = upsertDefinedName(wb, name, formula, scope);
+    const result = upsertDefinedName(wb, name, formula, scope, { comment });
     if (!result.ok && renamed && caseOnly) {
-      upsertDefinedName(wb, previous.name, previous.formula, scope);
+      upsertDefinedName(wb, previous.name, previous.formula, scope, {
+        comment: previous.comment ?? '',
+      });
     }
     if (renamed && !caseOnly) {
       if (result.ok && !deleteDefinedName(wb, previous.name, scope).ok) {
@@ -780,7 +783,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       return;
     }
     const result = recordDefinedNamesChange(history, wb, () =>
-      replaceDefinedName(previous, name, formula, scope),
+      replaceDefinedName(previous, name, formula, scope, commentInput.value.trim()),
     );
     if (!result.ok) {
       showError(errorMessageFor(result.reason, t));
@@ -809,6 +812,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     setReadOnlyState(deleteBtn, !canMutate);
     setReadOnlyState(quickInput, !canMutate);
     setReadOnlyState(quickCommitBtn, !canMutate);
+    // The engine must be able to store the note, or the field would silently drop it.
+    setReadOnlyState(commentInput, !wb.capabilities.definedNameAttrs);
     if (canMutate) {
       setStateDisabledReason(
         filterBtn,

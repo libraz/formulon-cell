@@ -2,6 +2,7 @@ import { commitCellInput, inputOperation } from '../commands/cell-input-commit.j
 import { coerceInput, inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { dblClickRange, extractRefs, rotateRefAt } from '../commands/refs.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
@@ -221,6 +222,8 @@ export class InlineEditor {
     this.invalidateLease();
     const s = this.deps.store.getState();
     const a = s.selection.active;
+    const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+    if (deferForAllowedRangeUnlock(this.deps.store, [cell], () => this.begin(seed))) return;
     const controller = interactionControllerFor(this.deps.store);
     if (controller && controller.policy !== undefined) {
       const operation = inputOperation(seed);

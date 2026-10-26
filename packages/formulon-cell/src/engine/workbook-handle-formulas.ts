@@ -592,16 +592,29 @@ export abstract class WorkbookHandleFormulasMethods {
     return r.text || null;
   }
 
-  /** Iterate over defined names. `localSheetId === -1` means workbook scope;
-   *  otherwise it is the 0-based sheet index for a sheet-scoped name. */
-  *definedNames(): Generator<{ name: string; formula: string; localSheetId: number }> {
+  /** Iterate over defined names, hidden ones included. `localSheetId === -1`
+   *  means workbook scope; otherwise it is the 0-based sheet index for a
+   *  sheet-scoped name. `comment` and `hidden` are omitted when unset. */
+  *definedNames(): Generator<{
+    name: string;
+    formula: string;
+    localSheetId: number;
+    comment?: string;
+    hidden?: boolean;
+  }> {
     assertAlive(this);
     const n = numberValue(wb(this).definedNameCount(), 'definedNameCount');
     for (let i = 0; i < n; i += 1) {
       const e = wb(this).definedNameAt(i);
       if (!e.status.ok || !e.name || e.formula === undefined || e.localSheetId === undefined)
         continue;
-      yield { name: e.name, formula: e.formula, localSheetId: e.localSheetId };
+      yield {
+        name: e.name,
+        formula: e.formula,
+        localSheetId: e.localSheetId,
+        ...(e.comment ? { comment: e.comment } : {}),
+        ...(e.hidden ? { hidden: true } : {}),
+      };
     }
   }
 
@@ -613,6 +626,19 @@ export abstract class WorkbookHandleFormulasMethods {
     if (!this.capabilities.definedNameMutate) return false;
     const s = wb(this).setDefinedNameScoped(name, formula, localSheetId);
     return s.ok;
+  }
+
+  /** Set the comment and/or hidden flag of an existing defined name; an
+   *  omitted key is left unchanged. Returns false when the name is missing or
+   *  the engine lacks the API. */
+  setDefinedNameAttrs(
+    name: string,
+    localSheetId: number,
+    attrs: { comment?: string; hidden?: boolean },
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.definedNameAttrs) return false;
+    return wb(this).setDefinedNameAttrs(name, localSheetId, attrs).ok;
   }
 }
 

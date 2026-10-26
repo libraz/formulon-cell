@@ -20,6 +20,7 @@ import type {
   PaperSize,
   WorkbookViewMode,
 } from '../store/types.js';
+import { projectTableDesign } from './ribbon/table-design.js';
 
 /**
  * Ribbon active-state contract shared by every framework wrapper.
@@ -472,6 +473,7 @@ export const projectRibbonActiveState = (
       }
     }
   }
+  projectTableDesign(host, instance);
   const buttons = indexRibbonButtons(host);
   for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
     const button = buttons.get(command)?.[0];

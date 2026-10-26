@@ -151,10 +151,10 @@ describe('table mirror', () => {
 
     expect(updateTableOverlay(store, overlay?.id ?? '', { style: 'dark' })).not.toBeNull();
 
-    expect(updateTable).toHaveBeenCalledWith(0, { styleName: 'TableStyleDark1' });
+    expect(updateTable).toHaveBeenCalledWith(0, { styleName: 'TableStyleDark2' });
     expect(createTable).not.toHaveBeenCalled();
     expect(wb.getTables()).toHaveLength(1);
-    expect(tableXml(wb)).toContain('TableStyleDark1');
+    expect(tableXml(wb)).toContain('TableStyleDark2');
   });
 
   it('resizes a table, re-creating it when the column count changes', async () => {

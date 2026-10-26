@@ -11,6 +11,7 @@ import {
   restoreSyncedFormatKeyMembership,
   syncNamedStyleCatalogToEngine,
 } from './cell-format-sync.js';
+import { DrawingObjectMirror } from './drawing-object-mirror.js';
 import {
   createFormatHistoryBridge,
   type FormatHistoryBridge,
@@ -160,9 +161,12 @@ const sameHiddenRows = (
 export class StoreMirror {
   constructor(private readonly handle: WorkbookHandle) {
     this.tables = new TableMirror(handle);
+    this.drawingObjects = new DrawingObjectMirror(handle);
   }
 
   private readonly tables: TableMirror;
+
+  private readonly drawingObjects: DrawingObjectMirror;
 
   /** Optional mount store whose AutoFilter and page-setup slices are mirrored
    * into the engine as they change. Keeping this association at the adapter
@@ -252,8 +256,11 @@ export class StoreMirror {
     this.unsubscribeBoundStore = store.subscribe((state) => {
       // Tables go first: creating or removing one edits the filter ranges in
       // a nested notification, which mirrors every slice from the newer state.
-      if (this.storeSyncMuted > 0) this.tables.rebase(store.getState().tables.tables);
-      else if (this.tables.sync(store)) return;
+      if (this.storeSyncMuted > 0) {
+        this.tables.rebase(store.getState().tables);
+        this.drawingObjects.rebase(store.getState());
+      } else if (this.tables.sync(store)) return;
+      else if (this.drawingObjects.sync(store)) return;
       associatePaginationEngine(state, this.handle);
       const nextFormats = state.format.formats;
       const formatSheets = changedFormatSheets(this.lastFormatEntries, nextFormats);
@@ -362,6 +369,7 @@ export class StoreMirror {
     this.lastHiddenRows = state?.layout.hiddenRows ?? null;
     this.lastHiddenRowsSheet = state?.data.sheetIndex ?? null;
     this.lastPageSetupMap = state?.pageSetup.setupBySheet ?? null;
-    this.tables.rebase(state?.tables.tables ?? null);
+    this.tables.rebase(state?.tables ?? null);
+    this.drawingObjects.rebase(state ?? null);
   }
 }

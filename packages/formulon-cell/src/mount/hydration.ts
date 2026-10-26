@@ -11,6 +11,8 @@ import { summarizePassthroughs, summarizeTables } from '../engine/passthrough-sy
 import { hydratePageSetupFromEngine } from '../engine/print-sync.js';
 import { hydrateProtectionFromEngine } from '../engine/protection-sync.js';
 import { hydrateSheetPrFromEngine } from '../engine/sheet-pr-sync.js';
+import { hydrateSlicersFromEngine } from '../engine/slicer-sync.js';
+import { hydrateSparklinesFromEngine } from '../engine/sparkline-sync.js';
 import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -23,6 +25,7 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
     mutators.replaceCells(store, wb.cells(sheet));
     hydrateLayoutFromEngine(wb, store, sheet);
     hydrateImagesFromEngine(wb, store, sheet);
+    hydrateSparklinesFromEngine(wb, store, sheet);
     hydrateChartsFromEngine(wb, store, sheet);
     hydrateThreadedCommentsFromEngine(wb, store, sheet);
     hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
@@ -60,6 +63,7 @@ export function hydrateWorkbookMetadataFromEngine(
   hydrateProtectionFromEngine(wb, store);
   hydrateSheetPrFromEngine(wb, store);
   hydrateTableOverlaysFromEngine(wb, store);
+  hydrateSlicersFromEngine(wb, store);
 }
 
 export function dispatchWorkbookObjectSummaries(host: HTMLElement, wb: WorkbookHandle): void {

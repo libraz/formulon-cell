@@ -34,20 +34,44 @@ export function sparklineAt(
   return spec ? { ...spec } : null;
 }
 
+let groupSeq = 0;
+
+/** A group id no other sparkline of this session shares. */
+export const newSparklineGroupId = (): string => {
+  groupSeq += 1;
+  return `sparkline-group-${groupSeq}`;
+};
+
+/** Attach several sparklines as one group, which is one engine group and one
+ *  undo step. Nothing is written when a host cell is protected. */
+export function setSparklines(
+  store: SpreadsheetStore,
+  entries: readonly SparklineEntry[],
+  history: History | null = null,
+): boolean {
+  for (const { addr } of entries) {
+    if (!isCellWritable(store.getState(), addr)) {
+      warnProtected(addr);
+      return false;
+    }
+  }
+  // A lone sparkline is its own group; several created together share one.
+  const group = entries.length > 1 ? newSparklineGroupId() : undefined;
+  recordSparklineChange(history, store, () => {
+    for (const { addr, spec } of entries) {
+      mutators.setSparkline(store, addr, group === undefined ? spec : { ...spec, group });
+    }
+  });
+  return true;
+}
+
 export function setSparkline(
   store: SpreadsheetStore,
   addr: Addr,
   spec: Sparkline,
   history: History | null = null,
 ): boolean {
-  if (!isCellWritable(store.getState(), addr)) {
-    warnProtected(addr);
-    return false;
-  }
-  recordSparklineChange(history, store, () => {
-    mutators.setSparkline(store, addr, spec);
-  });
-  return true;
+  return setSparklines(store, [{ addr, spec }], history);
 }
 
 export function clearSparkline(
@@ -89,19 +113,19 @@ export function clearSparklinesInRange(
 
 /** Split `Sheet2!B2:B9` / `'My Sheet'!B2:B9` into its qualifier (with the `!`)
  *  and the A1 body; the qualifier is empty for a bare range. */
-const splitSourceQualifier = (source: string): { qualifier: string; body: string } => {
+export const splitSourceQualifier = (source: string): { qualifier: string; body: string } => {
   const bang = source.lastIndexOf('!');
   return bang < 0
     ? { qualifier: '', body: source }
     : { qualifier: source.slice(0, bang + 1), body: source.slice(bang + 1) };
 };
 
-const unquoteSheetName = (qualifier: string): string => {
+export const unquoteSheetName = (qualifier: string): string => {
   const name = qualifier.slice(0, -1);
   return name.startsWith("'") && name.endsWith("'") ? name.slice(1, -1).replace(/''/g, "'") : name;
 };
 
-const quoteSheetName = (name: string): string =>
+export const quoteSheetName = (name: string): string =>
   /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`;
 
 /** Re-point sparklines after a row/column insert or delete on `sheet`: host

@@ -335,7 +335,8 @@ describe('Spreadsheet.mountToolbar', () => {
     ]);
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'formatTableHome', menuId: 'menu-table-style-home' },
-      tableButton,
+      // The Table Design tab appearing re-renders the ribbon.
+      host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]'),
     );
     const activeStyleButton = host.querySelector<HTMLButtonElement>(
       '[data-table-style="dark"][data-table-color="#4472c4"][data-table-variant="banded"]',
@@ -358,8 +359,9 @@ describe('Spreadsheet.mountToolbar', () => {
         range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
         style: 'light',
         color: '#ed7d31',
-        banded: false,
-        firstCol: true,
+        // The pick changes the look only; the table keeps its own style options.
+        banded: true,
+        firstCol: false,
       },
     ]);
     sheet.instance.history.undo();

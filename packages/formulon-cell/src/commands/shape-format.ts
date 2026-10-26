@@ -121,6 +121,16 @@ export const shapeOutlineDashPatch = (
   lineWidth: visibleWeight(item),
 });
 
+/** Whether the shape's style can be changed: a shape drawn only as its
+ *  bounding box has none of its own. */
+export const shapeStyleEditable = (item: SessionIllustration): boolean =>
+  item.kind === 'shape' && !item.nativeLocked;
+
+/** Whether the outline dash can be set: the file stores no dash style, so a
+ *  shape saved with the workbook has none. */
+export const shapeDashEditable = (item: SessionIllustration): boolean =>
+  shapeStyleEditable(item) && item.nativeObjectId === undefined;
+
 const applyShapePatch = (
   store: SpreadsheetStore,
   item: SessionIllustration,
@@ -129,7 +139,7 @@ const applyShapePatch = (
   history: History | null,
   wb?: WorkbookHandle,
 ): SessionIllustration | null =>
-  item.kind === 'shape'
+  shapeStyleEditable(item)
     ? updateSessionIllustration(store, item.id, patch, history, wb, {
         origin: 'ribbon',
         commandId,
@@ -180,6 +190,7 @@ export function applySessionShapeOutlineDash(
   history: History | null = null,
   wb?: WorkbookHandle,
 ): SessionIllustration | null {
+  if (!shapeDashEditable(item)) return null;
   const patch = shapeOutlineDashPatch(item, dash);
   return applyShapePatch(store, item, patch, 'shapeOutline', history, wb);
 }

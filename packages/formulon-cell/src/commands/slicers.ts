@@ -11,6 +11,13 @@ export interface CreateSlicerOptions {
   selected?: readonly string[];
   x?: number;
   y?: number;
+  w?: number;
+  h?: number;
+  /** Sheet hosting the slicer; defaults to the sheet of its table. */
+  sheet?: number;
+  caption?: string;
+  style?: string;
+  columnCount?: number;
 }
 
 export type CreateSlicerResult =
@@ -86,6 +93,12 @@ export function createSlicer(
     selected: options.selected ? [...options.selected] : [],
     x: options.x,
     y: options.y,
+    ...(options.sheet !== undefined ? { sheet: options.sheet } : {}),
+    ...(options.w !== undefined ? { w: options.w } : {}),
+    ...(options.h !== undefined ? { h: options.h } : {}),
+    ...(options.caption !== undefined ? { caption: options.caption } : {}),
+    ...(options.style !== undefined ? { style: options.style } : {}),
+    ...(options.columnCount !== undefined ? { columnCount: options.columnCount } : {}),
   };
   mutators.addSlicer(store, spec);
   return { ok: true, spec };

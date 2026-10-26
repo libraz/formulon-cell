@@ -139,7 +139,6 @@ export const dataObjectsEn: DataObjectsStrings = {
     createPivotTable: 'Create PivotTable...',
     editPivotTable: 'Edit',
     pivotFieldList: 'PivotTable Fields',
-    pivotFieldListCheckboxReadOnly: 'Use the field area controls below to move PivotTable fields.',
     backToWorkbookObjects: 'Back to Workbook Objects',
     pivotAvailableFields: 'Choose fields to add to report',
     pivotName: 'Name',
@@ -150,6 +149,12 @@ export const dataObjectsEn: DataObjectsStrings = {
     pivotAreaFilters: 'Filters',
     pivotAreaValues: 'Values',
     pivotAreaNone: 'Not in report',
+    pivotSubtotals: 'Subtotals',
+    pivotSubtotalAutomatic: 'Automatic',
+    pivotSubtotalNone: 'None',
+    pivotSubtotalCustom: 'Custom',
+    pivotSubtotalCustomEmpty:
+      'Select at least one function for the custom subtotal, or choose Automatic.',
     pivotAggregation: 'Summarize by',
     pivotAggregateSum: 'Sum',
     pivotAggregateCount: 'Count',
@@ -176,6 +181,8 @@ export const dataObjectsEn: DataObjectsStrings = {
     objectSelect: 'Select',
     objectDuplicate: 'Duplicate',
     objectDelete: 'Delete',
+    shapeLocked:
+      'This shape cannot be redrawn by the editor, so it can be moved but not deleted, copied or restyled.',
     shapeColor: 'Shape color',
     shapeRadius: 'Corner radius',
     shapeLineWidth: 'Line width',
@@ -212,12 +219,17 @@ export const dataObjectsEn: DataObjectsStrings = {
       comments: 'Comments',
       threadedComments: 'Threaded comments',
       images: 'Images',
+      shapes: 'Shapes',
+      sparklines: 'Sparklines',
+      slicers: 'Table slicers',
       workbookTheme: 'Workbook theme',
       phonetic: 'Phonetic guides',
       definedNames: 'Defined names',
       namedCellStyles: 'Named cell styles',
       autoFilter: 'AutoFilter',
       sheetProtection: 'Sheet protection',
+      workbookProtection: 'Workbook protection',
+      protectedRanges: 'Protected ranges',
       sheetViews: 'Sheet views',
       pageSetup: 'Page setup',
       loadedTables: 'Loaded tables',
@@ -242,7 +254,13 @@ export const dataObjectsEn: DataObjectsStrings = {
       threadedComments:
         'Comments, replies, people and resolution are saved in XLSX when the engine supports threaded comments.',
       images:
-        'When the engine supports images, newly inserted pictures can be edited and saved in XLSX. Loaded pictures are read-only; native picture reordering is unavailable. Shapes remain session overlays.',
+        'When the engine supports images, newly inserted pictures can be edited and saved in XLSX. Loaded pictures are read-only; native picture reordering is unavailable.',
+      shapes:
+        'Rectangles, rounded rectangles, ovals, triangles, diamonds and lines are saved in XLSX. Arrows, dash styles and partial transparency cannot be saved, so those controls are unavailable for saved shapes. Loaded shapes the editor cannot draw appear as dashed outlines.',
+      sparklines:
+        'Sparkline groups are loaded from XLSX, then edited and saved with their colours, markers, axes and other group settings.',
+      slicers:
+        'Table slicers are loaded from XLSX, then edited and saved. The selected items are stored in the table filter.',
       workbookTheme:
         'Theme colours and major/minor typefaces can be edited separately from the application appearance.',
       phonetic:
@@ -254,6 +272,10 @@ export const dataObjectsEn: DataObjectsStrings = {
       autoFilter: 'Persisted AutoFilter definitions require engine read/write APIs.',
       sheetProtection:
         'Protection UI state can be hosted and can round-trip when engine metadata is available.',
+      workbookProtection:
+        'Workbook structure protection can be hosted and can round-trip with its password hash.',
+      protectedRanges:
+        'Allowed edit ranges can be hosted and can round-trip with their password hashes.',
       sheetViews: 'Sheet views can be captured and restored in the UI for the current session.',
       pageSetup:
         'Orientation, paper, scaling, margins, print options, header/footer, print area, print titles and manual breaks round-trip when the engine exposes print settings.',

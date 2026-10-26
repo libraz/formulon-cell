@@ -7,6 +7,7 @@ import {
   placementForPixels,
   sessionPosition,
 } from './drawing-geometry.js';
+import { shapeFromNative } from './shapes-sync.js';
 import type { EngineDrawingAnchor } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type { EngineDrawingObject, EngineImage } from './workbook-handle-annotations.js';
@@ -74,50 +75,81 @@ const imageFromNative = (
   };
 };
 
-/** Hydrate persisted pictures while leaving shapes, charts and other drawing
- * objects untouched. Non-picture objects remain session-only by design. */
+/** Run `fn` without mirroring its store writes back into the engine. */
+const muted = (wb: WorkbookHandle, fn: () => void): void => {
+  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(fn);
+  else fn();
+};
+
+/** Drop the native projections of `sheet` (every sheet when omitted). Overlays
+ *  without a native object stay. */
+const dropNativeProjections = (store: SpreadsheetStore, sheet?: number): void => {
+  store.setState((state) => {
+    const illustrations = state.illustrations.illustrations.filter(
+      (item) => (sheet !== undefined && item.sheet !== sheet) || item.nativeObjectId === undefined,
+    );
+    return illustrations.length === state.illustrations.illustrations.length
+      ? state
+      : { ...state, illustrations: { illustrations } };
+  });
+};
+
+/** Hydrate the pictures and shapes of `sheet` in drawing order. Charts and
+ * other drawing objects are not projected here. */
 export function hydrateImagesFromEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
 ): void {
-  if (!wb.capabilities.images) return;
-  // A second hydration follows a workbook replacement or an undo. Remove
-  // stale native picture projections first while preserving session shapes and
-  // any images that have no native object yet.
-  store.setState((state) => {
-    const illustrations = state.illustrations.illustrations.filter(
-      (item) => item.sheet !== sheet || item.nativeObjectId === undefined,
+  if (!wb.capabilities.images && !wb.capabilities.shapes) return;
+  // A second hydration follows a workbook replacement, an undo or a structure
+  // edit: remove the stale native projections first, keeping the overlays that
+  // have no native object yet.
+  muted(wb, () => {
+    // An object keeps the overlay id it had, so selection and history stay valid.
+    const known = new Map(
+      store
+        .getState()
+        .illustrations.illustrations.filter(
+          (item) => item.sheet === sheet && item.nativeObjectId !== undefined,
+        )
+        .map((item) => [item.nativeObjectId, item.id] as const),
     );
-    return illustrations.length === state.illustrations.illustrations.length
-      ? state
-      : { ...state, illustrations: { illustrations } };
+    const named = <T extends { id: string; nativeObjectId?: number }>(item: T): T => ({
+      ...item,
+      id: known.get(item.nativeObjectId) ?? item.id,
+    });
+    dropNativeProjections(store, sheet);
+    const shapes = new Map(
+      (wb.capabilities.shapes ? wb.listShapes(sheet) : []).map((shape) => [shape.objectId, shape]),
+    );
+    for (const object of wb.listDrawingObjects(sheet)) {
+      const shape = shapes.get(object.objectId);
+      if (shape) {
+        const item = shapeFromNative(store, sheet, shape);
+        if (item) mutators.upsertIllustration(store, named(item));
+        continue;
+      }
+      if (!wb.capabilities.images || object.kind !== 0 || object.imageFormat === 0) continue;
+      const image = wb.getImage(sheet, object.objectId);
+      if (!image) continue;
+      mutators.upsertIllustration(
+        store,
+        named(imageFromNative(store, sheet, object, image)) as unknown as SessionIllustration,
+      );
+    }
   });
-  for (const object of wb.listDrawingObjects(sheet)) {
-    if (object.kind !== 0 || object.imageFormat === 0) continue;
-    const image = wb.getImage(sheet, object.objectId);
-    if (!image) continue;
-    mutators.upsertIllustration(
-      store,
-      imageFromNative(store, sheet, object, image) as unknown as SessionIllustration,
-    );
-  }
 }
 
-/** Rebuild every native picture projection after sheets moved or were removed:
- * their stored sheet indexes are stale on every sheet, not just the active one.
+/** Rebuild every native projection after sheets moved or were removed: their
+ * stored sheet indexes are stale on every sheet, not just the active one.
  * Other sheets re-project when they are next shown. */
 export function reloadImagesFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
-  if (!wb.capabilities.images) return;
-  store.setState((state) => {
-    const illustrations = state.illustrations.illustrations.filter(
-      (item) => item.nativeObjectId === undefined,
-    );
-    return illustrations.length === state.illustrations.illustrations.length
-      ? state
-      : { ...state, illustrations: { illustrations } };
+  if (!wb.capabilities.images && !wb.capabilities.shapes) return;
+  muted(wb, () => {
+    dropNativeProjections(store);
+    hydrateImagesFromEngine(wb, store, store.getState().data.sheetIndex);
   });
-  hydrateImagesFromEngine(wb, store, store.getState().data.sheetIndex);
 }
 
 export function persistentImageFromState(item: SessionIllustration): PersistedSessionImage | null {

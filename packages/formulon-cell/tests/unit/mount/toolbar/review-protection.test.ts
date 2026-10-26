@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commentAt, setComment } from '../../../../src/commands/comment.js';
+import {
+  isWorkbookStructureProtected,
+  verifyWorkbookStructurePassword,
+  whenSheetPasswordsHashed,
+} from '../../../../src/commands/protection.js';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
@@ -153,7 +158,24 @@ describe('Spreadsheet.mountToolbar', () => {
     const workbookEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(workbookEvent, 'target', { value: workbookButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(workbookEvent)).toBe(true);
-    expect(sheet.instance.store.getState().protection.workbookStructure).toEqual({});
+    await waitFor(() => Boolean(document.body.querySelector<HTMLElement>('.fc-tb__dlg')));
+    const workbookDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const workbookInputs = Array.from(
+      workbookDialog?.querySelectorAll<HTMLInputElement>('input') ?? [],
+    );
+    expect(workbookInputs).toHaveLength(2);
+    for (const input of workbookInputs) input.value = 'wb';
+    workbookDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await waitFor(() => sheet.instance.store.getState().protection.workbookStructure !== undefined);
+    expect(isWorkbookStructureProtected(sheet.instance.store.getState())).toBe(true);
+    await whenSheetPasswordsHashed();
+    expect(sheet.instance.store.getState().protection.workbookStructure?.passwordHash).toBeTruthy();
+    await expect(
+      verifyWorkbookStructurePassword(sheet.instance.store.getState(), 'wb'),
+    ).resolves.toBe(true);
+    await expect(
+      verifyWorkbookStructurePassword(sheet.instance.store.getState(), 'bad'),
+    ).resolves.toBe(false);
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'protectReview', menuId: 'menu-protect-review' },
@@ -165,6 +187,35 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(unprotectWorkbookButton?.disabled).toBe(false);
     expect(unprotectWorkbookButton?.dataset.menuDisabledReason).toBeUndefined();
+    const unprotectWorkbookEvent = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(unprotectWorkbookEvent, 'target', { value: unprotectWorkbookButton });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(unprotectWorkbookEvent)).toBe(true);
+    await waitFor(() => Boolean(document.body.querySelector<HTMLElement>('.fc-tb__dlg')));
+    const wrongInput = document.body.querySelector<HTMLInputElement>('.fc-tb__dlg input');
+    if (!wrongInput) throw new Error('Expected Unprotect Workbook password input.');
+    wrongInput.value = 'bad';
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    await waitFor(() =>
+      Boolean(
+        document.body
+          .querySelector<HTMLElement>('.fc-tb__dlg')
+          ?.textContent?.includes('The password is incorrect.'),
+      ),
+    );
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    expect(isWorkbookStructureProtected(sheet.instance.store.getState())).toBe(true);
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(unprotectWorkbookEvent)).toBe(true);
+    await waitFor(() => Boolean(document.body.querySelector<HTMLElement>('.fc-tb__dlg')));
+    const rightInput = document.body.querySelector<HTMLInputElement>('.fc-tb__dlg input');
+    if (!rightInput) throw new Error('Expected Unprotect Workbook password input.');
+    rightInput.value = 'wb';
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    await waitFor(() => !isWorkbookStructureProtected(sheet.instance.store.getState()));
+
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'protectReview', menuId: 'menu-protect-review' },
+      protectButton as HTMLButtonElement,
+    );
     const allowRangeButton = reviewProtectMenu?.querySelector<HTMLButtonElement>(
       '[data-protect-action="allow-edit-ranges"]',
     );
@@ -173,18 +224,32 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(allowEvent, 'target', { value: allowRangeButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(allowEvent)).toBe(true);
     await waitFor(() => Boolean(document.body.querySelector<HTMLElement>('.fc-tb__dlg')));
-    const allowDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
-    expect(allowDialog?.textContent).toContain('Range');
-    const allowRangeInput = allowDialog?.querySelector<HTMLInputElement>('input');
+    const footerButton = (label: string): HTMLButtonElement | undefined =>
+      Array.from(
+        document.body.querySelectorAll<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn'),
+      ).find((button) => button.textContent === label);
+    expect(footerButton('Modify...')?.disabled).toBe(true);
+    footerButton('New...')?.click();
+    await waitFor(() => document.body.querySelectorAll('.fc-tb__dlg').length === 2);
+    const editor = document.body.querySelectorAll<HTMLElement>('.fc-tb__dlg')[1];
+    const allowRangeInput = editor?.querySelector<HTMLInputElement>('input');
     expect(allowRangeInput?.value).toBeTruthy();
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    editor?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await waitFor(() => sheet.instance.store.getState().protection.allowedEditRanges.length === 1);
-    await waitFor(() =>
-      Boolean(
-        document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent?.includes('Allowed'),
-      ),
-    );
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    await waitFor(() => document.body.querySelectorAll('.fc-tb__dlg').length === 1);
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain('B2');
+    footerButton('Delete')?.click();
+    await waitFor(() => sheet.instance.store.getState().protection.allowedEditRanges.length === 0);
+    footerButton('New...')?.click();
+    await waitFor(() => document.body.querySelectorAll('.fc-tb__dlg').length === 2);
+    document
+      .querySelectorAll<HTMLElement>('.fc-tb__dlg')[1]
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.click();
+    await waitFor(() => sheet.instance.store.getState().protection.allowedEditRanges.length === 1);
+    await waitFor(() => document.body.querySelectorAll('.fc-tb__dlg').length === 1);
+    footerButton('OK')?.click();
+    await waitFor(() => document.body.querySelectorAll('.fc-tb__dlg').length === 0);
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'protectReview', menuId: 'menu-protect-review' },

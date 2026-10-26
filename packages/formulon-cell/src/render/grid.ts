@@ -1,3 +1,4 @@
+import { totalsCellAt } from '../commands/format-as-table.js';
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
 import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
@@ -34,6 +35,7 @@ import type { ChromePaintContext } from './grid/chrome-context.js';
 import { paintHeaders } from './grid/headers.js';
 import {
   setFillHandleRect,
+  setTotalsChevron,
   setValidationChevron,
   shouldShowValidationChevron,
 } from './grid/hit-state.js';
@@ -529,6 +531,7 @@ export class GridRenderer {
     const r = selection.range;
     setFillHandleRect(null);
     setValidationChevron(null);
+    setTotalsChevron(null);
     // A selected chart or picture replaces the cell cursor, as in Excel.
     if (ui.selectedObject) return;
 
@@ -557,6 +560,18 @@ export class GridRenderer {
     if (validationBounds && shouldShowValidationChevron(validationAt(format, activeAnchor))) {
       const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
       setValidationChevron({ rect, row: activeAnchor.row, col: activeAnchor.col });
+    } else if (validationBounds) {
+      const totals = totalsCellAt(state, a.sheet, activeAnchor.row, activeAnchor.col);
+      if (totals) {
+        const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
+        setTotalsChevron({
+          rect,
+          row: activeAnchor.row,
+          col: activeAnchor.col,
+          tableId: totals.table.id,
+          column: totals.column,
+        });
+      }
     }
 
     const preview = ui.fillPreview;
@@ -605,6 +620,7 @@ export {
   getErrorTriangleHits,
   getFillHandleRect,
   getOutlineToggleHits,
+  getTotalsChevron,
   getValidationChevron,
   isPlainTextOverflowCandidate,
   VALIDATION_TRIANGLE_COLOR,

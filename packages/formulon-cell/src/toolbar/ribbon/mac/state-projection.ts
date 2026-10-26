@@ -40,6 +40,7 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.page.font.office',
   'mac.page.font.gray',
   'mac.insert.newComment',
+  'mac.insert.shapeArrow',
   'mac.review.newComment',
   'mac.review.deleteComment',
   'mac.review.previousComment',
@@ -103,6 +104,10 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
       return MAC_CONTEXT_LABELS.themeEngineUnavailable[lang];
     if (state.protection.protectedSheets.size > 0) return MAC_CONTEXT_LABELS.themeProtected[lang];
     if (instance.workbook.getTheme()?.source === 2) return MAC_CONTEXT_LABELS.themeUnreadable[lang];
+  }
+  // The file stores no line end, so an engine that saves shapes cannot keep an arrow.
+  if (id === 'mac.insert.shapeArrow' && instance.workbook?.capabilities?.shapes) {
+    return strings.shapeArrowNotSaved;
   }
   if (
     id === 'mac.insert.newComment' ||

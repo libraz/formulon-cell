@@ -24,6 +24,11 @@ import {
 } from '../../commands/session-illustration.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../../commands/structure.js';
 import {
+  TABLE_OPTION_COMMANDS,
+  type TableOption,
+  toggleTableOption,
+} from '../../commands/table-design.js';
+import {
   setGridlinesVisible,
   setHeadingsVisible,
   setR1C1ReferenceStyle,
@@ -40,6 +45,7 @@ import { outlineSummaryFor } from '../../store/outline-summary.js';
 import { clampZoom } from '../../store/render-scale.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
+import { showMessage } from '../dialogs/prompt.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 import { applyMergeAction } from '../merge-action.js';
@@ -358,6 +364,31 @@ const applyGenericRibbonCommand = (
     }
     case 'formatTableHome':
       void hooks?.insert?.createTable?.('medium');
+      return true;
+    case 'tableHeaderRow':
+    case 'tableTotalRow':
+    case 'tableBandedRows':
+    case 'tableFirstColumn':
+    case 'tableLastColumn':
+    case 'tableBandedColumns':
+      if (
+        toggleTableOption(
+          i.store,
+          i.history,
+          i.workbook,
+          TABLE_OPTION_COMMANDS[id] as TableOption,
+          i.i18n.strings.ribbonMenu.cellStyleTotalCell,
+        ) === 'blocked'
+      ) {
+        void showMessage({
+          title: deps.text.tableStyleOptions,
+          message: deps.text.tableShiftBlocked,
+          okLabel: i.i18n.strings.pageSetup.ok,
+        });
+      }
+      runtime.refreshCells();
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
       return true;
     case 'insertRows':
       insertRows(i.store, i.workbook, i.history, range.r0, rowCount);

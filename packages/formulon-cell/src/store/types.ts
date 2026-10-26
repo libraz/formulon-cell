@@ -369,7 +369,15 @@ export interface Sparkline {
   /** When true, paint negatives in `negativeColor` (column / win-loss). */
   showNegative?: boolean;
   negativeColor?: string;
+  /** Sparklines created by one action share a group, which is one engine group. */
+  group?: string;
+  /** Engine group settings the overlay does not model (markers, axes, date
+   *  axis, line weight, ...), carried so an update does not reset them. */
+  nativeGroup?: SparklineGroupSettings;
 }
+
+/** An engine sparkline group without its members. */
+export type SparklineGroupSettings = Omit<import('@libraz/formulon').SparklineGroup, 'sparklines'>;
 
 export interface SparklineSlice {
   /** Per-host-cell sparkline keyed by `addrKey`. */
@@ -457,6 +465,12 @@ export interface SessionIllustration {
   lineDash?: SessionShapeLineDash;
   /** A shape's fill opacity, opaque when unset; 0 is No Fill. */
   opacity?: number;
+  /** A shape's text, lines joined with `\n`. */
+  text?: string;
+  /** A loaded shape the overlay can only approximate (unknown preset, gradient
+   *  or rotation, group): drawn as its bounding box, and only its anchor is
+   *  written back. */
+  nativeLocked?: boolean;
 }
 
 export interface IllustrationsSlice {
@@ -523,6 +537,28 @@ export interface SlicerSpec {
   x?: number;
   /** Optional anchor y relative to the host. */
   y?: number;
+  /** Optional panel size in pixels; the file stores it as the anchor's extent. */
+  w?: number;
+  h?: number;
+  /** Sheet hosting the slicer; unset shows it on every sheet. */
+  sheet?: number;
+  caption?: string;
+  /** Slicer style name; unset is no style. */
+  style?: string;
+  /** Number of chip columns. */
+  columnCount?: number;
+  /** The engine anchor the panel is drawn from, so it scrolls with the sheet. */
+  nativeAnchor?: EngineDrawingAnchor;
+  /** Engine slicer settings the panel does not model, kept so an update does
+   *  not reset them. `name` identifies the slicer in the engine. */
+  native?: SlicerNativeSettings;
+}
+
+export interface SlicerNativeSettings {
+  name: string;
+  rowHeight: number;
+  sortOrder: number;
+  crossFilter: number;
 }
 
 /** History-tracked slice carrying every active slicer. The collection is
@@ -545,11 +581,20 @@ export interface SheetViewsSlice {
   activeViewId: string | null;
 }
 
+/** A `<protectedRange>`. `range` is the first area; `extraAreas` holds the
+ *  rest of a multi-area `sqref`. */
 export interface AllowedEditRange {
   id: string;
   title: string;
   range: Range;
+  extraAreas?: readonly Range[];
+  /** Plain text typed this session; never written to a file. */
   password?: string;
+  /** The 16-bit verifier of a loaded file's `password` attribute. */
+  legacyPasswordHash?: string;
+  passwordHash?: SheetProtectionPasswordHash;
+  /** Opaque `securityDescriptor`, kept verbatim. */
+  securityDescriptor?: string;
 }
 
 /** Workbook-level sheet-protection state. Each protected sheet is keyed by
@@ -591,10 +636,20 @@ export interface SheetProtectionState {
   permissions?: SheetProtectionPermissions;
 }
 
+/** Workbook structure lock (`lockStructure`); password fields as on
+ *  `SheetProtectionState`. */
+export interface WorkbookStructureProtectionState {
+  password?: string;
+  legacyPasswordHash?: string;
+  passwordHash?: SheetProtectionPasswordHash;
+}
+
 export interface ProtectionSlice {
   protectedSheets: Map<number, SheetProtectionState>;
-  workbookStructure?: { password?: string };
+  workbookStructure?: WorkbookStructureProtectionState;
   allowedEditRanges: readonly AllowedEditRange[];
+  /** Password-guarded ranges unlocked this session; never saved or undone. */
+  unlockedAllowedRanges?: ReadonlySet<string>;
 }
 
 export interface ThreadedCommentsSlice {

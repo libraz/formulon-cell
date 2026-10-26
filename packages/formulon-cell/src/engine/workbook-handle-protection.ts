@@ -1,4 +1,4 @@
-import type { EngineCapabilities, Workbook } from './types.js';
+import type { EngineCapabilities, ProtectedRange, Workbook, WorkbookProtection } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
@@ -144,6 +144,49 @@ export abstract class WorkbookHandleProtectionMethods {
       pivotTables: b(protection.pivotTables),
     });
     return s.ok;
+  }
+
+  /** Reads `<workbookProtection>` as the engine stores it (booleans as 0/1).
+   *  `null` when the workbook carries none or the engine lacks the API. */
+  getWorkbookProtection(): WorkbookProtection | null {
+    assertAlive(this);
+    if (!this.capabilities.workbookProtectionRoundtrip) return null;
+    const r = wb(this).getWorkbookProtection();
+    return r.status.ok ? r.protection : null;
+  }
+
+  /** Replaces `<workbookProtection>`; an all-empty record removes the element. */
+  setWorkbookProtection(protection: WorkbookProtection): boolean {
+    assertAlive(this);
+    if (!this.capabilities.workbookProtectionRoundtrip) return false;
+    return wb(this).setWorkbookProtection(protection).ok;
+  }
+
+  /** The `<protectedRange>` records of `sheet` in file order; empty when the
+   *  engine lacks the API. */
+  getProtectedRanges(sheet: number): ProtectedRange[] {
+    assertAlive(this);
+    if (!this.capabilities.protectedRanges) return [];
+    const r = wb(this).getProtectedRanges(sheet);
+    return r.status.ok ? [...r] : [];
+  }
+
+  addProtectedRange(sheet: number, range: ProtectedRange): boolean {
+    assertAlive(this);
+    if (!this.capabilities.protectedRanges) return false;
+    return wb(this).addProtectedRange(sheet, range).ok;
+  }
+
+  updateProtectedRange(sheet: number, index: number, range: ProtectedRange): boolean {
+    assertAlive(this);
+    if (!this.capabilities.protectedRanges) return false;
+    return wb(this).updateProtectedRange(sheet, index, range).ok;
+  }
+
+  removeProtectedRange(sheet: number, index: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.protectedRanges) return false;
+    return wb(this).removeProtectedRange(sheet, index).ok;
   }
 }
 

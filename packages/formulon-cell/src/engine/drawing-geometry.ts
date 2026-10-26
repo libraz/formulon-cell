@@ -10,7 +10,6 @@ import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { EngineDrawingAnchor } from './types.js';
-import type { EngineDrawingObject } from './workbook-handle-annotations.js';
 
 /** `AnchorKind.Absolute`: the engine cannot re-anchor such an object. */
 export const ANCHOR_KIND_ABSOLUTE = 2;
@@ -30,7 +29,7 @@ export const viewportZoom = (store: SpreadsheetStore | undefined): number => {
 };
 
 /** The anchor fields of a drawing object, as the store keeps them. */
-export const drawingAnchorOf = (object: EngineDrawingObject): EngineDrawingAnchor => ({
+export const drawingAnchorOf = (object: EngineDrawingAnchor): EngineDrawingAnchor => ({
   anchorKind: object.anchorKind,
   editAs: object.editAs,
   fromRow: object.fromRow,
@@ -240,6 +239,54 @@ export const sessionPosition = (
       h: Math.max(1, dimensions.heightEmu / EMU_PER_PX) * zoom,
     };
   }
+};
+
+/** The two-cell anchor spanning the grid-pixel `frame`, with the given `editAs`. */
+export const twoCellAnchorForPixels = (
+  store: SpreadsheetStore,
+  frame: { x: number; y: number; w: number; h: number },
+  editAs: EngineDrawingAnchor['editAs'],
+): EngineDrawingAnchor => {
+  const state = store.getState();
+  const zoom = viewportZoom(store);
+  const point = (x: number, y: number) => {
+    try {
+      const layout = layoutForView(state);
+      const col = colAtX(layout, state.viewport, x, zoom);
+      const row = rowAtY(layout, state.viewport, y, zoom);
+      const rect = cellRectUnclamped(layout, state.viewport, row, col);
+      return {
+        row,
+        col,
+        rowOff: Math.max(0, Math.round(((y - rect.y) / zoom) * EMU_PER_PX)),
+        colOff: Math.max(0, Math.round(((x - rect.x) / zoom) * EMU_PER_PX)),
+      };
+    } catch {
+      const { defaultColWidth, defaultRowHeight } = state.layout;
+      return {
+        row: Math.max(0, Math.floor(y / (defaultRowHeight * zoom))),
+        col: Math.max(0, Math.floor(x / (defaultColWidth * zoom))),
+        rowOff: 0,
+        colOff: 0,
+      };
+    }
+  };
+  const from = point(frame.x, frame.y);
+  const to = point(frame.x + frame.w, frame.y + frame.h);
+  return {
+    anchorKind: ANCHOR_KIND_TWO_CELL,
+    editAs,
+    fromRow: from.row,
+    fromCol: from.col,
+    fromRowOff: from.rowOff,
+    fromColOff: from.colOff,
+    toRow: to.row,
+    toCol: to.col,
+    toRowOff: to.rowOff,
+    toColOff: to.colOff,
+    cx: 0,
+    cy: 0,
+  };
 };
 
 /** Grid pixels of the top-left corner of cell (row, col) under the current view. */

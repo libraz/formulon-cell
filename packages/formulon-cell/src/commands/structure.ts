@@ -25,6 +25,14 @@ import {
   type NativeFormatSnapshot,
 } from '../engine/format-history-bridge.js';
 import { hydrateImagesFromEngine } from '../engine/images-sync.js';
+import { hydrateProtectedRangesFromEngine } from '../engine/protection-sync.js';
+import { captureShapeAnchors, captureShapeRestore } from '../engine/shapes-sync.js';
+import {
+  captureSlicerAnchors,
+  captureSlicerRestore,
+  hydrateSlicersFromEngine,
+} from '../engine/slicer-sync.js';
+import { captureSparklineGroups, hydrateSparklinesFromEngine } from '../engine/sparkline-sync.js';
 import type {
   Addr,
   CellValue,
@@ -333,20 +341,23 @@ function shiftAnchoredRanges(
   });
 
   // Sparklines: host cells move with their rows/columns and sources follow data.
-  recordSparklineChange(history, store, () => {
-    store.setState((s) => {
-      if (s.sparkline.sparklines.size === 0) return s;
-      const sparklines = shiftSparklinesForAxisEdit(
-        s.sparkline.sparklines,
-        sheet,
-        wb.sheetName(sheet),
-        axis,
-        split,
-        delta,
-      );
-      return { ...s, sparkline: { sparklines } };
+  // The engine shifts its own groups, and the native op re-reads them.
+  if (!(nativeAxisOp && wb.capabilities.sparklines)) {
+    recordSparklineChange(history, store, () => {
+      store.setState((s) => {
+        if (s.sparkline.sparklines.size === 0) return s;
+        const sparklines = shiftSparklinesForAxisEdit(
+          s.sparkline.sparklines,
+          sheet,
+          wb.sheetName(sheet),
+          axis,
+          split,
+          delta,
+        );
+        return { ...s, sparkline: { sparklines } };
+      });
     });
-  });
+  }
 
   // Copy marquee. Transient UI state that history never captures, so it is
   // shifted outside the recorders — otherwise the outline would keep pointing
@@ -674,17 +685,35 @@ function applyAxisShiftViaEngine(
     }
     originalFormulas.push(...collectAllFormulas(wb));
   }
+  // A delete drops or trims the protected ranges inside the band; undo writes them back.
+  const protectedRangesBefore =
+    !positive && record && wb.capabilities.protectedRanges ? wb.getProtectedRanges(sheet) : [];
   // The engine deletes the pictures and charts lying inside the band; undo puts
   // them back from these captures, under their own ids.
   const deletedDrawings: Uint8Array[] = [];
+  // Shapes and table slicers have no snapshot; they are put back by inserting them again.
+  const deletedObjects: (() => boolean)[] = [];
   if (!positive && record && wb.capabilities.drawings) {
     for (const object of wb.listDrawingObjects(sheet)) {
       if (!drawingRemovedByDelete(object, axis, split, count)) continue;
       const snapshot = wb.snapshotDrawing(sheet, object.objectId);
-      if (snapshot === null) return false;
-      deletedDrawings.push(snapshot);
+      if (snapshot !== null) {
+        deletedDrawings.push(snapshot);
+        continue;
+      }
+      const restore =
+        captureShapeRestore(wb, sheet, object.objectId) ??
+        captureSlicerRestore(wb, sheet, object.objectId);
+      if (restore === null) return false;
+      deletedObjects.push(restore);
     }
   }
+
+  // A delete collapses the shapes and slicers it does not remove.
+  const restoreAnchors =
+    !positive && record ? [captureShapeAnchors(wb, sheet), captureSlicerAnchors(wb, sheet)] : [];
+  // The engine drops the sparklines whose cell a delete removes.
+  const restoreSparklines = !positive && record ? captureSparklineGroups(wb, store) : null;
 
   const canRestoreMerges = record && wb.capabilities.merges;
   const beforeMerges = canRestoreMerges ? wb.getMerges(sheet) : [];
@@ -708,6 +737,9 @@ function applyAxisShiftViaEngine(
     wb.recalcAuto();
     hydrateChartsFromEngine(wb, store, sheet);
     hydrateImagesFromEngine(wb, store, sheet);
+    hydrateSparklinesFromEngine(wb, store);
+    hydrateSlicersFromEngine(wb, store);
+    hydrateProtectedRangesFromEngine(wb, store, sheet);
     return true;
   };
 
@@ -884,14 +916,28 @@ function applyAxisShiftViaEngine(
       for (const c of captured) writeCell(wb, c.addr, c.value, c.formula);
       for (const entry of originalFormulas) wb.setFormula(entry.addr, entry.formula);
     });
-    if (deletedDrawings.length === 0) return;
+    restoreSparklines?.();
+    if (protectedRangesBefore.length > 0) {
+      for (const record of protectedRangesBefore) {
+        const index = wb.getProtectedRanges(sheet).findIndex((r) => r.name === record.name);
+        if (index >= 0) wb.updateProtectedRange(sheet, index, record);
+        else wb.addProtectedRange(sheet, record);
+      }
+      hydrateProtectedRangesFromEngine(wb, store, sheet);
+    }
+    // Survivors first, so a restored object cannot take a survivor's captured anchor.
+    for (const restore of restoreAnchors) restore();
     for (const snapshot of deletedDrawings) {
       if (wb.restoreDrawing(sheet, snapshot) === null) {
         throw new Error('structure: failed to restore a deleted drawing');
       }
     }
-    hydrateChartsFromEngine(wb, store, sheet);
+    for (const restore of deletedObjects) {
+      if (!restore()) throw new Error('structure: failed to restore a deleted drawing');
+    }
+    if (deletedDrawings.length > 0) hydrateChartsFromEngine(wb, store, sheet);
     hydrateImagesFromEngine(wb, store, sheet);
+    hydrateSlicersFromEngine(wb, store);
   };
 
   const rollbackRedo = (): void => {

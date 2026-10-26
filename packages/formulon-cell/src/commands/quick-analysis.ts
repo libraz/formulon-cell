@@ -1,12 +1,17 @@
 import { formatA1Range, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { rangeArea, rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
+import { rangeArea, rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SparklineKind, type SpreadsheetStore } from '../store/store.js';
 import type { SelectionStats } from './aggregate.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
 import type { History } from './history.js';
-import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
+import {
+  isCellWritable,
+  isRangeInAllowedEditRange,
+  isSheetProtected,
+  warnProtected,
+} from './protection.js';
 import { clearSessionChartsInRange, createSessionChart } from './session-chart.js';
 import {
   recordConditionalRulesChange,
@@ -295,9 +300,7 @@ export function enabledQuickAnalysisActions(input: QuickAnalysisInput): QuickAna
 function firstLockedProtectedAddr(input: QuickAnalysisExecuteInput, range: Range) {
   const state = input.store.getState();
   if (!isSheetProtected(state, range.sheet)) return null;
-  if (state.protection.allowedEditRanges.some((entry) => rangeContainsRange(entry.range, range))) {
-    return null;
-  }
+  if (isRangeInAllowedEditRange(state, range)) return null;
   if (rangeArea(range) > MAX_EXACT_PROTECTION_SCAN_CELLS) {
     return { sheet: range.sheet, row: range.r0, col: range.c0 };
   }

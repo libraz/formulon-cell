@@ -137,7 +137,7 @@ const createTableStyleSwatch = (
   btn.dataset.tableVariant = variant;
   btn.appendChild(tableStyleSwatchPart('fc-tb__tablestyle-swatch__head', swatch.header));
   for (let i = 0; i < 3; i += 1) {
-    const rowFill = banded && i % 2 === 1 ? swatch.band : '#ffffff';
+    const rowFill = banded && i % 2 === 0 ? swatch.band : '#ffffff';
     const row = tableStyleSwatchPart('fc-tb__tablestyle-swatch__row', rowFill);
     if (firstCol) {
       row.append(

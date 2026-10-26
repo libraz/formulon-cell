@@ -139,8 +139,6 @@ export const dataObjectsKo: DataObjectsStrings = {
     createPivotTable: '피벗 테이블 만들기...',
     editPivotTable: '편집',
     pivotFieldList: '피벗 테이블 필드',
-    pivotFieldListCheckboxReadOnly:
-      '아래 필드 영역 컨트롤을 사용하여 피벗 테이블 필드를 이동하세요.',
     backToWorkbookObjects: '통합 문서 개체로 돌아가기',
     pivotAvailableFields: '보고서에 추가할 필드를 선택하세요.',
     pivotName: '이름',
@@ -151,6 +149,12 @@ export const dataObjectsKo: DataObjectsStrings = {
     pivotAreaFilters: '필터',
     pivotAreaValues: '값',
     pivotAreaNone: '보고서에 없음',
+    pivotSubtotals: '부분합',
+    pivotSubtotalAutomatic: '자동',
+    pivotSubtotalNone: '없음',
+    pivotSubtotalCustom: '사용자 지정',
+    pivotSubtotalCustomEmpty:
+      '사용자 지정 부분합에는 함수를 하나 이상 선택하거나 자동을 선택하세요.',
     pivotAggregation: '요약 기준',
     pivotAggregateSum: '합계',
     pivotAggregateCount: '개수',
@@ -177,6 +181,8 @@ export const dataObjectsKo: DataObjectsStrings = {
     objectSelect: '선택',
     objectDuplicate: '복제',
     objectDelete: '삭제',
+    shapeLocked:
+      '이 도형은 편집기에서 다시 그릴 수 없으므로 이동만 가능하며 삭제, 복사, 서식 변경은 할 수 없습니다.',
     shapeColor: '도형 색',
     shapeRadius: '모서리 반경',
     shapeLineWidth: '선 너비',
@@ -213,12 +219,17 @@ export const dataObjectsKo: DataObjectsStrings = {
       comments: '노트',
       threadedComments: '메모',
       images: '그림',
+      shapes: '도형',
+      sparklines: '스파크라인',
+      slicers: '표 슬라이서',
       workbookTheme: '통합 문서 테마',
       phonetic: '윗주',
       definedNames: '정의된 이름',
       namedCellStyles: '이름이 지정된 셀 스타일',
       autoFilter: '자동 필터',
       sheetProtection: '시트 보호',
+      workbookProtection: '통합 문서 보호',
+      protectedRanges: '보호된 범위',
       sheetViews: '시트 보기',
       pageSetup: '페이지 설정',
       loadedTables: '로드된 표',
@@ -242,7 +253,13 @@ export const dataObjectsKo: DataObjectsStrings = {
       threadedComments:
         '엔진에서 스레드 메모를 지원하면 메모, 회신, 사용자 및 해결 상태가 XLSX에 저장됩니다.',
       images:
-        '엔진에서 그림을 지원하면 새로 삽입한 그림을 편집하고 XLSX에 저장할 수 있습니다. 로드된 그림은 읽기 전용이며 기본 그림 순서 변경은 사용할 수 없습니다. 도형은 세션 오버레이로 유지됩니다.',
+        '엔진에서 그림을 지원하면 새로 삽입한 그림을 편집하고 XLSX에 저장할 수 있습니다. 로드된 그림은 읽기 전용이며 기본 그림 순서 변경은 사용할 수 없습니다.',
+      shapes:
+        '사각형, 둥근 사각형, 타원, 삼각형, 마름모, 선은 XLSX에 저장됩니다. 화살표, 대시 스타일, 부분 투명도는 저장할 수 없으므로 저장되는 도형에서는 해당 기능을 사용할 수 없습니다. 편집기에서 그릴 수 없는 로드된 도형은 점선 윤곽으로 표시됩니다.',
+      sparklines:
+        '스파크라인 그룹은 XLSX에서 불러와 색, 표식, 축 등 그룹 설정과 함께 편집하고 저장할 수 있습니다.',
+      slicers:
+        '표 슬라이서는 XLSX에서 불러와 편집하고 저장할 수 있습니다. 선택한 항목은 표 필터에 저장됩니다.',
       workbookTheme:
         '테마 색과 주 글꼴/보조 글꼴은 응용 프로그램 모양과 별도로 편집할 수 있습니다.',
       phonetic:
@@ -254,6 +271,8 @@ export const dataObjectsKo: DataObjectsStrings = {
       autoFilter: '저장된 자동 필터 정의에는 엔진 읽기/쓰기 API가 필요합니다.',
       sheetProtection:
         '엔진 메타데이터를 사용할 수 있으면 보호 UI 상태를 호스트하고 왕복 저장할 수 있습니다.',
+      workbookProtection: '통합 문서 구조 보호는 암호 해시와 함께 왕복 저장할 수 있습니다.',
+      protectedRanges: '허용된 편집 범위는 암호 해시와 함께 왕복 저장할 수 있습니다.',
       sheetViews: '현재 세션에서 시트 보기를 UI에 캡처하고 복원할 수 있습니다.',
       pageSetup:
         '엔진에서 인쇄 설정을 제공하면 방향, 용지, 배율, 여백, 인쇄 옵션, 머리글/바닥글, 인쇄 영역, 인쇄 제목 및 수동 나누기를 왕복 저장할 수 있습니다.',

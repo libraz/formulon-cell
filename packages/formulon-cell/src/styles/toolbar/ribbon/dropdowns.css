@@ -481,3 +481,31 @@
 .fc-tb__rb-select--border-style > .fc-tb__rb-dd__btn {
   width: 100%;
 }
+
+/* Table Name box of the Table Design tab. */
+.fc-tb__rb-input {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  vertical-align: middle;
+  font-size: 11px;
+  color: var(--fc-tb-fg-soft);
+}
+.fc-tb__rb-input__field {
+  box-sizing: border-box;
+  width: 130px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--fc-tb-ribbon-line);
+  border-radius: 2px;
+  background: var(--fc-tb-input-bg);
+  color: var(--fc-tb-input-fg);
+  font: inherit;
+}
+.fc-tb__rb-input__field:focus-visible {
+  outline: 2px solid var(--fc-tb-accent);
+  outline-offset: -2px;
+}
+.fc-tb__rb-input__field:disabled {
+  opacity: 0.45;
+}

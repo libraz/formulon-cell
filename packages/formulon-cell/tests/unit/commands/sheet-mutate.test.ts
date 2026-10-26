@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import {
-  addAllowedEditRange,
-  setWorkbookStructureProtected,
-} from '../../../src/commands/protection.js';
+import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import {
   addSheet,
   moveSheet,
@@ -240,8 +237,14 @@ describe('removeSheet', () => {
     const { wb } = makeFake({ sheetCount: 3 });
     mutators.setSheetProtected(store, 1, true, { password: 'remove' });
     mutators.setSheetProtected(store, 2, true, { password: 'keep' });
-    addAllowedEditRange(store, { sheet: 1, r0: 0, c0: 0, r1: 0, c1: 0 }, { title: 'Drop' });
-    addAllowedEditRange(store, { sheet: 2, r0: 1, c0: 1, r1: 1, c1: 1 }, { title: 'Keep' });
+    mutators.addAllowedEditRange(store, {
+      title: 'Drop',
+      range: { sheet: 1, r0: 0, c0: 0, r1: 0, c1: 0 },
+    });
+    mutators.addAllowedEditRange(store, {
+      title: 'Keep',
+      range: { sheet: 2, r0: 1, c0: 1, r1: 1, c1: 1 },
+    });
 
     expect(removeSheet(store, wb, 1)).toBe(true);
 
@@ -385,8 +388,14 @@ describe('moveSheet', () => {
     const { wb } = makeFake();
     mutators.setSheetProtected(store, 0, true, { password: 'move' });
     mutators.setSheetProtected(store, 2, true, { password: 'shift' });
-    addAllowedEditRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, { title: 'Move' });
-    addAllowedEditRange(store, { sheet: 2, r0: 1, c0: 1, r1: 1, c1: 1 }, { title: 'Shift' });
+    mutators.addAllowedEditRange(store, {
+      title: 'Move',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+    });
+    mutators.addAllowedEditRange(store, {
+      title: 'Shift',
+      range: { sheet: 2, r0: 1, c0: 1, r1: 1, c1: 1 },
+    });
 
     expect(moveSheet(store, wb, 0, 2)).toBe(true);
 

@@ -250,10 +250,13 @@ export type {
   CustomTableStyle,
   FormatAsTableOptions,
   PivotTableStyleAssignment,
+  TableColumnTotals,
+  TableNameError,
   TableOverlay,
   TableOverlayPatch,
   TableStyle,
   TableStyleSwatch,
+  TableTotalsFunction,
 } from './commands/format-as-table.js';
 export {
   applyPivotTableStyleById,
@@ -270,6 +273,7 @@ export {
   engineTableOverlays,
   formatAsTable,
   formatAsTableByStyleId,
+  isBandedCol,
   isBandedRow,
   isFirstCol,
   isHeaderRow,
@@ -283,10 +287,12 @@ export {
   sessionTableOverlays,
   TABLE_STYLE_COLORS,
   tableForCell,
+  tableNameError,
   tableOverlayAt,
   tableOverlayById,
   tableStyleSwatch,
   tableVariantFromOptions,
+  totalsCellAt,
   updateTableOverlay,
   upsertTable,
 } from './commands/format-as-table.js';
@@ -368,6 +374,7 @@ export {
 } from './commands/merge.js';
 export type {
   CreateDefinedNamesSource,
+  DefinedNameAttrs,
   DefinedNameDeleteResult,
   DefinedNameEntry,
   DefinedNameMutationResult,
@@ -491,11 +498,13 @@ export {
 } from './commands/print.js';
 export type {
   AllowedEditRangeOptions,
+  AllowedEditRangePatch,
   SheetProtectionOptions,
   WorkbookStructureProtectionOptions,
 } from './commands/protection.js';
 export {
   addAllowedEditRange,
+  allowedEditRangeHasPassword,
   allowedEditRangesForSheet,
   clearAllowedEditRanges,
   gateProtection,
@@ -508,15 +517,20 @@ export {
   protectedSheetPasswordHash,
   protectedSheetPermissions,
   recordProtectionChange,
+  removeAllowedEditRange,
   setCellLocked,
   setProtectedSheet,
   setWorkbookStructureProtected,
   toggleProtectedSheet,
   toggleWorkbookStructureProtected,
+  updateAllowedEditRange,
+  verifyAllowedEditRangePassword,
   verifySheetProtectionPassword,
   verifySheetProtectionPasswordHash,
+  verifyWorkbookStructurePassword,
   warnProtected,
   whenSheetPasswordsHashed,
+  workbookStructureHasPassword,
   workbookStructurePassword,
   writableAddrs,
 } from './commands/protection.js';
@@ -749,6 +763,7 @@ export {
   clearSparklinesInRange,
   listSparklines,
   setSparkline,
+  setSparklines,
   sparklineAt,
 } from './commands/sparkline.js';
 export {
@@ -757,6 +772,14 @@ export {
   insertCols,
   insertRows,
 } from './commands/structure.js';
+export type { TableOption, TableRenameResult } from './commands/table-design.js';
+export {
+  activeTableOverlay,
+  renameActiveTable,
+  setTableColumnFunction,
+  TABLE_TOTALS_FUNCTIONS,
+  toggleTableOption,
+} from './commands/table-design.js';
 export { applyTextScriptToRange } from './commands/text-script.js';
 export { textToColumns } from './commands/text-to-columns.js';
 export {
@@ -1294,9 +1317,11 @@ export type {
   SessionIllustration,
   SessionShapeKind,
   SessionShapeLineDash,
+  SlicerNativeSettings,
   SlicerSpec,
   SlicersSlice,
   Sparkline,
+  SparklineGroupSettings,
   SparklineKind,
   SparklineSlice,
   SpreadsheetStore,
@@ -1626,6 +1651,7 @@ export {
   ribbonTabCommandIds,
   ribbonTabLabel,
   SHAPE_CONTEXTUAL_RIBBON_TABS,
+  TABLE_CONTEXTUAL_RIBBON_TABS,
   toolbarText,
 } from './toolbar/ribbon-model.js';
 export type {

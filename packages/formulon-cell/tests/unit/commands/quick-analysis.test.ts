@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SelectionStats } from '../../../src/commands/aggregate.js';
 import { History } from '../../../src/commands/history.js';
-import { addAllowedEditRange, setProtectedSheet } from '../../../src/commands/protection.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import {
   buildQuickAnalysisActions,
   enabledQuickAnalysisActions,
@@ -382,7 +382,7 @@ describe('executeQuickAnalysisAction', () => {
     const { wb } = makeWb();
     const r = range(0, 2, 1_048_575, 2);
     setProtectedSheet(store, 0, true);
-    addAllowedEditRange(store, r);
+    mutators.addAllowedEditRange(store, { title: 'All', range: r });
 
     const result = executeQuickAnalysisAction({
       store,
@@ -500,7 +500,7 @@ describe('executeQuickAnalysisAction', () => {
         source: 'session',
         range: r,
         style: 'medium',
-        color: '#5b9bd5',
+        color: '#4472c4',
         showHeader: true,
         showTotal: false,
         banded: true,

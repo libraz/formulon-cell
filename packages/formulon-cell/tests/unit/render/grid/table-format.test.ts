@@ -18,16 +18,16 @@ describe('render/grid/table-format', () => {
   describe('header row', () => {
     it('applies bold + dark-fill + white-text for the dark style', () => {
       const fmt = tableCellFormat(table('dark'), 0, 1);
-      expect(fmt).toEqual({ fill: '#325575', color: '#ffffff', bold: true });
+      expect(fmt).toEqual({ fill: '#253f6c', color: '#ffffff', bold: true });
     });
 
     it('applies a light fill + ink text for the light style', () => {
       const fmt = tableCellFormat(table('light'), 0, 1);
-      expect(fmt).toEqual({ fill: '#d1e3f3', color: '#1f1f1f', bold: true });
+      expect(fmt).toEqual({ fill: '#cbd8ee', color: '#1f1f1f', bold: true });
     });
 
     it('returns undefined for the header row when showHeader is off', () => {
-      const fmt = tableCellFormat(table('medium', { showHeader: false }), 0, 1);
+      const fmt = tableCellFormat(table('medium', { showHeader: false, banded: false }), 0, 1);
       expect(fmt).toBeUndefined();
     });
   });
@@ -37,7 +37,7 @@ describe('render/grid/table-format', () => {
       const fmt = tableCellFormat(table('medium', { showTotal: true }), 5, 1);
       expect(fmt?.bold).toBe(true);
       // Medium total row reuses the header swatch, which equals the base hue.
-      expect(fmt?.fill).toBe('#5b9bd5');
+      expect(fmt?.fill).toBe('#4472c4');
     });
 
     it('does not apply the total style when showTotal is off', () => {
@@ -48,17 +48,30 @@ describe('render/grid/table-format', () => {
   });
 
   describe('banded rows', () => {
-    it('zebra-fills odd data rows', () => {
+    it('zebra-fills from the first data row, as the first stripe of the built-in styles', () => {
       const t = table('medium');
-      // header at row 0 → data starts at 1; data row 0 (sheet row 1) is "even"
-      // — no band; data row 1 (sheet row 2) is "odd" — band applies.
-      expect(tableCellFormat(t, 1, 1)).toBeUndefined();
-      expect(tableCellFormat(t, 2, 1)?.fill).toBe('#e5eff8');
+      expect(tableCellFormat(t, 1, 1)?.fill).toBe('#e1e8f6');
+      expect(tableCellFormat(t, 2, 1)).toBeUndefined();
+      expect(tableCellFormat(t, 3, 1)?.fill).toBe('#e1e8f6');
     });
 
     it('respects banded=false', () => {
       const t = table('medium', { banded: false });
       expect(tableCellFormat(t, 2, 1)).toBeUndefined();
+    });
+  });
+
+  describe('column stripes', () => {
+    it('fills every other column of the data rows', () => {
+      const t = table('medium', { colStripes: true, banded: false });
+      expect(tableCellFormat(t, 2, 0)?.fill).toBe('#e1e8f6');
+      expect(tableCellFormat(t, 2, 1)).toBeUndefined();
+      expect(tableCellFormat(t, 2, 2)?.fill).toBe('#e1e8f6');
+    });
+
+    it('leaves the header row to the header fill', () => {
+      const t = table('medium', { colStripes: true });
+      expect(tableCellFormat(t, 0, 1)?.fill).toBe('#4472c4');
     });
   });
 
@@ -81,9 +94,9 @@ describe('render/grid/table-format', () => {
 
     it('keeps the band fill while still bolding the first column', () => {
       const t = table('medium', { firstCol: true, banded: true });
-      const fmt = tableCellFormat(t, 2, 0);
+      const fmt = tableCellFormat(t, 1, 0);
       expect(fmt?.bold).toBe(true);
-      expect(fmt?.fill).toBe('#e5eff8');
+      expect(fmt?.fill).toBe('#e1e8f6');
     });
 
     it('bolds the last column when lastCol is on', () => {

@@ -27,6 +27,7 @@ type IllustrationDropdownDefaults = Pick<
   | 'updateArrangeMenu'
   | 'insertPictureFromRibbon'
   | 'insertShapeFromRibbon'
+  | 'updateShapesInsertMenu'
   | 'insertScreenshotFromRibbon'
 >;
 
@@ -82,6 +83,18 @@ export function createIllustrationDropdownDefaults(
     (instance: SpreadsheetInstance): DynamicDropdownsCtx['insertShapeFromRibbon'] =>
     (shape) => {
       instance.host.focus();
+      // The file stores no line end, so an arrow could not be saved.
+      if (shape === 'arrow' && instance.workbook.capabilities.shapes) {
+        const strings = instance.i18n.strings;
+        void showInstanceReport(instance, strings.ribbon.shapes, [
+          {
+            severity: 'info',
+            label: strings.ribbonMenu.shapeArrow,
+            detail: strings.workbookObjects.compatibilityDetails.shapes,
+          },
+        ]);
+        return;
+      }
       createRibbonShapeFromSelection(
         instance.store as unknown as Parameters<typeof createRibbonShapeFromSelection>[0],
         normalizedSelectionRange(instance),
@@ -174,6 +187,22 @@ export function createIllustrationDropdownDefaults(
       }
     };
 
+  const updateShapesInsertMenu =
+    (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateShapesInsertMenu'] =>
+    (menu) => {
+      // The file stores no line end, so an engine that saves shapes cannot keep an arrow.
+      const saved = instance.workbook.capabilities.shapes === true;
+      for (const button of menu.querySelectorAll<HTMLButtonElement>(
+        '[data-shape-insert="arrow"]',
+      )) {
+        setMenuControlDisabled(
+          button,
+          saved,
+          saved ? instance.i18n.strings.ribbonMenu.shapeArrowNotSaved : undefined,
+        );
+      }
+    };
+
   const buildScreenshotAction =
     (instance: SpreadsheetInstance): DynamicDropdownsCtx['insertScreenshotFromRibbon'] =>
     async (action = 'current-view') => {
@@ -239,6 +268,7 @@ export function createIllustrationDropdownDefaults(
     applyArrangeAction: buildArrangeAction(instance),
     insertPictureFromRibbon: buildPictureAction(instance),
     insertShapeFromRibbon: buildShapeAction(instance),
+    updateShapesInsertMenu: updateShapesInsertMenu(instance),
     insertScreenshotFromRibbon: buildScreenshotAction(instance),
   };
 }

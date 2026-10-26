@@ -51,6 +51,10 @@ import {
   type WorkbookHandleConditionalFormatMethods,
 } from './workbook-handle-conditional-format.js';
 import {
+  installDrawingObjectsMethods,
+  type WorkbookHandleDrawingObjectsMethods,
+} from './workbook-handle-drawing-objects.js';
+import {
   installFormulasMethods,
   type WorkbookHandleFormulasMethods,
 } from './workbook-handle-formulas.js';
@@ -68,6 +72,10 @@ import {
   installStylesMethods,
   type WorkbookHandleStylesMethods,
 } from './workbook-handle-styles.js';
+import {
+  installTableStylesMethods,
+  type WorkbookHandleTableStylesMethods,
+} from './workbook-handle-table-styles.js';
 import {
   installTablesMethods,
   type WorkbookHandleTablesMethods,
@@ -1200,16 +1208,19 @@ export interface WorkbookHandleFeatureMethods
   extends WorkbookHandleAnnotationsMethods,
     WorkbookHandleChartsMethods,
     WorkbookHandleConditionalFormatMethods,
+    WorkbookHandleDrawingObjectsMethods,
     WorkbookHandleFormulasMethods,
     WorkbookHandleLayoutMethods,
     WorkbookHandlePrintMethods,
     WorkbookHandleProtectionMethods,
     WorkbookHandleStylesMethods,
+    WorkbookHandleTableStylesMethods,
     WorkbookHandleTablesMethods {}
 
 installAnnotationsMethods(WorkbookHandle);
 installChartsMethods(WorkbookHandle);
 installConditionalFormatMethods(WorkbookHandle);
+installDrawingObjectsMethods(WorkbookHandle);
 installFormulasMethods(WorkbookHandle);
 installLayoutMethods(WorkbookHandle);
 installPivotMethods(WorkbookHandle);
@@ -1217,6 +1228,7 @@ installPrintMethods(WorkbookHandle);
 installProtectionMethods(WorkbookHandle);
 installStylesMethods(WorkbookHandle);
 installTablesMethods(WorkbookHandle);
+installTableStylesMethods(WorkbookHandle);
 installValidationMethods(WorkbookHandle);
 
 export { addrKey };

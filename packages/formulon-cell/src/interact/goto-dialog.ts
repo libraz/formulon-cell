@@ -341,7 +341,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     targetList.replaceChildren();
     const entries: string[] = [];
     for (const dn of rangeDefinedNames(getWb(), store.getState().data.sheetIndex)) {
-      entries.push(dn.name);
+      if (!dn.hidden) entries.push(dn.name);
     }
     for (const areas of recentReferences.get(store) ?? []) entries.push(formatReference(areas));
     for (const text of entries) {

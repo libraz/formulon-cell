@@ -64,6 +64,7 @@ describe('Mac ribbon command dispatch', () => {
     const history = new History();
     const formulaWrites: string[] = [];
     const workbook = {
+      capabilities: {},
       setFormula: (_addr: unknown, formula: string) => formulaWrites.push(formula),
     } as unknown as WorkbookHandle;
     const instance = {

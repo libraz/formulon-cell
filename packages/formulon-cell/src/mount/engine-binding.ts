@@ -28,6 +28,7 @@ import { attachPasteSpecial } from '../interact/paste-special.js';
 import { attachPointer } from '../interact/pointer.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
 import type { RangeInsertTarget } from '../interact/range-insert.js';
+import { attachTableTotals } from '../interact/table-totals.js';
 import {
   attachValidationAlert,
   attachValidationList,
@@ -372,6 +373,15 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       })
     : null;
   const validationPrompt = flags.validation ? attachValidationPrompt({ grid, store }) : null;
+  const tableTotals = attachTableTotals({
+    grid,
+    store,
+    history,
+    wb,
+    strings,
+    onAfterCommit: refreshCells,
+    onMoreFunctions: () => beginEditActiveCell(),
+  });
   const quickAnalysis = flags.quickAnalysis
     ? attachQuickAnalysis({
         host,
@@ -388,10 +398,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       })
     : null;
 
-  const onDblClick = (e: MouseEvent): void => {
-    if (e.button !== 0) return;
-    if (editor.isActive()) return;
-    if (getFormatPainter()?.isActive()) return;
+  const beginEditActiveCell = (): void => {
     const s = store.getState();
     const a = s.selection.active;
     const key = `${a.sheet}:${a.row}:${a.col}`;
@@ -404,6 +411,12 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       locale: inputLocaleForWorkbook(wb),
     });
     editor.begin(seed);
+  };
+  const onDblClick = (e: MouseEvent): void => {
+    if (e.button !== 0) return;
+    if (editor.isActive()) return;
+    if (getFormatPainter()?.isActive()) return;
+    beginEditActiveCell();
     e.preventDefault();
   };
   grid.addEventListener('dblclick', onDblClick);
@@ -525,6 +538,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       validation?.detach();
       validationPrompt?.detach();
       validationAlert?.detach();
+      tableTotals.detach();
       setPivotGuardSink(wb, null);
       quickAnalysis?.detach();
       grid.removeEventListener('dblclick', onDblClick);

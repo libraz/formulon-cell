@@ -29,6 +29,7 @@ export type {
   PivotReportLayoutResult,
   PivotWorksheetSource,
   PivotWorksheetSourceResult,
+  ProtectedRange,
   SaveResult,
   Status,
   StringResult,
@@ -36,6 +37,7 @@ export type {
   TableUpdateInput,
   Value,
   Workbook,
+  WorkbookProtection,
 } from '@libraz/formulon';
 
 /** Anchor geometry of a drawing object (picture or chart), as the engine
@@ -548,6 +550,12 @@ export interface EngineCapabilities {
   readonly drawings?: boolean;
   readonly images?: boolean;
   readonly charts?: boolean;
+  /** `listShapes` + `insertShape` + `updateShape` + `removeShape`. */
+  readonly shapes?: boolean;
+  /** Sparkline group list / add / update / set-members / remove. */
+  readonly sparklines?: boolean;
+  /** Table slicer list / add / update / remove. */
+  readonly slicers?: boolean;
   readonly workbookTheme?: boolean;
   readonly effectiveStyle?: boolean;
   readonly displayText?: boolean;
@@ -593,6 +601,13 @@ export interface EngineCapabilities {
   readonly autoFilter?: boolean;
   /** OOXML worksheet-table create/update/delete. */
   readonly tableMutate?: boolean;
+  /** Table style name, show-flags and per-column totals (`tableAt` style
+   *  fields, `setTableColumnTotals`). */
+  readonly tableStyleInfo?: boolean;
+  /** Custom `<tableStyles>` read/write and the default style names. */
+  readonly customTableStyles?: boolean;
+  /** `pivotGetStyleInfo` + `pivotSetStyleInfo`. */
+  readonly pivotStyleInfo?: boolean;
   /** `evaluateCfRange` (read-only evaluation). */
   readonly conditionalFormat: boolean;
   /** Full data-validation round-trip: `getValidations` + `addValidation` +
@@ -683,6 +698,12 @@ export interface EngineCapabilities {
   readonly spreadsheetProfile: boolean;
   /** `getSheetProtection` + `setSheetProtection` round-trip. */
   readonly sheetProtectionRoundtrip: boolean;
+  /** `getWorkbookProtection` + `setWorkbookProtection` round-trip. */
+  readonly workbookProtectionRoundtrip?: boolean;
+  /** `getProtectedRanges` + add / update / remove of `<protectedRange>` records. */
+  readonly protectedRanges?: boolean;
+  /** `setDefinedNameAttrs` for a name's comment and hidden flag. */
+  readonly definedNameAttrs?: boolean;
   /** `getExternalLinks` enumeration of `<externalReferences>` records. */
   readonly externalLinks: boolean;
   /** `getLambdaText` rendering of lambda values back to formula text. */

@@ -19,7 +19,8 @@ export type RibbonTab =
   | 'chartDesign'
   | 'chartFormat'
   | 'shapeFormat'
-  | 'pictureFormat';
+  | 'pictureFormat'
+  | 'tableDesign';
 
 export type ToolbarLang = Locale;
 
@@ -32,7 +33,7 @@ export interface RibbonCommand {
   title: string;
   label: string;
   icon?: string;
-  kind?: 'button' | 'large' | 'wide' | 'mono' | 'select' | 'color' | 'break';
+  kind?: 'button' | 'large' | 'wide' | 'mono' | 'select' | 'color' | 'input' | 'break';
   layout?: 'stacked';
   disabled?: boolean;
   /** Human-readable explanation exposed through the shared disabled-state
@@ -107,12 +108,15 @@ export const CHART_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['chartDesign'
 export const SHAPE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['shapeFormat'];
 /** The tab a selected picture adds to the ribbon. */
 export const PICTURE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['pictureFormat'];
+/** The tab the active cell adds while it is inside a table. */
+export const TABLE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['tableDesign'];
 /** Every contextual tab. Only one object is selected at a time, so the
  *  ribbon shows at most one of these sets. */
 export const CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = [
   ...CHART_CONTEXTUAL_RIBBON_TABS,
   ...SHAPE_CONTEXTUAL_RIBBON_TABS,
   ...PICTURE_CONTEXTUAL_RIBBON_TABS,
+  ...TABLE_CONTEXTUAL_RIBBON_TABS,
 ];
 
 export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> =
@@ -849,6 +853,28 @@ export function buildRibbonModel(
       contextual: true,
     },
     { ...tab('pictureFormat', [objectArrange()]), contextual: true },
+    {
+      ...tab('tableDesign', [
+        group(tr.tableProperties, [
+          { id: 'tableName', title: tr.tableName, label: tr.tableName, kind: 'input' },
+        ]),
+        group(tr.tableStyleOptions, [
+          cmd('tableHeaderRow', tr.headerRow, tr.headerRow, 'tableHeaderRow', 'wide'),
+          cmd('tableTotalRow', tr.totalRow, tr.totalRow, 'tableTotalRow', 'wide'),
+          cmd('tableBandedRows', tr.bandedRows, tr.bandedRows, 'tableBandedRows', 'wide'),
+          cmd('tableFirstColumn', tr.firstColumn, tr.firstColumn, 'tableFirstColumn', 'wide'),
+          cmd('tableLastColumn', tr.lastColumn, tr.lastColumn, 'tableLastColumn', 'wide'),
+          cmd(
+            'tableBandedColumns',
+            tr.bandedColumns,
+            tr.bandedColumns,
+            'tableBandedColumns',
+            'wide',
+          ),
+        ]),
+      ]),
+      contextual: true,
+    },
   ];
   const homeTab = allTabs.find((candidate) => candidate.id === 'home');
   if (!homeTab) return [];
@@ -886,7 +912,7 @@ export const ribbonCommands = (
     .filter((command) => command.kind !== 'break');
 
 export const isRibbonActivatableCommand = (command: RibbonCommand): boolean =>
-  command.kind !== 'break' && !['select', 'color'].includes(command.kind ?? 'button');
+  command.kind !== 'break' && !['select', 'color', 'input'].includes(command.kind ?? 'button');
 
 export const ribbonActivatableCommands = (
   input: Strings | ToolbarLang,

@@ -357,7 +357,9 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   }
 
   const openNameMenu = (): void => {
-    const rows = rangeDefinedNames(getWb(), store.getState().data.sheetIndex);
+    const rows = rangeDefinedNames(getWb(), store.getState().data.sheetIndex).filter(
+      (row) => !row.hidden,
+    );
     closeNameMenu();
     const menu = document.createElement('div');
     menu.className = 'fc-namebox-menu';

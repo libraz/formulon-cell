@@ -39,6 +39,7 @@ export const VALIDATION_TRIANGLE_COLOR = '#d24545';
 
 let cachedFillHandleRect: Rect | null = null;
 let cachedValidationChevron: { rect: Rect; row: number; col: number } | null = null;
+let cachedTotalsChevron: TotalsChevron | null = null;
 let cachedOutlineToggles: OutlineToggleHit[] = [];
 let cachedErrorTriangles: ErrorTriangleHit[] = [];
 
@@ -117,6 +118,24 @@ export function getValidationChevron(): { rect: Rect; row: number; col: number }
 
 export function setValidationChevron(v: { rect: Rect; row: number; col: number } | null): void {
   cachedValidationChevron = v;
+}
+
+/** Bounds + cell of the totals-row function picker painted on the active
+ *  cell when it sits in a table's total row, or null. */
+export interface TotalsChevron {
+  rect: Rect;
+  row: number;
+  col: number;
+  tableId: string;
+  column: number;
+}
+
+export function getTotalsChevron(): TotalsChevron | null {
+  return cachedTotalsChevron;
+}
+
+export function setTotalsChevron(v: TotalsChevron | null): void {
+  cachedTotalsChevron = v;
 }
 
 export function shouldShowValidationChevron(validation: CellValidation | undefined): boolean {

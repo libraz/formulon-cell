@@ -19,6 +19,7 @@ import {
   tableVariantFromOptions,
   updateTableOverlay,
 } from '../../commands/format-as-table.js';
+import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import {
@@ -147,13 +148,14 @@ const buildTableStyleAction =
       void showCreateTableDialog(instance, { style, color, variant });
       return;
     }
-    // Inside a table the gallery restyles it, as the desktop spreadsheet does.
+    // Inside a table the gallery restyles it and keeps the table's own style options.
+    const {
+      banded: _banded,
+      firstCol: _firstCol,
+      ...look
+    } = tableStyleOptionsById(state, style, color, variant);
     recordTablesChange(instance.history, instance.store, () => {
-      updateTableOverlay(
-        instance.store,
-        table.id,
-        tableStyleOptionsById(state, style, color, variant),
-      );
+      updateTableOverlay(instance.store, table.id, look);
     });
     instance.host.focus();
   };
@@ -258,14 +260,20 @@ export const showCreateTableDialog = async (
 const buildCellStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellStyleFromRibbon'] =>
   (id) => {
-    applyCellStyleToSelection(instance.store, instance.history, id, {
-      origin: 'ribbon',
-      commandId: 'cellStyles',
-      getWorkbook: () => instance.workbook,
-      getFallbackProfile: () =>
-        cellStyleFallbackProfileForPlatform(instance.host.dataset.fcPlatform),
-    });
-    instance.host.focus();
+    runAfterAllowedRangeUnlock(
+      instance.store,
+      selectionEditRanges(instance.store.getState()),
+      () => {
+        applyCellStyleToSelection(instance.store, instance.history, id, {
+          origin: 'ribbon',
+          commandId: 'cellStyles',
+          getWorkbook: () => instance.workbook,
+          getFallbackProfile: () =>
+            cellStyleFallbackProfileForPlatform(instance.host.dataset.fcPlatform),
+        });
+        instance.host.focus();
+      },
+    );
   };
 
 const updateCellStylesMenu =

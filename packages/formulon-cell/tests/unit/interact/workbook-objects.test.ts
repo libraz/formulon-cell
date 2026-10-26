@@ -56,6 +56,7 @@ const wbWithObjects = () => {
       },
     ],
     getPivotDefinition: () => null,
+    getPivotField: () => null,
     getPivotTables: () => [
       {
         sheetIndex: 0,
@@ -348,6 +349,69 @@ describe('attachWorkbookObjectsPanel', () => {
     handle.detach();
   });
 
+  it('limits a saved shape to what the file holds, and locks a boxed one', () => {
+    const items: SessionIllustration[] = [
+      {
+        id: 'saved',
+        kind: 'shape',
+        shape: 'rounded-rectangle',
+        sheet: 0,
+        nativeObjectId: 4,
+        nativeGeometryEditable: true,
+      },
+      {
+        id: 'boxed',
+        kind: 'shape',
+        shape: 'rectangle',
+        sheet: 0,
+        nativeObjectId: 5,
+        nativeGeometryEditable: true,
+        nativeLocked: true,
+      },
+    ];
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb: emptyWb(),
+      strings: en,
+      listSessionIllustrations: () => items,
+      onUpdateSessionIllustration: vi.fn(),
+      onDuplicateSessionIllustration: vi.fn(),
+      onClearSessionIllustration: vi.fn(),
+    });
+    handle.open();
+    const rows = Array.from(
+      host.querySelectorAll<HTMLElement>('.fc-objects__illustration-actions'),
+    ).map((actions) => actions.closest('li') as HTMLElement);
+    const inputs = (row: HTMLElement) => ({
+      radius: row.querySelector<HTMLInputElement>('input[type="number"]'),
+      opacity: row.querySelector<HTMLInputElement>('input[type="range"]'),
+      color: row.querySelector<HTMLInputElement>('input[type="color"]'),
+    });
+    const buttons = (row: HTMLElement) =>
+      Array.from(
+        row.querySelectorAll<HTMLButtonElement>('.fc-objects__illustration-actions button'),
+      );
+
+    const saved = inputs(rows[0] as HTMLElement);
+    expect(saved.radius?.disabled).toBe(true);
+    expect(saved.opacity?.step).toBe('1');
+    expect(saved.color?.disabled).toBe(false);
+    expect(
+      buttons(rows[0] as HTMLElement).every(
+        (b) => b.getAttribute('aria-disabled') !== 'true' && !b.disabled,
+      ),
+    ).toBe(true);
+
+    const boxed = inputs(rows[1] as HTMLElement);
+    expect(boxed.color?.disabled).toBe(true);
+    expect(boxed.opacity?.disabled).toBe(true);
+    const [, duplicate, remove] = buttons(rows[1] as HTMLElement);
+    for (const button of [duplicate, remove]) {
+      expect(button?.disabled || button?.getAttribute('aria-disabled') === 'true').toBe(true);
+    }
+    handle.detach();
+  });
+
   it('routes session illustration select, duplicate, and delete actions from the list', () => {
     const onSelectSessionIllustration = vi.fn();
     const onDuplicateSessionIllustration = vi.fn();
@@ -523,6 +587,7 @@ describe('attachWorkbookObjectsPanel', () => {
         ['1', 'Columns'],
         ['3', 'Filters'],
         ['2', 'Values'],
+        ['none', 'Not in report'],
       ],
     );
     const salesAggregation = form?.querySelector<HTMLSelectElement>(
@@ -608,12 +673,8 @@ describe('attachWorkbookObjectsPanel', () => {
     );
     expect(fieldListChecks).toHaveLength(2);
     for (const check of fieldListChecks) {
-      expect(check.disabled).toBe(true);
-      expect(check.dataset.disabledReason).toBe(en.workbookObjects.pivotFieldListCheckboxReadOnly);
-      expect(check.getAttribute('aria-description')).toBe(
-        en.workbookObjects.pivotFieldListCheckboxReadOnly,
-      );
-      expect(check.title).toBe(en.workbookObjects.pivotFieldListCheckboxReadOnly);
+      expect(check.disabled).toBe(false);
+      expect(check.checked).toBe(true);
     }
 
     const regionAxis = form.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
@@ -639,6 +700,40 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(calls.some((call) => call.startsWith('add-item:'))).toBe(false);
     expect(calls.some((call) => call.startsWith('rename:'))).toBe(false);
     expect(calls.some((call) => call.startsWith('anchor:'))).toBe(false);
+    handle.detach();
+  });
+
+  it('takes a field out of the report when its Field List box is unticked', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const check = form?.querySelector<HTMLInputElement>('[data-pivot-field-list-field-index="1"]');
+    const axis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="1"]');
+    if (!form || !check || !axis) throw new Error('missing field list controls');
+
+    check.checked = false;
+    check.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(axis.value).toBe('none');
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+    expect(calls).toContain('field-axis:0:0:1:null');
+    expect(calls).toContain('field-axis:0:0:0:0');
+    handle.detach();
+  });
+
+  it('puts a ticked field back on the area it left', () => {
+    const { wb } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.openPivotFieldList(0, 0);
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const check = form?.querySelector<HTMLInputElement>('[data-pivot-field-list-field-index="1"]');
+    const axis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="1"]');
+    if (!check || !axis) throw new Error('missing field list controls');
+    check.checked = false;
+    check.dispatchEvent(new Event('change'));
+    check.checked = true;
+    check.dispatchEvent(new Event('change'));
+    expect(axis.value).toBe(String(PivotAxis.Value));
     handle.detach();
   });
 

@@ -5,11 +5,13 @@ import {
   applySessionShapeOutlineDash,
   applySessionShapeOutlineWeight,
   SHAPE_LINE_DASHES,
+  shapeDashEditable,
   shapeFillColor,
   shapeHasFill,
   shapeOutlineColor,
   shapeOutlineDash,
   shapeOutlineWeight,
+  shapeStyleEditable,
 } from '../../commands/shape-format.js';
 import {
   normalizeHex,
@@ -107,7 +109,7 @@ export function createShapeFormatDropdownDefaults(
     updateShapeFillMenu(menu) {
       syncTheme(menu);
       const item = selectedShape();
-      const fillable = item !== null && shapeHasFill(item);
+      const fillable = item !== null && shapeStyleEditable(item) && shapeHasFill(item);
       projectColorMenu(menu, 'shapeFill', item ? shapeFillColor(item) : null, !fillable);
     },
     applyShapeOutlineAction(value) {
@@ -146,11 +148,25 @@ export function createShapeFormatDropdownDefaults(
     updateShapeOutlineMenu(menu) {
       syncTheme(menu);
       const item = selectedShape();
-      projectColorMenu(menu, 'shapeOutline', item ? shapeOutlineColor(item) : null, !item);
+      const editable = item !== null && shapeStyleEditable(item);
+      projectColorMenu(menu, 'shapeOutline', item ? shapeOutlineColor(item) : null, !editable);
       const weight = item ? shapeOutlineWeight(item) : null;
-      projectRadioPanel(menu, 'shapeOutlineWeight', weight === null ? null : String(weight), !item);
+      projectRadioPanel(
+        menu,
+        'shapeOutlineWeight',
+        weight === null ? null : String(weight),
+        !editable,
+      );
       const dash = item && weight !== null ? shapeOutlineDash(item) : null;
-      projectRadioPanel(menu, 'shapeOutlineDash', dash, !item);
+      projectRadioPanel(menu, 'shapeOutlineDash', dash, !editable);
+      // The file stores no dash style, so a saved shape cannot take one.
+      if (item && !shapeDashEditable(item)) {
+        for (const button of menu.querySelectorAll<HTMLButtonElement>(
+          '[data-shape-outline-dash], [data-format-submenu="dash"]',
+        )) {
+          setMenuControlDisabled(button, true);
+        }
+      }
     },
   };
 }
