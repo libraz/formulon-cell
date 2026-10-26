@@ -325,7 +325,7 @@ export const nextDemoSearchIndex = (
   direction: 'first' | 'next' | 'previous',
 ): number => {
   if (count <= 0) return -1;
-  if (direction === 'first') return current >= 0 ? current : 0;
+  if (direction === 'first') return Math.max(current, 0);
   if (direction === 'next') return (current + 1 + count) % count;
   return (current < 0 ? count - 1 : current - 1 + count) % count;
 };

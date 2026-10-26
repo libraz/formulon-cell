@@ -376,7 +376,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
               m.addr.row === currentMatch.addr.row &&
               m.addr.col === currentMatch.addr.col,
           ) + 1;
-    resultsSummary.textContent = `${idx > 0 ? idx : 0} / ${allCount}`;
+    resultsSummary.textContent = `${Math.max(idx, 0)} / ${allCount}`;
   };
 
   const step = (direction: 'next' | 'prev'): void => {

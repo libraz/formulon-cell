@@ -711,8 +711,8 @@ export function buildPrintDocument(
       return {
         row0: area.row0,
         col0: area.col0,
-        row1: row1 < area.row0 ? area.row0 : row1,
-        col1: col1 < area.col0 ? area.col0 : col1,
+        row1: Math.max(row1, area.row0),
+        col1: Math.max(col1, area.col0),
       };
     }),
     setup.pageOrder,

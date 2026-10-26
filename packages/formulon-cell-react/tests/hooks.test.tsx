@@ -43,6 +43,7 @@ function renderHook<T, P>(
   const ref: { value?: T; renderCount: number } = { renderCount: 0 };
   let currentProps = initialProps;
 
+  // biome-ignore lint/correctness/noComponentHookFactories: a probe built per render root hosts the hook under test and mounts once.
   const Probe = ({ p }: { p: P }): ReactNode => {
     ref.renderCount += 1;
     const v = hook(p);
@@ -314,6 +315,7 @@ describe('useSpreadsheetEvent', () => {
       instance: SpreadsheetInstance | null;
       handler: (e: unknown) => void;
     }
+    // biome-ignore lint/correctness/noComponentHookFactories: a probe built per render root hosts the hook under test and mounts once.
     const Probe = ({ instance, handler }: ProbeProps): ReactNode => {
       useSpreadsheetEvent(instance, 'cellChange' as SpreadsheetEventName, handler as never);
       return null;
@@ -352,6 +354,7 @@ describe('useSpreadsheetEvent', () => {
       instance: SpreadsheetInstance | null;
       handler: (e: unknown) => void;
     }
+    // biome-ignore lint/correctness/noComponentHookFactories: a probe built per render root hosts the hook under test and mounts once.
     const Probe = ({ instance, handler: h }: ProbeProps): ReactNode => {
       useSpreadsheetEvent(instance, 'cellChange' as SpreadsheetEventName, h as never);
       // Touch a memo so the test can assert the component actually mounted.

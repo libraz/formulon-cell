@@ -225,7 +225,7 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
   /** Index of the swatch that owns tabindex=0 (the roving focus target). */
   const rovingIndex = (): number => {
     const idx = swatches.findIndex((s) => s.dataset.color === selected);
-    return idx >= 0 ? idx : 0;
+    return Math.max(idx, 0);
   };
 
   const syncRoving = (): void => {
