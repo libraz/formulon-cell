@@ -121,7 +121,7 @@ Only a direct import of `@libraz/formulon/threads` needs `worker: { format: 'es'
 - Desktop-spreadsheet chrome: formula bar, status bar, ribbon, sheet tabs, context menu, and dialogs (format cells, paste special, find/replace, Go To, conditional formatting, named ranges, validation, PivotTable creation, and more).
 - A canvas-rendered grid themed through CSS tokens. `paper` (light), `ink` (dark), and `contrast` ship in the box.
 - Charts (column, bar, line, area, pie, doughnut and scatter) with a settings panel. Charts in loaded workbooks are edited in place and saved back.
-- XLSX persistence for threaded comments, images, charts, workbook themes and filters. Loaded pictures can be moved, resized and reordered unless they use an absolute anchor.
+- XLSX persistence for threaded comments and notes, images, charts, shapes, sparklines, tables and table styles, PivotTables, slicers, workbook themes, filters, sheet and workbook protection, view settings and calculation options. Loaded pictures can be moved, resized and reordered unless they use an absolute anchor. Save As can also write `.xlsb`, with a warning that lists what the binary format drops.
 - Feature flags and extension factories. `presets.minimal()`, `presets.standard()`, and `presets.full()` cover the common sets; any piece can be swapped or left out.
 - An opt-in Mac profile. `ui: { platform: 'mac' }` (or `'auto'` to detect it from the browser) switches to a Mac ribbon tab set, Mac shortcuts, and a nonmodal formula argument palette.
 - Runtime i18n. `en`, `ja`, `de`, `fr`, `zh`, `ko`, and `th` ship by default, and `sheet.i18n.register()` adds more without re-mounting.
