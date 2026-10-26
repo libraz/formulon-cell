@@ -254,8 +254,9 @@ export abstract class WorkbookHandleLayoutMethods {
   /** Return sheet defaults in the store's CSS-pixel units. Columns follow the
    *  `geometryPlatform` model: Mac derives an unstated default from
    *  `baseColWidth`, the default profile uses the engine's effective width.
-   *  Mac rows take the Normal font's height when it is tabulated; otherwise
-   *  rows without a stated default use 102/7 points. Null means the engine
+   *  Mac rows take the Normal font's height when it is tabulated, unless
+   *  `customHeight` pins the stated default; otherwise rows without a stated
+   *  default use 102/7 points. Null means the engine
    *  lacks geometry support or a native read/conversion failed. */
   getSheetDefaultLayoutPx(
     sheet: number,
@@ -282,7 +283,8 @@ export abstract class WorkbookHandleLayoutMethods {
       colWidth = columnCharsToPx(this, sheet, chars);
     }
     const statedRowPoints = defaults.hasDefaultRowHeight ? defaults.defaultRowHeight : 102 / 7;
-    const font = usesMacColumnModel(this) ? sheetNormalFont(this, sheet) : null;
+    const pinned = defaults.hasDefaultRowHeight && defaults.customHeight;
+    const font = usesMacColumnModel(this) && !pinned ? sheetNormalFont(this, sheet) : null;
     const rowPoints = (font && macDefaultRowPt(font.name, font.size)) ?? statedRowPoints;
     if (colWidth === null || !Number.isFinite(rowPoints)) return null;
     const rowHeight = rowPoints * CSS_PX_PER_POINT;

@@ -159,6 +159,23 @@ describe('WorkbookHandle.createDefault platform', () => {
     }
   });
 
+  it('keeps a Mac sheet default row height only when customHeight pins it', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'ja', platform: 'mac' });
+    try {
+      const raw = wb as unknown as {
+        wb: { setSheetFormatDefaults(sheet: number, d: object): RawStatus };
+      };
+      const stated = { baseColWidth: 10, defaultRowHeight: 30, hasDefaultRowHeight: true };
+      raw.wb.setSheetFormatDefaults(0, { ...stated, customHeight: false });
+      // 游ゴシック 12 recomputes to 20 pt, as Mac Excel does on load.
+      expect(wb.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(20 * PX_PER_PT, 8);
+      raw.wb.setSheetFormatDefaults(0, { ...stated, customHeight: true });
+      expect(wb.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(30 * PX_PER_PT, 8);
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('adds bare sheets to a loaded book', async () => {
     const created = await WorkbookHandle.createDefault({ locale: 'en' });
     const loaded = await WorkbookHandle.loadBytes(created.save());
