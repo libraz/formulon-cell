@@ -55,7 +55,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(input.value).toBe('100');
     input.value = '401';
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    expect(dialog?.textContent).toContain('Enter a zoom percentage from 50 to 400.');
+    expect(dialog?.textContent).toContain('Enter a zoom percentage from 10 to 400.');
     input.value = '125';
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();

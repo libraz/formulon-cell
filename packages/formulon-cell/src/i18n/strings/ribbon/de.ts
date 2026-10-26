@@ -291,7 +291,7 @@ export const ribbonDe: RibbonStrings = {
     paperTabloid: 'Tabloid',
     zoomDialogTitle: 'Zoom',
     zoomDialogPercent: 'Vergrößerung',
-    zoomDialogInvalid: 'Geben Sie einen Zoomfaktor zwischen 50 und 400 ein.',
+    zoomDialogInvalid: 'Geben Sie einen Zoomfaktor zwischen 10 und 400 ein.',
     marginsNormal: 'Normal',
     marginsWide: 'Breit',
     marginsNarrow: 'Schmal',

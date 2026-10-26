@@ -291,7 +291,7 @@ export const ribbonJa: RibbonStrings = {
     paperTabloid: 'タブロイド',
     zoomDialogTitle: 'ズーム',
     zoomDialogPercent: '倍率',
-    zoomDialogInvalid: '50 から 400 までの倍率を入力してください。',
+    zoomDialogInvalid: '10 から 400 までの倍率を入力してください。',
     marginsNormal: '標準',
     marginsWide: '広い',
     marginsNarrow: '狭い',

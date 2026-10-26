@@ -1,3 +1,4 @@
+import { ZOOM_MAX, ZOOM_MIN } from '../../store/render-scale.js';
 import { showNumberPrompt } from './prompt.js';
 
 export interface ZoomDialogOptions {
@@ -15,8 +16,8 @@ export const showZoomDialog = (opts: ZoomDialogOptions): Promise<number | null> 
     title: opts.title,
     label: opts.label,
     initial: opts.initial,
-    min: 50,
-    max: 400,
+    min: ZOOM_MIN * 100,
+    max: ZOOM_MAX * 100,
     step: 1,
     integer: true,
     okLabel: opts.okLabel,

@@ -1,5 +1,5 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { renderScale } from '../store/render-scale.js';
+import { renderScale, steppedZoom } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { navigationPolicyFor } from './navigation-policy.js';
 
@@ -32,9 +32,7 @@ export function attachWheel(deps: WheelDeps): () => void {
   const onWheel = (e: WheelEvent): void => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      const cur = store.getState().viewport.zoom;
-      const step = e.deltaY < 0 ? 0.1 : -0.1;
-      mutators.setZoom(store, Math.round((cur + step) * 10) / 10);
+      mutators.setZoom(store, steppedZoom(store.getState().viewport.zoom, e.deltaY < 0 ? 1 : -1));
       // A bounded embedded viewport owns zoom as session presentation state.
       // Do not persist it through the workbook unless the host explicitly
       // mounted an unrestricted navigation policy; this keeps a wheel gesture

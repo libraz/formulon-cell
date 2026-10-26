@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('store/viewport — setZoom', () => {
-  it('clamps zoom to [0.5, 4]', () => {
+  it('clamps zoom to [0.1, 4]', () => {
     const store = createSpreadsheetStore();
-    mutators.setZoom(store, 0.1);
-    expect(store.getState().viewport.zoom).toBe(0.5);
+    mutators.setZoom(store, 0.05);
+    expect(store.getState().viewport.zoom).toBe(0.1);
     mutators.setZoom(store, 10);
     expect(store.getState().viewport.zoom).toBe(4);
   });

@@ -1,4 +1,5 @@
 import type { LayoutSnapshot } from '../commands/slice-history.js';
+import { clampZoom } from '../store/render-scale.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -126,7 +127,7 @@ export function hydrateLayoutFromEngine(
     }
 
     // Engine carries zoom as a percentage (10..400, default 100); the store
-    // models it as a multiplier (1.0 = 100%) clamped to [0.5, 4].
+    // models it as a multiplier (1.0 = 100%) over the same range.
     // A view readback is authoritative even when the native value is the
     // default 100%. Hydration can follow a different sheet or a workbook
     // replacement, so retaining the previous store zoom at 100% leaks the
@@ -134,9 +135,7 @@ export function hydrateLayoutFromEngine(
     const viewport = view
       ? {
           ...s.viewport,
-          zoom: Number.isFinite(view.zoomScale)
-            ? Math.max(0.5, Math.min(4, view.zoomScale / 100))
-            : 1,
+          zoom: Number.isFinite(view.zoomScale) ? clampZoom(view.zoomScale / 100) : 1,
         }
       : s.viewport;
 

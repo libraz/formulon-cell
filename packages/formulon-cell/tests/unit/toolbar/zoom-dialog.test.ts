@@ -14,13 +14,13 @@ describe('showZoomDialog', () => {
       initial: 100,
       okLabel: 'OK',
       cancelLabel: 'Cancel',
-      invalidMessage: 'Enter a zoom percentage from 50 to 400.',
+      invalidMessage: 'Enter a zoom percentage from 10 to 400.',
     });
 
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Magnification');
     const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
-    expect(input?.min).toBe('50');
+    expect(input?.min).toBe('10');
     expect(input?.max).toBe('400');
     expect(input?.step).toBe('1');
     if (!input) throw new Error('Expected zoom input.');
@@ -37,7 +37,7 @@ describe('showZoomDialog', () => {
       initial: 100,
       okLabel: 'OK',
       cancelLabel: 'Cancel',
-      invalidMessage: 'Enter a zoom percentage from 50 to 400.',
+      invalidMessage: 'Enter a zoom percentage from 10 to 400.',
     });
 
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
@@ -46,7 +46,7 @@ describe('showZoomDialog', () => {
     input.value = '401';
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
 
-    expect(dialog?.textContent).toContain('Enter a zoom percentage from 50 to 400.');
+    expect(dialog?.textContent).toContain('Enter a zoom percentage from 10 to 400.');
     input.value = '150';
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await expect(pending).resolves.toBe(150);

@@ -7,6 +7,14 @@ import { normalizeFormatLocale } from '../format/locale.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
+  clampZoom,
+  sliderPositionToZoom,
+  steppedZoom,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  zoomToSliderPosition,
+} from '../store/render-scale.js';
+import {
   mutators,
   type SpreadsheetStore,
   type StatusAggKey,
@@ -128,8 +136,6 @@ const fmt = (n: number, locale: string): string => {
   return n.toLocaleString(normalizeFormatLocale(locale), { maximumFractionDigits: 4 });
 };
 
-const clampZoom = (zoom: number): number => Math.max(0.5, Math.min(4, zoom));
-
 export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   const { statusbar, store, getEngineLabel } = deps;
   let strings = deps.strings ?? defaultStrings;
@@ -201,9 +207,9 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   const zoomSlider = document.createElement('input');
   zoomSlider.type = 'range';
   zoomSlider.className = 'fc-host__statusbar-zoom-slider';
-  zoomSlider.min = '50';
-  zoomSlider.max = '400';
-  zoomSlider.step = '10';
+  zoomSlider.min = '0';
+  zoomSlider.max = '100';
+  zoomSlider.step = '1';
   const zoomIn = createStatusBarZoomButton('+');
   const zoomLabel = document.createElement('span');
   zoomLabel.className = 'fc-host__statusbar-zoom-label';
@@ -404,10 +410,11 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     zoomSlider.style.display =
       s.ui.statusOptions.zoom && s.ui.statusOptions.zoomSlider ? '' : 'none';
     const zoomPct = Math.round(s.viewport.zoom * 100);
-    zoomSlider.value = String(zoomPct);
+    zoomSlider.value = String(zoomToSliderPosition(s.viewport.zoom));
+    zoomSlider.setAttribute('aria-valuetext', `${zoomPct}%`);
     zoomLabel.textContent = `${zoomPct}%`;
-    const atMinZoom = s.viewport.zoom <= 0.5;
-    const atMaxZoom = s.viewport.zoom >= 4;
+    const atMinZoom = s.viewport.zoom <= ZOOM_MIN;
+    const atMaxZoom = s.viewport.zoom >= ZOOM_MAX;
     projectDisabledState(zoomOut, atMinZoom, strings.statusBar.zoomOutUnavailable, {
       datasetKey: 'disabledReason',
       titlePrefix: strings.statusBar.zoomOut,
@@ -435,13 +442,13 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   };
 
   zoomSlider.addEventListener('input', () => {
-    setZoom(Number(zoomSlider.value) / 100);
+    setZoom(sliderPositionToZoom(Number(zoomSlider.value)));
   });
   zoomOut.addEventListener('click', () => {
-    setZoom(store.getState().viewport.zoom - 0.1);
+    setZoom(steppedZoom(store.getState().viewport.zoom, -1));
   });
   zoomIn.addEventListener('click', () => {
-    setZoom(store.getState().viewport.zoom + 0.1);
+    setZoom(steppedZoom(store.getState().viewport.zoom, 1));
   });
 
   const refreshKeyboardLocks = (e: KeyboardEvent): void => {

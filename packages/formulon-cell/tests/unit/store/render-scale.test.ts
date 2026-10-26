@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { renderScale } from '../../../src/store/render-scale.js';
+import {
+  renderScale,
+  sliderPositionToZoom,
+  steppedZoom,
+  zoomToSliderPosition,
+} from '../../../src/store/render-scale.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const ROW_MAX_PX = (409 * 96) / 72;
@@ -76,5 +81,26 @@ describe('store/setColWidth + setRowHeight — whole screen px', () => {
     const store = withScale(0.75);
     mutators.setRowHeight(store, 0, 2000);
     expect(store.getState().layout.rowHeights.get(0)).toBe(ROW_MAX_PX);
+  });
+});
+
+describe('zoom stepping and the status-bar slider', () => {
+  it('steps zoom to the next multiple of 10% within 10%..400%', () => {
+    expect(steppedZoom(1, 1)).toBe(1.1);
+    expect(steppedZoom(1.03, 1)).toBe(1.1);
+    expect(steppedZoom(1.03, -1)).toBe(1);
+    expect(steppedZoom(0.1, -1)).toBe(0.1);
+    expect(steppedZoom(4, 1)).toBe(4);
+  });
+
+  it('keeps 100% at the slider centre with each half linear', () => {
+    expect(zoomToSliderPosition(0.1)).toBe(0);
+    expect(zoomToSliderPosition(0.55)).toBeCloseTo(25, 9);
+    expect(zoomToSliderPosition(1)).toBe(50);
+    expect(zoomToSliderPosition(2.5)).toBe(75);
+    expect(zoomToSliderPosition(4)).toBe(100);
+    for (const zoom of [0.1, 0.37, 1, 1.75, 4]) {
+      expect(sliderPositionToZoom(zoomToSliderPosition(zoom))).toBeCloseTo(zoom, 2);
+    }
   });
 });

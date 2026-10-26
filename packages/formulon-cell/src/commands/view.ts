@@ -120,18 +120,18 @@ export function setWorkbookView(
   wb?.setSheetViewMode(store.getState().data.sheetIndex, mode);
 }
 
-/** Set zoom as a decimal scale. Values are clamped by the store to 50..400%. */
+/** Set zoom as a decimal scale. Values are clamped by the store to 10..400%. */
 export function setZoomScale(store: SpreadsheetStore, zoom: number): void {
   mutators.setZoom(store, zoom);
 }
 
-/** Set zoom as a percentage. Values are clamped to 50..400%. */
+/** Set zoom as a percentage. Values are clamped to 10..400%. */
 export function setZoomPercent(store: SpreadsheetStore, percent: number): void {
   mutators.setZoom(store, percent / 100);
 }
 
 /** Set the per-sheet zoom level. `zoom` is a multiplier (1.0 = 100%) and is
- *  clamped by the store mutator to [0.5, 4]. When `wb` is supplied the
+ *  clamped by the store mutator to [0.1, 4]. When `wb` is supplied the
  *  engine receives the equivalent percentage so the value round-trips
  *  through .xlsx. Not journaled — spreadsheets treat zoom as a view setting
  *  outside the undo stack. */

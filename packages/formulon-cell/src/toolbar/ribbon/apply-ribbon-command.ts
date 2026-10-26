@@ -37,6 +37,7 @@ import { fontPointsToCssPx } from '../../engine/font-units.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { outlineSummaryFor } from '../../store/outline-summary.js';
+import { clampZoom } from '../../store/render-scale.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
 import type { SessionShapeKind } from '../illustration-types.js';
@@ -633,7 +634,7 @@ const applyGenericRibbonCommand = (
       const selectedCols = Math.max(1, selected.c1 - selected.c0 + 1);
       const scaleForRows = 20 / selectedRows;
       const scaleForCols = 12 / selectedCols;
-      setSheetZoom(i.store, Math.max(0.5, Math.min(4, scaleForRows, scaleForCols)), i.workbook);
+      setSheetZoom(i.store, clampZoom(Math.min(scaleForRows, scaleForCols)), i.workbook);
       runtime.refreshZoom();
       runtime.focusSheet();
       return true;

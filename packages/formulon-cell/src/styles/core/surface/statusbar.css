@@ -175,9 +175,53 @@
     cursor: default;
   }
 
+  /* Desktop zoom slider: a thin neutral groove with a tick at 100% (the
+     centre) and a light thumb, rather than a filled native range. */
   .fc-host__statusbar-zoom-slider {
-    width: 86px;
-    accent-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    --fc-zoom-groove: color-mix(in srgb, currentColor 38%, transparent);
+    width: 100px;
+    height: 14px;
+    margin: 0;
+    appearance: none;
+    background:
+      linear-gradient(var(--fc-zoom-groove), var(--fc-zoom-groove)) center / 1px 8px no-repeat,
+      linear-gradient(var(--fc-zoom-groove), var(--fc-zoom-groove)) center / 100% 2px no-repeat;
+    cursor: pointer;
+  }
+
+  .fc-host__statusbar-zoom-slider::-webkit-slider-runnable-track {
+    height: 14px;
+    background: transparent;
+  }
+
+  .fc-host__statusbar-zoom-slider::-moz-range-track {
+    height: 14px;
+    background: transparent;
+  }
+
+  .fc-host__statusbar-zoom-slider::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+    margin-top: 1px;
+    appearance: none;
+    border: var(--fc-hairline) solid color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: 50%;
+    background: var(--fc-bg, #fff);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  }
+
+  .fc-host__statusbar-zoom-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: var(--fc-hairline) solid color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: 50%;
+    background: var(--fc-bg, #fff);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  }
+
+  .fc-host__statusbar-zoom-slider:focus-visible {
+    outline: 2px solid var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    outline-offset: 2px;
   }
 
   .fc-host__statusbar-zoom-label {

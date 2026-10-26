@@ -641,20 +641,26 @@ describe('attachStatusBar', () => {
     const slider = statusbar.querySelector<HTMLInputElement>('.fc-host__statusbar-zoom-slider');
     const label = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-zoom-label');
     expect(slider).not.toBeNull();
-    expect(slider?.value).toBe('100');
+    // 100% sits at the centre: 10%..100% on the left half, 100%..400% on the right.
+    expect(slider?.value).toBe('50');
+    expect(slider?.getAttribute('aria-valuetext')).toBe('100%');
     expect(label?.textContent).toBe('100%');
     expect(slider?.getAttribute('aria-label')).toBe('ズーム');
 
     if (!slider) throw new Error('expected zoom slider');
-    slider.value = '150';
+    slider.value = '75';
     slider.dispatchEvent(new Event('input'));
-    expect(store.getState().viewport.zoom).toBe(1.5);
-    expect(label?.textContent).toBe('150%');
+    expect(store.getState().viewport.zoom).toBe(2.5);
+    expect(label?.textContent).toBe('250%');
+    slider.value = '0';
+    slider.dispatchEvent(new Event('input'));
+    expect(store.getState().viewport.zoom).toBe(0.1);
+    expect(slider.getAttribute('aria-valuetext')).toBe('10%');
     handle.detach();
   });
 
   it('projects disabled reasons when zoom buttons hit their limits', () => {
-    mutators.setZoom(store, 0.5);
+    mutators.setZoom(store, 0.1);
     const handle = attachStatusBar({
       statusbar,
       store,

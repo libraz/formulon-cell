@@ -2,7 +2,7 @@ import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import { frozenColEnd, frozenColStart, frozenRowEnd, frozenRowStart } from './freeze-band.js';
-import { renderScale } from './render-scale.js';
+import { clampZoom, renderScale } from './render-scale.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
   ChartSourceHighlight,
@@ -159,7 +159,7 @@ export const viewMutators = {
   },
 
   setZoom(store: SpreadsheetStore, zoom: number): void {
-    const z = Math.max(0.5, Math.min(4, zoom));
+    const z = clampZoom(zoom);
     store.setState((s) => ({ ...s, viewport: { ...s.viewport, zoom: z } }));
   },
 

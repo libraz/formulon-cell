@@ -289,7 +289,7 @@ export const ribbonTh: RibbonStrings = {
     paperTabloid: 'Tabloid',
     zoomDialogTitle: 'ย่อ/ขยาย',
     zoomDialogPercent: 'กำลังขยาย',
-    zoomDialogInvalid: 'ใส่เปอร์เซ็นต์การย่อ/ขยายตั้งแต่ 50 ถึง 400',
+    zoomDialogInvalid: 'ใส่เปอร์เซ็นต์การย่อ/ขยายตั้งแต่ 10 ถึง 400',
     marginsNormal: 'ปกติ',
     marginsWide: 'กว้าง',
     marginsNarrow: 'แคบ',

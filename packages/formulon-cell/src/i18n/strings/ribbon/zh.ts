@@ -289,7 +289,7 @@ export const ribbonZh: RibbonStrings = {
     paperTabloid: 'Tabloid',
     zoomDialogTitle: '缩放',
     zoomDialogPercent: '缩放比例',
-    zoomDialogInvalid: '请输入 50 到 400 之间的缩放百分比。',
+    zoomDialogInvalid: '请输入 10 到 400 之间的缩放百分比。',
     marginsNormal: '普通',
     marginsWide: '宽',
     marginsNarrow: '窄',

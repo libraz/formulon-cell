@@ -291,7 +291,7 @@ export const ribbonFr: RibbonStrings = {
     paperTabloid: 'Tabloïd',
     zoomDialogTitle: 'Zoom',
     zoomDialogPercent: 'Agrandissement',
-    zoomDialogInvalid: 'Entrez un pourcentage de zoom compris entre 50 et 400.',
+    zoomDialogInvalid: 'Entrez un pourcentage de zoom compris entre 10 et 400.',
     marginsNormal: 'Normales',
     marginsWide: 'Larges',
     marginsNarrow: 'Étroites',

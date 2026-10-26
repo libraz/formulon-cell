@@ -110,8 +110,8 @@ describe('view commands', () => {
     setZoomPercent(store, 175);
     expect(store.getState().viewport.zoom).toBe(1.75);
 
-    setZoomPercent(store, 25);
-    expect(store.getState().viewport.zoom).toBe(0.5);
+    setZoomPercent(store, 5);
+    expect(store.getState().viewport.zoom).toBe(0.1);
 
     setZoomScale(store, 9);
     expect(store.getState().viewport.zoom).toBe(4);

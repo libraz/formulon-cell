@@ -290,7 +290,7 @@ export const ribbonKo: RibbonStrings = {
     paperTabloid: 'Tabloid',
     zoomDialogTitle: '확대/축소',
     zoomDialogPercent: '확대/축소 배율',
-    zoomDialogInvalid: '50에서 400 사이의 확대/축소 비율을 입력하세요.',
+    zoomDialogInvalid: '10에서 400 사이의 확대/축소 비율을 입력하세요.',
     marginsNormal: '보통',
     marginsWide: '넓게',
     marginsNarrow: '좁게',
