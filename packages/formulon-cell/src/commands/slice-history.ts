@@ -7,6 +7,7 @@ import {
 import { syncLayoutToEngine } from '../engine/layout-sync.js';
 import type { Range, SheetAxisFormatOverride, SheetFontOverride } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { splitPosition } from '../store/split-panes.js';
 import type {
   CellFormat,
   ConditionalRule,
@@ -452,10 +453,16 @@ export interface LayoutSnapshot {
    *  compares nor restores these. */
   freezeRows: number;
   freezeCols: number;
+  /** Split position in twips while the band is split panes, else null. Engine-sync only. */
+  split: { x: number; y: number } | null;
   hiddenRows: Set<number>;
   hiddenCols: Set<number>;
+  defaultRowsHidden: boolean;
+  shownRows: Set<number>;
   outlineRows: Map<number, number>;
   outlineCols: Map<number, number>;
+  collapsedRows: Set<number>;
+  collapsedCols: Set<number>;
   outlineRowGutter: number;
   outlineColGutter: number;
   hiddenSheets: Set<number>;
@@ -469,10 +476,15 @@ export function captureLayoutSnapshot(state: State): LayoutSnapshot {
     rowHeights: new Map(state.layout.rowHeights),
     freezeRows: state.layout.freezeRows,
     freezeCols: state.layout.freezeCols,
+    split: splitPosition(state),
     hiddenRows: new Set(state.layout.hiddenRows),
     hiddenCols: new Set(state.layout.hiddenCols),
+    defaultRowsHidden: state.layout.defaultRowsHidden === true,
+    shownRows: new Set(state.layout.shownRows),
     outlineRows: new Map(state.layout.outlineRows),
     outlineCols: new Map(state.layout.outlineCols),
+    collapsedRows: new Set(state.layout.collapsedRows),
+    collapsedCols: new Set(state.layout.collapsedCols),
     outlineRowGutter: state.layout.outlineRowGutter,
     outlineColGutter: state.layout.outlineColGutter,
     hiddenSheets: new Set(state.layout.hiddenSheets),
@@ -490,8 +502,12 @@ export function applyLayoutSnapshot(store: SpreadsheetStore, snap: LayoutSnapsho
       rowHeights: new Map(snap.rowHeights),
       hiddenRows: new Set(snap.hiddenRows),
       hiddenCols: new Set(snap.hiddenCols),
+      defaultRowsHidden: snap.defaultRowsHidden,
+      shownRows: new Set(snap.shownRows),
       outlineRows: new Map(snap.outlineRows),
       outlineCols: new Map(snap.outlineCols),
+      collapsedRows: new Set(snap.collapsedRows),
+      collapsedCols: new Set(snap.collapsedCols),
       outlineRowGutter: snap.outlineRowGutter,
       outlineColGutter: snap.outlineColGutter,
       hiddenSheets: new Set(snap.hiddenSheets),
@@ -515,8 +531,12 @@ const sameLayoutSnapshot = (a: LayoutSnapshot, b: LayoutSnapshot): boolean =>
   sameNumberMap(a.rowHeights, b.rowHeights) &&
   sameNumberSet(a.hiddenRows, b.hiddenRows) &&
   sameNumberSet(a.hiddenCols, b.hiddenCols) &&
+  a.defaultRowsHidden === b.defaultRowsHidden &&
+  sameNumberSet(a.shownRows, b.shownRows) &&
   sameNumberMap(a.outlineRows, b.outlineRows) &&
   sameNumberMap(a.outlineCols, b.outlineCols) &&
+  sameNumberSet(a.collapsedRows, b.collapsedRows) &&
+  sameNumberSet(a.collapsedCols, b.collapsedCols) &&
   a.outlineRowGutter === b.outlineRowGutter &&
   a.outlineColGutter === b.outlineColGutter &&
   sameNumberSet(a.hiddenSheets, b.hiddenSheets) &&

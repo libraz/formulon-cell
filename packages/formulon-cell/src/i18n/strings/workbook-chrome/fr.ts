@@ -115,4 +115,29 @@ export const workbookChromeFr: WorkbookChromeStrings = {
     engineHelp:
       'Le moteur WASM formulon n’a pas pu démarrer. Vérifiez la prise en charge de WebAssembly et le chargement de l’actif WASM du moteur.',
   },
+  workbookSave: {
+    saveAsTitle: 'Enregistrer sous',
+    fileFormat: 'Format de fichier',
+    formatXlsx: 'Classeur (.xlsx)',
+    formatXlsb: 'Classeur binaire (.xlsb)',
+    save: 'Enregistrer',
+    cancel: 'Annuler',
+    lossTitle: 'Une partie du contenu ne sera pas enregistrée',
+    lossMessage:
+      '{format} ne peut pas contenir tout ce classeur. Les éléments suivants ne seront pas enregistrés :',
+    mayLoseMessage:
+      'Selon leur origine, {format} risque de ne pas conserver les éléments suivants :',
+    saveAnyway: 'Enregistrer quand même',
+    notes: 'Notes',
+    threadedComments: 'Commentaires à fil',
+    autoFilters: 'Filtres',
+    pivotTables: 'Tableaux croisés dynamiques',
+    slicers: 'Segments',
+    drawings: 'Images, formes et graphiques',
+    tables: 'Tableaux',
+    sparklines: 'Graphiques sparkline',
+    protectedRanges: 'Plages modifiables',
+    otherSettings:
+      'Autres paramètres (mise en page, affichages, protection du classeur, styles personnalisés)',
+  },
 };

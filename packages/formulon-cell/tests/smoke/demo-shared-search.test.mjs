@@ -345,7 +345,7 @@ describe('demo-shared Search/Tell me items', () => {
     ).not.toMatch(/React|Vue|portrait|landscape|Orientation|Print area|Active sheet/);
   });
 
-  it('drives demo Save download and status bar upload state through the shared helper', () => {
+  it('drives demo Save download and status bar upload state through the shared helper', async () => {
     const statuses = [];
     const clicked = vi.fn();
     const appended = [];
@@ -370,8 +370,22 @@ describe('demo-shared Search/Tell me items', () => {
       return 1;
     };
 
-    saveDemoWorkbookToDownload({
-      instance: { workbook: { save: () => new Uint8Array([1, 2, 3]) } },
+    const noLosses = {
+      downgradedFormulaCount: 0,
+      deferredFeatureCount: 0,
+      droppedPartCount: 0,
+      droppedRelationshipCount: 0,
+      renumberedPartCount: 0,
+    };
+    const i18n = { strings: {} };
+    await saveDemoWorkbookToDownload({
+      instance: {
+        host: documentRef.body,
+        i18n,
+        workbook: {
+          saveWithDiagnostics: () => ({ bytes: new Uint8Array([1, 2, 3]), diagnostics: noLosses }),
+        },
+      },
       bookName: 'Book1',
       setUploadStatus: (status) => statuses.push(status),
       documentRef,
@@ -386,10 +400,12 @@ describe('demo-shared Search/Tell me items', () => {
     expect(removed).toEqual([anchor]);
     expect(urlApi.revokeObjectURL).toHaveBeenCalledWith('blob:demo');
 
-    saveDemoWorkbookToDownload({
+    await saveDemoWorkbookToDownload({
       instance: {
+        host: documentRef.body,
+        i18n,
         workbook: {
-          save: () => {
+          saveWithDiagnostics: () => {
             throw new Error('save failed');
           },
         },

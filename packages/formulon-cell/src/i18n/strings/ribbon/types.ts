@@ -111,6 +111,8 @@ export interface RibbonStrings {
     insertFunction: string;
     definedNames: string;
     dataTools: string;
+    forecast: string;
+    whatIf: string;
     dataValidation: string;
     arrange: string;
     selectionPane: string;
@@ -147,6 +149,7 @@ export interface RibbonStrings {
     tableTotalsFunction: string;
     window: string;
     freeze: string;
+    split: string;
     names: string;
     functionLibrary: string;
     functionLogical: string;
@@ -182,6 +185,9 @@ export interface RibbonStrings {
     deleteComment: string;
     previousComment: string;
     nextComment: string;
+    notes: string;
+    showHideNote: string;
+    showAllNotes: string;
     script: string;
     recordActions: string;
     allScripts: string;
@@ -234,6 +240,7 @@ export interface RibbonStrings {
     hideDetail: string;
     summaryRowsBelow: string;
     summaryColsRight: string;
+    outlineSymbols: string;
     showRows: string;
     hideRows: string;
     showCols: string;

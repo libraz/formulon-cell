@@ -1,4 +1,5 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { setDataTableGuardSink } from '../commands/data-table-guard.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { setPivotGuardSink } from '../commands/pivot-guard.js';
@@ -28,6 +29,7 @@ import { attachPasteSpecial } from '../interact/paste-special.js';
 import { attachPointer } from '../interact/pointer.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
 import type { RangeInsertTarget } from '../interact/range-insert.js';
+import { attachSplitDrag } from '../interact/split-drag.js';
 import { attachTableTotals } from '../interact/table-totals.js';
 import {
   attachValidationAlert,
@@ -163,6 +165,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     (alert) => validationAlert?.show(alert),
     strings.pivotTableDialog.cannotChange,
   );
+  setDataTableGuardSink(wb, (alert) => validationAlert?.show(alert), strings.dataTableDialog);
 
   const activateSheet = (sheet: number): boolean => {
     if (
@@ -226,6 +229,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   // Header / footer slots are only reachable in Page Layout view, but the
   // listener is cheap and stateless until one is clicked.
   const pageBandEditor = attachPageBandEditor({ grid, store, history });
+  const detachSplitDrag = attachSplitDrag({ grid, store, getWb: () => wb });
   const autoFillOptions = attachAutoFillOptions({
     host: grid,
     store,
@@ -527,6 +531,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     followHyperlink: (target) => followHyperlink({ store, wb, ...hyperlinkFollow }, target),
     unbind: () => {
       detachPtr();
+      detachSplitDrag();
       pageBandEditor.detach();
       autoFillOptions.detach();
       pasteOptions.detach();
@@ -540,6 +545,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       validationAlert?.detach();
       tableTotals.detach();
       setPivotGuardSink(wb, null);
+      setDataTableGuardSink(wb, null);
       quickAnalysis?.detach();
       grid.removeEventListener('dblclick', onDblClick);
       unsubWb();

@@ -229,6 +229,8 @@ export interface RibbonMenusStrings {
     arrangeRequiresObject: string;
     arrangeNativeUnsupported: string;
     shapeArrowNotSaved: string;
+    /** Why Split is unavailable on an engine that cannot save split panes. */
+    splitNotSaved: string;
     arrangeAtFront: string;
     arrangeAtBack: string;
     underlineSingle: string;
@@ -255,6 +257,9 @@ export interface RibbonMenusStrings {
     calcCalculateNow: string;
     calcCalculateSheet: string;
     calcIterative: string;
+    whatIfGoalSeek: string;
+    whatIfDataTable: string;
+    whatIfDataTableUnavailable: string;
     sortAscendingMenu: string;
     sortDescendingMenu: string;
     sortColumn: string;
@@ -561,7 +566,6 @@ export interface RibbonMenusStrings {
     iconStars3: string;
     iconQuarters5: string;
     iconRatings5: string;
-    iconBars5: string;
     iconBoxes5: string;
   };
 }

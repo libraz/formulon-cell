@@ -47,7 +47,12 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   const cellFormatAt = (
     row: number,
     col: number,
-  ): { hyperlink?: string; hyperlinkTooltip?: string; comment?: string } | null => {
+  ): {
+    hyperlink?: string;
+    hyperlinkTooltip?: string;
+    comment?: string;
+    commentVisible?: boolean;
+  } | null => {
     const s = store.getState();
     const addr = { sheet: s.data.sheetIndex, row, col };
     const fmt = s.format.formats.get(addrKey(addr));
@@ -64,7 +69,8 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   const onMove = (e: PointerEvent): void => {
     const at = cellAt(e);
     const fmt = at ? cellFormatAt(at.row, at.col) : null;
-    const tooltip = fmt?.comment || fmt?.hyperlinkTooltip;
+    // A shown note is already on the canvas; hovering it adds no popup.
+    const tooltip = (fmt?.commentVisible ? undefined : fmt?.comment) || fmt?.hyperlinkTooltip;
     if (tooltip) {
       tip.textContent = tooltip;
       tip.hidden = false;

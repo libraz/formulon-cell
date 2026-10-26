@@ -72,6 +72,7 @@ import {
   shiftRangeAxis,
   shiftRangeValidations,
 } from './axis-shift.js';
+import { alertDataTableEdit, axisEditSplitsDataTable } from './data-table-guard.js';
 import { recordFilterChange } from './filter.js';
 import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
@@ -133,8 +134,19 @@ function insertionWouldOverflow(
 
   const indexedMaps =
     axis === 'row'
-      ? [state.layout.rowHeights, state.layout.hiddenRows, state.layout.outlineRows]
-      : [state.layout.colWidths, state.layout.hiddenCols, state.layout.outlineCols];
+      ? [
+          state.layout.rowHeights,
+          state.layout.hiddenRows,
+          state.layout.outlineRows,
+          state.layout.collapsedRows ?? new Set<number>(),
+          state.layout.shownRows ?? new Set<number>(),
+        ]
+      : [
+          state.layout.colWidths,
+          state.layout.hiddenCols,
+          state.layout.outlineCols,
+          state.layout.collapsedCols ?? new Set<number>(),
+        ];
   for (const indexed of indexedMaps) {
     for (const index of indexed.keys()) {
       if (index > lastMovable) return true;
@@ -1126,6 +1138,10 @@ function editAxis(
     return false;
   }
   if (kind === 'insert' && insertionWouldOverflow(store, wb, sheet, axis, split, n)) return false;
+  if (axisEditSplitsDataTable(wb, sheet, axis, kind, split, n)) {
+    alertDataTableEdit(wb);
+    return false;
+  }
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
   const structureShift: AxisStructureShift = { axis, split, delta };
   const inverseStructureShift: AxisStructureShift = { axis, split, delta: -delta };
@@ -1272,6 +1288,8 @@ function editAxis(
           : shiftIndexedMap(sizes, split, delta, max);
       const nextHidden = shiftIndexedSet(hidden, split, delta, max);
       const nextOutline = shiftIndexedMap(outline, split, delta, max);
+      const collapsed = row ? before.collapsedRows : before.collapsedCols;
+      const nextCollapsed = shiftIndexedSet(collapsed, split, delta, max);
       applyLayoutPatch(
         store,
         row
@@ -1279,11 +1297,14 @@ function editAxis(
               rowHeights: nextSizes,
               hiddenRows: nextHidden,
               outlineRows: nextOutline,
+              collapsedRows: nextCollapsed,
+              shownRows: shiftIndexedSet(before.shownRows, split, delta, max),
             }
           : {
               colWidths: nextSizes,
               hiddenCols: nextHidden,
               outlineCols: nextOutline,
+              collapsedCols: nextCollapsed,
             },
       );
     });

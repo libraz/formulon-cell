@@ -49,6 +49,7 @@ export function runFormatDialogTransaction(tx: FormatDialogTransaction): boolean
     hyperlinkTooltip: _hyperlinkTooltip,
     comment: _comment,
     commentAuthor: _commentAuthor,
+    commentVisible: _commentVisible,
     validation: _validation,
     ...repeatablePatch
   } = action.patch;

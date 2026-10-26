@@ -115,4 +115,30 @@ export interface WorkbookChromeStrings {
     title: string;
     engineHelp: string;
   };
+  workbookSave: {
+    saveAsTitle: string;
+    fileFormat: string;
+    formatXlsx: string;
+    formatXlsb: string;
+    save: string;
+    cancel: string;
+    /** Title of the warning shown before a save that leaves content out. */
+    lossTitle: string;
+    /** `{format}` is the chosen file type label. */
+    lossMessage: string;
+    /** `{format}` is the chosen file type label; lists content kept only in
+     *  some cases. */
+    mayLoseMessage: string;
+    saveAnyway: string;
+    notes: string;
+    threadedComments: string;
+    autoFilters: string;
+    pivotTables: string;
+    slicers: string;
+    drawings: string;
+    tables: string;
+    sparklines: string;
+    protectedRanges: string;
+    otherSettings: string;
+  };
 }

@@ -7,6 +7,11 @@ import { rangeContainsRange, rangesIntersect } from '../../store/selection-geome
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import type { CellRecord } from '../cell-shift.js';
 import { DEFAULT_COMMENT_AUTHOR } from '../comment-author.js';
+import {
+  alertDataTableEdit,
+  axisEditSplitsDataTable,
+  blockDataTableShift,
+} from '../data-table-guard.js';
 import { collectAllFormulas, type FormulaRecord } from '../formula-records.js';
 import { type AxisBandMoveContext, adjustFormulaForAxisBandMove } from '../formula-refs.js';
 import type { History } from '../history.js';
@@ -276,6 +281,21 @@ function cutBandPreflight(
   } else if (!commentsFitAfterInsert(wb, targetSheet, wholeRows, insertionAt, count)) {
     return false;
   }
+  // A data table can neither move with the band nor be split by its insertion.
+  if (blockDataTableShift(wb, logical)) return false;
+  if (
+    axisEditSplitsDataTable(
+      wb,
+      targetSheet,
+      wholeRows ? 'row' : 'col',
+      'insert',
+      insertionAt,
+      count,
+    )
+  ) {
+    alertDataTableEdit(wb);
+    return false;
+  }
   return true;
 }
 
@@ -299,6 +319,7 @@ interface SourceCommentSnapshot {
   addr: Addr;
   author: string;
   text: string;
+  visible: boolean;
   format: CellFormat | undefined;
 }
 
@@ -322,6 +343,7 @@ function captureSourceCommentSnapshots(
       addr,
       author: comment.author,
       text: comment.text,
+      visible: comment.visible === true,
       format: undefined,
     });
   }
@@ -344,6 +366,7 @@ function captureSourceCommentSnapshots(
       addr,
       author: format.commentAuthor ?? existing?.author ?? DEFAULT_COMMENT_AUTHOR,
       text: format.comment,
+      visible: format.commentVisible === true || existing?.visible === true,
       format: cloneCellFormat(format),
     });
   }
@@ -366,6 +389,7 @@ function recordSourceCommentRestore(
           comment.addr.col,
           comment.author,
           comment.text,
+          comment.visible,
         );
       }
       store.setState((s) => {
@@ -379,6 +403,7 @@ function recordSourceCommentRestore(
               ...(current ?? {}),
               comment: comment.text,
               commentAuthor: comment.author || undefined,
+              commentVisible: comment.visible || undefined,
             },
           );
         }

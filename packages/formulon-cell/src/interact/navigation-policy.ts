@@ -9,7 +9,8 @@ import {
   rangesIntersect,
   sameRange,
 } from '../store/selection-geometry.js';
-import type { SpreadsheetStore, State } from '../store/store.js';
+import { clampSplitPaneOrigin } from '../store/split-panes.js';
+import type { LayoutSlice, SpreadsheetStore, State } from '../store/store.js';
 
 /** The spreadsheet's physical coordinate limits (zero based, inclusive). */
 
@@ -514,6 +515,28 @@ export function nextTabStop(store: SpreadsheetStore, addr: Addr, reverse: boolea
   return null;
 }
 
+/** A split's top/left pane scrolled back to show `addr` above or left of it. */
+function splitPanesToward(
+  layout: LayoutSlice,
+  addr: Addr,
+  rowStart: number,
+  colStart: number,
+): LayoutSlice {
+  if (layout.splitPanes !== true) return layout;
+  const originRow = layout.freezeOriginRow ?? 0;
+  const originCol = layout.freezeOriginCol ?? 0;
+  const freezeOriginRow =
+    layout.freezeRows > 0 && addr.row < originRow
+      ? clampSplitPaneOrigin(layout.freezeRows, Math.max(rowStart, frozenRowEnd(layout)), addr.row)
+      : originRow;
+  const freezeOriginCol =
+    layout.freezeCols > 0 && addr.col < originCol
+      ? clampSplitPaneOrigin(layout.freezeCols, Math.max(colStart, frozenColEnd(layout)), addr.col)
+      : originCol;
+  if (freezeOriginRow === originRow && freezeOriginCol === originCol) return layout;
+  return { ...layout, freezeOriginRow, freezeOriginCol };
+}
+
 /** Scroll the viewport the least amount that brings `addr` into view. */
 export function scrollActiveIntoView(store: SpreadsheetStore, addr: Addr): void {
   store.setState((s) => {
@@ -538,7 +561,14 @@ export function scrollActiveIntoView(store: SpreadsheetStore, addr: Addr): void 
     }
     rowStart = Math.min(maxRowStart, Math.max(rowStartMin, rowStart));
     colStart = Math.min(maxColStart, Math.max(colStartMin, colStart));
-    if (rowStart === s.viewport.rowStart && colStart === s.viewport.colStart) return s;
-    return { ...s, viewport: { ...s.viewport, rowStart, colStart } };
+    const layout = splitPanesToward(s.layout, addr, rowStart, colStart);
+    if (
+      layout === s.layout &&
+      rowStart === s.viewport.rowStart &&
+      colStart === s.viewport.colStart
+    ) {
+      return s;
+    }
+    return { ...s, layout, viewport: { ...s.viewport, rowStart, colStart } };
   });
 }

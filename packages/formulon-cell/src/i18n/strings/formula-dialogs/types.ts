@@ -67,6 +67,29 @@ export interface FormulaDialogsStrings {
     unsupported: string;
     cancel: string;
     ok: string;
+    calculationSection: string;
+    workbookCalculation: string;
+    recalcBeforeSave: string;
+    recalcBeforeSaveRequiresManual: string;
+    formulasSection: string;
+    r1c1: string;
+    workbookSection: string;
+    precisionAsDisplayed: string;
+    precisionWarning: string;
+    date1904: string;
+    settingUnavailable: string;
+  };
+  dataTableDialog: {
+    title: string;
+    rowInput: string;
+    colInput: string;
+    invalidInput: string;
+    invalidRange: string;
+    rejected: string;
+    cannotChange: string;
+    tableFunction: string;
+    cancel: string;
+    ok: string;
   };
   evaluateFormulaDialog: {
     title: string;

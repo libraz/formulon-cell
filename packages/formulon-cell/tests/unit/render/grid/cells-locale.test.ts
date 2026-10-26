@@ -114,6 +114,7 @@ function paintOne({
       locale: 'en-US',
       getDisplay,
       sheetBackgroundImage: null,
+      fontEffects: false,
     },
     view,
     theme,

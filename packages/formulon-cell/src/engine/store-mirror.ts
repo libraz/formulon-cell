@@ -1,9 +1,17 @@
 import { associatePaginationEngine } from '../commands/pagination.js';
-import type { CellFormat, PageSetup, SpreadsheetStore, State } from '../store/store.js';
+import { hiddenRowsOf } from '../store/row-visibility.js';
+import {
+  type CellFormat,
+  mutators,
+  type PageSetup,
+  type SpreadsheetStore,
+  type State,
+} from '../store/store.js';
 import type { OutlineSummary } from '../store/types.js';
 import { parseAddrKey } from './address.js';
 import { syncAutoFilterToEngine, syncHiddenRowsToEngine } from './auto-filter-sync.js';
 import { remapActiveAxisFormatOverrides, remapAxisFormatOverrides } from './axis-format-sync.js';
+import { bindCalcSettingsStore } from './calc-settings-sync.js';
 import {
   captureSyncedFormatKeyMembership,
   flushFormatToEngine,
@@ -187,6 +195,8 @@ export class StoreMirror {
    *  both direct and command-mediated mutations. */
   private unsubscribeWorkbook: (() => void) | null = null;
 
+  private unsubscribeCalcSettings: (() => void) | null = null;
+
   private lastAutoFilterSignature = '';
 
   /** Hidden rows are part of the UI-owned filter result. Track their content
@@ -236,6 +246,8 @@ export class StoreMirror {
     this.unsubscribeBoundStore = null;
     this.unsubscribeWorkbook?.();
     this.unsubscribeWorkbook = null;
+    this.unsubscribeCalcSettings?.();
+    this.unsubscribeCalcSettings = null;
     if (this.boundStore) associatePaginationEngine(this.boundStore.getState(), null);
     this.boundStore = store;
     this.rebase();
@@ -248,6 +260,7 @@ export class StoreMirror {
     );
     registerFormatHistoryBridge(store, this.formatHistoryBridge);
     associatePaginationEngine(store.getState(), this.handle);
+    this.unsubscribeCalcSettings = bindCalcSettingsStore(this.handle, store);
     this.unsubscribeWorkbook = bindWholeSheetFontStore(this.handle, store, (mapIndex) => {
       remapSyncedFormatKeys(this.handle, mapIndex);
       remapActiveAxisFormatOverrides(this.handle, mapIndex);
@@ -327,6 +340,7 @@ export class StoreMirror {
           state.data.sheetIndex,
           previousHiddenRows,
           state.layout.hiddenRows,
+          hiddenRowsOf(state.layout),
         );
       }
       if (pageSetupChanged) syncPageSetupToEngine(this.handle, store, state.data.sheetIndex);
@@ -343,6 +357,12 @@ export class StoreMirror {
    *  every scroll or selection change. */
   flushViewState(): void {
     if (this.boundStore) syncViewStateToEngine(this.handle, this.boundStore);
+  }
+
+  /** Re-read the bound store's active sheet after a recalc no UI command ran. */
+  refreshCells(): void {
+    const store = this.boundStore;
+    if (store) mutators.replaceCells(store, this.handle.cells(store.getState().data.sheetIndex));
   }
 
   withMuted<T>(fn: () => T): T {

@@ -24,7 +24,7 @@ import {
 } from '../../../src/engine/charts-sync.js';
 import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { formatSessionChartValue } from '../../../src/interact/session-chart-format.js';
+import { createSessionChartFormatter } from '../../../src/interact/session-chart-format.js';
 import { attachSessionCharts } from '../../../src/interact/session-charts.js';
 import {
   createSpreadsheetStore,
@@ -971,7 +971,10 @@ describe('attachSessionCharts', () => {
       kind: 'column',
       dataLabels: { visible: true, showValue: true },
     });
-    const handle = attach({ locale: 'en-US', formatValue: formatSessionChartValue });
+    const handle = attach({
+      locale: 'en-US',
+      formatValue: createSessionChartFormatter(() => false),
+    });
     const label = (): string | null =>
       host.querySelector<SVGTextElement>('[data-chart-role="data-label"]')?.textContent ?? null;
     expect(label()).toBe('1,234.5');

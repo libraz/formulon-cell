@@ -1,5 +1,6 @@
 import { hydrateThreadedCommentsFromEngine } from '../engine/annotations-sync.js';
 import { hydrateAutoFilterFromEngine } from '../engine/auto-filter-sync.js';
+import { hydrateCalcSettingsFromEngine } from '../engine/calc-settings-sync.js';
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { hydrateChartsFromEngine } from '../engine/charts-sync.js';
@@ -60,6 +61,7 @@ export function hydrateWorkbookMetadataFromEngine(
   for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
     hydrateThreadedCommentsFromEngine(wb, store, sheet);
   }
+  hydrateCalcSettingsFromEngine(wb, store);
   hydrateProtectionFromEngine(wb, store);
   hydrateSheetPrFromEngine(wb, store);
   hydrateTableOverlaysFromEngine(wb, store);

@@ -110,6 +110,7 @@ export interface RibbonMenus {
   reviewNewComment?: RibbonMenuFactory;
   protect?: RibbonMenuFactory;
   calcOptions?: RibbonMenuFactory;
+  whatIf?: RibbonMenuFactory;
   sort?: RibbonMenuFactory;
   textToColumns?: RibbonMenuFactory;
   dataValidation?: RibbonMenuFactory;

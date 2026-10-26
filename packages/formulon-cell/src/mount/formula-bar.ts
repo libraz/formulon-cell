@@ -798,6 +798,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const onFxFocus = (): void => {
+    // A data table's result cells show their TABLE() formula but cannot be edited.
+    if (fxInput.readOnly) return;
     beginFormulaBarEdit();
   };
 

@@ -581,3 +581,91 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 });
+
+describe.skipIf(typeof WebAssembly === 'undefined')('Data > What-If Analysis', () => {
+  const mounted: { sheet: MountedStubSheet; host: HTMLElement }[] = [];
+  afterEach(() => {
+    for (const { sheet, host } of mounted.splice(0)) {
+      sheet.dispose();
+      host.remove();
+    }
+  });
+
+  const openMenu = async (workbook?: WorkbookHandle) => {
+    const sheet = await mountStubSheet({ locale: 'en', ...(workbook ? { workbook } : {}) });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    mounted.push({ sheet, host });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    tb.setActiveTab('data');
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="whatIf"]')?.click();
+    const menu = host.querySelector<HTMLElement>('#menu-what-if');
+    const item = (action: string) =>
+      menu?.querySelector<HTMLButtonElement>(`[data-what-if="${action}"]`) ?? null;
+    const click = (action: string) => {
+      const event = new MouseEvent('click', { bubbles: true });
+      Object.defineProperty(event, 'target', { value: item(action) });
+      return tb.dropdownsApi?.dynamicRibbonDropdownClick(event);
+    };
+    return { menu, item, click, tb };
+  };
+
+  it('offers Goal Seek and Data Table with icons and opens their dialogs', async () => {
+    const { menu, item, click, tb } = await openMenu(await WorkbookHandle.createDefault());
+    expect(menu).toBeTruthy();
+    expect(
+      Array.from(menu?.querySelectorAll<HTMLButtonElement>('[data-what-if]') ?? []).map(
+        (button) => button.dataset.whatIf,
+      ),
+    ).toEqual(['goal-seek', 'data-table']);
+    expect(menu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(2);
+    expect(item('data-table')?.getAttribute('aria-disabled')).not.toBe('true');
+    expect(click('data-table')).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-datatable')?.hidden).toBe(false);
+    expect(click('goal-seek')).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-mac-goalseek')?.hidden).toBe(false);
+    tb.dispose();
+  });
+
+  it('disables Data Table on an engine that cannot save it', async () => {
+    const { item, tb } = await openMenu();
+    expect(item('data-table')?.getAttribute('aria-disabled')).toBe('true');
+    tb.dispose();
+  });
+
+  it('disposes the dialogs it opened with the instance', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    const sheet = await mountStubSheet({ locale: 'en', workbook });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const unsubscribes: ReturnType<typeof vi.fn>[] = [];
+    const subscribe = sheet.instance.i18n.subscribe.bind(sheet.instance.i18n);
+    vi.spyOn(sheet.instance.i18n, 'subscribe').mockImplementation((listener) => {
+      const off = vi.fn(subscribe(listener));
+      unsubscribes.push(off);
+      return off;
+    });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    tb.setActiveTab('data');
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="whatIf"]')?.click();
+    for (const action of ['data-table', 'goal-seek']) {
+      const event = new MouseEvent('click', { bubbles: true });
+      Object.defineProperty(event, 'target', {
+        value: host.querySelector(`[data-what-if="${action}"]`),
+      });
+      tb.dropdownsApi?.dynamicRibbonDropdownClick(event);
+    }
+    const dialogSubscriptions = unsubscribes.slice(-2);
+    expect(dialogSubscriptions).toHaveLength(2);
+    tb.dispose();
+    sheet.dispose();
+    host.remove();
+    for (const off of dialogSubscriptions) expect(off).toHaveBeenCalled();
+  });
+});

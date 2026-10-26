@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
+import { blockDataTableEdit } from './data-table-guard.js';
 import { mergeAt } from './merge.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -103,6 +104,7 @@ export function autoSum(
   const fn = functionName;
 
   if (!isSingle && rangeArea(r) > MAX_AUTOSUM_SELECTION_CELLS) return null;
+  if (blockDataTableEdit(wb, ...autoSumTargets(state))) return null;
 
   if (isSingle) {
     if (isEmpty(state, sheet, a.row, a.col)) {

@@ -432,12 +432,12 @@ export function attachPointer(
       e.preventDefault();
       if (t.axis === 'row') {
         const collapsed = isRowGroupCollapsed(s.layout, t.i0, t.i1);
-        if (collapsed) expandRowGroup(store, history, t.i0, t.i1);
-        else collapseRowGroup(store, history, t.i0, t.i1);
+        if (collapsed) expandRowGroup(store, history, t.i0, t.i1, wb);
+        else collapseRowGroup(store, history, t.i0, t.i1, wb);
       } else {
         const collapsed = isColGroupCollapsed(s.layout, t.i0, t.i1);
-        if (collapsed) expandColGroup(store, history, t.i0, t.i1);
-        else collapseColGroup(store, history, t.i0, t.i1);
+        if (collapsed) expandColGroup(store, history, t.i0, t.i1, wb);
+        else collapseColGroup(store, history, t.i0, t.i1, wb);
       }
       drag = { kind: 'none' };
       onAfterCommit?.();

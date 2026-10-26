@@ -1,4 +1,5 @@
 import type { CellValue } from '../../../engine/types.js';
+import { excelSerialFromDate } from '../../../format/date-serial.js';
 import {
   datedif,
   dateFromSerial,
@@ -24,13 +25,14 @@ import type { FormulaReaderContext } from './context.js';
 import type { RangeReader } from './ranges.js';
 
 /** Exactly the reader members this family touches. */
-export type DateEvaluatorContext = Pick<FormulaReaderContext, 'readOperand'> &
+export type DateEvaluatorContext = Pick<FormulaReaderContext, 'readOperand' | 'state'> &
   Pick<RangeReader, 'numericValuesInFormulaRangeArg'>;
 
 /** Date and time functions: construction and parts, week numbering, EDATE/EOMONTH,
  *  day counts, DATEDIF/YEARFRAC, text parsing, and workday arithmetic. */
 export function createDateEvaluator(ctx: DateEvaluatorContext) {
   const { readOperand, numericValuesInFormulaRangeArg } = ctx;
+  const is1904 = (): boolean => ctx.state.ui.date1904 === true;
   const dateFunction = (
     fn:
       | 'DATE'
@@ -62,8 +64,14 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
     rowOffset: number,
     colOffset: number,
   ): CellValue => {
-    if (fn === 'TODAY') return { kind: 'number', value: todaySerial() };
-    if (fn === 'NOW') return { kind: 'number', value: Date.now() / 86_400_000 + 25569 };
+    const date1904 = is1904();
+    if (fn === 'TODAY') return { kind: 'number', value: todaySerial(date1904) };
+    if (fn === 'NOW') {
+      return {
+        kind: 'number',
+        value: excelSerialFromDate(new Date(Date.now()), date1904) ?? Number.NaN,
+      };
+    }
     const asOperand = (arg: FormulaDateArg): FormulaOperand | null =>
       arg.kind === 'range' || arg.kind === 'dynamic-range' ? null : arg;
     if (fn === 'DATEVALUE' || fn === 'TIMEVALUE') {
@@ -72,7 +80,7 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
       const operand = asOperand(arg);
       if (!operand) return { kind: 'error', code: 15, text: '#VALUE!' };
       const value = readOperand(operand, rowOffset, colOffset);
-      return fn === 'DATEVALUE' ? dateValueText(value) : timeValueText(value);
+      return fn === 'DATEVALUE' ? dateValueText(value, date1904) : timeValueText(value);
     }
     if (fn === 'DATEDIF') {
       const [startArg, endArg, unitArg] = args;
@@ -86,7 +94,7 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
       const start = readNumber(readOperand(startOperand, rowOffset, colOffset));
       const end = readNumber(readOperand(endOperand, rowOffset, colOffset));
       if (start === null || end === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-      return datedif(start, end, readOperand(unitOperand, rowOffset, colOffset));
+      return datedif(start, end, readOperand(unitOperand, rowOffset, colOffset), date1904);
     }
     if (fn === 'DAYS360') {
       const [startArg, endArg, methodArg] = args;
@@ -105,7 +113,7 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
           ? false
           : readLogical(readOperand(methodOperand, rowOffset, colOffset));
       if (method === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-      return days360(start, end, method);
+      return days360(start, end, method, date1904);
     }
     if (fn === 'YEARFRAC') {
       const [startArg, endArg, basisArg] = args;
@@ -124,7 +132,7 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
           ? 0
           : readNumber(readOperand(basisOperand, rowOffset, colOffset));
       if (basis === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-      return yearFrac(start, end, basis);
+      return yearFrac(start, end, basis, date1904);
     }
     if (
       fn === 'NETWORKDAYS' ||
@@ -169,8 +177,8 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
         kind: 'number',
         value:
           fn === 'NETWORKDAYS' || fn === 'NETWORKDAYS.INTL'
-            ? networkDays(start, endOrDays, holidays, weekends)
-            : workday(start, endOrDays, holidays, weekends),
+            ? networkDays(start, endOrDays, holidays, weekends, date1904)
+            : workday(start, endOrDays, holidays, weekends, date1904),
       };
     }
     const operandArgs = args as FormulaOperand[];
@@ -186,10 +194,10 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
     }
     if (fn === 'DATE') {
       const [year, month, day] = values.map((value) => Math.trunc(value as number));
-      return {
-        kind: 'number',
-        value: dateSerialFromParts(year as number, month as number, day as number),
-      };
+      const serial = dateSerialFromParts(year as number, month as number, day as number, date1904);
+      return Number.isNaN(serial)
+        ? { kind: 'error', code: 6, text: '#NUM!' }
+        : { kind: 'number', value: serial };
     }
     if (fn === 'HOUR' || fn === 'MINUTE' || fn === 'SECOND') {
       const totalSeconds = Math.round(serialTimeFraction(values[0] as number) * 86_400) % 86_400;
@@ -200,7 +208,7 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
     if (fn === 'DAYS') {
       return { kind: 'number', value: (values[0] as number) - (values[1] as number) };
     }
-    const date = dateFromSerial(values[0] as number);
+    const date = dateFromSerial(values[0] as number, date1904);
     if (date === null) return { kind: 'error', code: 15, text: '#VALUE!' };
     if (fn === 'EDATE' || fn === 'EOMONTH') {
       const monthOffset = Math.trunc(values[1] as number);
@@ -208,7 +216,7 @@ export function createDateEvaluator(ctx: DateEvaluatorContext) {
       const month = date.getUTCMonth() + monthOffset;
       const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
       const day = fn === 'EOMONTH' ? lastDay : Math.min(date.getUTCDate(), lastDay);
-      return { kind: 'number', value: dateSerialFromParts(year, month + 1, day) };
+      return { kind: 'number', value: dateSerialFromParts(year, month + 1, day, date1904) };
     }
     if (fn === 'YEAR') return { kind: 'number', value: date.getUTCFullYear() };
     if (fn === 'MONTH') return { kind: 'number', value: date.getUTCMonth() + 1 };

@@ -1,3 +1,4 @@
+import { blockDataTableCells } from '../../commands/data-table-guard.js';
 import { hyperlinkAt, isFollowableHyperlinkTarget } from '../../commands/hyperlinks.js';
 import {
   isCellWritable,
@@ -176,6 +177,7 @@ const insertSymbolAtActiveCell = (instance: SpreadsheetInstance, symbol: string)
       warnProtected(target);
       return;
     }
+    if (blockDataTableCells(instance.workbook, [target])) return;
     instance.history.begin();
     try {
       instance.workbook.setText(target, symbol);

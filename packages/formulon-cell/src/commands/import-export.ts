@@ -15,7 +15,13 @@ import {
   encodeCSV,
   parseCSV,
 } from './clipboard/csv.js';
-import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from './coerce-input.js';
+import {
+  canonicalizeLocalizedFormulaForInput,
+  coerceInputForCell,
+  inputLocaleForWorkbook,
+  writeCoerced,
+} from './coerce-input.js';
+import { blockDataTableEdit, blockTableFunction } from './data-table-guard.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -58,7 +64,24 @@ export function importCSV(
 
   const origin: Addr = anchor ?? state.selection.active;
   const sheet = origin.sheet;
+  const width = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
+  if (
+    blockDataTableEdit(wb, {
+      sheet,
+      r0: origin.row,
+      c0: origin.col,
+      r1: origin.row + rows.length - 1,
+      c1: origin.col + Math.max(0, width - 1),
+    })
+  ) {
+    return null;
+  }
   const inputLocale = options.locale ?? inputLocaleForWorkbook(wb);
+  const csvFormulas = rows
+    .flat()
+    .filter((raw) => raw.trim().startsWith('='))
+    .map((raw) => canonicalizeLocalizedFormulaForInput(wb, raw.trim(), inputLocale));
+  if (blockTableFunction(wb, csvFormulas)) return null;
   let maxCols = 0;
   let cellsWritten = 0;
 

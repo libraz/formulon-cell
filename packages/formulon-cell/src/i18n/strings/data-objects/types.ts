@@ -210,6 +210,9 @@ export interface DataObjectsStrings {
     };
     compatibilityLabels: {
       cellFormatting: string;
+      fontEffects: string;
+      gradientFills: string;
+      xlsbSave: string;
       conditionalFormatting: string;
       dataValidation: string;
       hyperlinks: string;
@@ -236,9 +239,19 @@ export interface DataObjectsStrings {
       chartsDrawings: string;
       chartAuthoring: string;
       externalLinks: string;
+      calcSettings: string;
+      dataTables: string;
+      showFormulas: string;
+      outlineSymbols: string;
+      outlineCollapse: string;
+      splitPanes: string;
+      hiddenDefaultRows: string;
     };
     compatibilityDetails: {
       cellFormatting: string;
+      fontEffects: string;
+      gradientFills: string;
+      xlsbSave: string;
       conditionalFormatting: string;
       dataValidation: string;
       hyperlinks: string;
@@ -268,6 +281,13 @@ export interface DataObjectsStrings {
       screenClipping: string;
       chartAuthoring: string;
       externalLinks: string;
+      calcSettings: string;
+      dataTables: string;
+      showFormulas: string;
+      outlineSymbols: string;
+      outlineCollapse: string;
+      splitPanes: string;
+      hiddenDefaultRows: string;
     };
     /** Engine-reported file losses, keyed by `FileLossId`. */
     lossLabels: {

@@ -634,6 +634,61 @@ describe('fillRange', () => {
     expect(num(wb, 0, 0, 3)).toBe(dateSerial(2025, 2, 28));
   });
 
+  describe('in a 1904 workbook', () => {
+    const serial1904 = (year: number, month: number, day: number): number =>
+      dateSerial(year, month, day) - 1462;
+    beforeEach(() => {
+      store.setState((s) => ({ ...s, ui: { ...s.ui, date1904: true } }));
+    });
+
+    it('fills a month series from 1904 serials', () => {
+      seedAndMirror(store, wb, [
+        { row: 0, col: 0, value: serial1904(2024, 1, 31) },
+        { row: 1, col: 0, value: serial1904(2024, 2, 29) },
+      ]);
+      setFormat(store, 0, 0, { numFmt: { kind: 'date', pattern: 'yyyy-mm-dd' } });
+      setFormat(store, 1, 0, { numFmt: { kind: 'date', pattern: 'yyyy-mm-dd' } });
+      fillRange(
+        store.getState(),
+        wb,
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+        { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+      );
+      wb.recalc();
+
+      expect(num(wb, 0, 2, 0)).toBe(serial1904(2024, 3, 31));
+      expect(num(wb, 0, 3, 0)).toBe(serial1904(2024, 4, 30));
+    });
+
+    it('steps years from a 1904 serial', () => {
+      seedAndMirror(store, wb, [{ row: 0, col: 0, value: serial1904(2024, 2, 29) }]);
+      fillRange(
+        store.getState(),
+        wb,
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+        { dateUnit: 'years' },
+      );
+      wb.recalc();
+
+      expect(num(wb, 0, 1, 0)).toBe(serial1904(2025, 2, 28));
+    });
+
+    it('leaves cells blank when a step would fall before 1904', () => {
+      seedAndMirror(store, wb, [{ row: 0, col: 1, value: 10 }]);
+      fillRange(
+        store.getState(),
+        wb,
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        { dateUnit: 'years' },
+      );
+      wb.recalc();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+    });
+  });
+
   it('shifts relative refs when filling formulas down', () => {
     // Source cell C1 = =A1+B1. Filling down to C4 should produce
     //   C2 = =A2+B2, C3 = =A3+B3, C4 = =A4+B4.

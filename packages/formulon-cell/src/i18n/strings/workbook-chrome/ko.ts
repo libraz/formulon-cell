@@ -113,4 +113,27 @@ export const workbookChromeKo: WorkbookChromeStrings = {
     engineHelp:
       'formulon WASM 엔진을 시작할 수 없습니다. WebAssembly 지원 여부와 엔진 WASM 자산을 로드할 수 있는지 확인하세요.',
   },
+  workbookSave: {
+    saveAsTitle: '다른 이름으로 저장',
+    fileFormat: '파일 형식',
+    formatXlsx: '통합 문서 (.xlsx)',
+    formatXlsb: '바이너리 통합 문서 (.xlsb)',
+    save: '저장',
+    cancel: '취소',
+    lossTitle: '일부 내용이 저장되지 않습니다',
+    lossMessage:
+      '{format}에는 이 통합 문서의 모든 내용을 저장할 수 없습니다. 다음 내용은 저장되지 않습니다:',
+    mayLoseMessage: '원본에 따라 {format}에는 다음 내용이 저장되지 않을 수 있습니다:',
+    saveAnyway: '그래도 저장',
+    notes: '메모',
+    threadedComments: '스레드 댓글',
+    autoFilters: '필터',
+    pivotTables: '피벗 테이블',
+    slicers: '슬라이서',
+    drawings: '그림, 도형 및 차트',
+    tables: '표',
+    sparklines: '스파크라인',
+    protectedRanges: '범위 편집 허용',
+    otherSettings: '기타 설정(페이지 설정, 보기, 통합 문서 보호, 사용자 지정 스타일)',
+  },
 };

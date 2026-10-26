@@ -83,7 +83,6 @@ const conditionalPresetActions = new Set<ConditionalPresetAction>([
   'icons-stars3',
   'icons-quarters5',
   'icons-ratings5',
-  'icons-bars5',
   'icons-boxes5',
 ]);
 

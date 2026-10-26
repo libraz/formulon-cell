@@ -8,6 +8,7 @@ import { effectiveCellFormatWithPending, flushFormatToEngine } from '../engine/c
 import type { Addr } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
 import { formatWithPending, sameFormatTarget } from '../store/pending-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -17,6 +18,7 @@ import {
   validateCoercedInput,
   writeInputValidated,
 } from './coerce-input.js';
+import { dataTableGuardAlert, dataTableOccupies, tableFunctionAlert } from './data-table-guard.js';
 import { interactionControllerFor, nativeAxisFontFormatFor } from './interaction-controller.js';
 import { mergeAnchorFor, mergeCellsFor } from './interaction-effects.js';
 import { pivotGuardAlert, pivotOccupies } from './pivot-guard.js';
@@ -120,6 +122,21 @@ export function commitCellInput({
       })
     ) {
       return { status: 'rejected', operation, alert: pivotGuardAlert(wb) };
+    }
+    if (
+      dataTableOccupies(wb, {
+        sheet: anchor.sheet,
+        r0: anchor.row,
+        c0: anchor.col,
+        r1: anchor.row,
+        c1: anchor.col,
+      })
+    ) {
+      return { status: 'rejected', operation, alert: dataTableGuardAlert(wb) };
+    }
+    const typed = coerceInputForCell(state, anchor, raw, inputLocale, wb);
+    if (typed.kind === 'formula' && formulaCallsTable(typed.text)) {
+      return { status: 'rejected', operation, alert: tableFunctionAlert(wb) };
     }
     const mergeCells = mergeCellsFor(state, addr);
     if (mergeCells === null) {

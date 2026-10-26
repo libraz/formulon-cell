@@ -32,12 +32,15 @@ export type FormatDialogField =
   | 'underline'
   | 'strike'
   | 'fontVertAlign'
+  | 'fontOutline'
+  | 'fontShadow'
   | 'fontFamily'
   | 'fontSize'
   | 'color'
   | 'fill'
   | 'fillPattern'
   | 'fillPatternColor'
+  | 'fillGradient'
   | 'border.top'
   | 'border.right'
   | 'border.bottom'
@@ -83,6 +86,8 @@ const normalizedFieldValue = (
     case 'bold':
     case 'italic':
     case 'strike':
+    case 'fontOutline':
+    case 'fontShadow':
     case 'formulaHidden':
       return value[field] === true;
     case 'indent':
@@ -101,6 +106,7 @@ const normalizedFieldValue = (
     case 'fill':
     case 'fillPattern':
     case 'fillPatternColor':
+    case 'fillGradient':
       return value[field] ?? undefined;
     case 'locked':
       return value.locked !== false;
@@ -161,12 +167,15 @@ export function summarizeDialogFormats(
     'underline',
     'strike',
     'fontVertAlign',
+    'fontOutline',
+    'fontShadow',
     'fontFamily',
     'fontSize',
     'color',
     'fill',
     'fillPattern',
     'fillPatternColor',
+    'fillGradient',
     'border.top',
     'border.right',
     'border.bottom',
@@ -234,18 +243,25 @@ export function buildTouchedDialogPatch(
   set('underline', draft.underline);
   set('strike', draft.strike);
   set('fontVertAlign', draft.fontVertAlign);
+  set('fontOutline', draft.fontOutline);
+  set('fontShadow', draft.fontShadow);
   set('fontFamily', draft.fontFamily || undefined);
   set('fontSize', draft.fontSize);
   set('color', draft.color);
   set('fill', draft.fill);
   set('fillPattern', draft.fillPattern);
   set('fillPatternColor', draft.fillPatternColor);
+  // The store's fill-kind rule clears whichever fill this one replaces.
+  set('fillGradient', draft.fillGradient);
   set('locked', draft.locked);
   set('formulaHidden', draft.formulaHidden);
   if (touched.has('hyperlink')) patch.hyperlink = draft.hyperlink.trim() || undefined;
   if (touched.has('comment')) {
     patch.comment = draft.comment || undefined;
-    if (!draft.comment) patch.commentAuthor = undefined;
+    if (!draft.comment) {
+      patch.commentAuthor = undefined;
+      patch.commentVisible = undefined;
+    }
   }
   if (touched.has('validation')) {
     const lines = draft.validationList
@@ -313,12 +329,15 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     underline: false,
     strike: false,
     fontVertAlign: undefined,
+    fontOutline: false,
+    fontShadow: false,
     fontFamily: '',
     fontSize: undefined,
     color: undefined,
     fill: undefined,
     fillPattern: undefined,
     fillPatternColor: undefined,
+    fillGradient: undefined,
     borders: {},
     borderStyle: 'thin',
     borderColor: undefined,
@@ -436,12 +455,15 @@ export function hydrateDraftFromFormat(
   draft.underline = fmt.underline === true ? 'single' : (fmt.underline ?? false);
   draft.strike = !!fmt.strike;
   draft.fontVertAlign = fmt.fontVertAlign;
+  draft.fontOutline = fmt.fontOutline === true;
+  draft.fontShadow = fmt.fontShadow === true;
   draft.fontFamily = fmt.fontFamily ?? '';
   draft.fontSize = fmt.fontSize;
   draft.color = fmt.color;
   draft.fill = fmt.fill;
   draft.fillPattern = fmt.fillPattern;
   draft.fillPatternColor = fmt.fillPatternColor;
+  draft.fillGradient = fmt.fillGradient ? structuredClone(fmt.fillGradient) : undefined;
   draft.borders = { ...(fmt.borders ?? {}) };
 
   const sides: SideKey[] = ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'];

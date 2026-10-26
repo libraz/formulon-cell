@@ -166,6 +166,7 @@ export function createDefaultDynamicDropdownsCtx(
   const base: DynamicDropdownsCtx = {
     getInst: () => instance,
     updateCalcOptionsMenu: formulaDefaults.updateCalcOptionsMenu,
+    updateWhatIfMenu: formulaDefaults.updateWhatIfMenu,
     updateCellDeleteMenu: cellDefaults.updateCellDeleteMenu,
     updateCellInsertMenu: cellDefaults.updateCellInsertMenu,
     updateClearMenu: editingDefaults.updateClearMenu,
@@ -211,6 +212,7 @@ export function createDefaultDynamicDropdownsCtx(
     applyFormulaAuditAction: formulaDefaults.applyFormulaAuditAction,
     applyWatchAction: formulaDefaults.applyWatchAction,
     applyCalcOptionAction: formulaDefaults.applyCalcOptionAction,
+    applyWhatIfAction: formulaDefaults.applyWhatIfAction,
     applyFindSelectAction: editingDefaults.applyFindSelectAction,
     applyDataValidationAction: dataDefaults.applyDataValidationAction,
     applyConditionalMenuAction: styleDefaults.applyConditionalMenuAction,

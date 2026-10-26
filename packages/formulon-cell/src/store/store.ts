@@ -59,6 +59,7 @@ export const createSpreadsheetStore = () =>
       showZeros: true,
       rightToLeft: false,
       showFormulas: false,
+      showOutlineSymbols: true,
       endMode: false,
       workbookView: 'normal',
       zoomBeforePreview: null,
@@ -67,6 +68,8 @@ export const createSpreadsheetStore = () =>
       selectedObject: null,
       chartSourceRefs: [],
       r1c1: false,
+      date1904: false,
+      precisionAsDisplayed: false,
       statusAggs: ['average', 'count', 'sum'],
       statusOptions: {
         capsLock: true,

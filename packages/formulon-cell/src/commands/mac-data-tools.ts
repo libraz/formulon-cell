@@ -5,6 +5,7 @@ import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js'
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
+import { blockDataTableShift } from './data-table-guard.js';
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
@@ -435,7 +436,7 @@ export async function solveMacGoalSeek(
   let scratch: WorkbookHandle | null = null;
   let sourceBytes: Uint8Array | null = null;
   try {
-    sourceBytes = new Uint8Array(wb.save());
+    sourceBytes = new Uint8Array(wb.save({ snapshot: true }));
     scratch = await WorkbookHandle.loadBytes(sourceBytes, { preferStub: wb.isStub });
     // A workbook in Manual calculation mode can carry stale cached results in
     // its saved bytes. Goal Seek always starts from a fresh calculation and
@@ -595,7 +596,7 @@ export function commitMacGoalSeek(
   }
   let currentBytes: Uint8Array;
   try {
-    currentBytes = instance.workbook.save();
+    currentBytes = instance.workbook.save({ snapshot: true });
   } catch {
     return failure('stale', 'stale');
   }
@@ -776,6 +777,10 @@ const subtotalOutputCells = (
 
 /** Analyze and authorize a Subtotal operation before it starts any row
  * insertion. The returned group positions are in original worksheet rows. */
+/** Subtotal rows are inserted across whole rows, so any data table they reach is refused. */
+const blockSubtotalOverDataTable = (wb: WorkbookHandle, range: Range): boolean =>
+  blockDataTableShift(wb, { sheet: range.sheet, r0: range.r0, c0: 0, r1: range.r1, c1: MAX_COL });
+
 export function planMacSubtotal(
   instance: SpreadsheetInstance,
   request: SubtotalRequest,
@@ -798,6 +803,7 @@ export function planMacSubtotal(
   if (hasUnsupportedSubtotalObject(instance, range))
     return failure('unsupported', 'unsupportedObjects');
   if (isSheetProtected(state, range.sheet)) return failure('rejected', 'protectedSheet');
+  if (blockSubtotalOverDataTable(wb, range)) return failure('rejected', 'notEditable');
   const dataStart = range.r0 + 1;
   const groupColumn = request.groupByColumn;
   if (!Number.isInteger(groupColumn) || groupColumn < range.c0 || groupColumn > range.c1)
@@ -875,6 +881,7 @@ export function commitMacSubtotal(
     return failure('stale', 'stale');
   }
   const range = { ...solution.range };
+  if (blockSubtotalOverDataTable(wb, range)) return failure('rejected', 'notEditable');
   const sheetName = wb.sheetName(range.sheet);
   const functionCode = subtotalFunctionCode(request.function);
   const columns = [...new Set(request.subtotalColumns)].filter(

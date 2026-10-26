@@ -1,6 +1,10 @@
 import type { FunctionCategory } from '../../../commands/function-categories.js';
 import type { InteractionOperation } from '../../../commands/interaction-policy.js';
 import {
+  disposeDataTableDialog,
+  openDataTableDialog,
+} from '../../../interact/data-table-dialog.js';
+import {
   disposeMacConsolidateDialog,
   openMacConsolidateDialog,
 } from '../../../interact/mac-consolidate-dialog.js';
@@ -39,6 +43,7 @@ export const MAC_RIBBON_ACTION_IDS = [
   'mac.formulas.category.all',
   'mac.review.stats',
   'mac.data.goalSeek',
+  'mac.data.dataTable',
   'mac.data.consolidate',
   'mac.data.subtotal',
   'mac.automate.showScripts',
@@ -146,6 +151,7 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     'mac.formulas.category.all': () => formulaCategory(instance, 'all'),
     'mac.review.stats': () => statistics.open(),
     'mac.data.goalSeek': () => openMacGoalSeekDialog(instance),
+    'mac.data.dataTable': () => openDataTableDialog(instance),
     'mac.data.consolidate': () => openMacConsolidateDialog(instance),
     'mac.data.subtotal': () => openMacSubtotalDialog(instance),
     'mac.automate.showScripts': () => openMacAutomationGallery(instance),
@@ -167,6 +173,7 @@ export function createMacRibbonActions(instance: SpreadsheetInstance): MacRibbon
     value: (): void => {
       disposeMacAutomationDialogs(instance);
       disposeMacGoalSeekDialog(instance);
+      disposeDataTableDialog(instance);
       disposeMacConsolidateDialog(instance);
       disposeMacSubtotalDialog(instance);
       sparkline.detach();

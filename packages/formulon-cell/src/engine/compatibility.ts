@@ -9,6 +9,9 @@ export type SpreadsheetCompatibilityStatus = 'writable' | 'read-only' | 'session
 
 export type SpreadsheetCompatibilityId =
   | 'cell-formatting'
+  | 'font-effects'
+  | 'gradient-fills'
+  | 'xlsb-save'
   | 'conditional-formatting'
   | 'data-validation'
   | 'hyperlinks'
@@ -27,6 +30,11 @@ export type SpreadsheetCompatibilityId =
   | 'workbook-protection'
   | 'protected-ranges'
   | 'sheet-views'
+  | 'show-formulas'
+  | 'outline-symbols'
+  | 'outline-collapse'
+  | 'split-panes'
+  | 'hidden-default-rows'
   | 'page-setup'
   | 'loaded-tables'
   | 'format-as-table'
@@ -34,7 +42,9 @@ export type SpreadsheetCompatibilityId =
   | 'pivot-authoring'
   | 'charts-drawings'
   | 'chart-authoring'
-  | 'external-links';
+  | 'external-links'
+  | 'calc-settings'
+  | 'data-tables';
 
 export interface SpreadsheetCompatibilityItem {
   id: SpreadsheetCompatibilityId;
@@ -172,6 +182,30 @@ export function summarizeSpreadsheetCompatibility(
         : 'Formatting can be shown in the UI but cannot be written through this engine.',
     },
     {
+      id: 'font-effects',
+      label: 'Font effects',
+      status: c.cellFormatting ? 'writable' : 'session',
+      reason: c.cellFormatting
+        ? 'Outline, shadow, condense and extend font flags are read and written under every profile. Outline and Shadow are set in the Mac Format Cells dialog and drawn as hollow and shadowed text only under the Mac profile; condense and extend are kept but not drawn.'
+        : 'Font effects are shown for the session but cannot be written through this engine.',
+    },
+    {
+      id: 'gradient-fills',
+      label: 'Gradient fills',
+      status: c.cellFormatting ? 'writable' : 'session',
+      reason: c.cellFormatting
+        ? 'Linear and path gradient fills are read, written and set through Fill Effects. Path gradients are painted as radial approximations.'
+        : 'Gradient fills are shown for the session but cannot be written through this engine.',
+    },
+    {
+      id: 'xlsb-save',
+      label: 'Binary workbook (.xlsb)',
+      status: c.xlsbSave ? 'writable' : 'unsupported',
+      reason: c.xlsbSave
+        ? 'Workbooks can be saved as .xlsb. Notes, threaded comments and filters are not written to .xlsb. Pictures, shapes and charts, PivotTables and slicers read from .xlsx, page setup (margins, header and footer, page breaks), protected ranges, some sheet views and workbook protection settings, custom table styles, and tables or sparklines whose references cannot be encoded may also be left out. The engine reports one total for these, so saving warns with the categories present before the file is delivered.'
+        : 'Saving as .xlsb requires the engine saveWithDiagnostics API.',
+    },
+    {
       id: 'conditional-formatting',
       label: 'Conditional formatting',
       status: c.conditionalFormatMutate
@@ -206,9 +240,15 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Comments',
       status: c.comments ? 'writable' : 'session',
       reason: c.comments
-        ? c.commentsEnumerable
-          ? 'Cell comments can be enumerated, read, and written.'
-          : 'Cell comments can be read and written for known cells; blank-cell comment hydration needs sheet-wide enumeration.'
+        ? `${
+            c.commentsEnumerable
+              ? 'Cell comments can be enumerated, read, and written.'
+              : 'Cell comments can be read and written for known cells; blank-cell comment hydration needs sheet-wide enumeration.'
+          }${
+            c.commentVisibility
+              ? ' Shown notes stay shown; a note moved by sort, insert/delete, cut or paste takes the default box size and position.'
+              : ' Note visibility is session-only.'
+          }`
         : 'Comment UI can be hosted for the session, but engine writeback is unavailable.',
     },
     {
@@ -281,6 +321,49 @@ export function summarizeSpreadsheetCompatibility(
         c.freeze || c.sheetZoom || c.hiddenRowsCols || c.outlines
           ? 'Sheet views can be captured and restored in the UI; individual view settings may still persist through engine view APIs.'
           : 'Sheet views can be captured and restored in the UI for the current session.',
+    },
+    {
+      id: 'show-formulas',
+      label: 'Show Formulas',
+      status: c.sheetShowFormulas ? 'writable' : 'session',
+      reason: c.sheetShowFormulas
+        ? 'Show Formulas is saved per sheet.'
+        : 'Show Formulas applies for the session; the engine cannot save the sheet flag.',
+    },
+    {
+      id: 'outline-symbols',
+      label: 'Outline symbols',
+      status: c.outlineSymbols ? 'writable' : 'session',
+      reason: c.outlineSymbols
+        ? 'Hiding the outline symbols is saved per sheet.'
+        : 'Outline symbols can be hidden for the session; the engine cannot save the sheet flag.',
+    },
+    {
+      id: 'outline-collapse',
+      label: 'Collapsed outline groups',
+      status: c.outlines && c.outlineCollapse ? 'writable' : 'session',
+      reason:
+        c.outlines && c.outlineCollapse
+          ? 'Collapsed groups are saved with their summary row or column marked collapsed.'
+          : 'Groups collapse for the session; the engine cannot save outline levels or the collapsed flag.',
+    },
+    {
+      id: 'split-panes',
+      label: 'Split panes',
+      status: c.sheetSplit && c.sheetView ? 'writable' : 'session',
+      reason:
+        c.sheetSplit && c.sheetView
+          ? 'Split panes are saved with the rows and columns each pane shows. The top and left panes scroll on their own but end where the other pane begins.'
+          : 'Split panes apply for the session; the engine cannot save a split.',
+    },
+    {
+      id: 'hidden-default-rows',
+      label: 'Rows hidden by default',
+      status: c.geometry && c.sheetFormatDefaults ? 'writable' : 'read-only',
+      reason:
+        c.geometry && c.sheetFormatDefaults
+          ? 'Sheets that hide rows by default keep that setting. A row the file keeps visible only through an empty row record opens hidden.'
+          : 'Rows hidden by default are shown hidden, but the setting cannot be changed.',
     },
     {
       id: 'page-setup',
@@ -356,6 +439,23 @@ export function summarizeSpreadsheetCompatibility(
       reason: c.externalLinks
         ? 'External link records can be inventoried.'
         : 'External link enumeration is unavailable.',
+    },
+    {
+      id: 'calc-settings',
+      label: 'Calculation options',
+      status: c.calcMode && c.calcSettings ? 'writable' : 'unsupported',
+      reason:
+        c.calcMode && c.calcSettings
+          ? 'Calculation mode, recalculation before saving, iteration, R1C1 reference style, precision as displayed and the 1904 date system are saved with the workbook. Precision as displayed rounds stored constants and new entries to their format; formula results keep full precision because the engine stores the option as metadata only.'
+          : 'Calculation options cannot be saved without the engine calcPr APIs.',
+    },
+    {
+      id: 'data-tables',
+      label: 'Data tables',
+      status: c.dataTables ? 'writable' : 'unsupported',
+      reason: c.dataTables
+        ? 'What-If data tables are created, computed and saved with the workbook; their result cells cannot be edited.'
+        : 'Creating or computing data tables requires the engine data-table APIs.',
     },
   ];
 

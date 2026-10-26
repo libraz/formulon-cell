@@ -31,6 +31,7 @@ import {
 } from '../commands/row-col-layout.js';
 import { recordFormatChange, recordTablesChange } from '../commands/slice-history.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
+import { setOutlineSymbolsVisible, setShowFormulas } from '../commands/view.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
@@ -251,7 +252,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       input.addSheet();
       return;
     }
-    if (matchesRibbonShortcut(e, 'recalcNow')) {
+    if (matchesRibbonShortcut(e, 'recalcNow') || matchesRibbonShortcut(e, 'recalcSheet')) {
       e.preventDefault();
       currentWb.recalc();
       mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
@@ -411,6 +412,16 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       input.invalidate();
       return;
     }
+    if (e.key === '8' && !e.shiftKey) {
+      e.preventDefault();
+      setOutlineSymbolsVisible(
+        input.store,
+        input.store.getState().ui.showOutlineSymbols === false,
+        currentWb,
+      );
+      input.invalidate();
+      return;
+    }
     if (e.key === '9') {
       e.preventDefault();
       if (restricted) return;
@@ -455,7 +466,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       dialog.open();
     } else if (e.key === '`') {
       e.preventDefault();
-      mutators.setShowFormulas(input.store, !input.store.getState().ui.showFormulas);
+      setShowFormulas(input.store, !input.store.getState().ui.showFormulas, currentWb);
     } else if (e.altKey && k === 'r') {
       e.preventDefault();
       mutators.setR1C1(input.store, !input.store.getState().ui.r1c1);
@@ -463,7 +474,9 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       e.preventDefault();
       if (restricted) return;
       const now = new Date();
-      const serial = excelSerialFromParts(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      const serial = excelSerialFromParts(now.getFullYear(), now.getMonth() + 1, now.getDate(), {
+        date1904: input.store.getState().ui.date1904 === true,
+      });
       if (serial === null) return;
       writeActiveCell(serial);
     } else if (e.key === ':' || (e.shiftKey && e.key === ';')) {

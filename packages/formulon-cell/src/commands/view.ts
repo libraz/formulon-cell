@@ -56,9 +56,28 @@ export function setSheetRightToLeft(
   }
 }
 
-/** Toggle formula text display. */
-export function setShowFormulas(store: SpreadsheetStore, visible: boolean): void {
+/** Toggle formula text display on the active sheet. */
+export function setShowFormulas(
+  store: SpreadsheetStore,
+  visible: boolean,
+  wb: WorkbookHandle | null = null,
+): void {
   mutators.setShowFormulas(store, visible);
+  if (wb && typeof wb.setSheetShowFormulas === 'function') {
+    wb.setSheetShowFormulas(store.getState().data.sheetIndex, visible);
+  }
+}
+
+/** Toggle the active sheet's outline symbols (group brackets and +/- buttons). */
+export function setOutlineSymbolsVisible(
+  store: SpreadsheetStore,
+  visible: boolean,
+  wb: WorkbookHandle | null = null,
+): void {
+  mutators.setShowOutlineSymbols(store, visible);
+  if (wb && typeof wb.setSheetShowOutlineSymbols === 'function') {
+    wb.setSheetShowOutlineSymbols(store.getState().data.sheetIndex, visible);
+  }
 }
 
 /** Set or clear the Excel-style sheet background image for on-screen display. */

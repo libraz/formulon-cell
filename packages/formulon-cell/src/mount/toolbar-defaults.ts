@@ -27,12 +27,10 @@ import { listComments } from '../commands/comment.js';
 import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
-  collapseColGroup,
-  collapseRowGroup,
-  expandColGroup,
-  expandRowGroup,
   groupCols,
   groupRows,
+  hideOutlineDetail,
+  showOutlineDetail,
   ungroupCols,
   ungroupRows,
 } from '../commands/outline.js';
@@ -242,6 +240,7 @@ export function createDefaultRibbonMenus(
     // Formulas tab
     autoSum: formulaFactories.createAutoSumMenu,
     calcOptions: formulaFactories.createCalcOptionsMenu,
+    whatIf: formulaFactories.createWhatIfMenu,
     clearArrows: formulaFactories.createClearArrowsMenu,
     errorChecking: formulaFactories.createErrorCheckingMenu,
 
@@ -363,14 +362,9 @@ export function createDefaultRibbonHooks(
         ungroupRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
       else ungroupCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
     } else if (action === 'hide-detail') {
-      if (useRows)
-        collapseRowGroup(instance.store, instance.history, range.r0, range.r1, instance.workbook);
-      else
-        collapseColGroup(instance.store, instance.history, range.c0, range.c1, instance.workbook);
-    } else if (useRows) {
-      expandRowGroup(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      hideOutlineDetail(instance.store, instance.history, range, instance.workbook);
     } else {
-      expandColGroup(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+      showOutlineDetail(instance.store, instance.history, range, instance.workbook);
     }
     instance.host.focus();
   };

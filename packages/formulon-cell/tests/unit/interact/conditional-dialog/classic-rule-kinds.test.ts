@@ -162,6 +162,60 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('picks a custom icon per level and keeps it when the rule is edited again', () => {
+    setRange(store, 0, 0, 4, 0);
+    const handle = attachConditionalDialog({ host, store, strings: en });
+    handle.open({ kind: 'icon-set' });
+    const family = document.querySelector<HTMLSelectElement>('select[data-cf-icon-family]');
+    if (!family) throw new Error('missing icon family select');
+    expect(Array.from(family.options, (option) => option.value)).not.toContain('bars5');
+    family.value = 'arrows4';
+    family.dispatchEvent(new Event('change', { bubbles: true }));
+    const level = (index: number): HTMLSelectElement | null =>
+      document.querySelector<HTMLSelectElement>(`select[data-cf-icon-level="${index}"]`);
+    expect([0, 1, 2, 3].map((index) => level(index)?.value)).toEqual([
+      'arrows4:0',
+      'arrows4:1',
+      'arrows4:2',
+      'arrows4:3',
+    ]);
+    expect(level(4)?.closest('[hidden]')).not.toBeNull();
+    const first = level(0);
+    const third = level(2);
+    if (!first || !third) throw new Error('missing icon level selects');
+    expect(Array.from(first.options, (option) => option.value)).toContain('none');
+    first.value = 'none';
+    third.value = 'stars3:2';
+    const add = (): void => {
+      document
+        .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    add();
+    const customIcons = [
+      null,
+      { set: 'arrows4', slot: 1 },
+      { set: 'stars3', slot: 2 },
+      { set: 'arrows4', slot: 3 },
+    ];
+    expect(store.getState().conditional.rules[0]).toMatchObject({ icons: 'arrows4', customIcons });
+
+    handle.open({ mode: 'edit', editIndex: 0 });
+    expect(level(0)?.value).toBe('none');
+    expect(level(2)?.value).toBe('stars3:2');
+    add();
+    expect(store.getState().conditional.rules[0]).toMatchObject({ icons: 'arrows4', customIcons });
+
+    handle.open({ mode: 'edit', editIndex: 0 });
+    family.value = 'traffic3';
+    family.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(level(0)?.value).toBe('traffic3:0');
+    add();
+    const saved = store.getState().conditional.rules[0];
+    expect(saved?.kind === 'icon-set' && saved.customIcons).toBeFalsy();
+    handle.detach();
+  });
+
   it('collects a strict icon threshold while defaulting each boundary to greater-than-or-equal', () => {
     setRange(store, 0, 0, 4, 0);
     const handle = attachConditionalDialog({ host, store, strings: en });

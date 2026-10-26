@@ -10,9 +10,11 @@ import {
   commentAt,
   listComments,
   listThreadedComments,
+  noteVisibleAt,
   recordCommentChange,
   recordThreadedChange,
   removeThreadedComment,
+  setNotesVisible,
   threadedCommentsAt,
 } from './comment.js';
 import type { History } from './history.js';
@@ -85,4 +87,32 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
       },
     );
   }
+};
+
+/** `toggle-active` is Show/Hide Note on the active cell; `toggle-all` is Show
+ *  All Notes, which shows every note unless all of them are already shown. */
+export type NoteVisibilityAction = 'toggle-active' | 'toggle-all';
+
+export interface ExecuteNoteVisibilityActionDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  action: NoteVisibilityAction;
+}
+
+export const executeNoteVisibilityAction = (deps: ExecuteNoteVisibilityActionDeps): boolean => {
+  const { store, workbook, action } = deps;
+  const state = store.getState();
+  const active = state.selection.active;
+  const addrs =
+    action === 'toggle-active'
+      ? commentAt(state, active) === null
+        ? []
+        : [active]
+      : listComments(state).map((entry) => entry.addr);
+  if (addrs.length === 0) return false;
+  const visible =
+    action === 'toggle-active'
+      ? !noteVisibleAt(state, active)
+      : !addrs.every((addr) => noteVisibleAt(state, addr));
+  return setNotesVisible(store, addrs, visible, workbook);
 };

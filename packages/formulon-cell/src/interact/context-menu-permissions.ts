@@ -34,7 +34,7 @@ export function createContextMenuPermissions(
   ctx: ContextMenuPermissionsContext,
 ): ContextMenuPermissions {
   const { store, interactionController, menuKind } = ctx;
-  const restrictedMenuSafeIds = new Set<ItemId>(['copy', 'paste', 'clear']);
+  const restrictedMenuSafeIds = new Set<ItemId>(['copy', 'paste', 'clear', 'showHideNote']);
   const navigationUnsupportedIds = new Set<ItemId>([
     'insertCopiedCells',
     'insertCells',
@@ -80,7 +80,13 @@ export function createContextMenuPermissions(
   };
 
   const operationForItem = (id: string): InteractionOperation | null => {
-    if (id === 'copy' || id === 'selectAll' || id === 'rowHeight' || id === 'colWidth') {
+    if (
+      id === 'copy' ||
+      id === 'selectAll' ||
+      id === 'rowHeight' ||
+      id === 'colWidth' ||
+      id === 'showHideNote'
+    ) {
       return null;
     }
     if (
@@ -132,7 +138,9 @@ export function createContextMenuPermissions(
     if (id === 'colHide' || id === 'colUnhide') return 'resizeColumns';
     if (id === 'rowGroup' || id === 'rowUngroup') return 'insertRows';
     if (id === 'colGroup' || id === 'colUngroup') return 'insertColumns';
-    if (id === 'insertComment' || id === 'deleteComment') return 'comment';
+    if (id === 'insertComment' || id === 'deleteComment') {
+      return 'comment';
+    }
     if (id === 'insertHyperlink' || id === 'openHyperlink') return 'hyperlink';
     if (id === 'defineName') return 'namedRange';
     if (id === 'toggleWatch') return 'object';

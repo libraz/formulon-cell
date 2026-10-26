@@ -6,6 +6,7 @@ import {
   writeCoerced,
   writeInputValidated,
 } from '../commands/coerce-input.js';
+import { dataTableCellAmong, dataTableGuardAlert } from '../commands/data-table-guard.js';
 import type { CellBatchOperation } from '../commands/interaction-policy.js';
 import { mergeAt } from '../commands/merge.js';
 import { isCellWritable } from '../commands/protection.js';
@@ -191,6 +192,15 @@ export function writeSelectionInput(
     }
   }
 
+  // The caller shows the rejection, so the guard's own alert stays silent here.
+  if (
+    dataTableCellAmong(
+      wb,
+      plan.map((entry) => entry.target),
+    )
+  ) {
+    return { status: 'rejected', outcome: dataTableGuardAlert(wb) };
+  }
   // One recalc for the whole fill instead of one per written cell.
   wb.withBatchedRecalc(() => {
     for (const { target, formula } of plan) {

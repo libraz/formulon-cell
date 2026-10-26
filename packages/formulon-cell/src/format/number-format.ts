@@ -3,7 +3,12 @@ import type { NumFmt } from '../store/store.js';
 import { excelSerialToDate, excelSerialToDateParts } from './date-serial.js';
 import { normalizeFormatLocale } from './locale.js';
 
-export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'en-US'): string {
+export function formatNumber(
+  value: number,
+  fmt: NumFmt | undefined,
+  locale = 'en-US',
+  date1904 = false,
+): string {
   if (!Number.isFinite(value)) return String(value);
   if (!fmt || fmt.kind === 'general') return formatGeneralNumber(value, locale);
   if (fmt.kind === 'text') return String(value);
@@ -57,19 +62,19 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
     return value < 0 ? `(${placed})` : `${placed} `;
   }
   if (fmt.kind === 'date') {
-    return renderDateTimePattern(value, fmt.pattern, locale);
+    return renderDateTimePattern(value, fmt.pattern, locale, date1904);
   }
   if (fmt.kind === 'time') {
-    return renderDateTimePattern(value, fmt.pattern, locale);
+    return renderDateTimePattern(value, fmt.pattern, locale, date1904);
   }
   if (fmt.kind === 'datetime') {
-    return renderDateTimePattern(value, fmt.pattern, locale);
+    return renderDateTimePattern(value, fmt.pattern, locale, date1904);
   }
   if (fmt.kind === 'special') {
     return formatSpecialPattern(value, fmt.pattern);
   }
   if (fmt.kind === 'custom') {
-    return formatCustomPattern(value, fmt.pattern, locale);
+    return formatCustomPattern(value, fmt.pattern, locale, date1904);
   }
   return String(value);
 }
@@ -119,7 +124,12 @@ const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
  *  `yyyy`/`yy`/`mmmmm`/`mmmm`/`mmm`/`mm`/`m`/`dddd`/`ddd`/`dd`/`d`/`hh`/`h`/
  *  `ss`/`s` plus `am/pm`. Not exhaustive but covers the patterns spreadsheets
  *  ship in its built-in format codes. */
-function formatCustomPattern(value: number, pattern: string, locale: string): string {
+function formatCustomPattern(
+  value: number,
+  pattern: string,
+  locale: string,
+  date1904: boolean,
+): string {
   const selected = selectNumberSection(pattern, value);
   // Strip style-only directives. Quoted literals must stay quoted until the
   // numeric/date renderer decides whether a token is active or literal.
@@ -127,7 +137,7 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
 
   // If the section contains date/time tokens, render as date.
   if (/y|m|d|h|s/i.test(stripLiterals(active))) {
-    return renderDateTimePattern(value, active, locale);
+    return renderDateTimePattern(value, active, locale, date1904);
   }
 
   return renderNumericPattern(selected.useAbs ? Math.abs(value) : value, active, locale);
@@ -432,9 +442,14 @@ function hasUnquotedPercent(s: string): boolean {
   return false;
 }
 
-function renderDateTimePattern(serial: number, pattern: string, locale: string): string {
-  const d = excelSerialToDate(serial);
-  const parts = excelSerialToDateParts(serial);
+function renderDateTimePattern(
+  serial: number,
+  pattern: string,
+  locale: string,
+  date1904: boolean,
+): string {
+  const d = excelSerialToDate(serial, date1904);
+  const parts = excelSerialToDateParts(serial, date1904);
   if (!d || !parts) return '';
   const yyyy = parts.year;
   const mm = parts.month;

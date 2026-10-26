@@ -310,6 +310,24 @@ describe('detectCapabilities', () => {
     expect(detectCapabilities(withoutReadback as unknown as Workbook).pivotTableMutate).toBe(false);
   });
 
+  it('probes calc settings and data tables by their whole method set', () => {
+    const calc = [
+      'fullPrecision',
+      'setFullPrecision',
+      'calcOnSave',
+      'setCalcOnSave',
+      'refMode',
+      'setRefMode',
+      'date1904',
+      'setDate1904',
+    ];
+    expect(detectCapabilities(makeWb(calc)).calcSettings).toBe(true);
+    expect(detectCapabilities(makeWb(calc.slice(1))).calcSettings).toBe(false);
+    const tables = ['addDataTable', 'getDataTable', 'removeDataTable', 'recalcDataTables'];
+    expect(detectCapabilities(makeWb(tables)).dataTables).toBe(true);
+    expect(detectCapabilities(makeWb(tables.slice(0, 3))).dataTables).toBe(false);
+  });
+
   it('spreadsheetProfile requires get + set profile ids', () => {
     const getOnly = makeWb(['excelProfileId']);
     expect(detectCapabilities(getOnly).spreadsheetProfile).toBe(false);

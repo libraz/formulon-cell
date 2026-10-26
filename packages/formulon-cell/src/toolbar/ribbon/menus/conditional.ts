@@ -245,7 +245,6 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
     iconStars3: t.iconStars3,
     iconQuarters5: t.iconQuarters5,
     iconRatings5: t.iconRatings5,
-    iconBars5: t.iconBars5,
     iconBoxes5: t.iconBoxes5,
   };
 };
@@ -357,7 +356,6 @@ const buildIconSetSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
     cfIconChoice('icons-stars3', 3, t.ratings),
     cfIconChoice('icons-quarters5', 5, t.iconQuarters5),
     cfIconChoice('icons-ratings5', 5, t.iconRatings5),
-    cfIconChoice('icons-bars5', 5, t.iconBars5),
     cfIconChoice('icons-boxes5', 5, t.iconBoxes5),
   ]);
   submenu.append(ratings, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));

@@ -95,6 +95,9 @@ const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
     'recommended chart charts graph column line pie bar scatter グラフ チャート おすすめ',
   symbolInsert: 'symbol symbols equation more symbols special characters 記号 数式 特殊文字',
   calcOptions: 'calculation options automatic manual workbook calc mode 計算方法 自動 手動 再計算',
+  recalcSheet: 'calculate sheet recalculate active sheet shift f9 シート再計算',
+  whatIf:
+    'what-if analysis goal seek data table scenario forecast what if 分析 ゴール シーク データ テーブル',
   errorChecking: 'error checking formula errors trace error エラーチェック 数式 エラー',
   watch: 'watch window add watch delete watch formula auditing ウォッチ ウィンドウ',
   watchView: 'watch window add watch delete watch formula auditing ウォッチ ウィンドウ',

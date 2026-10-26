@@ -33,6 +33,11 @@
     font-size: 11px;
   }
 
+  .fc-tb__dlg__loss-list {
+    margin: 4px 0 0;
+    padding-left: 20px;
+  }
+
   .fc-tb__dlg__preview {
     min-height: 74px;
     max-height: 150px;

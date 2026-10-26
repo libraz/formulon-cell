@@ -1,6 +1,7 @@
 import { clearSelectedContents } from '../commands/clear-contents.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { currentRegion, formatHasContent, isPopulated } from '../commands/current-region.js';
+import { blockDataTableCells } from '../commands/data-table-guard.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
@@ -500,6 +501,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
           warnProtected(a);
           return;
         }
+        if (blockDataTableCells(deps.wb, [a])) return;
         deps.wb.setBlank(a);
         deps.onClearActive();
         deps.onBeginEdit('');

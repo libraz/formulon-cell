@@ -126,7 +126,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     applyChanged();
   });
   formulas.addEventListener('click', () => {
-    setShowFormulas(store, !store.getState().ui.showFormulas);
+    setShowFormulas(store, !store.getState().ui.showFormulas, wb);
     applyChanged();
   });
   r1c1.addEventListener('click', () => {
@@ -256,16 +256,13 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     normalView.setAttribute('aria-pressed', String(s.ui.workbookView === 'normal'));
     pageLayoutView.setAttribute('aria-pressed', String(s.ui.workbookView === 'pageLayout'));
     pageBreakPreview.setAttribute('aria-pressed', String(s.ui.workbookView === 'pageBreakPreview'));
-    freezeNone.setAttribute(
-      'aria-pressed',
-      String(s.layout.freezeRows === 0 && s.layout.freezeCols === 0),
-    );
-    freezeTop.setAttribute('aria-pressed', String(s.layout.freezeRows === 1));
-    freezeFirst.setAttribute('aria-pressed', String(s.layout.freezeCols === 1));
-    freezePanes.setAttribute(
-      'aria-pressed',
-      String(s.layout.freezeRows > 0 || s.layout.freezeCols > 0),
-    );
+    // Split panes share the band with a freeze but are not frozen.
+    const freezeRows = s.layout.splitPanes === true ? 0 : s.layout.freezeRows;
+    const freezeCols = s.layout.splitPanes === true ? 0 : s.layout.freezeCols;
+    freezeNone.setAttribute('aria-pressed', String(freezeRows === 0 && freezeCols === 0));
+    freezeTop.setAttribute('aria-pressed', String(freezeRows === 1));
+    freezeFirst.setAttribute('aria-pressed', String(freezeCols === 1));
+    freezePanes.setAttribute('aria-pressed', String(freezeRows > 0 || freezeCols > 0));
     const pct = Math.round(s.viewport.zoom * 100);
     const known = ZOOM_PRESETS.includes(pct);
     zoomSelect.value = known ? String(pct) : '100';

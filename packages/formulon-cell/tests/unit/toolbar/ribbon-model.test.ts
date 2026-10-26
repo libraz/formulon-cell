@@ -59,6 +59,24 @@ describe('toolbar/ribbon-model', () => {
     );
   });
 
+  it('lays out the Formulas Calculation group like the desktop app', () => {
+    const formulas = buildRibbonModel('en').find((tab) => tab.id === 'formulas');
+    const calculation = formulas?.groups.find((group) => group.title === 'Calculation');
+    expect(calculation?.commands.map((c) => c.id)).toEqual([
+      'calcOptions',
+      'recalcNow',
+      'recalcSheet',
+    ]);
+    expect(
+      matchesRibbonShortcut(
+        new KeyboardEvent('keydown', { key: 'F9', shiftKey: true }),
+        'recalcSheet',
+      ),
+    ).toBe(true);
+    const auditing = formulas?.groups.find((group) => group.title === 'Formula Auditing');
+    expect(auditing?.commands.map((c) => c.id)).toContain('watch');
+  });
+
   it('keeps the shared core ribbon command surface unique within each tab', () => {
     const keys = buildRibbonModel('en').flatMap((tab) =>
       tab.groups.flatMap((group) =>
@@ -592,6 +610,7 @@ describe('toolbar/ribbon-model', () => {
       'Accessibility',
       'Language',
       'Comments',
+      'Notes',
       'Find',
       'Protection',
     ]);
@@ -818,7 +837,7 @@ describe('toolbar/ribbon-model', () => {
     const allowed =
       /^(Acrobat|PDF|R1C1|fx|SUM|AVG|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND|A-Z|Z-A|\$|%|,|\.0|\.00|B|I|U|S|\d+%)$/;
     const allowedInline =
-      /^(?:オートSUM \(Σ\)|.* \(Ctrl\+[A-Z]\)|(?:SUM|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND) の引数)$/;
+      /^(?:オートSUM \(Σ\)|What-If 分析|.* \((?:Ctrl\+[A-Z]|Shift\+F\d+)\)|(?:SUM|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND) の引数)$/;
     const untranslated = ribbonCommands('ja')
       .filter((command) => /[A-Za-z]{3,}/.test(command.title))
       .filter((command) => !allowed.test(command.title) && !allowedInline.test(command.title))

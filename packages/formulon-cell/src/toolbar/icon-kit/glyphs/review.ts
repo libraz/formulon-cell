@@ -1,7 +1,7 @@
 /** Review, accessibility, protection and annotation icons. */
 
 import { letter } from '../letters.js';
-import { circle, join, line, poly, rect, roundRect } from '../path.js';
+import { circle, ellipse, join, line, poly, rect, roundRect } from '../path.js';
 import {
   badge,
   bars,
@@ -29,6 +29,20 @@ const bubble = (box: { x: number; y: number; w: number; h: number }) =>
     ],
     true,
   );
+
+/** A sticky note: annotation paper with two text rules. */
+const note = (x: number, y: number, w: number, h: number) => [
+  outlined(roundRect(x, y, w, h, 1.2), PALETTE.warnSoft, PALETTE.warnDeep, 'regular'),
+  ...bars({
+    x: x + 2.4,
+    y: y + 3.4,
+    width: w - 4.8,
+    widths: [1, 0.6],
+    gap: 3,
+    color: PALETTE.warnDeep,
+    weight: 'regular',
+  }),
+];
 
 export const REVIEW_ICONS = {
   inspect: [
@@ -96,6 +110,16 @@ export const REVIEW_ICONS = {
     }),
     ...badge({ glyph: 'plus', corner: 'br' }),
   ],
+
+  // A note with an eye: shown or hidden on its own.
+  noteShowHide: [
+    ...note(2.4, 2.4, 14, 12),
+    outlined(ellipse(15.6, 17.4, 6, 3.8), PALETTE.paper, PALETTE.ink, 'regular'),
+    filled(circle(15.6, 17.4, 1.7), PALETTE.infoDeep),
+  ],
+
+  // Stacked notes: every note on the sheet.
+  noteShowAll: [...note(7.6, 2.4, 14, 11), ...note(2.4, 9.6, 14, 12)],
 
   link: [
     chainLink({ from: [5.8, 18.2], to: [10.4, 13.6] }),

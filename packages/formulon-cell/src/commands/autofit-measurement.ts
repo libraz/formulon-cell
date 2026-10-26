@@ -203,7 +203,7 @@ function autofitDisplayText(
 ): string {
   if (showsFormula(state, cell)) return cell.formula as string;
   if (cell.value.kind === 'number' && format?.numFmt)
-    return formatNumber(cell.value.value, format.numFmt, locale);
+    return formatNumber(cell.value.value, format.numFmt, locale, state.ui.date1904 === true);
   return formatCell(cell.value, locale);
 }
 

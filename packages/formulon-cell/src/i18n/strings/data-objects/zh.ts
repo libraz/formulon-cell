@@ -211,6 +211,9 @@ export const dataObjectsZh: DataObjectsStrings = {
     },
     compatibilityLabels: {
       cellFormatting: '单元格格式',
+      fontEffects: '字体效果',
+      gradientFills: '渐变填充',
+      xlsbSave: '二进制工作簿 (.xlsb)',
       conditionalFormatting: '条件格式',
       dataValidation: '数据验证',
       hyperlinks: '超链接',
@@ -237,14 +240,27 @@ export const dataObjectsZh: DataObjectsStrings = {
       chartsDrawings: '图表、绘图和图片',
       chartAuthoring: '图表创作',
       externalLinks: '外部链接',
+      calcSettings: '计算选项',
+      dataTables: '模拟运算表',
+      showFormulas: '显示公式',
+      outlineSymbols: '分级显示符号',
+      outlineCollapse: '已折叠的分级显示组',
+      splitPanes: '拆分窗格',
+      hiddenDefaultRows: '默认隐藏的行',
     },
     compatibilityDetails: {
       cellFormatting: '引擎支持时可使用 XF/字体/填充/边框/数字格式 API。',
+      fontEffects:
+        '空心、阴影、紧缩和扩展在所有配置文件下都会随字体保存。空心和阴影可在 Mac 的“设置单元格格式”中设置，且仅在 Mac 配置文件下绘制；紧缩和扩展会保留但不绘制。',
+      gradientFills: '线性和路径渐变填充会被保存，并可通过“填充效果”设置。路径渐变以径向近似绘制。',
+      xlsbSave:
+        '工作簿可以另存为 .xlsb。备注、批注和筛选不会写入。图片、形状和图表，从 .xlsx 读取的数据透视表和切片器，页面设置（页边距、页眉页脚、分页符），允许编辑区域，部分工作表视图和工作簿保护设置，自定义表格样式，以及引用无法编码的表格或迷你图也可能不会保存；保存前会先发出警告。',
       conditionalFormatting:
         '根据引擎支持情况，可以评估、创建条件格式规则，或在会话中托管这些规则。',
       dataValidation: '可以读取和写入验证区域、消息以及隐藏下拉箭头状态。',
       hyperlinks: '引擎支持回写时，可以枚举、添加和清除超链接。',
-      comments: '支持整张工作表枚举时，可以枚举、读取和写入单元格批注，包括空白单元格上的批注。',
+      comments:
+        '支持整张工作表枚举时，可以枚举、读取和写入单元格批注，包括空白单元格上的批注。显示的备注保持显示；通过排序、插入/删除、剪切或粘贴移动的备注框会恢复默认大小和位置。',
       threadedComments: '引擎支持线程批注时，批注、回复、人员和解决状态会保存到 XLSX。',
       images:
         '引擎支持图片时，可以编辑新插入的图片并将其保存到 XLSX。已加载的图片为只读；不支持原生图片重新排序。',
@@ -276,6 +292,16 @@ export const dataObjectsZh: DataObjectsStrings = {
       chartAuthoring:
         '可以创建和编辑柱形图、条形图、折线图、面积图、饼图、圆环图和散点图，并随工作簿一起保存。其他类型的图表显示为占位框，只能移动、调整大小和删除。',
       externalLinks: '引擎公开外部链接记录时，可以对其编目。',
+      calcSettings:
+        '计算模式、保存前重新计算、迭代计算、R1C1 引用样式、以显示精度为准和 1904 日期系统随工作簿一起保存。以显示精度为准会将已存储的常量和新输入舍入到其格式；由于引擎仅将该选项作为元数据保存，公式结果保持完整精度。',
+      dataTables: '模拟分析的模拟运算表可以创建、计算并随工作簿保存；其结果单元格不可编辑。',
+      showFormulas: '“显示公式”按工作表保存。',
+      outlineSymbols: '隐藏分级显示符号的设置按工作表保存。',
+      outlineCollapse: '折叠的组在保存时会将其汇总行或汇总列标记为已折叠。',
+      splitPanes:
+        '拆分窗格会连同每个窗格显示的行和列一起保存。上方和左侧窗格可以单独滚动，但会停在另一个窗格开始的位置。',
+      hiddenDefaultRows:
+        '默认隐藏行的工作表会保留该设置。文件仅通过空行记录保持可见的行在打开时会被隐藏。',
     },
     lossLabels: {
       undecodedFormula: '无法读取的公式',

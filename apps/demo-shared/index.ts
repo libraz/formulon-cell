@@ -26,11 +26,13 @@ import type {
   SpreadsheetUiOptions,
   ThemeName,
   ToolbarInstance,
+  WorkbookSaveFormat,
 } from '@libraz/formulon-cell';
 import {
   analyzeAccessibilityCells,
   analyzeSpellingCells,
   applyTextScriptToRange,
+  chooseWorkbookSaveFormat,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   isFeatureDefaultOff,
@@ -39,6 +41,8 @@ import {
   presets,
   resolveSpreadsheetPlatform,
   resolveSpreadsheetUiOptions,
+  saveWorkbookWithPrompts,
+  WORKBOOK_SAVE_FORMATS,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 import { nextDemoSearchIndex } from './demo-search.js';
@@ -95,33 +99,45 @@ export const resolveInitialPlatform = (
 export type DemoUploadStatus = 'saved' | 'saving' | 'error' | null;
 
 export interface SaveDemoWorkbookOptions {
-  instance: Pick<SpreadsheetInstance, 'workbook'> | null;
+  instance: Pick<SpreadsheetInstance, 'workbook' | 'host' | 'i18n'> | null;
   bookName: string;
   setUploadStatus: (status: DemoUploadStatus) => void;
+  format?: WorkbookSaveFormat;
   documentRef?: Pick<Document, 'body' | 'createElement'>;
   urlApi?: Pick<typeof URL, 'createObjectURL' | 'revokeObjectURL'>;
   setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
 }
 
-export const saveDemoWorkbookToDownload = ({
+/** Write the workbook, warn before a file that leaves content out, and
+ *  download it with the extension of the chosen format. */
+export const saveDemoWorkbookToDownload = async ({
   instance,
   bookName,
   setUploadStatus,
+  format = 'xlsx',
   documentRef = globalThis.document,
   urlApi = globalThis.URL,
   setTimeoutFn = globalThis.setTimeout.bind(globalThis),
-}: SaveDemoWorkbookOptions): void => {
+}: SaveDemoWorkbookOptions): Promise<void> => {
   if (!instance) return;
   setUploadStatus('saving');
   try {
-    const bytes = instance.workbook.save();
-    const blob = new Blob([bytes as BlobPart], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    const outcome = await saveWorkbookWithPrompts({
+      wb: instance.workbook,
+      strings: instance.i18n.strings,
+      format,
+      host: instance.host,
     });
+    if (!outcome) {
+      setUploadStatus(null);
+      return;
+    }
+    const { extension, mimeType } = WORKBOOK_SAVE_FORMATS[outcome.format];
+    const blob = new Blob([outcome.bytes as BlobPart], { type: mimeType });
     const url = urlApi.createObjectURL(blob);
     const a = documentRef.createElement('a');
     a.href = url;
-    a.download = `${bookName}.xlsx`;
+    a.download = `${bookName}${extension}`;
     documentRef.body.appendChild(a);
     a.click();
     documentRef.body.removeChild(a);
@@ -130,6 +146,19 @@ export const saveDemoWorkbookToDownload = ({
   } catch {
     setUploadStatus('error');
   }
+};
+
+/** Save As: ask for the file type first, then save like Save. */
+export const saveDemoWorkbookAsToDownload = async (
+  opts: Omit<SaveDemoWorkbookOptions, 'format'>,
+): Promise<void> => {
+  if (!opts.instance) return;
+  const format = await chooseWorkbookSaveFormat(
+    opts.instance.workbook,
+    opts.instance.i18n.strings,
+    opts.instance.host,
+  );
+  if (format) await saveDemoWorkbookToDownload({ ...opts, format });
 };
 
 export type DemoIconName = 'app' | 'save' | 'undo' | 'redo' | 'search';

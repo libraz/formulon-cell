@@ -6,7 +6,7 @@ import type { FormulaReaderContext, NumericFunctionName } from './context.js';
 import type { RangeReader } from './ranges.js';
 
 /** Exactly the reader members this family touches. */
-export type FinancialEvaluatorContext = Pick<FormulaReaderContext, 'readOperand'> &
+export type FinancialEvaluatorContext = Pick<FormulaReaderContext, 'readOperand' | 'state'> &
   Pick<
     RangeReader,
     | 'formulaRangeArgBounds'
@@ -284,7 +284,7 @@ export function createFinancialEvaluator(ctx: FinancialEvaluatorContext) {
       if (maturity <= settlement || third <= 0 || redemption <= 0) {
         return { kind: 'error', code: 6, text: '#NUM!' };
       }
-      const yearFraction = yearFrac(settlement, maturity, basis);
+      const yearFraction = yearFrac(settlement, maturity, basis, ctx.state.ui.date1904 === true);
       if (yearFraction.kind !== 'number' || yearFraction.value <= 0) return yearFraction;
       if (fn === 'PRICEDISC') {
         return numericResult(redemption * (1 - third * yearFraction.value));
@@ -323,7 +323,7 @@ export function createFinancialEvaluator(ctx: FinancialEvaluatorContext) {
       if (settlement <= issue || rate <= 0 || par <= 0) {
         return { kind: 'error', code: 6, text: '#NUM!' };
       }
-      const yearFraction = yearFrac(issue, settlement, basis);
+      const yearFraction = yearFrac(issue, settlement, basis, ctx.state.ui.date1904 === true);
       if (yearFraction.kind !== 'number' || yearFraction.value <= 0) return yearFraction;
       return numericResult(par * rate * yearFraction.value);
     }

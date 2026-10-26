@@ -19,8 +19,10 @@ import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { numberFormatPaint } from '../format/number-format.js';
+import { gradientFillCss } from '../render/gradient-fill-css.js';
 import { cellFontFamily } from '../render/painters/text.js';
 import { formatWithPending } from '../store/pending-format.js';
+import { hiddenRowsOf } from '../store/row-visibility.js';
 import {
   type CellFormat,
   defaultPageSetup,
@@ -78,6 +80,9 @@ export interface PrintDocument {
 
 export interface BuildPrintDocumentOptions {
   printableBounds?: PageMargins | null;
+  /** Print the Outline and Shadow font effects, which only the Mac profile
+   *  draws. */
+  fontEffects?: boolean;
 }
 
 export interface PrintSheetOptions {
@@ -245,6 +250,7 @@ function inlineCellStyle(
   showGridlines: boolean,
   blackAndWhite: boolean,
   scale = 1,
+  fontEffects = false,
 ): string {
   const parts: string[] = [];
   if (showGridlines) {
@@ -254,6 +260,12 @@ function inlineCellStyle(
   if (!fmt) return parts.join(';');
   if (fmt.bold) parts.push('font-weight:600');
   if (fmt.italic) parts.push('font-style:italic');
+  if (fontEffects && fmt.fontShadow)
+    parts.push(`text-shadow:${scale}px ${scale}px 0 rgba(0,0,0,0.35)`);
+  if (fontEffects && fmt.fontOutline) {
+    parts.push(`-webkit-text-stroke:${0.75 * scale}px currentColor`);
+    parts.push('-webkit-text-fill-color:transparent');
+  }
   if (fmt.underline || fmt.strike) {
     const decos: string[] = [];
     if (fmt.underline) decos.push('underline');
@@ -292,8 +304,10 @@ function inlineCellStyle(
       : undefined;
   const color = formatColor ?? fmt.color;
   if (color && !blackAndWhite) parts.push(`color:${color}`);
-  if (fmt.fill && !blackAndWhite) parts.push(`background:${fmt.fill}`);
-  if (fmt.fillPattern && !blackAndWhite) {
+  if (fmt.fillGradient && !blackAndWhite) {
+    parts.push(`background:${gradientFillCss(fmt.fillGradient)}`);
+  } else if (fmt.fill && !blackAndWhite) parts.push(`background:${fmt.fill}`);
+  if (fmt.fillPattern && !fmt.fillGradient && !blackAndWhite) {
     const image = fillPatternCss(fmt.fillPattern, fmt.fillPatternColor);
     if (image) parts.push(`background-image:${image}`);
     if (fmt.fillPattern === 'gray125' || fmt.fillPattern === 'gray25') {
@@ -501,7 +515,7 @@ export function buildPrintDocument(
         }
       : baseSetup;
   const showFormulas = state.ui.showFormulas;
-  const hiddenRows = state.layout.hiddenRows;
+  const hiddenRows = hiddenRowsOf(state.layout);
   const hiddenCols = state.layout.hiddenCols;
   // The native paginator is authoritative when the worksheet's print setup
   // has been synchronized to the engine. A printer profile changes the
@@ -857,6 +871,7 @@ export function buildPrintDocument(
       setup.showGridlines === true,
       setup.blackAndWhite === true,
       cellScale,
+      options.fontEffects === true,
     );
     const rowspanAttr = span && span.rowspan > 1 ? ` rowspan="${span.rowspan}"` : '';
     const colspanAttr = span && span.colspan > 1 ? ` colspan="${span.colspan}"` : '';
@@ -1303,7 +1318,10 @@ export function printSheet(
     ? (resolvePrinterProfileBounds(setup, options.printerProfiles, options.printerProfileId) ??
       null)
     : undefined;
-  const doc = buildPrintDocument(wb, store, sheet, title, { printableBounds });
+  const doc = buildPrintDocument(wb, store, sheet, title, {
+    printableBounds,
+    fontEffects: (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac',
+  });
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.dataset.fcPrintMode = mode;

@@ -41,6 +41,7 @@ export const gridPopupsTh: GridPopupsStrings = {
     colUngroup: 'ยกเลิกการจัดกลุ่มคอลัมน์',
     insertComment: 'แก้ไขข้อคิดเห็น…',
     deleteComment: 'ลบข้อคิดเห็น',
+    showHideNote: 'แสดง/ซ่อนบันทึกย่อ',
     insertHyperlink: 'แทรกไฮเปอร์ลิงก์…',
     addWatch: 'เพิ่มการตรวจสอบ',
     removeWatch: 'เอาการตรวจสอบออก',

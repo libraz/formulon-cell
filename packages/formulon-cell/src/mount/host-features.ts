@@ -41,7 +41,6 @@ import {
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
-import { formatSessionChartValue } from '../interact/session-chart-format.js';
 import { attachSessionCharts, type SessionChartsHandle } from '../interact/session-charts.js';
 import {
   attachSessionIllustrations,
@@ -395,6 +394,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           getWb: input.wb,
           getLocale: input.i18nLocale,
           strings,
+          store: input.store,
+          history: input.history,
         });
         input.featureRegistry.set(
           'iterative',
@@ -742,7 +743,6 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           labels: strings.sessionCharts,
           history: input.history,
           locale: input.i18nLocale(),
-          formatValue: formatSessionChartValue,
         });
         const chartHandle = input.wrapHandle(s.sessionCharts, () => s.sessionCharts?.detach());
         chartHandle.setStrings = (next) =>

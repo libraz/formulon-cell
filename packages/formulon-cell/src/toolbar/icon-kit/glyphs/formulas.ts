@@ -212,6 +212,26 @@ export const FORMULA_ICONS = {
     ...loopArrow({ cx: 12, cy: 12, r: 8.4, color: PALETTE.accent, weight: 'bold' }),
     letter('digits', { height: 7.4, cy: 12, color: PALETTE.ink }),
   ],
+  // Goal Seek: a target hit at its centre.
+  goalSeek: [
+    filled(circle(12, 12, 9.2), PALETTE.paper),
+    ring(12, 12, 8.6, 8.6, PALETTE.ink, 'regular'),
+    ring(12, 12, 5, 5, PALETTE.accent, 'regular'),
+    filled(circle(12, 12, 1.8), PALETTE.accent),
+  ],
+  // Data Table: results framed by the formula row and the input column.
+  dataTable: sheet({
+    x: 2.4,
+    y: 2.4,
+    w: 19.2,
+    h: 19.2,
+    cols: 3,
+    rows: 3,
+    bands: [
+      { axis: 'row', index: 0, fill: PALETTE.infoSoft },
+      { axis: 'col', index: 0, fill: PALETTE.infoSoft },
+    ],
+  }),
   // Watch window: an eye over the value being tracked.
   watch: [
     stroked(

@@ -55,6 +55,7 @@ export type ItemId =
   | 'colUngroup'
   | 'insertComment'
   | 'deleteComment'
+  | 'showHideNote'
   | 'insertHyperlink'
   | 'openHyperlink'
   | 'editPhonetic'
@@ -139,6 +140,7 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'colUngroup',
   'insertComment',
   'deleteComment',
+  'showHideNote',
   'insertHyperlink',
   'openHyperlink',
   'editPhonetic',
@@ -259,6 +261,7 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'sep', id: 'sep3' },
     { kind: 'item', id: 'insertComment', label: t.insertComment, hint: '⇧F2' },
     { kind: 'item', id: 'deleteComment', label: t.deleteComment },
+    { kind: 'item', id: 'showHideNote', label: t.showHideNote },
     { kind: 'sep', id: 'sep4' },
     { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
     { kind: 'item', id: 'defineName', label: t.defineName },
@@ -412,7 +415,12 @@ export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
     sortSubmenu(s),
     { kind: 'sep', id: 'sep3' },
     { kind: 'item', id: 'insertComment', label: hasNote ? m.editNote : m.newNote },
-    ...(hasNote ? [{ kind: 'item', id: 'deleteComment', label: m.deleteNote } as const] : []),
+    ...(hasNote
+      ? ([
+          { kind: 'item', id: 'deleteComment', label: m.deleteNote },
+          { kind: 'item', id: 'showHideNote', label: t.showHideNote },
+        ] as const)
+      : []),
     { kind: 'sep', id: 'sep4' },
     { kind: 'item', id: 'formatCells', label: m.formatCells, hint: '⌘1' },
     { kind: 'item', id: 'editPhonetic', label: m.editPhonetic },

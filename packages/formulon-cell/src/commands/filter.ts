@@ -8,6 +8,7 @@ import {
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell, fromEngineValue, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {
   FilterSortSpec,
@@ -16,6 +17,7 @@ import type {
   ValueFilterCriteria,
 } from '../store/store.js';
 import { parseLocalizedNumericInput } from './coerce-input.js';
+import { blockDataTableEdit } from './data-table-guard.js';
 import { activeFilterRange, withFilterRange, withoutFilterRange } from './filter-ranges.js';
 import { formatNumber } from './format.js';
 import type { History } from './history.js';
@@ -665,6 +667,14 @@ export function copyAdvancedFilterResult(
     rowIndexes.push(r);
   }
 
+  const output = {
+    sheet: dest.sheet,
+    r0: dest.row,
+    c0: dest.col,
+    r1: dest.row + rowIndexes.length - 1,
+    c1: dest.col + width - 1,
+  };
+  if (wb && blockDataTableEdit(wb, output)) return 0;
   const writeMatchedRows = (): void => {
     store.setState((s) => {
       const cells = new Map(s.data.cells);
@@ -739,7 +749,11 @@ function cloneCellRecord(cell: { value: CellValue; formula: string | null }): {
   value: CellValue;
   formula: string | null;
 } {
-  return { value: { ...cell.value } as CellValue, formula: cell.formula };
+  // A data table's TABLE() cells copy as their values.
+  return {
+    value: { ...cell.value } as CellValue,
+    formula: isDataTableFormula(cell.formula) ? null : cell.formula,
+  };
 }
 
 function writeCellRecord(
@@ -747,7 +761,7 @@ function writeCellRecord(
   addr: Addr,
   cell: { value: CellValue; formula: string | null } | undefined,
 ): void {
-  if (cell) writeCell(wb, addr, cell.value, cell.formula);
+  if (cell) writeCell(wb, addr, cell.value, isDataTableFormula(cell.formula) ? null : cell.formula);
   else wb.setBlank(addr);
 }
 
@@ -1056,7 +1070,8 @@ const classifyFilterValue = (value: CellValue | undefined): FilterItemKind => {
 const filterItemLabel = (state: State, addr: Addr, value: CellValue, locale: string): string => {
   if (value.kind === 'number') {
     const fmt = state.format.formats.get(addrKey(addr));
-    if (fmt?.numFmt) return formatNumber(value.value, fmt.numFmt, locale);
+    if (fmt?.numFmt)
+      return formatNumber(value.value, fmt.numFmt, locale, state.ui.date1904 === true);
   }
   return formatCell(value, locale);
 };

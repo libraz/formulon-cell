@@ -237,6 +237,8 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     arrangeRequiresObject: 'Wählen Sie ein anzuordnendes Objekt aus.',
     arrangeNativeUnsupported: 'Die Engine kann die Stapelreihenfolge von Bildern nicht speichern.',
     shapeArrowNotSaved: 'Pfeile werden nicht in der Arbeitsmappe gespeichert.',
+    splitNotSaved:
+      'Geteilte Fensterbereiche können in dieser Arbeitsmappe nicht gespeichert werden.',
     arrangeAtFront: 'Das ausgewählte Objekt befindet sich bereits im Vordergrund.',
     arrangeAtBack: 'Das ausgewählte Objekt befindet sich bereits im Hintergrund.',
     underlineSingle: 'Unterstrichen',
@@ -263,7 +265,10 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     calcManual: 'Manuell',
     calcCalculateNow: 'Jetzt berechnen',
     calcCalculateSheet: 'Blatt berechnen',
-    calcIterative: 'Iterative Berechnung …',
+    calcIterative: 'Berechnungsoptionen …',
+    whatIfGoalSeek: 'Zielwertsuche …',
+    whatIfDataTable: 'Datentabelle …',
+    whatIfDataTableUnavailable: 'Diese Engine kann keine Datentabellen speichern.',
     sortAscendingMenu: 'Aufsteigend sortieren',
     sortDescendingMenu: 'Absteigend sortieren',
     sortColumn: 'Sortieren nach',
@@ -580,7 +585,6 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     iconStars3: '3 Sterne',
     iconQuarters5: '5 Viertel',
     iconRatings5: '5 Bewertungen',
-    iconBars5: '5 Balken',
     iconBoxes5: '5 Kästchen',
   },
 };

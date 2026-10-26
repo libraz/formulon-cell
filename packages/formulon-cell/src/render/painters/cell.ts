@@ -1,4 +1,4 @@
-import type { ConditionalIconSet } from '../../store/store.js';
+import type { CellGradientFill, ConditionalIconSet } from '../../store/store.js';
 import type { Rect } from '../geometry.js';
 import type { CellPaintCtx } from './types.js';
 
@@ -29,6 +29,28 @@ export function paintCellBackground({
  *  present so the artwork and value don't overlap. */
 export const CONDITIONAL_ICON_GUTTER = 16;
 
+const ARROWS_3 = [Math.PI / 2, 0, -Math.PI / 2];
+const ARROWS_4 = [Math.PI / 2, Math.PI / 4, -Math.PI / 4, -Math.PI / 2];
+const ARROWS_5 = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2];
+
+/** Arrow directions per slot, low → high (0 = right, π/2 = down). */
+const ARROW_ANGLES: Partial<Record<ConditionalIconSet, readonly number[]>> = {
+  arrows3: ARROWS_3,
+  arrowsGray3: ARROWS_3,
+  arrows4: ARROWS_4,
+  arrowsGray4: ARROWS_4,
+  arrows5: ARROWS_5,
+  arrowsGray5: ARROWS_5,
+};
+
+const RAMP: Readonly<Record<number, readonly string[]>> = {
+  3: ['#d24545', '#cfa64a', '#3aa055'],
+  4: ['#d24545', '#cfa64a', '#cfa64a', '#3aa055'],
+  5: ['#d24545', '#e07a4d', '#cfa64a', '#7fb352', '#3aa055'],
+};
+
+const rampColor = (slots: number, idx: number): string | undefined => RAMP[slots]?.[idx];
+
 /** Paint a small icon-set glyph at the left of a cell rect. The artwork is
  *  drawn with primitive shapes — no SVG / image asset — so the renderer
  *  stays self-contained. `slot` is 0-based; the family decides the count
@@ -46,23 +68,14 @@ export function paintConditionalIcon(
   const cy = rect.y + rect.h / 2;
   const r = Math.min(5, Math.floor(rect.h * 0.32));
   ctx.save();
-  if (kind === 'arrows3' || kind === 'arrows5') {
-    // Map slot to a unit-vector direction. arrows3: [down, right, up];
-    // arrows5: [down, down-right, right, up-right, up]. Color tracks slot:
-    // low → red, mid → amber, high → green. arrows5 reuses the same ramp
-    // with finer steps.
-    const slots = kind === 'arrows5' ? 5 : 3;
-    const idx = Math.max(0, Math.min(slots - 1, slot));
-    const colors =
-      kind === 'arrows5'
-        ? ['#d24545', '#e07a4d', '#cfa64a', '#7fb352', '#3aa055']
-        : ['#d24545', '#cfa64a', '#3aa055'];
-    const color = colors[idx] ?? '#777';
-    // Direction angle in radians, 0 = right, -π/2 = up, π/2 = down.
-    const angles =
-      kind === 'arrows5'
-        ? [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2]
-        : [Math.PI / 2, 0, -Math.PI / 2];
+  if (ARROW_ANGLES[kind]) {
+    // Direction tracks the slot (low → down, high → up); colour runs
+    // red → amber → green, or stays gray for the gray families.
+    const angles = ARROW_ANGLES[kind] ?? [];
+    const idx = Math.max(0, Math.min(angles.length - 1, slot));
+    const color = kind.startsWith('arrowsGray')
+      ? '#7f7f7f'
+      : (rampColor(angles.length, idx) ?? '#777');
     const a = angles[idx] ?? 0;
     const len = r + 2;
     const dx = Math.cos(a) * len;
@@ -102,11 +115,20 @@ export function paintConditionalIcon(
       ctx.closePath();
       ctx.fill();
     }
-  } else if (kind === 'traffic3' || kind === 'trafficRim3') {
-    // Three colored circles, only the slot's circle is filled solid; the
-    // other two are dim outlines so the icon reads as a single state.
-    const idx = Math.max(0, Math.min(2, slot));
-    const colors = ['#d24545', '#cfa64a', '#3aa055'];
+  } else if (
+    kind === 'traffic3' ||
+    kind === 'trafficRim3' ||
+    kind === 'traffic4' ||
+    kind === 'redToBlack4'
+  ) {
+    // One solid circle in the slot's colour; the rimmed set adds a housing.
+    const colors =
+      kind === 'traffic4'
+        ? ['#404040', '#d24545', '#cfa64a', '#3aa055']
+        : kind === 'redToBlack4'
+          ? ['#404040', '#8c8c8c', '#e8a0a0', '#d24545']
+          : ['#d24545', '#cfa64a', '#3aa055'];
+    const idx = Math.max(0, Math.min(colors.length - 1, slot));
     const color = colors[idx] ?? '#777';
     if (kind === 'trafficRim3') {
       ctx.strokeStyle = '#4f4f4f';
@@ -119,9 +141,55 @@ export function paintConditionalIcon(
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
-  } else if (kind === 'symbols3') {
+  } else if (kind === 'signs3') {
+    // Red diamond, amber triangle, green circle.
+    const idx = Math.max(0, Math.min(2, slot));
+    ctx.fillStyle = ['#d24545', '#cfa64a', '#3aa055'][idx] ?? '#777';
+    ctx.beginPath();
+    if (idx === 0) {
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + r, cy);
+      ctx.lineTo(cx, cy + r);
+      ctx.lineTo(cx - r, cy);
+      ctx.closePath();
+    } else if (idx === 1) {
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + r, cy + r);
+      ctx.lineTo(cx - r, cy + r);
+      ctx.closePath();
+    } else {
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  } else if (kind === 'symbols3' || kind === 'symbolsCircled3') {
     const idx = Math.max(0, Math.min(2, slot));
     ctx.lineWidth = 1.6;
+    if (kind === 'symbolsCircled3') {
+      // Coloured disc with the symbol knocked out in white.
+      ctx.fillStyle = ['#d24545', '#cfa64a', '#3aa055'][idx] ?? '#777';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      if (idx === 2) {
+        ctx.moveTo(cx - r + 2, cy);
+        ctx.lineTo(cx - 1, cy + r - 2);
+        ctx.lineTo(cx + r - 2, cy - r + 2);
+      } else if (idx === 1) {
+        ctx.moveTo(cx, cy - r + 2);
+        ctx.lineTo(cx, cy + 1);
+      } else {
+        ctx.moveTo(cx - r + 2, cy - r + 2);
+        ctx.lineTo(cx + r - 2, cy + r - 2);
+        ctx.moveTo(cx + r - 2, cy - r + 2);
+        ctx.lineTo(cx - r + 2, cy + r - 2);
+      }
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     if (idx === 2) {
       ctx.strokeStyle = '#3aa055';
       ctx.beginPath();
@@ -164,7 +232,7 @@ export function paintConditionalIcon(
     ctx.lineTo(cx - r, cy + 1);
     ctx.closePath();
     ctx.fill();
-  } else if (kind === 'quarters5' || kind === 'ratings5') {
+  } else if (kind === 'quarters5') {
     const idx = Math.max(0, Math.min(4, slot));
     ctx.strokeStyle = '#5c5c5c';
     ctx.lineWidth = 1;
@@ -172,20 +240,25 @@ export function paintConditionalIcon(
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = '#3f7ad8';
-    if (kind === 'ratings5') {
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.globalAlpha = 0.25 + idx * 0.18;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    } else {
-      const end = -Math.PI / 2 + ((idx + 1) / 4) * Math.PI * 2;
+    if (idx > 0) {
       ctx.beginPath();
       ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r, -Math.PI / 2, end);
+      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (idx / 4) * Math.PI * 2);
       ctx.closePath();
       ctx.fill();
     }
+  } else if (kind === 'ratings4' || kind === 'ratings5') {
+    // Four signal bars; the slot sets how many are lit.
+    const lit =
+      kind === 'ratings4' ? Math.max(0, Math.min(3, slot)) + 1 : Math.max(0, Math.min(4, slot));
+    ctx.fillStyle = '#3f7ad8';
+    const baseX = cx - 6;
+    for (let i = 0; i < 4; i += 1) {
+      const h = 3 + i * 2.5;
+      ctx.globalAlpha = i < lit ? 1 : 0.25;
+      ctx.fillRect(baseX + i * 3.2, cy + r - h, 2.2, h);
+    }
+    ctx.globalAlpha = 1;
   } else if (kind === 'bars5' || kind === 'boxes5') {
     const idx = Math.max(0, Math.min(4, slot));
     ctx.fillStyle = '#3f7ad8';
@@ -251,9 +324,55 @@ export function paintConditionalIcon(
   ctx.restore();
 }
 
+/** OOXML gradient fill. A linear gradient's `degree` turns clockwise from
+ *  left-to-right; a path gradient is approximated by a radial one spreading
+ *  from the centre of its inner rectangle to the farthest cell corner. */
+function paintGradientFill(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  gradient: CellGradientFill,
+): void {
+  let paint: CanvasGradient;
+  if (gradient.type === 'path') {
+    const cx = bounds.x + ((gradient.left + gradient.right) / 2) * bounds.w;
+    const cy = bounds.y + ((gradient.top + gradient.bottom) / 2) * bounds.h;
+    const radius = Math.max(
+      Math.hypot(cx - bounds.x, cy - bounds.y),
+      Math.hypot(bounds.x + bounds.w - cx, cy - bounds.y),
+      Math.hypot(cx - bounds.x, bounds.y + bounds.h - cy),
+      Math.hypot(bounds.x + bounds.w - cx, bounds.y + bounds.h - cy),
+    );
+    paint = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+  } else {
+    const angle = (gradient.degree * Math.PI) / 180;
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const half = (Math.abs(bounds.w * dx) + Math.abs(bounds.h * dy)) / 2;
+    const cx = bounds.x + bounds.w / 2;
+    const cy = bounds.y + bounds.h / 2;
+    paint = ctx.createLinearGradient(
+      cx - dx * half,
+      cy - dy * half,
+      cx + dx * half,
+      cy + dy * half,
+    );
+  }
+  for (const stop of gradient.stops) {
+    paint.addColorStop(Math.max(0, Math.min(1, stop.position)), stop.color);
+  }
+  ctx.save();
+  ctx.fillStyle = paint;
+  ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+  ctx.restore();
+}
+
 /** User-set background fill — drawn above range tint and active highlight so
  *  cells with explicit fill stay visually filled even when selected. */
 export function paintCellFill({ ctx, bounds, format }: CellPaintCtx): void {
+  if (format?.fillGradient) {
+    paintGradientFill(ctx, bounds, format.fillGradient);
+    return;
+  }
   const fill = format?.fill;
   const pattern = format?.fillPattern;
   if (!fill && !pattern) return;

@@ -11,6 +11,7 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import { blockDataTableEdit } from './data-table-guard.js';
 import type { History } from './history.js';
 import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
 import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
@@ -193,6 +194,11 @@ const mergeVisualKeys: readonly (keyof CellFormat)[] = [
   'fill',
   'fillPattern',
   'fillPatternColor',
+  'fillGradient',
+  'fontOutline',
+  'fontShadow',
+  'fontCondense',
+  'fontExtend',
   'fontFamily',
   'fontSize',
 ];
@@ -407,6 +413,7 @@ export function applyMerge(
   if (effective.r0 === effective.r1 && effective.c0 === effective.c1) return false;
   if (!canMaterializeMergeRange(effective)) return false;
   if (mergeBlockedByTable(stateBefore, effective)) return false;
+  if (blockDataTableEdit(wb, effective)) return false;
   const sheet = effective.sheet;
 
   // Sheet protection: refuse to clear locked cells (no silent backdoor).
@@ -460,6 +467,7 @@ export function applyMergeAcross(
   if (rangeWidth(effective) <= 1 || rangeHeight(effective) <= 0) return false;
   if (!canMaterializeMergeRange(effective)) return false;
   if (mergeBlockedByTable(stateBefore, effective)) return false;
+  if (blockDataTableEdit(wb, effective)) return false;
   if (mergeBlockedByProtection(stateBefore, effective)) {
     warnProtected({ sheet: effective.sheet, row: effective.r0, col: effective.c0 });
     return false;

@@ -41,6 +41,7 @@ export const gridPopupsEn: GridPopupsStrings = {
     colUngroup: 'Ungroup columns',
     insertComment: 'Edit comment…',
     deleteComment: 'Delete comment',
+    showHideNote: 'Show/Hide Note',
     insertHyperlink: 'Insert hyperlink…',
     addWatch: 'Add Watch',
     removeWatch: 'Remove Watch',

@@ -437,6 +437,32 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       { type: 1, value: '67' },
     ]);
   });
+
+  it('writes icon families under their engine set names, with custom icons per level', () => {
+    expect(
+      conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows5' })?.iconSet,
+    ).toMatchObject({ name: 13 });
+    expect(
+      conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'arrows4' })?.iconSet
+        ?.thresholds,
+    ).toHaveLength(3);
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'icon-set',
+        range,
+        icons: 'flags3',
+        customIcons: [null, { set: 'flags3', slot: 1 }, { set: 'boxes5', slot: 4 }],
+      })?.iconSet,
+    ).toMatchObject({
+      name: 2,
+      icons: [
+        { iconSet: 'NoIcons', iconId: 0 },
+        { iconSet: '3Flags', iconId: 1 },
+        { iconSet: '5Boxes', iconId: 4 },
+      ],
+    });
+    expect(conditionalRuleToEngineInput({ kind: 'icon-set', range, icons: 'bars5' })).toBeNull();
+  });
 });
 
 describe('syncConditionalRulesToEngine (H-13)', () => {

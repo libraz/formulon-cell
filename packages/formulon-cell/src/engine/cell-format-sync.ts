@@ -1,9 +1,11 @@
-import { type CellStyleFormatGroup, cellStyleGroupMatches } from '../commands/cell-styles.js';
+import type { CellStyleFormatGroup } from '../commands/cell-style-catalog.js';
+import { CELL_STYLE_GROUP_FIELDS, cellStyleGroupMatches } from '../commands/cell-style-groups.js';
 import {
   customPivotTableStyleById,
   pivotTableStyleAssignment,
   tableStyleSwatch,
 } from '../commands/format-as-table.js';
+import { withFillReplacement } from '../store/format-merge.js';
 import { formatWithPending } from '../store/pending-format.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey, parseAddrKey } from './address.js';
@@ -776,44 +778,15 @@ const RAW_ALIGNMENT_OPTIONAL_FIELDS = [
   'readingOrder',
 ] as const;
 
-const CELL_STYLE_GROUP_FIELDS: Record<CellStyleFormatGroup, readonly (keyof CellFormat)[]> = {
-  number: ['numFmt'],
-  alignment: [
-    'align',
-    'vAlign',
-    'wrap',
-    'justifyLastLine',
-    'shrinkToFit',
-    'indent',
-    'rotation',
-    'textDirection',
-  ],
-  font: [
-    'fontFamily',
-    'fontSize',
-    'bold',
-    'italic',
-    'underline',
-    'strike',
-    'fontVertAlign',
-    'color',
-  ],
-  border: ['borders'],
-  fill: ['fill', 'fillPattern', 'fillPatternColor'],
-  protection: ['locked', 'formulaHidden'],
-};
-
 const formatHasGroupFields = (fmt: CellFormat, group: CellStyleFormatGroup): boolean =>
   CELL_STYLE_GROUP_FIELDS[group].some((field) => Object.hasOwn(fmt, field));
 
-const FONT_NON_AXIS_FIELDS: readonly (keyof CellFormat)[] = [
-  'bold',
-  'italic',
-  'underline',
-  'strike',
-  'fontVertAlign',
-  'color',
-];
+const FONT_EFFECT_FIELDS = [
+  ['fontOutline', 'outline', 'hasOutline'],
+  ['fontShadow', 'shadow', 'hasShadow'],
+  ['fontCondense', 'condense', 'hasCondense'],
+  ['fontExtend', 'extend', 'hasExtend'],
+] as const;
 
 const sameFontNonAxisField = (
   format: CellFormat,
@@ -828,14 +801,24 @@ const sameFontNonAxisField = (
   if (!Object.hasOwn(format, field)) return true;
   const left = format[field];
   const right = current[field];
-  if (field === 'bold' || field === 'italic' || field === 'strike') {
+  if (
+    field === 'bold' ||
+    field === 'italic' ||
+    field === 'strike' ||
+    FONT_EFFECT_FIELDS.some(([key]) => key === field)
+  ) {
     return (left === true) === (right === true);
   }
   return Object.is(left, right);
 };
 
 const fontNonAxisMatches = (format: CellFormat, current: Partial<CellFormat>): boolean =>
-  FONT_NON_AXIS_FIELDS.every((field) => sameFontNonAxisField(format, current, field));
+  CELL_STYLE_GROUP_FIELDS.font.every(
+    (field) =>
+      field === 'fontFamily' ||
+      field === 'fontSize' ||
+      sameFontNonAxisField(format, current, field),
+  );
 
 /** Preserve the raw inherited font record when a direct write changes only
  *  family and/or size. The raw record carries theme, charset, colour and
@@ -991,6 +974,7 @@ export function patchXfIndexFromBase(
   for (const key of Object.keys(patch) as Array<keyof CellFormat>) {
     if (patch[key] === undefined) delete (effective as Partial<CellFormat>)[key];
   }
+  withFillReplacement(effective, patch);
 
   const target = buildXfForFormat(wb, effective);
   if (!target) return -1;
@@ -1004,38 +988,9 @@ export function patchXfIndexFromBase(
     'protection',
   ];
   const touched = new Set<CellStyleFormatGroup>();
-  if (
-    [
-      'fontFamily',
-      'fontSize',
-      'bold',
-      'italic',
-      'underline',
-      'strike',
-      'fontVertAlign',
-      'color',
-    ].some((key) => has(key as keyof CellFormat))
-  )
-    touched.add('font');
-  if (['fill', 'fillPattern', 'fillPatternColor'].some((key) => has(key as keyof CellFormat)))
-    touched.add('fill');
-  if (has('borders')) touched.add('border');
-  if (has('numFmt')) touched.add('number');
-  if (
-    [
-      'align',
-      'vAlign',
-      'wrap',
-      'justifyLastLine',
-      'shrinkToFit',
-      'indent',
-      'rotation',
-      'textDirection',
-    ].some((key) => has(key as keyof CellFormat))
-  )
-    touched.add('alignment');
-  if (['locked', 'formulaHidden'].some((key) => has(key as keyof CellFormat)))
-    touched.add('protection');
+  for (const group of groups) {
+    if (CELL_STYLE_GROUP_FIELDS[group].some((key) => has(key))) touched.add(group);
+  }
   for (const group of groups) {
     if (!touched.has(group)) copyRawGroup(target, source, group);
   }
@@ -1094,6 +1049,11 @@ export function patchXfIndexFromBase(
       // colour win while leaving every other raw font field intact.
       font.color = literalColorSpec();
     }
+    for (const [key, flag, presence] of FONT_EFFECT_FIELDS) {
+      if (!has(key)) continue;
+      font[flag] = patch[key] === true;
+      font[presence] = true;
+    }
     const fontIndex = wb.addFontRecord(font);
     if (fontIndex < 0) return -1;
     target.fontIndex = fontIndex;
@@ -1103,22 +1063,30 @@ export function patchXfIndexFromBase(
     const sourceFill = wb.getFillRecord(source.fillIndex);
     const targetFill = wb.getFillRecord(target.fillIndex);
     if (!sourceFill || !targetFill) return -1;
-    const fill = { ...sourceFill };
+    // A gradient replaces the whole fill, and a solid or pattern fill
+    // replaces a gradient, so either change takes the rebuilt record.
+    const replacesFill =
+      patch.fillGradient !== undefined ||
+      (sourceFill.gradient !== undefined &&
+        (has('fill') || has('fillPattern') || has('fillGradient')));
+    const fill = replacesFill ? { ...targetFill } : { ...sourceFill };
     const fillRecord = fill as unknown as Record<string, unknown>;
     const setLiteral = (slot: 'fg' | 'bg', argb: number): void => {
       fillRecord[slot] = literalColorSpec();
       fillRecord[`${slot}Argb`] = argb;
     };
-    if (has('fillPattern') || has('fill')) fill.pattern = targetFill.pattern;
-    if (has('fillPatternColor')) setLiteral('fg', targetFill.fgArgb);
-    // `fill` is the visible solid foreground for a solid/empty pattern and
-    // the background for a patterned fill. Change only that owned colour
-    // pair; the other selector stays exactly as it was in the source record.
-    if (has('fill'))
-      setLiteral(
-        targetFill.pattern > 1 ? 'bg' : 'fg',
-        targetFill.pattern > 1 ? targetFill.bgArgb : targetFill.fgArgb,
-      );
+    if (!replacesFill) {
+      if (has('fillPattern') || has('fill')) fill.pattern = targetFill.pattern;
+      if (has('fillPatternColor')) setLiteral('fg', targetFill.fgArgb);
+      // `fill` is the visible solid foreground for a solid/empty pattern and
+      // the background for a patterned fill. Change only that owned colour
+      // pair; the other selector stays exactly as it was in the source record.
+      if (has('fill'))
+        setLiteral(
+          targetFill.pattern > 1 ? 'bg' : 'fg',
+          targetFill.pattern > 1 ? targetFill.bgArgb : targetFill.fgArgb,
+        );
+    }
     const fillIndex = wb.addFillRecord(fill);
     if (fillIndex < 0) return -1;
     target.fillIndex = fillIndex;

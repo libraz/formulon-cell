@@ -97,4 +97,11 @@ export {
   type TextToColumnsDialogResult,
   type TextToColumnsDialogStrings,
 } from './text-to-columns.js';
+export {
+  chooseWorkbookSaveFormat,
+  confirmWorkbookSaveLosses,
+  type SaveWorkbookWithPromptsOptions,
+  saveWorkbookWithPrompts,
+  workbookSaveFormats,
+} from './workbook-save.js';
 export { showZoomDialog, type ZoomDialogOptions } from './zoom.js';

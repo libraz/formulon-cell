@@ -1,3 +1,4 @@
+import { splitPosition } from '../store/split-panes.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { SelectionSlice, SheetViewMemo } from '../store/types.js';
 import type { Range } from './types.js';
@@ -61,12 +62,19 @@ const memoFromEngine = (
   const topCol = view?.topLeftCol ?? 0;
   const freezeRows = view?.freezeRows ?? 0;
   const freezeCols = view?.freezeCols ?? 0;
+  // A split's lower-right pane scrolls from its own saved origin.
+  const splitRows = (view?.splitY ?? 0) > 0;
+  const splitCols = (view?.splitX ?? 0) > 0;
   return {
     selection: selectionFromEngine(sheet, saved),
-    rowStart: scrollStart(freezeRows, topRow, view?.paneTopLeftRow ?? 0),
-    colStart: scrollStart(freezeCols, topCol, view?.paneTopLeftCol ?? 0),
-    freezeOriginRow: freezeRows > 0 ? topRow : 0,
-    freezeOriginCol: freezeCols > 0 ? topCol : 0,
+    rowStart: splitRows
+      ? (view?.paneTopLeftRow ?? 0)
+      : scrollStart(freezeRows, topRow, view?.paneTopLeftRow ?? 0),
+    colStart: splitCols
+      ? (view?.paneTopLeftCol ?? 0)
+      : scrollStart(freezeCols, topCol, view?.paneTopLeftCol ?? 0),
+    freezeOriginRow: freezeRows > 0 || splitRows ? topRow : 0,
+    freezeOriginCol: freezeCols > 0 || splitCols ? topCol : 0,
     workbookView: view?.viewMode ?? 'normal',
     zoomBeforePreview: null,
   };
@@ -130,12 +138,12 @@ const writeSheetView = (
     ranges: [selection.range, ...(selection.extraRanges ?? [])],
   });
   const view = wb.getSheetView(sheet);
-  const freezeRows = view?.freezeRows ?? 0;
-  const freezeCols = view?.freezeCols ?? 0;
-  const topRow = freezeRows > 0 ? memo.freezeOriginRow : memo.rowStart;
-  const topCol = freezeCols > 0 ? memo.freezeOriginCol : memo.colStart;
+  const bandRows = (view?.freezeRows ?? 0) > 0 || (view?.splitY ?? 0) > 0;
+  const bandCols = (view?.freezeCols ?? 0) > 0 || (view?.splitX ?? 0) > 0;
+  const topRow = bandRows ? memo.freezeOriginRow : memo.rowStart;
+  const topCol = bandCols ? memo.freezeOriginCol : memo.colStart;
   wb.setSheetTopLeft(sheet, topRow, topCol);
-  if (freezeRows > 0 || freezeCols > 0) wb.setSheetPaneTopLeft(sheet, memo.rowStart, memo.colStart);
+  if (bandRows || bandCols) wb.setSheetPaneTopLeft(sheet, memo.rowStart, memo.colStart);
 };
 
 /**
@@ -151,6 +159,9 @@ export function syncViewStateToEngine(wb: WorkbookHandle, store: SpreadsheetStor
     if (sheet !== active && sheet < count) writeSheetView(wb, sheet, memo);
   }
   if (active < count) {
+    // A split measures the rows its top pane shows now, which scrolling may have changed.
+    const split = splitPosition(s);
+    if (split) wb.setSheetSplit(active, split.x, split.y);
     writeSheetView(wb, active, {
       selection: s.selection,
       rowStart: s.viewport.rowStart,

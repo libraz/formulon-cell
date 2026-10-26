@@ -70,6 +70,11 @@ const visualFormatKeys: readonly (keyof CellFormat)[] = [
   'fill',
   'fillPattern',
   'fillPatternColor',
+  'fillGradient',
+  'fontOutline',
+  'fontShadow',
+  'fontCondense',
+  'fontExtend',
   'fontFamily',
   'fontSize',
 ];

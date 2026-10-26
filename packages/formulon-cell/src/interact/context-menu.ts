@@ -17,8 +17,9 @@ import type {
 } from '../commands/interaction-policy.js';
 import { refreshPivotTable } from '../commands/pivot-table.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
+import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
-import { hiddenInSelection } from '../commands/row-col-layout.js';
+import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { type Addr, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -552,6 +553,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         .filter((e) => !(e.kind === 'item' && e.id === 'insertCopiedCells' && !hasCopiedCells))
         .filter((e) => !(e.kind === 'item' && hasCopiedCells && PLAIN_INSERT_IDS.includes(e.id)))
         .filter((e) => !(e.kind === 'item' && e.id === 'insertComment' && !deps.onEditComment))
+        .filter(
+          (e) =>
+            !(
+              e.kind === 'item' &&
+              e.id === 'showHideNote' &&
+              commentAt(store.getState(), activeAddr) === null
+            ),
+        )
         .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
         .filter((e) => !(e.kind === 'item' && e.id === 'defineName' && !deps.onDefineName))
         .map((e) => {
@@ -607,10 +616,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const s = store.getState();
     const rowHidden =
       kind === 'row' &&
-      hiddenInSelection(s.layout, 'row', s.selection.range.r0, s.selection.range.r1).length > 0;
+      hiddenExtentInSelection(s.layout, 'row', s.selection.range.r0, s.selection.range.r1) !== null;
     const colHidden =
       kind === 'col' &&
-      hiddenInSelection(s.layout, 'col', s.selection.range.c0, s.selection.range.c1).length > 0;
+      hiddenExtentInSelection(s.layout, 'col', s.selection.range.c0, s.selection.range.c1) !== null;
     const rowUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="rowUnhide"]');
     const colUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="colUnhide"]');
     const openHyperlink = root.querySelector<HTMLButtonElement>('[data-fc-action="openHyperlink"]');
@@ -1025,6 +1034,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       case 'deleteComment': {
         const addr = state.selection.active;
         wrapFmt('deleteComment', () => clearComment(store, addr, wb));
+        return;
+      }
+      case 'showHideNote': {
+        executeNoteVisibilityAction({ store, workbook: wb, action: 'toggle-active' });
         return;
       }
       case 'insertHyperlink': {

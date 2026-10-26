@@ -82,6 +82,7 @@ describe('attachContextMenu', () => {
       'sortMenu',
       'insertComment',
       'deleteComment',
+      'showHideNote',
       'formatCells',
       'defineName',
       'insertHyperlink',

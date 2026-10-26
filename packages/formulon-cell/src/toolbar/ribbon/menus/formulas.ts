@@ -22,6 +22,7 @@ export interface FormulasMenuFactories {
   createCalcOptionsMenu: () => HTMLDivElement;
   createClearArrowsMenu: () => HTMLDivElement;
   createErrorCheckingMenu: () => HTMLDivElement;
+  createWhatIfMenu: () => HTMLDivElement;
 }
 
 type FormulasMenuText = ToolbarMenuText & {
@@ -77,6 +78,16 @@ export const createFormulasMenuFactories = (
     return menu;
   };
 
+  // Data > Forecast > What-If Analysis.
+  const createWhatIfMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-what-if');
+    menu.append(
+      menuIconButton(t.whatIfGoalSeek, 'whatIf', 'goal-seek', 'what-if-goal-seek'),
+      menuIconButton(t.whatIfDataTable, 'whatIf', 'data-table', 'what-if-data-table'),
+    );
+    return menu;
+  };
+
   const createClearArrowsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-clear-arrows');
     menu.append(
@@ -113,5 +124,6 @@ export const createFormulasMenuFactories = (
     createCalcOptionsMenu,
     createClearArrowsMenu,
     createErrorCheckingMenu,
+    createWhatIfMenu,
   };
 };

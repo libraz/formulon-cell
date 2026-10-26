@@ -89,7 +89,16 @@ export type FontRecord = EngineFilled<
   | 'hasExtend'
 >;
 
-export type FillRecord = EngineFilled<import('@libraz/formulon').FillRecord, 'fg' | 'bg'>;
+export type GradientStop = EngineFilled<import('@libraz/formulon').GradientStop, 'color'>;
+
+export type GradientFill = Omit<import('@libraz/formulon').GradientFill, 'stops'> & {
+  stops: readonly GradientStop[];
+};
+
+export type FillRecord = Omit<
+  EngineFilled<import('@libraz/formulon').FillRecord, 'fg' | 'bg'>,
+  'gradient'
+> & { gradient?: GradientFill };
 
 export type BorderSide = EngineFilled<import('@libraz/formulon').BorderSide, 'color'>;
 
@@ -653,13 +662,25 @@ export interface EngineCapabilities {
   /** Read/write display flags on `<sheetView>`: gridlines, row/column
    *  headers, zeros, and right-to-left direction. */
   readonly sheetViewFlags?: boolean;
+  /** `setSheetShowFormulas`: the per-sheet `<sheetView showFormulas>` flag. */
+  readonly sheetShowFormulas?: boolean;
+  /** `setSheetShowOutlineSymbols`: the per-sheet `<sheetView showOutlineSymbols>` flag. */
+  readonly outlineSymbols?: boolean;
+  /** `setSheetSplit`: unfrozen split panes (`<pane xSplit ySplit>`). */
+  readonly sheetSplit?: boolean;
+  /** `setSheetFormatDefaults`: restating `<sheetFormatPr>`, including `zeroHeight`. */
+  readonly sheetFormatDefaults?: boolean;
   /** `setColumnOutline` + `setRowOutline`. */
   readonly outlines: boolean;
+  /** `setRowCollapsed` + `setColumnCollapsed`: the summary row/column `collapsed` flag. */
+  readonly outlineCollapse?: boolean;
   /** `getComment` + `setComment`. */
   readonly comments: boolean;
   /** Optional sheet-wide comment enumerator. Enables comments on blank cells
    *  to hydrate without probing physical cells. */
   readonly commentsEnumerable?: boolean;
+  /** `getCommentVisible` + `setCommentVisible`: a note shown without hovering. */
+  readonly commentVisibility?: boolean;
   /** Full hyperlink round-trip: `getHyperlinks`, `addHyperlink`, and
    *  `clearHyperlinks`. */
   readonly hyperlinks: boolean;
@@ -694,6 +715,12 @@ export interface EngineCapabilities {
   readonly localeFacts?: boolean;
   /** `calcMode` + `setCalcMode` round-trip metadata for `<calcPr>`. */
   readonly calcMode: boolean;
+  /** `fullPrecision`, `calcOnSave`, `refMode` and `date1904` getters and setters. */
+  readonly calcSettings?: boolean;
+  /** What-If data tables: `addDataTable`, `getDataTable`, `removeDataTable`, `recalcDataTables`. */
+  readonly dataTables?: boolean;
+  /** `saveWithDiagnostics` with a container argument: `.xlsb` can be written. */
+  readonly xlsbSave?: boolean;
   /** Workbook formula-behaviour host profile. */
   readonly spreadsheetProfile: boolean;
   /** `getSheetProtection` + `setSheetProtection` round-trip. */

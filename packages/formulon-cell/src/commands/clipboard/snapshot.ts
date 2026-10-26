@@ -1,5 +1,6 @@
 import { addrKey } from '../../engine/address.js';
 import type { Addr, CellValue, Range } from '../../engine/types.js';
+import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
 import type { CellFormat, State } from '../../store/store.js';
 import type { CopyResult } from './copy.js';
@@ -136,7 +137,8 @@ export function captureSnapshot(
         continue;
       }
       line.push({
-        formula: cell?.formula ?? null,
+        // A data table's TABLE() cells copy as their values.
+        formula: isDataTableFormula(cell?.formula) ? null : (cell?.formula ?? null),
         value: cell?.value ?? { kind: 'blank' },
         format: fmt ? cloneFormat(fmt) : undefined,
       });

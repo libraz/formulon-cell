@@ -8,6 +8,7 @@ import { type CellFormat, mutators, type SpreadsheetStore, type State } from '..
 import { customListsFor } from './autofill-series.js';
 import { recordCommentChange } from './comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
+import { blockDataTableEdit } from './data-table-guard.js';
 import { filterRangeForSort, inferAutoFilterRange, setFilterSort } from './filter.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
@@ -109,6 +110,7 @@ const hydrateSortComments = (
                 col: entry.addr.col,
                 author: comment.author,
                 text: comment.text,
+                ...(comment.visible ? { visible: true as const } : {}),
               },
             ]
           : [];
@@ -127,8 +129,21 @@ const hydrateSortComments = (
   for (const comment of inRange) {
     const key = addrKey({ sheet: range.sheet, row: comment.row, col: comment.col });
     const previous = formats.get(key) ?? {};
-    if (previous.comment === comment.text && previous.commentAuthor === comment.author) continue;
-    formats.set(key, { ...previous, comment: comment.text, commentAuthor: comment.author });
+    const visible = comment.visible === true;
+    if (
+      previous.comment === comment.text &&
+      previous.commentAuthor === comment.author &&
+      (previous.commentVisible === true) === visible
+    ) {
+      continue;
+    }
+    const { commentVisible: _visible, ...rest } = previous;
+    formats.set(key, {
+      ...rest,
+      comment: comment.text,
+      commentAuthor: comment.author,
+      ...(visible ? { commentVisible: true } : {}),
+    });
     changed = true;
   }
   if (!changed) return current;
@@ -545,6 +560,7 @@ export function sortRange(
   if (!canRewriteExactRange(range, start)) return false;
   if (rangeIntersectsMerges(state, range)) return false;
   if (!ensureWritableRange(state, { ...range, r0: start })) return false;
+  if (blockDataTableEdit(wb, { ...range, r0: start })) return false;
 
   // A real formulon bundle owns the comparison semantics for formula-driven
   // sorts. Do this before hydrating comments or touching any cell so an
@@ -682,6 +698,7 @@ export function sortRange(
         addr.col,
         format?.commentAuthor ?? DEFAULT_COMMENT_AUTHOR,
         format?.comment ?? '',
+        format?.commentVisible === true,
       );
     }
   };

@@ -19,6 +19,8 @@ import {
   unwatchCell,
   watchRange,
 } from '../../index.js';
+import { openDataTableDialog } from '../../interact/data-table-dialog.js';
+import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
@@ -132,6 +134,25 @@ const updateCalcOptionsMenu =
       button.setAttribute('aria-checked', String(active));
       button.classList.toggle('fc-tb__menu-item--active', active);
     }
+  };
+
+const buildWhatIfAction =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyWhatIfAction'] =>
+  (action) => {
+    if (action === 'goal-seek') openMacGoalSeekDialog(instance);
+    else if (action === 'data-table') openDataTableDialog(instance);
+  };
+
+const updateWhatIfMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateWhatIfMenu'] =>
+  (menu) => {
+    const dataTable = menu.querySelector<HTMLButtonElement>('[data-what-if="data-table"]');
+    if (!dataTable) return;
+    setMenuControlDisabled(
+      dataTable,
+      !instance.workbook.capabilities.dataTables,
+      instance.i18n.strings.ribbonMenu.whatIfDataTableUnavailable,
+    );
   };
 
 const buildFormulaAuditAction =
@@ -324,6 +345,8 @@ type FormulasDropdownDefaults = Pick<
   | 'updateWatchMenu'
   | 'applyCalcOptionAction'
   | 'updateCalcOptionsMenu'
+  | 'applyWhatIfAction'
+  | 'updateWhatIfMenu'
   | 'applyDefinedNameAction'
   | 'updateDefinedNamesMenu'
 >;
@@ -340,6 +363,8 @@ export function createFormulasDropdownDefaults(
     updateWatchMenu: updateWatchMenu(instance),
     applyCalcOptionAction: buildCalcOptionAction(instance),
     updateCalcOptionsMenu: updateCalcOptionsMenu(instance),
+    applyWhatIfAction: buildWhatIfAction(instance),
+    updateWhatIfMenu: updateWhatIfMenu(instance),
     applyDefinedNameAction: buildDefinedNameAction(instance),
     updateDefinedNamesMenu: updateDefinedNamesMenu(instance),
   };

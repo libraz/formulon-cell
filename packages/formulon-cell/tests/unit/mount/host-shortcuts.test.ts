@@ -558,6 +558,21 @@ describe('mount/host-shortcuts', () => {
     expect(e.defaultPrevented).toBe(true);
   });
 
+  it.each([
+    [false, 45292],
+    [true, 43830],
+  ])('Ctrl+; enters today as a serial (1904 workbook: %s)', (date1904, expected) => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2024, 0, 1, 12));
+      s.store.setState((st) => ({ ...st, ui: { ...st.ui, date1904 } }));
+      s.handler(key({ key: ';', ctrlKey: true }));
+      expect(s.setNumber).toHaveBeenCalledWith(expect.anything(), expected);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does nothing when the matching feature is unavailable', () => {
     s.feature.findReplace = null;
     s.handler(key({ key: 'f', ctrlKey: true }));

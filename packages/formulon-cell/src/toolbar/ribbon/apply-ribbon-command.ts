@@ -16,12 +16,14 @@ import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setOutlineSummaryPosition } from '../../commands/outline.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
+import { executeNoteVisibilityAction } from '../../commands/ribbon-comment.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
 import { arrangeSessionChart } from '../../commands/session-chart.js';
 import {
   arrangeSessionIllustration,
   selectedSessionIllustration,
 } from '../../commands/session-illustration.js';
+import { toggleSplitPanes } from '../../commands/split-panes.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../../commands/structure.js';
 import {
   TABLE_OPTION_COMMANDS,
@@ -31,6 +33,7 @@ import {
 import {
   setGridlinesVisible,
   setHeadingsVisible,
+  setOutlineSymbolsVisible,
   setR1C1ReferenceStyle,
   setSheetRightToLeft,
   setSheetZoom,
@@ -437,6 +440,21 @@ const applyGenericRibbonCommand = (
     case 'outlineHideDetail':
       hooks?.page?.outline?.('hide-detail');
       return true;
+    case 'outlineSymbols':
+      setOutlineSymbolsVisible(
+        i.store,
+        i.store.getState().ui.showOutlineSymbols === false,
+        i.workbook,
+      );
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    case 'split':
+      if (i.workbook.capabilities.sheetSplit !== true) return true;
+      toggleSplitPanes(i.store, i.workbook);
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
     case 'outlineSummaryBelow':
     case 'outlineSummaryRight': {
       const summary = outlineSummaryFor(state.layout, state.data.sheetIndex);
@@ -548,11 +566,12 @@ const applyGenericRibbonCommand = (
       hooks?.formula?.errorChecking?.();
       return true;
     case 'showFormulasFormula':
-      setShowFormulas(i.store, !i.store.getState().ui.showFormulas);
+      setShowFormulas(i.store, !i.store.getState().ui.showFormulas, i.workbook);
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
     case 'recalcNow':
+    case 'recalcSheet':
       i.recalc();
       runtime.focusSheet();
       return true;
@@ -562,7 +581,7 @@ const applyGenericRibbonCommand = (
       return true;
     case 'viewGridlines':
     case 'pageLayoutGridlinesView':
-      setGridlinesVisible(i.store, i.store.getState().ui.showGridLines === false);
+      setGridlinesVisible(i.store, i.store.getState().ui.showGridLines === false, i.workbook);
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
@@ -576,7 +595,7 @@ const applyGenericRibbonCommand = (
     }
     case 'viewHeadings':
     case 'pageLayoutHeadingsView':
-      setHeadingsVisible(i.store, i.store.getState().ui.showHeaders === false);
+      setHeadingsVisible(i.store, i.store.getState().ui.showHeaders === false, i.workbook);
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
@@ -595,7 +614,7 @@ const applyGenericRibbonCommand = (
       hooks?.sheetView?.deleteActive?.();
       return true;
     case 'viewFormulas':
-      setShowFormulas(i.store, !i.store.getState().ui.showFormulas);
+      setShowFormulas(i.store, !i.store.getState().ui.showFormulas, i.workbook);
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;
@@ -636,6 +655,16 @@ const applyGenericRibbonCommand = (
       return true;
     case 'nextCommentReview':
       hooks?.review?.selectComment?.(1);
+      return true;
+    case 'showHideNoteReview':
+    case 'showAllNotesReview':
+      executeNoteVisibilityAction({
+        store: i.store,
+        workbook: i.workbook,
+        action: id === 'showHideNoteReview' ? 'toggle-active' : 'toggle-all',
+      });
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
       return true;
     case 'protectReview':
     case 'protect':

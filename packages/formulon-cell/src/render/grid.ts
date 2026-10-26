@@ -41,6 +41,7 @@ import {
 } from './grid/hit-state.js';
 import { paintFreezeDividers, paintGridLines } from './grid/lines.js';
 import { mergeRangeAt } from './grid/merged-cells.js';
+import { paintVisibleNotes } from './grid/notes.js';
 import {
   paintPageBreakPreview,
   paintPageLayoutBackground,
@@ -268,6 +269,7 @@ export class GridRenderer {
     this.paintActive(state, theme, cols, rows);
     this.paintEditorRefs(state);
     this.paintChartSourceRefs(state);
+    paintVisibleNotes(this.ctx, state, cols, rows);
     this.paintTraces(state, cols, rows);
   }
 
@@ -435,6 +437,8 @@ export class GridRenderer {
       locale: this.getLocale(),
       getDisplay: this.getDisplay,
       sheetBackgroundImage: entry?.status === 'loaded' ? entry.image : null,
+      fontEffects:
+        (this.host.closest?.<HTMLElement>('.fc-host') ?? this.host).dataset?.fcPlatform === 'mac',
     };
   }
 

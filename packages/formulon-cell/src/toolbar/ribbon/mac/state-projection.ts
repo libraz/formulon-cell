@@ -7,7 +7,7 @@ import type { SpreadsheetInstance } from '../../../mount/types.js';
 import { rangeValidationsIntersect } from '../../../store/range-validations.js';
 import { projectDisabledState } from '../../menu-a11y.js';
 import { indexRibbonButtons, projectActiveState } from '../../ribbon-active-state.js';
-import { macRibbonLabelForCommand } from './labels.js';
+import { EMBEDDED_UNSUPPORTED, macRibbonLabelForCommand } from './labels.js';
 import { MAC_CONTEXT_LABELS } from './labels-data.js';
 import { toolbarLangForLocale } from './locale.js';
 
@@ -27,6 +27,7 @@ const MAC_ACTIVE_STATE_KEYS: Readonly<Record<string, keyof ReturnType<typeof pro
     'mac.data.filter': 'filterOn',
     'mac.review.protectSheet': 'protected',
     'mac.view.freeze': 'frozen',
+    'mac.view.split': 'splitPanes',
   };
 
 const MAC_POLICY_PROJECTED_COMMANDS = [
@@ -59,6 +60,8 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.formulas.errorCheck.run',
   'mac.formulas.errorCheck.trace',
   'mac.formulas.errorCheck.ignore',
+  'mac.data.dataTable',
+  'mac.view.split',
   'mac.data.validation.settings',
   'mac.data.validation.circleInvalid',
   'mac.data.validation.clearCircles',
@@ -137,6 +140,12 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
       !roots.length
     )
       return strings.commentNone;
+  }
+  if (id === 'mac.view.split' && !instance.workbook?.capabilities?.sheetSplit) {
+    return strings.splitNotSaved;
+  }
+  if (id === 'mac.data.dataTable' && !instance.workbook?.capabilities?.dataTables) {
+    return EMBEDDED_UNSUPPORTED[lang];
   }
   if (id === 'mac.data.clear' && !activeFilterRange(state)) {
     return MAC_CONTEXT_LABELS.filterRangeRequired[lang];

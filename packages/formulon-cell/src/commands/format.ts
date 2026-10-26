@@ -10,6 +10,7 @@ import { numFmtWithDecimals } from '../engine/format-writeback.js';
 import type { Addr, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import { currencySymbolForLocale } from '../format/locale.js';
+import { mergeFormatPatch } from '../store/format-merge.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
 import {
@@ -254,9 +255,7 @@ const stagePendingFormat = (
   const previous = sameAddr(state.ui.pendingFormat?.addr ?? addr, addr)
     ? (state.ui.pendingFormat?.format ?? {})
     : {};
-  const next: Partial<CellFormat> = { ...previous, ...patch };
-  if (patch.borders) next.borders = { ...(previous.borders ?? {}), ...patch.borders };
-  mutators.setPendingFormat(store, { addr, format: next });
+  mutators.setPendingFormat(store, { addr, format: mergeFormatPatch(previous, patch) });
 };
 
 interface SelectionFormatEntry {
@@ -269,9 +268,7 @@ const mergeCellFormat = (
   patch: Partial<CellFormat> | null,
 ): CellFormat | undefined => {
   if (patch === null) return undefined;
-  const next: CellFormat = { ...(previous ?? {}), ...patch };
-  if (patch.borders) next.borders = { ...(previous?.borders ?? {}), ...patch.borders };
-  return next;
+  return mergeFormatPatch(previous, patch);
 };
 
 const commitSelectionFormatEntries = (
@@ -336,6 +333,11 @@ const axisSafeFormatKeys = new Set<keyof CellFormat>([
   'fill',
   'fillPattern',
   'fillPatternColor',
+  'fillGradient',
+  'fontOutline',
+  'fontShadow',
+  'fontCondense',
+  'fontExtend',
   'fontFamily',
   'fontSize',
   'locked',
@@ -1095,7 +1097,8 @@ const borderEntriesForPlan = (
 const operationsForFormatPatch = (patch: Partial<CellFormat>): Set<InteractionOperation> => {
   const operations = new Set<InteractionOperation>();
   for (const key of Object.keys(patch) as Array<keyof CellFormat>) {
-    if (key === 'comment' || key === 'commentAuthor') operations.add('comment');
+    if (key === 'comment' || key === 'commentAuthor' || key === 'commentVisible')
+      operations.add('comment');
     else if (
       key === 'hyperlink' ||
       key === 'hyperlinkDisplay' ||
@@ -1358,6 +1361,11 @@ const visualFormatKeys: readonly (keyof CellFormat)[] = [
   'fill',
   'fillPattern',
   'fillPatternColor',
+  'fillGradient',
+  'fontOutline',
+  'fontShadow',
+  'fontCondense',
+  'fontExtend',
   'fontFamily',
   'fontSize',
 ];

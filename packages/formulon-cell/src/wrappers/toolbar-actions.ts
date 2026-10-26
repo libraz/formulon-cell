@@ -17,7 +17,7 @@ import {
   deleteCols,
   deleteRows,
   type FreezeMode,
-  hiddenInSelection,
+  hiddenExtentInSelection,
   hideCols,
   hideRows,
   insertCells,
@@ -302,7 +302,7 @@ export const toggleSelectedRowsHidden = (instance: SpreadsheetInstance | null): 
   if (!instance) return;
   const s = instance.store.getState();
   const r = s.selection.range;
-  if (hiddenInSelection(s.layout, 'row', r.r0, r.r1).length > 0) {
+  if (hiddenExtentInSelection(s.layout, 'row', r.r0, r.r1) !== null) {
     showRowsAroundSelection(instance.store, instance.history, r.r0, r.r1, instance.workbook);
   } else {
     hideRows(instance.store, instance.history, r.r0, r.r1, instance.workbook);
@@ -313,7 +313,7 @@ export const toggleSelectedColsHidden = (instance: SpreadsheetInstance | null): 
   if (!instance) return;
   const s = instance.store.getState();
   const r = s.selection.range;
-  if (hiddenInSelection(s.layout, 'col', r.c0, r.c1).length > 0) {
+  if (hiddenExtentInSelection(s.layout, 'col', r.c0, r.c1) !== null) {
     showColsAroundSelection(instance.store, instance.history, r.c0, r.c1, instance.workbook);
   } else {
     hideCols(instance.store, instance.history, r.c0, r.c1, instance.workbook);

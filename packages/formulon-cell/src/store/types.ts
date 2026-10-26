@@ -81,14 +81,25 @@ export interface LayoutSlice {
   freezeOriginRow?: number;
   /** First column of the frozen band. Absent = 0. */
   freezeOriginCol?: number;
+  /** The band is an unfrozen split rather than a freeze: its top/left panes
+   *  scroll on their own and the divider can be dragged. */
+  splitPanes?: boolean;
   /** Rows hidden by the user. Geometry returns height 0; renderer skips them. */
   hiddenRows: Set<number>;
   hiddenCols: Set<number>;
+  /** `<sheetFormatPr zeroHeight>`: rows are hidden unless listed in `shownRows`. */
+  defaultRowsHidden?: boolean;
+  /** Rows that stay visible on a sheet whose rows are hidden by default. */
+  shownRows?: Set<number>;
   /** Outline (group) level per row, 1..7. Absent or 0 means no group. The
    *  bracket gutter widens with the maximum level; collapse/expand toggle
    *  hides/shows the rows in a contiguous group. spreadsheet parity. */
   outlineRows: Map<number, number>;
   outlineCols: Map<number, number>;
+  /** Summary rows / columns whose outline group is collapsed (the OOXML
+   *  `collapsed` flag). Absent = none. */
+  collapsedRows?: Set<number>;
+  collapsedCols?: Set<number>;
   /** Width of the row outline gutter in CSS px — derived from
    *  `outlineRows` (max level × per-level slot). Maintained by outline
    *  mutators; renderer treats this as authoritative. */
@@ -199,6 +210,8 @@ export interface UiSlice {
   /** When true, formula cells display the formula text instead of the
    *  evaluated value. Equivalent to the desktop-spreadsheet "Show Formulas" (Ctrl+`). */
   showFormulas: boolean;
+  /** When false, the outline gutters (brackets and +/- toggles) are hidden. */
+  showOutlineSymbols: boolean;
   /** Excel End mode: the next arrow key jumps to the edge of the current data region. */
   endMode: boolean;
   /** Workbook view mode surfaced by View > Workbook Views. Page Layout folds
@@ -216,6 +229,12 @@ export interface UiSlice {
   /** Display refs in R1C1 form instead of A1 (headers, name box). Underlying
    *  storage stays A1 — only the rendered representation changes. */
   r1c1: boolean;
+  /** The workbook's 1904 date system (`<workbookPr date1904>`), mirrored from
+   *  the engine so every serial/date conversion reads one flag. */
+  date1904?: boolean;
+  /** "Set precision as displayed" (`<calcPr fullPrecision="0">`), mirrored so
+   *  typed numbers round to their format as they are committed. */
+  precisionAsDisplayed?: boolean;
   /** Live formula-reference highlights (desktop spreadsheets: colored borders on referenced
    *  cells while editing a formula). Empty when no formula edit is active. */
   editorRefs: EditorRefHighlight[];

@@ -54,8 +54,10 @@ import {
   resolveInitialLocale,
   resolveInitialPlatform,
   type DemoPlatform,
+  type DemoUploadStatus,
   reportDemoScriptRun,
   runDemoBackstageAction,
+  saveDemoWorkbookAsToDownload,
   saveDemoWorkbookToDownload,
 } from '../../demo-shared/index.js';
 import DemoBackstage from './DemoBackstage.vue';
@@ -223,14 +225,20 @@ onBeforeUnmount(() => {
   disposeScriptMenu = undefined;
 });
 
+const demoSaveOptions = () => ({
+  instance: instance.value,
+  bookName: bookName.value,
+  setUploadStatus: (next: DemoUploadStatus) => {
+    uploadStatus.value = next;
+  },
+});
+
 const onSave = (): void => {
-  saveDemoWorkbookToDownload({
-    instance: instance.value,
-    bookName: bookName.value,
-    setUploadStatus: (next) => {
-      uploadStatus.value = next;
-    },
-  });
+  void saveDemoWorkbookToDownload(demoSaveOptions());
+};
+
+const onSaveAs = (): void => {
+  void saveDemoWorkbookAsToDownload(demoSaveOptions());
 };
 
 const onNewWorkbook = async (): Promise<void> => {
@@ -281,6 +289,7 @@ const runBackstageAction = (action: DemoBackstageAction): void => {
     newWorkbook: onNewWorkbook,
     openWorkbook: () => fileInput.value?.click(),
     saveWorkbook: onSave,
+    saveWorkbookAs: onSaveAs,
     showNotice: showRibbonNotice,
     toggleOptions: () => {
       showPanel.value = !showPanel.value;
@@ -442,7 +451,7 @@ onBeforeUnmount(() => {
       @toggle-panel="showPanel = !showPanel"
       @tab-change="ribbonTab = $event"
     />
-    <input ref="fileInput" type="file" accept=".xlsx,.xlsm" hidden @change="onOpenFiles" />
+    <input ref="fileInput" type="file" accept=".xlsx,.xlsm,.xlsb" hidden @change="onOpenFiles" />
 
     <main :class="['demo__body', { 'demo__body--panel': showPanel }]">
       <div class="fc-tb__sheet-col">

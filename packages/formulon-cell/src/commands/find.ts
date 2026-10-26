@@ -4,6 +4,7 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { inputLocaleForWorkbook, writeInput } from './coerce-input.js';
+import { blockDataTableCells } from './data-table-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 export interface FindOptions {
@@ -389,6 +390,7 @@ export function replaceOne(
     warnProtected(match.addr);
     return false;
   }
+  if (blockDataTableCells(wb, [match.addr])) return false;
   // `writeInput` canonicalizes a localized formula before it reaches the
   // engine, and applies the selected input locale to displayed values.
   writeInput(wb, match.addr, replacement, store, locale);
@@ -405,14 +407,24 @@ export function replaceAll(
   if (opts.query === '' || (opts.lookIn ?? 'values') === 'comments' || opts.lookIn === 'notes') {
     return 0;
   }
-  const matches = findAll(state, opts);
+  const matches = findAll(state, opts).filter((m) => {
+    const formula = wb.cellFormula(m.addr);
+    return opts.lookIn === 'formulas' ? formula !== null : formula === null;
+  });
+  // Refuse the whole replacement up front rather than stopping partway.
+  if (
+    blockDataTableCells(
+      wb,
+      matches.map((m) => m.addr),
+    )
+  )
+    return 0;
   let count = 0;
   // The mode gate below keeps formula source replacement and displayed-value
   // replacement separate, so a batched recalc cannot turn one into the other.
   wb.withBatchedRecalc(() => {
     for (const m of matches) {
       const formula = wb.cellFormula(m.addr);
-      if (opts.lookIn === 'formulas' ? formula === null : formula !== null) continue;
       if (!isCellWritable(state, m.addr)) {
         warnProtected(m.addr);
         continue;

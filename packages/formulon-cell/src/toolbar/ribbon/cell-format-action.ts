@@ -9,7 +9,7 @@ import type { Locale } from '../../i18n/strings.js';
 // caller's side via the `deps` struct (status text, tab list refresh, etc).
 
 import {
-  hiddenInSelection,
+  hiddenExtentInSelection,
   hideCols,
   hideRows,
   moveSheet,
@@ -150,15 +150,13 @@ export const applyCellFormatAction = async (
     return;
   }
   if (action === 'show-rows') {
-    const targets = hiddenInSelection(i.store.getState().layout, 'row', range.r0, range.r1);
-    if (targets.length > 0)
-      showRows(i.store, i.history, targets[0] ?? range.r0, targets.at(-1) ?? range.r1, i.workbook);
+    const hidden = hiddenExtentInSelection(i.store.getState().layout, 'row', range.r0, range.r1);
+    if (hidden) showRows(i.store, i.history, hidden.first, hidden.last, i.workbook);
     return;
   }
   if (action === 'show-cols') {
-    const targets = hiddenInSelection(i.store.getState().layout, 'col', range.c0, range.c1);
-    if (targets.length > 0)
-      showCols(i.store, i.history, targets[0] ?? range.c0, targets.at(-1) ?? range.c1, i.workbook);
+    const hidden = hiddenExtentInSelection(i.store.getState().layout, 'col', range.c0, range.c1);
+    if (hidden) showCols(i.store, i.history, hidden.first, hidden.last, i.workbook);
     return;
   }
   if (action === 'row-height') {

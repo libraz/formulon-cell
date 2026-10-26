@@ -198,6 +198,58 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.byId['format-as-table'].reason).toContain('ListObject');
   });
 
+  it('marks calculation options and data tables writable once the engine saves them', () => {
+    const wb = (capabilities: Record<string, boolean>) =>
+      ({
+        capabilities: { ...baseCaps, ...capabilities },
+        getPassthroughs: () => [],
+        getTables: () => [],
+        getPivotTables: () => [],
+      }) as unknown as WorkbookHandle;
+
+    const on = summarizeSpreadsheetCompatibility(
+      wb({ calcMode: true, calcSettings: true, dataTables: true }),
+    );
+    expect(on.byId['calc-settings'].status).toBe('writable');
+    expect(on.byId['calc-settings'].reason).toContain('formula results keep full precision');
+    expect(on.byId['data-tables'].status).toBe('writable');
+
+    const off = summarizeSpreadsheetCompatibility(wb({ calcMode: true }));
+    expect(off.byId['calc-settings'].status).toBe('unsupported');
+    expect(off.byId['data-tables'].status).toBe('unsupported');
+  });
+
+  it('reports font effects, gradient fills and .xlsb saving', () => {
+    const wb = (capabilities: Record<string, boolean>) =>
+      ({
+        capabilities: { ...baseCaps, ...capabilities },
+        getPassthroughs: () => [],
+        getTables: () => [],
+        getPivotTables: () => [],
+      }) as unknown as WorkbookHandle;
+
+    const on = summarizeSpreadsheetCompatibility(wb({ cellFormatting: true, xlsbSave: true }));
+    expect(on.byId['font-effects'].status).toBe('writable');
+    expect(on.byId['gradient-fills'].status).toBe('writable');
+    expect(on.byId['xlsb-save'].status).toBe('writable');
+    expect(on.byId['xlsb-save'].reason).toContain('Notes');
+    for (const deferred of [
+      'page setup',
+      'protected ranges',
+      'sheet views',
+      'sparklines',
+      'tables',
+    ]) {
+      expect(on.byId['xlsb-save'].reason).toContain(deferred);
+    }
+    expect(on.byId['font-effects'].reason).toContain('only under the Mac profile');
+
+    const off = summarizeSpreadsheetCompatibility(wb({}));
+    expect(off.byId['font-effects'].status).toBe('session');
+    expect(off.byId['gradient-fills'].status).toBe('session');
+    expect(off.byId['xlsb-save'].status).toBe('unsupported');
+  });
+
   it('surfaces point-only comment support as missing blank-cell enumeration', () => {
     const wb = {
       capabilities: {

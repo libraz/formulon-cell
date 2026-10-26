@@ -20,6 +20,9 @@ const COMPATIBILITY_LABEL_KEYS: Record<
   keyof WorkbookObjectsStrings['compatibilityLabels']
 > = {
   'cell-formatting': 'cellFormatting',
+  'font-effects': 'fontEffects',
+  'gradient-fills': 'gradientFills',
+  'xlsb-save': 'xlsbSave',
   'conditional-formatting': 'conditionalFormatting',
   'data-validation': 'dataValidation',
   hyperlinks: 'hyperlinks',
@@ -38,6 +41,11 @@ const COMPATIBILITY_LABEL_KEYS: Record<
   'workbook-protection': 'workbookProtection',
   'protected-ranges': 'protectedRanges',
   'sheet-views': 'sheetViews',
+  'show-formulas': 'showFormulas',
+  'outline-symbols': 'outlineSymbols',
+  'outline-collapse': 'outlineCollapse',
+  'split-panes': 'splitPanes',
+  'hidden-default-rows': 'hiddenDefaultRows',
   'page-setup': 'pageSetup',
   'loaded-tables': 'loadedTables',
   'format-as-table': 'formatAsTable',
@@ -46,6 +54,8 @@ const COMPATIBILITY_LABEL_KEYS: Record<
   'charts-drawings': 'chartsDrawings',
   'chart-authoring': 'chartAuthoring',
   'external-links': 'externalLinks',
+  'calc-settings': 'calcSettings',
+  'data-tables': 'dataTables',
 };
 
 const STATUS_LABEL_KEYS: Record<

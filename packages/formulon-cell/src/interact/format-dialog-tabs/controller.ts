@@ -22,6 +22,13 @@ export interface FormatTabContext {
   syncControls(): void;
   renderPreview(): void;
   getLocale(): string;
+  /** Whether the workbook uses the 1904 date system. */
+  getDate1904(): boolean;
+  /** Editing a conditional-format differential format, which carries no
+   *  gradient fill and no font effects. */
+  isDxfMode(): boolean;
+  /** Whether the host renders the Mac desktop profile. */
+  isMacPlatform(): boolean;
 }
 
 export interface FormatTabController {

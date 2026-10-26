@@ -195,6 +195,8 @@ export const MENU_ICON_GLYPHS = {
   'watch-delete': 'watch',
   'watch-delete-all': 'watch',
   'watch-open': 'watch',
+  'what-if-data-table': 'dataTable',
+  'what-if-goal-seek': 'goalSeek',
 } as const satisfies Record<string, ExcelRibbonIconName>;
 
 export type MenuIconSlug = keyof typeof MENU_ICON_GLYPHS;

@@ -42,6 +42,7 @@ export interface GridPopupsStrings {
     colUngroup: string;
     insertComment: string;
     deleteComment: string;
+    showHideNote: string;
     insertHyperlink: string;
     addWatch: string;
     removeWatch: string;

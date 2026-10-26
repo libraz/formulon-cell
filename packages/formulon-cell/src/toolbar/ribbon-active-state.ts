@@ -1,12 +1,12 @@
 import { activeCellStyleId } from '../commands/cell-styles.js';
-import { commentAt } from '../commands/comment.js';
+import { allNotesVisible, commentAt, noteVisibleAt } from '../commands/comment.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { BorderPreset as CommandBorderPreset } from '../commands/format.js';
 import { tableForCell } from '../commands/format-as-table.js';
 import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
-import { hiddenInSelection } from '../commands/row-col-layout.js';
+import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../engine/font-units.js';
 import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
@@ -20,6 +20,7 @@ import type {
   PaperSize,
   WorkbookViewMode,
 } from '../store/types.js';
+import { projectDisabledState } from './menu-a11y.js';
 import { projectTableDesign } from './ribbon/table-design.js';
 
 /**
@@ -68,6 +69,8 @@ export interface ActiveState {
   zoom: number;
   formatPainterArmed: boolean;
   hasComment: boolean;
+  noteVisible: boolean;
+  allNotesVisible: boolean;
   fontFamily: string;
   fontSize: number;
   fontColor: string;
@@ -84,6 +87,8 @@ export interface ActiveState {
   formulasVisible: boolean;
   outlineSummaryBelow: boolean;
   outlineSummaryRight: boolean;
+  outlineSymbolsVisible: boolean;
+  splitPanes: boolean;
   zerosVisible: boolean;
   rightToLeft: boolean;
   workbookView: WorkbookViewMode;
@@ -125,6 +130,8 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   zoom: 1,
   formatPainterArmed: false,
   hasComment: false,
+  noteVisible: false,
+  allNotesVisible: false,
   fontFamily: 'Aptos',
   fontSize: 11,
   fontColor: '#201f1e',
@@ -141,6 +148,8 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   formulasVisible: false,
   outlineSummaryBelow: true,
   outlineSummaryRight: true,
+  outlineSymbolsVisible: true,
+  splitPanes: false,
   zerosVisible: true,
   rightToLeft: false,
   workbookView: 'normal',
@@ -215,7 +224,11 @@ export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = ne
   ['viewFormulas', 'formulasVisible'],
   ['outlineSummaryBelow', 'outlineSummaryBelow'],
   ['outlineSummaryRight', 'outlineSummaryRight'],
+  ['outlineSymbols', 'outlineSymbolsVisible'],
+  ['split', 'splitPanes'],
   ['viewZeros', 'zerosVisible'],
+  ['showHideNoteReview', 'noteVisible'],
+  ['showAllNotesReview', 'allNotesVisible'],
   ['viewRightToLeft', 'rightToLeft'],
   ['viewR1C1', 'r1c1'],
   ['viewNormal', 'workbookView'],
@@ -406,14 +419,16 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     percent: f?.numFmt?.kind === 'percent',
     commaStyle: f?.numFmt?.kind === 'fixed' && f.numFmt.thousands === true,
     numberFormat: numberFormatOf(f?.numFmt),
-    frozen: s.layout.freezeRows > 0 || s.layout.freezeCols > 0,
+    frozen: s.layout.splitPanes !== true && (s.layout.freezeRows > 0 || s.layout.freezeCols > 0),
     filterOn: activeFilterRange(s) !== null,
-    rowsHidden: hiddenInSelection(s.layout, 'row', r.r0, r.r1).length > 0,
-    colsHidden: hiddenInSelection(s.layout, 'col', r.c0, r.c1).length > 0,
+    rowsHidden: hiddenExtentInSelection(s.layout, 'row', r.r0, r.r1) !== null,
+    colsHidden: hiddenExtentInSelection(s.layout, 'col', r.c0, r.c1) !== null,
     protected: inst.isSheetProtected(),
     zoom: s.viewport.zoom,
     formatPainterArmed: !!inst.formatPainter?.isActive(),
     hasComment: commentAt(s, a) != null,
+    noteVisible: noteVisibleAt(s, a),
+    allNotesVisible: allNotesVisible(s),
     fontFamily: f?.fontFamily ?? displayFamily,
     // CellFormat stores CSS pixels for paint; Excel's ribbon exposes points.
     fontSize: fontCssPxToDisplayPoints(f?.fontSize ?? displaySize),
@@ -431,6 +446,8 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     formulasVisible: !!s.ui.showFormulas,
     outlineSummaryBelow: outlineSummary.below,
     outlineSummaryRight: outlineSummary.right,
+    outlineSymbolsVisible: s.ui.showOutlineSymbols !== false,
+    splitPanes: s.layout.splitPanes === true,
     zerosVisible: s.ui.showZeros !== false,
     rightToLeft: s.ui.rightToLeft === true,
     workbookView: s.ui.workbookView,
@@ -475,6 +492,20 @@ export const projectRibbonActiveState = (
   }
   projectTableDesign(host, instance);
   const buttons = indexRibbonButtons(host);
+  // Authoring a split the engine cannot save is refused up front.
+  const splitSaved = instance.workbook?.capabilities?.sheetSplit === true;
+  for (const button of buttons.get('split') ?? []) {
+    // Re-enable only what this projection disabled; an embedding policy owns the rest.
+    if (splitSaved && button.dataset.splitNotSaved !== 'true') continue;
+    if (splitSaved) delete button.dataset.splitNotSaved;
+    else button.dataset.splitNotSaved = 'true';
+    projectDisabledState(
+      button,
+      !splitSaved,
+      splitSaved ? null : instance.i18n.strings.ribbonMenu.splitNotSaved,
+      { datasetKey: 'ribbonDisabledReason' },
+    );
+  }
   for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
     const button = buttons.get(command)?.[0];
     if (!button) continue;

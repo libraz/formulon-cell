@@ -161,6 +161,11 @@ const visualClearFormatKeys = new Set([
   'fill',
   'fillPattern',
   'fillPatternColor',
+  'fillGradient',
+  'fontOutline',
+  'fontShadow',
+  'fontCondense',
+  'fontExtend',
   'fontFamily',
   'fontSize',
 ]);

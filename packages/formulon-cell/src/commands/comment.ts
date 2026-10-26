@@ -17,6 +17,8 @@ export interface CommentEntry {
   addr: Addr;
   text: string;
   author?: string;
+  /** Present only for a note shown without hovering. */
+  visible?: true;
 }
 
 export type ThreadedCommentEntry = EngineThreadedComment;
@@ -361,10 +363,15 @@ export function recordThreadedChange<T>(
   return result;
 }
 
-type CommentSnapshot = Array<{ addr: Addr; text: string | null; author: string | null }>;
+type CommentSnapshot = Array<{
+  addr: Addr;
+  text: string | null;
+  author: string | null;
+  visible: boolean;
+}>;
 type PhysicalCommentSnapshot = Array<{
   addr: Addr;
-  comment: { author: string; text: string } | null;
+  comment: { author: string; text: string; visible?: boolean } | null;
 }>;
 
 /** Read the comment text on a cell, or null when unset. */
@@ -381,6 +388,20 @@ export function commentAuthorAt(state: State, addr: Addr): string | null {
   return typeof author === 'string' && author.length > 0 ? author : null;
 }
 
+/** Whether the note on a cell stays shown instead of only on hover. */
+export function noteVisibleAt(state: State, addr: Addr): boolean {
+  return (
+    commentAt(state, addr) !== null &&
+    state.format.formats.get(addrKey(addr))?.commentVisible === true
+  );
+}
+
+/** True when `sheet` has notes and every one of them is shown. */
+export function allNotesVisible(state: State, sheet = state.data.sheetIndex): boolean {
+  const notes = listComments(state, sheet);
+  return notes.length > 0 && notes.every((note) => note.visible === true);
+}
+
 /** List non-empty comments on `sheet` in row-major order. */
 export function listComments(state: State, sheet = state.data.sheetIndex): CommentEntry[] {
   const out: CommentEntry[] = [];
@@ -390,6 +411,7 @@ export function listComments(state: State, sheet = state.data.sheetIndex): Comme
     if (!addr || addr.sheet !== sheet) continue;
     const entry: CommentEntry = { addr, text: fmt.comment };
     if (fmt.commentAuthor) entry.author = fmt.commentAuthor;
+    if (fmt.commentVisible === true) entry.visible = true;
     out.push(entry);
   }
   return out.sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
@@ -426,7 +448,11 @@ export function setComment(
     if (wb.setCommentEntry(addr.sheet, addr.row, addr.col, author, text) === false) return false;
   }
   if (text.length === 0) {
-    mutators.setCellFormat(store, addr, { comment: undefined, commentAuthor: undefined });
+    mutators.setCellFormat(store, addr, {
+      comment: undefined,
+      commentAuthor: undefined,
+      commentVisible: undefined,
+    });
   } else {
     mutators.setCellFormat(store, addr, { comment: text, commentAuthor: author });
   }
@@ -455,6 +481,7 @@ const captureCommentSnapshot = (state: State, addrs: readonly Addr[]): CommentSn
     addr: cloneAddr(addr),
     text: commentAt(state, addr),
     author: commentAuthorAt(state, addr),
+    visible: noteVisibleAt(state, addr),
   }));
 
 const sameCommentSnapshot = (a: CommentSnapshot, b: CommentSnapshot): boolean =>
@@ -467,7 +494,8 @@ const sameCommentSnapshot = (a: CommentSnapshot, b: CommentSnapshot): boolean =>
       entry.addr.row === other.addr.row &&
       entry.addr.col === other.addr.col &&
       entry.text === other.text &&
-      entry.author === other.author
+      entry.author === other.author &&
+      entry.visible === other.visible
     );
   });
 
@@ -502,16 +530,27 @@ const applyCommentStoreSnapshot = (store: SpreadsheetStore, snapshot: CommentSna
       const current = formats.get(key);
       if (entry.text === null) {
         if (!current) continue;
-        const { comment: _comment, commentAuthor: _author, ...rest } = current;
+        const {
+          comment: _comment,
+          commentAuthor: _author,
+          commentVisible: _visible,
+          ...rest
+        } = current;
         if (Object.keys(rest).length === 0) formats.delete(key);
         else formats.set(key, rest);
         continue;
       }
-      const { comment: _comment, commentAuthor: _author, ...rest } = current ?? {};
+      const {
+        comment: _comment,
+        commentAuthor: _author,
+        commentVisible: _visible,
+        ...rest
+      } = current ?? {};
       formats.set(key, {
         ...rest,
         comment: entry.text,
         ...(entry.author !== null ? { commentAuthor: entry.author } : {}),
+        ...(entry.visible ? { commentVisible: true } : {}),
       });
     }
     return { ...s, format: { ...s.format, formats } };
@@ -525,15 +564,11 @@ const applyPhysicalCommentSnapshot = (
   if (!wb?.capabilities.comments) return;
   for (const entry of snapshot) {
     const comment = entry.comment;
-    if (
-      wb.setCommentEntry(
-        entry.addr.sheet,
-        entry.addr.row,
-        entry.addr.col,
-        comment?.author ?? '',
-        comment?.text ?? '',
-      ) === false
-    ) {
+    const { sheet, row, col } = entry.addr;
+    const written = comment
+      ? wb.setCommentEntry(sheet, row, col, comment.author, comment.text, comment.visible === true)
+      : wb.setCommentEntry(sheet, row, col, '', '');
+    if (written === false) {
       throw new Error('comment engine write failed');
     }
   }
@@ -563,7 +598,11 @@ const applyCommentSnapshot = (
         comment:
           entry.text === null
             ? null
-            : { author: entry.author ?? DEFAULT_COMMENT_AUTHOR, text: entry.text },
+            : {
+                author: entry.author ?? DEFAULT_COMMENT_AUTHOR,
+                text: entry.text,
+                visible: entry.visible,
+              },
       }));
       applyPhysicalCommentSnapshot(wb, physical);
     }
@@ -599,9 +638,38 @@ export function clearComments(
   applyCommentSnapshot(
     store,
     wb,
-    writable.map((addr) => ({ addr, text: null, author: null })),
+    writable.map((addr) => ({ addr, text: null, author: null, visible: false })),
     authorization,
   );
+}
+
+/** Show or hide the notes at `addrs` in one store publication. Like the
+ * desktop app this is a view change: it ignores sheet protection and host
+ * edit policy and records no undo step. False when nothing changed. */
+export function setNotesVisible(
+  store: SpreadsheetStore,
+  addrs: readonly Addr[],
+  visible: boolean,
+  wb?: WorkbookHandle,
+): boolean {
+  const state = store.getState();
+  const targets = uniqueAddrs(addrs).filter(
+    (addr) => commentAt(state, addr) !== null && noteVisibleAt(state, addr) !== visible,
+  );
+  if (targets.length === 0) return false;
+  if (wb?.capabilities.commentVisibility) {
+    for (const addr of targets) wb.setCommentVisible(addr.sheet, addr.row, addr.col, visible);
+  }
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    for (const addr of targets) {
+      const key = addrKey(addr);
+      const { commentVisible: _drop, ...rest } = formats.get(key) ?? {};
+      formats.set(key, visible ? { ...rest, commentVisible: true } : rest);
+    }
+    return { ...s, format: { ...s.format, formats } };
+  });
+  return true;
 }
 
 export function recordCommentChange<T>(

@@ -219,6 +219,9 @@ export const dataObjectsDe: DataObjectsStrings = {
     },
     compatibilityLabels: {
       cellFormatting: 'Zellenformatierung',
+      fontEffects: 'Schrifteffekte',
+      gradientFills: 'Farbverlaufsfüllungen',
+      xlsbSave: 'Binäre Arbeitsmappe (.xlsb)',
       conditionalFormatting: 'Bedingte Formatierung',
       dataValidation: 'Datenüberprüfung',
       hyperlinks: 'Hyperlinks',
@@ -245,10 +248,23 @@ export const dataObjectsDe: DataObjectsStrings = {
       chartsDrawings: 'Diagramme, Zeichnungen und Bilder',
       chartAuthoring: 'Diagrammerstellung',
       externalLinks: 'Externe Links',
+      calcSettings: 'Berechnungsoptionen',
+      dataTables: 'Datentabellen',
+      showFormulas: 'Formeln anzeigen',
+      outlineSymbols: 'Gliederungssymbole',
+      outlineCollapse: 'Reduzierte Gliederungsgruppen',
+      splitPanes: 'Geteilte Fensterbereiche',
+      hiddenDefaultRows: 'Standardmäßig ausgeblendete Zeilen',
     },
     compatibilityDetails: {
       cellFormatting:
         'XF-/Schriftart-/Füllungs-/Rahmen-/Zahlenformat-APIs sind verfügbar, wenn die Engine sie unterstützt.',
+      fontEffects:
+        'Kontur, Schatten, Schmal und Breit werden in jedem Profil mit der Schrift gespeichert. Kontur und Schatten lassen sich im Mac-Dialog „Zellen formatieren“ festlegen und werden nur im Mac-Profil dargestellt; Schmal und Breit bleiben erhalten, werden aber nicht dargestellt.',
+      gradientFills:
+        'Lineare und Pfad-Farbverläufe werden gespeichert und lassen sich über Fülleffekte festlegen. Pfadverläufe werden radial angenähert dargestellt.',
+      xlsbSave:
+        'Arbeitsmappen können als .xlsb gespeichert werden. Notizen, Kommentare mit Unterhaltungen und Filter werden nicht geschrieben. Bilder, Formen und Diagramme, aus .xlsx gelesene PivotTables und Datenschnitte, Seite einrichten (Ränder, Kopf- und Fußzeile, Seitenumbrüche), bearbeitbare Bereiche, einige Blattansichten und Einstellungen des Arbeitsmappenschutzes, benutzerdefinierte Tabellenformatvorlagen sowie Tabellen oder Sparklines mit nicht kodierbaren Bezügen können ebenfalls fehlen; vor dem Speichern erscheint eine Warnung.',
       conditionalFormatting:
         'Regeln für bedingte Formatierung können je nach Engineunterstützung ausgewertet, erstellt oder in der Sitzung gehostet werden.',
       dataValidation:
@@ -256,7 +272,7 @@ export const dataObjectsDe: DataObjectsStrings = {
       hyperlinks:
         'Hyperlinks können aufgelistet, hinzugefügt und gelöscht werden, wenn die Engine das Zurückschreiben unterstützt.',
       comments:
-        'Zellkommentare, auch Kommentare in leeren Zellen, können aufgelistet, gelesen und geschrieben werden, wenn eine blattweite Aufzählung verfügbar ist.',
+        'Zellkommentare, auch Kommentare in leeren Zellen, können aufgelistet, gelesen und geschrieben werden, wenn eine blattweite Aufzählung verfügbar ist. Eingeblendete Notizen bleiben eingeblendet; eine durch Sortieren, Einfügen/Löschen, Ausschneiden oder Einfügen verschobene Notiz erhält Standardgröße und -position.',
       threadedComments:
         'Kommentare, Antworten, Personen und Auflösungsstatus werden in XLSX gespeichert, wenn die Engine Kommentare mit Threads unterstützt.',
       images:
@@ -306,6 +322,18 @@ export const dataObjectsDe: DataObjectsStrings = {
         'Säulen-, Balken-, Linien-, Flächen-, Kreis-, Ring- und Punktdiagramme können erstellt und bearbeitet werden und werden mit der Arbeitsmappe gespeichert. Andere Diagrammtypen werden als Platzhalter angezeigt, die nur verschoben, in der Größe geändert und gelöscht werden können.',
       externalLinks:
         'Datensätze externer Links können erfasst werden, wenn die Engine sie bereitstellt.',
+      calcSettings:
+        'Berechnungsmodus, Neuberechnung vor dem Speichern, Iteration, Z1S1-Bezugsart, Genauigkeit wie angezeigt und die 1904-Datumswerte werden mit der Arbeitsmappe gespeichert. Genauigkeit wie angezeigt rundet gespeicherte Konstanten und neue Eingaben auf ihr Format; Formelergebnisse behalten die volle Genauigkeit, da die Engine die Option nur als Metadaten speichert.',
+      dataTables:
+        'Was-wäre-wenn-Datentabellen werden erstellt, berechnet und mit der Arbeitsmappe gespeichert; ihre Ergebniszellen lassen sich nicht bearbeiten.',
+      showFormulas: '„Formeln anzeigen“ wird pro Blatt gespeichert.',
+      outlineSymbols: 'Ausgeblendete Gliederungssymbole werden pro Blatt gespeichert.',
+      outlineCollapse:
+        'Reduzierte Gruppen werden gespeichert, wobei ihre Zusammenfassungszeile oder -spalte als reduziert markiert ist.',
+      splitPanes:
+        'Geteilte Fensterbereiche werden mit den Zeilen und Spalten jedes Bereichs gespeichert. Der obere und der linke Bereich scrollen eigenständig, enden aber dort, wo der andere Bereich beginnt.',
+      hiddenDefaultRows:
+        'Blätter, die Zeilen standardmäßig ausblenden, behalten diese Einstellung. Eine Zeile, die die Datei nur über einen leeren Zeileneintrag sichtbar hält, wird ausgeblendet geöffnet.',
     },
     lossLabels: {
       undecodedFormula: 'Nicht lesbare Formeln',

@@ -997,4 +997,40 @@ describe('printSheet', () => {
     host.remove();
     wb.dispose();
   });
+
+  it('prints Outline and Shadow only under the Mac profile, and gradients everywhere', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'Effects');
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        fontOutline: true,
+        fontShadow: true,
+        fillGradient: {
+          type: 'linear',
+          degree: 90,
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          stops: [
+            { position: 0, color: '#ffffff' },
+            { position: 1, color: '#4472c4' },
+          ],
+        },
+      },
+    );
+    const a1Style = (html: string): string =>
+      /<td[^>]*style="([^"]*)"[^>]*>(?:(?!<\/td>)[\s\S])*Effects/.exec(html)?.[1] ?? '';
+    const plain = a1Style(buildPrintDocument(wb, store, 0).html);
+    expect(plain).not.toContain('text-shadow');
+    expect(plain).not.toContain('-webkit-text-stroke');
+    expect(plain).toContain('linear-gradient(180deg');
+    const mac = a1Style(buildPrintDocument(wb, store, 0, 'Print', { fontEffects: true }).html);
+    expect(mac).toContain('text-shadow');
+    expect(mac).toContain('-webkit-text-stroke');
+    wb.dispose();
+  });
 });

@@ -6,6 +6,7 @@ import type {
 } from '@libraz/formulon';
 import { inputLocaleForWorkbook, parseLocalizedNumericInput } from '../commands/coerce-input.js';
 import { distinctValues, normalizeColorKey } from '../commands/filter.js';
+import type { HiddenIndices } from '../store/row-visibility.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {
   FilterSortSpec,
@@ -641,12 +642,13 @@ export function syncHiddenRowsToEngine(
   sheet: number,
   before: ReadonlySet<number>,
   after: ReadonlySet<number>,
+  hiddenAfter: HiddenIndices = after,
 ): boolean {
   if (!wb.capabilities.hiddenRowsCols) return false;
   const rows = new Set<number>();
   for (const row of before) rows.add(row);
   for (const row of after) rows.add(row);
-  for (const row of rows) wb.setRowHidden(sheet, row, after.has(row));
+  for (const row of rows) wb.setRowHidden(sheet, row, hiddenAfter.has(row));
   return true;
 }
 

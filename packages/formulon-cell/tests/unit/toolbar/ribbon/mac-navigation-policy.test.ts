@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { setComment } from '../../../../src/commands/comment.js';
+import { noteVisibleAt, setComment } from '../../../../src/commands/comment.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createI18nController } from '../../../../src/i18n/controller.js';
 import { attachNavigationPolicy } from '../../../../src/interact/navigation-policy.js';
@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe('Mac note navigation bounds', () => {
-  it('skips excluded notes, opens only on an allowed note, and limits the note report', async () => {
+  it('skips excluded notes and opens only on an allowed note', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const host = document.createElement('div');
@@ -52,9 +52,7 @@ describe('Mac note navigation bounds', () => {
       expect(opened).toEqual(['0:1']);
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 1 });
       applyRibbonCommand('mac.review.showNotes', deps);
-      const report = document.querySelector('[role="dialog"]');
-      expect(report?.textContent).toContain('allowed note');
-      expect(report?.textContent).not.toContain('excluded note');
+      expect(noteVisibleAt(store.getState(), { sheet: 0, row: 0, col: 1 })).toBe(true);
     } finally {
       navigation.dispose();
       workbook.dispose();
@@ -105,7 +103,7 @@ describe('Mac note navigation bounds', () => {
     }
   });
 
-  it('labels listed notes with A1 addresses', async () => {
+  it('Show All Notes shows every note, and Show/Hide Note toggles the active one', async () => {
     const store = createSpreadsheetStore();
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
     const host = document.createElement('div');
@@ -122,10 +120,15 @@ describe('Mac note navigation bounds', () => {
     } as unknown as ApplyRibbonCommandDeps;
     setComment(store, { sheet: 0, row: 2, col: 1 }, 'note text');
     try {
+      const note = { sheet: 0, row: 2, col: 1 };
       applyRibbonCommand('mac.review.showNotes', deps);
-      const report = document.querySelector('[role="dialog"]');
-      expect(report?.textContent).toContain('B3');
-      expect(report?.textContent).toContain('Notes');
+      expect(noteVisibleAt(store.getState(), note)).toBe(true);
+      store.setState((s) => ({
+        ...s,
+        selection: { ...s.selection, active: note, anchor: note },
+      }));
+      applyRibbonCommand('mac.review.showHideNote', deps);
+      expect(noteVisibleAt(store.getState(), note)).toBe(false);
     } finally {
       workbook.dispose();
     }

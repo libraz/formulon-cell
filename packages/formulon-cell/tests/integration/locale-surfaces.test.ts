@@ -413,10 +413,10 @@ afterEach(() => {
 });
 
 describe('seven-language locale surface manifest', () => {
-  it('keeps all 55 dictionary sections complete and placeholder-compatible', () => {
+  it('keeps every dictionary section complete and placeholder-compatible', () => {
     expect(LOCALE_SURFACE_LOCALES).toHaveLength(7);
     expect(Object.keys(dictionaries).sort()).toEqual([...LOCALE_SURFACE_LOCALES].sort());
-    expect(Object.keys(dictionaries.en)).toHaveLength(55);
+    expect(Object.keys(dictionaries.en)).toHaveLength(LOCALE_SURFACE_SECTIONS.length);
     expect(Object.keys(dictionaries.en).sort()).toEqual([...LOCALE_SURFACE_SECTIONS].sort());
 
     const baseline = stringLeaves(dictionaries.en);
@@ -610,6 +610,15 @@ describe('seven-language locale surface manifest', () => {
             instance.setSheetProtected(false);
           }
         } else if (route.id === 'toolbar.protection.protectWorkbook') {
+          // Protect Workbook asks for an optional password first; confirm it empty so
+          // the unprotect route that follows stays a direct click.
+          const dialog = firstVisibleOverlay(host);
+          assertOverlayLabel(
+            dialog,
+            dictionaryLabel(strings, 'ribbonMenu.protectWorkbookDialogTitle'),
+          );
+          dialog.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+          await Promise.resolve();
           expect(isWorkbookStructureProtected(instance.store.getState())).toBe(true);
         } else if (route.id === 'toolbar.protection.unprotectWorkbook') {
           expect(isWorkbookStructureProtected(instance.store.getState())).toBe(false);

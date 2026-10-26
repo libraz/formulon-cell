@@ -859,15 +859,6 @@ export const MAC_CONTEXT_LABELS = {
     ko: '댓글',
     th: 'ข้อคิดเห็น',
   },
-  notesTitle: {
-    ja: 'メモ',
-    en: 'Notes',
-    de: 'Notizen',
-    fr: 'Notes',
-    zh: '备注',
-    ko: '메모',
-    th: 'บันทึกย่อ',
-  },
   inkUnavailable: {
     ja: 'このスプレッドシートではインクを使用できません。',
     en: 'Ink is unavailable for this spreadsheet.',
@@ -1228,6 +1219,13 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     zh: '上一条备注',
     ko: '이전 메모',
     th: 'บันทึกย่อก่อนหน้า',
+  },
+  'mac.review.showHideNote': {
+    de: 'Notiz ein-/ausblenden',
+    fr: 'Afficher/masquer la note',
+    zh: '显示/隐藏备注',
+    ko: '메모 표시/숨기기',
+    th: 'แสดง/ซ่อนบันทึกย่อ',
   },
   'mac.review.showNotes': {
     de: 'Alle Notizen anzeigen',

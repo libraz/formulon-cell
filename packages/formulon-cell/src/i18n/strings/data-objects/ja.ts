@@ -214,6 +214,9 @@ export const dataObjectsJa: DataObjectsStrings = {
     },
     compatibilityLabels: {
       cellFormatting: 'セルの書式',
+      fontEffects: 'フォントの効果',
+      gradientFills: 'グラデーションの塗りつぶし',
+      xlsbSave: 'バイナリ ブック (.xlsb)',
       conditionalFormatting: '条件付き書式',
       dataValidation: 'データの入力規則',
       hyperlinks: 'ハイパーリンク',
@@ -240,10 +243,23 @@ export const dataObjectsJa: DataObjectsStrings = {
       chartsDrawings: 'グラフ、図形、画像',
       chartAuthoring: 'グラフ作成',
       externalLinks: '外部リンク',
+      calcSettings: '計算方法の設定',
+      dataTables: 'データ テーブル',
+      showFormulas: '数式の表示',
+      outlineSymbols: 'アウトライン記号',
+      outlineCollapse: '折りたたんだアウトライン',
+      splitPanes: 'ウィンドウの分割',
+      hiddenDefaultRows: '既定で非表示の行',
     },
     compatibilityDetails: {
       cellFormatting:
         'エンジンが対応している場合、XF、フォント、塗りつぶし、罫線、表示形式を書き戻せます。',
+      fontEffects:
+        '中抜き、影、文字間隔の圧縮と拡張は、どのプロファイルでもフォントと一緒に保存されます。中抜きと影は Mac の [セルの書式設定] で設定し、Mac プロファイルでのみ描画されます。圧縮と拡張は保持されますが描画されません。',
+      gradientFills:
+        '線形とパスのグラデーションの塗りつぶしは保存され、[塗りつぶし効果] で設定できます。パスのグラデーションは放射状の近似で描画されます。',
+      xlsbSave:
+        'ブックを .xlsb で保存できます。メモ、スレッド形式のコメント、フィルターは書き込まれません。画像・図形・グラフ、.xlsx から読み込んだピボットテーブルとスライサー、ページ設定 (余白、ヘッダーとフッター、改ページ)、範囲の編集の許可、一部のシートの表示とブックの保護の設定、ユーザー設定のテーブル スタイル、参照を書き込めないテーブルやスパークラインも保存されない場合があります。保存前に警告が表示されます。',
       conditionalFormatting:
         'エンジンの対応状況に応じて、条件付き書式ルールの評価、作成、またはセッション内表示を行います。',
       dataValidation:
@@ -251,7 +267,7 @@ export const dataObjectsJa: DataObjectsStrings = {
       hyperlinks:
         'エンジンの書き戻しに対応している場合、ハイパーリンクを一覧、追加、削除できます。',
       comments:
-        'シート全体のコメント列挙 API がある場合、空セル上のコメントも含めて一覧、読み書きできます。',
+        'シート全体のコメント列挙 API がある場合、空セル上のコメントも含めて一覧、読み書きできます。表示中のメモは表示のまま保存されます。並べ替え、挿入/削除、切り取り、貼り付けで移動したメモのボックスは既定のサイズと位置になります。',
       threadedComments:
         'エンジンが対応している場合、コメント、返信、作成者、解決状態をXLSXに保存できます。',
       images:
@@ -294,6 +310,18 @@ export const dataObjectsJa: DataObjectsStrings = {
       chartAuthoring:
         '縦棒、横棒、折れ線、面、円、ドーナツ、散布図のグラフを作成・編集でき、ブックと一緒に保存されます。そのほかの種類のグラフは代替表示になり、移動、サイズ変更、削除だけができます。',
       externalLinks: 'エンジンが公開している場合、外部リンク レコードを一覧できます。',
+      calcSettings:
+        '計算方法、保存前の再計算、反復計算、R1C1 参照形式、表示桁数での計算、1904 年からの日付がブックと一緒に保存されます。表示桁数での計算は保存済みの定数と新しい入力を表示形式に丸めます。エンジンはこのオプションをメタデータとしてのみ保持するため、数式の結果は完全な精度のままです。',
+      dataTables:
+        'What-If 分析のデータ テーブルを作成・計算し、ブックと一緒に保存します。結果のセルは編集できません。',
+      showFormulas: '数式の表示はシートごとに保存されます。',
+      outlineSymbols: 'アウトライン記号を非表示にした状態はシートごとに保存されます。',
+      outlineCollapse:
+        '折りたたんだグループは、集計行または集計列に折りたたみの印を付けて保存されます。',
+      splitPanes:
+        '分割したウィンドウは、各ウィンドウに表示している行と列とともに保存されます。上と左のウィンドウは個別にスクロールできますが、もう一方のウィンドウの先頭より先には進みません。',
+      hiddenDefaultRows:
+        '行を既定で非表示にするシートは、その設定を保ったまま保存されます。空の行レコードだけで表示を保っている行は、開いたときに非表示になります。',
     },
     lossLabels: {
       undecodedFormula: '読み込めなかった数式',

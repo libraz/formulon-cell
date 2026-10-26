@@ -2,6 +2,7 @@ import { iconSetSlotCount } from '../render/conditional.js';
 import type { CellFormat } from '../store/store.js';
 import type { ConditionalRule, ConditionalScalePoint } from '../store/types.js';
 import { formatA1Cell } from './address.js';
+import { iconSetToEngine } from './cf-icon-sets.js';
 import {
   borderRecordFromFormat,
   cssColorToArgb,
@@ -58,21 +59,6 @@ const VALUE_OBJECT_TYPE = {
   min: 3,
   max: 4,
 } as const;
-
-const ENGINE_ICON_SETS = [
-  'arrows3',
-  'arrows5',
-  'triangles3',
-  'traffic3',
-  'trafficRim3',
-  'symbols3',
-  'flags3',
-  'stars3',
-  'quarters5',
-  'ratings5',
-  'bars5',
-  'boxes5',
-] as const;
 
 const ENGINE_DATA_BAR_DIRECTIONS = {
   context: 0,
@@ -274,10 +260,6 @@ function defaultIconThresholds(slots: number): CfValueObjectInput[] {
     type: VALUE_OBJECT_TYPE.percent,
     value: String(Math.round(((index + 1) * 100) / slots)),
   }));
-}
-
-function iconSetOrdinal(icons: Extract<ConditionalRule, { kind: 'icon-set' }>['icons']): number {
-  return ENGINE_ICON_SETS.indexOf(icons);
 }
 
 function ruleApply(rule: ConditionalRule): Partial<CellFormat> {
@@ -489,8 +471,8 @@ function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFor
       };
     }
     case 'icon-set': {
-      const name = iconSetOrdinal(rule.icons);
-      if (name < 0) return null;
+      const iconSet = iconSetToEngine(rule.icons, rule.customIcons);
+      if (!iconSet) return null;
       const slots = iconSetSlotCount(rule.icons);
       // The engine takes exactly N-1 thresholds; a shorter list renders with
       // fewer buckets locally and has no file representation.
@@ -505,12 +487,13 @@ function conditionalRuleBodyToEngineInput(rule: ConditionalRule): ConditionalFor
         sqref,
         type: RULE_TYPE.iconSet,
         iconSet: {
-          name,
+          name: iconSet.name,
           thresholds,
           reverse: rule.reverseOrder === true,
           showValue: rule.showValue !== false,
           percent: true,
           ...(rule.floor ? { floor: scalePointToCfValueObject(rule.floor) } : {}),
+          ...(iconSet.icons ? { icons: iconSet.icons } : {}),
         },
       };
     }

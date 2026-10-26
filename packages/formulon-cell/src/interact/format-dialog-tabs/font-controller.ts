@@ -31,13 +31,25 @@ const NORMAL_FONT_FIELDS: readonly FormatDialogField[] = [
   'underline',
   'strike',
   'fontVertAlign',
+  'fontOutline',
+  'fontShadow',
   'fontFamily',
   'fontSize',
   'color',
 ];
 
 export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTabController {
-  const { draft, getLocale, on, touch, isMixed, syncControls, renderPreview } = ctx;
+  const {
+    draft,
+    getLocale,
+    on,
+    touch,
+    isMixed,
+    syncControls,
+    renderPreview,
+    isMacPlatform,
+    isDxfMode,
+  } = ctx;
   const {
     boldCk,
     italicCk,
@@ -45,6 +57,8 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     strikeCk,
     superscriptCk,
     subscriptCk,
+    outlineCk,
+    shadowCk,
     normalFontCk,
     fontStyleList,
     familyInput,
@@ -123,12 +137,19 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     strikeCk.input.checked = draft.strike;
     superscriptCk.input.checked = draft.fontVertAlign === 'superscript';
     subscriptCk.input.checked = draft.fontVertAlign === 'subscript';
+    const effectsOffered = isMacPlatform() && !isDxfMode();
+    outlineCk.wrap.hidden = !effectsOffered;
+    shadowCk.wrap.hidden = !effectsOffered;
+    outlineCk.input.checked = draft.fontOutline;
+    shadowCk.input.checked = draft.fontShadow;
     normalFontCk.input.checked =
       !draft.bold &&
       !draft.italic &&
       !draft.underline &&
       !draft.strike &&
       !draft.fontVertAlign &&
+      !draft.fontOutline &&
+      !draft.fontShadow &&
       !draft.fontFamily &&
       draft.fontSize === undefined &&
       draft.color === undefined;
@@ -149,6 +170,8 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     markMixedCheck(strikeCk.input, isMixed('strike'), 'strike');
     markMixedCheck(superscriptCk.input, isMixed('fontVertAlign'), 'fontVertAlign');
     markMixedCheck(subscriptCk.input, isMixed('fontVertAlign'), 'fontVertAlign');
+    markMixedCheck(outlineCk.input, isMixed('fontOutline'), 'fontOutline');
+    markMixedCheck(shadowCk.input, isMixed('fontShadow'), 'fontShadow');
     const normalFontMixed = NORMAL_FONT_FIELDS.some((field) => isMixed(field));
     normalFontCk.input.indeterminate = normalFontMixed;
     markMixed(normalFontCk.input, normalFontMixed);
@@ -242,6 +265,13 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     syncControls();
     renderPreview();
   };
+  const onEffectChange = (field: 'fontOutline' | 'fontShadow', input: HTMLInputElement): void => {
+    touch(field);
+    draft[field] = input.checked;
+    normalFontCk.input.checked = false;
+    syncControls();
+    renderPreview();
+  };
   const onNormalFontChange = (): void => {
     if (!normalFontCk.input.checked) return;
     touch(...NORMAL_FONT_FIELDS);
@@ -250,6 +280,8 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     draft.underline = false;
     draft.strike = false;
     draft.fontVertAlign = undefined;
+    draft.fontOutline = false;
+    draft.fontShadow = false;
     draft.fontFamily = '';
     draft.fontSize = undefined;
     draft.color = undefined;
@@ -336,6 +368,8 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
   on(strikeCk.input, 'change', onStrikeChange);
   on(superscriptCk.input, 'change', onSuperscriptChange);
   on(subscriptCk.input, 'change', onSubscriptChange);
+  on(outlineCk.input, 'change', () => onEffectChange('fontOutline', outlineCk.input));
+  on(shadowCk.input, 'change', () => onEffectChange('fontShadow', shadowCk.input));
   on(normalFontCk.input, 'change', onNormalFontChange);
   on(fontStyleList, 'click', onFontStyleListClick as EventListener);
   on(familyInput, 'input', onFamilyInput);

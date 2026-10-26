@@ -159,7 +159,6 @@
 .fc-tb__cf-icon-choice--icons-stars3 span,
 .fc-tb__cf-icon-choice--icons-quarters5 span:nth-child(n + 4),
 .fc-tb__cf-icon-choice--icons-ratings5 span:nth-child(n + 4),
-.fc-tb__cf-icon-choice--icons-bars5 span:nth-child(n + 4),
 .fc-tb__cf-icon-choice--icons-boxes5 span:nth-child(n + 4) {
   color: #107c41;
 }
@@ -172,7 +171,6 @@
 .fc-tb__cf-icon-choice--icons-flags3 span:nth-child(2),
 .fc-tb__cf-icon-choice--icons-quarters5 span:nth-child(3),
 .fc-tb__cf-icon-choice--icons-ratings5 span:nth-child(3),
-.fc-tb__cf-icon-choice--icons-bars5 span:nth-child(3),
 .fc-tb__cf-icon-choice--icons-boxes5 span:nth-child(3) {
   color: #d6a100;
 }
@@ -186,7 +184,6 @@
 .fc-tb__cf-icon-choice--icons-flags3 span:last-child,
 .fc-tb__cf-icon-choice--icons-quarters5 span:nth-child(-n + 2),
 .fc-tb__cf-icon-choice--icons-ratings5 span:nth-child(-n + 2),
-.fc-tb__cf-icon-choice--icons-bars5 span:nth-child(-n + 2),
 .fc-tb__cf-icon-choice--icons-boxes5 span:nth-child(-n + 2) {
   color: #c00000;
 }
@@ -199,8 +196,7 @@
   color: #ed7d31;
 }
 
-.fc-tb__cf-icon-choice--icons-trafficRim3 span,
-.fc-tb__cf-icon-choice--icons-ratings5 span {
+.fc-tb__cf-icon-choice--icons-trafficRim3 span {
   width: 12px;
   border: 1px solid currentColor;
   border-radius: 50%;
@@ -226,8 +222,7 @@
 }
 
 .fc-tb__cf-icon-choice--icons-traffic3 span,
-.fc-tb__cf-icon-choice--icons-trafficRim3 span,
-.fc-tb__cf-icon-choice--icons-ratings5 span {
+.fc-tb__cf-icon-choice--icons-trafficRim3 span {
   overflow: hidden;
   text-indent: 20px;
 }
@@ -236,7 +231,7 @@
   font-size: 15px;
 }
 
-.fc-tb__cf-icon-choice--icons-bars5 span,
+.fc-tb__cf-icon-choice--icons-ratings5 span,
 .fc-tb__cf-icon-choice--icons-boxes5 span {
   font-size: 12px;
 }

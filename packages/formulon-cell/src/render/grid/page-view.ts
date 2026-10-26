@@ -13,6 +13,7 @@ import {
   type SheetPagination,
 } from '../../commands/pagination.js';
 import { renderScale } from '../../store/render-scale.js';
+import { hiddenRowsOf } from '../../store/row-visibility.js';
 import type { PageSetup } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
@@ -263,7 +264,7 @@ interface PageAxes {
 /** Unscaled extent of the tracks `band` lays out, hidden ones excluded. */
 function bandExtent(state: ViewState, band: AxisBand, axis: 'row' | 'col'): number {
   const layout = state.layout;
-  const hidden = axis === 'row' ? layout.hiddenRows : layout.hiddenCols;
+  const hidden = axis === 'row' ? hiddenRowsOf(layout) : layout.hiddenCols;
   const sizes = axis === 'row' ? layout.rowHeights : layout.colWidths;
   const fallback = axis === 'row' ? layout.defaultRowHeight : layout.defaultColWidth;
   let extent = 0;

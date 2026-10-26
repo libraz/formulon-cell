@@ -7,6 +7,7 @@ import { rangeContainsRange, rangesIntersect, sameRange } from '../../store/sele
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { recordCommentChange } from '../comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from '../comment-author.js';
+import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
@@ -295,8 +296,14 @@ const hydrateEngineComments = (
 ): void => {
   if (!wb.capabilities.commentsEnumerable || ranges.length === 0) return;
   const sheets = new Set(ranges.map((range) => range.sheet));
-  const comments: Array<{ sheet: number; row: number; col: number; author: string; text: string }> =
-    [];
+  const comments: Array<{
+    sheet: number;
+    row: number;
+    col: number;
+    author: string;
+    text: string;
+    visible?: boolean;
+  }> = [];
   for (const sheet of sheets) {
     for (const comment of wb.getComments(sheet)) {
       if (!comment.text) continue;
@@ -323,6 +330,7 @@ const hydrateEngineComments = (
         ...formats.get(key),
         comment: comment.text,
         commentAuthor: comment.author || undefined,
+        commentVisible: comment.visible || undefined,
       });
     }
     return { ...s, format: { ...s.format, formats } };
@@ -334,6 +342,7 @@ const formatWithoutComment = (format: CellFormat | undefined): CellFormat | null
   const next = { ...format };
   delete next.comment;
   delete next.commentAuthor;
+  delete next.commentVisible;
   return next;
 };
 
@@ -341,7 +350,11 @@ const formatCommentsOnly = (format: CellFormat | undefined): CellFormat | null =
   const text = commentText(format);
   if (!text) return null;
   const author = commentAuthor(format);
-  return author ? { comment: text, commentAuthor: author } : { comment: text };
+  return {
+    comment: text,
+    ...(author ? { commentAuthor: author } : {}),
+    ...(format?.commentVisible === true ? { commentVisible: true } : {}),
+  };
 };
 
 const clearSourceFormats = (store: SpreadsheetStore, source: Range): void => {
@@ -459,6 +472,19 @@ export function pasteSpecial(
   const checked = preflight(current, snap, resolvedDestination, opt.what, opt.transpose);
   if (!checked) return null;
   if (blockPivotEdit(wb, checked.destination)) return null;
+  // A cut would also clear the source, and a data table cannot move.
+  const guarded =
+    snap.mode === 'cut' ? [checked.destination, sourceLogical] : [checked.destination];
+  if (blockDataTableEdit(wb, ...guarded)) return null;
+  if (
+    wantsFormulas(opt.what) &&
+    blockTableFunction(
+      wb,
+      snap.cells.flatMap((row) => row.map((cell) => cell.formula)),
+    )
+  ) {
+    return null;
+  }
 
   // Excel treats cutting and pasting back onto the exact source rectangle as a
   // no-op while consuming the cut marquee. In particular, do not clear and
@@ -470,7 +496,12 @@ export function pasteSpecial(
 
   // Pre-compute format patches we'll merge into the format slice in one pass.
   const formatWrites: { key: string; format: CellFormat | null }[] = [];
-  const commentWrites: { addr: Addr; text: string | null; author: string | null }[] = [];
+  const commentWrites: {
+    addr: Addr;
+    text: string | null;
+    author: string | null;
+    visible?: boolean;
+  }[] = [];
   let skippedNonFiniteOperations = 0;
 
   const applyTopology = wantsFormats(opt.what);
@@ -601,7 +632,12 @@ export function pasteSpecial(
         const text = commentText(src.format);
         const existing = commentText(state.format.formats.get(addrKey(addr)));
         if (text !== null || existing !== null) {
-          commentWrites.push({ addr, text, author: commentAuthor(src.format) });
+          commentWrites.push({
+            addr,
+            text,
+            author: commentAuthor(src.format),
+            visible: text !== null && src.format?.commentVisible === true,
+          });
         }
       }
 
@@ -792,6 +828,7 @@ export function pasteSpecial(
           mutators.setCellFormat(store, addr, {
             comment: undefined,
             commentAuthor: undefined,
+            commentVisible: undefined,
           });
           wb.setCommentEntry(addr.sheet, addr.row, addr.col, '', '');
         }
@@ -799,6 +836,7 @@ export function pasteSpecial(
           mutators.setCellFormat(store, write.addr, {
             comment: write.text ?? undefined,
             commentAuthor: write.text ? (write.author ?? undefined) : undefined,
+            commentVisible: write.visible || undefined,
           });
           wb.setCommentEntry(
             write.addr.sheet,
@@ -806,6 +844,7 @@ export function pasteSpecial(
             write.addr.col,
             write.author ?? DEFAULT_COMMENT_AUTHOR,
             write.text ?? '',
+            write.visible === true,
           );
         }
       });

@@ -4,6 +4,7 @@ import type { Addr, CellValue } from '../engine/types.js';
 import { formatCell, fromEngineValue } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
+import { blockDataTableCells } from './data-table-guard.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
@@ -449,6 +450,7 @@ export function insertDefinedNameFormula(
     warnProtected(addr);
     return null;
   }
+  if (blockDataTableCells(wb, [addr])) return null;
   const formula = `=${entry.name}`;
   wb.setFormula(addr, formula);
   return { addr, formula };

@@ -2,6 +2,7 @@ import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { State } from '../../store/store.js';
 import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from '../coerce-input.js';
+import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { blockPivotEdit } from '../pivot-guard.js';
 import { isCellWritable } from '../protection.js';
 import { parseTSV } from './tsv.js';
@@ -32,20 +33,27 @@ export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteR
     r1: origin.row + rows.length - 1,
     c1: origin.col + pastedCols - 1,
   };
-  if (blockPivotEdit(wb, pasteArea)) return null;
+  if (blockPivotEdit(wb, pasteArea) || blockDataTableEdit(wb, pasteArea)) return null;
   const inputLocale = inputLocaleForWorkbook(wb);
   let maxCols = 0;
+  const writes: { addr: Addr; input: ReturnType<typeof coerceInputForCell> }[] = [];
+  for (let r = 0; r < rows.length; r += 1) {
+    const cells = rows[r] ?? [];
+    if (cells.length > maxCols) maxCols = cells.length;
+    for (let c = 0; c < cells.length; c += 1) {
+      const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
+      if (!isCellWritable(state, addr)) continue;
+      writes.push({
+        addr,
+        input: coerceInputForCell(state, addr, cells[c] ?? '', inputLocale, wb),
+      });
+    }
+  }
+  const formulas = writes.map(({ input }) => (input.kind === 'formula' ? input.text : null));
+  if (blockTableFunction(wb, formulas)) return null;
 
   wb.withBatchedRecalc(() => {
-    for (let r = 0; r < rows.length; r += 1) {
-      const cells = rows[r] ?? [];
-      if (cells.length > maxCols) maxCols = cells.length;
-      for (let c = 0; c < cells.length; c += 1) {
-        const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
-        if (!isCellWritable(state, addr)) continue;
-        writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? '', inputLocale, wb));
-      }
-    }
+    for (const { addr, input } of writes) writeCoerced(wb, addr, input);
   });
 
   return {

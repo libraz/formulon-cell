@@ -25,6 +25,8 @@ export interface CellPaintCtx {
   displayOverride?: string | null;
   /** BCP 47 locale used for number/date formatting. */
   locale?: string;
+  /** Interpret serials in the workbook's 1904 date system. */
+  date1904?: boolean;
   /** Sheet direction. Flips the reading-order end that general alignment,
    *  indentation and the in-cell affordances anchor to. Cell-level
    *  `format.textDirection` is separate — it governs the run of text itself. */
@@ -36,6 +38,8 @@ export interface CellPaintCtx {
   /** Colour tag and `*x` fill of the number-format section that renders a
    *  numeric value; the display text alone carries neither. */
   formatPaint?: NumberFormatPaint | null;
+  /** Draw the Outline and Shadow font effects; only the Mac profile does. */
+  fontEffects?: boolean;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

@@ -1,6 +1,7 @@
 import { parseAddrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { formatBoolean, formatEditableNumber, formatError } from '../../engine/value.js';
+import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
 import { isWholeColumnRange, isWholeRowRange, sameRange } from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
 import { encodeTSV } from './tsv.js';
@@ -165,7 +166,10 @@ function displayValue(
   // Formula cells emit the formula text (already `=`-prefixed) so a paste
   //  into Excel / Sheets reconstructs the formula instead of freezing the
   //  last computed value.
-  if (cell.formula != null) return localizeFormula?.(cell.formula) ?? cell.formula;
+  // A data table's TABLE() cells copy as their values, as the desktop app does.
+  if (cell.formula != null && !isDataTableFormula(cell.formula)) {
+    return localizeFormula?.(cell.formula) ?? cell.formula;
+  }
   switch (cell.value.kind) {
     case 'number':
       return formatEditableNumber(cell.value.value, locale);

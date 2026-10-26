@@ -4,6 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from './coerce-input.js';
+import { blockDataTableEdit } from './data-table-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
@@ -68,6 +69,7 @@ export function textToColumns(
   delimiter: string | readonly string[],
   options: TextToColumnsOptions = {},
 ): number {
+  if (blockDataTableEdit(wb, ...textToColumnsTargets(state, range, delimiter, options))) return 0;
   let maxTokens = 0;
   const formatWrites: Array<{ key: string; format: CellFormat }> = [];
   const candidates = [...state.data.cells.entries()]

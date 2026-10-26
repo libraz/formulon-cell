@@ -96,7 +96,9 @@ describe('conditional-format commands', () => {
     expect(applyConditionalPresetAction(store, 'scale-ryg')).toBe(true);
     expect(applyConditionalPresetAction(store, 'icons-arrows5')).toBe(true);
     expect(applyConditionalPresetAction(store, 'icons-symbols3')).toBe(true);
-    expect(applyConditionalPresetAction(store, 'icons-bars5')).toBe(true);
+    expect(applyConditionalPresetAction(store, 'icons-boxes5')).toBe(true);
+    // A family without a file form is not authorable.
+    expect(applyConditionalPresetAction(store, 'icons-bars5' as never)).toBe(false);
     expect(applyConditionalPresetAction(store, 'top10-percent')).toBe(true);
     expect(applyConditionalPresetAction(store, 'duplicates')).toBe(true);
 
@@ -149,7 +151,7 @@ describe('conditional-format commands', () => {
         { kind: 'percent', value: 200 / 3 },
       ],
     });
-    expect(rules[5]).toMatchObject({ kind: 'icon-set', icons: 'bars5', showValue: true });
+    expect(rules[5]).toMatchObject({ kind: 'icon-set', icons: 'boxes5', showValue: true });
     expect(rules[6]).toMatchObject({ kind: 'top-bottom', mode: 'top', n: 10, percent: true });
     expect(rules[7]).toMatchObject({ kind: 'duplicates', apply: { fill: '#ffc7ce' } });
 

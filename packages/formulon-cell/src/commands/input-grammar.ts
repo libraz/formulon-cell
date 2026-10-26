@@ -442,9 +442,14 @@ const windowYear = (year: string): number | null => {
 };
 
 /** A calendar date as a serial, inside the 1900–9999 range dates may take. */
-const dateSerial = (year: number | null, month: number, day: number): number | null => {
+const dateSerial = (
+  year: number | null,
+  month: number,
+  day: number,
+  date1904: boolean,
+): number | null => {
   if (year === null || year < 1900 || year > 9999) return null;
-  return excelSerialFromParts(year, month, day, { allowFictitious: true });
+  return excelSerialFromParts(year, month, day, { allowFictitious: true, date1904 });
 };
 
 const thisYear = (): number => new Date().getFullYear();
@@ -463,7 +468,11 @@ const monthFromName = (name: string, months: MonthNames): number | null => {
 };
 
 /** Dates written with numbers and `/`, `-` (and `.` where the locale allows). */
-function parseNumericDate(text: string, profile: InputProfile): TypedValue | null {
+function parseNumericDate(
+  text: string,
+  profile: InputProfile,
+  date1904: boolean,
+): TypedValue | null {
   const separator = text.match(/[/.-]/)?.[0];
   if (!separator) return null;
   if (separator === '.' && !profile.dotDates) return null;
@@ -473,17 +482,19 @@ function parseNumericDate(text: string, profile: InputProfile): TypedValue | nul
   if (parts.length === 3) {
     const [a = '', b = '', c = ''] = parts;
     let serial: number | null;
-    if (a.length === 4) serial = dateSerial(Number(a), Number(b), Number(c));
-    else if (profile.order === 'ymd') serial = dateSerial(windowYear(a), Number(b), Number(c));
-    else if (profile.order === 'mdy') serial = dateSerial(windowYear(c), Number(a), Number(b));
-    else serial = dateSerial(windowYear(c), Number(b), Number(a));
+    if (a.length === 4) serial = dateSerial(Number(a), Number(b), Number(c), date1904);
+    else if (profile.order === 'ymd')
+      serial = dateSerial(windowYear(a), Number(b), Number(c), date1904);
+    else if (profile.order === 'mdy')
+      serial = dateSerial(windowYear(c), Number(a), Number(b), date1904);
+    else serial = dateSerial(windowYear(c), Number(b), Number(a), date1904);
     return serial === null ? null : { value: serial, formatCode: 'mm-dd-yy' };
   }
   if (parts.length !== 2) return null;
   const [a = '', b = ''] = parts;
   if (a.length === 4) {
     if (!profile.yearMonthCode) return null;
-    const serial = dateSerial(Number(a), Number(b), 1);
+    const serial = dateSerial(Number(a), Number(b), 1, date1904);
     return serial === null ? null : { value: serial, formatCode: profile.yearMonthCode };
   }
   if (a.length > 2 || b.length > 2) return null;
@@ -491,19 +502,23 @@ function parseNumericDate(text: string, profile: InputProfile): TypedValue | nul
   const second = Number(b);
   const month = profile.order === 'dmy' ? second : first;
   const day = profile.order === 'dmy' ? first : second;
-  const monthDay = dateSerial(thisYear(), month, day);
+  const monthDay = dateSerial(thisYear(), month, day, date1904);
   if (monthDay !== null) return { value: monthDay, formatCode: profile.monthDayCode };
   // A second field that cannot be the day (m/d) or the month (d/m) is read as
   // a two-digit year: `1/0` is January 2000 in en-US, `12.30` December 1930
   // in de-DE.
   const yearFallback = profile.order === 'mdy' || (profile.order === 'dmy' && second > 12);
   if (!yearFallback) return null;
-  const serial = dateSerial(windowYear(b), first, 1);
+  const serial = dateSerial(windowYear(b), first, 1, date1904);
   return serial === null ? null : { value: serial, formatCode: 'mmm-yy' };
 }
 
 /** Dates that spell the month out. */
-function parseMonthNameDate(text: string, profile: InputProfile): TypedValue | null {
+function parseMonthNameDate(
+  text: string,
+  profile: InputProfile,
+  date1904: boolean,
+): TypedValue | null {
   const prefix = profile.monthNamePrefix;
   const code = (plain: string, prefixed: string): string =>
     prefix ? `${prefix}${prefixed}` : plain;
@@ -512,7 +527,8 @@ function parseMonthNameDate(text: string, profile: InputProfile): TypedValue | n
   if (!m && profile.dottedDayMonthYear) m = text.match(/^(\d{1,2})\.\s(\p{L}+)\s(\d{2}|\d{4})$/u);
   if (m) {
     const month = monthFromName(m[2] ?? '', profile.monthNames);
-    const serial = month === null ? null : dateSerial(windowYear(m[3] ?? ''), month, Number(m[1]));
+    const serial =
+      month === null ? null : dateSerial(windowYear(m[3] ?? ''), month, Number(m[1]), date1904);
     return serial === null ? null : { value: serial, formatCode: code('d-mmm-yy', 'd\\-mmm\\-yy') };
   }
   if (profile.monthDayCommaYear) {
@@ -520,14 +536,14 @@ function parseMonthNameDate(text: string, profile: InputProfile): TypedValue | n
     if (m) {
       const month = monthFromName(m[1] ?? '', profile.monthNames);
       const serial =
-        month === null ? null : dateSerial(windowYear(m[3] ?? ''), month, Number(m[2]));
+        month === null ? null : dateSerial(windowYear(m[3] ?? ''), month, Number(m[2]), date1904);
       return serial === null ? null : { value: serial, formatCode: 'd-mmm-yy' };
     }
   }
   m = text.match(/^(\d{1,2})[-\s](\p{L}+)$/u);
   if (m) {
     const month = monthFromName(m[2] ?? '', profile.monthNames);
-    const serial = month === null ? null : dateSerial(thisYear(), month, Number(m[1]));
+    const serial = month === null ? null : dateSerial(thisYear(), month, Number(m[1]), date1904);
     return serial === null ? null : { value: serial, formatCode: code('d-mmm', 'd\\-mmm') };
   }
   m = text.match(/^(\p{L}+)[-\s](\d{1,2}|\d{4})$/u);
@@ -536,10 +552,10 @@ function parseMonthNameDate(text: string, profile: InputProfile): TypedValue | n
   if (month === null) return null;
   if (profile.monthFirstNumber === 'day') {
     if ((m[2] ?? '').length > 2) return null;
-    const serial = dateSerial(thisYear(), month, Number(m[2]));
+    const serial = dateSerial(thisYear(), month, Number(m[2]), date1904);
     return serial === null ? null : { value: serial, formatCode: 'd-mmm' };
   }
-  const serial = dateSerial(windowYear(m[2] ?? ''), month, 1);
+  const serial = dateSerial(windowYear(m[2] ?? ''), month, 1, date1904);
   return serial === null ? null : { value: serial, formatCode: code('mmm-yy', 'mmm\\-yy') };
 }
 
@@ -556,33 +572,39 @@ const ERA_START: Readonly<Record<string, number>> = {
   R: 2019,
 };
 
-const eraSerial = (era: string, eraYear: number, month: number, day: number): number | null =>
-  eraYear < 1 ? null : dateSerial((ERA_START[era] ?? 0) + eraYear - 1, month, day);
+const eraSerial = (
+  era: string,
+  eraYear: number,
+  month: number,
+  day: number,
+  date1904: boolean,
+): number | null =>
+  eraYear < 1 ? null : dateSerial((ERA_START[era] ?? 0) + eraYear - 1, month, day, date1904);
 
 /** Dates written with CJK year/month/day markers or a Japanese era. */
-function parseCjkDate(text: string, profile: InputProfile): TypedValue | null {
+function parseCjkDate(text: string, profile: InputProfile, date1904: boolean): TypedValue | null {
   const cjk = profile.cjkDates;
   if (cjk) {
     let m = text.match(/^(\d{1,4})年(\d{1,2})月(\d{1,2})日$/);
     if (m) {
-      const serial = dateSerial(windowYear(m[1] ?? ''), Number(m[2]), Number(m[3]));
+      const serial = dateSerial(windowYear(m[1] ?? ''), Number(m[2]), Number(m[3]), date1904);
       return serial === null ? null : { value: serial, formatCode: cjk.ymd };
     }
     m = text.match(/^(\d{1,4})年(\d{1,2})月$/);
     if (m) {
-      const serial = dateSerial(windowYear(m[1] ?? ''), Number(m[2]), 1);
+      const serial = dateSerial(windowYear(m[1] ?? ''), Number(m[2]), 1, date1904);
       return serial === null ? null : { value: serial, formatCode: cjk.ym };
     }
     m = text.match(/^(\d{1,2})月(\d{1,2})日$/);
     if (m) {
-      const serial = dateSerial(thisYear(), Number(m[1]), Number(m[2]));
+      const serial = dateSerial(thisYear(), Number(m[1]), Number(m[2]), date1904);
       return serial === null ? null : { value: serial, formatCode: cjk.md };
     }
   }
   if (profile.koreanDate) {
     const m = text.match(/^(\d{4})년\s(\d{1,2})월\s(\d{1,2})일$/);
     if (m) {
-      const serial = dateSerial(Number(m[1]), Number(m[2]), Number(m[3]));
+      const serial = dateSerial(Number(m[1]), Number(m[2]), Number(m[3]), date1904);
       return serial === null ? null : { value: serial, formatCode: profile.koreanDate };
     }
   }
@@ -590,12 +612,12 @@ function parseCjkDate(text: string, profile: InputProfile): TypedValue | null {
     let m = text.match(/^(明治|大正|昭和|平成|令和)(\d{1,2}|元)年(\d{1,2})月(\d{1,2})日$/);
     if (m) {
       const eraYear = m[2] === '元' ? 1 : Number(m[2]);
-      const serial = eraSerial(m[1] ?? '', eraYear, Number(m[3]), Number(m[4]));
+      const serial = eraSerial(m[1] ?? '', eraYear, Number(m[3]), Number(m[4]), date1904);
       return serial === null ? null : { value: serial, formatCode: '[$-411]ggge"年"m"月"d"日"' };
     }
     m = text.match(/^([MTSHR])(\d{1,2})([/.-])(\d{1,2})\3(\d{1,2})$/);
     if (m) {
-      const serial = eraSerial(m[1] ?? '', Number(m[2]), Number(m[4]), Number(m[5]));
+      const serial = eraSerial(m[1] ?? '', Number(m[2]), Number(m[4]), Number(m[5]), date1904);
       return serial === null ? null : { value: serial, formatCode: '[$-411]ge.m.d' };
     }
   }
@@ -603,29 +625,37 @@ function parseCjkDate(text: string, profile: InputProfile): TypedValue | null {
 }
 
 /** Times, dates and numeric date + time pairs. */
-export function parseDateTimeInput(text: string, locale: string | undefined): TypedValue | null {
+export function parseDateTimeInput(
+  text: string,
+  locale: string | undefined,
+  date1904 = false,
+): TypedValue | null {
   const profile = profileFor(locale);
   const body = foldWideForms(text.trim(), locale);
   const time = parseTime(body, profile);
   if (time) return time;
   const date =
-    parseNumericDate(body, profile) ??
-    parseMonthNameDate(body, profile) ??
-    parseCjkDate(body, profile);
+    parseNumericDate(body, profile, date1904) ??
+    parseMonthNameDate(body, profile, date1904) ??
+    parseCjkDate(body, profile, date1904);
   if (date) return date;
   const pair = body.match(/^(\S+)\s+(\d.*)$/);
   if (!pair) return null;
-  const datePart = parseNumericDate(pair[1] ?? '', profile);
+  const datePart = parseNumericDate(pair[1] ?? '', profile, date1904);
   const timePart = parseTime(pair[2] ?? '', profile);
   if (!datePart || !timePart?.formatCode || timePart.formatCode === 'mmss.0') return null;
   return { value: datePart.value + timePart.value, formatCode: 'm/d/yy h:mm' };
 }
 
 /** Every typed-value form, in the order overlapping spellings resolve. */
-export function parseTypedValue(text: string, locale: string | undefined): TypedValue | null {
+export function parseTypedValue(
+  text: string,
+  locale: string | undefined,
+  date1904 = false,
+): TypedValue | null {
   return (
     parseNumberInput(text, locale) ??
     parseFraction(foldWideForms(text.trim(), locale)) ??
-    parseDateTimeInput(text, locale)
+    parseDateTimeInput(text, locale, date1904)
   );
 }

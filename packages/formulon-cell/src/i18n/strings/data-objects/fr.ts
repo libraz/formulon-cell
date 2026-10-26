@@ -217,6 +217,9 @@ export const dataObjectsFr: DataObjectsStrings = {
     },
     compatibilityLabels: {
       cellFormatting: 'Mise en forme des cellules',
+      fontEffects: 'Effets de police',
+      gradientFills: 'Remplissages dégradés',
+      xlsbSave: 'Classeur binaire (.xlsb)',
       conditionalFormatting: 'Mise en forme conditionnelle',
       dataValidation: 'Validation des données',
       hyperlinks: 'Liens hypertexte',
@@ -243,10 +246,23 @@ export const dataObjectsFr: DataObjectsStrings = {
       chartsDrawings: 'Graphiques, dessins et images',
       chartAuthoring: 'Création de graphique',
       externalLinks: 'Liaisons externes',
+      calcSettings: 'Options de calcul',
+      dataTables: 'Tables de données',
+      showFormulas: 'Afficher les formules',
+      outlineSymbols: 'Symboles du plan',
+      outlineCollapse: 'Groupes de plan réduits',
+      splitPanes: 'Volets fractionnés',
+      hiddenDefaultRows: 'Lignes masquées par défaut',
     },
     compatibilityDetails: {
       cellFormatting:
         'Les API XF/police/remplissage/bordure/format de nombre sont disponibles lorsque le moteur les prend en charge.',
+      fontEffects:
+        'Contour, ombre, condensé et étendu sont enregistrés avec la police dans tous les profils. Contour et Ombre se définissent dans la boîte Format de cellule sur Mac et ne sont dessinés qu’avec le profil Mac ; condensé et étendu sont conservés mais non dessinés.',
+      gradientFills:
+        'Les dégradés linéaires et de chemin sont enregistrés et se définissent via Effets de remplissage. Les dégradés de chemin sont dessinés de façon radiale approchée.',
+      xlsbSave:
+        'Les classeurs peuvent être enregistrés en .xlsb. Les notes, commentaires à fil et filtres ne sont pas écrits. Les images, formes et graphiques, les tableaux croisés dynamiques et segments lus depuis un .xlsx, la mise en page (marges, en-tête et pied de page, sauts de page), les plages modifiables, certains affichages de feuille et paramètres de protection du classeur, les styles de tableau personnalisés ainsi que les tableaux ou graphiques sparkline dont les références ne peuvent pas être encodées peuvent aussi manquer ; un avertissement s’affiche avant l’enregistrement.',
       conditionalFormatting:
         'Les règles de mise en forme conditionnelle peuvent être évaluées, créées ou hébergées pour la session selon la prise en charge du moteur.',
       dataValidation:
@@ -254,7 +270,7 @@ export const dataObjectsFr: DataObjectsStrings = {
       hyperlinks:
         'Les liens hypertexte peuvent être énumérés, ajoutés et effacés lorsque la réécriture du moteur est disponible.',
       comments:
-        'Les commentaires de cellule, y compris ceux des cellules vides, peuvent être énumérés, lus et écrits lorsqu’une énumération à l’échelle de la feuille est disponible.',
+        'Les commentaires de cellule, y compris ceux des cellules vides, peuvent être énumérés, lus et écrits lorsqu’une énumération à l’échelle de la feuille est disponible. Les notes affichées restent affichées ; une note déplacée par un tri, une insertion/suppression, un couper ou un coller reprend la taille et la position par défaut.',
       threadedComments:
         'Les commentaires, réponses, personnes et résolutions sont enregistrés dans XLSX lorsque le moteur prend en charge les commentaires avec conversation.',
       images:
@@ -305,6 +321,18 @@ export const dataObjectsFr: DataObjectsStrings = {
         'Les graphiques en histogramme, en barres, en courbes, en aires, en secteurs, en anneau et en nuage de points peuvent être créés et modifiés, et sont enregistrés avec le classeur. Les autres types de graphiques s’affichent sous forme d’espace réservé, que l’on peut seulement déplacer, redimensionner et supprimer.',
       externalLinks:
         'Les enregistrements de liaisons externes peuvent être répertoriés lorsque le moteur les expose.',
+      calcSettings:
+        "Le mode de calcul, le recalcul avant l'enregistrement, l'itération, le style de référence L1C1, la précision au format affiché et le calendrier depuis 1904 sont enregistrés avec le classeur. La précision au format affiché arrondit les constantes stockées et les nouvelles saisies à leur format ; les résultats des formules gardent leur précision complète, car le moteur ne conserve l'option que comme métadonnée.",
+      dataTables:
+        'Les tables de données de simulation sont créées, calculées et enregistrées avec le classeur ; leurs cellules de résultat ne peuvent pas être modifiées.',
+      showFormulas: 'L’option Afficher les formules est enregistrée pour chaque feuille.',
+      outlineSymbols: 'Le masquage des symboles du plan est enregistré pour chaque feuille.',
+      outlineCollapse:
+        'Les groupes réduits sont enregistrés avec leur ligne ou colonne de synthèse marquée comme réduite.',
+      splitPanes:
+        'Les volets fractionnés sont enregistrés avec les lignes et colonnes affichées dans chaque volet. Les volets du haut et de gauche défilent seuls, mais s’arrêtent là où commence l’autre volet.',
+      hiddenDefaultRows:
+        'Les feuilles qui masquent les lignes par défaut conservent ce réglage. Une ligne que le fichier garde visible uniquement par un enregistrement de ligne vide s’ouvre masquée.',
     },
     lossLabels: {
       undecodedFormula: 'Formules illisibles',

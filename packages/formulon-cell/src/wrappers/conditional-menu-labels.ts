@@ -103,8 +103,6 @@ export const conditionalIconSetLabel = (
       return labels.iconQuarters5;
     case 'icons-ratings5':
       return labels.iconRatings5;
-    case 'icons-bars5':
-      return labels.iconBars5;
     case 'icons-boxes5':
       return labels.iconBoxes5;
     default:

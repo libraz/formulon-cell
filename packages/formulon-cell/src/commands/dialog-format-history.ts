@@ -12,7 +12,8 @@ import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import type { History, HistoryEntry } from './history.js';
 
 type FormatMapSnapshot = ReadonlyMap<string, CellFormat | undefined>;
-type CommentSnapshot = ReadonlyMap<string, { author: string; text: string } | null>;
+type NoteSnapshot = { author: string; text: string; visible?: true };
+type CommentSnapshot = ReadonlyMap<string, NoteSnapshot | null>;
 interface NativeXfSnapshotEntry {
   readonly directXfIndex: number;
   readonly effectiveXfIndex: number | null;
@@ -137,8 +138,8 @@ const applyFormats = (
 const captureComments = (
   workbook: WorkbookHandle | null,
   targets: readonly Addr[],
-): Map<string, { author: string; text: string } | null> => {
-  const result = new Map<string, { author: string; text: string } | null>();
+): Map<string, NoteSnapshot | null> => {
+  const result = new Map<string, NoteSnapshot | null>();
   if (!workbook?.capabilities.comments) return result;
   for (const addr of targets) {
     result.set(addrKey(addr), clone(workbook.getComment(addr.sheet, addr.row, addr.col)));
@@ -147,8 +148,8 @@ const captureComments = (
 };
 
 const sameComment = (
-  left: { author: string; text: string } | null | undefined,
-  right: { author: string; text: string } | null | undefined,
+  left: NoteSnapshot | null | undefined,
+  right: NoteSnapshot | null | undefined,
 ): boolean => same(left ?? null, right ?? null);
 
 const writeComments = (workbook: WorkbookHandle, desired: CommentSnapshot): void => {
@@ -164,6 +165,7 @@ const writeComments = (workbook: WorkbookHandle, desired: CommentSnapshot): void
       col,
       comment?.author ?? '',
       comment?.text ?? '',
+      comment ? comment.visible === true : undefined,
     );
     if (!ok) throw new Error('dialog comment engine write failed');
   }
@@ -173,8 +175,8 @@ const commentsFromFormats = (
   formats: FormatMapSnapshot,
   targets: readonly Addr[],
   keys?: ReadonlySet<string>,
-): Map<string, { author: string; text: string } | null> => {
-  const result = new Map<string, { author: string; text: string } | null>();
+): Map<string, NoteSnapshot | null> => {
+  const result = new Map<string, NoteSnapshot | null>();
   for (const addr of targets) {
     const key = addrKey(addr);
     if (keys && !keys.has(key)) continue;
@@ -182,7 +184,11 @@ const commentsFromFormats = (
     result.set(
       key,
       format?.comment
-        ? { author: format.commentAuthor ?? DEFAULT_COMMENT_AUTHOR, text: format.comment }
+        ? {
+            author: format.commentAuthor ?? DEFAULT_COMMENT_AUTHOR,
+            text: format.comment,
+            ...(format.commentVisible === true ? { visible: true as const } : {}),
+          }
         : null,
     );
   }
@@ -200,7 +206,8 @@ const commentChangedKeys = (
     const next = after.get(key);
     if (
       !same(previous?.comment, next?.comment) ||
-      !same(previous?.commentAuthor, next?.commentAuthor)
+      !same(previous?.commentAuthor, next?.commentAuthor) ||
+      !same(previous?.commentVisible === true, next?.commentVisible === true)
     ) {
       result.add(key);
     }
@@ -211,8 +218,8 @@ const commentChangedKeys = (
 const selectComments = (
   comments: CommentSnapshot,
   keys: ReadonlySet<string>,
-): Map<string, { author: string; text: string } | null> => {
-  const result = new Map<string, { author: string; text: string } | null>();
+): Map<string, NoteSnapshot | null> => {
+  const result = new Map<string, NoteSnapshot | null>();
   for (const key of keys) {
     result.set(key, clone(comments.get(key) ?? null));
   }
@@ -399,7 +406,7 @@ export function recordDialogFormatChange(options: RecordDialogFormatChangeOption
   const beforeComments = captureComments(workbook, targets);
 
   let afterFormats: Map<string, CellFormat | undefined>;
-  let afterComments: Map<string, { author: string; text: string } | null>;
+  let afterComments: Map<string, NoteSnapshot | null>;
   let beforeNativeXfs = new Map<string, NativeXfSnapshotEntry>();
   let beforeTracking = new Map<string, boolean>();
   let nativePublicationAttempted = false;

@@ -5,7 +5,7 @@ import { dictionaryLocaleFor } from '../../i18n/strings.js';
 import {
   handleDeleteCellsAction,
   handleInsertCellsAction,
-  hiddenInSelection,
+  hiddenExtentInSelection,
   mutators,
   type SpreadsheetInstance,
 } from '../../index.js';
@@ -199,8 +199,8 @@ const updateFormatCellsMenu =
       addrKey({ sheet: range.sheet, row: range.r0, col: range.c0 }),
     );
     const activeLocked = representativeFormat?.locked !== false;
-    const rowsHidden = hiddenInSelection(state.layout, 'row', range.r0, range.r1).length > 0;
-    const colsHidden = hiddenInSelection(state.layout, 'col', range.c0, range.c1).length > 0;
+    const rowsHidden = hiddenExtentInSelection(state.layout, 'row', range.r0, range.r1) !== null;
+    const colsHidden = hiddenExtentInSelection(state.layout, 'col', range.c0, range.c1) !== null;
     const sheet = state.data.sheetIndex;
     const hiddenSheetCount = state.layout.hiddenSheets.size;
     const visibleSheetCount = instance.workbook.sheetCount - hiddenSheetCount;

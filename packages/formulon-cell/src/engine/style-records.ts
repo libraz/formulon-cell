@@ -48,11 +48,19 @@ export function completeFontRecord(record: FontRecord): EngineFontRecord {
 }
 
 export function completeFillRecord(record: FillRecord): EngineFillRecord {
-  return {
-    ...record,
+  const { gradient, ...rest } = record;
+  const out: EngineFillRecord = {
+    ...rest,
     fg: record.fg ?? authoredColorSpec(),
     bg: record.bg ?? authoredColorSpec(),
   };
+  if (gradient) {
+    out.gradient = {
+      ...gradient,
+      stops: gradient.stops.map((stop) => ({ ...stop, color: stop.color ?? authoredColorSpec() })),
+    };
+  }
+  return out;
 }
 
 const completeBorderSide = (side: BorderSide): EngineBorderSide => ({

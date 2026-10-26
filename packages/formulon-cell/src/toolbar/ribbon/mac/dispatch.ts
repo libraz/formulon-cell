@@ -1,6 +1,5 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import {
-  listComments,
   listThreadedComments,
   recordThreadedChange,
   removeThreadedComment,
@@ -9,6 +8,7 @@ import { selectNextFormulaError } from '../../../commands/error-indicators.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../commands/page-setup.js';
 import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
+import { executeNoteVisibilityAction } from '../../../commands/ribbon-comment.js';
 import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
@@ -57,6 +57,7 @@ const aliases: Readonly<Record<string, string>> = {
   'mac.review.protectSheet': 'protectReview',
   'mac.review.protectWorkbook': 'protectWorkbookReview',
   'mac.view.standard': 'viewNormal',
+  'mac.view.split': 'split',
   'mac.view.pageBreakPreview': 'viewPageBreakPreview',
   'mac.view.pageLayout': 'viewPageLayout',
   'mac.view.gridlines': 'viewGridlines',
@@ -183,6 +184,7 @@ const operations = [
   'mac.review.previousNote',
   'mac.review.nextNote',
   'mac.review.newNote',
+  'mac.review.showHideNote',
   'mac.review.showNotes',
   'mac.draw.toggle',
   'mac.draw.eraser',
@@ -412,7 +414,10 @@ export function dispatchMacRibbonCommand(
         return ctx.applyPageBreakAction('reset-all');
       case 'mac.view.freeze':
         return ctx.applyFreezeAction(
-          state.layout.freezeRows > 0 || state.layout.freezeCols > 0 ? 'off' : 'selection',
+          state.layout.splitPanes !== true &&
+            (state.layout.freezeRows > 0 || state.layout.freezeCols > 0)
+            ? 'off'
+            : 'selection',
         );
       case 'mac.view.freeze.firstRow':
         return ctx.applyFreezeAction('row');
@@ -466,17 +471,12 @@ export function dispatchMacRibbonCommand(
             })),
           ...reportDialogLabels(instance.i18n.strings),
         });
+      case 'mac.review.showHideNote':
       case 'mac.review.showNotes':
-        return showReport({
-          title: MAC_CONTEXT_LABELS.notesTitle[toolbarLangForLocale(instance.i18n.locale)],
-          items: listComments(state)
-            .filter((note) => isNavigationAddrAllowed(instance.store, note.addr))
-            .map((note) => ({
-              severity: 'info',
-              label: formatA1Cell(note.addr.row, note.addr.col),
-              detail: note.text,
-            })),
-          ...reportDialogLabels(instance.i18n.strings),
+        return executeNoteVisibilityAction({
+          store: instance.store,
+          workbook: instance.workbook,
+          action: id === 'mac.review.showHideNote' ? 'toggle-active' : 'toggle-all',
         });
     }
     if (id.startsWith('mac.draw.')) {

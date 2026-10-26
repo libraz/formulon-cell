@@ -1,4 +1,6 @@
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { iconSetToEngine } from '../engine/cf-icon-sets.js';
+import { iconSetSlotCount } from '../render/conditional.js';
 import { rangesIntersect } from '../store/selection-geometry.js';
 import type {
   ConditionalIconSet,
@@ -54,7 +56,6 @@ export type ConditionalPresetAction =
   | 'icons-stars3'
   | 'icons-quarters5'
   | 'icons-ratings5'
-  | 'icons-bars5'
   | 'icons-boxes5';
 
 export function listConditionalRules(state: State): readonly ConditionalRule[] {
@@ -148,7 +149,7 @@ const colorScaleStops = (
 };
 
 const iconSetThresholds = (icons: ConditionalIconSet): ConditionalScalePoint[] => {
-  const slots = icons.endsWith('5') ? 5 : 3;
+  const slots = iconSetSlotCount(icons);
   return Array.from({ length: slots - 1 }, (_, index) => ({
     kind: 'percent',
     value: ((index + 1) * 100) / slots,
@@ -222,6 +223,7 @@ export function applyConditionalPresetAction(
   }
   if (action.startsWith('icons-')) {
     const icons = action.replace('icons-', '') as ConditionalIconSet;
+    if (!iconSetToEngine(icons)) return false;
     addConditionalRule(store, {
       kind: 'icon-set',
       range,

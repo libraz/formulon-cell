@@ -4,6 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea, rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SparklineKind, type SpreadsheetStore } from '../store/store.js';
 import type { SelectionStats } from './aggregate.js';
+import { blockDataTableCells } from './data-table-guard.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
 import type { History } from './history.js';
 import {
@@ -411,6 +412,14 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
       writes.push({ addr, formula });
     }
     if (writes.length === 0) return { ok: false, reason: 'protected' };
+    if (
+      blockDataTableCells(
+        wb,
+        writes.map((write) => write.addr),
+      )
+    ) {
+      return { ok: false, reason: 'protected' };
+    }
     if (input.history) input.history.begin();
     try {
       for (const write of writes) {
@@ -441,6 +450,14 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
       writes.push({ addr, formula });
     }
     if (writes.length === 0) return { ok: false, reason: 'protected' };
+    if (
+      blockDataTableCells(
+        wb,
+        writes.map((write) => write.addr),
+      )
+    ) {
+      return { ok: false, reason: 'protected' };
+    }
     if (input.history) input.history.begin();
     try {
       for (const write of writes) {

@@ -157,6 +157,7 @@ export function attachNumberTab(
                 ? { kind: 'time', pattern }
                 : { kind: 'custom', pattern },
             locale,
+            ctx.getDate1904(),
           );
         } catch {
           label = pattern;

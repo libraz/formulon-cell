@@ -758,6 +758,7 @@ function makeFormulaOperandReader(
       return formatText(
         readOperand(operand.value, rowOffset, colOffset),
         readOperand(operand.pattern, rowOffset, colOffset),
+        state.ui.date1904 === true,
       );
     }
     if (operand.kind === 'text-fixed-format') {

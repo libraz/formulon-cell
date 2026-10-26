@@ -106,6 +106,7 @@ export interface RunDemoBackstageActionOptions {
   newWorkbook: () => void | Promise<void>;
   openWorkbook: () => void;
   saveWorkbook: () => void;
+  saveWorkbookAs: () => void;
   showNotice: (title: string, detail: string) => void;
   toggleOptions: () => void;
   closeBackstage: () => void;
@@ -117,7 +118,8 @@ export const runDemoBackstageAction = (opts: RunDemoBackstageActionOptions): voi
   if (action === 'new') {
     void opts.newWorkbook();
   } else if (action === 'open') opts.openWorkbook();
-  else if (action === 'save' || action === 'save-as') opts.saveWorkbook();
+  else if (action === 'save') opts.saveWorkbook();
+  else if (action === 'save-as') opts.saveWorkbookAs();
   else if (action === 'print') instance?.print('print');
   else if (action === 'export') instance?.print('pdf');
   else if (action === 'page-setup') instance?.openPageSetup();

@@ -1,4 +1,12 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import {
+  frozenColsWidth,
+  frozenRowsHeight,
+  gridOriginX,
+  gridOriginY,
+  layoutForView,
+  mirrorX,
+} from '../render/geometry.js';
 import { renderScale, steppedZoom } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { navigationPolicyFor } from './navigation-policy.js';
@@ -18,11 +26,31 @@ export interface WheelDeps {
  * - **Ctrl/Cmd + wheel** → zoom (delegates to `mutators.setZoom`).
  * - **Shift + wheel**    → horizontal scroll (deltaY redirected to deltaX).
  * - **Plain wheel**      → vertical (deltaY) and horizontal (deltaX) scroll.
+ *   Over a split's top or left pane, that pane scrolls on its own axis.
  *
  * Trackpads emit small pixel-precise deltas (1–5 px), which would round to
  * zero rows on every event. We accumulate residuals across events so a slow
  * scroll still advances by one row once enough pixels have accumulated.
  */
+/** Whether the pointer is over the top and/or left pane of a split. */
+function splitPaneAt(
+  grid: HTMLElement,
+  state: ReturnType<SpreadsheetStore['getState']>,
+  e: WheelEvent,
+): { top: boolean; left: boolean } {
+  if (state.layout.splitPanes !== true) return { top: false, left: false };
+  const layout = layoutForView(state);
+  const rect = grid.getBoundingClientRect();
+  const x = mirrorX(layout, e.clientX - rect.left);
+  const y = e.clientY - rect.top;
+  return {
+    top:
+      layout.freezeRows > 0 && y < gridOriginY(layout) + frozenRowsHeight(layout, state.viewport),
+    left:
+      layout.freezeCols > 0 && x < gridOriginX(layout) + frozenColsWidth(layout, state.viewport),
+  };
+}
+
 export function attachWheel(deps: WheelDeps): () => void {
   const { grid, store, getWb } = deps;
 
@@ -66,7 +94,13 @@ export function attachWheel(deps: WheelDeps): () => void {
     accY -= dRow * rh;
     accX -= dCol * cw;
     e.preventDefault();
-    mutators.scrollBy(store, dRow, dCol);
+    const pane = splitPaneAt(grid, state, e);
+    const bandRow = pane.top ? dRow : 0;
+    const bandCol = pane.left ? dCol : 0;
+    if (bandRow !== 0 || bandCol !== 0) mutators.scrollSplitPane(store, bandRow, bandCol);
+    if (dRow - bandRow !== 0 || dCol - bandCol !== 0) {
+      mutators.scrollBy(store, dRow - bandRow, dCol - bandCol);
+    }
   };
 
   grid.addEventListener('wheel', onWheel, { passive: false });

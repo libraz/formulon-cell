@@ -67,6 +67,8 @@ export interface CellPaintContext {
   getDisplay: CellDisplayResolver | undefined;
   /** The active sheet's background image once loaded, otherwise null. */
   sheetBackgroundImage: HTMLImageElement | null;
+  /** The host renders the Mac profile, which draws Outline and Shadow. */
+  fontEffects: boolean;
 }
 
 export function paintCells(
@@ -299,7 +301,7 @@ export function paintCells(
     const anchorFormat = format.formats.get(anchorKey);
     for (const rect of rects) {
       paintMergeSurface(rect, isActive, selected);
-      if (anchorFormat?.fill || anchorFormat?.fillPattern) {
+      if (anchorFormat?.fill || anchorFormat?.fillPattern || anchorFormat?.fillGradient) {
         paintCellFill({
           ctx,
           theme,
@@ -351,9 +353,11 @@ export function paintCells(
         !isMergeAnchor &&
         !engineFmt?.fill &&
         !engineFmt?.fillPattern &&
+        !engineFmt?.fillGradient &&
         !engineFmt?.borders &&
         !fmt?.fill &&
         !fmt?.fillPattern &&
+        !fmt?.fillGradient &&
         !fmt?.borders &&
         !tableFmt?.fill &&
         !tableFmt?.fillPattern &&
@@ -383,6 +387,7 @@ export function paintCells(
           ? {
               ...baseFmt,
               fill: overlay.fill ?? baseFmt?.fill,
+              fillGradient: overlay.fill ? undefined : baseFmt?.fillGradient,
               color: overlay.color ?? baseFmt?.color,
               bold: overlay.bold || baseFmt?.bold,
               italic: overlay.italic || baseFmt?.italic,
@@ -461,18 +466,20 @@ export function paintCells(
         showZeros: state.ui.showZeros !== false,
         displayOverride,
         locale,
+        date1904: state.ui.date1904 === true,
         rtl,
         zoom: renderScale(state.layout, state.viewport),
         formatPaint:
           formatCode && customDisplay === null && value.kind === 'number'
             ? numberFormatPaint(formatCode, value.value)
             : null,
+        fontEffects: cellCtx.fontEffects,
       };
 
       // Static format fill OR overlay fill — both painted via paintCellFill,
       // which reads `format.fill`. The merged effectiveFmt already prefers
       // overlay over static, so a single call yields the right result.
-      if (effectiveFmt?.fill || effectiveFmt?.fillPattern) {
+      if (effectiveFmt?.fill || effectiveFmt?.fillPattern || effectiveFmt?.fillGradient) {
         if (isMergeAnchor && mergedRects.length > 0) {
           for (const mergedRect of mergedRects) {
             paintCellFill({ ...paintCtx, bounds: mergedRect });
@@ -481,7 +488,8 @@ export function paintCells(
           paintCellFill(paintCtx);
         }
       }
-      if (isActive && !effectiveFmt?.fill) paintCellBackground(paintCtx);
+      if (isActive && !effectiveFmt?.fill && !effectiveFmt?.fillGradient)
+        paintCellBackground(paintCtx);
       if (overlay) paintDataBar(ctx, bounds, overlay);
       const hideConditionalValue =
         overlay?.showValue === false &&

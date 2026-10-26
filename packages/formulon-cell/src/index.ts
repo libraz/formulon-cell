@@ -396,11 +396,13 @@ export {
   expandRowGroup,
   groupCols,
   groupRows,
+  hideOutlineDetail,
   isColGroupCollapsed,
   isRowGroupCollapsed,
   MAX_OUTLINE_LEVEL,
   OUTLINE_GUTTER_PER_LEVEL,
   rowGroupRangeAt,
+  showOutlineDetail,
   ungroupCols,
   ungroupRows,
 } from './commands/outline.js';
@@ -588,6 +590,7 @@ export {
   applyFreezeMode,
   autofitColsWidth,
   autofitRowsHeight,
+  hiddenExtentInSelection,
   hiddenInSelection,
   hideCols,
   hideRows,
@@ -766,6 +769,7 @@ export {
   setSparklines,
   sparklineAt,
 } from './commands/sparkline.js';
+export { toggleSplitPanes } from './commands/split-panes.js';
 export {
   deleteCols,
   deleteRows,
@@ -803,6 +807,7 @@ export {
   clearSheetBackgroundImage,
   setGridlinesVisible,
   setHeadingsVisible,
+  setOutlineSymbolsVisible,
   setR1C1ReferenceStyle,
   setSheetBackgroundImage,
   setSheetZoom,
@@ -824,6 +829,13 @@ export {
   watchRange,
   watchRanges,
 } from './commands/watch.js';
+export type {
+  WorkbookSaveFormat,
+  WorkbookSaveLoss,
+  WorkbookSaveOutcome,
+  XlsbContentLossId,
+} from './commands/workbook-save.js';
+export { WORKBOOK_SAVE_FORMATS, writeWorkbook } from './commands/workbook-save.js';
 export type {
   AutomaticColorOption,
   ColorPaletteHandle,
@@ -963,6 +975,7 @@ export type {
   ChangeEvent,
   ChangeListener,
   WorkbookHandleFeatureMethods,
+  WorkbookSaveOptions,
 } from './engine/workbook-handle.js';
 export { WorkbookHandle } from './engine/workbook-handle.js';
 export type {
@@ -974,6 +987,11 @@ export type {
   EnginePerson,
   EngineThreadedComment,
 } from './engine/workbook-handle-annotations.js';
+export type {
+  DataTableDefinition,
+  DataTableInfo,
+} from './engine/workbook-handle-data-tables.js';
+export type { WorkbookCalcSettings } from './engine/workbook-handle-formulas.js';
 export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
 export type {
   EngineHeaderFooterInput,
@@ -1130,6 +1148,7 @@ export type {
   ContextMenuItem,
   ContextMenuOptions,
 } from './interact/context-menu-options.js';
+export { openDataTableDialog } from './interact/data-table-dialog.js';
 export type {
   ErrorMenuDeps,
   ErrorMenuHandle,
@@ -1292,9 +1311,12 @@ export type {
   CellBorderStyle,
   CellBorders,
   CellFormat,
+  CellGradientFill,
+  CellGradientStop,
   CellVAlign,
   CellValidation,
   ChartsSlice,
+  ConditionalIconRef,
   ConditionalIconSet,
   ConditionalRule,
   ConditionalScalePoint,
@@ -1357,6 +1379,13 @@ export type {
   ReportOptions,
 } from './toolbar/dialogs/report.js';
 export { reportDialogLabels, showReport } from './toolbar/dialogs/report.js';
+export type { SaveWorkbookWithPromptsOptions } from './toolbar/dialogs/workbook-save.js';
+export {
+  chooseWorkbookSaveFormat,
+  confirmWorkbookSaveLosses,
+  saveWorkbookWithPrompts,
+  workbookSaveFormats,
+} from './toolbar/dialogs/workbook-save.js';
 export type {
   ExcelRibbonIconDefinition,
   ExcelRibbonIconName,

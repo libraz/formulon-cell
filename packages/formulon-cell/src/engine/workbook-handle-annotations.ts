@@ -31,6 +31,13 @@ type CommentEnumerableWorkbook = Workbook & {
   ) => readonly EngineCommentEntry[] & { readonly status: { ok: boolean } };
 };
 
+/** A legacy note. `visible` is present only for a note shown without hovering. */
+export interface EngineNoteEntry {
+  author: string;
+  text: string;
+  visible?: true;
+}
+
 /** Lossless hyperlink record returned by the native engine. Kept module-local
  * at the public package boundary; gallery commands use it without widening
  * the root cell API. */
@@ -161,16 +168,35 @@ export abstract class WorkbookHandleAnnotationsMethods {
 
   /** Read the cell comment at `(sheet, row, col)`. Returns null when the
    *  cell has no comment or when the engine doesn't expose `getComment`. */
-  getComment(sheet: number, row: number, col: number): { author: string; text: string } | null {
+  getComment(sheet: number, row: number, col: number): EngineNoteEntry | null {
     assertAlive(this);
     if (!this.capabilities.comments) return null;
     const e = wb(this).getComment(sheet, row, col);
-    return e ? { author: e.author, text: e.text } : null;
+    if (!e) return null;
+    return this.getCommentVisible(sheet, row, col)
+      ? { author: e.author, text: e.text, visible: true }
+      : { author: e.author, text: e.text };
+  }
+
+  /** Whether the note is shown without hovering. False when absent or when
+   *  the engine cannot report visibility. */
+  getCommentVisible(sheet: number, row: number, col: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.commentVisibility) return false;
+    const r = wb(this).getCommentVisible(sheet, row, col);
+    return r.status.ok && r.value === 1;
+  }
+
+  /** Show or hide an existing note; the engine keeps its box geometry. */
+  setCommentVisible(sheet: number, row: number, col: number, visible: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.commentVisibility) return false;
+    return wb(this).setCommentVisible(sheet, row, col, visible).ok;
   }
 
   /** Snapshot every comment on `sheet` when the engine exposes a sheet-wide
    *  enumerator. Empty under stub or older engines. */
-  getComments(sheet: number): { row: number; col: number; author: string; text: string }[] {
+  getComments(sheet: number): ({ row: number; col: number } & EngineNoteEntry)[] {
     assertAlive(this);
     if (!this.capabilities.commentsEnumerable) return [];
     const engineWb = wb(this) as CommentEnumerableWorkbook;
@@ -182,16 +208,29 @@ export abstract class WorkbookHandleAnnotationsMethods {
       col: e.col,
       author: e.author,
       text: e.text,
+      ...(this.getCommentVisible(sheet, e.row, e.col) ? { visible: true as const } : {}),
     }));
   }
 
-  /** Persist a cell comment. Empty `text` removes it. No-op (returns false)
-   *  under the stub. */
-  setCommentEntry(sheet: number, row: number, col: number, author: string, text: string): boolean {
+  /** Persist a cell comment. Empty `text` removes it. `visible` restates the
+   *  note's shown state, which a re-added note otherwise loses. No-op
+   *  (returns false) under the stub. */
+  setCommentEntry(
+    sheet: number,
+    row: number,
+    col: number,
+    author: string,
+    text: string,
+    visible?: boolean,
+  ): boolean {
     assertAlive(this);
     if (!this.capabilities.comments) return false;
     const s = wb(this).setComment(sheet, row, col, author, text);
-    return s.ok;
+    if (!s.ok) return false;
+    if (visible === undefined || text.length === 0 || !this.capabilities.commentVisibility) {
+      return true;
+    }
+    return wb(this).setCommentVisible(sheet, row, col, visible).ok;
   }
 
   /** Read every native threaded comment on a sheet, including replies. Notes

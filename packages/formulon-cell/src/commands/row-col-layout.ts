@@ -8,6 +8,7 @@ import {
   frozenRowEnd,
   frozenRowStart,
 } from '../store/freeze-band.js';
+import { isRowHidden } from '../store/row-visibility.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import {
   type AutofitOptions,
@@ -61,9 +62,31 @@ export function showRows(
       for (const row of s.layout.hiddenRows) {
         if (row >= r0 && row <= r1) next.delete(row);
       }
-      return { ...s, layout: { ...s.layout, hiddenRows: next } };
+      return { ...s, layout: { ...s.layout, ...showDefaultHiddenRows(s.layout, next, r0, r1) } };
     });
   });
+}
+
+/** The layout patch that shows `[r0, r1]`, given the explicitly hidden rows
+ *  left once they are unhidden. On a sheet that hides rows by default,
+ *  unhiding everything to the last row turns the default off, keeping hidden
+ *  the default-hidden rows above `r0`; a span too large to list leaves the
+ *  default-hidden rows as they are. */
+function showDefaultHiddenRows(
+  layout: LayoutSlice,
+  hiddenRows: Set<number>,
+  r0: number,
+  r1: number,
+): Pick<LayoutSlice, 'hiddenRows' | 'defaultRowsHidden' | 'shownRows'> {
+  if (layout.defaultRowsHidden !== true) return { hiddenRows };
+  const shownRows = new Set(layout.shownRows);
+  if (r1 >= MAX_ROW && r0 <= MAX_MATERIALIZED_LAYOUT_ROWS) {
+    for (let r = 0; r < r0; r += 1) if (!shownRows.has(r)) hiddenRows.add(r);
+    return { hiddenRows, defaultRowsHidden: false, shownRows: new Set() };
+  }
+  if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return { hiddenRows };
+  for (let r = r0; r <= r1; r += 1) shownRows.add(r);
+  return { hiddenRows, shownRows };
 }
 
 export function showRowsAroundSelection(
@@ -73,11 +96,11 @@ export function showRowsAroundSelection(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
-  const hidden = store.getState().layout.hiddenRows;
+  const layout = store.getState().layout;
   let start = r0;
   let end = r1;
-  while (start > 0 && hidden.has(start - 1)) start -= 1;
-  while (end < MAX_ROW && hidden.has(end + 1)) end += 1;
+  while (start > 0 && isRowHidden(layout, start - 1)) start -= 1;
+  while (end < MAX_ROW && isRowHidden(layout, end + 1)) end += 1;
   showRows(store, history, start, end, wb);
 }
 
@@ -415,27 +438,63 @@ export function hiddenInSelection(
 ): number[] {
   const lo = Math.min(a, b);
   const hi = Math.max(a, b);
-  const set = axis === 'row' ? layout.hiddenRows : layout.hiddenCols;
   const out: number[] = [];
+  if (axis === 'row' && layout.defaultRowsHidden === true) {
+    for (let r = lo; r <= hi; r += 1) if (isRowHidden(layout, r)) out.push(r);
+    return out;
+  }
+  const set = axis === 'row' ? layout.hiddenRows : layout.hiddenCols;
   for (const index of set) {
     if (index >= lo && index <= hi) out.push(index);
   }
   return out.sort((left, right) => left - right);
 }
 
+/** First and last hidden row or column of the selection, without listing
+ *  the ones between; null when none is hidden. */
+export function hiddenExtentInSelection(
+  layout: LayoutSlice,
+  axis: 'row' | 'col',
+  a: number,
+  b: number,
+): { first: number; last: number } | null {
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (axis === 'row' && layout.defaultRowsHidden === true) {
+    // Visible rows are the listed ones, so each walk stops within them.
+    let first = lo;
+    while (first <= hi && !isRowHidden(layout, first)) first += 1;
+    if (first > hi) return null;
+    let last = hi;
+    while (!isRowHidden(layout, last)) last -= 1;
+    return { first, last };
+  }
+  const set = axis === 'row' ? layout.hiddenRows : layout.hiddenCols;
+  let first = Number.POSITIVE_INFINITY;
+  let last = Number.NEGATIVE_INFINITY;
+  for (const index of set) {
+    if (index < lo || index > hi) continue;
+    first = Math.min(first, index);
+    last = Math.max(last, index);
+  }
+  return first <= last ? { first, last } : null;
+}
+
 /** Pin `rows` rows / `cols` cols whose first row/column is `origin` (default
  *  A1). Freezing is a view setting, not an undo step. When `wb` is supplied
- *  the counts are pushed to the engine so they round-trip through .xlsx. */
+ *  the counts are pushed to the engine so they round-trip through .xlsx.
+ *  `split` makes the band split panes instead of a freeze. */
 export function setFreezePanes(
   store: SpreadsheetStore,
   rows: number,
   cols: number,
   wb?: WorkbookHandle,
   origin?: { row: number; col: number },
+  split = false,
 ): void {
   const sheet = store.getState().data.sheetIndex;
   const before = captureLayoutSnapshot(store.getState());
-  mutators.setFreezePanes(store, rows, cols, origin);
+  mutators.setFreezePanes(store, rows, cols, origin, split);
   if (!wb) return;
   const after = captureLayoutSnapshot(store.getState());
   syncLayoutToEngine(wb, store.getState().layout, sheet, before, after);
@@ -443,9 +502,38 @@ export function setFreezePanes(
 
 export type FreezeMode = 'none' | 'topRow' | 'firstColumn' | 'panes';
 
+/** Where Freeze Panes and Split divide the window: above and left of the
+ *  active cell, or through the middle of the window when the active cell is
+ *  its top-left. Moves the window to the band's origin. */
+export function panesAtActiveCell(store: SpreadsheetStore): {
+  rows: number;
+  cols: number;
+  origin: { row: number; col: number };
+} {
+  const { layout, viewport, selection } = store.getState();
+  let originRow = frozenRowEnd(layout) > 0 ? frozenRowStart(layout) : viewport.rowStart;
+  let originCol = frozenColEnd(layout) > 0 ? frozenColStart(layout) : viewport.colStart;
+  const a = selection.active;
+  // An active cell that is scrolled out of view becomes the top-left first.
+  if (a.row < originRow || a.col < originCol) {
+    originRow = a.row;
+    originCol = a.col;
+  }
+  const middle = a.row === originRow && a.col === originCol;
+  const rows = middle ? Math.max(1, Math.floor(viewport.rowCount / 2)) : a.row - originRow;
+  const cols = middle ? Math.max(1, Math.floor(viewport.colCount / 2)) : a.col - originCol;
+  // The band starts where the window starts, so the window moves with it.
+  store.setState((s) => ({
+    ...s,
+    viewport: { ...s.viewport, rowStart: originRow, colStart: originCol },
+  }));
+  return { rows, cols, origin: { row: originRow, col: originCol } };
+}
+
 /** Freeze (or unfreeze) the way the desktop spreadsheet does: the band starts
  *  at the top-left visible cell, and "Freeze Panes" splits at the active
- *  cell, or at the middle of the window when the active cell is the top-left. */
+ *  cell, or at the middle of the window when the active cell is the top-left.
+ *  Freeze Panes on split panes freezes them where they are split. */
 export function applyFreezeMode(
   store: SpreadsheetStore,
   mode: FreezeMode,
@@ -455,35 +543,20 @@ export function applyFreezeMode(
     setFreezePanes(store, 0, 0, wb);
     return;
   }
-  const { layout, viewport, selection } = store.getState();
-  let originRow = frozenRowEnd(layout) > 0 ? frozenRowStart(layout) : viewport.rowStart;
-  let originCol = frozenColEnd(layout) > 0 ? frozenColStart(layout) : viewport.colStart;
-  let rows = 1;
-  let cols = 0;
-  if (mode === 'firstColumn') {
-    rows = 0;
-    cols = 1;
-  } else if (mode === 'panes') {
-    const a = selection.active;
-    // An active cell that is scrolled out of view becomes the top-left first.
-    if (a.row < originRow || a.col < originCol) {
-      originRow = a.row;
-      originCol = a.col;
-    }
-    if (a.row === originRow && a.col === originCol) {
-      rows = Math.max(1, Math.floor(viewport.rowCount / 2));
-      cols = Math.max(1, Math.floor(viewport.colCount / 2));
-    } else {
-      rows = a.row - originRow;
-      cols = a.col - originCol;
-    }
-  }
+  const { layout, viewport } = store.getState();
   if (mode === 'panes') {
-    // The band starts where the window starts, so the window moves with it.
-    store.setState((s) => ({
-      ...s,
-      viewport: { ...s.viewport, rowStart: originRow, colStart: originCol },
-    }));
+    if (layout.splitPanes === true) {
+      const origin = { row: frozenRowStart(layout), col: frozenColStart(layout) };
+      setFreezePanes(store, layout.freezeRows, layout.freezeCols, wb, origin);
+      return;
+    }
+    const { rows, cols, origin } = panesAtActiveCell(store);
+    setFreezePanes(store, rows, cols, wb, origin);
+    return;
   }
+  const originRow = frozenRowEnd(layout) > 0 ? frozenRowStart(layout) : viewport.rowStart;
+  const originCol = frozenColEnd(layout) > 0 ? frozenColStart(layout) : viewport.colStart;
+  const rows = mode === 'firstColumn' ? 0 : 1;
+  const cols = mode === 'firstColumn' ? 1 : 0;
   setFreezePanes(store, rows, cols, wb, { row: originRow, col: originCol });
 }

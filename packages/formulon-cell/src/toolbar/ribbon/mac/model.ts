@@ -625,7 +625,7 @@ const viewTab = (): RibbonTabModel =>
         ),
         disabledCompactCommand('mac.view.arrange', t('arrange'), 'arrange', EMBEDDED_UNSUPPORTED),
         compactCommand('mac.view.freeze', t('freeze'), 'freeze'),
-        disabledCompactCommand('mac.view.split', t('split'), 'split', EMBEDDED_UNSUPPORTED),
+        compactCommand('mac.view.split', t('split'), 'split'),
         disabledCompactCommand('mac.view.hide', t('hide'), 'hide', EMBEDDED_UNSUPPORTED),
         disabledCompactCommand('mac.view.unhide', t('unhide'), 'show', EMBEDDED_UNSUPPORTED),
         disabledCompactCommand(

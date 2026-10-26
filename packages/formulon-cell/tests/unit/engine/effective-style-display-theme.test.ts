@@ -115,6 +115,7 @@ describe('formulon 0.13 style projections and workbook themes', () => {
           locale: 'en-US',
           getDisplay: undefined,
           sheetBackgroundImage: null,
+          fontEffects: false,
         },
         view,
         renderTheme,

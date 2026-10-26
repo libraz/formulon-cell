@@ -112,4 +112,27 @@ export const workbookChromeEn: WorkbookChromeStrings = {
     engineHelp:
       'The formulon WASM engine could not start. Check WebAssembly support and that the engine WASM asset can be loaded.',
   },
+  workbookSave: {
+    saveAsTitle: 'Save As',
+    fileFormat: 'File Format',
+    formatXlsx: 'Workbook (.xlsx)',
+    formatXlsb: 'Binary Workbook (.xlsb)',
+    save: 'Save',
+    cancel: 'Cancel',
+    lossTitle: 'Some content will not be saved',
+    lossMessage:
+      '{format} cannot hold everything in this workbook. The following will not be saved:',
+    mayLoseMessage: '{format} may not keep the following, depending on where it came from:',
+    saveAnyway: 'Save Anyway',
+    notes: 'Notes',
+    threadedComments: 'Threaded comments',
+    autoFilters: 'Filters',
+    pivotTables: 'PivotTables',
+    slicers: 'Slicers',
+    drawings: 'Pictures, shapes and charts',
+    tables: 'Tables',
+    sparklines: 'Sparklines',
+    protectedRanges: 'Protected ranges',
+    otherSettings: 'Other settings (page setup, views, workbook protection, custom styles)',
+  },
 };

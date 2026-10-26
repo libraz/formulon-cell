@@ -5,6 +5,7 @@ import type { Strings } from '../../i18n/strings.js';
 import type { FillPattern } from '../../store/store.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
 import { makeButton, makeSwatches } from '../format-dialog-dom.js';
+import { GRADIENT_SHADING_STYLES, type GradientShadingStyle } from '../format-dialog-model.js';
 
 export interface FillTabRefs {
   fillInput: HTMLInputElement;
@@ -14,7 +15,92 @@ export interface FillTabRefs {
   fillPatternGallery: HTMLDivElement;
   fillPatternColorInput: HTMLInputElement;
   fillSample: HTMLDivElement;
+  fillEffectsButton: HTMLButtonElement;
+  fillEffects: HTMLDivElement;
+  gradientColor1: HTMLInputElement;
+  gradientColor2: HTMLInputElement;
+  gradientStyleInputs: ReadonlyMap<GradientShadingStyle, HTMLInputElement>;
+  gradientVariants: readonly HTMLButtonElement[];
 }
+
+const shadingLabel = (t: Strings['formatDialog'], style: GradientShadingStyle): string => {
+  switch (style) {
+    case 'horizontal':
+      return t.gradientHorizontal;
+    case 'vertical':
+      return t.gradientVertical;
+    case 'diagonalUp':
+      return t.gradientDiagonalUp;
+    case 'diagonalDown':
+      return t.gradientDiagonalDown;
+    case 'fromCorner':
+      return t.gradientFromCorner;
+    case 'fromCenter':
+      return t.gradientFromCenter;
+  }
+};
+
+/** Fill Effects: two colours, a shading style and its variants. */
+const createFillEffects = (
+  t: Strings['formatDialog'],
+): Pick<
+  FillTabRefs,
+  'fillEffects' | 'gradientColor1' | 'gradientColor2' | 'gradientStyleInputs' | 'gradientVariants'
+> => {
+  const fillEffects = document.createElement('div');
+  fillEffects.className = 'fc-fmtdlg__fill-effects';
+  fillEffects.hidden = true;
+  const colorInput = (index: 1 | 2, label: string): HTMLInputElement => {
+    const row = document.createElement('label');
+    row.className = 'fc-fmtdlg__row';
+    const text = document.createElement('span');
+    text.textContent = label;
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.setAttribute('aria-label', label);
+    input.dataset.fcGradientColor = String(index);
+    row.append(text, input);
+    fillEffects.appendChild(row);
+    return input;
+  };
+  const gradientColor1 = colorInput(1, t.gradientColor1);
+  const gradientColor2 = colorInput(2, t.gradientColor2);
+  const styles = document.createElement('fieldset');
+  styles.className = 'fc-fmtdlg__gradient-styles';
+  const legend = document.createElement('legend');
+  legend.textContent = t.gradientShadingStyle;
+  styles.appendChild(legend);
+  const gradientStyleInputs = new Map<GradientShadingStyle, HTMLInputElement>();
+  for (const style of GRADIENT_SHADING_STYLES) {
+    const label = document.createElement('label');
+    label.className = 'fc-fmtdlg__check';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'fc-gradient-style';
+    input.dataset.fcGradientStyle = style;
+    const text = document.createElement('span');
+    text.textContent = shadingLabel(t, style);
+    label.append(input, text);
+    styles.appendChild(label);
+    gradientStyleInputs.set(style, input);
+  }
+  fillEffects.appendChild(styles);
+  const variants = document.createElement('div');
+  variants.className = 'fc-fmtdlg__gradient-variants';
+  variants.setAttribute('role', 'group');
+  variants.setAttribute('aria-label', t.gradientVariants);
+  const gradientVariants = [0, 1, 2, 3].map((index) => {
+    const button = makeButton('');
+    button.className = 'fc-fmtdlg__gradient-variant';
+    button.dataset.fcGradientVariant = String(index);
+    button.setAttribute('aria-label', `${t.gradientVariants} ${index + 1}`);
+    button.setAttribute('aria-pressed', 'false');
+    variants.appendChild(button);
+    return button;
+  });
+  fillEffects.appendChild(variants);
+  return { fillEffects, gradientColor1, gradientColor2, gradientStyleInputs, gradientVariants };
+};
 
 export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog']): FillTabRefs {
   const fillSection = document.createElement('div');
@@ -96,6 +182,11 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     fillPatternGallery.appendChild(button);
   }
   fillSection.appendChild(fillPatternGallery);
+  const fillEffectsButton = makeButton(t.fillEffects);
+  fillEffectsButton.dataset.fcFillEffects = '';
+  fillSection.appendChild(fillEffectsButton);
+  const effects = createFillEffects(t);
+  fillSection.appendChild(effects.fillEffects);
 
   const sample = document.createElement('div');
   sample.className = 'fc-fmtdlg__fill-sample';
@@ -115,5 +206,7 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     fillPatternGallery,
     fillPatternColorInput,
     fillSample,
+    fillEffectsButton,
+    ...effects,
   };
 }

@@ -20,6 +20,7 @@ import { addMergeToMaps } from '../store/merge-maps.js';
 import { rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { listComments, recordCommentChange } from './comment.js';
+import { blockDataTableShift } from './data-table-guard.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
@@ -44,6 +45,7 @@ interface EngineCommentRecord {
   addr: Addr;
   author: string;
   text: string;
+  visible: boolean;
 }
 
 export interface ShiftReplayCheckpoint {
@@ -135,6 +137,7 @@ export const restoreShiftReplayCheckpoint = (
           comment.addr.col,
           comment.author,
           comment.text,
+          comment.visible,
         );
       }
     }
@@ -166,6 +169,7 @@ export function insertCells(
       : { sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
   const delta = direction === 'down' ? range.r1 - range.r0 + 1 : range.c1 - range.c0 + 1;
   if (delta > 0 && shiftWouldOverflow(store, wb, affected, direction, delta)) return false;
+  if (blockDataTableShift(wb, affected)) return false;
   return shiftCellBand(store, wb, history, affected, direction, delta);
 }
 
@@ -183,6 +187,7 @@ export function deleteCells(
       ? { sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
       : { sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
   const delta = direction === 'up' ? -(range.r1 - range.r0 + 1) : -(range.c1 - range.c0 + 1);
+  if (blockDataTableShift(wb, affected)) return false;
   return shiftCellBand(store, wb, history, affected, direction === 'up' ? 'down' : 'right', delta);
 }
 
@@ -518,7 +523,14 @@ function shiftEngineComments(
     for (const entry of entries) {
       const shifted = shiftedCommentAddr(entry.addr, axis, delta);
       if (!inShiftTarget(shifted, affected, axis)) continue;
-      wb.setCommentEntry(shifted.sheet, shifted.row, shifted.col, entry.author, entry.text);
+      wb.setCommentEntry(
+        shifted.sheet,
+        shifted.row,
+        shifted.col,
+        entry.author,
+        entry.text,
+        entry.visible,
+      );
     }
   });
 }
@@ -533,10 +545,20 @@ function collectEngineComments(
         addr: { sheet: affected.sheet, row: comment.row, col: comment.col },
         author: comment.author,
         text: comment.text,
+        visible: comment.visible === true,
       }))
     : storeCommentAddresses.flatMap((addr) => {
         const comment = wb.getComment(addr.sheet, addr.row, addr.col);
-        return comment ? [{ addr, author: comment.author, text: comment.text }] : [];
+        return comment
+          ? [
+              {
+                addr,
+                author: comment.author,
+                text: comment.text,
+                visible: comment.visible === true,
+              },
+            ]
+          : [];
       });
   const unique = new Map<string, EngineCommentRecord>();
   for (const entry of entries) {
@@ -555,6 +577,7 @@ function hydrateEngineOnlyComments(
     mutators.setCellFormat(store, entry.addr, {
       comment: entry.text,
       commentAuthor: entry.author || undefined,
+      commentVisible: entry.visible || undefined,
     });
   }
 }

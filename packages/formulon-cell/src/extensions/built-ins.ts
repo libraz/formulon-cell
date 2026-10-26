@@ -42,7 +42,6 @@ import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
-import { formatSessionChartValue } from '../interact/session-chart-format.js';
 import { attachSessionCharts } from '../interact/session-charts.js';
 import { attachSessionIllustrations } from '../interact/session-illustrations.js';
 import { attachSlicer } from '../interact/slicer.js';
@@ -202,7 +201,6 @@ export const charts = (): Extension => ({
       labels: ctx.i18n.strings.sessionCharts,
       history: ctx.history,
       locale: ctx.i18n.locale,
-      formatValue: formatSessionChartValue,
     });
     return {
       refresh: () => handle.refresh(),
@@ -397,24 +395,28 @@ export const conditionalDialog = (): Extension => ({
   },
 });
 
-/** Iterative-calc settings dialog — id `'iterative'`. Always-on in the
- *  default mount; surfaced here so consumers building a custom chrome
- *  can wire their own opener. */
+/** Calculation options dialog (mode, iteration, R1C1, precision, 1904 dates)
+ *  — id `'iterative'`. Always-on in the default mount; surfaced here so
+ *  consumers building a custom chrome can wire their own opener. */
 export const iterativeDialog = (): Extension => ({
   id: 'iterative',
   priority: 50,
   setup(ctx) {
-    let handle = attachIterativeDialog({
-      host: ctx.host,
-      getWb: ctx.getWb,
-      strings: ctx.i18n.strings,
-    });
+    const attach = (strings: typeof ctx.i18n.strings) =>
+      attachIterativeDialog({
+        host: ctx.host,
+        getWb: ctx.getWb,
+        strings,
+        store: ctx.store,
+        history: ctx.history,
+      });
+    let handle = attach(ctx.i18n.strings);
     return {
       open: () => handle.open(),
       close: () => handle.close(),
       setStrings: (next) => {
         handle.detach();
-        handle = attachIterativeDialog({ host: ctx.host, getWb: ctx.getWb, strings: next });
+        handle = attach(next);
       },
       dispose: () => handle.detach(),
     };

@@ -41,6 +41,7 @@ export const gridPopupsJa: GridPopupsStrings = {
     colUngroup: '列のグループ解除',
     insertComment: 'コメントを編集…',
     deleteComment: 'コメントを削除',
+    showHideNote: 'メモの表示/非表示',
     insertHyperlink: 'ハイパーリンクを挿入…',
     addWatch: 'ウォッチを追加',
     removeWatch: 'ウォッチを削除',

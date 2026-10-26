@@ -213,6 +213,9 @@ export const dataObjectsKo: DataObjectsStrings = {
     },
     compatibilityLabels: {
       cellFormatting: '셀 서식',
+      fontEffects: '글꼴 효과',
+      gradientFills: '그라데이션 채우기',
+      xlsbSave: '바이너리 통합 문서 (.xlsb)',
       conditionalFormatting: '조건부 서식',
       dataValidation: '데이터 유효성 검사',
       hyperlinks: '하이퍼링크',
@@ -239,17 +242,30 @@ export const dataObjectsKo: DataObjectsStrings = {
       chartsDrawings: '차트, 그리기 및 그림',
       chartAuthoring: '차트 만들기',
       externalLinks: '외부 링크',
+      calcSettings: '계산 옵션',
+      dataTables: '데이터 표',
+      showFormulas: '수식 표시',
+      outlineSymbols: '윤곽 기호',
+      outlineCollapse: '축소된 윤곽 그룹',
+      splitPanes: '창 나누기',
+      hiddenDefaultRows: '기본적으로 숨겨진 행',
     },
     compatibilityDetails: {
       cellFormatting:
         '엔진에서 지원하는 경우 XF/글꼴/채우기/테두리/숫자 서식 API를 사용할 수 있습니다.',
+      fontEffects:
+        '윤곽선, 그림자, 좁게 및 넓게는 모든 프로필에서 글꼴과 함께 저장됩니다. 윤곽선과 그림자는 Mac의 셀 서식 대화 상자에서 설정하며 Mac 프로필에서만 그려집니다. 좁게와 넓게는 유지되지만 그려지지 않습니다.',
+      gradientFills:
+        '선형 및 경로 그라데이션 채우기는 저장되며 채우기 효과에서 설정할 수 있습니다. 경로 그라데이션은 방사형 근사로 그려집니다.',
+      xlsbSave:
+        '통합 문서를 .xlsb로 저장할 수 있습니다. 메모, 스레드 댓글, 필터는 기록되지 않습니다. 그림·도형·차트, .xlsx에서 읽은 피벗 테이블과 슬라이서, 페이지 설정(여백, 머리글과 바닥글, 페이지 나누기), 범위 편집 허용, 일부 시트 보기와 통합 문서 보호 설정, 사용자 지정 표 스타일, 참조를 인코딩할 수 없는 표나 스파크라인도 빠질 수 있으며 저장 전에 경고가 표시됩니다.',
       conditionalFormatting:
         '엔진 지원에 따라 조건부 서식 규칙을 평가하거나 만들거나 세션에서 호스트할 수 있습니다.',
       dataValidation:
         '유효성 검사 범위, 메시지 및 숨겨진 드롭다운 화살표 상태를 읽고 쓸 수 있습니다.',
       hyperlinks: '엔진에 다시 쓰기 기능이 있으면 하이퍼링크를 열거하고 추가하고 지울 수 있습니다.',
       comments:
-        '시트 전체 열거를 지원하면 빈 셀의 노트를 포함한 셀 노트를 열거하고 읽고 쓸 수 있습니다.',
+        '시트 전체 열거를 지원하면 빈 셀의 노트를 포함한 셀 노트를 열거하고 읽고 쓸 수 있습니다. 표시된 메모는 표시 상태로 유지됩니다. 정렬, 삽입/삭제, 잘라내기 또는 붙여넣기로 이동한 메모 상자는 기본 크기와 위치가 됩니다.',
       threadedComments:
         '엔진에서 스레드 메모를 지원하면 메모, 회신, 사용자 및 해결 상태가 XLSX에 저장됩니다.',
       images:
@@ -293,6 +309,17 @@ export const dataObjectsKo: DataObjectsStrings = {
       chartAuthoring:
         '세로 막대형, 가로 막대형, 꺾은선형, 영역형, 원형, 도넛형, 분산형 차트를 만들고 편집할 수 있으며 통합 문서와 함께 저장됩니다. 그 밖의 차트 종류는 자리 표시자로 표시되며 이동, 크기 조정, 삭제만 할 수 있습니다.',
       externalLinks: '엔진에서 외부 링크 레코드를 제공하면 목록화할 수 있습니다.',
+      calcSettings:
+        '계산 모드, 저장 전 다시 계산, 반복 계산, R1C1 참조 스타일, 표시된 정밀도, 1904 날짜 체계가 통합 문서와 함께 저장됩니다. 표시된 정밀도는 저장된 상수와 새 입력을 서식에 맞게 반올림합니다. 엔진이 이 옵션을 메타데이터로만 저장하므로 수식 결과는 전체 정밀도를 유지합니다.',
+      dataTables:
+        '가상 분석 데이터 표를 만들고 계산하여 통합 문서와 함께 저장합니다. 결과 셀은 편집할 수 없습니다.',
+      showFormulas: '수식 표시는 시트별로 저장됩니다.',
+      outlineSymbols: '윤곽 기호 숨기기는 시트별로 저장됩니다.',
+      outlineCollapse: '축소된 그룹은 요약 행 또는 열에 축소 표시가 된 상태로 저장됩니다.',
+      splitPanes:
+        '나눈 창은 각 창에 표시된 행과 열과 함께 저장됩니다. 위쪽과 왼쪽 창은 따로 스크롤되지만 다른 창이 시작되는 곳에서 멈춥니다.',
+      hiddenDefaultRows:
+        '행을 기본적으로 숨기는 시트는 그 설정을 유지합니다. 빈 행 레코드로만 표시가 유지되는 행은 열 때 숨겨집니다.',
     },
     lossLabels: {
       undecodedFormula: '읽을 수 없는 수식',

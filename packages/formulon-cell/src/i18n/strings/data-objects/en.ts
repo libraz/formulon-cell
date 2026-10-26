@@ -213,6 +213,9 @@ export const dataObjectsEn: DataObjectsStrings = {
     },
     compatibilityLabels: {
       cellFormatting: 'Cell formatting',
+      fontEffects: 'Font effects',
+      gradientFills: 'Gradient fills',
+      xlsbSave: 'Binary workbook (.xlsb)',
       conditionalFormatting: 'Conditional formatting',
       dataValidation: 'Data validation',
       hyperlinks: 'Hyperlinks',
@@ -239,10 +242,23 @@ export const dataObjectsEn: DataObjectsStrings = {
       chartsDrawings: 'Charts, drawings, and images',
       chartAuthoring: 'Chart authoring',
       externalLinks: 'External links',
+      calcSettings: 'Calculation options',
+      dataTables: 'Data tables',
+      showFormulas: 'Show Formulas',
+      outlineSymbols: 'Outline symbols',
+      outlineCollapse: 'Collapsed outline groups',
+      splitPanes: 'Split panes',
+      hiddenDefaultRows: 'Rows hidden by default',
     },
     compatibilityDetails: {
       cellFormatting:
         'XF/font/fill/border/number-format APIs are available when the engine supports them.',
+      fontEffects:
+        'Outline, shadow, condense and extend are saved with the font under every profile. Outline and Shadow are set in the Mac Format Cells dialog and drawn only under the Mac profile; condense and extend are kept but not drawn.',
+      gradientFills:
+        'Linear and path gradient fills are saved and can be set through Fill Effects. Path gradients are painted as radial approximations.',
+      xlsbSave:
+        'Workbooks can be saved as .xlsb. Notes, threaded comments and filters are not written. Pictures, shapes and charts, PivotTables and slicers read from .xlsx, page setup (margins, header and footer, page breaks), protected ranges, some sheet views and workbook protection settings, custom table styles, and tables or sparklines whose references cannot be encoded may also be left out; saving warns first.',
       conditionalFormatting:
         'Conditional-format rules can be evaluated, authored, or hosted for the session depending on engine support.',
       dataValidation:
@@ -250,7 +266,7 @@ export const dataObjectsEn: DataObjectsStrings = {
       hyperlinks:
         'Hyperlinks can be enumerated, added, and cleared when engine writeback is available.',
       comments:
-        'Cell comments, including comments on blank cells, can be enumerated, read, and written when sheet-wide enumeration is available.',
+        'Cell comments, including comments on blank cells, can be enumerated, read, and written when sheet-wide enumeration is available. Shown notes stay shown; a note moved by sort, insert/delete, cut or paste takes the default box size and position.',
       threadedComments:
         'Comments, replies, people and resolution are saved in XLSX when the engine supports threaded comments.',
       images:
@@ -297,6 +313,18 @@ export const dataObjectsEn: DataObjectsStrings = {
       chartAuthoring:
         'Column, bar, line, area, pie, doughnut, and scatter charts can be created and edited, and are saved with the workbook. Other chart types are shown as placeholders that can be moved, resized, and deleted.',
       externalLinks: 'External link records can be inventoried when the engine exposes them.',
+      calcSettings:
+        'Calculation mode, recalculation before saving, iteration, R1C1 reference style, precision as displayed and the 1904 date system are saved with the workbook. Precision as displayed rounds stored constants and new entries to their format; formula results keep full precision because the engine stores the option as metadata only.',
+      dataTables:
+        'What-If data tables are created, computed and saved with the workbook; their result cells cannot be edited.',
+      showFormulas: 'Show Formulas is saved per sheet.',
+      outlineSymbols: 'Hiding the outline symbols is saved per sheet.',
+      outlineCollapse:
+        'Collapsed groups are saved with their summary row or column marked collapsed.',
+      splitPanes:
+        'Split panes are saved with the rows and columns each pane shows. The top and left panes scroll on their own but end where the other pane begins.',
+      hiddenDefaultRows:
+        'Sheets that hide rows by default keep that setting. A row the file keeps visible only through an empty row record opens hidden.',
     },
     lossLabels: {
       undecodedFormula: 'Formulas that could not be read',

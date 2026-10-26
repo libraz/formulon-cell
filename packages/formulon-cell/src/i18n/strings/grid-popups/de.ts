@@ -41,6 +41,7 @@ export const gridPopupsDe: GridPopupsStrings = {
     colUngroup: 'Gruppierung der Spalten aufheben',
     insertComment: 'Kommentar bearbeiten…',
     deleteComment: 'Kommentar löschen',
+    showHideNote: 'Notiz ein-/ausblenden',
     insertHyperlink: 'Hyperlink einfügen…',
     addWatch: 'Überwachung hinzufügen',
     removeWatch: 'Überwachung entfernen',

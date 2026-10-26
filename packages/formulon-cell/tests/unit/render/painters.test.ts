@@ -785,3 +785,86 @@ describe('paintCellText font strictness', () => {
     expect(stableTextMetricsBox(13).descent).toBeCloseTo(2.86);
   });
 });
+
+describe('paintCellText font effects', () => {
+  const effectSpy = () => {
+    const strokes: string[] = [];
+    const fills: string[] = [];
+    const shadows: Array<{ color: string; x: number; y: number }> = [];
+    let shadowColor = '';
+    let shadowOffsetX = 0;
+    let shadowOffsetY = 0;
+    const ctx = makeTextSpy().ctx;
+    Object.defineProperties(ctx, {
+      shadowColor: {
+        get: () => shadowColor,
+        set: (v: string) => {
+          shadowColor = v;
+        },
+      },
+      shadowOffsetX: {
+        get: () => shadowOffsetX,
+        set: (v: number) => {
+          shadowOffsetX = v;
+        },
+      },
+      shadowOffsetY: {
+        get: () => shadowOffsetY,
+        set: (v: number) => {
+          shadowOffsetY = v;
+        },
+      },
+    });
+    Object.assign(ctx, {
+      shadowBlur: 0,
+      lineWidth: 1,
+      strokeStyle: '',
+      fillText(text: string): void {
+        fills.push(text);
+        shadows.push({ color: shadowColor, x: shadowOffsetX, y: shadowOffsetY });
+      },
+      strokeText(text: string): void {
+        strokes.push(text);
+      },
+    });
+    return { ctx, strokes, fills, shadows };
+  };
+  const base = {
+    bounds: { x: 0, y: 0, w: 120, h: 30 },
+    theme: theme(),
+    value: { kind: 'text' as const, value: 'Hi' },
+    formula: null,
+    isActive: false,
+    isInRange: false,
+  };
+
+  it('paints outlined text as a hollow stroke', () => {
+    const spy = effectSpy();
+    paintCellText({ ...base, ctx: spy.ctx, fontEffects: true, format: { fontOutline: true } });
+    expect(spy.strokes).toEqual(['Hi']);
+    expect(spy.fills).toEqual([]);
+  });
+
+  it('paints shadowed text with an offset shadow', () => {
+    const spy = effectSpy();
+    paintCellText({ ...base, ctx: spy.ctx, fontEffects: true, format: { fontShadow: true } });
+    expect(spy.fills).toEqual(['Hi']);
+    expect(spy.shadows[0]?.color).not.toBe('');
+    expect(spy.shadows[0]?.x).toBeGreaterThan(0);
+    expect(spy.shadows[0]?.y).toBeGreaterThan(0);
+  });
+
+  it('paints the effects as plain text outside the Mac profile', () => {
+    const spy = effectSpy();
+    paintCellText({ ...base, ctx: spy.ctx, format: { fontOutline: true, fontShadow: true } });
+    expect(spy.strokes).toEqual([]);
+    expect(spy.fills).toEqual(['Hi']);
+    expect(spy.shadows[0]?.x ?? 0).toBe(0);
+  });
+
+  it('paints plain text without a shadow', () => {
+    const spy = effectSpy();
+    paintCellText({ ...base, ctx: spy.ctx });
+    expect(spy.shadows[0]?.x ?? 0).toBe(0);
+  });
+});

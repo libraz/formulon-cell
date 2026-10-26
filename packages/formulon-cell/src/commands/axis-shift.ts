@@ -37,6 +37,7 @@ export function cloneInsertedFormat(format: CellFormat): CellFormat {
   delete next.hyperlinkTooltip;
   delete next.comment;
   delete next.commentAuthor;
+  delete next.commentVisible;
   delete next.validation;
   if (format.borders) next.borders = { ...format.borders };
   if (format.numFmt) next.numFmt = { ...format.numFmt };

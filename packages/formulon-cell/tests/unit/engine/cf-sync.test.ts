@@ -433,7 +433,7 @@ describe('evaluateCfFromEngine', () => {
   it('lifts known IconSet ordinals into icon overlay metadata', () => {
     const wb = fakeWb(true, [
       { row: 0, col: 0, matches: [{ kind: KIND_ICON, iconSetName: 0, iconIndex: 2 }] },
-      { row: 0, col: 1, matches: [{ kind: KIND_ICON, iconSetName: 1, iconIndex: 9 }] },
+      { row: 0, col: 1, matches: [{ kind: KIND_ICON, iconSetName: 13, iconIndex: 9 }] },
     ]);
     const out = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9);
     expect(out.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toMatchObject({

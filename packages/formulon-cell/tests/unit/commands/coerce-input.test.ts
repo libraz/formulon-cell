@@ -282,3 +282,60 @@ describe('writeInputValidated', () => {
     expect(wb.setText).toHaveBeenCalledWith(addr, 'Closed');
   });
 });
+
+describe('typed dates in a 1904 workbook', () => {
+  const store1904 = (): ReturnType<typeof createSpreadsheetStore> => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({ ...s, ui: { ...s.ui, date1904: true } }));
+    return store;
+  };
+  const addr: Addr = { sheet: 0, row: 0, col: 0 };
+
+  it('reads the date system from the store', () => {
+    expect(coerceInputForCell(store1904().getState(), addr, '2024-01-01')).toMatchObject({
+      kind: 'number',
+      value: 43830,
+    });
+    expect(
+      coerceInputForCell(createSpreadsheetStore().getState(), addr, '2024-01-01'),
+    ).toMatchObject({ kind: 'number', value: 45292 });
+  });
+
+  it('keeps dates before 1904 as text', () => {
+    expect(coerceInputForCell(store1904().getState(), addr, '1903-12-31')).toEqual({
+      kind: 'text',
+      value: '1903-12-31',
+    });
+    expect(coerceInput('1903-12-31', { date1904: true }).kind).toBe('text');
+    expect(coerceInput('1903-12-31').kind).toBe('number');
+  });
+
+  it('applies to month-name and CJK date spellings', () => {
+    expect(coerceInput('1-Jan-2024', { date1904: true })).toMatchObject({ value: 43830 });
+    expect(coerceInput('2024年1月1日', { locale: 'ja-JP', date1904: true })).toMatchObject({
+      value: 43830,
+    });
+  });
+});
+
+describe('coerceInputForCell under Set precision as displayed', () => {
+  it('rounds a typed number to the digits its format shows', () => {
+    const store = createSpreadsheetStore();
+    const addr: Addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setCellFormat(store, addr, { numFmt: { kind: 'fixed', decimals: 2 } });
+    expect(coerceInputForCell(store.getState(), addr, '1.23456')).toEqual({
+      kind: 'number',
+      value: 1.23456,
+    });
+    store.setState((s) => ({ ...s, ui: { ...s.ui, precisionAsDisplayed: true } }));
+    expect(coerceInputForCell(store.getState(), addr, '1.23456')).toEqual({
+      kind: 'number',
+      value: 1.23,
+    });
+    // A General cell keeps full precision.
+    expect(coerceInputForCell(store.getState(), { ...addr, col: 1 }, '1.23456')).toEqual({
+      kind: 'number',
+      value: 1.23456,
+    });
+  });
+});

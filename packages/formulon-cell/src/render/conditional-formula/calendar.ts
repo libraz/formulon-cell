@@ -7,9 +7,14 @@ import {
 import { textValue } from './coercion.js';
 import { FORMULA_NUMBER_LITERAL } from './parser.js';
 
-const dateSerialFromParts = (year: number, month: number, day: number): number => {
+const dateSerialFromParts = (
+  year: number,
+  month: number,
+  day: number,
+  date1904 = false,
+): number => {
   const normalizedYear = year >= 0 && year < 1900 ? year + 1900 : year;
-  if (normalizedYear === 1900 && month === 2 && day === 29) return 60;
+  if (!date1904 && normalizedYear === 1900 && month === 2 && day === 29) return 60;
   const date = new Date(0);
   date.setUTCHours(0, 0, 0, 0);
   date.setUTCFullYear(normalizedYear, month - 1, day);
@@ -17,11 +22,16 @@ const dateSerialFromParts = (year: number, month: number, day: number): number =
     date.getUTCFullYear(),
     date.getUTCMonth() + 1,
     date.getUTCDate(),
-    { allowFictitious: true },
+    { allowFictitious: true, date1904 },
   );
   return serial ?? Number.NaN;
 };
-const validatedDateSerial = (year: number, month: number, day: number): number | null => {
+const validatedDateSerial = (
+  year: number,
+  month: number,
+  day: number,
+  date1904: boolean,
+): number | null => {
   const normalizedYear = year >= 0 && year < 1900 ? year + 1900 : year;
   const date = new Date(0);
   date.setUTCHours(0, 0, 0, 0);
@@ -33,14 +43,19 @@ const validatedDateSerial = (year: number, month: number, day: number): number |
   ) {
     return null;
   }
-  return excelSerialFromParts(normalizedYear, month, day);
+  return excelSerialFromParts(normalizedYear, month, day, { date1904 });
 };
-const dateValueText = (value: CellValue): CellValue => {
+const dateValueText = (value: CellValue, date1904 = false): CellValue => {
   const text = textValue(value)?.trim();
   if (!text) return { kind: 'error', code: 15, text: '#VALUE!' };
   let match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/u.exec(text);
   if (match) {
-    const serial = validatedDateSerial(Number(match[1]), Number(match[2]), Number(match[3]));
+    const serial = validatedDateSerial(
+      Number(match[1]),
+      Number(match[2]),
+      Number(match[3]),
+      date1904,
+    );
     return serial === null
       ? { kind: 'error', code: 15, text: '#VALUE!' }
       : { kind: 'number', value: serial };
@@ -49,7 +64,7 @@ const dateValueText = (value: CellValue): CellValue => {
   if (match) {
     const rawYear = Number(match[3]);
     const year = rawYear < 100 ? (rawYear < 30 ? rawYear + 2000 : rawYear + 1900) : rawYear;
-    const serial = validatedDateSerial(year, Number(match[1]), Number(match[2]));
+    const serial = validatedDateSerial(year, Number(match[1]), Number(match[2]), date1904);
     return serial === null
       ? { kind: 'error', code: 15, text: '#VALUE!' }
       : { kind: 'number', value: serial };
@@ -74,16 +89,24 @@ const timeValueText = (value: CellValue): CellValue => {
   }
   return { kind: 'number', value: (hour * 3600 + minute * 60 + second) / 86_400 };
 };
-const todaySerial = (): number => {
+const todaySerial = (date1904 = false): number => {
   const now = new Date(Date.now());
-  return dateSerialFromParts(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate());
+  return dateSerialFromParts(
+    now.getUTCFullYear(),
+    now.getUTCMonth() + 1,
+    now.getUTCDate(),
+    date1904,
+  );
 };
 const serialTimeFraction = (serial: number): number => ((serial % 1) + 1) % 1;
-const dateFromSerial = (serial: number): Date | null => {
-  return excelSerialToDate(serial);
+const dateFromSerial = (serial: number, date1904 = false): Date | null => {
+  return excelSerialToDate(serial, date1904);
 };
-const serialDateParts = (serial: number): { year: number; month: number; day: number } | null => {
-  const parts = excelSerialToDateParts(serial);
+const serialDateParts = (
+  serial: number,
+  date1904: boolean,
+): { year: number; month: number; day: number } | null => {
+  const parts = excelSerialToDateParts(serial, date1904);
   if (parts === null) return null;
   return {
     year: parts.year,
@@ -99,11 +122,15 @@ const previousMonthParts = (year: number, month: number): { year: number; month:
   month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
 const daysInMonth = (year: number, month: number): number =>
   new Date(Date.UTC(year, month, 0)).getUTCDate();
-const clampedDateSerial = (year: number, month: number, day: number): number =>
-  dateSerialFromParts(year, month, Math.min(day, daysInMonth(year, month)));
+const clampedDateSerial = (year: number, month: number, day: number, date1904: boolean): number =>
+  dateSerialFromParts(year, month, Math.min(day, daysInMonth(year, month)), date1904);
 const defaultWeekendDays = new Set<number>([0, 6]);
-const isWeekendSerial = (serial: number, weekends = defaultWeekendDays): boolean => {
-  const date = dateFromSerial(serial);
+const isWeekendSerial = (
+  serial: number,
+  weekends = defaultWeekendDays,
+  date1904 = false,
+): boolean => {
+  const date = dateFromSerial(serial, date1904);
   if (date === null) return false;
   return weekends.has(date.getUTCDay());
 };
@@ -136,19 +163,21 @@ const isBusinessDay = (
   serial: number,
   holidays: Set<number>,
   weekends = defaultWeekendDays,
-): boolean => !isWeekendSerial(serial, weekends) && !holidays.has(Math.trunc(serial));
+  date1904 = false,
+): boolean => !isWeekendSerial(serial, weekends, date1904) && !holidays.has(Math.trunc(serial));
 const networkDays = (
   start: number,
   end: number,
   holidays = new Set<number>(),
   weekends = defaultWeekendDays,
+  date1904 = false,
 ): number => {
   const first = Math.trunc(start);
   const last = Math.trunc(end);
   const direction = first <= last ? 1 : -1;
   let count = 0;
   for (let serial = first; direction > 0 ? serial <= last : serial >= last; serial += direction) {
-    if (isBusinessDay(serial, holidays, weekends)) count += direction;
+    if (isBusinessDay(serial, holidays, weekends, date1904)) count += direction;
   }
   return count;
 };
@@ -157,20 +186,21 @@ const workday = (
   days: number,
   holidays = new Set<number>(),
   weekends = defaultWeekendDays,
+  date1904 = false,
 ): number => {
   let remaining = Math.trunc(days);
   let serial = Math.trunc(start);
   const direction = remaining >= 0 ? 1 : -1;
   while (remaining !== 0) {
     serial += direction;
-    if (!isBusinessDay(serial, holidays, weekends)) continue;
+    if (!isBusinessDay(serial, holidays, weekends, date1904)) continue;
     remaining -= direction;
   }
   return serial;
 };
-const days360 = (start: number, end: number, european: boolean): CellValue => {
-  const startParts = serialDateParts(start);
-  const endParts = serialDateParts(end);
+const days360 = (start: number, end: number, european: boolean, date1904 = false): CellValue => {
+  const startParts = serialDateParts(start, date1904);
+  const endParts = serialDateParts(end, date1904);
   if (startParts === null || endParts === null) {
     return { kind: 'error', code: 15, text: '#VALUE!' };
   }
@@ -200,9 +230,9 @@ const days360 = (start: number, end: number, european: boolean): CellValue => {
 const isLeapYear = (year: number): boolean =>
   (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 const daysInYear = (year: number): number => (isLeapYear(year) ? 366 : 365);
-const actualActualYearFrac = (start: number, end: number): CellValue => {
-  const startDate = dateFromSerial(start);
-  const endDate = dateFromSerial(end);
+const actualActualYearFrac = (start: number, end: number, date1904: boolean): CellValue => {
+  const startDate = dateFromSerial(start, date1904);
+  const endDate = dateFromSerial(end, date1904);
   if (startDate === null || endDate === null) {
     return { kind: 'error', code: 15, text: '#VALUE!' };
   }
@@ -210,7 +240,7 @@ const actualActualYearFrac = (start: number, end: number): CellValue => {
   const last = Math.trunc(end);
   if (first === last) return { kind: 'number', value: 0 };
   if (first > last) {
-    const value = actualActualYearFrac(end, start);
+    const value = actualActualYearFrac(end, start, date1904);
     return value.kind === 'number' ? { kind: 'number', value: -value.value } : value;
   }
   const startYear = startDate.getUTCFullYear();
@@ -218,8 +248,8 @@ const actualActualYearFrac = (start: number, end: number): CellValue => {
   if (startYear === endYear) {
     return { kind: 'number', value: (last - first) / daysInYear(startYear) };
   }
-  const nextYearStart = dateSerialFromParts(startYear + 1, 1, 1);
-  const endYearStart = dateSerialFromParts(endYear, 1, 1);
+  const nextYearStart = dateSerialFromParts(startYear + 1, 1, 1, date1904);
+  const endYearStart = dateSerialFromParts(endYear, 1, 1, date1904);
   let value = (nextYearStart - first) / daysInYear(startYear);
   for (let year = startYear + 1; year < endYear; year += 1) {
     value += 1;
@@ -227,22 +257,22 @@ const actualActualYearFrac = (start: number, end: number): CellValue => {
   value += (last - endYearStart) / daysInYear(endYear);
   return { kind: 'number', value };
 };
-const yearFrac = (start: number, end: number, basis: number): CellValue => {
+const yearFrac = (start: number, end: number, basis: number, date1904 = false): CellValue => {
   const normalizedBasis = Math.trunc(basis);
   if (normalizedBasis < 0 || normalizedBasis > 4) {
     return { kind: 'error', code: 6, text: '#NUM!' };
   }
   if (normalizedBasis === 0 || normalizedBasis === 4) {
-    const value = days360(start, end, normalizedBasis === 4);
+    const value = days360(start, end, normalizedBasis === 4, date1904);
     return value.kind === 'number' ? { kind: 'number', value: value.value / 360 } : value;
   }
   const days = Math.trunc(end) - Math.trunc(start);
-  if (normalizedBasis === 1) return actualActualYearFrac(start, end);
+  if (normalizedBasis === 1) return actualActualYearFrac(start, end, date1904);
   return { kind: 'number', value: days / (normalizedBasis === 2 ? 360 : 365) };
 };
-const datedif = (start: number, end: number, unitValue: CellValue): CellValue => {
-  const startParts = serialDateParts(start);
-  const endParts = serialDateParts(end);
+const datedif = (start: number, end: number, unitValue: CellValue, date1904 = false): CellValue => {
+  const startParts = serialDateParts(start, date1904);
+  const endParts = serialDateParts(end, date1904);
   const unit = textValue(unitValue)?.trim().toUpperCase();
   if (startParts === null || endParts === null || !unit) {
     return { kind: 'error', code: 15, text: '#VALUE!' };
@@ -252,7 +282,7 @@ const datedif = (start: number, end: number, unitValue: CellValue): CellValue =>
   if (first > last) return { kind: 'error', code: 6, text: '#NUM!' };
   const { year: y1, month: m1, day: d1 } = startParts;
   const { year: y2, month: m2, day: d2 } = endParts;
-  const anniversaryThisYear = clampedDateSerial(y2, m1, d1);
+  const anniversaryThisYear = clampedDateSerial(y2, m1, d1, date1904);
   const fullYears = y2 - y1 - (anniversaryThisYear > last ? 1 : 0);
   const fullMonths = (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
   if (unit === 'D') return { kind: 'number', value: last - first };
@@ -261,13 +291,18 @@ const datedif = (start: number, end: number, unitValue: CellValue): CellValue =>
   if (unit === 'YM') return { kind: 'number', value: ((fullMonths % 12) + 12) % 12 };
   if (unit === 'YD') {
     const anniversary =
-      anniversaryThisYear <= last ? anniversaryThisYear : clampedDateSerial(y2 - 1, m1, d1);
+      anniversaryThisYear <= last
+        ? anniversaryThisYear
+        : clampedDateSerial(y2 - 1, m1, d1, date1904);
     return { kind: 'number', value: last - anniversary };
   }
   if (unit === 'MD') {
     if (d2 >= d1) return { kind: 'number', value: d2 - d1 };
     const previous = previousMonthParts(y2, m2);
-    return { kind: 'number', value: last - clampedDateSerial(previous.year, previous.month, d1) };
+    return {
+      kind: 'number',
+      value: last - clampedDateSerial(previous.year, previous.month, d1, date1904),
+    };
   }
   return { kind: 'error', code: 6, text: '#NUM!' };
 };

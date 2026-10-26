@@ -16,6 +16,8 @@ const fire = (
     ctrlKey?: boolean;
     metaKey?: boolean;
     shiftKey?: boolean;
+    clientX?: number;
+    clientY?: number;
   },
 ): WheelEvent => {
   const e = new WheelEvent('wheel', {
@@ -24,6 +26,8 @@ const fire = (
     deltaX: init.deltaX ?? 0,
     deltaY: init.deltaY ?? 0,
   });
+  Object.defineProperty(e, 'clientX', { value: init.clientX ?? 0 });
+  Object.defineProperty(e, 'clientY', { value: init.clientY ?? 0 });
   Object.defineProperty(e, 'ctrlKey', { value: init.ctrlKey ?? false });
   Object.defineProperty(e, 'metaKey', { value: init.metaKey ?? false });
   Object.defineProperty(e, 'shiftKey', { value: init.shiftKey ?? false });
@@ -148,5 +152,19 @@ describe('attachWheel', () => {
     expect(store.getState().viewport.rowStart).toBe(0);
     // Re-attach so afterEach detach is a no-op-safe call.
     detach = attachWheel({ grid, store });
+  });
+
+  it('scrolls the top split pane when the wheel is over it', () => {
+    mutators.setFreezePanes(store, 5, 0, { row: 0, col: 0 }, true);
+    mutators.scrollBy(store, 20, 0);
+    const rh = store.getState().layout.defaultRowHeight;
+    // Header (20 px) plus two rows down: inside the top pane.
+    fire(grid, { deltaY: rh * 3, clientX: 100, clientY: 60 });
+    expect(store.getState().layout.freezeOriginRow).toBe(3);
+    expect(store.getState().viewport.rowStart).toBe(25);
+    // Below the split the bottom pane scrolls as usual.
+    fire(grid, { deltaY: rh * 2, clientX: 100, clientY: 300 });
+    expect(store.getState().viewport.rowStart).toBe(27);
+    expect(store.getState().layout.freezeOriginRow).toBe(3);
   });
 });

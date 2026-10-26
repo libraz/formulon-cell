@@ -2,6 +2,7 @@ import type { PaginationResult } from '@libraz/formulon';
 import { parseAddrKey } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { renderScale } from '../store/render-scale.js';
+import { hiddenRowsOf, isRowHidden } from '../store/row-visibility.js';
 // Page pagination for the Page Layout and Page Break Preview workbook views.
 //
 // `print.ts` owns the same split for the printed document; this module reuses
@@ -232,7 +233,7 @@ function extendNativeBands(
   if (bands.length === 0) return bands;
   const last = bands[bands.length - 1];
   if (!last || last.end >= target) return bands;
-  const hidden = axis === 'row' ? state.layout.hiddenRows : state.layout.hiddenCols;
+  const hidden = axis === 'row' ? hiddenRowsOf(state.layout) : state.layout.hiddenCols;
   const defaultSize = axis === 'row' ? state.layout.defaultRowHeight : state.layout.defaultColWidth;
   const sizes = axis === 'row' ? state.layout.rowHeights : state.layout.colWidths;
   const manual = axis === 'row' ? setup.manualPageBreakRows : setup.manualPageBreakCols;
@@ -385,7 +386,7 @@ function paginate(state: State, sheet: number, opts: PaginateOptions): SheetPagi
     setup,
     [region],
     layout,
-    layout.hiddenRows,
+    hiddenRowsOf(layout),
     layout.hiddenCols,
   );
   const pagePx = printablePagePixels(setup, scale);
@@ -396,7 +397,7 @@ function paginate(state: State, sheet: number, opts: PaginateOptions): SheetPagi
     budget: Math.max(layout.defaultRowHeight, pagePx.height),
     manualBreaks: setup.manualPageBreakRows,
     sizeOf: (row) =>
-      layout.hiddenRows.has(row) ? 0 : (layout.rowHeights.get(row) ?? layout.defaultRowHeight),
+      isRowHidden(layout, row) ? 0 : (layout.rowHeights.get(row) ?? layout.defaultRowHeight),
   });
   const colBands = splitAxisIntoBands({
     from: origin.col,
@@ -569,7 +570,7 @@ export function pageLayoutGaps(
     return previous ? centeredNativeOrigin(previous, axis) : printableOrigin;
   };
   const axisExtent = (axis: 'row' | 'col', band: AxisBand): number => {
-    const hidden = axis === 'row' ? state.layout.hiddenRows : state.layout.hiddenCols;
+    const hidden = axis === 'row' ? hiddenRowsOf(state.layout) : state.layout.hiddenCols;
     const sizes = axis === 'row' ? state.layout.rowHeights : state.layout.colWidths;
     const fallback = axis === 'row' ? state.layout.defaultRowHeight : state.layout.defaultColWidth;
     let extent = 0;

@@ -1,5 +1,6 @@
 import { isColGroupCollapsed, isRowGroupCollapsed } from '../../commands/outline.js';
 import { outlineSummaryFor } from '../../store/outline-summary.js';
+import { isRowHidden } from '../../store/row-visibility.js';
 import type { Sparkline } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
@@ -173,7 +174,7 @@ export function paintOutlineGutters(
           // the run's edge.
           const summaryRow = summary.below ? r1 + 1 : r0 - 1;
           const summaryY =
-            rows.positionAt.has(summaryRow) && !layout.hiddenRows.has(summaryRow)
+            rows.positionAt.has(summaryRow) && !isRowHidden(layout, summaryRow)
               ? oy + (rows.positionAt.get(summaryRow) ?? 0) + (rows.sizeAt.get(summaryRow) ?? 0) / 2
               : summary.below
                 ? bottom + TOGGLE_SIZE / 2 + 2

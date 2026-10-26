@@ -35,6 +35,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'protection',
   'namedRangeDialog',
   'iterativeDialog',
+  'dataTableDialog',
   'evaluateFormulaDialog',
   'externalLinksDialog',
   'fxDialog',
@@ -71,6 +72,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'sheetTabs',
   'a11y',
   'mountError',
+  'workbookSave',
 ] as const;
 
 export type LocaleSurfaceSection = (typeof LOCALE_SURFACE_SECTIONS)[number];
@@ -426,6 +428,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
+    'interact.dataTableDialog',
+    'interact/data-table-dialog.ts',
+    'openDataTableDialog',
+    'dataTableDialog',
+    'block',
+  ),
+  shell(
     'interact.macConsolidateDialog',
     'interact/mac-consolidate-dialog.ts',
     'openMacConsolidateDialog',
@@ -603,6 +612,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'toolbar/dialogs/text-to-columns.ts',
     'showTextToColumnsDialog',
     'ribbonMenu',
+    'block',
+  ),
+  shell(
+    'toolbar.workbookSave',
+    'toolbar/dialogs/workbook-save.ts',
+    'chooseWorkbookSaveFormat',
+    'workbookSave',
     'block',
   ),
   shell(

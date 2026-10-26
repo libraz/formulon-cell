@@ -127,6 +127,10 @@ const FILL_PATTERN_FROM_ORDINAL = new Map<number, FillPattern>([
   [18, 'gray0625'],
 ]);
 
+/** `GradientFill.type` ordinals. */
+const GRADIENT_LINEAR = 0;
+const GRADIENT_PATH = 1;
+
 /** Built-in numFmt id for "General" — every engine reserves 0 for this. */
 const BUILTIN_NUM_FMT_GENERAL = 0;
 
@@ -161,11 +165,39 @@ export function fontRecordFromFormat(
     underline: underlineOrdinal(fmt.underline),
     vertAlign: fmt.fontVertAlign === 'superscript' ? 1 : fmt.fontVertAlign === 'subscript' ? 2 : 0,
     colorArgb: fmt.color ? (cssColorToArgb(fmt.color) ?? BLACK_ARGB) : BLACK_ARGB,
+    outline: fmt.fontOutline === true,
+    shadow: fmt.fontShadow === true,
+    condense: fmt.fontCondense === true,
+    extend: fmt.fontExtend === true,
+    hasOutline: fmt.fontOutline !== undefined,
+    hasShadow: fmt.fontShadow !== undefined,
+    hasCondense: fmt.fontCondense !== undefined,
+    hasExtend: fmt.fontExtend !== undefined,
   };
 }
 
 /** Build a FillRecord from the cell's fill fields. */
 export function fillRecordFromFormat(fmt: CellFormat): FillRecord {
+  if (fmt.fillGradient) {
+    const g = fmt.fillGradient;
+    return {
+      pattern: 0,
+      fgArgb: NO_COLOR_ARGB,
+      bgArgb: NO_COLOR_ARGB,
+      gradient: {
+        type: g.type === 'path' ? GRADIENT_PATH : GRADIENT_LINEAR,
+        degree: g.degree,
+        left: g.left,
+        right: g.right,
+        top: g.top,
+        bottom: g.bottom,
+        stops: g.stops.map((stop) => ({
+          position: stop.position,
+          colorArgb: cssColorToArgb(stop.color) ?? BLACK_ARGB,
+        })),
+      },
+    };
+  }
   if (fmt.fillPattern) {
     return {
       pattern: FILL_PATTERN_ORDINALS[fmt.fillPattern],
@@ -437,8 +469,12 @@ export function buildXfRecord(
     'strike',
     'fontVertAlign',
     'color',
+    'fontOutline',
+    'fontShadow',
+    'fontCondense',
+    'fontExtend',
   ].some((field) => Object.hasOwn(fmt, field));
-  const hasFill = ['fill', 'fillPattern', 'fillPatternColor'].some((field) =>
+  const hasFill = ['fill', 'fillPattern', 'fillPatternColor', 'fillGradient'].some((field) =>
     Object.hasOwn(fmt, field),
   );
   const hasBorder = Object.hasOwn(fmt, 'borders');
@@ -528,11 +564,32 @@ export function fontRecordToFormat(
   if (rec.colorArgb !== BLACK_ARGB && rec.colorArgb !== NO_COLOR_ARGB) {
     out.color = argbToCssColor(rec.colorArgb);
   }
+  if (rec.outline) out.fontOutline = true;
+  if (rec.shadow) out.fontShadow = true;
+  if (rec.condense) out.fontCondense = true;
+  if (rec.extend) out.fontExtend = true;
   return out;
 }
 
 /** Translate an engine FillRecord back into the CellFormat fill fields. */
 export function fillRecordToFormat(rec: FillRecord): Partial<CellFormat> {
+  if (rec.gradient) {
+    const g = rec.gradient;
+    return {
+      fillGradient: {
+        type: g.type === GRADIENT_PATH ? 'path' : 'linear',
+        degree: g.degree,
+        left: g.left,
+        right: g.right,
+        top: g.top,
+        bottom: g.bottom,
+        stops: g.stops.map((stop) => ({
+          position: stop.position,
+          color: argbToCssColor(stop.colorArgb),
+        })),
+      },
+    };
+  }
   if (rec.pattern === 0) return {};
   if (rec.pattern === 1) {
     return rec.fgArgb === NO_COLOR_ARGB ? {} : { fill: argbToCssColor(rec.fgArgb) };

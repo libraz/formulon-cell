@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import { frozenColEnd, frozenColStart, frozenRowEnd, frozenRowStart } from './freeze-band.js';
 import { clampZoom, renderScale } from './render-scale.js';
+import { clampSplitPaneOrigin } from './split-panes.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
   ChartSourceHighlight,
@@ -63,6 +64,10 @@ export const viewMutators = {
 
   setShowFormulas(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: on } }));
+  },
+
+  setShowOutlineSymbols(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, showOutlineSymbols: on } }));
   },
 
   setEndMode(store: SpreadsheetStore, on: boolean): void {
@@ -251,6 +256,32 @@ export const viewMutators = {
     });
   },
 
+  /** Scroll the top / left split panes by `dRow` / `dCol`. A pane stops at the
+   *  sheet edge and where the pane past the split begins. No-op unless split. */
+  scrollSplitPane(store: SpreadsheetStore, dRow: number, dCol: number): void {
+    store.setState((s) => {
+      const { layout, viewport } = s;
+      if (layout.splitPanes !== true) return s;
+      const freezeOriginRow = clampSplitPaneOrigin(
+        layout.freezeRows,
+        Math.max(viewport.rowStart, frozenRowEnd(layout)),
+        (layout.freezeOriginRow ?? 0) + dRow,
+      );
+      const freezeOriginCol = clampSplitPaneOrigin(
+        layout.freezeCols,
+        Math.max(viewport.colStart, frozenColEnd(layout)),
+        (layout.freezeOriginCol ?? 0) + dCol,
+      );
+      if (
+        freezeOriginRow === layout.freezeOriginRow &&
+        freezeOriginCol === layout.freezeOriginCol
+      ) {
+        return s;
+      }
+      return { ...s, layout: { ...layout, freezeOriginRow, freezeOriginCol } };
+    });
+  },
+
   scrollBy(store: SpreadsheetStore, dRow: number, dCol: number): void {
     // Keep at least one body row/col visible past the freeze zone, otherwise the
     // viewport disappears off the right/bottom.
@@ -277,12 +308,14 @@ export const viewMutators = {
 
   /** Pin `rows` rows / `cols` columns starting at `origin` (default A1). Pass
    *  0/0 to unfreeze. Freezing scrolls the body past the band; unfreezing an
-   *  axis scrolls it to the band's first row/column so nothing jumps. */
+   *  axis scrolls it to the band's first row/column so nothing jumps. With
+   *  `split` the band becomes split panes instead of a freeze. */
   setFreezePanes(
     store: SpreadsheetStore,
     rows: number,
     cols: number,
     origin: { row: number; col: number } = { row: 0, col: 0 },
+    split = false,
   ): void {
     const fr = Math.max(0, Math.floor(rows));
     const fc = Math.max(0, Math.floor(cols));
@@ -295,6 +328,7 @@ export const viewMutators = {
         freezeCols: fc,
         freezeOriginRow,
         freezeOriginCol,
+        splitPanes: split && (fr > 0 || fc > 0),
       };
       const fromRow =
         fr === 0 && s.layout.freezeRows > 0 ? frozenRowStart(s.layout) : s.viewport.rowStart;

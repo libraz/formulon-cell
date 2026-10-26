@@ -76,6 +76,9 @@ export interface FontTabRefs {
   strikeCk: ReturnType<typeof makeCheckbox>;
   superscriptCk: ReturnType<typeof makeCheckbox>;
   subscriptCk: ReturnType<typeof makeCheckbox>;
+  /** Mac-only effects; the controller hides them on other platforms. */
+  outlineCk: ReturnType<typeof makeCheckbox>;
+  shadowCk: ReturnType<typeof makeCheckbox>;
   normalFontCk: ReturnType<typeof makeCheckbox>;
   fontStyleList: HTMLDivElement;
   familyInput: HTMLInputElement;
@@ -139,6 +142,10 @@ export function createFontTab(
   superscriptCk.input.dataset.fcCheck = 'superscript';
   const subscriptCk = makeCheckbox(t.fontSubscript);
   subscriptCk.input.dataset.fcCheck = 'subscript';
+  const outlineCk = makeCheckbox(t.fontOutline);
+  outlineCk.input.dataset.fcCheck = 'fontOutline';
+  const shadowCk = makeCheckbox(t.fontShadow);
+  shadowCk.input.dataset.fcCheck = 'fontShadow';
   styleRow.append(
     boldCk.wrap,
     italicCk.wrap,
@@ -146,6 +153,8 @@ export function createFontTab(
     strikeCk.wrap,
     superscriptCk.wrap,
     subscriptCk.wrap,
+    outlineCk.wrap,
+    shadowCk.wrap,
   );
 
   const normalFontCk = makeCheckbox(t.normalFont);
@@ -355,6 +364,8 @@ export function createFontTab(
     strikeCk,
     superscriptCk,
     subscriptCk,
+    outlineCk,
+    shadowCk,
     normalFontCk,
     fontStyleList,
     familyInput,

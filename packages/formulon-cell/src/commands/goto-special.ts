@@ -3,6 +3,7 @@ import { findDependents, findPrecedents } from '../engine/refs-graph.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells, validationAt } from '../store/range-validations.js';
+import { visibleRowSegments } from '../store/row-visibility.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import type { SelectionSlice } from '../store/types.js';
@@ -274,7 +275,7 @@ const visibleSegments = (
 const visibleRuns = (state: State, areas: readonly Range[]): Run[] => {
   const runs: Run[] = [];
   for (const area of areas) {
-    const rows = visibleSegments(area.r0, area.r1, state.layout.hiddenRows);
+    const rows = visibleRowSegments(state.layout, area.r0, area.r1);
     const cols = visibleSegments(area.c0, area.c1, state.layout.hiddenCols);
     for (const [r0, r1] of rows) for (const [c0, c1] of cols) runs.push({ r0, r1, c0, c1 });
   }

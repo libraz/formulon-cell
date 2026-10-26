@@ -762,6 +762,32 @@ describe('evaluateConditional', () => {
     expect(overlay2.get('0:0:2')?.iconSlot).toBe(0);
   });
 
+  it('icon-set draws per-level custom icons and leaves a NoIcons level blank', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 0);
+    s = seedNumber(s, 0, 1, 50);
+    s = seedNumber(s, 0, 2, 100);
+    s = withConditionalRules(s, [
+      {
+        kind: 'icon-set',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        icons: 'arrows3',
+        customIcons: [{ set: 'stars3', slot: 0 }, null, { set: 'arrows4', slot: 3 }],
+      },
+    ]);
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')).toMatchObject({ iconKind: 'stars3', iconSlot: 0 });
+    expect(overlay.get('0:0:1')?.iconKind).toBeUndefined();
+    expect(overlay.get('0:0:2')).toMatchObject({ iconKind: 'arrows4', iconSlot: 3 });
+  });
+
+  it('classifies 4-icon families by quartiles', () => {
+    expect(iconSetSlotCount('arrows4')).toBe(4);
+    expect(iconSetSlotFor('traffic4', 0.3)).toBe(1);
+    expect(iconSetSlotFor('redToBlack4', 0.8)).toBe(3);
+  });
+
   it('icon-set honors custom threshold metadata', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();

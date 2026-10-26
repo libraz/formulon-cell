@@ -23,7 +23,7 @@ interface IterativeSettings {
 
 const overlay = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-iterdlg');
 const enableInput = (): HTMLInputElement | null =>
-  document.querySelector<HTMLInputElement>('.fc-iterdlg input[type="checkbox"]');
+  document.querySelector<HTMLInputElement>('.fc-iterdlg [data-calc-option="iterative"]');
 const numberInput = (): HTMLInputElement | null =>
   document.querySelector<HTMLInputElement>('.fc-iterdlg input[type="number"]');
 const textInput = (): HTMLInputElement | null =>

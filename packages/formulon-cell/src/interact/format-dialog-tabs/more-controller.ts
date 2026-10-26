@@ -12,8 +12,8 @@ import type { MoreTabRefs } from './more.js';
 
 /** Convert a spreadsheet date serial to a native `<input type="date">` value
  *  (`yyyy-mm-dd`, UTC). Returns '' for non-finite serials. */
-const serialToDateInputValue = (serial: number): string => {
-  return excelSerialToIsoDate(serial) ?? '';
+const serialToDateInputValue = (serial: number, date1904: boolean): string => {
+  return excelSerialToIsoDate(serial, date1904) ?? '';
 };
 
 /** Convert a day-fraction time serial to a native `<input type="time">` value
@@ -30,8 +30,13 @@ const serialToTimeInputValue = (serial: number): string => {
 
 /** Format a stored bound (serial or plain number) for the bound `<input>` value,
  *  matching the input type chosen for the validation kind. */
-const boundInputValue = (kind: ValidationKind, value: number, locale?: string): string => {
-  if (kind === 'date') return serialToDateInputValue(value);
+const boundInputValue = (
+  kind: ValidationKind,
+  value: number,
+  locale: string | undefined,
+  date1904: boolean,
+): string => {
+  if (kind === 'date') return serialToDateInputValue(value, date1904);
   if (kind === 'time') return serialToTimeInputValue(value);
   return formatEditableNumber(value, locale);
 };
@@ -43,10 +48,11 @@ const boundInputValue = (kind: ValidationKind, value: number, locale?: string): 
 const parseBoundInputValue = (
   kind: ValidationKind,
   raw: string,
-  locale?: string,
+  locale: string | undefined,
+  date1904: boolean,
 ): number | null => {
   if (kind === 'date' || kind === 'time') {
-    const coerced = coerceInput(raw);
+    const coerced = coerceInput(raw, { date1904 });
     return coerced.kind === 'number' ? coerced.value : null;
   }
   const n = parseLocalizedNumericInput(raw, locale);
@@ -58,6 +64,7 @@ const parseBoundInputValue = (
 export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatTabController {
   const { draft, on, touch, isMixed, syncControls } = ctx;
   const getLocale = ctx.getLocale;
+  const getDate1904 = ctx.getDate1904;
   const {
     hlInput,
     hlClear,
@@ -180,6 +187,7 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
         draft.validationKind,
         draft.validationA,
         getLocale(),
+        getDate1904(),
       );
     }
     if (!invalidBoundInputs.has(validationBInput)) {
@@ -187,6 +195,7 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
         draft.validationKind,
         draft.validationB,
         getLocale(),
+        getDate1904(),
       );
     }
     validationFormulaInput.value = draft.validationFormula;
@@ -316,8 +325,18 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     // Switching between numeric / date / time kinds swaps the bound-input type,
     // so re-render the stored bounds in the new type's value format.
     applyBoundInputMode(draft.validationKind);
-    validationAInput.value = boundInputValue(draft.validationKind, draft.validationA, getLocale());
-    validationBInput.value = boundInputValue(draft.validationKind, draft.validationB, getLocale());
+    validationAInput.value = boundInputValue(
+      draft.validationKind,
+      draft.validationA,
+      getLocale(),
+      getDate1904(),
+    );
+    validationBInput.value = boundInputValue(
+      draft.validationKind,
+      draft.validationB,
+      getLocale(),
+      getDate1904(),
+    );
     syncControls();
   };
   const onValidationOpChange = (): void => {
@@ -332,7 +351,12 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
   };
   const onValidationAInput = (): void => {
     touch('validation');
-    const n = parseBoundInputValue(draft.validationKind, validationAInput.value, getLocale());
+    const n = parseBoundInputValue(
+      draft.validationKind,
+      validationAInput.value,
+      getLocale(),
+      getDate1904(),
+    );
     setBoundInputValidity(validationAInput, n !== null);
     if (n !== null) {
       draft.validationA = n;
@@ -344,7 +368,12 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
   };
   const onValidationBInput = (): void => {
     touch('validation');
-    const n = parseBoundInputValue(draft.validationKind, validationBInput.value, getLocale());
+    const n = parseBoundInputValue(
+      draft.validationKind,
+      validationBInput.value,
+      getLocale(),
+      getDate1904(),
+    );
     setBoundInputValidity(validationBInput, n !== null);
     if (n !== null) {
       draft.validationB = n;

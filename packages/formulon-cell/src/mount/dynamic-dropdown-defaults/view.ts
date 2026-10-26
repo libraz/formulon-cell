@@ -24,7 +24,9 @@ const updateFreezeMenu =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateFreezeMenu'] =>
   (menu) => {
     const state = instance.store.getState();
-    const hasFreeze = state.layout.freezeRows > 0 || state.layout.freezeCols > 0;
+    const hasFreeze =
+      state.layout.splitPanes !== true &&
+      (state.layout.freezeRows > 0 || state.layout.freezeCols > 0);
     const strings = instance.i18n.strings;
     const toolbarStrings = strings.toolbar as typeof strings.toolbar & { unfreezePanes?: string };
     const primary = menu.querySelector<HTMLButtonElement>(

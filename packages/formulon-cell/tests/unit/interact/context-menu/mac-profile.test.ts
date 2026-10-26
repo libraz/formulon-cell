@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { noteVisibleAt } from '../../../../src/commands/comment.js';
 import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings/en.js';
 import { ja } from '../../../../src/i18n/strings/ja.js';
@@ -117,6 +118,9 @@ describe('context menu on the Mac platform profile', () => {
     fireContextMenu(host, 200, 70);
     expect(label('insertComment')).toBe('メモの編集');
     expect(label('deleteComment')).toBe('メモの削除');
+    expect(label('showHideNote')).toBe('メモの表示/非表示');
+    item('showHideNote')?.click();
+    expect(noteVisibleAt(store.getState(), { sheet: 0, row: 0, col: 0 })).toBe(true);
   });
 
   it('shows Mac shortcut glyphs and drops the Windows-only hints', () => {

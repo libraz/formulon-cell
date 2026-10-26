@@ -11,6 +11,7 @@ import { formulaForEdit } from '../engine/edit-seed.js';
 import { syncActiveSheet } from '../engine/layout-sync.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
@@ -81,7 +82,11 @@ const cellDisplayText = (
   if (formula && fmt?.formulaHidden === true && state.protection.protectedSheets.has(addr.sheet)) {
     return '';
   }
-  if (formula) return formulaForEdit(wb, addr, formula, state.ui.r1c1) ?? formula;
+  if (formula) {
+    const text = formulaForEdit(wb, addr, formula, state.ui.r1c1) ?? formula;
+    // Data table results read as the array formula the desktop app shows.
+    return isDataTableFormula(formula) ? `{${text}}` : text;
+  }
   if (!cell) {
     const lambda = wb.getLambdaText(addr);
     return lambda ? wb.getFormulaForDisplay(`=${lambda}`) : '';
@@ -174,7 +179,11 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const object = s.ui.selectedObject;
     if (document.activeElement !== tag) tag.value = object ? object.name : nameBoxText(ref);
     const display = cellDisplayText(s, wb, a);
-    if (!getFormulaEditing()) fxInput.value = object ? '' : display;
+    if (!getFormulaEditing()) {
+      fxInput.value = object ? '' : display;
+      fxInput.readOnly =
+        !object && isDataTableFormula(s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`)?.formula);
+    }
     activeCellMirror.setAttribute('aria-rowindex', String(a.row + 1));
     activeCellMirror.setAttribute('aria-colindex', String(a.col + 1));
     activeCellMirror.setAttribute('aria-label', display ? `${ref} ${display}` : ref);

@@ -18,6 +18,7 @@ import {
   type State,
 } from '../store/store.js';
 import { inputLanguage, parseNumberInput, parseTypedValue } from './input-grammar.js';
+import { displayedPrecisionValue } from './precision-as-displayed.js';
 import { isCellWritable, warnProtected } from './protection.js';
 import { extractRefs, normalizeR1C1Formula } from './refs.js';
 import {
@@ -39,6 +40,8 @@ export interface CoerceInputOptions {
   forceText?: boolean;
   /** BCP47 input locale. When omitted, the input grammar uses en-US. */
   locale?: string;
+  /** Read typed dates in the 1904 date system. */
+  date1904?: boolean;
 }
 
 /** Boolean spellings typed input accepts, per input language. */
@@ -158,6 +161,11 @@ export function inputLocaleForWorkbook(wb: WorkbookHandle): string | undefined {
   return undefined;
 }
 
+/** The workbook's date system, for callers that hold no store. */
+export function workbookDate1904(wb: WorkbookHandle): boolean {
+  return (typeof wb.calcSettings === 'function' && wb.calcSettings()?.date1904) || false;
+}
+
 /**
  * Parse only the numeric grammar used by cell input, without applying any of
  * the other spreadsheet coercions. Dialog criteria use this boundary because
@@ -194,7 +202,7 @@ export function coerceInput(raw: string, options?: CoerceInputOptions): CoercedI
   if (errorCode !== null) {
     return { kind: 'error', code: errorCode, text: formatError(errorCode, raw) };
   }
-  const typed = parseTypedValue(trimmed, locale);
+  const typed = parseTypedValue(trimmed, locale, options?.date1904 === true);
   if (typed === null) return { kind: 'text', value: raw };
   const implicitFormat = typed.formatCode ? formatCodeToNumFmt(typed.formatCode) : null;
   return implicitFormat
@@ -213,12 +221,19 @@ export function coerceInputForCell(
   const coerced = coerceInput(raw, {
     forceText: format?.numFmt?.kind === 'text',
     locale,
+    date1904: state.ui.date1904 === true,
   });
   if (wb && coerced.kind === 'formula') {
     return {
       ...coerced,
       text: canonicalizeLocalizedFormulaForInput(wb, coerced.text, locale),
     };
+  }
+  if (coerced.kind === 'number' && state.ui.precisionAsDisplayed === true) {
+    // A General cell takes the format the entry implies, so round to that.
+    const shown =
+      format?.numFmt && format.numFmt.kind !== 'general' ? format.numFmt : coerced.implicitFormat;
+    return { ...coerced, value: displayedPrecisionValue(coerced.value, shown) };
   }
   return coerced;
 }
@@ -283,7 +298,7 @@ export function writeInput(
   const finalCoerced =
     coerced ??
     (() => {
-      const input = coerceInput(raw, { locale: inputLocale });
+      const input = coerceInput(raw, { locale: inputLocale, date1904: workbookDate1904(wb) });
       return input.kind === 'formula'
         ? { ...input, text: canonicalizeLocalizedFormulaForInput(wb, input.text, inputLocale) }
         : input;
@@ -320,7 +335,7 @@ export function writeInputValidated(
     coerced = coerceInputForCell(state, a, raw, inputLocale, wb);
   }
   if (!coerced) {
-    const input = coerceInput(raw, { locale: inputLocale });
+    const input = coerceInput(raw, { locale: inputLocale, date1904: workbookDate1904(wb) });
     coerced =
       input.kind === 'formula'
         ? { ...input, text: canonicalizeLocalizedFormulaForInput(wb, input.text, inputLocale) }

@@ -3,6 +3,12 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { selectionContainsAddr, selectionCoversRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
+import { deleteDataTables } from './data-table.js';
+import {
+  alertDataTableEdit,
+  dataTableGuardAlert,
+  planDataTableSelection,
+} from './data-table-guard.js';
 import { History } from './history.js';
 import { InteractionController, interactionControllerFor } from './interaction-controller.js';
 import {
@@ -111,9 +117,24 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   if (pivotPlan.partial || (pivotPlan.whole.length > 0 && !mayDeletePivots)) {
     return rejectPivotEdit();
   }
-  // Deleting a whole report and clearing the rest of the selection undo together.
+  const dataTablePlan = planDataTableSelection(workbook, store.getState().selection);
+  if (dataTablePlan.partial || (dataTablePlan.whole.length > 0 && !mayDeletePivots)) {
+    alertDataTableEdit(workbook);
+    return {
+      status: 'rejected',
+      applied: [],
+      rejected: [{ code: 'protected', reason: dataTableGuardAlert(workbook).message }],
+      revision: commands?.revision ?? 0,
+    };
+  }
+  const removesObjects = pivotPlan.whole.length > 0 || dataTablePlan.whole.length > 0;
+  // Deleting a whole report or data table and clearing the rest of the
+  // selection undo together.
   const history = options.history && !options.history.isReplaying() ? options.history : null;
-  const txn = pivotPlan.whole.length > 0 ? history?.begin() : undefined;
+  const txn = removesObjects ? history?.begin() : undefined;
+  if (dataTablePlan.whole.length > 0) {
+    deleteDataTables({ store, workbook, history }, dataTablePlan.whole);
+  }
   if (pivotPlan.whole.length > 0) {
     const removed = deletePivotTables(
       { store, workbook, history },
@@ -130,9 +151,7 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
     if (cleared.status === 'rejected') history.abort(txn);
     else history.end(txn);
   }
-  return cleared.status === 'noop' && pivotPlan.whole.length > 0
-    ? { ...cleared, status: 'applied' }
-    : cleared;
+  return cleared.status === 'noop' && removesObjects ? { ...cleared, status: 'applied' } : cleared;
 };
 
 const clearCollectedContents = (

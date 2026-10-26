@@ -3,7 +3,13 @@ import { addrKey, parseAddrKey } from './address.js';
 import type { EngineSyncOptions } from './cell-format-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-type EngineCommentEntry = { row: number; col: number; author: string; text: string };
+type EngineCommentEntry = {
+  row: number;
+  col: number;
+  author: string;
+  text: string;
+  visible?: boolean;
+};
 type CommentEnumerableWorkbook = WorkbookHandle & {
   getComments?: (sheet: number) => EngineCommentEntry[];
 };
@@ -38,7 +44,11 @@ export function hydrateCommentsAndHyperlinksFromEngine(
         if (e.text.length === 0) continue;
         updates.push({
           key: addrKey({ sheet, row: e.row, col: e.col }),
-          patch: { comment: e.text, commentAuthor: e.author },
+          patch: {
+            comment: e.text,
+            commentAuthor: e.author,
+            ...(e.visible ? { commentVisible: true } : {}),
+          },
         });
       }
     } else {
@@ -52,7 +62,11 @@ export function hydrateCommentsAndHyperlinksFromEngine(
         if (e && e.text.length > 0) {
           updates.push({
             key: addrKey(c.addr),
-            patch: { comment: e.text, commentAuthor: e.author },
+            patch: {
+              comment: e.text,
+              commentAuthor: e.author,
+              ...(e.visible ? { commentVisible: true } : {}),
+            },
           });
         }
       }

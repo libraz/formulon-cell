@@ -3,6 +3,7 @@ import { cellFormatFromXf } from '../engine/cell-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -14,6 +15,13 @@ import {
   inputLocaleForWorkbook,
   validateCoercedInput,
 } from './coerce-input.js';
+import {
+  alertDataTableEdit,
+  alertDataTableGuard,
+  dataTableCellAmong,
+  dataTableGuardAlert,
+  tableFunctionAlert,
+} from './data-table-guard.js';
 import type { History } from './history.js';
 import { InteractionAuthorizer } from './interaction-authorizer.js';
 import {
@@ -265,6 +273,25 @@ export class InteractionController {
       }
     }
     if (globalRejections.length > 0) return this.rejectResult(globalRejections);
+    const lockedByDataTable = dataTableCellAmong(
+      wb,
+      prepared.map((change) => change.patch.addr),
+    );
+    if (lockedByDataTable) {
+      alertDataTableEdit(wb);
+      return this.rejectResult([
+        { addr: lockedByDataTable, code: 'protected', reason: dataTableGuardAlert(wb).message },
+      ]);
+    }
+    // TABLE() is the Data Table command's own formula; typing it is refused.
+    const typedTable = prepared.find((change) => formulaCallsTable(change.patch.formula));
+    if (typedTable) {
+      const alert = tableFunctionAlert(wb);
+      alertDataTableGuard(wb, alert);
+      return this.rejectResult([
+        { addr: typedTable.patch.addr, code: 'invalid', reason: alert.message },
+      ]);
+    }
 
     const intent: OperationIntent = {
       operation: command.operation,

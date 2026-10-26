@@ -44,7 +44,7 @@ import {
   trackFrameDrag,
 } from './drawing-frame.js';
 import { createObjectMenu, type ObjectMenuEntry } from './object-menu.js';
-import { formatSessionChartValue } from './session-chart-format.js';
+import { createSessionChartFormatter } from './session-chart-format.js';
 import {
   type ChartValueFormatter,
   chartSettingsDefaults,
@@ -271,7 +271,8 @@ export function attachSessionCharts(deps: {
   formatValue?: ChartValueFormatter;
 }): SessionChartsHandle {
   const { host, store, history = null, getWb = (): WorkbookHandle | null => null } = deps;
-  const formatValue = deps.formatValue ?? formatSessionChartValue;
+  const formatValue =
+    deps.formatValue ?? createSessionChartFormatter(() => store.getState().ui.date1904 === true);
   let locale = deps.locale;
   let labels: SessionChartLabels = { ...DEFAULT_LABELS, ...deps.labels };
   const root = document.createElement('div');

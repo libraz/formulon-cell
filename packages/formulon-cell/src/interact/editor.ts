@@ -1,5 +1,5 @@
 import { commitCellInput, inputOperation } from '../commands/cell-input-commit.js';
-import { coerceInput, inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { coerceInput, inputLocaleForWorkbook, workbookDate1904 } from '../commands/coerce-input.js';
 import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
@@ -902,7 +902,10 @@ export class InlineEditor {
       this.input.style.textAlign = 'left';
       return;
     }
-    const coerced = coerceInput(raw, { locale: inputLocaleForWorkbook(this.deps.wb) });
+    const coerced = coerceInput(raw, {
+      locale: inputLocaleForWorkbook(this.deps.wb),
+      date1904: workbookDate1904(this.deps.wb),
+    });
     if (coerced.kind === 'number') this.input.style.textAlign = 'right';
     else if (coerced.kind === 'bool') this.input.style.textAlign = 'center';
     else this.input.style.textAlign = 'left';

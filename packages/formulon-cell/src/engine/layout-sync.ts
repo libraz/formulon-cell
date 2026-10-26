@@ -1,6 +1,10 @@
 import type { LayoutSnapshot } from '../commands/slice-history.js';
+import { outlineGutterWidth } from '../store/outline-summary.js';
 import { clampZoom } from '../store/render-scale.js';
+import { isRowHidden } from '../store/row-visibility.js';
+import { splitCount } from '../store/split-panes.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
+import { MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -56,6 +60,8 @@ export function hydrateLayoutFromEngine(
   const engineDefaults = engineAxisDefaults(wb, sheet);
   const defaults = engineDefaults ?? platformAxisDefaults(wb);
   const view = wb.getSheetView(sheet);
+  const defaultRowsHidden =
+    typeof wb.sheetRowsHiddenByDefault === 'function' && wb.sheetRowsHiddenByDefault(sheet);
   const hasAxisLayouts =
     wb.capabilities.colRowSize || wb.capabilities.hiddenRowsCols || wb.capabilities.outlines;
   // hiddenSheets is workbook-scoped — walk every sheet so the set is correct
@@ -94,36 +100,70 @@ export function hydrateLayoutFromEngine(
     const colWidths = addColumnWidths(new Map(hasAxisLayouts ? [] : s.layout.colWidths), cols);
     const hiddenCols = new Set(hasAxisLayouts ? [] : s.layout.hiddenCols);
     const outlineCols = new Map(hasAxisLayouts ? [] : s.layout.outlineCols);
+    const collapsedCols = new Set(hasAxisLayouts ? [] : s.layout.collapsedCols);
     for (const c of cols) {
       for (let col = c.first; col <= c.last; col += 1) {
         if (c.hidden) hiddenCols.add(col);
         if (c.outlineLevel > 0) outlineCols.set(col, c.outlineLevel);
+        if (c.collapsed) collapsedCols.add(col);
       }
     }
 
     const rowHeights = addRowHeights(new Map(hasAxisLayouts ? [] : s.layout.rowHeights), rows);
     const hiddenRows = new Set(hasAxisLayouts ? [] : s.layout.hiddenRows);
     const outlineRows = new Map(hasAxisLayouts ? [] : s.layout.outlineRows);
+    const collapsedRows = new Set(hasAxisLayouts ? [] : s.layout.collapsedRows);
     for (const r of rows) {
       if (r.hidden) hiddenRows.add(r.row);
       if (r.outlineLevel > 0) outlineRows.set(r.row, r.outlineLevel);
+      if (r.collapsed) collapsedRows.add(r.row);
+    }
+
+    // A sheet that hides rows by default shows the rows with a visible record
+    // of their own; a row holding cells is written as one.
+    const shownRows = new Set<number>();
+    if (defaultRowsHidden) {
+      for (const r of rows) if (!r.hidden) shownRows.add(r.row);
+      for (const key of s.data.cells.keys()) {
+        const addr = parseAddrKey(key);
+        if (addr) shownRows.add(addr.row);
+      }
     }
 
     const layout = {
       ...s.layout,
       ...defaults,
+      defaultRowsHidden,
+      shownRows,
       colWidths,
       rowHeights,
       hiddenCols,
       hiddenRows,
       outlineCols,
       outlineRows,
+      collapsedCols,
+      collapsedRows,
+      outlineRowGutter: outlineGutterWidth(outlineRows),
+      outlineColGutter: outlineGutterWidth(outlineCols),
       hiddenSheets,
       veryHiddenSheets,
     };
     if (view) {
       layout.freezeRows = view.freezeRows;
       layout.freezeCols = view.freezeCols;
+      layout.splitPanes = false;
+      if ((view.splitX ?? 0) > 0 || (view.splitY ?? 0) > 0) {
+        const zoom = Number.isFinite(view.zoomScale) ? clampZoom(view.zoomScale / 100) : 1;
+        const ui = {
+          showHeaders: view.showRowColHeaders !== false,
+          showOutlineSymbols: view.showOutlineSymbols !== false,
+        };
+        const count = (axis: 'row' | 'col', origin: number, twips: number, limit: number) =>
+          splitCount(layout, ui, axis, origin, twips, zoom, limit);
+        layout.freezeRows = count('row', view.topLeftRow ?? 0, view.splitY ?? 0, MAX_ROW + 1);
+        layout.freezeCols = count('col', view.topLeftCol ?? 0, view.splitX ?? 0, MAX_COL + 1);
+        layout.splitPanes = layout.freezeRows > 0 || layout.freezeCols > 0;
+      }
     }
 
     // Engine carries zoom as a percentage (10..400, default 100); the store
@@ -155,6 +195,8 @@ export function hydrateLayoutFromEngine(
             rightToLeft: view.rightToLeft === true,
             // Adapters without the field keep the sheet's remembered mode.
             workbookView: view.viewMode ?? s.ui.workbookView,
+            showFormulas: view.showFormulas ?? s.ui.showFormulas,
+            showOutlineSymbols: view.showOutlineSymbols ?? s.ui.showOutlineSymbols,
           }
         : s.ui,
     };
@@ -252,14 +294,8 @@ export function syncLayoutToEngine(
       wb.setColumnHidden(sheet, col, col, a);
     }
 
-    const hrKeys = new Set<number>();
-    for (const k of before.hiddenRows) hrKeys.add(k);
-    for (const k of after.hiddenRows) hrKeys.add(k);
-    for (const row of hrKeys) {
-      const b = before.hiddenRows.has(row);
-      const a = after.hiddenRows.has(row);
-      if (b === a) continue;
-      wb.setRowHidden(sheet, row, a);
+    for (const row of rowsWithChangedVisibility(before, after)) {
+      wb.setRowHidden(sheet, row, isRowHidden(after, row));
     }
   }
 
@@ -285,8 +321,34 @@ export function syncLayoutToEngine(
     }
   }
 
+  if (before.defaultRowsHidden !== after.defaultRowsHidden) {
+    wb.patchSheetFormatDefaults(sheet, { zeroHeight: after.defaultRowsHidden });
+  }
+
+  if (wb.capabilities.outlineCollapse) {
+    for (const col of changedMembers(before.collapsedCols, after.collapsedCols)) {
+      wb.setColumnCollapsed(sheet, col, col, after.collapsedCols.has(col));
+    }
+    for (const row of changedMembers(before.collapsedRows, after.collapsedRows)) {
+      wb.setRowCollapsed(sheet, row, after.collapsedRows.has(row));
+    }
+  }
+
   if (wb.capabilities.freeze) {
-    if (before.freezeRows !== after.freezeRows || before.freezeCols !== after.freezeCols) {
+    const freezeChanged =
+      before.freezeRows !== after.freezeRows || before.freezeCols !== after.freezeCols;
+    if (after.split) {
+      if (freezeChanged || before.split?.x !== after.split.x || before.split?.y !== after.split.y) {
+        wb.setSheetSplit(sheet, after.split.x, after.split.y);
+      }
+    } else if (before.split) {
+      // A freeze replaces the split; otherwise the split is removed.
+      if (after.freezeRows > 0 || after.freezeCols > 0) {
+        wb.setSheetFreeze(sheet, after.freezeRows, after.freezeCols);
+      } else {
+        wb.setSheetSplit(sheet, 0, 0);
+      }
+    } else if (freezeChanged) {
       wb.setSheetFreeze(sheet, after.freezeRows, after.freezeCols);
     }
   }
@@ -314,6 +376,27 @@ export function syncLayoutToEngine(
     }
   }
 }
+
+/** Rows whose explicit, shown or default-hidden status differs between the
+ *  snapshots. Turning the default on or off restates every listed row. */
+const rowsWithChangedVisibility = (before: LayoutSnapshot, after: LayoutSnapshot): Set<number> => {
+  const rows = new Set([
+    ...changedMembers(before.hiddenRows, after.hiddenRows),
+    ...changedMembers(before.shownRows, after.shownRows),
+  ]);
+  if (before.defaultRowsHidden !== after.defaultRowsHidden) {
+    for (const set of [before.hiddenRows, after.hiddenRows, before.shownRows, after.shownRows]) {
+      for (const row of set) rows.add(row);
+    }
+  }
+  return rows;
+};
+
+/** Members of exactly one of `a` and `b`. */
+const changedMembers = (a: ReadonlySet<number>, b: ReadonlySet<number>): number[] => [
+  ...[...a].filter((i) => !b.has(i)),
+  ...[...b].filter((i) => !a.has(i)),
+];
 
 const sheetVisibilityOf = (snapshot: LayoutSnapshot, sheet: number): SheetVisibility =>
   snapshot.veryHiddenSheets.has(sheet)

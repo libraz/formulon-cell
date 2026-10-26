@@ -2,7 +2,7 @@ import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
-  hiddenInSelection,
+  hiddenExtentInSelection,
   hideCols,
   hideRows,
   showCols,
@@ -88,11 +88,9 @@ export function runContextMenuStructureItem(
     }
     case 'rowUnhide': {
       const r = state.selection.range;
-      const targets = hiddenInSelection(state.layout, 'row', r.r0, r.r1);
-      const first = targets[0];
-      const last = targets[targets.length - 1];
-      if (first === undefined || last === undefined) return true;
-      showRows(store, history, first, last);
+      const hidden = hiddenExtentInSelection(state.layout, 'row', r.r0, r.r1);
+      if (!hidden) return true;
+      showRows(store, history, hidden.first, hidden.last);
       return true;
     }
     case 'rowGroup': {
@@ -130,11 +128,9 @@ export function runContextMenuStructureItem(
     }
     case 'colUnhide': {
       const r = state.selection.range;
-      const targets = hiddenInSelection(state.layout, 'col', r.c0, r.c1);
-      const first = targets[0];
-      const last = targets[targets.length - 1];
-      if (first === undefined || last === undefined) return true;
-      showCols(store, history, first, last);
+      const hidden = hiddenExtentInSelection(state.layout, 'col', r.c0, r.c1);
+      if (!hidden) return true;
+      showCols(store, history, hidden.first, hidden.last);
       return true;
     }
     case 'colGroup': {

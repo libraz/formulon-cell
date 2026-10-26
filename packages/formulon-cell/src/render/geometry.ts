@@ -8,6 +8,7 @@ import {
   frozenRowStart,
 } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
+import { isRowHidden } from '../store/row-visibility.js';
 import type { LayoutSlice, State, UiSlice, ViewportSlice } from '../store/store.js';
 
 export interface Rect {
@@ -62,7 +63,7 @@ export function colWidth(layout: LayoutSlice, col: number, viewport?: ViewportSl
 }
 
 export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportSlice): number {
-  if (layout.hiddenRows.has(row)) return 0;
+  if (isRowHidden(layout, row)) return 0;
   return (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * renderScale(layout, viewport);
 }
 
@@ -134,6 +135,7 @@ export function layoutForView(
   const showHeaders = overrides.showHeaders ?? state.ui.showHeaders !== false;
   const base = {
     ...state.layout,
+    ...(state.ui.showOutlineSymbols === false && { outlineRowGutter: 0, outlineColGutter: 0 }),
     rtl: state.ui.rightToLeft === true,
     viewWidth: state.viewport.widthPx,
     ...pageGapsFor(state),
@@ -488,7 +490,7 @@ export function isRowVisible(layout: LayoutSlice, viewport: ViewportSlice, row: 
     (row < viewport.navigationRange.r0 || row > viewport.navigationRange.r1)
   )
     return false;
-  if (layout.hiddenRows.has(row)) return false;
+  if (isRowHidden(layout, row)) return false;
   if (row < frozenRowEnd(layout)) return row >= frozenRowStart(layout);
   const start = viewportRowStart(layout, viewport);
   return row >= start && row <= viewportRowEnd(viewport);
@@ -590,12 +592,12 @@ export function visibleRows(layout: LayoutSlice, viewport: ViewportSlice): numbe
       (r < viewport.navigationRange.r0 || r > viewport.navigationRange.r1)
     )
       continue;
-    if (!layout.hiddenRows.has(r)) out.push(r);
+    if (!isRowHidden(layout, r)) out.push(r);
   }
   const start = viewportRowStart(layout, viewport);
   const end = viewportRowEnd(viewport) + 1;
   for (let r = start; r < end; r += 1) {
-    if (!layout.hiddenRows.has(r)) out.push(r);
+    if (!isRowHidden(layout, r)) out.push(r);
   }
   return out;
 }

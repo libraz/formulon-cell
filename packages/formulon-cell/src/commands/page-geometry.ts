@@ -1,4 +1,5 @@
 /** Physical page geometry for printing and the page-layout views: paper sizes, margins, per-page axis bands, region tiling, and fit-to-pages scale. */
+import type { HiddenIndices } from '../store/row-visibility.js';
 import type { PageMargins, PageSetup } from '../store/store.js';
 import { type PrintAreaBounds, parsePrintTitleCols } from './print-ranges.js';
 
@@ -140,7 +141,7 @@ export function printableMarginAdjustments(setup: PageSetup): PrintableMarginAdj
 function printContentInches(
   regions: readonly PrintAreaBounds[],
   layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
+  hiddenRows: HiddenIndices,
   hiddenCols: ReadonlySet<number>,
   titleColRange: [number, number] | null = null,
 ): { width: number; height: number } {
@@ -199,7 +200,7 @@ function measuredColumnWidth(
 function measuredRowHeight(
   row: number,
   layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
+  hiddenRows: HiddenIndices,
 ): number {
   return hiddenRows.has(row) ? 0 : (layout.rowHeights.get(row) ?? layout.defaultRowHeight);
 }
@@ -208,7 +209,7 @@ export function splitPrintRegionIntoTiles(
   region: PrintAreaBounds,
   setup: PageSetup,
   layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
+  hiddenRows: HiddenIndices,
   hiddenCols: ReadonlySet<number>,
   titleRowRange: [number, number] | null,
   titleColRange: [number, number] | null,
@@ -290,7 +291,7 @@ export function computeFitToPagesScale(
   setup: PageSetup,
   regions: readonly PrintAreaBounds[],
   layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
+  hiddenRows: HiddenIndices,
   hiddenCols: ReadonlySet<number>,
 ): number {
   const fitWidth = setup.fitWidth ?? 0;

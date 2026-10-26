@@ -51,6 +51,10 @@ import {
   type WorkbookHandleConditionalFormatMethods,
 } from './workbook-handle-conditional-format.js';
 import {
+  installDataTablesMethods,
+  type WorkbookHandleDataTablesMethods,
+} from './workbook-handle-data-tables.js';
+import {
   installDrawingObjectsMethods,
   type WorkbookHandleDrawingObjectsMethods,
 } from './workbook-handle-drawing-objects.js';
@@ -148,8 +152,17 @@ const sameCellSnapshot = (a: CellSnapshot, b: CellSnapshot): boolean =>
   a.formula === b.formula &&
   sameCellValue(a.value, b.value);
 
+/** Options of `save` / `saveWithDiagnostics`. */
+export interface WorkbookSaveOptions {
+  /** An internal copy rather than a user save: skips the recalculation
+   *  Manual mode runs before saving, so the live workbook stays as it was. */
+  snapshot?: boolean;
+}
+
 /** `<calcPr calcMode>` code for Manual. */
 const CALC_MODE_MANUAL = 1;
+/** `<calcPr calcMode>` code for Automatic Except for Data Tables. */
+const CALC_MODE_AUTO_NO_TABLE = 2;
 
 /** Mac Excel's 12 pt new-workbook family per profile locale; others use Aptos Narrow. */
 const MAC_DEFAULT_FONT_FAMILY: Readonly<Partial<Record<ProfileLocale, string>>> = {
@@ -411,17 +424,11 @@ export class WorkbookHandle {
   /** The engine gives sheets added to a Mac-profile book their profile
    *  defaults; the Windows row height `createDefault` states is ours to repeat. */
   private stateNewSheetRowHeight(sheet: number): void {
-    if (this.newSheetRowHeight === undefined || !this.canStateSheetFormatDefaults()) return;
-    this.wb.setSheetFormatDefaults(sheet, {
+    if (this.newSheetRowHeight === undefined) return;
+    this.patchSheetFormatDefaults(sheet, {
       defaultRowHeight: this.newSheetRowHeight,
       hasDefaultRowHeight: true,
     });
-  }
-
-  private canStateSheetFormatDefaults(): boolean {
-    return (
-      this.capabilities.geometry === true && typeof this.wb.setSheetFormatDefaults === 'function'
-    );
   }
 
   private uniqueSheetName(): string {
@@ -725,7 +732,7 @@ export class WorkbookHandle {
       this.pendingRecalc = false;
       return;
     }
-    this.recalc();
+    this.runRecalc(false);
   }
 
   canUndo(): boolean {
@@ -760,12 +767,26 @@ export class WorkbookHandle {
     return true;
   }
 
+  /** Calculate Now (F9). The engine's pass computes data tables itself
+   *  except under Automatic Except for Data Tables, where F9 asks for them. */
   recalc(): void {
+    this.runRecalc(true);
+  }
+
+  private runRecalc(withDataTables: boolean): void {
     this.assertAlive();
     // A full pass covers whatever a batch had queued up.
     this.pendingRecalc = false;
     const s = this.wb.recalc();
     if (!s.ok) throw new Error(`recalc: ${s.message}`);
+    if (
+      withDataTables &&
+      this.capabilities.dataTables &&
+      this.calcMode() === CALC_MODE_AUTO_NO_TABLE
+    ) {
+      const t = this.wb.recalcDataTables();
+      if (!t.ok) throw new Error(`recalcDataTables: ${t.message}`);
+    }
     this.emitRecalc();
   }
 
@@ -986,8 +1007,8 @@ export class WorkbookHandle {
     return formulas;
   }
 
-  save(): Uint8Array {
-    return this.saveWithDiagnostics().bytes;
+  save(options?: WorkbookSaveOptions): Uint8Array {
+    return this.saveWithDiagnostics('xlsx', options).bytes;
   }
 
   /** Loss counters captured when the file was read. All zero for workbooks
@@ -1002,13 +1023,26 @@ export class WorkbookHandle {
   }
 
   /** Serialize the workbook and report what the writer dropped or deferred.
-   *  Engines without `saveWithDiagnostics` save plainly and report zeros. */
-  saveWithDiagnostics(format: 'xlsx' | 'xlsb' = 'xlsx'): {
+   *  Engines without `saveWithDiagnostics` save `.xlsx` plainly and report
+   *  zeros; they cannot write `.xlsb`. */
+  saveWithDiagnostics(
+    format: 'xlsx' | 'xlsb' = 'xlsx',
+    options: WorkbookSaveOptions = {},
+  ): {
     bytes: Uint8Array;
     diagnostics: SaveDiagnostics;
   } {
     this.assertAlive();
+    if (format === 'xlsb' && !this.capabilities.xlsbSave) {
+      throw new Error('save: this engine cannot write .xlsb');
+    }
     this.storeMirror.flushViewState();
+    // Manual calculation still recalculates before saving unless the
+    // workbook turned that off.
+    if (!options.snapshot && this.isManualCalcMode() && this.calcSettings()?.calcOnSave !== false) {
+      this.recalc();
+      this.storeMirror.refreshCells();
+    }
     const raw =
       typeof this.wb.saveWithDiagnostics === 'function'
         ? this.wb.saveWithDiagnostics(SAVE_FORMAT_ORDINAL[format])
@@ -1208,6 +1242,7 @@ export interface WorkbookHandleFeatureMethods
   extends WorkbookHandleAnnotationsMethods,
     WorkbookHandleChartsMethods,
     WorkbookHandleConditionalFormatMethods,
+    WorkbookHandleDataTablesMethods,
     WorkbookHandleDrawingObjectsMethods,
     WorkbookHandleFormulasMethods,
     WorkbookHandleLayoutMethods,
@@ -1220,6 +1255,7 @@ export interface WorkbookHandleFeatureMethods
 installAnnotationsMethods(WorkbookHandle);
 installChartsMethods(WorkbookHandle);
 installConditionalFormatMethods(WorkbookHandle);
+installDataTablesMethods(WorkbookHandle);
 installDrawingObjectsMethods(WorkbookHandle);
 installFormulasMethods(WorkbookHandle);
 installLayoutMethods(WorkbookHandle);

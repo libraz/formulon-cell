@@ -1,4 +1,4 @@
-import { GeometryMode, type WidthModelResult } from '@libraz/formulon';
+import { GeometryMode, type SheetFormatDefaults, type WidthModelResult } from '@libraz/formulon';
 import type { WorkbookViewMode } from '../store/types.js';
 import { displayCharsForScreenPx, screenPxForDisplayChars } from './column-display-width.js';
 import {
@@ -35,6 +35,7 @@ type LayoutCol = {
   hidden: boolean;
   outlineLevel: number;
   hasWidth?: boolean;
+  collapsed?: boolean;
 };
 
 type LayoutRow = {
@@ -44,6 +45,7 @@ type LayoutRow = {
   outlineLevel: number;
   hasHeight?: boolean;
   customHeight?: boolean;
+  collapsed?: boolean;
 };
 
 declare module './workbook-handle.js' {
@@ -246,6 +248,8 @@ export abstract class WorkbookHandleLayoutMethods {
         outlineLevel: e.outlineLevel,
       };
       if (hasWidth !== undefined) entry.hasWidth = hasWidth;
+      const collapsed = optionalFlag(source.collapsed);
+      if (collapsed !== undefined) entry.collapsed = collapsed;
       out.push(entry);
     }
     return out;
@@ -392,6 +396,20 @@ export abstract class WorkbookHandleLayoutMethods {
     return s.ok;
   }
 
+  /** Set or clear the `collapsed` flag on the summary columns `[first, last]`. */
+  setColumnCollapsed(sheet: number, first: number, last: number, collapsed: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.outlineCollapse) return false;
+    return wb(this).setColumnCollapsed(sheet, first, last, collapsed).ok;
+  }
+
+  /** Set or clear the `collapsed` flag on the summary row `row`. */
+  setRowCollapsed(sheet: number, row: number, collapsed: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.outlineCollapse) return false;
+    return wb(this).setRowCollapsed(sheet, row, collapsed).ok;
+  }
+
   /** Snapshot of `sheet`'s view, including display flags. Returns null when
    *  the engine doesn't expose `getSheetView` (i.e. the stub or an older bundle). */
   getSheetView(sheet: number): {
@@ -409,9 +427,15 @@ export abstract class WorkbookHandleLayoutMethods {
     /** Scroll origin (`topLeftCell`); the frozen band's first cell when frozen. */
     topLeftRow?: number;
     topLeftCol?: number;
-    /** First visible cell of the scrolling pane of a frozen view. */
+    /** First visible cell of the scrolling pane of a frozen or split view. */
     paneTopLeftRow?: number;
     paneTopLeftCol?: number;
+    /** Absent when the engine cannot write the flag. */
+    showFormulas?: boolean;
+    showOutlineSymbols?: boolean;
+    /** Unfrozen split position in screen twips (header included); 0 for none. */
+    splitX?: number;
+    splitY?: number;
   } | null {
     assertAlive(this);
     if (!this.capabilities.sheetView) return null;
@@ -433,6 +457,12 @@ export abstract class WorkbookHandleLayoutMethods {
       topLeftCol: r.view.topLeftCol,
       paneTopLeftRow: r.view.paneTopLeftRow,
       paneTopLeftCol: r.view.paneTopLeftCol,
+      showFormulas: this.capabilities.sheetShowFormulas ? r.view.showFormulas !== 0 : undefined,
+      showOutlineSymbols: this.capabilities.outlineSymbols
+        ? r.view.showOutlineSymbols !== 0
+        : undefined,
+      splitX: this.capabilities.sheetSplit ? r.view.splitX : undefined,
+      splitY: this.capabilities.sheetSplit ? r.view.splitY : undefined,
     };
   }
 
@@ -547,6 +577,58 @@ export abstract class WorkbookHandleLayoutMethods {
     return wb(this).setSheetRightToLeft(sheet, rightToLeft).ok;
   }
 
+  setSheetShowFormulas(sheet: number, show: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetShowFormulas) return false;
+    return wb(this).setSheetShowFormulas(sheet, show).ok;
+  }
+
+  setSheetShowOutlineSymbols(sheet: number, show: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.outlineSymbols) return false;
+    return wb(this).setSheetShowOutlineSymbols(sheet, show).ok;
+  }
+
+  /** Split the view at `xTwips` / `yTwips` of screen space, headers included;
+   *  `0, 0` removes the split. Replaces any freeze. */
+  setSheetSplit(sheet: number, xTwips: number, yTwips: number): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetSplit) return false;
+    return wb(this).setSheetSplit(sheet, Math.round(xTwips), Math.round(yTwips)).ok;
+  }
+
+  /** Whether `sheet` hides every row that does not say otherwise (`zeroHeight`). */
+  sheetRowsHiddenByDefault(sheet: number): boolean {
+    assertAlive(this);
+    if (this.capabilities.geometry !== true) return false;
+    try {
+      const defaults = wb(this).getSheetFormatDefaults(sheet);
+      return defaults.status.ok && defaults.zeroHeight === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Restate `sheet`'s `<sheetFormatPr>` with `patch` applied. The engine resets
+   *  every width key a call leaves out, so the stored set is always passed whole. */
+  patchSheetFormatDefaults(sheet: number, patch: Partial<SheetFormatDefaults>): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetFormatDefaults) return false;
+    const current = wb(this).getSheetFormatDefaults(sheet);
+    if (!current.status.ok) return false;
+    const full: SheetFormatDefaults = {
+      defaultColWidth: current.defaultColWidth,
+      defaultRowHeight: current.defaultRowHeight,
+      baseColWidth: current.baseColWidth,
+      hasDefaultColWidth: current.hasDefaultColWidth,
+      hasDefaultRowHeight: current.hasDefaultRowHeight,
+      customHeight: current.customHeight,
+      zeroHeight: current.zeroHeight,
+      ...patch,
+    };
+    return wb(this).setSheetFormatDefaults(sheet, full).ok;
+  }
+
   /** Insert `count` blank rows at `row` on `sheet`. The engine rewrites
    *  cross-workbook formula refs to follow the shift. Returns false on
    *  engines without `insertDeleteRowsCols`. NOT routed through the
@@ -658,6 +740,8 @@ export abstract class WorkbookHandleLayoutMethods {
       };
       if (hasHeight !== undefined) entry.hasHeight = hasHeight;
       if (customHeight !== undefined) entry.customHeight = customHeight;
+      const collapsed = optionalFlag(source.collapsed);
+      if (collapsed !== undefined) entry.collapsed = collapsed;
       out.push(entry);
     }
     return out;

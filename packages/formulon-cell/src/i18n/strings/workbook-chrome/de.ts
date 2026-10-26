@@ -115,4 +115,28 @@ export const workbookChromeDe: WorkbookChromeStrings = {
     engineHelp:
       'Die formulon-WASM-Engine konnte nicht gestartet werden. Prüfen Sie die WebAssembly-Unterstützung und ob das WASM-Asset der Engine geladen werden kann.',
   },
+  workbookSave: {
+    saveAsTitle: 'Speichern unter',
+    fileFormat: 'Dateiformat',
+    formatXlsx: 'Arbeitsmappe (.xlsx)',
+    formatXlsb: 'Binäre Arbeitsmappe (.xlsb)',
+    save: 'Speichern',
+    cancel: 'Abbrechen',
+    lossTitle: 'Einige Inhalte werden nicht gespeichert',
+    lossMessage:
+      '{format} kann nicht alle Inhalte dieser Arbeitsmappe aufnehmen. Folgendes wird nicht gespeichert:',
+    mayLoseMessage: '{format} behält Folgendes je nach Herkunft möglicherweise nicht bei:',
+    saveAnyway: 'Trotzdem speichern',
+    notes: 'Notizen',
+    threadedComments: 'Kommentare mit Unterhaltungen',
+    autoFilters: 'Filter',
+    pivotTables: 'PivotTables',
+    slicers: 'Datenschnitte',
+    drawings: 'Bilder, Formen und Diagramme',
+    tables: 'Tabellen',
+    sparklines: 'Sparklines',
+    protectedRanges: 'Bearbeitbare Bereiche',
+    otherSettings:
+      'Weitere Einstellungen (Seite einrichten, Ansichten, Arbeitsmappenschutz, benutzerdefinierte Formatvorlagen)',
+  },
 };

@@ -1,4 +1,5 @@
 import { writeInput } from '../commands/coerce-input.js';
+import { blockDataTableCells } from '../commands/data-table-guard.js';
 import {
   deferForAllowedRangeUnlock,
   isCellWritable,
@@ -119,6 +120,10 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     }
     if (!isCellWritable(store.getState(), addr)) {
       warnProtected(addr);
+      close();
+      return;
+    }
+    if (blockDataTableCells(wb, [addr])) {
       close();
       return;
     }

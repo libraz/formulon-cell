@@ -1,13 +1,20 @@
 // Fill tab behaviour for the Format Cells dialog: background color, swatch
 // grid, pattern style gallery and pattern color.
 
+import { gradientFillCss } from '../../render/gradient-fill-css.js';
 import type { FillPattern } from '../../store/store.js';
-import { isHexColor } from '../format-dialog-model.js';
+import {
+  type GradientShadingStyle,
+  gradientForShading,
+  gradientVariantCount,
+  isHexColor,
+  shadingForGradient,
+} from '../format-dialog-model.js';
 import { type FormatTabContext, type FormatTabController, markMixed } from './controller.js';
 import type { FillTabRefs } from './fill.js';
 
 export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatTabController {
-  const { draft, on, touch, isMixed, syncControls, renderPreview } = ctx;
+  const { draft, on, touch, isMixed, syncControls, renderPreview, isDxfMode } = ctx;
   const {
     fillInput,
     fillReset,
@@ -15,7 +22,52 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
     fillPatternSelect,
     fillPatternGallery,
     fillPatternColorInput,
+    fillEffectsButton,
+    fillEffects,
+    gradientColor1,
+    gradientColor2,
+    gradientStyleInputs,
+    gradientVariants,
   } = refs;
+
+  // Fill Effects selection; a loaded gradient seeds it on sync.
+  const shading: { style: GradientShadingStyle; variant: number } = {
+    style: 'horizontal',
+    variant: 0,
+  };
+  let effectsOpen = false;
+
+  const syncFillEffects = (): void => {
+    const loaded = draft.fillGradient ? shadingForGradient(draft.fillGradient) : null;
+    if (loaded) {
+      shading.style = loaded.style;
+      shading.variant = loaded.variant;
+      gradientColor1.value = loaded.color1;
+      gradientColor2.value = loaded.color2;
+    } else if (draft.fillGradient) {
+      const stops = draft.fillGradient.stops;
+      gradientColor1.value = stops[0]?.color ?? '#ffffff';
+      gradientColor2.value = stops[stops.length - 1]?.color ?? '#4472c4';
+    }
+    const offered = !isDxfMode();
+    fillEffectsButton.hidden = !offered;
+    fillEffects.hidden = !offered || (!effectsOpen && !draft.fillGradient);
+    fillEffectsButton.setAttribute('aria-expanded', fillEffects.hidden ? 'false' : 'true');
+    for (const [style, input] of gradientStyleInputs) {
+      input.checked = (loaded !== null || !draft.fillGradient) && style === shading.style;
+    }
+    const count = gradientVariantCount(shading.style);
+    gradientVariants.forEach((button, index) => {
+      button.hidden = index >= count;
+      button.style.backgroundImage = gradientFillCss(
+        gradientForShading(shading.style, index, gradientColor1.value, gradientColor2.value),
+      );
+      button.setAttribute(
+        'aria-pressed',
+        draft.fillGradient && index === shading.variant ? 'true' : 'false',
+      );
+    });
+  };
 
   const sync = (): void => {
     fillInput.value = draft.fill && isHexColor(draft.fill) ? draft.fill : '#ffffff';
@@ -33,6 +85,7 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
       draft.fillPatternColor && isHexColor(draft.fillPatternColor)
         ? draft.fillPatternColor
         : '#000000';
+    syncFillEffects();
   };
 
   const syncMixed = (): void => {
@@ -56,13 +109,59 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
   };
 
   // ── Events ─────────────────────────────────────────────────────────────
+  const applyShading = (): void => {
+    touch('fillGradient');
+    draft.fillGradient = gradientForShading(
+      shading.style,
+      Math.min(shading.variant, gradientVariantCount(shading.style) - 1),
+      gradientColor1.value,
+      gradientColor2.value,
+    );
+    draft.fill = undefined;
+    draft.fillPattern = undefined;
+    draft.fillPatternColor = undefined;
+    syncControls();
+    renderPreview();
+  };
+  const onFillEffectsToggle = (): void => {
+    effectsOpen = fillEffects.hidden === true;
+    if (gradientColor1.value === '#000000' && !draft.fillGradient) {
+      gradientColor1.value = draft.fill && isHexColor(draft.fill) ? draft.fill : '#ffffff';
+      gradientColor2.value = '#4472c4';
+    }
+    syncFillEffects();
+  };
+  const onGradientStyleChange = (e: Event): void => {
+    const style = (e.target as HTMLInputElement).dataset.fcGradientStyle as
+      | GradientShadingStyle
+      | undefined;
+    if (!style) return;
+    shading.style = style;
+    applyShading();
+  };
+  const onGradientVariantClick = (e: Event): void => {
+    const button = (e.target as HTMLElement).closest<HTMLButtonElement>(
+      '[data-fc-gradient-variant]',
+    );
+    if (!button) return;
+    shading.variant = Number(button.dataset.fcGradientVariant ?? 0);
+    applyShading();
+  };
+  // A solid or pattern choice replaces the gradient.
+  const dropGradient = (): void => {
+    if (!draft.fillGradient) return;
+    touch('fillGradient');
+    draft.fillGradient = undefined;
+  };
   const onFillInput = (): void => {
+    dropGradient();
     touch('fill');
     draft.fill = fillInput.value;
     syncControls();
     renderPreview();
   };
   const onFillReset = (): void => {
+    dropGradient();
     touch('fill');
     draft.fill = undefined;
     fillSwatches.setValue(null);
@@ -70,6 +169,7 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
     renderPreview();
   };
   const onFillPatternChange = (): void => {
+    dropGradient();
     touch('fillPattern');
     draft.fillPattern = (fillPatternSelect.value || undefined) as FillPattern | undefined;
     syncControls();
@@ -82,6 +182,7 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
     onFillPatternChange();
   };
   const onFillPatternColorInput = (): void => {
+    dropGradient();
     touch('fillPatternColor');
     draft.fillPatternColor = fillPatternColorInput.value;
     syncControls();
@@ -91,6 +192,7 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
     const color = btn?.dataset.color;
     if (!color) return;
+    dropGradient();
     touch('fill');
     draft.fill = color;
     fillInput.value = color;
@@ -104,6 +206,11 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
   on(fillPatternGallery, 'click', onFillPatternGalleryClick);
   on(fillPatternColorInput, 'input', onFillPatternColorInput);
   on(fillSwatches.el, 'click', onFillSwatchClick);
+  on(fillEffectsButton, 'click', onFillEffectsToggle);
+  on(gradientColor1, 'input', applyShading);
+  on(gradientColor2, 'input', applyShading);
+  for (const input of gradientStyleInputs.values()) on(input, 'change', onGradientStyleChange);
+  for (const button of gradientVariants) on(button, 'click', onGradientVariantClick);
 
   return { sync, syncMixed };
 }

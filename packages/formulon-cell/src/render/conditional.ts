@@ -1,6 +1,7 @@
 import { addrKey, formatA1Cell } from '../engine/address.js';
 import { type CellValue, type Range, ValueKind } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { excelSerialToDate } from '../format/date-serial.js';
 import type {
   CellFormat,
   ConditionalIconSet,
@@ -60,6 +61,7 @@ let cachedRulesRef: State['conditional']['rules'] | null = null;
 let cachedCellsRef: State['data']['cells'] | null = null;
 let cachedSheet: number | null = null;
 let cachedRtl: boolean | null = null;
+let cachedDate1904: boolean | null = null;
 let cachedWb: WorkbookHandle | null = null;
 let cachedLocale: string | null = null;
 let cachedProfile: ReturnType<WorkbookHandle['spreadsheetProfileId']> = null;
@@ -82,6 +84,7 @@ export function _resetConditionalCache(): void {
   cachedCellsRef = null;
   cachedSheet = null;
   cachedRtl = null;
+  cachedDate1904 = null;
   cachedWb = null;
   cachedLocale = null;
   cachedProfile = null;
@@ -193,29 +196,24 @@ function boundsForRule(
   };
 }
 
-/** Number of slots per icon family. `arrows5` is the only 5-slot family;
- *  the rest land on 3 slots with thresholds at 0.33 / 0.67. */
-export function iconSetSlotCount(set: ConditionalIconSet): 3 | 5 {
-  return set === 'arrows5' ||
-    set === 'quarters5' ||
-    set === 'ratings5' ||
-    set === 'bars5' ||
-    set === 'boxes5'
-    ? 5
-    : 3;
+/** Number of slots per icon family; the name's numeric suffix is the count. */
+export function iconSetSlotCount(set: ConditionalIconSet): 3 | 4 | 5 {
+  return set.endsWith('5') ? 5 : set.endsWith('4') ? 4 : 3;
 }
 
 /** Classify `t` (a 0..1 percentile) into a slot index for the icon family.
- *  Uses the spreadsheet's default thresholds — [0.33, 0.67] for 3-slot families and
- *  [0.20, 0.40, 0.60, 0.80] for 5-slot families. */
+ *  Uses the spreadsheet's default thresholds — [0.33, 0.67] for 3-slot families,
+ *  quartiles for 4-slot and [0.20, 0.40, 0.60, 0.80] for 5-slot families. */
 export function iconSetSlotFor(set: ConditionalIconSet, t: number): number {
-  if (iconSetSlotCount(set) === 5) {
+  const slots = iconSetSlotCount(set);
+  if (slots === 5) {
     if (t < 0.2) return 0;
     if (t < 0.4) return 1;
     if (t < 0.6) return 2;
     if (t < 0.8) return 3;
     return 4;
   }
+  if (slots === 4) return t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3;
   if (t < 0.33) return 0;
   if (t < 0.67) return 1;
   return 2;
@@ -280,6 +278,7 @@ export function evaluateConditional(
     cachedCellsRef === state.data.cells &&
     cachedSheet === state.data.sheetIndex &&
     cachedRtl === state.ui.rightToLeft &&
+    cachedDate1904 === (state.ui.date1904 === true) &&
     cachedWb === wb &&
     cachedLocale === locale &&
     cachedProfile === profile &&
@@ -297,6 +296,7 @@ export function evaluateConditional(
     cachedCellsRef = state.data.cells;
     cachedSheet = state.data.sheetIndex;
     cachedRtl = state.ui.rightToLeft;
+    cachedDate1904 = state.ui.date1904 === true;
     cachedWb = wb;
     cachedLocale = locale;
     cachedProfile = profile;
@@ -355,6 +355,7 @@ export function evaluateConditional(
   cachedCellsRef = state.data.cells;
   cachedSheet = state.data.sheetIndex;
   cachedRtl = state.ui.rightToLeft;
+  cachedDate1904 = state.ui.date1904 === true;
   cachedWb = wb;
   cachedLocale = locale;
   cachedProfile = profile;
@@ -631,8 +632,11 @@ function paintIconSet(
       slot = Math.max(0, Math.min(slots - 1, slot));
       if (rule.reverseOrder) slot = slots - 1 - slot;
       const overlay = out.get(key) ?? {};
-      overlay.iconKind = rule.icons;
-      overlay.iconSlot = slot;
+      const icon = rule.customIcons ? rule.customIcons[slot] : { set: rule.icons, slot };
+      if (icon) {
+        overlay.iconKind = icon.set;
+        overlay.iconSlot = icon.slot;
+      }
       overlay.showValue = rule.showValue !== false;
       out.set(key, overlay);
     }
@@ -780,13 +784,11 @@ function normalizeDate(d: Date): number {
   return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / DAY_MS);
 }
 
-function excelSerialToDate(serial: number): Date {
-  return new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * DAY_MS);
-}
-
-function cellDateDay(v: CellValue): number | null {
-  if (v.kind === 'number' && Number.isFinite(v.value))
-    return normalizeDate(excelSerialToDate(v.value));
+function cellDateDay(v: CellValue, date1904: boolean): number | null {
+  if (v.kind === 'number' && Number.isFinite(v.value)) {
+    const date = excelSerialToDate(v.value, date1904);
+    return date === null ? null : normalizeDate(date);
+  }
   if (v.kind === 'text') {
     const time = Date.parse(v.value);
     if (Number.isFinite(time)) return normalizeDate(new Date(time));
@@ -847,7 +849,7 @@ function paintDateOccurring(
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
       if (!cell) continue;
-      const day = cellDateDay(cell.value);
+      const day = cellDateDay(cell.value, state.ui.date1904 === true);
       if (day === null || !datePeriodMatches(day, rule.period)) continue;
       const overlay = out.get(key) ?? {};
       mergeApply(overlay, rule.apply);

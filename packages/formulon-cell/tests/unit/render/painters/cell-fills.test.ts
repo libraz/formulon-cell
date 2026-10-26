@@ -177,3 +177,103 @@ describe('render/painters — paintConditionalIcon', () => {
     }
   });
 });
+
+describe('render/painters — gradient fills', () => {
+  const gradientSpy = () => {
+    const created: Array<{ kind: 'linear' | 'radial'; args: number[]; stops: [number, string][] }> =
+      [];
+    const rects: Array<{ style: unknown }> = [];
+    let fillStyle: unknown = '';
+    const make =
+      (kind: 'linear' | 'radial') =>
+      (...args: number[]) => {
+        const entry = { kind, args, stops: [] as [number, string][] };
+        created.push(entry);
+        return {
+          addColorStop(offset: number, color: string) {
+            entry.stops.push([offset, color]);
+          },
+          entry,
+        };
+      };
+    const ctx = {
+      get fillStyle() {
+        return fillStyle;
+      },
+      set fillStyle(v: unknown) {
+        fillStyle = v;
+      },
+      fillRect() {
+        rects.push({ style: fillStyle });
+      },
+      save() {},
+      restore() {},
+      createLinearGradient: make('linear'),
+      createRadialGradient: make('radial'),
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, created, rects };
+  };
+  const stops = [
+    { position: 0, color: '#ff0000' },
+    { position: 1, color: '#0000ff' },
+  ];
+
+  it('paints a 90 degree linear gradient top to bottom across the cell', () => {
+    const spy = gradientSpy();
+    paintCellFill({
+      ...makeCtx({}),
+      ctx: spy.ctx,
+      format: {
+        fillGradient: { type: 'linear', degree: 90, left: 0, right: 0, top: 0, bottom: 0, stops },
+      },
+    });
+    expect(spy.created).toHaveLength(1);
+    const [x0, y0, x1, y1] = spy.created[0]?.args ?? [];
+    expect(x0).toBeCloseTo(40, 5);
+    expect(x1).toBeCloseTo(40, 5);
+    expect(y0).toBeCloseTo(20, 5);
+    expect(y1).toBeCloseTo(50, 5);
+    expect(spy.created[0]?.stops).toEqual([
+      [0, '#ff0000'],
+      [1, '#0000ff'],
+    ]);
+    expect(spy.rects).toHaveLength(1);
+  });
+
+  it('paints a path gradient outward from its inner rectangle', () => {
+    const spy = gradientSpy();
+    paintCellFill({
+      ...makeCtx({}),
+      ctx: spy.ctx,
+      format: {
+        fillGradient: {
+          type: 'path',
+          degree: 0,
+          left: 0.5,
+          right: 0.5,
+          top: 0.5,
+          bottom: 0.5,
+          stops,
+        },
+      },
+    });
+    expect(spy.created[0]?.kind).toBe('radial');
+    const [cx, cy] = spy.created[0]?.args ?? [];
+    expect(cx).toBeCloseTo(40, 5);
+    expect(cy).toBeCloseTo(35, 5);
+  });
+
+  it('a gradient replaces the solid fill colour', () => {
+    const spy = gradientSpy();
+    paintCellFill({
+      ...makeCtx({}),
+      ctx: spy.ctx,
+      format: {
+        fill: '#00ff00',
+        fillGradient: { type: 'linear', degree: 0, left: 0, right: 0, top: 0, bottom: 0, stops },
+      },
+    });
+    expect(spy.rects).toHaveLength(1);
+    expect(spy.rects[0]?.style).not.toBe('#00ff00');
+  });
+});

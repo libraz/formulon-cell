@@ -270,6 +270,31 @@ export const cellFontCss = (font: CellFont, size = font.size): string =>
 const isDoubleUnderline = (underline: CellFormat['underline']): boolean =>
   underline === 'double' || underline === 'doubleAccounting';
 
+/** Set up the Outline / Shadow font effects on `ctx` (inside the caller's
+ *  save) and return the glyph painter: outlined text is a hollow stroke in the
+ *  text colour, shadowed text gets a hard offset shadow. */
+const applyFontEffects = (
+  ctx: CanvasRenderingContext2D,
+  format: CellFormat | undefined,
+  fontSize: number,
+): ((text: string, x: number, y: number) => void) => {
+  if (format?.fontShadow) {
+    const offset = Math.max(1, fontSize / 14);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowOffsetX = offset;
+    ctx.shadowOffsetY = offset;
+    ctx.shadowBlur = 0;
+  }
+  if (!format?.fontOutline) return (text, x, y) => ctx.fillText(text, x, y);
+  const color = ctx.fillStyle;
+  const width = Math.max(0.75, fontSize / 18);
+  return (text, x, y) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.strokeText(text, x, y);
+  };
+};
+
 const paintTextDecorations = (
   ctx: CanvasRenderingContext2D,
   format: CellFormat | undefined,
@@ -312,9 +337,11 @@ export function paintCellText({
   showZeros,
   displayOverride,
   locale,
+  date1904 = false,
   rtl = false,
   zoom,
   formatPaint: formatPaintFor,
+  fontEffects = false,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
@@ -331,7 +358,7 @@ export function paintCellText({
   } else {
     text =
       value.kind === 'number' && format?.numFmt
-        ? formatNumber(value.value, format.numFmt, locale)
+        ? formatNumber(value.value, format.numFmt, locale, date1904)
         : formatCell(value, locale);
   }
   if (!text) return;
@@ -395,6 +422,7 @@ export function paintCellText({
   ctx.beginPath();
   ctx.rect(bounds.x, bounds.y, bounds.w, bounds.h);
   ctx.clip();
+  const drawText = applyFontEffects(ctx, fontEffects ? format : undefined, fontSize);
 
   // Rotated text — render around cell center, ignore wrap/indent for
   // simplicity. (Real desktop spreadsheets are more elaborate but this covers ±90° common case.)
@@ -403,7 +431,7 @@ export function paintCellText({
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 0, 0);
+    drawText(text, 0, 0);
     ctx.restore();
     return;
   }
@@ -439,7 +467,7 @@ export function paintCellText({
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i] ?? '';
       const baselineY = startY + i * lineH;
-      ctx.fillText(line, tx, baselineY);
+      drawText(line, tx, baselineY);
       const width = ctx.measureText(line).width;
       const lineX0 = align === 'right' ? tx - width : align === 'center' ? tx - width / 2 : tx;
       paintTextDecorations(ctx, format, isHyperlink, lineX0, width, baselineY, measured);
@@ -514,14 +542,14 @@ export function paintCellText({
     const leadingWidth = ctx.measureText(leading).width;
     const trailingWidth = ctx.measureText(trailing).width;
     ctx.textAlign = 'left';
-    ctx.fillText(leading, left, ty);
+    drawText(leading, left, ty);
     ctx.textAlign = 'right';
-    ctx.fillText(trailing, right, ty);
+    drawText(trailing, right, ty);
     const charWidth = ctx.measureText(fill.char).width;
     const gap = right - trailingWidth - (left + leadingWidth);
     if (fill.char.trim() && charWidth > 0 && gap >= charWidth) {
       ctx.textAlign = 'left';
-      ctx.fillText(fill.char.repeat(Math.floor(gap / charWidth)), left + leadingWidth, ty);
+      drawText(fill.char.repeat(Math.floor(gap / charWidth)), left + leadingWidth, ty);
     }
     paintTextDecorations(ctx, format, isHyperlink, left, right - left, ty, box);
     ctx.restore();
@@ -578,7 +606,7 @@ export function paintCellText({
     }
     ctx.restore();
   }
-  ctx.fillText(text, tx, ty);
+  drawText(text, tx, ty);
 
   const lineX0 =
     align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;

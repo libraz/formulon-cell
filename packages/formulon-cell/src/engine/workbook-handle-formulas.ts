@@ -65,6 +65,18 @@ declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleFormulasMethods {}
 }
 
+/** Workbook calculation options persisted in `<calcPr>` and `<workbookPr>`. */
+export interface WorkbookCalcSettings {
+  /** `false` is "Set precision as displayed". */
+  fullPrecision: boolean;
+  /** Recalculate before saving. */
+  calcOnSave: boolean;
+  /** R1C1 reference style (`refMode`). */
+  r1c1: boolean;
+  /** 1904 date system. */
+  date1904: boolean;
+}
+
 function internals(handle: unknown): WorkbookHandleInternals {
   return handle as WorkbookHandleInternals;
 }
@@ -484,8 +496,8 @@ export abstract class WorkbookHandleFormulasMethods {
    *  it: `Manual` suppresses the automatic recalc that follows a cell write,
    *  leaving the cells dirty until Calculate Now. Returns `null` when the
    *  engine doesn't expose `calcMode`. Codes: 0 = Auto, 1 = Manual,
-   *  2 = AutoNoTable (treated as Auto — data tables have no separate
-   *  evaluation path here). */
+   *  2 = AutoNoTable, under which the engine's own pass skips data tables
+   *  and only `recalc()` (Calculate Now) computes them. */
   calcMode(): 0 | 1 | 2 | null {
     assertAlive(this);
     if (!this.capabilities.calcMode) return null;
@@ -506,6 +518,45 @@ export abstract class WorkbookHandleFormulasMethods {
     // class's own members need the cast to be visible here.
     if (previous === 1 && mode !== 1) (this as unknown as WorkbookHandle).recalc();
     return true;
+  }
+
+  /** The `<calcPr>` / `<workbookPr>` settings outside the calc mode, or
+   *  `null` when the engine doesn't expose them. */
+  calcSettings(): WorkbookCalcSettings | null {
+    assertAlive(this);
+    if (!this.capabilities.calcSettings) return null;
+    const flag = (r: { status: { ok: boolean }; value: number }, fallback: boolean): boolean =>
+      r.status.ok ? r.value !== 0 : fallback;
+    const w = wb(this);
+    return {
+      fullPrecision: flag(w.fullPrecision(), true),
+      calcOnSave: flag(w.calcOnSave(), true),
+      r1c1: flag(w.refMode(), false),
+      date1904: flag(w.date1904(), false),
+    };
+  }
+
+  /** Writes one calc setting. `date1904` switches the date system without
+   *  converting stored serials, the way the desktop option does. Returns
+   *  `false` when unsupported. */
+  setCalcSetting<K extends keyof WorkbookCalcSettings>(
+    key: K,
+    value: WorkbookCalcSettings[K],
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.calcSettings) return false;
+    const w = wb(this);
+    switch (key) {
+      case 'fullPrecision':
+        return w.setFullPrecision(value).ok;
+      case 'calcOnSave':
+        return w.setCalcOnSave(value).ok;
+      case 'r1c1':
+        return w.setRefMode(value ? 1 : 0).ok;
+      case 'date1904':
+        return w.setDate1904(value).ok;
+    }
+    return false;
   }
 
   /** Formula-behaviour profile selected in the engine. Profiles model host

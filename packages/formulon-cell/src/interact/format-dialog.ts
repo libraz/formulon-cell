@@ -131,6 +131,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const history = deps.history ?? null;
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
   const strings = deps.strings ?? defaultStrings;
+  const isMacHost = (): boolean =>
+    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
   const getFormatLocale = (): string => {
     const wb = getWb();
     const wbLocale = wb ? inputLocaleForWorkbook(wb) : undefined;
@@ -138,6 +140,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       deps.getLocale?.() ?? wbLocale ?? bundledLocaleForStrings(strings) ?? 'en-US',
     );
   };
+  const getDate1904 = (): boolean => store.getState().ui.date1904 === true;
   const t = strings.formatDialog;
 
   const localizeDialogFormula = (formula: string): string => {
@@ -276,8 +279,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     refs: view,
     draft,
     getLocale: getFormatLocale,
+    getDate1904,
     defaultPatternFor: (cat) => defaultPatternFor(cat),
     previewValue: () => (applyDxf !== null ? null : previewValue),
+    fontEffects: () => isMacHost(),
   });
   const renderPreview = (): void => {
     alignTab.syncRotationDial();
@@ -312,6 +317,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
   };
 
+  let dialogMode: NonNullable<FormatDialogOpenOptions['mode']> = 'format';
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
     const dxfMode = mode === 'dxf';
@@ -564,6 +570,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     syncControls: () => syncControlsFromDraft(),
     renderPreview: () => renderPreview(),
     getLocale: getFormatLocale,
+    getDate1904,
+    isDxfMode: () => dialogMode === 'dxf',
+    isMacPlatform: isMacHost,
   };
   shell.on(tabsStrip, 'click', onTabClick as EventListener);
   shell.on(tabsStrip, 'keydown', onTabKeyDown as EventListener);
@@ -595,6 +604,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const api: FormatDialogHandle = {
     open(tab?: TabId, options?: FormatDialogOpenOptions): void {
+      dialogMode = options?.mode ?? 'format';
       applyDxf = options?.mode === 'dxf' ? (options.onApplyDxf ?? null) : null;
       syncColorPaletteTheme(overlay, themeColorColumns(getWb()?.getTheme()?.colors));
       hydrateFromActive(options?.initialFormat);

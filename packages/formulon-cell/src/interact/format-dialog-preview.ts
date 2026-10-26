@@ -5,6 +5,7 @@
 import { formatNumber } from '../commands/format.js';
 import type { CellValue } from '../engine/types.js';
 import { formatCell, formatGeneralNumber } from '../engine/value.js';
+import { gradientFillCss } from '../render/gradient-fill-css.js';
 import {
   cellFontFamily,
   cellTextVerticalOffset,
@@ -28,10 +29,13 @@ export interface FormatPreviewInput {
   readonly refs: FormatPreviewRefs;
   readonly draft: DraftState;
   getLocale(): string;
+  getDate1904(): boolean;
   defaultPatternFor(category: NumberCategory): string;
   /** Active cell value; null while editing a differential format, where a
    *  representative synthetic sample stands in. */
   previewValue(): CellValue | null;
+  /** Outline and Shadow are drawn only under the Mac profile. */
+  fontEffects(): boolean;
 }
 
 export const fillPatternImage = (pattern: FillPattern | undefined, color = '#000000'): string => {
@@ -128,7 +132,7 @@ const cssBorder = (s: CellBorderSide | undefined): string => {
 
 /** Returns the preview renderer; call it after every draft change. */
 export function createFormatPreview(input: FormatPreviewInput): () => void {
-  const { refs, draft, getLocale, defaultPatternFor } = input;
+  const { refs, draft, getLocale, getDate1904, defaultPatternFor } = input;
   const { preview, previewCell, fontPreviewBox, fillSample, borderVisualPreview } = refs;
   return (): void => {
     const cssFontVertAlign =
@@ -158,8 +162,19 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
       el.style.lineHeight = size !== undefined ? `${size * 1.25}px` : '';
       el.style.verticalAlign = cssFontVertAlign;
       el.style.color = draft.color ?? '';
+      const effects = input.fontEffects();
+      const outline = effects && draft.fontOutline;
+      el.style.textShadow = effects && draft.fontShadow ? '1px 1px 0 rgba(0, 0, 0, 0.35)' : '';
+      el.style.setProperty('-webkit-text-stroke', outline ? '0.75px currentColor' : '');
+      el.style.setProperty('-webkit-text-fill-color', outline ? 'transparent' : '');
     };
     const applyFillPreview = (el: HTMLElement): void => {
+      if (draft.fillGradient) {
+        el.style.backgroundColor = '';
+        el.style.backgroundImage = gradientFillCss(draft.fillGradient);
+        el.style.backgroundSize = '';
+        return;
+      }
       el.style.backgroundColor = draft.fill ?? '';
       el.style.backgroundImage = fillPatternImage(draft.fillPattern, draft.fillPatternColor);
       el.style.backgroundSize =
@@ -247,7 +262,7 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
     const numericText =
       value.kind === 'number'
         ? synthetic || numFmt.kind !== 'general'
-          ? formatNumber(value.value, numFmt, getLocale())
+          ? formatNumber(value.value, numFmt, getLocale(), getDate1904())
           : formatGeneralNumber(value.value, getLocale(), { useGrouping: false })
         : formatCell(value, getLocale());
     previewCell.textContent = numericText;

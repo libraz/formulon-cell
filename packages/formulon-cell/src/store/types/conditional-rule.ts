@@ -1,21 +1,37 @@
 import type { Range } from '../../engine/types.js';
 import type { CellFormat } from './cell-format.js';
 
-/** Icon-set artwork name. 3-slot families classify by [0.33, 0.67];
- *  5-slot families classify by [0.20, 0.40, 0.60, 0.80]. */
+/** Icon-set artwork name. The suffix is the icon count: 3-slot families
+ *  classify by [0.33, 0.67], 4-slot by quartiles, 5-slot by
+ *  [0.20, 0.40, 0.60, 0.80]. `bars5` has no file form and is render-only. */
 export type ConditionalIconSet =
   | 'arrows3'
+  | 'arrowsGray3'
+  | 'arrows4'
+  | 'arrowsGray4'
   | 'arrows5'
+  | 'arrowsGray5'
   | 'triangles3'
   | 'traffic3'
   | 'trafficRim3'
+  | 'signs3'
+  | 'traffic4'
+  | 'redToBlack4'
   | 'symbols3'
+  | 'symbolsCircled3'
   | 'flags3'
   | 'stars3'
+  | 'ratings4'
   | 'quarters5'
   | 'ratings5'
   | 'bars5'
   | 'boxes5';
+
+/** One icon of a family: `slot` is 0-based, lowest bucket first. */
+export interface ConditionalIconRef {
+  set: ConditionalIconSet;
+  slot: number;
+}
 
 export type ConditionalScalePoint =
   | { kind: 'min' | 'max'; gte?: boolean }
@@ -107,6 +123,9 @@ export type ConditionalRule = ConditionalRulePriorityOptions &
         thresholds?: ConditionalScalePoint[];
         /** Invert slot index so the highest values get the "low" icon. */
         reverseOrder?: boolean;
+        /** Custom icon set: the icon drawn for each level, lowest first, one
+         *  per family slot; `null` draws no icon. Absent means the family's own. */
+        customIcons?: (ConditionalIconRef | null)[];
       }
     | {
         kind: 'top-bottom';

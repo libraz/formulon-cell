@@ -259,13 +259,16 @@ const exactText = (leftValue: CellValue, rightValue: CellValue): CellValue => {
   if (left === null || right === null) return { kind: 'error', code: 15, text: '#VALUE!' };
   return { kind: 'bool', value: left === right };
 };
-const formatText = (valueCell: CellValue, patternCell: CellValue): CellValue => {
+const formatText = (valueCell: CellValue, patternCell: CellValue, date1904: boolean): CellValue => {
   const value = readNumber(valueCell);
   const pattern = textValue(patternCell);
   if (value === null || pattern === null || pattern === '') {
     return { kind: 'error', code: 15, text: '#VALUE!' };
   }
-  return { kind: 'text', value: formatNumber(value, { kind: 'custom', pattern }) };
+  return {
+    kind: 'text',
+    value: formatNumber(value, { kind: 'custom', pattern }, undefined, date1904),
+  };
 };
 const fixedFormatText = (
   fn: 'DOLLAR' | 'FIXED',

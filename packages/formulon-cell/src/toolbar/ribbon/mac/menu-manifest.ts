@@ -3,14 +3,7 @@ import {
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
 import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
-import {
-  EMBEDDED_UNSUPPORTED,
-  type Label,
-  labelFor,
-  labels,
-  NOT_IMPLEMENTED,
-  OFFICE_REQUIRED,
-} from './labels.js';
+import { type Label, labelFor, labels, NOT_IMPLEMENTED, OFFICE_REQUIRED } from './labels.js';
 
 /** A leaf rendered in one of the Mac Office-style command menus. */
 export interface MacRibbonMenuItem {
@@ -261,18 +254,14 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
       disabled: true,
       disabledReason: NOT_IMPLEMENTED.en,
     },
-    {
-      id: 'mac.data.dataTable',
-      label: 'Data Table',
-      disabled: true,
-      disabledReason: EMBEDDED_UNSUPPORTED.en,
-    },
+    { id: 'mac.data.dataTable', label: 'Data Table' },
   ]),
   'mac.review.notes': menu([
     { id: 'mac.review.newNote', label: 'New Note' },
     { id: 'mac.review.nextNote', label: 'Next Note' },
     { id: 'mac.review.previousNote', label: 'Previous Note' },
-    { id: 'mac.review.showNotes', label: 'Show Notes' },
+    { id: 'mac.review.showHideNote', label: 'Show/Hide Note' },
+    { id: 'mac.review.showNotes', label: 'Show All Notes' },
   ]),
   'mac.view.show': menu([
     { id: 'mac.view.gridlines', label: 'Gridlines' },

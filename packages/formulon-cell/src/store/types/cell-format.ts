@@ -100,6 +100,24 @@ export interface CellBorders {
   diagonalUp?: CellBorderSide;
 }
 
+/** One colour stop of a gradient fill; `position` runs 0..1. */
+export interface CellGradientStop {
+  position: number;
+  color: string;
+}
+
+/** OOXML `<gradientFill>`. `degree` is a linear gradient's angle; `left` /
+ *  `right` / `top` / `bottom` (0..1) place a path gradient's inner rectangle. */
+export interface CellGradientFill {
+  type: 'linear' | 'path';
+  degree: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  stops: CellGradientStop[];
+}
+
 export interface CellFormat {
   /** Named cell style id last applied through the Cell Styles gallery. Direct
    *  formatting may still override individual fields, mirroring spreadsheets'
@@ -112,6 +130,14 @@ export interface CellFormat {
   strike?: boolean;
   /** Baseline shift for super/subscript text. */
   fontVertAlign?: 'superscript' | 'subscript';
+  /** OOXML `<outline>` / `<shadow>` font effects; painted as hollow and
+   *  drop-shadowed text. */
+  fontOutline?: boolean;
+  fontShadow?: boolean;
+  /** OOXML `<condense>` / `<extend>`: legacy Mac spacing flags, kept for
+   *  round-trip only. */
+  fontCondense?: boolean;
+  fontExtend?: boolean;
   /** OOXML phonetic guide (ruby/furigana) over the cell text, one entry per
    *  `<rPh>` block. A guide that reads the whole cell is a single run; a
    *  partially annotated cell keeps one run per annotated span. */
@@ -146,6 +172,8 @@ export interface CellFormat {
   fillPattern?: FillPattern;
   /** Foreground color for `fillPattern`. */
   fillPatternColor?: string;
+  /** Gradient fill; when set it replaces `fill` and `fillPattern`. */
+  fillGradient?: CellGradientFill;
   /** Override theme font family for this cell. */
   fontFamily?: string;
   /** Font size in CSS pixels. */
@@ -167,6 +195,8 @@ export interface CellFormat {
   comment?: string;
   /** Optional comment author from the engine. Preserved for xlsx round-trip. */
   commentAuthor?: string;
+  /** The note stays shown beside its cell instead of only on hover. */
+  commentVisible?: boolean;
   /** Data validation. When kind === 'list', the cell paints a small ▼ on its
    *  right edge; clicking it opens a dropdown of `source` values. Other
    *  kinds (whole/decimal/date/time/textLength/custom) constrain typed input

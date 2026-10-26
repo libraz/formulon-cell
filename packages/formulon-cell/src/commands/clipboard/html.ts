@@ -140,7 +140,7 @@ export function encodeHtml(
           : cell.value.kind === 'blank'
             ? (fmt?.hyperlinkDisplay ?? '')
             : cell.value.kind === 'number' && fmt?.numFmt
-              ? formatNumber(cell.value.value, fmt.numFmt, locale)
+              ? formatNumber(cell.value.value, fmt.numFmt, locale, state.ui.date1904 === true)
               : formatCell(cell.value, locale);
       const style = styleOf(fmt ?? undefined);
       const styleAttr = style ? ` style="${escapeHtml(style)}"` : '';

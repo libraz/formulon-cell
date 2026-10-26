@@ -169,6 +169,7 @@ export const dynamicDropdownNoopOverrides = (): Partial<DynamicDropdownsCtx> => 
   applyReviewCommentAction: vi.fn(),
   applyProtectAction: vi.fn(),
   applyCalcOptionAction: vi.fn(),
+  applyWhatIfAction: vi.fn(),
   updateArrangeMenu: vi.fn(),
   updateCellStylesMenu: vi.fn(),
   updateCurrencyMenu: vi.fn(),

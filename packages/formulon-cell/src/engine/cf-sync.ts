@@ -1,8 +1,13 @@
 import type { ConditionalCellOverlay } from '../render/conditional.js';
 import { iconSetSlotCount } from '../render/conditional.js';
-import type { ConditionalIconSet, SpreadsheetStore } from '../store/store.js';
+import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, ConditionalRule, ConditionalScalePoint } from '../store/types.js';
 import { addrKey } from './address.js';
+import {
+  customIconFromEngine,
+  iconSetFamilyForOrdinal,
+  iconSetFromEngine,
+} from './cf-icon-sets.js';
 import { TIME_PERIOD } from './cf-writeback.js';
 import {
   borderRecordToFormat,
@@ -16,21 +21,6 @@ import type { WorkbookHandle } from './workbook-handle.js';
 const KIND_COLOR_SCALE = 1;
 const KIND_DATA_BAR = 2;
 const KIND_ICON_SET = 3;
-
-const ENGINE_ICON_SETS: readonly ConditionalIconSet[] = [
-  'arrows3',
-  'arrows5',
-  'triangles3',
-  'traffic3',
-  'trafficRim3',
-  'symbols3',
-  'flags3',
-  'stars3',
-  'quarters5',
-  'ratings5',
-  'bars5',
-  'boxes5',
-];
 
 const ENGINE_RULE_TYPE = {
   expression: 0,
@@ -100,11 +90,6 @@ const sameColor = (
 
 const isOpaqueBlack = (c: { r: number; g: number; b: number; a: number }): boolean =>
   c.r === 0 && c.g === 0 && c.b === 0 && c.a === 255;
-
-const engineIconSet = (ordinal: number): ConditionalIconSet | null =>
-  Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_ICON_SETS.length
-    ? (ENGINE_ICON_SETS[ordinal] ?? null)
-    : null;
 
 const engineDataBarDirection = (ordinal: number): DataBarDirection | undefined =>
   Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_DATA_BAR_DIRECTIONS.length
@@ -212,6 +197,23 @@ function dataBarMetadataForCell(
   if (byPriority.length === 1) return byPriority[0]?.dataBar;
   if (byPriority.length > 1) return undefined;
   return containing.length === 1 ? containing[0]?.dataBar : undefined;
+}
+
+function iconSetMetadataForCell(
+  entries: readonly ConditionalFormatEntry[],
+  priority: number,
+  row: number,
+  col: number,
+): ConditionalFormatEntry['iconSet'] | undefined {
+  const containing = entries.filter(
+    (entry) =>
+      entry.type === ENGINE_RULE_TYPE.iconSet &&
+      entry.iconSet &&
+      entryContainsCell(entry, row, col),
+  );
+  const byPriority = containing.filter((entry) => entry.priority === priority);
+  if (byPriority.length === 1) return byPriority[0]?.iconSet;
+  return containing.length === 1 ? containing[0]?.iconSet : undefined;
 }
 
 function dataBarHasMixedPopulation(
@@ -418,8 +420,9 @@ function engineConditionalFormatToRules(
       });
     } else if (entry.type === ENGINE_RULE_TYPE.iconSet) {
       if (!entry.iconSet) continue;
-      const icons = engineIconSet(entry.iconSet.name);
-      if (!icons) continue;
+      const iconSet = iconSetFromEngine(entry.iconSet.name, entry.iconSet.icons);
+      if (!iconSet) continue;
+      const { icons } = iconSet;
       const slots = iconSetSlotCount(icons);
       const engineThresholds = entry.iconSet.thresholds.map(engineScalePoint);
       // formulon 0.12 stores the floor separately; `thresholds` contains
@@ -435,6 +438,7 @@ function engineConditionalFormatToRules(
         ...(entry.iconSet.reverse ? { reverseOrder: true } : {}),
         ...(thresholds.length > 0 ? { thresholds } : {}),
         ...(floor ? { floor } : {}),
+        ...(iconSet.customIcons ? { customIcons: iconSet.customIcons } : {}),
       });
     }
   }
@@ -564,10 +568,22 @@ export function evaluateCfFromEngine(
         }
         overlay.barGradient = m.barGradient;
       } else if (m.kind === KIND_ICON_SET) {
-        const iconKind = engineIconSet(m.iconSetName);
+        const iconKind = iconSetFamilyForOrdinal(m.iconSetName);
         if (iconKind && overlay.iconKind === undefined) {
-          overlay.iconKind = iconKind;
-          overlay.iconSlot = Math.max(0, Math.min(iconSetSlotCount(iconKind) - 1, m.iconIndex));
+          const level = Math.max(0, Math.min(iconSetSlotCount(iconKind) - 1, m.iconIndex));
+          const custom = iconSetMetadataForCell(
+            metadataEntries,
+            m.priority,
+            cell.row,
+            cell.col,
+          )?.icons;
+          const icon = custom
+            ? customIconFromEngine(custom[level])
+            : { set: iconKind, slot: level };
+          if (icon) {
+            overlay.iconKind = icon.set;
+            overlay.iconSlot = icon.slot;
+          }
         }
       } else if (m.dxfIdEngaged) {
         const dxf = dxfToOverlay(wb, m.dxfId);

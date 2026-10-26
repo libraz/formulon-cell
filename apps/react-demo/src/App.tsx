@@ -46,6 +46,7 @@ import {
   resolveInitialLocale,
   resolveInitialPlatform,
   runDemoBackstageAction,
+  saveDemoWorkbookAsToDownload,
   saveDemoWorkbookToDownload,
 } from '../../demo-shared/index.js';
 import { DemoBackstage } from './DemoBackstage.js';
@@ -222,7 +223,11 @@ export const App = (): ReactElement => {
   useEffect(() => installDemoScriptMenu(applyParsedScript), [applyParsedScript]);
 
   const onSave = useCallback(() => {
-    saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
+    void saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
+  }, [bookName, instance]);
+
+  const onSaveAs = useCallback(() => {
+    void saveDemoWorkbookAsToDownload({ instance, bookName, setUploadStatus });
   }, [bookName, instance]);
 
   const onNewWorkbook = useCallback(async () => {
@@ -301,6 +306,7 @@ export const App = (): ReactElement => {
         newWorkbook: onNewWorkbook,
         openWorkbook: () => fileInputRef.current?.click(),
         saveWorkbook: onSave,
+        saveWorkbookAs: onSaveAs,
         showNotice: showRibbonNotice,
         toggleOptions: () => setShowPanel((v) => !v),
         closeBackstage: () => {
@@ -310,7 +316,7 @@ export const App = (): ReactElement => {
         },
       });
     },
-    [instance, onNewWorkbook, onSave, showRibbonNotice, ui],
+    [instance, onNewWorkbook, onSave, onSaveAs, showRibbonNotice, ui],
   );
 
   const onFormatterChange = useCallback((key: 'uppercase' | 'arrows', checked: boolean) => {
@@ -401,7 +407,7 @@ export const App = (): ReactElement => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".xlsx,.xlsm"
+        accept=".xlsx,.xlsm,.xlsb"
         hidden
         onChange={(ev) => {
           const f = ev.target.files?.[0];

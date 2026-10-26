@@ -407,11 +407,19 @@ export abstract class WorkbookHandleStylesMethods {
     if (!record) return null;
     const fgArgb = record.fg ? resolveArgb(this, record.fg, 1) : null;
     const bgArgb = record.bg ? resolveArgb(this, record.bg, 2) : null;
-    if (fgArgb === null && bgArgb === null) return record;
+    const gradient = record.gradient && {
+      ...record.gradient,
+      stops: record.gradient.stops.map((stop) => {
+        const colorArgb = stop.color ? resolveArgb(this, stop.color, 1) : null;
+        return colorArgb === null ? stop : { ...stop, colorArgb };
+      }),
+    };
+    if (fgArgb === null && bgArgb === null && !gradient) return record;
     return {
       ...record,
       ...(fgArgb === null ? {} : { fgArgb }),
       ...(bgArgb === null ? {} : { bgArgb }),
+      ...(gradient ? { gradient } : {}),
     };
   }
 

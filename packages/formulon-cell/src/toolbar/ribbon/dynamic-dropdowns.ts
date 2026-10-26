@@ -38,6 +38,7 @@ export interface DynamicDropdownsCtx {
   getInst: () => SpreadsheetInstance | null;
   // Menus that need refresh just before they open.
   updateCalcOptionsMenu: (menu: HTMLElement) => void;
+  updateWhatIfMenu: (menu: HTMLElement) => void;
   updateCellDeleteMenu: (menu: HTMLElement) => void;
   updateCellInsertMenu: (menu: HTMLElement) => void;
   updateCellStylesMenu: (menu: HTMLElement) => void;
@@ -124,6 +125,7 @@ export interface DynamicDropdownsCtx {
   applyReviewCommentAction: (action: string) => void;
   applyProtectAction: (action: string) => void | Promise<void>;
   applyCalcOptionAction: (action: string) => void;
+  applyWhatIfAction: (action: string) => void;
   createRecommendedChartFromSelection: () => void | Promise<void>;
   createChartFromSelection: (kind: SessionChartKind) => void;
   chartKindFromAction: (action: string) => SessionChartKind;
@@ -204,6 +206,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'comment-action',
   'protect-action',
   'calc-option',
+  'what-if',
   'chart-insert',
   'picture-insert',
   'shape-insert',
@@ -299,6 +302,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
   'menu-shape-outline': 'updateShapeOutlineMenu',
   'menu-shapes-insert': 'updateShapesInsertMenu',
   'menu-calc-options': 'updateCalcOptionsMenu',
+  'menu-what-if': 'updateWhatIfMenu',
   'menu-cell-styles-home': 'updateCellStylesMenu',
   'menu-clear': 'updateClearMenu',
   'menu-clear-arrows': 'updateClearArrowsMenu',
@@ -696,6 +700,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'comment-action', handler: (v) => ctx.applyReviewCommentAction(v) },
     { attr: 'protect-action', handler: (v) => ctx.applyProtectAction(v) },
     { attr: 'calc-option', handler: (v) => ctx.applyCalcOptionAction(v) },
+    { attr: 'what-if', handler: (v) => ctx.applyWhatIfAction(v) },
     {
       attr: 'chart-insert',
       handler: (v) => {

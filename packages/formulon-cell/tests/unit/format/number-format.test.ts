@@ -215,3 +215,22 @@ describe('numberFormatPaint', () => {
     expect(numberFormatPaint('"a*b"0', 1).fill).toBeUndefined();
   });
 });
+
+describe('formatNumber date systems', () => {
+  const ymd = { kind: 'date', pattern: 'yyyy-mm-dd' } as const;
+
+  it('renders the same serial as different dates in each system', () => {
+    expect(formatNumber(45292, ymd)).toBe('2024-01-01');
+    expect(formatNumber(43830, ymd, 'en-US', true)).toBe('2024-01-01');
+    expect(formatNumber(0, ymd, 'en-US', true)).toBe('1904-01-01');
+  });
+
+  it('threads the date system through custom date patterns', () => {
+    const custom = { kind: 'custom', pattern: 'yyyy/mm/dd h:mm' } as const;
+    expect(formatNumber(43830.5, custom, 'en-US', true)).toBe('2024/01/01 12:00');
+  });
+
+  it('renders nothing for a negative serial in the 1904 system', () => {
+    expect(formatNumber(-1, ymd, 'en-US', true)).toBe('');
+  });
+});

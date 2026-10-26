@@ -144,6 +144,7 @@ export const RIBBON_KEYSHORTCUTS: Readonly<Record<string, string>> = {
   namedRanges: 'Control+F3',
   paste: 'Control+V Meta+V',
   recalcNow: 'F9',
+  recalcSheet: 'Shift+F9',
   redoHome: 'Control+Y Meta+Y Meta+Shift+Z',
   undoHome: 'Control+Z Meta+Z',
 };
@@ -629,11 +630,18 @@ export function buildRibbonModel(
         cmd('errorChecking', tr.errorChecking, tr.errorChecking, 'errorChecking', 'wide'),
         cmd('showFormulasFormula', viewText.formulas, viewText.formulas, 'function', 'wide'),
         cmd('evaluateFormula', tr.evaluateFormula, tr.evaluateFormula, 'function', 'wide'),
+        cmd('watch', tr.watch, tr.watch, 'watch', 'wide'),
       ]),
       group(tr.calculation, [
-        cmd('recalcNow', tr.recalc, `${tr.recalc} (F9)`, 'calcNow', 'wide'),
         cmd('calcOptions', tr.options, tr.options, 'calcOptions', 'wide'),
-        cmd('watch', tr.watch, tr.watch, 'watch', 'wide'),
+        cmd('recalcNow', tr.recalc, `${tr.recalc} (F9)`, 'calcNow', 'wide'),
+        cmd(
+          'recalcSheet',
+          strings.ribbonMenu.calcCalculateSheet,
+          `${strings.ribbonMenu.calcCalculateSheet} (Shift+F9)`,
+          'calcSheet',
+          'wide',
+        ),
       ]),
     ]),
     tab('data', [
@@ -655,6 +663,7 @@ export function buildRibbonModel(
         cmd('dataValidation', tr.dataValidation, tr.dataValidation, 'dataValidation', 'wide'),
         cmd('linksData', tr.links, tr.links, 'link', 'wide'),
       ]),
+      group(tr.forecast, [cmd('whatIf', tr.whatIf, tr.whatIf, 'whatIf', 'wide')]),
       group(tr.outline, [
         cmd('outlineGroup', tr.groupOutline, outlineTitle('group'), 'outlineGroup', 'wide'),
         cmd('outlineUngroup', tr.ungroupOutline, outlineTitle('ungroup'), 'outlineUngroup', 'wide'),
@@ -662,6 +671,7 @@ export function buildRibbonModel(
         cmd('outlineHideDetail', tr.hideDetail, outlineTitle('hide'), 'outlineHide', 'wide'),
         cmd('outlineSummaryBelow', tr.summaryRowsBelow, tr.summaryRowsBelow, 'outlineHide', 'wide'),
         cmd('outlineSummaryRight', tr.summaryColsRight, tr.summaryColsRight, 'outlineShow', 'wide'),
+        cmd('outlineSymbols', tr.outlineSymbols, tr.outlineSymbols, 'outlineGroup', 'wide'),
       ]),
     ]),
     tab('review', [
@@ -675,6 +685,10 @@ export function buildRibbonModel(
         cmd('deleteCommentReview', tr.deleteComment, commentTitle('delete'), 'clear', 'wide'),
         cmd('previousCommentReview', tr.previousComment, commentTitle('previous'), 'goTo', 'wide'),
         cmd('nextCommentReview', tr.nextComment, commentTitle('next'), 'goTo', 'wide'),
+      ]),
+      group(tr.notes, [
+        cmd('showHideNoteReview', tr.showHideNote, tr.showHideNote, 'noteShowHide', 'wide'),
+        cmd('showAllNotesReview', tr.showAllNotes, tr.showAllNotes, 'noteShowAll', 'wide'),
       ]),
       group(tr.find, [cmd('findReview', tr.find, `${tr.find} (Ctrl+F)`, 'find', 'wide')]),
       group(tr.protection, [
@@ -762,6 +776,7 @@ export function buildRibbonModel(
       ]),
       group(tr.window, [
         cmd('freeze', tr.freeze, tr.freeze, 'freeze', 'wide'),
+        cmd('split', tr.split, tr.split, 'split', 'wide'),
         cmd('windowVisibility', tr.format, tr.format, 'table', 'wide'),
       ]),
       group(tr.zoom, [

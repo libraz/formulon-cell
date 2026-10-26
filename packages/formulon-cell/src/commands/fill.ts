@@ -11,6 +11,7 @@ import {
   textSeriesValue,
 } from './autofill-series.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
+import { blockDataTableEdit } from './data-table-guard.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
 import type { History } from './history.js';
 import { isCellWritable } from './protection.js';
@@ -119,6 +120,8 @@ type DateFillUnit = 'days' | 'weekdays' | 'months' | 'years';
 
 interface ProjectionContext {
   locale: string | undefined;
+  /** Workbook date system the source serials are read in. */
+  date1904: boolean;
   dateUnit?: DateFillUnit;
   /** Fill Series: a lone number steps by one instead of repeating. */
   series?: boolean;
@@ -126,10 +129,14 @@ interface ProjectionContext {
   sign: 1 | -1;
 }
 
-const serialToDate = (serial: number): Date => excelSerialToDate(serial) ?? new Date(Number.NaN);
+const serialToDate = (serial: number, date1904: boolean): Date =>
+  excelSerialToDate(serial, date1904) ?? new Date(Number.NaN);
 
-const dateToSerial = (date: Date, fraction: number): number =>
-  Math.floor(excelSerialFromDate(date) ?? Number.NaN) + fraction;
+/** The date as a number cell, or null when the date system cannot hold it. */
+const dateCell = (date: Date, fraction: number, date1904: boolean): ProjectedCell | null => {
+  const value = Math.floor(excelSerialFromDate(date, date1904) ?? Number.NaN) + fraction;
+  return Number.isFinite(value) ? { kind: 'number', value } : null;
+};
 
 const daysInMonth = (year: number, month: number): number =>
   new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
@@ -158,13 +165,14 @@ function buildDateUnitProjection(
   line: SourceCell[],
   unit: DateFillUnit,
   sign: 1 | -1,
+  date1904: boolean,
 ): SeriesProjection | null {
   if (line.length === 0 || !line.every((c) => c.numeric !== null && c.formula === null)) {
     return null;
   }
   const last = line[line.length - 1]?.numeric ?? 0;
   const fraction = last - Math.floor(last);
-  const lastDate = serialToDate(last);
+  const lastDate = serialToDate(last, date1904);
   return {
     at: (i) => {
       const step = i * sign;
@@ -173,7 +181,7 @@ function buildDateUnitProjection(
         unit === 'weekdays'
           ? addWeekdays(lastDate, step)
           : addMonthsClamped(lastDate, unit === 'months' ? step : step * 12);
-      return { kind: 'number', value: dateToSerial(date, fraction) };
+      return dateCell(date, fraction, date1904);
     },
   };
 }
@@ -219,7 +227,7 @@ function dateRun(cells: SourceCell[], ctx: ProjectionContext): Run {
     const trend = linearFit(values);
     return { length: k, at: (x) => ({ kind: 'number', value: trend(x) }) };
   }
-  const dates = values.map(serialToDate);
+  const dates = values.map((v) => serialToDate(v, ctx.date1904));
   const monthIndex = (d: Date): number => d.getUTCFullYear() * 12 + d.getUTCMonth();
   const isMonthEnd = (d: Date): boolean =>
     d.getUTCDate() === daysInMonth(d.getUTCFullYear(), d.getUTCMonth());
@@ -235,10 +243,8 @@ function dateRun(cells: SourceCell[], ctx: ProjectionContext): Run {
     const fraction = first - Math.floor(first);
     return {
       length: k,
-      at: (x) => ({
-        kind: 'number',
-        value: dateToSerial(addMonthsClamped(anchor, monthStep * x, endOfMonth), fraction),
-      }),
+      at: (x) =>
+        dateCell(addMonthsClamped(anchor, monthStep * x, endOfMonth), fraction, ctx.date1904),
     };
   }
   const days = values.slice(1).map((v, i) => Math.trunc(v - (values[i] ?? 0)));
@@ -322,7 +328,7 @@ const sameRun = (a: SlotKind, b: SlotKind, cellA: SourceCell, cellB: SourceCell)
 function buildProjection(line: SourceCell[], ctx: ProjectionContext): SeriesProjection {
   if (line.length === 0) return { at: () => null };
   if (ctx.dateUnit) {
-    const projection = buildDateUnitProjection(line, ctx.dateUnit, ctx.sign);
+    const projection = buildDateUnitProjection(line, ctx.dateUnit, ctx.sign, ctx.date1904);
     if (projection) return projection;
   }
   const kinds = line.map((cell) => slotKind(cell, ctx.locale));
@@ -401,6 +407,7 @@ const cloneFormat = (format: CellFormat): CellFormat => {
   };
   delete clone.comment;
   delete clone.commentAuthor;
+  delete clone.commentVisible;
   return clone;
 };
 
@@ -408,6 +415,7 @@ const preserveDestinationComments = (source: CellFormat, destination?: CellForma
   const next = cloneFormat(source);
   if (destination?.comment !== undefined) next.comment = destination.comment;
   if (destination?.commentAuthor !== undefined) next.commentAuthor = destination.commentAuthor;
+  if (destination?.commentVisible !== undefined) next.commentVisible = destination.commentVisible;
   return next;
 };
 
@@ -520,11 +528,13 @@ function applyFillRange(
     return false;
   }
   if (!fillDestinationWritable(state, src, dest)) return false;
+  if (blockDataTableEdit(wb, fillOutputRange(src, dest))) return false;
   const dir = opts?.copyOnly ? 'copy' : detectDirection(src, dest);
   const sheet = src.sheet;
   const source = readSource(state, src);
   const series = {
     locale: inputLocaleForWorkbook(wb),
+    date1904: state.ui.date1904 === true,
     dateUnit: opts?.dateUnit,
     series: opts?.series,
   };

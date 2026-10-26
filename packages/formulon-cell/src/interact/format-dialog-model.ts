@@ -8,6 +8,7 @@ import type {
   CellBorderStyle,
   CellBorders,
   CellFormat,
+  CellGradientFill,
   CellVAlign,
   CellValidation,
   FillPattern,
@@ -63,12 +64,15 @@ export interface DraftState {
   underline: CellFormat['underline'];
   strike: boolean;
   fontVertAlign: CellFormat['fontVertAlign'];
+  fontOutline: boolean;
+  fontShadow: boolean;
   fontFamily: string;
   fontSize: number | undefined;
   color: string | undefined;
   fill: string | undefined;
   fillPattern: FillPattern | undefined;
   fillPatternColor: string | undefined;
+  fillGradient: CellGradientFill | undefined;
   borders: CellBorders;
   /** "Active" line style — applied when a side checkbox is turned on. */
   borderStyle: BorderStyleKey;
@@ -209,4 +213,120 @@ export const defaultPatternForLocale = (category: NumberCategory, locale: string
 
 export function isHexColor(s: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(s);
+}
+
+/** Fill Effects shading styles, in the desktop dialog's order. */
+export const GRADIENT_SHADING_STYLES = [
+  'horizontal',
+  'vertical',
+  'diagonalUp',
+  'diagonalDown',
+  'fromCorner',
+  'fromCenter',
+] as const;
+export type GradientShadingStyle = (typeof GRADIENT_SHADING_STYLES)[number];
+
+const LINEAR_DEGREES: Record<Exclude<GradientShadingStyle, 'fromCorner' | 'fromCenter'>, number> = {
+  horizontal: 90,
+  vertical: 0,
+  diagonalUp: 45,
+  diagonalDown: 135,
+};
+
+/** Path-gradient focus per From Corner variant: top-left, top-right,
+ *  bottom-left, bottom-right. */
+const CORNERS: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1],
+];
+
+export const gradientVariantCount = (style: GradientShadingStyle): number =>
+  style === 'fromCenter' ? 2 : 4;
+
+/** The two-colour gradient a shading style and variant produce. Linear
+ *  variants run colour 1 to 2, 2 to 1, then the two mirrored three-stop forms. */
+export function gradientForShading(
+  style: GradientShadingStyle,
+  variant: number,
+  color1: string,
+  color2: string,
+): CellGradientFill {
+  const ramp = (a: string, b: string): CellGradientFill['stops'] => [
+    { position: 0, color: a },
+    { position: 1, color: b },
+  ];
+  if (style === 'fromCenter') {
+    return {
+      type: 'path',
+      degree: 0,
+      left: 0.5,
+      right: 0.5,
+      top: 0.5,
+      bottom: 0.5,
+      stops: variant === 1 ? ramp(color2, color1) : ramp(color1, color2),
+    };
+  }
+  if (style === 'fromCorner') {
+    const [x, y] = CORNERS[variant] ?? [0, 0];
+    return {
+      type: 'path',
+      degree: 0,
+      left: x,
+      right: x,
+      top: y,
+      bottom: y,
+      stops: ramp(color1, color2),
+    };
+  }
+  const mirrored = (a: string, b: string): CellGradientFill['stops'] => [
+    { position: 0, color: a },
+    { position: 0.5, color: b },
+    { position: 1, color: a },
+  ];
+  const stops =
+    variant === 1
+      ? ramp(color2, color1)
+      : variant === 2
+        ? mirrored(color1, color2)
+        : variant === 3
+          ? mirrored(color2, color1)
+          : ramp(color1, color2);
+  return {
+    type: 'linear',
+    degree: LINEAR_DEGREES[style],
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    stops,
+  };
+}
+
+/** The shading style, variant and colours that reproduce `gradient`, or null
+ *  for a loaded gradient the two-colour dialog cannot express. */
+export function shadingForGradient(gradient: CellGradientFill): {
+  style: GradientShadingStyle;
+  variant: number;
+  color1: string;
+  color2: string;
+} | null {
+  const first = gradient.stops[0]?.color;
+  const second = gradient.stops[1]?.color;
+  if (!first || !second) return null;
+  for (const style of GRADIENT_SHADING_STYLES) {
+    for (let variant = 0; variant < gradientVariantCount(style); variant += 1) {
+      for (const [color1, color2] of [
+        [first, second],
+        [second, first],
+      ] as const) {
+        const candidate = gradientForShading(style, variant, color1, color2);
+        if (JSON.stringify(candidate) === JSON.stringify(gradient)) {
+          return { style, variant, color1, color2 };
+        }
+      }
+    }
+  }
+  return null;
 }

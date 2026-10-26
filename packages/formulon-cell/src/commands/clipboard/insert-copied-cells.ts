@@ -18,7 +18,13 @@ import {
   shiftFormats,
   shiftMerges,
 } from '../cell-shift.js';
-import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from '../coerce-input.js';
+import {
+  canonicalizeLocalizedFormulaForInput,
+  coerceInputForCell,
+  inputLocaleForWorkbook,
+  writeCoerced,
+} from '../coerce-input.js';
+import { blockDataTableShift, blockTableFunction } from '../data-table-guard.js';
 import type { History } from '../history.js';
 import { blockedByProtection, isCellWritable, isSheetProtected } from '../protection.js';
 import {
@@ -100,6 +106,14 @@ export function insertCopiedCellsFromTSV(
     console.warn('formulon-cell: insert copied cells blocked — merge would be split');
     return null;
   }
+  if (blockDataTableShift(wb, affected)) return null;
+  const pastedFormulas = snapshot
+    ? snapshot.cells.flatMap((row) => row.map((cell) => cell.formula))
+    : rows
+        .flat()
+        .filter((raw) => raw.trim().startsWith('='))
+        .map((raw) => canonicalizeLocalizedFormulaForInput(wb, raw.trim(), inputLocale));
+  if (blockTableFunction(wb, pastedFormulas)) return null;
 
   const replayRecovery: ShiftHistoryReplayRecovery = {};
   if (history && !history.isReplaying()) {
@@ -555,6 +569,7 @@ function prepareBandSnapshot(
           ...(cell.format ?? {}),
           comment: comment.text,
           commentAuthor: comment.author || undefined,
+          commentVisible: comment.visible || undefined,
         };
       }
       line.push(cell);

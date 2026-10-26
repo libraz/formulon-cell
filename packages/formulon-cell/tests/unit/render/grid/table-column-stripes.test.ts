@@ -74,7 +74,14 @@ function bandedCells(over: Partial<TableOverlay>): string[] {
   const rows = buildRowLayout(view.layout, view.viewport);
   const { ctx, fills } = fillSpy();
   paintCells(
-    { ctx, wb: null, locale: 'en-US', getDisplay: undefined, sheetBackgroundImage: null },
+    {
+      ctx,
+      wb: null,
+      locale: 'en-US',
+      getDisplay: undefined,
+      sheetBackgroundImage: null,
+      fontEffects: false,
+    },
     view,
     theme,
     cols,

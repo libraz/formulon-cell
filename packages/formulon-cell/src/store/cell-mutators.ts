@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
+import { mergeFormatPatch } from './format-merge.js';
 import { addMergeToMaps, removeIntersectingMerges } from './merge-maps.js';
 import type { SpreadsheetStore } from './store.js';
 import type { CellFormat, CustomCellStyle } from './types.js';
@@ -120,10 +121,7 @@ export const cellMutators = {
       if (patch === null) {
         formats.delete(key);
       } else {
-        const prev = formats.get(key) ?? {};
-        const next: CellFormat = { ...prev, ...patch };
-        if (patch.borders) next.borders = { ...(prev.borders ?? {}), ...patch.borders };
-        formats.set(key, next);
+        formats.set(key, mergeFormatPatch(formats.get(key), patch));
       }
       return { ...s, format: { ...s.format, formats } };
     });
@@ -145,10 +143,7 @@ export const cellMutators = {
           if (patch === null) {
             formats.delete(key);
           } else {
-            const prev = formats.get(key) ?? {};
-            const next: CellFormat = { ...prev, ...patch };
-            if (patch.borders) next.borders = { ...(prev.borders ?? {}), ...patch.borders };
-            formats.set(key, next);
+            formats.set(key, mergeFormatPatch(formats.get(key), patch));
           }
         }
       }
