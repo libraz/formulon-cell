@@ -194,7 +194,13 @@ export async function runLocaleVisualLayout(
       expect(tipBounds.x + tipBounds.width).toBeLessThanOrEqual(width);
       expect(tipBounds.y + tipBounds.height).toBeLessThanOrEqual(800);
     }
+    // Focus tips follow keyboard focus only, so return to Paste with Shift+Tab.
+    // WebKit reaches buttons with Tab only while Option is held.
+    const tabKey = page.context().browser()?.browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
     await paste.focus();
+    await page.keyboard.press(tabKey);
+    await page.keyboard.press(`Shift+${tabKey}`);
+    await expect(paste).toBeFocused();
     await expect(paste).toHaveAttribute('aria-describedby', (await tip.getAttribute('id')) ?? '');
     await page.keyboard.press('Escape');
     await expect(tip).toHaveCount(0);

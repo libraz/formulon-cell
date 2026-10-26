@@ -156,13 +156,20 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount({ platform: 'mac' });
   await sp.expectNoStub();
+  const menu = page.locator('#menu-mac-insert-shapes');
   await page.locator('[data-ribbon-tab="insert"]').click();
-  const kinds = ['Line', 'Arrow', 'Rectangle', 'RoundedRectangle', 'Oval', 'Triangle', 'Diamond'];
+  await sp.clickRibbon('mac.insert.shapes');
+  await expect(menu.locator('.fc-tb__visual-tile')).toHaveCount(7);
+  await expect(menu.locator('.fc-tb__visual-tile svg')).toHaveCount(7);
+  // The saved file has no line end, so the engine-backed Arrow tile stays disabled.
+  await expect(menu.locator('[data-ribbon-command="mac.insert.shapeArrow"]')).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  const kinds = ['Line', 'Rectangle', 'RoundedRectangle', 'Oval', 'Triangle', 'Diamond'];
   for (const kind of kinds) {
+    // Inserting a shape selects it and switches to the Shape Format tab.
+    await page.locator('[data-ribbon-tab="insert"]').click();
     await sp.clickRibbon('mac.insert.shapes');
-    const menu = page.locator('#menu-mac-insert-shapes');
-    await expect(menu.locator('.fc-tb__visual-tile')).toHaveCount(7);
-    await expect(menu.locator('.fc-tb__visual-tile svg')).toHaveCount(7);
     await menu.locator(`[data-ribbon-command="mac.insert.shape${kind}"]`).click();
     await expect(menu).toBeHidden();
   }
@@ -180,11 +187,9 @@ export async function runMacInsertGalleryScenario(page: Page): Promise<void> {
     );
   await expect
     .poll(shapes)
-    .toEqual(['line', 'arrow', 'rectangle', 'rounded-rectangle', 'oval', 'triangle', 'diamond']);
+    .toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle', 'diamond']);
   await page.locator('.fc-host').focus();
   await page.keyboard.press('Meta+z');
-  await expect
-    .poll(shapes)
-    .toEqual(['line', 'arrow', 'rectangle', 'rounded-rectangle', 'oval', 'triangle']);
+  await expect.poll(shapes).toEqual(['line', 'rectangle', 'rounded-rectangle', 'oval', 'triangle']);
   await sp.expectNoConsoleErrors();
 }

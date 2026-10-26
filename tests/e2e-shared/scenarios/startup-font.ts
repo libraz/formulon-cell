@@ -32,7 +32,7 @@ export async function runStartupFont(
     probe.__startupText = {};
     const original = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
-      if (['ITEM', 'LONDON', 'REYKJAVÍK', 'fahrenheit', 'Reykjavík ☼'].includes(text)) {
+      if (['item', 'London', 'Reykjavík', 'fahrenheit', 'Reykjavík ☼'].includes(text)) {
         probe.__startupText[text] = { font: this.font, width: this.measureText(text).width };
       }
       if (maxWidth === undefined) original.call(this, text, x, y);
@@ -43,7 +43,9 @@ export async function runStartupFont(
   const errors = spreadsheet.collectConsoleErrors();
   await spreadsheet.mount({ fixture: null, locale, platform });
   await spreadsheet.expectNoStub();
-  await page.waitForFunction(() => (window as unknown as FontProbeWindow).__startupText.REYKJAVÍK);
+  await page.waitForFunction(
+    () => (window as unknown as FontProbeWindow).__startupText['Reykjavík'],
+  );
   const expected = STARTUP[platform][locale];
   const fontName = expected.font.name;
   const fontSize = String(expected.font.size);
@@ -71,9 +73,9 @@ export async function runStartupFont(
   }
   expect(startup.rowHeight).toBeCloseTo(expected.rowHeight, 4);
   for (const [text, col] of [
-    ['ITEM', 0],
-    ['LONDON', 0],
-    ['REYKJAVÍK', 0],
+    ['item', 0],
+    ['London', 0],
+    ['Reykjavík', 0],
     ['fahrenheit', 2],
     ['Reykjavík ☼', 3],
   ] as const) {

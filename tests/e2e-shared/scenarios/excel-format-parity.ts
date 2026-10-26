@@ -130,10 +130,10 @@ export async function runExcelFormatPreviewScenario(
   await expect(negativeMinus).toHaveText('-1,234.00');
   await dialog.locator('[data-fc-negative-style="red-parens"]').click();
   await expect(sample).toHaveText('(1,234.50)');
-  await expect(sample).toHaveCSS('color', 'rgb(192, 0, 0)');
+  await expect(sample).toHaveCSS('color', 'rgb(255, 0, 0)');
   await dialog.locator('[data-fc-negative-style="minus"]').click();
   await expect(sample).toHaveText('-1,234.50');
-  await expect(sample).not.toHaveCSS('color', 'rgb(192, 0, 0)');
+  await expect(sample).not.toHaveCSS('color', 'rgb(255, 0, 0)');
   await dialog
     .locator('.fc-fmtdlg__footer')
     .getByRole('button', { name: locale === 'ja' ? 'キャンセル' : 'Cancel', exact: true })

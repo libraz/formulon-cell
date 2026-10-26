@@ -431,18 +431,18 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   const goToDialog = page.getByRole('dialog', { name: '選択オプション' });
   await expect(goToDialog).toBeVisible();
   // The direct-reference row belongs to plain Go To; special mode hides it.
-  await expect(goToDialog.getByText('参照先', { exact: true }).first()).toBeHidden();
+  await expect(goToDialog.locator('.fc-goto__reference')).toBeHidden();
   for (const label of [
-    '範囲',
-    'アクティブなシート',
-    '現在の選択範囲',
-    '種類',
-    '空白セル',
-    '空白以外のセル',
-    '数式',
+    'コメント',
     '定数',
-    '入力規則',
+    '数式',
+    '空白セル',
+    'アクティブ セル領域',
+    'アクティブ行との相違',
+    '参照元',
+    '可視セル',
     '条件付き書式',
+    'データの入力規則',
   ]) {
     await expect(goToDialog.getByText(label, { exact: true }).first()).toBeVisible();
   }

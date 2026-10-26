@@ -45,7 +45,10 @@ export async function runMacScaleAndSheetViewScenario(page: Page): Promise<void>
   if (!view) throw new Error('saved sheet view is missing');
   const id = view.id;
   await sp.clickRibbon('mac.view.freeze');
-  await page.locator('#menu-mac-view-freeze [data-ribbon-command="mac.view.freeze.off"]').click();
+  // While panes are frozen the menu's first item is Unfreeze Panes.
+  const unfreeze = page.locator('#menu-mac-view-freeze [data-ribbon-command="mac.view.freeze"]');
+  await expect(unfreeze).toHaveText('Unfreeze Panes');
+  await unfreeze.click();
   await expect.poll(async () => (await read()).freezeRows).toBe(0);
   const select = page.locator('[data-ribbon-select="sheetViewSelect"]');
   await select.locator('.fc-tb__rb-dd__btn').click();

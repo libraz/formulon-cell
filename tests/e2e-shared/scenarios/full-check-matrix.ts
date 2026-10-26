@@ -109,7 +109,7 @@ type BrowserInstance = {
     getState(): {
       selection: unknown;
       ui: {
-        filterRange: unknown;
+        filterRanges: unknown[];
         filterCriteria: unknown[];
         editor: { kind: string };
         copyMode?: string | null;
@@ -155,7 +155,7 @@ type ProbeWindow = Window & {
 type RuntimeSnapshot = {
   locale: string;
   profile: string | null;
-  filterRange: unknown;
+  filterRanges: unknown[];
   filterCriteria: unknown[];
   hiddenRows: number[];
   conditionalRuleCount: number;
@@ -329,7 +329,7 @@ const runtime = (page: Page): Promise<RuntimeSnapshot> =>
     return {
       locale: instance.locale,
       profile: instance.workbook.spreadsheetProfileId?.() ?? null,
-      filterRange: state.ui.filterRange,
+      filterRanges: state.ui.filterRanges,
       filterCriteria: state.ui.filterCriteria,
       hiddenRows: [...state.layout.hiddenRows].sort((a, b) => a - b),
       conditionalRuleCount: state.conditional.rules.length,
@@ -1089,7 +1089,7 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect(dropdown).toContainText(localizedDecimal(nextLocale, 12.5));
   await expect(dropdown.locator('.fc-filter-dropdown__row')).toHaveCount(6);
   const afterLocaleSwitch = await runtime(page);
-  expect(afterLocaleSwitch.filterRange).toEqual(beforeLocaleSwitch.filterRange);
+  expect(afterLocaleSwitch.filterRanges).toEqual(beforeLocaleSwitch.filterRanges);
   expect(afterLocaleSwitch.filterCriteria).toEqual(beforeLocaleSwitch.filterCriteria);
   expect(afterLocaleSwitch.hiddenRows).toEqual(beforeLocaleSwitch.hiddenRows);
   expect(
@@ -1113,7 +1113,7 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
     .fill(localizedDecimal(nextLocale, 10));
   await dropdown.locator('.fc-filter-dropdown__apply').click();
   await expect(dropdown).toBeHidden();
-  await expect.poll(async () => (await runtime(page)).filterRange).toEqual(range);
+  await expect.poll(async () => (await runtime(page)).filterRanges).toEqual([range]);
   await expect.poll(async () => (await runtime(page)).hiddenRows).toEqual([2, 5]);
   await expect
     .poll(async () => (await runtime(page)).filterCriteria)
@@ -1131,7 +1131,7 @@ const runFilterFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect(dropdown).toBeHidden();
   await expect.poll(async () => (await runtime(page)).hiddenRows).toEqual([]);
   await expect.poll(async () => (await runtime(page)).filterCriteria).toEqual([]);
-  await expect.poll(async () => (await runtime(page)).filterRange).toBeNull();
+  await expect.poll(async () => (await runtime(page)).filterRanges).toEqual([]);
 
   await page.evaluate((nextRange) => {
     const instance = (window as ProbeWindow).__fcInst;
