@@ -1,4 +1,5 @@
 import type { CellValue } from '../../engine/types.js';
+import type { NumberFormatPaint } from '../../format/number-format.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
@@ -32,6 +33,9 @@ export interface CellPaintCtx {
    *  scale; text metrics need the same multiplier so glyphs do not stay at
    *  their 100% size inside a zoomed cell. */
   zoom?: number;
+  /** Colour tag and `*x` fill of the number-format section that renders a
+   *  numeric value; the display text alone carries neither. */
+  formatPaint?: NumberFormatPaint | null;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

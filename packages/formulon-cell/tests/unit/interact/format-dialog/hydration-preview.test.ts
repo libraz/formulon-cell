@@ -276,7 +276,7 @@ describe('attachFormatDialog', () => {
     if (!preview || !redParens || !minus) throw new Error('negative preview controls missing');
     redParens.click();
     expect(preview.textContent).toBe('(1,234.50)');
-    expect(preview.style.color).toBe('#c00000');
+    expect(preview.style.color).toBe('#ff0000');
 
     minus.click();
     expect(preview.textContent).toBe('-1,234.50');

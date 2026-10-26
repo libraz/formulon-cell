@@ -632,6 +632,7 @@ export function effectiveCellFormatFromEngine(
   sheet: number,
   row: number,
   col: number,
+  cache?: Map<string, Partial<CellFormat> | null>,
 ): Partial<CellFormat> | null {
   if (!wb.capabilities?.effectiveStyle) {
     const displayFont = wb.workbookDisplayFont;
@@ -644,6 +645,20 @@ export function effectiveCellFormatFromEngine(
   }
   const effective = wb.getEffectiveStyle(sheet, row, col);
   if (!effective) return null;
+  // The projection depends only on these fields, so a caller painting many
+  // cells that share an XF can reuse one result; it must not mutate it.
+  const cacheKey = `${effective.xfIndex}|${effective.locked}|${effective.hidden}|${effective.numFmtCode}`;
+  const cached = cache?.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const format = projectEffectiveStyle(wb, effective);
+  cache?.set(cacheKey, format);
+  return format;
+}
+
+function projectEffectiveStyle(
+  wb: WorkbookHandle,
+  effective: NonNullable<ReturnType<WorkbookHandle['getEffectiveStyle']>>,
+): Partial<CellFormat> | null {
   const xf = wb.getCellXf(effective.xfIndex);
   if (!xf) return null;
   const format = cellFormatFromXf(wb, xf, wb.workbookDefaultFont);

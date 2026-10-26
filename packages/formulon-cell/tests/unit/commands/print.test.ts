@@ -381,7 +381,7 @@ describe('buildPrintDocument', () => {
     );
 
     const doc = buildPrintDocument(wb, store, 0);
-    expect(doc.html).toMatch(/color:#c00000/);
+    expect(doc.html).toMatch(/color:#ff0000/);
     wb.dispose();
   });
 

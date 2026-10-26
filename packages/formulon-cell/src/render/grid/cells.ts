@@ -8,6 +8,7 @@ import { numFmtToFormatCode } from '../../engine/format-writeback.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
 import type { CellValue } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import { numberFormatPaint } from '../../format/number-format.js';
 import { rangeValidationAt } from '../../store/range-validations.js';
 import { renderScale } from '../../store/render-scale.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
@@ -125,11 +126,14 @@ export function paintCells(
   // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
   // currently win per field for cells with overlap. Restricted to the
   // visible viewport rect so we don't pay for off-screen cells.
+  const effectiveFormats = new Map<string, Partial<CellFormat> | null>();
   const effectiveFormatAt = (row: number, col: number): Partial<CellFormat> | undefined => {
     if (!wb?.capabilities.effectiveStyle || typeof wb.getEffectiveStyle !== 'function') {
       return undefined;
     }
-    return effectiveCellFormatFromEngine(wb, data.sheetIndex, row, col) ?? undefined;
+    return (
+      effectiveCellFormatFromEngine(wb, data.sheetIndex, row, col, effectiveFormats) ?? undefined
+    );
   };
   if (wb?.capabilities.conditionalFormat) {
     const sheet = state.data.sheetIndex;
@@ -421,12 +425,12 @@ export function paintCells(
           fmt,
         ) ?? null;
       let nativeDisplay: string | null = null;
+      const formatCode = fmt?.numFmt ? numFmtToFormatCode(fmt.numFmt, wb) : null;
       if (customDisplay === null && state.ui.showFormulas !== true && wb) {
         // A just-authored number format may be present in the store before a
         // mirror flush reaches the native XF table. Format that value directly
         // with formulon; loaded/inherited formats can use the workbook cell
         // renderer, which also applies its date system and effective XF.
-        const formatCode = fmt?.numFmt ? numFmtToFormatCode(fmt.numFmt, wb) : null;
         if (formatCode && !overlay && typeof wb.formatValueForDisplay === 'function') {
           nativeDisplay = wb.formatValueForDisplay(value, formatCode);
         } else if (
@@ -459,6 +463,10 @@ export function paintCells(
         locale,
         rtl,
         zoom: renderScale(state.layout, state.viewport),
+        formatPaint:
+          formatCode && customDisplay === null && value.kind === 'number'
+            ? numberFormatPaint(formatCode, value.value)
+            : null,
       };
 
       // Static format fill OR overlay fill — both painted via paintCellFill,

@@ -120,10 +120,24 @@ const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
  *  `ss`/`s` plus `am/pm`. Not exhaustive but covers the patterns spreadsheets
  *  ship in its built-in format codes. */
 function formatCustomPattern(value: number, pattern: string, locale: string): string {
-  // Split into up to four sections on ';' that aren't inside a quoted literal
-  //  or a bracketed tag. Spreadsheets allow: positive;negative;zero;text. When any
-  //  section carries a [>n]/[<n]/[=n] condition we evaluate those first and
-  //  only fall back to the sign-based default when no condition matches.
+  const selected = selectNumberSection(pattern, value);
+  // Strip style-only directives. Quoted literals must stay quoted until the
+  // numeric/date renderer decides whether a token is active or literal.
+  const active = stripFormatDirectives(selected.section);
+
+  // If the section contains date/time tokens, render as date.
+  if (/y|m|d|h|s/i.test(stripLiterals(active))) {
+    return renderDateTimePattern(value, active, locale);
+  }
+
+  return renderNumericPattern(selected.useAbs ? Math.abs(value) : value, active, locale);
+}
+
+/** Pick the section of `pattern` that renders `value`. Spreadsheets allow
+ *  positive;negative;zero;text; sections carrying a [>n]/[<n]/[=n] condition
+ *  are tried first, and the sign-based default applies only when none match.
+ *  `useAbs` is set when the chosen section supplies its own sign. */
+function selectNumberSection(pattern: string, value: number): { section: string; useAbs: boolean } {
   const sections = splitSections(pattern);
 
   let active: string | null = null;
@@ -139,6 +153,12 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
       useAbs = value < 0;
       break;
     }
+  }
+  const conditional = sections.some((s) => parseCondition(s));
+  if (active === null && conditional) {
+    // With conditions present, the first unconditioned section takes every
+    //  value no condition matched.
+    active = sections.find((s) => !parseCondition(s)) ?? sections[0] ?? '';
   }
   if (active === null) {
     // Second pass: classic sign-based selection over sections that carry
@@ -156,17 +176,106 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
       active = pos ?? sections[0] ?? '';
     }
   }
+  return { section: active, useAbs };
+}
 
-  // Strip style-only directives. Quoted literals must stay quoted until the
-  // numeric/date renderer decides whether a token is active or literal.
-  active = stripFormatDirectives(active);
+/** The desktop spreadsheet's default 56-colour palette, indexed by `[ColorN]`. */
+// biome-ignore format: eight palette entries per line
+const FORMAT_PALETTE = [
+  '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff',
+  '#800000', '#008000', '#000080', '#808000', '#800080', '#008080', '#c0c0c0', '#808080',
+  '#9999ff', '#993366', '#ffffcc', '#ccffff', '#660066', '#ff8080', '#0066cc', '#ccccff',
+  '#000080', '#ff00ff', '#ffff00', '#00ffff', '#800080', '#800000', '#008080', '#0000ff',
+  '#00ccff', '#ccffff', '#ccffcc', '#ffff99', '#99ccff', '#ff99cc', '#cc99ff', '#ffcc99',
+  '#3366ff', '#33cccc', '#99cc00', '#ffcc00', '#ff9900', '#ff6600', '#666699', '#969696',
+  '#003366', '#339966', '#003300', '#333300', '#993300', '#993366', '#333399', '#333333',
+];
 
-  // If the section contains date/time tokens, render as date.
-  if (/y|m|d|h|s/i.test(stripLiterals(active))) {
-    return renderDateTimePattern(value, active, locale);
+const FORMAT_COLOR_NAMES: Record<string, string> = {
+  black: '#000000',
+  blue: '#0000ff',
+  cyan: '#00ffff',
+  green: '#00ff00',
+  magenta: '#ff00ff',
+  red: '#ff0000',
+  white: '#ffffff',
+  yellow: '#ffff00',
+};
+
+/** Paint-time parts of a format code that the display text cannot carry. */
+export interface NumberFormatPaint {
+  /** Colour from a `[Red]` / `[ColorN]` tag in the section that renders the value. */
+  color?: string;
+  /** `*x` repeat: `char` fills the cell width between the literal text on
+   *  one side of it (`lead` before, or `trail` after) and the rest. */
+  fill?: { char: string; lead?: string; trail?: string };
+}
+
+/** Read the colour tag and `*x` fill of the section that renders `value`. */
+export function numberFormatPaint(code: string, value: number): NumberFormatPaint {
+  const { section } = selectNumberSection(code, value);
+  const out: NumberFormatPaint = {};
+  for (const tag of section.matchAll(/\[([^\]]*)\]/g)) {
+    const name = (tag[1] ?? '').toLowerCase();
+    const indexed = name.match(/^color(\d+)$/);
+    const color =
+      FORMAT_COLOR_NAMES[name] ?? (indexed ? FORMAT_PALETTE[Number(indexed[1]) - 1] : undefined);
+    if (color) {
+      out.color = color;
+      break;
+    }
   }
+  const fill = fillSplit(section.replace(/\[[^\]]*\]/g, ''));
+  if (fill) out.fill = fill;
+  return out;
+}
 
-  return renderNumericPattern(useAbs ? Math.abs(value) : value, active, locale);
+/** Split a section at its unquoted `*x` when the text on one side of it is
+ *  pure literal (quotes, escapes, `_x` spacers, plain symbols). */
+function fillSplit(section: string): NumberFormatPaint['fill'] | null {
+  for (let i = 0; i < section.length; i += 1) {
+    const ch = section[i];
+    if (ch === '"') {
+      i = section.indexOf('"', i + 1);
+      if (i < 0) return null;
+    } else if (ch === '\\' || ch === '_') {
+      i += 1;
+    } else if (ch === '*') {
+      const char = section[i + 1];
+      if (!char) return null;
+      const lead = literalText(section.slice(0, i));
+      if (lead !== null) return { char, lead };
+      const trail = literalText(section.slice(i + 2));
+      return trail !== null ? { char, trail } : null;
+    }
+  }
+  return null;
+}
+
+/** The text a literal-only fragment of a format section displays, or null
+ *  when it holds a placeholder or token. */
+function literalText(fragment: string): string | null {
+  let out = '';
+  for (let i = 0; i < fragment.length; i += 1) {
+    const ch = fragment[i] ?? '';
+    if (ch === '"') {
+      const end = fragment.indexOf('"', i + 1);
+      if (end < 0) return null;
+      out += fragment.slice(i + 1, end);
+      i = end;
+    } else if (ch === '\\') {
+      out += fragment[i + 1] ?? '';
+      i += 1;
+    } else if (ch === '_') {
+      out += ' ';
+      i += 1;
+    } else if (/[0#?.,%@/:*a-z]/i.test(ch)) {
+      return null;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
 }
 
 function formatSpecialPattern(value: number, pattern: string): string {

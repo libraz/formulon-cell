@@ -18,6 +18,7 @@ import type { CellValue } from '../engine/types.js';
 // browser's print pipeline is the entire export path.
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { numberFormatPaint } from '../format/number-format.js';
 import { cellFontFamily } from '../render/painters/text.js';
 import { formatWithPending } from '../store/pending-format.js';
 import {
@@ -284,13 +285,13 @@ function inlineCellStyle(
   }
   if (fmt.textDirection === 'rtl') parts.push('direction:rtl');
   else if (fmt.textDirection === 'ltr') parts.push('direction:ltr');
-  const redNegative =
-    value.kind === 'number' &&
-    value.value < 0 &&
-    (fmt.numFmt?.kind === 'fixed' || fmt.numFmt?.kind === 'currency') &&
-    (fmt.numFmt.negativeStyle === 'red' || fmt.numFmt.negativeStyle === 'red-parens');
-  if (fmt.color && !blackAndWhite) parts.push(`color:${fmt.color}`);
-  else if (redNegative && !blackAndWhite) parts.push('color:#c00000');
+  const formatCode = value.kind === 'number' ? numFmtToFormatCode(fmt.numFmt) : null;
+  const formatColor =
+    formatCode && value.kind === 'number'
+      ? numberFormatPaint(formatCode, value.value).color
+      : undefined;
+  const color = formatColor ?? fmt.color;
+  if (color && !blackAndWhite) parts.push(`color:${color}`);
   if (fmt.fill && !blackAndWhite) parts.push(`background:${fmt.fill}`);
   if (fmt.fillPattern && !blackAndWhite) {
     const image = fillPatternCss(fmt.fillPattern, fmt.fillPatternColor);

@@ -278,7 +278,7 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
     }
     if (!draft.color && value.kind === 'number' && value.value < 0) {
       previewCell.style.color =
-        draft.negativeStyle === 'red' || draft.negativeStyle === 'red-parens' ? '#c00000' : '';
+        draft.negativeStyle === 'red' || draft.negativeStyle === 'red-parens' ? '#ff0000' : '';
     }
   };
 }

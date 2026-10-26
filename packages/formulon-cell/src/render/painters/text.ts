@@ -314,6 +314,7 @@ export function paintCellText({
   locale,
   rtl = false,
   zoom,
+  formatPaint: formatPaintFor,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
@@ -339,11 +340,7 @@ export function paintCellText({
   const isError = value.kind === 'error';
   const isBool = value.kind === 'bool';
   const isFormulaDisplay = showFormulas && formula != null;
-  const redNegative =
-    value.kind === 'number' &&
-    value.value < 0 &&
-    (format?.numFmt?.kind === 'fixed' || format?.numFmt?.kind === 'currency') &&
-    (format.numFmt.negativeStyle === 'red' || format.numFmt.negativeStyle === 'red-parens');
+  const formatPaint = isFormulaDisplay ? null : formatPaintFor;
   const fontVertAlign = format?.fontVertAlign;
   const baseFont = cellFont(format, theme, isFormulaDisplay === true);
   const zoomScale = visualZoom(zoom);
@@ -358,16 +355,17 @@ export function paintCellText({
   const paintFontCss = cellFontCss(font);
   ctx.font = paintFontCss;
   const isHyperlink = !!format?.hyperlink;
-  ctx.fillStyle = format?.color
-    ? format.color
-    : isHyperlink
-      ? theme.accent
-      : isError
-        ? theme.cellErrorFg
-        : isBool
-          ? theme.cellBoolFg
-          : redNegative
-            ? '#c00000'
+  // A number-format colour tag outranks the cell's font colour.
+  ctx.fillStyle = formatPaint?.color
+    ? formatPaint.color
+    : format?.color
+      ? format.color
+      : isHyperlink
+        ? theme.accent
+        : isError
+          ? theme.cellErrorFg
+          : isBool
+            ? theme.cellBoolFg
             : isNumeric
               ? theme.cellNumFg
               : theme.fg;
@@ -497,6 +495,38 @@ export function paintCellText({
   const box = stableTextMetricsBox(drawFontSize);
   let ty = textBaselineY(bounds, box, vAlign, padY);
   ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
+
+  // A `*x` fill spans the cell whatever the alignment: one part sits at
+  // each edge with the fill character repeated between them.
+  const fill = formatPaint?.fill;
+  const fillParts =
+    !fill || rtl
+      ? null
+      : fill.lead !== undefined && text.startsWith(fill.lead)
+        ? [fill.lead, text.slice(fill.lead.length)]
+        : fill.trail !== undefined && text.endsWith(fill.trail)
+          ? [text.slice(0, text.length - fill.trail.length), fill.trail]
+          : null;
+  if (fill && fillParts) {
+    const [leading = '', trailing = ''] = fillParts;
+    const left = bounds.x + padX + indentPx;
+    const right = bounds.x + bounds.w - padX;
+    const leadingWidth = ctx.measureText(leading).width;
+    const trailingWidth = ctx.measureText(trailing).width;
+    ctx.textAlign = 'left';
+    ctx.fillText(leading, left, ty);
+    ctx.textAlign = 'right';
+    ctx.fillText(trailing, right, ty);
+    const charWidth = ctx.measureText(fill.char).width;
+    const gap = right - trailingWidth - (left + leadingWidth);
+    if (fill.char.trim() && charWidth > 0 && gap >= charWidth) {
+      ctx.textAlign = 'left';
+      ctx.fillText(fill.char.repeat(Math.floor(gap / charWidth)), left + leadingWidth, ty);
+    }
+    paintTextDecorations(ctx, format, isHyperlink, left, right - left, ty, box);
+    ctx.restore();
+    return;
+  }
 
   // A phonetic guide (Japanese furigana/ruby) is stored separately from the
   // cell value by OOXML, one run per annotated span. Each reading sits over

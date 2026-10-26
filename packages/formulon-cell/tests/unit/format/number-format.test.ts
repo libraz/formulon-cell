@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatNumber } from '../../../src/format/number-format.js';
+import { formatNumber, numberFormatPaint } from '../../../src/format/number-format.js';
 
 describe('formatNumber', () => {
   it('returns the input as a string for non-finite numbers', () => {
@@ -176,5 +176,42 @@ describe('formatNumber', () => {
     };
     expect(formatNumber(1234, fmt)).toBe('$1,234.00');
     expect(formatNumber(-1234, fmt)).toBe('-$1,234.00');
+  });
+});
+
+describe('numberFormatPaint', () => {
+  const accounting = '_ "¥"* #,##0_ ;_ "¥"* \\-#,##0_ ;_ "¥"* "-"_ ;_ @_ ';
+
+  it('reads the colour tag of the section that renders the value', () => {
+    expect(numberFormatPaint('#,##0;[Red]-#,##0', -1).color).toBe('#ff0000');
+    expect(numberFormatPaint('#,##0;[Red]-#,##0', 1).color).toBeUndefined();
+    expect(numberFormatPaint('[Blue]0;[Red]-0;[Green]0', 0).color).toBe('#00ff00');
+    expect(numberFormatPaint('[Color10]0', 3).color).toBe('#008000');
+    expect(numberFormatPaint('[>100][Magenta]0;[Cyan]0', 150).color).toBe('#ff00ff');
+    expect(numberFormatPaint('[>100][Magenta]0;[Cyan]0', 50).color).toBe('#00ffff');
+  });
+
+  it('ignores locale and condition tags that are not colours', () => {
+    expect(numberFormatPaint('[$-411]ge.m.d', 45000).color).toBeUndefined();
+  });
+
+  it('splits an accounting fill after its leading literal', () => {
+    expect(numberFormatPaint(accounting, 1234).fill).toEqual({ char: ' ', lead: ' ¥' });
+    expect(numberFormatPaint(accounting, -1234).fill).toEqual({ char: ' ', lead: ' ¥' });
+    expect(numberFormatPaint('_ * #,##0_ ;_ * \\-#,##0_ ', 1).fill).toEqual({
+      char: ' ',
+      lead: ' ',
+    });
+  });
+
+  it('splits a fill before its trailing literal when the lead holds placeholders', () => {
+    expect(numberFormatPaint('0**', 12).fill).toEqual({ char: '*', trail: '' });
+    expect(numberFormatPaint('0*-"kg"', 12).fill).toEqual({ char: '-', trail: 'kg' });
+  });
+
+  it('reports no fill when neither side is literal or no fill exists', () => {
+    expect(numberFormatPaint('0* 0', 1).fill).toBeUndefined();
+    expect(numberFormatPaint('#,##0', 1).fill).toBeUndefined();
+    expect(numberFormatPaint('"a*b"0', 1).fill).toBeUndefined();
   });
 });
