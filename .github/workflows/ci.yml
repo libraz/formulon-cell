@@ -8,6 +8,8 @@ on:
     paths:
       - 'apps/**'
       - 'packages/**'
+      - 'scripts/**'
+      - 'tests/**'
       - 'package.json'
       - 'yarn.lock'
       - 'tsconfig.base.json'
@@ -19,6 +21,8 @@ on:
     paths:
       - 'apps/**'
       - 'packages/**'
+      - 'scripts/**'
+      - 'tests/**'
       - 'package.json'
       - 'yarn.lock'
       - 'tsconfig.base.json'
