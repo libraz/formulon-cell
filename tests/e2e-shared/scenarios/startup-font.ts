@@ -43,9 +43,7 @@ export async function runStartupFont(
   const errors = spreadsheet.collectConsoleErrors();
   await spreadsheet.mount({ fixture: null, locale, platform });
   await spreadsheet.expectNoStub();
-  await page.waitForFunction(
-    () => (window as unknown as FontProbeWindow).__startupText['Reykjavík'],
-  );
+  await page.waitForFunction(() => (window as unknown as FontProbeWindow).__startupText.Reykjavík);
   const expected = STARTUP[platform][locale];
   const fontName = expected.font.name;
   const fontSize = String(expected.font.size);
