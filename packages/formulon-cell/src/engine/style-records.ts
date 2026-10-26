@@ -31,6 +31,14 @@ export function completeFontRecord(record: FontRecord): EngineFontRecord {
     family: record.family ?? 0,
     hasCharset: record.hasCharset ?? false,
     charset: record.charset ?? 0,
+    outline: record.outline ?? false,
+    shadow: record.shadow ?? false,
+    condense: record.condense ?? false,
+    extend: record.extend ?? false,
+    hasOutline: record.hasOutline ?? false,
+    hasShadow: record.hasShadow ?? false,
+    hasCondense: record.hasCondense ?? false,
+    hasExtend: record.hasExtend ?? false,
     // A `<scheme>` link makes the font track the workbook theme. Only a record
     // read back out of a file carries one; a font the cell layer authored from
     // a family name is a literal typeface, so it stays unlinked.

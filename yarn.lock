@@ -514,7 +514,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@libraz/formulon-cell@workspace:packages/formulon-cell"
   dependencies:
-    "@libraz/formulon": "npm:0.17.0"
+    "@libraz/formulon": "npm:0.18.0"
     "@vitest/coverage-v8": "npm:5.0.5"
     happy-dom: "npm:21.0.3"
     typescript: "npm:6.0.3"
@@ -527,10 +527,10 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@libraz/formulon@npm:0.17.0":
-  version: 0.17.0
-  resolution: "@libraz/formulon@npm:0.17.0"
-  checksum: 10c0/6b2d50690fa832cd111e4e4f402e26d5d3f390faa885172e33ea11571c2c8e87684ebda8c43b52fe3f69dc0f383745cd0155baea6340eceb3352221c46515802
+"@libraz/formulon@npm:0.18.0":
+  version: 0.18.0
+  resolution: "@libraz/formulon@npm:0.18.0"
+  checksum: 10c0/3562d338b7dd64fe3531252cfbb128f83a736c8995ae6ef4fed0ee5aa993cf5df63cc1e354006817299d1917c9d12306772e95855ae8ca1aa653ba30be756a52
   languageName: node
   linkType: hard
 

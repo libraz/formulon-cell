@@ -77,6 +77,14 @@ export type FontRecord = EngineFilled<
   | 'charset'
   | 'scheme'
   | 'color'
+  | 'outline'
+  | 'shadow'
+  | 'condense'
+  | 'extend'
+  | 'hasOutline'
+  | 'hasShadow'
+  | 'hasCondense'
+  | 'hasExtend'
 >;
 
 export type FillRecord = EngineFilled<import('@libraz/formulon').FillRecord, 'fg' | 'bg'>;
