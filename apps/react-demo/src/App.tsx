@@ -63,7 +63,7 @@ export const App = (): ReactElement => {
   const [workbook, setWorkbook] = useState<WorkbookHandle | null>(null);
   const [instance, setInstance] = useState<SpreadsheetInstance | null>(null);
   const [log, setLog] = useState<ChangeLogEntry[]>([]);
-  const [formatters, setFormatters] = useState({ uppercase: true, arrows: true });
+  const [formatters, setFormatters] = useState({ uppercase: false, arrows: false });
   const [preset, setPreset] = useState<PresetKey>('full');
   const [overrides, setOverrides] = useState<FeatureFlags>({});
   const [showRibbon, setShowRibbon] = useState(true);
