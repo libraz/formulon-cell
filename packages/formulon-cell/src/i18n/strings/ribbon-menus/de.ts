@@ -31,8 +31,6 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     autoFitRowHeight: 'Optimale Zeilenhöhe',
     colWidth: 'Spaltenbreite …',
     autoFitColWidth: 'Optimale Spaltenbreite',
-    rowHeightPrompt: 'Zeilenhöhe in Pixel eingeben',
-    colWidthPrompt: 'Spaltenbreite in Pixel eingeben',
     rowHeightLabel: 'Zeilenhöhe:',
     colWidthLabel: 'Spaltenbreite:',
     sheetNameLabel: 'Blattname',

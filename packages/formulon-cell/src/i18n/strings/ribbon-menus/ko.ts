@@ -31,8 +31,6 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     autoFitRowHeight: '행 높이 자동 맞춤',
     colWidth: '열 너비…',
     autoFitColWidth: '열 너비 자동 맞춤',
-    rowHeightPrompt: '픽셀 단위로 행 높이를 입력하세요',
-    colWidthPrompt: '픽셀 단위로 열 너비를 입력하세요',
     rowHeightLabel: '행 높이:',
     colWidthLabel: '열 너비:',
     sheetNameLabel: '시트 이름',

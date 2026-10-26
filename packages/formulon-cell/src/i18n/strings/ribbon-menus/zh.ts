@@ -31,8 +31,6 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     autoFitRowHeight: '自动调整行高',
     colWidth: '列宽…',
     autoFitColWidth: '自动调整列宽',
-    rowHeightPrompt: '输入行高（像素）',
-    colWidthPrompt: '输入列宽（像素）',
     rowHeightLabel: '行高:',
     colWidthLabel: '列宽:',
     sheetNameLabel: '工作表名称',

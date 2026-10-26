@@ -31,8 +31,6 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     autoFitRowHeight: 'Ajuster automatiquement la hauteur de ligne',
     colWidth: 'Largeur de colonne…',
     autoFitColWidth: 'Ajuster automatiquement la largeur de colonne',
-    rowHeightPrompt: 'Entrez la hauteur de ligne en pixels',
-    colWidthPrompt: 'Entrez la largeur de colonne en pixels',
     rowHeightLabel: 'Hauteur de ligne :',
     colWidthLabel: 'Largeur de colonne :',
     sheetNameLabel: 'Nom de la feuille',

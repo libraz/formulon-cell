@@ -31,8 +31,6 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     autoFitRowHeight: 'AutoFit Row Height',
     colWidth: 'Column Width...',
     autoFitColWidth: 'AutoFit Column Width',
-    rowHeightPrompt: 'Enter row height in pixels',
-    colWidthPrompt: 'Enter column width in pixels',
     rowHeightLabel: 'Row height:',
     colWidthLabel: 'Column width:',
     sheetNameLabel: 'Sheet name',
