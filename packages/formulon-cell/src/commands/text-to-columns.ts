@@ -32,6 +32,31 @@ const splitText = (
   return value.split(pattern);
 };
 
+/** The cells `textToColumns` writes for `range`: each text cell that splits, and
+ *  the cells to its right that receive the extra pieces. */
+export function textToColumnsTargets(
+  state: State,
+  range: Range,
+  delimiter: string | readonly string[],
+  options: TextToColumnsOptions = {},
+): Range[] {
+  const targets: Range[] = [];
+  for (const [key, cell] of state.data.cells) {
+    const addr = parseAddrKey(key);
+    if (!addr || !rangeContainsAddr(range, addr) || cell.value.kind !== 'text') continue;
+    const pieces = splitText(cell.value.value, delimiter, options).length;
+    if (pieces < 2) continue;
+    targets.push({
+      sheet: range.sheet,
+      r0: addr.row,
+      c0: addr.col,
+      r1: addr.row,
+      c1: addr.col + pieces - 1,
+    });
+  }
+  return targets;
+}
+
 /** Split each cell in `range` (column-major) by `delimiter` and write the
  *  resulting tokens to the cells immediately to the right of the source.
  *  Returns the maximum number of tokens produced. */

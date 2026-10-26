@@ -3,9 +3,11 @@ import {
   type PasteSpecialOptions,
   type PasteWhat,
   pasteSpecial,
+  resolvePasteDestination,
 } from '../commands/clipboard/paste-special.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -177,6 +179,13 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const applyOptions = (opts: PasteSpecialOptions, openOpts?: PasteSpecialOpenOptions): boolean => {
     const snap = openOpts?.snapshot ?? openSnapshot ?? deps.getSnapshot();
     if (!snap) {
+      return false;
+    }
+    const destination = resolvePasteDestination(store.getState(), snap, opts.transpose);
+    if (
+      destination &&
+      deferForAllowedRangeUnlock(store, [destination], () => void applyOptions(opts, openOpts))
+    ) {
       return false;
     }
     // Bundle every value/format mutation into one undoable step. Cell writes

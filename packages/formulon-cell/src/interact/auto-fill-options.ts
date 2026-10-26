@@ -1,6 +1,6 @@
-import type { FillFormattingMode } from '../commands/fill.js';
-import { fillRange } from '../commands/fill.js';
+import { type FillFormattingMode, fillOutputRange, fillRange } from '../commands/fill.js';
 import type { History } from '../commands/history.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -170,6 +170,12 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   const reapply = (mode: AutoFillMode): void => {
     const current = detail;
     if (!current) return;
+    if (
+      deferForAllowedRangeUnlock(store, [fillOutputRange(current.src, current.dest)], () =>
+        reapply(mode),
+      )
+    )
+      return;
     if (history) history.begin();
     let wrote = false;
     try {

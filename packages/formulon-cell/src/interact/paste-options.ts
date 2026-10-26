@@ -5,6 +5,7 @@ import {
 } from '../commands/clipboard/paste-special.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -125,6 +126,7 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
   const applyMode = (mode: PasteOptionsMode): void => {
     const current = activation;
     if (!current) return;
+    if (deferForAllowedRangeUnlock(store, [current.range], () => applyMode(mode))) return;
     let result: PasteSpecialResult | null = null;
     const apply = (): void => {
       mutators.setRange(store, current.range);

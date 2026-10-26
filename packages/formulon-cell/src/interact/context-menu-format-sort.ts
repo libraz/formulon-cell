@@ -17,6 +17,7 @@ import {
 } from '../commands/format.js';
 import type { History } from '../commands/history.js';
 import { phoneticReading, setPhoneticReading } from '../commands/phonetic.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { inferSortHasHeader, sortRange } from '../commands/sort.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import { localeForWorkbook, profileTextKey } from '../engine/profile-text-semantics.js';
@@ -151,6 +152,15 @@ export function runContextMenuFormatSortItem(
     case 'sortAsc':
     case 'sortDesc': {
       const range = boundRowsToData(store, inferAutoFilterRange(state, state.selection.range));
+      if (
+        deferForAllowedRangeUnlock(
+          store,
+          [range],
+          () => void runContextMenuFormatSortItem(ctx, id, store.getState()),
+        )
+      ) {
+        return true;
+      }
       // A sort rewrites every cell in the range; group them so one undo
       // restores the original order.
       if (history) history.begin();

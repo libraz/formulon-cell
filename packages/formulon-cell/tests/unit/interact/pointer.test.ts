@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  registerAllowedRangeUnlockUi,
+  setProtectedSheet,
+} from '../../../src/commands/protection.js';
+import { legacySheetPasswordHash } from '../../../src/engine/protection-password.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachPointer } from '../../../src/interact/pointer.js';
 import { selectionContainsAddr } from '../../../src/store/selection-geometry.js';
@@ -662,6 +667,39 @@ describe('attachPointer', () => {
       expect(sel).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 });
 
       // Reset for other tests.
+      stub.mockReturnValue(null);
+    });
+
+    it('a fill that waited for a range password still raises the AutoFill Options', async () => {
+      const grid = await import('../../../src/render/grid.js');
+      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
+      stub.mockReturnValue({ x: 152, y: 54, w: 6, h: 6 });
+      seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.addAllowedEditRange(store, {
+        title: 'Guarded',
+        range: { sheet: 0, r0: 1, c0: 0, r1: 2, c1: 0 },
+        legacyPasswordHash: legacySheetPasswordHash('pw'),
+      });
+      setProtectedSheet(store, 0, true);
+      registerAllowedRangeUnlockUi(store, {
+        askPassword: async () => 'pw',
+        reportIncorrect: async () => {},
+      });
+      const onAutoFillOptions = vi.fn();
+      host.addEventListener('fc:autofilloptions', onAutoFillOptions);
+      detach = attachPointer(host, store, wb);
+
+      fireDown(host, 155, 57);
+      fireMove(host, 100, 100);
+      fireUp(host, 100, 100);
+      expect(onAutoFillOptions).not.toHaveBeenCalled();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(onAutoFillOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: expect.objectContaining({ dest: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 } }),
+        }),
+      );
       stub.mockReturnValue(null);
     });
 

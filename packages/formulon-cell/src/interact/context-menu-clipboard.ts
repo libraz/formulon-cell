@@ -13,6 +13,7 @@ import {
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -135,6 +136,12 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
     const state = store.getState();
     const destination = resolvePasteDestination(state, snap, transpose);
     if (!ctx.canPasteToRange(destination)) return;
+    if (
+      destination &&
+      deferForAllowedRangeUnlock(store, [destination], () => runPasteSpecial(what, transpose))
+    ) {
+      return;
+    }
     if (history) history.begin();
     try {
       pasteSpecial(
@@ -232,6 +239,16 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
             ? resolvePasteDestination(pasteState, snap)
             : pasteDestinationRange(pasteState.selection.active, rows, cols);
           if (!ctx.canPasteToRange(destination)) {
+            return;
+          }
+          if (
+            destination &&
+            deferForAllowedRangeUnlock(
+              store,
+              [destination],
+              () => void run('paste', store.getState()),
+            )
+          ) {
             return;
           }
           if (history) history.begin();

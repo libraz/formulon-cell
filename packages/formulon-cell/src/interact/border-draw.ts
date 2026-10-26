@@ -1,6 +1,8 @@
 import type { History } from '../commands/history.js';
+import { deferForAllowedRangeUnlock, runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import { addrKey } from '../engine/address.js';
+import type { Range as SheetRange } from '../engine/types.js';
 import { cellRect, hitTest, layoutForView } from '../render/geometry.js';
 import {
   type CellBorderSide,
@@ -109,6 +111,23 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  const cellAt = (row: number, col: number): SheetRange => ({
+    sheet: store.getState().data.sheetIndex,
+    r0: row,
+    c0: col,
+    r1: row,
+    c1: col,
+  });
+
+  /** Draw (or erase) one edge; true when it waits for a range password instead. */
+  const paintEdge = (hit: EdgeHit): boolean => {
+    const draw = (): void =>
+      recordFormatChange(history, store, () => writeEdge(hit, mode === 'erase'));
+    if (deferForAllowedRangeUnlock(store, [cellAt(hit.row, hit.col)], draw)) return true;
+    draw();
+    return false;
+  };
+
   /** Pick the nearest cell edge for a pointer in the data area. Returns null
    *  when the pointer is inside a cell with no edge within EDGE_TOL. */
   const edgeAt = (x: number, y: number): EdgeHit | null => {
@@ -186,9 +205,13 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     if (!hit) return;
     e.preventDefault();
     e.stopPropagation();
-    dragging = true;
     lastEdgeKey = `${hit.row}:${hit.col}:${hit.edge}`;
-    recordFormatChange(history, store, () => writeEdge(hit, mode === 'erase'));
+    // A password prompt ends the stroke; the edge is drawn once the range unlocks.
+    if (paintEdge(hit)) {
+      lastEdgeKey = null;
+      return;
+    }
+    dragging = true;
     host.setPointerCapture(e.pointerId);
   };
 
@@ -208,7 +231,11 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     e.preventDefault();
     e.stopPropagation();
     lastEdgeKey = key;
-    recordFormatChange(history, store, () => writeEdge(hit, mode === 'erase'));
+    if (paintEdge(hit)) {
+      if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+      dragging = false;
+      lastEdgeKey = null;
+    }
   };
 
   const onPointerUp = (e: PointerEvent): void => {
@@ -221,7 +248,19 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
       e.preventDefault();
       e.stopPropagation();
       const anchor = dragAnchor;
-      recordFormatChange(history, store, () => writeGrid(anchor, cell));
+      runAfterAllowedRangeUnlock(
+        store,
+        [
+          {
+            sheet: s.data.sheetIndex,
+            r0: Math.min(anchor.row, cell.row),
+            c0: Math.min(anchor.col, cell.col),
+            r1: Math.max(anchor.row, cell.row),
+            c1: Math.max(anchor.col, cell.col),
+          },
+        ],
+        () => recordFormatChange(history, store, () => writeGrid(anchor, cell)),
+      );
     }
     dragging = false;
     dragAnchor = null;

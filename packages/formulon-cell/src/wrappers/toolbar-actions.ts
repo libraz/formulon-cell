@@ -3,10 +3,11 @@
 // Each handler accepts a `SpreadsheetInstance | null` (matching the prop
 // shape both wrappers expose) and short-circuits if no instance is mounted.
 
-import type { AutoSumFunction } from '../commands/auto-sum.js';
+import { type AutoSumFunction, autoSumTargets } from '../commands/auto-sum.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { ConditionalPresetAction } from '../commands/conditional-format.js';
 import { recordRecentFunction } from '../commands/function-history.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import {
   addSheet,
   applyConditionalPresetAction,
@@ -168,18 +169,23 @@ export const handleAutoSum = (
   functionName: AutoSumFunction = 'SUM',
 ): boolean => {
   if (!instance) return false;
-  instance.history.begin();
-  let result: ReturnType<typeof autoSum> = null;
-  try {
-    result = autoSum(instance.store.getState(), instance.workbook, functionName);
-  } finally {
-    instance.history.end();
-  }
-  if (!result) return false;
-  mutators.replaceCells(instance.store, instance.workbook.cells(result.addr.sheet));
-  mutators.setActive(instance.store, result.addr);
-  recordRecentFunction(instance.store, functionName);
-  return true;
+  const run = (): boolean => {
+    instance.history.begin();
+    let result: ReturnType<typeof autoSum> = null;
+    try {
+      result = autoSum(instance.store.getState(), instance.workbook, functionName);
+    } finally {
+      instance.history.end();
+    }
+    if (!result) return false;
+    mutators.replaceCells(instance.store, instance.workbook.cells(result.addr.sheet));
+    mutators.setActive(instance.store, result.addr);
+    recordRecentFunction(instance.store, functionName);
+    return true;
+  };
+  const targets = autoSumTargets(instance.store.getState());
+  // A password prompt makes the AutoSum asynchronous; it reports as not done yet.
+  return deferForAllowedRangeUnlock(instance.store, targets, run) ? false : run();
 };
 
 export const handleAutoSumAction = (

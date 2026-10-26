@@ -10,7 +10,7 @@ import { DEFAULT_COMMENT_AUTHOR } from '../comment-author.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
-import { isCellWritable } from '../protection.js';
+import { isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import {
   recordFormatChange,
@@ -99,7 +99,7 @@ const bandProtectionAllows = (state: State, range: Range): boolean => {
   // allowed-edit interval must cover the complete band; sparse unlocked cells
   // cannot prove that the omitted cells are writable without enumerating the
   // million-cell axis.
-  return state.protection.allowedEditRanges.some((entry) => rangeContainsRange(entry.range, range));
+  return isRangeInAllowedEditRange(state, range);
 };
 
 const translateMerges = (

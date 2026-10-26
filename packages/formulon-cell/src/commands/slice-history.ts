@@ -28,6 +28,7 @@ import type {
 } from './format-as-table.js';
 import type { History } from './history.js';
 import type { OperationIntent } from './interaction-policy.js';
+import { deferForAllowedRangeUnlock, selectionEditRanges } from './protection.js';
 
 /* ---------- Snapshot helpers ---------- */
 
@@ -766,6 +767,13 @@ export function recordRepeatableFormatChange(
   mutate: () => void,
 ): void {
   const repeat = (): void => recordRepeatableFormatChange(history, store, mutate);
+  // The selection is the target: a password-guarded range under it is unlocked first.
+  if (
+    !history?.isReplaying() &&
+    deferForAllowedRangeUnlock(store, selectionEditRanges(store.getState()), repeat)
+  ) {
+    return;
+  }
   recordFormatChange(history, store, mutate, { repeat });
   history?.setRepeat(repeat);
 }

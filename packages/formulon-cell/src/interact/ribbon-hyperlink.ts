@@ -9,6 +9,7 @@ import {
   hyperlinkAt,
   isFollowableHyperlinkTarget,
 } from '../commands/hyperlinks.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -29,6 +30,8 @@ export type RibbonHyperlinkActionResult =
   | { kind: 'open-external-dialog' }
   | { kind: 'open-url'; url: string }
   | { kind: 'cleared' }
+  | { kind: 'deferred' }
+  | { kind: 'refused' }
   | { kind: 'report'; report: RibbonHyperlinkReport };
 
 export interface ExecuteRibbonHyperlinkActionDeps {
@@ -43,7 +46,8 @@ export interface ExecuteRibbonHyperlinkActionDeps {
  *  handles `open-hyperlink-dialog` / `open-external-dialog` by calling the
  *  matching instance method, `open-url` by calling `window.open` with safe
  *  flags, and `report` by displaying the ribbon-report shell. `cleared`
- *  signals the mutation already ran via the supplied history. */
+ *  signals the mutation already ran via the supplied history, `deferred` that
+ *  it waits for a range password, and `refused` that protection blocked it. */
 export const executeRibbonHyperlinkAction = (
   deps: ExecuteRibbonHyperlinkActionDeps,
 ): RibbonHyperlinkActionResult => {
@@ -80,8 +84,21 @@ export const executeRibbonHyperlinkAction = (
     }
     return { kind: 'open-url', url };
   }
-  recordFormatChange(history, store, () => {
-    clearHyperlink(store, state.selection.active, workbook);
-  });
-  return { kind: 'cleared' };
+  const { active } = state.selection;
+  const cell = {
+    sheet: active.sheet,
+    r0: active.row,
+    c0: active.col,
+    r1: active.row,
+    c1: active.col,
+  };
+  const clear = (): void => {
+    recordFormatChange(history, store, () => {
+      clearHyperlink(store, active, workbook);
+    });
+  };
+  // A password prompt makes the removal asynchronous; the caller hears `deferred`.
+  if (deferForAllowedRangeUnlock(store, [cell], clear)) return { kind: 'deferred' };
+  clear();
+  return hyperlinkAt(store.getState(), active) === null ? { kind: 'cleared' } : { kind: 'refused' };
 };

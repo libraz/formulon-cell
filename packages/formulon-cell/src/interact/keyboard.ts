@@ -4,6 +4,11 @@ import { currentRegion, formatHasContent, isPopulated } from '../commands/curren
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
+import {
+  isCellWritable,
+  runAfterAllowedRangeUnlock,
+  warnProtected,
+} from '../commands/protection.js';
 import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
@@ -472,36 +477,52 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       // controller always owns the mounted write.
       if (controller) {
         e.preventDefault();
-        const result = controller.execute({
-          type: 'cellBatch',
-          operation: 'clear',
-          origin: 'keyboard',
-          changes: [{ addr: a, value: { kind: 'blank' } }],
-          denied: 'reject',
+        const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+        runAfterAllowedRangeUnlock(store, [cell], () => {
+          const result = controller.execute({
+            type: 'cellBatch',
+            operation: 'clear',
+            origin: 'keyboard',
+            changes: [{ addr: a, value: { kind: 'blank' } }],
+            denied: 'reject',
+          });
+          if (result.status !== 'rejected') {
+            deps.onClearActive();
+            deps.onBeginEdit('');
+          }
         });
-        if (result.status !== 'rejected') {
-          deps.onClearActive();
-          deps.onBeginEdit('');
-        }
         return;
       }
-      deps.wb.setBlank(a);
-      deps.onClearActive();
-      deps.onBeginEdit('');
       e.preventDefault();
+      const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+      runAfterAllowedRangeUnlock(store, [cell], () => {
+        if (!isCellWritable(store.getState(), a)) {
+          warnProtected(a);
+          return;
+        }
+        deps.wb.setBlank(a);
+        deps.onClearActive();
+        deps.onBeginEdit('');
+      });
       return;
     } else if (k === 'Delete') {
       // Delete uses the same sparse union collector as Home > Clear Contents.
       // A registered controller always owns the mounted write; standalone
       // consumers receive the helper's ephemeral atomic controller.
       e.preventDefault();
-      const result = clearSelectedContents({
+      runAfterAllowedRangeUnlock(
         store,
-        workbook: deps.wb,
-        history: deps.history,
-        origin: 'keyboard',
-      });
-      if (result.status !== 'rejected') deps.onClearActive();
+        [s.selection.range, ...(s.selection.extraRanges ?? [])],
+        () => {
+          const result = clearSelectedContents({
+            store,
+            workbook: deps.wb,
+            history: deps.history,
+            origin: 'keyboard',
+          });
+          if (result.status !== 'rejected') deps.onClearActive();
+        },
+      );
       return;
     } else if (k === 'Escape') {
       // No editor active, so Escape cancels the copy marquee — the only way

@@ -16,6 +16,7 @@ import type {
   PermissionDecision,
 } from '../commands/interaction-policy.js';
 import { refreshPivotTable } from '../commands/pivot-table.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
@@ -946,6 +947,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         return;
       }
       case 'clear': {
+        const selected = store.getState().selection;
+        if (
+          deferForAllowedRangeUnlock(store, [selected.range, ...(selected.extraRanges ?? [])], () =>
+            run(id),
+          )
+        ) {
+          return;
+        }
         if (hasExplicitPolicy()) {
           const addresses = collectSelectedContentAddresses(store, wb);
           if (addresses.length === 0) return;

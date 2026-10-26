@@ -1,7 +1,7 @@
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
-import { executeRibbonFillAction } from '../commands/fill.js';
+import { executeRibbonFillAction, fillOutputRange } from '../commands/fill.js';
 import { clearFilter, recordFilterChange, setAutoFilter } from '../commands/filter.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import {
@@ -16,6 +16,13 @@ import {
 import { formatAsTable } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import {
+  deferForAllowedRangeUnlock,
+  isCellWritable,
+  runAfterAllowedRangeUnlock,
+  selectionEditRanges,
+  warnProtected,
+} from '../commands/protection.js';
 import {
   hideCols,
   hideRows,
@@ -34,6 +41,7 @@ import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { type NumberFormatAction, numberFormatForAction } from '../toolbar/number-format.js';
+import { fillSeriesSourceRange } from '../toolbar/ribbon/fill-series.js';
 import { matchesRibbonShortcut } from '../toolbar/ribbon-model.js';
 
 const DIRECT_NUMBER_FORMAT_BY_CODE: Readonly<Record<string, NumberFormatAction>> = {
@@ -134,9 +142,33 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (!restricted) dialog.open();
       return;
     }
+    /** Write a number into the active cell through the protection gate and range unlock. */
+    const writeActiveCell = (value: number): void => {
+      const { active } = input.store.getState().selection;
+      const cell = {
+        sheet: active.sheet,
+        r0: active.row,
+        c0: active.col,
+        r1: active.row,
+        c1: active.col,
+      };
+      runAfterAllowedRangeUnlock(input.store, [cell], () => {
+        const target = input.store.getState().selection.active;
+        if (!isCellWritable(input.store.getState(), target)) {
+          warnProtected(target);
+          return;
+        }
+        currentWb.setNumber(target, value);
+        mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+      });
+    };
     const applyDirectNumberFormat = (action: NumberFormatAction): void => {
       const fmt = numberFormatForAction(action, input.getLocale());
       if (!fmt) return;
+      const target = selectionEditRanges(input.store.getState());
+      if (deferForAllowedRangeUnlock(input.store, target, () => applyDirectNumberFormat(action))) {
+        return;
+      }
       recordFormatChange(
         input.history,
         input.store,
@@ -164,6 +196,12 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       toggle: FormatToggle,
       value?: boolean,
     ): void => {
+      const target = selectionEditRanges(input.store.getState());
+      if (
+        deferForAllowedRangeUnlock(input.store, target, () => applyFormatToggle(key, toggle, value))
+      ) {
+        return;
+      }
       let applied = value;
       recordFormatChange(
         input.history,
@@ -427,64 +465,70 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       const now = new Date();
       const serial = excelSerialFromParts(now.getFullYear(), now.getMonth() + 1, now.getDate());
       if (serial === null) return;
-      currentWb.setNumber(input.store.getState().selection.active, serial);
-      mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+      writeActiveCell(serial);
     } else if (e.key === ':' || (e.shiftKey && e.key === ';')) {
       e.preventDefault();
       if (restricted) return;
       const now = new Date();
       const frac =
         (now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds()) / 86400;
-      currentWb.setNumber(input.store.getState().selection.active, frac);
-      mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+      writeActiveCell(frac);
     } else if (k === 'd') {
       e.preventDefault();
       if (restricted) return;
       const r = input.store.getState().selection.range;
       if (r.r1 > r.r0) {
-        const changed = executeRibbonFillAction({
-          store: input.store,
-          workbook: currentWb,
-          history: input.history,
-          action: 'down',
+        const target = fillOutputRange(fillSeriesSourceRange(r, 'down'), r);
+        runAfterAllowedRangeUnlock(input.store, [target], () => {
+          const changed = executeRibbonFillAction({
+            store: input.store,
+            workbook: currentWb,
+            history: input.history,
+            action: 'down',
+          });
+          if (changed) {
+            mutators.replaceCells(
+              input.store,
+              currentWb.cells(input.store.getState().data.sheetIndex),
+            );
+            input.invalidate();
+          }
         });
-        if (changed) {
-          mutators.replaceCells(
-            input.store,
-            currentWb.cells(input.store.getState().data.sheetIndex),
-          );
-          input.invalidate();
-        }
       }
     } else if (k === 'r') {
       e.preventDefault();
       if (restricted) return;
       const r = input.store.getState().selection.range;
       if (r.c1 > r.c0) {
-        const changed = executeRibbonFillAction({
-          store: input.store,
-          workbook: currentWb,
-          history: input.history,
-          action: 'right',
+        const target = fillOutputRange(fillSeriesSourceRange(r, 'right'), r);
+        runAfterAllowedRangeUnlock(input.store, [target], () => {
+          const changed = executeRibbonFillAction({
+            store: input.store,
+            workbook: currentWb,
+            history: input.history,
+            action: 'right',
+          });
+          if (changed) {
+            mutators.replaceCells(
+              input.store,
+              currentWb.cells(input.store.getState().data.sheetIndex),
+            );
+            input.invalidate();
+          }
         });
-        if (changed) {
-          mutators.replaceCells(
-            input.store,
-            currentWb.cells(input.store.getState().data.sheetIndex),
-          );
-          input.invalidate();
-        }
       }
     } else if (k === 'e') {
       e.preventDefault();
       if (restricted) return;
-      executeRibbonFillAction({
-        store: input.store,
-        workbook: currentWb,
-        history: input.history,
-        action: 'flash',
+      runAfterAllowedRangeUnlock(input.store, [input.store.getState().selection.range], () => {
+        executeRibbonFillAction({
+          store: input.store,
+          workbook: currentWb,
+          history: input.history,
+          action: 'flash',
+        });
+        input.invalidate();
       });
-      input.invalidate();
     } else if (k === 'b') {
       e.preventDefault();
       if (restricted) return;

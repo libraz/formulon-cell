@@ -15,6 +15,7 @@ import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey } from '../engine/address.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Range } from '../engine/types.js';
@@ -530,21 +531,26 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       e.preventDefault();
       return;
     }
-    if (history) history.begin();
-    let r: { writtenRange: Range } | null = null;
-    let activation: PasteOptionsActivation | null = null;
-    try {
-      ({ result: r, activation } = pasteFromClipboardText(s, text));
-    } finally {
-      if (history) history.end();
-    }
     e.preventDefault();
-    if (r) {
-      consumeCutMarquee();
-      mutators.setRange(store, r.writtenRange);
-      deps.onAfterCommit();
-      if (activation) deps.onPasteOptions?.(activation);
-    }
+    const applyPaste = (): void => {
+      if (history) history.begin();
+      let r: { writtenRange: Range } | null = null;
+      let activation: PasteOptionsActivation | null = null;
+      try {
+        ({ result: r, activation } = pasteFromClipboardText(store.getState(), text));
+      } finally {
+        if (history) history.end();
+      }
+      if (r) {
+        consumeCutMarquee();
+        mutators.setRange(store, r.writtenRange);
+        deps.onAfterCommit();
+        if (activation) deps.onPasteOptions?.(activation);
+      }
+    };
+    const destination = pasteDestinationRange(s, text);
+    if (destination) runAfterAllowedRangeUnlock(store, [destination], applyPaste);
+    else applyPaste();
   };
 
   host.addEventListener('copy', onCopy);
@@ -644,21 +650,26 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       deps.onAfterCommit();
       return;
     }
-    if (!isWithinNavigationBounds(pasteDestinationRange(pasteState, text))) return;
-    if (history) history.begin();
-    let r: { writtenRange: Range } | null = null;
-    let activation: PasteOptionsActivation | null = null;
-    try {
-      ({ result: r, activation } = pasteFromClipboardText(pasteState, text));
-    } finally {
-      if (history) history.end();
-    }
-    if (r) {
-      consumeCutMarquee();
-      mutators.setRange(store, r.writtenRange);
-      deps.onAfterCommit();
-      if (activation) deps.onPasteOptions?.(activation);
-    }
+    const destination = pasteDestinationRange(pasteState, text);
+    if (!isWithinNavigationBounds(destination)) return;
+    const applyPaste = (): void => {
+      if (history) history.begin();
+      let r: { writtenRange: Range } | null = null;
+      let activation: PasteOptionsActivation | null = null;
+      try {
+        ({ result: r, activation } = pasteFromClipboardText(store.getState(), text));
+      } finally {
+        if (history) history.end();
+      }
+      if (r) {
+        consumeCutMarquee();
+        mutators.setRange(store, r.writtenRange);
+        deps.onAfterCommit();
+        if (activation) deps.onPasteOptions?.(activation);
+      }
+    };
+    if (destination) runAfterAllowedRangeUnlock(store, [destination], applyPaste);
+    else applyPaste();
   };
 
   return {

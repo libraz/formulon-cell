@@ -1,5 +1,10 @@
 import { hyperlinkAt, isFollowableHyperlinkTarget } from '../../commands/hyperlinks.js';
 import {
+  isCellWritable,
+  runAfterAllowedRangeUnlock,
+  warnProtected,
+} from '../../commands/protection.js';
+import {
   createRibbonChartFromSelection,
   executeRibbonHyperlinkAction,
   executeRibbonPivotTableAction,
@@ -164,13 +169,21 @@ const buildPivotTableAction =
 
 const insertSymbolAtActiveCell = (instance: SpreadsheetInstance, symbol: string): void => {
   const addr = instance.store.getState().selection.active;
-  instance.history.begin();
-  try {
-    instance.workbook.setText(addr, symbol);
-    mutators.replaceCells(instance.store, instance.workbook.cells(addr.sheet));
-  } finally {
-    instance.history.end();
-  }
+  const cell = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+  runAfterAllowedRangeUnlock(instance.store, [cell], () => {
+    const target = instance.store.getState().selection.active;
+    if (!isCellWritable(instance.store.getState(), target)) {
+      warnProtected(target);
+      return;
+    }
+    instance.history.begin();
+    try {
+      instance.workbook.setText(target, symbol);
+      mutators.replaceCells(instance.store, instance.workbook.cells(target.sheet));
+    } finally {
+      instance.history.end();
+    }
+  });
 };
 
 const buildSymbolAction =

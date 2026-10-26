@@ -8,6 +8,7 @@ import {
   mergeAcrossWillLoseData,
   mergeWillLoseData,
 } from '../commands/merge.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -38,6 +39,12 @@ export async function applyMergeAction(
 ): Promise<boolean> {
   const { store, workbook, history, strings } = context;
   const selection = store.getState().selection.range;
+  // A password-guarded range under the selection is unlocked first; the action then repeats.
+  if (
+    deferForAllowedRangeUnlock(store, [selection], () => void applyMergeAction(context, action))
+  ) {
+    return false;
+  }
 
   if (action === 'unmergeCells') {
     return applyUnmerge(store, workbook, history, selection);

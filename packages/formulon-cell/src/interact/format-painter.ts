@@ -1,4 +1,5 @@
 import type { History } from '../commands/history.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -131,6 +132,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     const cols = pattern[0]?.length ?? 0;
     if (!rows || !cols) return;
     if (rangeArea(dest) > MAX_FORMAT_PAINTER_CELLS) return;
+    if (deferForAllowedRangeUnlock(store, [dest], () => apply(dest))) return;
 
     // Operate directly on the format map for atomicity. Wrap in history so
     // Cmd+Z reverts the entire paste.

@@ -2,6 +2,8 @@ import {
   circleInvalidValidationData,
   recordValidationCirclesChange,
 } from '../../commands/error-indicators.js';
+import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
+import { textToColumnsTargets } from '../../commands/text-to-columns.js';
 import { circleInvalidValidationDataWithEngine } from '../../commands/validate.js';
 import { parseAddrKey } from '../../engine/address.js';
 import { makeRangeResolver } from '../../engine/range-resolver.js';
@@ -22,14 +24,23 @@ const buildTextToColumnsAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['splitTextToColumns'] =>
   (delimiter) => {
     const range = normalizedSelectionRange(instance);
-    instance.history.begin();
-    try {
-      textToColumns(instance.store.getState(), instance.store, instance.workbook, range, delimiter);
-      mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
-    } finally {
-      instance.history.end();
-    }
-    instance.host.focus();
+    const targets = textToColumnsTargets(instance.store.getState(), range, delimiter);
+    runAfterAllowedRangeUnlock(instance.store, targets, () => {
+      instance.history.begin();
+      try {
+        textToColumns(
+          instance.store.getState(),
+          instance.store,
+          instance.workbook,
+          range,
+          delimiter,
+        );
+        mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
+      } finally {
+        instance.history.end();
+      }
+      instance.host.focus();
+    });
   };
 
 const buildTextToColumnsCustom =
@@ -78,21 +89,26 @@ const buildTextToColumnsCustom =
       return;
     }
     const selected = normalizedSelectionRange(instance);
-    instance.history.begin();
-    try {
-      textToColumns(
-        instance.store.getState(),
-        instance.store,
-        instance.workbook,
-        selected,
-        result.delimiters,
-        { collapseConsecutiveDelimiters: result.collapseConsecutiveDelimiters },
-      );
-      mutators.replaceCells(instance.store, instance.workbook.cells(selected.sheet));
-    } finally {
-      instance.history.end();
-    }
-    instance.host.focus();
+    const targets = textToColumnsTargets(instance.store.getState(), selected, result.delimiters, {
+      collapseConsecutiveDelimiters: result.collapseConsecutiveDelimiters,
+    });
+    runAfterAllowedRangeUnlock(instance.store, targets, () => {
+      instance.history.begin();
+      try {
+        textToColumns(
+          instance.store.getState(),
+          instance.store,
+          instance.workbook,
+          selected,
+          result.delimiters,
+          { collapseConsecutiveDelimiters: result.collapseConsecutiveDelimiters },
+        );
+        mutators.replaceCells(instance.store, instance.workbook.cells(selected.sheet));
+      } finally {
+        instance.history.end();
+      }
+      instance.host.focus();
+    });
   };
 
 const buildDataValidationAction =
@@ -108,14 +124,17 @@ const buildDataValidationAction =
       return;
     }
     if (action === 'clear-rules') {
-      clearValidationInRangeWithEngine(
-        instance.store,
-        instance.history,
-        instance.workbook,
-        normalizedSelectionRange(instance),
-      );
-      mutators.clearValidationCircles(instance.store);
-      instance.host.focus();
+      const range = normalizedSelectionRange(instance);
+      runAfterAllowedRangeUnlock(instance.store, [range], () => {
+        clearValidationInRangeWithEngine(
+          instance.store,
+          instance.history,
+          instance.workbook,
+          range,
+        );
+        mutators.clearValidationCircles(instance.store);
+        instance.host.focus();
+      });
       return;
     }
     if (action !== 'circle-invalid') return;

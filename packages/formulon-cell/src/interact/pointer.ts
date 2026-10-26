@@ -1,5 +1,5 @@
 import type { AutofitOptions } from '../commands/autofit-measurement.js';
-import { fillDestFor, fillRange } from '../commands/fill.js';
+import { fillDestFor, fillOutputRange, fillRange } from '../commands/fill.js';
 import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
 import { headerFilterRanges } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
@@ -16,6 +16,7 @@ import {
 } from '../commands/outline.js';
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { autofitColsWidth, autofitRowsHeight } from '../commands/row-col-layout.js';
 import {
   applyLayoutSnapshot,
@@ -315,7 +316,7 @@ export function attachPointer(
     s: State,
     src: Range,
     dest: Range,
-    opts: { copyOnly: boolean },
+    opts: { copyOnly: boolean; announce?: { clientX: number; clientY: number } },
   ): { applied: boolean; restricted: boolean } => {
     const controller = interactionControllerFor(store);
     const restricted = controller?.policy !== undefined;
@@ -330,6 +331,14 @@ export function attachPointer(
       });
       applied = result.status === 'applied';
     } else {
+      // A password-guarded range in the way is unlocked first; the fill then repeats.
+      if (
+        deferForAllowedRangeUnlock(store, [fillOutputRange(src, dest)], () =>
+          commitFill(store.getState(), src, dest, opts),
+        )
+      ) {
+        return { applied: false, restricted };
+      }
       // Bundle every per-cell write into a single undoable transaction.
       if (history) history.begin();
       applied = false;
@@ -350,6 +359,21 @@ export function attachPointer(
       onAfterCommit?.();
       mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
       mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
+      // Raised here, not by the caller, so a fill that waited for a password gets its options too.
+      if (!restricted && opts.announce) {
+        host.dispatchEvent(
+          new CustomEvent('fc:autofilloptions', {
+            bubbles: true,
+            detail: {
+              src,
+              dest,
+              mode: opts.copyOnly ? 'copy' : 'series',
+              clientX: opts.announce.clientX,
+              clientY: opts.announce.clientY,
+            },
+          }),
+        );
+      }
     }
     return { applied, restricted };
   };
@@ -877,21 +901,10 @@ export function attachPointer(
         }
         // Spreadsheet parity: holding Ctrl/⌘ on release toggles series → tile copy.
         const copyOnly = e.ctrlKey || e.metaKey;
-        const { applied, restricted } = commitFill(s, drag.src, dest, { copyOnly });
-        if (applied && !restricted) {
-          host.dispatchEvent(
-            new CustomEvent('fc:autofilloptions', {
-              bubbles: true,
-              detail: {
-                src: drag.src,
-                dest,
-                mode: copyOnly ? 'copy' : 'series',
-                clientX: e.clientX,
-                clientY: e.clientY,
-              },
-            }),
-          );
-        }
+        commitFill(s, drag.src, dest, {
+          copyOnly,
+          announce: { clientX: e.clientX, clientY: e.clientY },
+        });
       }
     }
     drag = { kind: 'none' };

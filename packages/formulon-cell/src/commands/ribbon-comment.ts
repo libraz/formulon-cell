@@ -16,6 +16,7 @@ import {
   threadedCommentsAt,
 } from './comment.js';
 import type { History } from './history.js';
+import { deferForAllowedRangeUnlock } from './protection.js';
 
 export type RibbonCommentAction = 'delete-active' | 'delete-all';
 
@@ -41,6 +42,11 @@ export const executeRibbonCommentAction = (deps: ExecuteRibbonCommentActionDeps)
       : listThreadedComments(store, state.data.sheetIndex, workbook)
     : [];
   if (targets.length === 0 && threaded.length === 0) return;
+  const footprint = [
+    ...targets.map((entry) => entry.addr),
+    ...threaded.map((entry) => ({ sheet: state.data.sheetIndex, row: entry.row, col: entry.col })),
+  ].map((a) => ({ sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col }));
+  if (deferForAllowedRangeUnlock(store, footprint, () => executeRibbonCommentAction(deps))) return;
   if (targets.length > 0) {
     recordCommentChange(
       history,

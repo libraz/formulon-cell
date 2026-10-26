@@ -11,6 +11,7 @@ import {
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAt, mergeWillLoseData } from '../commands/merge.js';
+import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../components/color-palette.js';
 import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
@@ -342,6 +343,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
 
     const state = store.getState();
+    // The dialog stays open while a password-guarded range under the selection is unlocked.
+    if (deferForAllowedRangeUnlock(store, selectionEditRanges(state), () => void applyAndClose())) {
+      return;
+    }
     const range = state.selection.range;
     const liveWb = getWb();
     const plan = planSelectionFormat(state);

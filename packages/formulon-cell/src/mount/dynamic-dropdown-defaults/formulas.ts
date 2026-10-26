@@ -1,4 +1,6 @@
+import { autoSumTargets } from '../../commands/auto-sum.js';
 import { recordRecentFunction } from '../../commands/function-history.js';
+import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
 import { addrKey } from '../../engine/address.js';
 import {
   type AutoSumFunction,
@@ -28,18 +30,20 @@ const buildAutoSumFormula =
       instance.openFunctionArguments();
       return;
     }
-    instance.history.begin();
-    let result: ReturnType<typeof autoSum> = null;
-    try {
-      result = autoSum(instance.store.getState(), instance.workbook, fn as AutoSumFunction);
-    } finally {
-      instance.history.end();
-    }
-    if (result) {
-      mutators.setActive(instance.store, result.addr);
-      recordRecentFunction(instance.store, fn);
-    }
-    instance.host.focus();
+    runAfterAllowedRangeUnlock(instance.store, autoSumTargets(instance.store.getState()), () => {
+      instance.history.begin();
+      let result: ReturnType<typeof autoSum> = null;
+      try {
+        result = autoSum(instance.store.getState(), instance.workbook, fn as AutoSumFunction);
+      } finally {
+        instance.history.end();
+      }
+      if (result) {
+        mutators.setActive(instance.store, result.addr);
+        recordRecentFunction(instance.store, fn);
+      }
+      instance.host.focus();
+    });
   };
 
 const buildWatchAction =
@@ -247,7 +251,7 @@ const buildDefinedNameAction =
       return;
     }
     if (action === 'use-formula') {
-      const names = listDefinedNames(instance.workbook);
+      const names = listDefinedNames(instance.workbook).filter((entry) => !entry.hidden);
       if (names.length === 0) {
         await showInstanceReport(instance, instance.i18n.strings.ribbonMenu.useInFormula, [
           {
@@ -268,17 +272,27 @@ const buildDefinedNameAction =
         instance.host.focus();
         return;
       }
-      insertDefinedNameFormula(
-        instance.store.getState(),
-        instance.workbook,
-        selected,
-        instance.store,
-      );
-      mutators.replaceCells(
-        instance.store,
-        instance.workbook.cells(instance.store.getState().data.sheetIndex),
-      );
-      instance.host.focus();
+      const { active } = instance.store.getState().selection;
+      const cell = {
+        sheet: active.sheet,
+        r0: active.row,
+        c0: active.col,
+        r1: active.row,
+        c1: active.col,
+      };
+      runAfterAllowedRangeUnlock(instance.store, [cell], () => {
+        insertDefinedNameFormula(
+          instance.store.getState(),
+          instance.workbook,
+          selected,
+          instance.store,
+        );
+        mutators.replaceCells(
+          instance.store,
+          instance.workbook.cells(instance.store.getState().data.sheetIndex),
+        );
+        instance.host.focus();
+      });
     }
   };
 

@@ -1,10 +1,49 @@
 import { formatA1Range } from '../engine/address.js';
-import type { Addr } from '../engine/types.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
 import { mergeAt } from './merge.js';
 import { isCellWritable, warnProtected } from './protection.js';
+
+/** The cells AutoSum can write for the current selection: the empty slots its rules pick,
+ *  whichever of them turns out writable. */
+export function autoSumTargets(state: State): Range[] {
+  const r = state.selection.range;
+  const sheet = state.data.sheetIndex;
+  const a = state.selection.active;
+  const cell = (row: number, col: number): Range => ({ sheet, r0: row, c0: col, r1: row, c1: col });
+  if (r.r0 === r.r1 && r.c0 === r.c1) {
+    if (isEmpty(state, sheet, a.row, a.col)) return [cell(a.row, a.col)];
+    if (!isNum(state, sheet, a.row, a.col)) return [];
+    let bottom = a.row;
+    while (isNum(state, sheet, bottom + 1, a.col)) bottom += 1;
+    let right = a.col;
+    while (isNum(state, sheet, a.row, right + 1)) right += 1;
+    return [cell(bottom + 1, a.col), cell(a.row, right + 1)].filter((t) =>
+      isEmpty(state, sheet, t.r0, t.c0),
+    );
+  }
+  const inside: Range[] = [];
+  for (let col = r.c0; col <= r.c1; col += 1) {
+    for (let row = r.r1; row >= r.r0; row -= 1) {
+      if (!isNum(state, sheet, row, col)) continue;
+      if (row < r.r1 && isEmpty(state, sheet, row + 1, col)) inside.push(cell(row + 1, col));
+      break;
+    }
+  }
+  for (let row = r.r0; row <= r.r1; row += 1) {
+    for (let col = r.c1; col >= r.c0; col -= 1) {
+      if (!isNum(state, sheet, row, col)) continue;
+      if (col < r.c1 && isEmpty(state, sheet, row, col + 1)) inside.push(cell(row, col + 1));
+      break;
+    }
+  }
+  if (inside.length > 0) return inside;
+  return [cell(r.r1 + 1, r.c0), cell(r.r0, r.c1 + 1)].filter((t) =>
+    isEmpty(state, sheet, t.r0, t.c0),
+  );
+}
 
 const MAX_AUTOSUM_SELECTION_CELLS = 100_000;
 

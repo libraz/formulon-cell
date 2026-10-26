@@ -636,6 +636,15 @@ export function fillDestFor(src: Range, target: { row: number; col: number }): R
     : { sheet: src.sheet, r0: src.r0, c0: target.col, r1: src.r1, c1: src.c1 };
 }
 
+/** The cells a fill of `src` into `dest` writes: `dest` without the source rows or columns. */
+export function fillOutputRange(src: Range, dest: Range): Range {
+  if (dest.r1 > src.r1) return { ...dest, r0: src.r1 + 1 };
+  if (dest.r0 < src.r0) return { ...dest, r1: src.r0 - 1 };
+  if (dest.c1 > src.c1) return { ...dest, c0: src.c1 + 1 };
+  if (dest.c0 < src.c0) return { ...dest, c1: src.c0 - 1 };
+  return dest;
+}
+
 export type RibbonFillAction =
   | 'down'
   | 'right'

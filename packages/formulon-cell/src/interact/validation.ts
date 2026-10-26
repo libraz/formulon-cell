@@ -1,5 +1,9 @@
 import { writeInput } from '../commands/coerce-input.js';
-import { isCellWritable, warnProtected } from '../commands/protection.js';
+import {
+  deferForAllowedRangeUnlock,
+  isCellWritable,
+  warnProtected,
+} from '../commands/protection.js';
 import { resolveListValues } from '../commands/validate.js';
 import { addrKey } from '../engine/address.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
@@ -108,6 +112,11 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
   const commitValue = (row: number, col: number, value: string): void => {
     const sheet = store.getState().data.sheetIndex;
     const addr = { sheet, row, col };
+    const cell = { sheet, r0: row, c0: col, r1: row, c1: col };
+    if (deferForAllowedRangeUnlock(store, [cell], () => commitValue(row, col, value))) {
+      close();
+      return;
+    }
     if (!isCellWritable(store.getState(), addr)) {
       warnProtected(addr);
       close();

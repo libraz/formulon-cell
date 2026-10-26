@@ -11,6 +11,7 @@ import {
   threadedCommentsAt,
 } from '../commands/comment.js';
 import type { History } from '../commands/history.js';
+import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
@@ -288,7 +289,21 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     return true;
   };
 
+  /** Unlock a password-guarded range under the note's cell first; the handler then repeats. */
+  const deferForUnlock = (repeat: () => void): boolean => {
+    const { active } = store.getState().selection;
+    const cell = {
+      sheet: active.sheet,
+      r0: active.row,
+      c0: active.col,
+      r1: active.row,
+      c1: active.col,
+    };
+    return deferForAllowedRangeUnlock(store, [cell], repeat);
+  };
+
   const onOk = (): void => {
+    if (deferForUnlock(onOk)) return;
     if (threadedMode) {
       if (!writeThread()) return;
     } else if (!writeComment(textarea.value)) return;
@@ -296,6 +311,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   };
 
   const onRemove = (): void => {
+    if (deferForUnlock(onRemove)) return;
     if (threadedMode) {
       const state = store.getState();
       const addr = state.selection.active;
@@ -338,6 +354,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const onResolve = (): void => {
     if (!threadedMode) return;
+    if (deferForUnlock(onResolve)) return;
     const state = store.getState();
     const addr = state.selection.active;
     const wb = getWb() ?? undefined;

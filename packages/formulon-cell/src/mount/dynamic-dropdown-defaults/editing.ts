@@ -1,3 +1,5 @@
+import { fillOutputRange } from '../../commands/fill.js';
+import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
 import { parseAddrKey } from '../../engine/address.js';
 import {
   activeFilterRange,
@@ -38,13 +40,21 @@ import { normalizedSelectionRange } from './selection.js';
 const buildFillDirection =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillDirection'] =>
   (direction) => {
-    executeRibbonFillAction({
-      store: instance.store,
-      workbook: instance.workbook,
-      history: instance.history,
-      action: direction satisfies RibbonFillAction,
+    const range = normalizedSelectionRange(instance);
+    // A fill writes everything but its source row or column; Flash Fill may reach the whole selection.
+    const target =
+      direction === 'flash'
+        ? range
+        : fillOutputRange(fillSeriesSourceRange(range, direction), range);
+    runAfterAllowedRangeUnlock(instance.store, [target], () => {
+      executeRibbonFillAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action: direction satisfies RibbonFillAction,
+      });
+      instance.host.focus();
     });
-    instance.host.focus();
   };
 
 const updateFillMenu =
@@ -73,9 +83,8 @@ const updateFillMenu =
     }
   };
 
-const buildFillSeries =
-  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillSeries'] =>
-  async (mode) => {
+const buildFillSeries = (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillSeries'] => {
+  const apply: DynamicDropdownsCtx['applyFillSeries'] = async (mode) => {
     const range = normalizedSelectionRange(instance);
     const fillSeriesDialogStrings = (
       instance.i18n.strings as typeof instance.i18n.strings & {
@@ -113,21 +122,25 @@ const buildFillSeries =
       choice.mode === 'years'
         ? choice.mode
         : undefined;
-    instance.history.begin();
-    try {
-      recordFormatChange(instance.history, instance.store, () => {
-        fillRange(instance.store.getState(), instance.workbook, src, range, {
-          copyOnly: choice.mode === 'copy',
-          dateUnit,
-          formatting: 'with',
-          store: instance.store,
+    runAfterAllowedRangeUnlock(instance.store, [fillOutputRange(src, range)], () => {
+      instance.history.begin();
+      try {
+        recordFormatChange(instance.history, instance.store, () => {
+          fillRange(instance.store.getState(), instance.workbook, src, range, {
+            copyOnly: choice.mode === 'copy',
+            dateUnit,
+            formatting: 'with',
+            store: instance.store,
+          });
         });
-      });
-    } finally {
-      instance.history.end();
-    }
-    instance.host.focus();
+      } finally {
+        instance.history.end();
+      }
+      instance.host.focus();
+    });
   };
+  return apply;
+};
 
 const visualClearFormatKeys = new Set([
   'cellStyle',
@@ -187,14 +200,20 @@ const buildClearAction =
     ) {
       return;
     }
-    executeRibbonClearAction({
-      store: instance.store,
-      workbook: instance.workbook,
-      history: instance.history,
-      action: clearAction,
-      commands: instance.commands,
-    });
-    instance.host.focus();
+    runAfterAllowedRangeUnlock(
+      instance.store,
+      selectionEditRanges(instance.store.getState()),
+      () => {
+        executeRibbonClearAction({
+          store: instance.store,
+          workbook: instance.workbook,
+          history: instance.history,
+          action: clearAction,
+          commands: instance.commands,
+        });
+        instance.host.focus();
+      },
+    );
   };
 
 const updateClearMenu =
@@ -302,13 +321,19 @@ const buildSortMenuAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applySortMenuAction'] =>
   async (action) => {
     if (action === 'asc' || action === 'desc') {
-      sortActiveColumnAuto({
-        store: instance.store,
-        workbook: instance.workbook,
-        history: instance.history,
-        direction: action,
-      });
-      instance.host.focus();
+      runAfterAllowedRangeUnlock(
+        instance.store,
+        [inferAutoFilterRange(instance.store.getState())],
+        () => {
+          sortActiveColumnAuto({
+            store: instance.store,
+            workbook: instance.workbook,
+            history: instance.history,
+            direction: action,
+          });
+          instance.host.focus();
+        },
+      );
       return;
     }
     if (action === 'custom') {
@@ -340,22 +365,24 @@ const buildSortMenuAction =
         instance.host.focus();
         return;
       }
-      sortRangeWithHistory({
-        store: instance.store,
-        workbook: instance.workbook,
-        history: instance.history,
-        range,
-        options: {
-          byCol: Number(result.column),
-          direction: result.direction,
-          keys: result.levels.map((level) => ({
-            byCol: Number(level.column),
-            direction: level.direction,
-          })),
-          hasHeader: result.hasHeader,
-        },
+      runAfterAllowedRangeUnlock(instance.store, [range], () => {
+        sortRangeWithHistory({
+          store: instance.store,
+          workbook: instance.workbook,
+          history: instance.history,
+          range,
+          options: {
+            byCol: Number(result.column),
+            direction: result.direction,
+            keys: result.levels.map((level) => ({
+              byCol: Number(level.column),
+              direction: level.direction,
+            })),
+            hasHeader: result.hasHeader,
+          },
+        });
+        instance.host.focus();
       });
-      instance.host.focus();
       return;
     }
     if (action === 'dedupe') {
@@ -380,17 +407,19 @@ const buildSortMenuAction =
         instance.host.focus();
         return;
       }
-      instance.history.begin();
-      try {
-        removeDuplicates(instance.store.getState(), instance.store, instance.workbook, range, {
-          columns: result.columns.map(Number),
-          hasHeader: result.hasHeader,
-        });
-      } finally {
-        instance.history.end();
-      }
-      mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
-      instance.host.focus();
+      runAfterAllowedRangeUnlock(instance.store, [range], () => {
+        instance.history.begin();
+        try {
+          removeDuplicates(instance.store.getState(), instance.store, instance.workbook, range, {
+            columns: result.columns.map(Number),
+            hasHeader: result.hasHeader,
+          });
+        } finally {
+          instance.history.end();
+        }
+        mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
+        instance.host.focus();
+      });
       return;
     }
     if (action === 'conditional') {

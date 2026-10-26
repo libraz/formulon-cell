@@ -1,5 +1,6 @@
 import { commitCellInput } from '../commands/cell-input-commit.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
 import { extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -146,6 +147,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   let currentLease: FormulaEditLease | null = null;
   let suspended = false;
   let commitRejected = false;
+  /** A commit waits for a range password; the prompt's focus change must not re-commit. */
+  let commitDeferred = false;
   let externalDraft: ExternalDraftState | null = null;
   let detached = false;
   let ownedEditorRefs: EditorRefHighlight[] | null = null;
@@ -539,6 +542,15 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const commitSelection = (): void => {
     commitRejected = false;
     const state = store.getState();
+    if (commitDeferred) return;
+    if (
+      deferForAllowedRangeUnlock(store, selectionEditRanges(state), commitSelection, () => {
+        commitDeferred = false;
+      })
+    ) {
+      commitDeferred = true;
+      return;
+    }
     const anchor = state.selection.active;
     const batch = buildSelectionInputBatch(state, fxInput.value, anchor);
     if (!batch) {
@@ -703,6 +715,23 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (detached || suspended || !fxEditing) return false;
     commitRejected = false;
     const a = editingAnchor ?? store.getState().selection.active;
+    // A password-guarded range under the cell is unlocked first; the commit then repeats.
+    const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+    // One deferred commit at a time; it keeps its Enter / Tab direction.
+    if (commitDeferred) return false;
+    if (
+      deferForAllowedRangeUnlock(
+        store,
+        [cell],
+        () => void commitFx(advance),
+        () => {
+          commitDeferred = false;
+        },
+      )
+    ) {
+      commitDeferred = true;
+      return false;
+    }
     if (!commitRawAt(a, fxInput.value)) return false;
     finishEditing();
     moveAfterCommit(advance);
@@ -964,7 +993,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       closeFormulaHelpers();
       return;
     }
-    if (commitRejected) return;
+    if (commitRejected || commitDeferred) return;
     if (fxInput.value !== fxBaseline) commitFx('none');
     else {
       fxEditing = false;

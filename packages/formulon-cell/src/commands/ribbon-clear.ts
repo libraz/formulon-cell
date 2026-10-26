@@ -5,6 +5,7 @@
 
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
+import { allowedEditRangeAreas } from '../engine/protection-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
@@ -28,7 +29,7 @@ import {
   interactionControllerFor,
 } from './interaction-controller.js';
 import type { InteractionOperation, OperationEffect } from './interaction-policy.js';
-import { isCellWritable, isSheetProtected } from './protection.js';
+import { isAllowedEditRangeOpen, isCellWritable, isSheetProtected } from './protection.js';
 import { recordConditionalRulesChange } from './slice-history.js';
 
 export type RibbonClearAction =
@@ -392,8 +393,8 @@ function conditionalRuleWritable(state: State, range: Range): boolean {
     return true;
   }
   const allowed = state.protection.allowedEditRanges
-    .filter((entry) => entry.range.sheet === range.sheet)
-    .map((entry) => entry.range);
+    .filter((entry) => entry.range.sheet === range.sheet && isAllowedEditRangeOpen(state, entry))
+    .flatMap((entry) => allowedEditRangeAreas(entry));
   const first = allowed[0];
   if (!first) return false;
   return selectionCoversRange({ range: first, extraRanges: allowed.slice(1) }, range);

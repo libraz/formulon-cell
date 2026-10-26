@@ -1,5 +1,6 @@
 import type { History } from '../commands/history.js';
 import { clearHyperlink, hyperlinkAt, setHyperlink } from '../commands/hyperlinks.js';
+import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -95,9 +96,12 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     const state = store.getState();
     const addr = state.selection.active;
     const wb = getWb() ?? undefined;
-    recordFormatChange(history, store, () => {
-      if (next) setHyperlink(store, addr, next, wb);
-      else clearHyperlink(store, addr, wb);
+    const cell = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+    runAfterAllowedRangeUnlock(store, [cell], () => {
+      recordFormatChange(history, store, () => {
+        if (next) setHyperlink(store, addr, next, wb);
+        else clearHyperlink(store, addr, wb);
+      });
     });
   };
 
