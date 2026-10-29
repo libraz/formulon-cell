@@ -20,12 +20,22 @@ function selectValue(select: HTMLSelectElement, value: string): void {
   select.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+function optionDisabled(opt: HTMLOptionElement): boolean {
+  return opt.disabled || opt.closest('optgroup')?.disabled === true;
+}
+
+function optionDisabledReason(opt: HTMLOptionElement): string | null {
+  return opt.dataset.disabledReason ?? opt.closest('optgroup')?.dataset.disabledReason ?? null;
+}
+
 function createCustomSelectButton(select: HTMLSelectElement): HTMLButtonElement {
   const button = createInteractionButton({
     className: 'fc-select__button',
     role: 'combobox',
     ariaLabel: select.getAttribute('aria-label') ?? '',
   });
+  // WebKit skips implicit button tab stops when full keyboard access is off.
+  button.tabIndex = 0;
   button.setAttribute('aria-haspopup', 'listbox');
   button.setAttribute('aria-expanded', 'false');
 
@@ -45,7 +55,7 @@ function createCustomSelectOptionRow(opt: HTMLOptionElement): HTMLButtonElement 
     dataset: { value: opt.value },
     text: opt.textContent ?? '',
   });
-  projectDisabledState(row, opt.disabled, opt.dataset.disabledReason ?? null, {
+  projectDisabledState(row, optionDisabled(opt), optionDisabledReason(opt), {
     datasetKey: 'disabledReason',
   });
   return row;
@@ -75,6 +85,7 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
 
   let activeIndex = Math.max(0, select.selectedIndex);
   let disposed = false;
+  let pointerDownInside = false;
 
   const options = (): HTMLOptionElement[] => Array.from(select.options);
   const rows = (): HTMLElement[] =>
@@ -82,8 +93,15 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
 
   const syncSelected = (): void => {
     value.textContent = optionLabel(select);
+    projectDisabledState(button, select.disabled, select.dataset.disabledReason ?? null, {
+      datasetKey: 'disabledReason',
+    });
     const opts = options();
-    activeIndex = Math.max(0, select.selectedIndex);
+    const selectedOption = opts[select.selectedIndex];
+    activeIndex =
+      selectedOption && !optionDisabled(selectedOption)
+        ? select.selectedIndex
+        : opts.findIndex((opt) => !optionDisabled(opt));
     for (const [i, row] of rows().entries()) {
       const selected = opts[i]?.value === select.value;
       row.setAttribute('aria-selected', selected ? 'true' : 'false');
@@ -92,21 +110,51 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
   };
 
   const close = (): void => {
+    pointerDownInside = false;
     list.hidden = true;
     button.setAttribute('aria-expanded', 'false');
   };
 
   const move = (delta: number): void => {
-    const count = options().length;
-    if (count === 0) return;
-    activeIndex = (activeIndex + delta + count) % count;
+    const opts = options();
+    const count = opts.length;
+    if (count === 0) {
+      activeIndex = -1;
+      renderActive();
+      return;
+    }
+
+    const start = activeIndex < 0 ? (delta > 0 ? -1 : 0) : activeIndex;
+    activeIndex = -1;
+    for (let distance = 1; distance <= count; distance += 1) {
+      const candidate = (start + delta * distance + count) % count;
+      const candidateOption = opts[candidate];
+      if (candidateOption && !optionDisabled(candidateOption)) {
+        activeIndex = candidate;
+        break;
+      }
+    }
+    renderActive(true);
+  };
+
+  const setActive = (index: number): void => {
+    const opt = options()[index];
+    activeIndex = opt && !optionDisabled(opt) ? index : -1;
+    renderActive(true);
+  };
+
+  const renderActive = (scroll = false): void => {
     for (const [i, row] of rows().entries()) {
-      row.classList.toggle('fc-select__option--active', i === activeIndex);
-      if (i === activeIndex) row.scrollIntoView({ block: 'nearest' });
+      const active = i === activeIndex;
+      row.classList.toggle('fc-select__option--active', active);
+      if (scroll && active && typeof row.scrollIntoView === 'function') {
+        row.scrollIntoView({ block: 'nearest' });
+      }
     }
   };
 
   const open = (): void => {
+    if (select.disabled) return;
     renderOptions();
     list.hidden = false;
     button.setAttribute('aria-expanded', 'true');
@@ -118,6 +166,7 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
     for (const [i, opt] of options().entries()) {
       const row = createCustomSelectOptionRow(opt);
       row.addEventListener('click', () => {
+        if (select.disabled || optionDisabled(opt)) return;
         selectValue(select, opt.value);
         activeIndex = i;
         syncSelected();
@@ -129,11 +178,17 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
   }
 
   const onButtonClick = (): void => {
+    if (select.disabled) return;
     if (list.hidden) open();
     else close();
   };
 
   const onButtonKey = (e: KeyboardEvent): void => {
+    if (select.disabled) return;
+    if (e.key === 'Tab') {
+      if (!list.hidden) close();
+      return;
+    }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       if (list.hidden) open();
@@ -143,8 +198,13 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
     if (e.key === 'Home' || e.key === 'End') {
       e.preventDefault();
       if (list.hidden) open();
-      activeIndex = e.key === 'Home' ? 0 : Math.max(0, options().length - 1);
-      syncSelected();
+      const opts = options();
+      const candidates = opts.map((opt, index) => ({ opt, index }));
+      const target =
+        e.key === 'Home'
+          ? candidates.find(({ opt }) => !optionDisabled(opt))
+          : [...candidates].reverse().find(({ opt }) => !optionDisabled(opt));
+      setActive(target?.index ?? -1);
       return;
     }
     if (e.key === 'Enter' || e.key === ' ') {
@@ -154,31 +214,63 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
         return;
       }
       const opt = options()[activeIndex];
-      if (opt && !opt.disabled) selectValue(select, opt.value);
+      if (opt && !optionDisabled(opt)) selectValue(select, opt.value);
       syncSelected();
       close();
       return;
     }
     if (e.key === 'Escape') {
+      if (list.hidden) return;
       e.preventDefault();
+      syncSelected();
       close();
     }
   };
 
+  const onFocusOut = (e: FocusEvent): void => {
+    if (pointerDownInside) return;
+    if (!(e.relatedTarget instanceof Node) || !wrap.contains(e.relatedTarget)) close();
+  };
+
+  const onWrapPointerDown = (): void => {
+    pointerDownInside = true;
+  };
+
+  const onDocumentPointerEnd = (e: Event): void => {
+    pointerDownInside = false;
+    const pointerTargetInside = e.target instanceof Node && wrap.contains(e.target);
+    const focusOutside = !wrap.contains(document.activeElement);
+    if (!pointerTargetInside || (e.type === 'pointercancel' && focusOutside)) close();
+  };
+
+  const onWindowBlur = (): void => {
+    pointerDownInside = false;
+    if (!wrap.contains(document.activeElement)) close();
+  };
+
   const onDocumentPointer = (e: Event): void => {
-    if (!wrap.contains(e.target as Node)) close();
+    if (!wrap.contains(e.target as Node)) {
+      pointerDownInside = false;
+      close();
+    }
   };
 
   const observer = new MutationObserver(() => {
     renderOptions();
     syncSelected();
+    if (select.disabled) close();
   });
   observer.observe(select, { childList: true, subtree: true, attributes: true });
 
   button.addEventListener('click', onButtonClick);
   button.addEventListener('keydown', onButtonKey);
+  wrap.addEventListener('focusout', onFocusOut);
+  wrap.addEventListener('pointerdown', onWrapPointerDown);
   select.addEventListener('change', syncSelected);
   document.addEventListener('pointerdown', onDocumentPointer);
+  document.addEventListener('pointerup', onDocumentPointerEnd);
+  document.addEventListener('pointercancel', onDocumentPointerEnd);
+  select.ownerDocument.defaultView?.addEventListener('blur', onWindowBlur);
 
   renderOptions();
   syncSelected();
@@ -188,11 +280,17 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
     dispose() {
       if (disposed) return;
       disposed = true;
+      pointerDownInside = false;
       observer.disconnect();
       button.removeEventListener('click', onButtonClick);
       button.removeEventListener('keydown', onButtonKey);
+      wrap.removeEventListener('focusout', onFocusOut);
+      wrap.removeEventListener('pointerdown', onWrapPointerDown);
       select.removeEventListener('change', syncSelected);
       document.removeEventListener('pointerdown', onDocumentPointer);
+      document.removeEventListener('pointerup', onDocumentPointerEnd);
+      document.removeEventListener('pointercancel', onDocumentPointerEnd);
+      select.ownerDocument.defaultView?.removeEventListener('blur', onWindowBlur);
       select.classList.remove('fc-select__native');
       select.removeAttribute('aria-hidden');
       select.tabIndex = 0;
