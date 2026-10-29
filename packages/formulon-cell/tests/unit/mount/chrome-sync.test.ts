@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { SpreadsheetEmitter } from '../../../src/events.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
@@ -113,6 +113,186 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     expect(activeRow?.getAttribute('aria-rowindex')).toBe('201');
     expect(activeRow?.parentElement).toBe(a11y);
     expect(a11y.querySelectorAll('[role="row"]').length).toBe(21);
+  });
+
+  it('reuses viewport mirrors and resolves only the active display while navigating', () => {
+    const store = sheet.instance.store;
+    store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: 0, rowCount: 20, colStart: 0, colCount: 10 },
+    }));
+    const rowsBefore = [...a11y.querySelectorAll<HTMLElement>(':scope > [role="row"]')];
+    expect(rowsBefore).toHaveLength(20);
+    const activeBefore = a11y.querySelector<HTMLElement>('[aria-selected="true"]');
+    const b1Id = `${a11y.id}-cell-0-1`;
+    const b1Before = document.getElementById(b1Id);
+    expect(b1Before).not.toBeNull();
+    const createElement = vi.spyOn(document, 'createElement');
+    const getLambdaText = vi.spyOn(sheet.workbook, 'getLambdaText');
+    createElement.mockClear();
+    getLambdaText.mockClear();
+
+    mutators.setActive(store, { sheet: 0, row: 0, col: 1 });
+
+    expect(createElement).toHaveBeenCalledTimes(0);
+    expect(getLambdaText.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(a11y.querySelector('[aria-selected="true"]')).toBe(activeBefore);
+    expect([...a11y.querySelectorAll<HTMLElement>(':scope > [role="row"]')]).toEqual(rowsBefore);
+
+    mutators.setActive(store, { sheet: 0, row: 0, col: 2 });
+
+    expect(createElement).toHaveBeenCalledTimes(0);
+    expect(getLambdaText.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(document.getElementById(b1Id)).toBe(b1Before);
+    expect([...a11y.querySelectorAll<HTMLElement>(':scope > [role="row"]')]).toEqual(rowsBefore);
+    expect(a11y.querySelector('[aria-selected="true"]')?.id).toBe(activeBefore?.id);
+    expect(grid.getAttribute('aria-activedescendant')).toBe(activeBefore?.id);
+
+    mutators.setActive(store, { sheet: 0, row: 200, col: 40 });
+    const activeOnlyRow = a11y.querySelector<HTMLElement>(
+      ':scope > [role="row"][aria-rowindex="201"]',
+    );
+    expect(activeOnlyRow).not.toBeNull();
+    expect(a11y.querySelectorAll('[role="row"]')).toHaveLength(21);
+    const activeOnlyObserver = new MutationObserver(() => {});
+    activeOnlyObserver.observe(activeOnlyRow as HTMLElement, { childList: true });
+    mutators.setActive(store, { sheet: 0, row: 201, col: 41 });
+    expect(a11y.querySelector(':scope > [role="row"][aria-rowindex="202"]')).toBe(activeOnlyRow);
+    expect(activeOnlyObserver.takeRecords()).toHaveLength(0);
+    activeOnlyObserver.disconnect();
+    expect(createElement).toHaveBeenCalledTimes(0);
+    expect(a11y.querySelector('[aria-selected="true"]')?.id).toBe(activeBefore?.id);
+    expect(grid.getAttribute('aria-activedescendant')).toBe(activeBefore?.id);
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    expect(a11y.querySelectorAll('[role="row"]')).toHaveLength(20);
+    expect(a11y.querySelectorAll<HTMLElement>(':scope > [role="row"]')[0]).toBe(rowsBefore[0]);
+    expect(getLambdaText.mock.calls.length).toBeLessThanOrEqual(2);
+    getLambdaText.mockRestore();
+    createElement.mockRestore();
+  });
+
+  it('updates an existing mirror when the immutable cell map changes', () => {
+    const store = sheet.instance.store;
+    const setA1Text = (value: string): void => {
+      store.setState((s) => ({
+        ...s,
+        data: {
+          ...s.data,
+          cells: new Map([['0:0:0', { value: { kind: 'text', value }, formula: null }]]),
+        },
+      }));
+    };
+    setA1Text('before');
+    const activeCell = a11y.querySelector<HTMLElement>('[aria-selected="true"]');
+    expect(activeCell?.textContent).toBe('A1 before');
+
+    setA1Text('after');
+
+    expect(a11y.querySelector('[aria-selected="true"]')).toBe(activeCell);
+    expect(activeCell?.textContent).toBe('A1 after');
+  });
+
+  it('reconciles overlapping row and column mirrors while scrolling', () => {
+    const store = sheet.instance.store;
+    store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: 0, rowCount: 20, colStart: 0, colCount: 10 },
+    }));
+    const b2Id = `${a11y.id}-cell-1-1`;
+    const b2Before = document.getElementById(b2Id);
+    const row1Before = document.getElementById(`${a11y.id}-row-0`);
+    const row2Before = document.getElementById(`${a11y.id}-row-1`);
+    expect(b2Before).not.toBeNull();
+    expect(row1Before).not.toBeNull();
+    expect(row2Before).not.toBeNull();
+    const createElement = vi.spyOn(document, 'createElement');
+    const getLambdaText = vi.spyOn(sheet.workbook, 'getLambdaText');
+    const retainedRowObserver = new MutationObserver(() => {});
+    const rowListObserver = new MutationObserver(() => {});
+    retainedRowObserver.observe(row2Before as HTMLElement, { childList: true });
+    rowListObserver.observe(a11y, { childList: true });
+    createElement.mockClear();
+    getLambdaText.mockClear();
+
+    store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: 1 },
+    }));
+
+    expect(createElement).toHaveBeenCalledTimes(11);
+    expect(getLambdaText).toHaveBeenCalledTimes(10);
+    expect(document.getElementById(b2Id)).toBe(b2Before);
+    expect(document.getElementById(`${a11y.id}-row-1`)).toBe(row2Before);
+    expect(retainedRowObserver.takeRecords()).toHaveLength(0);
+    const rowListChanges = rowListObserver
+      .takeRecords()
+      .flatMap((record) => [...record.removedNodes, ...record.addedNodes]);
+    expect(rowListChanges).not.toContain(row2Before);
+    expect(rowListChanges).toContain(row1Before);
+    expect(rowListChanges).toContain(document.getElementById(`${a11y.id}-row-20`));
+    retainedRowObserver.disconnect();
+    rowListObserver.disconnect();
+
+    createElement.mockClear();
+    getLambdaText.mockClear();
+    store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, colStart: 1 },
+    }));
+
+    expect(createElement).toHaveBeenCalledTimes(20);
+    expect(getLambdaText).toHaveBeenCalledTimes(20);
+    expect(document.getElementById(b2Id)).toBe(b2Before);
+    expect(document.getElementById(`${a11y.id}-row-1`)).toBe(row2Before);
+    vi.restoreAllMocks();
+  });
+
+  it('relabels retained cells on simultaneous data and viewport changes, and on forced refresh', () => {
+    const store = sheet.instance.store;
+    store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: 0, rowCount: 20, colStart: 0, colCount: 10 },
+      data: {
+        ...s.data,
+        cells: new Map([['0:1:1', { value: { kind: 'text', value: 'before' }, formula: null }]]),
+      },
+    }));
+    const b2Id = `${a11y.id}-cell-1-1`;
+    const b2Before = document.getElementById(b2Id);
+    const c2Before = document.getElementById(`${a11y.id}-cell-1-2`);
+    expect(b2Before?.textContent).toBe('B2 before');
+    expect(c2Before).not.toBeNull();
+    const createElement = vi.spyOn(document, 'createElement');
+    const getLambdaText = vi.spyOn(sheet.workbook, 'getLambdaText');
+    createElement.mockClear();
+    getLambdaText.mockClear();
+
+    store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: 1 },
+      data: {
+        ...s.data,
+        cells: new Map([['0:1:1', { value: { kind: 'text', value: 'after' }, formula: null }]]),
+      },
+    }));
+
+    expect(createElement).toHaveBeenCalledTimes(11);
+    expect(getLambdaText).toHaveBeenCalledTimes(200);
+    expect(document.getElementById(b2Id)).toBe(b2Before);
+    expect(b2Before?.textContent).toBe('B2 after');
+
+    createElement.mockClear();
+    getLambdaText.mockClear();
+    getLambdaText.mockReturnValue('1');
+    tag.focus();
+    tag.blur();
+
+    expect(createElement).toHaveBeenCalledTimes(0);
+    expect(getLambdaText).toHaveBeenCalledTimes(200);
+    expect(document.getElementById(b2Id)).toBe(b2Before);
+    expect(document.getElementById(`${a11y.id}-cell-1-2`)).toBe(c2Before);
+    expect(c2Before?.textContent).toBe('C2 =1');
+    vi.restoreAllMocks();
   });
 
   it('a range selection formats as A1:B3', () => {

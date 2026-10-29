@@ -139,6 +139,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     rowMirror.setAttribute('aria-rowindex', String(row + 1));
     return rowMirror;
   };
+  const activeOnlyRowMirror = createRowMirror(-1);
   grid.setAttribute('aria-activedescendant', activeCellMirror.id);
   grid.setAttribute('aria-rowcount', String(MAX_ROW + 1));
   grid.setAttribute('aria-colcount', String(MAX_COL + 1));
@@ -169,75 +170,295 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     );
   };
 
-  const updateChrome = (): void => {
-    const wb = getWb();
-    const s = store.getState();
-    host.dataset.fcWorkbookView = s.ui.workbookView;
-    const a = s.selection.active;
-    const ref = selectionRef(s);
-    // A selected chart or picture names itself and leaves the formula bar empty.
-    const object = s.ui.selectedObject;
-    if (document.activeElement !== tag) tag.value = object ? object.name : nameBoxText(ref);
-    const display = cellDisplayText(s, wb, a);
-    if (!getFormulaEditing()) {
-      fxInput.value = object ? '' : display;
-      fxInput.readOnly =
-        !object && isDataTableFormula(s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`)?.formula);
-    }
-    activeCellMirror.setAttribute('aria-rowindex', String(a.row + 1));
-    activeCellMirror.setAttribute('aria-colindex', String(a.col + 1));
-    activeCellMirror.setAttribute('aria-label', display ? `${ref} ${display}` : ref);
-    activeCellMirror.textContent = `${ref} ${display}`;
-    a11yLive.textContent = `${ref} ${display}`;
-    const rowMirrors: HTMLElement[] = [];
-    let activePlaced = false;
-    const rowEnd = Math.min(
+  interface MirrorViewport {
+    sheet: number;
+    rowStart: number;
+    rowEnd: number;
+    colStart: number;
+    colEnd: number;
+  }
+  interface ContentSnapshot {
+    cells: State['data']['cells'];
+    formats: State['format']['formats'];
+    protectedSheets: State['protection']['protectedSheets'];
+    r1c1: boolean | undefined;
+    wb: WorkbookHandle;
+    profileId: ReturnType<WorkbookHandle['spreadsheetProfileId']>;
+    inputLocale: string | undefined;
+    strings: Strings;
+  }
+
+  const mirrorViewport = (s: State): MirrorViewport => ({
+    sheet: s.data.sheetIndex,
+    rowStart: s.viewport.rowStart,
+    rowEnd: Math.min(
       MAX_ROW,
       s.viewport.rowStart + Math.max(1, Math.min(s.viewport.rowCount, MAX_A11Y_VIEWPORT_ROWS)) - 1,
-    );
-    const colEnd = Math.min(
+    ),
+    colStart: s.viewport.colStart,
+    colEnd: Math.min(
       MAX_COL,
       s.viewport.colStart + Math.max(1, Math.min(s.viewport.colCount, MAX_A11Y_VIEWPORT_COLS)) - 1,
+    ),
+  });
+
+  const sameViewport = (left: MirrorViewport | undefined, right: MirrorViewport): boolean =>
+    left?.sheet === right.sheet &&
+    left.rowStart === right.rowStart &&
+    left.rowEnd === right.rowEnd &&
+    left.colStart === right.colStart &&
+    left.colEnd === right.colEnd;
+
+  const contentSnapshot = (s: State, wb: WorkbookHandle): ContentSnapshot => ({
+    cells: s.data.cells,
+    formats: s.format.formats,
+    protectedSheets: s.protection.protectedSheets,
+    r1c1: s.ui.r1c1,
+    wb,
+    profileId: wb.spreadsheetProfileId(),
+    inputLocale: inputLocaleForWorkbook(wb),
+    strings: getStrings(),
+  });
+
+  const sameContent = (left: ContentSnapshot | undefined, right: ContentSnapshot): boolean =>
+    left?.cells === right.cells &&
+    left.formats === right.formats &&
+    left.protectedSheets === right.protectedSheets &&
+    left.r1c1 === right.r1c1 &&
+    left.wb === right.wb &&
+    left.profileId === right.profileId &&
+    left.inputLocale === right.inputLocale &&
+    left.strings === right.strings;
+
+  const cellKey = (sheet: number, row: number, col: number): string => `${sheet}:${row}:${col}`;
+  const ordinaryCells = new Map<string, HTMLElement>();
+  const ordinaryDisplays = new Map<string, string>();
+  const rowMirrors = new Map<number, HTMLElement>();
+  let currentViewport: MirrorViewport | undefined;
+  let currentContent: ContentSnapshot | undefined;
+  let activePlaceholder: HTMLElement | null = null;
+  let activeCoordinateKey: string | undefined;
+  let currentActiveDisplay: { key: string; text: string } | undefined;
+
+  const setOrdinaryCellText = (
+    node: HTMLElement,
+    row: number,
+    col: number,
+    display: string,
+  ): void => {
+    const cellRef = formatA1Cell(row, col);
+    node.id = `${mirrorId}-cell-${row}-${col}`;
+    node.setAttribute('role', 'gridcell');
+    node.setAttribute('aria-rowindex', String(row + 1));
+    node.setAttribute('aria-colindex', String(col + 1));
+    node.setAttribute('aria-selected', 'false');
+    node.setAttribute('aria-label', display ? `${cellRef} ${display}` : cellRef);
+    node.textContent = `${cellRef} ${display}`;
+  };
+
+  const reconcileChildren = (parent: HTMLElement, desired: readonly HTMLElement[]): void => {
+    const desiredSet = new Set(desired);
+    for (const child of Array.from(parent.children)) {
+      if (!desiredSet.has(child as HTMLElement)) child.remove();
+    }
+    for (let index = 0; index < desired.length; index += 1) {
+      const desiredChild = desired[index];
+      if (!desiredChild || parent.children.item(index) === desiredChild) continue;
+      parent.insertBefore(desiredChild, parent.children.item(index));
+    }
+  };
+
+  const refreshOrdinaryCells = (s: State, wb: WorkbookHandle, viewport: MirrorViewport): void => {
+    ordinaryDisplays.clear();
+    for (let row = viewport.rowStart; row <= viewport.rowEnd; row += 1) {
+      for (let col = viewport.colStart; col <= viewport.colEnd; col += 1) {
+        const key = cellKey(viewport.sheet, row, col);
+        const node = ordinaryCells.get(key);
+        if (!node) continue;
+        const display = cellDisplayText(s, wb, { sheet: viewport.sheet, row, col });
+        ordinaryDisplays.set(key, display);
+        setOrdinaryCellText(node, row, col, display);
+      }
+    }
+  };
+
+  const rebuildMirror = (
+    s: State,
+    wb: WorkbookHandle,
+    viewport: MirrorViewport,
+    refreshAll: boolean,
+  ): void => {
+    const sameSheet = currentViewport?.sheet === viewport.sheet;
+    if (!sameSheet) {
+      ordinaryCells.clear();
+      ordinaryDisplays.clear();
+      rowMirrors.clear();
+      activePlaceholder = null;
+    } else if (activePlaceholder && activeCellMirror.parentElement) {
+      activeCellMirror.replaceWith(activePlaceholder);
+      activePlaceholder = null;
+    }
+    activeCoordinateKey = cellKey(
+      s.selection.active.sheet,
+      s.selection.active.row,
+      s.selection.active.col,
     );
-    for (let row = s.viewport.rowStart; row <= rowEnd; row += 1) {
+    const rowOrder: number[] = [];
+    const nextCellKeys = new Set<string>();
+    const nextRows = new Set<number>();
+    let activePlaced = false;
+    for (let row = viewport.rowStart; row <= viewport.rowEnd; row += 1) {
+      let rowMirror = rowMirrors.get(row);
+      if (!rowMirror) {
+        rowMirror = createRowMirror(row);
+        rowMirrors.set(row, rowMirror);
+      }
+      nextRows.add(row);
+      rowOrder.push(row);
       const cells: HTMLElement[] = [];
-      for (let col = s.viewport.colStart; col <= colEnd; col += 1) {
-        if (row === a.row && col === a.col) {
+      for (let col = viewport.colStart; col <= viewport.colEnd; col += 1) {
+        const key = cellKey(viewport.sheet, row, col);
+        nextCellKeys.add(key);
+        let cellMirror = ordinaryCells.get(key);
+        if (!cellMirror) {
+          cellMirror = document.createElement('div');
+          ordinaryCells.set(key, cellMirror);
+        }
+        if (refreshAll || !ordinaryDisplays.has(key)) {
+          const display = cellDisplayText(s, wb, { sheet: viewport.sheet, row, col });
+          ordinaryDisplays.set(key, display);
+          setOrdinaryCellText(cellMirror, row, col, display);
+        }
+        if (row === s.selection.active.row && col === s.selection.active.col) {
+          activePlaceholder = cellMirror;
           cells.push(activeCellMirror);
           activePlaced = true;
-          continue;
+        } else {
+          cells.push(cellMirror);
         }
-        const cellMirror = document.createElement('div');
-        const cellRef = formatA1Cell(row, col);
-        const cellDisplay = cellDisplayText(s, wb, { sheet: s.data.sheetIndex, row, col });
-        cellMirror.id = `${mirrorId}-cell-${row}-${col}`;
-        cellMirror.setAttribute('role', 'gridcell');
-        cellMirror.setAttribute('aria-rowindex', String(row + 1));
-        cellMirror.setAttribute('aria-colindex', String(col + 1));
-        cellMirror.setAttribute('aria-selected', 'false');
-        cellMirror.setAttribute('aria-label', cellDisplay ? `${cellRef} ${cellDisplay}` : cellRef);
-        cellMirror.textContent = `${cellRef} ${cellDisplay}`;
-        cells.push(cellMirror);
       }
-      // The active cell can sit outside the mirrored column window; it still
-      // belongs to its own row so `aria-activedescendant` stays resolvable.
-      if (row === a.row && !activePlaced) {
-        if (a.col < s.viewport.colStart) cells.unshift(activeCellMirror);
+      if (row === s.selection.active.row && !activePlaced) {
+        if (s.selection.active.col < viewport.colStart) cells.unshift(activeCellMirror);
         else cells.push(activeCellMirror);
         activePlaced = true;
       }
-      const rowMirror = createRowMirror(row);
-      rowMirror.replaceChildren(...cells);
-      rowMirrors.push(rowMirror);
+      reconcileChildren(rowMirror, cells);
+    }
+    for (const key of ordinaryCells.keys()) {
+      if (nextCellKeys.has(key)) continue;
+      ordinaryCells.delete(key);
+      ordinaryDisplays.delete(key);
+    }
+    for (const row of rowMirrors.keys()) {
+      if (!nextRows.has(row)) rowMirrors.delete(row);
     }
     if (!activePlaced) {
-      const activeRow = createRowMirror(a.row);
-      activeRow.replaceChildren(activeCellMirror);
-      if (a.row < s.viewport.rowStart) rowMirrors.unshift(activeRow);
-      else rowMirrors.push(activeRow);
+      activeOnlyRowMirror.id = `${mirrorId}-row-${s.selection.active.row}`;
+      activeOnlyRowMirror.setAttribute('aria-rowindex', String(s.selection.active.row + 1));
+      reconcileChildren(activeOnlyRowMirror, [activeCellMirror]);
+      if (s.selection.active.row < viewport.rowStart) rowOrder.unshift(s.selection.active.row);
+      else rowOrder.push(s.selection.active.row);
     }
-    a11y.replaceChildren(...rowMirrors);
+    const orderedRows = rowOrder.map((row) =>
+      row === s.selection.active.row && !rowMirrors.has(row)
+        ? activeOnlyRowMirror
+        : (rowMirrors.get(row) as HTMLElement),
+    );
+    reconcileChildren(a11y, orderedRows);
+    currentViewport = viewport;
   };
+
+  const moveActiveMirror = (s: State, viewport: MirrorViewport): void => {
+    const active = s.selection.active;
+    const nextKey = cellKey(active.sheet, active.row, active.col);
+    if (nextKey === activeCoordinateKey) return;
+
+    if (activePlaceholder && activeCellMirror.parentElement) {
+      activeCellMirror.replaceWith(activePlaceholder);
+    } else if (activeCellMirror.parentElement !== activeOnlyRowMirror) {
+      activeCellMirror.remove();
+    }
+    activePlaceholder = null;
+    activeCoordinateKey = nextKey;
+
+    const targetPlaceholder = ordinaryCells.get(nextKey);
+    if (targetPlaceholder) {
+      targetPlaceholder.replaceWith(activeCellMirror);
+      activePlaceholder = targetPlaceholder;
+      activeOnlyRowMirror.remove();
+      return;
+    }
+
+    if (active.row >= viewport.rowStart && active.row <= viewport.rowEnd) {
+      activeOnlyRowMirror.remove();
+      const rowMirror = rowMirrors.get(active.row);
+      if (!rowMirror) return;
+      if (active.col < viewport.colStart)
+        rowMirror.insertBefore(activeCellMirror, rowMirror.firstChild);
+      else rowMirror.append(activeCellMirror);
+      return;
+    }
+
+    activeOnlyRowMirror.id = `${mirrorId}-row-${active.row}`;
+    activeOnlyRowMirror.setAttribute('aria-rowindex', String(active.row + 1));
+    reconcileChildren(activeOnlyRowMirror, [activeCellMirror]);
+    if (active.row < viewport.rowStart) {
+      if (a11y.firstElementChild !== activeOnlyRowMirror)
+        a11y.insertBefore(activeOnlyRowMirror, a11y.firstChild);
+    } else if (a11y.lastElementChild !== activeOnlyRowMirror) {
+      a11y.append(activeOnlyRowMirror);
+    }
+  };
+
+  const refreshChrome = (forceContent: boolean): void => {
+    const wb = getWb();
+    const s = store.getState();
+    const viewport = mirrorViewport(s);
+    const snapshot = contentSnapshot(s, wb);
+    const viewportChanged = !sameViewport(currentViewport, viewport);
+    const contentChanged = forceContent || !sameContent(currentContent, snapshot);
+    host.dataset.fcWorkbookView = s.ui.workbookView;
+
+    if (viewportChanged) {
+      rebuildMirror(s, wb, viewport, contentChanged);
+    } else if (contentChanged) {
+      refreshOrdinaryCells(s, wb, viewport);
+      moveActiveMirror(s, viewport);
+    } else {
+      moveActiveMirror(s, viewport);
+    }
+    if (contentChanged) currentContent = snapshot;
+
+    const active = s.selection.active;
+    const activeKey = cellKey(active.sheet, active.row, active.col);
+    let display = ordinaryDisplays.get(activeKey);
+    if (display === undefined) {
+      if (currentActiveDisplay?.key === activeKey && !contentChanged) {
+        display = currentActiveDisplay.text;
+      } else {
+        display = cellDisplayText(s, wb, active);
+      }
+    }
+    currentActiveDisplay = { key: activeKey, text: display };
+    const ref = selectionRef(s);
+    const object = s.ui.selectedObject;
+    if (document.activeElement !== tag) tag.value = object ? object.name : nameBoxText(ref);
+    if (!getFormulaEditing()) {
+      fxInput.value = object ? '' : display;
+      fxInput.readOnly =
+        !object &&
+        isDataTableFormula(
+          s.data.cells.get(`${active.sheet}:${active.row}:${active.col}`)?.formula,
+        );
+    }
+    activeCellMirror.setAttribute('aria-rowindex', String(active.row + 1));
+    activeCellMirror.setAttribute('aria-colindex', String(active.col + 1));
+    activeCellMirror.setAttribute('aria-label', display ? `${ref} ${display}` : ref);
+    activeCellMirror.textContent = `${ref} ${display}`;
+    a11yLive.textContent = `${ref} ${display}`;
+  };
+
+  const updateChrome = (): void => refreshChrome(true);
 
   let nameMenu: HTMLDivElement | null = null;
   const closeNameMenu = (): void => {
@@ -468,7 +689,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       });
     }
     invalidate();
-    updateChrome();
+    refreshChrome(false);
   });
 
   syncActiveSheet(getWb(), lastSheetIdx);
