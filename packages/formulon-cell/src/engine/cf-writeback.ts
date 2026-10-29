@@ -213,6 +213,20 @@ function trackedEntryIndex(
   return entryMatchesInput(indexed, tracked.input) ? tracked.index : -1;
 }
 
+export function getTrackedConditionalRuleIndexes(
+  currentFormats: readonly ConditionalFormatEntry[],
+  sheet: number,
+  tracked: SyncedConditionalRuleMap,
+): ReadonlySet<number> {
+  const indexes = new Set<number>();
+  for (const value of tracked.values()) {
+    if (value.sheet !== sheet) continue;
+    const index = trackedEntryIndex(currentFormats, value);
+    if (index >= 0) indexes.add(index);
+  }
+  return indexes;
+}
+
 function decrementTrackedIndexesAfterRemoval(
   tracked: SyncedConditionalRuleMap,
   sheet: number,
@@ -577,12 +591,7 @@ export function syncTrackedConditionalRulesToEngine(
   // Session rules rank after every rule this mount did not write, in store
   // order, so reordering the store reorders the engine priorities.
   let currentFormats = wb.getConditionalFormats(sheet);
-  const trackedIndexes = new Set<number>();
-  for (const value of opts.tracked.values()) {
-    if (value.sheet !== sheet) continue;
-    const index = trackedEntryIndex(currentFormats, value);
-    if (index >= 0) trackedIndexes.add(index);
-  }
+  const trackedIndexes = getTrackedConditionalRuleIndexes(currentFormats, sheet, opts.tracked);
   let basePriority = 0;
   currentFormats.forEach((entry, index) => {
     if (!trackedIndexes.has(index)) basePriority = Math.max(basePriority, entry.priority);

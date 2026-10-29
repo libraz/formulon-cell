@@ -25,6 +25,11 @@ export interface AlwaysOnDialogsDeps {
   getLocale: () => string;
   /** Called after the CF rules dialog changed the rule set. */
   onConditionalRulesChanged: () => void;
+  /** Identifies engine mirrors of session CF rules for list de-duplication. */
+  getSessionConditionalFormatIndexes?: (
+    sheet: number,
+    currentFormats: ReturnType<WorkbookHandle['getConditionalFormats']>,
+  ) => ReadonlySet<number>;
   openConditionalDialog: (options: ConditionalDialogOpenOptions) => void;
   /** True while an interaction policy blocks the filter dropdown. */
   isRestricted: () => boolean;
@@ -58,6 +63,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
       getActiveSheet: () => store.getState().data.sheetIndex,
       getSelectionRange: () => store.getState().selection.range,
       onChanged: deps.onConditionalRulesChanged,
+      getSessionConditionalFormatIndexes: deps.getSessionConditionalFormatIndexes,
       onNewRule: () => deps.openConditionalDialog({ mode: 'new' }),
       onEditRule: (editIndex) => deps.openConditionalDialog({ mode: 'edit', editIndex }),
       store,

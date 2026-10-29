@@ -25,6 +25,12 @@ export interface CfRulesDialogDeps {
   /** Called after a remove / clearAll mutation so the host can repaint the
    *  CF overlay. */
   onChanged?: () => void;
+  /** Identifies engine entries written from session rules so those rules are
+   *  listed only once from their authoritative store records. */
+  getSessionConditionalFormatIndexes?: (
+    sheet: number,
+    currentFormats: ReturnType<WorkbookHandle['getConditionalFormats']>,
+  ) => ReadonlySet<number>;
   /** Opens the companion "New Formatting Rule" dialog from Manage Rules. */
   onNewRule?: () => void;
   /** Opens the companion "Edit Formatting Rule" dialog for session rules. */
@@ -472,14 +478,6 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     updateCommandState();
   };
 
-  const onKey = (e: KeyboardEvent): void => {
-    if (overlay.hidden) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    }
-  };
-  shell.on(document, 'keydown', onKey as EventListener);
   shell.on(newRuleBtn, 'click', () => {
     close();
     deps.onNewRule?.();
@@ -521,8 +519,12 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     const wb = getWb();
     const sheet = getActiveSheet();
     const scopeSelection = scopeSelect.value === 'selection' ? deps.getSelectionRange?.() : null;
-    const engineRules = (wb?.getConditionalFormats(sheet) ?? [])
+    const currentFormats = wb?.getConditionalFormats(sheet) ?? [];
+    const trackedIndexes =
+      deps.getSessionConditionalFormatIndexes?.(sheet, currentFormats) ?? new Set<number>();
+    const engineRules = currentFormats
       .map((rule, index) => ({ rule, index }))
+      .filter(({ index }) => !trackedIndexes.has(index))
       .sort((a, b) => a.rule.priority - b.rule.priority || a.index - b.index)
       .filter(
         ({ rule }) =>
@@ -679,6 +681,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         removeManagedRule(managedRule, index);
       });
       row.addEventListener('keydown', (e) => {
+        if (e.target !== row) return;
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           focusRuleRow(index + 1);

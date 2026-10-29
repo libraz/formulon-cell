@@ -11,6 +11,62 @@ import { canLoadWasm } from './xlsx-roundtrip/fixtures.js';
 
 const range = { sheet: 0, r0: 1, c0: 2, r1: 3, c1: 4 };
 const sqref = [{ firstRow: 1, firstCol: 2, lastRow: 3, lastCol: 4 }];
+type GetTrackedConditionalRuleIndexes = (
+  currentFormats: ReturnType<WorkbookHandle['getConditionalFormats']>,
+  sheet: number,
+  tracked: SyncedConditionalRuleMap,
+) => ReadonlySet<number>;
+
+const loadTrackedConditionalRuleIndexes = async (): Promise<
+  GetTrackedConditionalRuleIndexes | undefined
+> =>
+  (await import('../../../src/engine/cf-writeback.js')).getTrackedConditionalRuleIndexes as
+    | GetTrackedConditionalRuleIndexes
+    | undefined;
+
+describe('getTrackedConditionalRuleIndexes', () => {
+  const input = conditionalRuleToEngineInput({
+    kind: 'cell-value',
+    range,
+    op: '>',
+    a: 10,
+    apply: {},
+  });
+
+  it('resolves shifted entries by stable id and filters other sheets', async () => {
+    if (!input) throw new Error('Expected cell-value input');
+    const tracked: SyncedConditionalRuleMap = new Map([
+      ['sheet-zero', { sheet: 0, index: 0, id: 'owned-zero', input }],
+      ['sheet-one', { sheet: 1, index: 0, id: 'owned-one', input }],
+    ]);
+    const formats = [
+      { id: 'imported', ...input },
+      { id: 'owned-zero', ...input },
+      { id: 'owned-one', ...input },
+    ] as unknown as ReturnType<WorkbookHandle['getConditionalFormats']>;
+    const getTracked = await loadTrackedConditionalRuleIndexes();
+    expect(getTracked).toBeTypeOf('function');
+    if (!getTracked) return;
+
+    expect(getTracked(formats, 0, tracked)).toEqual(new Set([1]));
+    expect(getTracked(formats, 1, tracked)).toEqual(new Set([2]));
+  });
+
+  it('uses the safe legacy index fallback only for idless entries', async () => {
+    if (!input) throw new Error('Expected cell-value input');
+    const tracked: SyncedConditionalRuleMap = new Map([['legacy', { sheet: 0, index: 0, input }]]);
+    const idless = { ...input } as unknown as ReturnType<
+      typeof WorkbookHandle.prototype.getConditionalFormats
+    >[number];
+    const withImportedId = { ...idless, id: 'imported' };
+    const getTracked = await loadTrackedConditionalRuleIndexes();
+    expect(getTracked).toBeTypeOf('function');
+    if (!getTracked) return;
+
+    expect(getTracked([idless], 0, tracked)).toEqual(new Set([0]));
+    expect(getTracked([withImportedId], 0, tracked)).toEqual(new Set());
+  });
+});
 
 describe('conditionalRuleToEngineInput (H-13)', () => {
   it('translates a cell-value rule with operator + threshold', () => {

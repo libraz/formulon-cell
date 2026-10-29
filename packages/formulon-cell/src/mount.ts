@@ -17,6 +17,7 @@ import {
   tracePrecedents as tracePrecedentArrows,
 } from './commands/traces.js';
 import {
+  getTrackedConditionalRuleIndexes,
   type SyncedConditionalRuleMap,
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
@@ -383,6 +384,14 @@ export const Spreadsheet = {
     });
     sheetTabsController.update();
 
+    let syncedSessionCfRules: SyncedConditionalRuleMap = new Map();
+    const syncSessionConditionalRules = (): void => {
+      const rules = store.getState().conditional.rules;
+      for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+        syncTrackedConditionalRulesToEngine(wb, rules, sheet, { tracked: syncedSessionCfRules });
+      }
+    };
+
     // Always-on host features — not toggleable via `MountOptions.features`.
     const alwaysOnDialogs = attachAlwaysOnDialogs({
       host,
@@ -395,6 +404,8 @@ export const Spreadsheet = {
         syncSessionConditionalRules();
         renderer.invalidate();
       },
+      getSessionConditionalFormatIndexes: (sheet, currentFormats) =>
+        getTrackedConditionalRuleIndexes(currentFormats, sheet, syncedSessionCfRules),
       openConditionalDialog: (options) => featureState.conditionalDialog?.open(options),
       isRestricted: () => commands.policy !== undefined,
     });
@@ -558,13 +569,6 @@ export const Spreadsheet = {
 
     let disposed = false;
 
-    let syncedSessionCfRules: SyncedConditionalRuleMap = new Map();
-    const syncSessionConditionalRules = (): void => {
-      const rules = store.getState().conditional.rules;
-      for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
-        syncTrackedConditionalRulesToEngine(wb, rules, sheet, { tracked: syncedSessionCfRules });
-      }
-    };
     const hostFeatures = createHostFeatureController({
       autocompleteStub,
       canvas,

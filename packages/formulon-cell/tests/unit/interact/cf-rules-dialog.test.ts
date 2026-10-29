@@ -8,6 +8,7 @@ import { conditionalRuleToEngineInput, inputWithDxf } from '../../../src/engine/
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachCfRulesDialog } from '../../../src/interact/cf-rules-dialog.js';
+import { createDialogShell } from '../../../src/interact/dialog-shell.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -409,6 +410,241 @@ describe('attachCfRulesDialog', () => {
     handle.detach();
   });
 
+  it('lets Space toggle Stop If True when its checkbox has focus', () => {
+    const { wb } = fakeWb([]);
+    const store = createSpreadsheetStore();
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>',
+      a: 5,
+      apply: { fill: '#ffc7ce' },
+    });
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      store,
+    });
+    try {
+      handle.open();
+      const checkbox = document.querySelector<HTMLInputElement>(
+        '.fc-cfrulesdlg__cell-stop input[type="checkbox"]',
+      );
+      checkbox?.focus();
+      const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+      checkbox?.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(checkbox);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('does not intercept Enter on the per-row Duplicate button', () => {
+    const { wb } = fakeWb([]);
+    const store = createSpreadsheetStore();
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>',
+      a: 5,
+      apply: { fill: '#ffc7ce' },
+    });
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      store,
+    });
+    try {
+      handle.open();
+      const duplicate = document.querySelector<HTMLButtonElement>(
+        '.fc-cfrulesdlg__table tbody tr .fc-cfrulesdlg__row-duplicate',
+      );
+      duplicate?.focus();
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      duplicate?.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(duplicate);
+      expect(store.getState().conditional.rules).toHaveLength(1);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('does not intercept Enter on the per-row Remove button', () => {
+    const { wb } = fakeWb([]);
+    const store = createSpreadsheetStore();
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>',
+      a: 5,
+      apply: { fill: '#ffc7ce' },
+    });
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      store,
+    });
+    try {
+      handle.open();
+      const remove = document.querySelector<HTMLButtonElement>(
+        '.fc-cfrulesdlg__table tbody tr .fc-cfrulesdlg__remove',
+      );
+      remove?.focus();
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      remove?.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(remove);
+      expect(store.getState().conditional.rules).toHaveLength(1);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('does not remove a rule when Delete starts on a child control', () => {
+    const { wb } = fakeWb([]);
+    const store = createSpreadsheetStore();
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>',
+      a: 5,
+      apply: { fill: '#ffc7ce' },
+    });
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      store,
+    });
+    try {
+      handle.open();
+      const checkbox = document.querySelector<HTMLInputElement>(
+        '.fc-cfrulesdlg__cell-stop input[type="checkbox"]',
+      );
+      checkbox?.focus();
+      const event = new KeyboardEvent('keydown', {
+        key: 'Delete',
+        bubbles: true,
+        cancelable: true,
+      });
+      checkbox?.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(store.getState().conditional.rules).toHaveLength(1);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('hides only a tracked session mirror and keeps an identical imported rule', () => {
+    const sessionRule = {
+      kind: 'cell-value' as const,
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>' as const,
+      a: 5,
+      apply: { fill: '#ffc7ce' },
+    };
+    const input = conditionalRuleToEngineInput(sessionRule);
+    if (!input) throw new Error('Expected a cell-value engine input');
+    const engineRule = (id: string, priority: number): Rule =>
+      ({ id, priority, stopIfTrue: false, ...input }) as Rule;
+    const { wb } = fakeWb([engineRule('session-mirror', 1), engineRule('identical-imported', 2)]);
+    const store = createSpreadsheetStore();
+    mutators.addConditionalRule(store, sessionRule);
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      store,
+      getSessionConditionalFormatIndexes: (_sheet, _formats) => new Set([0]),
+    });
+
+    try {
+      handle.open();
+      const rows = (): HTMLTableRowElement[] =>
+        Array.from(
+          document.querySelectorAll<HTMLTableRowElement>('.fc-cfrulesdlg__table tbody tr'),
+        );
+      expect(rows().map((row) => row.dataset.ruleSource)).toEqual(['engine', 'session']);
+
+      const sessionRow = (): HTMLTableRowElement => {
+        const row = rows().find((candidate) => candidate.dataset.ruleSource === 'session');
+        if (!row) throw new Error('Expected the session rule row');
+        return row;
+      };
+      sessionRow().querySelector<HTMLInputElement>('.fc-cfrulesdlg__cell-stop input')?.click();
+      expect(store.getState().conditional.rules).toHaveLength(1);
+      expect(store.getState().conditional.rules[0]?.stopIfTrue).toBe(true);
+      expect(rows().map((row) => row.dataset.ruleSource)).toEqual(['engine', 'session']);
+
+      const duplicate = sessionRow().querySelector<HTMLButtonElement>(
+        '.fc-cfrulesdlg__row-duplicate',
+      );
+      expect(duplicate?.disabled).toBe(false);
+      duplicate?.click();
+      expect(store.getState().conditional.rules).toHaveLength(2);
+      expect(rows().map((row) => row.dataset.ruleSource)).toEqual(['engine', 'session', 'session']);
+
+      rows()
+        .filter((row) => row.dataset.ruleSource === 'session')[1]
+        ?.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__remove')
+        ?.click();
+      expect(store.getState().conditional.rules).toHaveLength(1);
+      expect(rows().map((row) => row.dataset.ruleSource)).toEqual(['engine', 'session']);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('excludes tracked engine indexes before sorting the manager inventory', () => {
+    const { wb, removed } = fakeWb([
+      rule({ id: 'session-mirror', priority: 2 }),
+      rule({
+        id: 'imported',
+        priority: 1,
+        sqref: [{ firstRow: 1, firstCol: 1, lastRow: 2, lastCol: 1 }],
+      }),
+    ]);
+    const seenSnapshots: string[][] = [];
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      getSessionConditionalFormatIndexes: (_sheet, formats) => {
+        seenSnapshots.push(formats.map((entry) => entry.id ?? ''));
+        return new Set([0]);
+      },
+    });
+    try {
+      handle.open();
+
+      expect(
+        Array.from(
+          document.querySelectorAll<HTMLElement>(
+            '.fc-cfrulesdlg__table tbody .fc-cfrulesdlg__cell-range',
+          ),
+          (cell) => cell.textContent,
+        ),
+      ).toEqual(['B2:B3']);
+      expect(seenSnapshots[0]).toEqual(['session-mirror', 'imported']);
+      document
+        .querySelector<HTMLButtonElement>('.fc-cfrulesdlg__table tbody tr .fc-cfrulesdlg__remove')
+        ?.click();
+      expect(removed).toEqual([1]);
+      expect(seenSnapshots[1]).toEqual(['session-mirror']);
+    } finally {
+      handle.detach();
+    }
+  });
+
   it('clicking the per-row remove button calls removeConditionalFormatAt and rerenders', () => {
     const { wb, removed } = fakeWb([
       rule({ id: 'a', priority: 1 }),
@@ -683,6 +919,36 @@ describe('attachCfRulesDialog', () => {
     expect(dialog?.hidden).toBe(true);
     expect(clearAll?.classList.contains('fc-cfrulesdlg__clearall--armed')).toBe(false);
     handle.detach();
+  });
+
+  it('Escape dismisses only the top dialog shell', () => {
+    const { wb } = fakeWb([rule()]);
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+    });
+    let top: ReturnType<typeof createDialogShell> | null = null;
+    try {
+      handle.open();
+      top = createDialogShell({
+        host,
+        className: 'fc-cfrulesdlg-test-top',
+        ariaLabel: 'Top dialog',
+        onDismiss: () => top?.close(),
+      });
+      top.open();
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+      expect(top.isOpen()).toBe(false);
+      expect(document.querySelector<HTMLElement>('.fc-cfrulesdlg')?.hidden).toBe(false);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.querySelector<HTMLElement>('.fc-cfrulesdlg')?.hidden).toBe(true);
+    } finally {
+      top?.dispose();
+      handle.detach();
+    }
   });
 
   it('detach removes the dialog node from the DOM', () => {
