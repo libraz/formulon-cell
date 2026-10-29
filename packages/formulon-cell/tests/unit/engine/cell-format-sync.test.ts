@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   captureSyncedFormatKeyMembership,
+  effectiveCellFormatWithPending,
   flushFormatToEngine,
   hydrateCellFormatsFromEngine,
   restoreSyncedFormatKeyMembership,
@@ -485,6 +486,93 @@ describe('synced format key checkpoints', () => {
     seedSyncedFormatKeys(wb, 4, [key]);
     restoreSyncedFormatKeyMembership(wb, new Map([[key, false]]));
     expect(captureSyncedFormatKeyMembership(wb, [key])).toEqual(new Map([[key, false]]));
+  });
+});
+
+describe('effective format projection cache', () => {
+  it('reuses XF metadata per operation while preserving axis and pending format output', () => {
+    const calls = { effective: 0, xf: 0, font: 0, fill: 0, border: 0, numFmt: 0 };
+    let bold = true;
+    const xf = {
+      fontIndex: 1,
+      fillIndex: 2,
+      borderIndex: 3,
+      numFmtId: 164,
+      horizontalAlign: 2,
+      verticalAlign: 1,
+      wrapText: false,
+      hasAlignment: true,
+      hasHorizontalAlign: true,
+      hasVerticalAlign: true,
+    } as CellXf;
+    const wb = {
+      capabilities: { effectiveStyle: true },
+      getEffectiveStyle: () => {
+        calls.effective += 1;
+        return {
+          xfIndex: 7,
+          locked: true,
+          hidden: false,
+          numFmtCode: '#,##0.00',
+        };
+      },
+      getCellXf: () => {
+        calls.xf += 1;
+        return xf;
+      },
+      getResolvedFontRecord: () => {
+        calls.font += 1;
+        return { name: 'Arial', size: 11, bold } as FontRecord;
+      },
+      getResolvedFillRecord: () => {
+        calls.fill += 1;
+        return null;
+      },
+      getResolvedBorderRecord: () => {
+        calls.border += 1;
+        return null;
+      },
+      getNumFmtCode: () => {
+        calls.numFmt += 1;
+        return '#,##0.00';
+      },
+    } as unknown as WorkbookHandle;
+    const store = createSpreadsheetStore();
+    const pendingAddr = addrKey({ sheet: 0, row: 1, col: 0 });
+    store.setState((state) => ({
+      ...state,
+      format: { ...state.format, formats: new Map([[pendingAddr, { italic: true }]]) },
+    }));
+    const state = store.getState();
+    const operationCache = new Map<string, Partial<CellFormat> | null>();
+    const projected: (Partial<CellFormat> | null)[] = [];
+    for (let row = 0; row < 1000; row += 1) {
+      projected.push(
+        effectiveCellFormatWithPending(wb, state, { sheet: 0, row, col: 0 }, operationCache),
+      );
+    }
+
+    expect(projected[0]).toMatchObject({ bold: true, align: 'center', locked: true });
+    expect(projected[1]).toMatchObject({ bold: true, italic: true });
+    expect(calls.effective).toBe(1000); // The effective style is cell-specific.
+    expect(calls.xf).toBe(1);
+    expect(calls.font).toBe(1);
+    expect(calls.fill).toBe(1);
+    expect(calls.border).toBe(1);
+    expect(calls.numFmt).toBe(1);
+
+    // A later copy operation receives a new cache and sees fresh engine data
+    // even when the selected XF index is unchanged.
+    bold = false;
+    const nextOperation = effectiveCellFormatWithPending(
+      wb,
+      state,
+      { sheet: 0, row: 2, col: 0 },
+      new Map(),
+    );
+    expect(nextOperation?.bold).toBeUndefined();
+    expect(calls.xf).toBe(2);
+    expect(calls.font).toBe(2);
   });
 });
 

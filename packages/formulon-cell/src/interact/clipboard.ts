@@ -1,5 +1,6 @@
 import { type CopyResult, copy } from '../commands/clipboard/copy.js';
 import { createDrawingClipboard } from '../commands/clipboard/drawing.js';
+import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { encodeHtml } from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import {
@@ -11,13 +12,13 @@ import {
   type ClipboardSnapshot,
   captureSnapshotFromCopyResult,
 } from '../commands/clipboard/snapshot.js';
+import { materializedCopyCells } from '../commands/clipboard/source-cells.js';
 import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { addrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import type { Range } from '../engine/types.js';
 import { formatBoolean, formatCell, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -248,19 +249,12 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       ui.copyRange &&
       (!ui.copyRanges || ui.copyRanges.length <= 1)
     ) {
-      // Rebuild the source-sheet cache from the engine first. The visible
-      // store cache can still belong to the active destination sheet after a
-      // sheet switch, while the internal copy remains anchored elsewhere.
+      // Refresh only the logical source band. The visible store cache can
+      // still belong to the active destination sheet after a sheet switch.
       const sourceSheet = ui.copyRange.sheet;
-      const sourceCells = new Map(state.data.cells);
-      for (const key of sourceCells.keys()) {
-        if (key.startsWith(`${sourceSheet}:`)) sourceCells.delete(key);
-      }
-      for (const cell of wb.cells(sourceSheet)) {
-        sourceCells.set(addrKey(cell.addr), { value: cell.value, formula: cell.formula });
-      }
-      const sourceIsActive = sourceSheet === state.data.sheetIndex;
       const sourceLogical = { ...ui.copyRange };
+      const sourceCells = materializedCopyCells(wb, sourceLogical);
+      const sourceIsActive = sourceSheet === state.data.sheetIndex;
       const sourceMerges = sourceIsActive
         ? state.merges
         : (() => {
@@ -311,9 +305,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
             sourceState,
             materialized,
             'copy',
-            wb.capabilities.effectiveStyle && !wb.isStub
-              ? (addr) => effectiveCellFormatWithPending(wb, sourceState, addr)
-              : (addr) => sourceState.format.formats.get(addrKey(addr)),
+            formatResolverFor(sourceState),
           )
         : null;
       // Keep snapshotText untouched: it is the system clipboard token that
@@ -352,23 +344,22 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   };
   const materializedRanges = (result: CopyResult): Range[] =>
     result.payloadRanges ?? [result.range];
-  const formatResolverFor =
-    (sourceState: State) => (addr: { sheet: number; row: number; col: number }) =>
-      wb.capabilities.effectiveStyle && !wb.isStub
-        ? effectiveCellFormatWithPending(wb, sourceState, addr)
-        : sourceState.format.formats.get(addrKey(addr));
+  const formatResolverFor = (sourceState: State) => createCopyFormatResolver(wb, sourceState);
   const captureMaterializedSnapshot = (
     state: State,
     result: CopyResult,
     mode: 'copy' | 'cut',
+    resolveFormat = formatResolverFor(state),
   ): ClipboardSnapshot | null => {
-    return captureSnapshotFromCopyResult(state, result, mode, formatResolverFor(state));
+    return captureSnapshotFromCopyResult(state, result, mode, resolveFormat);
   };
-  const encodeMaterializedHtml = (state: State, result: CopyResult): string =>
+  const encodeMaterializedHtml = (
+    state: State,
+    result: CopyResult,
+    resolveFormat = formatResolverFor(state),
+  ): string =>
     materializedRanges(result)
-      .map((range) =>
-        encodeHtml(state, range, inputLocaleForWorkbook(wb), formatResolverFor(state)),
-      )
+      .map((range) => encodeHtml(state, range, inputLocaleForWorkbook(wb), resolveFormat))
       .join('');
   const hasPastePayload = (text: string): boolean =>
     text.length > 0 ||
@@ -465,11 +456,14 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       mutators.setCopyRange(store, null);
       return;
     }
-    const captured = captureMaterializedSnapshot(s, r, 'copy');
+    const resolveFormat = formatResolverFor(s);
+    const captured = captureMaterializedSnapshot(s, r, 'copy', resolveFormat);
     snapshot = isRestricted() && captured ? valueOnlySnapshot(captured) : captured;
     snapshotText = snapshot && isRestricted() ? valueOnlyText(snapshot) : r.tsv;
     e.clipboardData.setData('text/plain', snapshotText ?? r.tsv);
-    if (!isRestricted()) e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r));
+    if (!isRestricted()) {
+      e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r, resolveFormat));
+    }
     if (r.ranges) mutators.setCopyRanges(store, r.ranges);
     else mutators.setCopyRange(store, r.range);
     payloadRevision = store.getState().ui.copyRevision ?? 0;
@@ -500,8 +494,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     e.clipboardData.setData('text/plain', r.tsv);
-    e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r));
-    snapshot = captureMaterializedSnapshot(s, r, 'cut');
+    const resolveFormat = formatResolverFor(s);
+    e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r, resolveFormat));
+    snapshot = captureMaterializedSnapshot(s, r, 'cut', resolveFormat);
     snapshotText = r.tsv;
     mutators.setCopyRange(store, r.range, 'cut');
     payloadRevision = store.getState().ui.copyRevision ?? 0;

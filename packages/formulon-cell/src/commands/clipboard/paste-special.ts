@@ -1,7 +1,7 @@
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import { writeCell } from '../../engine/value.js';
-import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import type { CellPatch, WorkbookHandle } from '../../engine/workbook-handle.js';
 import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps.js';
 import { rangeContainsRange, rangesIntersect, sameRange } from '../../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
@@ -11,6 +11,7 @@ import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
+import { snapshotToPatch } from '../prepared-change.js';
 import { isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import {
@@ -518,6 +519,15 @@ export function pasteSpecial(
     ? materializedPasteCells(snap, destination, opt.transpose)
     : null;
   if (bandDestination && !bandCells) return null;
+  const bandValuePatches: CellPatch[] | null =
+    bandCells &&
+    snap.mode === 'copy' &&
+    opt.what === 'all' &&
+    opt.operation === 'none' &&
+    !opt.transpose &&
+    history !== null
+      ? []
+      : null;
   const bandTargetKeys = bandCells
     ? new Set(bandCells.map((cell) => addrKey({ sheet, row: cell.row, col: cell.col })))
     : null;
@@ -541,9 +551,19 @@ export function pasteSpecial(
           (cell.formula !== null || cell.value.kind !== 'blank') &&
           isCellWritable(current, cell.addr),
       );
-      wb.withBatchedRecalc(() => {
-        for (const cell of stale) wb.setBlank(cell.addr);
-      });
+      if (bandValuePatches) {
+        for (const cell of stale) {
+          bandValuePatches.push({
+            addr: cell.addr,
+            value: { kind: 'blank' },
+            formula: null,
+          });
+        }
+      } else {
+        wb.withBatchedRecalc(() => {
+          for (const cell of stale) wb.setBlank(cell.addr);
+        });
+      }
     }
     if (!opt.skipBlanks && wantsFormats(opt.what)) {
       for (const [key, format] of current.format.formats) {
@@ -651,7 +671,13 @@ export function pasteSpecial(
       const operating =
         opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));
       const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
-      if (operating) {
+      if (bandValuePatches) {
+        const formula =
+          shouldPasteFormula && src.formula
+            ? shiftFormulaRefs(src.formula, row - (snap.range.r0 + sr), col - (snap.range.c0 + sc))
+            : null;
+        bandValuePatches.push({ addr, value: src.value, formula });
+      } else if (operating) {
         const srcNum = numericValue(src);
         if (srcNum !== null) {
           const dest = existingNumeric(state, sheet, row, col);
@@ -731,6 +757,27 @@ export function pasteSpecial(
       }
     }
   });
+
+  if (bandValuePatches) {
+    const atomic = wb.applyCellPatchAtomic(bandValuePatches);
+    if (atomic.changed.length > 0 && history && !history.isReplaying()) {
+      const changed = new Set(atomic.changed.map(addrKey));
+      const before = atomic.before
+        .filter((snapshot) => changed.has(addrKey(snapshot.addr)))
+        .map(snapshotToPatch);
+      const after = atomic.after
+        .filter((snapshot) => changed.has(addrKey(snapshot.addr)))
+        .map(snapshotToPatch);
+      history.push({
+        undo: () => {
+          wb.applyCellPatchAtomic(before);
+        },
+        redo: () => {
+          wb.applyCellPatchAtomic(after);
+        },
+      });
+    }
+  }
 
   if (formatWrites.length > 0) {
     recordFormatChange(history, store, () => {

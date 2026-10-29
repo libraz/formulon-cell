@@ -1,5 +1,6 @@
 import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
+import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import {
   type PasteWhat,
@@ -10,12 +11,12 @@ import {
   type ClipboardSnapshot,
   captureSnapshotFromCopyResult,
 } from '../commands/clipboard/snapshot.js';
+import { materializedCopyCells } from '../commands/clipboard/source-cells.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -96,12 +97,7 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         data: {
           ...state.data,
           sheetIndex: ui.copyRange.sheet,
-          cells: new Map(
-            Array.from(wb.cells(ui.copyRange.sheet), (cell) => [
-              addrKey(cell.addr),
-              { value: cell.value, formula: cell.formula },
-            ]),
-          ),
+          cells: materializedCopyCells(wb, ui.copyRange),
         },
         selection: { ...state.selection, range: ui.copyRange, extraRanges: [] },
       };
@@ -115,9 +111,7 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
             sourceState,
             materialized,
             'copy',
-            wb.capabilities.effectiveStyle && !wb.isStub
-              ? (addr) => effectiveCellFormatWithPending(wb, sourceState, addr)
-              : (addr) => sourceState.format.formats.get(addrKey(addr)),
+            createCopyFormatResolver(wb, sourceState),
           )
         : null;
     }
@@ -169,14 +163,8 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         }
         const r = copy(state, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
         if (r) {
-          localSnapshot = captureSnapshotFromCopyResult(
-            state,
-            r,
-            'copy',
-            wb.capabilities.effectiveStyle && !wb.isStub
-              ? (addr) => effectiveCellFormatWithPending(wb, state, addr)
-              : (addr) => state.format.formats.get(addrKey(addr)),
-          );
+          const resolveFormat = createCopyFormatResolver(wb, state);
+          localSnapshot = captureSnapshotFromCopyResult(state, r, 'copy', resolveFormat);
           localSnapshotText = r.tsv;
           if (r.ranges) mutators.setCopyRanges(store, r.ranges);
           else mutators.setCopyRange(store, r.range);
@@ -195,14 +183,8 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         }
         const r = cut(state, wb);
         if (r) {
-          localSnapshot = captureSnapshotFromCopyResult(
-            state,
-            r,
-            'cut',
-            wb.capabilities.effectiveStyle && !wb.isStub
-              ? (addr) => effectiveCellFormatWithPending(wb, state, addr)
-              : (addr) => state.format.formats.get(addrKey(addr)),
-          );
+          const resolveFormat = createCopyFormatResolver(wb, state);
+          localSnapshot = captureSnapshotFromCopyResult(state, r, 'cut', resolveFormat);
           if (!localSnapshot) return true;
           localSnapshotText = r.tsv;
           mutators.setCopyRange(store, r.range, 'cut');

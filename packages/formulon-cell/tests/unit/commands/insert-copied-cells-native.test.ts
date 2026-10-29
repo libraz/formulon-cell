@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { copy } from '../../../src/commands/clipboard/copy.js';
 import { insertCopiedBand } from '../../../src/commands/clipboard/insert-copied-cells.js';
 import { captureSnapshotFromCopyResult } from '../../../src/commands/clipboard/snapshot.js';
@@ -306,6 +306,28 @@ describe('native Insert Copied Cells whole-band parity', () => {
     wb.recalc();
     expect(wb.cellFormula({ sheet: 0, row: 4, col: 1 })).toBe('=$F5');
     expect(wb.cellFormula({ sheet: 0, row: 4, col: 4 })).toBe('=$F5');
+  });
+
+  it('rejects a destination merge before reading the target sheet cell map', () => {
+    const destinationMerge = { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 };
+    mutators.mergeRange(store, destinationMerge);
+    expect(wb.engineAddMerge(0, destinationMerge)).toBe(true);
+    mutators.selectCol(store, 2);
+    const snapshot = {
+      mode: 'copy' as const,
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      logicalRange: colRange(0),
+      rows: 1,
+      cols: 1,
+      cells: [[{ value: { kind: 'blank' as const }, formula: null, format: undefined }]],
+    };
+    const history = new History();
+    wb.attachHistory(history);
+    const cells = vi.spyOn(wb, 'cells');
+
+    expect(insertCopiedBand(store, wb, history, snapshot)).toBeNull();
+    expect(cells).not.toHaveBeenCalled();
+    expect(history.canUndo()).toBe(false);
   });
 
   it('refreshes a source column after an insertion to its right', () => {

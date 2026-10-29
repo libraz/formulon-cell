@@ -17,6 +17,7 @@ import {
   attachContextMenu,
   type ContextMenuHandle,
 } from '../../../../src/interact/context-menu.js';
+import { createContextMenuClipboard } from '../../../../src/interact/context-menu-clipboard.js';
 import type { ContextMenuInteractionController } from '../../../../src/interact/context-menu-options.js';
 import { disposeOverlayPortal } from '../../../../src/interact/overlay-portal.js';
 import {
@@ -76,6 +77,51 @@ describe('attachContextMenu', () => {
       expect(writeText).toHaveBeenCalledWith('X');
       expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
       expect(visibleMenu()).toBeNull();
+    });
+
+    it('refreshes local whole-column copies from the full source range', () => {
+      seed(store, wb, [{ row: 4, col: 2, value: 'top' }]);
+      setRange(store, 0, 2, 1_048_575, 2);
+      const clipboard = createContextMenuClipboard({
+        store,
+        wb,
+        history: null,
+        deps: {},
+        afterCommit: () => {},
+        hasExplicitPolicy: () => false,
+        canPasteToRange: () => true,
+        executeClipboardText: () => {},
+      });
+      clipboard.run('copy', store.getState());
+
+      wb.setText({ sheet: 0, row: 20_000, col: 2 }, 'added after copy');
+      const ranges: Range[] = [];
+      vi.spyOn(wb, 'cellsInRange').mockImplementation(function* (range) {
+        ranges.push({ ...range });
+        yield {
+          addr: { sheet: 0, row: 4, col: 2 },
+          value: { kind: 'text', value: 'top' },
+          formula: null,
+        };
+        yield {
+          addr: { sheet: 0, row: 20_000, col: 2 },
+          value: { kind: 'text', value: 'added after copy' },
+          formula: null,
+        };
+      });
+      const fullSheetScans = vi.spyOn(wb, 'cells').mockImplementation(() => {
+        throw new Error('unexpected full-sheet source scan');
+      });
+
+      const refreshed = clipboard.snapshot();
+
+      expect(ranges).toEqual([{ sheet: 0, r0: 0, c0: 2, r1: 1_048_575, c1: 2 }]);
+      expect(fullSheetScans).not.toHaveBeenCalled();
+      expect(refreshed?.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 20_000, c1: 2 });
+      expect(refreshed?.cells[19_996]?.[0]?.value).toEqual({
+        kind: 'text',
+        value: 'added after copy',
+      });
     });
 
     it('Copy clears a stale copy marquee when the selected range cannot be copied', () => {

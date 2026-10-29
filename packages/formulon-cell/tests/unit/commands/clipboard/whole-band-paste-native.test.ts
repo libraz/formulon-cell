@@ -1,6 +1,7 @@
 // @vitest-environment node
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { refreshCopiedBandSnapshot } from '../../../../src/commands/clipboard/copied-band.js';
 import { copy } from '../../../../src/commands/clipboard/copy.js';
 import { pasteSpecial } from '../../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshotFromCopyResult } from '../../../../src/commands/clipboard/snapshot.js';
@@ -167,4 +168,53 @@ describe('whole-band paste native persistence', () => {
       }
     },
   );
+
+  it('refreshes a copied whole column from the full logical source range', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const store = createSpreadsheetStore();
+    try {
+      wb.setText({ sheet: 0, row: 4, col: 2 }, 'top');
+      mutators.replaceCells(store, wb.cells(0));
+      const logical = { sheet: 0, r0: 0, c0: 2, r1: 1_048_575, c1: 2 };
+      mutators.setRange(store, logical);
+      const initial = copy(store.getState());
+      expect(initial).not.toBeNull();
+      if (!initial) throw new Error('missing whole-column copy');
+      const snapshot = captureSnapshotFromCopyResult(store.getState(), initial);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('missing whole-column snapshot');
+      mutators.setCopyRange(store, logical, 'copy');
+
+      wb.setText({ sheet: 0, row: 20_000, col: 2 }, 'added after copy');
+      const ranges: Array<{ sheet: number; r0: number; c0: number; r1: number; c1: number }> = [];
+      vi.spyOn(wb, 'cellsInRange').mockImplementation(function* (range) {
+        ranges.push({ ...range });
+        yield {
+          addr: { sheet: 0, row: 4, col: 2 },
+          value: { kind: 'text', value: 'top' },
+          formula: null,
+        };
+        yield {
+          addr: { sheet: 0, row: 20_000, col: 2 },
+          value: { kind: 'text', value: 'added after copy' },
+          formula: null,
+        };
+      });
+      const fullSheetScans = vi.spyOn(wb, 'cells').mockImplementation(() => {
+        throw new Error('unexpected full-sheet source scan');
+      });
+
+      const refreshed = refreshCopiedBandSnapshot(store, wb, snapshot, 0, false, 0, 1);
+
+      expect(ranges).toEqual([logical]);
+      expect(fullSheetScans).not.toHaveBeenCalled();
+      expect(refreshed.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 20_000, c1: 2 });
+      expect(refreshed.cells[19_996]?.[0]?.value).toEqual({
+        kind: 'text',
+        value: 'added after copy',
+      });
+    } finally {
+      wb.dispose();
+    }
+  });
 });

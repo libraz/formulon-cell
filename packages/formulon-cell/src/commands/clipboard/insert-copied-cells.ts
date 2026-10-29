@@ -351,7 +351,6 @@ export function insertCopiedBand(
   if (
     !preflightCopiedBand(
       store.getState(),
-      wb,
       snapshot,
       band,
       targetSheet,
@@ -655,7 +654,6 @@ function validCopiedBandSnapshot(snapshot: ClipboardSnapshot, logical: Range): b
 
 function preflightCopiedBand(
   state: State,
-  wb: WorkbookHandle,
   snapshot: ClipboardSnapshot,
   band: Range,
   targetSheet: number,
@@ -666,7 +664,18 @@ function preflightCopiedBand(
   const pasteOrigin: Addr = wholeRows
     ? { sheet: targetSheet, row: insertionAt, col: 0 }
     : { sheet: targetSheet, row: 0, col: insertionAt };
-  const pasteState = materializedStateForSheet(state, wb, targetSheet, pasteOrigin, band);
+  // Destination resolution needs only selection geometry, so skip materializing target cells.
+  const pasteState: State = {
+    ...state,
+    data: { ...state.data, sheetIndex: targetSheet },
+    selection: {
+      ...state.selection,
+      active: pasteOrigin,
+      anchor: pasteOrigin,
+      range: band,
+      extraRanges: [],
+    },
+  };
   const destination = resolvePasteDestination(pasteState, snapshot, false);
   if (!destination || !sameRange(destination, band)) return false;
 

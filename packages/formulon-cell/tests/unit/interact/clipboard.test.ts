@@ -279,6 +279,127 @@ describe('attachClipboard', () => {
     handle.detach();
   });
 
+  it('refreshes a live whole-column copy from its full range without scanning the sheet', () => {
+    seedAndMirror(store, wb, [{ row: 4, col: 2, value: 'top' }]);
+    setRange(store, 0, 2, 1_048_575, 2);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+    fireClipboard(host, 'copy');
+
+    wb.setText({ sheet: 0, row: 20_000, col: 2 }, 'added after copy');
+    const ranges: Array<{ sheet: number; r0: number; c0: number; r1: number; c1: number }> = [];
+    vi.spyOn(wb, 'cellsInRange').mockImplementation(function* (range) {
+      ranges.push({ ...range });
+      yield {
+        addr: { sheet: 0, row: 4, col: 2 },
+        value: { kind: 'text', value: 'top' },
+        formula: null,
+      };
+      yield {
+        addr: { sheet: 0, row: 20_000, col: 2 },
+        value: { kind: 'text', value: 'added after copy' },
+        formula: null,
+      };
+    });
+    const fullSheetScans = vi.spyOn(wb, 'cells').mockImplementation(() => {
+      throw new Error('unexpected full-sheet source scan');
+    });
+
+    const refreshed = handle.getSnapshot();
+
+    expect(ranges).toEqual([{ sheet: 0, r0: 0, c0: 2, r1: 1_048_575, c1: 2 }]);
+    expect(fullSheetScans).not.toHaveBeenCalled();
+    expect(refreshed?.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 20_000, c1: 2 });
+    expect(refreshed?.cells[19_996]?.[0]?.value).toEqual({
+      kind: 'text',
+      value: 'added after copy',
+    });
+    handle.detach();
+  });
+
+  it('shares format reads across copy snapshot and HTML, then refreshes on the next copy', async () => {
+    const formatHost = document.createElement('div');
+    document.body.appendChild(formatHost);
+    const formatStore = createSpreadsheetStore();
+    const formatWb = await WorkbookHandle.createDefault();
+    let formatHandle: ReturnType<typeof attachClipboard> | null = null;
+    try {
+      expect(formatWb.capabilities.effectiveStyle).toBe(true);
+      const defaultXf = formatWb.getCellStyleXf(0);
+      if (!defaultXf) throw new Error('missing default XF');
+      const defaultFont = formatWb.getFontRecord(defaultXf.fontIndex);
+      if (!defaultFont) throw new Error('missing default font');
+      const boldFont = formatWb.addFontRecord({ ...defaultFont, bold: true, hasBold: true });
+      const boldXf = formatWb.addXfRecord({ ...defaultXf, fontIndex: boldFont });
+      const italicFont = formatWb.addFontRecord({ ...defaultFont, italic: true, hasItalic: true });
+      const italicXf = formatWb.addXfRecord({ ...defaultXf, fontIndex: italicFont });
+      expect(formatWb.setColumnStyle(0, 0, 0, boldXf)).toBe(true);
+      expect(formatWb.setCellXfIndex(0, 0, 0, italicXf)).toBe(true);
+      for (let row = 0; row < 1000; row += 1) formatWb.setNumber({ sheet: 0, row, col: 0 }, row);
+      mutators.replaceCells(formatStore, formatWb.cells(0));
+      formatStore.setState((state) => ({
+        ...state,
+        format: {
+          ...state.format,
+          formats: new Map([[addrKey({ sheet: 0, row: 1, col: 0 }), { italic: true }]]),
+        },
+      }));
+      setRange(formatStore, 0, 0, 999, 0);
+
+      const effectiveReads = vi.spyOn(formatWb, 'getEffectiveStyle');
+      const xfReads = vi.spyOn(formatWb, 'getCellXf');
+      const fontReads = vi.spyOn(formatWb, 'getResolvedFontRecord');
+      const fillReads = vi.spyOn(formatWb, 'getResolvedFillRecord');
+      const borderReads = vi.spyOn(formatWb, 'getResolvedBorderRecord');
+      formatHandle = attachClipboard({
+        host: formatHost,
+        store: formatStore,
+        wb: formatWb,
+        onAfterCommit,
+      });
+
+      const first = fireClipboard(formatHost, 'copy');
+      expect(first.transfer.getData('text/html')).toContain('font-weight:bold');
+      expect(first.transfer.getData('text/html')).toContain('font-style:italic');
+      expect(effectiveReads).toHaveBeenCalledTimes(1000);
+      expect(xfReads).toHaveBeenCalledTimes(2);
+      // Each unique XF reads its font plus the workbook display font.
+      expect(fontReads).toHaveBeenCalledTimes(4);
+      expect(fillReads).toHaveBeenCalledTimes(2);
+      expect(borderReads).toHaveBeenCalledTimes(2);
+
+      const firstSnapshot = formatHandle.getSnapshot();
+      expect(firstSnapshot?.cells[0]?.[0]?.format).toMatchObject({ italic: true });
+      expect(firstSnapshot?.cells[1]?.[0]?.format).toMatchObject({ bold: true, italic: true });
+      expect(firstSnapshot?.cells[2]?.[0]?.format).toMatchObject({ bold: true });
+
+      for (let row = 0; row < 1000; row += 1) {
+        expect(formatWb.setCellXfIndex(0, row, 0, italicXf)).toBe(true);
+      }
+      effectiveReads.mockClear();
+      xfReads.mockClear();
+      fontReads.mockClear();
+      fillReads.mockClear();
+      borderReads.mockClear();
+      const second = fireClipboard(formatHost, 'copy');
+      const secondHtml = second.transfer.getData('text/html');
+      expect(secondHtml).toContain('font-style:italic');
+      expect(secondHtml).not.toContain('font-weight:bold');
+      expect(effectiveReads).toHaveBeenCalledTimes(1000);
+      expect(xfReads).toHaveBeenCalledTimes(1);
+      expect(fontReads).toHaveBeenCalledTimes(2);
+      expect(fillReads).toHaveBeenCalledTimes(1);
+      expect(borderReads).toHaveBeenCalledTimes(1);
+
+      const secondSnapshot = formatHandle.getSnapshot();
+      expect(secondSnapshot?.cells[2]?.[0]?.format).toMatchObject({ italic: true });
+      expect(secondSnapshot?.cells[2]?.[0]?.format?.bold).toBeUndefined();
+    } finally {
+      formatHandle?.detach();
+      formatWb.dispose();
+      formatHost.remove();
+    }
+  });
+
   it('pastes the internal snapshot for format-only copies with empty plain text', () => {
     setFormat(store, 9, 2, { hyperlink: 'https://example.test', bold: true });
     setRange(store, 0, 2, 1048575, 2);

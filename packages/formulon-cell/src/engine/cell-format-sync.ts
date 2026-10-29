@@ -696,8 +696,9 @@ export function effectiveCellFormatWithPending(
   wb: WorkbookHandle,
   state: import('../store/store.js').State,
   addr: Addr,
+  cache?: Map<string, Partial<CellFormat> | null>,
 ): Partial<CellFormat> | null {
-  const effective = effectiveCellFormatFromEngine(wb, addr.sheet, addr.row, addr.col);
+  const effective = effectiveCellFormatFromEngine(wb, addr.sheet, addr.row, addr.col, cache);
   const direct = formatWithPending(state, addr);
   if (!effective && !direct) return null;
   return { ...(effective ?? {}), ...(direct ?? {}) };

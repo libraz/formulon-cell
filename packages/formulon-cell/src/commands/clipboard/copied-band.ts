@@ -1,12 +1,13 @@
 import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
-import { effectiveCellFormatWithPending } from '../../engine/cell-format-sync.js';
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { addMergeToMaps } from '../../store/merge-maps.js';
 import type { CellFormat, SpreadsheetStore, State } from '../../store/store.js';
 import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../coerce-input.js';
 import { copy } from './copy.js';
+import { createCopyFormatResolver } from './format-resolver.js';
 import { type ClipboardSnapshot, captureSnapshotFromCopyResult } from './snapshot.js';
+import { materializedCopyCells } from './source-cells.js';
 
 export function cloneCellFormat(format: CellFormat): CellFormat {
   return {
@@ -130,9 +131,7 @@ export function refreshCopiedBandSnapshot(
     sourceState,
     sourceCopy,
     mode,
-    wb.capabilities.effectiveStyle && !wb.isStub
-      ? (addr) => effectiveCellFormatWithPending(wb, sourceState, addr)
-      : (addr) => sourceState.format.formats.get(addrKey(addr)),
+    createCopyFormatResolver(wb, sourceState),
   );
   if (!refreshed)
     return shiftedSnapshotFallback(snapshot, logical, targetSheet, wholeRows, insertionAt, count);
@@ -178,12 +177,7 @@ function materializedSourceState(
   logical: Range,
 ): State {
   const sourceSheet = snapshot.range.sheet;
-  const cells = new Map(
-    Array.from(wb.cells(sourceSheet), (cell) => [
-      addrKey(cell.addr),
-      { value: cell.value, formula: cell.formula },
-    ]),
-  );
+  const cells = materializedCopyCells(wb, logical);
   if (sourceSheet === state.data.sheetIndex) {
     return {
       ...state,
