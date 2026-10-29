@@ -41,11 +41,15 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
   const onDocumentPointerDown = (event: PointerEvent): void => {
     if (!(event.target instanceof Node && root.contains(event.target))) close();
   };
+  const onDocumentFocusIn = (event: FocusEvent): void => {
+    if (!(event.target instanceof Node && root.contains(event.target))) close();
+  };
   const onWindowBlur = (): void => close();
 
   const close = (restoreFocus = false): void => {
     if (!root.isConnected) return;
     document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+    document.removeEventListener('focusin', onDocumentFocusIn, true);
     window.removeEventListener('blur', onWindowBlur);
     root.remove();
     root.replaceChildren();
@@ -96,6 +100,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
       if (!root.isConnected) {
         overlayPortalFor(host).appendChild(root);
         document.addEventListener('pointerdown', onDocumentPointerDown, true);
+        document.addEventListener('focusin', onDocumentFocusIn, true);
         window.addEventListener('blur', onWindowBlur);
       }
       root.style.display = 'block';

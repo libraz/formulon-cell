@@ -700,7 +700,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   const isOwnChromeContextTarget = (target: EventTarget | null): boolean =>
     target instanceof OwnerElement &&
-    !!target.closest('.fc-host__formulabar, .fc-host__sheetbar, .fc-sheetmenu');
+    !!target.closest(
+      '.fc-host__formulabar, .fc-host__sheetbar, .fc-host__statusbar, .fc-sheetmenu, .fc-statusbar__chooser',
+    );
 
   const onContextMenu = (e: MouseEvent): void => {
     if (isOwnChromeContextTarget(e.target)) return;
@@ -736,6 +738,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const insideMenu = (target: EventTarget | null): boolean =>
     target instanceof OwnerNode && (root.contains(target) || sub.contains(target));
 
+  const onDocFocusIn = (): void => {
+    if (!visible || insideMenu(ownerDocument.activeElement)) return;
+    hide(false);
+  };
+
   const onDocPointerDown = (e: MouseEvent): void => {
     if (!visible) return;
     if (insideMenu(e.target)) return;
@@ -750,8 +757,17 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   const onDocKey = (e: KeyboardEvent): void => {
     if (!visible) return;
+    if (!insideMenu(ownerDocument.activeElement)) {
+      hide(false);
+      return;
+    }
+    if (e.key === 'Tab') {
+      hide(false);
+      return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       if (openSub) {
         const parent = openSub.parentBtn;
         closeSubmenu();
@@ -763,20 +779,25 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
+      e.stopPropagation();
       focusMenuItem(activeIndex + 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopPropagation();
       focusMenuItem(activeIndex - 1);
     } else if (e.key === 'Home') {
       e.preventDefault();
+      e.stopPropagation();
       focusMenuItem(0);
     } else if (e.key === 'End') {
       e.preventDefault();
+      e.stopPropagation();
       focusMenuItem(panelItems(activePanel()).length - 1);
     } else if (e.key === 'ArrowRight') {
       const el = ownerDocument.activeElement;
       if (el instanceof OwnerHTMLButtonElement && el.dataset.fcSubmenu) {
         e.preventDefault();
+        e.stopPropagation();
         openSubmenu(el.dataset.fcSubmenu, el);
         focusPanel = 'sub';
         focusMenuItem(0);
@@ -784,6 +805,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     } else if (e.key === 'ArrowLeft') {
       if (openSub && focusPanel === 'sub') {
         e.preventDefault();
+        e.stopPropagation();
         const parent = openSub.parentBtn;
         closeSubmenu();
         focusPanel = 'root';
@@ -794,12 +816,16 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       const target = ownerDocument.activeElement;
       if (target instanceof OwnerHTMLButtonElement && insideMenu(target)) {
         e.preventDefault();
+        e.stopPropagation();
         target.click();
       }
     }
   };
 
-  const onScroll = (): void => hide(false);
+  const onScroll = (event: Event): void => {
+    if (insideMenu(event.target)) return;
+    hide(false);
+  };
 
   const refreshOpenPermissions = (): void => {
     if (!visible || !interactionController) return;
@@ -1092,6 +1118,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   host.addEventListener('keydown', onHostKey);
   ownerDocument.addEventListener('contextmenu', onDocContextMenu, true);
   ownerDocument.addEventListener('mousedown', onDocPointerDown, true);
+  ownerDocument.addEventListener('focusin', onDocFocusIn, true);
   ownerDocument.addEventListener('keydown', onDocKey, true);
   ownerWindow?.addEventListener('scroll', onScroll, true);
   const unsubscribePolicy = interactionController?.subscribe?.(refreshOpenPermissions) ?? null;
@@ -1101,6 +1128,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     host.removeEventListener('keydown', onHostKey);
     ownerDocument.removeEventListener('contextmenu', onDocContextMenu, true);
     ownerDocument.removeEventListener('mousedown', onDocPointerDown, true);
+    ownerDocument.removeEventListener('focusin', onDocFocusIn, true);
     ownerDocument.removeEventListener('keydown', onDocKey, true);
     ownerWindow?.removeEventListener('scroll', onScroll, true);
     unsubscribePolicy?.();

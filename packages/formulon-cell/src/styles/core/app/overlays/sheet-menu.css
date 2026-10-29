@@ -20,6 +20,9 @@
     font-family: var(--fc-font-ui, system-ui);
     font-size: 12px;
     line-height: 1.25;
+    box-sizing: border-box;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
   }
 
   .fc-sheetmenu[hidden] {

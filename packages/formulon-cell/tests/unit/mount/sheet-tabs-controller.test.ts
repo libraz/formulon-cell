@@ -586,6 +586,87 @@ describe('mount/sheet-tabs-controller', () => {
       expect(document.activeElement).toBe(tab);
     });
 
+    it.each([
+      ['Tab', false],
+      ['Tab', true],
+    ] as const)('lets %s navigation leave the sheet menu (shift=%s)', (key, shiftKey) => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+      const item = h.sheetMenu.querySelector<HTMLButtonElement>('[role^="menuitem"]');
+      if (!item) throw new Error('menu item not found');
+      const bubbled = vi.fn();
+      document.body.addEventListener('keydown', bubbled);
+
+      const event = new KeyboardEvent('keydown', {
+        key,
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      item.dispatchEvent(event);
+
+      expect(h.sheetMenu.hidden).toBe(true);
+      expect(event.defaultPrevented).toBe(false);
+      expect(bubbled).toHaveBeenCalledOnce();
+      expect(document.activeElement).not.toBe(tab);
+      document.body.removeEventListener('keydown', bubbled);
+    });
+
+    it('closes when focus leaves the sheet menu and leaves later keys to the new target', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      const outsideInput = document.createElement('input');
+      h.host.appendChild(outsideInput);
+      h.controller.showMenu(0, tab, 0, 0);
+
+      outsideInput.focus();
+
+      expect(h.sheetMenu.hidden).toBe(true);
+      expect(document.activeElement).toBe(outsideInput);
+      const arrow = new KeyboardEvent('keydown', {
+        key: 'ArrowDown',
+        bubbles: true,
+        cancelable: true,
+      });
+      outsideInput.dispatchEvent(arrow);
+      const escapeEvent = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      outsideInput.dispatchEvent(escapeEvent);
+
+      expect(arrow.defaultPrevented).toBe(false);
+      expect(escapeEvent.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(outsideInput);
+    });
+
+    it('stops Escape from reaching the host when it is handled by a menu item', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+      const item = h.sheetMenu.querySelector<HTMLButtonElement>('[role^="menuitem"]');
+      if (!item) throw new Error('menu item not found');
+      const hostKeydown = vi.fn();
+      h.host.addEventListener('keydown', hostKeydown);
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      item.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(h.sheetMenu.hidden).toBe(true);
+      expect(hostKeydown).not.toHaveBeenCalled();
+      h.host.removeEventListener('keydown', hostKeydown);
+    });
+
     it('supports Arrow/Home/End keyboard navigation inside the sheet menu', () => {
       h = mount({ sheets: ['A', 'B', 'C'], capabilities: {} });
       const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[1];

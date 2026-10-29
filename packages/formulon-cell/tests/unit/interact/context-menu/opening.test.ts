@@ -324,6 +324,30 @@ describe('attachContextMenu', () => {
       expect(e.defaultPrevented).toBe(false);
     });
 
+    it('right-click in the statusbar or its chooser does not open the cell menu', () => {
+      const statusbar = document.createElement('div');
+      statusbar.className = 'fc-host__statusbar';
+      const statusbarControl = document.createElement('button');
+      statusbar.appendChild(statusbarControl);
+      const chooser = document.createElement('div');
+      chooser.className = 'fc-statusbar__chooser';
+      const chooserItem = document.createElement('button');
+      chooserItem.className = 'fc-statusbar__chooser-item';
+      chooser.appendChild(chooserItem);
+      host.append(statusbar, chooser);
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      setRange(store, 10, 10, 10, 10);
+      const selectionBefore = store.getState().selection.range;
+
+      const statusbarEvent = fireContextMenu(statusbarControl, 200, 70);
+      const chooserEvent = fireContextMenu(chooserItem, 200, 70);
+
+      expect(statusbarEvent.defaultPrevented).toBe(false);
+      expect(chooserEvent.defaultPrevented).toBe(false);
+      expect(visibleMenu()).toBeNull();
+      expect(store.getState().selection.range).toEqual(selectionBefore);
+    });
+
     it('mounts the menu into the host overlay portal so theme travels by cascade', () => {
       host.classList.add('fc-host');
       host.dataset.fcTheme = 'ink';
@@ -654,6 +678,134 @@ describe('attachContextMenu', () => {
       expect(document.activeElement).toBe(host);
     });
 
+    it.each(['Tab', 'Shift+Tab'])('%s dismisses the menu without consuming the key', (key) => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      const focused = document.activeElement;
+      const event = new KeyboardEvent('keydown', {
+        key: key === 'Shift+Tab' ? 'Tab' : key,
+        shiftKey: key === 'Shift+Tab',
+        bubbles: true,
+        cancelable: true,
+      });
+      focused?.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(visibleMenu()).toBeNull();
+      expect(document.activeElement).toBe(focused);
+    });
+
+    it('closes on outside focus and does not consume the outside element arrow key', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      const outside = document.createElement('button');
+      document.body.appendChild(outside);
+      fireContextMenu(host, 200, 70);
+
+      outside.focus();
+      expect(visibleMenu()).toBeNull();
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'ArrowDown',
+        bubbles: true,
+        cancelable: true,
+      });
+      outside.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(outside);
+    });
+
+    it('keeps the menu open while focus moves between the root and submenu', () => {
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [
+            {
+              id: 'app.more',
+              label: 'More',
+              children: [{ id: 'app.nested', label: 'Nested', action: vi.fn() }],
+            },
+          ],
+        },
+      });
+      fireContextMenu(host, 200, 70);
+      const trigger = document.querySelector<HTMLButtonElement>(
+        '.fc-ctxmenu [data-fc-submenu="app.more"]',
+      );
+      trigger?.click();
+      const nested = document.querySelector<HTMLButtonElement>(
+        '.fc-ctxmenu__sub [data-fc-action="app.nested"]',
+      );
+
+      expect(nested).toBeTruthy();
+      expect(document.activeElement).toBe(nested);
+      expect(visibleMenu()).not.toBeNull();
+
+      trigger?.focus();
+
+      expect(visibleMenu()).not.toBeNull();
+      expect(document.querySelector<HTMLElement>('.fc-ctxmenu__sub')?.style.display).toBe('block');
+    });
+
+    it('submenu Escape closes only the submenu and stops document bubbling', () => {
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [
+            {
+              id: 'app.more',
+              label: 'More',
+              children: [{ id: 'app.nested', label: 'Nested', action: vi.fn() }],
+            },
+          ],
+        },
+      });
+      fireContextMenu(host, 200, 70);
+      const trigger = document.querySelector<HTMLButtonElement>(
+        '.fc-ctxmenu [data-fc-submenu="app.more"]',
+      );
+      trigger?.click();
+      const nested = document.querySelector<HTMLButtonElement>(
+        '.fc-ctxmenu__sub [data-fc-action="app.nested"]',
+      );
+      const outerKeyHandler = vi.fn();
+      document.addEventListener('keydown', outerKeyHandler);
+      const event = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      nested?.dispatchEvent(event);
+      document.removeEventListener('keydown', outerKeyHandler);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(outerKeyHandler).not.toHaveBeenCalled();
+      expect(visibleMenu()).not.toBeNull();
+      expect(document.querySelector<HTMLElement>('.fc-ctxmenu__sub')?.style.display).toBe('none');
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it('removes the focus dismissal listener when detached', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      const root = visibleMenu();
+      expect(root?.style.display).toBe('block');
+
+      detach();
+      detach = null;
+      const outside = document.createElement('button');
+      document.body.appendChild(outside);
+      outside.focus();
+
+      expect(root?.style.display).toBe('block');
+    });
+
     it('Arrow keys move focus through enabled menu items and Enter invokes the focused item', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit, onFormatDialog });
       fireContextMenu(host, 200, 70);
@@ -674,6 +826,48 @@ describe('attachContextMenu', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       window.dispatchEvent(new Event('scroll'));
+      expect(visibleMenu()).toBeNull();
+    });
+
+    it('scrolling the root menu does not dismiss it', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      const root = visibleMenu();
+      root?.dispatchEvent(new Event('scroll', { bubbles: true }));
+
+      expect(visibleMenu()).not.toBeNull();
+    });
+
+    it('scrolling the submenu does not dismiss the menu', () => {
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [
+            {
+              id: 'app.more',
+              label: 'More',
+              children: [{ id: 'app.nested', label: 'Nested', action: vi.fn() }],
+            },
+          ],
+        },
+      });
+      fireContextMenu(host, 200, 70);
+      document.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]')?.click();
+      const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+      sub?.dispatchEvent(new Event('scroll', { bubbles: true }));
+
+      expect(sub?.style.display).toBe('block');
+      expect(visibleMenu()).not.toBeNull();
+    });
+
+    it('scrolling the host still dismisses the menu', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      host.dispatchEvent(new Event('scroll', { bubbles: true }));
+
       expect(visibleMenu()).toBeNull();
     });
 

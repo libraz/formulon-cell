@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { de, en, fr, ja } from '../../../src/i18n/strings.js';
 import { attachStatusBar } from '../../../src/interact/status-bar.js';
@@ -269,6 +269,37 @@ describe('attachStatusBar', () => {
     handle.detach();
   });
 
+  it('keeps a status-bar right-click from reaching the parent host context-menu handler', () => {
+    const host = document.createElement('div');
+    statusbar.replaceWith(host);
+    host.appendChild(statusbar);
+    const parentContextMenu = vi.fn();
+    host.addEventListener('contextmenu', parentContextMenu);
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    const target = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
+    if (!target) throw new Error('status-bar aggregate strip not found');
+    const event = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 100,
+      clientY: 200,
+    });
+
+    target.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(parentContextMenu).not.toHaveBeenCalled();
+    expect(document.querySelector<HTMLElement>('.fc-statusbar__chooser')?.style.display).toBe(
+      'block',
+    );
+    handle.detach();
+    host.removeEventListener('contextmenu', parentContextMenu);
+  });
+
   it('keeps the status bar chooser close to Excel 365 desktop menu geometry', () => {
     const source = readFileSync(join(root, 'src/interact/status-bar.ts'), 'utf8');
     const css = readFileSync(
@@ -498,6 +529,99 @@ describe('attachStatusBar', () => {
     const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
     expect(chooser?.style.display).toBe('none');
     expect(document.activeElement).toBe(statusbar);
+    handle.detach();
+  });
+
+  it.each([false, true])('lets Tab navigation leave the chooser (shift=%s)', (shiftKey) => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const item = document.querySelector<HTMLButtonElement>('.fc-statusbar__chooser-item');
+    if (!item) throw new Error('chooser item not found');
+    const bubbled = vi.fn();
+    document.body.addEventListener('keydown', bubbled);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey,
+      bubbles: true,
+      cancelable: true,
+    });
+    item.dispatchEvent(event);
+
+    expect(document.querySelector<HTMLElement>('.fc-statusbar__chooser')?.style.display).toBe(
+      'none',
+    );
+    expect(event.defaultPrevented).toBe(false);
+    expect(bubbled).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(item);
+    handle.detach();
+    document.body.removeEventListener('keydown', bubbled);
+  });
+
+  it('closes when focus leaves the chooser and leaves later keys to the new target', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    const outsideInput = document.createElement('input');
+    document.body.appendChild(outsideInput);
+    statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+
+    outsideInput.focus();
+
+    expect(document.querySelector<HTMLElement>('.fc-statusbar__chooser')?.style.display).toBe(
+      'none',
+    );
+    expect(document.activeElement).toBe(outsideInput);
+    const arrow = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      bubbles: true,
+      cancelable: true,
+    });
+    outsideInput.dispatchEvent(arrow);
+    const escapeEvent = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    outsideInput.dispatchEvent(escapeEvent);
+
+    expect(arrow.defaultPrevented).toBe(false);
+    expect(escapeEvent.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(outsideInput);
+    handle.detach();
+  });
+
+  it('stops Escape from reaching outer listeners when handled by a chooser item', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const item = document.querySelector<HTMLButtonElement>('.fc-statusbar__chooser-item');
+    if (!item) throw new Error('chooser item not found');
+    const bodyKeydown = vi.fn();
+    document.body.addEventListener('keydown', bodyKeydown);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    item.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-statusbar__chooser')?.style.display).toBe(
+      'none',
+    );
+    expect(bodyKeydown).not.toHaveBeenCalled();
+    document.body.removeEventListener('keydown', bodyKeydown);
     handle.detach();
   });
 

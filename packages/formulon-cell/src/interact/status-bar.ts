@@ -480,7 +480,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const items = chooserItems();
     if (items.length === 0) return;
     popoverActiveIndex = (idx + items.length) % items.length;
-    items[popoverActiveIndex]?.focus({ preventScroll: true });
+    items[popoverActiveIndex]?.focus();
   };
 
   const buildChooser = (): void => {
@@ -571,6 +571,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const onContextMenu = (e: MouseEvent): void => {
     e.preventDefault();
+    e.stopPropagation();
     showChooser(e.clientX, e.clientY);
   };
 
@@ -594,27 +595,47 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     hideChooser(false);
   };
 
+  const onDocFocusIn = (e: FocusEvent): void => {
+    if (!popoverVisible) return;
+    if (e.target instanceof Node && popover.contains(e.target)) return;
+    hideChooser(false);
+  };
+
   const onDocKey = (e: KeyboardEvent): void => {
     if (!popoverVisible) return;
+    if (!popover.contains(document.activeElement)) {
+      hideChooser(false);
+      return;
+    }
+    if (e.key === 'Tab') {
+      hideChooser(false);
+      return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       hideChooser(true);
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
+      e.stopPropagation();
       focusChooserItem(popoverActiveIndex + 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopPropagation();
       focusChooserItem(popoverActiveIndex - 1);
     } else if (e.key === 'Home') {
       e.preventDefault();
+      e.stopPropagation();
       focusChooserItem(0);
     } else if (e.key === 'End') {
       e.preventDefault();
+      e.stopPropagation();
       focusChooserItem(chooserItems().length - 1);
     } else if (e.key === 'Enter' || e.key === ' ') {
       const target = document.activeElement;
       if (target instanceof HTMLButtonElement && popover.contains(target)) {
         e.preventDefault();
+        e.stopPropagation();
         target.click();
       }
     }
@@ -624,6 +645,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   statusbar.addEventListener('keydown', onStatusbarKeyDown);
   center.addEventListener('click', onCenterClick);
   document.addEventListener('mousedown', onDocPointerDown, true);
+  document.addEventListener('focusin', onDocFocusIn, true);
   document.addEventListener('keydown', onDocKey, true);
   document.addEventListener('keydown', refreshKeyboardLocks, true);
   document.addEventListener('keyup', refreshKeyboardLocks, true);
@@ -646,6 +668,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       statusbar.removeEventListener('keydown', onStatusbarKeyDown);
       center.removeEventListener('click', onCenterClick);
       document.removeEventListener('mousedown', onDocPointerDown, true);
+      document.removeEventListener('focusin', onDocFocusIn, true);
       document.removeEventListener('keydown', onDocKey, true);
       document.removeEventListener('keydown', refreshKeyboardLocks, true);
       document.removeEventListener('keyup', refreshKeyboardLocks, true);

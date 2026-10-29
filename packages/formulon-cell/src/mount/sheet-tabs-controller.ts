@@ -507,8 +507,22 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     if (target instanceof Node && sheetMenu.contains(target)) return;
     closeMenu();
   };
+  const onSheetMenuFocusIn = (e: FocusEvent): void => {
+    if (sheetMenu.hidden) return;
+    const target = e.target;
+    if (target instanceof Node && sheetMenu.contains(target)) return;
+    closeMenu();
+  };
   const onSheetMenuKeyDown = (e: KeyboardEvent): void => {
     if (sheetMenu.hidden) return;
+    if (!sheetMenu.contains(document.activeElement)) {
+      closeMenu();
+      return;
+    }
+    if (e.key === 'Tab') {
+      closeMenu();
+      return;
+    }
     const items = Array.from(sheetMenu.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'));
     const enabled = items.filter((item) => !item.disabled);
     const active =
@@ -522,6 +536,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     };
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       closeMenu(true);
     } else if (e.key === 'ArrowDown') {
       focusAt(activeIndex < 0 ? 0 : activeIndex + 1);
@@ -544,7 +559,8 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   lastSheet.addEventListener('click', lastSheetRepeater.onClick);
   addSheetBtn.addEventListener('click', onAddSheetClick);
   document.addEventListener('pointerdown', onSheetMenuPointerDown);
-  document.addEventListener('keydown', onSheetMenuKeyDown);
+  document.addEventListener('focusin', onSheetMenuFocusIn, true);
+  document.addEventListener('keydown', onSheetMenuKeyDown, true);
 
   return {
     addSheet: addAndSwitchSheet,
@@ -556,7 +572,8 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       lastSheet.removeEventListener('click', lastSheetRepeater.onClick);
       addSheetBtn.removeEventListener('click', onAddSheetClick);
       document.removeEventListener('pointerdown', onSheetMenuPointerDown);
-      document.removeEventListener('keydown', onSheetMenuKeyDown);
+      document.removeEventListener('focusin', onSheetMenuFocusIn, true);
+      document.removeEventListener('keydown', onSheetMenuKeyDown, true);
       sheetMenu.remove();
     },
     showMenu,
