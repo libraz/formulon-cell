@@ -237,6 +237,103 @@ describe('shared wrapped text behavior', () => {
     }
   });
 
+  it('reuses one word and grapheme segmenter per locale across repeated wraps', () => {
+    const intl = globalThis.Intl as unknown as { Segmenter?: typeof Intl.Segmenter };
+    const NativeSegmenter = intl.Segmenter;
+    if (!NativeSegmenter) throw new Error('Intl.Segmenter is required for this regression.');
+    const inputs = [
+      ['ja-JP', '東京都千代田区丸の内東京都千代田区丸の内'],
+      ['fr-FR', 'bonjour\u202f! anticonstitutionnellement'],
+      ['th-TH', 'กรุงเทพมหานครประเทศไทยกรุงเทพมหานครประเทศไทย'],
+      ['en-US', 'á👩‍💻á👩‍💻abcdefgh'],
+    ] as const;
+    const countSegmenters = (counts: Map<string, number>): typeof Intl.Segmenter =>
+      class extends NativeSegmenter {
+        constructor(...args: ConstructorParameters<typeof Intl.Segmenter>) {
+          const [locale, options] = args;
+          const key = `${locale ?? 'en-US'}:${options?.granularity ?? 'grapheme'}`;
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+          super(...args);
+        }
+      };
+
+    const firstCounts = new Map<string, number>();
+    try {
+      intl.Segmenter = countSegmenters(firstCounts);
+      for (const [locale, text] of inputs) {
+        const options = {
+          maxWidth: 30,
+          measureText: (value: string) => [...value].length * 10,
+          locale,
+        };
+        const expected = wrapText(text, options);
+        expect(wrapText(text, options)).toEqual(expected);
+        expect(expected.length).toBeGreaterThan(0);
+        expect(firstCounts.get(`${locale}:word`)).toBe(1);
+        expect(firstCounts.get(`${locale}:grapheme`)).toBe(1);
+      }
+
+      const replacementCounts = new Map<string, number>();
+      intl.Segmenter = countSegmenters(replacementCounts);
+      for (const [locale, text] of inputs) {
+        const options = {
+          maxWidth: 30,
+          measureText: (value: string) => [...value].length * 10,
+          locale,
+        };
+        wrapText(text, options);
+        wrapText(text, options);
+        expect(replacementCounts.get(`${locale}:word`)).toBe(1);
+        expect(replacementCounts.get(`${locale}:grapheme`)).toBe(1);
+      }
+    } finally {
+      intl.Segmenter = NativeSegmenter;
+    }
+  });
+
+  it('keeps invalid locale fallback behavior and does not cache failed constructors', () => {
+    const intl = globalThis.Intl as unknown as { Segmenter?: typeof Intl.Segmenter };
+    const NativeSegmenter = intl.Segmenter;
+    if (!NativeSegmenter) throw new Error('Intl.Segmenter is required for this regression.');
+    let constructions = 0;
+    const CountingSegmenter = class extends NativeSegmenter {
+      constructor(...args: ConstructorParameters<typeof Intl.Segmenter>) {
+        constructions += 1;
+        super(...args);
+      }
+    };
+    try {
+      intl.Segmenter = CountingSegmenter;
+      const options = {
+        maxWidth: 100,
+        measureText: (value: string) => [...value].length * 10,
+        locale: 'not a valid locale',
+      };
+      expect(wrapText('alpha beta', options)).toEqual(['alpha beta']);
+      const firstConstructions = constructions;
+      expect(firstConstructions).toBeGreaterThan(1);
+      expect(wrapText('alpha beta', options)).toEqual(['alpha beta']);
+      expect(constructions).toBeGreaterThan(firstConstructions);
+    } finally {
+      intl.Segmenter = NativeSegmenter;
+    }
+  });
+
+  it('measures an oversized wrap unit only once before grapheme splitting', () => {
+    const requests = new Map<string, number>();
+    const lines = wrapText('abcdefgh', {
+      maxWidth: 20,
+      measureText: (value) => {
+        requests.set(value, (requests.get(value) ?? 0) + 1);
+        return value.length * 10;
+      },
+      locale: 'en-US',
+    });
+
+    expect(lines).toEqual(['ab', 'cd', 'ef', 'gh']);
+    expect(requests.get('abcdefgh')).toBe(1);
+  });
+
   it('keeps authored paragraph-edge whitespace while trimming automatic separators', () => {
     const measureText = (value: string): number => value.length * 10;
     expect(wrapText('  alpha', { maxWidth: 100, measureText })).toEqual(['  alpha']);

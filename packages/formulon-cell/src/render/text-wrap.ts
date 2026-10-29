@@ -58,6 +58,12 @@ interface IntlWithSegmenter {
   ) => SegmenterLike;
 }
 
+type SegmenterConstructor = IntlWithSegmenter['Segmenter'];
+
+const SEGMENTER_CACHE_LIMIT = 128;
+const segmenterCache = new Map<string, SegmenterLike>();
+let cachedSegmenterConstructor: SegmenterConstructor;
+
 const combiningMark = /\p{Mark}/u;
 
 /** Width available to a cell's wrapped text under the shared canvas/AutoFit contract. */
@@ -70,11 +76,30 @@ const segmentWithIntl = (
   granularity: 'word' | 'grapheme',
 ): string[] | null => {
   const Segmenter = (globalThis.Intl as IntlWithSegmenter | undefined)?.Segmenter;
+  if (Segmenter !== cachedSegmenterConstructor) {
+    segmenterCache.clear();
+    cachedSegmenterConstructor = Segmenter;
+  }
   if (!Segmenter) return null;
+  const localeKey = locale ?? 'en-US';
+  const key = `${localeKey.length}:${localeKey}:${granularity}`;
   try {
-    const segmenter = new Segmenter(locale ?? 'en-US', { granularity });
+    let segmenter = segmenterCache.get(key);
+    if (segmenter) {
+      segmenterCache.delete(key);
+      segmenterCache.set(key, segmenter);
+    } else {
+      segmenter = new Segmenter(localeKey, { granularity });
+      segmenterCache.set(key, segmenter);
+      if (segmenterCache.size > SEGMENTER_CACHE_LIMIT) {
+        const leastRecentKey = segmenterCache.keys().next().value;
+        if (leastRecentKey !== undefined) segmenterCache.delete(leastRecentKey);
+      }
+    }
     return Array.from(segmenter.segment(text), (entry) => entry.segment);
   } catch {
+    // Drop the cached instance so the next call constructs a fresh one.
+    segmenterCache.delete(key);
     // Invalid/unsupported locales and partial Intl implementations fall back
     // to the deterministic segmenters below.
     return null;
@@ -222,12 +247,12 @@ const wrapParagraph = (paragraph: string, options: TextWrapOptions): string[] =>
   };
 
   const appendUnit = (unit: WrapUnit): void => {
+    const unitWidth = measuredWidth(unit.text, options.measureText);
     const fitsWhole =
-      measuredWidth(unit.text, options.measureText) <= maxWidth &&
+      unitWidth <= maxWidth &&
       (!line || measuredWidth(line + unit.text, options.measureText) <= maxWidth);
     const leadingWhitespace =
       !afterWrappedBoundary && lines.length === 0 && isBreakableWhitespace(line);
-    const unitWidth = measuredWidth(unit.text, options.measureText);
     if (fitsWhole) {
       line += unit.text;
       return;
