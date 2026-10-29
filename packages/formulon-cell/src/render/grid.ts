@@ -1,8 +1,8 @@
 import { totalsCellAt } from '../commands/format-as-table.js';
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
-import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
-import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
-import type { Range } from '../engine/types.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
+import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
@@ -21,8 +21,6 @@ import {
   frozenRowsHeight,
   gridOriginX,
   gridOriginY,
-  isColVisible,
-  isRowVisible,
   layoutForView,
   type Rect,
   rangeRects,
@@ -57,6 +55,38 @@ import {
   paintSpillOutline,
   paintValidationChevron,
 } from './painters.js';
+
+type SpillCandidateCells = ReadonlyMap<string, { value: CellValue; formula: string | null }>;
+type SpillErrorCandidate = { row: number; col: number };
+
+const spillErrorCandidateCache = new WeakMap<
+  SpillCandidateCells,
+  Map<number, readonly SpillErrorCandidate[]>
+>();
+
+function spillErrorCandidates(
+  cells: SpillCandidateCells,
+  sheet: number,
+): readonly SpillErrorCandidate[] {
+  let bySheet = spillErrorCandidateCache.get(cells);
+  if (!bySheet) {
+    bySheet = new Map();
+    spillErrorCandidateCache.set(cells, bySheet);
+  }
+  const cached = bySheet.get(sheet);
+  if (cached) return cached;
+
+  const candidates: SpillErrorCandidate[] = [];
+  for (const [key, cell] of cells) {
+    if (cell.value.kind !== 'error' || !cell.formula || !looksLikeArrayFormula(cell.formula))
+      continue;
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) continue;
+    candidates.push({ row: addr.row, col: addr.col });
+  }
+  bySheet.set(sheet, candidates);
+  return candidates;
+}
 
 const visibleCount = (
   pixels: number,
@@ -491,10 +521,43 @@ export class GridRenderer {
     rows: AxisLayout,
   ): void {
     const { layout, viewport, data } = state;
-    // Prefer the engine's authoritative spill list when available; fall back
-    // to the JS heuristic for stub mode or older engine package builds.
     const wb = this.getWb();
-    const ranges = wb?.spillRanges(data.sheetIndex) ?? findSpillRanges(data.cells, data.sheetIndex);
+    const supportsSpillInfo =
+      wb?.capabilities?.spillInfo === true && typeof wb.spillInfo === 'function';
+    const useVisibleSpillQueries =
+      supportsSpillInfo && data.cells.size > rows.visible.length * cols.visible.length;
+    const frameSpillInfo = new Map<string, ReturnType<WorkbookHandle['spillInfo']>>();
+    let ranges: Range[];
+
+    if (useVisibleSpillQueries && wb) {
+      // Query every visible coordinate: phantom cells carry the anchor's
+      // shape, even when the anchor itself is outside the viewport.
+      const seenAnchors = new Set<string>();
+      ranges = [];
+      for (const row of rows.visible) {
+        for (const col of cols.visible) {
+          const key = addrKey({ sheet: data.sheetIndex, row, col });
+          const info = wb.spillInfo(data.sheetIndex, row, col);
+          frameSpillInfo.set(key, info);
+          if (!info || (info.rows <= 1 && info.cols <= 1)) continue;
+          const anchorKey = `${info.anchorRow}:${info.anchorCol}`;
+          if (seenAnchors.has(anchorKey)) continue;
+          seenAnchors.add(anchorKey);
+          ranges.push({
+            sheet: data.sheetIndex,
+            r0: info.anchorRow,
+            c0: info.anchorCol,
+            r1: info.anchorRow + info.rows - 1,
+            c1: info.anchorCol + info.cols - 1,
+          });
+        }
+      }
+    } else {
+      // Prefer the engine's authoritative spill list when available; fall back
+      // to the JS heuristic for stub mode or older engine package builds.
+      ranges = wb?.spillRanges(data.sheetIndex) ?? findSpillRanges(data.cells, data.sheetIndex);
+    }
+
     for (const r of ranges) {
       for (const rect of rangeRects(layout, viewport, r)) {
         paintSpillOutline(this.ctx, rect, theme);
@@ -504,14 +567,12 @@ export class GridRenderer {
     // #SPILL! obstruction outline. The engine's `spillInfo` reports the
     // attempted shape even when the result couldn't materialise; we use
     // that to figure out which cells are blocking and ring them in red.
-    if (!wb?.spillInfo) return;
-    for (const [key, cell] of data.cells) {
-      if (!cell.formula || cell.value.kind !== 'error') continue;
-      if (!looksLikeArrayFormula(cell.formula)) continue;
-      const addr = parseAddrKey(key);
-      if (!addr || addr.sheet !== data.sheetIndex) continue;
-      const { row, col } = addr;
-      const info = wb.spillInfo(data.sheetIndex, row, col);
+    if (!wb || typeof wb.spillInfo !== 'function') return;
+    for (const { row, col } of spillErrorCandidates(data.cells, data.sheetIndex)) {
+      const key = addrKey({ sheet: data.sheetIndex, row, col });
+      const info = frameSpillInfo.has(key)
+        ? (frameSpillInfo.get(key) ?? null)
+        : wb.spillInfo(data.sheetIndex, row, col);
       if (!info) continue;
       const target: Range = {
         sheet: data.sheetIndex,
@@ -520,12 +581,19 @@ export class GridRenderer {
         r1: info.anchorRow + info.rows - 1,
         c1: info.anchorCol + info.cols - 1,
       };
-      const blockers = findSpillBlockers(data.cells, data.sheetIndex, target);
-      for (const b of blockers) {
-        if (!isRowVisible(layout, viewport, b.row)) continue;
-        if (!isColVisible(layout, viewport, b.col)) continue;
-        const rect = cellRectIn(layout, cols, rows, b.row, b.col);
-        paintSpillBlocker(this.ctx, rect);
+      for (const visibleRow of rows.visible) {
+        if (visibleRow < target.r0 || visibleRow > target.r1) continue;
+        for (const visibleCol of cols.visible) {
+          if (visibleCol < target.c0 || visibleCol > target.c1) continue;
+          if (visibleRow === info.anchorRow && visibleCol === info.anchorCol) continue;
+          const blocker = data.cells.get(
+            addrKey({ sheet: data.sheetIndex, row: visibleRow, col: visibleCol }),
+          );
+          if (!blocker) continue;
+          if (blocker.formula === null && blocker.value.kind === 'blank') continue;
+          const rect = cellRectIn(layout, cols, rows, visibleRow, visibleCol);
+          paintSpillBlocker(this.ctx, rect);
+        }
       }
     }
   }
