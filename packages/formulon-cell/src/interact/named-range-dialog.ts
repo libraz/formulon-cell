@@ -457,7 +457,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
           focusNameRow(count - 1);
         } else if ((e.key === 'Delete' || e.key === 'Backspace') && canMutate) {
           e.preventDefault();
-          deleteBtn.click();
+          requestDeleteSelectedName(item);
         } else if ((e.key === 'Enter' || e.key === ' ') && canMutate) {
           e.preventDefault();
           editBtn.click();
@@ -686,16 +686,15 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   function closeDeleteConfirm(): void {
     deleteShell.close();
     pendingDeleteName = null;
-    if (shell.isOpen()) panel.focus();
   }
 
-  const requestDeleteSelectedName = (): void => {
+  const requestDeleteSelectedName = (opener: HTMLElement = deleteBtn): void => {
     const entry = currentRows[selectedNameIndex];
-    if (!entry) return;
+    if (!entry || deleteBtn.disabled) return;
     pendingDeleteName = entry;
     deleteMessage.textContent = t.confirmDeleteMessage.replace('{name}', entry.name);
+    opener.focus({ preventScroll: true });
     deleteShell.open();
-    requestAnimationFrame(() => deleteOkBtn.focus());
   };
 
   const confirmDeleteSelectedName = (): void => {
@@ -714,7 +713,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     closeDeleteConfirm();
     selectedNameIndex = Math.min(selectedNameIndex, Math.max(0, currentRows.length - 2));
     renderList();
-    requestAnimationFrame(() => focusNameRow(selectedNameIndex));
+    if (!shell.isOpen()) return;
+    const rows = list.querySelectorAll<HTMLElement>('.fc-namedlg__item');
+    if (rows.length > 0) focusNameRow(selectedNameIndex);
+    else if (!newBtn.disabled) newBtn.focus({ preventScroll: true });
+    else closeBtn.focus({ preventScroll: true });
   };
 
   const commitQuickRefers = (): void => {
@@ -885,7 +888,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       renderList();
       shell.open();
       deferInitialFocus(overlay, () => {
-        if (editorShell.isOpen()) return;
+        if (editorShell.isOpen() || deleteShell.isOpen()) return;
         if (wb.capabilities.definedNameMutate) newBtn.focus();
         else closeBtn.focus();
       });

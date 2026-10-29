@@ -777,26 +777,198 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     expect(calls).toEqual([{ name: 'TaxRate', formula: '', localSheetId: -1 }]);
     // List should now be empty.
     expect(document.querySelector<HTMLElement>('.fc-namedlg__empty')?.textContent).toBeTruthy();
+    expect(document.activeElement).toBe(
+      document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button'),
+    );
     handle.detach();
   });
 
   it('Cancel in delete confirmation leaves the selected name intact', () => {
+    const frames: FrameRequestCallback[] = [];
+    const schedule = (callback: FrameRequestCallback): number => frames.push(callback);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
     const { wb, calls, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');
     const handle = attachNamedRangeDialog({ host, wb });
-    handle.open();
-    Array.from(
-      document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
-    )[2]?.click();
-    const cancel = Array.from(
-      document.querySelectorAll<HTMLButtonElement>('.fc-namedlg-confirm button'),
-    ).find((button) => button.textContent === 'キャンセル');
-    cancel?.click();
+    try {
+      handle.open();
+      Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
+      )[2]?.click();
+      const cancel = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-namedlg-confirm button'),
+      ).find((button) => button.textContent === 'キャンセル');
+      cancel?.click();
 
-    expect(calls).toEqual([]);
-    expect(document.querySelectorAll<HTMLElement>('.fc-namedlg__item')).toHaveLength(1);
-    expect(document.querySelector<HTMLElement>('.fc-namedlg-confirm')?.hidden).toBe(true);
-    handle.detach();
+      expect(calls).toEqual([]);
+      expect(document.querySelectorAll<HTMLElement>('.fc-namedlg__item')).toHaveLength(1);
+      expect(document.querySelector<HTMLElement>('.fc-namedlg-confirm')?.hidden).toBe(true);
+      const deleteButton = document.querySelector<HTMLButtonElement>(
+        '.fc-namedlg__actions button:nth-child(3)',
+      );
+      expect(document.activeElement).toBe(deleteButton);
+      for (const frame of frames.splice(0)) frame(0);
+      expect(document.activeElement).toBe(deleteButton);
+    } finally {
+      handle.detach();
+      frameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns focus to a row after Escape and does not let queued frames steal it', () => {
+    const frames: FrameRequestCallback[] = [];
+    const schedule = (callback: FrameRequestCallback): number => frames.push(callback);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      const row = document.querySelector<HTMLElement>('.fc-namedlg__item');
+      row?.focus();
+      row?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+      const confirm = document.querySelector<HTMLElement>('.fc-namedlg-confirm');
+      expect(confirm?.hidden).toBe(false);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(document.activeElement).toBe(row);
+      expect(confirm?.hidden).toBe(true);
+      for (const frame of frames.splice(0)) frame(0);
+      expect(document.activeElement).toBe(row);
+    } finally {
+      handle.detach();
+      frameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps the confirmation focused when the manager initial-focus frame runs', () => {
+    const frames: FrameRequestCallback[] = [];
+    const schedule = (callback: FrameRequestCallback): number => frames.push(callback);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      const deleteButton = document.querySelector<HTMLButtonElement>(
+        '.fc-namedlg__actions button:nth-child(3)',
+      );
+      deleteButton?.click();
+      const confirmOk = document.querySelector<HTMLButtonElement>('.fc-namedlg-confirm button');
+      expect(document.activeElement).toBe(confirmOk);
+      expect(frames.length).toBeGreaterThan(0);
+
+      frames.shift()?.(0);
+      expect(document.activeElement).toBe(confirmOk);
+    } finally {
+      handle.detach();
+      frameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns focus to the delete button when deletion fails', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const setDefinedNameEntry = vi.spyOn(wb, 'setDefinedNameEntry').mockReturnValue(false);
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      const deleteButton = document.querySelector<HTMLButtonElement>(
+        '.fc-namedlg__actions button:nth-child(3)',
+      );
+      const row = document.querySelector<HTMLElement>('.fc-namedlg__item');
+      deleteButton?.click();
+      document.querySelector<HTMLButtonElement>('.fc-namedlg-confirm button')?.click();
+
+      expect(document.querySelector<HTMLElement>('.fc-namedlg__error')?.hidden).toBe(false);
+      expect(document.activeElement).toBe(deleteButton);
+
+      row?.focus();
+      row?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+      document.querySelector<HTMLButtonElement>('.fc-namedlg-confirm button')?.click();
+      expect(document.activeElement).toBe(row);
+    } finally {
+      handle.detach();
+      setDefinedNameEntry.mockRestore();
+    }
+  });
+
+  it('focuses the remaining row immediately after a successful deletion', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('Budget', '=Sheet1!$B$1');
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      document
+        .querySelector<HTMLButtonElement>('.fc-namedlg__actions button:nth-child(3)')
+        ?.click();
+      document.querySelector<HTMLButtonElement>('.fc-namedlg-confirm button')?.click();
+
+      const row = document.querySelector<HTMLElement>('.fc-namedlg__item');
+      expect(row?.textContent).toContain('TaxRate');
+      expect(document.activeElement).toBe(row);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('falls back to Close when no name remains and New is disabled', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      const actions = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
+      );
+      const newButton = actions[0];
+      actions[2]?.click();
+      if (newButton) newButton.disabled = true;
+      document.querySelector<HTMLButtonElement>('.fc-namedlg-confirm button')?.click();
+
+      expect(document.querySelectorAll<HTMLElement>('.fc-namedlg__item')).toHaveLength(0);
+      expect(newButton?.disabled).toBe(true);
+      expect(document.activeElement).toBe(
+        document.querySelector<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      );
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('does not refocus the manager when it closes before queued focus work runs', () => {
+    const frames: FrameRequestCallback[] = [];
+    const schedule = (callback: FrameRequestCallback): number => frames.push(callback);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
+    const { wb, registry } = makeMutableWb();
+    registry.set('Budget', '=Sheet1!$B$1');
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      document
+        .querySelector<HTMLButtonElement>('.fc-namedlg__actions button:nth-child(3)')
+        ?.click();
+      document.querySelector<HTMLButtonElement>('.fc-namedlg-confirm button')?.click();
+      handle.close();
+      expect(document.activeElement).toBe(host);
+
+      for (const frame of frames.splice(0)) frame(0);
+      expect(document.activeElement).toBe(host);
+      expect(document.querySelector<HTMLElement>('.fc-namedlg')?.hidden).toBe(true);
+    } finally {
+      handle.detach();
+      frameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('exposes a selectable listbox and moves row selection with keyboard', () => {

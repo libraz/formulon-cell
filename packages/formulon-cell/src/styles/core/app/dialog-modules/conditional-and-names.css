@@ -427,20 +427,25 @@
     gap: 6px;
     margin-top: 6px;
   }
-  .fc-namedlg-confirm__panel {
+  .fc-namedlg-confirm .fc-namedlg-confirm__panel {
     width: min(90vw, 360px);
     max-width: 360px;
+    height: auto;
+    max-height: 92vh;
   }
   .fc-namedlg-confirm__body {
     display: grid;
+    min-height: 0;
     gap: 12px;
     padding: 14px;
+    overflow-y: auto;
   }
   .fc-namedlg-confirm__message {
     margin: 0;
     color: var(--fc-fg-strong);
     font-size: 12px;
     line-height: 1.35;
+    overflow-wrap: anywhere;
   }
   .fc-namedlg-confirm__buttons {
     display: flex;
