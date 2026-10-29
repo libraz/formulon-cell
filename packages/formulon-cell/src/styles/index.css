@@ -4,8 +4,8 @@
  * style the grid, the toolbar, and all three built-in palettes. `mount()` does
  * not inject styles at runtime, so the host must import this file.
  *
- * Layered so consumer styles always win:
- *   @layer fc.reset, fc.base, fc.theme, fc.tokens, fc.surface, fc.app;
+ * Every rule is layered so consumer styles always win (see README.md):
+ *   @layer fc.reset, fc.base, fc.theme, fc.tokens, fc.surface, fc.app, fc.chrome;
  *
  * Three built-in palettes ship: `paper` (default, light), `ink` (dark), and
  * `contrast` (high-contrast accessibility). Switch by setting

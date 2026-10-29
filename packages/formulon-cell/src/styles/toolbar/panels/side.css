@@ -1,24 +1,26 @@
-/* Side-panel controls owned by the package (checkbox rows and the empty-state
-   placeholder). The demo's own settings-drawer scaffolding lives in the demo
-   apps' shared shell stylesheet. */
+@layer fc.chrome {
+  /* Side-panel controls owned by the package (checkbox rows and the empty-state
+     placeholder). The demo's own settings-drawer scaffolding lives in the demo
+     apps' shared shell stylesheet. */
 
-/* ── Checkboxes ─────────────────────────────────────────────────────── */
-.fc-tb__check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 13px;
-  cursor: pointer;
-}
+  /* ── Checkboxes ─────────────────────────────────────────────────────── */
+  .fc-tb__check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+    cursor: pointer;
+  }
 
-.fc-tb__check input {
-  accent-color: var(--fc-tb-accent);
-}
+  .fc-tb__check input {
+    accent-color: var(--fc-tb-accent);
+  }
 
-.fc-tb__empty {
-  margin: 0;
-  font-size: 12px;
-  color: var(--fc-tb-fg-soft);
-  font-style: italic;
+  .fc-tb__empty {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fc-tb-fg-soft);
+    font-style: italic;
+  }
 }

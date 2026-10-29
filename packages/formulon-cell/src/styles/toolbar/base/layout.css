@@ -1,8 +1,10 @@
-/* ── Body layout ────────────────────────────────────────────────────── */
-.fc-tb__sheet-col {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
+@layer fc.chrome {
+  /* ── Body layout ────────────────────────────────────────────────────── */
+  .fc-tb__sheet-col {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
 }

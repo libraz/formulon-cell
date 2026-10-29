@@ -1,370 +1,374 @@
-.fc-tb__ribbon-group--clipboard .fc-tb__ribbon-tools {
-  display: grid;
-  grid-template-columns: 58px repeat(2, 30px);
-  grid-auto-rows: 26px;
-  gap: 2px;
-  min-height: 76px;
-  max-height: 76px;
-}
+@layer fc.chrome {
+  .fc-tb__ribbon-group--clipboard .fc-tb__ribbon-tools {
+    display: grid;
+    grid-template-columns: 58px repeat(2, 30px);
+    grid-auto-rows: 26px;
+    gap: 2px;
+    min-height: 76px;
+    max-height: 76px;
+  }
 
-.fc-tb__ribbon-group--clipboard .fc-tb__rb--large {
-  grid-row: 1 / span 3;
-}
+  .fc-tb__ribbon-group--clipboard .fc-tb__rb--large {
+    grid-row: 1 / span 3;
+  }
 
-.fc-tb__ribbon-group--clipboard .fc-tb__rb--wide {
-  grid-column: 2 / span 2;
-  min-width: 58px;
-  width: 58px;
-}
+  .fc-tb__ribbon-group--clipboard .fc-tb__rb--wide {
+    grid-column: 2 / span 2;
+    min-width: 58px;
+    width: 58px;
+  }
 
-.fc-tb__ribbon-group--font .fc-tb__ribbon-tools {
-  width: 296px;
-}
+  .fc-tb__ribbon-group--font .fc-tb__ribbon-tools {
+    width: 296px;
+  }
 
-.fc-tb__ribbon-group--alignment .fc-tb__ribbon-tools {
-  width: 190px;
-}
+  .fc-tb__ribbon-group--alignment .fc-tb__ribbon-tools {
+    width: 190px;
+  }
 
-.fc-tb__ribbon-group--alignment .fc-tb__rb-icon {
-  width: 22px;
-  height: 22px;
-}
+  .fc-tb__ribbon-group--alignment .fc-tb__rb-icon {
+    width: 22px;
+    height: 22px;
+  }
 
-.fc-tb__ribbon-group--number .fc-tb__ribbon-tools {
-  width: 170px;
-}
+  .fc-tb__ribbon-group--number .fc-tb__ribbon-tools {
+    width: 170px;
+  }
 
-.fc-tb__ribbon-group--tiles .fc-tb__ribbon-tools {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: nowrap;
-  gap: 4px;
-  min-height: 76px;
-  max-height: 76px;
-}
+  .fc-tb__ribbon-group--tiles .fc-tb__ribbon-tools {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 4px;
+    min-height: 76px;
+    max-height: 76px;
+  }
 
-.fc-tb__ribbon-group--tiles .fc-tb__rb,
-.fc-tb__ribbon-group--tiles .fc-tb__rb--wide,
-.fc-tb__ribbon-group--tiles .fc-tb__rb--mono {
-  position: relative;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 3px;
-  width: auto;
-  min-width: 52px;
-  max-width: none;
-  height: 66px;
-  padding: 5px 6px 3px;
-  font-family: var(--fc-tb-font);
-  font-size: 10.5px;
-  font-weight: 400;
-  line-height: 1.08;
-  text-align: center;
-  white-space: normal;
-}
+  .fc-tb__ribbon-group--tiles .fc-tb__rb,
+  .fc-tb__ribbon-group--tiles .fc-tb__rb--wide,
+  .fc-tb__ribbon-group--tiles .fc-tb__rb--mono {
+    position: relative;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 3px;
+    width: auto;
+    min-width: 52px;
+    max-width: none;
+    height: 66px;
+    padding: 5px 6px 3px;
+    font-family: var(--fc-tb-font);
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1.08;
+    text-align: center;
+    white-space: normal;
+  }
 
-.fc-tb__ribbon-group--tiles .fc-tb__rb .fc-tb__rb-split-chevron {
-  position: static;
-  margin: -2px 0 0;
-}
+  .fc-tb__ribbon-group--tiles .fc-tb__rb .fc-tb__rb-split-chevron {
+    position: static;
+    margin: -2px 0 0;
+  }
 
-.fc-tb__ribbon-group--tiles .fc-tb__rb-icon {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-}
+  .fc-tb__ribbon-group--tiles .fc-tb__rb-icon {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+  }
 
-/* Translated tile labels use the same two-line box in every script. Keeping
-   the icon on a fixed flex track prevents long labels (especially Thai and
-   German) from collapsing the SVG to zero height. A label wraps at 98px (a
-   112px tile) but never splits a word: the tile grows to the longest one. */
-.fc-tb__ribbon-group--tiles .fc-tb__rb > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
-.fc-tb__ribbon-group--mixed
-  .fc-tb__rb--wide:not(.fc-tb__rb--stacked)
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  display: -webkit-box;
-  flex: 0 0 auto;
-  align-self: stretch;
-  min-width: min-content;
-  max-width: 98px;
-  max-height: 2.16em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  overflow-wrap: break-word;
-  line-height: 1.08;
-  white-space: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
+  /* Translated tile labels use the same two-line box in every script. Keeping
+     the icon on a fixed flex track prevents long labels (especially Thai and
+     German) from collapsing the SVG to zero height. A label wraps at 98px (a
+     112px tile) but never splits a word: the tile grows to the longest one. */
+  .fc-tb__ribbon-group--tiles .fc-tb__rb > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
+  .fc-tb__ribbon-group--mixed
+    .fc-tb__rb--wide:not(.fc-tb__rb--stacked)
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    display: -webkit-box;
+    flex: 0 0 auto;
+    align-self: stretch;
+    min-width: min-content;
+    max-width: 98px;
+    max-height: 2.16em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: break-word;
+    line-height: 1.08;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
 
-.fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) .fc-tb__rb-icon {
-  flex: 0 0 24px;
-}
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) .fc-tb__rb-icon {
+    flex: 0 0 24px;
+  }
 
-.fc-tb__ribbon-group--tiles .fc-tb__rb--mono {
-  font-family: var(--fc-tb-font);
-}
+  .fc-tb__ribbon-group--tiles .fc-tb__rb--mono {
+    font-family: var(--fc-tb-font);
+  }
 
-.fc-tb__ribbon-group--tiles .fc-tb__rb--mono:not(:has(.fc-tb__rb-icon)) {
-  font-size: 15px;
-  font-weight: 600;
-}
+  .fc-tb__ribbon-group--tiles .fc-tb__rb--mono:not(:has(.fc-tb__rb-icon)) {
+    font-size: 15px;
+    font-weight: 600;
+  }
 
-.fc-tb__ribbon-group--tiles .fc-tb__rb--mono:not(:has(.fc-tb__rb-icon))::first-line {
-  font-size: 15px;
-}
+  .fc-tb__ribbon-group--tiles .fc-tb__rb--mono:not(:has(.fc-tb__rb-icon))::first-line {
+    font-size: 15px;
+  }
 
-.fc-tb__ribbon-group--stacked .fc-tb__ribbon-tools {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(3, 22px);
-  align-content: start;
-  gap: 2px;
-  min-height: 76px;
-  max-height: 76px;
-}
+  .fc-tb__ribbon-group--stacked .fc-tb__ribbon-tools {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(3, 22px);
+    align-content: start;
+    gap: 2px;
+    min-height: 76px;
+    max-height: 76px;
+  }
 
-/* Column flow keeps the stacked buttons in the 84px track: under the default
-   row flow the full-height tiles claim it first (they carry an explicit
-   `grid-row`, which auto-placement resolves before the auto-positioned
-   stacked buttons) and the 84px buttons then spill out of a 74px track. */
-.fc-tb__ribbon-group--mixed .fc-tb__ribbon-tools {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  grid-template-rows: repeat(3, 22px);
-  align-content: start;
-  gap: 2px 4px;
-  min-height: 76px;
-  max-height: 76px;
-}
+  /* Column flow keeps the stacked buttons in the 84px track: under the default
+     row flow the full-height tiles claim it first (they carry an explicit
+     `grid-row`, which auto-placement resolves before the auto-positioned
+     stacked buttons) and the 84px buttons then spill out of a 74px track. */
+  .fc-tb__ribbon-group--mixed .fc-tb__ribbon-tools {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    grid-template-rows: repeat(3, 22px);
+    align-content: start;
+    gap: 2px 4px;
+    min-height: 76px;
+    max-height: 76px;
+  }
 
-.fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
-  grid-row: 1 / span 3;
-}
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
+    grid-row: 1 / span 3;
+  }
 
-/* The button is two pixels taller than its 22px row so it fills the row gap
-   as well: WCAG 2.2 target size wants 24px, and relying on the spacing
-   exception instead is brittle — anything that overlaps the row (the ribbon
-   display toggle floats over the last group) shrinks the usable target back
-   under the minimum. */
-.fc-tb__ribbon-group--stacked .fc-tb__rb--stacked,
-.fc-tb__ribbon-group--mixed .fc-tb__rb--stacked {
-  justify-content: flex-start;
-  box-sizing: border-box;
-  gap: 2px;
-  width: auto;
-  min-width: 84px;
-  max-width: 148px;
-  height: 24px;
-  padding: 1px 2px;
-  font-size: 10.5px;
-  font-weight: 400;
-  line-height: 1;
-  text-align: left;
-  white-space: nowrap;
-}
+  /* The button is two pixels taller than its 22px row so it fills the row gap
+     as well: WCAG 2.2 target size wants 24px, and relying on the spacing
+     exception instead is brittle — anything that overlaps the row (the ribbon
+     display toggle floats over the last group) shrinks the usable target back
+     under the minimum. */
+  .fc-tb__ribbon-group--stacked .fc-tb__rb--stacked,
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--stacked {
+    justify-content: flex-start;
+    box-sizing: border-box;
+    gap: 2px;
+    width: auto;
+    min-width: 84px;
+    max-width: 148px;
+    height: 24px;
+    padding: 1px 2px;
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1;
+    text-align: left;
+    white-space: nowrap;
+  }
 
-.fc-tb__ribbon-group--stacked .fc-tb__rb--stacked span,
-.fc-tb__ribbon-group--mixed .fc-tb__rb--stacked span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  .fc-tb__ribbon-group--stacked .fc-tb__rb--stacked span,
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--stacked span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-.fc-tb__ribbon-group--stacked
-  .fc-tb__rb--stacked
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
-.fc-tb__ribbon-group--mixed
-  .fc-tb__rb--stacked
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  flex: 1 1 auto;
-}
+  .fc-tb__ribbon-group--stacked
+    .fc-tb__rb--stacked
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
+  .fc-tb__ribbon-group--mixed
+    .fc-tb__rb--stacked
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    flex: 1 1 auto;
+  }
 
-.fc-tb__ribbon-group--stacked .fc-tb__rb--stacked .fc-tb__rb-icon,
-.fc-tb__ribbon-group--mixed .fc-tb__rb--stacked .fc-tb__rb-icon {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 17px;
-}
+  .fc-tb__ribbon-group--stacked .fc-tb__rb--stacked .fc-tb__rb-icon,
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--stacked .fc-tb__rb-icon {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+  }
 
-.fc-tb__ribbon-group--alignment.fc-tb__ribbon-group--stacked .fc-tb__rb--stacked .fc-tb__rb-icon,
-.fc-tb__ribbon-group--alignment.fc-tb__ribbon-group--mixed .fc-tb__rb--stacked .fc-tb__rb-icon {
-  width: 22px;
-  height: 22px;
-}
+  .fc-tb__ribbon-group--alignment.fc-tb__ribbon-group--stacked .fc-tb__rb--stacked .fc-tb__rb-icon,
+  .fc-tb__ribbon-group--alignment.fc-tb__ribbon-group--mixed .fc-tb__rb--stacked .fc-tb__rb-icon {
+    width: 22px;
+    height: 22px;
+  }
 
-.fc-tb__ribbon-group--stacked .fc-tb__rb--stacked .fc-tb__rb-split-chevron,
-.fc-tb__ribbon-group--mixed .fc-tb__rb--stacked .fc-tb__rb-split-chevron {
-  width: 8px;
-  height: 6px;
-  flex: 0 0 8px;
-  margin: 0 0 0 auto;
-}
+  .fc-tb__ribbon-group--stacked .fc-tb__rb--stacked .fc-tb__rb-split-chevron,
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--stacked .fc-tb__rb-split-chevron {
+    width: 8px;
+    height: 6px;
+    flex: 0 0 8px;
+    margin: 0 0 0 auto;
+  }
 
-.fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
-  position: relative;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 3px;
-  width: auto;
-  min-width: 52px;
-  max-width: none;
-  height: 66px;
-  padding: 5px 6px 3px;
-  font-size: 10.5px;
-  font-weight: 400;
-  line-height: 1.08;
-  text-align: center;
-  white-space: normal;
-}
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) {
+    position: relative;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 3px;
+    width: auto;
+    min-width: 52px;
+    max-width: none;
+    height: 66px;
+    padding: 5px 6px 3px;
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1.08;
+    text-align: center;
+    white-space: normal;
+  }
 
-.fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) .fc-tb__rb-icon {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-}
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) .fc-tb__rb-icon {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+  }
 
-.fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) .fc-tb__rb-split-chevron {
-  position: static;
-  margin: -2px 0 0;
-}
+  .fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) .fc-tb__rb-split-chevron {
+    position: static;
+    margin: -2px 0 0;
+  }
 
-/* Width-fitting stages set by fit-ribbon when the panel is too narrow. The
-   doubled class outranks the platform tile rules. Narrow: tiles wrap their
-   labels onto two lines (fit-ribbon sets each label's narrowest two-line
-   width), never narrower than their longest word. */
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb:not(.fc-tb__rb--stacked) {
-  min-width: 48px;
-  max-width: none;
-  padding-inline: 3px;
-}
+  /* Width-fitting stages set by fit-ribbon when the panel is too narrow. The
+     doubled class outranks the platform tile rules. Narrow: tiles wrap their
+     labels onto two lines (fit-ribbon sets each label's narrowest two-line
+     width), never narrower than their longest word. */
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb:not(.fc-tb__rb--stacked) {
+    min-width: 48px;
+    max-width: none;
+    padding-inline: 3px;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb:not(.fc-tb__rb--stacked)
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  min-width: min-content;
-  max-width: none;
-}
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--narrow.fc-tb__ribbon-group--narrow
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb:not(.fc-tb__rb--stacked)
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    min-width: min-content;
+    max-width: none;
+  }
 
-/* Condensed: large buttons drop to icon-and-label rows three high, in the same
-   order, each row as wide as its full label. */
-.fc-tb__ribbon .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed .fc-tb__ribbon-tools {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  grid-template-columns: none;
-  grid-template-rows: repeat(3, minmax(24px, auto));
-  align-content: start;
-  align-items: center;
-  gap: 0 4px;
-}
+  /* Condensed: large buttons drop to icon-and-label rows three high, in the same
+     order, each row as wide as its full label. */
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    grid-template-columns: none;
+    grid-template-rows: repeat(3, minmax(24px, auto));
+    align-content: start;
+    align-items: center;
+    gap: 0 4px;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb.fc-tb__rb {
-  grid-row: auto;
-  flex-direction: row;
-  justify-content: flex-start;
-  gap: 3px;
-  width: auto;
-  min-width: 0;
-  max-width: none;
-  height: 24px;
-  padding: 1px 4px;
-  font-size: 10.5px;
-  line-height: 1;
-  text-align: left;
-  white-space: nowrap;
-}
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb.fc-tb__rb {
+    grid-row: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 3px;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    height: 24px;
+    padding: 1px 4px;
+    font-size: 10.5px;
+    line-height: 1;
+    text-align: left;
+    white-space: nowrap;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb
-  .fc-tb__rb-icon {
-  flex: 0 0 17px;
-  width: 17px;
-  height: 17px;
-}
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb
+    .fc-tb__rb-icon {
+    flex: 0 0 17px;
+    width: 17px;
+    height: 17px;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  display: block;
-  flex: 0 1 auto;
-  align-self: center;
-  width: auto;
-  min-width: 0;
-  max-height: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  -webkit-line-clamp: none;
-}
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    display: block;
+    flex: 0 1 auto;
+    align-self: center;
+    width: auto;
+    min-width: 0;
+    max-height: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-line-clamp: none;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb
-  .fc-tb__rb-split-chevron {
-  position: static;
-  flex: 0 0 8px;
-  width: 8px;
-  height: 6px;
-  margin: 0 0 0 1px;
-}
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb
+    .fc-tb__rb-split-chevron {
+    position: static;
+    flex: 0 0 8px;
+    width: 8px;
+    height: 6px;
+    margin: 0 0 0 1px;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb-dd
-  > .fc-tb__rb-dd__btn {
-  height: 24px;
-}
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--condensed.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb-dd
+    > .fc-tb__rb-dd__btn {
+    height: 24px;
+  }
 
-/* Icon only: row buttons that carry an icon drop their visible label; the
-   accessible name and tooltip remain. The repeated class outranks the fixed
-   platform track widths so the group can actually shrink. */
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only
-  .fc-tb__ribbon-tools {
-  width: auto;
-  min-width: 0;
-  grid-template-columns: none;
-  grid-auto-columns: max-content;
-}
+  /* Icon only: row buttons that carry an icon drop their visible label; the
+     accessible name and tooltip remain. The repeated class outranks the fixed
+     platform track widths so the group can actually shrink. */
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only
+    .fc-tb__ribbon-tools {
+    width: auto;
+    min-width: 0;
+    grid-template-columns: none;
+    grid-auto-columns: max-content;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only
-  .fc-tb__ribbon-tools
-  > :is(.fc-tb__rb--stacked):has(> .fc-tb__rb-icon),
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--condensed
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb:has(> .fc-tb__rb-icon) {
-  width: auto;
-  min-width: 28px;
-  max-width: none;
-}
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only
+    .fc-tb__ribbon-tools
+    > :is(.fc-tb__rb--stacked):has(> .fc-tb__rb-icon),
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb:has(> .fc-tb__rb-icon) {
+    width: auto;
+    min-width: 28px;
+    max-width: none;
+  }
 
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb--stacked:has(> .fc-tb__rb-icon)
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
-.fc-tb__ribbon
-  .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--condensed
-  .fc-tb__ribbon-tools
-  > .fc-tb__rb:has(> .fc-tb__rb-icon)
-  > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  display: none;
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb--stacked:has(> .fc-tb__rb-icon)
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron),
+  .fc-tb__ribbon
+    .fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--icon-only.fc-tb__ribbon-group--condensed
+    .fc-tb__ribbon-tools
+    > .fc-tb__rb:has(> .fc-tb__rb-icon)
+    > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    display: none;
+  }
 }

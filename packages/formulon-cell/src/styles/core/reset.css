@@ -1,6 +1,8 @@
 @layer fc.reset {
   .fc-host,
-  .fc-host * {
+  .fc-host *,
+  .fc-overlay-portal,
+  .fc-overlay-portal * {
     box-sizing: border-box;
   }
 }

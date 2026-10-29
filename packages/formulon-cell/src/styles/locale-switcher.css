@@ -57,10 +57,10 @@
     width: 0;
     max-width: 0;
   }
-}
 
-@media print {
-  .fc-host__locale-switcher {
-    display: none !important;
+  @media print {
+    .fc-host__locale-switcher {
+      display: none !important;
+    }
   }
 }

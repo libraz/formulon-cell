@@ -1,131 +1,133 @@
-/* Ribbon color controls — font/fill color buttons and the shared flyout
-   that hosts the spreadsheet "Office" color palette. */
+@layer fc.chrome {
+  /* Ribbon color controls — font/fill color buttons and the shared flyout
+     that hosts the spreadsheet "Office" color palette. */
 
-.fc-tb__rb-color {
-  position: relative;
-  display: inline-flex;
-  width: 30px;
-  height: 26px;
-  color: var(--fc-tb-fg);
-  font: inherit;
-  font-size: 11px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  cursor: pointer;
-}
+  .fc-tb__rb-color {
+    position: relative;
+    display: inline-flex;
+    width: 30px;
+    height: 26px;
+    color: var(--fc-tb-fg);
+    font: inherit;
+    font-size: 11px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+  }
 
-.fc-tb__rb-color:hover {
-  background: var(--fc-tb-ribbon-hover);
-  border-color: var(--fc-tb-ribbon-line);
-}
+  .fc-tb__rb-color:hover {
+    background: var(--fc-tb-ribbon-hover);
+    border-color: var(--fc-tb-ribbon-line);
+  }
 
-.fc-tb__rb-color input[type="color"] {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
+  .fc-tb__rb-color input[type="color"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
 
-.fc-tb__rb-color::after {
-  position: absolute;
-  right: 5px;
-  bottom: 3px;
-  left: 5px;
-  height: 3px;
-  background: currentColor;
-  content: "";
-}
+  .fc-tb__rb-color::after {
+    position: absolute;
+    right: 5px;
+    bottom: 3px;
+    left: 5px;
+    height: 3px;
+    background: currentColor;
+    content: "";
+  }
 
-.fc-tb__rb-color[data-ribbon-command="fontColor"]::after {
-  background: #c00000;
-}
+  .fc-tb__rb-color[data-ribbon-command="fontColor"]::after {
+    background: #c00000;
+  }
 
-.fc-tb__rb-color[data-ribbon-command="fillColor"]::after {
-  background: #fff200;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  height: 4px;
-}
+  .fc-tb__rb-color[data-ribbon-command="fillColor"]::after {
+    background: #fff200;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    height: 4px;
+  }
 
-.fc-tb__rb-color__btn {
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
+  .fc-tb__rb-color__btn {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
 
-.fc-tb__rb-color__btn:hover,
-.fc-tb__rb-color--open .fc-tb__rb-color__btn {
-  background: var(--fc-tb-ribbon-hover);
-  border-color: var(--fc-tb-ribbon-line);
-}
+  .fc-tb__rb-color__btn:hover,
+  .fc-tb__rb-color--open .fc-tb__rb-color__btn {
+    background: var(--fc-tb-ribbon-hover);
+    border-color: var(--fc-tb-ribbon-line);
+  }
 
-.fc-tb__rb-color__icon {
-  transform: translateY(-2px);
-}
+  .fc-tb__rb-color__icon {
+    transform: translateY(-2px);
+  }
 
-.fc-tb__rb-color__swatch {
-  position: absolute;
-  right: 4px;
-  bottom: 3px;
-  left: 4px;
-  height: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-}
+  .fc-tb__rb-color__swatch {
+    position: absolute;
+    right: 4px;
+    bottom: 3px;
+    left: 4px;
+    height: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+  }
 
-.fc-tb__rb-color__chev {
-  position: absolute;
-  right: 0;
-  bottom: 6px;
-  width: 9px;
-  height: 9px;
-  color: var(--fc-tb-fg-soft);
-}
+  .fc-tb__rb-color__chev {
+    position: absolute;
+    right: 0;
+    bottom: 6px;
+    width: 9px;
+    height: 9px;
+    color: var(--fc-tb-fg-soft);
+  }
 
-.fc-tb__rb-color__btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+  .fc-tb__rb-color__btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 
-/* Flyout shell hosting the shared color palette (createColorPalette).
-   The palette element supplies its own padding and grid layout. */
-.fc-tb__color-flyout,
-.fc-tb__merge-menu {
-  position: fixed;
-  z-index: 90;
-  border: 1px solid #c8c8c8;
-  border-radius: 3px;
-  background: var(--fc-tb-ribbon-bg, #ffffff);
-  color: var(--fc-tb-fg);
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.15),
-    0 1px 4px rgba(0, 0, 0, 0.12);
-  font-family: var(--fc-tb-font);
-  font-size: 12px;
-}
+  /* Flyout shell hosting the shared color palette (createColorPalette).
+     The palette element supplies its own padding and grid layout. */
+  .fc-tb__color-flyout,
+  .fc-tb__merge-menu {
+    position: fixed;
+    z-index: 90;
+    border: 1px solid #c8c8c8;
+    border-radius: 3px;
+    background: var(--fc-tb-ribbon-bg, #ffffff);
+    color: var(--fc-tb-fg);
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.15),
+      0 1px 4px rgba(0, 0, 0, 0.12);
+    font-family: var(--fc-tb-font);
+    font-size: 12px;
+  }
 
-.fc-tb__color-flyout {
-  width: max-content;
-  overflow: hidden;
-}
+  .fc-tb__color-flyout {
+    width: max-content;
+    overflow: hidden;
+  }
 
-.fc-tb__color-flyout__native {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+  .fc-tb__color-flyout__native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
 }

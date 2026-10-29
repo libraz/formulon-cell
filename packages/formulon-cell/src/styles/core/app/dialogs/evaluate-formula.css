@@ -1,4 +1,4 @@
-@layer fc {
+@layer fc.app {
   .fc-evaldlg {
     position: fixed;
     inset: 0;

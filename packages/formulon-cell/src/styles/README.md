@@ -13,13 +13,36 @@ This directory ships **two independent stylesheets** plus a token vocabulary:
 `layers.css` declares this order (lowest to highest precedence — later wins):
 
 ```css
-@layer fc.reset, fc.base, fc.theme, fc.tokens, fc.surface, fc.app;
+@layer fc.reset, fc.base, fc.theme, fc.tokens, fc.surface, fc.app, fc.chrome;
 ```
+
+`fc.chrome` holds the ribbon toolbar bundle (`toolbar/`, `platform-mac.css`).
+Both public entries (`index.css`, `toolbar.css`) import `layers.css` first, so the
+order holds whichever one a host loads first.
 
 Every rule **must** live inside one of these layers so that consumer-side styles
 (which are unlayered, and therefore beat any layered rule) can override our
-defaults without `!important`. The single source of truth is `index.css`; never
-declare layers in a leaf stylesheet.
+defaults without `!important`. Never declare layers in a leaf stylesheet.
+`tests/unit/styles/cascade-layers.test.ts` fails on any unlayered rule.
+
+`fc.reset` makes `.fc-host` and `.fc-overlay-portal` subtrees `border-box`, so
+dialogs size the same whether or not the host page has a global reset.
+
+### Hosts with an unlayered element reset
+
+The flip side: an unlayered host reset such as `button { padding: 0 }`
+(VitePress, Tailwind preflight, normalize-style resets) beats every rule here
+too. Because every rule is layered, the host can hand those elements back with
+a rule at the reset's own specificity, loaded after it:
+
+```css
+:where(.fc-host, .fc-overlay-portal) :is(button, input, select, textarea) {
+  all: revert-layer;
+}
+```
+
+`:where()` keeps the specificity equal to the reset's, so the host's own
+class-level overrides still win. List the elements the host reset touches.
 
 ## Theming surface
 

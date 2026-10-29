@@ -1,17 +1,3 @@
-/* This menu is teleported into the host page's <body>, so it is exposed to the
- * host's own unlayered element resets. A rule like `button { padding: 0 }`
- * (VitePress, Tailwind preflight, normalize.css) is unlayered and therefore
- * outranks our @layer-scoped layout, which would collapse the item padding and
- * clip the keyboard-shortcut hints against the right edge. Re-assert the
- * structural padding unlayered so class specificity wins it back. */
-.fc-ctxmenu__item {
-  box-sizing: border-box;
-  padding: 3px 18px 3px 12px;
-}
-.fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item {
-  padding: 0 10px;
-}
-
 @layer fc.app {
   .fc-ctxmenu {
     position: fixed;
@@ -430,6 +416,7 @@
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item {
     grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0 10px;
     column-gap: 24px;
     min-height: 24px;
     border-radius: calc(var(--fc-ctxmenu-mac-radius) - var(--fc-ctxmenu-mac-pad));

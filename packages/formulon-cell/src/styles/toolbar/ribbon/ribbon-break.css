@@ -1,6 +1,8 @@
-/* ── Ribbon row break ──────────────────────────────────────────────────── */
-.fc-tb__rb-break {
-  flex: 0 0 100%;
-  width: 0;
-  height: 0;
+@layer fc.chrome {
+  /* ── Ribbon row break ──────────────────────────────────────────────────── */
+  .fc-tb__rb-break {
+    flex: 0 0 100%;
+    width: 0;
+    height: 0;
+  }
 }

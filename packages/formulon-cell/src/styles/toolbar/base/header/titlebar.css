@@ -1,145 +1,147 @@
-/* ── Title bar ──────────────────────────────────────────────────────── */
-.fc-tb__titlebar {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(180px, auto) minmax(220px, 480px) minmax(
-      128px,
-      1fr
-    );
-  align-items: center;
-  gap: 10px;
-  min-height: 36px;
-  padding: 0 10px;
-  background: var(--fc-tb-title);
-  color: var(--fc-tb-title-fg);
-}
+@layer fc.chrome {
+  /* ── Title bar ──────────────────────────────────────────────────────── */
+  .fc-tb__titlebar {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(180px, auto) minmax(220px, 480px) minmax(
+        128px,
+        1fr
+      );
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 0 10px;
+    background: var(--fc-tb-title);
+    color: var(--fc-tb-title-fg);
+  }
 
-.fc-tb__title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 12px;
-}
+  .fc-tb__title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+    font-size: 12px;
+  }
 
-.fc-tb__title strong {
-  font-weight: 600;
-}
+  .fc-tb__title strong {
+    font-weight: 600;
+  }
 
-.fc-tb__title span {
-  color: var(--fc-tb-fg-soft);
-  white-space: nowrap;
-}
+  .fc-tb__title span {
+    color: var(--fc-tb-fg-soft);
+    white-space: nowrap;
+  }
 
-.fc-tb__search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  min-width: 0;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--fc-tb-fg-soft);
-  box-shadow: none;
-}
+  .fc-tb__search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    min-width: 0;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--fc-tb-fg-soft);
+    box-shadow: none;
+  }
 
-.fc-tb__search:hover,
-.fc-tb__search:focus-within {
-  border-color: var(--fc-tb-ribbon-line);
-  background: var(--fc-tb-input-bg);
-}
+  .fc-tb__search:hover,
+  .fc-tb__search:focus-within {
+    border-color: var(--fc-tb-ribbon-line);
+    background: var(--fc-tb-input-bg);
+  }
 
-.fc-tb__search .fc-tb__rb-icon {
-  flex: 0 0 auto;
-}
+  .fc-tb__search .fc-tb__rb-icon {
+    flex: 0 0 auto;
+  }
 
-.fc-tb__search input {
-  min-width: 0;
-  width: 100%;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--fc-tb-input-fg);
-  font: inherit;
-  font-size: 12px;
-}
+  .fc-tb__search input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--fc-tb-input-fg);
+    font: inherit;
+    font-size: 12px;
+  }
 
-.fc-tb__command-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  left: 0;
-  z-index: 40;
-  overflow: hidden;
-  border: 1px solid var(--fc-tb-ribbon-line);
-  border-radius: 4px;
-  background: var(--fc-tb-ribbon-bg);
-  color: var(--fc-tb-input-fg);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.18),
-    0 2px 6px rgba(0, 0, 0, 0.12);
-}
+  .fc-tb__command-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    z-index: 40;
+    overflow: hidden;
+    border: 1px solid var(--fc-tb-ribbon-line);
+    border-radius: 4px;
+    background: var(--fc-tb-ribbon-bg);
+    color: var(--fc-tb-input-fg);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.18),
+      0 2px 6px rgba(0, 0, 0, 0.12);
+  }
 
-.fc-tb__command-item {
-  display: grid;
-  grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1.3fr);
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 10px;
-  border: 0;
-  border-bottom: 1px solid var(--fc-tb-line-soft);
-  background: var(--fc-tb-ribbon-bg);
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
+  .fc-tb__command-item {
+    display: grid;
+    grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1.3fr);
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 0;
+    border-bottom: 1px solid var(--fc-tb-line-soft);
+    background: var(--fc-tb-ribbon-bg);
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
 
-.fc-tb__command-item:last-child {
-  border-bottom: 0;
-}
+  .fc-tb__command-item:last-child {
+    border-bottom: 0;
+  }
 
-.fc-tb__command-item:hover,
-.fc-tb__command-item--active,
-.fc-tb__command-item[aria-selected="true"],
-.fc-tb__command-item:focus-visible {
-  background: var(--fc-tb-ribbon-rail);
-  outline: 0;
-}
+  .fc-tb__command-item:hover,
+  .fc-tb__command-item--active,
+  .fc-tb__command-item[aria-selected="true"],
+  .fc-tb__command-item:focus-visible {
+    background: var(--fc-tb-ribbon-rail);
+    outline: 0;
+  }
 
-.fc-tb__command-item--disabled,
-.fc-tb__command-item[aria-disabled="true"] {
-  cursor: default;
-}
+  .fc-tb__command-item--disabled,
+  .fc-tb__command-item[aria-disabled="true"] {
+    cursor: default;
+  }
 
-.fc-tb__command-item--disabled strong,
-.fc-tb__command-item[aria-disabled="true"] strong {
-  color: var(--fc-tb-fg-soft);
-}
+  .fc-tb__command-item--disabled strong,
+  .fc-tb__command-item[aria-disabled="true"] strong {
+    color: var(--fc-tb-fg-soft);
+  }
 
-.fc-tb__command-item strong,
-.fc-tb__command-item span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .fc-tb__command-item strong,
+  .fc-tb__command-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-.fc-tb__command-item strong {
-  font-weight: 600;
-}
+  .fc-tb__command-item strong {
+    font-weight: 600;
+  }
 
-.fc-tb__command-item span,
-.fc-tb__command-empty {
-  color: var(--fc-tb-fg-soft);
-}
+  .fc-tb__command-item span,
+  .fc-tb__command-empty {
+    color: var(--fc-tb-fg-soft);
+  }
 
-.fc-tb__command-empty {
-  padding: 10px;
-  font-size: 12px;
+  .fc-tb__command-empty {
+    padding: 10px;
+    font-size: 12px;
+  }
 }

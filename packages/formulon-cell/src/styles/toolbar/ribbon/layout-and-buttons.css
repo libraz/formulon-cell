@@ -1,437 +1,439 @@
-.fc-tb__ribbon-shell {
-  position: relative;
-  flex: 0 0 auto;
-  background: var(--fc-tb-ribbon-bg);
-  border-bottom: 1px solid var(--fc-tb-ribbon-line);
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.8);
-}
+@layer fc.chrome {
+  .fc-tb__ribbon-shell {
+    position: relative;
+    flex: 0 0 auto;
+    background: var(--fc-tb-ribbon-bg);
+    border-bottom: 1px solid var(--fc-tb-ribbon-line);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.8);
+  }
 
-.fc-tb__ribbon-shell--collapsed {
-  box-shadow: none;
-}
+  .fc-tb__ribbon-shell--collapsed {
+    box-shadow: none;
+  }
 
-.fc-tb__ribbon-tabs {
-  display: flex;
-  align-items: end;
-  min-width: 0;
-  height: 31px;
-  padding: 0 220px 0 2px;
-  background: var(--fc-tb-ribbon-bg);
-  border-bottom: 1px solid var(--fc-tb-ribbon-line);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--fc-tb-fg-soft) 45%, transparent) transparent;
-}
+  .fc-tb__ribbon-tabs {
+    display: flex;
+    align-items: end;
+    min-width: 0;
+    height: 31px;
+    padding: 0 220px 0 2px;
+    background: var(--fc-tb-ribbon-bg);
+    border-bottom: 1px solid var(--fc-tb-ribbon-line);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--fc-tb-fg-soft) 45%, transparent) transparent;
+  }
 
-.fc-tb__ribbon-tab {
-  position: relative;
-  flex: 0 0 auto;
-  height: 31px;
-  padding: 0 10px;
-  border: 0;
-  background: transparent;
-  color: var(--fc-tb-fg);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 31px;
-  cursor: pointer;
-  white-space: nowrap;
-}
+  .fc-tb__ribbon-tab {
+    position: relative;
+    flex: 0 0 auto;
+    height: 31px;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+    color: var(--fc-tb-fg);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 31px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
 
-.fc-tb__ribbon-tab:hover:not(:disabled) {
-  background: var(--fc-tb-ribbon-hover);
-  color: var(--fc-tb-fg);
-}
+  .fc-tb__ribbon-tab:hover:not(:disabled) {
+    background: var(--fc-tb-ribbon-hover);
+    color: var(--fc-tb-fg);
+  }
 
-.fc-tb__ribbon-tab--file:hover {
-  background: var(--fc-tb-ribbon-hover);
-  color: var(--fc-tb-fg);
-}
+  .fc-tb__ribbon-tab--file:hover {
+    background: var(--fc-tb-ribbon-hover);
+    color: var(--fc-tb-fg);
+  }
 
-.fc-tb__ribbon-tab--active {
-  background: var(--fc-tb-ribbon-bg);
-  color: var(--fc-tb-fg);
-  font-weight: 600;
-}
+  .fc-tb__ribbon-tab--active {
+    background: var(--fc-tb-ribbon-bg);
+    color: var(--fc-tb-fg);
+    font-weight: 600;
+  }
 
-.fc-tb__ribbon-tab--active::after {
-  position: absolute;
-  right: 10px;
-  bottom: -1px;
-  left: 10px;
-  height: 3px;
-  background: var(--fc-tb-accent);
-  content: "";
-}
+  .fc-tb__ribbon-tab--active::after {
+    position: absolute;
+    right: 10px;
+    bottom: -1px;
+    left: 10px;
+    height: 3px;
+    background: var(--fc-tb-accent);
+    content: "";
+  }
 
-/* A tab a selected object adds is set apart by the accent colour, as the
- * desktop spreadsheet sets apart its contextual tabs. */
-.fc-tb__ribbon-tab--contextual,
-.fc-tb__ribbon-tab--contextual:hover:not(:disabled) {
-  color: var(--fc-tb-accent);
-}
+  /* A tab a selected object adds is set apart by the accent colour, as the
+   * desktop spreadsheet sets apart its contextual tabs. */
+  .fc-tb__ribbon-tab--contextual,
+  .fc-tb__ribbon-tab--contextual:hover:not(:disabled) {
+    color: var(--fc-tb-accent);
+  }
 
-.fc-tb__ribbon-tab:disabled {
-  cursor: default;
-  opacity: 0.62;
-}
+  .fc-tb__ribbon-tab:disabled {
+    cursor: default;
+    opacity: 0.62;
+  }
 
-/* `:not([hidden])` so the user-agent `[hidden] { display: none }` rule isn't
- * shadowed by our `display: flex`. Without this, non-active ribbon panels
- * stay laid out and stack vertically, breaking the sheet height. The
- * playground worked around this with an `!important` override but consumers
- * shouldn't need to know about that. */
-.fc-tb__ribbon:not([hidden]) {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  min-width: 0;
-  min-height: 96px;
-  /* The end padding keeps the floating display toggle off the last group. */
-  padding: 3px 36px 2px 6px;
-  background: var(--fc-tb-ribbon-bg);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--fc-tb-fg-soft) 45%, transparent) transparent;
-}
+  /* `:not([hidden])` so the user-agent `[hidden] { display: none }` rule isn't
+   * shadowed by our `display: flex`. Without this, non-active ribbon panels
+   * stay laid out and stack vertically, breaking the sheet height. The
+   * playground worked around this with an `!important` override but consumers
+   * shouldn't need to know about that. */
+  .fc-tb__ribbon:not([hidden]) {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: 0;
+    min-height: 96px;
+    /* The end padding keeps the floating display toggle off the last group. */
+    padding: 3px 36px 2px 6px;
+    background: var(--fc-tb-ribbon-bg);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--fc-tb-fg-soft) 45%, transparent) transparent;
+  }
 
-.fc-tb__ribbon-shell--tabsOnly:not(.fc-tb__ribbon-shell--peek) .fc-tb__ribbon,
-.fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) .fc-tb__ribbon {
-  display: none;
-}
+  .fc-tb__ribbon-shell--tabsOnly:not(.fc-tb__ribbon-shell--peek) .fc-tb__ribbon,
+  .fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) .fc-tb__ribbon {
+    display: none;
+  }
 
-.fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) .fc-tb__ribbon-tabs {
-  height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  overflow: hidden;
-  border-bottom: 0;
-}
+  .fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) .fc-tb__ribbon-tabs {
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    border-bottom: 0;
+  }
 
-.fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) {
-  min-height: 31px;
-}
+  .fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) {
+    min-height: 31px;
+  }
 
-.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon:not([hidden]) {
-  min-height: 42px;
-  padding: 3px 36px 2px 6px;
-  overflow-x: auto;
-}
+  .fc-tb__ribbon-shell--singleLine .fc-tb__ribbon:not([hidden]) {
+    min-height: 42px;
+    padding: 3px 36px 2px 6px;
+    overflow-x: auto;
+  }
 
-.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-group {
-  grid-template-rows: 1fr;
-}
+  .fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-group {
+    grid-template-rows: 1fr;
+  }
 
-.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-tools {
-  flex-wrap: nowrap;
-  min-height: 32px;
-  max-height: 32px;
-  align-items: center;
-}
+  .fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-tools {
+    flex-wrap: nowrap;
+    min-height: 32px;
+    max-height: 32px;
+    align-items: center;
+  }
 
-.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-label,
-.fc-tb__ribbon-shell--singleLine .fc-tb__rb-break {
-  display: none;
-}
+  .fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-label,
+  .fc-tb__ribbon-shell--singleLine .fc-tb__rb-break {
+    display: none;
+  }
 
-.fc-tb__ribbon-display {
-  position: absolute;
-  right: 7px;
-  bottom: 5px;
-  z-index: 2;
-}
+  .fc-tb__ribbon-display {
+    position: absolute;
+    right: 7px;
+    bottom: 5px;
+    z-index: 2;
+  }
 
-.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-display,
-.fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-display {
-  top: 4px;
-  bottom: auto;
-}
+  .fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-display,
+  .fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-display {
+    top: 4px;
+    bottom: auto;
+  }
 
-/* 24px square rather than the chevron's visual weight: WCAG 2.2 target size
-   is measured on the button box, and this one sits over the ribbon so it has
-   no neighbouring whitespace to fall back on. */
-.fc-tb__ribbon-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  background: transparent;
-  color: var(--fc-tb-fg-soft);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1;
-}
+  /* 24px square rather than the chevron's visual weight: WCAG 2.2 target size
+     is measured on the button box, and this one sits over the ribbon so it has
+     no neighbouring whitespace to fall back on. */
+  .fc-tb__ribbon-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--fc-tb-fg-soft);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+  }
 
-.fc-tb__ribbon-toggle:hover,
-.fc-tb__ribbon-toggle:focus-visible {
-  background: var(--fc-tb-ribbon-hover);
-  border-color: var(--fc-tb-ribbon-line);
-  color: var(--fc-tb-fg);
-  outline: 0;
-}
+  .fc-tb__ribbon-toggle:hover,
+  .fc-tb__ribbon-toggle:focus-visible {
+    background: var(--fc-tb-ribbon-hover);
+    border-color: var(--fc-tb-ribbon-line);
+    color: var(--fc-tb-fg);
+    outline: 0;
+  }
 
-.fc-tb__ribbon-toggle::before {
-  width: 7px;
-  height: 7px;
-  border-top: 1.6px solid currentColor;
-  border-left: 1.6px solid currentColor;
-  content: "";
-  transform: translateY(2px) rotate(45deg);
-}
+  .fc-tb__ribbon-toggle::before {
+    width: 7px;
+    height: 7px;
+    border-top: 1.6px solid currentColor;
+    border-left: 1.6px solid currentColor;
+    content: "";
+    transform: translateY(2px) rotate(45deg);
+  }
 
-.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-toggle::before,
-.fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-toggle::before {
-  transform: translateY(-2px) rotate(-135deg);
-}
+  .fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-toggle::before,
+  .fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-toggle::before {
+    transform: translateY(-2px) rotate(-135deg);
+  }
 
-.fc-tb__ribbon-display-menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 4px);
-  min-width: 168px;
-  padding: 4px 0;
-  border: 1px solid var(--fc-tb-line);
-  border-radius: 2px;
-  background: var(--fc-tb-ribbon-bg);
-  box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.16),
-    0 1px 3px rgba(0, 0, 0, 0.12);
-}
+  .fc-tb__ribbon-display-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 4px);
+    min-width: 168px;
+    padding: 4px 0;
+    border: 1px solid var(--fc-tb-line);
+    border-radius: 2px;
+    background: var(--fc-tb-ribbon-bg);
+    box-shadow:
+      0 6px 16px rgba(0, 0, 0, 0.16),
+      0 1px 3px rgba(0, 0, 0, 0.12);
+  }
 
-.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-display-menu,
-.fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-display-menu {
-  top: calc(100% + 4px);
-  bottom: auto;
-}
+  .fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-display-menu,
+  .fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-display-menu {
+    top: calc(100% + 4px);
+    bottom: auto;
+  }
 
-.fc-tb__ribbon-display-option {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  min-height: 28px;
-  padding: 4px 12px 4px 8px;
-  border: 0;
-  background: transparent;
-  color: var(--fc-tb-fg);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  text-align: left;
-  white-space: nowrap;
-}
+  .fc-tb__ribbon-display-option {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    min-height: 28px;
+    padding: 4px 12px 4px 8px;
+    border: 0;
+    background: transparent;
+    color: var(--fc-tb-fg);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    white-space: nowrap;
+  }
 
-.fc-tb__ribbon-display-option:hover,
-.fc-tb__ribbon-display-option:focus-visible {
-  background: var(--fc-tb-ribbon-hover);
-  outline: 0;
-}
+  .fc-tb__ribbon-display-option:hover,
+  .fc-tb__ribbon-display-option:focus-visible {
+    background: var(--fc-tb-ribbon-hover);
+    outline: 0;
+  }
 
-.fc-tb__ribbon-display-option[aria-checked="true"]::before {
-  width: 9px;
-  height: 5px;
-  border-bottom: 2px solid var(--fc-tb-accent);
-  border-left: 2px solid var(--fc-tb-accent);
-  content: "";
-  transform: rotate(-45deg);
-}
+  .fc-tb__ribbon-display-option[aria-checked="true"]::before {
+    width: 9px;
+    height: 5px;
+    border-bottom: 2px solid var(--fc-tb-accent);
+    border-left: 2px solid var(--fc-tb-accent);
+    content: "";
+    transform: rotate(-45deg);
+  }
 
-.fc-tb__ribbon-group {
-  display: grid;
-  flex: 0 0 auto;
-  grid-template-rows: 1fr auto;
-  align-items: end;
-  min-width: max-content;
-  max-width: none;
-  padding: 0 6px;
-  border-right: 1px solid var(--fc-tb-ribbon-line);
-}
+  .fc-tb__ribbon-group {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-rows: 1fr auto;
+    align-items: end;
+    min-width: max-content;
+    max-width: none;
+    padding: 0 6px;
+    border-right: 1px solid var(--fc-tb-ribbon-line);
+  }
 
-.fc-tb__ribbon-group:first-child {
-  padding-left: 0;
-}
+  .fc-tb__ribbon-group:first-child {
+    padding-left: 0;
+  }
 
-.fc-tb__ribbon-group:last-child {
-  border-right: 0;
-}
+  .fc-tb__ribbon-group:last-child {
+    border-right: 0;
+  }
 
-.fc-tb__ribbon-tools {
-  display: flex;
-  align-items: flex-start;
-  align-content: flex-start;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 2px;
-  min-height: 76px;
-  max-height: 76px;
-}
+  .fc-tb__ribbon-tools {
+    display: flex;
+    align-items: flex-start;
+    align-content: flex-start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 2px;
+    min-height: 76px;
+    max-height: 76px;
+  }
 
-.fc-tb__ribbon-label {
-  height: 14px;
-  /* 10px text needs the full 4.5:1 ratio, so the label can only be washed out
-     so far before it drops under WCAG AA against the ribbon background. */
-  color: color-mix(in srgb, var(--fc-tb-fg-soft) 90%, var(--fc-tb-ribbon-bg));
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
-  white-space: nowrap;
-}
+  .fc-tb__ribbon-label {
+    height: 14px;
+    /* 10px text needs the full 4.5:1 ratio, so the label can only be washed out
+       so far before it drops under WCAG AA against the ribbon background. */
+    color: color-mix(in srgb, var(--fc-tb-fg-soft) 90%, var(--fc-tb-ribbon-bg));
+    font-size: 10px;
+    line-height: 14px;
+    text-align: center;
+    white-space: nowrap;
+  }
 
-.fc-tb__rb {
-  display: inline-flex;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 26px;
-  padding: 0 2px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  color: var(--fc-tb-fg);
-  font-family: var(--fc-tb-font);
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    background 80ms ease,
-    border-color 80ms ease,
-    color 80ms ease;
-}
-.fc-tb__rb:where(:has(> .fc-tb__rb-split-chevron)) {
-  min-width: 36px;
-}
-.fc-tb__rb:hover:not(:disabled) {
-  background: var(--fc-tb-ribbon-hover);
-  border-color: var(--fc-tb-ribbon-line);
-}
-.fc-tb__rb:active:not(:disabled) {
-  background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
-  border-color: var(--fc-tb-ribbon-line);
-}
-.fc-tb__rb:focus-visible {
-  outline: 2px solid var(--fc-tb-accent);
-  outline-offset: -2px;
-}
-.fc-tb__rb:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.fc-tb__rb--active {
-  background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
-  border-color: var(--fc-tb-ribbon-line);
-  color: var(--fc-tb-fg);
-}
-.fc-tb__rb-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  display: block;
-  vector-effect: non-scaling-stroke;
-}
-.fc-tb__rb--large {
-  position: relative;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 58px;
-  height: 66px;
-  padding: 2px 2px 3px;
-  font-size: 11px;
-  line-height: 1.1;
-}
-.fc-tb__rb--large .fc-tb__rb-icon {
-  width: 32px;
-  height: 32px;
-}
-.fc-tb__rb--large > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  display: -webkit-box;
-  flex: 1 1 auto;
-  /* A label never splits a word: the button grows to the longest one. */
-  width: 54px;
-  min-width: min-content;
-  min-height: 2.2em;
-  max-height: 2.2em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.1;
-  white-space: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-.fc-tb__rb--large .fc-tb__rb-icon {
-  flex: 0 0 32px;
-}
-/* Two-line labels break between phrases rather than inside a word, and the
-   two lines share the width evenly. */
-.fc-tb__ribbon .fc-tb__rb > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
-  word-break: auto-phrase;
-  text-wrap-style: balance;
-}
-.fc-tb__rb--large .fc-tb__rb-split-chevron {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  margin-top: 0;
-}
-.fc-tb__rb-split-chevron {
-  width: 10px;
-  height: 7px;
-  flex: 0 0 10px;
-  margin-top: -2px;
-  pointer-events: auto;
-}
-.fc-tb__rb--mono {
-  font-family: var(--fc-tb-mono);
-  font-size: 11px;
-  font-weight: 500;
-  width: auto;
-  min-width: 30px;
-  padding: 0 6px;
-}
+  .fc-tb__rb {
+    display: inline-flex;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 26px;
+    padding: 0 2px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    color: var(--fc-tb-fg);
+    font-family: var(--fc-tb-font);
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+      background 80ms ease,
+      border-color 80ms ease,
+      color 80ms ease;
+  }
+  .fc-tb__rb:where(:has(> .fc-tb__rb-split-chevron)) {
+    min-width: 36px;
+  }
+  .fc-tb__rb:hover:not(:disabled) {
+    background: var(--fc-tb-ribbon-hover);
+    border-color: var(--fc-tb-ribbon-line);
+  }
+  .fc-tb__rb:active:not(:disabled) {
+    background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
+    border-color: var(--fc-tb-ribbon-line);
+  }
+  .fc-tb__rb:focus-visible {
+    outline: 2px solid var(--fc-tb-accent);
+    outline-offset: -2px;
+  }
+  .fc-tb__rb:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .fc-tb__rb--active {
+    background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
+    border-color: var(--fc-tb-ribbon-line);
+    color: var(--fc-tb-fg);
+  }
+  .fc-tb__rb-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: block;
+    vector-effect: non-scaling-stroke;
+  }
+  .fc-tb__rb--large {
+    position: relative;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 58px;
+    height: 66px;
+    padding: 2px 2px 3px;
+    font-size: 11px;
+    line-height: 1.1;
+  }
+  .fc-tb__rb--large .fc-tb__rb-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .fc-tb__rb--large > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    display: -webkit-box;
+    flex: 1 1 auto;
+    /* A label never splits a word: the button grows to the longest one. */
+    width: 54px;
+    min-width: min-content;
+    min-height: 2.2em;
+    max-height: 2.2em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.1;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .fc-tb__rb--large .fc-tb__rb-icon {
+    flex: 0 0 32px;
+  }
+  /* Two-line labels break between phrases rather than inside a word, and the
+     two lines share the width evenly. */
+  .fc-tb__ribbon .fc-tb__rb > span:not(.fc-tb__rb-icon):not(.fc-tb__rb-split-chevron) {
+    word-break: auto-phrase;
+    text-wrap-style: balance;
+  }
+  .fc-tb__rb--large .fc-tb__rb-split-chevron {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    margin-top: 0;
+  }
+  .fc-tb__rb-split-chevron {
+    width: 10px;
+    height: 7px;
+    flex: 0 0 10px;
+    margin-top: -2px;
+    pointer-events: auto;
+  }
+  .fc-tb__rb--mono {
+    font-family: var(--fc-tb-mono);
+    font-size: 11px;
+    font-weight: 500;
+    width: auto;
+    min-width: 30px;
+    padding: 0 6px;
+  }
 
-.fc-tb__rb--wide {
-  width: auto;
-  min-width: 58px;
-  max-width: 160px;
-  padding: 0 7px;
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fc-tb__rb--bold {
-  font-weight: 700;
-}
-.fc-tb__rb--italic {
-  font-style: italic;
-}
-.fc-tb__rb--underline {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.fc-tb__rb--strike {
-  text-decoration: line-through;
-}
+  .fc-tb__rb--wide {
+    width: auto;
+    min-width: 58px;
+    max-width: 160px;
+    padding: 0 7px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fc-tb__rb--bold {
+    font-weight: 700;
+  }
+  .fc-tb__rb--italic {
+    font-style: italic;
+  }
+  .fc-tb__rb--underline {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .fc-tb__rb--strike {
+    text-decoration: line-through;
+  }
 
-/* A collapsed ribbon opens over the worksheet without resizing its viewport. */
-.fc-tb__ribbon-shell--peek > .fc-tb__ribbon:not([hidden]) {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  left: 0;
-  z-index: 90;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.13);
-}
+  /* A collapsed ribbon opens over the worksheet without resizing its viewport. */
+  .fc-tb__ribbon-shell--peek > .fc-tb__ribbon:not([hidden]) {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    z-index: 90;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.13);
+  }
 
-/* The display-options menu opens over the peeking ribbon, not under it. */
-.fc-tb__ribbon-shell--peek .fc-tb__ribbon-display {
-  z-index: 91;
+  /* The display-options menu opens over the peeking ribbon, not under it. */
+  .fc-tb__ribbon-shell--peek .fc-tb__ribbon-display {
+    z-index: 91;
+  }
 }
