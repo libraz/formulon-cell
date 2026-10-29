@@ -480,6 +480,45 @@ describe('mount/formula-bar — edit lifecycle', () => {
     controller.detach();
   });
 
+  it('reapplies dragged ranges to the formula bar selection captured at pointer start', () => {
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = harness;
+    input.focus();
+    input.dispatchEvent(new FocusEvent('focus'));
+    input.value = '=SUM(B1:B2)+D1';
+    input.dispatchEvent(new Event('input'));
+    input.setSelectionRange(8, 10);
+
+    controller.insertRefAtCaret('C4', { phase: 'start' });
+    expect(input.value).toBe('=SUM(B1:C4)+D1');
+    controller.insertRefAtCaret('C4:D5', { phase: 'update' });
+    expect(input.value).toBe('=SUM(B1:C4:D5)+D1');
+    controller.insertRefAtCaret('A4:C5', { phase: 'update' });
+    expect(input.value).toBe('=SUM(B1:A4:C5)+D1');
+
+    harness.detach();
+  });
+
+  it('rejects a stale formula-bar drag update after text input', () => {
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = harness;
+    input.focus();
+    input.dispatchEvent(new FocusEvent('focus'));
+    input.value = '=SUM(B1:B2)+D1';
+    input.dispatchEvent(new Event('input'));
+    input.setSelectionRange(8, 10);
+    controller.insertRefAtCaret('C4', { phase: 'start' });
+
+    input.value = `${input.value}+E1`;
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new Event('input'));
+    const afterEdit = input.value;
+    controller.insertRefAtCaret('C4:D5', { phase: 'update' });
+
+    expect(input.value).toBe(afterEdit);
+    harness.detach();
+  });
+
   it('Mac formula-bar range insertion leaves the caret ready for more formula text', () => {
     sheet.host.dataset.fcPlatform = 'mac';
     const active = { sheet: 0, row: 0, col: 2 };

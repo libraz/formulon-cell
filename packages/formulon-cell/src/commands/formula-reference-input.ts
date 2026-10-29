@@ -15,13 +15,26 @@ interface ReferenceSpan {
 const IDENT_CHAR = /[\p{L}\p{N}_.\\]/u;
 const R1C1_ATOM = /R(?:\[-?\d+\]|[1-9]\d*)?C(?:\[-?\d+\]|[1-9]\d*)?/iy;
 
+function mergeColonConnectedSpans(text: string, spans: ReferenceSpan[]): ReferenceSpan[] {
+  const merged: ReferenceSpan[] = [];
+  for (const span of spans) {
+    const previous = merged[merged.length - 1];
+    if (previous && /^\s*:\s*$/u.test(text.slice(previous.end, span.start))) {
+      previous.end = span.end;
+    } else {
+      merged.push({ ...span });
+    }
+  }
+  return merged;
+}
+
 function a1ReferenceSpans(text: string): ReferenceSpan[] {
   const spans: ReferenceSpan[] = [];
   rewriteRefs(text, (token, start) => {
     spans.push({ start, end: token.end });
     return null;
   });
-  return spans;
+  return mergeColonConnectedSpans(text, spans);
 }
 
 function readQuotedSheet(text: string, start: number): number | null {
@@ -116,10 +129,14 @@ function matchR1C1At(text: string, start: number): { end: number } | null {
   const first = R1C1_ATOM.exec(text);
   if (!first || first.index !== start) return null;
   let end = start + first[0].length;
-  if (text[end] === ':') {
-    R1C1_ATOM.lastIndex = end + 1;
-    const second = R1C1_ATOM.exec(text);
-    if (second?.index === end + 1) end = end + 1 + second[0].length;
+  while (true) {
+    const colon = /^\s*:\s*/u.exec(text.slice(end));
+    if (!colon) break;
+    const nextStart = end + colon[0].length;
+    R1C1_ATOM.lastIndex = nextStart;
+    const next = R1C1_ATOM.exec(text);
+    if (!next || next.index !== nextStart) break;
+    end = nextStart + next[0].length;
   }
   if (IDENT_CHAR.test(text[end] ?? '') || text[end] === '[' || text[end] === '(') return null;
   return { end };

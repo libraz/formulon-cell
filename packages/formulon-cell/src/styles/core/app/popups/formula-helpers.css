@@ -1,86 +1,139 @@
-/* Editor helper popovers — function autocomplete and the signature
-   tooltip (arghelper) that hovers over the active cell editor. */
+/* Editor helper popovers — a compact function list, its active function
+   ScreenTip, and the signature tooltip for an open call. */
 
 @layer fc.app {
-  /* Function autocomplete — popover under the active editor offering matching
-     function names in a compact monospace listing. */
   .fc-autocomplete {
     position: fixed;
     z-index: var(--fc-z-popover, 2147483040);
+    display: grid;
+    grid-template-columns: 220px 224px;
+    align-items: start;
+    gap: 8px;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: calc(100vw - 12px);
+    overflow: visible;
+    pointer-events: none;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    user-select: none;
+  }
+  .fc-autocomplete.fc-autocomplete--narrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fc-autocomplete__list {
+    position: relative;
+    box-sizing: border-box;
+    width: 220px;
+    min-width: 180px;
+    max-height: min(200px, calc(100vh - 20px));
+    padding: 2px 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
     pointer-events: auto;
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule-strong, var(--fc-rule));
     border-radius: 2px;
     box-shadow:
-      0 8px 24px rgba(0, 0, 0, 0.18),
-      0 1px 3px rgba(0, 0, 0, 0.14);
-    max-height: 292px;
-    overflow-y: auto;
-    font-family: var(--fc-font-ui, system-ui);
-    font-size: 12px;
+      0 5px 16px rgba(0, 0, 0, 0.16),
+      0 1px 3px rgba(0, 0, 0, 0.12);
     color: var(--fc-fg, currentColor);
-    user-select: none;
   }
   .fc-autocomplete__item {
     display: grid;
-    grid-template-columns: 26px minmax(0, 1fr);
+    grid-template-columns: 18px minmax(0, 1fr);
     align-items: center;
-    gap: 8px;
+    gap: 7px;
+    box-sizing: border-box;
     width: 100%;
-    min-height: 32px;
-    padding: 3px 8px;
+    min-height: 24px;
+    padding: 2px 7px;
     border: 0;
-    border-bottom: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+    border-radius: 2px;
     background: transparent;
     color: inherit;
     font: inherit;
     text-align: left;
     cursor: pointer;
-    line-height: 1.25;
-  }
-  .fc-autocomplete__item:last-child {
-    border-bottom: 0;
+    line-height: 1.2;
   }
   .fc-autocomplete__item:hover,
   .fc-autocomplete__item--active {
-    background: #f3f2f1;
-    color: var(--fc-fg, currentColor);
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
+    color: var(--fc-fg-strong, currentColor);
+  }
+  .fc-autocomplete__item--active {
+    outline: 1px solid var(--fc-accent-soft, var(--fc-accent, currentColor));
+    outline-offset: -1px;
+  }
+  .fc-autocomplete__glyph {
+    display: block;
+    width: 16px;
+    height: 16px;
+    color: var(--fc-fg-mute, currentColor);
   }
   .fc-autocomplete__badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 23px;
-    height: 18px;
-    border: 1px solid var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg, Canvas);
+    width: 18px;
+    height: 16px;
     color: var(--fc-fg-mute, currentColor);
     font-family: var(--fc-font-mono, monospace);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
-  }
-  .fc-autocomplete__main {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
   }
   .fc-autocomplete__name {
     overflow: hidden;
     color: var(--fc-fg-strong, currentColor);
-    font-family: var(--fc-font-mono, monospace);
-    font-size: 12.5px;
-    font-weight: 600;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .fc-autocomplete__detail {
-    overflow: hidden;
-    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+  .fc-autocomplete__help {
+    box-sizing: border-box;
+    width: 224px;
+    min-width: 170px;
+    max-width: calc(100vw - 250px);
+    max-height: min(160px, calc(100vh - 20px));
+    padding: 6px 8px;
+    overflow-y: auto;
+    pointer-events: none;
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule-strong, var(--fc-rule));
+    border-radius: 2px;
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.14),
+      0 1px 3px rgba(0, 0, 0, 0.1);
+    color: var(--fc-fg, currentColor);
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+  .fc-autocomplete.fc-autocomplete--narrow .fc-autocomplete__help {
+    height: 72px;
+    max-height: 72px;
+  }
+  .fc-autocomplete__help:empty {
+    visibility: hidden;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .fc-autocomplete__signature {
+    color: var(--fc-fg-strong, currentColor);
+    font-family: var(--fc-font-mono, monospace);
     font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .fc-autocomplete__description {
+    margin-top: 4px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 64%, transparent));
+    overflow-wrap: anywhere;
   }
 
   /* Argument helper — floating signature tip above the editor that shows
@@ -88,6 +141,10 @@
   .fc-arghelper {
     position: fixed;
     z-index: var(--fc-z-popover, 2147483040);
+    box-sizing: border-box;
+    max-width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    overflow: auto;
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
     border-radius: 2px;
@@ -95,24 +152,37 @@
       0 6px 16px rgba(0, 0, 0, 0.14),
       0 1px 3px rgba(0, 0, 0, 0.12);
     padding: 3px 8px;
+    color: var(--fc-fg, currentColor);
     font-family: var(--fc-font-mono, monospace);
     font-size: 12px;
-    color: var(--fc-fg, currentColor);
     user-select: none;
     white-space: nowrap;
     pointer-events: none;
   }
-  .fc-arghelper__name {
-    color: var(--fc-fg-mute);
-  }
-  .fc-arghelper__sep {
-    color: var(--fc-fg-mute);
-  }
+  .fc-arghelper__name,
+  .fc-arghelper__sep,
   .fc-arghelper__arg {
     color: var(--fc-fg-mute);
   }
   .fc-arghelper__arg--active {
     color: var(--fc-fg-strong, CanvasText);
     font-weight: 600;
+  }
+
+  @media (max-width: 520px) {
+    .fc-autocomplete {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px;
+    }
+    .fc-autocomplete__list {
+      width: min(220px, calc(100vw - 20px));
+      min-width: 0;
+      max-height: min(200px, calc(100vh - 120px));
+    }
+    .fc-autocomplete__help {
+      width: min(220px, calc(100vw - 20px));
+      max-width: none;
+      max-height: min(96px, calc(100vh - 220px));
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { applyMerge } from '../../src/commands/merge.js';
+import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import { cellRectUnclamped, layoutForView } from '../../src/render/geometry.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
@@ -50,10 +51,38 @@ const center = (sheet: MountedStubSheet, row: number, col: number): { x: number;
   return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
 };
 
+const mountRealSheet = async (): Promise<MountedStubSheet> => {
+  const workbook = await WorkbookHandle.createDefault();
+  expect(workbook.isStub).toBe(false);
+  return mountStubSheet({ workbook });
+};
+
+const seedFormulaReferenceCells = (
+  sheet: MountedStubSheet,
+  extra: Array<{ row: number; col: number; value: number }> = [],
+): void => {
+  const cells = [
+    { row: 0, col: 1, value: 2 },
+    { row: 1, col: 1, value: 3 },
+    { row: 0, col: 3, value: 7 },
+    { row: 3, col: 2, value: 11 },
+    { row: 4, col: 3, value: 13 },
+    ...extra,
+  ];
+  for (const cell of cells) {
+    sheet.workbook.setNumber({ sheet: 0, row: cell.row, col: cell.col }, cell.value);
+  }
+};
+
 describe('integration: formula reference pointer routing', () => {
   let sheet: MountedStubSheet;
 
-  afterEach(() => sheet?.dispose());
+  afterEach(() => {
+    if (!sheet) return;
+    const workbook = sheet.workbook;
+    sheet.dispose();
+    if (!workbook.isStub) workbook.dispose();
+  });
 
   it.each(['default', 'mac'] as const)(
     '%s platform inserts references from formula bar draft and commits the edited formula',
@@ -85,6 +114,118 @@ describe('integration: formula reference pointer routing', () => {
       expect(sheet.workbook.cellFormula(addr)).toBe('=B2+A2');
     },
   );
+
+  it('preserves the untouched A1 endpoint while dragging a formula-bar reference forward', async () => {
+    sheet = await mountRealSheet();
+    prepareViewport(sheet);
+    const formulaAddr = { sheet: 0, row: 4, col: 4 };
+    seedFormulaReferenceCells(sheet);
+    sheet.workbook.setFormula(formulaAddr, '=SUM(B1:B2)+D1');
+    sheet.workbook.recalc();
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    mutators.setActive(sheet.instance.store, formulaAddr);
+    const formula = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
+    expect(formula).not.toBeNull();
+    expect(grid).not.toBeNull();
+    formula?.focus();
+    formula?.dispatchEvent(new FocusEvent('focus'));
+    const endpoint = formula?.value.indexOf('B2') ?? -1;
+    expect(endpoint).toBeGreaterThanOrEqual(0);
+    formula?.setSelectionRange(endpoint, endpoint + 2);
+
+    const c4 = center(sheet, 3, 2);
+    const d5 = center(sheet, 4, 3);
+    if (grid) {
+      pointer(grid, 'pointerdown', c4.x, c4.y);
+      expect(formula?.value).toBe('=SUM(B1:C4)+D1');
+      pointer(grid, 'pointermove', d5.x, d5.y);
+      expect(formula?.value).toBe('=SUM(B1:C4:D5)+D1');
+      pointer(grid, 'pointerup', d5.x, d5.y);
+    }
+
+    formula?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    expect(sheet.workbook.cellFormula(formulaAddr)).toBe('=SUM(B1:C4:D5)+D1');
+    expect(sheet.workbook.getValue(formulaAddr)).toEqual({ kind: 'number', value: 43 });
+  });
+
+  it('preserves the untouched endpoint while dragging an inline formula reference forward', async () => {
+    sheet = await mountRealSheet();
+    prepareViewport(sheet);
+    const formulaAddr = { sheet: 0, row: 4, col: 4 };
+    seedFormulaReferenceCells(sheet);
+    sheet.workbook.setFormula(formulaAddr, '=SUM(B1:B2)+D1');
+    sheet.workbook.recalc();
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    mutators.setActive(sheet.instance.store, formulaAddr);
+    sheet.host.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+    const formula = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__editor');
+    const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
+    expect(formula).not.toBeNull();
+    expect(grid).not.toBeNull();
+    expect(formula?.value).toBe('=SUM(B1:B2)+D1');
+    const endpoint = formula?.value.indexOf('B2') ?? -1;
+    expect(endpoint).toBeGreaterThanOrEqual(0);
+    formula?.setSelectionRange(endpoint, endpoint + 2);
+
+    const c4 = center(sheet, 3, 2);
+    const d5 = center(sheet, 4, 3);
+    if (grid) {
+      pointer(grid, 'pointerdown', c4.x, c4.y);
+      expect(formula?.value).toBe('=SUM(B1:C4)+D1');
+      pointer(grid, 'pointermove', d5.x, d5.y);
+      expect(formula?.value).toBe('=SUM(B1:C4:D5)+D1');
+      pointer(grid, 'pointerup', d5.x, d5.y);
+    }
+
+    formula?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    expect(sheet.workbook.cellFormula(formulaAddr)).toBe('=SUM(B1:C4:D5)+D1');
+    expect(sheet.workbook.getValue(formulaAddr)).toEqual({ kind: 'number', value: 43 });
+  });
+
+  it('preserves the original endpoint when dragging a formula-bar reference in reverse R1C1 style', async () => {
+    sheet = await mountRealSheet();
+    prepareViewport(sheet);
+    const formulaAddr = { sheet: 0, row: 4, col: 4 };
+    seedFormulaReferenceCells(sheet, [
+      { row: 3, col: 0, value: 17 },
+      { row: 4, col: 2, value: 19 },
+    ]);
+    sheet.workbook.setFormula(formulaAddr, '=SUM(B1:B2)+D1');
+    sheet.workbook.recalc();
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    mutators.setR1C1(sheet.instance.store, true);
+    mutators.setActive(sheet.instance.store, formulaAddr);
+    const formula = sheet.host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    const grid = sheet.host.querySelector<HTMLElement>('.fc-host__grid');
+    expect(formula).not.toBeNull();
+    expect(grid).not.toBeNull();
+    formula?.focus();
+    formula?.dispatchEvent(new FocusEvent('focus'));
+    const endpoint = formula?.value.indexOf('R[-3]C[-3]') ?? -1;
+    expect(endpoint).toBeGreaterThanOrEqual(0);
+    formula?.setSelectionRange(endpoint, endpoint + 'R[-3]C[-3]'.length);
+
+    const c5 = center(sheet, 4, 2);
+    const a4 = center(sheet, 3, 0);
+    if (grid) {
+      pointer(grid, 'pointerdown', c5.x, c5.y);
+      expect(formula?.value).toBe('=SUM(R[-4]C[-3]:RC[-2])+R[-4]C[-1]');
+      pointer(grid, 'pointermove', a4.x, a4.y);
+      expect(formula?.value).toBe('=SUM(R[-4]C[-3]:R[-1]C[-4]:RC[-2])+R[-4]C[-1]');
+      pointer(grid, 'pointerup', a4.x, a4.y);
+    }
+
+    formula?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    expect(sheet.workbook.cellFormula(formulaAddr)).toBe('=SUM(B1:A4:C5)+D1');
+    expect(sheet.workbook.getValue(formulaAddr).kind).toBe('number');
+  });
 
   it('uses the merged cell anchor for a clicked reference and range drag', async () => {
     sheet = await mountStubSheet({ ui: { platform: 'mac' } });

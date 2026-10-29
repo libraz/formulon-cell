@@ -139,6 +139,27 @@ describe('attachArgHelper', () => {
     handle.detach();
   });
 
+  it('hides while composing and refreshes when composition ends', () => {
+    setText(input, '=SUM(');
+    const handle = attachArgHelper({ input });
+    handle.refresh();
+    expect(tooltip()).not.toBeNull();
+
+    expect(handle.setComposing).toBeTypeOf('function');
+    handle.setComposing?.(true);
+    expect(tooltip()).toBeNull();
+    handle.refresh();
+    expect(tooltip()).toBeNull();
+    handle.setComposing?.(false);
+    expect(tooltip()).not.toBeNull();
+
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    expect(tooltip()).toBeNull();
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    expect(tooltip()).not.toBeNull();
+    handle.detach();
+  });
+
   it('detach removes the tooltip element from the DOM', () => {
     setText(input, '=SUM(');
     const handle = attachArgHelper({ input });

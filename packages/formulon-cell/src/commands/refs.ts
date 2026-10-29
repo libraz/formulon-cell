@@ -27,8 +27,7 @@ export interface FormulaRef {
  *  while editing a formula. */
 export function extractRefs(text: string): FormulaRef[] {
   if (!text.startsWith('=')) return [];
-  const out: FormulaRef[] = [];
-  const colorMap = new Map<string, number>();
+  const candidates: Omit<FormulaRef, 'colorIndex'>[] = [];
   rewriteRefs(text, (token, start) => {
     if (token.kind !== 'cell') return null;
     const headStart = start + token.sheetQual.length;
@@ -49,24 +48,41 @@ export function extractRefs(text: string): FormulaRef[] {
     const r1 = Math.max(head.row, tail.row);
     const c0 = Math.min(head.col, tail.col);
     const c1 = Math.max(head.col, tail.col);
-    const key = `${r0}:${c0}:${r1}:${c1}`;
-    let colorIndex = colorMap.get(key);
-    if (colorIndex === undefined) {
-      colorIndex = colorMap.size;
-      colorMap.set(key, colorIndex);
-    }
-    out.push({
+    candidates.push({
       r0,
       c0,
       r1,
       c1,
       start,
       end: token.end,
-      colorIndex,
     });
     return null;
   });
-  return out;
+
+  const merged: Omit<FormulaRef, 'colorIndex'>[] = [];
+  for (const candidate of candidates) {
+    const previous = merged[merged.length - 1];
+    if (previous && /^\s*:\s*$/u.test(text.slice(previous.end, candidate.start))) {
+      previous.r0 = Math.min(previous.r0, candidate.r0);
+      previous.c0 = Math.min(previous.c0, candidate.c0);
+      previous.r1 = Math.max(previous.r1, candidate.r1);
+      previous.c1 = Math.max(previous.c1, candidate.c1);
+      previous.end = candidate.end;
+    } else {
+      merged.push({ ...candidate });
+    }
+  }
+
+  const colorMap = new Map<string, number>();
+  return merged.map((ref) => {
+    const key = `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}`;
+    let colorIndex = colorMap.get(key);
+    if (colorIndex === undefined) {
+      colorIndex = colorMap.size;
+      colorMap.set(key, colorIndex);
+    }
+    return { ...ref, colorIndex };
+  });
 }
 
 /** Distinct accent colors used for formula-edit reference highlighting. They

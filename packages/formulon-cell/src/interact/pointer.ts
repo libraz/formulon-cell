@@ -542,7 +542,7 @@ export function attachPointer(
       const anchor = { row: mergedAnchor.row, col: mergedAnchor.col };
       const base = { row: s.selection.active.row, col: s.selection.active.col };
       const r1c1 = s.ui.r1c1 === true;
-      editor.insertRefAtCaret(refOf(anchor.row, anchor.col, { r1c1, base }));
+      editor.insertRefAtCaret(refOf(anchor.row, anchor.col, { r1c1, base }), { phase: 'start' });
       drag = { kind: 'range-insert', anchor, tip: anchor, base, r1c1 };
       return;
     }
@@ -794,6 +794,7 @@ export function attachPointer(
         if (editor) {
           editor.insertRefAtCaret(
             rangeRefOf(drag.anchor, drag.tip, { r1c1: drag.r1c1, base: drag.base }),
+            { phase: 'update' },
           );
         }
         return;

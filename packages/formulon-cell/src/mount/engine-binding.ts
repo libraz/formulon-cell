@@ -217,7 +217,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       editor.isActive() && editor.isFormulaEdit()
         ? {
             isFormulaEdit: () => editor.isFormulaEdit(),
-            insertRefAtCaret: (ref) => editor.insertRefAtCaret(ref),
+            insertRefAtCaret: (ref, options) => editor.insertRefAtCaret(ref, options),
           }
         : (getFormulaBarEditor?.() ?? null),
     () => ({

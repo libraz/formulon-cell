@@ -35,6 +35,41 @@ describe('rotateRefAt lexical boundaries', () => {
     expect(rotateRefAt('=Foo.A1+1', 6)).toEqual({ text: '=Foo.A1+1', caret: 6 });
   });
 
+  it('extracts colon chains as one bounding ref and assigns colors after merging', () => {
+    const formula = '=E1+SUM(B1:C4:D5)+SUM(B1:D5)';
+    const refs = extractRefs(formula);
+
+    expect(refs).toEqual([
+      {
+        r0: 0,
+        c0: 4,
+        r1: 0,
+        c1: 4,
+        start: formula.indexOf('E1'),
+        end: formula.indexOf('E1') + 2,
+        colorIndex: 0,
+      },
+      {
+        r0: 0,
+        c0: 1,
+        r1: 4,
+        c1: 3,
+        start: formula.indexOf('B1'),
+        end: formula.indexOf('D5') + 2,
+        colorIndex: 1,
+      },
+      {
+        r0: 0,
+        c0: 1,
+        r1: 4,
+        c1: 3,
+        start: formula.lastIndexOf('B1'),
+        end: formula.lastIndexOf('D5') + 2,
+        colorIndex: 1,
+      },
+    ]);
+  });
+
   it('does not offer function suggestions inside string literals', () => {
     expect(suggestFunctions('="SUM"', 5)).toBeNull();
   });

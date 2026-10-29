@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { defaultStrings } from '../../../../src/i18n/strings.js';
+import { attachFormulaBarController } from '../../../../src/mount/formula-bar.js';
 import { mutators } from '../../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/index.js';
 import {
@@ -7,6 +9,38 @@ import {
   attachFormulaBarHarness,
   type ExternalDraftTestHandle,
 } from './fixtures.js';
+
+const attachFormulaBarWithAutocomplete = (sheet: MountedStubSheet) => {
+  const formulabar = document.createElement('div');
+  const fxInput = document.createElement('textarea');
+  const fxAccept = document.createElement('button');
+  const fxCancel = document.createElement('button');
+  formulabar.append(fxCancel, fxAccept, fxInput);
+  sheet.host.appendChild(formulabar);
+  const autocomplete = {
+    isOpen: () => false,
+    move: vi.fn(),
+    acceptHighlighted: vi.fn(() => false),
+    close: vi.fn(),
+    refresh: vi.fn(),
+  };
+  const argHelper = { refresh: vi.fn(), close: vi.fn() };
+  const controller = attachFormulaBarController({
+    formulabar,
+    fxAccept,
+    fxCancel,
+    fxInput,
+    getArgHelper: () => argHelper,
+    getAutocomplete: () => autocomplete,
+    getStrings: () => defaultStrings,
+    cancelBindingEditor: () => {},
+    host: sheet.host,
+    store: sheet.instance.store,
+    updateChrome: () => {},
+    wb: () => sheet.workbook,
+  });
+  return { controller, fxInput, autocomplete, detach: controller.detach };
+};
 
 describe('mount/formula-bar — native commit result', () => {
   let sheet: MountedStubSheet;
@@ -607,6 +641,53 @@ describe('mount/formula-bar — native commit result', () => {
     }
 
     draft.cancel();
+    harness.detach();
+  });
+
+  it('dismisses an external draft suggestion popup before the first Escape cancels the draft', () => {
+    const harness = attachFormulaBarWithAutocomplete(sheet);
+    const address = { sheet: 0, row: 0, col: 0 };
+    const onFinish = vi.fn();
+    const draft = harness.controller.beginExternalDraft(address, '=SU', { onFinish });
+    if (!draft) throw new Error('External draft did not start.');
+    const open = vi.spyOn(harness.autocomplete, 'isOpen').mockReturnValue(true);
+    const close = vi.spyOn(harness.autocomplete, 'close');
+
+    const firstEscape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      cancelable: true,
+      bubbles: true,
+    });
+    harness.fxInput.dispatchEvent(firstEscape);
+    expect(firstEscape.defaultPrevented).toBe(true);
+    expect(close).toHaveBeenCalledOnce();
+    expect(onFinish).not.toHaveBeenCalled();
+    expect(harness.controller.isEditing()).toBe(true);
+
+    open.mockReturnValue(false);
+    harness.fxInput.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, bubbles: true }),
+    );
+    expect(onFinish).toHaveBeenCalledWith('cancelled');
+    harness.detach();
+  });
+
+  it('commits a typed external formula on Enter without accepting the highlighted suggestion', () => {
+    const harness = attachFormulaBarWithAutocomplete(sheet);
+    const address = { sheet: 0, row: 0, col: 0 };
+    const onFinish = vi.fn();
+    const draft = harness.controller.beginExternalDraft(address, '=SUM(1)', { onFinish });
+    if (!draft) throw new Error('External draft did not start.');
+    vi.spyOn(harness.autocomplete, 'isOpen').mockReturnValue(true);
+    const accept = vi.spyOn(harness.autocomplete, 'acceptHighlighted');
+
+    harness.fxInput.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }),
+    );
+
+    expect(accept).not.toHaveBeenCalled();
+    expect(sheet.workbook.cellFormula(address)).toBe('=SUM(1)');
+    expect(onFinish).toHaveBeenCalledWith('committed');
     harness.detach();
   });
 });

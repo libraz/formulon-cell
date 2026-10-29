@@ -4,7 +4,7 @@ import { formatA1Cell } from '../engine/address.js';
  *  detect a live formula edit and inject clicked cell references. */
 export interface RangeInsertTarget {
   isFormulaEdit: () => boolean;
-  insertRefAtCaret: (ref: string) => void;
+  insertRefAtCaret: (ref: string, options?: { phase: 'start' | 'update' }) => void;
 }
 
 const r1c1Axis = (prefix: 'R' | 'C', target: number, base: number): string => {

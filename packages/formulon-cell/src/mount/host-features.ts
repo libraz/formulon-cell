@@ -26,6 +26,7 @@ import type { InlineEditor } from '../interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from '../interact/error-menu.js';
 import { attachFormatDialog } from '../interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from '../interact/format-painter.js';
+import { resolveFormulaHelperDetails } from '../interact/formula-helper-catalog.js';
 import { catalogLocaleOrdinal, catalogLocaleTag } from '../interact/function-catalog-text.js';
 import { attachFxDialog, type FxDialogHandle } from '../interact/fx-dialog.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
@@ -815,7 +816,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.fxAutocomplete !== input.autocompleteStub) return;
         s.fxAutocomplete = attachAutocomplete({
           input: input.fxInput,
-          onAfterInsert: () => input.getFormulaBar().syncFxRefs(),
+          onAfterInsert: () => input.fxInput.dispatchEvent(new Event('input', { bubbles: true })),
           getTables: () => input.wb().getTables(),
           getNames: () =>
             collectAutocompleteNames(
@@ -839,6 +840,18 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             return wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase();
           },
           getListSeparator: () => input.wb().localeFacts()?.listSeparator ?? ',',
+          getFunctionDetails: (canonicalName) => {
+            const wb = input.wb();
+            const localeTag = catalogLocaleTag(inputLocaleForWorkbook(wb) ?? 'en-US');
+            return resolveFormulaHelperDetails(canonicalName, {
+              localeTag,
+              listSeparator: wb.localeFacts()?.listSeparator ?? ',',
+              getMetadata: (name, locale) => wb.functionMetadataForLocale(name, locale),
+              localizeName: (name) =>
+                wb.localizeFunctionName(name, catalogLocaleOrdinal(localeTag)) || name,
+              getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
+            });
+          },
           labels: strings.autocomplete,
         });
         s.fxArgHelper = attachArgHelper({

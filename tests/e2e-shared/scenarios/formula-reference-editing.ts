@@ -85,9 +85,32 @@ export async function runFormulaReferenceEditing(
   expect((await readSource()).formula).toBe(original);
 
   await begin();
-  await select(8, 10); // Replace just B2, preserving the B1: range prefix.
-  await clickCell(3, 2);
+  await select(8, 10); // Replace just B2, preserving the B1: range prefix throughout the drag.
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
   await expect(input).toHaveValue('=SUM(B1:C4)+D1');
+  await page.mouse.move(to.x, to.y, { steps: 5 });
+  await expect(input).toHaveValue('=SUM(B1:C4:D5)+D1');
+  await page.mouse.up();
+  await page.keyboard.press('Enter');
+  await expect.poll(readSource).toEqual({
+    formula: '=SUM(B1:C4:D5)+D1',
+    value: { kind: 'number', value: 43 },
+  });
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.undo(),
+    ),
+  ).toBe(true);
+
+  await begin();
+  await select(8, 10);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  const reverse = await gridCellCenter(page, 4, 0);
+  await page.mouse.move(reverse.x, reverse.y, { steps: 5 });
+  await expect(input).toHaveValue('=SUM(B1:A4:C5)+D1');
+  await page.mouse.up();
   await page.keyboard.press('Escape');
   expect((await readSource()).formula).toBe(original);
 

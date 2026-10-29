@@ -1,4 +1,5 @@
 import { caretInsideImplicitIntersection, findActiveSignature } from '../commands/refs.js';
+import { createFormulaCaretPositioner } from './formula-helper-position.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 let argHelperSeq = 0;
@@ -8,6 +9,8 @@ export interface ArgHelperHandle {
   refresh(): void;
   /** Hide the tooltip. */
   close(): void;
+  /** Hide while an IME composition is in progress. */
+  setComposing?(composing: boolean): void;
   setLabels(labels: Partial<ArgHelperLabels>): void;
   detach(): void;
 }
@@ -44,6 +47,8 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
   };
   let root: HTMLDivElement | null = null;
   let rootId = '';
+  let isComposing = false;
+  const positioner = createFormulaCaretPositioner(input);
 
   const close = (): void => {
     if (!root) return;
@@ -53,9 +58,11 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
   };
 
   const positionAboveCaret = (el: HTMLDivElement): void => {
-    const rect = input.getBoundingClientRect();
-    el.style.left = `${rect.left}px`;
-    el.style.top = `${Math.max(0, rect.top - 26)}px`;
+    positioner.position(
+      el,
+      'above',
+      overlayPortalFor(input).querySelector<HTMLElement>('.fc-autocomplete'),
+    );
   };
 
   const render = (
@@ -116,6 +123,10 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
   };
 
   const refresh = (): void => {
+    if (isComposing || !positioner.isAnchorVisible()) {
+      close();
+      return;
+    }
     const text = input.value;
     const caret = input.selectionStart ?? text.length;
     const sig = findActiveSignature(text, caret, {
@@ -132,15 +143,34 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
     render(displayName, sig.args, sig.activeArgIndex, implicit);
   };
 
+  const setComposing = (composing: boolean): void => {
+    if (isComposing === composing) return;
+    isComposing = composing;
+    if (composing) close();
+    else refresh();
+  };
+
+  const onCompositionStart = (): void => setComposing(true);
+  const onCompositionEnd = (): void => setComposing(false);
+  input.addEventListener('compositionstart', onCompositionStart);
+  input.addEventListener('compositionend', onCompositionEnd);
+  positioner.subscribe(() => {
+    if (root) refresh();
+  });
+
   return {
     refresh,
     close,
+    setComposing,
     setLabels(next) {
       labels = { ...labels, ...next };
       refresh();
     },
     detach() {
       close();
+      input.removeEventListener('compositionstart', onCompositionStart);
+      input.removeEventListener('compositionend', onCompositionEnd);
+      positioner.dispose();
     },
   };
 }

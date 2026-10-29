@@ -26,12 +26,18 @@ import {
   collectAutocompleteNames,
   pickListValues,
 } from './autocomplete.js';
+import { handleFormulaAutocompleteKey } from './formula-autocomplete-key.js';
 import {
   createFormulaEditLease,
   type FormulaEditLease,
   type FormulaEditLeaseContext,
   type FormulaEditLeaseSnapshot,
 } from './formula-edit-lease.js';
+import { resolveFormulaHelperDetails } from './formula-helper-catalog.js';
+import {
+  createFormulaReferenceGesture,
+  type FormulaReferenceGesture,
+} from './formula-reference-gesture.js';
 import { catalogLocaleOrdinal, catalogLocaleTag } from './function-catalog-text.js';
 import { navigationPolicyFor, nextTabStop } from './navigation-policy.js';
 import {
@@ -56,6 +62,12 @@ const policyRejection = (operation: string): { severity: 'stop'; message: string
   severity: 'stop',
   message: `The ${operation} operation is not permitted for this cell.`,
 });
+
+interface ActiveReferenceGesture {
+  gesture: FormulaReferenceGesture;
+  value: string;
+  caret: number;
+}
 
 export interface EditorDeps {
   host: HTMLElement;
@@ -113,6 +125,8 @@ export class InlineEditor {
 
   private composing = false;
 
+  private referenceGesture: ActiveReferenceGesture | null = null;
+
   private editBaseline = '';
 
   private leaseGeneration = 0;
@@ -134,20 +148,42 @@ export class InlineEditor {
   /** Insert `ref` at the current caret, replacing any selection. Used by the
    *  pointer layer to inject a clicked cell/range reference into a live
    *  formula edit. */
-  insertRefAtCaret(ref: string): void {
+  insertRefAtCaret(ref: string, options?: { phase: 'start' | 'update' }): void {
     if (!this.input) return;
     const el = this.input;
-    const result = insertFormulaReference(
-      el.value,
-      el.selectionStart ?? el.value.length,
-      el.selectionEnd ?? el.selectionStart ?? el.value.length,
-      ref,
-      { r1c1: this.deps.store.getState().ui.r1c1 === true },
-    );
+    const selectionStart = el.selectionStart ?? el.value.length;
+    const selectionEnd = el.selectionEnd ?? selectionStart;
+    let gesture: FormulaReferenceGesture | null = null;
+    if (options?.phase === 'start') {
+      gesture = createFormulaReferenceGesture(el.value, selectionStart, selectionEnd, {
+        r1c1: this.deps.store.getState().ui.r1c1 === true,
+      });
+    } else if (options?.phase === 'update') {
+      const current = this.referenceGesture;
+      if (
+        !current ||
+        current.value !== el.value ||
+        current.caret !== selectionStart ||
+        current.caret !== selectionEnd
+      ) {
+        this.referenceGesture = null;
+        return;
+      }
+      gesture = current.gesture;
+    } else {
+      this.referenceGesture = null;
+    }
+    const result = gesture
+      ? gesture.insert(ref)
+      : insertFormulaReference(el.value, selectionStart, selectionEnd, ref, {
+          r1c1: this.deps.store.getState().ui.r1c1 === true,
+        });
+    this.referenceGesture =
+      options?.phase && gesture ? { gesture, value: result.text, caret: result.caret } : null;
     el.value = result.text;
     el.setSelectionRange(result.caret, result.caret);
     el.focus();
-    this.onInput();
+    this.syncInputState();
   }
 
   suspendForFormulaPalette(context: FormulaEditLeaseContext): FormulaEditLease | null {
@@ -253,6 +289,7 @@ export class InlineEditor {
 
   cancel(): void {
     this.invalidateLease();
+    this.referenceGesture = null;
     if (!this.input) {
       this.editingAddr = null;
       this.composing = false;
@@ -274,6 +311,7 @@ export class InlineEditor {
   }
 
   commit(advance: 'down' | 'right' | 'up' | 'left' | 'none' = 'down'): void {
+    this.referenceGesture = null;
     if (!this.input || !this.editingAddr) return;
     const result = commitCellInput({
       store: this.deps.store,
@@ -326,6 +364,7 @@ export class InlineEditor {
    *  formulas as if filled. The active cell is the anchor — the source for
    *  relative-ref deltas. After committing, the active cell stays put. */
   commitMulti(): void {
+    this.referenceGesture = null;
     if (!this.input || !this.editingAddr) return;
     const input = this.input;
     const raw = input.value;
@@ -391,30 +430,12 @@ export class InlineEditor {
     if (this.composing || e.isComposing || e.key === 'Process') {
       return;
     }
-    // When the autocomplete is open, intercept arrow/enter/tab/escape so they
-    //  drive the popover instead of the surrounding editor.
-    if (this.autocomplete?.isOpen()) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        this.autocomplete.move(1);
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        this.autocomplete.move(-1);
-        return;
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        if (this.autocomplete.acceptHighlighted()) {
-          e.preventDefault();
-          return;
-        }
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        this.autocomplete.close();
-        return;
-      }
+    if (
+      this.autocomplete &&
+      handleFormulaAutocompleteKey(e, this.autocomplete, { formulaEdit: this.isFormulaEdit() })
+    ) {
+      e.stopPropagation();
+      return;
     }
     if (
       e.metaKey &&
@@ -434,9 +455,7 @@ export class InlineEditor {
         if (r.text !== this.input.value) {
           this.input.value = r.text;
           this.input.setSelectionRange(r.caret, r.caret);
-          syncEditorRefs(this.deps.store, this.input.value);
-          this.autocomplete?.refresh();
-          this.argHelper?.refresh();
+          this.syncInputState();
         }
       }
       return;
@@ -525,7 +544,7 @@ export class InlineEditor {
       if (r.text !== this.input.value) {
         this.input.value = r.text;
         this.input.setSelectionRange(r.caret, r.caret);
-        syncEditorRefs(this.deps.store, this.input.value);
+        this.syncInputState();
       }
     } else if (e.key === 'F9' && this.input) {
       const start = this.input.selectionStart ?? 0;
@@ -567,17 +586,13 @@ export class InlineEditor {
         e.stopPropagation();
         this.input.value = result.text;
         this.input.setSelectionRange(result.start, result.end);
-        syncEditorRefs(this.deps.store, this.input.value);
-        this.autocomplete?.refresh();
-        this.argHelper?.refresh();
+        this.syncInputState();
       }
     }
   };
 
   private readonly onKeyUp = (): void => {
-    // Caret moves on arrow / Home / End / click — those don't fire `input`,
-    //  but the active argument can change. Refresh the tooltip alone.
-    this.argHelper?.refresh();
+    this.refreshHelpersAfterSelection();
   };
 
   private readonly onBlur = (): void => {
@@ -586,6 +601,11 @@ export class InlineEditor {
   };
 
   private readonly onInput = (): void => {
+    this.referenceGesture = null;
+    this.syncInputState();
+  };
+
+  private syncInputState(): void {
     this.refreshSize();
     if (this.input) this.applyTextAlignment(this.input.value);
     if (this.input) {
@@ -598,15 +618,35 @@ export class InlineEditor {
     }
     this.autocomplete?.refresh();
     this.argHelper?.refresh();
-  };
+  }
 
   private readonly onCompositionStart = (): void => {
     this.composing = true;
+    this.autocomplete?.setComposing?.(true);
+    this.argHelper?.setComposing?.(true);
   };
 
   private readonly onCompositionEnd = (): void => {
     this.composing = false;
+    this.autocomplete?.setComposing?.(false);
+    this.argHelper?.setComposing?.(false);
     this.onInput();
+  };
+
+  private readonly refreshHelpersAfterSelection = (): void => {
+    const input = this.input;
+    const gesture = this.referenceGesture;
+    if (
+      gesture &&
+      (!input ||
+        input.value !== gesture.value ||
+        input.selectionStart !== gesture.caret ||
+        input.selectionEnd !== gesture.caret)
+    ) {
+      this.referenceGesture = null;
+    }
+    this.autocomplete?.refresh();
+    this.argHelper?.refresh();
   };
 
   /** Double-click inside a formula edit selects a semantic token rather than
@@ -615,7 +655,10 @@ export class InlineEditor {
    *  native word selection. */
   private readonly onDblClick = (e: MouseEvent): void => {
     const el = this.input;
-    if (!el?.value.startsWith('=')) return;
+    if (!el?.value.startsWith('=')) {
+      this.refreshHelpersAfterSelection();
+      return;
+    }
     // The browser has already selected a word; probe its midpoint so the hit
     //  point lands inside the intended token.
     const a = el.selectionStart ?? 0;
@@ -626,16 +669,19 @@ export class InlineEditor {
       e.preventDefault();
       el.setSelectionRange(range.start, range.end);
     }
-    this.argHelper?.refresh();
+    this.refreshHelpersAfterSelection();
   };
 
   /** Triple-click inside a formula edit selects the whole formula. */
   private readonly onClick = (e: MouseEvent): void => {
     const el = this.input;
-    if (!el || e.detail < 3 || !el.value.startsWith('=')) return;
+    if (!el || e.detail < 3 || !el.value.startsWith('=')) {
+      this.refreshHelpersAfterSelection();
+      return;
+    }
     e.preventDefault();
     el.setSelectionRange(0, el.value.length);
-    this.argHelper?.refresh();
+    this.refreshHelpersAfterSelection();
   };
 
   private insertNewline(): void {
@@ -646,7 +692,7 @@ export class InlineEditor {
     el.value = `${el.value.slice(0, start)}\n${el.value.slice(end)}`;
     const caret = start + 1;
     el.setSelectionRange(caret, caret);
-    this.refreshSize();
+    this.onInput();
   }
 
   private refreshSize(): void {
@@ -675,6 +721,7 @@ export class InlineEditor {
     this.autocomplete = null;
     this.argHelper?.detach();
     this.argHelper = null;
+    this.referenceGesture = null;
     const input = this.input;
     if (!input) {
       if (focusHost) this.deps.host.focus({ preventScroll: true });
@@ -762,7 +809,10 @@ export class InlineEditor {
     }
     this.autocomplete = attachAutocomplete({
       input,
-      onAfterInsert: () => syncEditorRefs(this.deps.store, input.value),
+      onAfterInsert: () => {
+        this.referenceGesture = null;
+        this.syncInputState();
+      },
       getTables: () => this.deps.wb.getTables(),
       getNames: () =>
         collectAutocompleteNames(this.deps.wb.definedNames(), this.deps.wb.getTables(), addr.sheet),
@@ -786,6 +836,17 @@ export class InlineEditor {
         );
       },
       getListSeparator: () => this.deps.wb.localeFacts()?.listSeparator ?? ',',
+      getFunctionDetails: (canonicalName) =>
+        resolveFormulaHelperDetails(canonicalName, {
+          localeTag: catalogLocaleTag(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US'),
+          listSeparator: this.deps.wb.localeFacts()?.listSeparator ?? ',',
+          getMetadata: (name, locale) => this.deps.wb.functionMetadataForLocale(name, locale),
+          localizeName: (name) => {
+            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US');
+            return this.deps.wb.localizeFunctionName(name, locale) || name;
+          },
+          getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
+        }),
       labels: this.deps.getLabels?.().autocomplete,
     });
     this.argHelper = attachArgHelper({
@@ -834,6 +895,8 @@ export class InlineEditor {
     return [
       ['keydown', this.onKey],
       ['keyup', this.onKeyUp],
+      ['select', this.refreshHelpersAfterSelection],
+      ['mouseup', this.refreshHelpersAfterSelection],
       ['input', this.onInput],
       ['compositionstart', this.onCompositionStart],
       ['compositionend', this.onCompositionEnd],

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   attachAutocomplete,
   collectAutocompleteNames,
@@ -11,6 +11,18 @@ import {
 } from '../../../src/interact/autocomplete.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const liveHandles = new Set<ReturnType<typeof attachAutocomplete>>();
+const attach = (deps: Parameters<typeof attachAutocomplete>[0]) => {
+  const handle = attachAutocomplete(deps);
+  liveHandles.add(handle);
+  return handle;
+};
+
+afterEach(() => {
+  for (const handle of liveHandles) handle.detach();
+  liveHandles.clear();
+  document.body.replaceChildren();
+});
 
 const sales = {
   name: 'Sales',
@@ -58,7 +70,7 @@ describe('suggestStructuredRef', () => {
   it('suggests all columns just inside an empty bracket', () => {
     const text = '=Sales[';
     const ctx = suggestStructuredRef(text, text.length, [sales]);
-    expect(ctx?.matches).toEqual(['Region', 'Revenue', 'Quarter']);
+    expect(ctx?.matches).toEqual(['Quarter', 'Region', 'Revenue']);
     expect(ctx?.tokenStart).toBe('=Sales['.length);
     expect(ctx?.tokenEnd).toBe('=Sales['.length);
     expect(ctx?.insertSuffix).toBe(']');
@@ -135,7 +147,7 @@ describe('attachAutocomplete labels', () => {
     input.value = '=CUS';
     document.body.appendChild(input);
     input.setSelectionRange(input.value.length, input.value.length);
-    const handle = attachAutocomplete({
+    const handle = attach({
       input,
       getCustomFunctions: () => ['CUSTOM_RATE'],
       labels: {
@@ -152,12 +164,38 @@ describe('attachAutocomplete labels', () => {
     input.remove();
   });
 
+  it('resets dismissal when a canceled edit is programmatically closed', () => {
+    const input = document.createElement('textarea');
+    input.value = '=SU';
+    document.body.appendChild(input);
+    input.setSelectionRange(input.value.length, input.value.length);
+    const handle = attach({ input, getFunctionNames: () => ['SUM', 'SUMIF'] });
+    handle.refresh();
+    expect(handle.isOpen()).toBe(true);
+
+    handle.dismiss?.();
+    handle.refresh();
+    expect(handle.isOpen()).toBe(false);
+    input.blur();
+    handle.close();
+
+    // Cancel and begin another edit with the same draft text and caret.
+    input.value = '=SU';
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.focus();
+    handle.refresh();
+    expect(handle.isOpen()).toBe(true);
+
+    handle.detach();
+    input.remove();
+  });
+
   it('shows a custom function signature from its args and falls back to the label', () => {
     const input = document.createElement('textarea');
     input.value = '=CUS';
     document.body.appendChild(input);
     input.setSelectionRange(input.value.length, input.value.length);
-    const handle = attachAutocomplete({
+    const handle = attach({
       input,
       getCustomFunctions: () => ['CUSTOM_RATE', 'CUSTOM_PLAIN'],
       getCustomFunctionArgs: (name) =>
@@ -167,10 +205,12 @@ describe('attachAutocomplete labels', () => {
     });
 
     handle.refresh();
+    handle.move(1);
     const text = document.body.textContent ?? '';
     expect(text).toContain('CUSTOM_RATE(base; rate; [step])');
-    expect(text).toContain('Custom function');
     expect(text).not.toContain('CUSTOM_PLAIN(');
+    handle.move(-1);
+    expect(document.body.textContent).toContain('Custom function');
 
     handle.detach();
     input.remove();
@@ -181,7 +221,7 @@ describe('attachAutocomplete labels', () => {
     input.value = '=Sales[';
     document.body.appendChild(input);
     input.setSelectionRange(input.value.length, input.value.length);
-    const handle = attachAutocomplete({
+    const handle = attach({
       input,
       getTables: () => [sales],
       labels: {
@@ -205,24 +245,26 @@ describe('attachAutocomplete labels', () => {
     input.value = '=S';
     document.body.appendChild(input);
     input.setSelectionRange(input.value.length, input.value.length);
-    const handle = attachAutocomplete({
+    const handle = attach({
       input,
       getFunctionNames: () => ['SUM', 'SUBTOTAL'],
     });
 
     handle.refresh();
     const root = document.querySelector<HTMLElement>('.fc-autocomplete');
-    expect(root?.getAttribute('role')).toBe('listbox');
+    const listbox = root?.querySelector<HTMLElement>('.fc-autocomplete__list');
+    expect(root?.getAttribute('role')).toBeNull();
+    expect(listbox?.getAttribute('role')).toBe('listbox');
     expect(input.getAttribute('aria-expanded')).toBe('true');
-    expect(input.getAttribute('aria-controls')).toBe(root?.id);
+    expect(input.getAttribute('aria-controls')).toBe(listbox?.id);
 
-    const options = Array.from(root?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+    const options = Array.from(listbox?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
     expect(options[0]?.getAttribute('aria-selected')).toBe('true');
     expect(input.getAttribute('aria-activedescendant')).toBe(options[0]?.id);
 
     handle.move(1);
     const nextOptions = Array.from(
-      document.querySelectorAll<HTMLElement>('.fc-autocomplete [role="option"]'),
+      document.querySelectorAll<HTMLElement>('.fc-autocomplete__list [role="option"]'),
     );
     expect(nextOptions[0]?.getAttribute('aria-selected')).toBe('false');
     expect(nextOptions[1]?.getAttribute('aria-selected')).toBe('true');
@@ -240,7 +282,7 @@ describe('attachAutocomplete labels', () => {
     input.value = '=合';
     document.body.appendChild(input);
     input.setSelectionRange(input.value.length, input.value.length);
-    const handle = attachAutocomplete({
+    const handle = attach({
       input,
       getFunctionNames: () => ['SUM'],
       getFunctionDisplayNames: () => ['合計'],
@@ -263,20 +305,27 @@ describe('attachAutocomplete labels', () => {
     expect(source).not.toContain("document.createElement('button')");
   });
 
-  it('keeps the formula autocomplete popup compact like Excel desktop', () => {
+  it('keeps autocomplete list and ScreenTip compact separate surfaces', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/popups/formula-helpers.css'), 'utf8');
 
+    expect(css).toMatch(/\.fc-autocomplete\s*\{[\s\S]*?pointer-events: none;/);
     expect(css).toMatch(
-      /\.fc-autocomplete\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?0 8px 24px rgba\(0, 0, 0, 0\.18\)/,
+      /\.fc-autocomplete__list\s*\{[\s\S]*?max-height: min\(200px, calc\(100vh - 20px\)\);[\s\S]*?background: var\(--fc-bg-elev, Canvas\);[\s\S]*?border-radius: 2px;[\s\S]*?0 5px 16px rgba\(0, 0, 0, 0\.16\)/,
     );
     expect(css).toMatch(
-      /\.fc-autocomplete__item\s*\{[\s\S]*?grid-template-columns: 26px minmax\(0, 1fr\);[\s\S]*?min-height: 32px;[\s\S]*?padding: 3px 8px;/,
+      /\.fc-autocomplete__item\s*\{[\s\S]*?grid-template-columns: 18px minmax\(0, 1fr\);[\s\S]*?min-height: 24px;[\s\S]*?padding: 2px 7px;/,
     );
     expect(css).toMatch(
-      /\.fc-autocomplete__badge\s*\{[\s\S]*?width: 23px;[\s\S]*?height: 18px;[\s\S]*?background: var\(--fc-bg, Canvas\);/,
+      /\.fc-autocomplete__help\s*\{[\s\S]*?width: 224px;[\s\S]*?border-radius: 2px;[\s\S]*?0 4px 14px rgba\(0, 0, 0, 0\.14\)/,
     );
+    expect(css).not.toMatch(/\.fc-autocomplete__item\s*\{[^}]*border-bottom:/);
+    expect(css).toMatch(/\.fc-autocomplete__badge\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 16px;/);
     expect(css).not.toContain('text-transform: uppercase');
     expect(css).not.toContain('box-shadow: var(--fc-shadow-8)');
+    expect(css).not.toContain('background: #f3f2f1');
+    expect(css).toContain(
+      'outline: 1px solid var(--fc-accent-soft, var(--fc-accent, currentColor))',
+    );
   });
 });
 
@@ -286,7 +335,7 @@ describe('attachAutocomplete defined names', () => {
     input.value = value;
     document.body.appendChild(input);
     input.setSelectionRange(value.length, value.length);
-    const handle = attachAutocomplete({
+    const handle = attach({
       input,
       getNames: () => names,
       getFunctionNames: () => ['SUMIF', 'SUM'],

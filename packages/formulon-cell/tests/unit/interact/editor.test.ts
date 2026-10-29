@@ -79,6 +79,34 @@ describe('InlineEditor', () => {
     },
   );
 
+  it('reapplies every dragged reference to the formula captured at pointer start', () => {
+    editor.begin('=SUM(B1:B2)+D1');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.setSelectionRange(8, 10);
+
+    editor.insertRefAtCaret('C4', { phase: 'start' });
+    expect(input.value).toBe('=SUM(B1:C4)+D1');
+    editor.insertRefAtCaret('C4:D5', { phase: 'update' });
+    expect(input.value).toBe('=SUM(B1:C4:D5)+D1');
+    editor.insertRefAtCaret('A4:C5', { phase: 'update' });
+    expect(input.value).toBe('=SUM(B1:A4:C5)+D1');
+  });
+
+  it('rejects a stale drag update after ordinary formula input', () => {
+    editor.begin('=SUM(B1:B2)+D1');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.setSelectionRange(8, 10);
+    editor.insertRefAtCaret('C4', { phase: 'start' });
+
+    input.value = `${input.value}+E1`;
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const afterEdit = input.value;
+    editor.insertRefAtCaret('C4:D5', { phase: 'update' });
+
+    expect(input.value).toBe(afterEdit);
+  });
+
   it('begin appends an input to the grid and switches editor mode to enter', () => {
     mutators.setActive(store, { sheet: 0, row: 2, col: 3 });
     editor.begin('hi');
@@ -916,6 +944,42 @@ describe('InlineEditor', () => {
     expect(e.defaultPrevented).toBe(true);
     expect(editor.isActive()).toBe(true);
     expect(input.value).toBe('a\n');
+  });
+
+  it('Alt+Enter keeps newline behavior while formula suggestions are open', () => {
+    vi.spyOn(wb, 'functionNames').mockReturnValue(['SUM', 'SUBTOTAL']);
+    editor.begin('=SU');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.querySelector('.fc-autocomplete')).not.toBeNull();
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      altKey: true,
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(event);
+
+    expect(input.value).toBe('=SU\n');
+    expect(editor.isActive()).toBe(true);
+    expect(onAfterCommit).not.toHaveBeenCalled();
+  });
+
+  it('suppresses formula helpers throughout IME composition', () => {
+    vi.spyOn(wb, 'functionNames').mockReturnValue(['SUM', 'SUBTOTAL']);
+    editor.begin('=S');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.querySelector('.fc-autocomplete')).not.toBeNull();
+
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    input.value = '=SU';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(document.querySelector('.fc-autocomplete')).toBeNull();
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    expect(document.querySelector('.fc-autocomplete')).not.toBeNull();
   });
 
   it('Cmd+T rotates a formula reference on Mac without committing', () => {

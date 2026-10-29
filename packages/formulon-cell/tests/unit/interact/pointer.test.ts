@@ -216,8 +216,8 @@ describe('attachPointer', () => {
       fireDown(host, 200, 70); // B2
       fireMove(host, 300, 100); // C3
 
-      expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'B2');
-      expect(insertRefAtCaret).toHaveBeenNthCalledWith(2, 'B2:C3');
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'B2', { phase: 'start' });
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(2, 'B2:C3', { phase: 'update' });
     });
 
     it('inserts relative R1C1 references when R1C1 reference style is enabled', () => {
@@ -232,8 +232,10 @@ describe('attachPointer', () => {
       fireDown(host, 200, 70); // B2, two rows/cols before D4.
       fireMove(host, 300, 100); // C3.
 
-      expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'R[-2]C[-2]');
-      expect(insertRefAtCaret).toHaveBeenNthCalledWith(2, 'R[-2]C[-2]:R[-1]C[-1]');
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'R[-2]C[-2]', { phase: 'start' });
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(2, 'R[-2]C[-2]:R[-1]C[-1]', {
+        phase: 'update',
+      });
     });
   });
 
