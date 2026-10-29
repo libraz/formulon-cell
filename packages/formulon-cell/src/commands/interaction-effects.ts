@@ -74,20 +74,48 @@ export const cellEffects = (
   return effects;
 };
 
-export const isWorkbookAddress = (wb: WorkbookHandle, addr: Addr): boolean => {
+const isWorkbookAddressWithSheetCount = (
+  readSheetCount: () => number | null,
+  addr: Addr,
+): boolean => {
   try {
-    return (
-      Number.isInteger(addr.sheet) &&
-      Number.isInteger(addr.row) &&
-      Number.isInteger(addr.col) &&
-      addr.sheet >= 0 &&
-      addr.row >= 0 &&
-      addr.col >= 0 &&
-      addr.row <= MAX_ROW &&
-      addr.col <= MAX_COL &&
-      addr.sheet < wb.sheetCount
-    );
+    if (
+      !Number.isInteger(addr.sheet) ||
+      !Number.isInteger(addr.row) ||
+      !Number.isInteger(addr.col) ||
+      addr.sheet < 0 ||
+      addr.row < 0 ||
+      addr.col < 0 ||
+      addr.row > MAX_ROW ||
+      addr.col > MAX_COL
+    ) {
+      return false;
+    }
+    const sheetCount = readSheetCount();
+    return sheetCount !== null && addr.sheet < sheetCount;
   } catch {
     return false;
   }
+};
+
+export const isWorkbookAddress = (wb: WorkbookHandle, addr: Addr): boolean =>
+  isWorkbookAddressWithSheetCount(() => wb.sheetCount, addr);
+
+/** Create a decision-local address check that reads the workbook's sheet
+ * count only after coordinates pass validation, then reuses that result. */
+export const createWorkbookAddressCheck = (wb: WorkbookHandle): ((addr: Addr) => boolean) => {
+  let sheetCountRead = false;
+  let sheetCount: number | null = null;
+  const readSheetCount = (): number | null => {
+    if (!sheetCountRead) {
+      sheetCountRead = true;
+      try {
+        sheetCount = wb.sheetCount;
+      } catch {
+        sheetCount = null;
+      }
+    }
+    return sheetCount;
+  };
+  return (addr) => isWorkbookAddressWithSheetCount(readSheetCount, addr);
 };

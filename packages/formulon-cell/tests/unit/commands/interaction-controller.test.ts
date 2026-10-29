@@ -9,7 +9,7 @@ import {
   viewerPolicy,
 } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
-import { addrKey } from '../../../src/engine/address.js';
+import { addrKey, MAX_COL } from '../../../src/engine/address.js';
 import { type Addr, type CellValue, type Range, ValueKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -399,6 +399,156 @@ describe('InteractionController', () => {
       addr: A1,
     });
   });
+
+  it.each([
+    ['legacy', false, false],
+    ['policy', true, false],
+    ['policy formula recursion', true, true],
+  ] as const)(
+    'reads sheetCount once per %s decision for a full row of addresses',
+    async (_label, withPolicy, includesFormula) => {
+      const { controller: service, workbook: wb } = await createController();
+      if (withPolicy) service.setPolicy({ defaultOperation: 'allow' });
+      const sheetCount = vi.spyOn(wb, 'sheetCount', 'get');
+      const cells = Array.from({ length: MAX_COL + 1 }, (_, col) => ({
+        sheet: 0,
+        row: 0,
+        col,
+      }));
+
+      const result = service.canExecute({
+        operation: includesFormula ? 'valueEdit' : 'clear',
+        origin: 'keyboard',
+        effects: [{ kind: 'cells', cells, ...(includesFormula ? { includesFormula: true } : {}) }],
+      });
+
+      expect(result).toEqual({ allowed: true });
+      expect(sheetCount).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('reads sheetCount lazily and refreshes it for each authorization decision', async () => {
+    const { controller: service, workbook: wb } = await createController();
+    service.setPolicy({ defaultOperation: 'allow' });
+    const sheetCount = vi.spyOn(wb, 'sheetCount', 'get').mockReturnValue(2);
+    const secondSheet: Addr = { sheet: 1, row: 0, col: 0 };
+    const intent: OperationIntent = {
+      operation: 'clear',
+      origin: 'keyboard',
+      effects: [{ kind: 'cells', cells: [secondSheet] }],
+    };
+
+    expect(service.canExecute(intent)).toEqual({ allowed: true });
+    expect(sheetCount).toHaveBeenCalledTimes(1);
+
+    sheetCount.mockClear();
+    sheetCount.mockReturnValue(1);
+    expect(service.canExecute(intent)).toMatchObject({
+      allowed: false,
+      code: 'outOfBounds',
+      addr: secondSheet,
+    });
+    expect(sheetCount).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not read sheetCount for invalid addresses, denied operations, or workbook-only effects', async () => {
+    const { controller: service, workbook: wb } = await createController();
+    const sheetCount = vi.spyOn(wb, 'sheetCount', 'get');
+    service.setPolicy({ defaultOperation: 'allow', operations: { clear: false } });
+
+    expect(
+      service.canExecute({
+        operation: 'clear',
+        origin: 'keyboard',
+        effects: [{ kind: 'cells', cells: [A1] }],
+      }),
+    ).toMatchObject({ allowed: false, code: 'operationDenied' });
+    expect(sheetCount).not.toHaveBeenCalled();
+
+    service.setPolicy({ defaultOperation: 'allow' });
+    expect(
+      service.canExecute({
+        operation: 'clear',
+        origin: 'keyboard',
+        effects: [{ kind: 'cells', cells: [{ sheet: -1, row: 0, col: 0 }] }],
+      }),
+    ).toMatchObject({ allowed: false, code: 'outOfBounds' });
+    expect(sheetCount).not.toHaveBeenCalled();
+
+    expect(
+      service.canExecute({
+        operation: 'clear',
+        origin: 'keyboard',
+        effects: [{ kind: 'workbook' }],
+      }),
+    ).toEqual({ allowed: true });
+    expect(sheetCount).not.toHaveBeenCalled();
+  });
+
+  it('maps a sheetCount getter failure to the first out-of-bounds address', async () => {
+    const { controller: service, workbook: wb } = await createController();
+    service.setPolicy({ defaultOperation: 'allow' });
+    const sheetCount = vi.spyOn(wb, 'sheetCount', 'get').mockImplementation(() => {
+      throw new Error('sheet count unavailable');
+    });
+    const addresses = [A1, B1];
+
+    expect(
+      service.canExecute({
+        operation: 'clear',
+        origin: 'keyboard',
+        effects: [{ kind: 'cells', cells: addresses }],
+      }),
+    ).toMatchObject({ allowed: false, code: 'outOfBounds', addr: A1 });
+    expect(sheetCount).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['bounds', 'editable predicate'] as const)(
+    'keeps per-address sheet checks fresh when a %s callback changes the workbook',
+    async (callbackKind) => {
+      let currentSheetCount = 2;
+      let boundsCalls = 0;
+      let editableCalls = 0;
+      const { controller: service, workbook: wb } = await createController({
+        getBounds:
+          callbackKind === 'bounds'
+            ? () => {
+                boundsCalls += 1;
+                if (boundsCalls === 2) currentSheetCount = 1;
+                return { sheet: 1, r0: 0, c0: 0, r1: 0, c1: 1 };
+              }
+            : undefined,
+      });
+      const sheetCount = vi
+        .spyOn(wb, 'sheetCount', 'get')
+        .mockImplementation(() => currentSheetCount);
+      service.setPolicy({
+        defaultOperation: 'allow',
+        ...(callbackKind === 'editable predicate'
+          ? {
+              editable: {
+                predicate: () => {
+                  editableCalls += 1;
+                  if (editableCalls === 1) currentSheetCount = 1;
+                  return true;
+                },
+              },
+            }
+          : {}),
+      });
+      const first: Addr = { sheet: 1, row: 0, col: 0 };
+      const second: Addr = { sheet: 1, row: 0, col: 1 };
+
+      expect(
+        service.canExecute({
+          operation: 'clear',
+          origin: 'keyboard',
+          effects: [{ kind: 'cells', cells: [first, second] }],
+        }),
+      ).toMatchObject({ allowed: false, code: 'outOfBounds', addr: second });
+      expect(sheetCount).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it('keeps pending editor format out of foreign-origin writes', async () => {
     const { store, controller: service, workbook: wb, history } = await createController();

@@ -4,7 +4,12 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { HistoryDirection, HistoryEntry } from './history.js';
-import { effectCells, isWorkbookAddress, mergeCellsFor } from './interaction-effects.js';
+import {
+  createWorkbookAddressCheck,
+  effectCells,
+  isWorkbookAddress,
+  mergeCellsFor,
+} from './interaction-effects.js';
 import {
   type InteractionOperation,
   type InteractionPolicy,
@@ -58,6 +63,14 @@ const macSubtotalStructuralRange = (intent: OperationIntent): Range | null => {
 const ownsMacRemoveHyperlinkCommand = (intent: OperationIntent): boolean =>
   intent.commandId === MAC_REMOVE_HYPERLINK_COMMAND_ID;
 
+const hasEditablePredicate = (policy: InteractionPolicy | undefined): boolean => {
+  const editable = policy?.editable;
+  return (
+    typeof editable === 'function' ||
+    (editable !== undefined && !Array.isArray(editable) && 'predicate' in editable)
+  );
+};
+
 const macRemoveHyperlinkCells = (intent: OperationIntent): readonly Addr[] | null => {
   if (!ownsMacRemoveHyperlinkCommand(intent)) return null;
   if (
@@ -75,6 +88,7 @@ const macRemoveHyperlinkCells = (intent: OperationIntent): readonly Addr[] | nul
 };
 
 type CanExecute = (intent: OperationIntent) => PermissionDecision;
+type WorkbookAddressCheck = (addr: Addr) => boolean;
 
 export interface InteractionAuthorizerOptions {
   readonly store: SpreadsheetStore;
@@ -116,6 +130,12 @@ export class InteractionAuthorizer {
     try {
       const wb = this.getWb();
       if (!wb) return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
+      const cachedAddressCheck = createWorkbookAddressCheck(wb);
+      // Host callbacks may change the workbook between per-cell checks; keep reads live.
+      const isAddress =
+        policy && (this.getBounds !== undefined || hasEditablePredicate(policy))
+          ? (addr: Addr) => isWorkbookAddress(wb, addr)
+          : cachedAddressCheck;
       if (ownsMacRemoveHyperlinkCommand(intent)) {
         if (!macRemoveHyperlinkCells(intent)) {
           return {
@@ -124,13 +144,13 @@ export class InteractionAuthorizer {
             reason: 'Remove hyperlinks authorization needs one nonempty same-sheet cell effect',
           };
         }
-        if (!policy) return this.legacyDecision(intent, wb);
-        return this.policyDecision(intent, policy, wb);
+        if (!policy) return this.legacyDecision(intent, isAddress);
+        return this.policyDecision(intent, policy, isAddress);
       }
       if (macSubtotalStructuralOperation(intent) !== null)
-        return this.macSubtotalStructuralDecision(intent, policy, wb);
-      if (!policy) return this.legacyDecision(intent, wb);
-      return this.policyDecision(intent, policy, wb);
+        return this.macSubtotalStructuralDecision(intent, policy, isAddress);
+      if (!policy) return this.legacyDecision(intent, isAddress);
+      return this.policyDecision(intent, policy, isAddress);
     } catch {
       return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
     }
@@ -139,7 +159,7 @@ export class InteractionAuthorizer {
   private macSubtotalStructuralDecision(
     intent: OperationIntent,
     policy: InteractionPolicy | undefined,
-    wb: WorkbookHandle,
+    isAddress: WorkbookAddressCheck,
   ): PermissionDecision {
     const range = macSubtotalStructuralRange(intent);
     if (!range) {
@@ -167,8 +187,8 @@ export class InteractionAuthorizer {
       range.c0 < 0 ||
       range.r1 < range.r0 ||
       range.c1 < range.c0 ||
-      !isWorkbookAddress(wb, { sheet: range.sheet, row: range.r0, col: range.c0 }) ||
-      !isWorkbookAddress(wb, { sheet: range.sheet, row: range.r1, col: range.c1 })
+      !isAddress({ sheet: range.sheet, row: range.r0, col: range.c0 }) ||
+      !isAddress({ sheet: range.sheet, row: range.r1, col: range.c1 })
     ) {
       return {
         allowed: false,
@@ -233,7 +253,7 @@ export class InteractionAuthorizer {
   private policyDecision(
     intent: OperationIntent,
     policy: InteractionPolicy,
-    wb: WorkbookHandle,
+    isAddress: WorkbookAddressCheck,
   ): PermissionDecision {
     if (!IMPLEMENTED_OPERATIONS.has(intent.operation) && !macRemoveHyperlinkCells(intent)) {
       return {
@@ -301,7 +321,7 @@ export class InteractionAuthorizer {
           reason: 'cell is outside the configured bounds',
         };
       }
-      if (!isWorkbookAddress(wb, addr)) {
+      if (!isAddress(addr)) {
         return {
           allowed: false,
           code: 'outOfBounds',
@@ -331,7 +351,7 @@ export class InteractionAuthorizer {
           effects: [{ kind: 'cells', cells: formulaCells, includesFormula: true }],
         },
         policy,
-        wb,
+        isAddress,
       );
       if (!formulaDecision.allowed) return formulaDecision;
     }
@@ -407,12 +427,15 @@ export class InteractionAuthorizer {
     return this.preflightIntent(intent, canExecute).allowed;
   }
 
-  private legacyDecision(intent: OperationIntent, wb: WorkbookHandle): PermissionDecision {
+  private legacyDecision(
+    intent: OperationIntent,
+    isAddress: WorkbookAddressCheck,
+  ): PermissionDecision {
     for (const effect of intent.effects) {
       const addresses = effectCells(effect);
       if (addresses === null) return { allowed: false, code: 'unsupported' };
       for (const addr of addresses) {
-        if (!isWorkbookAddress(wb, addr)) return { allowed: false, code: 'outOfBounds', addr };
+        if (!isAddress(addr)) return { allowed: false, code: 'outOfBounds', addr };
         if (
           isMutatingInteraction(intent.operation) &&
           !isCellWritable(this.store.getState(), addr)
