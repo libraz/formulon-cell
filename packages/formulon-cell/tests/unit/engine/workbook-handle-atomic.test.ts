@@ -131,6 +131,37 @@ const makeRaw = (
   };
 };
 
+type FormulaReadResult = {
+  status: typeof good | ReturnType<typeof failed>;
+  formula?: string | null;
+};
+
+const makeFormulaReadRaw = (
+  sheets: PhysicalCell[][],
+  readFormula: (
+    sheet: number,
+    row: number,
+    col: number,
+    physicalFormula: string | null,
+  ) => FormulaReadResult = (_sheet, _row, _col, physicalFormula) => ({
+    status: good,
+    formula: physicalFormula,
+  }),
+  options: Parameters<typeof makeRaw>[1] = {},
+): ReturnType<typeof makeRaw> & { getFormulaCalls: () => number } => {
+  const fixture = makeRaw(sheets, options);
+  let getFormulaCalls = 0;
+  const raw = Object.assign({}, fixture.raw, {
+    getFormula: (sheet: number, row: number, col: number): FormulaReadResult => {
+      getFormulaCalls += 1;
+      const physicalFormula =
+        sheets[sheet]?.find((cell) => cell.row === row && cell.col === col)?.formula ?? null;
+      return readFormula(sheet, row, col, physicalFormula);
+    },
+  });
+  return { ...fixture, raw, getFormulaCalls: () => getFormulaCalls };
+};
+
 describe('WorkbookHandle atomic cell patches', () => {
   it('fails before writing when the value snapshot read fails', () => {
     const fixture = makeRaw([[{ row: 0, col: 0, formula: '=OLD', value: numberValue(7) }]], {
@@ -319,6 +350,143 @@ describe('WorkbookHandle atomic cell patches', () => {
     ]);
     expect(fixture.cellCountCalls()).toBe(2);
     expect(fixture.cellAtCalls()).toBe(3);
+  });
+
+  it('reads a small unique target set directly without scanning every physical cell', () => {
+    const cells = Array.from({ length: 1000 }, (_, row) => ({
+      row,
+      col: 0,
+      formula: row === 0 ? '=A1' : row === 1 ? '=B1' : null,
+      value: numberValue(row + 1),
+    }));
+    const fixture = makeFormulaReadRaw([cells]);
+    const wb = makeHandle(fixture.raw);
+
+    const formulas = wb.cellFormulas([
+      addr(0, 1, 0),
+      addr(0, 0, 0),
+      addr(0, 1, 0),
+      addr(0, 1001, 0),
+      addr(0, 999, 0),
+    ]);
+
+    expect([...formulas]).toEqual([
+      ['0:1:0', '=B1'],
+      ['0:0:0', '=A1'],
+      ['0:1001:0', null],
+      ['0:999:0', null],
+    ]);
+    expect(fixture.getFormulaCalls()).toBe(4);
+    expect(fixture.cellCountCalls()).toBe(1);
+    expect(fixture.cellAtCalls()).toBe(0);
+  });
+
+  it('resolves TABLE formulas only from physical entries after direct reads', () => {
+    const fixture = makeFormulaReadRaw(
+      [
+        [
+          { row: 0, col: 0, formula: 'TABLE()', value: numberValue(1) },
+          { row: 0, col: 1, formula: null, value: numberValue(2) },
+        ],
+      ],
+      (_sheet, row, col, physicalFormula) => ({
+        status: good,
+        formula: row === 9 && col === 9 ? 'TABLE()' : physicalFormula,
+      }),
+    );
+    const wb = makeHandle(fixture.raw);
+
+    expect([...wb.cellFormulas([addr(0, 0, 0), addr(0, 9, 9)])]).toEqual([
+      ['0:0:0', 'TABLE()'],
+      ['0:9:9', null],
+    ]);
+    expect(fixture.getFormulaCalls()).toBe(2);
+    expect(fixture.cellCountCalls()).toBe(1);
+    expect(fixture.cellAtCalls()).toBe(2);
+  });
+
+  it('keeps best-effort direct formula read failures and malformed results unresolved', () => {
+    const fixture = makeFormulaReadRaw(
+      [
+        [
+          { row: 0, col: 0, formula: '=A1', value: numberValue(1) },
+          { row: 1, col: 0, formula: '=B1', value: numberValue(2) },
+        ],
+      ],
+      (_sheet, row) => (row === 0 ? { status: failed('formula read failed') } : { status: good }),
+    );
+    const wb = makeHandle(fixture.raw);
+
+    expect([...wb.cellFormulas([addr(0, 0, 0), addr(0, 1, 0)])]).toEqual([
+      ['0:0:0', null],
+      ['0:1:0', null],
+    ]);
+    expect(fixture.getFormulaCalls()).toBe(2);
+    expect(fixture.cellAtCalls()).toBe(0);
+  });
+
+  it('fails before writing on direct atomic formula read failure or missing formula data', () => {
+    for (const readResult of [{ status: failed('formula read failed') }, { status: good }]) {
+      const fixture = makeFormulaReadRaw(
+        [[{ row: 0, col: 0, formula: '=OLD', value: numberValue(7) }]],
+        () => readResult,
+      );
+      const wb = makeHandle(fixture.raw);
+
+      expect(() =>
+        wb.applyCellPatchAtomic([
+          { addr: addr(0, 0, 0), value: { kind: 'number', value: 9 }, formula: null },
+        ]),
+      ).toThrow('atomic formula read at 0:0:0');
+      expect(fixture.setCalls()).toBe(0);
+      expect(fixture.recalcCalls()).toBe(0);
+      expect(wb.getValue(addr(0, 0, 0))).toEqual({ kind: 'number', value: 7 });
+    }
+  });
+
+  it('rolls back after a post-write direct formula read failure', () => {
+    let formulaReads = 0;
+    const fixture = makeFormulaReadRaw(
+      [[{ row: 0, col: 0, formula: '=OLD', value: numberValue(7) }]],
+      (_sheet, _row, _col, physicalFormula) => {
+        formulaReads += 1;
+        return formulaReads === 2
+          ? { status: failed('post-write formula read failed') }
+          : { status: good, formula: physicalFormula };
+      },
+      { formulaValues: { '=OLD': numberValue(7), '=NEW': numberValue(8) } },
+    );
+    const wb = makeHandle(fixture.raw);
+
+    expect(() =>
+      wb.applyCellPatchAtomic([
+        { addr: addr(0, 0, 0), value: { kind: 'number', value: 8 }, formula: '=NEW' },
+      ]),
+    ).toThrow('atomic formula read at 0:0:0');
+    expect(fixture.getFormulaCalls()).toBe(2);
+    expect(fixture.setCalls()).toBe(2);
+    expect(fixture.recalcCalls()).toBe(2);
+    expect(wb.getValue(addr(0, 0, 0))).toEqual({ kind: 'number', value: 7 });
+    expect(wb.cellFormula(addr(0, 0, 0))).toBe('=OLD');
+  });
+
+  it('keeps the physical scan for sparse batches larger than the sheet', () => {
+    const fixture = makeFormulaReadRaw([
+      [
+        { row: 0, col: 0, formula: '=A1', value: numberValue(1) },
+        { row: 1, col: 0, formula: null, value: numberValue(2) },
+      ],
+    ]);
+    const wb = makeHandle(fixture.raw);
+
+    expect([...wb.cellFormulas([addr(0, 0, 0), addr(0, 1, 0), addr(0, 2, 0)])]).toEqual([
+      ['0:0:0', '=A1'],
+      ['0:1:0', null],
+      ['0:2:0', null],
+    ]);
+    expect(fixture.getFormulaCalls()).toBe(0);
+    expect(fixture.cellCountCalls()).toBe(1);
+    expect(fixture.cellAtCalls()).toBe(2);
   });
 
   it('does not enumerate an empty request and skips failed physical entries', () => {

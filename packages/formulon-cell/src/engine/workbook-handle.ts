@@ -52,6 +52,7 @@ import {
 } from './workbook-handle-conditional-format.js';
 import {
   installDataTablesMethods,
+  isDataTableFormula,
   type WorkbookHandleDataTablesMethods,
 } from './workbook-handle-data-tables.js';
 import {
@@ -937,10 +938,11 @@ export class WorkbookHandle {
     return null;
   }
 
-  /** Read formulas for a batch of physical cells with one engine enumeration
-   * per touched sheet. Missing cells and physical literals are represented by
-   * null, while the returned map keeps the first occurrence order of the
-   * requested addresses. */
+  /** Read formulas for unique requested cells using sparse direct reads when
+   * available, or one physical enumeration per touched sheet. Missing cells
+   * and physical literals are represented by null, and the returned map keeps
+   * the first occurrence order of the requested addresses. TABLE formulas are
+   * resolved through physical entries because direct reads may synthesize them. */
   cellFormulas(addrs: readonly Addr[]): ReadonlyMap<string, string | null> {
     this.assertAlive();
     return this.readFormulaMap(addrs, false);
@@ -982,6 +984,43 @@ export class WorkbookHandle {
         const message = error instanceof Error ? error.message : 'cell count read failed';
         throw new Error(`atomic formula read at sheet:${sheet}: ${message}`);
       }
+
+      if (this.capabilities.formulaRead && targets.size <= n) {
+        for (const [coordinateKey, key] of targets) {
+          const a = requested.get(key);
+          if (!a) continue;
+          let result: ReturnType<Workbook['getFormula']>;
+          try {
+            result = this.wb.getFormula(sheet, a.row, a.col);
+          } catch (error) {
+            if (strict) {
+              const message = error instanceof Error ? error.message : 'formula read failed';
+              throw new Error(`atomic formula read at ${addrKey(a)}: ${message}`);
+            }
+            targets.delete(coordinateKey);
+            continue;
+          }
+          if (!result.status.ok) {
+            if (strict) {
+              throw new Error(`atomic formula read at ${addrKey(a)}: ${result.status.message}`);
+            }
+            targets.delete(coordinateKey);
+            continue;
+          }
+          if (result.formula === undefined) {
+            if (strict) {
+              throw new Error(`atomic formula read at ${addrKey(a)}: malformed formula result`);
+            }
+            targets.delete(coordinateKey);
+            continue;
+          }
+          if (isDataTableFormula(result.formula)) continue;
+          formulas.set(key, result.formula);
+          targets.delete(coordinateKey);
+        }
+        if (targets.size === 0) continue;
+      }
+
       for (let i = 0; i < n; i += 1) {
         const e = this.wb.cellAt(sheet, i);
         if (!e.status.ok) {
