@@ -14,6 +14,16 @@ const borderSideSignature = (side: CellBorderSide | undefined): string => {
   return `style:${side.style};color:${side.color ?? ''}`;
 };
 
+interface DiagonalSummary {
+  coordinates: string;
+  borders: CellFormat['borders'];
+}
+
+const diagonalSummaries = new WeakMap<
+  ReadonlyMap<string, CellFormat>,
+  WeakMap<Range, DiagonalSummary>
+>();
+
 /** Excel stores a uniform diagonal border on every cell covered by a merge,
  *  but renders that border once across the merged surface. Mixed diagonal
  *  metadata is discarded by Excel at merge time; suppress it here as well so
@@ -22,6 +32,15 @@ export const mergedDiagonalBorders = (
   formats: ReadonlyMap<string, CellFormat>,
   merge: Range,
 ): CellFormat['borders'] => {
+  let byMerge = diagonalSummaries.get(formats);
+  if (!byMerge) {
+    byMerge = new WeakMap();
+    diagonalSummaries.set(formats, byMerge);
+  }
+  const coordinates = `${merge.sheet}:${merge.r0}:${merge.c0}:${merge.r1}:${merge.c1}`;
+  const cached = byMerge.get(merge);
+  if (cached?.coordinates === coordinates) return cached.borders;
+
   let down: CellBorderSide | undefined;
   let downSignature: string | null = null;
   let up: CellBorderSide | undefined;
@@ -54,5 +73,7 @@ export const mergedDiagonalBorders = (
   if (upSignature !== null && upSignature !== 'mixed' && upSignature !== 'absent') {
     result.diagonalUp = up;
   }
-  return Object.keys(result).length > 0 ? result : undefined;
+  const borders = Object.keys(result).length > 0 ? result : undefined;
+  byMerge.set(merge, { coordinates, borders });
+  return borders;
 };

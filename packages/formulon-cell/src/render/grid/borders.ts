@@ -56,11 +56,11 @@ export function paintBorders(
   // rangeRects keeps the same freeze/RTL projection as the selection path.
   for (const merge of state.merges.byAnchor.values()) {
     if (merge.sheet !== data.sheetIndex) continue;
-    const borders = mergedDiagonalBorders(format.formats, merge);
-    if (!borders) continue;
     const rects = rangeRects(layout, state.viewport, merge);
     const clips = connectedRects(rects);
     if (clips.length === 0) continue;
+    const borders = mergedDiagonalBorders(format.formats, merge);
+    if (!borders) continue;
     const globalBounds = {
       x: Math.min(...rects.map((rect) => rect.x)),
       y: Math.min(...rects.map((rect) => rect.y)),

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { addrKey } from '../../../../src/engine/address.js';
+import type { Range } from '../../../../src/engine/types.js';
 import {
   buildColLayout,
   buildRowLayout,
@@ -7,8 +9,14 @@ import {
   rangeRects,
 } from '../../../../src/render/geometry.js';
 import type { GridHitState } from '../../../../src/render/grid/hit-state.js';
+import { mergedDiagonalBorders } from '../../../../src/render/grid/merged-cells.js';
 import { GridRenderer } from '../../../../src/render/grid.js';
-import { createSpreadsheetStore, mutators, type State } from '../../../../src/store/store.js';
+import {
+  type CellFormat,
+  createSpreadsheetStore,
+  mutators,
+  type State,
+} from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
 const theme = {
@@ -153,6 +161,36 @@ function paintBorders(renderer: GridRenderer, state: State): void {
       paintBorders(state: State, theme: ResolvedTheme, cols: unknown, rows: unknown): void;
     }
   ).paintBorders(view, theme, cols, rows);
+}
+
+class TrackingFormatMap extends Map<string, CellFormat> {
+  reads = 0;
+
+  constructor(
+    source: ReadonlyMap<string, CellFormat>,
+    private readonly trackedKeys: ReadonlySet<string>,
+  ) {
+    super(source);
+  }
+
+  override get(key: string): CellFormat | undefined {
+    if (this.trackedKeys.has(key)) this.reads += 1;
+    return super.get(key);
+  }
+}
+
+function trackMergeFormatReads(state: State, merge: Range) {
+  const trackedKeys = new Set<string>();
+  for (let row = merge.r0; row <= merge.r1; row += 1) {
+    for (let col = merge.c0; col <= merge.c1; col += 1) {
+      trackedKeys.add(addrKey({ sheet: merge.sheet, row, col }));
+    }
+  }
+  const formats = new TrackingFormatMap(state.format.formats, trackedKeys);
+  return {
+    state: { ...state, format: { ...state.format, formats } },
+    formats,
+  };
 }
 
 function hitsOf(renderer: GridRenderer): GridHitState {
@@ -330,6 +368,107 @@ describe('GridRenderer merged selection parity', () => {
     // One down and one up line for the full merged surface. Drawing each of
     // four component cells would produce eight paths and visible crossings.
     expect(spy.strokes).toBe(2);
+  });
+
+  it('skips diagonal metadata reads for merges outside the viewport', () => {
+    const store = createSpreadsheetStore();
+    const merge = { sheet: 0, r0: 100, c0: 100, r1: 199, c1: 199 } as const;
+    mutators.mergeRange(store, merge);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: merge.r0, col: merge.c0 },
+      {
+        borders: { diagonalDown: true },
+      },
+    );
+    const tracked = trackMergeFormatReads(store.getState(), merge);
+    const spy = canvasSpy();
+    const renderer = makeRenderer(tracked.state, spy);
+
+    paintBorders(renderer, tracked.state);
+
+    // The merge covers 10,000 cells. Its diagonal summary must not read any
+    // of them when the viewport cannot display the merged surface.
+    expect(tracked.formats.reads).toBe(0);
+  });
+
+  it('reuses a merge diagonal summary while still painting visible perimeter cells', () => {
+    const store = createSpreadsheetStore();
+    const merge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 } as const;
+    mutators.mergeRange(store, merge);
+    for (let row = merge.r0; row <= merge.r1; row += 1) {
+      for (let col = merge.c0; col <= merge.c1; col += 1) {
+        mutators.setCellFormat(
+          store,
+          { sheet: 0, row, col },
+          {
+            borders: { diagonalDown: true },
+          },
+        );
+      }
+    }
+    const tracked = trackMergeFormatReads(store.getState(), merge);
+    const spy = canvasSpy();
+    const renderer = makeRenderer(tracked.state, spy);
+
+    paintBorders(renderer, tracked.state);
+    const readsAfterFirstPaint = tracked.formats.reads;
+    paintBorders(renderer, tracked.state);
+
+    // Each paint reads the four visible perimeter formats. Only the first
+    // paint also needs four reads to establish diagonal uniformity.
+    expect(readsAfterFirstPaint).toBe(8);
+    expect(tracked.formats.reads - readsAfterFirstPaint).toBe(4);
+    expect(spy.strokes).toBe(2);
+  });
+
+  it('recomputes a cached diagonal summary when the formats map changes', () => {
+    const store = createSpreadsheetStore();
+    const merge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 } as const;
+    mutators.mergeRange(store, merge);
+    for (let row = merge.r0; row <= merge.r1; row += 1) {
+      for (let col = merge.c0; col <= merge.c1; col += 1) {
+        mutators.setCellFormat(
+          store,
+          { sheet: 0, row, col },
+          {
+            borders: { diagonalDown: true },
+          },
+        );
+      }
+    }
+    const first = trackMergeFormatReads(store.getState(), merge);
+    const spy = canvasSpy();
+    const renderer = makeRenderer(first.state, spy);
+    paintBorders(renderer, first.state);
+    expect(spy.strokes).toBe(1);
+
+    const changedFormats = new Map(first.state.format.formats);
+    const firstCellKey = addrKey({ sheet: 0, row: merge.r0, col: merge.c0 });
+    changedFormats.set(firstCellKey, { borders: {} });
+    const changedState = {
+      ...first.state,
+      format: { ...first.state.format, formats: changedFormats },
+    };
+    const second = trackMergeFormatReads(changedState, merge);
+    paintBorders(renderer, second.state);
+
+    // A non-uniform diagonal is suppressed; reusing the previous Map's result
+    // would incorrectly leave a stroke on the canvas.
+    expect(spy.strokes).toBe(1);
+    expect(second.formats.reads).toBe(8);
+  });
+
+  it('recomputes a cached diagonal summary when the merge object changes coordinates', () => {
+    const merge = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const formats = new Map<string, CellFormat>([
+      [addrKey({ sheet: 0, row: 0, col: 0 }), { borders: { diagonalDown: true } }],
+    ]);
+
+    expect(mergedDiagonalBorders(formats, merge)?.diagonalDown).toBe(true);
+    merge.r1 = 1;
+
+    expect(mergedDiagonalBorders(formats, merge)).toBeUndefined();
   });
 
   it('projects one merged diagonal through freeze and RTL quadrants', () => {
