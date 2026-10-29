@@ -4,19 +4,31 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
-## Unreleased
+## 0.12.0 — 2026-10-30
 
 ### Added
 
 - `WorkbookHandle.createDefault()` and `loadBytes()` take `locateFile`, passed to the engine to resolve its `.wasm` URL for hosts that serve it from a CDN or a sub-path.
+- Every stylesheet rule sits in a declared cascade layer, and the ribbon toolbar bundle has its own `fc.chrome` layer. A host whose own unlayered element resets override the spreadsheet's styles can restore them with `revert-layer`, as `styles/README.md` describes.
+- Arrow keys, Tab, the move after Enter and movement inside a selection skip hidden rows and columns and step over merged cells. On a Mac, Tab moves along a row and Return goes back to the column where the Tab run started.
 
 ### Changed
 
 - The hit targets a grid paints (fill handle, validation and totals chevrons, error triangles, outline toggles, page-view handles) belong to that grid. `gridHitState(grid)` returns them and replaces `getErrorTriangleHits()`.
+- Painting, navigation and editing do less work on large sheets: number and date formatters, text segmenters, spill error checks and merged-cell diagonal borders are cached, the status bar sums a whole row or column without scanning the sheet, the screen-reader mirror is updated in place, and the ribbon is rebuilt only when the interaction policy changes.
+- Copy and Paste read only the copied range from the workbook instead of the whole sheet, and pasting a copied band of values and formulas is one engine write and one undo step.
 
 ### Fixed
 
 - Two spreadsheets on one page no longer hit-test each other's fill handle, validation dropdown, totals picker or error indicators, and their conditional formats are no longer recomputed on every frame.
+- Only the topmost dialog handles Escape, Tab and a backdrop click, so closing a nested dialog no longer closes the one below it. The name manager focuses New when it opens and returns focus to New or Edit after its editor closes.
+- Tab cycles through a dialog's controls with a radio group as one stop. Enter on a dialog button keeps its own action, and the Enter that confirms IME input no longer submits the dialog.
+- The Insert Cells and Delete Cells direction dialog keeps keyboard focus while open, submits with Enter on a direction, shows which direction has focus, and closes with the spreadsheet.
+- Context menus, the sheet-tab menu, the status-bar chooser and the object menu close when focus leaves them or on Tab, fit a short window and scroll, and right-clicking the status bar no longer opens the cell menu.
+- A context menu keeps one highlighted item as the pointer or keyboard moves between a submenu and its parent, and the mini toolbar shows whether the active cell (or its merge) is bold, italic, underlined or aligned.
+- Custom selects skip disabled options, cannot be opened while disabled, and close on Tab, focus loss, an outside click or the window losing focus.
+- Manage Rules lists each conditional-format rule once, and Space, Enter and Delete on a rule's own controls keep their normal meaning.
+- After the named-range delete confirmation, focus returns to the Delete button or the list, and the confirmation fits long names.
 
 ## 0.11.0 — 2026-10-27
 
@@ -831,6 +843,8 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.12.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.12.0
+[0.11.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.11.0
 [0.10.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.10.0
 [0.9.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.9.1
 [0.9.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.9.0
