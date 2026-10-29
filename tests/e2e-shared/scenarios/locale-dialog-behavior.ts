@@ -173,23 +173,46 @@ const addConditionalRule = async (dialog: ReturnType<Page['locator']>): Promise<
   await expect(dialog).toBeHidden();
 };
 
-/**
- * I07 — exercise locale-dependent dialog boundaries through the real UI.
- *
- * The scenario deliberately keeps canonical assertions at the workbook/store
- * boundary and localized assertions at the input/display boundary. This
- * catches a locale switch that changes labels but leaves a conditional rule or
- * watch value in the previous profile.
- */
-export async function runLocaleDialogBehaviorScenario(
+type LocaleScenarioContext = {
+  sp: UserJourneyPage;
+  localeSelect: ReturnType<Page['locator']>;
+  consoleErrors: { read: () => string[] };
+};
+
+const setupLocaleScenario = async (
   page: Page,
-  platform: Platform = 'default',
-): Promise<void> {
+  platform: Platform,
+): Promise<LocaleScenarioContext> => {
   const sp = new UserJourneyPage(page);
   const consoleErrors = sp.collectConsoleErrors();
   await sp.mount({ locale: 'en', fixture: 'empty', platform });
   await sp.expectNoStub();
   const localeSelect = await enableLocaleSwitcher(page);
+  return { sp, localeSelect, consoleErrors };
+};
+
+const finishLocaleScenario = async (
+  page: Page,
+  consoleErrors: LocaleScenarioContext['consoleErrors'],
+): Promise<void> => {
+  await page.evaluate(() => {
+    (window as unknown as SpreadsheetGlobal).__fcInst?.setFeatures?.({ localeSwitcher: false });
+  });
+  await expect(page.locator('.fc-host__locale-switcher-select')).toHaveCount(0);
+  expect(consoleErrors.read(), 'locale dialog scenario should not emit console errors').toEqual([]);
+};
+
+/**
+ * I07 — verify conditional rule drafts and numeric criteria across locales.
+ *
+ * Keep this flow independent so it gets a fresh workbook and its seven-rule
+ * hydration loop stays within Playwright's normal per-test deadline.
+ */
+export async function runConditionalLocaleDialogScenario(
+  page: Page,
+  platform: Platform = 'default',
+): Promise<void> {
+  const { sp, localeSelect, consoleErrors } = await setupLocaleScenario(page, platform);
 
   // A real editable dialog keeps its draft while locale changes are rejected.
   // The selector is force-clicked because the modal backdrop correctly owns
@@ -251,9 +274,21 @@ export async function runLocaleDialogBehaviorScenario(
     // with unchanged cell values and already-authored conditional state.
   }
 
+  await finishLocaleScenario(page, consoleErrors);
+}
+
+/** I07 — verify localized conditional formulas and the workbook save path. */
+export async function runConditionalFormulaLocaleScenario(
+  page: Page,
+  platform: Platform = 'default',
+): Promise<void> {
+  const { sp, localeSelect, consoleErrors } = await setupLocaleScenario(page, platform);
+
   // Localized function names and separators are converted only at the formula
   // input boundary. The stored rule remains the canonical AND expression,
   // which is also what the xlsx save path consumes.
+  await sp.enter('A1', '1.5');
+  await expect.poll(() => readCell(page, 0)).toEqual({ kind: 'number', value: 1.5 });
   await switchLocale(page, localeSelect, PROFILES[2], platform);
   await goTo(page, 'A1');
   const germanFormulaDialog = await openConditional(page, {
@@ -311,56 +346,69 @@ export async function runLocaleDialogBehaviorScenario(
     formula: '=AND(A1>1.5,A1<3,A1<>"a;b")',
   });
 
+  await finishLocaleScenario(page, consoleErrors);
+}
+
+/** I07 — exercise Mac Goal Seek input and empty-target validation in German. */
+export async function runMacGoalSeekLocaleDialogScenario(page: Page): Promise<void> {
+  const platform: Platform = 'mac';
+  const { sp, localeSelect, consoleErrors } = await setupLocaleScenario(page, platform);
+
   // Mac Goal Seek accepts a localized decimal through a text input. Exercise
   // the physical keyboard path once on the German profile, then verify that
   // an empty draft is rejected without being coerced to zero.
-  if (platform === 'mac') {
-    await switchLocale(page, localeSelect, PROFILES[2], platform);
-    await sp.enter('E1', '3');
-    await sp.enter('F1', '=E1*2');
-    await sp.goTo('F1');
-    await page.locator('[data-ribbon-tab="data"]').click();
-    await sp.clickRibbon('mac.data.whatIf');
-    await page.locator('#menu-mac-data-what-if [data-ribbon-command="mac.data.goalSeek"]').click();
-    const goalSeek = page.locator('.fc-mac-goalseek');
-    await expect(goalSeek).toBeVisible();
-    await goalSeek.locator('#fc-mac-goalseek-formula-cell').fill('F1');
-    await goalSeek.locator('#fc-mac-goalseek-changing-cell').fill('E1');
-    const target = goalSeek.locator('#fc-mac-goalseek-target-value');
-    await target.fill('');
-    await target.pressSequentially('1,5');
-    await expect(target).toHaveValue('1,5');
-    const goalSeekSubmit = goalSeek.locator('[data-fc-mac-action="goal-seek-ok"]');
-    await goalSeekSubmit.click();
-    await expect(goalSeek.locator('.fc-mac-goalseek__status')).toHaveAttribute(
-      'data-state',
-      'success',
-    );
-    await goalSeekSubmit.click();
-    await expect(goalSeek).toBeHidden();
-    await expect.poll(() => sp.readValue('E1')).toEqual({ kind: 'number', value: 0.75 });
-    await expect.poll(() => sp.readValue('F1')).toEqual({ kind: 'number', value: 1.5 });
+  await switchLocale(page, localeSelect, PROFILES[2], platform);
+  await sp.enter('E1', '3');
+  await sp.enter('F1', '=E1*2');
+  await sp.goTo('F1');
+  await page.locator('[data-ribbon-tab="data"]').click();
+  await sp.clickRibbon('mac.data.whatIf');
+  await page.locator('#menu-mac-data-what-if [data-ribbon-command="mac.data.goalSeek"]').click();
+  const goalSeek = page.locator('.fc-mac-goalseek');
+  await expect(goalSeek).toBeVisible();
+  await goalSeek.locator('#fc-mac-goalseek-formula-cell').fill('F1');
+  await goalSeek.locator('#fc-mac-goalseek-changing-cell').fill('E1');
+  const target = goalSeek.locator('#fc-mac-goalseek-target-value');
+  await target.fill('');
+  await target.pressSequentially('1,5');
+  await expect(target).toHaveValue('1,5');
+  const goalSeekSubmit = goalSeek.locator('[data-fc-mac-action="goal-seek-ok"]');
+  await goalSeekSubmit.click();
+  await expect(goalSeek.locator('.fc-mac-goalseek__status')).toHaveAttribute(
+    'data-state',
+    'success',
+  );
+  await goalSeekSubmit.click();
+  await expect(goalSeek).toBeHidden();
+  await expect.poll(() => sp.readValue('E1')).toEqual({ kind: 'number', value: 0.75 });
+  await expect.poll(() => sp.readValue('F1')).toEqual({ kind: 'number', value: 1.5 });
 
-    await page.locator('[data-ribbon-tab="data"]').click();
-    await sp.clickRibbon('mac.data.whatIf');
-    await page.locator('#menu-mac-data-what-if [data-ribbon-command="mac.data.goalSeek"]').click();
-    await expect(goalSeek).toBeVisible();
-    const emptyTarget = goalSeek.locator('#fc-mac-goalseek-target-value');
-    await emptyTarget.fill('');
-    await goalSeek.locator('[data-fc-mac-action="goal-seek-ok"]').click();
-    await expect(goalSeek.locator('.fc-mac-goalseek__status')).toHaveAttribute(
-      'data-state',
-      'error',
-    );
-    await expect(emptyTarget).toHaveValue('');
-    await goalSeek.locator('[data-fc-mac-action="goal-seek-cancel"]').click();
-    await expect(goalSeek).toBeHidden();
-  }
+  await page.locator('[data-ribbon-tab="data"]').click();
+  await sp.clickRibbon('mac.data.whatIf');
+  await page.locator('#menu-mac-data-what-if [data-ribbon-command="mac.data.goalSeek"]').click();
+  await expect(goalSeek).toBeVisible();
+  const emptyTarget = goalSeek.locator('#fc-mac-goalseek-target-value');
+  await emptyTarget.fill('');
+  await goalSeek.locator('[data-fc-mac-action="goal-seek-ok"]').click();
+  await expect(goalSeek.locator('.fc-mac-goalseek__status')).toHaveAttribute('data-state', 'error');
+  await expect(emptyTarget).toHaveValue('');
+  await goalSeek.locator('[data-fc-mac-action="goal-seek-cancel"]').click();
+  await expect(goalSeek).toBeHidden();
+
+  await finishLocaleScenario(page, consoleErrors);
+}
+
+/** I07 — verify Watch Window values stay localized while the window remains open. */
+export async function runWatchWindowLocaleDialogScenario(
+  page: Page,
+  platform: Platform = 'default',
+): Promise<void> {
+  const { sp, localeSelect, consoleErrors } = await setupLocaleScenario(page, platform);
 
   // Watch Window uses the profile-aware display renderer and stays mounted
   // while the active locale changes. Add the row through its visible button so
   // the test covers the same path as the Review ribbon command.
-  await goTo(page, 'C1');
+  await sp.goTo('C1');
   await page.keyboard.type('=DOLLAR(1234.567)');
   await page.keyboard.press('Enter');
   await page.keyboard.press('ArrowUp');
@@ -386,9 +434,5 @@ export async function runLocaleDialogBehaviorScenario(
   await watch.locator('.fc-watch__close').click();
   await expect(watch).toBeHidden();
 
-  await page.evaluate(() => {
-    (window as unknown as SpreadsheetGlobal).__fcInst?.setFeatures?.({ localeSwitcher: false });
-  });
-  await expect(page.locator('.fc-host__locale-switcher-select')).toHaveCount(0);
-  expect(consoleErrors.read(), 'locale dialog scenario should not emit console errors').toEqual([]);
+  await finishLocaleScenario(page, consoleErrors);
 }

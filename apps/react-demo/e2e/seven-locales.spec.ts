@@ -1,5 +1,10 @@
 import { test } from '@playwright/test';
-import { runLocaleDialogBehaviorScenario } from '../../../tests/e2e-shared/scenarios/locale-dialog-behavior.js';
+import {
+  runConditionalFormulaLocaleScenario,
+  runConditionalLocaleDialogScenario,
+  runMacGoalSeekLocaleDialogScenario,
+  runWatchWindowLocaleDialogScenario,
+} from '../../../tests/e2e-shared/scenarios/locale-dialog-behavior.js';
 import { runLocaleFormulaScenario } from '../../../tests/e2e-shared/scenarios/locale-formulas.js';
 import { runLocaleInputScenario } from '../../../tests/e2e-shared/scenarios/locale-input.js';
 import { runLocaleShortcutsScenario } from '../../../tests/e2e-shared/scenarios/locale-shortcuts.js';
@@ -22,10 +27,20 @@ test('I04 (react-demo): localized editing and clipboard preserve numbers and boo
 });
 
 for (const platform of ['default', 'mac'] as const) {
-  test(`I07 (react-demo): locale dialogs and watch values follow seven locales on ${platform}`, async ({
+  test(`I07 (react-demo): conditional drafts and numeric rules follow seven locales on ${platform}`, async ({
     page,
   }) => {
-    await runLocaleDialogBehaviorScenario(page, platform);
+    await runConditionalLocaleDialogScenario(page, platform);
+  });
+  test(`I07 (react-demo): conditional formulas localize and save on ${platform}`, async ({
+    page,
+  }) => {
+    await runConditionalFormulaLocaleScenario(page, platform);
+  });
+  test(`I07 (react-demo): Watch Window values follow seven locales on ${platform}`, async ({
+    page,
+  }) => {
+    await runWatchWindowLocaleDialogScenario(page, platform);
   });
   test(`I06 (react-demo): locale shortcuts and selector focus on ${platform}`, async ({ page }) => {
     await runLocaleShortcutsScenario(page, platform);
@@ -34,3 +49,9 @@ for (const platform of ['default', 'mac'] as const) {
     await runLocaleFormulaScenario(page, platform);
   });
 }
+
+test('I07 (react-demo): Mac Goal Seek accepts localized targets and rejects empty input', async ({
+  page,
+}) => {
+  await runMacGoalSeekLocaleDialogScenario(page);
+});
