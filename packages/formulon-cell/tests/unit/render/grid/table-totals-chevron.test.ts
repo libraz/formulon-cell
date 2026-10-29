@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { defaultTableOverlay } from '../../../../src/commands/format-as-table.js';
 import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
-import { getTotalsChevron, setTotalsChevron } from '../../../../src/render/grid/hit-state.js';
+import { type GridHitState, gridHitState } from '../../../../src/render/grid/hit-state.js';
 import { GridRenderer } from '../../../../src/render/grid.js';
 import { createSpreadsheetStore, mutators, type State } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
@@ -29,9 +29,12 @@ function ctxStub(): CanvasRenderingContext2D {
   }) as unknown as CanvasRenderingContext2D;
 }
 
-function paintActive(state: State): void {
+function paintActive(state: State): GridHitState {
+  const host = {
+    getBoundingClientRect: () => ({ width: 640, height: 480 }),
+  } as unknown as HTMLElement;
   const renderer = new GridRenderer({
-    host: { getBoundingClientRect: () => ({ width: 640, height: 480 }) } as unknown as HTMLElement,
+    host,
     canvas: { getContext: () => ctxStub(), style: {} } as unknown as HTMLCanvasElement,
     getState: () => state,
     getTheme: () => theme,
@@ -47,6 +50,7 @@ function paintActive(state: State): void {
     buildColLayout(view.layout, view.viewport),
     buildRowLayout(view.layout, view.viewport),
   );
+  return gridHitState(host);
 }
 
 function tableStore(over: Partial<ReturnType<typeof defaultTableOverlay>> = {}) {
@@ -61,30 +65,29 @@ function tableStore(over: Partial<ReturnType<typeof defaultTableOverlay>> = {}) 
   return store;
 }
 
-afterEach(() => setTotalsChevron(null));
-
 describe('totals-row function chevron', () => {
   it('is painted on the active cell of an engine table total row', () => {
     const store = tableStore();
     mutators.setActive(store, { sheet: 0, row: 3, col: 1 });
-    paintActive(store.getState());
-    expect(getTotalsChevron()).toMatchObject({ row: 3, col: 1, tableId: 't1', column: 1 });
+    expect(paintActive(store.getState()).totalsChevron).toMatchObject({
+      row: 3,
+      col: 1,
+      tableId: 't1',
+      column: 1,
+    });
   });
 
   it('is absent on a data row, without a total row, and on a session table', () => {
     const store = tableStore();
     mutators.setActive(store, { sheet: 0, row: 2, col: 1 });
-    paintActive(store.getState());
-    expect(getTotalsChevron()).toBeNull();
+    expect(paintActive(store.getState()).totalsChevron).toBeNull();
 
     const noTotal = tableStore({ showTotal: false });
     mutators.setActive(noTotal, { sheet: 0, row: 3, col: 1 });
-    paintActive(noTotal.getState());
-    expect(getTotalsChevron()).toBeNull();
+    expect(paintActive(noTotal.getState()).totalsChevron).toBeNull();
 
     const session = tableStore({ source: 'session' });
     mutators.setActive(session, { sheet: 0, row: 3, col: 1 });
-    paintActive(session.getState());
-    expect(getTotalsChevron()).toBeNull();
+    expect(paintActive(session.getState()).totalsChevron).toBeNull();
   });
 });

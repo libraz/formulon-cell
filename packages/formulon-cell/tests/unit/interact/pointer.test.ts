@@ -7,23 +7,13 @@ import {
 import { legacySheetPasswordHash } from '../../../src/engine/protection-password.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachPointer } from '../../../src/interact/pointer.js';
+import { gridHitState } from '../../../src/render/grid.js';
 import { selectionContainsAddr } from '../../../src/store/selection-geometry.js';
 import {
   createSpreadsheetStore,
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
-
-// We mock getFillHandleRect on the rendering module so tests can place a fake
-// fill handle without running the renderer. By default, every test runs with
-// the real implementation (returns null) — only the dedicated fill suite
-// reassigns the spy.
-vi.mock('../../../src/render/grid.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../src/render/grid.js')>(
-    '../../../src/render/grid.js',
-  );
-  return { ...actual, getFillHandleRect: vi.fn(() => null) };
-});
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -626,11 +616,9 @@ describe('attachPointer', () => {
 
   describe('fill handle', () => {
     it('drag from the fill handle previews and commits a fill', async () => {
-      const grid = await import('../../../src/render/grid.js');
       // Place a fake fill handle at the bottom-right of cell (0, 0).
       // Cell (0,0) is at x=52..156, y=30..58. Handle ~ (152, 54, 6, 6).
-      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
-      stub.mockReturnValue({ x: 152, y: 54, w: 6, h: 6 });
+      gridHitState(host).fillHandle = { x: 152, y: 54, w: 6, h: 6 };
 
       seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
@@ -667,13 +655,10 @@ describe('attachPointer', () => {
       expect(sel).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 });
 
       // Reset for other tests.
-      stub.mockReturnValue(null);
     });
 
     it('a fill that waited for a range password still raises the AutoFill Options', async () => {
-      const grid = await import('../../../src/render/grid.js');
-      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
-      stub.mockReturnValue({ x: 152, y: 54, w: 6, h: 6 });
+      gridHitState(host).fillHandle = { x: 152, y: 54, w: 6, h: 6 };
       seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       mutators.addAllowedEditRange(store, {
@@ -700,14 +685,11 @@ describe('attachPointer', () => {
           detail: expect.objectContaining({ dest: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 } }),
         }),
       );
-      stub.mockReturnValue(null);
     });
 
     it('double-click fill unmerges a merged destination like a drag fill', async () => {
-      const grid = await import('../../../src/render/grid.js');
       // Handle at the bottom-right of cell (0, 1): x∈[156,260), y∈[30,58).
-      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
-      stub.mockReturnValue({ x: 256, y: 54, w: 6, h: 6 });
+      gridHitState(host).fillHandle = { x: 256, y: 54, w: 6, h: 6 };
 
       seed(store, wb, [
         { row: 0, col: 0, value: 1 },
@@ -726,14 +708,10 @@ describe('attachPointer', () => {
       expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 5 });
       expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'number', value: 5 });
       expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 });
-
-      stub.mockReturnValue(null);
     });
 
     it('pointercancel during a fill drag clears the preview and writes nothing', async () => {
-      const grid = await import('../../../src/render/grid.js');
-      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
-      stub.mockReturnValue({ x: 152, y: 54, w: 6, h: 6 });
+      gridHitState(host).fillHandle = { x: 152, y: 54, w: 6, h: 6 };
       seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       const onAfterCommit = vi.fn();
@@ -750,25 +728,18 @@ describe('attachPointer', () => {
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
       expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
-      stub.mockReturnValue(null);
     });
 
     it('hovering over the fill handle sets the crosshair cursor', async () => {
-      const grid = await import('../../../src/render/grid.js');
-      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
-      stub.mockReturnValue({ x: 152, y: 54, w: 6, h: 6 });
+      gridHitState(host).fillHandle = { x: 152, y: 54, w: 6, h: 6 };
 
       detach = attachPointer(host, store, wb);
       fireMove(host, 155, 57);
       expect(host.style.cursor).toBe('crosshair');
-
-      stub.mockReturnValue(null);
     });
 
     it('double-click on the fill handle extends down to match the left neighbour', async () => {
-      const grid = await import('../../../src/render/grid.js');
-      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
-      stub.mockReturnValue({ x: 256, y: 54, w: 6, h: 6 });
+      gridHitState(host).fillHandle = { x: 256, y: 54, w: 6, h: 6 };
 
       // Left column (col 0) has data in rows 0..3; source at (0, 1) carries
       // the value to be filled. spreadsheet rule: extend until the left neighbour
@@ -793,14 +764,10 @@ describe('attachPointer', () => {
       expect(wb.getValue({ sheet: 0, row: 3, col: 1 })).toEqual({ kind: 'number', value: 10 });
       const sel = store.getState().selection.range;
       expect(sel).toEqual({ sheet: 0, r0: 0, c0: 1, r1: 3, c1: 1 });
-
-      stub.mockReturnValue(null);
     });
 
     it('double-click on the fill handle is a no-op when neither neighbour has data', async () => {
-      const grid = await import('../../../src/render/grid.js');
-      const stub = grid.getFillHandleRect as unknown as ReturnType<typeof vi.fn>;
-      stub.mockReturnValue({ x: 152, y: 54, w: 6, h: 6 });
+      gridHitState(host).fillHandle = { x: 152, y: 54, w: 6, h: 6 };
 
       seed(store, wb, [{ row: 0, col: 0, value: 1 }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
@@ -809,8 +776,6 @@ describe('attachPointer', () => {
       detach = attachPointer(host, store, wb, onAfterCommit);
       fireDblClick(host, 155, 57);
       expect(onAfterCommit).not.toHaveBeenCalled();
-
-      stub.mockReturnValue(null);
     });
   });
 

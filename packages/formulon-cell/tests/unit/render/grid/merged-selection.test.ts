@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   buildColLayout,
@@ -6,12 +6,7 @@ import {
   layoutForView,
   rangeRects,
 } from '../../../../src/render/geometry.js';
-import {
-  getFillHandleRect,
-  getValidationChevron,
-  setFillHandleRect,
-  setValidationChevron,
-} from '../../../../src/render/grid/hit-state.js';
+import type { GridHitState } from '../../../../src/render/grid/hit-state.js';
 import { GridRenderer } from '../../../../src/render/grid.js';
 import { createSpreadsheetStore, mutators, type State } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
@@ -160,10 +155,9 @@ function paintBorders(renderer: GridRenderer, state: State): void {
   ).paintBorders(view, theme, cols, rows);
 }
 
-afterEach(() => {
-  setFillHandleRect(null);
-  setValidationChevron(null);
-});
+function hitsOf(renderer: GridRenderer): GridHitState {
+  return (renderer as unknown as { hits: GridHitState }).hits;
+}
 
 describe('GridRenderer merged selection parity', () => {
   it('uses the full merge for the active outline, validation chevron, and fill handle', () => {
@@ -196,9 +190,9 @@ describe('GridRenderer merged selection parity', () => {
     // The selection outline is the same rectangle and must not be painted a
     // second time over the active merge outline. The chevron adds one stroke.
     expect(spy.strokeRects).toHaveLength(2);
-    expect(getValidationChevron()).toMatchObject({ row: 1, col: 1 });
-    expect(getValidationChevron()?.rect.x).toBe(mergeRect.x + mergeRect.w - 18);
-    expect(getFillHandleRect()).toMatchObject({
+    expect(hitsOf(renderer).validationChevron).toMatchObject({ row: 1, col: 1 });
+    expect(hitsOf(renderer).validationChevron?.rect.x).toBe(mergeRect.x + mergeRect.w - 18);
+    expect(hitsOf(renderer).fillHandle).toMatchObject({
       x: mergeRect.x + mergeRect.w - 3,
       y: mergeRect.y + mergeRect.h - 3,
     });
@@ -485,19 +479,23 @@ describe('GridRenderer while a chart or picture is selected', () => {
     const store = createSpreadsheetStore();
     mutators.setRange(store, { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 });
     const shown = canvasSpy();
-    paintActive(makeRenderer(store.getState(), shown), store.getState());
-    paintCells(makeRenderer(store.getState(), shown), store.getState());
+    const shownRenderer = makeRenderer(store.getState(), shown);
+    paintActive(shownRenderer, store.getState());
+    paintCells(shownRenderer, store.getState());
     expect(shown.strokeRects.length).toBeGreaterThan(0);
     expect(shown.fills.some((fill) => fill.style === theme.accentSoft)).toBe(true);
-    expect(getFillHandleRect()).not.toBeNull();
+    expect(hitsOf(shownRenderer).fillHandle).not.toBeNull();
 
     mutators.setSelectedObject(store, { id: 'chart-1', name: 'Chart 1' });
     const state = store.getState();
     const hidden = canvasSpy();
-    paintActive(makeRenderer(state, hidden), state);
-    paintCells(makeRenderer(state, hidden), state);
+    const hiddenRenderer = makeRenderer(state, hidden);
+    paintActive(hiddenRenderer, state);
+    paintCells(hiddenRenderer, state);
     expect(hidden.strokeRects).toEqual([]);
     expect(hidden.fills.some((fill) => fill.style === theme.accentSoft)).toBe(false);
-    expect(getFillHandleRect()).toBeNull();
+    // The renderer that painted a handle drops it once an object is selected.
+    paintActive(shownRenderer, state);
+    expect(hitsOf(shownRenderer).fillHandle).toBeNull();
   });
 });

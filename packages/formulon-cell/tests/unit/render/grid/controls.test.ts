@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { isFillHandleHit } from '../../../../src/interact/pointer-targets.js';
-import { getFillHandleRect, setFillHandleRect } from '../../../../src/render/grid/hit-state.js';
+import { type GridHitState, gridHitState } from '../../../../src/render/grid/hit-state.js';
 import {
   FILL_HANDLE_SIZE,
   paintFillHandle,
@@ -39,8 +39,9 @@ function theme(over: Partial<ResolvedTheme> = {}): ResolvedTheme {
 }
 
 describe('render/grid/controls — painter → cache → hit-zone contract', () => {
-  afterEach(() => {
-    setFillHandleRect(null);
+  let hits: GridHitState;
+  beforeEach(() => {
+    hits = gridHitState(document.createElement('div'));
   });
 
   describe('fill handle', () => {
@@ -65,45 +66,45 @@ describe('render/grid/controls — painter → cache → hit-zone contract', () 
     it('caches the painted rect and lets the pointer layer read it back', () => {
       const ctx = ctxSpy();
       const rect = paintFillHandle(ctx, { x: 0, y: 0, w: 50, h: 20 }, theme());
-      setFillHandleRect(rect);
-      expect(getFillHandleRect()).toBe(rect);
+      hits.fillHandle = rect;
+      expect(hits.fillHandle).toBe(rect);
     });
 
     it('hit-tests true inside the painted rect', () => {
-      setFillHandleRect({ x: 100, y: 100, w: 8, h: 8 });
-      expect(isFillHandleHit(104, 104)).toBe(true); // center
-      expect(isFillHandleHit(100, 100)).toBe(true); // top-left corner
-      expect(isFillHandleHit(108, 108)).toBe(true); // bottom-right corner
+      hits.fillHandle = { x: 100, y: 100, w: 8, h: 8 };
+      expect(isFillHandleHit(hits, 104, 104)).toBe(true); // center
+      expect(isFillHandleHit(hits, 100, 100)).toBe(true); // top-left corner
+      expect(isFillHandleHit(hits, 108, 108)).toBe(true); // bottom-right corner
     });
 
     it('hit-tests true within the 3px halo (grab zone)', () => {
-      setFillHandleRect({ x: 100, y: 100, w: 8, h: 8 });
-      expect(isFillHandleHit(97, 97)).toBe(true); // 3px outside top-left
-      expect(isFillHandleHit(111, 111)).toBe(true); // 3px outside bot-right
-      expect(isFillHandleHit(96, 100)).toBe(false); // 4px outside — miss
-      expect(isFillHandleHit(112, 100)).toBe(false); // 4px outside — miss
+      hits.fillHandle = { x: 100, y: 100, w: 8, h: 8 };
+      expect(isFillHandleHit(hits, 97, 97)).toBe(true); // 3px outside top-left
+      expect(isFillHandleHit(hits, 111, 111)).toBe(true); // 3px outside bot-right
+      expect(isFillHandleHit(hits, 96, 100)).toBe(false); // 4px outside — miss
+      expect(isFillHandleHit(hits, 112, 100)).toBe(false); // 4px outside — miss
     });
 
     it('hit-tests false when the cache is null (handle offscreen)', () => {
-      setFillHandleRect(null);
-      expect(isFillHandleHit(0, 0)).toBe(false);
-      expect(isFillHandleHit(100, 100)).toBe(false);
+      hits.fillHandle = null;
+      expect(isFillHandleHit(hits, 0, 0)).toBe(false);
+      expect(isFillHandleHit(hits, 100, 100)).toBe(false);
     });
 
     it('hit zone follows the rect after re-paint at a new corner', () => {
       const ctx = ctxSpy();
       // Initial paint at (200, 100).
       const a = paintFillHandle(ctx, { x: 200, y: 100, w: 80, h: 20 }, theme());
-      setFillHandleRect(a);
-      expect(isFillHandleHit(280, 120)).toBe(true);
+      hits.fillHandle = a;
+      expect(isFillHandleHit(hits, 280, 120)).toBe(true);
 
       // Selection moves; paint again at (50, 50).
       const b = paintFillHandle(ctx, { x: 50, y: 50, w: 30, h: 18 }, theme());
-      setFillHandleRect(b);
+      hits.fillHandle = b;
       // The old position is no longer hot.
-      expect(isFillHandleHit(280, 120)).toBe(false);
+      expect(isFillHandleHit(hits, 280, 120)).toBe(false);
       // The new position is hot.
-      expect(isFillHandleHit(80, 68)).toBe(true);
+      expect(isFillHandleHit(hits, 80, 68)).toBe(true);
     });
   });
 

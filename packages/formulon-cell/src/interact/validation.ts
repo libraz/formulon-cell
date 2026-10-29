@@ -10,7 +10,7 @@ import { addrKey } from '../engine/address.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
-import { getValidationChevron } from '../render/grid.js';
+import { gridHitState } from '../render/grid.js';
 import { validationAt } from '../store/range-validations.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
@@ -140,7 +140,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     close();
     if (list.length === 0) return;
     const rect = grid.getBoundingClientRect();
-    const chevron = getValidationChevron();
+    const chevron = gridHitState(grid).validationChevron;
     if (!chevron) return;
 
     const div = document.createElement('div');
@@ -228,7 +228,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
 
   const onDown = (e: PointerEvent): void => {
     if (e.button !== 0) return;
-    const chevron = getValidationChevron();
+    const chevron = gridHitState(grid).validationChevron;
     if (!chevron) return;
     const rect = grid.getBoundingClientRect();
     const x = e.clientX - rect.left;

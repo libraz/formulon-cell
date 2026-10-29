@@ -53,20 +53,47 @@ export interface ConditionalCellOverlay {
   showValue?: boolean;
 }
 
-// Single-slot identity cache. zustand replaces conditional.rules /
-// data.cells by reference on every mutation, so a triple reference match
-// means the previous evaluation is still valid. Pan, scroll, and selection
-// changes leave these references untouched and hit the cache.
-let cachedRulesRef: State['conditional']['rules'] | null = null;
-let cachedCellsRef: State['data']['cells'] | null = null;
-let cachedSheet: number | null = null;
-let cachedRtl: boolean | null = null;
-let cachedDate1904: boolean | null = null;
-let cachedWb: WorkbookHandle | null = null;
-let cachedLocale: string | null = null;
-let cachedProfile: ReturnType<WorkbookHandle['spreadsheetProfileId']> = null;
-let cachedVisibleBounds: ConditionalVisibleBounds | null = null;
-let cachedOverlay: Map<string, ConditionalCellOverlay> | null = null;
+/** Single-slot identity cache owned by one renderer. zustand replaces
+ *  conditional.rules / data.cells by reference on every mutation, so matching
+ *  references mean the previous evaluation is still valid; pan, scroll, and
+ *  selection changes leave them untouched and hit the cache. */
+export interface ConditionalCache {
+  key: ConditionalCacheKey | null;
+  overlay: Map<string, ConditionalCellOverlay> | null;
+}
+
+interface ConditionalCacheKey {
+  rules: State['conditional']['rules'];
+  cells: State['data']['cells'];
+  sheet: number;
+  rtl: boolean;
+  date1904: boolean;
+  wb: WorkbookHandle | null;
+  locale: string;
+  profile: ReturnType<WorkbookHandle['spreadsheetProfileId']>;
+  bounds: ConditionalVisibleBounds | null;
+}
+
+export function createConditionalCache(): ConditionalCache {
+  return { key: null, overlay: null };
+}
+
+function sameCacheKey(a: ConditionalCacheKey, b: ConditionalCacheKey): boolean {
+  return (
+    a.rules === b.rules &&
+    a.cells === b.cells &&
+    a.sheet === b.sheet &&
+    a.rtl === b.rtl &&
+    a.date1904 === b.date1904 &&
+    a.wb === b.wb &&
+    a.locale === b.locale &&
+    a.profile === b.profile &&
+    a.bounds?.r0 === b.bounds?.r0 &&
+    a.bounds?.c0 === b.bounds?.c0 &&
+    a.bounds?.r1 === b.bounds?.r1 &&
+    a.bounds?.c1 === b.bounds?.c1
+  );
+}
 
 /** Optional paint bounds. Exported evaluation calls omit this to preserve
  * full-range behaviour; the canvas passes its current viewport so native
@@ -76,20 +103,6 @@ export interface ConditionalVisibleBounds {
   c0: number;
   r1: number;
   c1: number;
-}
-
-/** Test hook — drop the cached overlay so the next call recomputes. */
-export function _resetConditionalCache(): void {
-  cachedRulesRef = null;
-  cachedCellsRef = null;
-  cachedSheet = null;
-  cachedRtl = null;
-  cachedDate1904 = null;
-  cachedWb = null;
-  cachedLocale = null;
-  cachedProfile = null;
-  cachedVisibleBounds = null;
-  cachedOverlay = null;
 }
 
 /** Read the workbook's active formula-behaviour profile for the renderer
@@ -263,47 +276,43 @@ const isBlankValue = (v: CellValue): boolean => v.kind === 'blank';
 /**
  * Evaluate conditional formatting rules for the active sheet's cells. We
  * compute per-rule numeric extremes for color-scale / data-bar rules once,
- * then walk the cell entries assigning overlays.
+ * then walk the cell entries assigning overlays. Pass the renderer's `cache`
+ * to reuse the previous result while its inputs are unchanged.
  */
 export function evaluateConditional(
   state: State,
   wb: WorkbookHandle | null = null,
   locale = '',
   visibleBounds: ConditionalVisibleBounds | null = null,
+  cache: ConditionalCache | null = null,
 ): Map<string, ConditionalCellOverlay> {
-  const profile = profileForCache(wb);
-  if (
-    cachedOverlay !== null &&
-    cachedRulesRef === state.conditional.rules &&
-    cachedCellsRef === state.data.cells &&
-    cachedSheet === state.data.sheetIndex &&
-    cachedRtl === state.ui.rightToLeft &&
-    cachedDate1904 === (state.ui.date1904 === true) &&
-    cachedWb === wb &&
-    cachedLocale === locale &&
-    cachedProfile === profile &&
-    cachedVisibleBounds?.r0 === visibleBounds?.r0 &&
-    cachedVisibleBounds?.c0 === visibleBounds?.c0 &&
-    cachedVisibleBounds?.r1 === visibleBounds?.r1 &&
-    cachedVisibleBounds?.c1 === visibleBounds?.c1
-  ) {
-    return cachedOverlay;
+  const key: ConditionalCacheKey = {
+    rules: state.conditional.rules,
+    cells: state.data.cells,
+    sheet: state.data.sheetIndex,
+    rtl: state.ui.rightToLeft,
+    date1904: state.ui.date1904 === true,
+    wb,
+    locale,
+    profile: profileForCache(wb),
+    bounds: visibleBounds ? { ...visibleBounds } : null,
+  };
+  if (cache?.key && cache.overlay && sameCacheKey(cache.key, key)) return cache.overlay;
+  const out = overlayFor(state, wb, visibleBounds);
+  if (cache) {
+    cache.key = key;
+    cache.overlay = out;
   }
+  return out;
+}
+
+function overlayFor(
+  state: State,
+  wb: WorkbookHandle | null,
+  visibleBounds: ConditionalVisibleBounds | null,
+): Map<string, ConditionalCellOverlay> {
   const out = new Map<string, ConditionalCellOverlay>();
   const rules = state.conditional.rules;
-  if (rules.length === 0) {
-    cachedRulesRef = rules;
-    cachedCellsRef = state.data.cells;
-    cachedSheet = state.data.sheetIndex;
-    cachedRtl = state.ui.rightToLeft;
-    cachedDate1904 = state.ui.date1904 === true;
-    cachedWb = wb;
-    cachedLocale = locale;
-    cachedProfile = profile;
-    cachedVisibleBounds = visibleBounds ? { ...visibleBounds } : null;
-    cachedOverlay = out;
-    return out;
-  }
   const sheet = state.data.sheetIndex;
   const stopped = new Set<string>();
 
@@ -351,16 +360,6 @@ export function evaluateConditional(
     }
   }
 
-  cachedRulesRef = state.conditional.rules;
-  cachedCellsRef = state.data.cells;
-  cachedSheet = state.data.sheetIndex;
-  cachedRtl = state.ui.rightToLeft;
-  cachedDate1904 = state.ui.date1904 === true;
-  cachedWb = wb;
-  cachedLocale = locale;
-  cachedProfile = profile;
-  cachedVisibleBounds = visibleBounds ? { ...visibleBounds } : null;
-  cachedOverlay = out;
   return out;
 }
 

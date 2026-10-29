@@ -1,16 +1,13 @@
 import { headerFilterRanges } from '../commands/filter-ranges.js';
 import { hitZone, layoutForView } from '../render/geometry.js';
 import {
-  getPageBandHits,
-  getPageBreakHandles,
-  getRulerHandles,
   PAGE_BREAK_GRAB,
   type PageBandHit,
   type PageBreakHandle,
   RULER_GRAB,
   type RulerHandle,
 } from '../render/grid/page-view.js';
-import { getFillHandleRect } from '../render/grid.js';
+import { type GridHitState, gridHitState } from '../render/grid.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 
 /** Pixels the fill-handle hit zone extends past the painted handle. */
@@ -19,10 +16,15 @@ const FILL_HANDLE_HIT_PAD = 3;
 /** The page boundary under the pointer, if Page Break Preview is showing one
  *  there. A manual break wins over an automatic one at the same position so
  *  a stack of coincident lines still drags the one the user can move. */
-export const pageBreakHandleAt = (s: State, x: number, y: number): PageBreakHandle | null => {
+export const pageBreakHandleAt = (
+  s: State,
+  hits: GridHitState,
+  x: number,
+  y: number,
+): PageBreakHandle | null => {
   if (s.ui.workbookView !== 'pageBreakPreview') return null;
   let best: PageBreakHandle | null = null;
-  for (const handle of getPageBreakHandles()) {
+  for (const handle of hits.pageBreakHandles) {
     const distance =
       handle.axis === 'row' ? Math.abs(y - handle.position) : Math.abs(x - handle.position);
     if (distance > PAGE_BREAK_GRAB) continue;
@@ -34,9 +36,14 @@ export const pageBreakHandleAt = (s: State, x: number, y: number): PageBreakHand
 /** The ruler margin boundary under the pointer in Page Layout view. Only
  *  the ruler bands themselves are live; the same coordinate further into the
  *  sheet belongs to a cell. */
-export const rulerHandleAt = (s: State, x: number, y: number): RulerHandle | null => {
+export const rulerHandleAt = (
+  s: State,
+  hits: GridHitState,
+  x: number,
+  y: number,
+): RulerHandle | null => {
   if (s.ui.workbookView !== 'pageLayout') return null;
-  for (const handle of getRulerHandles()) {
+  for (const handle of hits.rulerHandles) {
     const horizontal = handle.side === 'left' || handle.side === 'right';
     const across = horizontal ? y : x;
     if (across < handle.bandStart || across > handle.bandEnd) continue;
@@ -58,9 +65,14 @@ export const marginInchesFor = (handle: RulerHandle, x: number, y: number): numb
 };
 
 /** The header / footer slot under the pointer in Page Layout view. */
-export const pageBandAt = (s: State, x: number, y: number): PageBandHit | null => {
+export const pageBandAt = (
+  s: State,
+  hits: GridHitState,
+  x: number,
+  y: number,
+): PageBandHit | null => {
   if (s.ui.workbookView !== 'pageLayout') return null;
-  for (const band of getPageBandHits()) {
+  for (const band of hits.pageBands) {
     if (x < band.rect.x || x > band.rect.x + band.rect.w) continue;
     if (y < band.rect.y || y > band.rect.y + band.rect.h) continue;
     return band;
@@ -80,8 +92,8 @@ export const indexAt = (s: State, x: number, y: number): { row: number; col: num
   return null;
 };
 
-export const isFillHandleHit = (x: number, y: number): boolean => {
-  const rect = getFillHandleRect();
+export const isFillHandleHit = (hits: GridHitState, x: number, y: number): boolean => {
+  const rect = hits.fillHandle;
   if (!rect) return false;
   // Pad so the handle is comfortable to grab.
   const pad = FILL_HANDLE_HIT_PAD;
@@ -100,22 +112,23 @@ export function updateCursor(
   y: number,
 ): void {
   const s0 = store.getState();
-  const breakHandle = pageBreakHandleAt(s0, x, y);
+  const hits = gridHitState(host);
+  const breakHandle = pageBreakHandleAt(s0, hits, x, y);
   if (breakHandle) {
     host.style.cursor = breakHandle.axis === 'row' ? 'row-resize' : 'col-resize';
     return;
   }
-  const ruler = rulerHandleAt(s0, x, y);
+  const ruler = rulerHandleAt(s0, hits, x, y);
   if (ruler) {
     host.style.cursor =
       ruler.side === 'left' || ruler.side === 'right' ? 'col-resize' : 'row-resize';
     return;
   }
-  if (pageBandAt(s0, x, y)) {
+  if (pageBandAt(s0, hits, x, y)) {
     host.style.cursor = 'text';
     return;
   }
-  if (isFillHandleHit(x, y)) {
+  if (isFillHandleHit(hits, x, y)) {
     host.style.cursor = 'crosshair';
     return;
   }

@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { _resetConditionalCache, evaluateConditional } from '../../../../src/render/conditional.js';
+import { evaluateConditional } from '../../../../src/render/conditional.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import { formulaRule, withConditionalRules } from '../conditional-fixtures.js';
 
 describe('evaluateConditional', () => {
   afterEach(() => {
-    _resetConditionalCache();
     vi.useRealTimers();
   });
 

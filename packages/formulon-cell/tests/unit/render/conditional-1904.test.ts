@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { _resetConditionalCache, evaluateConditional } from '../../../src/render/conditional.js';
+import { evaluateConditional } from '../../../src/render/conditional.js';
 import type { ConditionalRule, State } from '../../../src/store/store.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 import {
@@ -16,7 +16,6 @@ const with1904 = (state: State, date1904: boolean): State => ({
 
 describe('conditional formatting in a 1904 workbook', () => {
   afterEach(() => {
-    _resetConditionalCache();
     vi.useRealTimers();
   });
 

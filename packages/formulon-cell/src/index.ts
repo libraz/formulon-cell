@@ -1297,12 +1297,18 @@ export {
   RIBBON_HOST_MENU_FIRST_COMMANDS,
   Spreadsheet,
 } from './mount.js';
-export type { ErrorTriangleHit, ErrorTriangleKind } from './render/grid.js';
+export type {
+  ErrorTriangleHit,
+  ErrorTriangleKind,
+  GridHitState,
+  TotalsChevron,
+  ValidationChevron,
+} from './render/grid.js';
 export {
   detectErrorKind,
   detectValidationViolation,
   ERROR_TRIANGLE_COLOR,
-  getErrorTriangleHits,
+  gridHitState,
   VALIDATION_TRIANGLE_COLOR,
 } from './render/grid.js';
 export type {

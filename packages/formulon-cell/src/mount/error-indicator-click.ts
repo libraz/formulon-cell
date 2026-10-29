@@ -1,6 +1,6 @@
 import type { ErrorMenuHandle } from '../interact/error-menu.js';
 import type { ErrorTriangleHit } from '../render/grid/hit-state.js';
-import { getErrorTriangleHits } from '../render/grid.js';
+import { gridHitState } from '../render/grid.js';
 
 export interface ErrorIndicatorClickDeps {
   grid: HTMLElement;
@@ -63,7 +63,7 @@ export function createErrorIndicatorClickHandler(
 
   const hitAt = (e: MouseEvent): ErrorTriangleHit | null => {
     const { x, y } = localPoint(e);
-    return getErrorTriangleHits().find((hit) => hitContains(hit, x, y)) ?? null;
+    return gridHitState(grid).errorTriangles.find((hit) => hitContains(hit, x, y)) ?? null;
   };
 
   const reset = (): void => {

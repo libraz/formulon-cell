@@ -18,9 +18,6 @@ import {
   layoutForView,
 } from '../../../../src/render/geometry.js';
 import {
-  getPageBandHits,
-  getPageBreakHandles,
-  getRulerHandles,
   paintPageBreakPreview,
   paintPageLayoutBackground,
   paintPageLayoutChrome,
@@ -161,7 +158,7 @@ describe('Page Layout painting', () => {
     const { view, cols, rows } = viewFor(state);
     const { ctx, texts } = makeCtxSpy();
 
-    paintPageLayoutChrome(
+    const bands = paintPageLayoutChrome(
       pc(ctx),
       view,
       theme,
@@ -172,7 +169,7 @@ describe('Page Layout painting', () => {
       rows,
     );
 
-    const headers = getPageBandHits().filter((h) => h.kind === 'header');
+    const headers = bands.filter((h) => h.kind === 'header');
     expect(headers.length).toBeGreaterThan(0);
     expect(headers.length % 3).toBe(0);
     expect(headers.slice(0, 3).map((h) => h.slot)).toEqual(['left', 'center', 'right']);
@@ -213,9 +210,7 @@ describe('Page Layout painting', () => {
     const pagination = paginationFor(state, 0);
     const { ctx } = makeCtxSpy();
 
-    paintPageRulers(pc(ctx), view, theme, pagination, 'cm', cols, rows);
-
-    const handles = getRulerHandles();
+    const handles = paintPageRulers(pc(ctx), view, theme, pagination, 'cm', cols, rows);
     expect(handles.map((h) => h.side)).toContain('left');
     expect(handles.map((h) => h.side)).toContain('top');
     const left = handles.find((h) => h.side === 'left');
@@ -262,7 +257,7 @@ describe('Page Break Preview painting', () => {
     const { view, cols, rows } = viewFor(state);
     const { ctx } = makeCtxSpy();
 
-    paintPageBreakPreview(
+    const handles = paintPageBreakPreview(
       pc(ctx),
       view,
       theme,
@@ -272,8 +267,6 @@ describe('Page Break Preview painting', () => {
       cols,
       rows,
     );
-
-    const handles = getPageBreakHandles();
     const frame = handles.filter((h) => h.kind === 'printArea');
     expect(frame.map((h) => h.axis).sort()).toEqual(['col', 'row']);
     expect(frame.find((h) => h.axis === 'row')?.index).toBe(4);
@@ -289,7 +282,7 @@ describe('Page Break Preview painting', () => {
     const { view, cols, rows } = viewFor(state);
     const { ctx } = makeCtxSpy();
 
-    paintPageBreakPreview(
+    const handles = paintPageBreakPreview(
       pc(ctx),
       view,
       theme,
@@ -300,7 +293,7 @@ describe('Page Break Preview painting', () => {
       rows,
     );
 
-    const breaks = getPageBreakHandles().filter((h) => h.kind === 'break');
+    const breaks = handles.filter((h) => h.kind === 'break');
     expect(breaks.some((h) => h.axis === 'row' && h.index === 20 && h.manual)).toBe(true);
     // The sheet is one column band wide, so no vertical split exists.
     expect(breaks.some((h) => h.axis === 'col')).toBe(false);

@@ -1,32 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { CellValue } from '../../../../src/engine/types.js';
 import {
   detectErrorKind,
   detectValidationViolation,
   ERROR_TRIANGLE_COLOR,
-  getErrorTriangleHits,
-  getFillHandleRect,
-  getOutlineToggleHits,
-  getValidationChevron,
+  gridHitState,
   isPlainTextOverflowCandidate,
   normalizeFormatLocale,
-  setErrorTriangleHits,
-  setFillHandleRect,
-  setOutlineToggles,
-  setValidationChevron,
   shouldShowValidationChevron,
   VALIDATION_TRIANGLE_COLOR,
 } from '../../../../src/render/grid/hit-state.js';
 
 describe('render/grid/hit-state', () => {
-  beforeEach(() => {
-    // Module-level caches — reset between tests so they don't leak.
-    setErrorTriangleHits([]);
-    setOutlineToggles([]);
-    setFillHandleRect(null);
-    setValidationChevron(null);
-  });
-
   describe('error/validation triangle colors', () => {
     it('exposes distinct sentinel colors for error vs validation triangles', () => {
       expect(ERROR_TRIANGLE_COLOR).toBe('#2ea043');
@@ -159,40 +144,22 @@ describe('render/grid/hit-state', () => {
     });
   });
 
-  describe('hit-rect caches', () => {
-    it('round-trips the fill handle rect', () => {
-      const rect = { x: 10, y: 20, w: 6, h: 6 };
-      setFillHandleRect(rect);
-      expect(getFillHandleRect()).toBe(rect);
-      setFillHandleRect(null);
-      expect(getFillHandleRect()).toBeNull();
+  describe('gridHitState', () => {
+    it('starts empty and returns the same state for the same surface', () => {
+      const surface = document.createElement('div');
+      const hits = gridHitState(surface);
+      expect(hits.fillHandle).toBeNull();
+      expect(hits.validationChevron).toBeNull();
+      expect(hits.totalsChevron).toBeNull();
+      expect(hits.errorTriangles).toEqual([]);
+      expect(gridHitState(surface)).toBe(hits);
     });
 
-    it('round-trips outline toggle hits', () => {
-      setOutlineToggles([
-        { axis: 'row', level: 1, i0: 0, i1: 4, rect: { x: 0, y: 0, w: 10, h: 10 } },
-      ]);
-      expect(getOutlineToggleHits()).toHaveLength(1);
-    });
-
-    it('round-trips error triangle hits', () => {
-      setErrorTriangleHits([
-        {
-          rect: { x: 0, y: 0, w: 5, h: 5 },
-          addr: { sheet: 0, row: 0, col: 0 },
-          kind: 'error',
-        },
-      ]);
-      expect(getErrorTriangleHits()).toHaveLength(1);
-    });
-
-    it('round-trips the validation chevron', () => {
-      setValidationChevron({ rect: { x: 0, y: 0, w: 12, h: 12 }, row: 2, col: 3 });
-      expect(getValidationChevron()).toEqual({
-        rect: { x: 0, y: 0, w: 12, h: 12 },
-        row: 2,
-        col: 3,
-      });
+    it('keeps each surface separate', () => {
+      const a = document.createElement('div');
+      const b = document.createElement('div');
+      gridHitState(a).fillHandle = { x: 10, y: 20, w: 6, h: 6 };
+      expect(gridHitState(b).fillHandle).toBeNull();
     });
   });
 });

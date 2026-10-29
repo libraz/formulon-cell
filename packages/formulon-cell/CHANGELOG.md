@@ -4,6 +4,16 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- The hit targets a grid paints (fill handle, validation and totals chevrons, error triangles, outline toggles, page-view handles) belong to that grid. `gridHitState(grid)` returns them and replaces `getErrorTriangleHits()`.
+
+### Fixed
+
+- Two spreadsheets on one page no longer hit-test each other's fill handle, validation dropdown, totals picker or error indicators, and their conditional formats are no longer recomputed on every frame.
+
 ## 0.11.0 — 2026-10-27
 
 ### Added

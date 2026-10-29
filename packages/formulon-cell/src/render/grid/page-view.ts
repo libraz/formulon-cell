@@ -376,14 +376,6 @@ export interface PageBandHit {
   kind: 'header' | 'footer';
 }
 
-let pageBandHits: PageBandHit[] = [];
-
-/** Header / footer slots drawn by the last Page Layout paint, in screen
- *  coordinates. The pointer layer reads this to open the inline editor. */
-export function getPageBandHits(): readonly PageBandHit[] {
-  return pageBandHits;
-}
-
 const BAND_SLOTS: PageBandHit['slot'][] = ['left', 'center', 'right'];
 
 function bandText(setup: PageSetup, kind: PageBandHit['kind'], slot: PageBandHit['slot']): string {
@@ -406,7 +398,7 @@ export interface PageBandStrings {
  * Foreground pass for Page Layout view. Repaints everything the cells are not
  * allowed to cover — the gutters between sheets and the margin bands inside
  * them — then frames each page and lays the header / footer slots into the top
- * and bottom margins.
+ * and bottom margins. Returns those slots in screen coordinates.
  */
 export function paintPageLayoutChrome(
   pc: ChromePaintContext,
@@ -417,7 +409,7 @@ export function paintPageLayoutChrome(
   strings: PageBandStrings,
   cols: AxisLayout,
   rows: AxisLayout,
-): void {
+): PageBandHit[] {
   const { ctx, dpr } = pc;
   const axes = pageAxes(state, pagination, cols, rows);
   const rowSegs = segmentsFor(axes.rowRuns, axes.margins.top, axes.margins.bottom);
@@ -457,8 +449,9 @@ export function paintPageLayoutChrome(
     ctx.strokeRect(Math.round(x) + align, Math.round(rect.y) + align, rect.w, rect.h);
   }
 
-  pageBandHits = paintPageBands(pc, state, theme, axes, setup, strings, pagination);
+  const bands = paintPageBands(pc, state, theme, axes, setup, strings, pagination);
   ctx.restore();
+  return bands;
 }
 
 /** Height of a header / footer slot inside its margin. */
@@ -579,13 +572,6 @@ export interface RulerHandle {
   pxPerInch: number;
 }
 
-let rulerHandles: RulerHandle[] = [];
-
-/** Margin boundaries drawn by the last Page Layout paint. */
-export function getRulerHandles(): readonly RulerHandle[] {
-  return rulerHandles;
-}
-
 /** Pointer slack around a ruler margin boundary, in pixels. */
 export const RULER_GRAB = 4;
 
@@ -598,7 +584,8 @@ const CM_PER_INCH = 2.54;
  * desk, the printable width as paper, and the boundary between them is the
  * handle that sets the margin. Ticks are numbered from the printable origin,
  * which is where the desktop app zeroes them too, and in the locale's unit —
- * centimetres almost everywhere, inches in the US.
+ * centimetres almost everywhere, inches in the US. Returns the margin
+ * boundaries it drew.
  */
 export function paintPageRulers(
   pc: ChromePaintContext,
@@ -608,11 +595,11 @@ export function paintPageRulers(
   unit: 'in' | 'cm',
   cols: AxisLayout,
   rows: AxisLayout,
-): void {
+): RulerHandle[] {
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const layout = state.layout;
   const band = rulerTop(layout);
-  if (band <= 0) return;
+  if (band <= 0) return [];
   const axes = pageAxes(state, pagination, cols, rows);
   const zoom = renderScale(state.layout, state.viewport);
   const pxPerInch = pagination.pxPerInch * zoom;
@@ -734,7 +721,7 @@ export function paintPageRulers(
   ctx.textAlign = 'left';
   ctx.restore();
 
-  rulerHandles = handles;
+  return handles;
 }
 
 /** A line the user can drag in Page Break Preview. */
@@ -751,14 +738,6 @@ export interface PageBreakHandle {
   manual: boolean;
 }
 
-let pageBreakHandles: PageBreakHandle[] = [];
-
-/** Break lines drawn by the last preview paint. The pointer layer hit-tests
- *  against these to start a drag. */
-export function getPageBreakHandles(): readonly PageBreakHandle[] {
-  return pageBreakHandles;
-}
-
 /** Pointer slack around a break line, in pixels. */
 export const PAGE_BREAK_GRAB = 4;
 
@@ -766,7 +745,7 @@ export const PAGE_BREAK_GRAB = 4;
  * Page Break Preview: wash out everything that will not print, frame the print
  * area, draw every page boundary, and number the pages. Runs after the cells so
  * the lines sit on top, and before the selection so the active outline still
- * reads clearly.
+ * reads clearly. Returns the lines the user can drag.
  */
 export function paintPageBreakPreview(
   pc: ChromePaintContext,
@@ -777,7 +756,7 @@ export function paintPageBreakPreview(
   pageLabel: (page: number) => string,
   cols: AxisLayout,
   rows: AxisLayout,
-): void {
+): PageBreakHandle[] {
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const layout = state.layout;
   const ox = gridOriginX(layout);
@@ -941,7 +920,7 @@ export function paintPageBreakPreview(
   ctx.textAlign = 'left';
   ctx.restore();
 
-  pageBreakHandles = handles;
+  return handles;
 }
 
 /** Screen coordinate just past `index` on its axis. When the index has

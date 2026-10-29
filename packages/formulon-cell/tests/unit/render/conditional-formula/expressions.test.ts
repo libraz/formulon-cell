@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  _resetConditionalCache,
-  evaluateConditional,
-  parseFormulaPredicate,
-} from '../../../../src/render/conditional.js';
+import { evaluateConditional, parseFormulaPredicate } from '../../../../src/render/conditional.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import {
   formulaRule,
@@ -14,7 +10,6 @@ import {
 
 describe('evaluateConditional', () => {
   afterEach(() => {
-    _resetConditionalCache();
     vi.useRealTimers();
   });
 

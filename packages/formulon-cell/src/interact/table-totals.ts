@@ -3,7 +3,7 @@ import type { History } from '../commands/history.js';
 import { setTableColumnFunction, TABLE_TOTALS_FUNCTIONS } from '../commands/table-design.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import { getTotalsChevron } from '../render/grid.js';
+import { gridHitState } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
@@ -108,7 +108,7 @@ export function attachTableTotals(deps: TableTotalsDeps): TableTotalsHandle {
 
   const open = (): boolean => {
     close();
-    const chevron = getTotalsChevron();
+    const chevron = gridHitState(grid).totalsChevron;
     if (!chevron) return false;
     const s = store.getState();
     const totals = totalsCellAt(s, s.data.sheetIndex, chevron.row, chevron.col);
@@ -170,7 +170,7 @@ export function attachTableTotals(deps: TableTotalsDeps): TableTotalsHandle {
 
   const onDown = (e: PointerEvent): void => {
     if (e.button !== 0) return;
-    const chevron = getTotalsChevron();
+    const chevron = gridHitState(grid).totalsChevron;
     if (!chevron) return;
     const rect = grid.getBoundingClientRect();
     const x = e.clientX - rect.left;

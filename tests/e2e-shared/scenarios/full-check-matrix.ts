@@ -598,8 +598,10 @@ const errorTriangleCenter = async (
   }`;
   return page.evaluate(
     async ({ moduleUrl: nextModuleUrl, row: targetRow, col: targetCol }) => {
-      const { getErrorTriangleHits } = await import(nextModuleUrl);
-      const hit = (getErrorTriangleHits() as ErrorTriangleProbe[]).find(
+      const { gridHitState } = await import(nextModuleUrl);
+      const grid = document.querySelector<HTMLElement>('.fc-host__grid');
+      if (!grid) throw new Error('full-check error geometry cannot find grid');
+      const hit = (gridHitState(grid).errorTriangles as ErrorTriangleProbe[]).find(
         ({ addr }) => addr.sheet === 0 && addr.row === targetRow && addr.col === targetCol,
       );
       if (!hit) {

@@ -4,6 +4,7 @@ import type { CellValue } from '../../engine/types.js';
 import type { CellFormat, CellValidation } from '../../store/store.js';
 import type { Rect } from '../geometry.js';
 import type { OutlineToggleHit } from '../painters.js';
+import type { PageBandHit, PageBreakHandle, RulerHandle } from './page-view.js';
 
 export function isPlainTextOverflowCandidate(input: {
   value: CellValue;
@@ -37,21 +38,59 @@ export const ERROR_TRIANGLE_COLOR = '#2ea043';
 /** Color used for data-validation violation triangles (spreadsheet-style red). */
 export const VALIDATION_TRIANGLE_COLOR = '#d24545';
 
-let cachedFillHandleRect: Rect | null = null;
-let cachedValidationChevron: { rect: Rect; row: number; col: number } | null = null;
-let cachedTotalsChevron: TotalsChevron | null = null;
-let cachedOutlineToggles: OutlineToggleHit[] = [];
-let cachedErrorTriangles: ErrorTriangleHit[] = [];
-
-/** Latest hit-rects of all error / validation triangles painted in this
- *  frame. The mount-level click handler hit-tests these to open the
- *  error-info popover. */
-export function getErrorTriangleHits(): ErrorTriangleHit[] {
-  return cachedErrorTriangles;
+/** Bounds + cell of the active cell's validation chevron. */
+export interface ValidationChevron {
+  rect: Rect;
+  row: number;
+  col: number;
 }
 
-export function setErrorTriangleHits(hits: ErrorTriangleHit[]): void {
-  cachedErrorTriangles = hits;
+/** Bounds + cell of the totals-row function picker painted on the active
+ *  cell when it sits in a table's total row. */
+export interface TotalsChevron {
+  rect: Rect;
+  row: number;
+  col: number;
+  tableId: string;
+  column: number;
+}
+
+/** Hit targets the latest frame painted on one grid surface. Each mount owns
+ *  its own, so two spreadsheets on a page never hit-test each other's frame. */
+export interface GridHitState {
+  /** Fill handle bounds; null while the handle is offscreen. */
+  fillHandle: Rect | null;
+  /** The active cell's list-validation chevron, or null. */
+  validationChevron: ValidationChevron | null;
+  /** The active total-row cell's function picker, or null. */
+  totalsChevron: TotalsChevron | null;
+  outlineToggles: readonly OutlineToggleHit[];
+  errorTriangles: readonly ErrorTriangleHit[];
+  pageBands: readonly PageBandHit[];
+  rulerHandles: readonly RulerHandle[];
+  pageBreakHandles: readonly PageBreakHandle[];
+}
+
+const hitStates = new WeakMap<HTMLElement, GridHitState>();
+
+/** Hit targets painted on `surface`, the grid element a `GridRenderer` paints
+ *  into and the pointer layers listen on. Empty until the first paint. */
+export function gridHitState(surface: HTMLElement): GridHitState {
+  let state = hitStates.get(surface);
+  if (!state) {
+    state = {
+      fillHandle: null,
+      validationChevron: null,
+      totalsChevron: null,
+      outlineToggles: [],
+      errorTriangles: [],
+      pageBands: [],
+      rulerHandles: [],
+      pageBreakHandles: [],
+    };
+    hitStates.set(surface, state);
+  }
+  return state;
 }
 
 /** Spreadsheet error sentinels that the renderer surfaces with a green corner
@@ -88,54 +127,6 @@ export function detectValidationViolation(
   resolveRange?: RangeResolver,
 ): boolean {
   return cellValueViolatesValidation(value, validation, resolveRange);
-}
-
-/** Latest hit-rects of all outline +/- toggles painted in this frame. The
- *  pointer layer hit-tests these to route clicks to collapse/expand. */
-export function getOutlineToggleHits(): OutlineToggleHit[] {
-  return cachedOutlineToggles;
-}
-
-export function setOutlineToggles(hits: OutlineToggleHit[]): void {
-  cachedOutlineToggles = hits;
-}
-
-/** Latest device-space bounds of the fill handle. Hit-tested by the pointer
- *  layer to start a fill drag. Null while the handle is offscreen. */
-export function getFillHandleRect(): Rect | null {
-  return cachedFillHandleRect;
-}
-
-export function setFillHandleRect(r: Rect | null): void {
-  cachedFillHandleRect = r;
-}
-
-/** Bounds + addr of the active cell's validation chevron, or null when the
- *  active cell has no list validation. */
-export function getValidationChevron(): { rect: Rect; row: number; col: number } | null {
-  return cachedValidationChevron;
-}
-
-export function setValidationChevron(v: { rect: Rect; row: number; col: number } | null): void {
-  cachedValidationChevron = v;
-}
-
-/** Bounds + cell of the totals-row function picker painted on the active
- *  cell when it sits in a table's total row, or null. */
-export interface TotalsChevron {
-  rect: Rect;
-  row: number;
-  col: number;
-  tableId: string;
-  column: number;
-}
-
-export function getTotalsChevron(): TotalsChevron | null {
-  return cachedTotalsChevron;
-}
-
-export function setTotalsChevron(v: TotalsChevron | null): void {
-  cachedTotalsChevron = v;
 }
 
 export function shouldShowValidationChevron(validation: CellValidation | undefined): boolean {

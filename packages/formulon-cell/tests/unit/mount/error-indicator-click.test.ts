@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createErrorIndicatorClickHandler } from '../../../src/mount/error-indicator-click.js';
-import { setErrorTriangleHits } from '../../../src/render/grid/hit-state.js';
+import { gridHitState } from '../../../src/render/grid/hit-state.js';
 
 const address = { sheet: 0, row: 5, col: 0 };
 const triangle = { addr: address, kind: 'error' as const, rect: { x: 32, y: 117, w: 6, h: 6 } };
@@ -13,7 +13,7 @@ function setup() {
   grid.append(canvas);
   document.body.append(host);
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 100, 200, 200));
-  setErrorTriangleHits([triangle]);
+  gridHitState(grid).errorTriangles = [triangle];
   const open = vi.fn();
   const handler = createErrorIndicatorClickHandler({
     grid,
@@ -55,7 +55,6 @@ function capturedClick(grid: HTMLElement, pointerId = 7, clientX = 45, clientY =
 }
 
 afterEach(() => {
-  setErrorTriangleHits([]);
   document.body.replaceChildren();
 });
 
@@ -164,13 +163,13 @@ describe('error indicator click routing', () => {
   it('requires the captured click to resolve to the same triangle', () => {
     const { canvas, grid, open } = setup();
     pointerDown(canvas);
-    setErrorTriangleHits([
+    gridHitState(grid).errorTriangles = [
       {
         addr: { sheet: 0, row: 6, col: 0 },
         kind: 'error',
         rect: { x: 80, y: 117, w: 6, h: 6 },
       },
-    ]);
+    ];
     capturedClick(grid, 7, 93, 220);
 
     expect(open).not.toHaveBeenCalled();

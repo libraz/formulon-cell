@@ -37,7 +37,7 @@ import {
   type ViewLayout,
 } from '../render/geometry.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
-import { getOutlineToggleHits } from '../render/grid.js';
+import { gridHitState } from '../render/grid.js';
 import { renderScale } from '../store/render-scale.js';
 import {
   isWholeColumnRange,
@@ -184,6 +184,7 @@ export function attachPointer(
   /** Sheet activation and invalid-target reporting for in-document links. */
   hyperlinkFollow: Pick<HyperlinkFollowDeps, 'activateSheet' | 'onInvalidTarget'> = {},
 ): () => void {
+  const hits = gridHitState(host);
   let drag: DragMode = { kind: 'none' };
   const unsubscribeSheetChange = store.subscribe((state) => {
     if (drag.kind === 'selection-marquee' && state.data.sheetIndex !== drag.base.range.sheet) {
@@ -421,7 +422,7 @@ export function attachPointer(
     // Outline toggles in the bracket gutters take precedence over hit-zoning;
     // they sit in territory the hitZone fall-through would otherwise treat as
     // a header/corner click.
-    for (const t of getOutlineToggleHits()) {
+    for (const t of hits.outlineToggles) {
       if (x < t.rect.x || x > t.rect.x + t.rect.w) continue;
       if (y < t.rect.y || y > t.rect.y + t.rect.h) continue;
       if (restricted) {
@@ -446,7 +447,7 @@ export function attachPointer(
 
     // Page Layout: dragging a ruler's margin boundary sets that margin, the
     // same affordance the desktop app puts on its rulers.
-    const ruler = rulerHandleAt(s, x, y);
+    const ruler = rulerHandleAt(s, hits, x, y);
     if (ruler) {
       if (restricted) {
         e.preventDefault();
@@ -463,7 +464,7 @@ export function attachPointer(
 
     // Page Layout: the header / footer bands live in the page margins, which
     // no cell occupies, so a click there can only mean "edit that slot".
-    const band = pageBandAt(s, x, y);
+    const band = pageBandAt(s, hits, x, y);
     if (band) {
       if (restricted) {
         e.preventDefault();
@@ -479,7 +480,7 @@ export function attachPointer(
 
     // Page Break Preview: the blue boundaries sit on top of the cells and are
     // the only thing in that view a drag from this position could mean.
-    const breakHandle = pageBreakHandleAt(s, x, y);
+    const breakHandle = pageBreakHandleAt(s, hits, x, y);
     if (breakHandle) {
       if (restricted) {
         e.preventDefault();
@@ -498,7 +499,7 @@ export function attachPointer(
     }
 
     // Fill handle takes precedence over normal cell hit-testing.
-    if (isFillHandleHit(x, y)) {
+    if (isFillHandleHit(hits, x, y)) {
       if (selectionDisabled) {
         e.preventDefault();
         drag = { kind: 'none' };
@@ -942,7 +943,7 @@ export function attachPointer(
 
     // Fill-handle takes precedence — spreadsheet-style "double-click to flash-fill
     // down to match the neighbour column's contiguous run."
-    if (isFillHandleHit(x, y)) {
+    if (isFillHandleHit(hits, x, y)) {
       e.preventDefault();
       e.stopPropagation();
       const src = { ...s.selection.range };

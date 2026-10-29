@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
-import { _resetConditionalCache, evaluateConditional } from '../../src/render/conditional.js';
+import { evaluateConditional } from '../../src/render/conditional.js';
 import type { ConditionalRule, State } from '../../src/store/store.js';
 import { createSpreadsheetStore } from '../../src/store/store.js';
 
@@ -55,10 +55,6 @@ const stateWithCells = (cells: State['data']['cells'], formula: string): State =
 };
 
 describe('integration: native conditional-format formula evaluation', () => {
-  afterEach(() => {
-    _resetConditionalCache();
-  });
-
   it.each(profileIds)('%s evaluates relative references and functions', async (profile) => {
     const workbook = await WorkbookHandle.createDefault();
     try {

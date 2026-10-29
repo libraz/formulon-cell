@@ -6,7 +6,7 @@ import { hydrateTableOverlaysFromEngine } from '../../../src/engine/table-sync.j
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import { attachTableTotals, type TableTotalsHandle } from '../../../src/interact/table-totals.js';
-import { setTotalsChevron } from '../../../src/render/grid/hit-state.js';
+import { gridHitState } from '../../../src/render/grid/hit-state.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('table totals function picker', () => {
@@ -49,19 +49,18 @@ describe('table totals function picker', () => {
       onAfterCommit: () => undefined,
       onMoreFunctions,
     });
-    setTotalsChevron({
+    gridHitState(grid).totalsChevron = {
       rect: { x: 60, y: 10, w: 18, h: 20 },
       row: 4,
       col: 1,
       tableId: store.getState().tables.tables[0]?.id ?? '',
       column: 1,
-    });
+    };
   });
 
   afterEach(() => {
     handle.detach();
     onMoreFunctions.mockClear();
-    setTotalsChevron(null);
     grid.remove();
     wb.dispose();
   });

@@ -6,6 +6,7 @@ import {
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { createConditionalCache } from '../../../src/render/conditional.js';
 import { buildColLayout, buildRowLayout, layoutForView } from '../../../src/render/geometry.js';
 import { paintCells } from '../../../src/render/grid/cells.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
@@ -116,6 +117,7 @@ describe('formulon 0.13 style projections and workbook themes', () => {
           getDisplay: undefined,
           sheetBackgroundImage: null,
           fontEffects: false,
+          conditionalCache: createConditionalCache(),
         },
         view,
         renderTheme,

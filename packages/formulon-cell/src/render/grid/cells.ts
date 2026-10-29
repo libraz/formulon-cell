@@ -14,7 +14,7 @@ import { renderScale } from '../../store/render-scale.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import { evaluateConditional } from '../conditional.js';
+import { type ConditionalCache, evaluateConditional } from '../conditional.js';
 import {
   type AxisLayout,
   cellRectIn,
@@ -47,7 +47,6 @@ import {
   type ErrorTriangleHit,
   isPlainTextOverflowCandidate,
   normalizeFormatLocale,
-  setErrorTriangleHits,
   VALIDATION_TRIANGLE_COLOR,
 } from './hit-state.js';
 import { connectedRects } from './range-rects.js';
@@ -69,6 +68,8 @@ export interface CellPaintContext {
   sheetBackgroundImage: HTMLImageElement | null;
   /** The host renders the Mac profile, which draws Outline and Shadow. */
   fontEffects: boolean;
+  /** The renderer's conditional-format overlay cache. */
+  conditionalCache: ConditionalCache;
 }
 
 export function paintCells(
@@ -77,7 +78,7 @@ export function paintCells(
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
-): void {
+): ErrorTriangleHit[] {
   const ctx = cellCtx.ctx;
   const {
     layout,
@@ -99,7 +100,9 @@ export function paintCells(
     r1: Math.max(state.viewport.rowStart, state.viewport.rowStart + state.viewport.rowCount - 1),
     c1: Math.max(state.viewport.colStart, state.viewport.colStart + state.viewport.colCount - 1),
   };
-  const conditional = new Map(evaluateConditional(state, wb, cellCtx.locale, visibleBounds));
+  const conditional = new Map(
+    evaluateConditional(state, wb, cellCtx.locale, visibleBounds, cellCtx.conditionalCache),
+  );
   const sparklines = sparkline.sparklines;
   const ignored = errorIndicators.ignoredErrors;
   const validationCircles = errorIndicators.validationCircles;
@@ -578,5 +581,5 @@ export function paintCells(
       }
     }
   }
-  setErrorTriangleHits(triangleHits);
+  return triangleHits;
 }

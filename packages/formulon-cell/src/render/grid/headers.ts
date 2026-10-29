@@ -14,8 +14,8 @@ import {
   type ViewState,
 } from '../geometry.js';
 import { paintOutlineGutters } from '../painters/controls.js';
+import type { OutlineToggleHit } from '../painters.js';
 import { type ChromePaintContext, ruleWidth } from './chrome-context.js';
-import { setOutlineToggles } from './hit-state.js';
 
 export function paintHeaders(
   pc: ChromePaintContext,
@@ -23,7 +23,7 @@ export function paintHeaders(
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
-): void {
+): OutlineToggleHit[] {
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const { layout, selection } = state;
   const active = selection.active;
@@ -223,5 +223,5 @@ export function paintHeaders(
   }
 
   // Bracket gutters for outline groups.
-  setOutlineToggles(paintOutlineGutters(ctx, state, theme, cols, rows, cssWidth, cssHeight));
+  return paintOutlineGutters(ctx, state, theme, cols, rows, cssWidth, cssHeight);
 }

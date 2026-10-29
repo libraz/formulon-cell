@@ -9,6 +9,7 @@ import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import type { State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
+import { createConditionalCache } from './conditional.js';
 import {
   type AxisLayout,
   buildColLayout,
@@ -33,12 +34,7 @@ import { paintBorders } from './grid/borders.js';
 import { type CellDisplayResolver, type CellPaintContext, paintCells } from './grid/cells.js';
 import type { ChromePaintContext } from './grid/chrome-context.js';
 import { paintHeaders } from './grid/headers.js';
-import {
-  setFillHandleRect,
-  setTotalsChevron,
-  setValidationChevron,
-  shouldShowValidationChevron,
-} from './grid/hit-state.js';
+import { type GridHitState, gridHitState, shouldShowValidationChevron } from './grid/hit-state.js';
 import { paintFreezeDividers, paintGridLines } from './grid/lines.js';
 import { mergeRangeAt } from './grid/merged-cells.js';
 import { paintVisibleNotes } from './grid/notes.js';
@@ -128,6 +124,10 @@ export class GridRenderer {
 
   private readonly onViewportSize: RendererDeps['onViewportSize'];
 
+  private readonly hits: GridHitState;
+
+  private readonly conditionalCache = createConditionalCache();
+
   private dpr = 1;
 
   private cssWidth = 0;
@@ -156,6 +156,7 @@ export class GridRenderer {
     this.getStrings = deps.getStrings ?? ((): Strings => defaultStrings);
     this.getDisplay = deps.getDisplay;
     this.onViewportSize = deps.onViewportSize;
+    this.hits = gridHitState(deps.host);
   }
 
   resize(): void {
@@ -259,11 +260,15 @@ export class GridRenderer {
     this.paintSheetBackground(state);
     if (state.ui.showGridLines !== false) this.paintGridLines(state, theme, cols, rows);
     this.paintCells(state, theme, cols, rows);
+    this.hits.outlineToggles = [];
     if (state.ui.showHeaders !== false) this.paintHeaders(state, theme, cols, rows);
     this.paintFreezeDividers(state, theme, cols, rows);
     this.paintBorders(state, theme, cols, rows);
     // Page chrome covers the gutters, so it has to follow every pass that
     // paints across the whole canvas — gridlines and freeze dividers do.
+    this.hits.pageBands = [];
+    this.hits.rulerHandles = [];
+    this.hits.pageBreakHandles = [];
     if (pagination) this.paintPageChrome(state, theme, pagination, cols, rows);
     this.paintSpills(state, theme, cols, rows);
     this.paintActive(state, theme, cols, rows);
@@ -296,7 +301,7 @@ export class GridRenderer {
     const setup = getPageSetup(this.getState(), state.data.sheetIndex);
     const strings = this.getStrings();
     if (state.ui.workbookView === 'pageLayout') {
-      paintPageLayoutChrome(
+      this.hits.pageBands = paintPageLayoutChrome(
         this.chromeCtx(),
         state,
         theme,
@@ -306,7 +311,7 @@ export class GridRenderer {
         cols,
         rows,
       );
-      paintPageRulers(
+      this.hits.rulerHandles = paintPageRulers(
         this.chromeCtx(),
         state,
         theme,
@@ -318,7 +323,7 @@ export class GridRenderer {
       return;
     }
     const template = strings.pageView.pageNumber;
-    paintPageBreakPreview(
+    this.hits.pageBreakHandles = paintPageBreakPreview(
       this.chromeCtx(),
       state,
       theme,
@@ -439,6 +444,7 @@ export class GridRenderer {
       sheetBackgroundImage: entry?.status === 'loaded' ? entry.image : null,
       fontEffects:
         (this.host.closest?.<HTMLElement>('.fc-host') ?? this.host).dataset?.fcPlatform === 'mac',
+      conditionalCache: this.conditionalCache,
     };
   }
 
@@ -448,7 +454,7 @@ export class GridRenderer {
     cols: AxisLayout,
     rows: AxisLayout,
   ): void {
-    paintCells(this.cellCtx(state), state, theme, cols, rows);
+    this.hits.errorTriangles = paintCells(this.cellCtx(state), state, theme, cols, rows);
   }
 
   private paintBorders(
@@ -466,7 +472,7 @@ export class GridRenderer {
     cols: AxisLayout,
     rows: AxisLayout,
   ): void {
-    paintHeaders(this.chromeCtx(), state, theme, cols, rows);
+    this.hits.outlineToggles = paintHeaders(this.chromeCtx(), state, theme, cols, rows);
   }
 
   private paintFreezeDividers(
@@ -533,9 +539,9 @@ export class GridRenderer {
     const { layout, viewport, selection, ui, format, data } = state;
     const a = selection.active;
     const r = selection.range;
-    setFillHandleRect(null);
-    setValidationChevron(null);
-    setTotalsChevron(null);
+    this.hits.fillHandle = null;
+    this.hits.validationChevron = null;
+    this.hits.totalsChevron = null;
     // A selected chart or picture replaces the cell cursor, as in Excel.
     if (ui.selectedObject) return;
 
@@ -563,18 +569,18 @@ export class GridRenderer {
     const validationBounds = trailingRect(activeRects, layout.rtl);
     if (validationBounds && shouldShowValidationChevron(validationAt(format, activeAnchor))) {
       const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
-      setValidationChevron({ rect, row: activeAnchor.row, col: activeAnchor.col });
+      this.hits.validationChevron = { rect, row: activeAnchor.row, col: activeAnchor.col };
     } else if (validationBounds) {
       const totals = totalsCellAt(state, a.sheet, activeAnchor.row, activeAnchor.col);
       if (totals) {
         const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
-        setTotalsChevron({
+        this.hits.totalsChevron = {
           rect,
           row: activeAnchor.row,
           col: activeAnchor.col,
           tableId: totals.table.id,
           column: totals.column,
-        });
+        };
       }
     }
 
@@ -606,7 +612,7 @@ export class GridRenderer {
     const handleRange = activeMerge && r.r0 === r.r1 && r.c0 === r.c1 ? activeVisualRange : r;
     const handleBounds = trailingRect(rangeRects(layout, viewport, handleRange), layout.rtl);
     if (handleBounds) {
-      setFillHandleRect(paintFillHandle(this.ctx, handleBounds, theme, layout.rtl));
+      this.hits.fillHandle = paintFillHandle(this.ctx, handleBounds, theme, layout.rtl);
     }
   }
 
@@ -621,13 +627,12 @@ export {
   ERROR_TRIANGLE_COLOR,
   type ErrorTriangleHit,
   type ErrorTriangleKind,
-  getErrorTriangleHits,
-  getFillHandleRect,
-  getOutlineToggleHits,
-  getTotalsChevron,
-  getValidationChevron,
+  type GridHitState,
+  gridHitState,
   isPlainTextOverflowCandidate,
+  type TotalsChevron,
   VALIDATION_TRIANGLE_COLOR,
+  type ValidationChevron,
 } from './grid/hit-state.js';
 
 import { validationAt } from '../store/range-validations.js';

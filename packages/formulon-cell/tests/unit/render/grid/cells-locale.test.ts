@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { formatA1FormulaAsR1C1 } from '../../../../src/commands/refs.js';
 import type { WorkbookHandle as WorkbookHandleType } from '../../../../src/engine/workbook-handle.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { createConditionalCache } from '../../../../src/render/conditional.js';
 import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
 import { type CellDisplayResolver, paintCells } from '../../../../src/render/grid/cells.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
@@ -115,6 +116,7 @@ function paintOne({
       getDisplay,
       sheetBackgroundImage: null,
       fontEffects: false,
+      conditionalCache: createConditionalCache(),
     },
     view,
     theme,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  _resetConditionalCache,
+  createConditionalCache,
   evaluateConditional,
   iconSetSlotCount,
   iconSetSlotFor,
@@ -18,7 +18,6 @@ import {
 
 describe('evaluateConditional', () => {
   afterEach(() => {
-    _resetConditionalCache();
     vi.useRealTimers();
   });
 
@@ -526,21 +525,37 @@ describe('evaluateConditional', () => {
   });
 
   it('returns the same Map reference when called twice with identical state', () => {
+    const cache = createConditionalCache();
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
-    const a = evaluateConditional(s);
-    const b = evaluateConditional(s);
+    const a = evaluateConditional(s, null, '', null, cache);
+    const b = evaluateConditional(s, null, '', null, cache);
     expect(b).toBe(a);
   });
 
+  it('keeps one cache per renderer so alternating sheets do not evict each other', () => {
+    const store = createSpreadsheetStore();
+    let first = store.getState();
+    first = seedNumber(first, 0, 0, 10);
+    first = withConditionalRules(first, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
+    const second = seedNumber(first, 0, 0, 1);
+    const cacheA = createConditionalCache();
+    const cacheB = createConditionalCache();
+    const a = evaluateConditional(first, null, '', null, cacheA);
+    const b = evaluateConditional(second, null, '', null, cacheB);
+    expect(evaluateConditional(first, null, '', null, cacheA)).toBe(a);
+    expect(evaluateConditional(second, null, '', null, cacheB)).toBe(b);
+  });
+
   it('returns the cached result when only an unrelated slice (selection) changed', () => {
+    const cache = createConditionalCache();
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
-    const a = evaluateConditional(s);
+    const a = evaluateConditional(s, null, '', null, cache);
     // Mutate selection (and thus the top-level state object), but keep cells
     // and rules references untouched. Cache should still hit.
     const sNext: State = {
@@ -550,44 +565,47 @@ describe('evaluateConditional', () => {
         active: { sheet: 0, row: 5, col: 5 },
       },
     };
-    const b = evaluateConditional(sNext);
+    const b = evaluateConditional(sNext, null, '', null, cache);
     expect(b).toBe(a);
   });
 
   it('recomputes when the cells map reference changes', () => {
+    const cache = createConditionalCache();
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
-    const a = evaluateConditional(s);
+    const a = evaluateConditional(s, null, '', null, cache);
     const sNext = seedNumber(s, 0, 0, 1); // value drops below 5 → no fill
-    const b = evaluateConditional(sNext);
+    const b = evaluateConditional(sNext, null, '', null, cache);
     expect(b).not.toBe(a);
     expect(a.get('0:0:0')?.fill).toBe('#ff0000');
     expect(b.get('0:0:0')?.fill).toBeUndefined();
   });
 
   it('recomputes when the rules array reference changes', () => {
+    const cache = createConditionalCache();
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     const rule1 = cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     s = withConditionalRules(s, [rule1]);
-    const a = evaluateConditional(s);
+    const a = evaluateConditional(s, null, '', null, cache);
     // Same rule shape, new array reference — must invalidate.
     const sNext: State = { ...s, conditional: { ...s.conditional, rules: [{ ...rule1 }] } };
-    const b = evaluateConditional(sNext);
+    const b = evaluateConditional(sNext, null, '', null, cache);
     expect(b).not.toBe(a);
   });
 
   it('recomputes when the active sheet changes', () => {
+    const cache = createConditionalCache();
     const store = createSpreadsheetStore();
     let s = store.getState();
     s = seedNumber(s, 0, 0, 10);
     s = withConditionalRules(s, [cellValueRule({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })]);
-    const a = evaluateConditional(s);
+    const a = evaluateConditional(s, null, '', null, cache);
     const sNext: State = { ...s, data: { ...s.data, sheetIndex: 1 } };
-    const b = evaluateConditional(sNext);
+    const b = evaluateConditional(sNext, null, '', null, cache);
     expect(b).not.toBe(a);
     // Rule range targets sheet 0, so on sheet 1 nothing applies.
     expect(b.size).toBe(0);
@@ -666,7 +684,6 @@ describe('evaluateConditional', () => {
     expect(thisWeek.get('0:0:0')?.fill).toBe('#00ff00');
     expect(thisWeek.get('0:1:0')?.fill).toBeUndefined();
 
-    _resetConditionalCache();
     const lastWeekState: State = {
       ...s,
       conditional: {
@@ -698,7 +715,6 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:1')?.fill).toBe('rgb(0, 0, 0)');
     expect(overlay.get('0:0:2')?.fill).toBe('rgb(255, 255, 255)');
 
-    _resetConditionalCache();
     const s2: State = {
       ...s,
       conditional: {
@@ -754,7 +770,6 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:1')?.iconSlot).toBe(1);
     expect(overlay.get('0:0:2')?.iconSlot).toBe(2);
     // Reverse order — slots 0/1/2 invert to 2/1/0.
-    _resetConditionalCache();
     const reversed: ConditionalRule = { ...rule, reverseOrder: true };
     const s2 = { ...s, conditional: { ...s.conditional, rules: [reversed] } };
     const overlay2 = evaluateConditional(s2);

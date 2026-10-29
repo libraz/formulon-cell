@@ -6,6 +6,7 @@ import {
   type TableOverlay,
   tableStyleSwatch,
 } from '../../../../src/commands/format-as-table.js';
+import { createConditionalCache } from '../../../../src/render/conditional.js';
 import {
   buildColLayout,
   buildRowLayout,
@@ -81,6 +82,7 @@ function bandedCells(over: Partial<TableOverlay>): string[] {
       getDisplay: undefined,
       sheetBackgroundImage: null,
       fontEffects: false,
+      conditionalCache: createConditionalCache(),
     },
     view,
     theme,
