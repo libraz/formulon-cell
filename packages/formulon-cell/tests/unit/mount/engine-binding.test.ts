@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSessionShape } from '../../../src/commands/session-illustration.js';
 import { type ChangeEvent, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { presets } from '../../../src/extensions/presets.js';
+import {
+  setTabNavigationMemory,
+  tabNavigationMemoryFor,
+} from '../../../src/interact/tab-navigation-session.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
 
@@ -84,6 +88,23 @@ describe('mount/engine-binding — feature gating against preset.minimal()', () 
 
   it('paste-special is not attached when its own flag is off', () => {
     expect(sheet.instance.features.pasteSpecial).toBeFalsy();
+  });
+
+  it('disposes Tab memory independently of the grid shortcuts feature', async () => {
+    const minimal = await mountStubSheet({
+      features: { ...presets.minimal(), shortcuts: false },
+    });
+    const store = minimal.instance.store;
+    setTabNavigationMemory(store, { laneRow: 4, returnOrigin: { sheet: 0, row: 4, col: 0 } });
+    expect(tabNavigationMemoryFor(store)).toEqual({
+      laneRow: 4,
+      returnOrigin: { sheet: 0, row: 4, col: 0 },
+    });
+
+    minimal.instance.dispose();
+
+    expect(tabNavigationMemoryFor(store)).toBeNull();
+    minimal.dispose();
   });
 });
 

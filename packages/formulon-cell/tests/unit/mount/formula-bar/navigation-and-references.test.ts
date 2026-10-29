@@ -147,6 +147,41 @@ describe('mount/formula-bar — edit lifecycle', () => {
     });
   });
 
+  it('Mac formula-bar commits retain the original Return origin across Tab edits', () => {
+    sheet.host.dataset.fcPlatform = 'mac';
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
+
+    for (const [value, key] of [
+      ['first', 'Tab'],
+      ['second', 'Tab'],
+      ['third', 'Enter'],
+    ] as const) {
+      fxInput.focus();
+      fxInput.dispatchEvent(new FocusEvent('focus'));
+      fxInput.value = value;
+      fxInput.dispatchEvent(new Event('input'));
+      fxInput.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }));
+    }
+
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'text',
+      value: 'first',
+    });
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+      kind: 'text',
+      value: 'second',
+    });
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({
+      kind: 'text',
+      value: 'third',
+    });
+    expect(sheet.instance.store.getState().selection.active).toEqual({
+      sheet: 0,
+      row: 1,
+      col: 0,
+    });
+  });
+
   it('Mac Option+Return leaves the textarea newline available to the browser', () => {
     sheet.host.dataset.fcPlatform = 'mac';
     fxInput.focus();

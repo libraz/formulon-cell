@@ -3,7 +3,7 @@ import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { currentRegion, formatHasContent, isPopulated } from '../commands/current-region.js';
 import { blockDataTableCells } from '../commands/data-table-guard.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
+import { expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
   isCellWritable,
@@ -24,7 +24,13 @@ import {
   nextTabStop,
   scrollActiveIntoView,
 } from './navigation-policy.js';
-import { nextAdvanceTarget } from './selection-navigation.js';
+import {
+  advanceAfterCommit,
+  canUseTabNavigationSession,
+  nextAdvanceTarget,
+} from './selection-navigation.js';
+import { resetTabNavigationSession } from './tab-navigation-session.js';
+import { stepVisibleWithMerge } from './visible-navigation.js';
 
 const move = (a: Addr, dRow: number, dCol: number): Addr => ({
   sheet: a.sheet,
@@ -378,12 +384,12 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       target =
         meta || endModeArrow
           ? jumpEdge(s, from, -1, 0)
-          : stepWithMerge(s, from, -1, 0, MAX_ROW, MAX_COL);
+          : stepVisibleWithMerge(s, from, -1, 0, MAX_ROW, MAX_COL);
     else if (k === 'ArrowDown')
       target =
         meta || endModeArrow
           ? jumpEdge(s, from, 1, 0)
-          : stepWithMerge(s, from, 1, 0, MAX_ROW, MAX_COL);
+          : stepVisibleWithMerge(s, from, 1, 0, MAX_ROW, MAX_COL);
     // Arrow keys move by what the user sees. A right-to-left sheet runs its
     // columns the other way, so the visual step and the index step take
     // opposite signs. Tab is unaffected — it advances in reading order, which
@@ -392,12 +398,12 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       target =
         meta || endModeArrow
           ? jumpEdge(s, from, 0, -colDir)
-          : stepWithMerge(s, from, 0, -colDir, MAX_ROW, MAX_COL);
+          : stepVisibleWithMerge(s, from, 0, -colDir, MAX_ROW, MAX_COL);
     else if (k === 'ArrowRight')
       target =
         meta || endModeArrow
           ? jumpEdge(s, from, 0, colDir)
-          : stepWithMerge(s, from, 0, colDir, MAX_ROW, MAX_COL);
+          : stepVisibleWithMerge(s, from, 0, colDir, MAX_ROW, MAX_COL);
     else if (k === 'Home')
       target = meta
         ? clamp(from, frozenRowEnd(s.layout), frozenColEnd(s.layout))
@@ -414,6 +420,19 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
         ? move(from, 0, -colDir * Math.max(1, s.viewport.colCount - 1))
         : move(from, -Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'Tab') {
+      const sessionDirection = shift ? 'left' : 'right';
+      if (
+        isMacPlatform() &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        canUseTabNavigationSession(store, true)
+      ) {
+        e.preventDefault();
+        advanceAfterCommit(store, sessionDirection, true);
+        scrollActiveIntoView(store, store.getState().selection.active);
+        return;
+      }
       const next = nextAdvanceTarget(s, shift ? 'left' : 'right', selectionTabTraversalEnabled);
       target = next.addr;
       preserveSelection = next.preserveSelection;
@@ -428,6 +447,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       // selection and always ends copy mode, unlike Ctrl+V which leaves a copy
       // marquee standing for repeat pastes.
       e.preventDefault();
+      resetTabNavigationSession(store);
       const revision = s.ui.copyRevision ?? 0;
       if (pendingEnterPaste?.revision === revision) return;
       let result: void | Promise<void>;
@@ -454,6 +474,12 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       const macReturn = isMacPlatform() && !e.altKey;
       if (macReturn && selectionDisabled) {
         e.preventDefault();
+        return;
+      }
+      if (macReturn && canUseTabNavigationSession(store, true)) {
+        e.preventDefault();
+        advanceAfterCommit(store, shift ? 'up' : 'down', true);
+        scrollActiveIntoView(store, store.getState().selection.active);
         return;
       }
       const next = nextAdvanceTarget(

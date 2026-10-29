@@ -7,11 +7,34 @@ import {
   navigationBoundsFor,
   nextTabStop,
 } from '../../../src/interact/navigation-policy.js';
+import {
+  attachTabNavigationSession,
+  setTabNavigationMemory,
+  tabNavigationMemoryFor,
+} from '../../../src/interact/tab-navigation-session.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const workbook = (): WorkbookHandle => ({ sheetCount: 1 }) as WorkbookHandle;
 
 describe('navigation policy', () => {
+  it('clears Mac Tab-entry memory on policy attach, replacement, and disposal', () => {
+    const store = createSpreadsheetStore();
+    const detachSession = attachTabNavigationSession(store);
+    const origin = { sheet: 0, row: 0, col: 0 };
+    setTabNavigationMemory(store, { laneRow: 0, returnOrigin: origin });
+
+    const handle = attachNavigationPolicy(store, workbook);
+    expect(tabNavigationMemoryFor(store)).toEqual({ laneRow: null, returnOrigin: null });
+    setTabNavigationMemory(store, { laneRow: 2, returnOrigin: { sheet: 0, row: 2, col: 0 } });
+
+    handle.setOptions({ range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 4 } });
+    expect(tabNavigationMemoryFor(store)).toEqual({ laneRow: null, returnOrigin: null });
+    setTabNavigationMemory(store, { laneRow: 3, returnOrigin: { sheet: 0, row: 3, col: 0 } });
+    handle.dispose();
+    expect(tabNavigationMemoryFor(store)).toEqual({ laneRow: null, returnOrigin: null });
+    detachSession();
+  });
+
   it('clamps the existing selection when a fixed region is installed', () => {
     const store = createSpreadsheetStore();
     const handle = attachNavigationPolicy(store, workbook, {
@@ -123,6 +146,30 @@ describe('navigation policy', () => {
       col: 4,
     });
     expect(nextTabStop(store, { sheet: 0, row: 3, col: 4 }, false)).toBeNull();
+    handle.dispose();
+  });
+
+  it('skips hidden cells inside an embedded Tab region', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachNavigationPolicy(store, workbook, {
+      range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+    });
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1]), hiddenCols: new Set([1]) },
+    }));
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    expect(nextTabStop(store, { sheet: 0, row: 0, col: 0 }, false)).toEqual({
+      sheet: 0,
+      row: 0,
+      col: 2,
+    });
+    expect(nextTabStop(store, { sheet: 0, row: 0, col: 2 }, false)).toEqual({
+      sheet: 0,
+      row: 2,
+      col: 0,
+    });
     handle.dispose();
   });
 

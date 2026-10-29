@@ -4,6 +4,7 @@ import type { Addr, Range } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formulaCallsTable } from '../engine/workbook-handle-data-tables.js';
+import { resetTabNavigationSession } from '../interact/tab-navigation-session.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -203,6 +204,7 @@ export class InteractionController {
   }
 
   setPolicy(next?: InteractionPolicy): void {
+    resetTabNavigationSession(this.store);
     this.authorizer.policy = next;
     if (this.manageHistoryGuard) this.installHistoryGuard();
     // Policy changes invalidate any host-held plan/request that was based on
@@ -445,6 +447,7 @@ export class InteractionController {
 
   dispose(): void {
     if (this.disposed) return;
+    resetTabNavigationSession(this.store);
     this.disposed = true;
     if (this.manageHistoryGuard) this.history.setGuard(null);
     this.listeners.clear();
@@ -921,9 +924,12 @@ export function registerInteractionController(
   store: SpreadsheetStore,
   controller: InteractionController,
 ): () => void {
+  resetTabNavigationSession(store);
   controllers.set(store, controller);
   return () => {
-    if (controllers.get(store) === controller) controllers.delete(store);
+    if (controllers.get(store) !== controller) return;
+    resetTabNavigationSession(store);
+    controllers.delete(store);
   };
 }
 

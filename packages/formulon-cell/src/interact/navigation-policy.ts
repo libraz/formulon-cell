@@ -11,6 +11,8 @@ import {
 } from '../store/selection-geometry.js';
 import { clampSplitPaneOrigin } from '../store/split-panes.js';
 import type { LayoutSlice, SpreadsheetStore, State } from '../store/store.js';
+import { resetTabNavigationSession } from './tab-navigation-session.js';
+import { isCellVisible } from './visible-navigation.js';
 
 /** The spreadsheet's physical coordinate limits (zero based, inclusive). */
 
@@ -192,6 +194,7 @@ export function attachNavigationPolicy(
   getWb: () => WorkbookHandle,
   options?: ViewportOptions,
 ): NavigationPolicyHandle {
+  resetTabNavigationSession(store);
   const old = registry.get(store);
   old?.handle.dispose();
 
@@ -202,6 +205,7 @@ export function attachNavigationPolicy(
     },
     setOptions(next?: ViewportOptions): void {
       if (!next) {
+        resetTabNavigationSession(store);
         record.options = undefined;
         registry.delete(store);
         syncNavigationViewport(store);
@@ -209,12 +213,14 @@ export function attachNavigationPolicy(
       }
       // Validate and normalize before replacing the current policy.
       const normalized = normalizeOptions(next, getWb(), store.getState());
+      resetTabNavigationSession(store);
       record.options = normalized;
       registry.set(store, record);
       syncNavigationViewport(store);
     },
     dispose(): void {
       if (registry.get(store) !== record) return;
+      resetTabNavigationSession(store);
       registry.delete(store);
       record.options = undefined;
       syncNavigationViewport(store);
@@ -500,7 +506,10 @@ export function nextTabStop(store: SpreadsheetStore, addr: Addr, reverse: boolea
     candidate = nextAddressInRange(bound, addr, reverse) ?? null;
   }
   for (let i = 0; candidate && i < MAX_TAB_SCAN; i += 1) {
-    if (isNavigationAddrAllowed(store, candidate)) {
+    if (
+      isCellVisible(store.getState().layout, candidate.row, candidate.col) &&
+      isNavigationAddrAllowed(store, candidate)
+    ) {
       if (options.tabNavigation !== 'editable') return candidate;
       const controller = interactionControllerFor(store);
       const permission = controller?.canExecute({

@@ -30,6 +30,7 @@ import { attachPointer } from '../interact/pointer.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
 import type { RangeInsertTarget } from '../interact/range-insert.js';
 import { attachSplitDrag } from '../interact/split-drag.js';
+import { attachTabNavigationSession } from '../interact/tab-navigation-session.js';
 import { attachTableTotals } from '../interact/table-totals.js';
 import {
   attachValidationAlert,
@@ -142,6 +143,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     wb,
   } = input;
 
+  const detachTabNavigationSession = attachTabNavigationSession(store);
   const pendingAtomic = new Map<number, PendingAtomicBatch>();
 
   const refreshCells = (): void => {
@@ -536,6 +538,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       autoFillOptions.detach();
       pasteOptions.detach();
       detachKey();
+      detachTabNavigationSession();
       clipboardH?.detach();
       detachContextMenu();
       findReplace?.detach();

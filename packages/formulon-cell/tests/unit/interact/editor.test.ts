@@ -696,6 +696,86 @@ describe('InlineEditor', () => {
     expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
   });
 
+  it('Mac inline Tab commits share the first Return origin across edits', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    for (const [value, key] of [
+      ['first', 'Tab'],
+      ['second', 'Tab'],
+      ['third', 'Enter'],
+    ] as const) {
+      editor.begin('');
+      const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      input.value = value;
+      input.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true, bubbles: true }));
+    }
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'first' });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'second' });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'text', value: 'third' });
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+  });
+
+  it('keeps Mac Tab memory when a validation-rejected edit is retried', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      {
+        validation: { kind: 'list', source: ['allowed'] },
+      },
+    );
+
+    editor.begin('');
+    let input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = 'origin';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }),
+    );
+    editor.begin('');
+    input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = 'rejected';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }),
+    );
+    expect(editor.isActive()).toBe(true);
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 1 });
+
+    input.value = 'allowed';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }),
+    );
+    editor.begin('');
+    input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = 'end';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }),
+    );
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'allowed' });
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+  });
+
+  it('keeps default-platform inline Tab and Return movement independent of Mac memory', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    for (const [value, key] of [
+      ['first', 'Tab'],
+      ['second', 'Tab'],
+      ['third', 'Enter'],
+    ] as const) {
+      editor.begin('');
+      const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      input.value = value;
+      input.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true, bubbles: true }));
+    }
+
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+  });
+
   it('Mac Cmd+Enter fills the selection in one undoable controller batch', () => {
     host.classList.add('fc-host');
     host.dataset.fcPlatform = 'mac';

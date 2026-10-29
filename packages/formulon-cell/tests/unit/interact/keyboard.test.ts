@@ -140,6 +140,296 @@ describe('attachKeyboard', () => {
   });
 
   describe('navigation', () => {
+    it('keeps the first Mac Tab origin for Return after multiple tabs', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+    });
+
+    it('keeps the physical row when Tab enters a vertical merge on Mac', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.mergeRange(store, { sheet: 0, r0: 0, r1: 1, c0: 2, c1: 2 });
+      mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+
+      fire(host, 'Tab');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 2 });
+      fire(host, 'Tab');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 3 });
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 1 });
+    });
+
+    it('lets reverse Tab cancel the first Return origin but retain its lane', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'Tab', { shiftKey: true });
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+    });
+
+    it('restarts the Return origin after reverse Tab and another forward Tab', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'Tab', { shiftKey: true });
+      fire(host, 'Tab');
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+    });
+
+    it('keeps the physical row when Shift+Tab crosses a vertical merge', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.mergeRange(store, { sheet: 0, r0: 0, r1: 1, c0: 2, c1: 2 });
+      mutators.setActive(store, { sheet: 0, row: 1, col: 3 });
+
+      fire(host, 'Tab', { shiftKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 2 });
+      fire(host, 'Tab', { shiftKey: true });
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+    });
+
+    it('preserves the Return origin through Escape, data writes, and equivalent reselection', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'Escape');
+      store.setState((state) => {
+        const cells = new Map(state.data.cells);
+        cells.set('0:0:0', { value: { kind: 'text', value: 'kept' }, formula: null });
+        return { ...state, data: { ...state.data, cells } };
+      });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 2 });
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+    });
+
+    it('uses the active cell after a different selection or ordinary movement', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      mutators.setActive(store, { sheet: 0, row: 3, col: 4 });
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 4, col: 4 });
+
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'ArrowLeft');
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+    });
+
+    it('keeps reverse-only Tab runs on their source row and does not make Windows Mac-specific', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 4, col: 3 });
+      fire(host, 'Tab', { shiftKey: true });
+      fire(host, 'Tab', { shiftKey: true });
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 5, col: 1 });
+
+      host.dataset.fcPlatform = 'windows';
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+    });
+
+    it('uses the full origin merge and visible rows when Return leaves a Tab run', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.mergeRange(store, { sheet: 0, r0: 0, r1: 1, c0: 0, c1: 0 });
+      store.setState((state) => ({
+        ...state,
+        layout: { ...state.layout, hiddenRows: new Set([2, 3]), hiddenCols: new Set([1, 2]) },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 4, col: 0 });
+    });
+
+    it('clears the Return origin on Shift+Return and after sheet, visibility, merge, or policy changes', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 2, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      fire(host, 'Enter', { shiftKey: true });
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 2 });
+
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      store.setState((state) => ({ ...state, data: { ...state.data, sheetIndex: 1 } }));
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+
+      store.setState((state) => ({ ...state, data: { ...state.data, sheetIndex: 0 } }));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      store.setState((state) => ({
+        ...state,
+        layout: { ...state.layout, hiddenRows: new Set([1]) },
+      }));
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 2 });
+
+      store.setState((state) => ({ ...state, layout: { ...state.layout, hiddenRows: new Set() } }));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      mutators.mergeRange(store, { sheet: 0, r0: 1, r1: 2, c0: 2, c1: 2 });
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      attachNavigationPolicy(store, () => ({ sheetCount: 1 }) as WorkbookHandle, {
+        range: { sheet: 0, r0: 0, c0: 0, r1: 8, c1: 8 },
+      });
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+    });
+
+    it('drops the Return origin when an interaction policy is replaced', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      const controller = new InteractionController({
+        store,
+        getWb: () => wb,
+        history: new History(),
+      });
+      const unregister = registerInteractionController(store, controller);
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+
+      controller.setPolicy({ readOnly: true, selection: true });
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+      unregister();
+      controller.dispose();
+    });
+
+    it('clears the Return origin when Enter is consumed as the one-shot paste', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      const onClipboardShortcut = vi.fn<(kind: 'copy' | 'cut' | 'paste') => void>();
+      detach = attachKeyboard({ host, store, wb, onBeginEdit, onClearActive, onClipboardShortcut });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fire(host, 'Tab');
+      fire(host, 'Tab');
+      mutators.setCopyRange(store, { sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 });
+
+      fire(host, 'Enter');
+      expect(onClipboardShortcut).toHaveBeenCalledWith('paste');
+      fire(host, 'Enter');
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+    });
+
+    it('skips hidden rows and columns with arrow keys', () => {
+      setup();
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenRows: new Set([1]), hiddenCols: new Set([1]) },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'ArrowDown');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 0 });
+      fire(host, 'ArrowRight');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 2 });
+    });
+
+    it('uses the geometric entry cell to decide whether a hidden-anchor merge is skipped', () => {
+      setup();
+      mutators.mergeRange(store, { sheet: 0, r0: 1, r1: 3, c0: 0, c1: 0 });
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenRows: new Set([1, 2]) },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'ArrowDown');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 4, col: 0 });
+      fire(host, 'ArrowUp');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+    });
+
+    it('traverses only visible selection cells on Mac and keeps a single visible stop selected', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcPlatform = 'mac';
+      setup();
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenRows: new Set([1, 2]), hiddenCols: new Set([1, 2]) },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 3 });
+
+      fire(host, 'Enter');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 0 });
+      fire(host, 'Tab');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 3 });
+      fire(host, 'Enter', { shiftKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 3 });
+
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenRows: new Set([1, 2, 3]), hiddenCols: new Set([1, 2, 3]) },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 3 });
+      fire(host, 'Tab');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 3 });
+    });
+
     it('Mac Return and Tab traverse the selected rectangle and retain it', () => {
       host.classList.add('fc-host');
       host.dataset.fcPlatform = 'mac';

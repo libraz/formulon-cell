@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { attachNavigationPolicy } from '../../../src/interact/navigation-policy.js';
 import { buildSelectionInputBatch } from '../../../src/interact/selection-input.js';
 import {
   advanceAfterCommit,
@@ -58,6 +59,68 @@ describe('nextWithinSelection', () => {
     expect(nextWithinSelection(store.getState(), 'left')).toEqual(addr(0, 1));
   });
 
+  it('traverses only visible cells when the selected rectangle contains hidden rows and columns', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1, 2]), hiddenCols: new Set([1, 2]) },
+    }));
+    mutators.setActive(store, addr(0, 0));
+    mutators.setRange(store, range(0, 0, 3, 3));
+
+    expect(nextWithinSelection(store.getState(), 'down')).toEqual(addr(3, 0));
+    expect(nextWithinSelection(store.getState(), 'right')).toEqual(addr(0, 3));
+    mutators.setRange(store, range(0, 0, 2, 2));
+    expect(nextWithinSelection(store.getState(), 'down')).toEqual(addr(0, 0));
+    expect(nextWithinSelection(store.getState(), 'right')).toEqual(addr(0, 0));
+  });
+
+  it('moves after a committed edit across hidden rows', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1, 2]) },
+    }));
+    mutators.setActive(store, addr(0, 0));
+
+    advanceAfterCommit(store, 'down', false);
+
+    expect(store.getState().selection.active).toEqual(addr(3, 0));
+  });
+
+  it('does not land on a hidden row when a fixed navigation range clamps the move', () => {
+    const store = createSpreadsheetStore();
+    const navigation = attachNavigationPolicy(
+      store,
+      () => ({ sheetCount: 1 }) as import('../../../src/engine/workbook-handle.js').WorkbookHandle,
+      { range: range(1, 0, 3, 2) },
+    );
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1]) },
+    }));
+    mutators.setActive(store, addr(2, 0));
+
+    advanceAfterCommit(store, 'up', false);
+
+    expect(store.getState().selection.active).toEqual(addr(2, 0));
+    navigation.dispose();
+  });
+
+  it('skips a merge when its hidden anchor hides the merged cell', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1, 2]) },
+    }));
+    mutators.mergeRange(store, range(1, 0, 3, 0));
+    mutators.setActive(store, addr(0, 0));
+
+    advanceAfterCommit(store, 'down', false);
+
+    expect(store.getState().selection.active).toEqual(addr(4, 0));
+  });
+
   it('skips merged interiors in traversal order and returns the anchor once', () => {
     const store = createSpreadsheetStore();
     mutators.mergeRange(store, range(0, 0, 1, 1));
@@ -72,6 +135,58 @@ describe('nextWithinSelection', () => {
       selection: { ...state.selection, active: addr(1, 1) },
     }));
     expect(nextWithinSelection(store.getState(), 'down')).toEqual(addr(2, 0));
+  });
+
+  it('visits a multi-cell merge once in forward and reverse row-major traversal', () => {
+    const store = createSpreadsheetStore();
+    mutators.mergeRange(store, range(0, 1, 1, 2));
+    mutators.setActive(store, addr(0, 0));
+    mutators.setRange(store, range(0, 0, 2, 2));
+
+    expect(nextWithinSelection(store.getState(), 'right')).toEqual(addr(0, 1));
+    mutators.setActivePreservingSelection(store, addr(0, 1));
+    expect(nextWithinSelection(store.getState(), 'right')).toEqual(addr(1, 0));
+    mutators.setActivePreservingSelection(store, addr(1, 0));
+    expect(nextWithinSelection(store.getState(), 'left')).toEqual(addr(0, 1));
+    mutators.setActivePreservingSelection(store, addr(0, 1));
+    expect(nextWithinSelection(store.getState(), 'left')).toEqual(addr(0, 0));
+    mutators.setActivePreservingSelection(store, addr(1, 0));
+    expect(nextWithinSelection(store.getState(), 'right')).toEqual(addr(2, 0));
+  });
+
+  it('visits a multi-cell merge once in forward and reverse column-major traversal', () => {
+    const store = createSpreadsheetStore();
+    mutators.mergeRange(store, range(0, 1, 1, 2));
+    mutators.setActive(store, addr(0, 0));
+    mutators.setRange(store, range(0, 0, 2, 2));
+    const forward = [addr(1, 0), addr(2, 0), addr(0, 1), addr(2, 1), addr(2, 2), addr(0, 0)];
+
+    for (const target of forward) {
+      expect(nextWithinSelection(store.getState(), 'down')).toEqual(target);
+      mutators.setActivePreservingSelection(store, target);
+    }
+
+    const reverse = [addr(2, 2), addr(2, 1), addr(0, 1), addr(2, 0), addr(1, 0), addr(0, 0)];
+    mutators.setActivePreservingSelection(store, addr(0, 0));
+    for (const target of reverse) {
+      expect(nextWithinSelection(store.getState(), 'up')).toEqual(target);
+      mutators.setActivePreservingSelection(store, target);
+    }
+  });
+
+  it('keeps the range when its sole visible logical stop is a merge', () => {
+    const store = createSpreadsheetStore();
+    mutators.mergeRange(store, range(0, 0, 0, 1));
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1]), hiddenCols: new Set([0]) },
+    }));
+    mutators.setActive(store, addr(0, 0));
+    mutators.setRange(store, range(0, 0, 1, 1));
+
+    for (const direction of ['down', 'up', 'right', 'left'] as const) {
+      expect(nextWithinSelection(store.getState(), direction)).toEqual(addr(0, 0));
+    }
   });
 
   it('keeps unmerged cells ahead of partial-width and partial-height merges', () => {
