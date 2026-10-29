@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_COL, MAX_ROW } from '../../../src/engine/address.js';
+import type { CellValue } from '../../../src/engine/types.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { de, en, fr, ja } from '../../../src/i18n/strings.js';
 import { attachStatusBar } from '../../../src/interact/status-bar.js';
@@ -40,6 +42,51 @@ const seedNumber = (store: SpreadsheetStore, row: number, col: number, value: nu
     return { ...s, data: { ...s.data, cells } };
   });
 };
+
+class IterationCountingMap<K, V> extends Map<K, V> {
+  static iterations = 0;
+  static gets = 0;
+
+  override get(key: K): V | undefined {
+    IterationCountingMap.gets += 1;
+    return super.get(key);
+  }
+
+  override [Symbol.iterator](): MapIterator<[K, V]> {
+    IterationCountingMap.iterations += 1;
+    return super[Symbol.iterator]();
+  }
+}
+
+type TrackedCell = { value: CellValue; formula: string | null };
+type TrackedCellMap = IterationCountingMap<string, TrackedCell>;
+type CellVisitCounter = { operation: number; cellVisits: number };
+
+const trackedGrid = (
+  sheet: number,
+  rows: number,
+  cols: number,
+  valueFor: (row: number, col: number) => number,
+  reads: CellVisitCounter,
+): TrackedCellMap =>
+  new IterationCountingMap(
+    Array.from({ length: rows * cols }, (_, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      let lastReadOperation = -1;
+      const cell: TrackedCell = {
+        get value(): CellValue {
+          if (lastReadOperation !== reads.operation) {
+            reads.cellVisits += 1;
+            lastReadOperation = reads.operation;
+          }
+          return { kind: 'number', value: valueFor(row, col) };
+        },
+        formula: null,
+      };
+      return [addrKey({ sheet, row, col }), cell];
+    }),
+  );
 
 describe('attachStatusBar', () => {
   let statusbar: HTMLElement;
@@ -153,6 +200,222 @@ describe('attachStatusBar', () => {
     expect(center?.textContent).toContain('60'); // sum
     expect(center?.textContent).toContain('20'); // avg
     expect(center?.textContent).toContain('3'); // count
+    handle.detach();
+  });
+
+  it('does not rescan cells when unrelated store state changes', () => {
+    IterationCountingMap.iterations = 0;
+    IterationCountingMap.gets = 0;
+    store.setState((s) => ({
+      ...s,
+      data: {
+        ...s.data,
+        cells: new IterationCountingMap<string, TrackedCell>([
+          [
+            addrKey({ sheet: 0, row: 0, col: 0 }),
+            { value: { kind: 'number', value: 10 }, formula: null },
+          ],
+          [
+            addrKey({ sheet: 0, row: 0, col: 1 }),
+            { value: { kind: 'number', value: 20 }, formula: null },
+          ],
+        ]),
+      },
+    }));
+    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const scansAfterMount = IterationCountingMap.iterations;
+    const lookupsAfterMount = IterationCountingMap.gets;
+    expect(scansAfterMount).toBe(0);
+    expect(lookupsAfterMount).toBe(1);
+
+    store.setState((s) => ({
+      ...s,
+      selection: { ...s.selection, active: { sheet: 0, row: 8, col: 8 } },
+    }));
+    mutators.setZoom(store, 1.1);
+
+    expect(IterationCountingMap.iterations).toBe(scansAfterMount);
+    expect(IterationCountingMap.gets).toBe(lookupsAfterMount);
+
+    store.setState((s) => ({
+      ...s,
+      selection: { ...s.selection, extraRanges: [{ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }] },
+    }));
+    expect(IterationCountingMap.iterations).toBe(scansAfterMount + 1);
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('30');
+
+    store.setState((s) => ({
+      ...s,
+      selection: { ...s.selection, extraRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }] },
+    }));
+    expect(IterationCountingMap.iterations).toBe(scansAfterMount + 2);
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('10');
+
+    store.setState((s) => ({ ...s, selection: { ...s.selection, extraRanges: [] } }));
+    expect(IterationCountingMap.iterations).toBe(scansAfterMount + 2);
+    expect(IterationCountingMap.gets).toBe(lookupsAfterMount + 1);
+
+    setRange(store, 0, 0, 0, 1);
+    expect(IterationCountingMap.iterations).toBe(scansAfterMount + 3);
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('30');
+
+    const updatedCells: TrackedCellMap = new IterationCountingMap(store.getState().data.cells);
+    updatedCells.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+      value: { kind: 'number', value: 30 },
+      formula: null,
+    });
+    const scansBeforeCellWrite = IterationCountingMap.iterations;
+    store.setState((s) => ({ ...s, data: { ...s.data, cells: updatedCells } }));
+    expect(IterationCountingMap.iterations).toBe(scansBeforeCellWrite + 1);
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('50');
+
+    const secondSheetCells = new IterationCountingMap<string, TrackedCell>([
+      [
+        addrKey({ sheet: 1, row: 0, col: 0 }),
+        { value: { kind: 'number', value: 90 }, formula: null },
+      ],
+    ]);
+    const scansBeforeSheetSwitch = IterationCountingMap.iterations;
+    const lookupsBeforeSheetSwitch = IterationCountingMap.gets;
+    store.setState((s) => ({
+      ...s,
+      data: { ...s.data, sheetIndex: 1, cells: secondSheetCells },
+      selection: {
+        ...s.selection,
+        active: { sheet: 1, row: 0, col: 0 },
+        anchor: { sheet: 1, row: 0, col: 0 },
+        range: { sheet: 1, r0: 0, c0: 0, r1: 0, c1: 0 },
+      },
+    }));
+    expect(IterationCountingMap.iterations).toBe(scansBeforeSheetSwitch);
+    expect(IterationCountingMap.gets).toBe(lookupsBeforeSheetSwitch + 1);
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('90');
+    handle.detach();
+  });
+
+  it('builds one cold row index and reuses only the selected row entries', () => {
+    const reads = { operation: 0, cellVisits: 0 };
+    const cells = trackedGrid(0, 1000, 20, (row, col) => row + col + 1, reads);
+    IterationCountingMap.iterations = 0;
+    IterationCountingMap.gets = 0;
+    store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
+    setRange(store, 0, 0, 0, MAX_COL);
+
+    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
+    expect(IterationCountingMap.iterations).toBe(1);
+    const firstRowVisits = reads.cellVisits;
+    expect(firstRowVisits).toBe(20);
+
+    reads.operation += 1;
+    setRange(store, 1, 0, 1, MAX_COL);
+
+    expect(IterationCountingMap.iterations).toBe(1);
+    expect(reads.cellVisits - firstRowVisits).toBe(20);
+    expect(center?.textContent).toContain('Sum: 230');
+    handle.detach();
+  });
+
+  it('reuses only the selected column entries after its cold index build', () => {
+    const reads = { operation: 0, cellVisits: 0 };
+    const cells = trackedGrid(0, 1000, 20, (row, col) => (row + 1) * (col + 1), reads);
+    IterationCountingMap.iterations = 0;
+    IterationCountingMap.gets = 0;
+    store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
+    setRange(store, 0, 0, MAX_ROW, 0);
+
+    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
+    expect(IterationCountingMap.iterations).toBe(1);
+    const firstColumnVisits = reads.cellVisits;
+    expect(firstColumnVisits).toBe(1000);
+
+    reads.operation += 1;
+    setRange(store, 0, 1, MAX_ROW, 1);
+
+    expect(IterationCountingMap.iterations).toBe(1);
+    expect(reads.cellVisits - firstColumnVisits).toBe(1000);
+    expect(center?.textContent).toContain('Sum: 1,001,000');
+    handle.detach();
+  });
+
+  it('rebuilds the header index when the sheet or cell map changes', () => {
+    const cells = new IterationCountingMap<string, TrackedCell>([
+      [
+        addrKey({ sheet: 0, row: 0, col: 0 }),
+        { value: { kind: 'number', value: 1 }, formula: null },
+      ],
+      [
+        addrKey({ sheet: 1, row: 0, col: 0 }),
+        { value: { kind: 'number', value: 2 }, formula: null },
+      ],
+    ]);
+    IterationCountingMap.iterations = 0;
+    IterationCountingMap.gets = 0;
+    store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
+    setRange(store, 0, 0, 0, MAX_COL);
+
+    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+    const center = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs');
+    expect(IterationCountingMap.iterations).toBe(1);
+    expect(center?.textContent).toContain('Sum: 1');
+
+    store.setState((s) => ({
+      ...s,
+      data: { ...s.data, sheetIndex: 1 },
+      selection: {
+        ...s.selection,
+        active: { sheet: 1, row: 0, col: 0 },
+        anchor: { sheet: 1, row: 0, col: 0 },
+        range: { sheet: 1, r0: 0, c0: 0, r1: 0, c1: MAX_COL },
+        extraRanges: [],
+      },
+    }));
+
+    expect(IterationCountingMap.iterations).toBe(2);
+    expect(center?.textContent).toContain('Sum: 2');
+
+    const replacement = new IterationCountingMap<string, TrackedCell>([
+      [
+        addrKey({ sheet: 1, row: 0, col: 0 }),
+        { value: { kind: 'number', value: 3 }, formula: null },
+      ],
+    ]);
+    store.setState((s) => ({ ...s, data: { ...s.data, cells: replacement } }));
+
+    expect(IterationCountingMap.iterations).toBe(3);
+    expect(center?.textContent).toContain('Sum: 3');
+    handle.detach();
+  });
+
+  it('uses the full aggregate path when a row selection has extra ranges', () => {
+    const cells = new IterationCountingMap<string, TrackedCell>([
+      [
+        addrKey({ sheet: 0, row: 0, col: 0 }),
+        { value: { kind: 'number', value: 1 }, formula: null },
+      ],
+      [
+        addrKey({ sheet: 0, row: 0, col: 1 }),
+        { value: { kind: 'number', value: 2 }, formula: null },
+      ],
+      [
+        addrKey({ sheet: 0, row: 1, col: 0 }),
+        { value: { kind: 'number', value: 3 }, formula: null },
+      ],
+    ]);
+    IterationCountingMap.iterations = 0;
+    IterationCountingMap.gets = 0;
+    store.setState((s) => ({ ...s, data: { ...s.data, cells } }));
+    setRange(store, 0, 0, 0, MAX_COL);
+    store.setState((s) => ({
+      ...s,
+      selection: { ...s.selection, extraRanges: [{ sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 }] },
+    }));
+
+    const handle = attachStatusBar({ statusbar, store, strings: en, getEngineLabel: () => 'stub' });
+
+    expect(IterationCountingMap.iterations).toBe(1);
+    expect(statusbar.querySelector('.fc-host__statusbar-aggs')?.textContent).toContain('Sum: 6');
     handle.detach();
   });
 

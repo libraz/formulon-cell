@@ -1,5 +1,5 @@
-import { parseAddrKey } from '../engine/address.js';
-import type { Range } from '../engine/types.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
+import type { CellValue, Range } from '../engine/types.js';
 import type { State, StatusAggKey } from '../store/store.js';
 
 export const STATUS_AGGREGATE_KEYS: readonly StatusAggKey[] = [
@@ -50,6 +50,14 @@ const EMPTY: SelectionStats = {
  * not twice — spreadsheet parity.
  */
 export function aggregateSelection(state: State): SelectionStats {
+  return aggregateSelectionFromEntries(state, state.data.cells);
+}
+
+/** Reduce already-filtered candidate entries without retaining them. */
+export function aggregateSelectionFromEntries(
+  state: State,
+  entries: Iterable<[string, { value: CellValue; formula: string | null }]>,
+): SelectionStats {
   const sheet = state.data.sheetIndex;
   const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])].filter(
     (range) => range.sheet === sheet,
@@ -64,31 +72,46 @@ export function aggregateSelection(state: State): SelectionStats {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
 
-  const visited = new Set<string>();
-  // Iterate the populated cell map rather than the range. selectAll() can hand
-  // us a 17B-cell rectangle; the cell map is bounded by what the user actually
-  // typed and stays cheap.
-  for (const [key, cell] of state.data.cells) {
-    const addr = parseAddrKey(key);
-    if (!addr || addr.sheet !== sheet) continue;
-    const { row, col } = addr;
-    let inAny = false;
-    for (const r of ranges) {
-      if (row < r.r0 || row > r.r1 || col < r.c0 || col > r.c1) continue;
-      inAny = true;
-      break;
-    }
-    if (!inAny) continue;
-    if (visited.has(key)) continue;
-    visited.add(key);
-    if (cell.value.kind === 'blank') continue;
+  const accumulate = (cell: { value: CellValue }): void => {
+    if (cell.value.kind === 'blank') return;
     nonBlankCount += 1;
-    if (cell.value.kind !== 'number') continue;
+    if (cell.value.kind !== 'number') return;
     const n = cell.value.value;
     numericCount += 1;
     sum += n;
     if (n < min) min = n;
     if (n > max) max = n;
+  };
+
+  const onlyRange = ranges.length === 1 ? ranges[0] : undefined;
+  if (
+    entries === state.data.cells &&
+    onlyRange &&
+    onlyRange.r0 === onlyRange.r1 &&
+    onlyRange.c0 === onlyRange.c1
+  ) {
+    const cell = state.data.cells.get(addrKey({ sheet, row: onlyRange.r0, col: onlyRange.c0 }));
+    if (cell) accumulate(cell);
+  } else {
+    const visited = new Set<string>();
+    // Iterate the populated cell map rather than the range. selectAll() can
+    // hand us a 17B-cell rectangle; the cell map is bounded by what the user
+    // actually typed and stays cheap.
+    for (const [key, cell] of entries) {
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== sheet) continue;
+      const { row, col } = addr;
+      let inAny = false;
+      for (const r of ranges) {
+        if (row < r.r0 || row > r.r1 || col < r.c0 || col > r.c1) continue;
+        inAny = true;
+        break;
+      }
+      if (!inAny) continue;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      accumulate(cell);
+    }
   }
 
   if (numericCount === 0) {

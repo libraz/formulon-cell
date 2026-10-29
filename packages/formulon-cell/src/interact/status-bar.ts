@@ -1,8 +1,11 @@
 import {
   aggregateSelection,
+  aggregateSelectionFromEntries,
+  type SelectionStats,
   STATUS_AGGREGATE_KEYS,
   statusAggregateValue,
 } from '../commands/aggregate.js';
+import { parseAddrKey } from '../engine/address.js';
 import { normalizeFormatLocale } from '../format/locale.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -14,9 +17,11 @@ import {
   ZOOM_MIN,
   zoomToSliderPosition,
 } from '../store/render-scale.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import {
   mutators,
   type SpreadsheetStore,
+  type State,
   type StatusAggKey,
   type StatusBarOptionKey,
   type WorkbookViewMode,
@@ -84,6 +89,62 @@ const STATUS_OPTION_KEYS: readonly StatusBarOptionKey[] = [
 ];
 const LOCK_OPTION_KEYS = ['capsLock', 'numLock', 'scrollLock'] as const;
 const VIEWPORT_PAD = 4;
+
+type AggregateRangeKey = readonly [sheet: number, r0: number, c0: number, r1: number, c1: number];
+
+interface AggregateCache {
+  cells: State['data']['cells'];
+  sheetIndex: number;
+  ranges: readonly AggregateRangeKey[];
+  stats: SelectionStats;
+}
+
+type AggregateCellEntry = [
+  string,
+  State['data']['cells'] extends Map<string, infer Cell> ? Cell : never,
+];
+
+interface SelectionAggregateIndex {
+  cells: State['data']['cells'];
+  sheetIndex: number;
+  rows: Map<number, AggregateCellEntry[]>;
+  columns: Map<number, AggregateCellEntry[]>;
+}
+
+const aggregateRangeKeys = (state: ReturnType<SpreadsheetStore['getState']>): AggregateRangeKey[] =>
+  [state.selection.range, ...(state.selection.extraRanges ?? [])].map((range) => [
+    range.sheet,
+    range.r0,
+    range.c0,
+    range.r1,
+    range.c1,
+  ]);
+
+const sameAggregateKey = (
+  cache: AggregateCache | undefined,
+  state: ReturnType<SpreadsheetStore['getState']>,
+  ranges: readonly AggregateRangeKey[],
+): cache is AggregateCache => {
+  if (
+    !cache ||
+    cache.cells !== state.data.cells ||
+    cache.sheetIndex !== state.data.sheetIndex ||
+    cache.ranges.length !== ranges.length
+  ) {
+    return false;
+  }
+  return ranges.every((range, index) => {
+    const cached = cache.ranges[index];
+    return (
+      cached !== undefined &&
+      cached[0] === range[0] &&
+      cached[1] === range[1] &&
+      cached[2] === range[2] &&
+      cached[3] === range[3] &&
+      cached[4] === range[4]
+    );
+  });
+};
 
 const createStatusBarButton = (className: string): HTMLButtonElement => {
   return createInteractionButton({ className });
@@ -382,11 +443,74 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     macroRecording.textContent = recording ? t.macroRecordingActive : t.macroRecording;
   };
 
+  let aggregateCache: AggregateCache | undefined;
+  let aggregateIndex: SelectionAggregateIndex | undefined;
+
+  const aggregateHeaderSelection = (s: State): SelectionStats | undefined => {
+    if (s.selection.extraRanges?.length) return undefined;
+    const range = s.selection.range;
+    if (range.sheet !== s.data.sheetIndex) return undefined;
+    const rowHeader = range.r0 === range.r1 && isWholeRowRange(range);
+    const columnHeader = range.c0 === range.c1 && isWholeColumnRange(range);
+    if (!rowHeader && !columnHeader) return undefined;
+
+    if (!aggregateIndex) {
+      const rows = new Map<number, AggregateCellEntry[]>();
+      const columns = new Map<number, AggregateCellEntry[]>();
+      for (const [key, cell] of s.data.cells) {
+        const addr = parseAddrKey(key);
+        if (!addr || addr.sheet !== s.data.sheetIndex) continue;
+        const entry: AggregateCellEntry = [key, cell];
+        let rowEntries = rows.get(addr.row);
+        if (!rowEntries) {
+          rowEntries = [];
+          rows.set(addr.row, rowEntries);
+        }
+        rowEntries.push(entry);
+        let columnEntries = columns.get(addr.col);
+        if (!columnEntries) {
+          columnEntries = [];
+          columns.set(addr.col, columnEntries);
+        }
+        columnEntries.push(entry);
+      }
+      aggregateIndex = {
+        cells: s.data.cells,
+        sheetIndex: s.data.sheetIndex,
+        rows,
+        columns,
+      };
+    }
+
+    const candidates = rowHeader
+      ? aggregateIndex.rows.get(range.r0)
+      : aggregateIndex.columns.get(range.c0);
+    return aggregateSelectionFromEntries(s, candidates ?? []);
+  };
+
   const refresh = (): void => {
     const s = store.getState();
+    if (
+      aggregateIndex &&
+      (aggregateIndex.cells !== s.data.cells || aggregateIndex.sheetIndex !== s.data.sheetIndex)
+    ) {
+      aggregateIndex = undefined;
+    }
     refreshStaticLabels();
     refreshModeLabel();
-    const stats = aggregateSelection(s);
+    const ranges = aggregateRangeKeys(s);
+    let stats: SelectionStats;
+    if (sameAggregateKey(aggregateCache, s, ranges)) {
+      stats = aggregateCache.stats;
+    } else {
+      stats = aggregateHeaderSelection(s) ?? aggregateSelection(s);
+      aggregateCache = {
+        cells: s.data.cells,
+        sheetIndex: s.data.sheetIndex,
+        ranges,
+        stats,
+      };
+    }
     const keys = s.ui.statusAggs;
     const pieces: string[] = [];
     for (const key of keys) {
@@ -674,6 +798,8 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       document.removeEventListener('keyup', refreshKeyboardLocks, true);
       popover.remove();
       unsub();
+      aggregateIndex = undefined;
+      aggregateCache = undefined;
     },
   };
 }
