@@ -114,6 +114,15 @@ export default defineConfig({
 });
 ```
 
+`.wasm` ファイルはエンジンの JS と同じ場所から取得されます。CDN や別のパスから配信する場合は、ワークブックを自分で作成してリゾルバを渡します。エンジンはページごとに一度だけ読み込まれるため、URL は最初の読み込みで決まります。
+
+```ts
+const workbook = await WorkbookHandle.createDefault({
+  locateFile: (path) => `https://cdn.example.com/formulon/${path}`,
+});
+await Spreadsheet.mount(host, { workbook });
+```
+
 `worker: { format: 'es' }` とクロスオリジン分離（`Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Embedder-Policy: require-corp`）が必要なのは、`@libraz/formulon/threads` を直接 import する場合だけです。formulon-cell の標準ローダーはワーカーを起動しません。
 
 ## 主な機能
