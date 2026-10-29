@@ -9,7 +9,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
-/** Reactive strings controller — Phase 3 makes labels live-updatable. */
+/** Reactive strings controller; subscribers re-render labels on locale change. */
 export interface I18nController {
   readonly locale: string;
   readonly strings: Strings;
