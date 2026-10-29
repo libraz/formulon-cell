@@ -1,4 +1,5 @@
 import { enhanceCustomSelect, syncCustomSelects } from './custom-select.js';
+import { advanceDialogTab, focusableDialogItems } from './dialog-focus.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 export interface DialogShellDeps {
@@ -153,15 +154,6 @@ interface BoundListener {
   options?: AddEventListenerOptions | boolean;
 }
 
-const FOCUSABLE_SELECTOR = [
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'a[href]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
 // A document can host dialogs from multiple spreadsheet instances. Keep one
 // activation order per document so every modal key handler agrees on which
 // visible panel currently owns the keyboard.
@@ -199,14 +191,6 @@ function ownsDialogKeys(overlay: HTMLElement): boolean {
 const keyWasHandled = (event: KeyboardEvent): boolean =>
   event.defaultPrevented || handledDialogKeyEvents.has(event);
 
-function focusableInside(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((el) => {
-    if (el.closest('[hidden],[aria-hidden="true"]')) return false;
-    if ('disabled' in el && (el as HTMLButtonElement | HTMLInputElement).disabled) return false;
-    return el.tabIndex >= 0;
-  });
-}
-
 /**
  * Shared lifecycle and listener-bookkeeping primitive for the spreadsheet's
  * 16+ modal dialogs. Each dialog used to hand-roll its own overlay creation,
@@ -235,6 +219,9 @@ function focusableInside(root: HTMLElement): HTMLElement[] {
  */
 export function createDialogShell(deps: DialogShellDeps): DialogShell {
   const { host, className, onDismiss } = deps;
+  const document = host.ownerDocument;
+  const OwnerHTMLElement = document.defaultView?.HTMLElement ?? HTMLElement;
+  const OwnerHTMLSelectElement = document.defaultView?.HTMLSelectElement ?? HTMLSelectElement;
   let ariaLabel = deps.ariaLabel;
   let disposed = false;
   let restoreFocusEl: HTMLElement | null = null;
@@ -263,8 +250,8 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
   const selectObserver = new MutationObserver((records) => {
     for (const record of records) {
       for (const node of Array.from(record.addedNodes)) {
-        if (!(node instanceof HTMLElement)) continue;
-        if (node instanceof HTMLSelectElement) {
+        if (!(node instanceof OwnerHTMLElement)) continue;
+        if (node instanceof OwnerHTMLSelectElement) {
           const handle = enhanceCustomSelect(node);
           if (handle) selectHandles.push(handle);
         }
@@ -302,38 +289,14 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
     });
   }
 
-  on(document, 'keydown', (e) => {
+  const onTabKeydown: EventListener = (e) => {
     const event = e as KeyboardEvent;
     if (overlay.hidden || keyWasHandled(event) || event.key !== 'Tab' || !ownsDialogKeys(overlay))
       return;
-    const items = focusableInside(panel);
-    if (items.length === 0) {
-      handledDialogKeyEvents.add(event);
-      event.preventDefault();
-      panel.focus({ preventScroll: true });
-      return;
-    }
-    const active = document.activeElement;
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (!active || !overlay.contains(active)) {
-      handledDialogKeyEvents.add(event);
-      event.preventDefault();
-      first?.focus({ preventScroll: true });
-      return;
-    }
-    if (event.shiftKey && active === first) {
-      handledDialogKeyEvents.add(event);
-      event.preventDefault();
-      last?.focus({ preventScroll: true });
-      return;
-    }
-    if (!event.shiftKey && active === last) {
-      handledDialogKeyEvents.add(event);
-      event.preventDefault();
-      first?.focus({ preventScroll: true });
-    }
-  });
+    if (advanceDialogTab(panel, event)) handledDialogKeyEvents.add(event);
+  };
+  on(overlay, 'keydown', onTabKeydown);
+  on(document, 'keydown', onTabKeydown);
 
   return {
     overlay,
@@ -346,11 +309,11 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       activateDialogLayer(overlay);
       if (!overlay.contains(document.activeElement)) {
         restoreFocusEl =
-          document.activeElement instanceof HTMLElement ? document.activeElement : host;
+          document.activeElement instanceof OwnerHTMLElement ? document.activeElement : host;
       }
       overlay.hidden = false;
       if (!overlay.contains(document.activeElement)) {
-        const first = focusableInside(panel)[0] ?? panel;
+        const first = focusableDialogItems(panel)[0] ?? panel;
         first.focus({ preventScroll: true });
       }
     },

@@ -1,3 +1,6 @@
+// Safari delivers the IME confirmation Enter with isComposing false.
+const IME_PROCESS_KEY_CODE = 229;
+
 const NON_SUBMIT_TARGETS = [
   'button',
   'select',
@@ -13,10 +16,12 @@ const NON_SUBMIT_TARGETS = [
 /**
  * True when an Enter keydown reaching a dialog overlay should run its primary
  * action. Enter on a button, inside a select or custom select, in a textarea,
- * or during IME composition keeps its native meaning instead.
+ * or during or confirming IME composition keeps its native meaning instead.
  */
 export function isSubmitEnter(event: KeyboardEvent): boolean {
-  if (event.key !== 'Enter' || event.isComposing) return false;
-  const target = event.target;
-  return !(target instanceof Element && target.closest(NON_SUBMIT_TARGETS));
+  if (event.key !== 'Enter' || event.isComposing || event.keyCode === IME_PROCESS_KEY_CODE) {
+    return false;
+  }
+  const target = event.target as Element | null;
+  return !(target?.nodeType === 1 && target.closest(NON_SUBMIT_TARGETS));
 }

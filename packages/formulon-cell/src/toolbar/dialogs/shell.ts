@@ -2,47 +2,9 @@
 // Each `showX(...)` wires up its own widgets but reuses this scaffold so
 // keyboard handling, focus restoration, and aria wiring stay consistent.
 
+import { advanceDialogTab } from '../../interact/dialog-focus.js';
+import { isSubmitEnter } from '../../interact/mac-dialog-keys.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
-
-const FOCUSABLE_DIALOG_SELECTOR = [
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'a[href]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-const focusableDialogItems = (root: HTMLElement): HTMLElement[] =>
-  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_DIALOG_SELECTOR)).filter((el) => {
-    if (el.closest('[hidden],[aria-hidden="true"]')) return false;
-    if ('disabled' in el && (el as HTMLButtonElement | HTMLInputElement).disabled) return false;
-    return el.tabIndex >= 0;
-  });
-
-export const trapDialogTab = (root: HTMLElement, event: KeyboardEvent): boolean => {
-  if (event.key !== 'Tab') return false;
-  const ownerDocument = root.ownerDocument;
-  const items = focusableDialogItems(root);
-  if (items.length === 0) {
-    event.preventDefault();
-    root.focus({ preventScroll: true });
-    return true;
-  }
-  const first = items[0];
-  const last = items[items.length - 1];
-  if (event.shiftKey && ownerDocument.activeElement === first) {
-    event.preventDefault();
-    last?.focus({ preventScroll: true });
-    return true;
-  }
-  if (!event.shiftKey && ownerDocument.activeElement === last) {
-    event.preventDefault();
-    first?.focus({ preventScroll: true });
-    return true;
-  }
-  return false;
-};
 
 export const restoreDialogFocus = (overlay: HTMLElement, opener: HTMLElement | null): void => {
   if (!opener) return;
@@ -209,11 +171,11 @@ export const installDialogLifecycle = <T>(
   };
   const onKey = (event: KeyboardEvent): void => {
     event.stopPropagation();
-    if (trapDialogTab(shell.overlay, event)) return;
+    if (advanceDialogTab(shell.overlay, event)) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       finish(onCancel());
-    } else if (event.key === 'Enter' && onSubmit) {
+    } else if (onSubmit && !event.defaultPrevented && isSubmitEnter(event)) {
       event.preventDefault();
       onSubmit();
     }

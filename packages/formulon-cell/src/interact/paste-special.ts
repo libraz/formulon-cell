@@ -13,6 +13,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 
 export interface PasteSpecialDeps {
   host: HTMLElement;
@@ -224,17 +225,13 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
 
   shell.on(cancelBtn, 'click', close);
   shell.on(okBtn, 'click', apply);
-  const onKey = (e: KeyboardEvent): void => {
-    if (overlay.hidden) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      apply();
-    }
+  const onOverlayKey = (e: KeyboardEvent): void => {
+    if (!isSubmitEnter(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    apply();
   };
-  shell.on(document, 'keydown', onKey as EventListener, true);
+  shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   return {
     open,

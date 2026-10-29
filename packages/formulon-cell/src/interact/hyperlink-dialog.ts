@@ -15,6 +15,7 @@ import {
   focusAndSelectInput,
   showDialogError,
 } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 
 export interface HyperlinkDialogDeps {
   host: HTMLElement;
@@ -126,16 +127,10 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   const onCancel = (): void => api.close();
 
   const onOverlayKey = (e: KeyboardEvent): void => {
+    if (!isSubmitEnter(e)) return;
+    e.preventDefault();
     e.stopPropagation();
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      api.close();
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      onOk();
-    }
+    onOk();
   };
 
   shell.on(okBtn, 'click', onOk);

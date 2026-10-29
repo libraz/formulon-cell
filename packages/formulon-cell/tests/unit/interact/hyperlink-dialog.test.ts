@@ -56,6 +56,123 @@ describe('attachHyperlinkDialog', () => {
     handle.detach();
   });
 
+  it('Cancel Enter keeps its native click behavior and does not submit the URL', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachHyperlinkDialog({ host, store });
+    handle.open();
+    const input = document.querySelector<HTMLInputElement>('.fc-hldlg input[type="url"]');
+    const buttons = document.querySelectorAll<HTMLButtonElement>(
+      '.fc-hldlg .fc-fmtdlg__footer button',
+    );
+    const cancelBtn = buttons[1];
+    if (!input || !cancelBtn) throw new Error('expected URL input and Cancel button');
+    input.value = 'https://example.com';
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+
+    try {
+      cancelBtn.focus();
+      cancelBtn.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(store.getState().format.formats.size).toBe(0);
+      expect(document.querySelector<HTMLElement>('.fc-hldlg')?.hidden).toBe(false);
+
+      cancelBtn.click();
+      expect(store.getState().format.formats.size).toBe(0);
+      expect(document.querySelector<HTMLElement>('.fc-hldlg')?.hidden).toBe(true);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('native Enter on the OK button clicks once without an overlay submission', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachHyperlinkDialog({ host, store });
+    handle.open();
+    const input = document.querySelector<HTMLInputElement>('.fc-hldlg input[type="url"]');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-hldlg .fc-fmtdlg__btn--primary');
+    if (!input || !okBtn) throw new Error('expected URL input and OK button');
+    input.value = 'https://example.com';
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+
+    try {
+      okBtn.focus();
+      okBtn.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      okBtn.click(); // happy-dom does not synthesize the native button click for keydown.
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.hyperlink,
+      ).toBe('https://example.com');
+      expect(document.querySelector<HTMLElement>('.fc-hldlg')?.hidden).toBe(true);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('wraps Tab and Shift+Tab through the shared dialog shell', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachHyperlinkDialog({ host, store });
+    handle.open();
+    const input = document.querySelector<HTMLInputElement>('.fc-hldlg input[type="url"]');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-hldlg .fc-fmtdlg__btn--primary');
+    if (!input || !okBtn) throw new Error('expected URL input and OK button');
+
+    try {
+      okBtn.focus();
+      const tab = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      });
+      okBtn.dispatchEvent(tab);
+      expect(tab.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(input);
+
+      const shiftTab = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      input.dispatchEvent(shiftTab);
+      expect(shiftTab.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(okBtn);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('ignores composing Enter without writing or dismissing the hyperlink dialog', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachHyperlinkDialog({ host, store });
+    handle.open();
+    const input = document.querySelector<HTMLInputElement>('.fc-hldlg input[type="url"]');
+    if (!input) throw new Error('expected URL input');
+    input.value = 'https://example.com';
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    try {
+      input.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(store.getState().format.formats.size).toBe(0);
+      expect(document.querySelector<HTMLElement>('.fc-hldlg')?.hidden).toBe(false);
+    } finally {
+      handle.detach();
+    }
+  });
+
   it('OK on an empty URL surfaces the error and does not write', () => {
     const store = createSpreadsheetStore();
     const handle = attachHyperlinkDialog({ host, store });

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 import { captureSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { attachHyperlinkDialog } from '../../../src/interact/hyperlink-dialog.js';
 import { attachPasteSpecial } from '../../../src/interact/paste-special.js';
 import {
   createSpreadsheetStore,
@@ -153,7 +154,19 @@ describe('attachPasteSpecial', () => {
 
     // Switch to "values" mode and submit.
     document.querySelector<HTMLInputElement>('input[type="radio"][value="values"]')?.click();
-    document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
+    const okBtn = document.querySelectorAll<HTMLButtonElement>(
+      '.fc-pastesp .fc-fmtdlg__btn--primary',
+    )[0];
+    if (!okBtn) throw new Error('expected OK button');
+    const enter = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    okBtn.focus();
+    okBtn.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(false);
+    okBtn.click(); // happy-dom does not synthesize the native button click for keydown.
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 7 });
     expect(onAfterCommit).toHaveBeenCalled();
@@ -293,6 +306,44 @@ describe('attachPasteSpecial', () => {
     handle.detach();
   });
 
+  it('Cancel Enter keeps its native click behavior and does not apply the paste', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 5, 5);
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      getSnapshot: () => snap,
+      onAfterCommit,
+    });
+    handle.open();
+    const cancelBtn = document.querySelectorAll<HTMLButtonElement>(
+      '.fc-pastesp .fc-fmtdlg__btn',
+    )[0];
+    if (!cancelBtn) throw new Error('expected Cancel button');
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+
+    try {
+      cancelBtn.focus();
+      cancelBtn.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(wb.getValue({ sheet: 0, row: 5, col: 5 }).kind).toBe('blank');
+      expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(false);
+
+      cancelBtn.click();
+      expect(wb.getValue({ sheet: 0, row: 5, col: 5 }).kind).toBe('blank');
+      expect(onAfterCommit).not.toHaveBeenCalled();
+      expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    } finally {
+      handle.detach();
+    }
+  });
+
   it('Escape closes the dialog', () => {
     seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
@@ -326,12 +377,97 @@ describe('attachPasteSpecial', () => {
     });
     handle.open();
 
+    const allRadio = document.querySelector<HTMLInputElement>('.fc-pastesp input[value="all"]');
+    if (!allRadio) throw new Error('expected the focused paste option radio');
     const e = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
-    document.dispatchEvent(e);
+    allRadio.dispatchEvent(e);
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 6, col: 6 })).toEqual({ kind: 'number', value: 11 });
     expect(onAfterCommit).toHaveBeenCalled();
     handle.detach();
+  });
+
+  it('ignores composing Enter without applying or dismissing the paste dialog', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 11 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 6, 6);
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      getSnapshot: () => snap,
+      onAfterCommit,
+    });
+    handle.open();
+    const allRadio = document.querySelector<HTMLInputElement>('.fc-pastesp input[value="all"]');
+    if (!allRadio) throw new Error('expected the focused paste option radio');
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    try {
+      allRadio.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(wb.getValue({ sheet: 0, row: 6, col: 6 }).kind).toBe('blank');
+      expect(onAfterCommit).not.toHaveBeenCalled();
+      expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(false);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('lets another top dialog own Enter and Escape without applying the paste underneath', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 11 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 6, 6);
+    const paste = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      getSnapshot: () => snap,
+      onAfterCommit,
+    });
+    const hyperlink = attachHyperlinkDialog({ host, store });
+    const pasteOverlay = document.querySelector<HTMLElement>('.fc-pastesp');
+    try {
+      paste.open();
+      hyperlink.open();
+      const urlInput = document.querySelector<HTMLInputElement>('.fc-hldlg input[type="url"]');
+      if (!urlInput) throw new Error('expected the hyperlink URL input');
+      urlInput.value = 'https://example.com';
+      const enter = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true,
+      });
+      urlInput.dispatchEvent(enter);
+
+      expect(pasteOverlay?.hidden).toBe(false);
+      expect(document.querySelector<HTMLElement>('.fc-hldlg')?.hidden).toBe(true);
+      expect(wb.getValue({ sheet: 0, row: 6, col: 6 }).kind).toBe('blank');
+      expect(onAfterCommit).not.toHaveBeenCalled();
+
+      hyperlink.open();
+      const reopenedInput = document.querySelector<HTMLInputElement>('.fc-hldlg input[type="url"]');
+      if (!reopenedInput) throw new Error('expected the reopened hyperlink URL input');
+      const escapeEvent = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      reopenedInput.dispatchEvent(escapeEvent);
+
+      expect(pasteOverlay?.hidden).toBe(false);
+      expect(document.querySelector<HTMLElement>('.fc-hldlg')?.hidden).toBe(true);
+      expect(wb.getValue({ sheet: 0, row: 6, col: 6 }).kind).toBe('blank');
+      expect(onAfterCommit).not.toHaveBeenCalled();
+    } finally {
+      hyperlink.detach();
+      paste.detach();
+    }
   });
 
   it('keydown is ignored while the overlay is hidden', () => {

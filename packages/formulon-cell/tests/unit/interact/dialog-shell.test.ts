@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Window as HappyWindow } from 'happy-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appendDialogActions,
@@ -222,6 +223,205 @@ describe('interact/dialog-shell', () => {
     shell.dispose();
   });
 
+  it('advances Tab before a later overlay listener stops propagation', () => {
+    const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X' });
+    const first = document.createElement('button');
+    const second = document.createElement('button');
+    const third = document.createElement('button');
+    shell.panel.append(first, second, third);
+    shell.open();
+    shell.overlay.addEventListener('keydown', (event) => event.stopPropagation());
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
+    first.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(second);
+    shell.dispose();
+  });
+
+  it('does not advance Tab when its target already prevented the event', () => {
+    const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X' });
+    const first = document.createElement('button');
+    const second = document.createElement('button');
+    shell.panel.append(first, second);
+    shell.open();
+    first.addEventListener('keydown', (event) => event.preventDefault());
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
+    first.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+    shell.dispose();
+  });
+
+  it('uses a checked second named radio as the first tab stop for Shift+Tab', () => {
+    const shell = createDialogShell({
+      host,
+      className: 'fc-radio-shift',
+      ariaLabel: 'Radio shift',
+    });
+    const firstRadio = document.createElement('input');
+    firstRadio.type = 'radio';
+    firstRadio.name = 'choice';
+    const checkedRadio = document.createElement('input');
+    checkedRadio.type = 'radio';
+    checkedRadio.name = 'choice';
+    checkedRadio.checked = true;
+    const last = document.createElement('button');
+    shell.panel.append(firstRadio, checkedRadio, last);
+    shell.open();
+
+    try {
+      checkedRadio.focus();
+      const event = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      checkedRadio.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(last);
+    } finally {
+      shell.dispose();
+    }
+  });
+
+  it('wraps from the last control to the checked second named radio', () => {
+    const shell = createDialogShell({
+      host,
+      className: 'fc-radio-forward',
+      ariaLabel: 'Radio forward',
+    });
+    const firstRadio = document.createElement('input');
+    firstRadio.type = 'radio';
+    firstRadio.name = 'choice';
+    const checkedRadio = document.createElement('input');
+    checkedRadio.type = 'radio';
+    checkedRadio.name = 'choice';
+    checkedRadio.checked = true;
+    const last = document.createElement('button');
+    shell.panel.append(firstRadio, checkedRadio, last);
+    shell.open();
+
+    try {
+      last.focus();
+      const event = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      });
+      last.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(checkedRadio);
+    } finally {
+      shell.dispose();
+    }
+  });
+
+  it('advances between a checked radio and Cancel in both Tab directions', () => {
+    const shell = createDialogShell({
+      host,
+      className: 'fc-radio-interior',
+      ariaLabel: 'Radio interior',
+    });
+    const firstRadio = document.createElement('input');
+    firstRadio.type = 'radio';
+    firstRadio.name = 'choice';
+    const checkedRadio = document.createElement('input');
+    checkedRadio.type = 'radio';
+    checkedRadio.name = 'choice';
+    checkedRadio.checked = true;
+    const cancel = document.createElement('button');
+    const ok = document.createElement('button');
+    shell.panel.append(firstRadio, checkedRadio, cancel, ok);
+    shell.open();
+
+    try {
+      checkedRadio.focus();
+      const forward = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      });
+      checkedRadio.dispatchEvent(forward);
+      expect(forward.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(cancel);
+      expect(firstRadio.checked).toBe(false);
+      expect(checkedRadio.checked).toBe(true);
+
+      const backward = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      cancel.dispatchEvent(backward);
+      expect(backward.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(checkedRadio);
+      expect(checkedRadio.checked).toBe(true);
+    } finally {
+      shell.dispose();
+    }
+  });
+
+  it('uses the host owner document for tab trapping and opener restoration', async () => {
+    const ownerWindow = new HappyWindow();
+    const ownerDocument = ownerWindow.document as unknown as Document;
+    const ownerView = ownerDocument.defaultView;
+    if (!ownerView) {
+      await ownerWindow.happyDOM.abort();
+      throw new Error('foreign document has no defaultView');
+    }
+    const opener = ownerDocument.createElement('button');
+    const foreignHost = ownerDocument.createElement('div');
+    foreignHost.tabIndex = -1;
+    ownerDocument.body.append(opener, foreignHost);
+    opener.focus();
+    const shell = createDialogShell({
+      host: foreignHost,
+      className: 'fc-foreign-doc',
+      ariaLabel: 'Foreign document',
+    });
+    const first = ownerDocument.createElement('button');
+    const last = ownerDocument.createElement('button');
+    shell.panel.append(first, last);
+
+    try {
+      shell.open();
+      expect(shell.overlay.ownerDocument).toBe(ownerDocument);
+      expect(ownerDocument.activeElement).toBe(first);
+
+      last.focus();
+      const event = new ownerView.KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      });
+      last.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(ownerDocument.activeElement).toBe(first);
+
+      shell.close();
+      expect(ownerDocument.activeElement).toBe(opener);
+    } finally {
+      shell.dispose();
+      await ownerWindow.happyDOM.abort();
+    }
+  });
+
   it('gives Escape to one open dialog layer at a time and restores the parent opener', () => {
     const parentDismiss = vi.fn();
     const childDismiss = vi.fn();
@@ -273,8 +473,8 @@ describe('interact/dialog-shell', () => {
     inputs[1]?.focus();
     const forward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
     inputs[1]?.dispatchEvent(forward);
-    expect(forward.defaultPrevented).toBe(false);
-    expect(document.activeElement).toBe(inputs[1]);
+    expect(forward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(inputs[2]);
 
     inputs[0]?.focus();
     const reverse = new KeyboardEvent('keydown', {
@@ -335,7 +535,7 @@ describe('interact/dialog-shell', () => {
     first.dispose();
   });
 
-  it('keeps focus handling independent across workbook hosts while the newer modal is open', () => {
+  it('assigns Tab progression to the newer modal across workbook hosts', () => {
     const otherHost = document.createElement('div');
     otherHost.tabIndex = -1;
     document.body.appendChild(otherHost);
@@ -353,8 +553,8 @@ describe('interact/dialog-shell', () => {
     const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
     secondInput.dispatchEvent(event);
 
-    expect(event.defaultPrevented).toBe(false);
-    expect(document.activeElement).toBe(secondInput);
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(secondNext);
     second.dispose();
     first.dispose();
     otherHost.remove();
