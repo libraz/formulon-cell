@@ -21,6 +21,18 @@ describe('engine/loader', () => {
     expect(createFormulon).toHaveBeenCalledTimes(1);
   });
 
+  it('passes the host wasm resolver to the engine factory', async () => {
+    const createFormulon = vi.fn(() => Promise.resolve({ versionString: () => 'wasm' }));
+    vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
+    vi.resetModules();
+    const { loadFormulon } = await import('../../../src/engine/loader.js');
+    const locateFile = (path: string): string => `https://cdn.example/engine/${path}`;
+
+    await loadFormulon({ locateFile });
+
+    expect(createFormulon).toHaveBeenCalledWith({ locateFile });
+  });
+
   it('fails before initialization when WebAssembly is unavailable', async () => {
     const createFormulon = vi.fn();
     vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));

@@ -6,6 +6,10 @@ versioning is [SemVer](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- `WorkbookHandle.createDefault()` and `loadBytes()` take `locateFile`, passed to the engine to resolve its `.wasm` URL for hosts that serve it from a CDN or a sub-path.
+
 ### Changed
 
 - The hit targets a grid paints (fill handle, validation and totals chevrons, error triangles, outline toggles, page-view handles) belong to that grid. `gridHitState(grid)` returns them and replaces `getErrorTriangleHits()`.

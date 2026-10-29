@@ -114,6 +114,15 @@ export default defineConfig({
 });
 ```
 
+The `.wasm` file is fetched from next to the engine's JS. To serve it from a CDN or another path, create the workbook yourself and pass a resolver; the engine loads once per page, so the first load decides the URL:
+
+```ts
+const workbook = await WorkbookHandle.createDefault({
+  locateFile: (path) => `https://cdn.example.com/formulon/${path}`,
+});
+await Spreadsheet.mount(host, { workbook });
+```
+
 Only a direct import of `@libraz/formulon/threads` needs `worker: { format: 'es' }` and cross-origin isolation (`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`). The default formulon-cell loader starts no workers.
 
 ## What's inside

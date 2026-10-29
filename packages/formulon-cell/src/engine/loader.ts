@@ -1,12 +1,11 @@
-// The formulon package is plain ESM and resolves the .wasm itself via its
-// own `import.meta.url` + `locateFile` mechanism, so we don't pass an
-// explicit wasm URL here — Emscripten finds the file next to formulon.js
-// at the consumer's resolved path.
+// The formulon package is plain ESM and resolves the .wasm next to
+// formulon.js via its own `import.meta.url`; hosts that serve the binary
+// elsewhere (a CDN, a sub-path) pass `locateFile` through to Emscripten.
 //
 // The default formulon entry is single-threaded and needs no cross-origin
 // isolation. Initialization errors still reject: the in-memory stub is
 // intentionally opt-in for tests and demos.
-import createFormulon from '@libraz/formulon';
+import createFormulon, { type FormulonModuleOptions } from '@libraz/formulon';
 import { createStubModule } from './stub-engine.js';
 import type { FormulonModule } from './types.js';
 
@@ -20,6 +19,10 @@ export interface LoadOptions {
   preferStub?: boolean;
   /** Called when `preferStub` explicitly selects the stub engine. */
   onFallback?: (reason: string) => void;
+  /** Resolve the URL of the engine's `.wasm` file, for hosts that serve it
+   *  from a CDN or a sub-path. The engine is loaded once per page, so only
+   *  the first load's resolver takes effect; later loads reuse that module. */
+  locateFile?: FormulonModuleOptions['locateFile'];
 }
 
 export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
@@ -40,10 +43,15 @@ export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
     return Promise.reject(new Error(unavailableReason));
   }
 
-  const promise: Promise<FormulonModule> = createFormulon().catch((reason: unknown) => {
-    cachedWasm = null;
-    throw new Error(`formulon WASM init failed: ${String(reason)}`);
-  });
+  const moduleOptions: FormulonModuleOptions = opts.locateFile
+    ? { locateFile: opts.locateFile }
+    : {};
+  const promise: Promise<FormulonModule> = createFormulon(moduleOptions).catch(
+    (reason: unknown) => {
+      cachedWasm = null;
+      throw new Error(`formulon WASM init failed: ${String(reason)}`);
+    },
+  );
   cachedWasm = promise;
 
   return promise;
