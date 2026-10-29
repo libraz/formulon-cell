@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatNumber, numberFormatPaint } from '../../../src/format/number-format.js';
 
 describe('formatNumber', () => {
@@ -232,5 +232,74 @@ describe('formatNumber date systems', () => {
 
   it('renders nothing for a negative serial in the 1904 system', () => {
     expect(formatNumber(-1, ymd, 'en-US', true)).toBe('');
+  });
+});
+
+describe('date name formatting', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function spyOnDateTimeFormatGetter() {
+    // Intl exposes format as a native getter, while TypeScript types it as a method.
+    const prototype = Intl.DateTimeFormat.prototype as unknown as { readonly format: unknown };
+    return vi.spyOn(prototype, 'format', 'get');
+  }
+
+  async function loadFreshFormatNumber() {
+    vi.resetModules();
+    return import('../../../src/format/number-format.js');
+  }
+
+  it('does not construct or invoke date-name formatters for numeric-only date and time patterns', async () => {
+    const dateTimeConstructor = vi.spyOn(Intl, 'DateTimeFormat');
+    const formatGetter = spyOnDateTimeFormatGetter();
+    const { formatNumber: formatFresh } = await loadFreshFormatNumber();
+
+    expect(formatFresh(45292, { kind: 'date', pattern: 'yyyy-mm-dd' }, 'en-US')).toBe('2024-01-01');
+    expect(formatFresh(0.5, { kind: 'time', pattern: 'hh:mm' }, 'en-US')).toBe('12:00');
+    expect(dateTimeConstructor).not.toHaveBeenCalled();
+    expect(formatGetter).not.toHaveBeenCalled();
+  });
+
+  it('builds only requested name tables, then reuses them by locale and width', async () => {
+    const dateTimeConstructor = vi.spyOn(Intl, 'DateTimeFormat');
+    const formatGetter = spyOnDateTimeFormatGetter();
+    const { formatNumber: formatFresh } = await loadFreshFormatNumber();
+    const longNames = { kind: 'custom', pattern: 'dddd mmmm' } as const;
+    const shortNames = { kind: 'custom', pattern: 'ddd mmm' } as const;
+
+    expect(formatFresh(45651, longNames, 'en-US')).toBe('Wednesday December');
+    expect(dateTimeConstructor).toHaveBeenCalledTimes(2);
+    expect(formatGetter).toHaveBeenCalledTimes(19);
+
+    expect(formatFresh(45652, longNames, 'en-US')).toBe('Thursday December');
+    expect(formatGetter).toHaveBeenCalledTimes(19);
+
+    expect(formatFresh(45651, shortNames, 'en-US')).toBe('Wed Dec');
+    expect(dateTimeConstructor).toHaveBeenCalledTimes(4);
+    expect(formatGetter).toHaveBeenCalledTimes(38);
+
+    const germanDate = formatFresh(45651, longNames, 'de-DE');
+    expect(germanDate).toBe('Mittwoch Dezember');
+    expect(dateTimeConstructor).toHaveBeenCalledTimes(6);
+    expect(formatGetter).toHaveBeenCalledTimes(57);
+
+    expect(formatFresh(45651, longNames, 'not a locale')).toBe('Wednesday December');
+    expect(formatGetter).toHaveBeenCalledTimes(57);
+  });
+
+  it('evicts old locale name tables after the bounded LRU fills', async () => {
+    const formatGetter = spyOnDateTimeFormatGetter();
+    const { formatNumber: formatFresh } = await loadFreshFormatNumber();
+    const weekday = { kind: 'custom', pattern: 'dddd' } as const;
+
+    expect(formatFresh(45651, weekday, 'en-US')).toBe('Wednesday');
+    const locales = Array.from({ length: 128 }, (_, index) => `en-US-u-ca-gregory-x-v${index}`);
+    for (const locale of locales) formatFresh(45651, weekday, locale);
+    expect(formatGetter).toHaveBeenCalledTimes(7 * 129);
+
+    expect(formatFresh(45652, weekday, 'en-US')).toBe('Thursday');
+    expect(formatGetter).toHaveBeenCalledTimes(7 * 130);
   });
 });

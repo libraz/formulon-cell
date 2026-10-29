@@ -5,8 +5,8 @@ import {
   phoneticKanaForm,
 } from '../../engine/phonetic-sync.js';
 import { formatCell, formatScientificNumber } from '../../engine/value.js';
+import { intlFormatterCache } from '../../format/intl-cache.js';
 import { convertKana } from '../../format/kana.js';
-import { normalizeFormatLocale } from '../../format/locale.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
@@ -64,9 +64,11 @@ function fitGeneralNumberToWidth(
     }
   } else {
     for (let digits = 12; digits >= 0; digits -= 1) {
-      const t = new Intl.NumberFormat(normalizeFormatLocale(locale), {
-        maximumFractionDigits: digits,
-      }).format(value);
+      const t = intlFormatterCache
+        .numberFormat(locale, {
+          maximumFractionDigits: digits,
+        })
+        .format(value);
       if (ctx.measureText(t).width <= availableWidth) return t;
     }
     for (let prec = 5; prec >= 0; prec -= 1) {

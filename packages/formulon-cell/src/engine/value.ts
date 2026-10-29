@@ -1,4 +1,4 @@
-import { normalizeFormatLocale } from '../format/locale.js';
+import { intlFormatterCache } from '../format/intl-cache.js';
 import type { Addr } from './types.js';
 import { type CellValue, type Value, ValueKind } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -45,11 +45,12 @@ export function formatScientificNumber(
     ? Math.max(0, Math.trunc(exponentDigits))
     : 2;
   const decimal =
-    new Intl.NumberFormat(normalizeFormatLocale(locale), {
-      useGrouping: false,
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    })
+    intlFormatterCache
+      .numberFormat(locale, {
+        useGrouping: false,
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })
       .formatToParts(1.1)
       .find((part) => part.type === 'decimal')?.value ?? '.';
   const scientific = value.toExponential(precision);
@@ -100,10 +101,12 @@ export function formatGeneralNumber(
   if (abs > 0 && (abs >= 1e11 || abs < 1e-9)) {
     return formatScientificNumber(value, 5, locale);
   }
-  return new Intl.NumberFormat(normalizeFormatLocale(locale), {
-    maximumFractionDigits: 12,
-    ...options,
-  }).format(value);
+  return intlFormatterCache
+    .numberFormat(locale, {
+      maximumFractionDigits: 12,
+      ...options,
+    })
+    .format(value);
 }
 
 export function fromEngineValue(v: Value): CellValue {

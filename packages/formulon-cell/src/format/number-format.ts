@@ -1,7 +1,44 @@
 import { formatGeneralNumber, formatScientificNumber } from '../engine/value.js';
 import type { NumFmt } from '../store/store.js';
 import { excelSerialToDate, excelSerialToDateParts } from './date-serial.js';
+import { intlFormatterCache } from './intl-cache.js';
 import { normalizeFormatLocale } from './locale.js';
+
+const DATE_NAME_CACHE_LIMIT = 128;
+type DateNameKind = 'weekday' | 'month';
+type DateNameWidth = 'long' | 'short';
+const dateNameTables = new Map<string, readonly string[]>();
+
+function dateNameTable(
+  locale: string,
+  kind: DateNameKind,
+  width: DateNameWidth,
+): readonly string[] {
+  const normalizedLocale = normalizeFormatLocale(locale);
+  const key = JSON.stringify([normalizedLocale, kind, width]);
+  const cached = dateNameTables.get(key);
+  if (cached) {
+    dateNameTables.delete(key);
+    dateNameTables.set(key, cached);
+    return cached;
+  }
+
+  const formatter = intlFormatterCache.dateTimeFormat(
+    normalizedLocale,
+    kind === 'weekday' ? { weekday: width, timeZone: 'UTC' } : { month: width, timeZone: 'UTC' },
+  );
+  const count = kind === 'weekday' ? 7 : 12;
+  const names = Array.from({ length: count }, (_, index) => {
+    const timestamp = kind === 'weekday' ? Date.UTC(2023, 0, index + 1) : Date.UTC(2023, index, 1);
+    return formatter.format(new Date(timestamp));
+  });
+  dateNameTables.set(key, names);
+  if (dateNameTables.size > DATE_NAME_CACHE_LIMIT) {
+    const oldest = dateNameTables.keys().next().value;
+    if (oldest !== undefined) dateNameTables.delete(oldest);
+  }
+  return names;
+}
 
 export function formatNumber(
   value: number,
@@ -14,31 +51,37 @@ export function formatNumber(
   if (fmt.kind === 'text') return String(value);
   if (fmt.kind === 'fixed') {
     const negStyle = fmt.negativeStyle ?? 'minus';
-    const body = new Intl.NumberFormat(normalizeFormatLocale(locale), {
-      style: 'decimal',
-      minimumFractionDigits: fmt.decimals,
-      maximumFractionDigits: fmt.decimals,
-      useGrouping: !!fmt.thousands,
-    }).format(Math.abs(value));
+    const body = intlFormatterCache
+      .numberFormat(locale, {
+        style: 'decimal',
+        minimumFractionDigits: fmt.decimals,
+        maximumFractionDigits: fmt.decimals,
+        useGrouping: !!fmt.thousands,
+      })
+      .format(Math.abs(value));
     return applyNegative(value, body, '', negStyle);
   }
   if (fmt.kind === 'currency') {
     const symbol = fmt.symbol ?? '$';
     const negStyle = fmt.negativeStyle ?? 'minus';
-    const body = new Intl.NumberFormat(normalizeFormatLocale(locale), {
-      style: 'decimal',
-      minimumFractionDigits: fmt.decimals,
-      maximumFractionDigits: fmt.decimals,
-      useGrouping: true,
-    }).format(Math.abs(value));
+    const body = intlFormatterCache
+      .numberFormat(locale, {
+        style: 'decimal',
+        minimumFractionDigits: fmt.decimals,
+        maximumFractionDigits: fmt.decimals,
+        useGrouping: true,
+      })
+      .format(Math.abs(value));
     return applyNegative(value, placeCurrencySymbol(body, symbol, locale), '', negStyle);
   }
   if (fmt.kind === 'percent') {
-    return new Intl.NumberFormat(normalizeFormatLocale(locale), {
-      style: 'percent',
-      minimumFractionDigits: fmt.decimals,
-      maximumFractionDigits: fmt.decimals,
-    }).format(value);
+    return intlFormatterCache
+      .numberFormat(locale, {
+        style: 'percent',
+        minimumFractionDigits: fmt.decimals,
+        maximumFractionDigits: fmt.decimals,
+      })
+      .format(value);
   }
   if (fmt.kind === 'scientific') {
     // Excel's built-in Scientific format is `0.00E+00` — the exponent is
@@ -48,12 +91,14 @@ export function formatNumber(
   }
   if (fmt.kind === 'accounting') {
     const symbol = fmt.symbol ?? '$';
-    const body = new Intl.NumberFormat(normalizeFormatLocale(locale), {
-      style: 'decimal',
-      minimumFractionDigits: fmt.decimals,
-      maximumFractionDigits: fmt.decimals,
-      useGrouping: true,
-    }).format(Math.abs(value));
+    const body = intlFormatterCache
+      .numberFormat(locale, {
+        style: 'decimal',
+        minimumFractionDigits: fmt.decimals,
+        maximumFractionDigits: fmt.decimals,
+        useGrouping: true,
+      })
+      .format(Math.abs(value));
     if (value === 0) {
       const placed = placeCurrencySymbol('-', symbol, locale);
       return placed.startsWith(symbol) ? `${symbol} -` : placed;
@@ -81,10 +126,12 @@ export function formatNumber(
 
 /** Use the locale's currency position and spacing with the cell's chosen symbol. */
 function placeCurrencySymbol(body: string, symbol: string, locale: string): string {
-  const parts = new Intl.NumberFormat(normalizeFormatLocale(locale), {
-    style: 'currency',
-    currency: 'USD',
-  }).formatToParts(1);
+  const parts = intlFormatterCache
+    .numberFormat(locale, {
+      style: 'currency',
+      currency: 'USD',
+    })
+    .formatToParts(1);
   const first = parts.findIndex((part) => part.type === 'integer');
   let last = first;
   for (let i = first; i < parts.length; i += 1) {
@@ -467,30 +514,18 @@ function renderDateTimePattern(
   const has12h = /a\/?p|am\/pm/i.test(pattern);
   const hh12 = ((hh + 11) % 12) + 1;
   const ampm = hh < 12 ? 'AM' : 'PM';
-  const DAYS_LONG = Array.from({ length: 7 }, (_, i) =>
-    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
-      weekday: 'long',
-      timeZone: 'UTC',
-    }).format(new Date(Date.UTC(2023, 0, i + 1))),
-  );
-  const DAYS_SHORT = Array.from({ length: 7 }, (_, i) =>
-    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
-      weekday: 'short',
-      timeZone: 'UTC',
-    }).format(new Date(Date.UTC(2023, 0, i + 1))),
-  );
-  const MONTHS_LONG = Array.from({ length: 12 }, (_, i) =>
-    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
-      month: 'long',
-      timeZone: 'UTC',
-    }).format(new Date(Date.UTC(2023, i, 1))),
-  );
-  const MONTHS_SHORT = Array.from({ length: 12 }, (_, i) =>
-    new Intl.DateTimeFormat(normalizeFormatLocale(locale), {
-      month: 'short',
-      timeZone: 'UTC',
-    }).format(new Date(Date.UTC(2023, i, 1))),
-  );
+  let daysLong: readonly string[] | undefined;
+  let daysShort: readonly string[] | undefined;
+  let monthsLong: readonly string[] | undefined;
+  let monthsShort: readonly string[] | undefined;
+  const getDaysLong = (): readonly string[] =>
+    (daysLong ??= dateNameTable(locale, 'weekday', 'long'));
+  const getDaysShort = (): readonly string[] =>
+    (daysShort ??= dateNameTable(locale, 'weekday', 'short'));
+  const getMonthsLong = (): readonly string[] =>
+    (monthsLong ??= dateNameTable(locale, 'month', 'long'));
+  const getMonthsShort = (): readonly string[] =>
+    (monthsShort ??= dateNameTable(locale, 'month', 'short'));
   let out = '';
   let prevWasH = false;
   for (let i = 0; i < pattern.length; ) {
@@ -574,13 +609,13 @@ function renderDateTimePattern(
         out += String(yyyy).slice(-2);
         break;
       case 'mmmmm':
-        out += Array.from(MONTHS_LONG[mm - 1] ?? '')[0] ?? '';
+        out += Array.from(getMonthsLong()[mm - 1] ?? '')[0] ?? '';
         break;
       case 'mmmm':
-        out += MONTHS_LONG[mm - 1] ?? '';
+        out += getMonthsLong()[mm - 1] ?? '';
         break;
       case 'mmm':
-        out += MONTHS_SHORT[mm - 1] ?? '';
+        out += getMonthsShort()[mm - 1] ?? '';
         break;
       case 'mm':
         out += prevWasH ? pad2(mi) : pad2(mm);
@@ -589,10 +624,10 @@ function renderDateTimePattern(
         out += prevWasH ? String(mi) : String(mm);
         break;
       case 'dddd':
-        out += DAYS_LONG[dow] ?? '';
+        out += getDaysLong()[dow] ?? '';
         break;
       case 'ddd':
-        out += DAYS_SHORT[dow] ?? '';
+        out += getDaysShort()[dow] ?? '';
         break;
       case 'dd':
         out += pad2(dd);
@@ -723,12 +758,14 @@ function renderScientificPattern(value: number, pattern: string, locale: string)
     exp += step;
     mantissa = av / 10 ** exp;
   }
-  const mantissaText = new Intl.NumberFormat(normalizeFormatLocale(locale), {
-    minimumIntegerDigits: Math.max(1, minIntDigits),
-    minimumFractionDigits: minFracDigits,
-    maximumFractionDigits: maxFracDigits,
-    useGrouping: false,
-  }).format(mantissa);
+  const mantissaText = intlFormatterCache
+    .numberFormat(locale, {
+      minimumIntegerDigits: Math.max(1, minIntDigits),
+      minimumFractionDigits: minFracDigits,
+      maximumFractionDigits: maxFracDigits,
+      useGrouping: false,
+    })
+    .format(mantissa);
   const expDigits = String(Math.abs(exp)).padStart(expPat.length, '0');
   const expSign = exp < 0 ? '-' : expSignSpec === '+' ? '+' : '';
   return `${sign}${prefix}${mantissaText}E${expSign}${expDigits}${suffix}`;
@@ -787,12 +824,14 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
   const minFracDigits = (fracPart.match(/0/g) ?? []).length;
   const maxFracDigits = (fracPart.match(/[0#?]/g) ?? []).length;
 
-  const formatted = new Intl.NumberFormat(normalizeFormatLocale(locale), {
-    minimumIntegerDigits: Math.max(1, minIntDigits),
-    minimumFractionDigits: minFracDigits,
-    maximumFractionDigits: maxFracDigits,
-    useGrouping: grouping,
-  }).format(scaled);
+  const formatted = intlFormatterCache
+    .numberFormat(locale, {
+      minimumIntegerDigits: Math.max(1, minIntDigits),
+      minimumFractionDigits: minFracDigits,
+      maximumFractionDigits: maxFracDigits,
+      useGrouping: grouping,
+    })
+    .format(scaled);
 
   return normalizeFormatSection(body.replace(block, formatted));
 }
