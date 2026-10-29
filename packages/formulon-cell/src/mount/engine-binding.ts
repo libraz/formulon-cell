@@ -420,8 +420,14 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   };
   const onDblClick = (e: MouseEvent): void => {
     if (e.button !== 0) return;
+    // Pointer-level double-click affordances (autofit / fill) run earlier on
+    // this same node and consume their event with preventDefault().
+    if (e.defaultPrevented) return;
     if (editor.isActive()) return;
     if (getFormatPainter()?.isActive()) return;
+    // Formula-bar reference picking preserves its focus. Do not start a second
+    // inline edit from the persisted, still-old formula while that draft is live.
+    if (getFormulaBarEditor?.()?.isFormulaEdit()) return;
     beginEditActiveCell();
     e.preventDefault();
   };

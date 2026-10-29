@@ -1,3 +1,4 @@
+import { formulaCaretContext } from '../commands/formula-edit-context.js';
 import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import { createInteractionButton } from './chip-button.js';
@@ -188,6 +189,8 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   };
   let root: HTMLDivElement | null = null;
   let ctx: SuggestionContext | null = null;
+  let ctxValue: string | null = null;
+  let ctxCaret = -1;
   let highlight = 0;
   let rootId = '';
 
@@ -196,6 +199,8 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     root.remove();
     root = null;
     ctx = null;
+    ctxValue = null;
+    ctxCaret = -1;
     highlight = 0;
     input.setAttribute('aria-expanded', 'false');
     input.removeAttribute('aria-controls');
@@ -268,14 +273,22 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   };
 
   const refresh = (): void => {
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    if (start !== end) {
+      close();
+      return;
+    }
     const text = input.value;
-    const caret = input.selectionStart ?? text.length;
+    const caret = start;
     const next = computeContext(text, caret, deps);
     if (!next) {
       close();
       return;
     }
     ctx = next;
+    ctxValue = text;
+    ctxCaret = caret;
     if (highlight >= ctx.matches.length) highlight = 0;
     render();
   };
@@ -287,6 +300,19 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   };
 
   const acceptHighlighted = (): boolean => {
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    if (start !== end) {
+      close();
+      return false;
+    }
+    if (ctxValue !== input.value || ctxCaret !== start) {
+      // Input/caret movement may outlive the popover's last refresh (for
+      // example a selection made before Enter). Refresh the list and let the
+      // next Enter accept it; never apply old token offsets to new text.
+      refresh();
+      return false;
+    }
     if (!ctx || ctx.matches.length === 0) return false;
     const pick = ctx.matches[highlight];
     if (!pick) return false;
@@ -332,6 +358,10 @@ function computeContext(
     const values = deps.getColumnValues(addr.sheet, addr.col, addr.row);
     return suggestColumnHistory(text, caret, values);
   }
+  // Suggestions replace the token prefix but leave the suffix in place. If
+  // the caret splits a token, accepting would duplicate its remaining text.
+  const next = text[caret] ?? '';
+  if (next && /[\p{L}\p{N}_.\\]/u.test(next)) return null;
   const struct = suggestStructuredRef(text, caret, deps.getTables?.() ?? []);
   if (struct) return struct;
   const engineNames = deps.getFunctionNames?.();
@@ -456,6 +486,7 @@ function suggestCustomFunctions(
   names: readonly string[],
 ): { token: string; tokenStart: number; matches: string[] } | null {
   if (!text.startsWith('=') || names.length === 0) return null;
+  if (formulaCaretContext(text, caret) !== 'expression') return null;
   let i = caret - 1;
   while (i >= 0) {
     const ch = text[i] ?? '';
@@ -485,6 +516,7 @@ function suggestNames(
   names: readonly AutocompleteName[],
 ): { tokenStart: number; matches: AutocompleteName[] } | null {
   if (!text.startsWith('=') || names.length === 0) return null;
+  if (formulaCaretContext(text, caret) !== 'expression') return null;
   let i = caret - 1;
   while (i >= 0 && /[\p{L}\p{N}_.\\]/u.test(text[i] ?? '')) i -= 1;
   const tokenStart = i + 1;
@@ -513,6 +545,10 @@ export function suggestStructuredRef(
   tables: readonly AutocompleteTable[],
 ): SuggestionContext | null {
   if (!text.startsWith('=') || tables.length === 0) return null;
+  const caretContext = formulaCaretContext(text, caret);
+  if (caretContext === 'string' || caretContext === 'sheet') return null;
+  const next = text[caret] ?? '';
+  if (next && /[\p{L}\p{N}_.\\\]]/u.test(next)) return null;
   // Look for the most recent unmatched `[` to the left of the caret, bounded
   // to the same formula segment (no `]` between caret and the opening bracket).
   let bracket = -1;

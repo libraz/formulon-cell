@@ -353,7 +353,7 @@ describe('Spreadsheet feature registry', () => {
     instance.dispose();
   });
 
-  it('routes Mac picker clicks to selection, argument clicks to the palette target, and keeps inline editing first', async () => {
+  it('routes Mac picker clicks and preserves active formula drafts across editing modes', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const workbook = await WorkbookHandle.createDefault({ preferStub: true });
@@ -394,6 +394,27 @@ describe('Spreadsheet feature registry', () => {
       'B2',
     );
 
+    const formulaInput = host.querySelector<HTMLTextAreaElement>('.fc-host__formulabar-input');
+    const paletteRoot = host.querySelector<HTMLElement>('.fc-mac-formula-palette');
+    const activePaletteDraft = formulaInput?.value;
+    grid.dispatchEvent(
+      new MouseEvent('dblclick', {
+        ...cell(0, 0),
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    expect(formulaInput?.value).toBe(activePaletteDraft);
+    expect(host.querySelector('.fc-host__editor')).toBeNull();
+    expect(workbook.cellFormula({ sheet: 0, row: 0, col: 0 })).toBeNull();
+
+    // Close and cancel the palette-owned draft before starting the separate
+    // inline-edit assertion below.
+    paletteRoot?.querySelector<HTMLButtonElement>('[data-action="close"]')?.click();
+    expect(paletteRoot?.hidden).toBe(true);
+    host.querySelector<HTMLButtonElement>('.fc-host__formulabar-action--cancel')?.click();
+
     workbook.setFormula({ sheet: 0, row: 0, col: 0 }, '=A2');
     mutators.replaceCells(instance.store, workbook.cells(0));
     mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
@@ -408,7 +429,6 @@ describe('Spreadsheet feature registry', () => {
     const inlineEditor = host.querySelector<HTMLTextAreaElement>('.fc-host__editor');
     expect(inlineEditor).not.toBeNull();
     const beforeInlineValue = inlineEditor?.value;
-    instance.openFunctionArguments();
     const inlinePointer = fireDown(1, 1);
     expect(inlinePointer.defaultPrevented).toBe(true);
     expect(inlineEditor?.value).not.toBe(beforeInlineValue);

@@ -56,6 +56,29 @@ describe('InlineEditor', () => {
     document.body.innerHTML = '';
   });
 
+  it.each([
+    { start: 0, end: 6, expected: '=C4' },
+    { start: 0, end: 3, expected: '=C4+B2' },
+    { start: 0, end: 0, expected: '=C4+B2' },
+    { start: 1, end: 3, expected: '=C4+B2' },
+    { start: 6, end: 6, expected: '=A1+C4' },
+  ])(
+    'preserves formula syntax when inserting a reference at $start:$end',
+    ({ start, end, expected }) => {
+      editor.begin('=A1+B2');
+      const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      input.setSelectionRange(start, end);
+
+      editor.insertRefAtCaret('C4');
+
+      expect(input.value).toBe(expected);
+      expect(input.selectionStart).toBe(expected.indexOf('C4') + 2);
+      expect(editor.isFormulaEdit()).toBe(true);
+      editor.commit('none');
+      expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe(expected);
+    },
+  );
+
   it('begin appends an input to the grid and switches editor mode to enter', () => {
     mutators.setActive(store, { sheet: 0, row: 2, col: 3 });
     editor.begin('hi');

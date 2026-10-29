@@ -35,7 +35,7 @@ export interface F9Replacement {
   preview: F9Preview;
 }
 
-const REF_RE = /^(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))?!?(\$?)([A-Za-z]+)(\$?)(\d+)$/;
+const REF_RE = /^(?:'((?:[^']|'')+)'!|([A-Za-z_][A-Za-z0-9_]*)!)?(\$?)([A-Za-z]+)(\$?)(\d+)$/;
 const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 const STRING_RE = /^"([^"]*)"$/;
 type F9FormulaEvaluator = (formula: string) => EvalResult;
@@ -82,17 +82,19 @@ function renderArrayForF9(result: EvalArrayResult): string | null {
 export function renderCellValueForF9(v: CellValue | undefined): string {
   if (!v || v.kind === 'blank') return '0';
   if (v.kind === 'number') return String(v.value);
-  if (v.kind === 'text') return `"${v.value}"`;
+  if (v.kind === 'text') return quoteF9Text(v.value);
   if (v.kind === 'bool') return v.value ? 'TRUE' : 'FALSE';
   if (v.kind === 'error') return v.text || '#ERROR!';
   return '';
 }
 
+const quoteF9Text = (value: string): string => `"${value.replaceAll('"', '""')}"`;
+
 function cellValueLiteral(v: CellValue | undefined): string {
   if (!v || v.kind === 'blank') return '0';
   if (v.kind === 'number') return String(v.value);
   if (v.kind === 'bool') return v.value ? 'TRUE' : 'FALSE';
-  if (v.kind === 'text') return JSON.stringify(v.value);
+  if (v.kind === 'text') return quoteF9Text(v.value);
   if (v.kind === 'error') return v.text || '#ERROR!';
   return '0';
 }
@@ -133,7 +135,7 @@ export function computeF9Preview(
   }
   const ref = trimmed.match(REF_RE);
   if (ref) {
-    const sheetName = ref[1] ?? ref[2];
+    const sheetName = (ref[1] ?? ref[2])?.replaceAll("''", "'");
     const letters = ref[4] ?? '';
     const digits = ref[6] ?? '';
     const col = colFromLetters(letters);
@@ -253,7 +255,7 @@ function rangeLiteralList(
 
 function extractF9Refs(formula: string): ExtractedF9Ref[] | null {
   const re =
-    /(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))?!?(\$?[A-Za-z]+\$?\d+)(?::(\$?[A-Za-z]+\$?\d+))?/g;
+    /(?:(?:'((?:[^']|'')+)'!|([A-Za-z_][A-Za-z0-9_]*)!))?(\$?[A-Za-z]+\$?\d+)(?::(\$?[A-Za-z]+\$?\d+))?/g;
   const refs: ExtractedF9Ref[] = [];
   for (let m = re.exec(formula); m !== null; m = re.exec(formula)) {
     const before = formula.slice(0, m.index);
@@ -266,7 +268,7 @@ function extractF9Refs(formula: string): ExtractedF9Ref[] | null {
     const base = {
       start: m.index,
       end,
-      sheetName: m[1] ?? m[2] ?? null,
+      sheetName: (m[1] ?? m[2])?.replaceAll("''", "'") ?? null,
       row: parsed.row,
       col: parsed.col,
     };
@@ -299,8 +301,9 @@ export function replaceFormulaSelectionWithF9Preview(
   options: F9PreviewOptions = {},
 ): F9Replacement | null {
   if (!formula.startsWith('=') || start === end) return null;
-  const left = Math.max(0, Math.min(start, end));
+  const left = Math.max(1, Math.min(start, end));
   const right = Math.min(formula.length, Math.max(start, end));
+  if (left >= right) return null;
   const selection = formula.slice(left, right);
   const preview = computeF9Preview(
     formula,

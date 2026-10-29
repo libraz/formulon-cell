@@ -534,7 +534,12 @@ export function attachPointer(
     if (inFormula && zone.kind === 'cell' && editor) {
       e.preventDefault();
       tryCapture();
-      const anchor = { row: zone.row, col: zone.col };
+      const rawAnchor = { row: zone.row, col: zone.col };
+      const mergedAnchor = mergeAnchorOf(s, {
+        sheet: s.data.sheetIndex,
+        ...rawAnchor,
+      });
+      const anchor = { row: mergedAnchor.row, col: mergedAnchor.col };
       const base = { row: s.selection.active.row, col: s.selection.active.col };
       const r1c1 = s.ui.r1c1 === true;
       editor.insertRefAtCaret(refOf(anchor.row, anchor.col, { r1c1, base }));
@@ -781,8 +786,10 @@ export function attachPointer(
       case 'range-insert': {
         const cell = hitTest(geometryLayout(s), s.viewport, x, y);
         if (!cell) return;
-        if (cell.row === drag.tip.row && cell.col === drag.tip.col) return;
-        drag.tip = { row: cell.row, col: cell.col };
+        const mergedCell = mergeAnchorOf(s, { sheet: s.data.sheetIndex, ...cell });
+        const tip = { row: mergedCell.row, col: mergedCell.col };
+        if (tip.row === drag.tip.row && tip.col === drag.tip.col) return;
+        drag.tip = tip;
         const editor = getEditor();
         if (editor) {
           editor.insertRefAtCaret(

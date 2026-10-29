@@ -463,8 +463,7 @@ export const Spreadsheet = {
         getFormatDialog: () => featureState.formatDialog,
         getFormatPainter: () => featureState.formatPainter,
         getFormulaBarEditor: () => {
-          if (host.dataset.fcPlatform !== 'mac') return null;
-          if (featureState.macFormulaPalette?.isOpen()) {
+          if (host.dataset.fcPlatform === 'mac' && featureState.macFormulaPalette?.isOpen()) {
             return featureState.macFormulaPalette.rangeInsertTarget();
           }
           return formulaBar;

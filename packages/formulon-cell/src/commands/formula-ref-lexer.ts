@@ -66,7 +66,9 @@ const isIdentChar = (c: string): boolean =>
   isUnicodeLetter(c) ||
   isUnicodeDigit(c) ||
   isUnicodeMark(c) ||
-  c === '_';
+  c === '_' ||
+  c === '.' ||
+  c === '\\';
 
 /** Parse a single A1 atom (`$?[A-Za-z]+$?[0-9]+`) at `start`. Returns the atom
  *  and its end offset, or null when the text there is not an atom. */
@@ -332,10 +334,13 @@ export function renderWholeRowAtom(abs: boolean, row: number): string | null {
 }
 
 /** Walk `formula`, replacing each reference token via `visit`. The visitor
- *  receives the token and returns the replacement text, or null to emit
- *  `#REF!` for the whole token. String literals, `#REF!` tokens, function
- *  names, and non-reference text are passed through untouched. */
-export function rewriteRefs(formula: string, visit: (tok: RefToken) => string | null): string {
+ *  receives the token, its starting character offset, and returns replacement
+ *  text, or null to emit `#REF!` for the whole token. String literals, `#REF!`
+ *  tokens, function names, and non-reference text are passed through. */
+export function rewriteRefs(
+  formula: string,
+  visit: (tok: RefToken, start: number) => string | null,
+): string {
   if (!formula.startsWith('=')) return formula;
   let out = '';
   let i = 0;
@@ -368,7 +373,7 @@ export function rewriteRefs(formula: string, visit: (tok: RefToken) => string | 
     if (!isIdentChar(prev) && prev !== "'") {
       const tok = matchRefToken(formula, i);
       if (tok) {
-        const rep = visit(tok);
+        const rep = visit(tok, i);
         out += rep ?? '#REF!';
         i = tok.end;
         continue;

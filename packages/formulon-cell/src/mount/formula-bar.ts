@@ -1,4 +1,5 @@
 import { commitCellInput } from '../commands/cell-input-commit.js';
+import { insertFormulaReference } from '../commands/formula-reference-input.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
 import { extractRefs, rotateRefAt } from '../commands/refs.js';
@@ -905,7 +906,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       e.preventDefault();
       e.stopPropagation();
       const caret = fxInput.selectionStart ?? fxInput.value.length;
-      const r = rotateRefAt(fxInput.value, caret);
+      const r = rotateRefAt(fxInput.value, caret, { r1c1: store.getState().ui.r1c1 === true });
       if (r.text !== fxInput.value) {
         fxInput.value = r.text;
         fxInput.setSelectionRange(r.caret, r.caret);
@@ -978,7 +979,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       e.preventDefault();
       e.stopPropagation();
       const caret = fxInput.selectionStart ?? fxInput.value.length;
-      const r = rotateRefAt(fxInput.value, caret);
+      const r = rotateRefAt(fxInput.value, caret, { r1c1: store.getState().ui.r1c1 === true });
       if (r.text !== fxInput.value) {
         fxInput.value = r.text;
         fxInput.setSelectionRange(r.caret, r.caret);
@@ -1007,19 +1008,15 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const insertRefAtCaret = (ref: string): void => {
     if (detached || (externalDraft && externalDraft.status !== 'open')) return;
-    const start = fxInput.selectionStart ?? fxInput.value.length;
-    const end = fxInput.selectionEnd ?? start;
-    const before = fxInput.value.slice(0, start);
-    const after = fxInput.value.slice(end);
-    // Replace any trailing partial reference token. This lets repeated pointer
-    // updates during a drag extend or replace the in-progress reference.
-    const stripped = before.replace(
-      /(?:\$?[A-Za-z]+\$?\d+:\$?[A-Za-z]+\$?\d*|\$?[A-Za-z]+\$?\d*|:)$/,
-      '',
+    const result = insertFormulaReference(
+      fxInput.value,
+      fxInput.selectionStart ?? fxInput.value.length,
+      fxInput.selectionEnd ?? fxInput.selectionStart ?? fxInput.value.length,
+      ref,
+      { r1c1: store.getState().ui.r1c1 === true },
     );
-    fxInput.value = stripped + ref + after;
-    const caret = stripped.length + ref.length;
-    fxInput.setSelectionRange(caret, caret);
+    fxInput.value = result.text;
+    fxInput.setSelectionRange(result.caret, result.caret);
     fxInput.focus();
     refreshActions();
     syncFxRefs();

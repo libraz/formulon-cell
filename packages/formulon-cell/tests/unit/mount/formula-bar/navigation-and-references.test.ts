@@ -18,6 +18,33 @@ describe('mount/formula-bar — edit lifecycle', () => {
 
   afterEach(() => sheet.dispose());
 
+  it.each([
+    { start: 0, end: 6, expected: '=C4' },
+    { start: 0, end: 3, expected: '=C4+B2' },
+    { start: 0, end: 0, expected: '=C4+B2' },
+    { start: 1, end: 3, expected: '=C4+B2' },
+    { start: 6, end: 6, expected: '=A1+C4' },
+  ])(
+    'preserves formula syntax when inserting a reference at $start:$end',
+    ({ start, end, expected }) => {
+      const harness = attachFormulaBarHarness(sheet, vi.fn());
+      const { controller, fxInput: input } = harness;
+      input.focus();
+      input.value = '=A1+B2';
+      input.dispatchEvent(new Event('input'));
+      input.setSelectionRange(start, end);
+
+      controller.insertRefAtCaret('C4');
+
+      expect(input.value).toBe(expected);
+      expect(input.selectionStart).toBe(expected.indexOf('C4') + 2);
+      expect(controller.isFormulaEdit()).toBe(true);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      expect(sheet.workbook.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe(expected);
+      harness.detach();
+    },
+  );
+
   it('F4 rotates the ref under the caret', () => {
     fxInput.focus();
     fxInput.dispatchEvent(new FocusEvent('focus'));

@@ -1,12 +1,12 @@
 import { colFromLetters, formatA1Cell, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
+import { formulaCaretContext } from './formula-edit-context.js';
+import { rewriteRefs } from './formula-ref-lexer.js';
 
 /**
  * F4 reference rotation: cycles between A1, $A$1, A$1, $A1, then back to A1.
  * Operates on the cell reference at `caret` in `text`. Returns the new text
  * + new caret position. If no reference is found, returns the input unchanged.
  */
-const REF_RE = /(\$?)([A-Za-z]+)(\$?)([0-9]+)/;
-
 /** A1-style cell ref or A1:B5 range surfaced in a formula text. */
 export interface FormulaRef {
   /** 0-indexed inclusive bounds. */
@@ -27,24 +27,24 @@ export interface FormulaRef {
  *  while editing a formula. */
 export function extractRefs(text: string): FormulaRef[] {
   if (!text.startsWith('=')) return [];
-  // Match: optional sheet prefix (Sheet1!), then A1 or A1:B5.
-  const re =
-    /(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))?!?(\$?[A-Za-z]+\$?\d+)(?::(\$?[A-Za-z]+\$?\d+))?/g;
   const out: FormulaRef[] = [];
   const colorMap = new Map<string, number>();
-  re.lastIndex = 0;
-  for (let m = re.exec(text); m !== null; m = re.exec(text)) {
-    const headM = m[3] ?? '';
-    const tailM = m[4];
+  rewriteRefs(text, (token, start) => {
+    if (token.kind !== 'cell') return null;
+    const headStart = start + token.sheetQual.length;
+    const headEnd =
+      headStart +
+      token.a.label.length +
+      token.a.rowStr.length +
+      (token.a.absCol ? 1 : 0) +
+      (token.a.absRow ? 1 : 0);
+    const headM = text.slice(headStart, headEnd);
     const head = parseA1Atom(headM);
+    const tailM = token.b
+      ? text.slice(start + token.sheetQual.length + headM.length + 1, token.end)
+      : undefined;
     const tail = tailM ? parseA1Atom(tailM) : head;
-    if (!head || !tail) continue;
-    // Skip false positives — function names like SIN1 don't have a digit-letter
-    //  shape in the head capture, so the regex naturally rejects them. But
-    //  we still need to skip when the ref start is inside a quoted string.
-    const before = text.slice(0, m.index);
-    const quoteCount = (before.match(/"/g) ?? []).length;
-    if (quoteCount % 2 === 1) continue;
+    if (!head || !tail) return null;
     const r0 = Math.min(head.row, tail.row);
     const r1 = Math.max(head.row, tail.row);
     const c0 = Math.min(head.col, tail.col);
@@ -60,11 +60,12 @@ export function extractRefs(text: string): FormulaRef[] {
       c0,
       r1,
       c1,
-      start: m.index,
-      end: m.index + m[0].length,
+      start,
+      end: token.end,
       colorIndex,
     });
-  }
+    return null;
+  });
   return out;
 }
 
@@ -86,33 +87,44 @@ export interface F4Result {
   caret: number;
 }
 
-export function rotateRefAt(text: string, caret: number): F4Result {
-  // Walk left from caret to find a candidate ref start.
-  // We bound the search to ~16 chars left.
-  const start = Math.max(0, caret - 16);
-  const window = text.slice(start, caret + 16);
-  const offset = start;
-  const re = new RegExp(REF_RE, 'g');
-  let chosen: { match: RegExpExecArray; absoluteStart: number } | null = null;
-  re.lastIndex = 0;
-  for (let m = re.exec(window); m !== null; m = re.exec(window)) {
-    const matchStart = offset + m.index;
-    const matchEnd = matchStart + m[0].length;
-    if (caret >= matchStart && caret <= matchEnd) {
-      chosen = { match: m, absoluteStart: matchStart };
-      break;
-    }
-  }
-  if (!chosen) return { text, caret };
-  const [whole, dCol, letters, dRow, digits] = chosen.match;
-  const next = nextStep(dCol === '$', dRow === '$');
-  const replacement = `${next.col ? '$' : ''}${letters}${next.row ? '$' : ''}${digits}`;
-  const before = text.slice(0, chosen.absoluteStart);
-  const after = text.slice(chosen.absoluteStart + whole.length);
-  return {
-    text: before + replacement + after,
-    caret: chosen.absoluteStart + replacement.length,
-  };
+export function rotateRefAt(
+  text: string,
+  caret: number,
+  options: { r1c1?: boolean } = {},
+): F4Result {
+  if (options.r1c1) return { text, caret };
+  let rotated: F4Result | null = null;
+  rewriteRefs(text, (token, tokenStart) => {
+    if (rotated || token.kind !== 'cell') return null;
+    const firstStart = tokenStart + token.sheetQual.length;
+    const firstEnd =
+      firstStart +
+      token.a.label.length +
+      token.a.rowStr.length +
+      (token.a.absCol ? 1 : 0) +
+      (token.a.absRow ? 1 : 0);
+    const secondStart = firstEnd + 1;
+    const secondEnd = token.end;
+    const endpoint =
+      caret >= secondStart && caret <= secondEnd && token.b
+        ? { start: secondStart, end: secondEnd }
+        : caret >= firstStart && caret <= firstEnd
+          ? { start: firstStart, end: firstEnd }
+          : null;
+    if (!endpoint) return null;
+    const raw = text.slice(endpoint.start, endpoint.end);
+    const match = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(raw);
+    if (!match) return null;
+    const [, dCol, letters, dRow, digits] = match;
+    const next = nextStep(dCol === '$', dRow === '$');
+    const replacement = `${next.col ? '$' : ''}${letters}${next.row ? '$' : ''}${digits}`;
+    rotated = {
+      text: `${text.slice(0, endpoint.start)}${replacement}${text.slice(endpoint.end)}`,
+      caret: endpoint.start + replacement.length,
+    };
+    return null;
+  });
+  return rotated ?? { text, caret };
 }
 
 function nextStep(absCol: boolean, absRow: boolean): { col: boolean; row: boolean } {
@@ -390,7 +402,7 @@ export function suggestFunctions(
   opts: { names?: readonly string[] } = {},
 ): { token: string; tokenStart: number; matches: string[] } | null {
   // Only suggest when we're inside a formula (text starts with '=').
-  if (!text.startsWith('=')) return null;
+  if (!text.startsWith('=') || formulaCaretContext(text, caret) !== 'expression') return null;
   // Dotted names such as BETA.DIST are one token; decimal literals still fail
   // the leading-letter check below.
   let i = caret - 1;

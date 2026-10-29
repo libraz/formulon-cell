@@ -1,6 +1,7 @@
 import { commitCellInput, inputOperation } from '../commands/cell-input-commit.js';
 import { coerceInput, inputLocaleForWorkbook, workbookDate1904 } from '../commands/coerce-input.js';
 import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
+import { insertFormulaReference } from '../commands/formula-reference-input.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { dblClickRange, extractRefs, rotateRefAt } from '../commands/refs.js';
@@ -136,26 +137,17 @@ export class InlineEditor {
   insertRefAtCaret(ref: string): void {
     if (!this.input) return;
     const el = this.input;
-    const start = el.selectionStart ?? el.value.length;
-    const end = el.selectionEnd ?? start;
-    const before = el.value.slice(0, start);
-    const after = el.value.slice(end);
-    // Replace any trailing partial ref token. Cases handled:
-    //   "=A"           → drop "A" (partial ref)
-    //   "=A1"          → drop "A1" (full ref)
-    //   "=A1:B"        → drop "A1:B" (partial range)
-    //   "=SUM(A1:B5"   → drop "A1:B5" (full range, keep prefix)
-    const stripped = before.replace(
-      /(?:\$?[A-Za-z]+\$?\d+:\$?[A-Za-z]+\$?\d*|\$?[A-Za-z]+\$?\d*|:)$/,
-      '',
+    const result = insertFormulaReference(
+      el.value,
+      el.selectionStart ?? el.value.length,
+      el.selectionEnd ?? el.selectionStart ?? el.value.length,
+      ref,
+      { r1c1: this.deps.store.getState().ui.r1c1 === true },
     );
-    el.value = stripped + ref + after;
-    const caret = stripped.length + ref.length;
-    el.setSelectionRange(caret, caret);
+    el.value = result.text;
+    el.setSelectionRange(result.caret, result.caret);
     el.focus();
-    this.refreshSize();
-    syncEditorRefs(this.deps.store, el.value);
-    this.argHelper?.refresh();
+    this.onInput();
   }
 
   suspendForFormulaPalette(context: FormulaEditLeaseContext): FormulaEditLease | null {
@@ -436,7 +428,9 @@ export class InlineEditor {
       e.stopPropagation();
       const caret = this.input?.selectionStart ?? this.input?.value.length ?? 0;
       if (this.input) {
-        const r = rotateRefAt(this.input.value, caret);
+        const r = rotateRefAt(this.input.value, caret, {
+          r1c1: this.deps.store.getState().ui.r1c1 === true,
+        });
         if (r.text !== this.input.value) {
           this.input.value = r.text;
           this.input.setSelectionRange(r.caret, r.caret);
@@ -525,7 +519,9 @@ export class InlineEditor {
       // Rotate the cell ref under the cursor: A1 → $A$1 → A$1 → $A1 → A1
       e.preventDefault();
       const caret = this.input.selectionStart ?? this.input.value.length;
-      const r = rotateRefAt(this.input.value, caret);
+      const r = rotateRefAt(this.input.value, caret, {
+        r1c1: this.deps.store.getState().ui.r1c1 === true,
+      });
       if (r.text !== this.input.value) {
         this.input.value = r.text;
         this.input.setSelectionRange(r.caret, r.caret);
