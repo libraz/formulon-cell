@@ -132,3 +132,89 @@ export async function runPopupViewportScenario(page: Page): Promise<void> {
     await expect(menu).toBeHidden();
   }
 }
+
+async function highlightedRootItems(menu: Locator): Promise<string[]> {
+  return menu.locator('.fc-ctxmenu__item').evaluateAll((items) =>
+    items
+      .filter((item) => {
+        const background = getComputedStyle(item).backgroundColor;
+        return background !== 'transparent' && background !== 'rgba(0, 0, 0, 0)';
+      })
+      .map(
+        (item) =>
+          (item as HTMLElement).dataset.fcSubmenu ?? (item as HTMLElement).dataset.fcAction ?? '',
+      ),
+  );
+}
+
+export async function runSubmenuHighlightScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  for (const platform of ['default', 'mac'] as const) {
+    await sp.mount({ locale: 'en', platform });
+    await sp.expectNoStub();
+    await sp.focusHost();
+    await page.mouse.move(1270, 0);
+    await page.keyboard.press('Shift+F10');
+    const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
+    const parent = menu.locator('[data-fc-submenu="sortMenu"]');
+    const sibling = menu.locator('[data-fc-action="clear"]');
+    const submenu = page.locator('.fc-ctxmenu__sub');
+    await parent.hover();
+    await expect(submenu).toBeVisible();
+    await sibling.hover();
+    expect(await highlightedRootItems(menu), `${platform}: hover after submenu`).toEqual(['clear']);
+
+    await parent.hover();
+    await expect(submenu).toBeVisible();
+    // The stationary pointer remains over the parent while the keyboard moves.
+    await page.keyboard.press('Home');
+    await expect(menu.locator('[data-fc-action="cut"]')).toBeFocused();
+    expect(await highlightedRootItems(menu), `${platform}: keyboard after hover`).toEqual(['cut']);
+    await expect(submenu).toBeHidden();
+    await page.keyboard.press('End');
+    const last = menu.locator('.fc-ctxmenu__item:not(:disabled)').last();
+    await expect(last).toBeFocused();
+    const lastId = await last.evaluate((item) => item.dataset.fcSubmenu ?? item.dataset.fcAction);
+    expect(await highlightedRootItems(menu)).toEqual([lastId]);
+
+    await sibling.hover();
+    await parent.hover();
+    await expect(submenu).toBeVisible();
+    const child = submenu.locator('.fc-ctxmenu__item:not(:disabled)').first();
+    await child.hover();
+    expect(await highlightedRootItems(menu), `${platform}: parent of active child`).toEqual([
+      'sortMenu',
+    ]);
+    await page.keyboard.press('ArrowLeft');
+    await expect(submenu).toBeHidden();
+    await expect(parent).toBeFocused();
+    expect(await highlightedRootItems(menu)).toEqual(['sortMenu']);
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    const moduleUrl = `/@fs${
+      new URL('../../../packages/formulon-cell/src/interact/object-menu.ts', import.meta.url)
+        .pathname
+    }`;
+    await page.evaluate(async (moduleUrl) => {
+      const host = document.querySelector<HTMLElement>('.fc-host');
+      if (!host) throw new Error('Missing host');
+      const { createObjectMenu } = await import(moduleUrl);
+      createObjectMenu(host).open(
+        80,
+        220,
+        [
+          { id: 'first', label: 'First object action', run: () => {} },
+          { id: 'second', label: 'Second object action', run: () => {} },
+        ],
+        { label: 'Object actions', restoreFocusTo: host },
+      );
+    }, moduleUrl);
+    const objectMenu = page.locator('.fc-ctxmenu--object');
+    await expect(objectMenu.locator('[data-fc-action="first"]')).toBeFocused();
+    expect(await highlightedRootItems(objectMenu)).toContain('first');
+    await objectMenu.locator('[data-fc-action="second"]').hover();
+    expect(await highlightedRootItems(objectMenu)).toContain('second');
+    await page.keyboard.press('Escape');
+    await expect(objectMenu).toHaveCount(0);
+  }
+}

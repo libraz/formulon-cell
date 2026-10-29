@@ -55,8 +55,13 @@
     -webkit-mask: var(--fc-menu-icon, none) center / 18px 18px no-repeat;
     mask: var(--fc-menu-icon, none) center / 18px 18px no-repeat;
   }
-  .fc-ctxmenu__item:hover:not([disabled]),
-  .fc-ctxmenu__item:focus-visible:not([disabled]) {
+  .fc-ctxmenu:not(.fc-ctxmenu--managed) .fc-ctxmenu__item:hover:not([disabled]),
+  .fc-ctxmenu:not(.fc-ctxmenu--managed) .fc-ctxmenu__item:focus-visible:not([disabled]) {
+    background: var(--fc-bg-hover);
+    color: inherit;
+    outline: none;
+  }
+  .fc-ctxmenu--managed .fc-ctxmenu__item--active:not([disabled]) {
     background: var(--fc-bg-hover);
     color: inherit;
     outline: none;
@@ -295,7 +300,7 @@
     content: "";
     transform: translateY(-50%) rotate(45deg);
   }
-  .fc-ctxmenu__item--open:not([disabled]) {
+  .fc-ctxmenu:not(.fc-ctxmenu--managed) .fc-ctxmenu__item--open:not([disabled]) {
     background: var(--fc-bg-hover);
   }
 
@@ -328,11 +333,23 @@
     cursor: pointer;
   }
 
-  .fc-ctxmenu__mini-btn:hover,
-  .fc-ctxmenu__mini-btn:focus-visible {
+  .fc-ctxmenu__mini-btn:hover:not(:disabled) {
     background: var(--fc-bg-hover);
     border-color: var(--fc-rule-subtle);
-    outline: none;
+  }
+  .fc-ctxmenu__mini-btn:focus:not(:disabled) {
+    background: var(--fc-bg-hover);
+    border-color: var(--fc-rule-subtle);
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 2px;
+  }
+  .fc-ctxmenu__mini-btn[aria-pressed="true"]:not(:disabled) {
+    background: var(--fc-accent-soft, color-mix(in srgb, var(--fc-accent) 14%, var(--fc-bg-elev)));
+    border-color: var(--fc-accent);
+  }
+  .fc-ctxmenu__mini-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 
   .fc-ctxmenu__mini-btn[data-fc-action="bold"]::before,
@@ -424,9 +441,21 @@
   .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item::before {
     display: none;
   }
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item:hover:not([disabled]),
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item:focus:not([disabled]),
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item--open:not([disabled]) {
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu:not(.fc-ctxmenu--managed)
+    .fc-ctxmenu__item:hover:not([disabled]),
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu:not(.fc-ctxmenu--managed)
+    .fc-ctxmenu__item:focus:not([disabled]),
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu:not(.fc-ctxmenu--managed)
+    .fc-ctxmenu__item--open:not([disabled]) {
+    background: var(--fc-ctxmenu-mac-pill);
+    color: var(--fc-accent-fg);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu--managed
+    .fc-ctxmenu__item--active:not([disabled]) {
     background: var(--fc-ctxmenu-mac-pill);
     color: var(--fc-accent-fg);
   }
@@ -441,16 +470,25 @@
     opacity: 1;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu:not(.fc-ctxmenu--managed)
     .fc-ctxmenu__item:hover:not([disabled])
     .fc-ctxmenu__hint,
   .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu:not(.fc-ctxmenu--managed)
     .fc-ctxmenu__item:focus:not([disabled])
     .fc-ctxmenu__hint,
   .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu:not(.fc-ctxmenu--managed)
     .fc-ctxmenu__item--open:not([disabled])
+    .fc-ctxmenu__hint,
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu--managed
+    .fc-ctxmenu__item--active:not([disabled])
     .fc-ctxmenu__hint {
     color: inherit;
   }
+  /* The managed menu has one explicit active row per panel. Its parent open
+   * state stays semantic; it cannot independently paint a second row. */
   .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item[disabled] .fc-ctxmenu__hint {
     color: inherit;
   }

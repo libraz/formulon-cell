@@ -21,6 +21,7 @@ import type {
   ContextMenuOptions,
 } from '../../../../src/interact/context-menu-options.js';
 import { buildCellEntries } from '../../../../src/interact/context-menu-spec.js';
+import { createDialogShell } from '../../../../src/interact/dialog-shell.js';
 import {
   attachNavigationPolicy,
   navigationBoundsFor,
@@ -41,6 +42,7 @@ describe('attachContextMenu', () => {
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
   let detach: ContextMenuHandle | null;
+  let actionDialog: ReturnType<typeof createDialogShell> | null;
   let onAfterCommit: Mock<() => void>;
   let onFormatDialog: Mock<() => void>;
   let unregisterController: (() => void) | null;
@@ -54,16 +56,38 @@ describe('attachContextMenu', () => {
     onAfterCommit = vi.fn<() => void>();
     onFormatDialog = vi.fn<() => void>();
     detach = null;
+    actionDialog = null;
     unregisterController = null;
   });
 
   afterEach(() => {
+    actionDialog?.dispose();
+    actionDialog = null;
     detach?.();
     disposeOverlayPortal(host);
     unregisterController?.();
     document.body.innerHTML = '';
     vi.restoreAllMocks();
   });
+
+  const createActionDialog = (): ReturnType<typeof createDialogShell> => {
+    actionDialog = createDialogShell({
+      host,
+      className: 'fc-context-menu-action-dialog',
+      ariaLabel: 'Context menu action dialog',
+      onDismiss: () => actionDialog?.close(),
+    });
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    actionDialog.panel.appendChild(closeButton);
+    return actionDialog;
+  };
+
+  const directActiveItems = (panel: HTMLElement): HTMLButtonElement[] =>
+    Array.from(panel.children).filter(
+      (child): child is HTMLButtonElement =>
+        child instanceof HTMLButtonElement && child.classList.contains('fc-ctxmenu__item--active'),
+    );
 
   it('keeps the Excel-compatible cell menu item sequence', () => {
     const ids = buildCellEntries(en)
@@ -108,6 +132,114 @@ describe('attachContextMenu', () => {
       expect(item('colInsertLeft')).toBeNull();
       expect(document.querySelector('.fc-ctxmenu__mini')).not.toBeNull();
       expect(miniItem('bold')).not.toBeNull();
+    });
+
+    it('shows false toggle state for a blank cell and omits state from action buttons', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, -100, -100);
+
+      for (const id of ['bold', 'italic', 'underline', 'alignLeft', 'alignCenter', 'alignRight']) {
+        expect(miniItem(id)?.getAttribute('aria-pressed'), id).toBe('false');
+      }
+      expect(miniItem('borders')?.hasAttribute('aria-pressed')).toBe(false);
+      expect(miniItem('formatCells')?.hasAttribute('aria-pressed')).toBe(false);
+    });
+
+    it('reflects pending formatting on a blank active cell', () => {
+      mutators.setPendingFormat(store, {
+        addr: { sheet: 0, row: 0, col: 0 },
+        format: { bold: true, italic: true, underline: 'double', align: 'right' },
+      });
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, -100, -100);
+
+      expect(miniItem('bold')?.getAttribute('aria-pressed')).toBe('true');
+      expect(miniItem('italic')?.getAttribute('aria-pressed')).toBe('true');
+      expect(miniItem('underline')?.getAttribute('aria-pressed')).toBe('true');
+      expect(miniItem('alignLeft')?.getAttribute('aria-pressed')).toBe('false');
+      expect(miniItem('alignCenter')?.getAttribute('aria-pressed')).toBe('false');
+      expect(miniItem('alignRight')?.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('projects the active cell state instead of aggregating neighboring selection cells', () => {
+      setRange(store, 0, 0, 0, 1);
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        {
+          bold: true,
+          italic: false,
+          underline: false,
+          align: 'center',
+        },
+      );
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 1 },
+        {
+          bold: false,
+          italic: true,
+          underline: true,
+          align: 'right',
+        },
+      );
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, -100, -100);
+
+      expect(miniItem('bold')?.getAttribute('aria-pressed')).toBe('true');
+      expect(miniItem('italic')?.getAttribute('aria-pressed')).toBe('false');
+      expect(miniItem('underline')?.getAttribute('aria-pressed')).toBe('false');
+      expect(miniItem('alignLeft')?.getAttribute('aria-pressed')).toBe('false');
+      expect(miniItem('alignCenter')?.getAttribute('aria-pressed')).toBe('true');
+      expect(miniItem('alignRight')?.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('uses the merge anchor format when the active cell is inside a merge', () => {
+      const anchor = { sheet: 0, row: 0, col: 0 };
+      const member = { sheet: 0, row: 0, col: 1 };
+      mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+      mutators.setCellFormat(store, anchor, { bold: true, align: 'center' });
+      mutators.setCellFormat(store, member, { italic: true, align: 'right' });
+      store.setState((state) => ({
+        ...state,
+        selection: {
+          ...state.selection,
+          active: member,
+          anchor,
+          range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        },
+      }));
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, -100, -100);
+
+      expect(miniItem('bold')?.getAttribute('aria-pressed')).toBe('true');
+      expect(miniItem('italic')?.getAttribute('aria-pressed')).toBe('false');
+      expect(miniItem('alignCenter')?.getAttribute('aria-pressed')).toBe('true');
+      expect(miniItem('alignRight')?.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('keeps a pressed mini-toolbar toggle disabled under a read-only policy', () => {
+      const controller = new InteractionController({
+        store,
+        history: new History(),
+        getWb: () => wb,
+      });
+      unregisterController = registerInteractionController(store, controller);
+      controller.setPolicy(viewerPolicy());
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        options: { mode: 'builtIn' },
+      });
+      fireContextMenu(host, -100, -100);
+
+      const bold = miniItem('bold');
+      expect(bold?.disabled).toBe(true);
+      expect(bold?.getAttribute('aria-disabled')).toBe('true');
+      expect(bold?.getAttribute('aria-pressed')).toBe('true');
     });
 
     it('clamps the root menu inside the viewport through shared positioning', () => {
@@ -178,6 +310,136 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       miniItem('formatCells')?.click();
       expect(onFormatDialog).toHaveBeenCalledTimes(1);
+    });
+
+    it('hands focus from a normal menu item to a dialog and restores the host on close', () => {
+      const shell = createActionDialog();
+      const dialogButton = shell.panel.querySelector('button');
+      detach = attachContextMenu({ host, store, wb, onFormatDialog: () => shell.open() });
+      host.focus();
+      fireContextMenu(host, 200, 70);
+
+      item('formatCells')?.click();
+
+      expect(visibleMenu()).toBeNull();
+      expect(shell.isOpen()).toBe(true);
+      expect(document.activeElement).toBe(dialogButton);
+      shell.close();
+      expect(document.activeElement).toBe(host);
+    });
+
+    it('hands focus from the mini toolbar to a dialog and restores the host on Escape', () => {
+      const shell = createActionDialog();
+      const dialogButton = shell.panel.querySelector('button');
+      detach = attachContextMenu({ host, store, wb, onFormatDialog: () => shell.open() });
+      host.focus();
+      fireContextMenu(host, 200, 70);
+
+      miniItem('formatCells')?.click();
+
+      expect(visibleMenu()).toBeNull();
+      expect(shell.isOpen()).toBe(true);
+      expect(document.activeElement).toBe(dialogButton);
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      );
+      expect(shell.isOpen()).toBe(false);
+      expect(document.activeElement).toBe(host);
+    });
+
+    it('hands focus from a custom submenu action to its dialog with a live context', () => {
+      const shell = createActionDialog();
+      const dialogButton = shell.panel.querySelector('button');
+      const received: ContextMenuContext[] = [];
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [
+            {
+              id: 'app.more',
+              label: 'More',
+              children: [
+                {
+                  id: 'app.openDialog',
+                  label: 'Open dialog',
+                  action: (context) => {
+                    received.push(context);
+                    shell.open();
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      });
+      host.focus();
+      fireContextMenu(host, 200, 70);
+      document.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]')?.click();
+
+      document.querySelector<HTMLButtonElement>('[data-fc-action="app.openDialog"]')?.click();
+
+      expect(received).toHaveLength(1);
+      expect(received[0]).toMatchObject({
+        kind: 'cell',
+        selection: store.getState().selection.range,
+      });
+      expect(received[0]?.event).toBeInstanceOf(MouseEvent);
+      expect(visibleMenu()).toBeNull();
+      expect(shell.isOpen()).toBe(true);
+      expect(document.activeElement).toBe(dialogButton);
+      shell.close();
+      expect(document.activeElement).toBe(host);
+    });
+
+    it('keeps host focus after a non-dialog custom menu action', () => {
+      const action = vi.fn();
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [{ id: 'app.run', label: 'Run', action }],
+        },
+      });
+      host.focus();
+      fireContextMenu(host, 200, 70);
+
+      item('app.run')?.click();
+
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(visibleMenu()).toBeNull();
+      expect(document.activeElement).toBe(host);
+    });
+
+    it('preserves focus chosen by a custom non-dialog action', () => {
+      const external = document.createElement('input');
+      document.body.appendChild(external);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [
+            {
+              id: 'app.focusExternal',
+              label: 'Focus external input',
+              action: () => external.focus(),
+            },
+          ],
+        },
+      });
+      host.focus();
+      fireContextMenu(host, 200, 70);
+
+      item('app.focusExternal')?.click();
+
+      expect(visibleMenu()).toBeNull();
+      expect(document.activeElement).toBe(external);
     });
 
     it('does not leave adjacent or trailing separators when optional entries are hidden', () => {
@@ -749,6 +1011,208 @@ describe('attachContextMenu', () => {
       expect(visibleMenu()).not.toBeNull();
       expect(document.querySelector<HTMLElement>('.fc-ctxmenu__sub')?.style.display).toBe('block');
     });
+
+    it('keeps one root highlight while a pointer crosses to a sibling during submenu grace', () => {
+      vi.useFakeTimers();
+      try {
+        detach = attachContextMenu({
+          host,
+          store,
+          wb,
+          options: {
+            mode: 'builtIn',
+            transform: () => [
+              {
+                id: 'app.more',
+                label: 'More',
+                children: [{ id: 'app.nested', label: 'Nested', action: vi.fn() }],
+              },
+              { id: 'app.other', label: 'Other', action: vi.fn() },
+            ],
+          },
+        });
+        fireContextMenu(host, 200, 70);
+        const root = visibleMenu();
+        const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+        const parent = root?.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]');
+        const sibling = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.other"]');
+        if (!root || !sub || !parent || !sibling) throw new Error('submenu fixture is incomplete');
+        expect(root?.classList.contains('fc-ctxmenu--managed')).toBe(true);
+        expect(sub?.classList.contains('fc-ctxmenu--managed')).toBe(true);
+        parent?.dispatchEvent(new MouseEvent('mouseenter'));
+        sibling?.dispatchEvent(new MouseEvent('mouseenter'));
+
+        expect(directActiveItems(root)).toEqual([sibling]);
+        expect(sub?.style.display).toBe('block');
+        vi.advanceTimersByTime(100);
+        expect(sub?.style.display).toBe('block');
+      } finally {
+        detach?.();
+        detach = null;
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
+    });
+
+    it('restores the submenu parent when the pointer returns before close grace expires', () => {
+      vi.useFakeTimers();
+      try {
+        detach = attachContextMenu({
+          host,
+          store,
+          wb,
+          options: {
+            mode: 'builtIn',
+            transform: () => [
+              {
+                id: 'app.more',
+                label: 'More',
+                children: [{ id: 'app.nested', label: 'Nested', action: vi.fn() }],
+              },
+              { id: 'app.other', label: 'Other', action: vi.fn() },
+            ],
+          },
+        });
+        fireContextMenu(host, 200, 70);
+        const root = visibleMenu();
+        const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+        const parent = root?.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]');
+        const sibling = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.other"]');
+        if (!root || !sub || !parent || !sibling) throw new Error('submenu fixture is incomplete');
+        parent?.dispatchEvent(new MouseEvent('mouseenter'));
+        const nested = sub?.querySelector<HTMLButtonElement>('[data-fc-action="app.nested"]');
+        if (!nested) throw new Error('submenu item is missing');
+        nested?.dispatchEvent(new MouseEvent('mouseenter'));
+        sibling?.dispatchEvent(new MouseEvent('mouseenter'));
+        expect(directActiveItems(root)).toEqual([sibling]);
+
+        sub.dispatchEvent(new MouseEvent('mouseenter'));
+        expect(directActiveItems(root)).toEqual([parent]);
+        expect(directActiveItems(sub)).toEqual([nested]);
+        vi.advanceTimersByTime(260);
+        expect(sub?.style.display).toBe('block');
+      } finally {
+        detach?.();
+        detach = null;
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
+    });
+
+    it('closes stale submenus on root keyboard movement and follows programmatic focus', () => {
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [
+            {
+              id: 'app.more',
+              label: 'More',
+              children: [{ id: 'app.nested', label: 'Nested', action: vi.fn() }],
+            },
+            { id: 'app.other', label: 'Other', action: vi.fn() },
+          ],
+        },
+      });
+      fireContextMenu(host, 200, 70);
+      const root = visibleMenu();
+      const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+      const parent = root?.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]');
+      const sibling = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.other"]');
+      if (!root || !sub || !parent || !sibling) throw new Error('submenu fixture is incomplete');
+      parent?.click();
+      parent?.focus();
+      expect(directActiveItems(root)).toEqual([parent]);
+      expect(sub?.style.display).toBe('block');
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', cancelable: true }));
+
+      expect(document.activeElement).toBe(sibling);
+      expect(sub?.style.display).toBe('none');
+      expect(directActiveItems(root)).toEqual([sibling]);
+    });
+
+    it('moves focus into submenu padding before Enter can invoke a root sibling', () => {
+      const nestedAction = vi.fn();
+      const siblingAction = vi.fn();
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [
+            {
+              id: 'app.more',
+              label: 'More',
+              children: [{ id: 'app.nested', label: 'Nested', action: nestedAction }],
+            },
+            { id: 'app.other', label: 'Other', action: siblingAction },
+          ],
+        },
+      });
+      fireContextMenu(host, 200, 70);
+      const root = visibleMenu();
+      const parent = root?.querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]');
+      const sibling = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.other"]');
+      if (!root || !parent || !sibling) throw new Error('submenu fixture is incomplete');
+      parent.dispatchEvent(new MouseEvent('mouseenter'));
+      const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+      if (!sub) throw new Error('submenu panel is missing');
+      sibling.dispatchEvent(new MouseEvent('mouseenter'));
+      expect(document.activeElement).toBe(sibling);
+
+      sub.dispatchEvent(new MouseEvent('mouseenter'));
+      expect(document.activeElement).toBe(sub);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+
+      expect(siblingAction).not.toHaveBeenCalled();
+      expect(nestedAction).not.toHaveBeenCalled();
+      expect(visibleMenu()).not.toBeNull();
+    });
+
+    it.each(['default', 'mac'])(
+      'does not activate disabled rows on %s pointer menus',
+      (platform) => {
+        host.dataset.fcPlatform = platform;
+        const firstAction = vi.fn();
+        detach = attachContextMenu({
+          host,
+          store,
+          wb,
+          options: {
+            mode: 'builtIn',
+            transform: () => [
+              { id: 'app.blocked', label: 'Blocked', disabled: true },
+              { id: 'app.first', label: 'First', action: firstAction },
+              { id: 'app.last', label: 'Last', action: vi.fn() },
+            ],
+          },
+        });
+        fireContextMenu(host, 200, 70);
+        const root = visibleMenu();
+        if (!root) throw new Error('context menu is missing');
+        const blocked = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.blocked"]');
+        const first = root?.querySelector<HTMLButtonElement>('[data-fc-action="app.first"]');
+        if (!blocked || !first) throw new Error('disabled-item fixture is incomplete');
+        first?.dispatchEvent(new MouseEvent('mouseenter'));
+        expect(first?.classList.contains('fc-ctxmenu__item--active')).toBe(true);
+        blocked?.dispatchEvent(new MouseEvent('mouseenter'));
+        expect(blocked?.classList.contains('fc-ctxmenu__item--active')).toBe(false);
+        expect(directActiveItems(root)).toEqual([]);
+        expect(document.activeElement).toBe(root);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+        expect(firstAction).not.toHaveBeenCalled();
+
+        document.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }),
+        );
+        expect(document.activeElement).toBe(first);
+        expect(directActiveItems(root)).toEqual([first]);
+      },
+    );
 
     it('submenu Escape closes only the submenu and stops document bubbling', () => {
       detach = attachContextMenu({

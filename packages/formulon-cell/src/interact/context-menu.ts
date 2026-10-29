@@ -15,12 +15,14 @@ import type {
   OperationIntent,
   PermissionDecision,
 } from '../commands/interaction-policy.js';
+import { mergeAt } from '../commands/merge.js';
 import { refreshPivotTable } from '../commands/pivot-table.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { type Addr, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -192,7 +194,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   };
 
   const root = ownerDocument.createElement('div');
-  root.className = 'fc-ctxmenu';
+  root.className = 'fc-ctxmenu fc-ctxmenu--managed';
   root.setAttribute('role', 'menu');
   root.setAttribute('aria-label', strings.contextMenu.title);
   root.style.display = 'none';
@@ -202,7 +204,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   // Single reusable child panel — the context menu is one level deep.
   const sub = ownerDocument.createElement('div');
-  sub.className = 'fc-ctxmenu fc-ctxmenu__sub';
+  sub.className = 'fc-ctxmenu fc-ctxmenu__sub fc-ctxmenu--managed';
   sub.setAttribute('role', 'menu');
   sub.style.display = 'none';
   sub.tabIndex = -1;
@@ -243,12 +245,20 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const closeSubmenu = (): void => {
     cancelSubClose();
     if (!openSub) return;
-    openSub.parentBtn.setAttribute('aria-expanded', 'false');
-    openSub.parentBtn.classList.remove('fc-ctxmenu__item--open');
+    const parentBtn = openSub.parentBtn;
+    const restoreParentFocus = visible && sub.contains(ownerDocument.activeElement);
+    if (restoreParentFocus) parentBtn.focus({ preventScroll: true });
+    parentBtn.setAttribute('aria-expanded', 'false');
+    parentBtn.classList.remove('fc-ctxmenu__item--open');
     openSub = null;
     sub.style.display = 'none';
+    clearPanelActiveItem(sub);
     sub.replaceChildren();
-    if (focusPanel === 'sub') focusPanel = 'root';
+    if (focusPanel === 'sub' || restoreParentFocus) {
+      focusPanel = 'root';
+      activeIndex = panelItems(root).indexOf(parentBtn);
+      setPanelActiveItem(root, parentBtn);
+    }
   };
 
   /** Close the submenu after a short grace period — lets the pointer travel
@@ -266,6 +276,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (!visible) return;
     visible = false;
     closeSubmenu();
+    clearActiveItems();
     root.style.display = 'none';
     activeIndex = -1;
     focusPanel = 'root';
@@ -274,6 +285,15 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (restoreFocus) {
       (focusTarget ?? host).focus({ preventScroll: true });
     }
+  };
+
+  const invokeMenuAction = (action: () => void): void => {
+    const menuHadFocus =
+      root.contains(ownerDocument.activeElement) || sub.contains(ownerDocument.activeElement);
+    hide(false);
+    // Focus the host before the action so keyboard undo works and an opened dialog keeps focus.
+    if (menuHadFocus) host.focus({ preventScroll: true });
+    action();
   };
 
   const isMacPlatform = (): boolean =>
@@ -285,6 +305,24 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     Array.from(panel.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item')).filter(
       (btn) => !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
     );
+
+  const clearPanelActiveItem = (panel: HTMLElement): void => {
+    for (const item of panel.querySelectorAll('.fc-ctxmenu__item--active')) {
+      item.classList.remove('fc-ctxmenu__item--active');
+    }
+  };
+
+  const setPanelActiveItem = (panel: HTMLElement, item: HTMLButtonElement | null): void => {
+    clearPanelActiveItem(panel);
+    if (item && !item.disabled && item.getAttribute('aria-disabled') !== 'true') {
+      item.classList.add('fc-ctxmenu__item--active');
+    }
+  };
+
+  const clearActiveItems = (): void => {
+    clearPanelActiveItem(root);
+    clearPanelActiveItem(sub);
+  };
 
   const createContext = (
     target: MenuTarget,
@@ -336,18 +374,39 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   };
 
   const focusMenuItem = (idx: number): void => {
-    const items = panelItems(activePanel());
-    if (items.length === 0) return;
-    activeIndex = (idx + items.length) % items.length;
-    items[activeIndex]?.focus();
+    const panelName = focusPanel;
+    const panel = activePanel();
+    const items = panelItems(panel);
+    if (items.length === 0) {
+      activeIndex = -1;
+      setPanelActiveItem(panel, null);
+      return;
+    }
+    const nextIndex = ((idx % items.length) + items.length) % items.length;
+    const next = items[nextIndex];
+    if (panelName === 'root' && openSub && openSub.parentBtn !== next) closeSubmenu();
+    activeIndex = nextIndex;
+    setPanelActiveItem(panel, next ?? null);
+    next?.focus();
   };
 
-  /** Mac menus have one highlight that follows the pointer, so hovering a row
-   *  also moves keyboard focus onto it. */
   const followPointer = (panel: 'root' | 'sub', btn: HTMLButtonElement): void => {
-    if (!isMacPlatform() || btn.disabled) return;
+    const menuPanel = panel === 'root' ? root : sub;
+    if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+      focusPanel = panel;
+      activeIndex = -1;
+      setPanelActiveItem(menuPanel, null);
+      menuPanel.focus({ preventScroll: true });
+      return;
+    }
     focusPanel = panel;
-    activeIndex = panelItems(activePanel()).indexOf(btn);
+    activeIndex = panelItems(menuPanel).indexOf(btn);
+    if (activeIndex < 0) {
+      setPanelActiveItem(menuPanel, null);
+      return;
+    }
+    setPanelActiveItem(menuPanel, btn);
+    if (panel === 'sub' && openSub) setPanelActiveItem(root, openSub.parentBtn);
     btn.focus({ preventScroll: true });
   };
 
@@ -377,6 +436,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     openSub = { id, parentBtn };
     parentBtn.setAttribute('aria-expanded', 'true');
     parentBtn.classList.add('fc-ctxmenu__item--open');
+    setPanelActiveItem(root, parentBtn);
   };
 
   const appendEntry = (
@@ -404,7 +464,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         setContextMenuItemDisabled(btn, true, decisionReason(decision));
       }
       btn.addEventListener('mouseenter', () => {
-        if (btn.disabled) return;
+        if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+          if (panel === 'root' && openSub && openSub.parentBtn !== btn) scheduleSubClose();
+          followPointer(panel, btn);
+          return;
+        }
         openSubmenu(entry.id, btn);
         followPointer(panel, btn);
       });
@@ -442,24 +506,12 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       e.preventDefault();
       e.stopPropagation();
       if (btn.disabled) return;
-      const menuHadFocus =
-        ownerDocument.activeElement === btn ||
-        root.contains(ownerDocument.activeElement) ||
-        sub.contains(ownerDocument.activeElement);
-      runEntry(entry);
-      hide(false);
-      // Context-menu buttons live in the overlay portal. Leaving focus on the
-      // now-hidden button prevents the host's keyboard undo/redo listener
-      // from seeing the next Cmd/Ctrl+Z. Dialog actions intentionally retain
-      // their focus, so only restore the grid host when no dialog owns it.
-      if (menuHadFocus && !ownerDocument.activeElement?.closest('[role="dialog"]')) {
-        host.focus({ preventScroll: true });
-      }
+      invokeMenuAction(() => runEntry(entry));
     });
     btn.addEventListener('mouseenter', () => {
       if (panel === 'root') {
         if (openSub && openSub.parentBtn !== btn) scheduleSubClose();
-      } else {
+      } else if (!btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
         cancelSubClose();
       }
       followPointer(panel, btn);
@@ -472,6 +524,19 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     allowedIds?: ReadonlySet<string>,
     hiddenIds?: ReadonlySet<string>,
   ): HTMLElement => {
+    const state = store.getState();
+    const activeAddr = state.selection.active;
+    const merge = mergeAt(state, activeAddr);
+    const formatAddr = merge ? { sheet: merge.sheet, row: merge.r0, col: merge.c0 } : activeAddr;
+    const format = effectiveCellFormatWithPending(wb, state, formatAddr);
+    const pressedById: Partial<Record<ItemId, boolean>> = {
+      bold: format?.bold === true,
+      italic: format?.italic === true,
+      underline: Boolean(format?.underline),
+      alignLeft: format?.align === 'left',
+      alignCenter: format?.align === 'center',
+      alignRight: format?.align === 'right',
+    };
     const toolbar = ownerDocument.createElement('div');
     toolbar.className = 'fc-ctxmenu__mini';
     toolbar.setAttribute('role', 'toolbar');
@@ -492,6 +557,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       if (allowedIds && !allowedIds.has(item.id)) continue;
       if (hiddenIds?.has(item.id)) continue;
       const btn = createContextMiniToolbarButton(item);
+      const pressed = pressedById[item.id];
+      if (pressed !== undefined) btn.setAttribute('aria-pressed', String(pressed));
       const decision = decisionForItem(item.id);
       if (!decision.allowed) {
         btn.dataset.policyDisabled = 'true';
@@ -500,8 +567,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        run(item.id);
-        hide(false);
+        invokeMenuAction(() => run(item.id));
       });
       toolbar.appendChild(btn);
     }
@@ -510,6 +576,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   };
 
   const buildMenu = (kind: MenuKind): void => {
+    if (openSub) closeSubmenu();
+    clearActiveItems();
+    activeIndex = -1;
     menuKind = kind;
     root.replaceChildren();
     submenuChildren.clear();
@@ -646,6 +715,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     event: MouseEvent | KeyboardEvent,
   ): void => {
     if (options?.mode === 'disabled') return;
+    if (visible) hide(false);
     // A fullscreen/dialog resolver can change between the browser's
     // fullscreenchange notification and this key/mouse event. Refresh the
     // owned portal synchronously so the menu is born inside the current focus
@@ -654,8 +724,13 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     activeTarget = target;
     activeEvent = event;
     activeContext = options ? createContext(target, event, []) : null;
+    const currentActive = ownerDocument.activeElement;
     restoreFocusEl =
-      ownerDocument.activeElement instanceof OwnerHTMLElement ? ownerDocument.activeElement : host;
+      currentActive instanceof OwnerHTMLElement &&
+      !root.contains(currentActive) &&
+      !sub.contains(currentActive)
+        ? currentActive
+        : host;
     root.setAttribute('aria-label', strings.contextMenu.title);
     focusPanel = 'root';
     buildMenu(target.kind);
@@ -738,9 +813,37 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const insideMenu = (target: EventTarget | null): boolean =>
     target instanceof OwnerNode && (root.contains(target) || sub.contains(target));
 
-  const onDocFocusIn = (): void => {
-    if (!visible || insideMenu(ownerDocument.activeElement)) return;
-    hide(false);
+  const onDocFocusIn = (event: FocusEvent): void => {
+    if (!visible) return;
+    const target = event.target;
+    if (!insideMenu(target)) {
+      hide(false);
+      return;
+    }
+    if (target === root || target === sub) {
+      const panel = target === root ? root : sub;
+      focusPanel = target === root ? 'root' : 'sub';
+      activeIndex = -1;
+      setPanelActiveItem(panel, null);
+      if (target === sub && openSub) setPanelActiveItem(root, openSub.parentBtn);
+      return;
+    }
+    if (
+      !(target instanceof OwnerHTMLButtonElement) ||
+      !target.classList.contains('fc-ctxmenu__item')
+    )
+      return;
+    const panelName = root.contains(target) ? 'root' : 'sub';
+    const panel = panelName === 'root' ? root : sub;
+    focusPanel = panelName;
+    if (target.disabled || target.getAttribute('aria-disabled') === 'true') {
+      activeIndex = -1;
+      setPanelActiveItem(panel, null);
+    } else {
+      activeIndex = panelItems(panel).indexOf(target);
+      setPanelActiveItem(panel, target);
+    }
+    if (panelName === 'sub' && openSub) setPanelActiveItem(root, openSub.parentBtn);
   };
 
   const onDocPointerDown = (e: MouseEvent): void => {
@@ -858,7 +961,21 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     activeIndex = -1;
     root.focus({ preventScroll: true });
   });
-  sub.addEventListener('mouseenter', cancelSubClose);
+  sub.addEventListener('mouseenter', () => {
+    cancelSubClose();
+    if (!openSub) return;
+    setPanelActiveItem(root, openSub.parentBtn);
+    focusPanel = 'sub';
+    const active = sub.querySelector<HTMLButtonElement>('.fc-ctxmenu__item--active');
+    if (active && panelItems(sub).includes(active)) {
+      activeIndex = panelItems(sub).indexOf(active);
+      active.focus({ preventScroll: true });
+    } else {
+      activeIndex = -1;
+      setPanelActiveItem(sub, null);
+      sub.focus({ preventScroll: true });
+    }
+  });
   sub.addEventListener('mouseleave', scheduleSubClose);
 
   function runEntry(entry: RenderMenuEntry): void {
