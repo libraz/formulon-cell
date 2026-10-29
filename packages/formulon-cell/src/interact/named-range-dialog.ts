@@ -619,8 +619,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     editorShell.overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
     editorShell.close();
     clearError();
-    if (shell.isOpen()) panel.focus();
-    else host.focus();
+    if (!shell.isOpen()) host.focus();
   }
 
   const openEditor = (mode: 'new' | 'edit'): void => {
@@ -646,8 +645,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       formulaInput.value = seed.formula;
     }
     clearError();
+    if (shell.isOpen()) {
+      (mode === 'new' ? newBtn : editBtn).focus({ preventScroll: true });
+    }
     editorShell.open();
-    requestAnimationFrame(() => {
+    deferInitialFocus(editorShell.overlay, () => {
       focusAndSelectInput(nameInput);
     });
   };
@@ -883,7 +885,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       renderList();
       shell.open();
       deferInitialFocus(overlay, () => {
-        if (wb.capabilities.definedNameMutate) nameInput.focus();
+        if (editorShell.isOpen()) return;
+        if (wb.capabilities.definedNameMutate) newBtn.focus();
         else closeBtn.focus();
       });
     },

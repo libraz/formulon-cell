@@ -136,6 +136,72 @@ describe('interact/dialog-shell', () => {
     shell.dispose();
   });
 
+  it('lets an open select consume Escape before the containing dialog', () => {
+    const onDismiss = vi.fn();
+    const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X', onDismiss });
+    const select = document.createElement('select');
+    for (const label of ['General', 'Currency']) {
+      const option = document.createElement('option');
+      option.value = label.toLowerCase();
+      option.textContent = label;
+      select.appendChild(option);
+    }
+    shell.panel.appendChild(select);
+    shell.open();
+    const combo = shell.panel.querySelector<HTMLButtonElement>('.fc-select__button');
+    expect(combo).not.toBeNull();
+    combo?.click();
+    const list = shell.panel.querySelector<HTMLElement>('.fc-select__list');
+    expect(list?.hidden).toBe(false);
+
+    combo?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+
+    expect(list?.hidden).toBe(true);
+    expect(onDismiss).not.toHaveBeenCalled();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    shell.dispose();
+  });
+
+  it('lets the first Escape cancel an open select highlight and the next dismiss the dialog', () => {
+    const onDismiss = vi.fn();
+    const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X', onDismiss });
+    const select = document.createElement('select');
+    select.innerHTML =
+      '<option value="general">General</option><option value="currency">Currency</option>';
+    shell.panel.appendChild(select);
+    shell.open();
+
+    const combo = shell.panel.querySelector<HTMLButtonElement>('.fc-select__button');
+    const list = shell.panel.querySelector<HTMLElement>('.fc-select__list');
+    combo?.click();
+    combo?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(select.value).toBe('general');
+
+    const firstEscape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    combo?.dispatchEvent(firstEscape);
+    expect(list?.hidden).toBe(true);
+    expect(firstEscape.defaultPrevented).toBe(true);
+    expect(select.value).toBe('general');
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    const secondEscape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    combo?.dispatchEvent(secondEscape);
+    expect(secondEscape.defaultPrevented).toBe(true);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    shell.dispose();
+  });
+
   it('traps Tab and Shift+Tab focus within the dialog while open', () => {
     const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X' });
     const first = document.createElement('button');
@@ -154,6 +220,144 @@ describe('interact/dialog-shell', () => {
     );
     expect(document.activeElement).toBe(last);
     shell.dispose();
+  });
+
+  it('gives Escape to one open dialog layer at a time and restores the parent opener', () => {
+    const parentDismiss = vi.fn();
+    const childDismiss = vi.fn();
+    const child = createDialogShell({
+      host,
+      className: 'fc-child',
+      ariaLabel: 'Child',
+      onDismiss: () => {
+        childDismiss();
+        child.close();
+      },
+    });
+    const parent = createDialogShell({
+      host,
+      className: 'fc-parent',
+      ariaLabel: 'Parent',
+      onDismiss: parentDismiss,
+    });
+    const parentButton = document.createElement('button');
+    parent.panel.appendChild(parentButton);
+    parent.open();
+    child.open();
+    expect(document.activeElement).toBe(child.panel);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(childDismiss).toHaveBeenCalledTimes(1);
+    expect(parentDismiss).not.toHaveBeenCalled();
+    expect(child.isOpen()).toBe(false);
+    expect(parent.isOpen()).toBe(true);
+    expect(document.activeElement).toBe(parentButton);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(parentDismiss).toHaveBeenCalledTimes(1);
+    child.dispose();
+    parent.dispose();
+  });
+
+  it('gives Tab trapping to the most recently opened dialog and wraps both ways', () => {
+    const older = createDialogShell({ host, className: 'fc-older', ariaLabel: 'Older' });
+    const olderInput = document.createElement('input');
+    older.panel.appendChild(olderInput);
+    const newer = createDialogShell({ host, className: 'fc-newer', ariaLabel: 'Newer' });
+    const inputs = Array.from({ length: 3 }, () => document.createElement('input'));
+    newer.panel.append(...inputs);
+    older.open();
+    newer.open();
+
+    inputs[1]?.focus();
+    const forward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    inputs[1]?.dispatchEvent(forward);
+    expect(forward.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(inputs[1]);
+
+    inputs[0]?.focus();
+    const reverse = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    inputs[0]?.dispatchEvent(reverse);
+    expect(reverse.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(inputs[2]);
+
+    const forwardWrap = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
+    inputs[2]?.dispatchEvent(forwardWrap);
+    expect(forwardWrap.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(inputs[0]);
+    newer.dispose();
+    older.dispose();
+  });
+
+  it('uses current open order after close/reopen and ignores shells in another open layer', () => {
+    const firstDismiss = vi.fn();
+    const secondDismiss = vi.fn();
+    const second = createDialogShell({
+      host,
+      className: 'fc-second',
+      ariaLabel: 'Second',
+      onDismiss: secondDismiss,
+    });
+    const first = createDialogShell({
+      host,
+      className: 'fc-first',
+      ariaLabel: 'First',
+      onDismiss: firstDismiss,
+    });
+    first.open();
+    second.open();
+    second.close();
+    second.open();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(secondDismiss).toHaveBeenCalledTimes(1);
+    expect(firstDismiss).not.toHaveBeenCalled();
+
+    second.close();
+    const alreadyHandled = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      cancelable: true,
+    });
+    alreadyHandled.preventDefault();
+    document.dispatchEvent(alreadyHandled);
+    expect(firstDismiss).not.toHaveBeenCalled();
+    second.dispose();
+    first.dispose();
+  });
+
+  it('keeps focus handling independent across workbook hosts while the newer modal is open', () => {
+    const otherHost = document.createElement('div');
+    otherHost.tabIndex = -1;
+    document.body.appendChild(otherHost);
+    const first = createDialogShell({ host, className: 'fc-one', ariaLabel: 'One' });
+    const second = createDialogShell({ host: otherHost, className: 'fc-two', ariaLabel: 'Two' });
+    const firstInput = document.createElement('input');
+    const secondInput = document.createElement('input');
+    const secondNext = document.createElement('input');
+    first.panel.appendChild(firstInput);
+    second.panel.append(secondInput, secondNext);
+    first.open();
+    second.open();
+
+    secondInput.focus();
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    secondInput.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(secondInput);
+    second.dispose();
+    first.dispose();
+    otherHost.remove();
   });
 
   it('does not trap Tab while hidden', () => {

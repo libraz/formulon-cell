@@ -162,6 +162,43 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+// A document can host dialogs from multiple spreadsheet instances. Keep one
+// activation order per document so every modal key handler agrees on which
+// visible panel currently owns the keyboard.
+const openDialogLayers = new WeakMap<Document, HTMLElement[]>();
+const handledDialogKeyEvents = new WeakSet<KeyboardEvent>();
+
+function removeDialogLayer(overlay: HTMLElement): void {
+  const stack = openDialogLayers.get(overlay.ownerDocument);
+  if (!stack) return;
+  const index = stack.indexOf(overlay);
+  if (index !== -1) stack.splice(index, 1);
+  if (stack.length === 0) openDialogLayers.delete(overlay.ownerDocument);
+}
+
+function activateDialogLayer(overlay: HTMLElement): void {
+  removeDialogLayer(overlay);
+  const doc = overlay.ownerDocument;
+  const stack = openDialogLayers.get(doc) ?? [];
+  stack.push(overlay);
+  openDialogLayers.set(doc, stack);
+}
+
+function ownsDialogKeys(overlay: HTMLElement): boolean {
+  const stack = openDialogLayers.get(overlay.ownerDocument);
+  if (!stack) return false;
+  // Drop closed or detached layers in case a host was removed without dispose.
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const layer = stack[i];
+    if (!layer || layer.hidden || !layer.isConnected) stack.splice(i, 1);
+  }
+  if (stack.length === 0) openDialogLayers.delete(overlay.ownerDocument);
+  return stack.at(-1) === overlay;
+}
+
+const keyWasHandled = (event: KeyboardEvent): boolean =>
+  event.defaultPrevented || handledDialogKeyEvents.has(event);
+
 function focusableInside(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((el) => {
     if (el.closest('[hidden],[aria-hidden="true"]')) return false;
@@ -252,12 +289,14 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
 
   if (onDismiss) {
     on(overlay, 'click', (e) => {
-      if ((e as MouseEvent).target === overlay) onDismiss();
+      if (ownsDialogKeys(overlay) && (e as MouseEvent).target === overlay) onDismiss();
     });
     on(document, 'keydown', (e) => {
-      if (overlay.hidden) return;
-      if ((e as KeyboardEvent).key === 'Escape') {
-        e.preventDefault();
+      const event = e as KeyboardEvent;
+      if (overlay.hidden || keyWasHandled(event) || !ownsDialogKeys(overlay)) return;
+      if (event.key === 'Escape') {
+        handledDialogKeyEvents.add(event);
+        event.preventDefault();
         onDismiss();
       }
     });
@@ -265,9 +304,11 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
 
   on(document, 'keydown', (e) => {
     const event = e as KeyboardEvent;
-    if (overlay.hidden || event.key !== 'Tab') return;
+    if (overlay.hidden || keyWasHandled(event) || event.key !== 'Tab' || !ownsDialogKeys(overlay))
+      return;
     const items = focusableInside(panel);
     if (items.length === 0) {
+      handledDialogKeyEvents.add(event);
       event.preventDefault();
       panel.focus({ preventScroll: true });
       return;
@@ -276,16 +317,19 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
     const first = items[0];
     const last = items[items.length - 1];
     if (!active || !overlay.contains(active)) {
+      handledDialogKeyEvents.add(event);
       event.preventDefault();
       first?.focus({ preventScroll: true });
       return;
     }
     if (event.shiftKey && active === first) {
+      handledDialogKeyEvents.add(event);
       event.preventDefault();
       last?.focus({ preventScroll: true });
       return;
     }
     if (!event.shiftKey && active === last) {
+      handledDialogKeyEvents.add(event);
       event.preventDefault();
       first?.focus({ preventScroll: true });
     }
@@ -299,6 +343,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       if (disposed) return;
       enhanceSelects(panel);
       syncCustomSelects(panel);
+      activateDialogLayer(overlay);
       if (!overlay.contains(document.activeElement)) {
         restoreFocusEl =
           document.activeElement instanceof HTMLElement ? document.activeElement : host;
@@ -310,6 +355,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       }
     },
     close() {
+      removeDialogLayer(overlay);
       const shouldRestore =
         !overlay.hidden &&
         !!restoreFocusEl &&
@@ -334,6 +380,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       listeners.length = 0;
       selectObserver.disconnect();
       for (const handle of selectHandles.splice(0)) handle.dispose();
+      removeDialogLayer(overlay);
       restoreFocusEl = null;
       overlay.remove();
     },

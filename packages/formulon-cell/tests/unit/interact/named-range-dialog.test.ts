@@ -225,6 +225,101 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     handle.detach();
   });
 
+  it('initially focuses a visible manager action rather than the hidden editor', () => {
+    const frames: FrameRequestCallback[] = [];
+    const schedule = (callback: FrameRequestCallback): number => frames.push(callback);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
+    const { wb } = makeMutableWb();
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
+      expect(newButton).not.toBeNull();
+      expect(frames.length).toBeGreaterThan(0);
+      for (const frame of frames.splice(0)) frame(0);
+      expect(document.activeElement).toBe(newButton);
+      expect(document.querySelector<HTMLElement>('.fc-namedlg-editor')?.hidden).toBe(true);
+    } finally {
+      handle.detach();
+      frameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not reclaim focus after the user moves within a newly opened editor', () => {
+    const frames: FrameRequestCallback[] = [];
+    const schedule = (callback: FrameRequestCallback): number => frames.push(callback);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
+    const { wb } = makeMutableWb();
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
+      const formula = document.querySelector<HTMLInputElement>(
+        '.fc-namedlg-editor__input[aria-label="参照範囲"]',
+      );
+      expect(formula).not.toBeNull();
+      expect(formula?.disabled).toBe(false);
+      formula?.focus();
+      expect(document.activeElement).toBe(formula);
+      expect(frames.length).toBeGreaterThan(0);
+      for (const frame of frames.splice(0)) frame(0);
+      expect(document.activeElement).toBe(formula);
+    } finally {
+      handle.detach();
+      frameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not focus a closed editor when its initial frame runs late', () => {
+    const frames: FrameRequestCallback[] = [];
+    const schedule = (callback: FrameRequestCallback): number => frames.push(callback);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    const frameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(schedule);
+    const { wb } = makeMutableWb();
+    const handle = attachNamedRangeDialog({ host, wb });
+    try {
+      handle.open();
+      const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
+      newButton?.click();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(document.activeElement).toBe(newButton);
+      expect(frames.length).toBeGreaterThan(0);
+      for (const frame of frames.splice(0)) frame(0);
+      expect(document.activeElement).toBe(newButton);
+    } finally {
+      handle.detach();
+      frameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('Escape closes the child editor first and returns focus to its opener', () => {
+    const { wb } = makeMutableWb();
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+    const newButton = document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button');
+    // Pointer activation does not move keyboard focus to buttons in WebKit.
+    host.focus();
+    newButton?.click();
+    const editor = document.querySelector<HTMLElement>('.fc-namedlg-editor');
+    expect(editor?.hidden).toBe(false);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(editor?.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-namedlg')?.hidden).toBe(false);
+    expect(document.activeElement).toBe(newButton);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelector<HTMLElement>('.fc-namedlg')?.hidden).toBe(true);
+    expect(document.activeElement).toBe(host);
+    handle.detach();
+  });
+
   it('passes the selected sheet scope when creating a defined name', () => {
     const { wb, calls } = makeMutableWb();
     const handle = attachNamedRangeDialog({ host, wb });
