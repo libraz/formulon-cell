@@ -7,6 +7,7 @@ import {
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
 import { getRecentFunctions } from '../../../commands/function-history.js';
+import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import type { Locale } from '../../../i18n/strings.js';
 import { catalogLocaleOrdinal, catalogLocaleTag } from '../../../interact/function-catalog-text.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
@@ -104,7 +105,8 @@ const functionAvailabilityFor = (
 const functionAvailabilitySignature = (
   context: MacFunctionAvailabilityContext | undefined,
   lang: Locale,
-): string => `${readerIdFor(context?.reader)}:${lang}`;
+): string =>
+  `${readerIdFor(context?.reader)}:${lang}:${context?.unavailableReason ?? defaultFunctionUnavailableReason(lang)}`;
 
 const projectFunctionButtonState = (
   button: HTMLButtonElement,
@@ -169,6 +171,20 @@ const liveNameSet = (names: LiveFunctionNames): ReadonlySet<string> | undefined 
 
 const liveNameSignature = (names: ReadonlySet<string> | undefined): string =>
   names === undefined ? 'static' : [...names].sort().join(',');
+
+type PreparedLiveFunctionNames = {
+  set: ReadonlySet<string> | undefined;
+  signature: string;
+};
+
+const prepareLiveFunctionNames = (
+  names: LiveFunctionNames,
+  lang: Locale,
+  reader: LocalizedFunctionCatalogReader | null | undefined,
+): PreparedLiveFunctionNames => {
+  const set = canonicalLiveNameSet(liveNameSet(names), lang, reader);
+  return { set, signature: liveNameSignature(set) };
+};
 
 const canonicalFunctionName = (
   reader: LocalizedFunctionCatalogReader | null | undefined,
@@ -374,19 +390,21 @@ export const createMacRibbonMenus = (
 };
 
 /** Update the session MRU without replacing an unchanged menu or losing its keyboard focus. */
-export const projectMacRecentMenu = (
+const projectMacRecentMenuPrepared = (
   host: HTMLElement,
   store: SpreadsheetStore,
   lang: Locale,
-  liveNames?: LiveFunctionNames,
+  liveSet: ReadonlySet<string> | undefined,
+  liveSignature: string,
   availabilityContext?: MacFunctionAvailabilityContext,
 ): void => {
   const menu = host.querySelector<HTMLElement>('#menu-mac-formulas-recent');
   if (!menu) return;
-  const liveSet = canonicalLiveNameSet(liveNameSet(liveNames), lang, availabilityContext?.reader);
   const names = getRecentFunctions(store, liveSet);
-  const signature = `${lang}:${liveNameSignature(liveSet)}:${functionAvailabilitySignature(availabilityContext, lang)}:${names.join(',')}`;
+  const signature = `${lang}:${liveSignature}:${functionAvailabilitySignature(availabilityContext, lang)}:${names.join(',')}`;
   const rebuild = menu.dataset.recentFunctions !== signature;
+  const wasRestricted = menu.dataset.functionPolicyRestricted === 'true';
+  const restricted = interactionControllerFor(store)?.restricted ?? false;
   const focused =
     rebuild && menu.contains(menu.ownerDocument.activeElement)
       ? (menu.ownerDocument.activeElement as HTMLElement).dataset.ribbonCommand
@@ -410,25 +428,28 @@ export const projectMacRecentMenu = (
       }),
     );
   }
-  const buttons = Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]'));
-  for (const button of buttons) {
-    const name = button.dataset.ribbonCommand?.replace(/^mac\.function\./, '');
-    if (name && button.dataset.ribbonCommand?.startsWith('mac.function.')) {
-      projectFunctionButtonState(button, name, store, lang, availabilityContext);
-      continue;
+  if (rebuild || restricted || wasRestricted) {
+    const buttons = Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]'));
+    for (const button of buttons) {
+      const name = button.dataset.ribbonCommand?.replace(/^mac\.function\./, '');
+      if (name && button.dataset.ribbonCommand?.startsWith('mac.function.')) {
+        projectFunctionButtonState(button, name, store, lang, availabilityContext);
+        continue;
+      }
+      const decision = canExecuteBuiltIn(store, button.dataset.ribbonCommand ?? '', 'ribbon');
+      projectDisabledState(
+        button,
+        !decision.allowed,
+        decision.allowed ? null : (decision.reason ?? decision.code ?? null),
+        {
+          datasetKey: 'ribbonDisabledReason',
+          titlePrefix: button.textContent ?? '',
+        },
+      );
     }
-    const decision = canExecuteBuiltIn(store, button.dataset.ribbonCommand ?? '', 'ribbon');
-    projectDisabledState(
-      button,
-      !decision.allowed,
-      decision.allowed ? null : (decision.reason ?? decision.code ?? null),
-      {
-        datasetKey: 'ribbonDisabledReason',
-        titlePrefix: button.textContent ?? '',
-      },
-    );
   }
   menu.dataset.recentFunctions = signature;
+  menu.dataset.functionPolicyRestricted = String(restricted);
   if (focused) {
     const next =
       Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')).find(
@@ -437,6 +458,17 @@ export const projectMacRecentMenu = (
       menu.querySelector<HTMLButtonElement>('[data-ribbon-command="mac.formulas.category.recent"]');
     next?.focus({ preventScroll: true });
   }
+};
+
+export const projectMacRecentMenu = (
+  host: HTMLElement,
+  store: SpreadsheetStore,
+  lang: Locale,
+  liveNames?: LiveFunctionNames,
+  availabilityContext?: MacFunctionAvailabilityContext,
+): void => {
+  const { set, signature } = prepareLiveFunctionNames(liveNames, lang, availabilityContext?.reader);
+  projectMacRecentMenuPrepared(host, store, lang, set, signature, availabilityContext);
 };
 
 const projectFunctionCategoryMenu = (
@@ -448,20 +480,22 @@ const projectFunctionCategoryMenu = (
   liveSignature: string,
   availabilityContext: MacFunctionAvailabilityContext | undefined,
 ): void => {
-  const names = supportedFunctionNames(category, liveSet);
-  const signature = `${lang}:${category}:${liveSignature}:${functionAvailabilitySignature(availabilityContext, lang)}:${names.join(',')}`;
+  const signature = `${lang}:${category}:${liveSignature}:${functionAvailabilitySignature(availabilityContext, lang)}`;
   const rebuild = menu.dataset.functionNames !== signature;
+  const wasRestricted = menu.dataset.functionPolicyRestricted === 'true';
+  const restricted = interactionControllerFor(store)?.restricted ?? false;
   const focused =
     rebuild && menu.contains(menu.ownerDocument.activeElement)
       ? (menu.ownerDocument.activeElement as HTMLElement).dataset.ribbonCommand
       : undefined;
-  const items = names.map(
-    (name): MacRibbonMenuItem => ({
-      id: `mac.function.${name}`,
-      label: name,
-    }),
-  );
   if (rebuild) {
+    const names = supportedFunctionNames(category, liveSet);
+    const items = names.map(
+      (name): MacRibbonMenuItem => ({
+        id: `mac.function.${name}`,
+        label: name,
+      }),
+    );
     menu.replaceChildren(
       ...items.map((item) => {
         const name = item.id.slice('mac.function.'.length);
@@ -475,12 +509,15 @@ const projectFunctionCategoryMenu = (
     );
     prepareMenu(menu, menu.getAttribute('aria-label') ?? undefined);
   }
-  for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
-    const command = button.dataset.ribbonCommand ?? '';
-    const name = command.startsWith('mac.function.') ? command.slice('mac.function.'.length) : '';
-    if (name) projectFunctionButtonState(button, name, store, lang, availabilityContext);
+  if (rebuild || restricted || wasRestricted) {
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
+      const command = button.dataset.ribbonCommand ?? '';
+      const name = command.startsWith('mac.function.') ? command.slice('mac.function.'.length) : '';
+      if (name) projectFunctionButtonState(button, name, store, lang, availabilityContext);
+    }
   }
   menu.dataset.functionNames = signature;
+  menu.dataset.functionPolicyRestricted = String(restricted);
   if (!focused) return;
   const next = menu.querySelector<HTMLButtonElement>(`[data-ribbon-command="${focused}"]`);
   if (next) next.focus({ preventScroll: true });
@@ -491,15 +528,14 @@ const projectFunctionCategoryMenu = (
  * submenus against the workbook's recognized names. Static membership remains
  * the fallback when the engine cannot enumerate its catalog; an empty live set
  * is authoritative and leaves the category panel empty. */
-export const projectMacFunctionCategoryMenus = (
+const projectMacFunctionCategoryMenusPrepared = (
   host: HTMLElement,
   store: SpreadsheetStore,
   lang: Locale,
-  liveNames?: LiveFunctionNames,
+  liveSet: ReadonlySet<string> | undefined,
+  liveSignature: string,
   availabilityContext?: MacFunctionAvailabilityContext,
 ): void => {
-  const liveSet = canonicalLiveNameSet(liveNameSet(liveNames), lang, availabilityContext?.reader);
-  const liveSignature = liveNameSignature(liveSet);
   for (const [commandId, category] of Object.entries(functionCategoryMenuIds)) {
     const menuId = macRibbonMenuIdForCommand(commandId);
     const menu = host.querySelector<HTMLElement>(`#${menuId}`);
@@ -533,6 +569,17 @@ export const projectMacFunctionCategoryMenus = (
   }
 };
 
+export const projectMacFunctionCategoryMenus = (
+  host: HTMLElement,
+  store: SpreadsheetStore,
+  lang: Locale,
+  liveNames?: LiveFunctionNames,
+  availabilityContext?: MacFunctionAvailabilityContext,
+): void => {
+  const { set, signature } = prepareLiveFunctionNames(liveNames, lang, availabilityContext?.reader);
+  projectMacFunctionCategoryMenusPrepared(host, store, lang, set, signature, availabilityContext);
+};
+
 /** Projects the Mac recent and function-category menus from the instance's live function names. */
 export const projectMacFunctionMenus = (
   host: HTMLElement,
@@ -543,7 +590,9 @@ export const projectMacFunctionMenus = (
     typeof instance.workbook.functionNames === 'function'
       ? instance.workbook.functionNames()
       : null;
-  const liveNames = reportedNames === null ? null : new Set(reportedNames);
+  // functionNames() is already canonical, so index it once without the WASM canonicalizer.
+  const liveSet = reportedNames === null ? undefined : new Set(reportedNames);
+  const liveSignature = reportedNames === null ? 'static' : reportedNames.join(',');
   const availabilityContext = {
     reader:
       reportedNames === null
@@ -552,6 +601,20 @@ export const projectMacFunctionMenus = (
     unavailableReason:
       instance.i18n.strings.fxDialog.functionUnavailable ?? defaultFunctionUnavailableReason(lang),
   };
-  projectMacRecentMenu(host, instance.store, lang, liveNames, availabilityContext);
-  projectMacFunctionCategoryMenus(host, instance.store, lang, liveNames, availabilityContext);
+  projectMacRecentMenuPrepared(
+    host,
+    instance.store,
+    lang,
+    liveSet,
+    liveSignature,
+    availabilityContext,
+  );
+  projectMacFunctionCategoryMenusPrepared(
+    host,
+    instance.store,
+    lang,
+    liveSet,
+    liveSignature,
+    availabilityContext,
+  );
 };

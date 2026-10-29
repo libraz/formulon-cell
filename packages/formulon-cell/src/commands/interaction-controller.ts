@@ -210,6 +210,7 @@ export class InteractionController {
     // Policy changes invalidate any host-held plan/request that was based on
     // the previous authorization. Notify renderer subscribers without sending
     // a mutation result through the host's onChanged callback.
+    interactionPolicyEpochs.set(this, interactionPolicyEpochFor(this) + 1);
     this.revisionValue += 1;
     const update: ChangeBatchResult = {
       status: 'noop',
@@ -917,6 +918,12 @@ export class InteractionController {
     }
   }
 }
+
+const interactionPolicyEpochs = new WeakMap<InteractionController, number>();
+
+/** Internal renderer signal for policy changes; deliberately absent from the public package exports. */
+export const interactionPolicyEpochFor = (controller: InteractionController): number =>
+  interactionPolicyEpochs.get(controller) ?? 0;
 
 const controllers = new WeakMap<SpreadsheetStore, InteractionController>();
 

@@ -27,7 +27,11 @@ import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
 // go through `renderRibbon()` once.
 
 import { withSelectionFormatOrigin } from '../commands/format.js';
-import { interactionControllerFor } from '../commands/interaction-controller.js';
+import {
+  type InteractionController,
+  interactionControllerFor,
+  interactionPolicyEpochFor,
+} from '../commands/interaction-controller.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensions/ui-options.js';
 import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-ink.js';
@@ -611,6 +615,29 @@ export function mountToolbar(
     if (next) unsubMacInk = next.subscribe(projectFormatToolbar);
   };
 
+  const syncInteractionSubscription = (current: SpreadsheetInstance | null): void => {
+    const next = current ? interactionControllerFor(current.store) : undefined;
+    if (next === subscribedInteractionController) return;
+    unsubPolicy?.();
+    unsubPolicy = null;
+    subscribedInteractionController = next;
+    interactionPolicyEpoch = next ? interactionPolicyEpochFor(next) : 0;
+    if (!next) return;
+    unsubPolicy = next.subscribe(() => {
+      // A copied listener list can still call us after a rebind to a new controller.
+      if (next !== subscribedInteractionController) return;
+      const nextEpoch = interactionPolicyEpochFor(next);
+      const policyChanged = nextEpoch !== interactionPolicyEpoch;
+      // Advance first so nested notifications don't read a no-op as a policy change.
+      interactionPolicyEpoch = nextEpoch;
+      if (policyChanged) renderToolbar();
+      else {
+        projectFormatToolbar();
+        interactionPolicy.project();
+      }
+    });
+  };
+
   const interactionPolicy = attachRibbonInteractionPolicy(host, {
     getInstance,
     closeDynamicDropdowns: () => dropdownsApi?.closeAllDynamicRibbonDropdowns(),
@@ -1021,6 +1048,8 @@ export function mountToolbar(
   let unsubFunctionHistory: (() => void) | null = null;
   let unsubLocale: (() => void) | null = null;
   let subscribedInstance: SpreadsheetInstance | null = null;
+  let subscribedInteractionController: InteractionController | undefined;
+  let interactionPolicyEpoch = 0;
   const refreshLocale = (current: SpreadsheetInstance): void => {
     if (langOverride !== undefined) return;
     const next = toolbarLangForLocale(current.i18n.locale);
@@ -1038,10 +1067,11 @@ export function mountToolbar(
     if (current === subscribedInstance) {
       syncInheritedPlatform(current);
       syncMacInkSubscription(current);
+      syncInteractionSubscription(current);
       return;
     }
     unsubStore?.();
-    unsubPolicy?.();
+    syncInteractionSubscription(null);
     unsubFunctionHistory?.();
     unsubLocale?.();
     subscribedInstance = current;
@@ -1066,9 +1096,7 @@ export function mountToolbar(
     unsubFunctionHistory = current
       ? subscribeRecentFunctions(current.store, projectFormatToolbar)
       : null;
-    unsubPolicy = current
-      ? (interactionControllerFor(current.store)?.subscribe(() => renderToolbar()) ?? null)
-      : null;
+    syncInteractionSubscription(current);
   };
   ensureStoreSubscription();
 
@@ -1157,6 +1185,8 @@ export function mountToolbar(
       unsubStore?.();
       unsubPolicy?.();
       unsubPolicy = null;
+      subscribedInteractionController = undefined;
+      interactionPolicyEpoch = 0;
       unsubFunctionHistory?.();
       unsubFunctionHistory = null;
       unsubLocale?.();

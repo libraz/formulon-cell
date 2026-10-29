@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { recordRecentFunction } from '../../../../src/commands/function-history.js';
+import { interactionControllerFor } from '../../../../src/commands/interaction-controller.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { Spreadsheet } from '../../../../src/mount.js';
+import {
+  projectMacFunctionCategoryMenus,
+  projectMacFunctionMenus,
+} from '../../../../src/toolbar/ribbon/mac/menus.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
 import { stubHelpers } from './fixtures.js';
 
@@ -545,12 +551,14 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(workbook.isStub).toBe(false);
     // Keep the workbook native for mount wiring, but use a tiny deterministic
     // catalog fixture; this counts projector method calls, not raw WASM work.
-    const functionNames = vi.fn(() => ['COUNTIF', 'SUM'] as const);
+    let catalog: readonly string[] = ['COUNTIF', 'SUM'];
+    const functionNames = vi.fn(() => catalog);
     Object.defineProperty(workbook, 'functionNames', {
       configurable: true,
       value: functionNames,
     });
     await sheet.instance.setWorkbook(workbook);
+    const canonicalizeFunctionName = vi.spyOn(workbook, 'canonicalizeFunctionName');
 
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       platform: 'mac',
@@ -559,6 +567,7 @@ describe('Spreadsheet.mountToolbar', () => {
     });
     try {
       expect(functionNames).toHaveBeenCalledTimes(1);
+      expect(canonicalizeFunctionName).not.toHaveBeenCalled();
 
       const categoryLeaves = (menuId: string): string[] =>
         Array.from(
@@ -578,6 +587,143 @@ describe('Spreadsheet.mountToolbar', () => {
       expect(categoryLeaves('menu-mac-formulas-more-information')).toHaveLength(0);
       expect(categoryLeaves('menu-mac-formulas-more-compatibility')).toHaveLength(0);
       expect(categoryLeaves('menu-mac-formulas-more-web')).toHaveLength(0);
+
+      functionNames.mockClear();
+      canonicalizeFunctionName.mockClear();
+      projectMacFunctionMenus(host, sheet.instance, 'en');
+      projectMacFunctionMenus(host, sheet.instance, 'en');
+      expect(functionNames).toHaveBeenCalledTimes(2);
+      expect(canonicalizeFunctionName).not.toHaveBeenCalled();
+
+      projectMacFunctionMenus(host, sheet.instance, 'de');
+      expect(
+        host.querySelector<HTMLButtonElement>(
+          '#menu-mac-formulas-math [data-ribbon-command="mac.function.SUM"]',
+        )?.textContent,
+      ).toBe('SUMME');
+
+      expect(recordRecentFunction(sheet.instance.store, 'SUM', new Set(['COUNTIF', 'SUM']))).toBe(
+        true,
+      );
+      projectMacFunctionMenus(host, sheet.instance, 'de');
+      expect(
+        host.querySelector<HTMLButtonElement>(
+          '#menu-mac-formulas-recent [data-ribbon-command="mac.function.SUM"]',
+        ),
+      ).not.toBeNull();
+
+      catalog = ['AVERAGE'];
+      projectMacFunctionMenus(host, sheet.instance, 'de');
+      expect(
+        host.querySelector<HTMLButtonElement>(
+          '#menu-mac-formulas-more-statistical [data-ribbon-command="mac.function.AVERAGE"]',
+        )?.textContent,
+      ).toBe('MITTELWERT');
+      expect(
+        host.querySelector('#menu-mac-formulas-recent [data-ribbon-command="mac.function.SUM"]'),
+      ).toBeNull();
+      expect(canonicalizeFunctionName).not.toHaveBeenCalled();
+    } finally {
+      tb.dispose();
+    }
+  });
+
+  it('skips unchanged unrestricted category projection and rechecks restricted leaves', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      platform: 'mac',
+      activeTab: 'formulas',
+      helpers: stubHelpers(),
+    });
+    const mathTrigger = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.formulas.math"]',
+    );
+    if (!mathTrigger) throw new Error('Missing Mac math category trigger.');
+    mathTrigger.click();
+
+    const originalSetHas = Set.prototype.has;
+    const originalSetAttribute = Element.prototype.setAttribute;
+    let membershipChecks = 0;
+    let functionLeafUpdates = 0;
+    vi.spyOn(Set.prototype, 'has').mockImplementation(function (this: Set<unknown>, value) {
+      if (
+        this.size === 2 &&
+        originalSetHas.call(this, 'COUNTIF') &&
+        originalSetHas.call(this, 'SUM')
+      ) {
+        membershipChecks += 1;
+      }
+      return originalSetHas.call(this, value);
+    });
+    vi.spyOn(Element.prototype, 'setAttribute').mockImplementation(function (
+      this: Element,
+      name: string,
+      value: string,
+    ) {
+      if (
+        name === 'aria-disabled' &&
+        (this as HTMLElement).dataset.ribbonCommand?.startsWith('mac.function.')
+      ) {
+        functionLeafUpdates += 1;
+      }
+      return originalSetAttribute.call(this, name, value);
+    });
+
+    try {
+      projectMacFunctionCategoryMenus(host, sheet.instance.store, 'en', ['COUNTIF', 'SUM']);
+      expect(membershipChecks).toBeGreaterThan(0);
+      const sumLeaf = host.querySelector<HTMLButtonElement>(
+        '#menu-mac-formulas-math [data-ribbon-command="mac.function.SUM"]',
+      );
+      const countIfLeaf = host.querySelector<HTMLButtonElement>(
+        '#menu-mac-formulas-more-statistical [data-ribbon-command="mac.function.COUNTIF"]',
+      );
+      if (!sumLeaf || !countIfLeaf) throw new Error('Missing projected Mac function leaves.');
+
+      sumLeaf.focus();
+      membershipChecks = 0;
+      functionLeafUpdates = 0;
+      projectMacFunctionCategoryMenus(host, sheet.instance.store, 'en', ['COUNTIF', 'SUM']);
+      expect(membershipChecks).toBe(0);
+      expect(functionLeafUpdates).toBe(0);
+      expect(
+        host.querySelector('#menu-mac-formulas-math [data-ribbon-command="mac.function.SUM"]'),
+      ).toBe(sumLeaf);
+      expect(document.activeElement).toBe(sumLeaf);
+
+      // Policy changes must re-project every leaf even though the catalog and
+      // localized menu signature are unchanged.
+      sheet.instance.commands.setPolicy({
+        editable: () => true,
+        operations: { formulaEdit: true },
+        defaultOperation: 'deny',
+        restrict: ({ commandId }) => commandId !== 'mac.function.SUM',
+      });
+      expect(interactionControllerFor(sheet.instance.store)?.restricted).toBe(true);
+      projectMacFunctionCategoryMenus(host, sheet.instance.store, 'en', ['COUNTIF', 'SUM']);
+      expect(
+        host.querySelector<HTMLButtonElement>(
+          '#menu-mac-formulas-math [data-ribbon-command="mac.function.SUM"]',
+        )?.disabled,
+      ).toBe(true);
+      expect(
+        host.querySelector<HTMLButtonElement>(
+          '#menu-mac-formulas-more-statistical [data-ribbon-command="mac.function.COUNTIF"]',
+        )?.disabled,
+      ).toBe(false);
+      expect(functionLeafUpdates).toBeGreaterThan(0);
+
+      sheet.instance.commands.setPolicy(undefined);
+      functionLeafUpdates = 0;
+      projectMacFunctionCategoryMenus(host, sheet.instance.store, 'en', ['COUNTIF', 'SUM']);
+      expect(
+        host.querySelector<HTMLButtonElement>(
+          '#menu-mac-formulas-math [data-ribbon-command="mac.function.SUM"]',
+        )?.disabled,
+      ).toBe(false);
+      expect(functionLeafUpdates).toBeGreaterThan(0);
+      functionLeafUpdates = 0;
+      projectMacFunctionCategoryMenus(host, sheet.instance.store, 'en', ['COUNTIF', 'SUM']);
+      expect(functionLeafUpdates).toBe(0);
     } finally {
       tb.dispose();
     }
