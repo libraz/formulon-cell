@@ -1,7 +1,7 @@
 import type { DeleteCellsDirection, InsertCellsDirection } from '../commands/cell-shift.js';
 import type { Strings } from '../i18n/strings.js';
-import { appendDialogActions } from './dialog-shell.js';
-import { overlayPortalFor } from './overlay-portal.js';
+import { appendDialogActions, createDialogShell } from './dialog-shell.js';
+import { isSubmitEnter } from './mac-dialog-keys.js';
 
 export interface CellShiftDialogDeps {
   host: HTMLElement;
@@ -10,24 +10,46 @@ export interface CellShiftDialogDeps {
   onSubmit(direction: InsertCellsDirection | DeleteCellsDirection): void;
 }
 
+interface CellShiftDialogRecord {
+  instanceId: string | undefined;
+  disposed: boolean;
+  close(): void;
+  dispose(): void;
+}
+
+const dialogs = new WeakMap<HTMLElement, CellShiftDialogRecord>();
+
 /** Open the Excel-style direction chooser used by Insert Cells and Delete Cells. */
 export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
-  const { strings, kind } = deps;
+  const { host, strings, kind } = deps;
   const t = strings.ribbonMenu;
-  const ownerDocument = deps.host.ownerDocument;
-  const portal = overlayPortalFor(deps.host);
-  portal.querySelector('.fc-cellshift')?.remove();
+  const ownerDocument = host.ownerDocument;
+  dialogs.get(host)?.close();
 
-  const root = ownerDocument.createElement('div');
-  root.className = 'fc-cellshift';
-  root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-modal', 'true');
-  root.setAttribute('aria-label', kind === 'insert' ? t.insertCells : t.deleteCells);
-  const panel = ownerDocument.createElement('div');
-  panel.className = 'fc-cellshift__panel';
-  const title = ownerDocument.createElement('div');
-  title.className = 'fc-cellshift__title';
-  title.textContent = kind === 'insert' ? t.insertCells : t.deleteCells;
+  const title = kind === 'insert' ? t.insertCells : t.deleteCells;
+  let record: CellShiftDialogRecord | null = null;
+  const shell = createDialogShell({
+    host,
+    className: 'fc-cellshift',
+    ariaLabel: title,
+    onDismiss: () => record?.close(),
+  });
+  const dispose = (): void => {
+    if (!record || record.disposed) return;
+    record.disposed = true;
+    shell.dispose();
+    if (dialogs.get(host) === record) dialogs.delete(host);
+  };
+  const close = (): void => {
+    if (!record || record.disposed) return;
+    shell.close();
+    dispose();
+  };
+
+  const panel = shell.panel;
+  const heading = ownerDocument.createElement('div');
+  heading.className = 'fc-cellshift__title';
+  heading.textContent = title;
   const choices = ownerDocument.createElement('div');
   choices.className = 'fc-cellshift__choices';
   const name = `fc-cellshift-${Math.random().toString(36).slice(2)}`;
@@ -53,28 +75,52 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
     buttonPrimaryClass: 'fc-cellshift__button--primary',
     buttonSecondaryClass: 'fc-cellshift__button--secondary',
   });
-  const close = (): void => root.remove();
-  cancelBtn.addEventListener('click', close);
-  okBtn.addEventListener('click', () => {
-    const selected = root.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.value;
-    if (selected === 'down' || selected === 'right' || selected === 'up' || selected === 'left') {
-      deps.onSubmit(selected);
-    }
+  panel.append(heading, choices, footer);
+
+  record = {
+    instanceId: host.dataset.fcInstId,
+    disposed: false,
+    close,
+    dispose,
+  };
+  dialogs.set(host, record);
+
+  const submit = (): void => {
+    if (!record || record.disposed || !shell.isOpen()) return;
+    const selected = panel.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.value;
+    const direction =
+      selected === 'down' || selected === 'right' || selected === 'up' || selected === 'left'
+        ? selected
+        : null;
     close();
+    if (direction) deps.onSubmit(direction);
+  };
+
+  shell.on(cancelBtn, 'click', close);
+  shell.on(okBtn, 'click', submit);
+  shell.on(shell.overlay, 'keydown', (rawEvent) => {
+    const event = rawEvent as KeyboardEvent;
+    if (!isSubmitEnter(event)) return;
+    const target = event.target;
+    if (!target || typeof target !== 'object' || !('nodeType' in target)) return;
+    const element = target as Element;
+    if (element.nodeType !== 1 || element.tagName !== 'INPUT') return;
+    const input = target as HTMLInputElement;
+    if (input.type !== 'radio' || input !== ownerDocument.activeElement) return;
+    event.preventDefault();
+    event.stopPropagation();
+    submit();
   });
-  root.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    }
-  });
-  root.addEventListener('mousedown', (e) => {
-    if (e.target === root) close();
-  });
-  panel.append(title, choices, footer);
-  root.appendChild(panel);
-  portal.appendChild(root);
+
+  shell.open();
   okBtn.focus({ preventScroll: true });
+}
+
+/** Dispose a host's current dialog without returning focus to a removed opener. */
+export function disposeCellShiftDialog(host: HTMLElement, instanceId?: string): void {
+  const record = dialogs.get(host);
+  if (!record || (instanceId !== undefined && record.instanceId !== instanceId)) return;
+  record.dispose();
 }
 
 function radio(

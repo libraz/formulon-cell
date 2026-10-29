@@ -364,6 +364,13 @@ const manual = (
  */
 export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
   shell(
+    'interact.cellShiftDialog',
+    'interact/cell-shift-dialog.ts',
+    'openCellShiftDialog',
+    'insertCopiedCellsDialog',
+    'block',
+  ),
+  shell(
     'interact.cellStylesGallery',
     'interact/cell-styles-gallery.ts',
     'attachCellStylesGallery',
@@ -664,13 +671,6 @@ export const LOCALE_SURFACE_MANUAL_FACTORIES: readonly LocaleSurfaceFactory[] = 
     'interact.insertCopiedCellsDialog',
     'interact/insert-copied-cells-dialog.ts',
     'openInsertCopiedCellsDialog',
-    'insertCopiedCellsDialog',
-    'block',
-  ),
-  manual(
-    'interact.cellShiftDialog',
-    'interact/cell-shift-dialog.ts',
-    'openCellShiftDialog',
     'insertCopiedCellsDialog',
     'block',
   ),

@@ -29,6 +29,7 @@ import { resolveSpreadsheetUiOptions } from './extensions/index.js';
 import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
 import { dictionaryLocaleFor, type Strings } from './i18n/strings.js';
+import { disposeCellShiftDialog } from './interact/cell-shift-dialog.js';
 import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
 import { attachNavigationPolicy, navigationBoundsFor } from './interact/navigation-policy.js';
 import {
@@ -1212,6 +1213,7 @@ export const Spreadsheet = {
         cleanup(() => i18n.dispose());
         cleanup(() => renderer.dispose());
         cleanup(disposeOwnedWorkbook);
+        cleanup(() => disposeCellShiftDialog(host, instanceId));
         cleanup(() => disposeOverlayPortal(host, instanceId));
         cleanup(() => {
           if (host.dataset.fcInstId === instanceId) {

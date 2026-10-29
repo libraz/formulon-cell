@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { copy } from '../../../src/commands/clipboard/copy.js';
 import type { ClipboardSnapshot } from '../../../src/commands/clipboard/snapshot.js';
@@ -6,6 +6,7 @@ import { captureSnapshotFromCopyResult } from '../../../src/commands/clipboard/s
 import { History } from '../../../src/commands/history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
+import { disposeCellShiftDialog } from '../../../src/interact/cell-shift-dialog.js';
 import { createHostShortcutHandler } from '../../../src/mount/host-shortcuts.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -134,6 +135,7 @@ function key(over: Partial<KeyboardEventInit & { key: string }>): KeyboardEvent 
 
 describe('mount/host-shortcuts', () => {
   let s: Setup;
+  afterEach(() => disposeCellShiftDialog(s.host));
   beforeEach(() => {
     s = makeSetup();
   });
