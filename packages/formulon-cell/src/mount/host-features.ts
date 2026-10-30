@@ -18,7 +18,11 @@ import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
 import { attachArgHelper } from '../interact/arg-helper.js';
-import { attachAutocomplete, collectAutocompleteNames } from '../interact/autocomplete.js';
+import {
+  type AutocompleteInsertOutcome,
+  attachAutocomplete,
+  collectAutocompleteNames,
+} from '../interact/autocomplete.js';
 import { attachBorderDraw, type BorderDrawHandle } from '../interact/border-draw.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
@@ -816,7 +820,10 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.fxAutocomplete !== input.autocompleteStub) return;
         s.fxAutocomplete = attachAutocomplete({
           input: input.fxInput,
-          onAfterInsert: () => input.fxInput.dispatchEvent(new Event('input', { bubbles: true })),
+          onAfterInsert: (outcome?: AutocompleteInsertOutcome) => {
+            input.getFormulaBar().notifyAutocompleteInsert?.(outcome);
+            input.fxInput.dispatchEvent(new Event('input', { bubbles: true }));
+          },
           getTables: () => input.wb().getTables(),
           getNames: () =>
             collectAutocompleteNames(

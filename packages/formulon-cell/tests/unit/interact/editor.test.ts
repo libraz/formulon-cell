@@ -107,6 +107,147 @@ describe('InlineEditor', () => {
     expect(input.value).toBe(afterEdit);
   });
 
+  it('navigates formula references in point mode without moving the grid selection', () => {
+    const editedCell = { sheet: 0, row: 3, col: 3 };
+    mutators.setActive(store, editedCell);
+    const selection = store.getState().selection;
+    editor.begin('=SUM(', { mode: 'point' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const press = (key: string, shiftKey = false): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', {
+        key,
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      input.dispatchEvent(event);
+      return event;
+    };
+
+    expect(press('ArrowLeft').defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(C4');
+    press('ArrowUp', true);
+    expect(input.value).toBe('=SUM(C3:C4');
+    press('ArrowDown');
+    expect(input.value).toBe('=SUM(C4');
+    expect(store.getState().selection).toBe(selection);
+    expect(wb.cellFormula(editedCell)).toBeNull();
+    editor.cancel();
+  });
+
+  it('continues from a mouse-picked reference with the next arrow', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    editor.begin('=SUM(', { mode: 'point' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    editor.insertRefAtCaret('B5', { phase: 'start' });
+    expect(input.value).toBe('=SUM(B5');
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
+    expect(input.value).toBe('=SUM(C5');
+    editor.cancel();
+  });
+
+  it('keeps point stepping through consecutive vertical moves in R1C1 mode', () => {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    vi.spyOn(wb, 'functionNames').mockReturnValue(['COUNT', 'SUM']);
+    editor.begin('=SUM(', { mode: 'point' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const up = (): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'ArrowUp',
+        bubbles: true,
+        cancelable: true,
+      });
+      input.dispatchEvent(event);
+      return event;
+    };
+
+    up();
+    expect(input.value).toBe('=SUM(R[-1]C');
+    up();
+    expect(input.value).toBe('=SUM(R[-2]C');
+    editor.cancel();
+  });
+
+  it('toggles F2 between edit and point arrow handling', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    editor.begin('=SUM(', { mode: 'point' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const toggle = (): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', { key: 'F2', bubbles: true, cancelable: true });
+      input.dispatchEvent(event);
+      return event;
+    };
+
+    expect(toggle().defaultPrevented).toBe(true);
+    const leftInEditMode = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(leftInEditMode);
+    expect(leftInEditMode.defaultPrevented).toBe(false);
+    expect(input.value).toBe('=SUM(');
+
+    toggle();
+    input.setSelectionRange(input.value.length, input.value.length);
+    const leftInPointMode = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(leftInPointMode);
+    expect(leftInPointMode.defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(C4');
+    editor.cancel();
+  });
+
+  it('starts a new point gesture after F4 changes a referenced token', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    const text = '=SUM(C4)+D1';
+    editor.begin(text, { mode: 'point' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const firstRefEnd = text.indexOf('C4') + 2;
+    input.setSelectionRange(firstRefEnd, firstRefEnd);
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }));
+    expect(input.value).toBe(text);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', cancelable: true }));
+    expect(input.value).toBe('=SUM($C$4)+D1');
+    const next = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(next);
+
+    expect(next.defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(D5)+D1');
+    editor.cancel();
+  });
+
+  it('enters point mode after accepting a function suggestion', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    vi.spyOn(wb, 'functionNames').mockReturnValue(['SUM']);
+    editor.begin('=SU', { mode: 'edit' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.querySelector('.fc-autocomplete')).not.toBeNull();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }));
+    expect(input.value).toBe('=SUM(');
+
+    const left = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(left);
+    expect(left.defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(C4');
+    editor.cancel();
+  });
+
   it('begin appends an input to the grid and switches editor mode to enter', () => {
     mutators.setActive(store, { sheet: 0, row: 2, col: 3 });
     editor.begin('hi');
@@ -604,6 +745,24 @@ describe('InlineEditor', () => {
     expect(lease?.userCancel()).toBeNull();
     expect(editor.isActive()).toBe(false);
     expect(grid.querySelector('textarea.fc-host__editor')).toBeNull();
+    editor.cancel();
+  });
+
+  it('restores the private point mode when an inline editor lease is cancelled', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    editor.begin('=SUM(', { mode: 'point' });
+    const lease = editor.suspendForFormulaPalette({
+      getLocale: () => 'en-US',
+      contextCurrent: () => true,
+    });
+    expect(lease).not.toBeNull();
+
+    const input = lease?.userCancel() as HTMLTextAreaElement | null;
+    expect(input).not.toBeNull();
+    input?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }),
+    );
+    expect(input?.value).toBe('=SUM(C4');
     editor.cancel();
   });
 

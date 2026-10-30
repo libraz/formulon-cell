@@ -506,6 +506,18 @@ describe('suggestFunctions', () => {
     });
     expect(suggestFunctions('=1.5', 4, 8, { names })).toBeNull();
   });
+
+  it('does not suggest a function suffix after a backslash identifier prefix', () => {
+    expect(suggestFunctions('=\\SU', 4, 8, { names: ['SUM'] })).toBeNull();
+  });
+
+  it('suggests function names at the end of an existing call identifier', () => {
+    expect(suggestFunctions('=SU(A1)', 3, 8, { names: ['SUM', 'SUMIF'] })).toEqual({
+      token: 'SU',
+      tokenStart: 1,
+      matches: ['SUM', 'SUMIF'],
+    });
+  });
 });
 
 describe('365 dynamic-array function catalog', () => {

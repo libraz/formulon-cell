@@ -2,6 +2,29 @@
  * insertion. Quotes and structured-reference headers are not formula tokens. */
 export type FormulaCaretContext = 'expression' | 'string' | 'sheet' | 'bracket' | 'function';
 
+/** Return the identifier prefix immediately before a formula caret. Formula
+ *  autocomplete treats Unicode letters/digits, `_`, `.`, and `\` as part
+ *  of the same token across function, custom-function, and defined-name
+ *  catalogs. */
+export function formulaIdentifierPrefix(
+  text: string,
+  caret: number,
+): { token: string; tokenStart: number } {
+  const end = Math.max(0, Math.min(Math.trunc(caret), text.length));
+  let start = end;
+  while (start > 0) {
+    let previous = start - 1;
+    const last = text.charCodeAt(previous);
+    if (last >= 0xdc00 && last <= 0xdfff && previous > 0) {
+      const beforeLast = text.charCodeAt(previous - 1);
+      if (beforeLast >= 0xd800 && beforeLast <= 0xdbff) previous -= 1;
+    }
+    if (!IDENT_CHAR.test(text.slice(previous, start))) break;
+    start = previous;
+  }
+  return { token: text.slice(start, end), tokenStart: start };
+}
+
 export function formulaCaretContext(text: string, caret: number): FormulaCaretContext {
   let i = text.startsWith('=') ? 1 : 0;
   const stop = Math.max(i, Math.min(caret, text.length));

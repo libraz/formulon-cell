@@ -45,6 +45,169 @@ describe('mount/formula-bar — edit lifecycle', () => {
     },
   );
 
+  it('formula-bar point arrows insert references without moving the workbook selection', () => {
+    const editedCell = { sheet: 0, row: 3, col: 3 };
+    mutators.setActive(sheet.instance.store, editedCell);
+    const selection = sheet.instance.store.getState().selection;
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = harness;
+    input.focus();
+    input.value = '=SUM(';
+    input.dispatchEvent(new Event('input'));
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', cancelable: true }));
+
+    const press = (key: string, shiftKey = false): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', { key, shiftKey, cancelable: true });
+      input.dispatchEvent(event);
+      return event;
+    };
+    expect(press('ArrowLeft').defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(C4');
+    press('ArrowUp', true);
+    expect(input.value).toBe('=SUM(C3:C4');
+    press('ArrowDown');
+    expect(input.value).toBe('=SUM(C4');
+    expect(sheet.instance.store.getState().selection).toBe(selection);
+    expect(sheet.workbook.cellFormula(editedCell)).toBeNull();
+    controller.cancelFx();
+    harness.detach();
+  });
+
+  it('formula-bar point arrow continues from a mouse-picked reference', () => {
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 3, col: 3 });
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = harness;
+    input.focus();
+    input.value = '=SUM(';
+    input.dispatchEvent(new Event('input'));
+    input.setSelectionRange(input.value.length, input.value.length);
+    controller.insertRefAtCaret('B5', { phase: 'start' });
+    expect(input.value).toBe('=SUM(B5');
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
+    expect(input.value).toBe('=SUM(C5');
+    controller.cancelFx();
+    harness.detach();
+  });
+
+  it('formula-bar keeps point stepping through consecutive vertical moves in R1C1 mode', () => {
+    const store = sheet.instance.store;
+    store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    const detached = document.createElement('div');
+    const input = document.createElement('textarea');
+    // Suggestions open whenever the token before the caret ends in a letter,
+    // unless dismissed for the exact text and caret, like the real list.
+    let open = false;
+    let dismissed: { value: string; caret: number } | null = null;
+    const autocomplete = {
+      isOpen: () => open,
+      move: () => {},
+      acceptHighlighted: () => false,
+      close: () => {
+        open = false;
+      },
+      refresh: () => {
+        const caret = input.selectionStart ?? input.value.length;
+        const blocked = dismissed?.value === input.value && dismissed.caret === caret;
+        if (!blocked) dismissed = null;
+        open = !blocked && /[A-Za-z]$/.test(input.value.slice(0, caret));
+      },
+      dismiss: () => {
+        dismissed = { value: input.value, caret: input.selectionStart ?? input.value.length };
+        open = false;
+      },
+    };
+    const controller = attachFormulaBarController({
+      formulabar: detached,
+      fxAccept: document.createElement('button'),
+      fxCancel: document.createElement('button'),
+      fxInput: input,
+      getArgHelper: () => ({ close: () => {}, refresh: () => {} }),
+      getAutocomplete: () => autocomplete,
+      getStrings: () => defaultStrings,
+      cancelBindingEditor: () => {},
+      host: sheet.host,
+      store,
+      updateChrome: () => {},
+      wb: () => sheet.workbook,
+    });
+    input.value = '=SUM(';
+    input.focus();
+    input.dispatchEvent(new FocusEvent('focus'));
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', cancelable: true }));
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', cancelable: true }));
+    expect(input.value).toBe('=SUM(R[-1]C');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', cancelable: true }));
+    expect(input.value).toBe('=SUM(R[-2]C');
+    controller.cancelFx();
+    controller.detach();
+  });
+
+  it('preserves point mode through the function-completion input notification', () => {
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 3, col: 3 });
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = harness;
+    input.focus();
+    input.value = '=SUM(';
+    input.dispatchEvent(new Event('input'));
+    controller.notifyAutocompleteInsert?.({ kind: 'function' });
+    input.dispatchEvent(new Event('input'));
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }));
+    expect(input.value).toBe('=SUM(C4');
+    controller.cancelFx();
+    harness.detach();
+  });
+
+  it('starts a new formula-bar point gesture after F4 changes a referenced token', () => {
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 3, col: 3 });
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = harness;
+    input.focus();
+    const text = '=SUM(C4)+D1';
+    input.value = text;
+    input.dispatchEvent(new Event('input'));
+    const firstRefEnd = text.indexOf('C4') + 2;
+    input.setSelectionRange(firstRefEnd, firstRefEnd);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', cancelable: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }));
+    expect(input.value).toBe(text);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', cancelable: true }));
+    expect(input.value).toBe('=SUM($C$4)+D1');
+    const next = new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true });
+    input.dispatchEvent(next);
+
+    expect(next.defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(D5)+D1');
+    controller.cancelFx();
+    harness.detach();
+  });
+
+  it('restores the private point mode when a formula-bar edit lease is cancelled', () => {
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 3, col: 3 });
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = harness;
+    input.focus();
+    input.value = '=SUM(';
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', cancelable: true }));
+    const lease = controller.suspendForFormulaPalette({
+      getLocale: () => 'en-US',
+      contextCurrent: () => true,
+    });
+    expect(lease).not.toBeNull();
+
+    lease?.userCancel();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }));
+    expect(input.value).toBe('=SUM(C4');
+    controller.cancelFx();
+    harness.detach();
+  });
+
   it('F4 rotates the ref under the caret', () => {
     fxInput.focus();
     fxInput.dispatchEvent(new FocusEvent('focus'));

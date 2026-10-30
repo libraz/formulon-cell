@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { insertFormulaReference } from '../../../src/commands/formula-reference-input.js';
+import {
+  insertFormulaReference,
+  resolveFormulaReferenceInsertionSpan,
+} from '../../../src/commands/formula-reference-input.js';
 
 describe('insertFormulaReference', () => {
   it.each([
@@ -70,6 +73,62 @@ describe('insertFormulaReference', () => {
 
   it('still inserts at a formula operand boundary', () => {
     expect(insertFormulaReference('=SUM(', 5, 5, 'C4')).toEqual({ text: '=SUM(C4', caret: 7 });
+  });
+
+  it.each(['=A1+', '=SUM(A1,', '=SUM(A1;', '=SUM(A1:', '=(A1+'])(
+    'inserts at an empty operand after an operator or separator in %s',
+    (text) => {
+      const result = insertFormulaReference(text, text.length, text.length, 'C4');
+      expect(result.text).toBe(`${text}C4`);
+    },
+  );
+
+  it.each(['=SUM(A1)', '=SUM("x")', '=A1%', '=A1#', '="x"', '=1!'])(
+    'does not append a reference after a completed operand in %s',
+    (text) => {
+      expect(insertFormulaReference(text, text.length, text.length, 'C4')).toEqual({
+        text,
+        caret: text.length,
+      });
+    },
+  );
+
+  it('continues to replace an explicit selection inside a quoted operand', () => {
+    expect(insertFormulaReference('="SUM"', 2, 5, 'C4')).toEqual({ text: '="C4"', caret: 4 });
+  });
+
+  it('rejects a selection that is not entirely in expression context when asked', () => {
+    const options = { requireExpressionSelection: true };
+    expect(resolveFormulaReferenceInsertionSpan('="abc', 2, 5, options)).toBeNull();
+    expect(resolveFormulaReferenceInsertionSpan('="SUM"', 2, 5, options)).toBeNull();
+    expect(resolveFormulaReferenceInsertionSpan('=1+SUM(A1)+2', 3, 10, options)).toEqual({
+      start: 3,
+      end: 10,
+    });
+  });
+
+  it('does not create an operand before an existing string literal', () => {
+    const text = '=A1+"x"';
+    expect(insertFormulaReference(text, 4, 4, 'C4')).toEqual({ text, caret: 4 });
+  });
+
+  it.each(['=@', '=Sheet1!', "='Other Sheet'!", '=@Sheet1!', "=@'Other Sheet'!"])(
+    'keeps an operand after a valid prefix or sheet qualifier in %s',
+    (text) => {
+      expect(insertFormulaReference(text, text.length, text.length, 'C4')).toEqual({
+        text: `${text}C4`,
+        caret: text.length + 2,
+      });
+    },
+  );
+
+  it('replaces a complete R1C1 reference at its closing bracket boundary', () => {
+    const text = '=SUM(R[-1]C[-1])';
+    const caret = text.indexOf(')');
+    expect(insertFormulaReference(text, caret, caret, 'R[0]C[0]', { r1c1: true })).toEqual({
+      text: '=SUM(R[0]C[0])',
+      caret: 13,
+    });
   });
 
   it.each(['B1', 'C4', 'D5'])(

@@ -4,6 +4,131 @@ import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 export type FormulaHelperSurface = 'inline' | 'bar';
 
+export async function runFormulaKeyboardPointing(
+  page: Page,
+  surface: FormulaHelperSurface,
+  platform: 'default' | 'mac',
+): Promise<void> {
+  const sheet = new UserJourneyPage(page);
+  await sheet.mount({ locale: 'en', platform });
+  await sheet.expectNoStub();
+  await page.evaluate(() => {
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    instance.applyChanges([
+      { addr: { sheet: 0, row: 3, col: 3 }, input: '=1' },
+      { addr: { sheet: 0, row: 2, col: 2 }, input: '1' },
+      { addr: { sheet: 0, row: 3, col: 2 }, input: '2' },
+    ]);
+  });
+  const input = page
+    .locator(surface === 'inline' ? '.fc-host__editor' : '.fc-host__formulabar-input')
+    .first();
+  const begin = async () => {
+    await sheet.goTo('D4');
+    if (surface === 'inline') await page.keyboard.press('F2');
+    else await input.focus();
+    await expect(input).toBeFocused();
+  };
+  const caret = () => input.evaluate((el) => (el as HTMLTextAreaElement).selectionStart);
+  const selectCaret = (offset: number) =>
+    input.evaluate(
+      (el, index) => (el as HTMLTextAreaElement).setSelectionRange(index, index),
+      offset,
+    );
+
+  await begin();
+  await input.fill('=SUM(');
+  await page.keyboard.press('ArrowLeft');
+  await expect(input).toHaveValue('=SUM(');
+  expect(await caret()).toBe(4);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('F2');
+  await page.keyboard.press('ArrowLeft');
+  await expect(input).toHaveValue('=SUM(C4');
+  await page.keyboard.press('Shift+ArrowUp');
+  await expect(input).toHaveValue('=SUM(C3:C4');
+  await page.keyboard.press('Shift+ArrowDown');
+  await expect(input).toHaveValue('=SUM(C4');
+  await page.keyboard.press('Shift+ArrowUp');
+  await expect(input).toHaveValue('=SUM(C3:C4');
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState().selection
+          .active,
+    ),
+  ).toEqual({ sheet: 0, row: 3, col: 3 });
+  expect(await sheet.readFormula('D4')).toBe('=1');
+  await page.keyboard.type(')');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => sheet.readFormula('D4')).toBe('=SUM(C3:C4)');
+  expect(await sheet.readValue('D4')).toEqual({ kind: 'number', value: 3 });
+
+  await begin();
+  await input.fill('=SU(C3:C4)');
+  await selectCaret(3);
+  const sum = page.locator('.fc-autocomplete__item').filter({
+    has: page.locator('.fc-autocomplete__name', { hasText: /^SUM$/ }),
+  });
+  await expect(sum).toBeVisible();
+  await sum.click();
+  await page.keyboard.press('Tab');
+  await expect(input).toHaveValue('=SUM(C3:C4)');
+  expect(await caret()).toBe(5);
+  await page.keyboard.press('ArrowLeft');
+  await expect(input).toHaveValue('=SUM(C4)');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => sheet.readFormula('D4')).toBe('=SUM(C4)');
+  expect(await sheet.readValue('D4')).toEqual({ kind: 'number', value: 2 });
+
+  await begin();
+  await input.fill('=SU');
+  await expect(page.locator('.fc-autocomplete')).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(input).toHaveValue('=SU');
+  await page.keyboard.press('F2');
+  await expect(page.locator('.fc-autocomplete')).toHaveCount(0);
+  await page.keyboard.press('ArrowLeft');
+  await expect(input).toHaveValue('=C4');
+  await input.fill('="SUM"');
+  await selectCaret(3);
+  await page.keyboard.press('ArrowLeft');
+  await expect(input).toHaveValue('="SUM"');
+  expect(await caret()).toBe(2);
+  await selectCaret(6);
+  await page.keyboard.press('ArrowLeft');
+  await expect(input).toHaveValue('="SUM"');
+  expect(await caret()).toBe(5);
+  await page.keyboard.press('Escape');
+  expect(await sheet.readFormula('D4')).toBe('=SUM(C4)');
+
+  await begin();
+  await input.fill('=1+SUM(A1)+2');
+  await input.evaluate((el) => (el as HTMLTextAreaElement).setSelectionRange(3, 10));
+  await page.keyboard.press('F2');
+  await page.keyboard.press('ArrowLeft');
+  await expect(input).toHaveValue('=1+C4+2');
+  await page.keyboard.press('Escape');
+  expect(await sheet.readFormula('D4')).toBe('=SUM(C4)');
+
+  if (surface === 'inline') {
+    await sheet.goTo('D4');
+    await page.keyboard.type('=');
+    await page.keyboard.press('ArrowUp');
+    await expect(input).toHaveValue('=D3');
+    await page.keyboard.press('Shift+ArrowLeft');
+    await expect(input).toHaveValue('=C3:D3');
+    const before = await caret();
+    await page.keyboard.press('F2');
+    await page.keyboard.press('ArrowLeft');
+    await expect(input).toHaveValue('=C3:D3');
+    expect(await caret()).toBe(before - 1);
+    await page.keyboard.press('Escape');
+    expect(await sheet.readFormula('D4')).toBe('=SUM(C4)');
+  }
+  await sheet.expectNoConsoleErrors();
+}
+
 export async function runFormulaHelperInteraction(
   page: Page,
   surface: FormulaHelperSurface,
@@ -135,6 +260,26 @@ export async function runFormulaHelperInteraction(
   await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 4));
   await expect(list).toHaveCount(0);
   await page.keyboard.press('Escape');
+
+  await page.evaluate(() => {
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    if (!instance.workbook.setDefinedNameEntry('Rate.Factor', '=2')) {
+      throw new Error('The real workbook rejected the defined-name fixture');
+    }
+    instance.formula.register('FOO', () => 0);
+  });
+  await begin();
+  await input.fill('=Rate.F+1');
+  await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(7, 7));
+  await expect(options.locator('.fc-autocomplete__name')).toHaveText(['Rate.Factor']);
+  await options.first().click();
+  await page.keyboard.press('Tab');
+  await expect(input).toHaveValue('=Rate.Factor+1');
+  await page.keyboard.press('Enter');
+  await expect.poll(source).toEqual({
+    formula: '=Rate.Factor+1',
+    value: { kind: 'number', value: 3 },
+  });
   await sheet.expectNoConsoleErrors();
 }
 

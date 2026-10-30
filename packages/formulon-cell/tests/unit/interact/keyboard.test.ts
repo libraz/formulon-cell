@@ -60,6 +60,14 @@ const setFormat = (store: SpreadsheetStore, row: number, col: number, format: Ce
   });
 };
 
+const setCellKeys = (store: SpreadsheetStore, keys: string[]): void => {
+  store.setState((s) => {
+    const cells = new Map(s.data.cells);
+    for (const key of keys) cells.set(key, { value: { kind: 'blank' }, formula: null });
+    return { ...s, data: { ...s.data, cells } };
+  });
+};
+
 const fire = (
   host: HTMLElement,
   key: string,
@@ -79,7 +87,7 @@ describe('attachKeyboard', () => {
   let host: HTMLElement;
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
-  let onBeginEdit: Mock<(seed: string) => void>;
+  let onBeginEdit: Mock<(seed: string, options?: { mode?: 'edit' | 'point' }) => void>;
   let onClearActive: Mock<() => void>;
   let onAfterHistory: Mock<() => void>;
   let onGoTo: Mock<() => void>;
@@ -126,7 +134,7 @@ describe('attachKeyboard', () => {
     document.body.appendChild(host);
     store = createSpreadsheetStore();
     wb = await newWb();
-    onBeginEdit = vi.fn<(seed: string) => void>();
+    onBeginEdit = vi.fn<(seed: string, options?: { mode?: 'edit' | 'point' }) => void>();
     onClearActive = vi.fn<() => void>();
     onAfterHistory = vi.fn<() => void>();
     onGoTo = vi.fn<() => void>();
@@ -838,6 +846,142 @@ describe('attachKeyboard', () => {
   });
 
   describe('Ctrl+Arrow jumpEdge', () => {
+    it.each([
+      { key: 'ArrowDown', start: 0, target: 900_000, vertical: true },
+      { key: 'ArrowUp', start: 900_000, target: 100, vertical: true },
+      { key: 'ArrowRight', start: 0, target: 9_000, vertical: false },
+      { key: 'ArrowLeft', start: 15_000, target: 1_000, vertical: false },
+    ])('$key sparse fallback finds a distant populated cell with bounded probes', (testCase) => {
+      setup();
+      const row = testCase.vertical ? testCase.target : 7;
+      const col = testCase.vertical ? 7 : testCase.target;
+      setCellKeys(store, [addrKey({ sheet: 0, row, col })]);
+      mutators.setActive(store, {
+        sheet: 0,
+        row: testCase.vertical ? testCase.start : 7,
+        col: testCase.vertical ? 7 : testCase.start,
+      });
+      const cells = store.getState().data.cells;
+      const has = vi.spyOn(cells, 'has');
+      const keys = vi.spyOn(cells, 'keys');
+
+      fire(host, testCase.key, { ctrlKey: true });
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row, col });
+      expect(has.mock.calls.length).toBeLessThanOrEqual(35);
+      expect(keys).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not scan cell keys when the ordinary gap probe finds a nearby cell', () => {
+      setup();
+      setCellKeys(store, [addrKey({ sheet: 0, row: 3, col: 0 })]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const cells = store.getState().data.cells;
+      const keys = vi.spyOn(cells, 'keys');
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active.row).toBe(3);
+      expect(keys).not.toHaveBeenCalled();
+    });
+
+    it('sparse fallback considers canonical in-bounds addresses on the active line', () => {
+      setup();
+      setCellKeys(store, [
+        '1:50:0',
+        '0:50:1',
+        '0:050:0',
+        '0:-1:0',
+        '0:1048576:0',
+        '0:0:16384',
+        '0:100:0',
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const keys = vi.spyOn(store.getState().data.cells, 'keys');
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 100, col: 0 });
+      expect(keys).toHaveBeenCalledTimes(1);
+    });
+
+    it('probes a moderate gap before scanning a larger off-axis cell map', () => {
+      setup();
+      const offAxisKeys = Array.from({ length: 2_000 }, (_, index) =>
+        addrKey({ sheet: 0, row: index + 1, col: 1 }),
+      );
+      setCellKeys(store, [...offAxisKeys, addrKey({ sheet: 0, row: 100, col: 0 })]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const keys = vi.spyOn(store.getState().data.cells, 'keys');
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 100, col: 0 });
+      expect(keys).not.toHaveBeenCalled();
+    });
+
+    it('sparse fallback preserves the nearest reverse-direction target', () => {
+      setup();
+      setCellKeys(store, [
+        addrKey({ sheet: 0, row: 850, col: 0 }),
+        addrKey({ sheet: 0, row: 900, col: 0 }),
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 1_000, col: 0 });
+
+      fire(host, 'ArrowUp', { ctrlKey: true });
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 900, col: 0 });
+    });
+
+    it('sparse fallback includes format-only cells and skips empty formats', () => {
+      setup();
+      setFormat(store, 2, 0, {});
+      setFormat(store, 900_000, 0, { hyperlink: 'https://example.test' });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const formats = store.getState().format.formats;
+      const entries = vi.spyOn(formats, 'entries');
+      const cells = store.getState().data.cells;
+      const has = vi.spyOn(cells, 'has');
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active.row).toBe(900_000);
+      expect(has.mock.calls.length).toBeLessThanOrEqual(35);
+      expect(entries).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not sparse-scan a populated contiguous run', () => {
+      setup();
+      setCellKeys(store, [
+        addrKey({ sheet: 0, row: 0, col: 0 }),
+        addrKey({ sheet: 0, row: 1, col: 0 }),
+        addrKey({ sheet: 0, row: 2, col: 0 }),
+        addrKey({ sheet: 0, row: 5, col: 0 }),
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const keys = vi.spyOn(store.getState().data.cells, 'keys');
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active.row).toBe(2);
+      expect(keys).not.toHaveBeenCalled();
+    });
+
+    it('sparse fallback with no matching cell still reaches the sheet edge', () => {
+      setup();
+      setCellKeys(store, ['1:5:0', '0:5:1']);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      const cells = store.getState().data.cells;
+      const has = vi.spyOn(cells, 'has');
+      const keys = vi.spyOn(cells, 'keys');
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active.row).toBe(1_048_575);
+      expect(has.mock.calls.length).toBeLessThanOrEqual(35);
+      expect(keys).toHaveBeenCalledTimes(1);
+    });
+
     it('empty origin + populated cells skips blanks to the next populated', () => {
       setup();
       seed(store, wb, [
@@ -920,7 +1064,7 @@ describe('attachKeyboard', () => {
     it('Ctrl+Enter starts edit without moving', () => {
       setup();
       const e = fire(host, 'Enter', { ctrlKey: true });
-      expect(onBeginEdit).toHaveBeenCalledWith('');
+      expect(onBeginEdit).toHaveBeenCalledWith('', { mode: 'point' });
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
       expect(e.defaultPrevented).toBe(true);
     });
@@ -928,7 +1072,7 @@ describe('attachKeyboard', () => {
     it('printable character calls onBeginEdit with that key', () => {
       setup();
       fire(host, 'a');
-      expect(onBeginEdit).toHaveBeenCalledWith('a');
+      expect(onBeginEdit).toHaveBeenCalledWith('a', { mode: 'point' });
     });
 
     it('printable + Alt or meta does not begin edit', () => {
@@ -943,7 +1087,7 @@ describe('attachKeyboard', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 5, formula: '=2+3' }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fire(host, 'F2');
-      expect(onBeginEdit).toHaveBeenCalledWith('=2+3');
+      expect(onBeginEdit).toHaveBeenCalledWith('=2+3', { mode: 'edit' });
     });
 
     it('F2 hides a formula seed when the cell is Hidden on a protected sheet', () => {
@@ -954,7 +1098,7 @@ describe('attachKeyboard', () => {
       mutators.setSheetProtected(store, 0, true);
       mutators.setActive(store, addr);
       fire(host, 'F2');
-      expect(onBeginEdit).toHaveBeenCalledWith('');
+      expect(onBeginEdit).toHaveBeenCalledWith('', { mode: 'edit' });
     });
 
     it('F2 seeds with formatted number when no formula', () => {
@@ -962,7 +1106,7 @@ describe('attachKeyboard', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 42 }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fire(host, 'F2');
-      expect(onBeginEdit).toHaveBeenCalledWith('42');
+      expect(onBeginEdit).toHaveBeenCalledWith('42', { mode: 'edit' });
     });
 
     it('F2 seeds with TRUE/FALSE for booleans', () => {
@@ -970,7 +1114,7 @@ describe('attachKeyboard', () => {
       seed(store, wb, [{ row: 0, col: 0, value: true }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fire(host, 'F2');
-      expect(onBeginEdit).toHaveBeenCalledWith('TRUE');
+      expect(onBeginEdit).toHaveBeenCalledWith('TRUE', { mode: 'edit' });
     });
 
     it('F2 seeds with raw text', () => {
@@ -978,14 +1122,14 @@ describe('attachKeyboard', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'hello' }]);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fire(host, 'F2');
-      expect(onBeginEdit).toHaveBeenCalledWith('hello');
+      expect(onBeginEdit).toHaveBeenCalledWith('hello', { mode: 'edit' });
     });
 
     it('F2 seeds with empty string when the cell is blank', () => {
       setup();
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fire(host, 'F2');
-      expect(onBeginEdit).toHaveBeenCalledWith('');
+      expect(onBeginEdit).toHaveBeenCalledWith('', { mode: 'edit' });
     });
 
     it('Control+U on Mac begins editing the existing cell seed', () => {
@@ -998,7 +1142,7 @@ describe('attachKeyboard', () => {
       const e = fire(host, 'U', { ctrlKey: true });
 
       expect(e.defaultPrevented).toBe(true);
-      expect(onBeginEdit).toHaveBeenCalledWith('seed');
+      expect(onBeginEdit).toHaveBeenCalledWith('seed', { mode: 'edit' });
     });
 
     it('Cmd+Control+V routes to Paste Special on Mac exactly once', () => {
@@ -1124,7 +1268,7 @@ describe('attachKeyboard', () => {
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
       expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
-      expect(onBeginEdit).toHaveBeenCalledWith('');
+      expect(onBeginEdit).toHaveBeenCalledWith('', { mode: 'point' });
     });
 
     it('Backspace routes through a registered controller even without a policy', () => {
@@ -1148,7 +1292,7 @@ describe('attachKeyboard', () => {
         fire(host, 'Backspace');
         expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
         expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'applied' }));
-        expect(onBeginEdit).toHaveBeenCalledWith('');
+        expect(onBeginEdit).toHaveBeenCalledWith('', { mode: 'point' });
         expect(history.undo()).toBe(true);
         expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
 

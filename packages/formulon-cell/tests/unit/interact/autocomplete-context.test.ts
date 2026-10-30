@@ -108,6 +108,27 @@ describe('formula autocomplete respects caret context', () => {
     expect(input.value).toBe('=Sales[Region]');
   });
 
+  it('reports the accepted table-column candidate kind', () => {
+    const input = document.createElement('textarea');
+    input.value = '=Sales[Re';
+    input.setSelectionRange(input.value.length, input.value.length);
+    document.body.append(input);
+    let outcome: { kind: string } | undefined;
+    const handle = attachAutocomplete({
+      input,
+      getTables: () => [table],
+      onAfterInsert: (result) => {
+        outcome = result;
+      },
+    });
+    attached.push({ input, handle });
+    handle.refresh();
+
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=Sales[Region]');
+    expect(outcome).toEqual({ kind: 'tableColumn' });
+  });
+
   it('keeps function and name suggestions active in formula expression text', () => {
     const { handle } = setup('=SUMC');
 

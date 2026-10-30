@@ -1,4 +1,4 @@
-import { formulaCaretContext } from '../commands/formula-edit-context.js';
+import { formulaCaretContext, formulaIdentifierPrefix } from '../commands/formula-edit-context.js';
 import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
@@ -7,6 +7,12 @@ import { createFormulaCaretPositioner } from './formula-helper-position.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 let autocompleteSeq = 0;
+
+export type AutocompleteSuggestionKind = 'function' | 'tableColumn' | 'column' | 'history' | 'name';
+
+export interface AutocompleteInsertOutcome {
+  kind: AutocompleteSuggestionKind;
+}
 
 export interface AutocompleteHandle {
   /** Re-evaluate the suggestion list against the current input value/caret.
@@ -76,8 +82,9 @@ export interface AutocompleteDeps {
   /** The textarea/input being edited. */
   input: HTMLInputElement | HTMLTextAreaElement;
   /** Called after the popover has rewritten input.value so consumers can
-   *  re-sync mirror state (e.g. formula-bar ref highlighting). */
-  onAfterInsert?: () => void;
+   *  re-sync mirror state (e.g. formula-bar ref highlighting). Receives the
+   *  accepted candidate kind; existing zero-argument callbacks remain valid. */
+  onAfterInsert?: (outcome?: AutocompleteInsertOutcome) => void;
   /** Snapshot of available tables for structured-ref completion. Returning
    *  `[]` (or omitting) disables the `Table[…` path; functions still complete. */
   getTables?: () => readonly AutocompleteTable[];
@@ -132,10 +139,13 @@ interface SuggestionContext {
    *  for refs and `${match}(` for functions. */
   insertSuffix: string;
   /** The kind drives display labels and badges. */
-  kind: 'function' | 'tableColumn' | 'column' | 'history' | 'name';
+  kind: AutocompleteSuggestionKind;
   /** Per-match kind and detail when the list mixes functions and names. */
-  kinds?: SuggestionContext['kind'][];
+  kinds?: AutocompleteSuggestionKind[];
   details?: string[];
+  /** Number of existing characters after the replacement that place the caret
+   *  inside a call parenthesis already present in the formula. */
+  existingCallParenLength?: number;
 }
 
 interface AutocompleteItemButtonInput {
@@ -515,16 +525,20 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     if (!ctx || ctx.matches.length === 0) return false;
     const pick = ctx.matches[highlight];
     if (!pick) return false;
+    const acceptedKind = ctx.kinds?.[highlight] ?? ctx.kind;
     const before = input.value.slice(0, ctx.tokenStart);
     const after = input.value.slice(ctx.tokenEnd);
-    const insert = ctx.kinds?.[highlight] === 'name' ? pick : `${pick}${ctx.insertSuffix}`;
+    const insert = acceptedKind === 'name' ? pick : `${pick}${ctx.insertSuffix}`;
     input.value = before + insert + after;
-    const caret = before.length + insert.length;
+    const caret =
+      before.length +
+      insert.length +
+      (acceptedKind === 'function' ? (ctx.existingCallParenLength ?? 0) : 0);
     input.setSelectionRange(caret, caret);
     input.focus();
     dismissed = { value: input.value, caret };
     close();
-    deps.onAfterInsert?.();
+    deps.onAfterInsert?.({ kind: acceptedKind });
     return true;
   };
 
@@ -589,7 +603,10 @@ function computeContext(
   // the caret splits a token, accepting would duplicate its remaining text.
   const next = text[caret] ?? '';
   if (next && /[\p{L}\p{N}_.\\]/u.test(next)) return null;
-  const struct = suggestStructuredRef(text, caret, deps.getTables?.() ?? []);
+  const existingCallParenLength = existingFunctionParenLength(text, caret);
+  const struct = existingCallParenLength
+    ? null
+    : suggestStructuredRef(text, caret, deps.getTables?.() ?? []);
   if (struct) return struct;
   const engineNames = deps.getFunctionNames?.();
   const displayNames = deps.getFunctionDisplayNames?.() ?? null;
@@ -601,7 +618,7 @@ function computeContext(
     fnNames ? { names: fnNames } : undefined,
   );
   const custom = suggestCustomFunctions(text, caret, deps.getCustomFunctions?.() ?? []);
-  const names = suggestNames(text, caret, deps.getNames?.() ?? []);
+  const names = existingCallParenLength ? null : suggestNames(text, caret, deps.getNames?.() ?? []);
   if (!fn && !custom && !names) return null;
   // Merge runtime and built-in names, then present the complete prefix match
   // set alphabetically. Keep the first spelling on a case-insensitive clash.
@@ -650,9 +667,21 @@ function computeContext(
     matches: merged,
     tokenStart,
     tokenEnd: caret,
-    insertSuffix: '(',
+    insertSuffix: existingCallParenLength ? '' : '(',
     kind: 'function',
+    existingCallParenLength: existingCallParenLength ?? undefined,
   };
+}
+
+function existingFunctionParenLength(text: string, caret: number): number | null {
+  const context = formulaCaretContext(text, caret);
+  if (context !== 'function' && context !== 'expression') return null;
+  const { token } = formulaIdentifierPrefix(text, caret);
+  if (!/^[\p{L}_]/u.test(token)) return null;
+  const openParen = /^\s*\(/u.exec(text.slice(caret))?.[0];
+  if (!openParen) return null;
+  if (context === 'function' || openParen.length > 1) return openParen.length;
+  return null;
 }
 
 /** Plain-text values above `beforeRow` in column `col` for the "pick from
@@ -730,15 +759,9 @@ function suggestCustomFunctions(
   names: readonly string[],
 ): { token: string; tokenStart: number; matches: string[] } | null {
   if (!text.startsWith('=') || names.length === 0) return null;
-  if (formulaCaretContext(text, caret) !== 'expression') return null;
-  let i = caret - 1;
-  while (i >= 0) {
-    const ch = text[i] ?? '';
-    if (/[\p{L}\p{N}_]/u.test(ch)) i -= 1;
-    else break;
-  }
-  const tokenStart = i + 1;
-  const token = text.slice(tokenStart, caret);
+  const caretContext = formulaCaretContext(text, caret);
+  if (caretContext !== 'expression' && caretContext !== 'function') return null;
+  const { token, tokenStart } = formulaIdentifierPrefix(text, caret);
   if (token.length < 1 || !/^[\p{L}_]/u.test(token)) return null;
   const upper = token.toLocaleUpperCase();
   const matches = names.filter((n) => n.toLocaleUpperCase().startsWith(upper));
@@ -761,10 +784,7 @@ function suggestNames(
 ): { tokenStart: number; matches: AutocompleteName[] } | null {
   if (!text.startsWith('=') || names.length === 0) return null;
   if (formulaCaretContext(text, caret) !== 'expression') return null;
-  let i = caret - 1;
-  while (i >= 0 && /[\p{L}\p{N}_.\\]/u.test(text[i] ?? '')) i -= 1;
-  const tokenStart = i + 1;
-  const token = text.slice(tokenStart, caret);
+  const { token, tokenStart } = formulaIdentifierPrefix(text, caret);
   if (token.length < 1 || !/^[\p{L}_\\]/u.test(token)) return null;
   const upper = token.toLocaleUpperCase();
   const seen = new Set<string>();

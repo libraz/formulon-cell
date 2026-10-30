@@ -5,12 +5,16 @@ import {
   runFormulaHelperGeometry,
   runFormulaHelperInteraction,
   runFormulaHelperVisual,
+  runFormulaKeyboardPointing,
 } from '../../../tests/e2e-shared/scenarios/formula-helper-compat.js';
 
 for (const platform of ['default', 'mac'] as const) {
   for (const surface of ['inline', 'bar'] satisfies FormulaHelperSurface[]) {
     test(`vue-demo: ${platform} ${surface} function helper interactions`, async ({ page }) => {
       await runFormulaHelperInteraction(page, surface, platform);
+    });
+    test(`vue-demo: ${platform} ${surface} formula keyboard pointing`, async ({ page }) => {
+      await runFormulaKeyboardPointing(page, surface, platform);
     });
   }
 }

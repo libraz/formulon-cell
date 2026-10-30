@@ -280,7 +280,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         store,
         wb,
         history,
-        onBeginEdit: (seed) => editor.begin(seed),
+        onBeginEdit: (seed, options) => editor.begin(seed, options),
         onClearActive: () => {
           refreshCells();
           updateChrome();
@@ -416,7 +416,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       sheetProtected: s.protection.protectedSheets.has(a.sheet),
       locale: inputLocaleForWorkbook(wb),
     });
-    editor.begin(seed);
+    editor.begin(seed, { mode: 'edit' });
   };
   const onDblClick = (e: MouseEvent): void => {
     if (e.button !== 0) return;

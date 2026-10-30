@@ -1,5 +1,5 @@
 import { colFromLetters, formatA1Cell, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
-import { formulaCaretContext } from './formula-edit-context.js';
+import { formulaCaretContext, formulaIdentifierPrefix } from './formula-edit-context.js';
 import { rewriteRefs } from './formula-ref-lexer.js';
 
 /**
@@ -153,7 +153,8 @@ function nextStep(absCol: boolean, absRow: boolean): { col: boolean; row: boolea
 
 const R1C1_REF_RE = /R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?/iy;
 
-const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string => {
+/** Resolve one R1C1 atom against `base` into A1 text (`$B$5`), or `#REF!`. */
+export const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string => {
   const m = /^R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?$/i.exec(raw);
   if (!m) return raw;
   const row =
@@ -417,18 +418,15 @@ export function suggestFunctions(
   max = 8,
   opts: { names?: readonly string[] } = {},
 ): { token: string; tokenStart: number; matches: string[] } | null {
-  // Only suggest when we're inside a formula (text starts with '=').
-  if (!text.startsWith('=') || formulaCaretContext(text, caret) !== 'expression') return null;
-  // Dotted names such as BETA.DIST are one token; decimal literals still fail
-  // the leading-letter check below.
-  let i = caret - 1;
-  while (i >= 0) {
-    const ch = text[i] ?? '';
-    if (isUnicodeIdentifierChar(ch)) i -= 1;
-    else break;
-  }
-  const tokenStart = i + 1;
-  const token = text.slice(tokenStart, caret);
+  // Only suggest in formula expressions and at a function name immediately
+  // before its opening parenthesis.
+  const caretContext = formulaCaretContext(text, caret);
+  if (!text.startsWith('=') || (caretContext !== 'expression' && caretContext !== 'function'))
+    return null;
+  // Same token boundary as custom functions and defined names, so a candidate
+  // cannot match only the suffix after a dot or backslash. Dotted names such as
+  // BETA.DIST are one token; decimal literals still fail the leading-letter check below.
+  const { token, tokenStart } = formulaIdentifierPrefix(text, caret);
   if (token.length < 1) return null;
   if (!/^[\p{L}_]/u.test(token)) return null;
   const upper = token.toLocaleUpperCase();

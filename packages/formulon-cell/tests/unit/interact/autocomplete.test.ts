@@ -141,6 +141,29 @@ describe('suggestColumnHistory', () => {
   });
 });
 
+describe('autocomplete insertion outcomes', () => {
+  it('reports the accepted column-history candidate kind', () => {
+    const input = document.createElement('textarea');
+    input.value = 'App';
+    input.setSelectionRange(input.value.length, input.value.length);
+    document.body.append(input);
+    let outcome: { kind: string } | undefined;
+    const handle = attach({
+      input,
+      editingAddr: { sheet: 0, row: 4, col: 2 },
+      getColumnValues: () => ['Apple'],
+      onAfterInsert: (result) => {
+        outcome = result;
+      },
+    });
+    handle.refresh();
+
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('Apple');
+    expect(outcome).toEqual({ kind: 'column' });
+  });
+});
+
 describe('attachAutocomplete labels', () => {
   it('renders localized labels for custom functions', () => {
     const input = document.createElement('textarea');
@@ -378,5 +401,139 @@ describe('attachAutocomplete defined names', () => {
     expect(document.querySelector('.fc-autocomplete__name')?.textContent).toBe('売上');
     handle.detach();
     input.remove();
+  });
+
+  it('uses the full dotted identifier for custom-function and defined-name matches', () => {
+    const input = document.createElement('textarea');
+    input.value = '=Rate.F';
+    input.setSelectionRange(input.value.length, input.value.length);
+    document.body.append(input);
+    let outcome: { kind: string } | undefined;
+    const handle = attach({
+      input,
+      getNames: () => [{ name: 'Rate.Factor', detail: '=Sheet1!$A$1' }],
+      getCustomFunctions: () => ['FOO', 'Rate.FOO'],
+      getFunctionNames: () => [],
+      onAfterInsert: (result) => {
+        outcome = result;
+      },
+    });
+    handle.refresh();
+
+    const candidates = [...document.querySelectorAll('.fc-autocomplete__name')].map(
+      (node) => node.textContent,
+    );
+    expect.soft(candidates).toEqual(['Rate.Factor', 'Rate.FOO']);
+    const nameIndex = candidates.indexOf('Rate.Factor');
+    for (let i = 0; i < nameIndex; i += 1) handle.move(1);
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=Rate.Factor');
+    expect(outcome).toEqual({ kind: 'name' });
+  });
+
+  it('keeps backslash-prefixed names whole and does not suggest a built-in suffix', () => {
+    const input = document.createElement('textarea');
+    input.value = '=\\SU';
+    input.setSelectionRange(input.value.length, input.value.length);
+    document.body.append(input);
+    const handle = attach({
+      input,
+      getNames: () => [{ name: '\\SUMRate', detail: '=Sheet1!$A$1' }],
+      getFunctionNames: () => ['SUM'],
+    });
+    handle.refresh();
+
+    expect
+      .soft(
+        [...document.querySelectorAll('.fc-autocomplete__name')].map((node) => node.textContent),
+      )
+      .toEqual(['\\SUMRate']);
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=\\SUMRate');
+  });
+
+  it('matches dotted Unicode custom functions against the entire identifier', () => {
+    const input = document.createElement('textarea');
+    input.value = '=売上_2.電';
+    input.setSelectionRange(input.value.length, input.value.length);
+    document.body.append(input);
+    const handle = attach({
+      input,
+      getCustomFunctions: () => ['電算', '売上_2.電算'],
+      getFunctionNames: () => [],
+    });
+    handle.refresh();
+
+    expect
+      .soft(
+        [...document.querySelectorAll('.fc-autocomplete__name')].map((node) => node.textContent),
+      )
+      .toEqual(['売上_2.電算']);
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=売上_2.電算(');
+  });
+
+  it.each([
+    ['=SU(A1)', 3, '=SUM(A1)', 5],
+    ['=IF(1,SU(A1),0)', 8, '=IF(1,SUM(A1),0)', 10],
+    ['=SU  (A1)', 3, '=SUM  (A1)', 7],
+  ])(
+    'completes a function name before its existing call: %s',
+    (value, caret, expected, expectedCaret) => {
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.setSelectionRange(caret, caret);
+      document.body.append(input);
+      let outcome: { kind: string } | undefined;
+      const handle = attach({
+        input,
+        getFunctionNames: () => ['SUM'],
+        getCustomFunctions: () => ['SUMCUSTOM'],
+        getNames: () => [{ name: 'SumRate', detail: '=Sheet1!$A$1' }],
+        onAfterInsert: (result) => {
+          outcome = result;
+        },
+      });
+      handle.refresh();
+
+      expect(handle.isOpen()).toBe(true);
+      expect(
+        [...document.querySelectorAll('.fc-autocomplete__name')].map((node) => node.textContent),
+      ).toEqual(['SUM', 'SUMCUSTOM']);
+      expect(handle.acceptHighlighted()).toBe(true);
+      expect(input.value).toBe(expected);
+      expect(input.selectionStart).toBe(expectedCaret);
+      expect(outcome).toEqual({ kind: 'function' });
+    },
+  );
+
+  it('does not offer names when a call-name prefix has no function matches', () => {
+    const input = document.createElement('textarea');
+    input.value = '=SU(';
+    input.setSelectionRange(input.value.length - 1, input.value.length - 1);
+    document.body.append(input);
+    const handle = attach({
+      input,
+      getFunctionNames: () => [],
+      getNames: () => [{ name: 'SumRate', detail: '=Sheet1!$A$1' }],
+    });
+
+    handle.refresh();
+
+    expect(handle.isOpen()).toBe(false);
+  });
+
+  it('keeps a remaining function-name suffix intact before an existing parenthesis', () => {
+    const input = document.createElement('textarea');
+    input.value = '=SUM(A1)';
+    input.setSelectionRange(3, 3);
+    document.body.append(input);
+    const handle = attach({ input, getFunctionNames: () => ['SUM', 'SUMIF'] });
+
+    handle.refresh();
+
+    expect(handle.isOpen()).toBe(false);
+    expect(handle.acceptHighlighted()).toBe(false);
+    expect(input.value).toBe('=SUM(A1)');
   });
 });

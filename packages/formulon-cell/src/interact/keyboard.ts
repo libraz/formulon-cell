@@ -10,7 +10,7 @@ import {
   runAfterAllowedRangeUnlock,
   warnProtected,
 } from '../commands/protection.js';
-import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -43,6 +43,50 @@ const clamp = (a: Addr, row: number, col: number): Addr => ({
   row: Math.max(0, Math.min(MAX_ROW, row)),
   col: Math.max(0, Math.min(MAX_COL, col)),
 });
+
+const MIN_JUMP_EDGE_GAP_PROBES = 32;
+
+function sparsePopulatedOnLine(
+  s: State,
+  a: Addr,
+  row: number,
+  col: number,
+  dRow: number,
+  dCol: number,
+): Addr | null {
+  const start = dRow !== 0 ? row : col;
+  const forward = dRow !== 0 ? dRow > 0 : dCol > 0;
+  let nearest: number | null = null;
+  const consider = (key: string): void => {
+    const addr = parseAddrKey(key);
+    if (
+      !addr ||
+      addrKey(addr) !== key ||
+      addr.sheet !== a.sheet ||
+      addr.row < 0 ||
+      addr.row > MAX_ROW ||
+      addr.col < 0 ||
+      addr.col > MAX_COL
+    ) {
+      return;
+    }
+    if (dRow !== 0 ? addr.col !== a.col : addr.row !== a.row) return;
+
+    const position = dRow !== 0 ? addr.row : addr.col;
+    if (forward ? position < start : position > start) return;
+    if (nearest === null || (forward ? position < nearest : position > nearest)) {
+      nearest = position;
+    }
+  };
+
+  for (const key of s.data.cells.keys()) consider(key);
+  for (const [key, format] of s.format.formats.entries()) {
+    if (formatHasContent(format)) consider(key);
+  }
+
+  if (nearest === null) return null;
+  return clamp(a, dRow !== 0 ? nearest : a.row, dCol !== 0 ? nearest : a.col);
+}
 
 /**
  * Spreadsheet-style Ctrl+Arrow jump. Three behaviors based on neighbor state:
@@ -78,12 +122,24 @@ function jumpEdge(s: State, a: Addr, dRow: number, dCol: number): Addr {
     return clamp(a, r, c);
   }
   // Either origin is blank, or origin is populated but adjacent is blank.
-  // Skip blanks to next populated cell.
+  // Let moderate gaps in a larger map stay on direct probes before scanning
+  // sparse model content. Reaching the sheet edge still stops the loop early.
+  const sparseScanAfter = Math.max(
+    MIN_JUMP_EDGE_GAP_PROBES,
+    s.data.cells.size + s.format.formats.size,
+  );
+  let probes = 0;
   while (r >= 0 && r <= MAX_ROW && c >= 0 && c <= MAX_COL) {
     if (isPopulated(s, sheet, r, c)) return clamp(a, r, c);
     if ((dRow !== 0 && r === limitRow) || (dCol !== 0 && c === limitCol)) break;
     r += dRow;
     c += dCol;
+    probes += 1;
+    if (probes === sparseScanAfter) {
+      const sparseTarget = sparsePopulatedOnLine(s, a, r, c, dRow, dCol);
+      if (sparseTarget) return sparseTarget;
+      break;
+    }
   }
   // No populated cell found — go to sheet edge in that direction.
   return clamp(a, dRow !== 0 ? limitRow : a.row, dCol !== 0 ? limitCol : a.col);
@@ -116,7 +172,7 @@ export interface KeyboardDeps {
   history?: import('../commands/history.js').History | null;
   /** Called when the user enters edit mode — playground / editor element
    *  consumes this to position the editor input. */
-  onBeginEdit: (seed: string) => void;
+  onBeginEdit: (seed: string, options?: { mode?: 'edit' | 'point' }) => void;
   onClearActive: () => void;
   /** Called after Cmd/Ctrl+Z or Cmd/Ctrl+Y reached the workbook. The host
    *  needs to refresh its cached cell map. */
@@ -209,7 +265,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     ) {
       e.preventDefault();
       e.stopImmediatePropagation();
-      deps.onBeginEdit(formatExisting(s, a, deps.wb));
+      deps.onBeginEdit(formatExisting(s, a, deps.wb), { mode: 'edit' });
       return;
     }
 
@@ -490,12 +546,12 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       target = next.addr;
       preserveSelection = next.preserveSelection;
     } else if (meta && k === 'Enter') {
-      deps.onBeginEdit('');
+      deps.onBeginEdit('', { mode: 'point' });
       e.preventDefault();
       return;
-    } else if (k === 'F2') {
+    } else if (k === 'F2' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       const seed = formatExisting(s, a, deps.wb);
-      deps.onBeginEdit(seed);
+      deps.onBeginEdit(seed, { mode: 'edit' });
       e.preventDefault();
       return;
     } else if (k === 'Backspace') {
@@ -515,7 +571,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
           });
           if (result.status !== 'rejected') {
             deps.onClearActive();
-            deps.onBeginEdit('');
+            deps.onBeginEdit('', { mode: 'point' });
           }
         });
         return;
@@ -530,7 +586,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
         if (blockDataTableCells(deps.wb, [a])) return;
         deps.wb.setBlank(a);
         deps.onClearActive();
-        deps.onBeginEdit('');
+        deps.onBeginEdit('', { mode: 'point' });
       });
       return;
     } else if (k === 'Delete') {
@@ -575,7 +631,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       return;
     } else if (k.length === 1 && !meta && !e.altKey) {
       // Printable -> begin edit, seed with the typed char.
-      deps.onBeginEdit(k);
+      deps.onBeginEdit(k, { mode: 'point' });
       e.preventDefault();
       return;
     } else {

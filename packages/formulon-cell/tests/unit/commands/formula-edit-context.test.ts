@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { formulaCaretContext } from '../../../src/commands/formula-edit-context.js';
+import {
+  formulaCaretContext,
+  formulaIdentifierPrefix,
+} from '../../../src/commands/formula-edit-context.js';
 
 describe('formulaCaretContext', () => {
   it.each([
@@ -16,5 +19,16 @@ describe('formulaCaretContext', () => {
     ['=SUM(A1)', 6, 'expression'],
   ] as const)('identifies context in %s at %i', (text, caret, expected) => {
     expect(formulaCaretContext(text, caret)).toBe(expected);
+  });
+});
+
+describe('formulaIdentifierPrefix', () => {
+  it.each([
+    ['=\\SUMRate', 9, '\\SUMRate', 1],
+    ['=Rate.Factor', 7, 'Rate.F', 1],
+    ['=売上_2.電算', 7, '売上_2.電', 1],
+    ['=𐐀_1.Abc', 7, '𐐀_1.A', 1],
+  ])('scans the shared identifier token in %s at %i', (text, caret, token, tokenStart) => {
+    expect(formulaIdentifierPrefix(text, caret)).toEqual({ token, tokenStart });
   });
 });
