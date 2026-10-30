@@ -61,23 +61,26 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   let optionsOpen = false;
 
   const overlay = document.createElement('div');
-  overlay.className = 'fc-find';
+  overlay.className = 'fc-find fc-fmtdlg__panel';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'false');
   overlay.hidden = true;
 
   const titlebar = document.createElement('div');
-  titlebar.className = 'fc-find__titlebar';
+  titlebar.className = 'fc-fmtdlg__header fc-find__titlebar';
   const title = document.createElement('div');
   title.className = 'fc-find__title';
   const closeBtn = makeBtn('fc-find__btn--icon');
+  closeBtn.className = 'fc-fmtdlg__close fc-find__btn--icon';
   titlebar.append(title, closeBtn);
 
   const tabs = document.createElement('div');
-  tabs.className = 'fc-find__tabs';
+  tabs.className = 'fc-fmtdlg__tabs fc-find__tabs';
   tabs.setAttribute('role', 'tablist');
   const findTab = makeBtn('fc-find__tab');
   const replaceTab = makeBtn('fc-find__tab');
+  findTab.className = 'fc-fmtdlg__tab fc-find__tab';
+  replaceTab.className = 'fc-fmtdlg__tab fc-find__tab';
   findTab.setAttribute('role', 'tab');
   replaceTab.setAttribute('role', 'tab');
   tabs.append(findTab, replaceTab);
@@ -182,7 +185,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   results.append(resultsTable, resultsSummary);
 
   const footer = document.createElement('div');
-  footer.className = 'fc-find__footer';
+  footer.className = 'fc-fmtdlg__footer fc-find__footer';
   const findAllBtn = makeBtn();
   findAllBtn.classList.add('fc-find__btn--find-all');
   const prevBtn = makeBtn();
@@ -513,7 +516,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       ariaDescription: false,
       titlePrefix: t.lookIn,
     });
-    findInput.placeholder = activeTab === 'find' ? t.findLabel : t.findWhat;
   };
 
   const showTab = (tab: FindTab): void => {
@@ -646,7 +648,9 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
 function makeBtn(extraClass?: string): HTMLButtonElement {
   const b = createDialogButton({ label: '', baseClass: 'fc-find__btn' });
-  b.className = extraClass ? `fc-find__btn ${extraClass}` : 'fc-find__btn';
+  b.className = extraClass
+    ? `fc-fmtdlg__btn fc-find__btn ${extraClass}`
+    : 'fc-fmtdlg__btn fc-find__btn';
   return b;
 }
 

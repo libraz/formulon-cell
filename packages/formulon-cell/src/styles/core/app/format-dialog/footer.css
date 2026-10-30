@@ -39,6 +39,25 @@
     background: var(--fc-fmtdlg-btn-primary-hover-bg);
     border-color: var(--fc-fmtdlg-btn-primary-hover-bg);
   }
+  /* The confirm pair follows the platform: OK before Cancel on Windows, after
+     it on Mac. Only the adjacent pair swaps, so auxiliary buttons keep place;
+     Evaluate Formula's [Evaluate, Close] is an action row, not a confirm pair. */
+  :not([data-fc-platform="mac"])
+    > .fc-fmtdlg
+    :is(.fc-fmtdlg__footer, .fc-namedlg-editor__buttons, .fc-namedlg-confirm__buttons):not(
+      .fc-evaldlg__footer
+    )
+    > .fc-fmtdlg__btn:has(+ .fc-fmtdlg__btn--primary) {
+    order: 1;
+  }
+  [data-fc-platform="mac"]
+    > .fc-fmtdlg
+    :is(.fc-fmtdlg__footer, .fc-namedlg-editor__buttons, .fc-namedlg-confirm__buttons):not(
+      .fc-evaldlg__footer
+    )
+    > .fc-fmtdlg__btn--primary:has(+ .fc-fmtdlg__btn) {
+    order: 1;
+  }
   .fc-fmtdlg__hintbar {
     padding: 10px 22px 12px;
     border-top: 1px solid var(--fc-fmtdlg-rule);

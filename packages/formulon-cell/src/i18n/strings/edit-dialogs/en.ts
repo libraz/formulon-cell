@@ -77,7 +77,6 @@ export const editDialogsEn: EditDialogsStrings = {
     title: 'Find and Replace',
     findTab: 'Find',
     replaceTab: 'Replace',
-    findLabel: 'Find',
     replaceLabel: 'Replace',
     findWhat: 'Find what:',
     replaceWith: 'Replace with:',

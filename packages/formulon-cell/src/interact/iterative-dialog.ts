@@ -89,11 +89,13 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     onDismiss: () => api.close(),
   });
 
+  shell.overlay.classList.add('fc-fmtdlg');
   const { body, footer } = appendDialogFrame(shell, {
     title: t.title,
-    headerClass: 'fc-iterdlg__header',
-    bodyClass: 'fc-iterdlg__body',
-    footerClass: 'fc-iterdlg__footer',
+    panelClasses: ['fc-fmtdlg__panel'],
+    headerClass: 'fc-fmtdlg__header fc-iterdlg__header',
+    bodyClass: 'fc-fmtdlg__body fc-iterdlg__body',
+    footerClass: 'fc-fmtdlg__footer fc-iterdlg__footer',
   });
 
   const section = (title: string): void => {
@@ -176,7 +178,8 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: t.cancel,
     okLabel: t.ok,
-    buttonBaseClass: 'fc-iterdlg__btn',
+    buttonBaseClass: 'fc-fmtdlg__btn fc-iterdlg__btn',
+    buttonPrimaryClass: 'fc-fmtdlg__btn--primary fc-iterdlg__btn--primary',
   });
 
   const draft: CalcOptionsDraft = { ...DEFAULTS };

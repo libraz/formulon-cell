@@ -10,7 +10,12 @@ import { rangesIntersect } from '../store/selection-geometry.js';
 import { type ConditionalRule, mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogButton, createDialogButton, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogButton,
+  appendDialogFrame,
+  createDialogButton,
+  createDialogShell,
+} from './dialog-shell.js';
 
 export interface CfRulesDialogDeps {
   host: HTMLElement;
@@ -52,7 +57,7 @@ export interface CfRulesDialogHandle {
 
 function createCfRulesDialogButton(className: string, label: string): HTMLButtonElement {
   const button = createDialogButton({ label, baseClass: 'fc-cfrulesdlg__btn' });
-  button.className = className;
+  button.className = `fc-fmtdlg__btn ${className}`;
   return button;
 }
 
@@ -188,16 +193,15 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     ariaLabel: t.title,
     onDismiss: () => close(),
   });
-  const { overlay, panel } = shell;
-
-  const header = document.createElement('div');
-  header.className = 'fc-cfrulesdlg__header';
-  header.textContent = t.title;
-  panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-cfrulesdlg__body';
-  panel.appendChild(body);
+  shell.overlay.classList.add('fc-fmtdlg');
+  const { overlay } = shell;
+  const { header, body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    panelClasses: ['fc-fmtdlg__panel'],
+    headerClass: 'fc-fmtdlg__header fc-cfrulesdlg__header',
+    bodyClass: 'fc-fmtdlg__body fc-cfrulesdlg__body',
+    footerClass: 'fc-fmtdlg__footer fc-cfrulesdlg__footer',
+  });
 
   const note = document.createElement('p');
   note.className = 'fc-cfrulesdlg__note';
@@ -249,18 +253,14 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   empty.hidden = true;
   body.appendChild(empty);
 
-  const footer = document.createElement('div');
-  footer.className = 'fc-cfrulesdlg__footer';
-  panel.appendChild(footer);
-
   const clearAllBtn = appendDialogButton(footer, {
     label: t.clearAll,
-    baseClass: 'fc-cfrulesdlg__clearall',
+    baseClass: 'fc-fmtdlg__btn fc-cfrulesdlg__clearall',
   });
 
   const closeBtn = appendDialogButton(footer, {
     label: t.close,
-    baseClass: 'fc-cfrulesdlg__close',
+    baseClass: 'fc-fmtdlg__btn fc-cfrulesdlg__close',
   });
   let selectedRuleIndex = 0;
   let currentRules: ManagedRule[] = [];

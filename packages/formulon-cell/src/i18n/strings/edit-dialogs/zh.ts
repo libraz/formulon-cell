@@ -77,7 +77,6 @@ export const editDialogsZh: EditDialogsStrings = {
     title: '查找和替换',
     findTab: '查找',
     replaceTab: '替换',
-    findLabel: '查找',
     replaceLabel: '替换',
     findWhat: '查找内容：',
     replaceWith: '替换为：',

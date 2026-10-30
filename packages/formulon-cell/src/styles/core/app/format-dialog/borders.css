@@ -31,7 +31,8 @@
     justify-content: center;
     background: var(--fc-fmtdlg-list-bg);
     color: var(--fc-fmtdlg-list-fg, var(--fc-fg, CanvasText));
-    border: 1px dotted var(--fc-fmtdlg-preview-border);
+    /* Guide frame for the cell edges; derived from the panel fg so it reads on any theme. */
+    border: 1px dotted color-mix(in srgb, var(--fc-fmtdlg-panel-fg, CanvasText) 40%, transparent);
     box-sizing: border-box;
     overflow: hidden;
     line-height: 1;

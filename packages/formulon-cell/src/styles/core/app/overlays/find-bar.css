@@ -8,22 +8,16 @@
     left: 50%;
     z-index: var(--fc-z-grid, 2147483010);
     pointer-events: auto;
-    display: flex;
-    flex-direction: column;
+  }
+
+  /* Panel chrome comes from .fc-fmtdlg__panel; this keeps the modeless find
+     panel content-sized and anchored under the formula bar. */
+  .fc-find.fc-fmtdlg__panel,
+  .fc-find.fc-fmtdlg__panel:has(> .fc-fmtdlg__tabs) {
     width: min(520px, calc(100% - 32px));
+    height: auto;
     min-height: 206px;
     transform: translateX(-50%);
-    background: var(--fc-bg-elev, Canvas);
-    color: var(--fc-fg, CanvasText);
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 24%, transparent));
-    border-radius: 2px;
-    box-shadow:
-      0 14px 36px rgba(0, 0, 0, 0.2),
-      0 1px 3px rgba(0, 0, 0, 0.12);
-    font-family: var(--fc-font-ui, system-ui);
-    font-size: 12px;
-    line-height: 1.35;
   }
 
   .fc-find[hidden] {
@@ -35,50 +29,11 @@
   }
 
   /* ── Header (title bar + tab strip) ──────────────────────────────── */
-  .fc-find__titlebar {
-    display: flex;
-    min-height: 30px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 3px 6px 3px 10px;
-    background: color-mix(in srgb, CanvasText 4%, Canvas);
-    border-bottom: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-  }
-
-  .fc-find__title {
-    font-size: 12px;
-  }
-
-  .fc-find__tabs {
-    display: flex;
-    gap: 1px;
-    padding: 8px 10px 0;
-  }
-
-  .fc-find__tab {
-    min-width: 76px;
-    padding: 5px 14px;
-    border-bottom-color: transparent;
-    border-radius: 3px 3px 0 0;
-    background: color-mix(in srgb, CanvasText 5%, Canvas);
-  }
-
-  .fc-find__tab[aria-selected="true"] {
-    position: relative;
-    z-index: 1;
-    background: Canvas;
-    border-bottom-color: Canvas;
-    font-weight: 600;
-  }
-
   /* ── Form fields ─────────────────────────────────────────────────── */
   .fc-find__form {
     display: grid;
     gap: 7px;
-    padding: 10px;
-    border-top: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    padding: 4px 20px 10px;
   }
 
   .fc-find__field {
@@ -92,33 +47,37 @@
     text-align: right;
   }
 
-  .fc-find input[type="text"] {
-    width: 100%;
-    min-width: 0;
-    padding: 3px 5px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 30%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg, inherit);
-    color: inherit;
+  .fc-find input[type="text"],
+  .fc-find select {
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 1px solid var(--fc-fmtdlg-input-border, transparent);
+    border-radius: 4px;
+    background: var(--fc-fmtdlg-input-bg);
+    color: var(--fc-fmtdlg-input-fg, inherit);
     font: inherit;
     outline: none;
   }
 
-  .fc-find select {
-    min-width: 134px;
-    padding: 2px 22px 2px 5px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 30%, transparent));
-    border-radius: 2px;
-    background: Canvas;
-    color: inherit;
-    font: inherit;
+  .fc-find input[type="text"] {
+    width: 100%;
+    min-width: 0;
   }
 
-  .fc-find input[type="text"]:focus {
-    border-color: var(--fc-accent, currentColor);
-    box-shadow: 0 0 0 1px var(--fc-accent, currentColor);
+  .fc-find select {
+    min-width: 134px;
+    padding-right: 22px;
+  }
+
+  .fc-find input[type="text"]:hover,
+  .fc-find select:hover {
+    border-color: var(--fc-fmtdlg-input-hover-border);
+  }
+
+  .fc-find input[type="text"]:focus,
+  .fc-find select:focus {
+    border-color: var(--fc-fmtdlg-list-focus-border);
+    box-shadow: 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-find__options-row {
@@ -162,11 +121,11 @@
   .fc-find__results {
     min-height: 118px;
     max-height: 190px;
-    margin: 0 10px 8px;
+    margin: 0 20px 8px;
     overflow: auto;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 28%, transparent));
-    background: Canvas;
+    border: 1px solid var(--fc-fmtdlg-rule);
+    border-radius: 4px;
+    background: var(--fc-fmtdlg-input-bg, Canvas);
   }
 
   .fc-find__results[hidden] {
@@ -215,35 +174,18 @@
     position: sticky;
     bottom: 0;
     padding: 4px 6px;
-    border-top: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
-    background: Canvas;
+    border-top: 1px solid var(--fc-fmtdlg-rule);
+    background: var(--fc-fmtdlg-input-bg, Canvas);
   }
 
   /* ── Footer buttons ──────────────────────────────────────────────── */
   .fc-find__footer {
-    display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    justify-content: flex-end;
-    padding: 0 10px 10px;
   }
 
-  .fc-find__btn {
-    min-width: 74px;
-    padding: 4px 10px;
-    background: color-mix(in srgb, CanvasText 3%, Canvas);
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 28%, transparent));
-    border-radius: 2px;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-
-  .fc-find__btn:hover {
-    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
+  .fc-find__footer .fc-fmtdlg__btn {
+    min-width: 0;
+    padding: 3px 12px;
   }
 
   .fc-find__btn:disabled {
@@ -251,42 +193,11 @@
     cursor: default;
   }
 
-  .fc-find__btn:focus-visible {
-    outline: 2px solid var(--fc-accent, currentColor);
-    outline-offset: 1px;
-  }
-  .fc-find__btn--icon {
-    position: relative;
-    min-width: 22px;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border-color: transparent;
-    background: transparent;
-  }
-  .fc-find__btn--icon::before,
-  .fc-find__btn--icon::after {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 11px;
-    height: 1.4px;
-    border-radius: 1px;
-    background: currentColor;
-    content: "";
-  }
-  .fc-find__btn--icon::before {
-    transform: translate(-50%, -50%) rotate(45deg);
-  }
-  .fc-find__btn--icon::after {
-    transform: translate(-50%, -50%) rotate(-45deg);
-  }
-
-  .fc-find__options-btn {
+  .fc-find .fc-find__options-btn {
     min-width: 26px;
   }
 
-  .fc-find__format-btn {
+  .fc-find .fc-find__format-btn {
     min-width: 82px;
   }
 
@@ -294,6 +205,10 @@
   @media (max-width: 560px) {
     .fc-find {
       top: 48px;
+    }
+
+    .fc-find.fc-fmtdlg__panel,
+    .fc-find.fc-fmtdlg__panel:has(> .fc-fmtdlg__tabs) {
       width: calc(100% - 18px);
     }
 

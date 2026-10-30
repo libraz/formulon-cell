@@ -322,8 +322,11 @@ describe('attachCellStylesGallery', () => {
   it('keeps Cell Styles gallery on compact desktop gallery chrome', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/dialogs/style-gallery.css'), 'utf8');
 
-    expect(css).toMatch(/\.fc-stylegallery__panel\s*\{[\s\S]*?border-radius: 2px;/);
-    expect(css).toMatch(/\.fc-stylegallery__chip:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).toMatch(/\.fc-stylegallery__panel\s*\{[\s\S]*?width: 560px;/);
+    expect(css).not.toMatch(/\.fc-stylegallery\s*\{/);
+    expect(css).toMatch(
+      /\.fc-stylegallery__chip:hover\s*\{[\s\S]*?border-color: var\(--fc-accent\);/,
+    );
     expect(css).not.toContain('background: #faf9f8');
   });
 });

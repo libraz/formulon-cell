@@ -379,7 +379,6 @@
     justify-content: flex-end;
   }
   .fc-namedlg__row {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 12px;
   }
   .fc-namedlg__form {
@@ -392,8 +391,9 @@
     width: min(92vw, 440px);
     max-width: 440px;
   }
+  /* Inline padding matches the shared header so title and labels share an edge. */
   .fc-namedlg-editor__body {
-    padding: 12px 14px 14px;
+    padding: 8px 20px 18px;
   }
   .fc-namedlg-editor__form {
     display: grid;
@@ -403,20 +403,24 @@
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
     gap: 8px;
-    align-items: start;
+    align-items: center;
     font-size: 12px;
+  }
+  .fc-namedlg-editor__row:has(textarea) {
+    align-items: start;
+  }
+  .fc-namedlg-editor__row:has(textarea) > span {
+    padding-top: 4px;
   }
   .fc-namedlg-editor__input {
     min-width: 0;
     min-height: 24px;
-    border: 1px solid var(--fc-rule-strong);
-    background: var(--fc-bg-elev);
-    color: var(--fc-fg-strong);
-    font:
-      12px "Aptos",
-      "Segoe UI",
-      sans-serif;
-    padding: 3px 5px;
+    border: 1px solid var(--fc-fmtdlg-input-border, transparent);
+    border-radius: 4px;
+    background: var(--fc-fmtdlg-input-bg);
+    color: var(--fc-fmtdlg-input-fg, inherit);
+    font: inherit;
+    padding: 3px 8px;
   }
   textarea.fc-namedlg-editor__input {
     resize: vertical;
@@ -424,8 +428,8 @@
   .fc-namedlg-editor__buttons {
     display: flex;
     justify-content: flex-end;
-    gap: 6px;
-    margin-top: 6px;
+    gap: 12px;
+    margin-top: 10px;
   }
   .fc-namedlg-confirm .fc-namedlg-confirm__panel {
     width: min(90vw, 360px);
@@ -436,8 +440,8 @@
   .fc-namedlg-confirm__body {
     display: grid;
     min-height: 0;
-    gap: 12px;
-    padding: 14px;
+    gap: 14px;
+    padding: 8px 20px 18px;
     overflow-y: auto;
   }
   .fc-namedlg-confirm__message {
@@ -450,7 +454,7 @@
   .fc-namedlg-confirm__buttons {
     display: flex;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 12px;
   }
   .fc-namedlg__note {
     color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));

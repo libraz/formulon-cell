@@ -3,7 +3,7 @@ import { listExternalLinks } from '../commands/external-links.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogButton, createDialogShell } from './dialog-shell.js';
+import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 
 export interface ExternalLinksDialogDeps {
   host: HTMLElement;
@@ -52,7 +52,7 @@ function appendExternalLinkActionButton(
 ): HTMLButtonElement {
   const button = appendDialogButton(parent, {
     label,
-    baseClass: 'fc-extlinkdlg__action',
+    baseClass: 'fc-fmtdlg__btn fc-extlinkdlg__action',
   });
   button.dataset.externalLinkAction = action;
   return button;
@@ -77,14 +77,14 @@ export function attachExternalLinksDialog(
     onDismiss: () => shell.close(),
   });
 
-  const header = document.createElement('div');
-  header.className = 'fc-extlinkdlg__header';
-  header.textContent = t.title;
-  shell.panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-extlinkdlg__body';
-  shell.panel.appendChild(body);
+  shell.overlay.classList.add('fc-fmtdlg');
+  const { header, body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    panelClasses: ['fc-fmtdlg__panel'],
+    headerClass: 'fc-fmtdlg__header fc-extlinkdlg__header',
+    bodyClass: 'fc-fmtdlg__body fc-extlinkdlg__body',
+    footerClass: 'fc-fmtdlg__footer fc-extlinkdlg__footer',
+  });
 
   const note = document.createElement('p');
   note.className = 'fc-extlinkdlg__note';
@@ -118,13 +118,9 @@ export function attachExternalLinksDialog(
   empty.hidden = true;
   body.appendChild(empty);
 
-  const footer = document.createElement('div');
-  footer.className = 'fc-extlinkdlg__footer';
-  shell.panel.appendChild(footer);
-
   const closeBtn = appendDialogButton(footer, {
     label: t.close,
-    baseClass: 'fc-extlinkdlg__close',
+    baseClass: 'fc-fmtdlg__btn fc-extlinkdlg__close',
   });
   shell.on(closeBtn, 'click', () => shell.close());
   let selectedIndex = 0;

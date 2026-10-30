@@ -77,7 +77,6 @@ export interface EditDialogsStrings {
     title: string;
     findTab: string;
     replaceTab: string;
-    findLabel: string;
     replaceLabel: string;
     findWhat: string;
     replaceWith: string;

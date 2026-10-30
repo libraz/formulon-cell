@@ -79,7 +79,6 @@ export const editDialogsDe: EditDialogsStrings = {
     title: 'Suchen und Ersetzen',
     findTab: 'Suchen',
     replaceTab: 'Ersetzen',
-    findLabel: 'Suchen',
     replaceLabel: 'Ersetzen',
     findWhat: 'Suchen nach:',
     replaceWith: 'Ersetzen durch:',

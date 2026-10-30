@@ -62,10 +62,17 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     ariaLabel: strings.cellStylesGallery.title,
     onDismiss: () => close(),
   });
+  shell.overlay.classList.add('fc-fmtdlg');
   const { overlay, panel } = shell;
+  panel.classList.add('fc-fmtdlg__panel');
+
+  const header = document.createElement('div');
+  header.className = 'fc-fmtdlg__header fc-stylegallery__header';
+  header.textContent = strings.cellStylesGallery.title;
+  panel.appendChild(header);
 
   const grid = document.createElement('div');
-  grid.className = 'fc-stylegallery__body';
+  grid.className = 'fc-fmtdlg__body fc-stylegallery__body';
   panel.appendChild(grid);
 
   let activeChipIndex = 0;
@@ -248,6 +255,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     setStrings(next: Strings): void {
       strings = next;
       shell.setAriaLabel(strings.cellStylesGallery.title);
+      header.textContent = strings.cellStylesGallery.title;
       for (const [id, heading] of headings) {
         heading.textContent = strings.cellStylesGallery.groups[id];
         const groupGrid = heading.nextElementSibling;

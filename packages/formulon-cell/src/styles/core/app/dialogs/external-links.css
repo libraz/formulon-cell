@@ -1,52 +1,13 @@
 @layer fc.app {
   /* External-links inspector — read-only workbook link inventory. */
-  .fc-extlinkdlg {
-    position: fixed;
-    inset: 0;
-    background: color-mix(in srgb, CanvasText 28%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--fc-z-dialog, 2147483020);
-    pointer-events: auto;
-    font-family: var(--fc-font-ui, system-ui);
-    font-size: 13px;
-    line-height: 1.4;
-    color: var(--fc-fg, CanvasText);
-  }
-  .fc-extlinkdlg[hidden] {
-    display: none;
-  }
   .fc-extlinkdlg__panel {
     width: 560px;
     max-width: 94vw;
-    max-height: min(90vh, 660px);
-    background: var(--fc-bg-elev, Canvas);
-    color: var(--fc-fg, CanvasText);
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.22),
-      0 2px 8px rgba(0, 0, 0, 0.16);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .fc-extlinkdlg__header {
-    min-height: 38px;
-    padding: 8px 14px;
-    font-weight: 600;
-    border-bottom: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: var(--fc-bg-hover);
   }
   .fc-extlinkdlg__body {
-    padding: 12px 14px 14px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    overflow: auto;
   }
   .fc-extlinkdlg__note {
     margin: 0;
@@ -59,25 +20,8 @@
     gap: 6px;
   }
   .fc-extlinkdlg__action {
-    min-height: 28px;
-    padding: 4px 8px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg-elev);
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
+    min-width: 0;
     text-align: center;
-  }
-  .fc-extlinkdlg__action:hover:not(:disabled) {
-    background: var(--fc-bg-rail);
-    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
-  }
-  .fc-extlinkdlg__action:focus-visible {
-    outline: 2px solid var(--fc-accent, currentColor);
-    outline-offset: 1px;
   }
   .fc-extlinkdlg__action:disabled {
     cursor: default;
@@ -117,35 +61,6 @@
   .fc-extlinkdlg__cell-target {
     word-break: break-all;
     max-width: 280px;
-  }
-  .fc-extlinkdlg__footer {
-    padding: 10px 16px 12px;
-    display: flex;
-    justify-content: flex-end;
-    border-top: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: var(--fc-bg-hover);
-  }
-  .fc-extlinkdlg__close {
-    min-width: 78px;
-    min-height: 30px;
-    padding: 5px 13px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg-elev);
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  .fc-extlinkdlg__close:hover {
-    background: var(--fc-bg-rail);
-    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
-  }
-  .fc-extlinkdlg__close:focus-visible {
-    outline: 2px solid var(--fc-accent, currentColor);
-    outline-offset: 1px;
   }
   @media (max-width: 520px) {
     .fc-extlinkdlg__actions {

@@ -1,45 +1,18 @@
 @layer fc.app {
   /* Named cell-styles gallery — preset style chips. */
-  .fc-stylegallery {
-    position: fixed;
-    inset: 0;
-    background: color-mix(in srgb, CanvasText 28%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--fc-z-dialog, 2147483020);
-    pointer-events: auto;
-    font-family: var(--fc-font-ui, system-ui);
-    font-size: 13px;
-    line-height: 1.4;
-    color: var(--fc-fg, CanvasText);
-  }
-  .fc-stylegallery[hidden] {
-    display: none;
-  }
   .fc-stylegallery__panel {
     width: 560px;
     max-width: 94vw;
-    max-height: min(90vh, 660px);
-    background: var(--fc-bg-elev, Canvas);
-    color: var(--fc-fg, CanvasText);
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.22),
-      0 2px 8px rgba(0, 0, 0, 0.16);
-    overflow: auto;
-    padding: 8px 0 10px;
+    padding-bottom: 18px;
   }
   .fc-stylegallery__body {
     display: grid;
     gap: 0;
+    align-content: start;
   }
   .fc-stylegallery__section {
     padding: 7px 12px 10px;
-    border-bottom: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-bottom: var(--fc-hairline, 1px) solid var(--fc-fmtdlg-rule);
   }
   .fc-stylegallery__section:last-child {
     border-bottom: 0;
@@ -56,21 +29,22 @@
     gap: 6px;
   }
   .fc-stylegallery__chip {
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
+    border: var(--fc-hairline, 1px) solid var(--fc-fmtdlg-rule);
+    border-radius: 5px;
     min-height: 32px;
     padding: 6px 9px;
-    background: var(--fc-bg-elev, Canvas);
-    color: var(--fc-fg, currentColor);
+    /* Previews sit on cell paper in every theme, as the style colours assume a
+       white sheet; a style's own fill and font colour override inline. */
+    background: #ffffff;
+    color: #000000;
     cursor: pointer;
     text-align: center;
     font: inherit;
     transition: filter 80ms ease;
   }
   .fc-stylegallery__chip:hover {
-    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
-    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+    border-color: var(--fc-accent);
+    box-shadow: inset 0 0 0 1px var(--fc-accent);
   }
   .fc-stylegallery__chip:focus-visible {
     outline: 2px solid var(--fc-accent);

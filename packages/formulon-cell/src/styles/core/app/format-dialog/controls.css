@@ -28,6 +28,17 @@
     width: 58px;
   }
 
+  /* A caption that wraps its own field lays out as caption, gap, field. */
+  .fc-tb__dlg__label:has(> input:is([type="text"], [type="number"]), > select, > .fc-select) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .fc-tb__dlg__label > :is(input[type="text"], input[type="number"], select, .fc-select) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   .fc-tb__dlg__hint {
     color: color-mix(in srgb, var(--fc-fmtdlg-panel-fg, CanvasText) 68%, transparent);
     font-size: 11px;

@@ -127,11 +127,13 @@ export function attachEvaluateFormulaDialog(
     onDismiss: () => api.close(),
   });
 
+  shell.overlay.classList.add('fc-fmtdlg');
   const { body, footer } = appendDialogFrame(shell, {
     title: t.title,
-    headerClass: 'fc-evaldlg__header',
-    bodyClass: 'fc-evaldlg__body',
-    footerClass: 'fc-evaldlg__footer',
+    panelClasses: ['fc-fmtdlg__panel'],
+    headerClass: 'fc-fmtdlg__header fc-evaldlg__header',
+    bodyClass: 'fc-fmtdlg__body fc-evaldlg__body',
+    footerClass: 'fc-fmtdlg__footer fc-evaldlg__footer',
   });
 
   const target = document.createElement('div');
@@ -167,12 +169,13 @@ export function attachEvaluateFormulaDialog(
 
   const evalBtn = appendDialogButton(footer, {
     label: t.evaluate,
-    baseClass: 'fc-evaldlg__btn',
+    baseClass: 'fc-fmtdlg__btn fc-evaldlg__btn',
   });
   const closeBtn = appendDialogButton(footer, {
     label: t.close,
     variant: 'primary',
-    baseClass: 'fc-evaldlg__btn',
+    baseClass: 'fc-fmtdlg__btn fc-evaldlg__btn',
+    primaryClass: 'fc-fmtdlg__btn--primary fc-evaldlg__btn--primary',
   });
 
   let currentFormula = '';

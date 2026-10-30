@@ -77,7 +77,6 @@ export const editDialogsKo: EditDialogsStrings = {
     title: '찾기 및 바꾸기',
     findTab: '찾기',
     replaceTab: '바꾸기',
-    findLabel: '찾기',
     replaceLabel: '바꾸기',
     findWhat: '찾을 내용:',
     replaceWith: '바꿀 내용:',

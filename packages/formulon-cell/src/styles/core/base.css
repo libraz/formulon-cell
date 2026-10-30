@@ -95,6 +95,18 @@
     text-rendering: geometricPrecision;
   }
 
+  /* Native checkboxes, radios and focus rings follow the theme accent instead
+     of the browser's default blue. Component rules in later layers still win. */
+  .fc-host,
+  .fc-overlay-portal {
+    accent-color: var(--fc-accent);
+  }
+  :where(.fc-host, .fc-overlay-portal)
+    :where(input, select, textarea, button, [role="option"], [role="tab"]):focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+
   .fc-mount-error {
     display: grid;
     gap: 10px;

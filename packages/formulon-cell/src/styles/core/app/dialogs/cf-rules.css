@@ -1,52 +1,13 @@
 @layer fc.app {
   /* CF rules manager — conditional-formatting rule inventory and deletion. */
-  .fc-cfrulesdlg {
-    position: fixed;
-    inset: 0;
-    background: color-mix(in srgb, CanvasText 28%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--fc-z-dialog, 2147483020);
-    pointer-events: auto;
-    font-family: var(--fc-font-ui, system-ui);
-    font-size: 13px;
-    line-height: 1.4;
-    color: var(--fc-fg, CanvasText);
-  }
-  .fc-cfrulesdlg[hidden] {
-    display: none;
-  }
   .fc-cfrulesdlg__panel {
-    width: 600px;
+    width: 680px;
     max-width: 94vw;
-    max-height: min(90vh, 660px);
-    background: var(--fc-bg-elev, Canvas);
-    color: var(--fc-fg, CanvasText);
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.22),
-      0 2px 8px rgba(0, 0, 0, 0.16);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .fc-cfrulesdlg__header {
-    min-height: 38px;
-    padding: 8px 14px;
-    font-weight: 600;
-    border-bottom: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: var(--fc-bg-hover);
   }
   .fc-cfrulesdlg__body {
-    padding: 12px 14px 14px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    overflow: auto;
   }
   .fc-cfrulesdlg__note {
     margin: 0;
@@ -78,21 +39,11 @@
     gap: 6px;
     flex-wrap: wrap;
   }
+  /* The command bar holds six actions; drop the footer button's 84px floor so
+     they stay on one row at the dialog's width. */
   .fc-cfrulesdlg__cmd {
-    min-height: 27px;
-    padding: 4px 10px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg-elev);
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  .fc-cfrulesdlg__cmd:hover:not(:disabled) {
-    background: var(--fc-bg-rail);
-    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+    min-width: 0;
+    padding-inline: 12px;
   }
   .fc-cfrulesdlg__cmd:disabled {
     opacity: 0.48;
@@ -169,23 +120,10 @@
   .fc-cfrulesdlg__row-move-down,
   .fc-cfrulesdlg__row-duplicate,
   .fc-cfrulesdlg__remove {
-    min-height: 26px;
-    padding: 3px 8px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg-elev);
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  .fc-cfrulesdlg__row-move-up:hover:not(:disabled),
-  .fc-cfrulesdlg__row-move-down:hover:not(:disabled),
-  .fc-cfrulesdlg__row-duplicate:hover:not(:disabled),
-  .fc-cfrulesdlg__remove:hover {
-    background: var(--fc-bg-rail);
-    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+    min-width: 0;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: 5px;
   }
   .fc-cfrulesdlg__row-move-up:disabled,
   .fc-cfrulesdlg__row-move-down:disabled,
@@ -194,42 +132,7 @@
     cursor: not-allowed;
   }
   .fc-cfrulesdlg__footer {
-    padding: 10px 16px 12px;
-    display: flex;
     justify-content: space-between;
-    border-top: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: var(--fc-bg-hover);
-  }
-  .fc-cfrulesdlg__clearall,
-  .fc-cfrulesdlg__close {
-    min-width: 78px;
-    min-height: 30px;
-    padding: 5px 13px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg-elev);
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  .fc-cfrulesdlg__clearall:hover,
-  .fc-cfrulesdlg__close:hover {
-    background: var(--fc-bg-rail);
-    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
-  }
-  .fc-cfrulesdlg__clearall:focus-visible,
-  .fc-cfrulesdlg__close:focus-visible,
-  .fc-cfrulesdlg__cmd:focus-visible,
-  .fc-cfrulesdlg__scope-select:focus-visible,
-  .fc-cfrulesdlg__row-move-up:focus-visible,
-  .fc-cfrulesdlg__row-move-down:focus-visible,
-  .fc-cfrulesdlg__row-duplicate:focus-visible,
-  .fc-cfrulesdlg__remove:focus-visible {
-    outline: 2px solid var(--fc-accent, currentColor);
-    outline-offset: 1px;
   }
   .fc-cfrulesdlg__clearall:disabled {
     opacity: 0.5;

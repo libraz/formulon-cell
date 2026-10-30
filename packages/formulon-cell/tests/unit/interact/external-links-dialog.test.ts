@@ -232,7 +232,9 @@ describe('attachExternalLinksDialog', () => {
   it('keeps External Links on compact desktop table geometry', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/dialogs/external-links.css'), 'utf8');
 
-    expect(css).toMatch(/\.fc-extlinkdlg__panel\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-extlinkdlg__panel\s*\{[\s\S]*?width: 560px;/);
+    expect(css).not.toMatch(/\.fc-extlinkdlg\s*\{/);
+    expect(css).not.toMatch(/\.fc-extlinkdlg__(header|footer|close)/);
     expect(css).toMatch(
       /\.fc-extlinkdlg__table tbody tr\[aria-selected="true"\]\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
     );

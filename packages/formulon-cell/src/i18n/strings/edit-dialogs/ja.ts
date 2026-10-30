@@ -79,7 +79,6 @@ export const editDialogsJa: EditDialogsStrings = {
     title: '検索と置換',
     findTab: '検索',
     replaceTab: '置換',
-    findLabel: '検索',
     replaceLabel: '置換',
     findWhat: '検索する文字列:',
     replaceWith: '置換後の文字列:',

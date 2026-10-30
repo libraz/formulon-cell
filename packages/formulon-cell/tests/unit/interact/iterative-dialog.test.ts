@@ -203,11 +203,20 @@ describe('attachIterativeDialog', () => {
   it('keeps Iterative Calculation on compact desktop dialog geometry', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/dialogs/iterative.css'), 'utf8');
 
-    expect(css).toMatch(/\.fc-iterdlg__panel\s*\{[\s\S]*?border-radius: 2px;/);
-    expect(css).toMatch(
-      /\.fc-iterdlg__row input\[type="number"\]:focus,[\s\S]*?\.fc-iterdlg__row input\[type="text"\]:focus\s*\{[\s\S]*?box-shadow: inset 0 0 0 1px var\(--fc-accent, currentColor\);/,
-    );
+    expect(css).toMatch(/\.fc-iterdlg__panel\s*\{[\s\S]*?width: 360px;/);
+    expect(css).not.toMatch(/\.fc-iterdlg\s*\{/);
+    expect(css).not.toMatch(/\.fc-iterdlg__(header|footer|btn)/);
     expect(css).not.toContain('box-shadow: 0 0 0 2px var(--fc-accent-soft');
+  });
+
+  it('wears the shared Format Cells dialog chrome', () => {
+    const handle = attachIterativeDialog({ host, getWb: () => makeFakeWb().handle });
+    const root = overlay();
+    expect(root?.classList.contains('fc-fmtdlg')).toBe(true);
+    expect(root?.querySelector('.fc-fmtdlg__panel')).not.toBeNull();
+    expect(root?.querySelector('.fc-fmtdlg__header')).not.toBeNull();
+    expect(root?.querySelector('.fc-fmtdlg__footer .fc-fmtdlg__btn--primary')).not.toBeNull();
+    handle.detach();
   });
 
   it('opens on the settings the workbook already carries', () => {

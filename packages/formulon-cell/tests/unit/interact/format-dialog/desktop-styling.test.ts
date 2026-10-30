@@ -183,7 +183,7 @@ describe('attachFormatDialog', () => {
     );
 
     expect(tabsCss).toMatch(
-      /\.fc-fmtdlg__panel-tab\[data-fc-tab="font"\]\s*\{[\s\S]*?grid-template-columns: 256px 128px 104px;[\s\S]*?gap: 8px 16px;[\s\S]*?padding: 20px 14px 0;/,
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="font"\]\s*\{[\s\S]*?grid-template-columns: 256px 128px 104px;[\s\S]*?gap: 8px 16px;[\s\S]*?padding: 8px 14px 0;/,
     );
     expect(tabsCss).toMatch(
       /\.fc-fmtdlg__font-list\s*\{[\s\S]*?height: 110px;[\s\S]*?min-height: 110px;/,

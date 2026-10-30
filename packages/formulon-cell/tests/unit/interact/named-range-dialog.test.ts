@@ -1087,16 +1087,18 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       'utf8',
     );
 
-    expect(css).toMatch(/\.fc-namedlg-editor__body\s*\{[\s\S]*?padding: 12px 14px 14px;/);
+    expect(css).toMatch(/\.fc-namedlg-editor__body\s*\{[\s\S]*?padding: 8px 20px 18px;/);
     expect(css).toMatch(/\.fc-namedlg-editor__form\s*\{[\s\S]*?gap: 6px;/);
     expect(css).toMatch(
       /\.fc-namedlg-editor__row\s*\{[\s\S]*?grid-template-columns: 72px minmax\(0, 1fr\);[\s\S]*?gap: 8px;/,
     );
     expect(css).toMatch(
-      /\.fc-namedlg-editor__buttons\s*\{[\s\S]*?gap: 6px;[\s\S]*?margin-top: 6px;/,
+      /\.fc-namedlg-editor__buttons\s*\{[\s\S]*?gap: 12px;[\s\S]*?margin-top: 10px;/,
     );
-    expect(css).toMatch(/\.fc-namedlg-confirm__body\s*\{[\s\S]*?gap: 12px;[\s\S]*?padding: 14px;/);
-    expect(css).toMatch(/\.fc-namedlg-confirm__buttons\s*\{[\s\S]*?gap: 6px;/);
+    expect(css).toMatch(
+      /\.fc-namedlg-confirm__body\s*\{[\s\S]*?gap: 14px;[\s\S]*?padding: 8px 20px 18px;/,
+    );
+    expect(css).toMatch(/\.fc-namedlg-confirm__buttons\s*\{[\s\S]*?gap: 12px;/);
   });
 });
 

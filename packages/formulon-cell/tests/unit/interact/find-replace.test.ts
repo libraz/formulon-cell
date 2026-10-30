@@ -514,15 +514,11 @@ describe('attachFindReplace', () => {
   it('keeps the Find/Replace floating panel on compact desktop geometry', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/overlays/find-bar.css'), 'utf8');
 
-    expect(css).toMatch(/\.fc-find\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-find\s*\{[\s\S]*?position: absolute;/);
     expect(css).toMatch(
       /\.fc-find__results-table tr:hover,[\s\S]*?\.fc-find__results-table tr:focus-visible\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
     );
-    expect(css).toMatch(/\.fc-find__btn:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
-    expect(css).toMatch(
-      /\.fc-find__btn--icon::before,[\s\S]*?\.fc-find__btn--icon::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
-    );
-    expect(css).toMatch(/\.fc-find__btn--icon::after\s*\{[\s\S]*?rotate\(-45deg\);/);
+    expect(css).not.toMatch(/\.fc-find__btn(:hover)?\s*\{/);
     expect(css).not.toContain('background: var(--fc-accent-soft');
   });
 });

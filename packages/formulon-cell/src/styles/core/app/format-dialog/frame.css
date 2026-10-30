@@ -38,7 +38,7 @@
     display: flex;
     flex-direction: column;
     width: min(96vw, 620px);
-    height: min(92vh, 612px);
+    max-height: min(92vh, 640px);
     background: var(--fc-fmtdlg-panel-bg);
     color: var(--fc-fmtdlg-panel-fg, var(--fc-fg, CanvasText));
     border: 1px solid var(--fc-fmtdlg-rule);
@@ -47,6 +47,17 @@
       0 18px 34px rgba(0, 0, 0, 0.26),
       0 2px 7px rgba(0, 0, 0, 0.14);
     overflow: hidden;
+  }
+  /* Tabbed dialogs keep one block size so switching tabs never resizes the
+     frame; single-page dialogs size to their content. */
+  .fc-fmtdlg__panel:has(> .fc-fmtdlg__tabs) {
+    height: min(92vh, 612px);
+  }
+  /* Only tabbed content sits in a framed group box; a single-page dialog's
+     body reads directly on the panel. */
+  .fc-fmtdlg__panel:not(:has(> .fc-fmtdlg__tabs)) > .fc-fmtdlg__body {
+    border-color: transparent;
+    padding-inline: 2px;
   }
   .fc-fmtdlg--range-picking .fc-fmtdlg__panel {
     pointer-events: auto;

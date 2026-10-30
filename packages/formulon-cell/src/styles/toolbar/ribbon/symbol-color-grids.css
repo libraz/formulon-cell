@@ -38,6 +38,21 @@
     line-height: 1;
   }
 
+  /* "More Symbols" dialog: each group is a tile grid like the ribbon menu. */
+  .fc-tb__symbol-dialog__row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+    gap: 2px;
+    margin: 2px 0 8px;
+  }
+
+  .fc-tb__symbol-dialog__row > .fc-tb__cf-choice {
+    height: 34px;
+    font-family: "Cambria Math", "Segoe UI Symbol", "Yu Gothic UI", serif;
+    font-size: 17px;
+    line-height: 1;
+  }
+
   .fc-tb__color-swatch-grid {
     display: grid;
     grid-template-columns: repeat(8, 22px);

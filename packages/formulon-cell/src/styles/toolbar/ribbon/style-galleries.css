@@ -73,6 +73,14 @@
     background: var(--fc-tb-ribbon-hover);
   }
 
+  /* The Cell Styles dialog marks the current style with an accent ring so the
+     preview keeps its cell-paper background. */
+  .fc-stylegallery__chip.fc-tb__menu-item--active {
+    background: #ffffff;
+    border-color: var(--fc-accent);
+    box-shadow: inset 0 0 0 1px var(--fc-accent);
+  }
+
   .fc-tb__tablestyle-grid {
     grid-template-columns: repeat(7, 62px);
     gap: 8px 9px;

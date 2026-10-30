@@ -79,7 +79,6 @@ export const editDialogsFr: EditDialogsStrings = {
     title: 'Rechercher et remplacer',
     findTab: 'Rechercher',
     replaceTab: 'Remplacer',
-    findLabel: 'Rechercher',
     replaceLabel: 'Remplacer',
     findWhat: 'Rechercher :',
     replaceWith: 'Remplacer par :',
