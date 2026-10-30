@@ -176,7 +176,7 @@ export const DEMO_ICONS: Record<DemoIconName, readonly DemoIconSegment[]> = {
     { d: 'M5.3 5.3h4.2v4.2h-4.2z', fill: '#107c41' },
   ],
   save: [
-    { d: 'M4 4h10l2 2v10H4z', fill: '#ffffff', stroke: '#1f1f1f' },
+    { d: 'M4 4h10l2 2v10H4z', fill: '#ffffff' },
     { d: 'M7 4v5h6V4', fill: '#2f75b5', stroke: '#1f4e79' },
     { d: 'M7 12.6h6v3H7z', fill: '#eef6ee', stroke: '#8a8f98' },
     { d: 'M8.5 14h3', stroke: '#8a8f98' },
@@ -185,18 +185,16 @@ export const DEMO_ICONS: Record<DemoIconName, readonly DemoIconSegment[]> = {
     { d: 'M7.2 5.2H3.8v-3.4', stroke: '#107c41' },
     {
       d: 'M4 5.2c2.2-2.1 5.7-2.3 8.1-.5 2.7 2.1 3 6.1.7 8.6-1.8 1.9-4.8 2.4-7.1 1.2',
-      stroke: '#1f1f1f',
     },
   ],
   redo: [
     { d: 'M12.8 5.2h3.4v-3.4', stroke: '#107c41' },
     {
       d: 'M16 5.2c-2.2-2.1-5.7-2.3-8.1-.5-2.7 2.1-3 6.1-.7 8.6 1.8 1.9 4.8 2.4 7.1 1.2',
-      stroke: '#1f1f1f',
     },
   ],
   search: [
-    { d: 'M8.5 14a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z', fill: '#ffffff', stroke: '#1f1f1f' },
+    { d: 'M8.5 14a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z' },
     { d: 'M12.5 12.5L17 17', stroke: '#107c41' },
     { d: 'M6.2 8.5h4.6', stroke: '#2f75b5' },
   ],
