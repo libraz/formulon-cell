@@ -703,7 +703,7 @@ export const formatWithSheetFontPatch = <T extends object>(
   return next as T;
 };
 
-/** Exposed for tests and engine sync diagnostics. */
+/** Font baseline captured for the sheet's active whole-sheet font override, if any. */
 export const activeSheetFontBaseline = (
   wb: WorkbookHandle,
   sheet: number,

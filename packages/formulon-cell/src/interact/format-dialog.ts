@@ -15,14 +15,17 @@ import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/pro
 import { recordFormatChange } from '../commands/slice-history.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../components/color-palette.js';
 import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
-import type { CellValue, Range } from '../engine/types.js';
+import {
+  displayCellFormatFromXf,
+  effectiveCellFormatWithPending,
+} from '../engine/cell-format-sync.js';
+import type { Addr, CellValue, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, dictionaryLocaleFor, type Strings } from '../i18n/strings.js';
 import { rangeValidationAt } from '../store/range-validations.js';
-import { sameRange } from '../store/selection-geometry.js';
+import { rangeContainsAddr, sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { syncCustomSelects } from './custom-select.js';
@@ -125,6 +128,99 @@ const mergeHasNonAnchorContent = (state: State, range: Range): boolean => {
   }
   return false;
 };
+
+/** Split `range` into rectangles that cover everything except `cells`
+ *  (all of which lie inside `range`). */
+const rangeMinusCells = (range: Range, cells: readonly Addr[]): Range[] => {
+  const colsByRow = new Map<number, number[]>();
+  for (const { row, col } of cells) {
+    const cols = colsByRow.get(row);
+    if (cols) cols.push(col);
+    else colsByRow.set(row, [col]);
+  }
+  const { sheet } = range;
+  const out: Range[] = [];
+  let nextRow = range.r0;
+  for (const row of [...colsByRow.keys()].sort((a, b) => a - b)) {
+    if (row > nextRow) out.push({ ...range, r0: nextRow, r1: row - 1 });
+    let nextCol = range.c0;
+    for (const col of [...new Set(colsByRow.get(row))].sort((a, b) => a - b)) {
+      if (col > nextCol) out.push({ sheet, r0: row, r1: row, c0: nextCol, c1: col - 1 });
+      nextCol = col + 1;
+    }
+    if (nextCol <= range.c1) out.push({ sheet, r0: row, r1: row, c0: nextCol, c1: range.c1 });
+    nextRow = row + 1;
+  }
+  if (nextRow <= range.r1) out.push({ ...range, r0: nextRow });
+  return out;
+};
+
+/** Read compact native XF bases only for an axis selection whose result can
+ *  be compared directly with the active cell's display font. Store-formatted
+ *  cells are excluded from the sampled ranges; sheet overrides or merges make
+ *  the regular resolver authoritative. */
+export function nativeFontSamplesForDialog(
+  state: State,
+  plan: SelectionFormatPlan,
+  wb: WorkbookHandle,
+): Partial<CellFormat>[] {
+  if (plan.axisBands.length === 0 || !wb.capabilities.rangeStylePatch) return [];
+  // Addresses with store entries are resolved by the store resolver, so
+  // their native bases are left out of the sampled ranges.
+  const storeAddrs: Addr[] = [];
+  for (const key of state.format.formats.keys()) {
+    const addr = parseAddrKey(key);
+    if (addr) storeAddrs.push(addr);
+  }
+  const pendingAddr = state.ui.pendingFormat?.addr;
+  if (pendingAddr) storeAddrs.push(pendingAddr);
+  if (
+    plan.ranges.some(
+      ({ sheet }) =>
+        state.format.sheetFontOverrides?.has(sheet) || state.format.sheetAxisOverrides?.has(sheet),
+    )
+  ) {
+    return [];
+  }
+  if (
+    [...state.merges.byAnchor.values()].some((merge) =>
+      plan.ranges.some(
+        (range) =>
+          range.sheet === merge.sheet &&
+          range.r0 <= merge.r1 &&
+          range.r1 >= merge.r0 &&
+          range.c0 <= merge.c1 &&
+          range.c1 >= merge.c0,
+      ),
+    )
+  ) {
+    return [];
+  }
+
+  try {
+    const xfIndices = new Set<number>();
+    for (const range of plan.ranges) {
+      const inside = storeAddrs.filter((addr) => rangeContainsAddr(range, addr));
+      for (const part of rangeMinusCells(range, inside)) {
+        const bases = wb.getRangeStyleBases(part);
+        if (!bases) return [];
+        for (const xfIndex of bases) {
+          if (!Number.isInteger(xfIndex) || xfIndex < 0) return [];
+          xfIndices.add(xfIndex);
+        }
+      }
+    }
+    const samples: Partial<CellFormat>[] = [];
+    for (const xfIndex of xfIndices) {
+      const sample = displayCellFormatFromXf(wb, xfIndex);
+      if (!sample) return [];
+      samples.push(sample);
+    }
+    return samples;
+  } catch {
+    return [];
+  }
+}
 
 export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const { host, store } = deps;
@@ -230,17 +326,31 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     touchedFields.clear();
     mixedFields.clear();
     selectionPlanForDialog = applyDxf ? null : planSelectionFormat(state);
+    const dialogWb = getWb();
+    const effectiveFormatCache = new Map<string, Partial<CellFormat> | null>();
+    const nativeFontSamples =
+      !applyDxf && dialogWb && selectionPlanForDialog
+        ? nativeFontSamplesForDialog(state, selectionPlanForDialog, dialogWb)
+        : [];
     const summary = applyDxf
       ? { activeFormat: initialFormat ?? {}, mixed: new Set<FormatDialogField>() }
-      : summarizeDialogFormats(state, selectionPlanForDialog);
+      : summarizeDialogFormats(
+          state,
+          selectionPlanForDialog,
+          dialogWb
+            ? (addr) => effectiveCellFormatWithPending(dialogWb, state, addr, effectiveFormatCache)
+            : undefined,
+          nativeFontSamples,
+        );
     for (const field of summary.mixed) mixedFields.add(field);
-    const dialogWb = getWb();
     const displayMerge = mergeAt(state, active);
     const displayAddr = displayMerge
       ? { sheet: displayMerge.sheet, row: displayMerge.r0, col: displayMerge.c0 }
       : active;
     const displayFormat =
-      !applyDxf && dialogWb ? effectiveCellFormatWithPending(dialogWb, state, displayAddr) : null;
+      !applyDxf && dialogWb
+        ? effectiveCellFormatWithPending(dialogWb, state, displayAddr, effectiveFormatCache)
+        : null;
     const merged = displayFormat
       ? { ...displayFormat, ...summary.activeFormat }
       : summary.activeFormat;

@@ -1,4 +1,7 @@
 import type { SelectionFormatPlan } from '../commands/format.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
+import type { Addr } from '../engine/types.js';
+import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import { formatWithPending } from '../store/pending-format.js';
 import type {
   CellBorderSide,
@@ -60,7 +63,7 @@ export interface DialogFormatSummary {
 
 type FormulaTransform = (formula: string) => string;
 
-const cloneFormat = (format: CellFormat | undefined): CellFormat =>
+const cloneFormat = (format: Partial<CellFormat> | null | undefined): CellFormat =>
   format ? structuredClone(format) : {};
 
 const normalizedBorderSide = (side: CellBorderSide | undefined): unknown => {
@@ -145,13 +148,159 @@ const sameNormalized = (left: unknown, right: unknown): boolean => {
   );
 };
 
+type DialogFormatResolver = (addr: Addr) => Partial<CellFormat> | null | undefined;
+
+const NATIVE_FONT_FIELDS = new Set<FormatDialogField>([
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'fontVertAlign',
+  'fontOutline',
+  'fontShadow',
+  'fontFamily',
+  'fontSize',
+  'color',
+]);
+
+const formatTargetAddr = (state: State, addr: Addr): Addr => {
+  const anchorKey = state.merges.byCell.get(addrKey(addr));
+  return anchorKey ? (parseAddrKey(anchorKey) ?? addr) : addr;
+};
+
+const firstImplicitCellWitness = (state: State, plan: SelectionFormatPlan): Addr | undefined => {
+  const excluded = new Set([...plan.cells, ...plan.exceptionCells].map(addrKey));
+  const ranges = [...plan.ranges].sort(
+    (left, right) =>
+      left.sheet - right.sheet ||
+      left.r0 - right.r0 ||
+      left.c0 - right.c0 ||
+      left.r1 - right.r1 ||
+      left.c1 - right.c1,
+  );
+
+  for (const range of ranges) {
+    const width = range.c1 - range.c0 + 1;
+    const area = (range.r1 - range.r0 + 1) * width;
+    if (width <= 0 || area <= 0) continue;
+    const positions = [
+      ...new Set(
+        [...plan.cells, ...plan.exceptionCells]
+          .filter(
+            (addr) =>
+              addr.sheet === range.sheet &&
+              addr.row >= range.r0 &&
+              addr.row <= range.r1 &&
+              addr.col >= range.c0 &&
+              addr.col <= range.c1,
+          )
+          .map((addr) => (addr.row - range.r0) * width + (addr.col - range.c0)),
+      ),
+    ].sort((left, right) => left - right);
+    let pointIndex = 0;
+    let cursor = 0;
+    while (cursor < area) {
+      while (pointIndex < positions.length && (positions[pointIndex] as number) < cursor) {
+        pointIndex += 1;
+      }
+      if (positions[pointIndex] === cursor) {
+        cursor += 1;
+        pointIndex += 1;
+        continue;
+      }
+
+      const rowOffset = Math.floor(cursor / width);
+      const addr: Addr = {
+        sheet: range.sheet,
+        row: range.r0 + rowOffset,
+        col: range.c0 + (cursor % width),
+      };
+      const key = addrKey(addr);
+      const anchorKey = state.merges.byCell.get(key) ?? key;
+      const anchor = parseAddrKey(anchorKey);
+      const anchorIsSelected =
+        anchor !== null &&
+        ranges.some(
+          (candidate) =>
+            candidate.sheet === anchor.sheet &&
+            anchor.row >= candidate.r0 &&
+            anchor.row <= candidate.r1 &&
+            anchor.col >= candidate.c0 &&
+            anchor.col <= candidate.c1,
+        );
+      if (anchor && anchorIsSelected && !excluded.has(anchorKey)) return anchor;
+
+      const merge = state.merges.byAnchor.get(anchorKey);
+      if (merge) {
+        if (merge.c1 < range.c1) {
+          cursor = rowOffset * width + (merge.c1 - range.c0 + 1);
+        } else if (merge.c0 <= range.c0) {
+          cursor = Math.min(area, (Math.min(range.r1, merge.r1) + 1 - range.r0) * width);
+        } else {
+          const coveredMerges = [...state.merges.byAnchor.entries()]
+            .filter(
+              ([anchorKey, candidate]) =>
+                excluded.has(anchorKey) &&
+                candidate.sheet === range.sheet &&
+                candidate.r0 <= addr.row &&
+                candidate.r1 >= addr.row &&
+                candidate.c0 <= range.c1 &&
+                candidate.c1 >= range.c0,
+            )
+            .map(([, candidate]) => ({
+              c0: Math.max(range.c0, candidate.c0),
+              c1: Math.min(range.c1, candidate.c1),
+              r1: candidate.r1,
+            }))
+            .sort((left, right) => left.c0 - right.c0 || right.c1 - left.c1);
+          let coveredThrough = range.c0 - 1;
+          let firstUncoveredRow = Number.POSITIVE_INFINITY;
+          for (const covered of coveredMerges) {
+            if (covered.c0 > coveredThrough + 1) break;
+            if (covered.c1 <= coveredThrough) continue;
+            coveredThrough = covered.c1;
+            firstUncoveredRow = Math.min(firstUncoveredRow, covered.r1 + 1);
+            if (coveredThrough >= range.c1) break;
+          }
+          cursor =
+            coveredThrough >= range.c1 && Number.isFinite(firstUncoveredRow)
+              ? Math.min(area, (Math.min(range.r1 + 1, firstUncoveredRow) - range.r0) * width)
+              : (rowOffset + 1) * width;
+        }
+        continue;
+      }
+      if (anchorKey === key && !excluded.has(key)) return addr;
+      cursor += 1;
+    }
+  }
+  return undefined;
+};
+
 export function summarizeDialogFormats(
   state: State,
   plan: SelectionFormatPlan | null,
+  resolveFormat?: DialogFormatResolver,
+  nativeFontSamples: readonly Partial<CellFormat>[] = [],
 ): DialogFormatSummary {
-  const activeFormat = cloneFormat(formatWithPending(state, state.selection.active));
+  const resolvedFormats = new Map<string, Partial<CellFormat> | null>();
+  const resolve = (addr: Addr): Partial<CellFormat> | undefined => {
+    const target = formatTargetAddr(state, addr);
+    const key = addrKey(target);
+    if (resolvedFormats.has(key)) return resolvedFormats.get(key) ?? undefined;
+    const format = resolveFormat?.(target) ?? formatWithPending(state, target);
+    resolvedFormats.set(key, format ?? null);
+    return format;
+  };
+  const activeFormat = cloneFormat(resolve(state.selection.active));
   const mixed = new Set<FormatDialogField>();
-  if (!plan || plan.cells.length === 0) return { activeFormat, mixed };
+  if (!plan) return { activeFormat, mixed };
+  const comparesImplicitCells = plan.axisBands.length > 0 || isWholeSheetSelection(plan.ranges);
+  if (plan.cells.length === 0 && !comparesImplicitCells) return { activeFormat, mixed };
+  const comparisonCells = [...plan.cells];
+  if (comparesImplicitCells) {
+    const witness = firstImplicitCellWitness(state, plan);
+    if (witness) comparisonCells.push(witness);
+  }
   const fields: FormatDialogField[] = [
     'numFmt',
     'align',
@@ -191,9 +340,12 @@ export function summarizeDialogFormats(
   for (const field of fields) {
     const expected = normalizedFieldValue(activeFormat, field);
     if (
-      plan.cells.some(
-        (addr) =>
-          !sameNormalized(normalizedFieldValue(formatWithPending(state, addr), field), expected),
+      (NATIVE_FONT_FIELDS.has(field) &&
+        nativeFontSamples.some(
+          (format) => !sameNormalized(normalizedFieldValue(format, field), expected),
+        )) ||
+      comparisonCells.some(
+        (addr) => !sameNormalized(normalizedFieldValue(resolve(addr), field), expected),
       )
     ) {
       mixed.add(field);

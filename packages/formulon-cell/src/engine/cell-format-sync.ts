@@ -5,6 +5,7 @@ import {
   pivotTableStyleAssignment,
   tableStyleSwatch,
 } from '../commands/format-as-table.js';
+import { sameStructuredValue } from '../commands/prepared-change.js';
 import { withFillReplacement } from '../store/format-merge.js';
 import { formatWithPending } from '../store/pending-format.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
@@ -61,6 +62,75 @@ import type { WorkbookHandle } from './workbook-handle.js';
 
 const HALIGN_GENERAL = 0;
 const VALIGN_BOTTOM = 2;
+const MAX_RESOLVED_XF_CACHE_ENTRIES = 256;
+
+interface ResolvedXfCacheEntry {
+  readonly key: string;
+  readonly format: CellFormat;
+  readonly xfIndex: number;
+}
+
+/** Exclude values whose formatter can observe state JSON and structuredClone
+ *  cannot represent. Descriptor reads avoid invoking user getters. */
+function isPlainDataTree(value: unknown, ancestors = new WeakSet<object>()): boolean {
+  if (value === null || value === undefined) return true;
+  switch (typeof value) {
+    case 'string':
+    case 'number':
+    case 'boolean':
+      return true;
+    case 'bigint':
+    case 'function':
+    case 'symbol':
+      return false;
+    case 'object':
+      break;
+    default:
+      return false;
+  }
+
+  const object = value as object;
+  if (ancestors.has(object)) return false;
+  ancestors.add(object);
+  try {
+    const prototype = Object.getPrototypeOf(object);
+    const keys = Reflect.ownKeys(object);
+    if (Array.isArray(object)) {
+      if (prototype !== Array.prototype) return false;
+      const length = Object.getOwnPropertyDescriptor(object, 'length');
+      if (!length || !('value' in length) || !Number.isInteger(length.value)) return false;
+      const arrayLength = length.value as number;
+      if (arrayLength < 0 || keys.length !== arrayLength + 1) return false;
+      const indexKeys = new Set<string>();
+      for (const key of keys) {
+        if (typeof key !== 'string') return false;
+        if (key === 'length') continue;
+        const index = Number(key);
+        if (!Number.isInteger(index) || index < 0 || String(index) !== key) return false;
+        indexKeys.add(key);
+      }
+      if (indexKeys.size !== arrayLength) return false;
+      for (let index = 0; index < arrayLength; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(object, String(index));
+        if (!descriptor?.enumerable || !('value' in descriptor)) return false;
+        if (!isPlainDataTree(descriptor.value, ancestors)) return false;
+      }
+      return true;
+    }
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    for (const key of keys) {
+      if (typeof key !== 'string') return false;
+      const descriptor = Object.getOwnPropertyDescriptor(object, key);
+      if (!descriptor?.enumerable || !('value' in descriptor)) return false;
+      if (!isPlainDataTree(descriptor.value, ancestors)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    ancestors.delete(object);
+  }
+}
 
 const PIVOT_KIND = {
   Header: 0,
@@ -343,19 +413,83 @@ export function syncCellFormatsToEngine(
   const previous = formattedKeySet(wb, sheet);
   const current = new Set<string>();
   const sheetFontPatch = sheetFontPatchFor(state, sheet);
+  const resolvedXfs = new Map<string, Set<ResolvedXfCacheEntry>>();
+  const resolvedXfLru = new Map<ResolvedXfCacheEntry, true>();
+  const cacheKeyFor = (format: CellFormat, sourceXfIndex: number | null): string | null => {
+    if (sourceXfIndex === null || !Number.isInteger(sourceXfIndex) || sourceXfIndex < 0) {
+      return null;
+    }
+    if (!isPlainDataTree(format)) return null;
+    // Patternless accounting codes come from workbook locale templates the key does not capture.
+    if (format.numFmt?.kind === 'accounting' && format.numFmt.pattern == null) return null;
+    try {
+      const serialized = JSON.stringify(format);
+      return serialized === undefined ? null : `${sourceXfIndex}\u0000${serialized}`;
+    } catch {
+      return null;
+    }
+  };
+  const cachedXfFor = (key: string | null, format: CellFormat): number | null => {
+    if (key === null) return null;
+    const bucket = resolvedXfs.get(key);
+    if (!bucket) return null;
+    for (const entry of bucket) {
+      try {
+        if (!sameStructuredValue(entry.format, format)) continue;
+      } catch {
+        continue;
+      }
+      resolvedXfLru.delete(entry);
+      resolvedXfLru.set(entry, true);
+      return entry.xfIndex;
+    }
+    return null;
+  };
+  const rememberXf = (key: string | null, format: CellFormat, xfIndex: number): void => {
+    if (key === null || xfIndex < 0) return;
+    let snapshot: CellFormat;
+    try {
+      snapshot = structuredClone(format);
+    } catch {
+      return;
+    }
+    const entry: ResolvedXfCacheEntry = { key, format: snapshot, xfIndex };
+    let bucket = resolvedXfs.get(key);
+    if (!bucket) {
+      bucket = new Set();
+      resolvedXfs.set(key, bucket);
+    }
+    bucket.add(entry);
+    resolvedXfLru.set(entry, true);
+    while (resolvedXfLru.size > MAX_RESOLVED_XF_CACHE_ENTRIES) {
+      const oldest = resolvedXfLru.keys().next().value;
+      if (!oldest) break;
+      resolvedXfLru.delete(oldest);
+      const oldestBucket = resolvedXfs.get(oldest.key);
+      oldestBucket?.delete(oldest);
+      if (oldestBucket?.size === 0) resolvedXfs.delete(oldest.key);
+    }
+  };
   for (const [key, fmt] of formats) {
     const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) continue;
     const { row, col } = addr;
-    const xfIndex = resolveXfForFormat(
-      wb,
-      fmt,
-      styleXfIds,
-      { sheet, row, col },
-      namedStyleXfs,
-      strict,
-      sheetFontPatch,
-    );
+    const currentXfIndex = wb.getCellXfIndex(sheet, row, col);
+    const cacheKey = cacheKeyFor(fmt, currentXfIndex);
+    let xfIndex = cachedXfFor(cacheKey, fmt);
+    if (xfIndex === null) {
+      const resolution = resolveXfForFormat(
+        wb,
+        fmt,
+        styleXfIds,
+        namedStyleXfs,
+        strict,
+        currentXfIndex,
+        sheetFontPatch,
+      );
+      xfIndex = resolution.xfIndex;
+      if (resolution.cacheable) rememberXf(cacheKey, fmt, xfIndex);
+    }
     if (xfIndex < 0) {
       if (strict) throw strictSyncError('resolveXf', key);
       continue;
@@ -547,7 +681,17 @@ export function cellFormatFromXf(
   workbookDefaultFont: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null = null,
   styleKeysByXfId: ReadonlyMap<number, string> | null = null,
 ): Partial<CellFormat> {
+  return cellFormatFromXfWithStatus(wb, xf, workbookDefaultFont, styleKeysByXfId).format;
+}
+
+function cellFormatFromXfWithStatus(
+  wb: WorkbookHandle,
+  xf: CellXf,
+  workbookDefaultFont: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
+  styleKeysByXfId: ReadonlyMap<number, string> | null,
+): { readonly format: Partial<CellFormat>; readonly complete: boolean } {
   const patch: Partial<CellFormat> = {};
+  let complete = true;
   const styleKey = xf.xfId === undefined ? undefined : styleKeysByXfId?.get(xf.xfId);
   if (styleKey !== undefined) patch.cellStyle = styleKey;
   const resolved = wb as WorkbookHandle & {
@@ -562,19 +706,23 @@ export function cellFormatFromXf(
       ? resolved.getResolvedFontRecord(xf.fontIndex)
       : wb.getFontRecord(xf.fontIndex);
   if (font) Object.assign(patch, fontRecordToFormat(font, workbookDefaultFont));
+  else complete = false;
   const fill =
     typeof resolved.getResolvedFillRecord === 'function'
       ? resolved.getResolvedFillRecord(xf.fillIndex)
       : wb.getFillRecord(xf.fillIndex);
   if (fill) Object.assign(patch, fillRecordToFormat(fill));
+  else complete = false;
   const border =
     typeof resolved.getResolvedBorderRecord === 'function'
       ? resolved.getResolvedBorderRecord(xf.borderIndex)
       : wb.getBorderRecord(xf.borderIndex);
   if (border) Object.assign(patch, borderRecordToFormat(border));
+  else complete = false;
   if (xf.numFmtId !== BUILTIN_NUM_FMT_GENERAL) {
     const code = wb.getNumFmtCode(xf.numFmtId);
-    if (code !== null) {
+    if (code === null) complete = false;
+    else {
       const numFmt = formatCodeToNumFmt(code);
       if (numFmt) patch.numFmt = numFmt;
     }
@@ -620,7 +768,7 @@ export function cellFormatFromXf(
     patch.locked = xf.locked !== false;
     patch.formulaHidden = xf.hidden === true;
   }
-  return patch;
+  return { format: patch, complete };
 }
 
 /**
@@ -661,19 +809,9 @@ function projectEffectiveStyle(
   wb: WorkbookHandle,
   effective: NonNullable<ReturnType<WorkbookHandle['getEffectiveStyle']>>,
 ): Partial<CellFormat> | null {
-  const xf = wb.getCellXf(effective.xfIndex);
-  if (!xf) return null;
-  const format = cellFormatFromXf(wb, xf, wb.workbookDefaultFont);
-  // `cellFormatFromXf` intentionally strips the workbook default from the
-  // sparse store representation. Rendering still needs the actual workbook
-  // font, including a theme-resolved family and its native point size.
-  const displayFont = wb.workbookDisplayFont;
-  if (displayFont) {
-    if (!Object.hasOwn(format, 'fontFamily')) format.fontFamily = displayFont.name;
-    if (!Object.hasOwn(format, 'fontSize')) {
-      format.fontSize = fontPointsToCssPx(displayFont.size);
-    }
-  }
+  const projection = projectDisplayCellFormatFromXf(wb, effective.xfIndex);
+  if (!projection) return null;
+  const format = projection.format;
   // The effective result carries protection and the resolved number-format
   // code even when the selected XF omits an explicit protection/numFmt
   // element. Keep those fields in this paint-only projection; this helper is
@@ -685,6 +823,38 @@ function projectEffectiveStyle(
     if (numFmt) format.numFmt = numFmt;
   }
   return format;
+}
+
+/** Project only the display format carried by one native cell XF. Row/column
+ *  ranges expose XF indices without cell addresses, so this deliberately
+ *  omits effective-style protection and number-format completion. */
+export function displayCellFormatFromXf(
+  wb: WorkbookHandle,
+  xfIndex: number,
+): Partial<CellFormat> | null {
+  const projection = projectDisplayCellFormatFromXf(wb, xfIndex);
+  return projection?.complete ? projection.format : null;
+}
+
+function projectDisplayCellFormatFromXf(
+  wb: WorkbookHandle,
+  xfIndex: number,
+): { readonly format: Partial<CellFormat>; readonly complete: boolean } | null {
+  const xf = wb.getCellXf(xfIndex);
+  if (!xf) return null;
+  const projection = cellFormatFromXfWithStatus(wb, xf, wb.workbookDefaultFont, null);
+  const format = projection.format;
+  // `cellFormatFromXf` intentionally strips the workbook default from the
+  // sparse store representation. Rendering still needs the actual workbook
+  // font, including a theme-resolved family and its native point size.
+  const displayFont = wb.workbookDisplayFont;
+  if (displayFont) {
+    if (!Object.hasOwn(format, 'fontFamily')) format.fontFamily = displayFont.name;
+    if (!Object.hasOwn(format, 'fontSize')) {
+      format.fontSize = fontPointsToCssPx(displayFont.size);
+    }
+  }
+  return { format, complete: projection.complete };
 }
 
 /**
@@ -747,9 +917,12 @@ function buildXfForFormat(
   wb: WorkbookHandle,
   fmt: CellFormat,
   sheetFontPatch?: SheetFontPatch,
+  workbookDefaultFont?: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
 ): CellXf | null {
   const effectiveFormat = formatWithSheetFontPatch(fmt, sheetFontPatch);
-  const fontIndex = wb.addFontRecord(fontRecordFromFormat(effectiveFormat, wb.workbookDefaultFont));
+  const defaultFont =
+    workbookDefaultFont === undefined ? wb.workbookDefaultFont : workbookDefaultFont;
+  const fontIndex = wb.addFontRecord(fontRecordFromFormat(effectiveFormat, defaultFont));
   if (fontIndex < 0) return null;
   const fillIndex = wb.addFillRecord(fillRecordFromFormat(fmt));
   if (fillIndex < 0) return null;
@@ -830,33 +1003,33 @@ const preserveRawFontForAxisEdit = (
   source: CellXf,
   currentProjected: Partial<CellFormat>,
   effectiveFormat: CellFormat,
-): void => {
-  if (!fontNonAxisMatches(effectiveFormat, currentProjected)) return;
+  workbookDefaultFont: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
+): boolean => {
+  if (!fontNonAxisMatches(effectiveFormat, currentProjected)) return true;
   const familyChanged =
     Object.hasOwn(effectiveFormat, 'fontFamily') &&
     effectiveFormat.fontFamily !== currentProjected.fontFamily;
   const sizeChanged =
     Object.hasOwn(effectiveFormat, 'fontSize') &&
     effectiveFormat.fontSize !== currentProjected.fontSize;
-  if (!familyChanged && !sizeChanged) return;
+  if (!familyChanged && !sizeChanged) return true;
   const baseFont = wb.getFontRecord(source.fontIndex);
-  if (!baseFont) return;
+  if (!baseFont) return false;
   const font = { ...baseFont };
   if (familyChanged) {
     const name = effectiveFormat.fontFamily;
     if (name !== undefined) font.name = name;
-    font.scheme =
-      name === wb.workbookDefaultFont?.name ? wb.workbookDefaultFont?.scheme : undefined;
+    font.scheme = name === workbookDefaultFont?.name ? workbookDefaultFont?.scheme : undefined;
   }
   if (sizeChanged && effectiveFormat.fontSize !== undefined) {
     font.size = fontCssPxToPoints(effectiveFormat.fontSize);
   }
-  if (!font.name || !Number.isFinite(font.size) || font.size <= 0) return;
+  if (!font.name || !Number.isFinite(font.size) || font.size <= 0) return false;
   const fontIndex = wb.addFontRecord(font);
-  if (fontIndex >= 0) {
-    record.fontIndex = fontIndex;
-    record.applyFont = source.applyFont;
-  }
+  if (fontIndex < 0) return false;
+  record.fontIndex = fontIndex;
+  record.applyFont = source.applyFont;
+  return true;
 };
 
 const copyRawGroup = (target: CellXf, source: CellXf, group: CellStyleFormatGroup): void => {
@@ -1135,27 +1308,36 @@ function resolveXfForFormat(
   wb: WorkbookHandle,
   fmt: CellFormat,
   styleXfIds: ReadonlyMap<string, number>,
-  addr: Addr,
   namedStyleXfs: ReadonlyMap<string, NamedStyleXfResolution>,
   strict: boolean,
+  currentXfIndex: number | null,
   sheetFontPatch?: SheetFontPatch,
-): number {
+): { readonly xfIndex: number; readonly cacheable: boolean } {
   const effectiveFormat = formatWithSheetFontPatch(fmt, sheetFontPatch);
-  const record = buildXfForFormat(wb, fmt, sheetFontPatch);
-  if (!record) return -1;
+  const workbookDefaultFont = wb.workbookDefaultFont;
+  const record = buildXfForFormat(wb, fmt, sheetFontPatch, workbookDefaultFont);
+  if (!record) return { xfIndex: -1, cacheable: false };
   const namedKey = fmt.cellStyle ?? 'normal';
   const namedXf = namedStyleXfs.get(namedKey);
   const mappedXfId =
     fmt.cellStyle === undefined ? styleXfIds.get('normal') : styleXfIds.get(fmt.cellStyle);
-  if (strict && mappedXfId !== undefined && !namedXf) return -1;
+  if (strict && mappedXfId !== undefined && !namedXf) return { xfIndex: -1, cacheable: false };
 
-  const currentXfIndex = wb.getCellXfIndex(addr.sheet, addr.row, addr.col);
-  const currentRaw = currentXfIndex === null ? null : wb.getCellXf(currentXfIndex);
-  const currentProjected = currentRaw
-    ? cellFormatFromXf(wb, currentRaw, wb.workbookDefaultFont)
+  const currentRaw = currentXfIndex === null ? null : (wb.getCellXf(currentXfIndex) ?? null);
+  const currentProjection = currentRaw
+    ? cellFormatFromXfWithStatus(wb, currentRaw, workbookDefaultFont, null)
     : null;
+  const currentProjected = currentProjection?.format ?? null;
+  let fontPreservationComplete = true;
   if (currentRaw && currentProjected) {
-    preserveRawFontForAxisEdit(wb, record, currentRaw, currentProjected, effectiveFormat);
+    fontPreservationComplete = preserveRawFontForAxisEdit(
+      wb,
+      record,
+      currentRaw,
+      currentProjected,
+      effectiveFormat,
+      workbookDefaultFont,
+    );
   }
   // quotePrefix has no CellFormat counterpart. Carry it through an edit as
   // opaque XF metadata while the current cell still points at its source row.
@@ -1197,7 +1379,20 @@ function resolveXfForFormat(
       copyRawGroup(record, namedXf.raw, group);
   }
   const xfId = mappedXfId;
-  return wb.addXfRecord(xfId === undefined ? record : { ...record, xfId });
+  const xfIndex = wb.addXfRecord(xfId === undefined ? record : { ...record, xfId });
+  return {
+    xfIndex,
+    cacheable:
+      xfIndex >= 0 &&
+      currentRaw !== null &&
+      currentXfIndex !== null &&
+      Number.isInteger(currentXfIndex) &&
+      currentXfIndex >= 0 &&
+      currentProjection?.complete === true &&
+      fontPreservationComplete &&
+      workbookDefaultFont !== null &&
+      workbookDefaultFont !== undefined,
+  };
 }
 
 /** Publish the named-style catalog without touching any cell, for a style-list

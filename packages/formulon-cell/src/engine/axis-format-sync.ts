@@ -279,7 +279,7 @@ const axisBudgetAvailable = (
   snapshot: SheetFontAxisSnapshot,
   existing: SheetAxisFormatOverride | undefined,
   bands: readonly AxisFormatBand[],
-  wb: WorkbookHandle | null,
+  readNativeDirectCells: (() => readonly Addr[]) | null,
   exceptions: readonly Addr[],
   baseUsed: number,
   baseKeys: ReadonlySet<string>,
@@ -312,10 +312,10 @@ const axisBudgetAvailable = (
     used += count;
     for (let row = band.first; row <= band.last; row += 1) selectedRows.add(row);
   }
-  if (!wb) return true;
+  if (!readNativeDirectCells) return true;
 
   const exceptionKeys = new Set(exceptions.map(addrKey));
-  for (const addr of nativeDirectCellsForSelection(wb, sheet, bands)) {
+  for (const addr of readNativeDirectCells()) {
     if (!exceptionKeys.has(addrKey(addr)) && !addDirect(addrKey(addr))) return false;
   }
   const selectedColumns = bands.filter((band) => band.axis === 'column');
@@ -419,13 +419,22 @@ export function prepareAxisFormatOverrideWithWorkbook(
   const existing = state.format.sheetAxisOverrides?.get(sheet);
   const baseline = existing?.baseline ?? wb?.getSheetFontAxisSnapshot(sheet) ?? emptySnapshot();
   const current = existing?.desired ?? wb?.getSheetFontAxisSnapshot(sheet) ?? baseline;
+  let memoizedNativeDirectCells: readonly Addr[] | null = null;
+  const readNativeDirectCells: (() => readonly Addr[]) | null = wb
+    ? () => {
+        if (memoizedNativeDirectCells === null) {
+          memoizedNativeDirectCells = nativeDirectCellsForSelection(wb, sheet, normalized);
+        }
+        return memoizedNativeDirectCells;
+      }
+    : null;
   if (
     !axisBudgetAvailable(
       sheet,
       current,
       existing,
       normalized,
-      wb,
+      readNativeDirectCells,
       exceptions,
       budgetBase,
       budgetKeys,
@@ -443,8 +452,12 @@ export function prepareAxisFormatOverrideWithWorkbook(
   );
   if (exceptions.length > 100_000) return null;
   const exceptionKeys = new Set(exceptions.map(addrKey));
+  // Resolvers run during the splits above may mutate the workbook, so re-read
+  // instead of reusing the budget-check snapshot.
   const nativeDirectCells = wb
-    ? nativeDirectCellsForSelection(wb, sheet, normalized)
+    ? resolvePatch
+      ? nativeDirectCellsForSelection(wb, sheet, normalized)
+      : (readNativeDirectCells?.() ?? [])
     : ([] as readonly Addr[]);
   const selectedRow = (addr: Addr): boolean =>
     normalized.some(

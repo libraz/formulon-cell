@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { planSelectionFormat } from '../../../src/commands/format.js';
+import { planSelectionFormat, type SelectionFormatPlan } from '../../../src/commands/format.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../src/engine/address.js';
+import type { Range } from '../../../src/engine/types.js';
 import {
   buildTouchedDialogPatch,
   computeDialogNumFmt,
@@ -10,8 +12,17 @@ import {
   setDraftSide,
   summarizeDialogFormats,
 } from '../../../src/interact/format-dialog-state.js';
+import { formatWithPending } from '../../../src/store/pending-format.js';
 import type { CellFormat, SpreadsheetStore } from '../../../src/store/store.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+
+const selectRange = (store: SpreadsheetStore, range: Range): void => {
+  const active = { sheet: range.sheet, row: range.r0, col: range.c0 };
+  store.setState((state) => ({
+    ...state,
+    selection: { ...state.selection, active, anchor: active, range, extraRanges: [] },
+  }));
+};
 
 describe('interact/format-dialog-state', () => {
   it('summarizes mixed fields and emits only touched draft fields', () => {
@@ -69,6 +80,210 @@ describe('interact/format-dialog-state', () => {
     draft.align = 'center';
     const touched = new Set(['align'] as const);
     expect(buildTouchedDialogPatch(draft, touched)).toEqual({ align: 'center' });
+  });
+
+  it.each([
+    {
+      name: 'whole worksheet',
+      range: { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL },
+      authored: [{ row: 0, col: 0 }],
+    },
+    {
+      name: 'whole column',
+      range: { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: 0 },
+      authored: [
+        { row: 0, col: 0 },
+        { row: 1, col: 0 },
+      ],
+    },
+    {
+      name: 'whole row',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: MAX_COL },
+      authored: [{ row: 0, col: 0 }],
+    },
+  ])('compares $name authored formats with one implicit-cell witness', ({ range, authored }) => {
+    const store = createSpreadsheetStore();
+    selectRange(store, range);
+    for (const cell of authored) {
+      mutators.setCellFormat(store, { sheet: 0, ...cell }, { bold: true });
+    }
+    const plan = planSelectionFormat(store.getState());
+    if (!plan) throw new Error('selection plan missing');
+
+    const summary = summarizeDialogFormats(store.getState(), plan);
+    expect(summary.activeFormat.bold).toBe(true);
+    expect(summary.mixed.has('bold')).toBe(true);
+    expect(plan.cells.length).toBe(authored.length);
+  });
+
+  it('uses inherited, pending, and merged-anchor formats in the shared resolver', () => {
+    const store = createSpreadsheetStore();
+    mutators.selectAll(store);
+    const wholePlan = planSelectionFormat(store.getState());
+    if (!wholePlan) throw new Error('whole-sheet plan missing');
+    const inherited = summarizeDialogFormats(store.getState(), wholePlan, () => ({ bold: true }));
+    expect(inherited.activeFormat.bold).toBe(true);
+    expect(inherited.mixed.has('bold')).toBe(false);
+
+    const anchor = { sheet: 0, row: 0, col: 0 };
+    const body = { sheet: 0, row: 0, col: 1 };
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    mutators.setCellFormat(store, anchor, { bold: true });
+    mutators.setPendingFormat(store, { addr: body, format: { bold: false } });
+    selectRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    const state = store.getState();
+    const plan = planSelectionFormat(state);
+    if (!plan) throw new Error('merged selection plan missing');
+    const resolved: Array<{ sheet: number; row: number; col: number }> = [];
+    const summary = summarizeDialogFormats(state, plan, (addr) => {
+      resolved.push(addr);
+      return { bold: true, ...formatWithPending(state, addr) };
+    });
+    expect(resolved).toHaveLength(1);
+    expect(resolved.every((addr) => addr.row === 0 && addr.col === 0)).toBe(true);
+    expect(summary.activeFormat.bold).toBe(false);
+    expect(summary.mixed.has('bold')).toBe(false);
+  });
+
+  it('uses native XF samples only for font fields', () => {
+    const store = createSpreadsheetStore();
+    mutators.selectAll(store);
+    const plan = planSelectionFormat(store.getState());
+    if (!plan) throw new Error('whole-sheet plan missing');
+    const active: Partial<CellFormat> = {
+      bold: false,
+      fontFamily: 'Arial',
+      fontSize: 16,
+      color: '#000000',
+      align: 'left',
+      numFmt: { kind: 'general' },
+      locked: true,
+    };
+
+    const summary = summarizeDialogFormats(store.getState(), plan, () => active, [
+      {
+        bold: true,
+        fontFamily: 'Arial',
+        fontSize: 16,
+        color: '#000000',
+        align: 'right',
+        numFmt: { kind: 'date', pattern: 'yyyy-mm-dd' },
+        locked: false,
+        fill: '#ff0000',
+        borders: { top: true },
+      },
+    ]);
+
+    expect(summary.mixed.has('bold')).toBe(true);
+    expect(summary.mixed.has('fontFamily')).toBe(false);
+    expect(summary.mixed.has('fontSize')).toBe(false);
+    expect(summary.mixed.has('color')).toBe(false);
+    expect(summary.mixed.has('align')).toBe(false);
+    expect(summary.mixed.has('numFmt')).toBe(false);
+    expect(summary.mixed.has('locked')).toBe(false);
+    expect(summary.mixed.has('fill')).toBe(false);
+    expect(summary.mixed.has('border.top')).toBe(false);
+  });
+
+  it('does not invent an implicit default when a whole selected axis is authored', () => {
+    const store = createSpreadsheetStore();
+    const formats = new Map<string, CellFormat>();
+    for (let col = 0; col <= MAX_COL; col += 1) {
+      formats.set(addrKey({ sheet: 0, row: 0, col }), { bold: true });
+    }
+    store.setState((state) => ({
+      ...state,
+      selection: {
+        ...state.selection,
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: MAX_COL },
+        extraRanges: [],
+      },
+      format: { ...state.format, formats },
+    }));
+    const plan = planSelectionFormat(store.getState());
+    if (!plan) throw new Error('authored-row plan missing');
+
+    const summary = summarizeDialogFormats(store.getState(), plan);
+    expect(plan.cells).toHaveLength(MAX_COL + 1);
+    expect(summary.activeFormat.bold).toBe(true);
+    expect(summary.mixed.has('bold')).toBe(false);
+  });
+
+  it('finds an unmerged implicit cell before a vertically merged axis block', () => {
+    const store = createSpreadsheetStore();
+    const active = { sheet: 0, row: 0, col: 0 };
+    const anchor = { sheet: 0, row: 0, col: 1 };
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 9, c1: MAX_COL };
+    const merge: Range = { sheet: 0, r0: 0, c0: 1, r1: 5, c1: MAX_COL };
+    mutators.setCellFormat(store, active, { bold: true });
+    mutators.setCellFormat(store, anchor, { bold: true });
+    store.setState((state) => ({
+      ...state,
+      selection: { ...state.selection, active, anchor: active, range, extraRanges: [] },
+      merges: {
+        byAnchor: new Map([[addrKey(anchor), merge]]),
+        byCell: new Map([[addrKey({ sheet: 0, row: 0, col: 2 }), addrKey(anchor)]]),
+      },
+    }));
+    const plan: SelectionFormatPlan = {
+      ranges: [range],
+      cells: [active, anchor],
+      exceptionCells: [],
+      axisBands: [{ axis: 'row', first: 0, last: 9 }],
+    };
+
+    const summary = summarizeDialogFormats(store.getState(), plan);
+    expect(summary.mixed.has('bold')).toBe(true);
+  });
+
+  it('skips a full-height union of vertical merges without scanning every row', () => {
+    const store = createSpreadsheetStore();
+    const active = { sheet: 0, row: 0, col: 0 };
+    const secondAnchor = { sheet: 0, row: 0, col: 1 };
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: 1 };
+    const mergeA: Range = { sheet: 0, r0: 0, c0: 0, r1: MAX_ROW, c1: 0 };
+    const mergeB: Range = { sheet: 0, r0: 0, c0: 1, r1: MAX_ROW, c1: 1 };
+    mutators.setCellFormat(store, active, { bold: true });
+    mutators.setCellFormat(store, secondAnchor, { bold: true });
+    selectRange(store, range);
+
+    let lookups = 0;
+    const byCell = {
+      get(key: string) {
+        const addr = parseAddrKey(key);
+        if (!addr || addr.row === 0) return undefined;
+        lookups += 1;
+        if (lookups > 16)
+          throw new Error(`merged-cell lookup exceeded bounded witness scan at ${key}`);
+        if (addr.col === 0) return addrKey(active);
+        if (addr.col === 1) return addrKey(secondAnchor);
+        return undefined;
+      },
+    } as unknown as Map<string, string>;
+    store.setState((state) => ({
+      ...state,
+      merges: {
+        byAnchor: new Map([
+          [addrKey(active), mergeA],
+          [addrKey(secondAnchor), mergeB],
+        ]),
+        byCell,
+      },
+    }));
+    const plan: SelectionFormatPlan = {
+      ranges: [range],
+      cells: [active, secondAnchor],
+      exceptionCells: [],
+      axisBands: [{ axis: 'column', first: 0, last: 1 }],
+    };
+
+    const summary = summarizeDialogFormats(store.getState(), plan);
+
+    expect(lookups).toBeLessThanOrEqual(16);
+    expect(summary.activeFormat.bold).toBe(true);
+    expect(summary.mixed.has('bold')).toBe(false);
   });
 
   describe('makeEmptyDraft', () => {

@@ -8,7 +8,7 @@ import { cellFormatFromXf, effectiveCellFormatWithPending } from '../engine/cell
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { numFmtWithDecimals } from '../engine/format-writeback.js';
 import type { Addr, Range } from '../engine/types.js';
-import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
+import { activeSheetFontBaseline, isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import { currencySymbolForLocale } from '../format/locale.js';
 import { mergeFormatPatch } from '../store/format-merge.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
@@ -1489,6 +1489,30 @@ function applyWholeSheetFontPatch(
     return false;
   }
 
+  const currentOverride = state.format.sheetFontOverrides?.get(sheet);
+  const withFontPatch = (base: Partial<CellFormat> | undefined): Partial<CellFormat> => {
+    const next = { ...(base ?? {}) };
+    if (hasFamily) {
+      if (patch.fontFamily === undefined) delete next.fontFamily;
+      else next.fontFamily = patch.fontFamily;
+    }
+    if (hasSize) {
+      if (patch.fontSize === undefined) delete next.fontSize;
+      else next.fontSize = patch.fontSize;
+    }
+    return next;
+  };
+  const nextFontPatch = withFontPatch(currentOverride?.patch);
+  const workbook =
+    currentOverride === undefined && Object.keys(nextFontPatch).length > 0
+      ? formatHistoryBridgeFor(store)?.workbook
+      : undefined;
+  const firstBaseline = workbook
+    ? (activeSheetFontBaseline(workbook, sheet) ??
+      workbook.getSheetFontAxisSnapshot(sheet) ??
+      undefined)
+    : undefined;
+
   store.setState((current) => {
     const formats = new Map(current.format.formats);
     const selectedKeys = new Set<string>();
@@ -1517,15 +1541,8 @@ function applyWholeSheetFontPatch(
 
     const overrides = new Map(current.format.sheetFontOverrides ?? []);
     const previous = overrides.get(sheet);
-    const nextPatch = { ...(previous?.patch ?? {}) };
-    if (hasFamily) {
-      if (patch.fontFamily === undefined) delete nextPatch.fontFamily;
-      else nextPatch.fontFamily = patch.fontFamily;
-    }
-    if (hasSize) {
-      if (patch.fontSize === undefined) delete nextPatch.fontSize;
-      else nextPatch.fontSize = patch.fontSize;
-    }
+    const baseline = previous?.baseline ?? (previous === undefined ? firstBaseline : undefined);
+    const nextPatch = withFontPatch(previous?.patch);
     if (Object.keys(nextPatch).length === 0) {
       if (previous?.clearAxes) {
         overrides.set(sheet, {
@@ -1540,7 +1557,7 @@ function applyWholeSheetFontPatch(
       overrides.set(sheet, {
         patch: nextPatch,
         ...(previous?.clearAxes ? { clearAxes: true } : {}),
-        ...(previous?.baseline ? { baseline: previous.baseline } : {}),
+        ...(baseline ? { baseline } : {}),
       });
     }
 
