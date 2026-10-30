@@ -1,10 +1,17 @@
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { State } from '../../store/store.js';
-import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from '../coerce-input.js';
+import {
+  coercedInputToPatch,
+  coerceInputForCell,
+  inputLocaleForWorkbook,
+  writeCoerced,
+} from '../coerce-input.js';
 import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
+import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
 import { isCellWritable } from '../protection.js';
+import { applyPatchesAtomic } from './apply-patches-atomic.js';
 import { parseTSV } from './tsv.js';
 
 export interface PasteResult {
@@ -17,8 +24,15 @@ export interface PasteResult {
  * numbers, etc. — matching the spreadsheet behaviour when you paste values from a
  * different program. Cells gated by sheet protection (locked + sheet
  * protected) are silently skipped, mirroring the spreadsheet's paste behaviour.
+ * With `history`, the cells are written in one atomic engine call and recorded
+ * as a single undo step; without it, each cell goes through the scalar path.
  */
-export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteResult | null {
+export function pasteTSV(
+  state: State,
+  wb: WorkbookHandle,
+  text: string,
+  history: History | null = null,
+): PasteResult | null {
   if (!text) return null;
   const rows = parseTSV(text);
   if (rows.length === 0) return null;
@@ -52,9 +66,17 @@ export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteR
   const formulas = writes.map(({ input }) => (input.kind === 'formula' ? input.text : null));
   if (blockTableFunction(wb, formulas)) return null;
 
-  wb.withBatchedRecalc(() => {
-    for (const { addr, input } of writes) writeCoerced(wb, addr, input);
-  });
+  if (history) {
+    applyPatchesAtomic(
+      wb,
+      writes.map(({ addr, input }) => coercedInputToPatch(addr, input)),
+      history,
+    );
+  } else {
+    wb.withBatchedRecalc(() => {
+      for (const { addr, input } of writes) writeCoerced(wb, addr, input);
+    });
+  }
 
   return {
     writtenRange: {

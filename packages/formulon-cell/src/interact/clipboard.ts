@@ -1,4 +1,5 @@
 import { type CopyResult, copy } from '../commands/clipboard/copy.js';
+import { cut } from '../commands/clipboard/cut.js';
 import { createDrawingClipboard } from '../commands/clipboard/drawing.js';
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { encodeHtml } from '../commands/clipboard/html.js';
@@ -430,7 +431,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     snapshot = null;
     snapshotText = null;
     payloadRevision = null;
-    return { result: pasteTSV(state, wb, text), activation: null };
+    return { result: pasteTSV(state, wb, text, history), activation: null };
   };
 
   const onCopy = (e: ClipboardEvent): void => {
@@ -485,9 +486,14 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       e.preventDefault();
       return;
     }
+    const r = cut(s, wb);
+    if (!r) {
+      // Rejected cut: leave the previous payload, marquee and drawings alone.
+      e.preventDefault();
+      return;
+    }
     drawings.clear();
-    const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
-    if (!r || !e.clipboardData) {
+    if (!e.clipboardData) {
       snapshot = null;
       snapshotText = null;
       payloadRevision = null;
@@ -592,14 +598,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     }
     if (kind === 'cut') {
       if (isRestricted()) return;
+      const r = cut(s, wb);
+      if (!r) return;
       drawings.clear();
-      const r = copy(s, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
-      if (!r) {
-        snapshot = null;
-        snapshotText = null;
-        payloadRevision = null;
-        return;
-      }
       snapshot = captureMaterializedSnapshot(s, r, 'cut');
       snapshotText = r.tsv;
       mutators.setCopyRange(store, r.range, 'cut');

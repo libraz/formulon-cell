@@ -6,8 +6,8 @@ import {
 } from '../engine/function-locale.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, SpreadsheetProfileId } from '../engine/types.js';
-import { formatError, fromEngineValue } from '../engine/value.js';
-import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { formatError, fromEngineValue, writeCell } from '../engine/value.js';
+import type { CellPatch, WorkbookHandle } from '../engine/workbook-handle.js';
 import { spreadsheetProfileForLocale } from '../mount/locale-profile.js';
 import { formatWithPending } from '../store/pending-format.js';
 import {
@@ -244,24 +244,30 @@ export function coerceInputForCell(
  * needs to skip writes for unchanged cells).
  */
 export function writeCoerced(wb: WorkbookHandle, a: Addr, c: CoercedInput): void {
+  const patch = coercedInputToPatch(a, c);
+  writeCell(wb, a, patch.value, patch.formula ?? null);
+}
+
+/** Build the engine patch for an already-coerced input. This is shared by
+ * ordinary scalar writes and the internal atomic TSV paste path. */
+export function coercedInputToPatch(a: Addr, c: CoercedInput): CellPatch {
   switch (c.kind) {
     case 'blank':
-      wb.setBlank(a);
-      return;
+      return { addr: a, value: { kind: 'blank' }, formula: null };
     case 'formula':
-      wb.setFormula(a, normalizeR1C1Formula(c.text, a));
-      return;
+      return {
+        addr: a,
+        value: { kind: 'blank' },
+        formula: normalizeR1C1Formula(c.text, a),
+      };
     case 'number':
-      wb.setNumber(a, c.value);
-      return;
+      return { addr: a, value: { kind: 'number', value: c.value }, formula: null };
     case 'bool':
-      wb.setBool(a, c.value);
-      return;
+      return { addr: a, value: { kind: 'bool', value: c.value }, formula: null };
     case 'error':
-      wb.setError(a, c.code);
-      return;
+      return { addr: a, value: { kind: 'error', code: c.code, text: c.text }, formula: null };
     case 'text':
-      wb.setText(a, c.value);
+      return { addr: a, value: { kind: 'text', value: c.value }, formula: null };
   }
 }
 

@@ -206,12 +206,12 @@ describe('attachClipboard', () => {
     handle.detach();
   });
 
-  it('copy clears a stale copy marquee when the next copy cannot be materialized', () => {
+  it('copy clears a stale copy marquee when the next ordinary range is too large', () => {
     mutators.setCopyRanges(store, [
       { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 },
       { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16383 },
     ]);
-    setRange(store, 0, 0, 1_048_575, 16_383);
+    setRange(store, 0, 0, 1_000, 999);
     const handle = attachClipboard({ host, store, wb, onAfterCommit });
 
     fireClipboard(host, 'copy');
@@ -471,6 +471,46 @@ describe('attachClipboard', () => {
     expect(formatAt(store, 4, 2)).toMatchObject({ bold: true });
     expect(formatAt(store, 6, 2)).toMatchObject({ italic: true });
     expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+    handle.detach();
+  });
+
+  it('rejects a whole-sheet cut without disturbing the previous copy payload', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    setFormat(store, 0, 0, { bold: true, fill: '#fff2cc' });
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+    const { transfer } = fireClipboard(host, 'copy');
+    const marquee = store.getState().ui.copyRange;
+
+    setRange(store, 0, 0, 1048575, 16383);
+    const { event } = fireClipboard(host, 'cut');
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(store.getState().ui.copyRange).toEqual(marquee);
+    expect(store.getState().ui.copyMode).toBe('copy');
+    expect(handle.getSnapshot()).not.toBeNull();
+    setRange(store, 2, 2, 2, 2);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    expect(formatAt(store, 2, 2)).toMatchObject({ bold: true, fill: '#fff2cc' });
+    handle.detach();
+  });
+
+  it('rejects a whole-sheet cut shortcut without disturbing the previous copy payload', async () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    setFormat(store, 0, 0, { bold: true, fill: '#fff2cc' });
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+    await handle.runShortcut('copy');
+    const marquee = store.getState().ui.copyRange;
+
+    setRange(store, 0, 0, 1048575, 16383);
+    await handle.runShortcut('cut');
+
+    expect(store.getState().ui.copyRange).toEqual(marquee);
+    expect(handle.getSnapshot()).not.toBeNull();
+    setRange(store, 2, 2, 2, 2);
+    await handle.runShortcut('paste');
+    expect(formatAt(store, 2, 2)).toMatchObject({ bold: true, fill: '#fff2cc' });
     handle.detach();
   });
 

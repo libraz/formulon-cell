@@ -79,8 +79,8 @@ describe('copy', () => {
     expect(copy(store.getState())).toBeNull();
   });
 
-  it('returns null for an over-sized range (>1M cells)', () => {
-    setRange(store, 0, 0, 1_048_575, 16_383);
+  it('returns null for an over-sized ordinary range (>1M cells)', () => {
+    setRange(store, 0, 0, 1_000, 1_000);
     expect(copy(store.getState())).toBeNull();
   });
 

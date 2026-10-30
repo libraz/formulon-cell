@@ -129,7 +129,7 @@ describe('attachContextMenu', () => {
         { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 },
         { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16383 },
       ]);
-      setRange(store, 0, 0, 1048575, 16383);
+      setRange(store, 0, 0, 1000, 999);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
       item('copy')?.click();

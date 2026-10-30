@@ -3,7 +3,13 @@ import type { Addr, Range } from '../../engine/types.js';
 import { writeCell } from '../../engine/value.js';
 import type { CellPatch, WorkbookHandle } from '../../engine/workbook-handle.js';
 import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps.js';
-import { rangeContainsRange, rangesIntersect, sameRange } from '../../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  rangeContainsRange,
+  rangesIntersect,
+  sameRange,
+} from '../../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { recordCommentChange } from '../comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from '../comment-author.js';
@@ -11,7 +17,6 @@ import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
-import { snapshotToPatch } from '../prepared-change.js';
 import { isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import {
@@ -19,6 +24,7 @@ import {
   recordLayoutChangeWithEngine,
   recordMergesChangeWithEngine,
 } from '../slice-history.js';
+import { applyPatchesAtomic } from './apply-patches-atomic.js';
 import {
   bandAxisFor,
   logicalRangeFor,
@@ -519,8 +525,7 @@ export function pasteSpecial(
     ? materializedPasteCells(snap, destination, opt.transpose)
     : null;
   if (bandDestination && !bandCells) return null;
-  const bandValuePatches: CellPatch[] | null =
-    bandCells &&
+  const valuePatches: CellPatch[] | null =
     snap.mode === 'copy' &&
     opt.what === 'all' &&
     opt.operation === 'none' &&
@@ -551,9 +556,9 @@ export function pasteSpecial(
           (cell.formula !== null || cell.value.kind !== 'blank') &&
           isCellWritable(current, cell.addr),
       );
-      if (bandValuePatches) {
+      if (valuePatches) {
         for (const cell of stale) {
-          bandValuePatches.push({
+          valuePatches.push({
             addr: cell.addr,
             value: { kind: 'blank' },
             formula: null,
@@ -671,12 +676,12 @@ export function pasteSpecial(
       const operating =
         opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));
       const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
-      if (bandValuePatches) {
+      if (valuePatches) {
         const formula =
           shouldPasteFormula && src.formula
             ? shiftFormulaRefs(src.formula, row - (snap.range.r0 + sr), col - (snap.range.c0 + sc))
             : null;
-        bandValuePatches.push({ addr, value: src.value, formula });
+        valuePatches.push({ addr, value: src.value, formula });
       } else if (operating) {
         const srcNum = numericValue(src);
         if (srcNum !== null) {
@@ -758,26 +763,7 @@ export function pasteSpecial(
     }
   });
 
-  if (bandValuePatches) {
-    const atomic = wb.applyCellPatchAtomic(bandValuePatches);
-    if (atomic.changed.length > 0 && history && !history.isReplaying()) {
-      const changed = new Set(atomic.changed.map(addrKey));
-      const before = atomic.before
-        .filter((snapshot) => changed.has(addrKey(snapshot.addr)))
-        .map(snapshotToPatch);
-      const after = atomic.after
-        .filter((snapshot) => changed.has(addrKey(snapshot.addr)))
-        .map(snapshotToPatch);
-      history.push({
-        undo: () => {
-          wb.applyCellPatchAtomic(before);
-        },
-        redo: () => {
-          wb.applyCellPatchAtomic(after);
-        },
-      });
-    }
-  }
+  if (valuePatches) applyPatchesAtomic(wb, valuePatches, history);
 
   if (formatWrites.length > 0) {
     recordFormatChange(history, store, () => {
@@ -902,7 +888,8 @@ export function pasteSpecial(
     const colWidths = snap.colWidths;
     const logicalRows = sourceLogical.r1 - sourceLogical.r0 + 1;
     const logicalCols = sourceLogical.c1 - sourceLogical.c0 + 1;
-    if (bandAxis === 'row' && rowHeights) {
+    const wholeSheet = isWholeRowRange(sourceLogical) && isWholeColumnRange(sourceLogical);
+    if ((bandAxis === 'row' || wholeSheet) && rowHeights) {
       recordLayoutChangeWithEngine(history, store, wb, () => {
         store.setState((s) => {
           const next = new Map(s.layout.rowHeights);
@@ -919,7 +906,7 @@ export function pasteSpecial(
         });
       });
     }
-    if (bandAxis === 'column' && colWidths) {
+    if ((bandAxis === 'column' || wholeSheet) && colWidths) {
       recordLayoutChangeWithEngine(history, store, wb, () => {
         store.setState((s) => {
           const next = new Map(s.layout.colWidths);

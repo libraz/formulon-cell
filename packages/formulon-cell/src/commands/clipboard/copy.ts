@@ -1,4 +1,4 @@
-import { parseAddrKey } from '../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { formatBoolean, formatEditableNumber, formatError } from '../../engine/value.js';
 import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
@@ -46,7 +46,7 @@ export function copy(
   if (!r) return null;
   const sheet = state.data.sheetIndex;
   if (payloadRanges.some((range) => range.r1 < range.r0 || range.c1 < range.c0)) return null;
-  // Refuse to materialise an entire-sheet copy — 17B blank strings would OOM.
+  // Cap the materialised payload; whole bands are already trimmed to their used span.
   const totalCells = payloadRanges.reduce(
     (sum, range) => sum + (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1),
     0,
@@ -98,6 +98,67 @@ function normalizedCopyRanges(
 }
 
 function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
+  const fullSheet = ranges.length === 1 ? ranges[0] : undefined;
+  // Whole-sheet selection: trim to the bounding box of used cells, formats and merges.
+  if (fullSheet && isWholeRowRange(fullSheet) && isWholeColumnRange(fullSheet)) {
+    let minRow = Number.POSITIVE_INFINITY;
+    let maxRow = -1;
+    let minCol = Number.POSITIVE_INFINITY;
+    let maxCol = -1;
+    const include = (row: number, col: number): void => {
+      if (row < fullSheet.r0 || row > fullSheet.r1 || col < fullSheet.c0 || col > fullSheet.c1) {
+        return;
+      }
+      minRow = Math.min(minRow, row);
+      maxRow = Math.max(maxRow, row);
+      minCol = Math.min(minCol, col);
+      maxCol = Math.max(maxCol, col);
+    };
+    const visitKey = (key: string): void => {
+      const addr = parseAddrKey(key);
+      if (
+        addr &&
+        addrKey(addr) === key &&
+        addr.sheet === state.data.sheetIndex &&
+        addr.row >= 0 &&
+        addr.row <= MAX_ROW &&
+        addr.col >= 0 &&
+        addr.col <= MAX_COL
+      ) {
+        include(addr.row, addr.col);
+      }
+    };
+    for (const key of state.data.cells.keys()) visitKey(key);
+    for (const [key, format] of state.format.formats) {
+      if (Object.keys(format).length > 0) visitKey(key);
+    }
+    for (const merge of state.merges.byAnchor.values()) {
+      if (
+        merge.sheet === state.data.sheetIndex &&
+        merge.r0 >= 0 &&
+        merge.c0 >= 0 &&
+        merge.r1 <= MAX_ROW &&
+        merge.c1 <= MAX_COL &&
+        merge.r0 >= fullSheet.r0 &&
+        merge.c0 >= fullSheet.c0 &&
+        merge.r1 <= fullSheet.r1 &&
+        merge.c1 <= fullSheet.c1 &&
+        merge.r1 >= merge.r0 &&
+        merge.c1 >= merge.c0
+      ) {
+        include(merge.r0, merge.c0);
+        include(merge.r1, merge.c1);
+      }
+    }
+    if (maxRow < 0 || maxCol < 0) {
+      minRow = 0;
+      maxRow = 0;
+      minCol = 0;
+      maxCol = 0;
+    }
+    return [{ sheet: fullSheet.sheet, r0: minRow, c0: minCol, r1: maxRow, c1: maxCol }];
+  }
+
   const wholeRows = ranges.every(isWholeRowRange);
   const wholeCols = ranges.every(isWholeColumnRange);
   if (!wholeRows && !wholeCols) return ranges;
