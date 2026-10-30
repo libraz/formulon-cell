@@ -203,18 +203,103 @@ export async function runSubmenuHighlightScenario(page: Page): Promise<void> {
         80,
         220,
         [
-          { id: 'first', label: 'First object action', run: () => {} },
-          { id: 'second', label: 'Second object action', run: () => {} },
+          {
+            id: 'first',
+            label: 'First object action',
+            run: () => {
+              host.dataset.objectAction = 'first';
+            },
+          },
+          {
+            id: 'second',
+            label: 'Second object action',
+            run: () => {
+              host.dataset.objectAction = 'second';
+            },
+          },
+          {
+            id: 'blocked',
+            label: 'Unavailable object action',
+            disabled: true,
+            run: () => {
+              host.dataset.objectAction = 'blocked';
+            },
+          },
         ],
         { label: 'Object actions', restoreFocusTo: host },
       );
     }, moduleUrl);
     const objectMenu = page.locator('.fc-ctxmenu--object');
     await expect(objectMenu.locator('[data-fc-action="first"]')).toBeFocused();
-    expect(await highlightedRootItems(objectMenu)).toContain('first');
+    expect(await highlightedRootItems(objectMenu)).toEqual(['first']);
     await objectMenu.locator('[data-fc-action="second"]').hover();
-    expect(await highlightedRootItems(objectMenu)).toContain('second');
-    await page.keyboard.press('Escape');
+    await expect(objectMenu.locator('[data-fc-action="second"]')).toBeFocused();
+    expect(await highlightedRootItems(objectMenu)).toEqual(['second']);
+    await page.keyboard.press('Home');
+    expect(await highlightedRootItems(objectMenu)).toEqual(['first']);
+    await page.keyboard.press('End');
+    expect(await highlightedRootItems(objectMenu)).toEqual(['second']);
+    await objectMenu.locator('[data-fc-action="blocked"]').hover();
+    await expect(objectMenu).toBeFocused();
+    expect(await highlightedRootItems(objectMenu)).toEqual([]);
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Space');
+    await expect(objectMenu).toBeVisible();
+    await expect(page.locator('.fc-host').first()).not.toHaveAttribute('data-object-action');
+    await page.keyboard.press('ArrowDown');
+    await expect(objectMenu.locator('[data-fc-action="first"]')).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(objectMenu.locator('[data-fc-action="second"]')).toBeFocused();
+    await page.keyboard.press('Enter');
     await expect(objectMenu).toHaveCount(0);
+    await expect(page.locator('.fc-host').first()).toHaveAttribute('data-object-action', 'second');
+    await expect(page.locator('.fc-host').first()).toBeFocused();
+  }
+}
+
+export async function runMacSubmenuLayoutScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  for (const locale of ['en', 'ja', 'de', 'fr']) {
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      await sp.mount({ locale, platform: 'mac' });
+      await sp.expectNoStub();
+      await page.mouse.move(width - 1, 0);
+      await page.locator('.fc-host').first().focus();
+      await page.keyboard.press('Shift+F10');
+      const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
+      const submenu = page.locator('.fc-ctxmenu__sub');
+      for (const id of ['sortMenu', 'pasteSpecialMenu']) {
+        await menu.locator(`[data-fc-submenu="${id}"]`).focus();
+        await page.keyboard.press('ArrowRight');
+        await expect(submenu).toBeVisible();
+        const bounds = await submenu.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return { left: box.left, right: box.right, width: box.width, viewport: innerWidth };
+        });
+        expect(bounds.left, `${locale}/${width}/${id}`).toBeGreaterThanOrEqual(0);
+        expect(bounds.right, `${locale}/${width}/${id}`).toBeLessThanOrEqual(bounds.viewport);
+        if (id === 'sortMenu') {
+          const rootWidth = await menu.evaluate((element) => element.getBoundingClientRect().width);
+          expect(bounds.width, `${locale}/${width}: short submenu fits its content`).toBeLessThan(
+            rootWidth,
+          );
+        }
+        if (width === 1280) {
+          const clipped = await submenu
+            .locator('.fc-ctxmenu__label')
+            .evaluateAll((labels) =>
+              labels
+                .filter((label) => label.scrollWidth > label.clientWidth + 1)
+                .map((label) => label.textContent),
+            );
+          expect(clipped, `${locale}/${id}: complete labels on desktop`).toEqual([]);
+        }
+        await page.keyboard.press('ArrowLeft');
+        await expect(submenu).toBeHidden();
+      }
+      await page.keyboard.press('Escape');
+      await expect(menu).toBeHidden();
+    }
   }
 }

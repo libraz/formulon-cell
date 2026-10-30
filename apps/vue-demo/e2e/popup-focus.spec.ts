@@ -1,5 +1,6 @@
 import { test } from '@playwright/test';
 import {
+  runMacSubmenuLayoutScenario,
   runPopupFocusScenario,
   runPopupViewportScenario,
   runSubmenuHighlightScenario,
@@ -15,6 +16,12 @@ test('right-click menus fit a short viewport and scroll to focused items (vue-de
   await runPopupViewportScenario(page);
 });
 
-test('submenu transitions keep one highlighted root item (vue-demo)', async ({ page }) => {
+test('cell and object context menus keep one highlighted item (vue-demo)', async ({ page }) => {
   await runSubmenuHighlightScenario(page);
+});
+
+test('Mac submenus fit their labels without inheriting the root width (vue-demo)', async ({
+  page,
+}) => {
+  await runMacSubmenuLayoutScenario(page);
 });

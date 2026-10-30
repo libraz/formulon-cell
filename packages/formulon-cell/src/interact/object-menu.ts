@@ -33,10 +33,32 @@ const VIEWPORT_PAD = 4;
 export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
   // The menu exists only while it is open, so a closed one leaves nothing in the portal.
   const root = document.createElement('div');
-  root.className = 'fc-ctxmenu fc-ctxmenu--object';
+  root.className = 'fc-ctxmenu fc-ctxmenu--object fc-ctxmenu--managed';
   root.setAttribute('role', 'menu');
   root.tabIndex = -1;
   let restoreFocusTo: HTMLElement | null = null;
+
+  const clearActiveItem = (): void => {
+    for (const item of root.querySelectorAll('.fc-ctxmenu__item--active')) {
+      item.classList.remove('fc-ctxmenu__item--active');
+    }
+  };
+
+  const isEnabledMenuItem = (target: Element | null): target is HTMLButtonElement =>
+    target instanceof HTMLButtonElement &&
+    root.contains(target) &&
+    target.classList.contains('fc-ctxmenu__item') &&
+    !target.disabled &&
+    target.getAttribute('aria-disabled') !== 'true';
+
+  const syncActiveItem = (target: EventTarget | null): void => {
+    clearActiveItem();
+    if (target instanceof Element && isEnabledMenuItem(target)) {
+      target.classList.add('fc-ctxmenu__item--active');
+    }
+  };
+
+  root.addEventListener('focusin', (event) => syncActiveItem(event.target));
 
   const onDocumentPointerDown = (event: PointerEvent): void => {
     if (!(event.target instanceof Node && root.contains(event.target))) close();
@@ -51,6 +73,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
     document.removeEventListener('pointerdown', onDocumentPointerDown, true);
     document.removeEventListener('focusin', onDocumentFocusIn, true);
     window.removeEventListener('blur', onWindowBlur);
+    clearActiveItem();
     root.remove();
     root.replaceChildren();
     const target = restoreFocusTo;
@@ -64,11 +87,20 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
       close(true);
       return;
     }
+    if (
+      (event.key === 'Enter' || event.key === ' ') &&
+      !isEnabledMenuItem(document.activeElement)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     handleMenuKeydown(event, root, { close, restoreFocusTo });
   });
 
   return {
     open(x, y, entries, options) {
+      clearActiveItem();
       root.replaceChildren();
       restoreFocusTo = options.restoreFocusTo;
       root.setAttribute('aria-label', options.label);
@@ -94,6 +126,14 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
           if (button.disabled) return;
           close(true);
           entry.run();
+        });
+        button.addEventListener('mouseenter', () => {
+          if (!isEnabledMenuItem(button)) {
+            clearActiveItem();
+            root.focus({ preventScroll: true });
+            return;
+          }
+          button.focus({ preventScroll: true });
         });
         root.appendChild(button);
       }

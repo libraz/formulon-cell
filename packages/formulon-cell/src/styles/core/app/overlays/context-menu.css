@@ -431,6 +431,11 @@
     background: var(--fc-bg-elev);
     border: var(--fc-hairline, 1px) solid var(--fc-rule-strong);
   }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sub {
+    min-width: min(196px, calc(100vw - 8px));
+    width: max-content;
+    max-width: calc(100vw - 8px);
+  }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: 0 10px;

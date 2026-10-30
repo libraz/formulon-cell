@@ -1,5 +1,6 @@
 import { test } from '@playwright/test';
 import {
+  runMacSubmenuLayoutScenario,
   runPopupFocusScenario,
   runPopupViewportScenario,
   runSubmenuHighlightScenario,
@@ -15,6 +16,12 @@ test('right-click menus fit a short viewport and scroll to focused items (react-
   await runPopupViewportScenario(page);
 });
 
-test('submenu transitions keep one highlighted root item (react-demo)', async ({ page }) => {
+test('cell and object context menus keep one highlighted item (react-demo)', async ({ page }) => {
   await runSubmenuHighlightScenario(page);
+});
+
+test('Mac submenus fit their labels without inheriting the root width (react-demo)', async ({
+  page,
+}) => {
+  await runMacSubmenuLayoutScenario(page);
 });
