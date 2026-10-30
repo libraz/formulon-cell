@@ -29,7 +29,7 @@
   .fc-tb__btn--active {
     background: var(--fc-tb-accent);
     border-color: var(--fc-tb-accent);
-    color: var(--fc-tb-title-fg);
+    color: var(--fc-tb-on-accent);
   }
 
   .fc-tb__btn:disabled {

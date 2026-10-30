@@ -182,7 +182,7 @@
   }
 
   .fc-tb__btn--primary {
-    color: var(--fc-tb-title-fg);
+    color: var(--fc-tb-on-accent);
     background: var(--fc-tb-accent);
     border-color: var(--fc-tb-accent);
   }

@@ -45,7 +45,7 @@
     --fc-sheetbar-tab-rule: #3b3a39;
 
     --fc-statusbar-bg: #201f1e;
-    --fc-statusbar-border: var(--fc-accent);
+    --fc-statusbar-border: #3b3a39;
     --fc-statusbar-fg: #c8c6c4;
     --fc-statusbar-fg-strong: #ffffff;
     --fc-statusbar-control: #605e5c;
@@ -109,21 +109,21 @@
     --fc-fmtdlg-preview-fg: #f3f2f1;
     --fc-fmtdlg-preview-border: #3b3a39;
 
-    /* Listbox panes — stay light against the dark panel for legibility */
-    --fc-fmtdlg-list-bg: #f8f8f8;
-    --fc-fmtdlg-list-fg: #1f1f1f;
-    --fc-fmtdlg-list-border: transparent;
+    /* Listbox panes — recessed below the dark panel, like native dark-mode lists */
+    --fc-fmtdlg-list-bg: #1b1a19;
+    --fc-fmtdlg-list-fg: #f3f2f1;
+    --fc-fmtdlg-list-border: #3b3a39;
     --fc-fmtdlg-list-focus-border: #2da153;
-    --fc-fmtdlg-list-hover-bg: #e7efe9;
-    --fc-fmtdlg-list-selected-bg: #b7d5bd;
-    --fc-fmtdlg-list-selected-fg: #1f1f1f;
+    --fc-fmtdlg-list-hover-bg: #2b2a29;
+    --fc-fmtdlg-list-selected-bg: #1f3a2a;
+    --fc-fmtdlg-list-selected-fg: #ffffff;
     --fc-fmtdlg-list-selected-bar: #1f5f31;
     --fc-fmtdlg-cat-selected-bg: #1f5f31;
     --fc-fmtdlg-cat-selected-fg: #ffffff;
 
-    /* Inputs — keep white for high contrast (matches reference screenshots) */
-    --fc-fmtdlg-input-bg: #ffffff;
-    --fc-fmtdlg-input-fg: #1f1f1f;
+    /* Inputs — one step above the panel so fields read as editable */
+    --fc-fmtdlg-input-bg: #2b2a29;
+    --fc-fmtdlg-input-fg: #f3f2f1;
     --fc-fmtdlg-input-border: transparent;
     --fc-fmtdlg-input-hover-border: #8a8886;
 

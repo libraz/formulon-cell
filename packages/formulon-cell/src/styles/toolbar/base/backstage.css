@@ -108,7 +108,7 @@
     height: 46px;
     border-radius: 8px;
     background: var(--fc-tb-brand);
-    color: var(--fc-tb-title-fg);
+    color: #ffffff;
   }
 
   .fc-tb__backstage-xl .fc-tb__rb-icon {
@@ -439,7 +439,7 @@
 
   .fc-tb__print-action--primary {
     background: var(--fc-tb-accent);
-    color: var(--fc-tb-title-fg);
+    color: var(--fc-tb-on-accent);
   }
 
   .fc-tb__print-action:disabled {
