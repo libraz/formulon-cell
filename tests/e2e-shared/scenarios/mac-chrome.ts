@@ -231,6 +231,19 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
     expect(visible, `${tabId} tab should be visible in the scrolled tab rail`).toBe(true);
   };
 
+  // A scrolled rail must not show a scrollbar over its tabs; the overlay one swallows clicks.
+  const expectTabHitAtCenter = async (tabId: MacRibbonTab): Promise<void> => {
+    const hit = await page.locator(`[data-ribbon-tab="${tabId}"]`).evaluate((tab) => {
+      const rect = tab.getBoundingClientRect();
+      const target = tab.ownerDocument.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+      return target !== null && tab.contains(target);
+    });
+    expect(hit, `${tabId} tab should receive a click right after the rail scrolls`).toBe(true);
+  };
+
   const expectGridStable = async (before: {
     x: number;
     y: number;
@@ -345,6 +358,7 @@ export async function runMacRibbonDisplayScenario(page: Page): Promise<void> {
         }
 
         await lastTab.scrollIntoViewIfNeeded();
+        await expectTabHitAtCenter(lastTabId);
         await lastTab.focus();
         await expect(lastTab).toBeFocused();
         await lastTab.click();

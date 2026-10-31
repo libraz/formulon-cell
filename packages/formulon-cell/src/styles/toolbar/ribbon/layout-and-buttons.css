@@ -21,8 +21,12 @@
     border-bottom: 1px solid var(--fc-tb-ribbon-line);
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--fc-tb-fg-soft) 45%, transparent) transparent;
+    /* An overlay scrollbar would cover the lower half of a tab and swallow its click. */
+    scrollbar-width: none;
+  }
+
+  .fc-tb__ribbon-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .fc-tb__ribbon-tab {

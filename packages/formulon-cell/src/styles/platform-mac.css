@@ -81,8 +81,11 @@
     background: var(--fc-tb-ribbon-rail);
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--fc-tb-fg-soft) 45%, transparent) transparent;
+    scrollbar-width: none;
+  }
+
+  [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-tab {
