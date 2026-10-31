@@ -11,7 +11,8 @@ import { categoryIdAt, pointIdAt, primitive } from './scene-primitives.js';
 import {
   annularPath,
   barGeometry,
-  boundedOption,
+  circularFrame,
+  doughnutFrame,
   normalizedMagnitudes,
   segmentsFor,
 } from './series-geometry.js';
@@ -635,19 +636,11 @@ export const addPieMarks = (
   const data = view.data;
   const first = data.series[0];
   if (!first) return;
-  const magnitudes = first.values.map((value) =>
-    value !== null && Number.isFinite(value) && value !== 0 ? Math.abs(value) : 0,
-  );
-  const scale = magnitudes.reduce((maximum, value) => Math.max(maximum, value), 0);
-  if (!(scale > 0)) return;
-  const normalized = magnitudes.map((value) => value / scale);
-  const total = normalized.reduce((sum, value) => sum + value, 0);
-  if (!(total > 0)) return;
-  const cx = plot.x + plot.width / 2;
-  const cy = plot.y + plot.height / 2;
-  const radius = Math.max(0, Math.min(plot.width, plot.height) / 2 - 2);
-  const firstSliceAngle = boundedOption(spec.firstSliceAngle, 0, 360, 0);
-  let start = -Math.PI / 2 + (firstSliceAngle * Math.PI) / 180;
+  const magnitudes = normalizedMagnitudes(first.values);
+  if (!magnitudes) return;
+  const { values: normalized, total } = magnitudes;
+  const { cx, cy, radius, firstSliceStart } = circularFrame(spec, plot);
+  let start = firstSliceStart;
   for (let pointIndex = 0; pointIndex < normalized.length; pointIndex += 1) {
     const value = normalized[pointIndex] ?? 0;
     if (!(value > 0)) continue;
@@ -714,13 +707,8 @@ export const addDoughnutMarks = (
 ): void => {
   const data = view.data;
   if (data.series.length === 0) return;
-  const cx = plot.x + plot.width / 2;
-  const cy = plot.y + plot.height / 2;
-  const outerRadius = Math.max(0, Math.min(plot.width, plot.height) / 2 - 2);
-  const holePercent = boundedOption(spec.holeSize, 10, 90, 50);
-  const holeRadius = (outerRadius * holePercent) / 100;
+  const { cx, cy, radius: outerRadius, holeRadius, firstSliceStart } = doughnutFrame(spec, plot);
   const ringWidth = (outerRadius - holeRadius) / data.series.length;
-  const firstSliceAngle = boundedOption(spec.firstSliceAngle, 0, 360, 0);
   for (let seriesIndex = 0; seriesIndex < data.series.length; seriesIndex += 1) {
     const series = data.series[seriesIndex];
     if (!series) continue;
@@ -728,7 +716,7 @@ export const addDoughnutMarks = (
     if (!normalized) continue;
     const innerRadius = holeRadius + ringWidth * seriesIndex;
     const outerRingRadius = innerRadius + ringWidth;
-    let start = -Math.PI / 2 + (firstSliceAngle * Math.PI) / 180;
+    let start = firstSliceStart;
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     for (let pointIndex = 0; pointIndex < normalized.values.length; pointIndex += 1) {
       const value = normalized.values[pointIndex] ?? 0;

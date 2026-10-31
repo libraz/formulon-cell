@@ -17,8 +17,9 @@ import {
 } from './scene-primitives.js';
 import {
   barGeometry,
-  boundedOption,
+  circularFrame,
   circularPoint,
+  doughnutFrame,
   normalizedMagnitudes,
   segmentsFor,
 } from './series-geometry.js';
@@ -619,18 +620,11 @@ const addPieDataLabels = (
   if (!first) return;
   const labelSpec = labelSpecFor(spec, first);
   if (!labelSpec || labelSpec.visible === false) return;
-  const magnitudes = first.values.map((value) =>
-    value !== null && Number.isFinite(value) ? Math.abs(value) : 0,
-  );
-  const scale = magnitudes.reduce((maximum, value) => Math.max(maximum, value), 0);
-  if (!(scale > 0)) return;
-  const normalized = magnitudes.map((value) => value / scale);
-  const total = normalized.reduce((sum, value) => sum + value, 0);
-  if (!(total > 0)) return;
-  const cx = plot.x + plot.width / 2;
-  const cy = plot.y + plot.height / 2;
-  const radius = Math.max(0, Math.min(plot.width, plot.height) / 2 - 2);
-  let start = -Math.PI / 2 + (boundedOption(spec.firstSliceAngle, 0, 360, 0) * Math.PI) / 180;
+  const magnitudes = normalizedMagnitudes(first.values);
+  if (!magnitudes) return;
+  const { values: normalized, total } = magnitudes;
+  const { cx, cy, radius, firstSliceStart } = circularFrame(spec, plot);
+  let start = firstSliceStart;
   for (let pointIndex = 0; pointIndex < normalized.length; pointIndex += 1) {
     const normalizedValue = normalized[pointIndex] ?? 0;
     if (!(normalizedValue > 0)) continue;
@@ -721,13 +715,8 @@ const addDoughnutDataLabels = (
 ): void => {
   const data = view.data;
   if (data.series.length === 0) return;
-  const cx = plot.x + plot.width / 2;
-  const cy = plot.y + plot.height / 2;
-  const outerRadius = Math.max(0, Math.min(plot.width, plot.height) / 2 - 2);
-  const holePercent = boundedOption(spec.holeSize, 10, 90, 50);
-  const holeRadius = (outerRadius * holePercent) / 100;
+  const { cx, cy, radius: outerRadius, holeRadius, firstSliceStart } = doughnutFrame(spec, plot);
   const ringWidth = (outerRadius - holeRadius) / data.series.length;
-  const firstSliceAngle = boundedOption(spec.firstSliceAngle, 0, 360, 0);
   const labelAngles = (start: number, angle: number): readonly number[] => {
     const middle = start + angle / 2;
     if (angle >= Math.PI * 2 - 1e-9) {
@@ -758,7 +747,7 @@ const addDoughnutDataLabels = (
     const innerRadius = holeRadius + ringWidth * seriesIndex;
     const outerRingRadius = innerRadius + ringWidth;
     const midpointRadius = (innerRadius + outerRingRadius) / 2;
-    let start = -Math.PI / 2 + (firstSliceAngle * Math.PI) / 180;
+    let start = firstSliceStart;
     const originalSeriesIndex = view.originalSeriesIndices[seriesIndex] ?? seriesIndex;
     for (let pointIndex = 0; pointIndex < normalized.values.length; pointIndex += 1) {
       const normalizedValue = normalized.values[pointIndex] ?? 0;

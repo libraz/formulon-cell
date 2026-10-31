@@ -259,6 +259,181 @@ const numericAxisLabelVisibility = (
   return visible;
 };
 
+/** The x axis line at `y`, or the y axis line at `x`, spanning the plot. */
+const axisLine = (plot: ChartScene['plot'], axis: 'x' | 'y', position: number): ChartPrimitive =>
+  primitive(
+    'line',
+    axis === 'x'
+      ? {
+          x1: plot.x,
+          x2: plot.x + plot.width,
+          y1: position,
+          y2: position,
+          stroke: 'currentColor',
+          'data-chart-axis': 'x',
+        }
+      : {
+          x1: position,
+          x2: position,
+          y1: plot.y,
+          y2: plot.y + plot.height,
+          stroke: 'currentColor',
+          'data-chart-axis': 'y',
+        },
+    'axis',
+  );
+
+/**
+ * Gridlines and tick labels of a numeric x axis. `crossingY` places
+ * `nextTo` labels; `percent` selects percent tick formatting.
+ */
+const addNumericXTicks = (
+  elements: ChartPrimitive[],
+  plot: ChartScene['plot'],
+  domain: Domain,
+  axis: ChartAxisSpec | undefined,
+  scale: (value: number) => number,
+  logBase: number | undefined,
+  crossingY: number,
+  percent: boolean,
+  locale: string,
+  formatter: ChartValueFormatter | undefined,
+  maxLabelWidth: number,
+): void => {
+  const visible = axisIsVisible(axis);
+  const gridlines = axisHasGridlines(axis);
+  const labelPosition = resolvedAxisLabelPosition(axis);
+  const ticks = axisTicks(domain, axis, logBase);
+  const labelVisibility = visible
+    ? numericAxisLabelVisibility(
+        ticks,
+        ticks.map((tick) => scale(tick)),
+        percent,
+        axis,
+        locale,
+        formatter,
+        maxLabelWidth,
+      )
+    : [];
+  for (let index = 0; index < ticks.length; index += 1) {
+    const tick = ticks[index] ?? 0;
+    const x = scale(tick);
+    if (gridlines) {
+      elements.push(
+        primitive(
+          'line',
+          {
+            x1: x,
+            x2: x,
+            y1: plot.y,
+            y2: plot.y + plot.height,
+            stroke: 'currentColor',
+            'stroke-opacity': 0.16,
+            'data-chart-axis': 'x',
+          },
+          'axis-tick',
+        ),
+      );
+    }
+    if (visible && labelPosition !== 'none' && labelVisibility[index]) {
+      const labelY =
+        labelPosition === 'high'
+          ? plot.y - 4
+          : labelPosition === 'nextTo'
+            ? crossingY + 12
+            : plot.y + plot.height + 12;
+      elements.push(
+        numericAxisLabel(
+          { x, y: labelY, 'text-anchor': 'middle', 'data-chart-axis': 'x' },
+          tick,
+          percent,
+          axis,
+          locale,
+          formatter,
+          maxLabelWidth,
+        ),
+      );
+    }
+  }
+};
+
+/** Gridlines and tick labels of a numeric y axis. `crossingX` places `nextTo` labels. */
+const addNumericYTicks = (
+  elements: ChartPrimitive[],
+  plot: ChartScene['plot'],
+  domain: Domain,
+  axis: ChartAxisSpec | undefined,
+  scale: (value: number) => number,
+  logBase: number | undefined,
+  crossingX: number,
+  percent: boolean,
+  locale: string,
+  formatter: ChartValueFormatter | undefined,
+  maxLabelWidth: number,
+): void => {
+  const visible = axisIsVisible(axis);
+  const gridlines = axisHasGridlines(axis);
+  const labelPosition = resolvedAxisLabelPosition(axis);
+  const ticks = axisTicks(domain, axis, logBase);
+  const labelVisibility = visible
+    ? numericAxisLabelVisibility(
+        ticks,
+        ticks.map((tick) => scale(tick)),
+        percent,
+        axis,
+        locale,
+        formatter,
+        maxLabelWidth,
+        'vertical',
+      )
+    : [];
+  for (let index = 0; index < ticks.length; index += 1) {
+    const tick = ticks[index] ?? 0;
+    const y = scale(tick);
+    if (gridlines) {
+      elements.push(
+        primitive(
+          'line',
+          {
+            x1: plot.x,
+            x2: plot.x + plot.width,
+            y1: y,
+            y2: y,
+            stroke: 'currentColor',
+            'stroke-opacity': 0.16,
+            'data-chart-axis': 'y',
+          },
+          'axis-tick',
+        ),
+      );
+    }
+    if (visible && labelPosition !== 'none' && labelVisibility[index]) {
+      const labelX =
+        labelPosition === 'high'
+          ? plot.x + plot.width + 4
+          : labelPosition === 'nextTo'
+            ? crossingX - 2
+            : plot.x - 2;
+      elements.push(
+        numericAxisLabel(
+          {
+            x: labelX,
+            y: y + 3,
+            'text-anchor': labelPosition === 'high' ? 'start' : 'end',
+            'data-chart-axis': 'y',
+          },
+          tick,
+          percent,
+          axis,
+          locale,
+          formatter,
+          maxLabelWidth,
+        ),
+      );
+    }
+  }
+};
+
 export const addAxis = (
   elements: ChartPrimitive[],
   plot: ChartScene['plot'],
@@ -286,8 +461,6 @@ export const addAxis = (
   const yAxis = spec.yAxis;
   const xVisible = axisIsVisible(xAxis);
   const yVisible = axisIsVisible(yAxis);
-  const xGridlines = axisHasGridlines(xAxis);
-  const yGridlines = axisHasGridlines(yAxis);
   const xLabelPosition = resolvedAxisLabelPosition(xAxis);
   const yLabelPosition = resolvedAxisLabelPosition(yAxis);
   const xScale = xDomain
@@ -330,74 +503,20 @@ export const addAxis = (
       categoryReverse,
       plot.y + plot.height,
     );
-    if (xVisible) {
-      elements.push(
-        primitive(
-          'line',
-          {
-            x1: plot.x,
-            x2: plot.x + plot.width,
-            y1: categoryY,
-            y2: categoryY,
-            stroke: 'currentColor',
-            'data-chart-axis': 'x',
-          },
-          'axis',
-        ),
-      );
-    }
-    const xTicks = axisTicks(xDomain, xAxis, xLogBase);
-    const xLabelVisibility = xVisible
-      ? numericAxisLabelVisibility(
-          xTicks,
-          xTicks.map((tick) => xScale(tick)),
-          percent,
-          xAxis,
-          locale,
-          formatter,
-          maxLabelWidth,
-        )
-      : [];
-    for (let index = 0; index < xTicks.length; index += 1) {
-      const tick = xTicks[index] ?? 0;
-      const x = xScale(tick);
-      if (xGridlines) {
-        elements.push(
-          primitive(
-            'line',
-            {
-              x1: x,
-              x2: x,
-              y1: plot.y,
-              y2: plot.y + plot.height,
-              stroke: 'currentColor',
-              'stroke-opacity': 0.16,
-              'data-chart-axis': 'x',
-            },
-            'axis-tick',
-          ),
-        );
-      }
-      if (xVisible && xLabelPosition !== 'none' && xLabelVisibility[index]) {
-        const labelY =
-          xLabelPosition === 'high'
-            ? plot.y - 4
-            : xLabelPosition === 'nextTo'
-              ? categoryY + 12
-              : plot.y + plot.height + 12;
-        elements.push(
-          numericAxisLabel(
-            { x, y: labelY, 'text-anchor': 'middle', 'data-chart-axis': 'x' },
-            tick,
-            percent,
-            xAxis,
-            locale,
-            formatter,
-            maxLabelWidth,
-          ),
-        );
-      }
-    }
+    if (xVisible) elements.push(axisLine(plot, 'x', categoryY));
+    addNumericXTicks(
+      elements,
+      plot,
+      xDomain,
+      xAxis,
+      xScale,
+      xLogBase,
+      categoryY,
+      percent,
+      locale,
+      formatter,
+      maxLabelWidth,
+    );
     if (yVisible) {
       if (yLabelPosition !== 'none') {
         for (let index = 0; index < xLabels.length; index += 1) {
@@ -424,20 +543,7 @@ export const addAxis = (
           );
         }
       }
-      elements.push(
-        primitive(
-          'line',
-          {
-            x1: zeroX,
-            x2: zeroX,
-            y1: plot.y,
-            y2: plot.y + plot.height,
-            stroke: 'currentColor',
-            'data-chart-axis': 'y',
-          },
-          'axis',
-        ),
-      );
+      elements.push(axisLine(plot, 'y', zeroX));
     }
   } else if (!horizontalCategory && yDomain && yScale && !xDomain) {
     const zeroY = numericAxisCrossing(yAxis, yDomain, yScale, yLogBase);
@@ -449,80 +555,20 @@ export const addAxis = (
       categoryReverse,
       plot.x,
     );
-    if (xVisible) {
-      elements.push(
-        primitive(
-          'line',
-          {
-            x1: plot.x,
-            x2: plot.x + plot.width,
-            y1: zeroY,
-            y2: zeroY,
-            stroke: 'currentColor',
-            'data-chart-axis': 'x',
-          },
-          'axis',
-        ),
-      );
-    }
-    const yTicks = axisTicks(yDomain, yAxis, yLogBase);
-    const yLabelVisibility = yVisible
-      ? numericAxisLabelVisibility(
-          yTicks,
-          yTicks.map((tick) => yScale(tick)),
-          percent,
-          yAxis,
-          locale,
-          formatter,
-          yAxisLabelMaxWidth,
-          'vertical',
-        )
-      : [];
-    for (let index = 0; index < yTicks.length; index += 1) {
-      const tick = yTicks[index] ?? 0;
-      const y = yScale(tick);
-      if (yGridlines) {
-        elements.push(
-          primitive(
-            'line',
-            {
-              x1: plot.x,
-              x2: plot.x + plot.width,
-              y1: y,
-              y2: y,
-              stroke: 'currentColor',
-              'stroke-opacity': 0.16,
-              'data-chart-axis': 'y',
-            },
-            'axis-tick',
-          ),
-        );
-      }
-      if (yVisible && yLabelPosition !== 'none' && yLabelVisibility[index]) {
-        const labelX =
-          yLabelPosition === 'high'
-            ? plot.x + plot.width + 4
-            : yLabelPosition === 'nextTo'
-              ? categoryX - 2
-              : plot.x - 2;
-        elements.push(
-          numericAxisLabel(
-            {
-              x: labelX,
-              y: y + 3,
-              'text-anchor': yLabelPosition === 'high' ? 'start' : 'end',
-              'data-chart-axis': 'y',
-            },
-            tick,
-            percent,
-            yAxis,
-            locale,
-            formatter,
-            yAxisLabelMaxWidth,
-          ),
-        );
-      }
-    }
+    if (xVisible) elements.push(axisLine(plot, 'x', zeroY));
+    addNumericYTicks(
+      elements,
+      plot,
+      yDomain,
+      yAxis,
+      yScale,
+      yLogBase,
+      categoryX,
+      percent,
+      locale,
+      formatter,
+      yAxisLabelMaxWidth,
+    );
     if (xVisible) {
       for (let index = 0; index < xLabels.length; index += 1) {
         if (xLabelPosition === 'none') continue;
@@ -549,167 +595,38 @@ export const addAxis = (
         );
       }
     }
-    if (yVisible) {
-      elements.push(
-        primitive(
-          'line',
-          {
-            x1: categoryX,
-            x2: categoryX,
-            y1: plot.y,
-            y2: plot.y + plot.height,
-            stroke: 'currentColor',
-            'data-chart-axis': 'y',
-          },
-          'axis',
-        ),
-      );
-    }
+    if (yVisible) elements.push(axisLine(plot, 'y', categoryX));
   } else if (xDomain && xScale && yDomain && yScale) {
     const zeroY = numericAxisCrossing(yAxis, yDomain, yScale, yLogBase);
     const zeroX = numericAxisCrossing(xAxis, xDomain, xScale, xLogBase);
-    if (xVisible) {
-      elements.push(
-        primitive(
-          'line',
-          {
-            x1: plot.x,
-            x2: plot.x + plot.width,
-            y1: zeroY,
-            y2: zeroY,
-            stroke: 'currentColor',
-            'data-chart-axis': 'x',
-          },
-          'axis',
-        ),
-      );
-    }
-    if (yVisible) {
-      elements.push(
-        primitive(
-          'line',
-          {
-            x1: zeroX,
-            x2: zeroX,
-            y1: plot.y,
-            y2: plot.y + plot.height,
-            stroke: 'currentColor',
-            'data-chart-axis': 'y',
-          },
-          'axis',
-        ),
-      );
-    }
-    const yTicks = axisTicks(yDomain, yAxis, yLogBase);
-    const yLabelVisibility = yVisible
-      ? numericAxisLabelVisibility(
-          yTicks,
-          yTicks.map((tick) => yScale(tick)),
-          percent,
-          yAxis,
-          locale,
-          formatter,
-          yAxisLabelMaxWidth,
-          'vertical',
-        )
-      : [];
-    for (let index = 0; index < yTicks.length; index += 1) {
-      const tick = yTicks[index] ?? 0;
-      const y = yScale(tick);
-      if (yGridlines) {
-        elements.push(
-          primitive(
-            'line',
-            {
-              x1: plot.x,
-              x2: plot.x + plot.width,
-              y1: y,
-              y2: y,
-              stroke: 'currentColor',
-              'stroke-opacity': 0.16,
-              'data-chart-axis': 'y',
-            },
-            'axis-tick',
-          ),
-        );
-      }
-      if (yVisible && yLabelPosition !== 'none' && yLabelVisibility[index]) {
-        const labelX =
-          yLabelPosition === 'high'
-            ? plot.x + plot.width + 4
-            : yLabelPosition === 'nextTo'
-              ? zeroX - 2
-              : plot.x - 2;
-        elements.push(
-          numericAxisLabel(
-            {
-              x: labelX,
-              y: y + 3,
-              'text-anchor': yLabelPosition === 'high' ? 'start' : 'end',
-              'data-chart-axis': 'y',
-            },
-            tick,
-            percent,
-            yAxis,
-            locale,
-            formatter,
-            yAxisLabelMaxWidth,
-          ),
-        );
-      }
-    }
-    const xTicks = axisTicks(xDomain, xAxis, xLogBase);
-    const xLabelVisibility = xVisible
-      ? numericAxisLabelVisibility(
-          xTicks,
-          xTicks.map((tick) => xScale(tick)),
-          false,
-          xAxis,
-          locale,
-          formatter,
-          maxLabelWidth,
-        )
-      : [];
-    for (let index = 0; index < xTicks.length; index += 1) {
-      const tick = xTicks[index] ?? 0;
-      const x = xScale(tick);
-      if (xGridlines) {
-        elements.push(
-          primitive(
-            'line',
-            {
-              x1: x,
-              x2: x,
-              y1: plot.y,
-              y2: plot.y + plot.height,
-              stroke: 'currentColor',
-              'stroke-opacity': 0.16,
-              'data-chart-axis': 'x',
-            },
-            'axis-tick',
-          ),
-        );
-      }
-      if (xVisible && xLabelPosition !== 'none' && xLabelVisibility[index]) {
-        const labelY =
-          xLabelPosition === 'high'
-            ? plot.y - 4
-            : xLabelPosition === 'nextTo'
-              ? zeroY + 12
-              : plot.y + plot.height + 12;
-        elements.push(
-          numericAxisLabel(
-            { x, y: labelY, 'text-anchor': 'middle', 'data-chart-axis': 'x' },
-            tick,
-            false,
-            xAxis,
-            locale,
-            formatter,
-            maxLabelWidth,
-          ),
-        );
-      }
-    }
+    if (xVisible) elements.push(axisLine(plot, 'x', zeroY));
+    if (yVisible) elements.push(axisLine(plot, 'y', zeroX));
+    addNumericYTicks(
+      elements,
+      plot,
+      yDomain,
+      yAxis,
+      yScale,
+      yLogBase,
+      zeroX,
+      percent,
+      locale,
+      formatter,
+      yAxisLabelMaxWidth,
+    );
+    addNumericXTicks(
+      elements,
+      plot,
+      xDomain,
+      xAxis,
+      xScale,
+      xLogBase,
+      zeroY,
+      false,
+      locale,
+      formatter,
+      maxLabelWidth,
+    );
   }
 
   const xTitle = xVisible ? axisTitleText(xAxis?.title, axisTitle) : undefined;

@@ -1,4 +1,10 @@
-import type { CategoryChartData, ChartGrouping, ChartKind, ChartSpec } from './types.js';
+import type {
+  CategoryChartData,
+  ChartGrouping,
+  ChartKind,
+  ChartScene,
+  ChartSpec,
+} from './types.js';
 
 const finite = (value: number, fallback: number): number =>
   Number.isFinite(value) ? value : fallback;
@@ -197,6 +203,34 @@ export const normalizedMagnitudes = (
     if (!Number.isFinite(total)) return null;
   }
   return total > 0 ? { values: normalized, total } : null;
+};
+
+interface CircularFrame {
+  readonly cx: number;
+  readonly cy: number;
+  readonly radius: number;
+  /** Start angle of the first slice in radians, measured from 12 o'clock. */
+  readonly firstSliceStart: number;
+}
+
+/** Centre, outer radius and first-slice angle of a pie or doughnut plot. */
+export const circularFrame = (spec: ChartSpec, plot: ChartScene['plot']): CircularFrame => {
+  const cx = plot.x + plot.width / 2;
+  const cy = plot.y + plot.height / 2;
+  const radius = Math.max(0, Math.min(plot.width, plot.height) / 2 - 2);
+  const firstSliceAngle = boundedOption(spec.firstSliceAngle, 0, 360, 0);
+  return { cx, cy, radius, firstSliceStart: -Math.PI / 2 + (firstSliceAngle * Math.PI) / 180 };
+};
+
+interface DoughnutFrame extends CircularFrame {
+  readonly holeRadius: number;
+}
+
+/** A circular frame plus the radius of the doughnut hole. */
+export const doughnutFrame = (spec: ChartSpec, plot: ChartScene['plot']): DoughnutFrame => {
+  const frame = circularFrame(spec, plot);
+  const holePercent = boundedOption(spec.holeSize, 10, 90, 50);
+  return { ...frame, holeRadius: (frame.radius * holePercent) / 100 };
 };
 
 interface CircularPoint {
