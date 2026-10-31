@@ -16,9 +16,6 @@ import {
 
 export { parseFormulaPredicate } from './conditional-formula/evaluator.js';
 
-const inRange = (sheet: number, row: number, col: number, r: Range): boolean =>
-  r.sheet === sheet && row >= r.r0 && row <= r.r1 && col >= r.c0 && col <= r.c1;
-
 /** Per-cell visual outputs derived from the active conditional rules. The
  *  renderer consults this for each painted cell to overlay fills, bars, and
  *  font tweaks. */
@@ -74,6 +71,11 @@ interface ConditionalCacheKey {
   bounds: ConditionalVisibleBounds | null;
 }
 
+function sameIndices(a: readonly number[] | undefined, b: readonly number[] | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 export function createConditionalCache(): ConditionalCache {
   return { key: null, overlay: null };
 }
@@ -91,7 +93,9 @@ function sameCacheKey(a: ConditionalCacheKey, b: ConditionalCacheKey): boolean {
     a.bounds?.r0 === b.bounds?.r0 &&
     a.bounds?.c0 === b.bounds?.c0 &&
     a.bounds?.r1 === b.bounds?.r1 &&
-    a.bounds?.c1 === b.bounds?.c1
+    a.bounds?.c1 === b.bounds?.c1 &&
+    sameIndices(a.bounds?.rowIndices, b.bounds?.rowIndices) &&
+    sameIndices(a.bounds?.colIndices, b.bounds?.colIndices)
   );
 }
 
@@ -103,6 +107,41 @@ export interface ConditionalVisibleBounds {
   c0: number;
   r1: number;
   c1: number;
+  rowIndices?: readonly number[];
+  colIndices?: readonly number[];
+}
+
+/** Yield the cells in a rule's visible intersection without allocating
+ *  arrays for large unbounded ranges. Axis-layout indices already include
+ *  frozen cells, so supplied lists are filtered against the rule only. */
+function* indicesInRange(
+  indices: readonly number[] | undefined,
+  first: number,
+  last: number,
+): Generator<number> {
+  if (indices !== undefined) {
+    for (const index of indices) {
+      if (index >= first && index <= last) yield index;
+    }
+    return;
+  }
+  for (let index = first; index <= last; index += 1) yield index;
+}
+
+function* cellsWithinRule(
+  rule: { range: Range },
+  visible: ConditionalVisibleBounds | null,
+): Generator<{ row: number; col: number }> {
+  const bounds = boundsForRule(rule, visible);
+  const rows = visible?.rowIndices;
+  const cols = visible?.colIndices;
+  const rowStart = rows === undefined ? bounds.r0 : rule.range.r0;
+  const rowEnd = rows === undefined ? bounds.r1 : rule.range.r1;
+  const colStart = cols === undefined ? bounds.c0 : rule.range.c0;
+  const colEnd = cols === undefined ? bounds.c1 : rule.range.c1;
+  for (const row of indicesInRange(rows, rowStart, rowEnd)) {
+    for (const col of indicesInRange(cols, colStart, colEnd)) yield { row, col };
+  }
 }
 
 /** Read the workbook's active formula-behaviour profile for the renderer
@@ -295,7 +334,17 @@ export function evaluateConditional(
     wb,
     locale,
     profile: profileForCache(wb),
-    bounds: visibleBounds ? { ...visibleBounds } : null,
+    bounds: visibleBounds
+      ? {
+          ...visibleBounds,
+          ...(visibleBounds.rowIndices !== undefined && {
+            rowIndices: visibleBounds.rowIndices.slice(),
+          }),
+          ...(visibleBounds.colIndices !== undefined && {
+            colIndices: visibleBounds.colIndices.slice(),
+          }),
+        }
+      : null,
   };
   if (cache?.key && cache.overlay && sameCacheKey(cache.key, key)) return cache.overlay;
   const out = overlayFor(state, wb, visibleBounds);
@@ -335,9 +384,9 @@ function overlayFor(
     } else if (rule.kind === 'average') {
       paintAverage(state, rule, ruleOverlay);
     } else if (rule.kind === 'text-contains') {
-      paintTextContains(state, rule, ruleOverlay);
+      paintTextContains(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'date-occurring') {
-      paintDateOccurring(state, rule, ruleOverlay);
+      paintDateOccurring(state, rule, ruleOverlay, visibleBounds);
     } else if (rule.kind === 'formula') {
       paintFormula(state, rule, ruleOverlay, wb, visibleBounds);
     } else if (rule.kind === 'duplicates' || rule.kind === 'unique') {
@@ -348,7 +397,7 @@ function overlayFor(
       rule.kind === 'errors' ||
       rule.kind === 'no-errors'
     ) {
-      paintBlankErrorPredicate(state, rule, ruleOverlay);
+      paintBlankErrorPredicate(state, rule, ruleOverlay, visibleBounds);
     }
 
     for (const [key, overlay] of ruleOverlay) {
@@ -373,22 +422,18 @@ function paintCellValue(
   const sheet = state.data.sheetIndex;
   const nativeFormula =
     wb?.capabilities.conditionalFormulaEvaluation === true ? nativeCellValueFormula(rule) : null;
-  const bounds = boundsForRule(rule, visibleBounds);
-  for (let r = bounds.r0; r <= bounds.r1; r += 1) {
-    for (let c = bounds.c0; c <= bounds.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (!cell) continue;
-      if (!inRange(sheet, r, c, rule.range)) continue;
-      const passes =
-        nativeFormula !== null && wb
-          ? nativeCellValuePasses(wb, sheet, r, c, rule, nativeFormula)
-          : testCellValue(cell.value, rule.op, rule.a, rule.b);
-      if (passes) {
-        const overlay = out.get(key) ?? {};
-        mergeApply(overlay, rule.apply);
-        out.set(key, overlay);
-      }
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (!cell) continue;
+    const passes =
+      nativeFormula !== null && wb
+        ? nativeCellValuePasses(wb, sheet, r, c, rule, nativeFormula)
+        : testCellValue(cell.value, rule.op, rule.a, rule.b);
+    if (passes) {
+      const overlay = out.get(key) ?? {};
+      mergeApply(overlay, rule.apply);
+      out.set(key, overlay);
     }
   }
 }
@@ -749,31 +794,30 @@ function paintTextContains(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'text-contains' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
   const needle = rule.caseSensitive ? rule.text : rule.text.toLocaleLowerCase();
   if (needle.length === 0) return;
   const sheet = state.data.sheetIndex;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (!cell) continue;
-      const raw = cellText(cell.value);
-      if (raw === null) continue;
-      const haystack = rule.caseSensitive ? raw : raw.toLocaleLowerCase();
-      const matches =
-        rule.mode === 'not-contains'
-          ? !haystack.includes(needle)
-          : rule.mode === 'begins-with'
-            ? haystack.startsWith(needle)
-            : rule.mode === 'ends-with'
-              ? haystack.endsWith(needle)
-              : haystack.includes(needle);
-      if (!matches) continue;
-      const overlay = out.get(key) ?? {};
-      mergeApply(overlay, rule.apply);
-      out.set(key, overlay);
-    }
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (!cell) continue;
+    const raw = cellText(cell.value);
+    if (raw === null) continue;
+    const haystack = rule.caseSensitive ? raw : raw.toLocaleLowerCase();
+    const matches =
+      rule.mode === 'not-contains'
+        ? !haystack.includes(needle)
+        : rule.mode === 'begins-with'
+          ? haystack.startsWith(needle)
+          : rule.mode === 'ends-with'
+            ? haystack.endsWith(needle)
+            : haystack.includes(needle);
+    if (!matches) continue;
+    const overlay = out.get(key) ?? {};
+    mergeApply(overlay, rule.apply);
+    out.set(key, overlay);
   }
 }
 
@@ -841,19 +885,18 @@ function paintDateOccurring(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'date-occurring' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
   const sheet = state.data.sheetIndex;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      if (!cell) continue;
-      const day = cellDateDay(cell.value, state.ui.date1904 === true);
-      if (day === null || !datePeriodMatches(day, rule.period)) continue;
-      const overlay = out.get(key) ?? {};
-      mergeApply(overlay, rule.apply);
-      out.set(key, overlay);
-    }
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    if (!cell) continue;
+    const day = cellDateDay(cell.value, state.ui.date1904 === true);
+    if (day === null || !datePeriodMatches(day, rule.period)) continue;
+    const overlay = out.get(key) ?? {};
+    mergeApply(overlay, rule.apply);
+    out.set(key, overlay);
   }
 }
 
@@ -867,26 +910,15 @@ function paintFormula(
   const useNative = wb?.capabilities.conditionalFormulaEvaluation === true;
   if (useNative && wb) {
     const sheet = state.data.sheetIndex;
-    const bounds = boundsForRule(rule, visibleBounds);
-    for (let r = bounds.r0; r <= bounds.r1; r += 1) {
-      for (let c = bounds.c0; c <= bounds.c1; c += 1) {
-        const key = addrKey({ sheet, row: r, col: c });
-        if (
-          !nativeConditionalFormulaPasses(
-            wb,
-            sheet,
-            r,
-            c,
-            rule.formula,
-            rule.range.r0,
-            rule.range.c0,
-          )
-        )
-          continue;
-        const overlay = out.get(key) ?? {};
-        mergeApply(overlay, rule.apply);
-        out.set(key, overlay);
-      }
+    for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+      const key = addrKey({ sheet, row: r, col: c });
+      if (
+        !nativeConditionalFormulaPasses(wb, sheet, r, c, rule.formula, rule.range.r0, rule.range.c0)
+      )
+        continue;
+      const overlay = out.get(key) ?? {};
+      mergeApply(overlay, rule.apply);
+      out.set(key, overlay);
     }
     return;
   }
@@ -894,17 +926,14 @@ function paintFormula(
   const predicate = parseFormulaPredicate(rule.formula);
   if (!formulaPredicate && !predicate) return;
   const sheet = state.data.sheetIndex;
-  const bounds = boundsForRule(rule, visibleBounds);
-  for (let r = bounds.r0; r <= bounds.r1; r += 1) {
-    for (let c = bounds.c0; c <= bounds.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      const passes = formulaPredicate?.test(r, c) ?? (cell ? predicate?.test(cell.value) : false);
-      if (!passes) continue;
-      const overlay = out.get(key) ?? {};
-      mergeApply(overlay, rule.apply);
-      out.set(key, overlay);
-    }
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    const passes = formulaPredicate?.test(r, c) ?? (cell ? predicate?.test(cell.value) : false);
+    if (!passes) continue;
+    const overlay = out.get(key) ?? {};
+    mergeApply(overlay, rule.apply);
+    out.set(key, overlay);
   }
 }
 
@@ -945,23 +974,22 @@ function paintBlankErrorPredicate(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'blanks' | 'non-blanks' | 'errors' | 'no-errors' }>,
   out: Map<string, ConditionalCellOverlay>,
+  visibleBounds: ConditionalVisibleBounds | null,
 ): void {
   const sheet = state.data.sheetIndex;
-  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
-    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
-      const key = addrKey({ sheet, row: r, col: c });
-      const cell = state.data.cells.get(key);
-      const value: CellValue = cell?.value ?? { kind: 'blank' };
-      let passes = false;
-      if (rule.kind === 'blanks') passes = isBlankValue(value);
-      else if (rule.kind === 'non-blanks') passes = !isBlankValue(value);
-      else if (rule.kind === 'errors') passes = isErrorValue(value);
-      else if (rule.kind === 'no-errors') passes = !isErrorValue(value) && !isBlankValue(value);
-      if (!passes) continue;
-      const overlay = out.get(key) ?? {};
-      mergeApply(overlay, rule.apply);
-      out.set(key, overlay);
-    }
+  for (const { row: r, col: c } of cellsWithinRule(rule, visibleBounds)) {
+    const key = addrKey({ sheet, row: r, col: c });
+    const cell = state.data.cells.get(key);
+    const value: CellValue = cell?.value ?? { kind: 'blank' };
+    let passes = false;
+    if (rule.kind === 'blanks') passes = isBlankValue(value);
+    else if (rule.kind === 'non-blanks') passes = !isBlankValue(value);
+    else if (rule.kind === 'errors') passes = isErrorValue(value);
+    else if (rule.kind === 'no-errors') passes = !isErrorValue(value) && !isBlankValue(value);
+    if (!passes) continue;
+    const overlay = out.get(key) ?? {};
+    mergeApply(overlay, rule.apply);
+    out.set(key, overlay);
   }
 }
 

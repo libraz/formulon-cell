@@ -99,6 +99,8 @@ export function paintCells(
     c0: state.viewport.colStart,
     r1: Math.max(state.viewport.rowStart, state.viewport.rowStart + state.viewport.rowCount - 1),
     c1: Math.max(state.viewport.colStart, state.viewport.colStart + state.viewport.colCount - 1),
+    rowIndices: rows.visible,
+    colIndices: cols.visible,
   };
   const conditional = new Map(
     evaluateConditional(state, wb, cellCtx.locale, visibleBounds, cellCtx.conditionalCache),
