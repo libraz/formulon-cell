@@ -1,4 +1,4 @@
-import { type CopyResult, copy } from '../commands/clipboard/copy.js';
+import { type CopyResult, copy, planCopyRanges } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { createDrawingClipboard } from '../commands/clipboard/drawing.js';
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
@@ -11,6 +11,7 @@ import {
 } from '../commands/clipboard/paste-special.js';
 import {
   type ClipboardSnapshot,
+  captureSnapshotFromCopyPlan,
   captureSnapshotFromCopyResult,
 } from '../commands/clipboard/snapshot.js';
 import { materializedCopyCells } from '../commands/clipboard/source-cells.js';
@@ -296,13 +297,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         layout: sourceLayout,
         selection: { ...state.selection, range: { ...ui.copyRange }, extraRanges: [] },
       };
-      const materialized = copy(
-        sourceState,
-        inputLocaleForWorkbook(wb),
-        localizeFormulaForClipboard(wb),
-      );
+      const materialized = planCopyRanges(sourceState);
       const refreshed = materialized
-        ? captureSnapshotFromCopyResult(
+        ? captureSnapshotFromCopyPlan(
             sourceState,
             materialized,
             'copy',
@@ -377,9 +374,9 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         extraRanges: [],
       },
     };
-    const result = copy(captureState, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
+    const result = planCopyRanges(captureState);
     return result
-      ? captureSnapshotFromCopyResult(captureState, result, 'copy', formatResolverFor(captureState))
+      ? captureSnapshotFromCopyPlan(captureState, result, 'copy', formatResolverFor(captureState))
       : null;
   };
 

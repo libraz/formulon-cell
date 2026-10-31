@@ -9,6 +9,7 @@ import { fixedFormPolicy } from '../../../src/commands/interaction-policy.js';
 import { insertRows } from '../../../src/commands/structure.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
+import type { PasteOptionsActivation } from '../../../src/interact/paste-options.js';
 import {
   type CellFormat,
   createSpreadsheetStore,
@@ -313,6 +314,60 @@ describe('attachClipboard', () => {
       kind: 'text',
       value: 'added after copy',
     });
+    handle.detach();
+  });
+
+  it('refreshes copied formulas without generating unused localized TSV', () => {
+    seedAndMirror(store, wb, [{ row: 4, col: 2, value: 3, formula: '=SUM(1,2)' }]);
+    setRange(store, 0, 2, 1_048_575, 2);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+    fireClipboard(host, 'copy');
+
+    wb.setFormula({ sheet: 0, row: 4, col: 2 }, '=SUM(3,4)');
+    wb.setText({ sheet: 0, row: 20_000, col: 2 }, 'added after copy');
+    const localize = vi.spyOn(wb, 'localizeFormulaText');
+
+    const refreshed = handle.getSnapshot();
+
+    expect(localize).not.toHaveBeenCalled();
+    expect(refreshed?.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 20_000, c1: 2 });
+    expect(refreshed?.cells[0]?.[0]?.formula).toBe('=SUM(3,4)');
+    expect(refreshed?.cells[19_996]?.[0]?.value).toEqual({
+      kind: 'text',
+      value: 'added after copy',
+    });
+    handle.detach();
+  });
+
+  it('captures internal paste undo snapshots without localizing destination formulas', () => {
+    const history = new History();
+    const onPasteOptions = vi.fn<(activation: PasteOptionsActivation) => void>();
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 3, formula: '=SUM(1,2)' },
+      { row: 1, col: 0, value: 5, formula: '=SUM(2,3)' },
+    ]);
+    setFormat(store, 0, 0, { italic: true, fill: '#e2f0d9' });
+    setFormat(store, 1, 0, { bold: true, fill: '#fff2cc' });
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, history, store, wb, onAfterCommit, onPasteOptions });
+    const copied = fireClipboard(host, 'copy').transfer.getData('text/plain');
+    const localize = vi.spyOn(wb, 'localizeFormulaText');
+    setRange(store, 1, 0, 1, 0);
+
+    fireClipboard(host, 'paste', copied);
+
+    expect(localize).not.toHaveBeenCalledWith('=SUM(2,3)');
+    expect(onPasteOptions).toHaveBeenCalledTimes(1);
+    const before = onPasteOptions.mock.calls[0]?.[0].before;
+    expect(before?.cells[0]?.[0]?.formula).toBe('=SUM(2,3)');
+    expect(before?.cells[0]?.[0]?.format).toMatchObject({ bold: true, fill: '#fff2cc' });
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=SUM(1,2)');
+    expect(formatAt(store, 1, 0)).toMatchObject({ italic: true, fill: '#e2f0d9' });
+    expect(onAfterCommit).toHaveBeenCalled();
+    expect(history.undo()).toBe(true);
+    wb.recalc();
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=SUM(2,3)');
+    expect(formatAt(store, 1, 0)).toMatchObject({ bold: true, fill: '#fff2cc' });
     handle.detach();
   });
 

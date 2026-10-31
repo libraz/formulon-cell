@@ -3,10 +3,9 @@ import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { addMergeToMaps } from '../../store/merge-maps.js';
 import type { CellFormat, SpreadsheetStore, State } from '../../store/store.js';
-import { inputLocaleForWorkbook, localizeFormulaForClipboard } from '../coerce-input.js';
-import { copy } from './copy.js';
+import { planCopyRanges } from './copy.js';
 import { createCopyFormatResolver } from './format-resolver.js';
-import { type ClipboardSnapshot, captureSnapshotFromCopyResult } from './snapshot.js';
+import { type ClipboardSnapshot, captureSnapshotFromCopyPlan } from './snapshot.js';
 import { materializedCopyCells } from './source-cells.js';
 
 export function cloneCellFormat(format: CellFormat): CellFormat {
@@ -124,10 +123,10 @@ export function refreshCopiedBandSnapshot(
         ? shiftedRangeForInsert(logicalBefore, targetSheet, axis, insertionAt, count)
         : logicalBefore;
   const sourceState = materializedSourceState(state, wb, snapshot, logical);
-  const sourceCopy = copy(sourceState, inputLocaleForWorkbook(wb), localizeFormulaForClipboard(wb));
+  const sourceCopy = planCopyRanges(sourceState);
   if (!sourceCopy)
     return shiftedSnapshotFallback(snapshot, logical, targetSheet, wholeRows, insertionAt, count);
-  const refreshed = captureSnapshotFromCopyResult(
+  const refreshed = captureSnapshotFromCopyPlan(
     sourceState,
     sourceCopy,
     mode,

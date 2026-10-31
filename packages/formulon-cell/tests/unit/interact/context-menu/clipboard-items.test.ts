@@ -124,6 +124,36 @@ describe('attachContextMenu', () => {
       });
     });
 
+    it('refreshes copied formulas without generating an unused localized TSV', () => {
+      seed(store, wb, [{ row: 4, col: 2, value: 'initial' }]);
+      setRange(store, 0, 2, 1_048_575, 2);
+      const clipboard = createContextMenuClipboard({
+        store,
+        wb,
+        history: null,
+        deps: {},
+        afterCommit: () => {},
+        hasExplicitPolicy: () => false,
+        canPasteToRange: () => true,
+        executeClipboardText: () => {},
+      });
+      clipboard.run('copy', store.getState());
+
+      wb.setFormula({ sheet: 0, row: 4, col: 2 }, '=SUM(3,4)');
+      wb.setText({ sheet: 0, row: 20_000, col: 2 }, 'added after copy');
+      const localize = vi.spyOn(wb, 'localizeFormulaText');
+
+      const refreshed = clipboard.snapshot();
+
+      expect(localize).not.toHaveBeenCalled();
+      expect(refreshed?.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 20_000, c1: 2 });
+      expect(refreshed?.cells[0]?.[0]?.formula).toBe('=SUM(3,4)');
+      expect(refreshed?.cells[19_996]?.[0]?.value).toEqual({
+        kind: 'text',
+        value: 'added after copy',
+      });
+    });
+
     it('Copy clears a stale copy marquee when the selected range cannot be copied', () => {
       mutators.setCopyRanges(store, [
         { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 },

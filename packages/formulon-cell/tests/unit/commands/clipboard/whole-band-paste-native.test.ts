@@ -217,4 +217,38 @@ describe('whole-band paste native persistence', () => {
       wb.dispose();
     }
   });
+
+  it('refreshes native formulas without generating an unused localized TSV', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const store = createSpreadsheetStore();
+    try {
+      wb.setFormula({ sheet: 0, row: 4, col: 2 }, '=SUM(1,2)');
+      mutators.replaceCells(store, wb.cells(0));
+      const logical = { sheet: 0, r0: 0, c0: 2, r1: 1_048_575, c1: 2 };
+      mutators.setRange(store, logical);
+      const initial = copy(store.getState());
+      expect(initial).not.toBeNull();
+      if (!initial) throw new Error('missing whole-column copy');
+      const snapshot = captureSnapshotFromCopyResult(store.getState(), initial);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('missing whole-column snapshot');
+      mutators.setCopyRange(store, logical, 'copy');
+
+      wb.setFormula({ sheet: 0, row: 4, col: 2 }, '=SUM(3,4)');
+      wb.setText({ sheet: 0, row: 20_000, col: 2 }, 'added after copy');
+      const localize = vi.spyOn(wb, 'localizeFormulaText');
+
+      const refreshed = refreshCopiedBandSnapshot(store, wb, snapshot, 0, false, 0, 1);
+
+      expect(localize).not.toHaveBeenCalled();
+      expect(refreshed.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 20_000, c1: 2 });
+      expect(refreshed.cells[0]?.[0]?.formula).toBe('=SUM(3,4)');
+      expect(refreshed.cells[19_996]?.[0]?.value).toEqual({
+        kind: 'text',
+        value: 'added after copy',
+      });
+    } finally {
+      wb.dispose();
+    }
+  });
 });

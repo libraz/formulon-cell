@@ -25,6 +25,9 @@ export interface CopyResult {
   payloadRanges?: Range[];
 }
 
+/** The normalized, bounded ranges represented by a copy, before TSV encoding. */
+export type CopyRangePlan = Omit<CopyResult, 'tsv'>;
+
 /**
  * Snapshot the current selection into a TSV payload. Cells come from the
  * store's cached cell map (no engine reads). Formula cells emit their formula
@@ -39,20 +42,10 @@ export function copy(
   locale?: string,
   localizeFormula?: (formula: string) => string,
 ): CopyResult | null {
-  const normalized = normalizedCopyRanges(state);
-  if (!normalized) return null;
-  const { payloadRanges, sourceRanges: ranges } = normalized;
-  const r = ranges[0];
-  if (!r) return null;
+  const plan = planCopyRanges(state);
+  if (!plan) return null;
+  const payloadRanges = plan.payloadRanges ?? [plan.range];
   const sheet = state.data.sheetIndex;
-  if (payloadRanges.some((range) => range.r1 < range.r0 || range.c1 < range.c0)) return null;
-  // Cap the materialised payload; whole bands are already trimmed to their used span.
-  const totalCells = payloadRanges.reduce(
-    (sum, range) => sum + (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1),
-    0,
-  );
-  if (totalCells > 1_000_000) return null;
-
   const grid: string[][] = [];
   for (const range of payloadRanges) {
     for (let row = range.r0; row <= range.r1; row += 1) {
@@ -63,12 +56,29 @@ export function copy(
       grid.push(line);
     }
   }
+  return { ...plan, tsv: encodeTSV(grid) };
+}
+
+/** Normalize and bound the selected ranges without reading cell values. */
+export function planCopyRanges(state: State): CopyRangePlan | null {
+  const normalized = normalizedCopyRanges(state);
+  if (!normalized) return null;
+  const { payloadRanges, sourceRanges: ranges } = normalized;
+  const range = ranges[0];
+  if (!range) return null;
+  if (payloadRanges.some((payload) => payload.r1 < payload.r0 || payload.c1 < payload.c0))
+    return null;
+  // Cap the materialised payload; whole bands are already trimmed to their used span.
+  const totalCells = payloadRanges.reduce(
+    (sum, payload) => sum + (payload.r1 - payload.r0 + 1) * (payload.c1 - payload.c0 + 1),
+    0,
+  );
+  if (totalCells > 1_000_000) return null;
   return {
-    tsv: encodeTSV(grid),
-    range: r,
-    logicalRange: { ...r },
+    range,
+    logicalRange: { ...range },
     ...(ranges.length > 1 ? { ranges } : {}),
-    ...(payloadRanges.length > 1 || !payloadRanges[0] || !sameRange(payloadRanges[0], r)
+    ...(payloadRanges.length > 1 || !payloadRanges[0] || !sameRange(payloadRanges[0], range)
       ? { payloadRanges }
       : {}),
   };

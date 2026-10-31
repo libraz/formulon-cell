@@ -1,4 +1,4 @@
-import { copy } from '../commands/clipboard/copy.js';
+import { copy, planCopyRanges } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
@@ -9,6 +9,7 @@ import {
 } from '../commands/clipboard/paste-special.js';
 import {
   type ClipboardSnapshot,
+  captureSnapshotFromCopyPlan,
   captureSnapshotFromCopyResult,
 } from '../commands/clipboard/snapshot.js';
 import { materializedCopyCells } from '../commands/clipboard/source-cells.js';
@@ -101,13 +102,9 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         },
         selection: { ...state.selection, range: ui.copyRange, extraRanges: [] },
       };
-      const materialized = copy(
-        sourceState,
-        inputLocaleForWorkbook(wb),
-        localizeFormulaForClipboard(wb),
-      );
+      const materialized = planCopyRanges(sourceState);
       localSnapshot = materialized
-        ? captureSnapshotFromCopyResult(
+        ? captureSnapshotFromCopyPlan(
             sourceState,
             materialized,
             'copy',

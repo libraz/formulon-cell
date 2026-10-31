@@ -3,7 +3,7 @@ import type { Addr, CellValue, Range } from '../../engine/types.js';
 import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
 import type { CellFormat, State } from '../../store/store.js';
-import type { CopyResult } from './copy.js';
+import type { CopyRangePlan, CopyResult } from './copy.js';
 
 /**
  * Structured snapshot of a range — values, formulas, AND formats. Captured
@@ -167,6 +167,16 @@ export function captureSnapshot(
 export function captureSnapshotFromCopyResult(
   state: State,
   result: CopyResult,
+  mode: 'copy' | 'cut' = 'copy',
+  formatResolver?: ClipboardFormatResolver,
+): ClipboardSnapshot | null {
+  return captureSnapshotFromCopyPlan(state, result, mode, formatResolver);
+}
+
+/** Capture the structured payload represented by a copy plan without TSV text. */
+export function captureSnapshotFromCopyPlan(
+  state: State,
+  result: CopyRangePlan,
   mode: 'copy' | 'cut' = 'copy',
   formatResolver?: ClipboardFormatResolver,
 ): ClipboardSnapshot | null {
