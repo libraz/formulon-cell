@@ -29,7 +29,11 @@ import {
 import {
   catalogLocaleOrdinal,
   catalogLocaleTag,
+  type FunctionNameReader,
   functionDescription,
+  functionListSeparator,
+  nativeFunctionName,
+  resolveCatalogFunctionName,
 } from './function-catalog-text.js';
 
 /** Heuristic locale detector for hosts that supply no `getLocale`. Built-in
@@ -51,23 +55,21 @@ export interface FxDialogOpenOptions {
   category?: FunctionCategory;
 }
 
-type FxWorkbookReader = FunctionCatalogReader & {
-  localeFacts?: () => { listSeparator?: string } | null;
-  functionMetadataForLocale?: (
-    name: string,
-    locale: string,
-  ) => {
-    name?: string;
-    minArity: number;
-    maxArity: number | null;
-    localizedName?: string;
-    signatureTemplate?: string;
-    description?: string;
-    availability?: number;
-  } | null;
-  localizeFunctionName?: (name: string, locale?: 0 | 1 | 2 | 3) => string | null;
-  canonicalizeFunctionName?: (name: string, locale?: 0 | 1 | 2 | 3) => string | null;
-};
+type FxWorkbookReader = FunctionCatalogReader &
+  FunctionNameReader & {
+    functionMetadataForLocale?: (
+      name: string,
+      locale: string,
+    ) => {
+      name?: string;
+      minArity: number;
+      maxArity: number | null;
+      localizedName?: string;
+      signatureTemplate?: string;
+      description?: string;
+      availability?: number;
+    } | null;
+  };
 
 export interface FxDialogDeps {
   host: HTMLElement;
@@ -254,47 +256,13 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const catalogEntry = (name: string): FunctionCatalogEntry | null =>
     catalog.entries.get(name) ?? null;
 
-  const activeListSeparator = (): ',' | ';' => {
-    const wb = deps.getWb?.();
-    return typeof wb?.localeFacts === 'function' && wb.localeFacts()?.listSeparator === ';'
-      ? ';'
-      : ',';
-  };
+  const activeListSeparator = (): ',' | ';' => functionListSeparator(deps.getWb?.() ?? null);
 
-  const nativeFunctionName = (canonicalName: string): string => {
-    try {
-      const wb = deps.getWb?.();
-      const localized =
-        typeof wb?.localizeFunctionName === 'function'
-          ? wb.localizeFunctionName(canonicalName, localeOrdinal())
-          : null;
-      return localized || canonicalName;
-    } catch {
-      return canonicalName;
-    }
-  };
+  const formulaFunctionName = (canonicalName: string): string =>
+    nativeFunctionName(deps.getWb?.() ?? null, canonicalName, localeOrdinal());
 
-  const resolveCatalogName = (rawName: string): string | null => {
-    const upper = rawName.trim().toLocaleUpperCase();
-    if (catalog.knownNames.has(upper)) return upper;
-    try {
-      const wb = deps.getWb?.();
-      if (wb) {
-        const canonical =
-          typeof wb.canonicalizeFunctionName === 'function'
-            ? wb.canonicalizeFunctionName(rawName, localeOrdinal())
-            : null;
-        if (canonical && catalog.knownNames.has(canonical)) return canonical;
-      }
-    } catch {
-      // A stale/disposing workbook leaves the current catalog usable.
-    }
-    const nativeMatch = [...catalog.entries.values()].find(
-      (entry) => nativeFunctionName(entry.canonicalName).toLocaleUpperCase() === upper,
-    );
-    if (nativeMatch) return nativeMatch.canonicalName;
-    return null;
-  };
+  const resolveCatalogName = (rawName: string): string | null =>
+    resolveCatalogFunctionName(catalog, deps.getWb?.() ?? null, rawName, localeOrdinal());
 
   const localizedDescription = (name: string): string =>
     functionDescription(catalogEntry(name) ?? { canonicalName: name }, localeTag());
@@ -450,7 +418,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     // German/French formula entry uses the localized function alias alongside
     // its semicolon separator; the commit boundary canonicalizes that text.
     const separator = activeListSeparator();
-    const formulaName = nativeFunctionName(selectedName);
+    const formulaName = formulaFunctionName(selectedName);
     return `=${formulaName}(${args.join(`${separator} `)})`;
   };
 

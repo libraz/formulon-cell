@@ -331,6 +331,20 @@ describe('interact/mac-formula-palette draft session', () => {
     namesSpy.mockRestore();
   });
 
+  it('guards a seeded open of an unknown name after a host-owned workbook is disposed', async () => {
+    const hostWorkbook = await WorkbookHandle.createDefault();
+    const { palette } = setup(() => hostWorkbook);
+    palette.open();
+    expect(paletteRoot(palette).dataset.state).toBe('picker');
+    hostWorkbook.dispose();
+
+    expect(() => palette.open('NOT_A_FUNCTION')).not.toThrow();
+    expect(paletteRoot(palette).querySelector('.fc-mac-formula-palette__guard')?.textContent).toBe(
+      defaultStrings.fxDialog.macPalette?.unavailable,
+    );
+    palette.close();
+  });
+
   it('retains the latest raw draft and blocks writes when the same-workbook catalog withdraws it', () => {
     const { beginDraft, formulaBar, palette } = setup();
     palette.open('SUM');

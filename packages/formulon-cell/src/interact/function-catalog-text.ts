@@ -5,6 +5,7 @@ import type {
   CatalogFunctionCategory,
   CatalogLocaleOrdinal,
   FunctionCatalogEntry,
+  FunctionCatalogSnapshot,
 } from '../commands/function-categories.js';
 
 export type FunctionDescription = {
@@ -346,6 +347,74 @@ export const catalogLocaleOrdinal = (locale: string): CatalogLocaleOrdinal => {
     default:
       return 0;
   }
+};
+
+/** Workbook surface the function pickers use for locale-dependent names. */
+export interface FunctionNameReader {
+  localeFacts?: () => { listSeparator?: string } | null;
+  localizeFunctionName?: (name: string, locale: CatalogLocaleOrdinal) => string | null;
+  canonicalizeFunctionName?: (name: string, locale: CatalogLocaleOrdinal) => string | null;
+}
+
+// Every reader call is guarded: a stale or disposing workbook throws, and the
+// current catalog must stay usable until the host swaps it out.
+
+/** Argument separator of the workbook's locale; `,` when unknown. */
+export const functionListSeparator = (reader: FunctionNameReader | null): ',' | ';' => {
+  try {
+    return typeof reader?.localeFacts === 'function' && reader.localeFacts()?.listSeparator === ';'
+      ? ';'
+      : ',';
+  } catch {
+    return ',';
+  }
+};
+
+/** Name a formula spells `canonicalName` with in `locale`; the canonical name when unmapped. */
+export const nativeFunctionName = (
+  reader: FunctionNameReader | null,
+  canonicalName: string,
+  locale: CatalogLocaleOrdinal,
+): string => {
+  try {
+    const localized =
+      typeof reader?.localizeFunctionName === 'function'
+        ? reader.localizeFunctionName(canonicalName, locale)
+        : null;
+    return localized || canonicalName;
+  } catch {
+    return canonicalName;
+  }
+};
+
+/**
+ * Catalog entry name for a typed function name, or `null` when the catalog
+ * has none. Same order as the engine write boundary: a canonical name wins,
+ * then the engine's alias table, then a scan of each entry's native name.
+ */
+export const resolveCatalogFunctionName = (
+  catalog: Pick<FunctionCatalogSnapshot, 'entries' | 'knownNames'>,
+  reader: FunctionNameReader | null,
+  rawName: string,
+  locale: CatalogLocaleOrdinal,
+): string | null => {
+  const upper = rawName.trim().toLocaleUpperCase();
+  if (catalog.knownNames.has(upper)) return upper;
+  try {
+    const canonical =
+      typeof reader?.canonicalizeFunctionName === 'function'
+        ? reader.canonicalizeFunctionName(rawName, locale)
+        : null;
+    if (canonical && catalog.knownNames.has(canonical)) return canonical;
+  } catch {
+    // Fall through to the native-name scan.
+  }
+  for (const entry of catalog.entries.values()) {
+    if (nativeFunctionName(reader, entry.canonicalName, locale).toLocaleUpperCase() === upper) {
+      return entry.canonicalName;
+    }
+  }
+  return null;
 };
 
 /** Canonical BCP-47 tag used to select a host-provided function catalog. */

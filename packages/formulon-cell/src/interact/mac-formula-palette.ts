@@ -26,6 +26,9 @@ import {
   catalogLocaleOrdinal,
   catalogLocaleTag,
   functionDescription,
+  functionListSeparator,
+  nativeFunctionName,
+  resolveCatalogFunctionName,
 } from './function-catalog-text.js';
 import type { FxDialogHandle, FxDialogOpenOptions } from './fx-dialog.js';
 import {
@@ -202,25 +205,12 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
   };
 
-  const activeListSeparator = (): ',' | ';' => {
-    const workbook = safeWorkbook();
-    return typeof workbook?.localeFacts === 'function' &&
-      workbook.localeFacts()?.listSeparator === ';'
-      ? ';'
-      : ',';
-  };
+  const activeListSeparator = (): ',' | ';' => functionListSeparator(safeWorkbook());
 
   const activeCatalogLocale = (): 0 | 1 | 2 | 3 => catalogLocaleOrdinal(deps.getLocale());
 
-  const nativeFunctionName = (canonical: string): string => {
-    try {
-      const workbook = safeWorkbook();
-      const localized = workbook?.localizeFunctionName(canonical, activeCatalogLocale());
-      return localized || canonical;
-    } catch {
-      return canonical;
-    }
-  };
+  const formulaFunctionName = (canonical: string): string =>
+    nativeFunctionName(safeWorkbook(), canonical, activeCatalogLocale());
 
   const isClosed = (): boolean => mode === 'closed';
 
@@ -247,20 +237,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
   };
 
-  const resolveProjectedName = (rawName: string): string | null => {
-    const name = canonicalName(rawName);
-    if (catalog.knownNames.has(name)) return name;
-    const nativeMatch = [...catalog.entries.values()].find(
-      (entry) => canonicalName(nativeFunctionName(entry.canonicalName)) === name,
-    );
-    if (nativeMatch) return nativeMatch.canonicalName;
-    const workbook = safeWorkbook();
-    if (workbook && typeof workbook.canonicalizeFunctionName === 'function') {
-      const canonical = workbook.canonicalizeFunctionName(rawName, activeCatalogLocale());
-      if (canonical && catalog.knownNames.has(canonical)) return canonical;
-    }
-    return null;
-  };
+  const resolveProjectedName = (rawName: string): string | null =>
+    resolveCatalogFunctionName(catalog, safeWorkbook(), rawName, activeCatalogLocale());
 
   const activeEndpoint = (view: DraftView): number =>
     view.caret.direction === 'backward' ? view.caret.start : view.caret.end;
@@ -720,7 +698,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     const assembled =
       parsed && committedName
         ? formulaWithArgumentCount(
-            nativeFunctionName(committedName),
+            formulaFunctionName(committedName),
             parsed.args,
             committedPreservesCount ? committedCount : null,
             activeListSeparator(),
@@ -902,7 +880,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     const replaced = replaceProjectedFormulaCall(
       currentRaw,
       projection,
-      nativeFunctionName(selectedName),
+      formulaFunctionName(selectedName),
       next.args,
       next.args.length,
       activeListSeparator(),
@@ -1095,7 +1073,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       const replaced = replaceProjectedFormulaCall(
         raw,
         projection,
-        nativeFunctionName(requestedName),
+        formulaFunctionName(requestedName),
         initialArgs,
         null,
         activeListSeparator(),
@@ -1139,7 +1117,11 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     preserveExplicitArgumentCount = false;
     synchronized = true;
     guardMessage = '';
-    const formula = assembledFormula(nativeFunctionName(selectedName), args, activeListSeparator());
+    const formula = assembledFormula(
+      formulaFunctionName(selectedName),
+      args,
+      activeListSeparator(),
+    );
     setDraftRaw(formula);
     mode = 'arguments-editing';
     postCommit = null;
