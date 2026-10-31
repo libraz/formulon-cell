@@ -28,6 +28,11 @@ import {
 } from './autocomplete.js';
 import { handleFormulaAutocompleteKey } from './formula-autocomplete-key.js';
 import {
+  FormulaDraftHistory,
+  type FormulaDraftHistoryState,
+  type FormulaDraftSnapshot,
+} from './formula-draft-history.js';
+import {
   createFormulaEditLease,
   type FormulaEditLease,
   type FormulaEditLeaseContext,
@@ -39,6 +44,7 @@ import {
   pickedReferenceNavigation,
 } from './formula-edit-navigation.js';
 import { resolveFormulaHelperDetails } from './formula-helper-catalog.js';
+import { classifyFormulaReferenceArrow } from './formula-reference-arrow.js';
 import {
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
@@ -52,8 +58,13 @@ import {
 } from './selection-input.js';
 import { advanceAfterCommit } from './selection-navigation.js';
 
-const syncEditorRefs = (store: SpreadsheetStore, text: string): void => {
-  const refs = extractRefs(text).map((r) => ({
+const syncEditorRefs = (store: SpreadsheetStore, text: string, editedAddr?: Addr | null): void => {
+  const state = store.getState();
+  const active = editedAddr ?? state.selection.active;
+  const refs = extractRefs(text, {
+    r1c1: state.ui.r1c1 === true,
+    base: { row: active.row, col: active.col },
+  }).map((r) => ({
     r0: r.r0,
     c0: r.c0,
     r1: r.r1,
@@ -136,6 +147,15 @@ export class InlineEditor {
 
   private composing = false;
 
+  private suppressSelectionNotifications = false;
+
+  private readonly draftHistory = new FormulaDraftHistory();
+
+  private pendingHistoryInput: 'undo' | 'redo' | null = null;
+
+  private ignoredHistoryInput: { action: 'undo' | 'redo'; snapshot: FormulaDraftSnapshot } | null =
+    null;
+
   private referenceGesture: ActiveReferenceGesture | null = null;
 
   private pointNavigation: FormulaReferenceNavigationState | null = null;
@@ -165,6 +185,13 @@ export class InlineEditor {
    *  formula edit. */
   insertRefAtCaret(ref: string, options?: { phase: 'start' | 'update' }): void {
     if (!this.input) return;
+    const historyBefore = this.captureDraftSnapshot();
+    if (options?.phase === 'start') {
+      this.draftHistory.beginGroup(historyBefore, 'reference');
+    } else if (options?.phase !== 'update') {
+      this.draftHistory.endGroup();
+      this.draftHistory.beginCommand(historyBefore);
+    }
     if (options?.phase !== 'update') this.arrowMode = 'point';
     this.pointNavigation = null;
     const el = this.input;
@@ -196,10 +223,18 @@ export class InlineEditor {
     const result = picked.insert(ref);
     this.referenceGesture =
       options?.phase && gesture ? { gesture, value: result.text, caret: result.caret } : null;
-    el.value = result.text;
-    el.setSelectionRange(result.caret, result.caret);
-    el.focus();
-    this.syncInputState();
+    const after: FormulaDraftSnapshot = {
+      value: result.text,
+      start: result.caret,
+      end: result.caret,
+      direction: 'none',
+      mode: this.arrowMode,
+    };
+    if (options?.phase) {
+      this.draftHistory.updateGroup(after, 'reference', historyBefore);
+    } else {
+      this.draftHistory.finishCommand(after);
+    }
     // The next arrow continues from the picked cell or range.
     if (this.editingAddr)
       this.pointNavigation = pickedReferenceNavigation({
@@ -209,6 +244,10 @@ export class InlineEditor {
         editedCell: this.editingAddr,
         r1c1,
       });
+    el.value = result.text;
+    el.setSelectionRange(result.caret, result.caret);
+    el.focus();
+    this.syncInputState();
   }
 
   suspendForFormulaPalette(context: FormulaEditLeaseContext): FormulaEditLease | null {
@@ -244,7 +283,8 @@ export class InlineEditor {
       locale: context.getLocale(),
     };
 
-    this.detachInput(false);
+    const suspendedHistory = this.draftHistory.captureState();
+    this.detachInput(false, true);
     this.editingAddr = null;
     this.composing = false;
     mutators.setEditor(this.deps.store, { kind: 'idle' });
@@ -263,9 +303,10 @@ export class InlineEditor {
           current.ui.r1c1 === snapshot.r1c1
         );
       },
-      restore: (captured) => this.restoreFromLease(captured, suspendedArrowMode),
+      restore: (captured) => this.restoreFromLease(captured, suspendedArrowMode, suspendedHistory),
       release: () => {
         if (this.currentLease === lease) this.currentLease = null;
+        if (!this.input && !this.currentLease) this.draftHistory.clear();
       },
     });
     this.currentLease = lease;
@@ -314,7 +355,10 @@ export class InlineEditor {
       input.focus();
       input.setSelectionRange(seed.length, seed.length);
     });
-    syncEditorRefs(this.deps.store, seed);
+    this.pendingHistoryInput = null;
+    this.ignoredHistoryInput = null;
+    this.draftHistory.reset(this.captureDraftSnapshot());
+    syncEditorRefs(this.deps.store, seed, this.editingAddr);
   }
 
   cancel(): void {
@@ -322,6 +366,9 @@ export class InlineEditor {
     this.referenceGesture = null;
     this.pointNavigation = null;
     this.arrowMode = 'edit';
+    this.pendingHistoryInput = null;
+    this.ignoredHistoryInput = null;
+    this.draftHistory.clear();
     if (!this.input) {
       this.editingAddr = null;
       this.composing = false;
@@ -343,6 +390,7 @@ export class InlineEditor {
   }
 
   commit(advance: 'down' | 'right' | 'up' | 'left' | 'none' = 'down'): void {
+    this.draftHistory.endGroup();
     this.referenceGesture = null;
     this.pointNavigation = null;
     if (!this.input || !this.editingAddr) return;
@@ -397,6 +445,7 @@ export class InlineEditor {
    *  formulas as if filled. The active cell is the anchor — the source for
    *  relative-ref deltas. After committing, the active cell stays put. */
   commitMulti(): void {
+    this.draftHistory.endGroup();
     this.referenceGesture = null;
     this.pointNavigation = null;
     if (!this.input || !this.editingAddr) return;
@@ -460,10 +509,89 @@ export class InlineEditor {
     return this.input != null || this.currentLease != null;
   }
 
+  private captureDraftSnapshot(): FormulaDraftSnapshot {
+    const input = this.input;
+    const value = input?.value ?? '';
+    const start = input?.selectionStart ?? value.length;
+    const end = input?.selectionEnd ?? start;
+    return {
+      value,
+      start,
+      end,
+      direction: input?.selectionDirection ?? 'none',
+      mode: this.arrowMode,
+    };
+  }
+
+  private applyDraftSnapshot(snapshot: FormulaDraftSnapshot): void {
+    const input = this.input;
+    if (!input) return;
+    this.referenceGesture = null;
+    this.pointNavigation = null;
+    this.arrowMode = snapshot.mode;
+    input.value = snapshot.value;
+    input.setSelectionRange(snapshot.start, snapshot.end, snapshot.direction);
+    this.syncInputState();
+  }
+
+  private applyDraftHistory(action: 'undo' | 'redo'): FormulaDraftSnapshot {
+    const snapshot =
+      (action === 'undo' ? this.draftHistory.undo() : this.draftHistory.redo()) ??
+      this.draftHistory.current();
+    const input = this.input;
+    if (!input) return snapshot;
+    this.pendingHistoryInput = null;
+    this.ignoredHistoryInput = null;
+    this.applyDraftSnapshot(snapshot);
+    return snapshot;
+  }
+
+  private handleDraftHistoryKey(event: KeyboardEvent): boolean {
+    const oneModifier = event.ctrlKey !== event.metaKey;
+    if (!oneModifier || event.altKey) return false;
+    const key = event.key.toLowerCase();
+    const action =
+      (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)
+        ? 'redo'
+        : key === 'z' && !event.shiftKey
+          ? 'undo'
+          : null;
+    if (!action) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    this.applyDraftHistory(action);
+    return true;
+  }
+
+  private readonly onBeforeInput = (event: InputEvent): void => {
+    const action =
+      event.inputType === 'historyUndo'
+        ? 'undo'
+        : event.inputType === 'historyRedo'
+          ? 'redo'
+          : null;
+    if (action) {
+      if (this.composing) return;
+      if (event.cancelable) {
+        event.preventDefault();
+        this.pendingHistoryInput = null;
+        this.ignoredHistoryInput = { action, snapshot: this.applyDraftHistory(action) };
+      } else {
+        this.ignoredHistoryInput = null;
+        this.pendingHistoryInput = action;
+      }
+      return;
+    }
+    this.pendingHistoryInput = null;
+    this.ignoredHistoryInput = null;
+    if (!this.composing) this.draftHistory.beforeInput(this.captureDraftSnapshot());
+  };
+
   private readonly onKey = (e: KeyboardEvent): void => {
     if (this.composing || e.isComposing || e.key === 'Process') {
       return;
     }
+    if (this.handleDraftHistoryKey(e)) return;
     if (
       e.key === 'F2' &&
       !e.ctrlKey &&
@@ -475,6 +603,8 @@ export class InlineEditor {
       e.preventDefault();
       e.stopPropagation();
       this.arrowMode = this.arrowMode === 'point' ? 'edit' : 'point';
+      this.draftHistory.endGroup();
+      this.draftHistory.observeSelection(this.captureDraftSnapshot());
       this.referenceGesture = null;
       this.pointNavigation = null;
       if (this.autocomplete?.dismiss) this.autocomplete.dismiss();
@@ -501,14 +631,30 @@ export class InlineEditor {
       e.stopPropagation();
       const caret = this.input?.selectionStart ?? this.input?.value.length ?? 0;
       if (this.input) {
+        const before = this.captureDraftSnapshot();
+        this.draftHistory.endGroup();
         const r = rotateRefAt(this.input.value, caret, {
           r1c1: this.deps.store.getState().ui.r1c1 === true,
+          base: this.editingAddr
+            ? { row: this.editingAddr.row, col: this.editingAddr.col }
+            : undefined,
         });
         if (r.text !== this.input.value) {
-          this.input.value = r.text;
-          this.input.setSelectionRange(r.caret, r.caret);
+          this.draftHistory.recordCommand(
+            before,
+            {
+              value: r.text,
+              start: r.caret,
+              end: r.caret,
+              direction: 'none',
+              mode: this.arrowMode,
+            },
+            'f4',
+          );
           this.pointNavigation = null;
           this.referenceGesture = null;
+          this.input.value = r.text;
+          this.input.setSelectionRange(r.caret, r.caret);
           this.syncInputState();
         }
       }
@@ -592,14 +738,30 @@ export class InlineEditor {
       // Rotate the cell ref under the cursor: A1 → $A$1 → A$1 → $A1 → A1
       e.preventDefault();
       const caret = this.input.selectionStart ?? this.input.value.length;
+      const before = this.captureDraftSnapshot();
+      this.draftHistory.endGroup();
       const r = rotateRefAt(this.input.value, caret, {
         r1c1: this.deps.store.getState().ui.r1c1 === true,
+        base: this.editingAddr
+          ? { row: this.editingAddr.row, col: this.editingAddr.col }
+          : undefined,
       });
       if (r.text !== this.input.value) {
-        this.input.value = r.text;
-        this.input.setSelectionRange(r.caret, r.caret);
+        this.draftHistory.recordCommand(
+          before,
+          {
+            value: r.text,
+            start: r.caret,
+            end: r.caret,
+            direction: 'none',
+            mode: this.arrowMode,
+          },
+          'f4',
+        );
         this.pointNavigation = null;
         this.referenceGesture = null;
+        this.input.value = r.text;
+        this.input.setSelectionRange(r.caret, r.caret);
         this.syncInputState();
       }
     } else if (e.key === 'F9' && this.input) {
@@ -640,10 +802,23 @@ export class InlineEditor {
       if (result) {
         e.preventDefault();
         e.stopPropagation();
-        this.input.value = result.text;
-        this.input.setSelectionRange(result.start, result.end);
+        const before = this.captureDraftSnapshot();
+        this.draftHistory.endGroup();
+        this.draftHistory.recordCommand(
+          before,
+          {
+            value: result.text,
+            start: result.start,
+            end: result.end,
+            direction: 'none',
+            mode: this.arrowMode,
+          },
+          'f9',
+        );
         this.pointNavigation = null;
         this.referenceGesture = null;
+        this.input.value = result.text;
+        this.input.setSelectionRange(result.start, result.end);
         this.syncInputState();
       }
     }
@@ -658,9 +833,46 @@ export class InlineEditor {
     if (this.input) this.commit('none');
   };
 
-  private readonly onInput = (): void => {
+  private readonly onInput = (rawEvent?: Event): void => {
+    const event = rawEvent as InputEvent | undefined;
+    const historyAction =
+      this.pendingHistoryInput ??
+      (event?.inputType === 'historyUndo'
+        ? 'undo'
+        : event?.inputType === 'historyRedo'
+          ? 'redo'
+          : null);
+    if (this.composing) {
+      this.pendingHistoryInput = null;
+      this.ignoredHistoryInput = null;
+      this.referenceGesture = null;
+      this.pointNavigation = null;
+      this.draftHistory.input(this.captureDraftSnapshot(), {
+        composing: true,
+        inputType: event?.inputType,
+      });
+      this.syncInputState();
+      return;
+    }
+    const ignored = this.ignoredHistoryInput;
+    if (historyAction && ignored?.action === historyAction) {
+      this.ignoredHistoryInput = null;
+      this.pendingHistoryInput = null;
+      this.applyDraftSnapshot(ignored.snapshot);
+      return;
+    }
+    this.ignoredHistoryInput = null;
+    if (historyAction) {
+      this.pendingHistoryInput = null;
+      this.applyDraftHistory(historyAction);
+      return;
+    }
     this.referenceGesture = null;
     this.pointNavigation = null;
+    this.draftHistory.input(this.captureDraftSnapshot(), {
+      composing: this.composing,
+      inputType: event?.inputType,
+    });
     this.syncInputState();
   };
 
@@ -668,24 +880,16 @@ export class InlineEditor {
     if (
       this.arrowMode !== 'point' ||
       !this.isFormulaEdit() ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey
+      this.composing ||
+      event.isComposing ||
+      event.key === 'Process'
     )
       return false;
-    const direction =
-      event.key === 'ArrowUp'
-        ? 'up'
-        : event.key === 'ArrowDown'
-          ? 'down'
-          : event.key === 'ArrowLeft'
-            ? 'left'
-            : event.key === 'ArrowRight'
-              ? 'right'
-              : null;
+    const arrow = classifyFormulaReferenceArrow(event, this.isMacPlatform());
     const input = this.input;
     const editedCell = this.editingAddr;
-    if (!direction || !input || !editedCell) return false;
+    if (!arrow || !input || !editedCell) return false;
+    const historyBefore = this.captureDraftSnapshot();
     const current = this.pointNavigation;
     const result = navigateFormulaReference({
       state: this.deps.store.getState(),
@@ -693,10 +897,11 @@ export class InlineEditor {
       selectionStart: input.selectionStart ?? input.value.length,
       selectionEnd: input.selectionEnd ?? input.value.length,
       editedCell,
-      direction,
-      extend: event.shiftKey,
+      direction: arrow.direction,
+      extend: arrow.extend,
       current,
       r1c1: this.deps.store.getState().ui.r1c1 === true,
+      jump: arrow.jump,
     });
     if (!result) return false;
     event.preventDefault();
@@ -704,6 +909,20 @@ export class InlineEditor {
     this.referenceGesture = null;
     this.pointNavigation = result;
     input.value = result.value;
+    if (!this.draftHistory.hasActiveGroup) {
+      this.draftHistory.beginGroup(historyBefore, 'reference');
+    }
+    this.draftHistory.updateGroup(
+      {
+        value: result.value,
+        start: result.caret,
+        end: result.caret,
+        direction: 'none',
+        mode: this.arrowMode,
+      },
+      'reference',
+      historyBefore,
+    );
     input.setSelectionRange(result.caret, result.caret);
     this.syncInputState();
     // The programmatic edit must not reopen suggestions that swallow the next arrow.
@@ -722,7 +941,7 @@ export class InlineEditor {
         raw: this.input.value,
         caret: this.input.selectionStart ?? this.input.value.length,
       });
-      syncEditorRefs(this.deps.store, this.input.value);
+      syncEditorRefs(this.deps.store, this.input.value, this.editingAddr);
     }
     this.autocomplete?.refresh();
     this.argHelper?.refresh();
@@ -730,6 +949,9 @@ export class InlineEditor {
 
   private readonly onCompositionStart = (): void => {
     this.composing = true;
+    this.pendingHistoryInput = null;
+    this.ignoredHistoryInput = null;
+    this.draftHistory.startComposition(this.captureDraftSnapshot());
     this.pointNavigation = null;
     this.referenceGesture = null;
     this.autocomplete?.setComposing?.(true);
@@ -738,13 +960,18 @@ export class InlineEditor {
 
   private readonly onCompositionEnd = (): void => {
     this.composing = false;
+    this.draftHistory.endComposition(this.captureDraftSnapshot());
     this.autocomplete?.setComposing?.(false);
     this.argHelper?.setComposing?.(false);
-    this.onInput();
+    this.syncInputState();
   };
 
   private readonly refreshHelpersAfterSelection = (): void => {
+    if (this.suppressSelectionNotifications) return;
     const input = this.input;
+    if (input && !this.composing) {
+      this.draftHistory.observeSelection(this.captureDraftSnapshot());
+    }
     const gesture = this.referenceGesture;
     if (
       gesture &&
@@ -774,6 +1001,7 @@ export class InlineEditor {
    *  like `F4:F8` selects as a unit). Non-formula edits keep the browser's
    *  native word selection. */
   private readonly onDblClick = (e: MouseEvent): void => {
+    this.draftHistory.endGroup();
     this.arrowMode = 'edit';
     this.pointNavigation = null;
     this.referenceGesture = null;
@@ -797,6 +1025,7 @@ export class InlineEditor {
 
   /** Triple-click inside a formula edit selects the whole formula. */
   private readonly onClick = (e: MouseEvent): void => {
+    this.draftHistory.endGroup();
     this.arrowMode = 'edit';
     this.pointNavigation = null;
     this.referenceGesture = null;
@@ -813,12 +1042,28 @@ export class InlineEditor {
   private insertNewline(): void {
     const el = this.input;
     if (!el) return;
+    const before = this.captureDraftSnapshot();
+    this.draftHistory.endGroup();
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? start;
-    el.value = `${el.value.slice(0, start)}\n${el.value.slice(end)}`;
+    const value = `${el.value.slice(0, start)}\n${el.value.slice(end)}`;
     const caret = start + 1;
+    this.draftHistory.recordCommand(
+      before,
+      {
+        value,
+        start: caret,
+        end: caret,
+        direction: 'none',
+        mode: this.arrowMode,
+      },
+      'newline',
+    );
+    el.value = value;
     el.setSelectionRange(caret, caret);
-    this.onInput();
+    this.referenceGesture = null;
+    this.pointNavigation = null;
+    this.syncInputState();
   }
 
   private refreshSize(): void {
@@ -840,7 +1085,7 @@ export class InlineEditor {
    *  the editor slices. A palette lease uses this boundary before blur can
    *  turn a suspended edit into a workbook write; ordinary cancel asks for
    *  host focus after the same teardown. */
-  private detachInput(focusHost: boolean): void {
+  private detachInput(focusHost: boolean, preserveHistory = false): void {
     this.unsubscribeStore?.();
     this.unsubscribeStore = null;
     this.autocomplete?.detach();
@@ -850,6 +1095,9 @@ export class InlineEditor {
     this.referenceGesture = null;
     this.pointNavigation = null;
     const input = this.input;
+    this.pendingHistoryInput = null;
+    this.ignoredHistoryInput = null;
+    if (!preserveHistory) this.draftHistory.clear();
     if (!input) {
       if (focusHost) this.deps.host.focus({ preventScroll: true });
       return;
@@ -876,6 +1124,7 @@ export class InlineEditor {
   private restoreFromLease(
     snapshot: Readonly<FormulaEditLeaseSnapshot>,
     restoredArrowMode: FormulaArrowMode,
+    restoredHistory: FormulaDraftHistoryState,
   ): HTMLElement | null {
     if (this.input || this.deps.wb !== snapshot.workbook) return null;
     const state = this.deps.store.getState();
@@ -910,6 +1159,9 @@ export class InlineEditor {
       el.setSelectionRange(start, end, snapshot.caret.direction);
     });
     mutators.setEditorRefs(this.deps.store, [...snapshot.editorRefs]);
+    this.pendingHistoryInput = null;
+    this.ignoredHistoryInput = null;
+    this.draftHistory.restoreState(restoredHistory);
     return input;
   }
 
@@ -941,10 +1193,16 @@ export class InlineEditor {
     }
     this.autocomplete = attachAutocomplete({
       input,
+      onBeforeInsert: () => {
+        this.suppressSelectionNotifications = true;
+        this.draftHistory.beginCommand(this.captureDraftSnapshot());
+      },
       onAfterInsert: (outcome?: AutocompleteInsertOutcome) => {
+        this.suppressSelectionNotifications = false;
         this.referenceGesture = null;
         this.pointNavigation = null;
         if (outcome?.kind === 'function') this.arrowMode = 'point';
+        this.draftHistory.finishCommand(this.captureDraftSnapshot());
         this.syncInputState();
       },
       getTables: () => this.deps.wb.getTables(),
@@ -1029,6 +1287,7 @@ export class InlineEditor {
     return [
       ['keydown', this.onKey],
       ['keyup', this.onKeyUp],
+      ['beforeinput', this.onBeforeInput],
       ['select', this.refreshHelpersAfterSelection],
       ['mouseup', this.refreshHelpersAfterSelection],
       ['input', this.onInput],

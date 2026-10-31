@@ -27,7 +27,7 @@ import type {
   PivotTableStyleAssignment,
   TableOverlay,
 } from './format-as-table.js';
-import type { History } from './history.js';
+import type { History, HistoryEntry } from './history.js';
 import type { OperationIntent } from './interaction-policy.js';
 import { deferForAllowedRangeUnlock, selectionEditRanges } from './protection.js';
 
@@ -326,6 +326,7 @@ interface SliceCodec<T> {
   repeat?: () => void;
   intent?: OperationIntent;
   inverseIntent?: OperationIntent;
+  replayAuthorization?: HistoryEntry['replayAuthorization'];
 }
 
 /** Run `mutate`, capturing the slice before and after, and push one entry
@@ -351,6 +352,7 @@ function recordSliceChange<T>(
     repeat: codec.repeat,
     ...(codec.intent ? { intent: codec.intent } : {}),
     ...(codec.inverseIntent ? { inverseIntent: codec.inverseIntent } : {}),
+    ...(codec.replayAuthorization ? { replayAuthorization: codec.replayAuthorization } : {}),
   });
 }
 
@@ -551,9 +553,29 @@ export function recordFormatChange(
   mutate: () => void,
   opts: { repeat?: () => void } = {},
 ): void {
+  recordFormatChangeCore(history, store, mutate, opts);
+}
+
+/** Record an automatic format side effect with its full replay authorization. */
+export function recordAuthorizedFormatChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+  replayAuthorization: NonNullable<HistoryEntry['replayAuthorization']>,
+): void {
+  recordFormatChangeCore(history, store, mutate, {}, replayAuthorization);
+}
+
+function recordFormatChangeCore(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+  opts: { repeat?: () => void },
+  replayAuthorization?: HistoryEntry['replayAuthorization'],
+): void {
   const bridge = history && !history.isReplaying() ? formatHistoryBridgeFor(store) : undefined;
   if (bridge) {
-    recordBridgedFormatChange(history as History, store, mutate, opts, bridge);
+    recordBridgedFormatChange(history as History, store, mutate, opts, bridge, replayAuthorization);
     return;
   }
   recordSliceChange(history, store, mutate, {
@@ -561,6 +583,7 @@ export function recordFormatChange(
     apply: applyFormatSnapshot,
     same: sameFormatSnapshot,
     repeat: opts.repeat,
+    replayAuthorization,
   });
 }
 
@@ -574,6 +597,7 @@ function recordBridgedFormatChange(
   mutate: () => void,
   opts: { repeat?: () => void },
   bridge: import('../engine/format-history-bridge.js').FormatHistoryBridge,
+  replayAuthorization?: HistoryEntry['replayAuthorization'],
 ): void {
   const before = captureFormatSnapshot(store.getState());
   let after: FormatSnapshot | undefined;
@@ -757,6 +781,7 @@ function recordBridgedFormatChange(
           afterNative,
         ),
       repeat: opts.repeat,
+      ...(replayAuthorization ? { replayAuthorization } : {}),
     });
   } catch (error) {
     try {

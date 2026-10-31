@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { addrKey } from '../../../../src/engine/address.js';
 import { defaultStrings } from '../../../../src/i18n/strings.js';
 import { attachFormulaBarController } from '../../../../src/mount/formula-bar.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
@@ -72,6 +73,119 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(sheet.workbook.cellFormula(editedCell)).toBeNull();
     controller.cancelFx();
     harness.detach();
+  });
+
+  it.each(['default', 'mac'] as const)(
+    'formula-bar Ctrl data-edge arrows use the current point gesture on the %s profile',
+    (profile) => {
+      if (profile === 'mac') sheet.host.dataset.fcPlatform = 'mac';
+      const editedCell = { sheet: 0, row: 1, col: 1 };
+      mutators.setActive(sheet.instance.store, editedCell);
+      sheet.instance.store.setState((state) => {
+        const cells = new Map(state.data.cells);
+        for (const col of [1, 2, 3, 4, 7]) {
+          cells.set(addrKey({ sheet: 0, row: 1, col }), {
+            value: { kind: 'number', value: col },
+            formula: null,
+          });
+        }
+        return { ...state, data: { ...state.data, cells } };
+      });
+      const selection = sheet.instance.store.getState().selection;
+      const harness = attachFormulaBarHarness(sheet, vi.fn());
+      const { controller, fxInput: input } = harness;
+      input.focus();
+      input.value = '=SUM()+7';
+      input.dispatchEvent(new Event('input'));
+      input.setSelectionRange(5, 5);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', cancelable: true }));
+      const press = (shiftKey = false): KeyboardEvent => {
+        const event = new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          ctrlKey: true,
+          shiftKey,
+          cancelable: true,
+        });
+        input.dispatchEvent(event);
+        return event;
+      };
+
+      expect(press().defaultPrevented).toBe(true);
+      expect(input.value).toBe('=SUM(E2)+7');
+      expect(press(true).defaultPrevented).toBe(true);
+      expect(input.value).toBe('=SUM(E2:H2)+7');
+      expect(sheet.instance.store.getState().selection).toBe(selection);
+      expect(sheet.workbook.cellFormula(editedCell)).toBeNull();
+      controller.cancelFx();
+      harness.detach();
+    },
+  );
+
+  it('formula-bar accepts Meta arrows only on Mac and leaves mixed or Alt modifiers native', () => {
+    const editedCell = { sheet: 0, row: 1, col: 1 };
+    mutators.setActive(sheet.instance.store, editedCell);
+    sheet.instance.store.setState((state) => {
+      const cells = new Map(state.data.cells);
+      for (const col of [1, 2, 3, 4, 7]) {
+        cells.set(addrKey({ sheet: 0, row: 1, col }), {
+          value: { kind: 'number', value: col },
+          formula: null,
+        });
+      }
+      return { ...state, data: { ...state.data, cells } };
+    });
+    const defaultHarness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller: defaultController, fxInput: defaultInput } = defaultHarness;
+    defaultInput.focus();
+    defaultInput.value = '=SUM()';
+    defaultInput.dispatchEvent(new Event('input'));
+    defaultInput.setSelectionRange(5, 5);
+    defaultInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', cancelable: true }));
+    const defaultMeta = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      metaKey: true,
+      cancelable: true,
+    });
+    defaultInput.dispatchEvent(defaultMeta);
+    expect(defaultMeta.defaultPrevented).toBe(false);
+    expect(defaultInput.value).toBe('=SUM()');
+    defaultController.cancelFx();
+    defaultHarness.detach();
+
+    sheet.host.dataset.fcPlatform = 'mac';
+    const macHarness = attachFormulaBarHarness(sheet, vi.fn());
+    const { controller, fxInput: input } = macHarness;
+    input.focus();
+    input.value = '=SUM()';
+    input.dispatchEvent(new Event('input'));
+    input.setSelectionRange(5, 5);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', cancelable: true }));
+    const unsupported = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      metaKey: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(unsupported);
+    expect(unsupported.defaultPrevented).toBe(false);
+    const alt = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      altKey: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(alt);
+    expect(alt.defaultPrevented).toBe(false);
+    const meta = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      metaKey: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(meta);
+    expect(meta.defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(E2)');
+    controller.cancelFx();
+    macHarness.detach();
   });
 
   it('formula-bar point arrow continues from a mouse-picked reference', () => {

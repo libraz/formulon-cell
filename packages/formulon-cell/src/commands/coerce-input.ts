@@ -223,11 +223,10 @@ export function coerceInputForCell(
     locale,
     date1904: state.ui.date1904 === true,
   });
-  if (wb && coerced.kind === 'formula') {
-    return {
-      ...coerced,
-      text: canonicalizeLocalizedFormulaForInput(wb, coerced.text, locale),
-    };
+  if (coerced.kind === 'formula') {
+    let text = wb ? canonicalizeLocalizedFormulaForInput(wb, coerced.text, locale) : coerced.text;
+    if (state.ui.r1c1) text = normalizeR1C1Formula(text, a);
+    return text === coerced.text ? coerced : { ...coerced, text };
   }
   if (coerced.kind === 'number' && state.ui.precisionAsDisplayed === true) {
     // A General cell takes the format the entry implies, so round to that.
@@ -258,7 +257,7 @@ export function coercedInputToPatch(a: Addr, c: CoercedInput): CellPatch {
       return {
         addr: a,
         value: { kind: 'blank' },
-        formula: normalizeR1C1Formula(c.text, a),
+        formula: c.text,
       };
     case 'number':
       return { addr: a, value: { kind: 'number', value: c.value }, formula: null };
@@ -283,7 +282,8 @@ function applyImplicitFormat(store: SpreadsheetStore, a: Addr, c: CoercedInput):
 
 /** Convenience: coerce + write in one call for the common keyboard path.
  *  When `store` is supplied, sheet-protection is checked first — locked cells
- *  on protected sheets emit a console warning and the write is skipped. */
+ *  on protected sheets emit a console warning and the write is skipped.
+ *  Without `store`, formula text is treated as A1. */
 export function writeInput(
   wb: WorkbookHandle,
   a: Addr,
@@ -321,7 +321,7 @@ export function writeInput(
  *  the outcome for an inline toast. Range-backed list sources resolve against
  *  `wb` rooted at `a.sheet`. When `store` is supplied, sheet-protection is
  *  gated first; gated cells return `{ ok: true }` and emit a console warning
- *  rather than writing through. */
+ *  rather than writing through. Without `store`, formula text is treated as A1. */
 export function writeInputValidated(
   wb: WorkbookHandle,
   a: Addr,

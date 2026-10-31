@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { addrKey } from '../../../src/engine/address.js';
 import {
   navigateFormulaReference,
   pickedReferenceNavigation,
@@ -7,6 +8,207 @@ import { createFormulaReferenceGesture } from '../../../src/interact/formula-ref
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('formula edit point navigation', () => {
+  it('uses data-edge jumps for Ctrl arrows while preserving and collapsing the expression span', () => {
+    const store = createSpreadsheetStore();
+    store.setState((state) => {
+      const cells = new Map(state.data.cells);
+      for (const col of [1, 2, 3, 4, 7]) {
+        cells.set(addrKey({ sheet: 0, row: 1, col }), {
+          value: { kind: 'number', value: col },
+          formula: null,
+        });
+      }
+      return { ...state, data: { ...state.data, cells } };
+    });
+    const editedCell = { sheet: 0, row: 1, col: 1 };
+    const text = '=SUM()+7';
+    const first = navigateFormulaReference({
+      state: store.getState(),
+      text,
+      selectionStart: 5,
+      selectionEnd: 5,
+      editedCell,
+      direction: 'right',
+      extend: false,
+      jump: true,
+    });
+    expect(first).toMatchObject({ value: '=SUM(E2)+7', anchor: { row: 1, col: 4 } });
+
+    const extended = navigateFormulaReference({
+      state: store.getState(),
+      text: first?.value ?? '',
+      selectionStart: first?.caret ?? 0,
+      selectionEnd: first?.caret ?? 0,
+      editedCell,
+      direction: 'right',
+      extend: true,
+      current: first,
+      jump: true,
+    });
+    expect(extended).toMatchObject({
+      value: '=SUM(E2:H2)+7',
+      anchor: { row: 1, col: 4 },
+      tip: { row: 1, col: 7 },
+    });
+
+    const collapsed = navigateFormulaReference({
+      state: store.getState(),
+      text: extended?.value ?? '',
+      selectionStart: extended?.caret ?? 0,
+      selectionEnd: extended?.caret ?? 0,
+      editedCell,
+      direction: 'left',
+      extend: false,
+      current: extended,
+      jump: true,
+    });
+    expect(collapsed).toMatchObject({
+      value: '=SUM(E2)+7',
+      anchor: { row: 1, col: 4 },
+      tip: { row: 1, col: 4 },
+    });
+
+    const reverseExtended = navigateFormulaReference({
+      state: store.getState(),
+      text: first?.value ?? '',
+      selectionStart: first?.caret ?? 0,
+      selectionEnd: first?.caret ?? 0,
+      editedCell,
+      direction: 'left',
+      extend: true,
+      current: first,
+      jump: true,
+    });
+    expect(reverseExtended).toMatchObject({
+      value: '=SUM(B2:E2)+7',
+      anchor: { row: 1, col: 4 },
+      tip: { row: 1, col: 1 },
+    });
+    const reverseCollapsed = navigateFormulaReference({
+      state: store.getState(),
+      text: reverseExtended?.value ?? '',
+      selectionStart: reverseExtended?.caret ?? 0,
+      selectionEnd: reverseExtended?.caret ?? 0,
+      editedCell,
+      direction: 'right',
+      extend: false,
+      current: reverseExtended,
+      jump: true,
+    });
+    expect(reverseCollapsed).toMatchObject({
+      value: '=SUM(E2)+7',
+      anchor: { row: 1, col: 4 },
+      tip: { row: 1, col: 4 },
+    });
+  });
+
+  it('applies visual RTL direction before the data jump and snaps a jumped merge body to its anchor', () => {
+    const store = createSpreadsheetStore();
+    store.setState((state) => {
+      const cells = new Map(state.data.cells);
+      for (const col of [5, 6]) {
+        cells.set(addrKey({ sheet: 0, row: 1, col }), {
+          value: { kind: 'number', value: col },
+          formula: null,
+        });
+      }
+      return {
+        ...state,
+        data: { ...state.data, cells },
+        ui: { ...state.ui, rightToLeft: true },
+      };
+    });
+    mutators.mergeRange(store, { sheet: 0, r0: 1, c0: 4, r1: 1, c1: 5 });
+    const result = navigateFormulaReference({
+      state: store.getState(),
+      text: '=SUM()',
+      selectionStart: 5,
+      selectionEnd: 5,
+      editedCell: { sheet: 0, row: 1, col: 6 },
+      direction: 'right',
+      extend: false,
+      jump: true,
+    });
+
+    expect(result).toMatchObject({ value: '=SUM(E2)', tip: { row: 1, col: 4 } });
+  });
+
+  it('keeps idle data-edge occupancy across hidden-column boundaries', () => {
+    const store = createSpreadsheetStore();
+    store.setState((state) => {
+      const cells = new Map(state.data.cells);
+      for (const col of [1, 2, 3, 4, 7]) {
+        cells.set(addrKey({ sheet: 0, row: 1, col }), {
+          value: { kind: 'number', value: col },
+          formula: null,
+        });
+      }
+      return {
+        ...state,
+        data: { ...state.data, cells },
+        layout: { ...state.layout, hiddenCols: new Set([4]) },
+      };
+    });
+    const result = navigateFormulaReference({
+      state: store.getState(),
+      text: '=SUM()',
+      selectionStart: 5,
+      selectionEnd: 5,
+      editedCell: { sheet: 0, row: 1, col: 1 },
+      direction: 'right',
+      extend: false,
+      jump: true,
+    });
+
+    expect(result?.tip).toEqual({ sheet: 0, row: 1, col: 4 });
+  });
+
+  it('formats a Ctrl range jump in R1C1 relative to the edited cell', () => {
+    const store = createSpreadsheetStore();
+    store.setState((state) => {
+      const cells = new Map(state.data.cells);
+      for (const col of [3, 4, 7]) {
+        cells.set(addrKey({ sheet: 0, row: 3, col }), {
+          value: { kind: 'number', value: col },
+          formula: null,
+        });
+      }
+      return {
+        ...state,
+        data: { ...state.data, cells },
+        ui: { ...state.ui, r1c1: true },
+      };
+    });
+    const editedCell = { sheet: 0, row: 3, col: 3 };
+    const first = navigateFormulaReference({
+      state: store.getState(),
+      text: '=SUM()',
+      selectionStart: 5,
+      selectionEnd: 5,
+      editedCell,
+      direction: 'right',
+      extend: false,
+      jump: true,
+      r1c1: true,
+    });
+    const range = navigateFormulaReference({
+      state: store.getState(),
+      text: first?.value ?? '',
+      selectionStart: first?.caret ?? 0,
+      selectionEnd: first?.caret ?? 0,
+      editedCell,
+      direction: 'right',
+      extend: true,
+      current: first,
+      jump: true,
+      r1c1: true,
+    });
+
+    expect(first?.tip).toEqual({ sheet: 0, row: 3, col: 4 });
+    expect(range?.tip).toEqual({ sheet: 0, row: 3, col: 7 });
+    expect(range?.value).toMatch(/^=SUM\(R.*:R.*\)$/u);
+  });
+
   it('starts from the edited cell and extends or collapses a reference with Shift', () => {
     const store = createSpreadsheetStore();
     const editedCell = { sheet: 0, row: 3, col: 3 };

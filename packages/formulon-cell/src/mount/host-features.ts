@@ -820,6 +820,9 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.fxAutocomplete !== input.autocompleteStub) return;
         s.fxAutocomplete = attachAutocomplete({
           input: input.fxInput,
+          onBeforeInsert: () => {
+            input.getFormulaBar().beforeAutocompleteInsert?.();
+          },
           onAfterInsert: (outcome?: AutocompleteInsertOutcome) => {
             input.getFormulaBar().notifyAutocompleteInsert?.(outcome);
             input.fxInput.dispatchEvent(new Event('input', { bubbles: true }));

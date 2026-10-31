@@ -1,4 +1,5 @@
 import { colFromLetters, colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { FUNCTION_NAMES } from './formula-function-names.js';
 /**
  * A1 reference tokenizer behind every transform in `formula-refs.ts`: token
  * shapes, the formula scanner that visits each reference, and the renderers
@@ -60,6 +61,7 @@ const isUnicodeDigit = (c: string): boolean => /^\p{N}$/u.test(c);
 const isUnicodeMark = (c: string): boolean => /^\p{M}$/u.test(c);
 const isLetter = (c: string): boolean => isAsciiLetter(c);
 const isDigit = (c: string): boolean => isAsciiDigit(c);
+const FUNCTION_NAME_SET = new Set(FUNCTION_NAMES);
 const isIdentChar = (c: string): boolean =>
   isAsciiLetter(c) ||
   isAsciiDigit(c) ||
@@ -172,9 +174,8 @@ function parseSheetQualifier(src: string, start: number): { text: string; end: n
   return { text: src.slice(start, end + 1), end: end + 1 };
 }
 
-/** Attempt to match a whole reference token at `start`. Rejects tokens that are
- *  actually function names (immediately followed by `(`) or that run into an
- *  identifier continuation. */
+/** Attempt to match a whole reference token at `start`. Rejects unqualified
+ *  cell-shaped function names and tokens that run into an identifier. */
 function matchRefToken(src: string, start: number): RefToken | null {
   let i = start;
   let sheetQual = '';
@@ -231,9 +232,25 @@ function matchRefToken(src: string, start: number): RefToken | null {
       i = second.end;
     }
   }
-  // Reject function calls (`SUM(`, `LOG10(`) and identifier run-ons.
+  // An unqualified single token directly followed by `(` is a call; qualified tokens and ranges stay references.
   const next = src[i] ?? '';
-  if (next === '(') return null;
+  if (next === '(' && !sheetQual && !b) return null;
+  // A space before `(` is valid intersection syntax; only known function names make it a call.
+  let afterWhitespace = i;
+  while (afterWhitespace < src.length && /\s/u.test(src[afterWhitespace] ?? '')) {
+    afterWhitespace += 1;
+  }
+  if (
+    afterWhitespace > i &&
+    src[afterWhitespace] === '(' &&
+    !sheetQual &&
+    !b &&
+    !first.atom.absCol &&
+    !first.atom.absRow &&
+    FUNCTION_NAME_SET.has(`${first.atom.label}${first.atom.rowStr}`)
+  ) {
+    return null;
+  }
   // A table name in a structured reference can look exactly like an A1
   // token (for example `T1[Amount]`). The bracketed part can also contain
   // cell-looking column names, so leave the complete structured reference to

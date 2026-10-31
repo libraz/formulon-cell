@@ -1,6 +1,7 @@
 import { colFromLetters, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formulaCaretContext } from './formula-edit-context.js';
 import { rewriteRefs } from './formula-ref-lexer.js';
+import { scanR1C1References } from './r1c1-reference.js';
 
 export interface FormulaReferenceInputOptions {
   /** The current editor displays native relative / absolute R1C1 references. */
@@ -16,7 +17,6 @@ export interface FormulaReferenceInsertionSpan {
 }
 
 const IDENT_CHAR = /[\p{L}\p{N}_.\\]/u;
-const R1C1_ATOM = /R(?:\[-?\d+\]|[1-9]\d*)?C(?:\[-?\d+\]|[1-9]\d*)?/iy;
 
 function mergeColonConnectedSpans(
   text: string,
@@ -60,92 +60,7 @@ function readQuotedSheet(text: string, start: number): number | null {
 }
 
 function r1c1ReferenceSpans(text: string): FormulaReferenceInsertionSpan[] {
-  const spans: FormulaReferenceInsertionSpan[] = [];
-  let i = text.startsWith('=') ? 1 : 0;
-  while (i < text.length) {
-    if (text[i] === '"') {
-      i += 1;
-      while (i < text.length) {
-        if (text[i] === '"' && text[i + 1] === '"') {
-          i += 2;
-          continue;
-        }
-        if (text[i] === '"') {
-          i += 1;
-          break;
-        }
-        i += 1;
-      }
-      continue;
-    }
-    if (text[i] === '[') {
-      // R1C1 relative coordinates use brackets as part of the reference atom.
-      const before = text.slice(0, i);
-      if (/(?:^|[^\p{L}\p{N}_.])R(?:\[-?\d+\])?C?(?:\[-?\d*)?$/iu.test(before)) {
-        i += 1;
-        while (i < text.length && text[i] !== ']') i += 1;
-        if (text[i] === ']') i += 1;
-        continue;
-      }
-      let depth = 1;
-      i += 1;
-      while (i < text.length && depth > 0) {
-        if (text[i] === '[') depth += 1;
-        else if (text[i] === ']') depth -= 1;
-        else if (text[i] === "'" && ['[', ']', '@', '#', "'"].includes(text[i + 1] ?? '')) {
-          i += 2;
-          continue;
-        }
-        i += 1;
-      }
-      continue;
-    }
-    if (text[i] === "'") {
-      const after = readQuotedSheet(text, i);
-      if (after === null) {
-        i += 1;
-        continue;
-      }
-      const token = matchR1C1At(text, after);
-      if (token) {
-        spans.push({ start: i, end: token.end });
-        i = token.end;
-      } else i = after;
-      continue;
-    }
-    if (i > 0 && IDENT_CHAR.test(text[i - 1] ?? '')) {
-      i += 1;
-      continue;
-    }
-    const unquoted = /^([\p{L}_][\p{L}\p{N}_.]*)!/u.exec(text.slice(i));
-    const qualifierEnd = unquoted ? i + unquoted[0].length : i;
-    const token = matchR1C1At(text, qualifierEnd);
-    if (token) {
-      spans.push({ start: i, end: token.end });
-      i = token.end;
-      continue;
-    }
-    i += 1;
-  }
-  return spans;
-}
-
-function matchR1C1At(text: string, start: number): { end: number } | null {
-  R1C1_ATOM.lastIndex = start;
-  const first = R1C1_ATOM.exec(text);
-  if (!first || first.index !== start) return null;
-  let end = start + first[0].length;
-  while (true) {
-    const colon = /^\s*:\s*/u.exec(text.slice(end));
-    if (!colon) break;
-    const nextStart = end + colon[0].length;
-    R1C1_ATOM.lastIndex = nextStart;
-    const next = R1C1_ATOM.exec(text);
-    if (!next || next.index !== nextStart) break;
-    end = nextStart + next[0].length;
-  }
-  if (IDENT_CHAR.test(text[end] ?? '') || text[end] === '[' || text[end] === '(') return null;
-  return { end };
+  return scanR1C1References(text).map(({ start, end }) => ({ start, end }));
 }
 
 function completeReferenceAt(

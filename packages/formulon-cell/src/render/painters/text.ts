@@ -306,10 +306,11 @@ const paintTextDecorations = (
   baselineY: number,
   box: TextMetricsBox,
 ): void => {
-  if (!format?.underline && !format?.strike && !isHyperlink) return;
+  const underline = format?.underline !== false && (!!format?.underline || isHyperlink);
+  if (!underline && !format?.strike) return;
   ctx.strokeStyle = ctx.fillStyle as string;
   ctx.lineWidth = 1;
-  if (format?.underline || isHyperlink) {
+  if (underline) {
     const underlineY = Math.round(baselineY + Math.max(2, box.descent * 0.55)) + 0.5;
     const ys = isDoubleUnderline(format?.underline) ? [underlineY, underlineY + 2] : [underlineY];
     for (const y of ys) {

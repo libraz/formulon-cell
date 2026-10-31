@@ -10,7 +10,7 @@ import { dataTableCellAmong, dataTableGuardAlert } from '../commands/data-table-
 import type { CellBatchOperation } from '../commands/interaction-policy.js';
 import { mergeAt } from '../commands/merge.js';
 import { isCellWritable } from '../commands/protection.js';
-import { shiftFormulaRefs } from '../commands/refs.js';
+import { normalizeR1C1Formula, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -101,7 +101,11 @@ export function buildSelectionInputBatch(
         hasFormula ||= isFormula;
         changes.push({
           addr,
-          input: isFormula ? shiftFormulaRefs(formulaRaw, row - anchor.row, col - anchor.col) : raw,
+          input: isFormula
+            ? state.ui.r1c1
+              ? formulaRaw
+              : shiftFormulaRefs(formulaRaw, row - anchor.row, col - anchor.col)
+            : raw,
         });
       }
     }
@@ -165,7 +169,9 @@ export function writeSelectionInput(
           // Formula results aren't run through DV (Excel validates the typed entry).
           plan.push({
             target,
-            formula: shiftFormulaRefs(canonicalFormula, row - anchor.row, col - anchor.col),
+            formula: state.ui.r1c1
+              ? normalizeR1C1Formula(canonicalFormula, target)
+              : shiftFormulaRefs(canonicalFormula, row - anchor.row, col - anchor.col),
           });
           continue;
         }

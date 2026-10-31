@@ -92,6 +92,7 @@ describe('TSV paste value batching', () => {
     try {
       expect(wb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setR1C1(store, true);
       mutators.setCellFormat(store, { sheet: 0, row: 0, col: 3 }, { numFmt: { kind: 'text' } });
       const tsv = "1,25\t5%\t31.12.2024\t00123\t'0042\t=SUM(RC[-5]:RC[-5])\t#NV\ntail";
 

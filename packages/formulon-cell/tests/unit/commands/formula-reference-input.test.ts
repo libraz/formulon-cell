@@ -144,13 +144,16 @@ describe('insertFormulaReference', () => {
     },
   );
 
-  it('replaces the complete R1C1 colon chain when the caret is inside a middle endpoint', () => {
-    const formula = '=SUM(R[-2]C[-3]:R[-1]C[-2]:RC)+E1';
-    const caret = formula.indexOf('R[-1]C[-2]') + 4;
+  it.each(['R[-2]C[-3]', 'R[-1]C[-2]', 'RC'])(
+    'replaces the complete R1C1 colon chain when the caret is inside %s',
+    (atom) => {
+      const formula = '=SUM(R[-2]C[-3]:R[-1]C[-2]:RC)+E1';
+      const caret = formula.indexOf(atom) + 1;
 
-    expect(insertFormulaReference(formula, caret, caret, 'R[2]C[2]', { r1c1: true })).toEqual({
-      text: '=SUM(R[2]C[2])+E1',
-      caret: 13,
-    });
-  });
+      expect(insertFormulaReference(formula, caret, caret, 'R[2]C[2]', { r1c1: true })).toEqual({
+        text: '=SUM(R[2]C[2])+E1',
+        caret: 13,
+      });
+    },
+  );
 });

@@ -552,7 +552,13 @@ export {
   isQuickAnalysisActionEnabled,
   quickAnalysisActionById,
 } from './commands/quick-analysis.js';
-export type { ActiveSignature, F4Result, FormulaRef, FormulaScanOptions } from './commands/refs.js';
+export type {
+  ActiveSignature,
+  F4Result,
+  FormulaRef,
+  FormulaReferenceFormatOptions,
+  FormulaScanOptions,
+} from './commands/refs.js';
 export {
   extractRefs,
   FUNCTION_SIGNATURES,

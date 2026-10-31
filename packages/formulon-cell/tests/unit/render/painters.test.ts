@@ -467,6 +467,31 @@ describe('paintCellText font strictness', () => {
     expect(spy.fills[0]?.text).toBe('Example');
   });
 
+  it.each([
+    { underline: undefined, strike: false, strokes: 1 },
+    { underline: false, strike: false, strokes: 0 },
+    { underline: true, strike: false, strokes: 1 },
+    { underline: 'double' as const, strike: false, strokes: 2 },
+    { underline: false, strike: true, strokes: 1 },
+  ])(
+    'respects hyperlink underline $underline and strike $strike',
+    ({ underline, strike, strokes }) => {
+      const spy = makeTextSpy();
+      paintCellText({
+        ctx: spy.ctx,
+        bounds: { x: 0, y: 0, w: 160, h: 24 },
+        theme: theme({ textCell: 13 }),
+        value: { kind: 'text', value: 'Example link' },
+        formula: null,
+        isActive: false,
+        isInRange: false,
+        format: { hyperlink: 'https://example.test', underline, strike },
+      });
+      expect(spy.fills[0]?.text).toBe('Example link');
+      expect(spy.strokeCount()).toBe(strokes);
+    },
+  );
+
   it('applies Excel-style indent as left text inset', () => {
     const plain = makeTextSpy();
     const indented = makeTextSpy();

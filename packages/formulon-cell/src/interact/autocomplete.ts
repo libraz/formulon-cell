@@ -81,6 +81,8 @@ export function collectAutocompleteNames(
 export interface AutocompleteDeps {
   /** The textarea/input being edited. */
   input: HTMLInputElement | HTMLTextAreaElement;
+  /** Called immediately before a successful candidate rewrites the input. */
+  onBeforeInsert?: () => void;
   /** Called after the popover has rewritten input.value so consumers can
    *  re-sync mirror state (e.g. formula-bar ref highlighting). Receives the
    *  accepted candidate kind; existing zero-argument callbacks remain valid. */
@@ -143,6 +145,9 @@ interface SuggestionContext {
   /** Per-match kind and detail when the list mixes functions and names. */
   kinds?: AutocompleteSuggestionKind[];
   details?: string[];
+  /** Candidate-specific replacement text, used when raw labels need syntax
+   *  encoding before they are inserted. */
+  insertions?: string[];
   /** Number of existing characters after the replacement that place the caret
    *  inside a call parenthesis already present in the formula. */
   existingCallParenLength?: number;
@@ -528,7 +533,10 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     const acceptedKind = ctx.kinds?.[highlight] ?? ctx.kind;
     const before = input.value.slice(0, ctx.tokenStart);
     const after = input.value.slice(ctx.tokenEnd);
-    const insert = acceptedKind === 'name' ? pick : `${pick}${ctx.insertSuffix}`;
+    const insert =
+      ctx.insertions?.[highlight] ??
+      (acceptedKind === 'name' ? pick : `${pick}${ctx.insertSuffix}`);
+    deps.onBeforeInsert?.();
     input.value = before + insert + after;
     const caret =
       before.length +
@@ -797,7 +805,131 @@ function suggestNames(
   return matches.length === 0 ? null : { tokenStart, matches };
 }
 
-const NAME_RE = /[A-Za-z_][A-Za-z0-9_]*$/;
+const STRUCTURED_REF_EXTRA_BRACKET_CHARS = new Set([
+  '\t',
+  '\n',
+  '\r',
+  ',',
+  ':',
+  '.',
+  '[',
+  ']',
+  '#',
+  "'",
+  '"',
+  '{',
+  '}',
+  '$',
+  '^',
+  '&',
+  '*',
+  '+',
+  '=',
+  '-',
+  '>',
+  '<',
+  '/',
+  '@',
+  '\\',
+  '!',
+  '(',
+  ')',
+  '%',
+  '?',
+  '`',
+  ';',
+  '~',
+  '_',
+]);
+
+const STRUCTURED_REF_ESCAPED_CHARS = new Set(['[', ']', '#', "'", '@']);
+
+/** Offsets of the `[` still open at `caret`. Outside brackets, "..." and '...' spans are
+ *  skipped; inside brackets, `'` escapes the next special character. */
+function openStructuredRefBrackets(text: string, caret: number): number[] {
+  const opens: number[] = [];
+  let inString = false;
+  let inSheet = false;
+  let i = text.startsWith('=') ? 1 : 0;
+  const stop = Math.max(i, Math.min(caret, text.length));
+
+  while (i < stop) {
+    const ch = text[i] ?? '';
+    const next = text[i + 1] ?? '';
+    if (inString) {
+      if (ch === '"') {
+        if (next === '"') {
+          i += 2;
+          continue;
+        }
+        inString = false;
+      }
+      i += 1;
+      continue;
+    }
+    if (inSheet) {
+      if (ch === "'") {
+        if (next === "'") {
+          i += 2;
+          continue;
+        }
+        inSheet = false;
+      }
+      i += 1;
+      continue;
+    }
+    if (opens.length > 0) {
+      if (ch === "'" && STRUCTURED_REF_ESCAPED_CHARS.has(next)) {
+        i += 2;
+        continue;
+      }
+      if (ch === '[') opens.push(i);
+      else if (ch === ']') opens.pop();
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "'") {
+      inSheet = true;
+      i += 1;
+      continue;
+    }
+    if (ch === '[') opens.push(i);
+    i += 1;
+  }
+  return opens;
+}
+
+function decodeStructuredRefPartial(partial: string): string {
+  let decoded = '';
+  for (let i = 0; i < partial.length; i += 1) {
+    const ch = partial[i] ?? '';
+    const next = partial[i + 1] ?? '';
+    // A dangling escape still identifies a useful prefix (`A'` before the escaped `]` in `A]B`).
+    if (ch === "'" && i === partial.length - 1) continue;
+    if (ch === "'" && STRUCTURED_REF_ESCAPED_CHARS.has(next)) {
+      decoded += next;
+      i += 1;
+    } else {
+      decoded += ch;
+    }
+  }
+  return decoded;
+}
+
+function encodeStructuredRefColumn(header: string, openBracketCount: number): string {
+  const escaped = [...header]
+    .map((ch) => (STRUCTURED_REF_ESCAPED_CHARS.has(ch) ? `'${ch}` : ch))
+    .join('');
+  const needsExtraBracket = [...header].some((ch) => STRUCTURED_REF_EXTRA_BRACKET_CHARS.has(ch));
+  const addInnerBracket = needsExtraBracket && openBracketCount === 1;
+  const closeCount = openBracketCount + (addInnerBracket ? 1 : 0);
+  return `${addInnerBracket ? '[' : ''}${escaped}${']'.repeat(closeCount)}`;
+}
 
 /** Detect a `TableName[partial` token immediately before the caret and return
  *  matching column names. The token is allowed to contain spaces inside the
@@ -813,28 +945,18 @@ export function suggestStructuredRef(
   if (caretContext === 'string' || caretContext === 'sheet') return null;
   const next = text[caret] ?? '';
   if (next && /[\p{L}\p{N}_.\\\]]/u.test(next)) return null;
-  // Look for the most recent unmatched `[` to the left of the caret, bounded
-  // to the same formula segment (no `]` between caret and the opening bracket).
-  let bracket = -1;
-  for (let i = caret - 1; i >= 0; i -= 1) {
-    const ch = text[i];
-    if (ch === ']' || ch === '"') return null;
-    if (ch === '[') {
-      bracket = i;
-      break;
-    }
-  }
-  if (bracket <= 0) return null;
-  const before = text.slice(0, bracket);
-  const nameMatch = NAME_RE.exec(before);
-  if (!nameMatch) return null;
-  const tableName = nameMatch[0];
-  const table = tables.find((t) => t.name.toLowerCase() === tableName.toLowerCase());
+  const openBrackets = openStructuredRefBrackets(text, caret);
+  if (openBrackets.length === 0) return null;
+  const tableBracket = openBrackets[0];
+  const columnBracket = openBrackets[openBrackets.length - 1];
+  if (tableBracket === undefined || columnBracket === undefined) return null;
+  const { token: tableName } = formulaIdentifierPrefix(text, tableBracket);
+  if (tableName.length === 0 || !/^[\p{L}_\\]/u.test(tableName)) return null;
+  const foldedTableName = tableName.toLocaleLowerCase();
+  const table = tables.find((t) => t.name.toLocaleLowerCase() === foldedTableName);
   if (!table || table.columns.length === 0) return null;
-  const partial = text.slice(bracket + 1, caret);
-  // Reject when the partial already contains characters that close the ref.
-  if (/[[\],]/.test(partial)) return null;
-  const lower = partial.toLowerCase();
+  const partial = decodeStructuredRefPartial(text.slice(columnBracket + 1, caret));
+  const lower = partial.toLocaleLowerCase();
   const seen = new Set<string>();
   const matches = table.columns
     .filter((c) => {
@@ -847,9 +969,10 @@ export function suggestStructuredRef(
   if (matches.length === 0) return null;
   return {
     matches,
-    tokenStart: bracket + 1,
+    tokenStart: columnBracket + 1,
     tokenEnd: caret,
     insertSuffix: ']',
     kind: 'tableColumn',
+    insertions: matches.map((header) => encodeStructuredRefColumn(header, openBrackets.length)),
   };
 }

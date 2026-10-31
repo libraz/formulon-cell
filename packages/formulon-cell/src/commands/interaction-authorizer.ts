@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { AUTO_HYPERLINK_COMMAND_ID } from './auto-hyperlink.js';
 import type { HistoryDirection, HistoryEntry } from './history.js';
 import {
   createWorkbookAddressCheck,
@@ -19,7 +20,7 @@ import {
   operationPermission,
   type PermissionDecision,
 } from './interaction-policy.js';
-import { isCellWritable, isSheetProtected } from './protection.js';
+import { isCellWritable, isSheetProtected, protectedSheetPermissions } from './protection.js';
 
 const IMPLEMENTED_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'valueEdit',
@@ -62,6 +63,31 @@ const macSubtotalStructuralRange = (intent: OperationIntent): Range | null => {
 
 const ownsMacRemoveHyperlinkCommand = (intent: OperationIntent): boolean =>
   intent.commandId === MAC_REMOVE_HYPERLINK_COMMAND_ID;
+
+const automaticHyperlinkCell = (intent: OperationIntent): Addr | null => {
+  if (
+    intent.commandId !== AUTO_HYPERLINK_COMMAND_ID ||
+    (intent.operation !== 'format' && intent.operation !== 'hyperlink') ||
+    (intent.origin !== 'editor' && intent.origin !== 'undo' && intent.origin !== 'redo') ||
+    intent.effects.length !== 1
+  ) {
+    return null;
+  }
+  const effect = intent.effects[0];
+  if (effect?.kind !== 'cells' || effect.cells.length !== 1 || effect.includesFormula === true) {
+    return null;
+  }
+  const cell = effect.cells[0];
+  return cell &&
+    Number.isInteger(cell.sheet) &&
+    Number.isInteger(cell.row) &&
+    Number.isInteger(cell.col)
+    ? cell
+    : null;
+};
+
+const ownsAutomaticHyperlinkCommand = (intent: OperationIntent): boolean =>
+  intent.commandId === AUTO_HYPERLINK_COMMAND_ID;
 
 const hasEditablePredicate = (policy: InteractionPolicy | undefined): boolean => {
   const editable = policy?.editable;
@@ -136,6 +162,29 @@ export class InteractionAuthorizer {
         policy && (this.getBounds !== undefined || hasEditablePredicate(policy))
           ? (addr: Addr) => isWorkbookAddress(wb, addr)
           : cachedAddressCheck;
+      if (ownsAutomaticHyperlinkCommand(intent)) {
+        const addr = automaticHyperlinkCell(intent);
+        if (!addr) {
+          return {
+            allowed: false,
+            code: 'invalid',
+            reason: 'Automatic hyperlink authorization needs one cell and no formula effect',
+          };
+        }
+        if (isSheetProtected(this.store.getState(), addr.sheet)) {
+          const permissions = protectedSheetPermissions(this.store.getState(), addr.sheet);
+          if (permissions?.formatCells !== true || permissions.insertHyperlinks !== true) {
+            return {
+              allowed: false,
+              code: 'protected',
+              addr,
+              reason: 'Automatic hyperlink needs protected-sheet format and hyperlink permission',
+            };
+          }
+        }
+        if (!policy) return this.legacyDecision(intent, isAddress);
+        return this.policyDecision(intent, policy, isAddress);
+      }
       if (ownsMacRemoveHyperlinkCommand(intent)) {
         if (!macRemoveHyperlinkCells(intent)) {
           return {
@@ -255,7 +304,11 @@ export class InteractionAuthorizer {
     policy: InteractionPolicy,
     isAddress: WorkbookAddressCheck,
   ): PermissionDecision {
-    if (!IMPLEMENTED_OPERATIONS.has(intent.operation) && !macRemoveHyperlinkCells(intent)) {
+    if (
+      !IMPLEMENTED_OPERATIONS.has(intent.operation) &&
+      !macRemoveHyperlinkCells(intent) &&
+      !automaticHyperlinkCell(intent)
+    ) {
       return {
         allowed: false,
         code: 'unsupported',
@@ -410,7 +463,8 @@ export class InteractionAuthorizer {
       for (const intent of intents) {
         if (
           macSubtotalStructuralOperation(intent) !== null ||
-          ownsMacRemoveHyperlinkCommand(intent)
+          ownsMacRemoveHyperlinkCommand(intent) ||
+          ownsAutomaticHyperlinkCommand(intent)
         ) {
           if (!canExecute(intent).allowed) allowed = false;
         } else if (this.policy && !this.preflightIntent(intent, canExecute).allowed) {
@@ -421,7 +475,11 @@ export class InteractionAuthorizer {
     }
     const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
     if (!intent) return this.policy === undefined;
-    if (macSubtotalStructuralOperation(intent) !== null || ownsMacRemoveHyperlinkCommand(intent))
+    if (
+      macSubtotalStructuralOperation(intent) !== null ||
+      ownsMacRemoveHyperlinkCommand(intent) ||
+      ownsAutomaticHyperlinkCommand(intent)
+    )
       return canExecute(intent).allowed;
     if (!this.policy) return true;
     return this.preflightIntent(intent, canExecute).allowed;

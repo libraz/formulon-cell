@@ -1,6 +1,8 @@
 import { colFromLetters, formatA1Cell, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
 import { formulaCaretContext, formulaIdentifierPrefix } from './formula-edit-context.js';
+import { FUNCTION_NAMES } from './formula-function-names.js';
 import { rewriteRefs } from './formula-ref-lexer.js';
+import { type R1C1Axis, type R1C1Endpoint, scanR1C1References } from './r1c1-reference.js';
 
 /**
  * F4 reference rotation: cycles between A1, $A$1, A$1, $A1, then back to A1.
@@ -21,13 +23,79 @@ export interface FormulaRef {
   colorIndex: number;
 }
 
-/** Extract every cell or range reference from a formula text. The returned
- *  list is in source order with a stable per-target color index so callers
- *  can paint distinct highlights for each ref, the same way spreadsheets do
- *  while editing a formula. */
-export function extractRefs(text: string): FormulaRef[] {
-  if (!text.startsWith('=')) return [];
-  const candidates: Omit<FormulaRef, 'colorIndex'>[] = [];
+export interface FormulaReferenceFormatOptions {
+  r1c1?: boolean;
+  base?: { row: number; col: number };
+}
+
+type FormulaRefCandidate = Omit<FormulaRef, 'colorIndex'>;
+
+function validR1C1Base(
+  base: { row: number; col: number } | undefined,
+): base is { row: number; col: number } {
+  return (
+    base !== undefined &&
+    Number.isInteger(base.row) &&
+    Number.isInteger(base.col) &&
+    base.row >= 0 &&
+    base.row <= MAX_ROW &&
+    base.col >= 0 &&
+    base.col <= MAX_COL
+  );
+}
+
+function resolveR1C1Axis(axis: R1C1Axis, base: number | undefined): number | null {
+  if (axis.absolute) return axis.value - 1;
+  return base === undefined ? null : base + axis.value;
+}
+
+function resolveR1C1Endpoint(
+  endpoint: R1C1Endpoint,
+  base: { row: number; col: number } | undefined,
+): { row: number; col: number } | null {
+  if ((!endpoint.row.absolute || !endpoint.column.absolute) && !validR1C1Base(base)) return null;
+  const row = resolveR1C1Axis(endpoint.row, base?.row);
+  const col = resolveR1C1Axis(endpoint.column, base?.col);
+  if (row === null || col === null || row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL)
+    return null;
+  return { row, col };
+}
+
+function mergeColonConnectedCandidates(
+  text: string,
+  candidates: FormulaRefCandidate[],
+): FormulaRefCandidate[] {
+  const merged: FormulaRefCandidate[] = [];
+  for (const candidate of candidates) {
+    const previous = merged[merged.length - 1];
+    if (previous && /^\s*:\s*$/u.test(text.slice(previous.end, candidate.start))) {
+      previous.r0 = Math.min(previous.r0, candidate.r0);
+      previous.c0 = Math.min(previous.c0, candidate.c0);
+      previous.r1 = Math.max(previous.r1, candidate.r1);
+      previous.c1 = Math.max(previous.c1, candidate.c1);
+      previous.end = candidate.end;
+    } else {
+      merged.push({ ...candidate });
+    }
+  }
+  return merged;
+}
+
+function assignReferenceColors(candidates: FormulaRefCandidate[]): FormulaRef[] {
+  const colorMap = new Map<string, number>();
+  return candidates.map((ref) => {
+    const key = `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}`;
+    let colorIndex = colorMap.get(key);
+    if (colorIndex === undefined) {
+      colorIndex = colorMap.size;
+      colorMap.set(key, colorIndex);
+    }
+    return { ...ref, colorIndex };
+  });
+}
+
+function a1ReferenceCandidates(text: string): FormulaRefCandidate[] {
+  const candidates: FormulaRefCandidate[] = [];
   rewriteRefs(text, (token, start) => {
     if (token.kind !== 'cell') return null;
     const headStart = start + token.sheetQual.length;
@@ -44,45 +112,63 @@ export function extractRefs(text: string): FormulaRef[] {
       : undefined;
     const tail = tailM ? parseA1Atom(tailM) : head;
     if (!head || !tail) return null;
-    const r0 = Math.min(head.row, tail.row);
-    const r1 = Math.max(head.row, tail.row);
-    const c0 = Math.min(head.col, tail.col);
-    const c1 = Math.max(head.col, tail.col);
     candidates.push({
-      r0,
-      c0,
-      r1,
-      c1,
+      r0: Math.min(head.row, tail.row),
+      c0: Math.min(head.col, tail.col),
+      r1: Math.max(head.row, tail.row),
+      c1: Math.max(head.col, tail.col),
       start,
       end: token.end,
     });
     return null;
   });
+  return mergeColonConnectedCandidates(text, candidates);
+}
 
-  const merged: Omit<FormulaRef, 'colorIndex'>[] = [];
-  for (const candidate of candidates) {
-    const previous = merged[merged.length - 1];
-    if (previous && /^\s*:\s*$/u.test(text.slice(previous.end, candidate.start))) {
-      previous.r0 = Math.min(previous.r0, candidate.r0);
-      previous.c0 = Math.min(previous.c0, candidate.c0);
-      previous.r1 = Math.max(previous.r1, candidate.r1);
-      previous.c1 = Math.max(previous.c1, candidate.c1);
-      previous.end = candidate.end;
-    } else {
-      merged.push({ ...candidate });
+function r1c1ReferenceCandidates(
+  text: string,
+  base: { row: number; col: number } | undefined,
+): FormulaRefCandidate[] {
+  const candidates: FormulaRefCandidate[] = [];
+  for (const reference of scanR1C1References(text)) {
+    const endpoints: { row: number; col: number }[] = [];
+    let isValid = true;
+    for (const endpoint of reference.endpoints) {
+      const coordinate = resolveR1C1Endpoint(endpoint, base);
+      if (!coordinate) {
+        isValid = false;
+        break;
+      }
+      endpoints.push(coordinate);
     }
+    if (!isValid || endpoints.length === 0) continue;
+    const rows = endpoints.map(({ row }) => row);
+    const cols = endpoints.map(({ col }) => col);
+    candidates.push({
+      r0: Math.min(...rows),
+      c0: Math.min(...cols),
+      r1: Math.max(...rows),
+      c1: Math.max(...cols),
+      start: reference.start,
+      end: reference.end,
+    });
   }
+  return candidates;
+}
 
-  const colorMap = new Map<string, number>();
-  return merged.map((ref) => {
-    const key = `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}`;
-    let colorIndex = colorMap.get(key);
-    if (colorIndex === undefined) {
-      colorIndex = colorMap.size;
-      colorMap.set(key, colorIndex);
-    }
-    return { ...ref, colorIndex };
-  });
+/** Extract every cell or range reference from a formula text. The returned
+ *  list is in source order with a stable per-target color index so callers
+ *  can paint distinct highlights for each ref, the same way spreadsheets do
+ *  while editing a formula. */
+export function extractRefs(
+  text: string,
+  options: FormulaReferenceFormatOptions = {},
+): FormulaRef[] {
+  if (!text.startsWith('=')) return [];
+  const candidates = options.r1c1
+    ? r1c1ReferenceCandidates(text, options.base)
+    : a1ReferenceCandidates(text);
+  return assignReferenceColors(candidates);
 }
 
 /** Distinct accent colors used for formula-edit reference highlighting. They
@@ -106,9 +192,9 @@ export interface F4Result {
 export function rotateRefAt(
   text: string,
   caret: number,
-  options: { r1c1?: boolean } = {},
+  options: FormulaReferenceFormatOptions = {},
 ): F4Result {
-  if (options.r1c1) return { text, caret };
+  if (options.r1c1) return rotateR1C1ReferenceAt(text, caret, options.base);
   let rotated: F4Result | null = null;
   rewriteRefs(text, (token, tokenStart) => {
     if (rotated || token.kind !== 'cell') return null;
@@ -143,6 +229,42 @@ export function rotateRefAt(
   return rotated ?? { text, caret };
 }
 
+function formatR1C1Axis(
+  prefix: 'R' | 'C',
+  absolute: boolean,
+  coordinate: number,
+  base: number,
+): string {
+  if (absolute) return `${prefix}${coordinate + 1}`;
+  const delta = coordinate - base;
+  return delta === 0 ? prefix : `${prefix}[${delta}]`;
+}
+
+function rotateR1C1ReferenceAt(
+  text: string,
+  caret: number,
+  base: { row: number; col: number } | undefined,
+): F4Result {
+  if (!validR1C1Base(base)) return { text, caret };
+  for (const reference of scanR1C1References(text)) {
+    const endpoint = reference.endpoints.find(
+      (candidate) => caret >= candidate.start && caret <= candidate.end,
+    );
+    if (!endpoint) continue;
+    const coordinate = resolveR1C1Endpoint(endpoint, base);
+    if (!coordinate) return { text, caret };
+    const next = nextStep(endpoint.column.absolute, endpoint.row.absolute);
+    const replacement =
+      `${formatR1C1Axis('R', next.row, coordinate.row, base.row)}` +
+      `${formatR1C1Axis('C', next.col, coordinate.col, base.col)}`;
+    return {
+      text: `${text.slice(0, endpoint.start)}${replacement}${text.slice(endpoint.end)}`,
+      caret: endpoint.start + replacement.length,
+    };
+  }
+  return { text, caret };
+}
+
 function nextStep(absCol: boolean, absRow: boolean): { col: boolean; row: boolean } {
   // Spreadsheet order: A1 -> $A$1 -> A$1 -> $A1 -> A1
   if (!absCol && !absRow) return { col: true, row: true };
@@ -151,67 +273,58 @@ function nextStep(absCol: boolean, absRow: boolean): { col: boolean; row: boolea
   return { col: false, row: false };
 }
 
-const R1C1_REF_RE = /R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?/iy;
-
 /** Resolve one R1C1 atom against `base` into A1 text (`$B$5`), or `#REF!`. */
 export const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string => {
-  const m = /^R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?$/i.exec(raw);
-  if (!m) return raw;
-  const row =
-    m[2] !== undefined
-      ? Number.parseInt(m[2], 10) - 1
-      : base.row + (m[1] !== undefined ? Number.parseInt(m[1], 10) : 0);
-  const col =
-    m[4] !== undefined
-      ? Number.parseInt(m[4], 10) - 1
-      : base.col + (m[3] !== undefined ? Number.parseInt(m[3], 10) : 0);
-  if (row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL) return '#REF!';
-  const a1 = formatA1Cell(row, col);
+  const reference = scanR1C1References(raw).find(
+    (candidate) => candidate.start === 0 && candidate.end === raw.length && !candidate.qualifier,
+  );
+  const endpoint = reference?.endpoints[0];
+  if (reference?.endpoints.length !== 1 || !endpoint) return raw;
+  const coordinate = resolveR1C1Endpoint(endpoint, base);
+  if (!coordinate) return '#REF!';
+  return formatResolvedA1Endpoint(endpoint, coordinate);
+};
+
+function formatResolvedA1Endpoint(
+  endpoint: R1C1Endpoint,
+  coordinate: { row: number; col: number },
+): string {
+  const a1 = formatA1Cell(coordinate.row, coordinate.col);
   const parts = /^([A-Z]+)(\d+)$/.exec(a1);
   if (!parts) return a1;
-  return `${m[4] !== undefined ? '$' : ''}${parts[1]}${m[2] !== undefined ? '$' : ''}${parts[2]}`;
-};
+  return `${endpoint.column.absolute ? '$' : ''}${parts[1]}${endpoint.row.absolute ? '$' : ''}${parts[2]}`;
+}
 
 /** Convert R1C1 references in a user-authored formula into A1 references for
  *  the workbook engine. This keeps the public R1C1 editing surface while
  *  preserving the existing A1 formula backend. */
 export function normalizeR1C1Formula(formula: string, base: { row: number; col: number }): string {
   if (!formula.startsWith('=')) return formula;
-  let out = '';
-  let i = 0;
-  let inString = false;
-  while (i < formula.length) {
-    const ch = formula[i] ?? '';
-    if (ch === '"') {
-      inString = !inString;
-      out += ch;
-      i += 1;
-      continue;
+  let output = '';
+  let cursor = 0;
+  for (const reference of scanR1C1References(formula, { includeExternal: true })) {
+    const converted = reference.endpoints.map((endpoint) => {
+      const coordinate = resolveR1C1Endpoint(endpoint, base);
+      return coordinate ? formatResolvedA1Endpoint(endpoint, coordinate) : '#REF!';
+    });
+    output += formula.slice(cursor, reference.start);
+    let endpointCursor = reference.start;
+    for (let index = 0; index < reference.endpoints.length; index += 1) {
+      const endpoint = reference.endpoints[index];
+      const formatted = converted[index];
+      if (!endpoint || formatted === undefined) continue;
+      output += formula.slice(endpointCursor, endpoint.start);
+      output += formatted;
+      endpointCursor = endpoint.end;
     }
-    if (!inString) {
-      const prev = i > 0 ? (formula[i - 1] ?? '') : '';
-      const prevIsIdent = /[A-Za-z0-9_]/.test(prev);
-      if (!prevIsIdent) {
-        R1C1_REF_RE.lastIndex = i;
-        const m = R1C1_REF_RE.exec(formula);
-        if (m && m.index === i) {
-          const raw = m[0];
-          const next = formula[i + raw.length] ?? '';
-          if (!/[A-Za-z0-9_[]/.test(next)) {
-            out += r1c1AtomToA1(raw, base);
-            i += raw.length;
-            continue;
-          }
-        }
-      }
-    }
-    out += ch;
-    i += 1;
+    output += formula.slice(endpointCursor, reference.end);
+    cursor = reference.end;
   }
-  return out;
+  return `${output}${formula.slice(cursor)}`;
 }
 
 const a1AtomToR1C1 = (raw: string, base: { row: number; col: number }): string => {
+  if (!validR1C1Base(base)) return raw;
   const m = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(raw);
   if (!m) return raw;
   const colAbs = m[1] === '$';
@@ -228,168 +341,30 @@ const a1AtomToR1C1 = (raw: string, base: { row: number; col: number }): string =
  *  The workbook still stores A1 formulas; this is a presentation transform. */
 export function formatA1FormulaAsR1C1(formula: string, base: { row: number; col: number }): string {
   if (!formula.startsWith('=')) return formula;
-  let out = '';
-  let i = 0;
-  let inString = false;
-  const atomRe = /\$?[A-Za-z]+\$?\d+/y;
-  while (i < formula.length) {
-    const ch = formula[i] ?? '';
-    if (ch === '"') {
-      inString = !inString;
-      out += ch;
-      i += 1;
-      continue;
-    }
-    if (!inString) {
-      const prev = i > 0 ? (formula[i - 1] ?? '') : '';
-      const prevIsIdent = /[A-Za-z0-9_]/.test(prev);
-      if (!prevIsIdent) {
-        atomRe.lastIndex = i;
-        const m = atomRe.exec(formula);
-        if (m && m.index === i) {
-          out += a1AtomToR1C1(m[0], base);
-          i += m[0].length;
-          continue;
-        }
-      }
-    }
-    out += ch;
-    i += 1;
-  }
-  return out;
+  return rewriteRefs(formula, (token, start) => {
+    if (token.kind !== 'cell') return formula.slice(start, token.end);
+    const headStart = start + token.sheetQual.length;
+    const headEnd =
+      headStart +
+      token.a.label.length +
+      token.a.rowStr.length +
+      (token.a.absCol ? 1 : 0) +
+      (token.a.absRow ? 1 : 0);
+    const head = a1AtomToR1C1(formula.slice(headStart, headEnd), base);
+    if (!token.b) return `${formula.slice(start, headStart)}${head}`;
+    const tailStart = headEnd + 1;
+    const tail = a1AtomToR1C1(formula.slice(tailStart, token.end), base);
+    return `${formula.slice(start, headStart)}${head}${formula.slice(headEnd, tailStart)}${tail}`;
+  });
 }
 
+// Keep this export path stable while sharing the catalog with the formula lexer.
+export { FUNCTION_NAMES } from './formula-function-names.js';
 // `shiftFormulaRefs` (relative-offset shifting for fill/paste/ctrl-enter) now
 // lives in the shared reference-rewriting module alongside the structural-edit
 // transforms, so all three share one tokenizer (function-name, sheet-qualifier,
 // range, and grid-bound handling). Re-exported here for existing import sites.
 export { shiftFormulaRefs } from './formula-refs.js';
-
-/** Common spreadsheet function names — used for editor autocomplete. */
-export const FUNCTION_NAMES: readonly string[] = [
-  'SUM',
-  'AVERAGE',
-  'COUNT',
-  'COUNTA',
-  'COUNTIF',
-  'COUNTIFS',
-  'SUMIF',
-  'SUMIFS',
-  'AVERAGEIF',
-  'AVERAGEIFS',
-  'MIN',
-  'MAX',
-  'MEDIAN',
-  'IF',
-  'IFS',
-  'IFERROR',
-  'IFNA',
-  'AND',
-  'OR',
-  'NOT',
-  'XOR',
-  'TRUE',
-  'FALSE',
-  'VLOOKUP',
-  'HLOOKUP',
-  'XLOOKUP',
-  'INDEX',
-  'MATCH',
-  'OFFSET',
-  'INDIRECT',
-  'CHOOSE',
-  'ROUND',
-  'ROUNDUP',
-  'ROUNDDOWN',
-  'CEILING',
-  'FLOOR',
-  'INT',
-  'MOD',
-  'ABS',
-  'POWER',
-  'SQRT',
-  'EXP',
-  'LN',
-  'LOG',
-  'LOG10',
-  'CONCATENATE',
-  'CONCAT',
-  'TEXTJOIN',
-  'LEFT',
-  'RIGHT',
-  'MID',
-  'LEN',
-  'UPPER',
-  'LOWER',
-  'PROPER',
-  'TRIM',
-  'SUBSTITUTE',
-  'REPLACE',
-  'FIND',
-  'SEARCH',
-  'TEXT',
-  'VALUE',
-  'NUMBERVALUE',
-  'TODAY',
-  'NOW',
-  'DATE',
-  'YEAR',
-  'MONTH',
-  'DAY',
-  'HOUR',
-  'MINUTE',
-  'SECOND',
-  'WEEKDAY',
-  'EOMONTH',
-  'DATEDIF',
-  'NETWORKDAYS',
-  'WORKDAY',
-  'PMT',
-  'PV',
-  'FV',
-  'NPV',
-  'IRR',
-  'RATE',
-  'NPER',
-  'ROW',
-  'COLUMN',
-  'ROWS',
-  'COLUMNS',
-  'TRANSPOSE',
-  'UNIQUE',
-  'SORT',
-  'SORTBY',
-  'FILTER',
-  'SEQUENCE',
-  'RANDARRAY',
-  'XMATCH',
-  'TEXTSPLIT',
-  'TEXTBEFORE',
-  'TEXTAFTER',
-  'VSTACK',
-  'HSTACK',
-  'TOROW',
-  'TOCOL',
-  'WRAPROWS',
-  'WRAPCOLS',
-  'CHOOSEROWS',
-  'CHOOSECOLS',
-  'TAKE',
-  'DROP',
-  'EXPAND',
-  'LAMBDA',
-  'LET',
-  'MAP',
-  'REDUCE',
-  'SCAN',
-  'BYROW',
-  'BYCOL',
-  'MAKEARRAY',
-  'GROUPBY',
-  'PIVOTBY',
-  'PERCENTOF',
-  'IMAGE',
-];
 
 /** Formula-text options shared by the argument scanner and editor helpers. */
 export interface FormulaScanOptions {

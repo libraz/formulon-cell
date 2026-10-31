@@ -16,6 +16,7 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const A1 = { sheet: 0, row: 0, col: 0 } as const;
 const B1 = { sheet: 0, row: 0, col: 1 } as const;
+const D4 = { sheet: 0, row: 3, col: 3 } as const;
 const SUBTOTAL_RANGE = { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 3 } as const;
 
 const subtotalStructuralIntent = (
@@ -82,6 +83,60 @@ describe('InteractionController', () => {
     expect(history.canUndo()).toBe(false);
   });
 
+  it('keeps automatic hyperlink authorization to one non-formula cell and both write permissions', async () => {
+    const { store, controller: service } = await createController();
+    const autoIntent = (
+      operation: 'format' | 'hyperlink',
+      options: {
+        origin?: OperationIntent['origin'];
+        cells?: readonly Addr[];
+        includesFormula?: boolean;
+        commandId?: string;
+      } = {},
+    ): OperationIntent => ({
+      operation,
+      origin: options.origin ?? 'editor',
+      commandId: options.commandId ?? 'editor.autoHyperlink',
+      effects: [
+        {
+          kind: 'cells',
+          cells: options.cells ?? [A1],
+          ...(options.includesFormula === undefined
+            ? {}
+            : { includesFormula: options.includesFormula }),
+        },
+      ],
+    });
+
+    service.setPolicy({ operations: { valueEdit: true, format: true, hyperlink: true } });
+    expect(service.canExecute(autoIntent('format')).allowed).toBe(true);
+    expect(service.canExecute(autoIntent('hyperlink')).allowed).toBe(true);
+    service.setPolicy({ operations: { valueEdit: true, format: true, hyperlink: false } });
+    expect(service.canExecute(autoIntent('hyperlink')).allowed).toBe(false);
+    service.setPolicy({ operations: { valueEdit: true, format: false, hyperlink: true } });
+    expect(service.canExecute(autoIntent('format')).allowed).toBe(false);
+
+    service.setPolicy(undefined);
+    expect(service.canExecute(autoIntent('hyperlink', { cells: [A1, B1] })).allowed).toBe(false);
+    expect(service.canExecute(autoIntent('hyperlink', { includesFormula: true })).allowed).toBe(
+      false,
+    );
+    expect(service.canExecute(autoIntent('hyperlink', { origin: 'ribbon' })).allowed).toBe(false);
+
+    mutators.setCellFormat(store, A1, { locked: false });
+    for (const permissions of [
+      { formatCells: true, insertHyperlinks: true },
+      { formatCells: false, insertHyperlinks: true },
+      { formatCells: true, insertHyperlinks: false },
+    ]) {
+      setProtectedSheet(store, 0, true, { permissions });
+      const decision = service.canExecute(autoIntent('hyperlink'));
+      expect(decision.allowed).toBe(permissions.formatCells && permissions.insertHyperlinks);
+      if (!permissions.formatCells || !permissions.insertHyperlinks)
+        expect(decision).toMatchObject({ allowed: false, code: 'protected' });
+    }
+  });
+
   it('uses the live workbook profile when preparing cell batch input', async () => {
     const store = createSpreadsheetStore();
     const wb = await WorkbookHandle.createDefault();
@@ -99,6 +154,39 @@ describe('InteractionController', () => {
       wb.dispose();
     }
   });
+
+  it.each([false, true])('applies the active formula input style (%s)', async (r1c1) => {
+    const { store, controller: service, workbook: wb } = await createController();
+    mutators.setR1C1(store, r1c1);
+
+    const result = service.execute({
+      type: 'cellBatch',
+      operation: 'formulaEdit',
+      origin: 'editor',
+      changes: [{ addr: D4, input: '=RC5' }],
+    });
+
+    expect(result.status).toBe('applied');
+    expect(wb.cellFormula(D4)).toBe(r1c1 ? '=$E4' : '=RC5');
+  });
+
+  it.each([false, true])(
+    'preserves trusted formula patches in either UI style (%s)',
+    async (r1c1) => {
+      const { store, controller: service, workbook: wb } = await createController();
+      mutators.setR1C1(store, r1c1);
+
+      const result = service.execute({
+        type: 'cellBatch',
+        operation: 'formulaEdit',
+        origin: 'instanceApi',
+        changes: [{ addr: D4, value: { kind: 'blank' }, formula: '=RC5' }],
+      });
+
+      expect(result.status).toBe('applied');
+      expect(wb.cellFormula(D4)).toBe('=RC5');
+    },
+  );
 
   it.each([
     ['windows-de_DE', '=SUMME(1,5;2)'],

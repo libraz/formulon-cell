@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   canonicalizeLocalizedFormulaForInput,
+  coercedInputToPatch,
   coerceInput,
   coerceInputForCell,
   inputLocaleForWorkbook,
@@ -164,6 +165,23 @@ const stubHandle = () => {
 };
 
 const addr: Addr = { sheet: 0, row: 0, col: 0 };
+const D4: Addr = { sheet: 0, row: 3, col: 3 };
+
+describe('formula input reference style', () => {
+  it.each([false, true])('coerces formulas according to the active UI style (%s)', (r1c1) => {
+    const store = createSpreadsheetStore();
+    mutators.setR1C1(store, r1c1);
+
+    expect(coerceInputForCell(store.getState(), D4, '=RC5')).toEqual({
+      kind: 'formula',
+      text: r1c1 ? '=$E4' : '=RC5',
+    });
+  });
+
+  it('keeps a pre-coerced formula canonical without guessing its reference style', () => {
+    expect(coercedInputToPatch(D4, { kind: 'formula', text: '=RC5' }).formula).toBe('=RC5');
+  });
+});
 
 describe('writeCoerced', () => {
   it('dispatches each kind to the matching setter', () => {
@@ -194,26 +212,46 @@ describe('writeInput', () => {
     expect(wb.setNumber).toHaveBeenCalledWith(addr, 3.14);
   });
 
+  it('defaults the storeless writer to A1 formula text', () => {
+    const wb = stubHandle();
+    writeInput(wb, D4, '=RC5');
+    expect(wb.setFormula).toHaveBeenCalledWith(D4, '=RC5');
+  });
+
+  it('uses the active R1C1 style for the stateful writer', () => {
+    const wb = stubHandle();
+    const store = createSpreadsheetStore();
+    mutators.setR1C1(store, true);
+
+    writeInput(wb, D4, '=RC5', store);
+
+    expect(wb.setFormula).toHaveBeenCalledWith(D4, '=$E4');
+  });
+
   it('normalizes R1C1 formula input to A1 before writing to the workbook', () => {
     const wb = stubHandle();
+    const store = createSpreadsheetStore();
+    mutators.setR1C1(store, true);
 
-    writeInput(wb, { sheet: 0, row: 3, col: 3 }, '=SUM(R[-2]C[-2]:R[-1]C[-1])');
+    writeInput(wb, D4, '=SUM(R[-2]C[-2]:R[-1]C[-1])', store);
 
-    expect(wb.setFormula).toHaveBeenCalledWith({ sheet: 0, row: 3, col: 3 }, '=SUM(B2:C3)');
+    expect(wb.setFormula).toHaveBeenCalledWith(D4, '=SUM(B2:C3)');
   });
 
   it('normalizes R1C1 formula input before workbook calculation', async () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const store = createSpreadsheetStore();
+    mutators.setR1C1(store, true);
     wb.setNumber({ sheet: 0, row: 1, col: 1 }, 2);
     wb.setNumber({ sheet: 0, row: 1, col: 2 }, 3);
     wb.setNumber({ sheet: 0, row: 2, col: 1 }, 4);
     wb.setNumber({ sheet: 0, row: 2, col: 2 }, 5);
 
-    writeInput(wb, { sheet: 0, row: 3, col: 3 }, '=SUM(R[-2]C[-2]:R[-1]C[-1])');
+    writeInput(wb, D4, '=SUM(R[-2]C[-2]:R[-1]C[-1])', store);
     wb.recalc();
 
-    expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toBe('=SUM(B2:C3)');
-    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 14 });
+    expect(wb.cellFormula(D4)).toBe('=SUM(B2:C3)');
+    expect(wb.getValue(D4)).toEqual({ kind: 'number', value: 14 });
   });
 
   it('applies the implicit number format to the store on typed input (H-35)', () => {

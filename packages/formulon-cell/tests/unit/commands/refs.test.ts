@@ -34,6 +34,41 @@ describe('normalizeR1C1Formula', () => {
       '="R[-2]C[-2]"+FOOR1C1+D5',
     );
   });
+
+  it('preserves sheet qualifiers and structured headers while normalizing real refs', () => {
+    expect(normalizeR1C1Formula("='RC'!RC+Table1[RC]+LOG10(R1C1)+Sheet1!R[-1]C[-1]", base)).toBe(
+      "='RC'!D4+Table1[RC]+LOG10($A$1)+Sheet1!C3",
+    );
+  });
+
+  it('normalizes every endpoint of an existing colon chain', () => {
+    expect(normalizeR1C1Formula('=SUM(R[-2]C[-1]:R[-1]C[0]:RC)', base)).toBe('=SUM(C2:D3:D4)');
+  });
+
+  it('normalizes R1C1 references before whitespace parentheses', () => {
+    expect(normalizeR1C1Formula('=RC (R[1]C)', base)).toBe('=D4 (D5)');
+  });
+
+  it('normalizes known out-of-grid R1C1 refs to #REF! and preserves unknown syntax', () => {
+    expect(normalizeR1C1Formula('=R[-4]C[-3]+R0C1+R1048577C1', base)).toBe('=#REF!+R0C1+#REF!');
+  });
+
+  it('normalizes valid range endpoints even when another endpoint is out of grid', () => {
+    expect(normalizeR1C1Formula("='RC'!R[-4]C:RC", base)).toBe("='RC'!#REF!:D4");
+  });
+
+  it('normalizes known relative refs to #REF! when the edited-cell base is out of grid', () => {
+    expect(normalizeR1C1Formula('=RC+R1C1', { row: -1, col: 3 })).toBe('=#REF!+$A$1');
+  });
+
+  it('converts references into another workbook', () => {
+    expect(
+      normalizeR1C1Formula("=[Book.xlsx]Sheet!R1C1+'[Book.xlsx]Sheet 1'!R[1]C:R2C3", {
+        row: 3,
+        col: 3,
+      }),
+    ).toBe("=[Book.xlsx]Sheet!$A$1+'[Book.xlsx]Sheet 1'!D5:$C$2");
+  });
 });
 
 describe('formatA1FormulaAsR1C1', () => {
@@ -52,6 +87,40 @@ describe('formatA1FormulaAsR1C1', () => {
   it('does not rewrite A1-looking text inside strings or identifiers', () => {
     expect(formatA1FormulaAsR1C1('="A1"+FOOA1+B2', base)).toBe('="A1"+FOOA1+R[-2]C[-2]');
   });
+
+  it('formats only actual A1 endpoints and preserves sheet and table text', () => {
+    expect(formatA1FormulaAsR1C1('=LOG10(A1)+\'A1 Forecast\'!A1+Table1[A1]+"A1"', base)).toBe(
+      '=LOG10(R[-3]C[-3])+\'A1 Forecast\'!R[-3]C[-3]+Table1[A1]+"A1"',
+    );
+  });
+
+  it('distinguishes whitespace function calls from A1 intersection references', () => {
+    for (const gap of [' ', '\t']) {
+      const functionFormula = `=LOG10${gap}(A1)`;
+      const formattedFunction = formatA1FormulaAsR1C1(functionFormula, base);
+      expect(formattedFunction).toBe(`=LOG10${gap}(R[-3]C[-3])`);
+      expect(normalizeR1C1Formula(formattedFunction, base)).toBe(functionFormula);
+    }
+
+    const intersection = '=A1 (B1)';
+    const formattedIntersection = formatA1FormulaAsR1C1(intersection, base);
+    expect(formattedIntersection).toBe('=R[-3]C[-3] (R[-3]C[-2])');
+    expect(normalizeR1C1Formula(formattedIntersection, base)).toBe(intersection);
+  });
+
+  it('keeps qualified A1-shaped names and A1 ranges as references before whitespace parentheses', () => {
+    expect(formatA1FormulaAsR1C1('=Sheet1!LOG10 (B1)', base)).toBe(
+      '=Sheet1!R[6]C[8505] (R[-3]C[-2])',
+    );
+    expect(formatA1FormulaAsR1C1('=LOG10:A12 (B1)', base)).toBe(
+      '=R[6]C[8505]:R[8]C[-3] (R[-3]C[-2])',
+    );
+  });
+
+  it('keeps whole-axis and external-book references unchanged', () => {
+    const formula = '=SUM(A:A)+SUM(1:3)+[Book.xlsx]Sheet!A1';
+    expect(formatA1FormulaAsR1C1(formula, base)).toBe(formula);
+  });
 });
 
 describe('shiftFormulaRefs', () => {
@@ -69,6 +138,10 @@ describe('shiftFormulaRefs', () => {
 
   it('shifts a sum of relative refs', () => {
     expect(shiftFormulaRefs('=A1+B2', 1, 1)).toBe('=B2+C3');
+  });
+
+  it('does not shift a known function name before whitespace and its opening parenthesis', () => {
+    expect(shiftFormulaRefs('=LOG10 (A1)', 1, 0)).toBe('=LOG10 (A2)');
   });
 
   it('respects $-locked column ($A1 — column anchored)', () => {

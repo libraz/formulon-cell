@@ -5,6 +5,7 @@ import {
   registerInteractionController,
 } from '../../../src/commands/interaction-controller.js';
 import type { InteractionPolicy } from '../../../src/commands/interaction-policy.js';
+import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { InlineEditor } from '../../../src/interact/editor.js';
 import {
@@ -135,6 +136,118 @@ describe('InlineEditor', () => {
     editor.cancel();
   });
 
+  it.each(['default', 'mac'] as const)(
+    'uses Ctrl data-edge arrows in point mode on the %s profile as one draft group',
+    (profile) => {
+      if (profile === 'mac') {
+        host.classList.add('fc-host');
+        host.dataset.fcPlatform = 'mac';
+      }
+      const editedCell = { sheet: 0, row: 1, col: 1 };
+      mutators.setActive(store, editedCell);
+      store.setState((state) => {
+        const cells = new Map(state.data.cells);
+        for (const col of [1, 2, 3, 4, 7]) {
+          cells.set(addrKey({ sheet: 0, row: 1, col }), {
+            value: { kind: 'number', value: col },
+            formula: null,
+          });
+        }
+        return { ...state, data: { ...state.data, cells } };
+      });
+      const selection = store.getState().selection;
+      editor.begin('=SUM()+7', { mode: 'point' });
+      const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+      input.setSelectionRange(5, 5);
+      const press = (shiftKey = false): KeyboardEvent => {
+        const event = new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          ctrlKey: true,
+          shiftKey,
+          bubbles: true,
+          cancelable: true,
+        });
+        input.dispatchEvent(event);
+        return event;
+      };
+
+      expect(press().defaultPrevented).toBe(true);
+      expect(input.value).toBe('=SUM(E2)+7');
+      expect(press(true).defaultPrevented).toBe(true);
+      expect(input.value).toBe('=SUM(E2:H2)+7');
+      expect(store.getState().selection).toBe(selection);
+      expect(wb.cellFormula(editedCell)).toBeNull();
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true }),
+      );
+      expect(input.value).toBe('=SUM()+7');
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          ctrlKey: true,
+          shiftKey: true,
+          cancelable: true,
+        }),
+      );
+      expect(input.value).toBe('=SUM(E2:H2)+7');
+      editor.cancel();
+    },
+  );
+
+  it('uses Meta data-edge arrows only on Mac and leaves unsupported modifiers native', () => {
+    const editedCell = { sheet: 0, row: 1, col: 1 };
+    mutators.setActive(store, editedCell);
+    store.setState((state) => {
+      const cells = new Map(state.data.cells);
+      for (const col of [1, 2, 3, 4, 7]) {
+        cells.set(addrKey({ sheet: 0, row: 1, col }), {
+          value: { kind: 'number', value: col },
+          formula: null,
+        });
+      }
+      return { ...state, data: { ...state.data, cells } };
+    });
+    editor.begin('=SUM()', { mode: 'point' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.setSelectionRange(5, 5);
+    const unsupported = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(unsupported);
+    expect(unsupported.defaultPrevented).toBe(false);
+    expect(input.value).toBe('=SUM()');
+    editor.cancel();
+
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    editor.begin('=SUM()', { mode: 'point' });
+    const macInput = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    macInput.setSelectionRange(5, 5);
+    const ctrlMeta = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    macInput.dispatchEvent(ctrlMeta);
+    expect(ctrlMeta.defaultPrevented).toBe(false);
+    expect(macInput.value).toBe('=SUM()');
+    const meta = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    macInput.dispatchEvent(meta);
+    expect(meta.defaultPrevented).toBe(true);
+    expect(macInput.value).toBe('=SUM(E2)');
+    editor.cancel();
+  });
+
   it('continues from a mouse-picked reference with the next arrow', () => {
     mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
     editor.begin('=SUM(', { mode: 'point' });
@@ -144,6 +257,203 @@ describe('InlineEditor', () => {
 
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
     expect(input.value).toBe('=SUM(C5');
+    editor.cancel();
+  });
+
+  it('undoes a picked reference and its point-arrow continuation as one local edit', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    editor.begin('=SUM(', { mode: 'point' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    editor.insertRefAtCaret('B5', { phase: 'start' });
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
+    expect(input.value).toBe('=SUM(C5');
+
+    const undo = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true });
+    input.dispatchEvent(undo);
+    expect(undo.defaultPrevented).toBe(true);
+    expect(input.value).toBe('=SUM(');
+    const redo = new KeyboardEvent('keydown', {
+      key: 'z',
+      ctrlKey: true,
+      shiftKey: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(redo);
+    expect(input.value).toBe('=SUM(C5');
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toBeNull();
+    editor.cancel();
+  });
+
+  it('records ordinary input, F4 and the redo branch only in local draft history', () => {
+    editor.begin('=A1');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.setSelectionRange(2, 2);
+    input.dispatchEvent(
+      new InputEvent('beforeinput', { inputType: 'insertText', bubbles: true, cancelable: true }),
+    );
+    input.value = '=A1+2';
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new InputEvent('input', { inputType: 'insertText', bubbles: true }));
+    input.setSelectionRange(3, 3);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', cancelable: true }));
+    expect(input.value).toBe('=$A$1+2');
+
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true }),
+    );
+    expect(input.value).toBe('=A1+2');
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true }),
+    );
+    expect(input.value).toBe('=A1');
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true, cancelable: true }),
+    );
+    expect(input.value).toBe('=A1+2');
+    input.setSelectionRange(3, 3);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', cancelable: true }));
+    expect(input.value).toBe('=$A$1+2');
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBeNull();
+    editor.cancel();
+  });
+
+  it('records inline F4 before store observers can synchronously undo', () => {
+    editor.begin('=A1');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.setSelectionRange(3, 3);
+    input.dispatchEvent(
+      new InputEvent('beforeinput', { inputType: 'insertText', bubbles: true, cancelable: true }),
+    );
+    input.value = '=A1+1';
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new InputEvent('input', { inputType: 'insertText', bubbles: true }));
+
+    let reentered = false;
+    const unsubscribe = store.subscribe((state) => {
+      if (reentered || state.ui.editor.kind !== 'edit' || state.ui.editor.raw !== '=$A$1+1') return;
+      reentered = true;
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+      );
+    });
+    input.setSelectionRange(3, 3);
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F4', bubbles: true, cancelable: true }),
+    );
+    unsubscribe();
+
+    expect(reentered).toBe(true);
+    expect(input.value).toBe('=A1+1');
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    expect(input.value).toBe('=A1');
+    editor.cancel();
+  });
+
+  it('records an unphased inline reference pick before store observers can undo', () => {
+    editor.begin('=SUM');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(
+      new InputEvent('beforeinput', { inputType: 'insertText', bubbles: true, cancelable: true }),
+    );
+    input.value = '=SUM(';
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new InputEvent('input', { inputType: 'insertText', bubbles: true }));
+
+    let reentered = false;
+    const unsubscribe = store.subscribe((state) => {
+      if (reentered || state.ui.editor.kind !== 'edit' || state.ui.editor.raw !== '=SUM(C4') return;
+      reentered = true;
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+      );
+    });
+    editor.insertRefAtCaret('C4');
+    unsubscribe();
+
+    expect(reentered).toBe(true);
+    expect(input.value).toBe('=SUM(');
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    expect(input.value).toBe('=SUM');
+    editor.cancel();
+  });
+
+  it('keeps one IME edit and routes native history input types into the local journal', () => {
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    input.value = 'あ';
+    input.setSelectionRange(1, 1);
+    input.dispatchEvent(
+      new InputEvent('input', {
+        inputType: 'insertCompositionText',
+        isComposing: true,
+        bubbles: true,
+      }),
+    );
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    input.dispatchEvent(
+      new InputEvent('beforeinput', {
+        inputType: 'insertFromComposition',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    input.dispatchEvent(
+      new InputEvent('input', { inputType: 'insertFromComposition', bubbles: true }),
+    );
+
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true }),
+    );
+    expect(input.value).toBe('');
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true }),
+    );
+    expect(input.value).toBe('');
+
+    input.dispatchEvent(
+      new InputEvent('beforeinput', {
+        inputType: 'historyRedo',
+        bubbles: true,
+        cancelable: false,
+      }),
+    );
+    input.value = 'native history should be overridden';
+    input.dispatchEvent(new InputEvent('input', { inputType: 'historyRedo', bubbles: true }));
+    expect(input.value).toBe('あ');
+    editor.cancel();
+  });
+
+  it('restores the active inline draft after empty native history events', () => {
+    editor.begin('=5');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(
+      new InputEvent('beforeinput', {
+        inputType: 'historyUndo',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    expect(input.value).toBe('=5');
+    input.value = 'stale native value';
+    input.dispatchEvent(new InputEvent('input', { inputType: 'historyUndo', bubbles: true }));
+    expect(input.value).toBe('=5');
+
+    input.dispatchEvent(
+      new InputEvent('beforeinput', {
+        inputType: 'historyRedo',
+        bubbles: true,
+        cancelable: false,
+      }),
+    );
+    input.value = 'another stale native value';
+    input.dispatchEvent(new InputEvent('input', { inputType: 'historyRedo', bubbles: true }));
+    expect(input.value).toBe('=5');
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBeNull();
     editor.cancel();
   });
 
@@ -167,6 +477,29 @@ describe('InlineEditor', () => {
     expect(input.value).toBe('=SUM(R[-1]C');
     up();
     expect(input.value).toBe('=SUM(R[-2]C');
+    editor.cancel();
+  });
+
+  it('resolves inline R1C1 highlights and F4 rotations against the edited cell', () => {
+    const address = { sheet: 0, row: 3, col: 3 };
+    mutators.setR1C1(store, true);
+    mutators.setActive(store, address);
+    editor.begin('=SUM(R[-2]C[-2])');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(store.getState().ui.editorRefs).toEqual([{ r0: 1, c0: 1, r1: 1, c1: 1, colorIndex: 0 }]);
+    const rotate = (): void => {
+      const caret = input.value.indexOf(')');
+      input.setSelectionRange(caret, caret);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', cancelable: true }));
+    };
+    rotate();
+    expect(input.value).toBe('=SUM(R2C2)');
+    rotate();
+    expect(input.value).toBe('=SUM(R2C[-2])');
+    rotate();
+    expect(input.value).toBe('=SUM(R[-2]C2)');
+    rotate();
+    expect(input.value).toBe('=SUM(R[-2]C[-2])');
     editor.cancel();
   });
 
@@ -245,6 +578,40 @@ describe('InlineEditor', () => {
     input.dispatchEvent(left);
     expect(left.defaultPrevented).toBe(true);
     expect(input.value).toBe('=SUM(C4');
+    editor.cancel();
+  });
+
+  it('records accepted functions before store observers can synchronously undo', () => {
+    vi.spyOn(wb, 'functionNames').mockReturnValue(['SUM']);
+    editor.begin('=S', { mode: 'edit' });
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.dispatchEvent(
+      new InputEvent('beforeinput', { inputType: 'insertText', bubbles: true, cancelable: true }),
+    );
+    input.value = '=SU';
+    input.setSelectionRange(3, 3);
+    input.dispatchEvent(new InputEvent('input', { inputType: 'insertText', bubbles: true }));
+    expect(document.querySelector('.fc-autocomplete')).not.toBeNull();
+
+    let reentered = false;
+    const unsubscribe = store.subscribe((state) => {
+      if (reentered || state.ui.editor.kind !== 'edit' || state.ui.editor.raw !== '=SUM(') return;
+      reentered = true;
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+      );
+    });
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+    );
+    unsubscribe();
+
+    expect(reentered).toBe(true);
+    expect(input.value).toBe('=SU');
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    expect(input.value).toBe('=S');
     editor.cancel();
   });
 
@@ -723,6 +1090,24 @@ describe('InlineEditor', () => {
       realWorkbook.dispose();
       localHost.remove();
     }
+  });
+
+  it('restores the private draft history when an inline formula lease is cancelled', () => {
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    editor.begin('=SUM(', { mode: 'point' });
+    editor.insertRefAtCaret('B5', { phase: 'start' });
+    const lease = editor.suspendForFormulaPalette({
+      getLocale: () => 'en-US',
+      contextCurrent: () => true,
+    });
+    expect(lease).not.toBeNull();
+    const restored = lease?.userCancel() as HTMLTextAreaElement | null;
+    expect(restored?.value).toBe('=SUM(B5');
+    restored?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true }),
+    );
+    expect(restored?.value).toBe('=SUM(');
+    editor.cancel();
   });
 
   it('refuses suspension during IME composition and invalidates stale leases', () => {

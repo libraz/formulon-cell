@@ -1,9 +1,11 @@
 import { rewriteRefs } from '../commands/formula-ref-lexer.js';
 import { resolveFormulaReferenceInsertionSpan } from '../commands/formula-reference-input.js';
+import { mergeAnchorOf } from '../commands/merge.js';
 import { r1c1AtomToA1 } from '../commands/refs.js';
 import { MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { State } from '../store/types.js';
+import { jumpToDataEdge } from './data-edge-navigation.js';
 import {
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
@@ -32,6 +34,7 @@ export interface NavigateFormulaReferenceInput {
   readonly extend: boolean;
   readonly current?: FormulaReferenceNavigationState | null;
   readonly r1c1?: boolean;
+  readonly jump?: boolean;
 }
 
 const R1C1_QUALIFIED = /^((?:'(?:[^']|'')*'|[\p{L}_][\p{L}\p{N}_.]*)!)?([^!]+)$/u;
@@ -128,7 +131,9 @@ export function navigateFormulaReference(
   }
 
   const { dRow, dCol } = axisStep(input);
-  const destination = stepVisibleWithMerge(state, tip, dRow, dCol, MAX_ROW, MAX_COL);
+  const destination = input.jump
+    ? mergeAnchorOf(state, jumpToDataEdge(state, tip, dRow, dCol))
+    : stepVisibleWithMerge(state, tip, dRow, dCol, MAX_ROW, MAX_COL);
   if (
     destination.row === tip.row &&
     destination.col === tip.col &&

@@ -1,5 +1,6 @@
 import { addrKey } from '../engine/address.js';
 import { cellFormatFromXf } from '../engine/cell-format-sync.js';
+import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import type { Addr, Range } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -8,8 +9,13 @@ import { resetTabNavigationSession } from '../interact/tab-navigation-session.js
 import { formatWithPending } from '../store/pending-format.js';
 import { validationAt } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, State } from '../store/types.js';
+import {
+  AUTO_HYPERLINK_COMMAND_ID,
+  detectTypedWebUrl,
+  getTypedWebUrlFormatPatch,
+} from './auto-hyperlink.js';
 import {
   type CoercedInput,
   coerceInputForCell,
@@ -51,7 +57,7 @@ import {
   snapshotToPatch,
   unionAddresses,
 } from './prepared-change.js';
-import { normalizeR1C1Formula } from './refs.js';
+import { recordAuthorizedFormatChange } from './slice-history.js';
 import { coerceCellValue } from './validate.js';
 
 const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
@@ -133,6 +139,8 @@ type HistoryIntents = {
 type HistoryPlanResult =
   | { readonly plan: HistoryIntents }
   | { readonly decision: PermissionDecision };
+
+type TypedUrlCandidate = { readonly addr: Addr; readonly raw: string };
 
 const originFromHost = (origin: string | undefined): InteractionOrigin => {
   switch (origin) {
@@ -246,6 +254,7 @@ export class InteractionController {
     const prepared: PreparedChange[] = [];
     const globalRejections: BatchRejection[] = [];
     let includesFormula = false;
+    let typedUrlCandidate: TypedUrlCandidate | undefined;
     const pending = state.ui.pendingFormat;
     const mayApplyPendingFormat =
       (command.origin === 'editor' || command.origin === 'formulaBar') &&
@@ -264,6 +273,29 @@ export class InteractionController {
       if ('rejection' in preparedChange) {
         globalRejections.push(preparedChange.rejection);
         continue;
+      }
+      if (
+        command.origin === 'editor' &&
+        command.operation === 'valueEdit' &&
+        command.changes.length === 1 &&
+        'input' in change &&
+        preparedChange.input?.kind === 'text' &&
+        preparedChange.patch.formula === null &&
+        detectTypedWebUrl(change.input) === change.input
+      ) {
+        try {
+          const previousValue = wb.getValue(preparedChange.patch.addr);
+          const previousFormula = wb.cellFormula(preparedChange.patch.addr);
+          if (
+            previousValue.kind !== 'text' ||
+            previousValue.value !== change.input ||
+            previousFormula !== null
+          ) {
+            typedUrlCandidate = { addr: preparedChange.patch.addr, raw: change.input };
+          }
+        } catch {
+          // Auto-format is optional; a failed preflight read must not block input.
+        }
       }
       if (preparedChange.patch.formula !== null) includesFormula = true;
       if (pendingAnchorKey === addrKey(preparedChange.patch.addr) && pending) {
@@ -381,7 +413,11 @@ export class InteractionController {
     );
     if ('decision' in historyPlan)
       return this.rejectResult([this.asRejection(historyPlan.decision)]);
-    return this.commitPrepared(eligible, rejected, true, historyPlan.plan);
+    const beforeNotify = typedUrlCandidate
+      ? (applied: readonly Addr[]): void =>
+          this.applyAutomaticHyperlink(wb, typedUrlCandidate as TypedUrlCandidate, applied)
+      : undefined;
+    return this.commitPrepared(eligible, rejected, true, historyPlan.plan, beforeNotify);
   }
 
   applyChanges(
@@ -554,7 +590,7 @@ export class InteractionController {
       patch: {
         addr: target,
         value: change.value,
-        formula: formula === null ? null : normalizeR1C1Formula(formula, target),
+        formula,
       },
       inheritedFormat,
       inheritedAxisXf,
@@ -623,11 +659,7 @@ export class InteractionController {
         return { patch: { addr, value: { kind: 'blank' }, formula: null }, input };
       case 'formula':
         return {
-          patch: {
-            addr,
-            value: { kind: 'blank' },
-            formula: normalizeR1C1Formula(input.text, addr),
-          },
+          patch: { addr, value: { kind: 'blank' }, formula: input.text },
           input,
         };
       case 'number':
@@ -751,12 +783,102 @@ export class InteractionController {
     );
   }
 
+  private applyAutomaticHyperlink(
+    originalWorkbook: WorkbookHandle,
+    candidate: TypedUrlCandidate,
+    applied: readonly Addr[],
+  ): void {
+    if (!applied.some((addr) => addrKey(addr) === addrKey(candidate.addr))) return;
+    try {
+      if (this.getWb() !== originalWorkbook) return;
+      const bridge = formatHistoryBridgeFor(this.store);
+      if (!bridge || bridge.workbook !== originalWorkbook) return;
+
+      const initialState = this.store.getState();
+      if (
+        !getTypedWebUrlFormatPatch(originalWorkbook, initialState, candidate.addr, candidate.raw)
+      ) {
+        return;
+      }
+      const initialPolicy = this.policy;
+      const initialRevision = this.revisionValue;
+
+      const intent = (
+        operation: 'format' | 'hyperlink',
+        origin: 'editor' | 'undo' | 'redo',
+      ): OperationIntent => ({
+        operation,
+        origin,
+        commandId: AUTO_HYPERLINK_COMMAND_ID,
+        effects: [{ kind: 'cells', cells: [candidate.addr] }],
+      });
+      const formatIntent = intent('format', 'editor');
+      const hyperlinkIntent = intent('hyperlink', 'editor');
+      if (!this.canExecute(formatIntent).allowed || !this.canExecute(hyperlinkIntent).allowed)
+        return;
+
+      const authorizedState = this.store.getState();
+      if (
+        this.disposed ||
+        this.getWb() !== originalWorkbook ||
+        formatHistoryBridgeFor(this.store) !== bridge ||
+        bridge.workbook !== originalWorkbook ||
+        this.policy !== initialPolicy ||
+        this.revisionValue !== initialRevision ||
+        authorizedState !== initialState
+      ) {
+        return;
+      }
+
+      const patch = getTypedWebUrlFormatPatch(
+        originalWorkbook,
+        authorizedState,
+        candidate.addr,
+        candidate.raw,
+      );
+      if (!patch) return;
+
+      // Keep the permission snapshot valid through the last read and the store mutation below.
+      if (
+        this.disposed ||
+        this.getWb() !== originalWorkbook ||
+        formatHistoryBridgeFor(this.store) !== bridge ||
+        bridge.workbook !== originalWorkbook ||
+        this.policy !== initialPolicy ||
+        this.revisionValue !== initialRevision ||
+        this.store.getState() !== authorizedState
+      ) {
+        return;
+      }
+
+      const replayAuthorization = {
+        undo: [intent('format', 'undo'), intent('hyperlink', 'undo')],
+        redo: [intent('format', 'redo'), intent('hyperlink', 'redo')],
+      } as const;
+      const transaction = this.history.begin({ replayAuthorization });
+      try {
+        recordAuthorizedFormatChange(
+          this.history,
+          this.store,
+          () => {
+            mutators.setCellFormat(this.store, candidate.addr, patch);
+          },
+          replayAuthorization,
+        );
+      } finally {
+        this.history.end(transaction);
+      }
+    } catch {
+      // The value commit is primary; the format recorder restores its own partial work first.
+    }
+  }
+
   private commitPrepared(
     prepared: readonly PreparedChange[],
     rejected: readonly BatchRejection[],
     recordHistory = true,
     historyPlan?: HistoryIntents,
-    beforeNotify?: () => void,
+    beforeNotify?: (applied: readonly Addr[]) => void,
   ): ChangeBatchResult {
     let wb: WorkbookHandle;
     try {
@@ -781,7 +903,7 @@ export class InteractionController {
       const changedFormats = changedFormatAddresses(beforeFormats, afterFormats, prepared);
       const applied = unionAddresses(atomic.changed, changedFormats);
       if (applied.length === 0) {
-        beforeNotify?.();
+        beforeNotify?.([]);
         return this.noopResult(rejected);
       }
       if (recordHistory) {
@@ -830,7 +952,7 @@ export class InteractionController {
         rejected,
         revision: this.revisionValue,
       };
-      beforeNotify?.();
+      beforeNotify?.(applied);
       this.notifyChanged(result);
       return result;
     } catch (error) {

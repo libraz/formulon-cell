@@ -101,6 +101,126 @@ describe('suggestStructuredRef', () => {
   it('returns null when no tables are passed', () => {
     expect(suggestStructuredRef('=Sales[r', 8, [])).toBeNull();
   });
+
+  it('matches the full Unicode and backslash table identifier', () => {
+    const tables = [
+      { name: '売上', columns: ['金額'] },
+      { name: '\\売上', columns: ['金額'] },
+    ];
+    expect(suggestStructuredRef('=売上[金', 5, tables)?.matches).toEqual(['金額']);
+    expect(suggestStructuredRef('=\\売上[金', 6, tables)?.matches).toEqual(['金額']);
+  });
+
+  it('does not fall back to a table-name suffix after a dot', () => {
+    const tables = [
+      { name: 'Sales.Data', columns: ['Revenue +Data Region'] },
+      { name: 'Data', columns: ['Region'] },
+    ];
+    const text = '=Sales.Data[Re';
+    expect(suggestStructuredRef(text, text.length, tables)?.matches).toEqual([
+      'Revenue +Data Region',
+    ]);
+  });
+
+  it('deduplicates header labels case-insensitively and keeps the list sorted', () => {
+    const ctx = suggestStructuredRef('=Sales[R', 8, [
+      { name: 'Sales', columns: ['Revenue', 'Region', 'region', 'Rate'] },
+    ]);
+    expect(ctx?.matches).toEqual(['Rate', 'Region', 'Revenue']);
+  });
+});
+
+describe('structured table autocomplete insertion', () => {
+  const setup = (value: string, tables: readonly { name: string; columns: string[] }[]) => {
+    const input = document.createElement('textarea');
+    input.value = value;
+    input.setSelectionRange(value.length, value.length);
+    document.body.append(input);
+    const handle = attach({ input, getTables: () => tables });
+    handle.refresh();
+    return { input, handle };
+  };
+
+  it('matches and inserts a full dotted table name without a suffix-table collision', () => {
+    const { input, handle } = setup('=Sales.Data[Re', [
+      { name: 'Sales.Data', columns: ['Revenue +Data Region'] },
+      { name: 'Data', columns: ['Region'] },
+    ]);
+    const candidates = [...document.querySelectorAll('.fc-autocomplete__name')].map(
+      (node) => node.textContent,
+    );
+
+    expect.soft(candidates).toEqual(['Revenue +Data Region']);
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe('=Sales.Data[[Revenue +Data Region]]');
+    expect(input.selectionStart).toBe(input.value.length);
+  });
+
+  it.each([
+    ['=売上[金', [{ name: '売上', columns: ['金額'] }], '金額', '=売上[金額]'],
+    ['=\\売上[金', [{ name: '\\売上', columns: ['金額'] }], '金額', '=\\売上[金額]'],
+  ])('matches and inserts the full table name for %s', (value, tables, label, expected) => {
+    const { input, handle } = setup(value, tables);
+    expect(document.querySelector('.fc-autocomplete__name')?.textContent).toBe(label);
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(input.value).toBe(expected);
+    expect(input.selectionStart).toBe(expected.length);
+  });
+
+  it.each([
+    ['A]B', "=Sales[A'", "=Sales[[A']B]]"],
+    ['A[B', "=Sales[A'[", "=Sales[[A'[B]]"],
+    ['Cost#', "=Sales[Cost'", "=Sales[[Cost'#]]"],
+    ['Qty@', "=Sales[Qty'", "=Sales[[Qty'@]]"],
+    ["O'Brien", "=Sales[O'", "=Sales[[O''Brien]]"],
+  ])(
+    'shows raw header %s and inserts its escaped structured reference',
+    (header, value, expected) => {
+      const { input, handle } = setup(value, [{ name: 'Sales', columns: [header] }]);
+      expect(document.querySelector('.fc-autocomplete__name')?.textContent).toBe(header);
+      expect(handle.acceptHighlighted()).toBe(true);
+      expect(input.value).toBe(expected);
+      expect(input.selectionStart).toBe(expected.length);
+    },
+  );
+
+  it.each([
+    ['Price, Net', '=Sales[P', '=Sales[[Price, Net]]'],
+    ['Tax:Total', '=Sales[T', '=Sales[[Tax:Total]]'],
+    ['A.B', '=Sales[A', '=Sales[[A.B]]'],
+  ])(
+    'adds extra brackets for special header %s without changing its label',
+    (header, value, expected) => {
+      const { input, handle } = setup(value, [{ name: 'Sales', columns: [header] }]);
+      expect(document.querySelector('.fc-autocomplete__name')?.textContent).toBe(header);
+      expect(handle.acceptHighlighted()).toBe(true);
+      expect(input.value).toBe(expected);
+      expect(input.selectionStart).toBe(expected.length);
+    },
+  );
+
+  it.each([
+    ['=Sales[[Re', '=Sales[[Region]]'],
+    ['=Sales[[#Headers],[Re', '=Sales[[#Headers],[Region]]'],
+    ["=Sales[A']", "=Sales[[A']B]]"],
+    ['=SUM(Sales[[Re)+1', '=SUM(Sales[[Region]])+1'],
+  ])(
+    'completes already-nested and escaped partial %s while preserving the suffix',
+    (value, expected) => {
+      const { input, handle } = setup(value, [{ name: 'Sales', columns: ['Region', 'A]B'] }]);
+      const caret = value.includes(')+') ? value.indexOf(')') : value.length;
+      input.setSelectionRange(caret, caret);
+      handle.refresh();
+      expect(document.querySelector('.fc-autocomplete__name')?.textContent).toBe(
+        value.includes("A']") ? 'A]B' : 'Region',
+      );
+      expect(handle.acceptHighlighted()).toBe(true);
+      expect(input.value).toBe(expected);
+      expect(input.selectionStart).toBe(
+        value.includes(')+') ? expected.indexOf(')+') : expected.length,
+      );
+    },
+  );
 });
 
 describe('suggestColumnHistory', () => {
@@ -142,6 +262,26 @@ describe('suggestColumnHistory', () => {
 });
 
 describe('autocomplete insertion outcomes', () => {
+  it('brackets a successful insertion with before and after callbacks', () => {
+    const input = document.createElement('textarea');
+    input.value = '=SU';
+    input.setSelectionRange(input.value.length, input.value.length);
+    document.body.append(input);
+    const calls: string[] = [];
+    const handle = attach({
+      input,
+      getFunctionNames: () => ['SUM'],
+      onBeforeInsert: () => calls.push(`before:${input.value}`),
+      onAfterInsert: (result) => calls.push(`after:${input.value}:${result?.kind}`),
+    });
+    handle.refresh();
+
+    expect(handle.acceptHighlighted()).toBe(true);
+    expect(calls).toEqual(['before:=SU', 'after:=SUM(:function']);
+    handle.detach();
+    input.remove();
+  });
+
   it('reports the accepted column-history candidate kind', () => {
     const input = document.createElement('textarea');
     input.value = 'App';

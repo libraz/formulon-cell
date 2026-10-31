@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { writeSelectionInput } from '../../../src/interact/selection-input.js';
+import {
+  buildSelectionInputBatch,
+  writeSelectionInput,
+} from '../../../src/interact/selection-input.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
 
 const A1 = { sheet: 0, row: 0, col: 0 };
 const A2 = { sheet: 0, row: 1, col: 0 };
+const D4 = { sheet: 0, row: 3, col: 3 };
+const E4 = { sheet: 0, row: 3, col: 4 };
 const stopFive = {
   kind: 'whole' as const,
   op: '=' as const,
@@ -48,6 +53,43 @@ describe('interact/selection-input — writeSelectionInput', () => {
     expect(run('5')).toEqual({ status: 'applied' });
     expect(sheet.workbook.getValue(A1)).toEqual({ kind: 'number', value: 5 });
     expect(sheet.workbook.getValue(A2)).toEqual({ kind: 'number', value: 5 });
+  });
+
+  it('keeps R1C1 formulas relative to each destination in Ctrl+Enter batches', () => {
+    const store = sheet.instance.store;
+    mutators.setR1C1(store, true);
+    mutators.setRange(store, { sheet: 0, r0: D4.row, c0: D4.col, r1: E4.row, c1: E4.col });
+
+    expect(buildSelectionInputBatch(store.getState(), '=RC5', D4)?.changes).toEqual([
+      { addr: D4, input: '=RC5' },
+      { addr: E4, input: '=RC5' },
+    ]);
+
+    expect(writeSelectionInput(sheet.workbook, store, store.getState(), '=RC5', D4)).toEqual({
+      status: 'applied',
+    });
+    expect(sheet.workbook.cellFormula(D4)).toBe('=$E4');
+    expect(sheet.workbook.cellFormula(E4)).toBe('=$E4');
+  });
+
+  it('shifts a relative R1C1 formula across Ctrl+Enter destinations', () => {
+    const store = sheet.instance.store;
+    mutators.setR1C1(store, true);
+    mutators.setRange(store, { sheet: 0, r0: D4.row, c0: D4.col, r1: E4.row, c1: E4.col });
+
+    expect(writeSelectionInput(sheet.workbook, store, store.getState(), '=RC[-1]', D4)).toEqual({
+      status: 'applied',
+    });
+    expect(sheet.workbook.cellFormula(D4)).toBe('=C4');
+    expect(sheet.workbook.cellFormula(E4)).toBe('=D4');
+  });
+
+  it('retains relative offsets when an invalid anchor reference becomes valid at the next target', () => {
+    mutators.setR1C1(sheet.instance.store, true);
+
+    expect(run('=R[-1]C')).toEqual({ status: 'applied' });
+    expect(sheet.workbook.cellFormula(A1)).toBe('=#REF!');
+    expect(sheet.workbook.cellFormula(A2)).toBe('=A1');
   });
 
   it.each([
