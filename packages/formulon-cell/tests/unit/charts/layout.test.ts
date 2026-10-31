@@ -1003,6 +1003,17 @@ describe('layoutChart', () => {
     }
   });
 
+  it('reserves no legend space for a doughnut legend that draws no entries', () => {
+    const data: ChartData = { domain: 'category', categories: ['A', 'B'], series: [] };
+    const shown = sceneFor(
+      { kind: 'doughnut', legend: { visible: true, position: 'right' } },
+      data,
+    );
+    const hidden = sceneFor({ kind: 'doughnut', legend: { visible: false } }, data);
+    expect(shown.elements.some((element) => element.role === 'legend')).toBe(false);
+    expect(shown.plot).toEqual(hidden.plot);
+  });
+
   it('bounds compact legends and retains full labels in aria-label attributes', () => {
     const data: ChartData = {
       domain: 'category',

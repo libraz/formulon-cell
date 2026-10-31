@@ -13,6 +13,22 @@ import type { ChartPrimitive, ChartScene, ChartSpec } from './types.js';
 const colorFor = (palette: readonly string[], index: number): string =>
   palette[((index % palette.length) + palette.length) % palette.length] ?? '#156082';
 
+/** Preferred legend column width: the widest label plus its key, at least 56. */
+export const legendPreferredWidth = (labels: readonly string[]): number =>
+  labels.reduce((current, label) => Math.max(current, textWidth(label) + 20), 56);
+
+/** Legend labels in drawing order; empty when the legend draws no entries. */
+export const legendLabels = (view: PreparedChartData, spec: ChartSpec): string[] => {
+  const data = view.data;
+  if (data.domain === 'category' && isCircularKind(spec.kind)) {
+    if (spec.kind === 'doughnut' && data.series.length === 0) return [];
+    return data.categories.map((label, index) => label ?? `${index + 1}`);
+  }
+  return data.series.map(
+    (series, index) => series.name ?? `${(view.originalSeriesIndices[index] ?? index) + 1}`,
+  );
+};
+
 export const addLegend = (
   elements: ChartPrimitive[],
   view: PreparedChartData,
@@ -24,6 +40,7 @@ export const addLegend = (
   rightLabelGutter = 0,
 ): void => {
   const data = view.data;
+  const labels = legendLabels(view, spec);
   const entries: {
     label: string;
     color: string;
@@ -50,7 +67,7 @@ export const addLegend = (
           )
         : undefined;
       entries.push({
-        label: data.categories[index] ?? `${index + 1}`,
+        label: labels[index] as string,
         color: style ? fillColor(style.fill, style.color) : colorFor(palette, originalPointIndex),
         seriesIndex: categoryView.originalSeriesIndices[0] ?? 0,
         pointIndex: originalPointIndex,
@@ -71,7 +88,7 @@ export const addLegend = (
         undefined,
       );
       entries.push({
-        label: series.name ?? `${originalSeriesIndex + 1}`,
+        label: labels[index] as string,
         color: keyColor(spec, style),
         seriesIndex: originalSeriesIndex,
         seriesId: series.id,
@@ -89,7 +106,7 @@ export const addLegend = (
         undefined,
       );
       entries.push({
-        label: series.name ?? `${originalSeriesIndex + 1}`,
+        label: labels[index] as string,
         color: keyColor(spec, style),
         seriesIndex: originalSeriesIndex,
         seriesId: series.id,
@@ -121,10 +138,7 @@ export const addLegend = (
     position === 'right' ? width - x - 4 : position === 'left' ? x + plot.x - 4 : width - x - 4,
   );
   const availableHeight = Math.max(14, position === 'bottom' ? height - 4 : height - y - 4);
-  const preferredWidth = entries.reduce(
-    (current, entry) => Math.max(current, textWidth(entry.label) + 20),
-    56,
-  );
+  const preferredWidth = legendPreferredWidth(entries.map((entry) => entry.label));
   const columnWidth = Math.max(20, Math.min(preferredWidth, availableWidth));
   const verticalRows = Math.max(1, Math.floor(availableHeight / 14));
   const capacity = horizontal

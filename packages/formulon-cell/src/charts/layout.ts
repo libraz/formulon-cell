@@ -16,7 +16,7 @@ import {
   type XYChartView,
 } from './filters.js';
 import { formatChartValue } from './format.js';
-import { addLegend } from './legend.js';
+import { addLegend, legendLabels, legendPreferredWidth } from './legend.js';
 import {
   axisDomain,
   categoryNumericLogBase,
@@ -270,13 +270,15 @@ export function layoutChart(input: {
   const elements: ChartPrimitive[] = [
     primitive('rect', { x: 0, y: 0, width, height, fill: 'transparent' }, 'background'),
   ];
+  const legendEntryLabels = legendLabels(prepared, spec);
   const hasLegend =
-    spec.legend?.visible ??
-    (data.domain === 'category'
-      ? isCircularKind(spec.kind)
-        ? data.categories.length > 1 && (spec.kind === 'pie' || data.series.length > 0)
-        : data.series.length > 1
-      : data.series.length > 1);
+    legendEntryLabels.length > 0 &&
+    (spec.legend?.visible ??
+      (data.domain === 'category'
+        ? isCircularKind(spec.kind)
+          ? data.categories.length > 1 && (spec.kind === 'pie' || data.series.length > 0)
+          : data.series.length > 1
+        : data.series.length > 1));
   const legendPosition = spec.legend?.position ?? 'bottom';
   const title = chartTitleText(spec.title, input.data, input.chartTitle);
   let left = 20;
@@ -285,14 +287,7 @@ export function layoutChart(input: {
   let bottom = 20;
   let rightLegendReserve = 0;
   if (hasLegend) {
-    const legendLabels =
-      data.domain === 'category' && isCircularKind(spec.kind)
-        ? data.categories
-        : data.series.map((series, index) => series.name ?? `${index + 1}`);
-    const legendWidth = legendLabels.reduce(
-      (current, label) => Math.max(current, textWidth(label) + 20),
-      56,
-    );
+    const legendWidth = legendPreferredWidth(legendEntryLabels);
     if (legendPosition === 'right') {
       rightLegendReserve = Math.min(180, Math.max(56, legendWidth));
       right += rightLegendReserve;
