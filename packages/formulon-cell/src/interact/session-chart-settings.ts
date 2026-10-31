@@ -14,22 +14,17 @@ import {
   type SessionChartSettingsLabels,
 } from './session-chart-settings-labels.js';
 import {
-  axisFromChart,
-  axisIsNumeric,
   type ChartDraft,
-  categoryCountForDraft,
-  cloneStyles,
-  defaultVaryColors,
   draftFromChart,
   effectiveDraftChart,
-  effectiveLegendVisible,
-  normalizedCrossingCustom,
+  reconcileSeriesDraft,
+  refreshDraftDefaults,
   type SessionChartSeriesRefs,
   type SessionChartSettingsPatch,
   type SessionChartSettingsShape,
-  scatterStyleOf,
   seriesEntries,
   stylePointEntries,
+  syncUntouchedOptionalOverrides,
   toPatch,
 } from './session-chart-settings-model.js';
 import { renderElements } from './session-chart-settings-tabs/elements.js';
@@ -205,108 +200,10 @@ export function createSessionChartSettings(
     surface.style.top = `${Math.max(minTop, Math.min(top, maxTop))}px`;
   };
 
-  const syncUntouchedOptionalOverrides = (): void => {
-    if (!chart || !data || !draft) return;
-    for (const axisName of ['xAxis', 'yAxis'] as const) {
-      const changed = draft[axisName === 'xAxis' ? 'xAxisChanged' : 'yAxisChanged'];
-      if (!changed.has('reverseOrder')) {
-        const reverseOrder = axisFromChart(chart[axisName]).reverseOrder;
-        draft[axisName].reverseOrder = reverseOrder;
-        draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'].reverseOrder = reverseOrder;
-      }
-
-      const baseline = draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'];
-      if (!changed.has('crossing')) {
-        const nextCrossing = axisFromChart(chart[axisName]);
-        nextCrossing.crossingCustom = normalizedCrossingCustom(
-          nextCrossing.crossingCustom,
-          axisIsNumeric({ kind: draft.kind }, axisName),
-          categoryCountForDraft(data, draft),
-        );
-        draft[axisName].crossing = nextCrossing.crossing;
-        draft[axisName].crossingMode = nextCrossing.crossingMode;
-        draft[axisName].crossingCustom = nextCrossing.crossingCustom;
-        baseline.crossing = nextCrossing.crossing;
-        baseline.crossingMode = nextCrossing.crossingMode;
-        baseline.crossingCustom = nextCrossing.crossingCustom;
-      }
-
-      if (!changed.has('labelPosition')) {
-        const nextLabelPosition = axisFromChart(chart[axisName]);
-        draft[axisName].labelPosition = nextLabelPosition.labelPosition;
-        draft[axisName].labelPositionMode = nextLabelPosition.labelPositionMode;
-        baseline.labelPosition = nextLabelPosition.labelPosition;
-        baseline.labelPositionMode = nextLabelPosition.labelPositionMode;
-      }
-
-      if (!changed.has('logBase')) {
-        const nextLog = axisFromChart(chart[axisName]);
-        draft[axisName].logBase = nextLog.logBase;
-        draft[axisName].logEnabled = nextLog.logEnabled;
-        draft[axisName].logBaseDraft = nextLog.logBaseDraft;
-        baseline.logBase = nextLog.logBase;
-        baseline.logEnabled = nextLog.logEnabled;
-        baseline.logBaseDraft = nextLog.logBaseDraft;
-      }
-    }
-    if (!draft.legendManuallyChanged) {
-      const nextLegendOverride = chart.legend?.visible;
-      if (nextLegendOverride === undefined) {
-        delete draft.legendOriginalOverride;
-        delete draft.legendOverride;
-      } else {
-        draft.legendOriginalOverride = nextLegendOverride;
-        draft.legendOverride = nextLegendOverride;
-      }
-      const effective = effectiveDraftChart(chart, draft);
-      const implicit = {
-        ...effective,
-        legend: effective.legend ? { ...effective.legend, visible: undefined } : undefined,
-      } as SessionChartSettingsShape;
-      draft.legendBaseline = effectiveLegendVisible(implicit, data);
-      draft.legendVisible = draft.legendOverride ?? draft.legendBaseline;
-    }
-    if (!draft.varyColorsManuallyChanged) {
-      const nextVaryColorsOverride = chart.varyColors;
-      if (nextVaryColorsOverride === undefined) {
-        delete draft.varyColorsOriginalOverride;
-        delete draft.varyColorsOverride;
-      } else {
-        draft.varyColorsOriginalOverride = nextVaryColorsOverride;
-        draft.varyColorsOverride = nextVaryColorsOverride;
-      }
-      draft.varyColorsBaseline = nextVaryColorsOverride ?? defaultVaryColors(String(draft.kind));
-      draft.varyColors = draft.varyColorsBaseline;
-    }
-    if (!draft.scatterStyleChanged) {
-      const nextScatterStyleOverride = scatterStyleOf(chart);
-      if (nextScatterStyleOverride === undefined) {
-        delete draft.scatterStyleOriginalOverride;
-        delete draft.scatterStyleOverride;
-      } else {
-        draft.scatterStyleOriginalOverride = nextScatterStyleOverride;
-        draft.scatterStyleOverride = nextScatterStyleOverride;
-      }
-      draft.scatterStyleBaseline = nextScatterStyleOverride ?? 'marker';
-      draft.scatterStyle = draft.scatterStyleBaseline;
-    }
-  };
-
-  const refreshDraftDefaults = (): void => {
-    if (!chart || !data || !draft) return;
-    const effective = effectiveDraftChart(chart, draft);
-    if (draft.legendOverride === undefined) {
-      draft.legendVisible = effectiveLegendVisible(effective, data);
-    }
-    if (draft.varyColorsOverride === undefined) {
-      draft.varyColors = defaultVaryColors(String(draft.kind));
-    }
-  };
-
   const refreshDraftData = (): void => {
     if (!chart || !draft) return;
     if (deps.readData) data = deps.readData(effectiveDraftChart(chart, draft));
-    refreshDraftDefaults();
+    if (data) refreshDraftDefaults(draft, chart, data);
   };
 
   const reconcileStyleSelection = (): void => {
@@ -321,21 +218,9 @@ export function createSessionChartSettings(
     }
   };
 
-  /** Align the draft with series added or removed in the workbook. */
-  const reconcileSeriesDraft = (): void => {
-    if (!chart || !draft) return;
-    const known = new Set(chart.data.series.map((series) => series.id));
-    const styles = draft.seriesStyles.filter((style) => known.has(style.seriesId));
-    for (const style of cloneStyles(chart.seriesStyles) ?? []) {
-      if (!styles.some((entry) => entry.seriesId === style.seriesId)) styles.push(style);
-    }
-    draft.seriesStyles = styles;
-    draft.filter.hiddenSeriesIds = draft.filter.hiddenSeriesIds.filter((id) => known.has(id));
-  };
-
   const renderPanel = (): void => {
     if (!chart || !data || !draft || disposed) return;
-    refreshDraftDefaults();
+    refreshDraftDefaults(draft, chart, data);
     surface.replaceChildren();
     surface.setAttribute('aria-label', labels.settings);
     const heading = element('div', 'fc-chart-settings__header');
@@ -404,12 +289,12 @@ export function createSessionChartSettings(
         disabled: draft.kindChanged,
         add: (refs) => {
           const added = deps.onAddSeries(committed.id, refs, history);
-          if (added !== null) reconcileSeriesDraft();
+          if (added !== null && chart && draft) reconcileSeriesDraft(draft, chart);
           return added;
         },
         remove: (seriesId) => {
           const removed = deps.onRemoveSeries(committed.id, seriesId, history);
-          if (removed) reconcileSeriesDraft();
+          if (removed && chart && draft) reconcileSeriesDraft(draft, chart);
           return removed;
         },
       };
@@ -545,8 +430,8 @@ export function createSessionChartSettings(
       }
       if (deps.readData) data = deps.readData(effectiveDraftChart(nextChart, draft));
       else data = nextData;
-      syncUntouchedOptionalOverrides();
-      refreshDraftDefaults();
+      syncUntouchedOptionalOverrides(draft, chart, data);
+      refreshDraftDefaults(draft, chart, data);
       reconcileStyleSelection();
       const nextEditable = deps.canEdit?.(nextChart) !== false;
       if (!anchor?.isConnected) {

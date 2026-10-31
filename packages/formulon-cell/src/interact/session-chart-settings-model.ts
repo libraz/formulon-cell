@@ -54,7 +54,7 @@ const cloneMarker = (marker?: ChartMarkerSpec): ChartMarkerSpec | undefined =>
       }
     : undefined;
 
-export const cloneStyles = (
+const cloneStyles = (
   styles?: readonly ChartSeriesStyleSpec[],
 ): ChartSeriesStyleSpec[] | undefined =>
   styles?.map((style) => ({
@@ -177,7 +177,7 @@ interface ChartAxisDraft {
   majorGridlines: boolean;
 }
 
-export const axisFromChart = (axis: SessionChartSettingsShape['xAxis']): ChartAxisDraft => {
+const axisFromChart = (axis: SessionChartSettingsShape['xAxis']): ChartAxisDraft => {
   const raw = (axis ?? {}) as Record<string, unknown>;
   const finite = (value: unknown): number | undefined =>
     typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -290,15 +290,12 @@ export const isDoughnutKind = (kind: string): boolean => kind === 'doughnut';
 
 export const defaultVaryColors = (kind: string): boolean => isCircularKind(kind);
 
-export const scatterStyleOf = (chart: SessionChartSettingsShape): ChartScatterStyle | undefined => {
+const scatterStyleOf = (chart: SessionChartSettingsShape): ChartScatterStyle | undefined => {
   const value = chart.scatterStyle;
   return value === 'marker' || value === 'line' || value === 'lineMarker' ? value : undefined;
 };
 
-export const effectiveLegendVisible = (
-  chart: SessionChartSettingsShape,
-  data: ChartData,
-): boolean => {
+const effectiveLegendVisible = (chart: SessionChartSettingsShape, data: ChartData): boolean => {
   if (chart.legend?.visible !== undefined) return chart.legend.visible;
   const prepared = prepareChartData(data, chart);
   return prepared.data.domain === 'category' && isCircularKind(chart.kind)
@@ -822,4 +819,119 @@ export const styleTarget = (
 ): void => {
   if (pointId === null) updateSeriesStyle(draft, seriesId, update);
   else updatePointStyle(draft, seriesId, pointId, update);
+};
+
+export const syncUntouchedOptionalOverrides = (
+  draft: ChartDraft,
+  chart: SessionChartSettingsShape,
+  data: ChartData,
+): void => {
+  for (const axisName of ['xAxis', 'yAxis'] as const) {
+    const changed = draft[axisName === 'xAxis' ? 'xAxisChanged' : 'yAxisChanged'];
+    if (!changed.has('reverseOrder')) {
+      const reverseOrder = axisFromChart(chart[axisName]).reverseOrder;
+      draft[axisName].reverseOrder = reverseOrder;
+      draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'].reverseOrder = reverseOrder;
+    }
+
+    const baseline = draft[axisName === 'xAxis' ? 'xAxisBaseline' : 'yAxisBaseline'];
+    if (!changed.has('crossing')) {
+      const nextCrossing = axisFromChart(chart[axisName]);
+      nextCrossing.crossingCustom = normalizedCrossingCustom(
+        nextCrossing.crossingCustom,
+        axisIsNumeric({ kind: draft.kind }, axisName),
+        categoryCountForDraft(data, draft),
+      );
+      draft[axisName].crossing = nextCrossing.crossing;
+      draft[axisName].crossingMode = nextCrossing.crossingMode;
+      draft[axisName].crossingCustom = nextCrossing.crossingCustom;
+      baseline.crossing = nextCrossing.crossing;
+      baseline.crossingMode = nextCrossing.crossingMode;
+      baseline.crossingCustom = nextCrossing.crossingCustom;
+    }
+
+    if (!changed.has('labelPosition')) {
+      const nextLabelPosition = axisFromChart(chart[axisName]);
+      draft[axisName].labelPosition = nextLabelPosition.labelPosition;
+      draft[axisName].labelPositionMode = nextLabelPosition.labelPositionMode;
+      baseline.labelPosition = nextLabelPosition.labelPosition;
+      baseline.labelPositionMode = nextLabelPosition.labelPositionMode;
+    }
+
+    if (!changed.has('logBase')) {
+      const nextLog = axisFromChart(chart[axisName]);
+      draft[axisName].logBase = nextLog.logBase;
+      draft[axisName].logEnabled = nextLog.logEnabled;
+      draft[axisName].logBaseDraft = nextLog.logBaseDraft;
+      baseline.logBase = nextLog.logBase;
+      baseline.logEnabled = nextLog.logEnabled;
+      baseline.logBaseDraft = nextLog.logBaseDraft;
+    }
+  }
+  if (!draft.legendManuallyChanged) {
+    const nextLegendOverride = chart.legend?.visible;
+    if (nextLegendOverride === undefined) {
+      delete draft.legendOriginalOverride;
+      delete draft.legendOverride;
+    } else {
+      draft.legendOriginalOverride = nextLegendOverride;
+      draft.legendOverride = nextLegendOverride;
+    }
+    const effective = effectiveDraftChart(chart, draft);
+    const implicit = {
+      ...effective,
+      legend: effective.legend ? { ...effective.legend, visible: undefined } : undefined,
+    } as SessionChartSettingsShape;
+    draft.legendBaseline = effectiveLegendVisible(implicit, data);
+    draft.legendVisible = draft.legendOverride ?? draft.legendBaseline;
+  }
+  if (!draft.varyColorsManuallyChanged) {
+    const nextVaryColorsOverride = chart.varyColors;
+    if (nextVaryColorsOverride === undefined) {
+      delete draft.varyColorsOriginalOverride;
+      delete draft.varyColorsOverride;
+    } else {
+      draft.varyColorsOriginalOverride = nextVaryColorsOverride;
+      draft.varyColorsOverride = nextVaryColorsOverride;
+    }
+    draft.varyColorsBaseline = nextVaryColorsOverride ?? defaultVaryColors(String(draft.kind));
+    draft.varyColors = draft.varyColorsBaseline;
+  }
+  if (!draft.scatterStyleChanged) {
+    const nextScatterStyleOverride = scatterStyleOf(chart);
+    if (nextScatterStyleOverride === undefined) {
+      delete draft.scatterStyleOriginalOverride;
+      delete draft.scatterStyleOverride;
+    } else {
+      draft.scatterStyleOriginalOverride = nextScatterStyleOverride;
+      draft.scatterStyleOverride = nextScatterStyleOverride;
+    }
+    draft.scatterStyleBaseline = nextScatterStyleOverride ?? 'marker';
+    draft.scatterStyle = draft.scatterStyleBaseline;
+  }
+};
+
+export const refreshDraftDefaults = (
+  draft: ChartDraft,
+  chart: SessionChartSettingsShape,
+  data: ChartData,
+): void => {
+  const effective = effectiveDraftChart(chart, draft);
+  if (draft.legendOverride === undefined) {
+    draft.legendVisible = effectiveLegendVisible(effective, data);
+  }
+  if (draft.varyColorsOverride === undefined) {
+    draft.varyColors = defaultVaryColors(String(draft.kind));
+  }
+};
+
+/** Align the draft with series added or removed in the workbook. */
+export const reconcileSeriesDraft = (draft: ChartDraft, chart: SessionChartSettingsShape): void => {
+  const known = new Set(chart.data.series.map((series) => series.id));
+  const styles = draft.seriesStyles.filter((style) => known.has(style.seriesId));
+  for (const style of cloneStyles(chart.seriesStyles) ?? []) {
+    if (!styles.some((entry) => entry.seriesId === style.seriesId)) styles.push(style);
+  }
+  draft.seriesStyles = styles;
+  draft.filter.hiddenSeriesIds = draft.filter.hiddenSeriesIds.filter((id) => known.has(id));
 };
