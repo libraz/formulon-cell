@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, parseAddrKey } from '../engine/address.js';
 import {
   type AxisFormatBand,
   type AxisFormatPatchResolver,
@@ -13,14 +13,7 @@ import { currencySymbolForLocale } from '../format/locale.js';
 import { mergeFormatPatch } from '../store/format-merge.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import { subtractFromRangeValidations } from '../store/range-validations.js';
-import {
-  isWholeColumnRange,
-  isWholeRowRange,
-  rangeContainsAddr,
-  rangesIntersect,
-  selectionCoversRange,
-  subtractRange,
-} from '../store/selection-geometry.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import {
   type CellAlign,
   type CellBorderSide,
@@ -33,16 +26,25 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
-import { planAxisSelection } from './axis-selection-plan.js';
+import { type BorderPreset, borderEntriesForPlan } from './border-presets.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOperation, InteractionOrigin } from './interaction-policy.js';
 import { gateProtection, isCellWritable, isSheetProtected } from './protection.js';
+import {
+  disjointRanges,
+  MAX_MATERIALIZED_FORMAT_CELLS,
+  mergeCoverageValid,
+  type SelectionFormatEntry,
+  selectionIncludes,
+  selectionPlan,
+  selectionRanges,
+} from './selection-format-plan.js';
 
 export { formatNumber } from '../format/number-format.js';
+export type { BorderPreset } from './border-presets.js';
+export { planSelectionFormat, type SelectionFormatPlan } from './selection-format-plan.js';
 
 type ToggleKey = 'bold' | 'italic' | 'underline' | 'strike';
-
-const MAX_MATERIALIZED_FORMAT_CELLS = 100_000;
 
 export interface SelectionFormatOptions {
   allowPending?: boolean;
@@ -76,138 +78,6 @@ export function withSelectionFormatOrigin<T>(
     else selectionFormatOrigin.set(store, previous);
   }
 }
-
-const validSelectionRange = (range: Range, sheet: number): boolean =>
-  range.sheet === sheet &&
-  Number.isInteger(range.sheet) &&
-  Number.isInteger(range.r0) &&
-  Number.isInteger(range.c0) &&
-  Number.isInteger(range.r1) &&
-  Number.isInteger(range.c1) &&
-  range.sheet >= 0 &&
-  range.r0 >= 0 &&
-  range.c0 >= 0 &&
-  range.r0 <= range.r1 &&
-  range.c0 <= range.c1 &&
-  range.r1 <= MAX_ROW &&
-  range.c1 <= MAX_COL;
-
-const selectionRanges = (state: State): Range[] | null => {
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
-  const primary = ranges[0];
-  if (!primary || !validSelectionRange(primary, primary.sheet)) return null;
-  if (!ranges.every((range) => validSelectionRange(range, primary.sheet))) return null;
-  return ranges.map((range) => ({ ...range }));
-};
-
-const disjointRanges = (ranges: readonly Range[]): Range[] => {
-  const result: Range[] = [];
-  for (const range of ranges) {
-    let pieces = [{ ...range }];
-    for (const cover of result) {
-      pieces = pieces.flatMap((piece) => subtractRange(piece, cover));
-      if (pieces.length === 0) break;
-    }
-    result.push(...pieces);
-  }
-  return result;
-};
-
-const mergeCoverageValid = (state: State, ranges: readonly Range[]): boolean => {
-  const selection = { range: ranges[0] as Range, extraRanges: ranges.slice(1) as Range[] };
-  for (const merge of state.merges.byAnchor.values()) {
-    if (ranges.some((range) => rangesIntersect(range, merge))) {
-      if (!selectionCoversRange(selection, merge)) return false;
-    }
-  }
-  return true;
-};
-
-const materializeSelection = (ranges: readonly Range[]): Addr[] | null => {
-  const cells = new Map<string, Addr>();
-  for (const range of disjointRanges(ranges)) {
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const addr = { sheet: range.sheet, row, col };
-        cells.set(addrKey(addr), addr);
-        if (cells.size > MAX_MATERIALIZED_FORMAT_CELLS) return null;
-      }
-    }
-  }
-  return [...cells.values()];
-};
-
-const selectionPlan = (
-  state: State,
-): {
-  ranges: Range[];
-  cells: Addr[];
-  exceptionCells: Addr[];
-  axisBands: AxisFormatBand[];
-} | null => {
-  const ranges = selectionRanges(state);
-  if (!ranges || !mergeCoverageValid(state, ranges)) return null;
-  const normalized = disjointRanges(ranges);
-  const geometry = planAxisSelection(ranges, MAX_MATERIALIZED_FORMAT_CELLS);
-  if (!geometry) return null;
-  const cells = materializeSelection(geometry.ordinaryRanges);
-  const exceptionCells = materializeSelection(geometry.exceptionRanges);
-  if (
-    !cells ||
-    !exceptionCells ||
-    cells.length + exceptionCells.length > MAX_MATERIALIZED_FORMAT_CELLS
-  )
-    return null;
-  const sparse = new Map<string, Addr>();
-  for (const addr of cells) sparse.set(addrKey(addr), addr);
-  const exceptions = new Set(exceptionCells.map(addrKey));
-  // Axis selections modify the compact native style and only materialise
-  // already-authored cells in the store. Blank/future cells remain implicit.
-  if (geometry.axisBands.length > 0) {
-    for (const key of state.format.formats.keys()) {
-      const addr = parseAddrKey(key);
-      if (!addr || addr.sheet !== normalized[0]?.sheet) continue;
-      if (
-        !exceptions.has(key) &&
-        geometry.axisBands.some(
-          (band) =>
-            (band.axis === 'column' && addr.col >= band.first && addr.col <= band.last) ||
-            (band.axis === 'row' && addr.row >= band.first && addr.row <= band.last),
-        )
-      )
-        sparse.set(key, addr);
-    }
-  }
-  if (sparse.size + exceptions.size > MAX_MATERIALIZED_FORMAT_CELLS) return null;
-  return {
-    ranges: normalized,
-    cells: [...sparse.values()],
-    exceptionCells,
-    axisBands: geometry.axisBands.map((band) => ({ ...band })),
-  };
-};
-
-export interface SelectionFormatPlan {
-  readonly ranges: readonly Range[];
-  readonly cells: readonly Addr[];
-  readonly exceptionCells: readonly Addr[];
-  readonly axisBands: readonly AxisFormatBand[];
-}
-
-/** Plan the complete primary-plus-extra selection for dialog-style actions. */
-export function planSelectionFormat(state: State): SelectionFormatPlan | null {
-  const plan = selectionPlan(state);
-  if (!plan) return null;
-  return {
-    ranges: plan.ranges.map((range) => ({ ...range })),
-    cells: plan.cells.map((addr) => ({ ...addr })),
-    exceptionCells: plan.exceptionCells.map((addr) => ({ ...addr })),
-    axisBands: plan.axisBands.map((band) => ({ ...band })),
-  };
-}
-
-const selectionIncludes = (ranges: readonly Range[], addr: Addr): boolean =>
-  ranges.some((range) => rangeContainsAddr(range, addr));
 
 const authorizeSelection = (
   store: SpreadsheetStore,
@@ -257,11 +127,6 @@ const stagePendingFormat = (
     : {};
   mutators.setPendingFormat(store, { addr, format: mergeFormatPatch(previous, patch) });
 };
-
-interface SelectionFormatEntry {
-  addr: Addr;
-  patch: Partial<CellFormat> | null;
-}
 
 const mergeCellFormat = (
   previous: CellFormat | undefined,
@@ -977,26 +842,6 @@ export function setBorders(state: State, store: SpreadsheetStore, sides: CellBor
   applySelectionFormatPatch(state, store, { borders: sides });
 }
 
-export type BorderPreset =
-  | 'none'
-  | 'outline'
-  | 'thickOutline'
-  | 'all'
-  | 'inside'
-  | 'insideHorizontal'
-  | 'insideVertical'
-  | 'top'
-  | 'bottom'
-  | 'left'
-  | 'right'
-  | 'doubleBottom'
-  | 'thickBottom'
-  | 'topAndBottom'
-  | 'topAndThickBottom'
-  | 'topAndDoubleBottom'
-  | 'diagonalDown'
-  | 'diagonalUp';
-
 export interface SelectionBorderAction {
   readonly preset: BorderPreset;
   readonly style?: CellBorderStyle;
@@ -1008,91 +853,6 @@ export interface SelectionFormatAction {
   readonly border?: SelectionBorderAction;
   readonly operations?: readonly InteractionOperation[];
 }
-
-type BorderSideName = keyof CellBorders;
-
-const borderEntriesForPlan = (
-  plan: { ranges: readonly Range[]; cells: readonly Addr[] },
-  preset: BorderPreset,
-  side: CellBorderSide,
-  thickSide: CellBorderSide,
-  doubleSide: CellBorderSide,
-): SelectionFormatEntry[] => {
-  const entries = new Map<string, SelectionFormatEntry>();
-  const add = (addr: Addr, name: BorderSideName, value: CellBorderSide): void => {
-    const key = addrKey(addr);
-    const current = entries.get(key);
-    if (!current) {
-      entries.set(key, { addr, patch: { borders: { [name]: value } } });
-      return;
-    }
-    if (current.patch?.borders) current.patch.borders[name] = value;
-  };
-
-  for (const range of plan.ranges) {
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const addr = { sheet: range.sheet, row, col };
-        if (preset === 'all') {
-          add(addr, 'top', side);
-          add(addr, 'right', side);
-          add(addr, 'bottom', side);
-          add(addr, 'left', side);
-        } else if (preset === 'none') {
-          add(addr, 'top', false);
-          add(addr, 'right', false);
-          add(addr, 'bottom', false);
-          add(addr, 'left', false);
-          add(addr, 'diagonalDown', false);
-          add(addr, 'diagonalUp', false);
-        } else if (preset === 'inside') {
-          if (row > range.r0) add(addr, 'top', side);
-          if (col > range.c0) add(addr, 'left', side);
-        } else if (preset === 'insideHorizontal') {
-          if (row > range.r0) add(addr, 'top', side);
-        } else if (preset === 'insideVertical') {
-          if (col > range.c0) add(addr, 'left', side);
-        } else if (preset === 'diagonalDown') {
-          add(addr, 'diagonalDown', side);
-        } else if (preset === 'diagonalUp') {
-          add(addr, 'diagonalUp', side);
-        } else if (preset === 'outline') {
-          if (row === range.r0) add(addr, 'top', side);
-          if (row === range.r1) add(addr, 'bottom', side);
-          if (col === range.c0) add(addr, 'left', side);
-          if (col === range.c1) add(addr, 'right', side);
-        } else if (preset === 'thickOutline') {
-          if (row === range.r0) add(addr, 'top', thickSide);
-          if (row === range.r1) add(addr, 'bottom', thickSide);
-          if (col === range.c0) add(addr, 'left', thickSide);
-          if (col === range.c1) add(addr, 'right', thickSide);
-        } else if (preset === 'top' && row === range.r0) {
-          add(addr, 'top', side);
-        } else if (preset === 'bottom' && row === range.r1) {
-          add(addr, 'bottom', side);
-        } else if (preset === 'left' && col === range.c0) {
-          add(addr, 'left', side);
-        } else if (preset === 'right' && col === range.c1) {
-          add(addr, 'right', side);
-        } else if (preset === 'doubleBottom' && row === range.r1) {
-          add(addr, 'bottom', doubleSide);
-        } else if (preset === 'thickBottom' && row === range.r1) {
-          add(addr, 'bottom', thickSide);
-        } else if (preset === 'topAndBottom') {
-          if (row === range.r0) add(addr, 'top', side);
-          if (row === range.r1) add(addr, 'bottom', side);
-        } else if (preset === 'topAndThickBottom') {
-          if (row === range.r0) add(addr, 'top', side);
-          if (row === range.r1) add(addr, 'bottom', thickSide);
-        } else if (preset === 'topAndDoubleBottom') {
-          if (row === range.r0) add(addr, 'top', side);
-          if (row === range.r1) add(addr, 'bottom', doubleSide);
-        }
-      }
-    }
-  }
-  return [...entries.values()];
-};
 
 const operationsForFormatPatch = (patch: Partial<CellFormat>): Set<InteractionOperation> => {
   const operations = new Set<InteractionOperation>();
