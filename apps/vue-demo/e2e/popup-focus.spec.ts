@@ -1,10 +1,17 @@
 import { test } from '@playwright/test';
 import {
+  runKeyboardMenuLayoutScenario,
   runMacSubmenuLayoutScenario,
   runPopupFocusScenario,
   runPopupViewportScenario,
   runSubmenuHighlightScenario,
 } from '../../../tests/e2e-shared/scenarios/popup-focus.js';
+
+test('keyboard context menus follow the selected cell and close on resize (vue-demo)', async ({
+  page,
+}) => {
+  await runKeyboardMenuLayoutScenario(page);
+});
 
 test('popup keyboard focus stays with the active surface (vue-demo)', async ({ page }) => {
   await runPopupFocusScenario(page);

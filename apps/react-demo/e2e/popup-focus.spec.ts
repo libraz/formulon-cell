@@ -1,10 +1,25 @@
 import { test } from '@playwright/test';
 import {
+  runKeyboardMenuLayoutScenario,
   runMacSubmenuLayoutScenario,
   runPopupFocusScenario,
   runPopupViewportScenario,
   runSubmenuHighlightScenario,
 } from '../../../tests/e2e-shared/scenarios/popup-focus.js';
+
+test('keyboard context menus follow the selected cell and close on resize (react-demo)', async ({
+  page,
+  browserName,
+}, testInfo) => {
+  await runKeyboardMenuLayoutScenario(
+    page,
+    browserName === 'chromium'
+      ? async (name) => {
+          await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
+        }
+      : undefined,
+  );
+});
 
 test('popup keyboard focus stays with the active surface (react-demo)', async ({ page }) => {
   await runPopupFocusScenario(page);

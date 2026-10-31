@@ -127,29 +127,37 @@ const appendContextMenuLabel = (
 
 export const createContextMenuItemButton = (
   entry: Extract<RenderMenuEntry, { kind: 'item' }>,
+  ownerDocument: Document = document,
 ): HTMLButtonElement => {
-  const button = createInteractionButton({
-    className: 'fc-ctxmenu__item',
-    dataset: { fcAction: entry.id },
-    role: 'menuitem',
-    tabIndex: -1,
-  });
+  const button = createInteractionButton(
+    {
+      className: 'fc-ctxmenu__item',
+      dataset: { fcAction: entry.id },
+      role: 'menuitem',
+      tabIndex: -1,
+    },
+    ownerDocument,
+  );
   appendContextMenuLabel(button, entry.label, entry.hint ?? '');
   return button;
 };
 
 export const createContextSubmenuButton = (
   entry: Extract<RenderMenuEntry, { kind: 'submenu' }>,
+  ownerDocument: Document = document,
 ): HTMLButtonElement => {
-  const button = createInteractionButton({
-    className: 'fc-ctxmenu__item fc-ctxmenu__item--parent',
-    dataset: {
-      fcSubmenu: entry.id,
-      fcAction: SUBMENU_ICON_ACTION[entry.id] ?? entry.id,
+  const button = createInteractionButton(
+    {
+      className: 'fc-ctxmenu__item fc-ctxmenu__item--parent',
+      dataset: {
+        fcSubmenu: entry.id,
+        fcAction: SUBMENU_ICON_ACTION[entry.id] ?? entry.id,
+      },
+      role: 'menuitem',
+      tabIndex: -1,
     },
-    role: 'menuitem',
-    tabIndex: -1,
-  });
+    ownerDocument,
+  );
   button.setAttribute('aria-haspopup', 'menu');
   button.setAttribute('aria-expanded', 'false');
   appendContextMenuLabel(button, entry.label);
@@ -160,14 +168,20 @@ export const createContextSubmenuButton = (
   return button;
 };
 
-export const createContextMiniToolbarButton = (item: {
-  id: ItemId;
-  label: string;
-}): HTMLButtonElement => {
-  return createInteractionButton({
-    className: 'fc-ctxmenu__mini-btn',
-    dataset: { fcAction: item.id },
-    ariaLabel: item.label,
-    tabIndex: -1,
-  });
+export const createContextMiniToolbarButton = (
+  item: {
+    id: ItemId;
+    label: string;
+  },
+  ownerDocument: Document = document,
+): HTMLButtonElement => {
+  return createInteractionButton(
+    {
+      className: 'fc-ctxmenu__mini-btn',
+      dataset: { fcAction: item.id },
+      ariaLabel: item.label,
+      tabIndex: -1,
+    },
+    ownerDocument,
+  );
 };

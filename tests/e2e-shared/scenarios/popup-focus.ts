@@ -1,8 +1,185 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import type { SpreadsheetInstance } from '../../../packages/formulon-cell/src/mount/types.js';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
+import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
 type PopupKind = 'cell' | 'sheet' | 'status';
+
+export async function runKeyboardMenuLayoutScenario(
+  page: Page,
+  capture?: (name: string) => Promise<void>,
+): Promise<void> {
+  const sheet = new UserJourneyPage(page);
+  const geometryUrl = `/@fs${
+    new URL('../../../packages/formulon-cell/src/render/geometry.ts', import.meta.url).pathname
+  }`;
+  for (const platform of ['default', 'mac'] as const) {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await sheet.mount({ locale: 'en', platform });
+    await sheet.expectNoStub();
+    await sheet.enter('A1', 'Menu placement');
+    await sheet.goTo('A1');
+    await page.locator('[data-ribbon-command="fontSize"] button').first().click();
+    await page.locator('.fc-tb__rb-dd__opt[data-value="24"]').click();
+    await sheet.goTo('D8');
+    const cell = await page.evaluate(async (geometryUrl) => {
+      const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+      const state = instance.store.getState();
+      const grid = document.querySelector('.fc-host__grid')?.getBoundingClientRect();
+      if (!grid) throw new Error('Grid unavailable');
+      const { layoutForView, cellRectUnclamped } = await import(geometryUrl);
+      const rect = cellRectUnclamped(layoutForView(state), state.viewport, 7, 3);
+      return {
+        left: grid.left + rect.x,
+        right: grid.left + rect.x + rect.w,
+        bottom: grid.top + rect.y + rect.h,
+      };
+    }, geometryUrl);
+    await page.mouse.move(1270, 0);
+    await page.keyboard.press('Shift+F10');
+    const menu = page.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)');
+    const submenu = page.locator('.fc-ctxmenu__sub');
+    await expect(menu).toBeVisible();
+    const box = await menu.boundingBox();
+    if (!box) throw new Error('Context menu bounds unavailable');
+    expect(box.x, `${platform}: menu follows column D`).toBeGreaterThanOrEqual(cell.left - 1);
+    expect(box.x).toBeLessThanOrEqual(cell.right + 1);
+    if (cell.bottom + box.height <= 996) {
+      expect(box.y, `${platform}: menu follows row 8`).toBeGreaterThanOrEqual(cell.bottom - 1);
+    }
+    expect(box.x + box.width).toBeLessThanOrEqual(1280);
+    expect(box.y + box.height).toBeLessThanOrEqual(1000);
+    await capture?.(`${platform}-keyboard-menu`);
+
+    const parent = menu.locator('[data-fc-submenu="sortMenu"]');
+    await parent.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(submenu).toBeVisible();
+    await expect(submenu.locator(':focus')).toHaveCount(1);
+    await page.setViewportSize({ width: 900, height: 600 });
+    await expect(menu).toBeHidden();
+    await expect(submenu).toBeHidden();
+    await expect(page.locator('.fc-host').first()).toBeFocused();
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst.store.getState()
+            .selection.active,
+      ),
+    ).toEqual({ sheet: 0, row: 7, col: 3 });
+
+    await page.keyboard.press('Shift+F10');
+    await expect(menu).toBeVisible();
+    await menu.locator('[role="menuitem"][data-fc-action="formatCells"]').click();
+    const dialog = page.locator('.fc-fmtdlg[aria-label="Format Cells"]');
+    await expect(menu).toBeHidden();
+    await expect(dialog).toBeVisible();
+    const dialogBox = await dialog.boundingBox();
+    if (!dialogBox) throw new Error('Format Cells bounds unavailable');
+    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.y).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(900);
+    expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(600);
+    await capture?.(`${platform}-format-dialog`);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await sheet.expectNoConsoleErrors();
+  }
+  await runOwnerDocumentMenuScenario(page, capture);
+}
+
+async function runOwnerDocumentMenuScenario(
+  page: Page,
+  capture?: (name: string) => Promise<void>,
+): Promise<void> {
+  const contextMenuUrl = `/@fs${
+    new URL('../../../packages/formulon-cell/src/interact/context-menu.ts', import.meta.url)
+      .pathname
+  }`;
+  await page.evaluate(async (moduleUrl) => {
+    const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
+    const frame = document.createElement('iframe');
+    frame.id = 'menu-owner-frame';
+    frame.style.cssText =
+      'position:fixed;left:20px;top:200px;width:640px;height:380px;border:0;z-index:100';
+    const loaded = new Promise<void>((resolve) =>
+      frame.addEventListener('load', () => resolve(), { once: true }),
+    );
+    frame.srcdoc = '<!doctype html><html><head></head><body style="margin:0"></body></html>';
+    document.body.append(frame);
+    await loaded;
+    const owner = frame.contentDocument;
+    if (!owner) throw new Error('Iframe document unavailable');
+    for (const style of document.querySelectorAll('style, link[rel="stylesheet"]')) {
+      owner.head.append(style.cloneNode(true));
+    }
+    const host = owner.createElement('div');
+    host.id = 'menu-owner-host';
+    host.className = 'fc-host';
+    host.tabIndex = 0;
+    host.style.cssText = 'width:100%;height:380px';
+    host.dataset.fcPlatform = 'mac';
+    host.dataset.fcTheme = 'paper';
+    owner.body.append(host);
+    const { attachContextMenu } = await import(moduleUrl);
+    const detach = attachContextMenu({
+      host,
+      store: instance.store,
+      wb: instance.workbook,
+      options: {
+        mode: 'builtIn',
+        transform: () => [
+          {
+            id: 'ownerParent',
+            label: 'More actions',
+            children: [{ id: 'ownerChild', label: 'Child action', action: () => {} }],
+          },
+        ],
+      },
+    });
+    (window as Window & { __menuOwnerCleanup?: () => void }).__menuOwnerCleanup = () => {
+      detach();
+      frame.remove();
+    };
+  }, contextMenuUrl);
+  try {
+    const frame = page.frameLocator('#menu-owner-frame');
+    await frame.locator('#menu-owner-host').click({ button: 'right', position: { x: 600, y: 40 } });
+    const parent = frame.locator('[data-fc-submenu="ownerParent"]');
+    const submenu = frame.locator('.fc-ctxmenu__sub');
+    await parent.focus();
+    await page.keyboard.press('ArrowRight');
+    const ownerState = await parent.evaluate((element) => {
+      const view = element.ownerDocument.defaultView;
+      const menu = element.closest('[role="menu"]');
+      if (!view || !menu) throw new Error('Iframe menu owner unavailable');
+      return {
+        ownerButton: element instanceof view.HTMLButtonElement,
+        focused: element.ownerDocument.activeElement === element,
+        menuDisplay: view.getComputedStyle(menu).display,
+      };
+    });
+    await expect(submenu, JSON.stringify(ownerState)).toBeVisible();
+    await expect(submenu.locator(':focus')).toHaveCount(1);
+    const parentBox = await parent.boundingBox();
+    const subBox = await submenu.boundingBox();
+    if (!parentBox || !subBox) throw new Error('Iframe submenu bounds unavailable');
+    expect(subBox.x + subBox.width).toBeLessThanOrEqual(parentBox.x + 3);
+    await capture?.('owner-document-submenu');
+    await page.locator('#menu-owner-frame').evaluate((frame) => {
+      (frame as HTMLIFrameElement).style.width = '600px';
+    });
+    await expect(frame.locator('.fc-ctxmenu:not(.fc-ctxmenu__sub)')).toBeHidden();
+    await expect(submenu).toBeHidden();
+    await expect(frame.locator('#menu-owner-host')).toBeFocused();
+  } finally {
+    await page.evaluate(() => {
+      const win = window as Window & { __menuOwnerCleanup?: () => void };
+      win.__menuOwnerCleanup?.();
+      delete win.__menuOwnerCleanup;
+    });
+  }
+}
 
 async function openPopup(page: Page, kind: PopupKind): Promise<Locator> {
   if (kind === 'cell') {

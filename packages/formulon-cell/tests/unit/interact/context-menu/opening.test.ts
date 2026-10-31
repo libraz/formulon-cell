@@ -37,6 +37,32 @@ import {
 } from '../../../../src/store/store.js';
 import { fireContextMenu, item, miniItem, newWb, setRange, visibleMenu } from './fixtures.js';
 
+const setWindowViewport = (width: number, height: number): (() => void) => {
+  const previousWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+  const previousHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+  return () => {
+    if (previousWidth) Object.defineProperty(window, 'innerWidth', previousWidth);
+    else Reflect.deleteProperty(window, 'innerWidth');
+    if (previousHeight) Object.defineProperty(window, 'innerHeight', previousHeight);
+    else Reflect.deleteProperty(window, 'innerHeight');
+  };
+};
+
+const rect = (left: number, top: number, width: number, height: number): DOMRect =>
+  ({
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  }) as DOMRect;
+
 describe('attachContextMenu', () => {
   let host: HTMLElement;
   let store: SpreadsheetStore;
@@ -293,6 +319,320 @@ describe('attachContextMenu', () => {
       expect(sub?.style.display).toBe('block');
       expect(sub?.style.left).toBe('72px');
       expect(sub?.style.top).toBe('26px');
+    });
+
+    it.each([
+      { key: 'ContextMenu', shiftKey: false },
+      { key: 'F10', shiftKey: true },
+    ])(
+      'anchors $key keyboard opening to the active cell in grid coordinates',
+      ({ key, shiftKey }) => {
+        const restoreViewport = setWindowViewport(1280, 900);
+        try {
+          const grid = document.createElement('div');
+          host.appendChild(grid);
+          host.getBoundingClientRect = vi.fn(() => rect(100, 200, 800, 500));
+          grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 600, 400));
+          setRange(store, 7, 3, 7, 3);
+          const before = {
+            selection: store.getState().selection,
+            viewport: store.getState().viewport,
+          };
+          detach = attachContextMenu({ host, grid, store, wb, onAfterCommit });
+
+          host.focus();
+          const event = new KeyboardEvent('keydown', {
+            key,
+            shiftKey,
+            bubbles: true,
+            cancelable: true,
+          });
+          host.dispatchEvent(event);
+
+          const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');
+          expect(event.defaultPrevented).toBe(true);
+          expect(root?.style.left).toBe('274px');
+          expect(root?.style.top).toBe('220px');
+          expect(store.getState().selection).toEqual(before.selection);
+          expect(store.getState().viewport).toEqual(before.viewport);
+        } finally {
+          restoreViewport();
+        }
+      },
+    );
+
+    it('anchors a visible merge fragment through frozen panes using the RTL leading corner', () => {
+      const restoreViewport = setWindowViewport(1280, 900);
+      try {
+        mutators.setFreezePanes(store, 1, 1);
+        mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 3 });
+        store.setState((state) => ({
+          ...state,
+          viewport: {
+            ...state.viewport,
+            rowStart: 3,
+            rowCount: 10,
+            colStart: 3,
+            colCount: 10,
+            widthPx: 600,
+          },
+          ui: { ...state.ui, rightToLeft: true },
+          selection: {
+            ...state.selection,
+            active: { sheet: 0, row: 3, col: 3 },
+            anchor: { sheet: 0, row: 0, col: 0 },
+            range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 3 },
+          },
+        }));
+        const grid = document.createElement('div');
+        host.appendChild(grid);
+        grid.getBoundingClientRect = vi.fn(() => rect(10, 30, 600, 400));
+        detach = attachContextMenu({ host, grid, store, wb, onAfterCommit });
+
+        host.focus();
+        host.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
+        );
+
+        const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');
+        expect(root?.style.left).toBe('514px');
+        expect(root?.style.top).toBe('90px');
+        expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 3 });
+        expect(store.getState().viewport.rowStart).toBe(3);
+        expect(store.getState().viewport.colStart).toBe(3);
+      } finally {
+        restoreViewport();
+      }
+    });
+
+    it.each([
+      { label: 'offscreen row 1048575', row: 1_048_575, hidden: false },
+      { label: 'a hidden active row', row: 4, hidden: true },
+    ])(
+      'falls back to the visible data origin for $label without walking to the active row',
+      ({ row, hidden }) => {
+        const restoreViewport = setWindowViewport(1280, 900);
+        try {
+          const rowHeights = new Map<number, number>();
+          const getRowHeight = vi.spyOn(rowHeights, 'get');
+          store.setState((state) => ({
+            ...state,
+            layout: {
+              ...state.layout,
+              rowHeights,
+              hiddenRows: hidden ? new Set([row]) : new Set(),
+            },
+            selection: {
+              ...state.selection,
+              active: { sheet: 0, row, col: 3 },
+              anchor: { sheet: 0, row, col: 3 },
+              range: { sheet: 0, r0: row, c0: 3, r1: row, c1: 3 },
+            },
+          }));
+          const grid = document.createElement('div');
+          host.appendChild(grid);
+          grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 600, 400));
+          detach = attachContextMenu({ host, grid, store, wb, onAfterCommit });
+
+          host.focus();
+          host.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
+          );
+
+          const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');
+          expect(root?.style.left).toBe('82px');
+          expect(root?.style.top).toBe('60px');
+          expect(getRowHeight.mock.calls.length).toBeLessThan(100);
+          expect(store.getState().selection.active).toEqual({ sheet: 0, row, col: 3 });
+          expect(store.getState().viewport.rowStart).toBe(0);
+        } finally {
+          restoreViewport();
+        }
+      },
+    );
+
+    it('falls back to the visible data origin when the grid has no measurable size', () => {
+      const restoreViewport = setWindowViewport(1280, 900);
+      try {
+        setRange(store, 7, 3, 7, 3);
+        const grid = document.createElement('div');
+        host.appendChild(grid);
+        grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 0, 0));
+        detach = attachContextMenu({ host, grid, store, wb, onAfterCommit });
+
+        host.focus();
+        host.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
+        );
+
+        const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');
+        expect(root?.style.left).toBe('82px');
+        expect(root?.style.top).toBe('60px');
+        expect(store.getState().selection.active).toEqual({ sheet: 0, row: 7, col: 3 });
+      } finally {
+        restoreViewport();
+      }
+    });
+
+    it.each([
+      {
+        label: 'offscreen merge anchor',
+        anchorRow: 0,
+        viewportRowStart: 3,
+        hiddenRows: [],
+        expectedTop: '120px',
+      },
+      {
+        label: 'hidden merge anchor',
+        anchorRow: 1,
+        viewportRowStart: 0,
+        hiddenRows: [1],
+        expectedTop: '160px',
+      },
+    ])(
+      'anchors the first visible merge fragment when the $label has visible cells',
+      ({ anchorRow, viewportRowStart, hiddenRows, expectedTop }) => {
+        const restoreViewport = setWindowViewport(1280, 900);
+        try {
+          const rowHeights = new Map<number, number>();
+          const getRowHeight = vi.spyOn(rowHeights, 'get');
+          const merge = { sheet: 0, r0: anchorRow, c0: 0, r1: 5, c1: 1 };
+          mutators.mergeRange(store, merge);
+          store.setState((state) => ({
+            ...state,
+            layout: { ...state.layout, rowHeights, hiddenRows: new Set(hiddenRows) },
+            viewport: {
+              ...state.viewport,
+              rowStart: viewportRowStart,
+              rowCount: 10,
+              colStart: 0,
+              colCount: 16,
+            },
+            selection: {
+              ...state.selection,
+              active: { sheet: 0, row: anchorRow, col: 0 },
+              anchor: { sheet: 0, row: anchorRow, col: 0 },
+              range: merge,
+            },
+          }));
+          const before = {
+            selection: store.getState().selection,
+            viewport: store.getState().viewport,
+          };
+          const grid = document.createElement('div');
+          host.appendChild(grid);
+          grid.getBoundingClientRect = vi.fn(() => rect(50, 40, 600, 400));
+          detach = attachContextMenu({ host, grid, store, wb, onAfterCommit });
+
+          host.focus();
+          host.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: 'ContextMenu',
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+
+          const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');
+          expect(root?.style.left).toBe('82px');
+          expect(root?.style.top).toBe(expectedTop);
+          expect(getRowHeight.mock.calls.length).toBeLessThan(100);
+          expect(store.getState().selection).toEqual(before.selection);
+          expect(store.getState().viewport).toEqual(before.viewport);
+        } finally {
+          restoreViewport();
+        }
+      },
+    );
+
+    it('flips a submenu against its owner document viewport inside an embedded sheet', () => {
+      const restoreViewport = setWindowViewport(1024, 768);
+      const ownerDocument = document.implementation.createHTMLDocument('embedded sheet');
+      Object.defineProperty(ownerDocument.documentElement, 'clientWidth', {
+        configurable: true,
+        value: 320,
+      });
+      Object.defineProperty(ownerDocument.documentElement, 'clientHeight', {
+        configurable: true,
+        value: 240,
+      });
+      const embeddedHost = ownerDocument.createElement('div');
+      ownerDocument.body.appendChild(embeddedHost);
+      try {
+        detach = attachContextMenu({ host: embeddedHost, store, wb, onAfterCommit });
+        fireContextMenu(embeddedHost, 200, 70);
+        const trigger = ownerDocument.querySelector<HTMLButtonElement>(
+          '[data-fc-submenu="pasteSpecialMenu"]',
+        );
+        const sub = ownerDocument.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+        expect(trigger).toBeTruthy();
+        expect(sub).toBeTruthy();
+        if (trigger) {
+          trigger.getBoundingClientRect = vi.fn(() => rect(260, 30, 30, 20));
+        }
+        if (sub) {
+          Object.defineProperty(sub, 'offsetWidth', { configurable: true, value: 180 });
+          Object.defineProperty(sub, 'offsetHeight', { configurable: true, value: 100 });
+        }
+
+        trigger?.dispatchEvent(new MouseEvent('mouseenter'));
+
+        expect(sub?.style.display).toBe('block');
+        expect(sub?.style.left).toBe('82px');
+      } finally {
+        detach?.();
+        detach = null;
+        disposeOverlayPortal(embeddedHost);
+        restoreViewport();
+      }
+    });
+
+    it('dismisses and clears an open submenu timer on owner-window resize, restoring focus', () => {
+      const restoreViewport = setWindowViewport(1280, 900);
+      vi.useFakeTimers();
+      try {
+        detach = attachContextMenu({ host, store, wb, onAfterCommit, onFormatDialog });
+        host.focus();
+        host.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true }),
+        );
+        const trigger = document.querySelector<HTMLButtonElement>(
+          '[data-fc-submenu="pasteSpecialMenu"]',
+        );
+        const root = document.querySelector<HTMLElement>('.fc-ctxmenu--managed');
+        const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+        trigger?.dispatchEvent(new MouseEvent('mouseenter'));
+        sub?.dispatchEvent(new MouseEvent('mouseleave'));
+
+        expect(vi.getTimerCount()).toBeGreaterThan(0);
+        window.dispatchEvent(new Event('resize'));
+
+        expect(root?.style.display).toBe('none');
+        expect(sub?.style.display).toBe('none');
+        expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+        expect(trigger?.classList.contains('fc-ctxmenu__item--open')).toBe(false);
+        expect(root?.querySelector('.fc-ctxmenu__item--active')).toBeNull();
+        expect(document.activeElement).toBe(host);
+        expect(vi.getTimerCount()).toBe(0);
+        vi.advanceTimersByTime(260);
+        expect(onFormatDialog).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+        restoreViewport();
+      }
+    });
+
+    it('removes the owner-window resize listener when detached', () => {
+      const addListener = vi.spyOn(window, 'addEventListener');
+      const removeListener = vi.spyOn(window, 'removeEventListener');
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      const resizeCall = addListener.mock.calls.find(([type]) => type === 'resize');
+      expect(resizeCall).toBeDefined();
+
+      detach();
+      detach = null;
+
+      expect(removeListener).toHaveBeenCalledWith('resize', resizeCall?.[1]);
     });
 
     it('mini toolbar invokes cell formatting actions', () => {

@@ -6,6 +6,11 @@ import {
   attachContextMenu,
   type ContextMenuHandle,
 } from '../../../../src/interact/context-menu.js';
+import {
+  createContextMenuItemButton,
+  createContextMiniToolbarButton,
+  createContextSubmenuButton,
+} from '../../../../src/interact/context-menu-entries.js';
 import { disposeOverlayPortal } from '../../../../src/interact/overlay-portal.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
 import { fireContextMenu, newWb, root, visibleMenu } from './fixtures.js';
@@ -60,16 +65,58 @@ describe('attachContextMenu', () => {
       const source = ['src/interact/context-menu.ts', 'src/interact/context-menu-entries.ts']
         .map((path) => readFileSync(join(root, path), 'utf8'))
         .join('\n');
+      const contextMenuSource = readFileSync(join(root, 'src/interact/context-menu.ts'), 'utf8');
+      const buttonCallsites = contextMenuSource
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('const btn = createContext'));
 
       expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
       expect(source).toContain('const createContextMenuItemButton');
       expect(source).toContain('const createContextSubmenuButton');
       expect(source).toContain('const createContextMiniToolbarButton');
-      expect(source).toContain('const btn = createContextSubmenuButton(entry)');
-      expect(source).toContain('const btn = createContextMenuItemButton(entry)');
-      expect(source).toContain('const btn = createContextMiniToolbarButton(item)');
+      expect(buttonCallsites).toEqual([
+        'const btn = createContextSubmenuButton(entry, ownerDocument);',
+        'const btn = createContextMenuItemButton(entry, ownerDocument);',
+        'const btn = createContextMiniToolbarButton(item, ownerDocument);',
+      ]);
       expect(source).not.toContain("document.createElement('button')");
       expect(source).not.toContain("arrow.textContent = '›'");
+    });
+
+    it('creates context menu buttons and their descendants in the requested document before append', () => {
+      const ownerDocument = document.implementation.createHTMLDocument('embedded menu');
+      const menuItem = createContextMenuItemButton(
+        { kind: 'item', id: 'copy', label: 'Copy', hint: 'Ctrl+C' },
+        ownerDocument,
+      );
+      const submenu = createContextSubmenuButton(
+        {
+          kind: 'submenu',
+          id: 'app.more',
+          label: 'More',
+          children: [{ kind: 'item', id: 'app.nested', label: 'Nested' }],
+        },
+        ownerDocument,
+      );
+      const mini = createContextMiniToolbarButton({ id: 'bold', label: 'Bold' }, ownerDocument);
+      const buttons = [menuItem, submenu, mini];
+
+      for (const button of buttons) {
+        expect(button.parentNode).toBeNull();
+        expect(button.ownerDocument === ownerDocument).toBe(true);
+        for (const child of button.querySelectorAll('*')) {
+          expect(child.ownerDocument === ownerDocument).toBe(true);
+        }
+      }
+      expect(submenu.querySelector('.fc-ctxmenu__arrow')?.ownerDocument === ownerDocument).toBe(
+        true,
+      );
+    });
+
+    it('keeps the context menu button factories on the global document by default', () => {
+      const button = createContextMenuItemButton({ kind: 'item', id: 'copy', label: 'Copy' });
+      expect(button.ownerDocument === document).toBe(true);
     });
 
     it('renders context submenu chevrons as fixed CSS glyphs, not text arrows', () => {

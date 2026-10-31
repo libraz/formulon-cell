@@ -19,8 +19,11 @@ export interface InteractionChipButtonOptions {
   tabIndex?: number;
 }
 
-export const createInteractionButton = (opts: InteractionButtonOptions): HTMLButtonElement => {
-  const button = document.createElement('button');
+export const createInteractionButton = (
+  opts: InteractionButtonOptions,
+  ownerDocument: Document = document,
+): HTMLButtonElement => {
+  const button = ownerDocument.createElement('button');
   button.type = 'button';
   button.className = opts.className;
   if (opts.text !== undefined) button.textContent = opts.text;
@@ -41,8 +44,12 @@ export const createInteractionButton = (opts: InteractionButtonOptions): HTMLBut
 
 export const createInteractionChipButton = (
   opts: InteractionChipButtonOptions,
+  ownerDocument: Document = document,
 ): HTMLButtonElement =>
-  createInteractionButton({
-    ...opts,
-    text: opts.label,
-  });
+  createInteractionButton(
+    {
+      ...opts,
+      text: opts.label,
+    },
+    ownerDocument,
+  );

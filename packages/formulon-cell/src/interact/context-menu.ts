@@ -26,6 +26,7 @@ import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
 import { type Addr, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { bodyBandOrigin, layoutForView, rangeRects } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -427,7 +428,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     sub.style.top = '-9999px';
     const r = parentBtn.getBoundingClientRect();
     const { width: sw } = panelSize(sub);
-    const viewport = viewportSize();
+    const viewport = viewportSize(ownerDocument);
     let x = r.right - 2;
     if (x + sw > viewport.width - VIEWPORT_PAD) x = r.left - sw + 2;
     const pos = clampPanelToViewport(sub, x, r.top - 4, { pad: VIEWPORT_PAD });
@@ -455,7 +456,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       submenuChildren.set(entry.id, entry.children);
       const source = entry.source;
       if (source) activeItemSources.set(entry.id, source);
-      const btn = createContextSubmenuButton(entry);
+      const btn = createContextSubmenuButton(entry, ownerDocument);
       if (source && explicitDisabledSources.has(source)) {
         setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
       } else if ((source?.builtIn || source?.command) && !decisionForItem(source).allowed) {
@@ -483,7 +484,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       container.appendChild(btn);
       return;
     }
-    const btn = createContextMenuItemButton(entry);
+    const btn = createContextMenuItemButton(entry, ownerDocument);
     const source = entry.source;
     if (source) activeItemSources.set(entry.id, source);
     if (disabledIds.has(entry.id)) {
@@ -556,7 +557,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     for (const item of buttons) {
       if (allowedIds && !allowedIds.has(item.id)) continue;
       if (hiddenIds?.has(item.id)) continue;
-      const btn = createContextMiniToolbarButton(item);
+      const btn = createContextMiniToolbarButton(item, ownerDocument);
       const pressed = pressedById[item.id];
       if (pressed !== undefined) btn.setAttribute('aria-pressed', String(pressed));
       const decision = decisionForItem(item.id);
@@ -798,16 +799,80 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (e.key !== 'ContextMenu' && !(e.key === 'F10' && e.shiftKey)) return;
     e.preventDefault();
     const active = store.getState().selection.active;
-    const rect = host.getBoundingClientRect();
+    const { x, y } = keyboardMenuPoint();
     show(
-      rect.left + Math.min(rect.width || 1, 24),
-      rect.top + Math.min(rect.height || 1, 24),
+      x,
+      y,
       {
         kind: 'cell',
         cell: { ...active },
       },
       e,
     );
+  };
+
+  /** Position keyboard-opened menus from the active cell's visible geometry.
+   *  The cell layout is local to the grid; the host rect converts it to client
+   *  coordinates before the shared overlay positioning handles clamping and
+   *  any transformed portal. */
+  const keyboardMenuPoint = (): { x: number; y: number } => {
+    const state = store.getState();
+    const layout = layoutForView(state);
+    const viewport = state.viewport;
+    const gridRect = hitHost.getBoundingClientRect();
+    const fallback = (): { x: number; y: number } => {
+      const origin = bodyBandOrigin(layout, viewport);
+      return { x: gridRect.left + origin.x, y: gridRect.top + origin.y };
+    };
+
+    if (
+      !Number.isFinite(gridRect.left) ||
+      !Number.isFinite(gridRect.top) ||
+      gridRect.width <= 0 ||
+      gridRect.height <= 0
+    ) {
+      return fallback();
+    }
+
+    const active = state.selection.active;
+    if (active.sheet !== state.data.sheetIndex) return fallback();
+
+    const activeRange = {
+      r0: active.row,
+      r1: active.row,
+      c0: active.col,
+      c1: active.col,
+    };
+    const merge = mergeAt(state, active);
+    const fragments = rangeRects(layout, viewport, merge ?? activeRange).filter(
+      (rect) => rect.w > 0 && rect.h > 0,
+    );
+    if (fragments.length === 0) return fallback();
+
+    // `rangeRects` clips to the viewport, so this stays bounded for a far-away row.
+    const activeCell = rangeRects(layout, viewport, {
+      r0: active.row,
+      r1: active.row,
+      c0: active.col,
+      c1: active.col,
+    }).find((rect) => rect.w > 0 && rect.h > 0);
+
+    const fragment = activeCell
+      ? fragments.find(
+          (rect) =>
+            activeCell.x + activeCell.w / 2 >= rect.x &&
+            activeCell.x + activeCell.w / 2 <= rect.x + rect.w &&
+            activeCell.y + activeCell.h / 2 >= rect.y &&
+            activeCell.y + activeCell.h / 2 <= rect.y + rect.h,
+        )
+      : undefined;
+    const visibleFragment = fragment ?? fragments[0];
+    if (!visibleFragment) return fallback();
+
+    return {
+      x: gridRect.left + visibleFragment.x + (layout.rtl ? visibleFragment.w : 0),
+      y: gridRect.top + visibleFragment.y + visibleFragment.h,
+    };
   };
 
   const insideMenu = (target: EventTarget | null): boolean =>
@@ -928,6 +993,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const onScroll = (event: Event): void => {
     if (insideMenu(event.target)) return;
     hide(false);
+  };
+
+  const onResize = (): void => {
+    if (!visible) return;
+    hide(insideMenu(ownerDocument.activeElement));
   };
 
   const refreshOpenPermissions = (): void => {
@@ -1238,6 +1308,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   ownerDocument.addEventListener('focusin', onDocFocusIn, true);
   ownerDocument.addEventListener('keydown', onDocKey, true);
   ownerWindow?.addEventListener('scroll', onScroll, true);
+  ownerWindow?.addEventListener('resize', onResize);
   const unsubscribePolicy = interactionController?.subscribe?.(refreshOpenPermissions) ?? null;
 
   const detach = ((): void => {
@@ -1248,6 +1319,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     ownerDocument.removeEventListener('focusin', onDocFocusIn, true);
     ownerDocument.removeEventListener('keydown', onDocKey, true);
     ownerWindow?.removeEventListener('scroll', onScroll, true);
+    ownerWindow?.removeEventListener('resize', onResize);
     unsubscribePolicy?.();
     cancelSubClose();
     root.remove();
