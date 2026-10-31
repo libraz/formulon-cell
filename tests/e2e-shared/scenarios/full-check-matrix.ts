@@ -191,8 +191,6 @@ interface SurfaceLabels {
   filterBlanks: string;
   filterApply: string;
   filterClear: string;
-  autocompletePick: string;
-  autocompleteCustom: string;
   argHelperIntersection: string;
   quickTitle: string;
   quickDataBar: string;
@@ -296,8 +294,6 @@ const getStrings = async (page: Page): Promise<SurfaceLabels> =>
       filterBlanks: strings.filterDropdown.blanks,
       filterApply: strings.filterDropdown.apply,
       filterClear: strings.filterDropdown.clear,
-      autocompletePick: strings.autocomplete.pickFromList,
-      autocompleteCustom: strings.autocomplete.customFunction,
       argHelperIntersection: strings.argHelper.implicitIntersection,
       quickTitle: strings.quickAnalysis.title,
       quickDataBar: strings.quickAnalysis.actions.dataBar,
@@ -1186,14 +1182,13 @@ const runFormulaFlow = async (page: Page, row: FullCheckRow): Promise<void> => {
   await expect(editor).toBeVisible();
   const autocomplete = page.locator('.fc-autocomplete').first();
   await expect(autocomplete).toBeVisible();
-  const labels = await getStrings(page);
   await expect(editor).toHaveAttribute('aria-expanded', 'true');
   await expect
     .poll(() => autocomplete.locator('.fc-autocomplete__item').count())
     .toBeGreaterThan(0);
-  await expect(autocomplete).toContainText(
-    new RegExp(`${labels.autocompletePick}|${labels.autocompleteCustom}`),
-  );
+  // Function suggestions carry their signature and description, not a list-pick label.
+  await expect(autocomplete).toHaveClass(/fc-autocomplete--has-help/);
+  await expect(autocomplete).toContainText(`${localizedSumName}(`);
   await page.keyboard.press('Escape');
   await expect(autocomplete).toBeHidden();
 
