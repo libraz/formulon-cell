@@ -474,8 +474,15 @@ export function syncCellFormatsToEngine(
     const addr = parseAddrKey(key);
     if (!addr || addr.sheet !== sheet) continue;
     const { row, col } = addr;
-    const currentXfIndex = wb.getCellXfIndex(sheet, row, col);
-    const cacheKey = cacheKeyFor(fmt, currentXfIndex);
+    const directXfIndex = wb.getCellXfIndex(sheet, row, col);
+    let sourceXfIndex = directXfIndex;
+    if (directXfIndex === 0 && wb.capabilities.effectiveStyle === true) {
+      const effective = wb.getEffectiveStyle(sheet, row, col);
+      if (effective?.source === 1 || effective?.source === 2) {
+        sourceXfIndex = effective.xfIndex;
+      }
+    }
+    const cacheKey = cacheKeyFor(fmt, sourceXfIndex);
     let xfIndex = cachedXfFor(cacheKey, fmt);
     if (xfIndex === null) {
       const resolution = resolveXfForFormat(
@@ -484,7 +491,7 @@ export function syncCellFormatsToEngine(
         styleXfIds,
         namedStyleXfs,
         strict,
-        currentXfIndex,
+        sourceXfIndex,
         sheetFontPatch,
       );
       xfIndex = resolution.xfIndex;

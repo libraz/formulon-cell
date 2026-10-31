@@ -217,7 +217,7 @@ describe('Format Cells dialog native engine contract', () => {
           },
         }),
       ).toBe(true);
-      expect(effectiveFontAt(workbook)?.size).toBe(11);
+      expect(effectiveFontAt(workbook)?.size).toBe(22);
 
       expect(history.undo()).toBe(true);
       expect(effectiveFontAt(workbook)?.size).toBe(22);
@@ -230,7 +230,7 @@ describe('Format Cells dialog native engine contract', () => {
       expect(effectiveFontAt(workbook)?.size).toBe(26);
       expect(workbook.getEffectiveStyle(0, 0, 0)?.source).toBe(1);
       expect(history.redo()).toBe(true);
-      expect(effectiveFontAt(workbook)?.size).toBe(11);
+      expect(effectiveFontAt(workbook)?.size).toBe(22);
     } finally {
       workbook.detachStore(store);
       workbook.dispose();

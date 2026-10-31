@@ -42,18 +42,14 @@ export interface NamedStyleSyncPlan {
 }
 
 interface PendingNamedStyleRegistration {
-  readonly name: string;
-  readonly xfId: number;
-  readonly builtinId: number | null;
-  readonly previous?: {
-    readonly name: string;
-    readonly xfId: number;
-    readonly builtinId: number | null;
-    readonly iLevel: number;
-    readonly hidden: boolean;
-    readonly customBuiltin: boolean;
-  };
+  readonly record: NamedCellStyleRecord;
+  readonly previous?: NamedCellStyleRecord;
 }
+
+type NamedCellStyleRecord = Parameters<WorkbookHandle['setNamedCellStyleRecord']>[0];
+type NamedStyleCatalogEntry = NonNullable<ReturnType<WorkbookHandle['getCellStyle']>> & {
+  readonly index: number;
+};
 
 export interface NamedStyleXfResolution {
   readonly xfId: number;
@@ -190,6 +186,97 @@ const sameNamedStyleFormat = (
   return stylePayloadMatchesNative(wb, xf, native, format, cellStyleGroups({ format }));
 };
 
+const isUnrepresentedNativeBuiltin = (entry: NamedStyleCatalogEntry): boolean =>
+  entry.builtinId >= 0 &&
+  entry.builtinId <= 53 &&
+  !CELL_STYLES.some((style) => style.builtinId === entry.builtinId);
+
+const isImportedNativeBuiltin = (
+  registration: NamedStyleRegistration,
+  entry: NamedStyleCatalogEntry,
+): boolean =>
+  registration.builtinId === null &&
+  registration.name === entry.name &&
+  isUnrepresentedNativeBuiltin(entry);
+
+const sameImportedNativeBuiltinFormat = (
+  wb: WorkbookHandle,
+  registration: NamedStyleRegistration,
+  entry: NamedStyleCatalogEntry,
+): boolean => {
+  if (!isImportedNativeBuiltin(registration, entry)) return false;
+  const xf = wb.getCellStyleXf(entry.xfId);
+  if (!xf) return false;
+  const native = cellFormatFromXf(wb, xf, wb.workbookDefaultFont);
+  return stylePayloadMatches(native, registration.format, registration.groups);
+};
+
+const namedStyleCatalog = (
+  wb: WorkbookHandle,
+): {
+  readonly entries: readonly NamedStyleCatalogEntry[];
+  readonly byBuiltin: ReadonlyMap<number, NamedStyleCatalogEntry>;
+  readonly byName: ReadonlyMap<string, NamedStyleCatalogEntry>;
+} => {
+  const entries: NamedStyleCatalogEntry[] =
+    typeof wb.cellStyleCount === 'function' && typeof wb.getCellStyle === 'function'
+      ? Array.from({ length: wb.cellStyleCount() }, (_, index) => {
+          const style = wb.getCellStyle(index);
+          return style ? [{ ...style, index }] : [];
+        }).flat()
+      : wb.getNamedCellStyles().map((style) => ({ ...style, hidden: false }));
+  const byBuiltin = new Map<number, NamedStyleCatalogEntry>();
+  const byName = new Map<string, NamedStyleCatalogEntry>();
+  for (const entry of entries) {
+    byName.set(entry.name.trim().toLowerCase(), entry);
+    if (entry.builtinId >= 0) byBuiltin.set(entry.builtinId, entry);
+  }
+  return { entries, byBuiltin, byName };
+};
+
+const existingNamedStyle = (
+  catalog: ReturnType<typeof namedStyleCatalog>,
+  registration: NamedStyleRegistration,
+): NamedStyleCatalogEntry | undefined => {
+  const builtin =
+    registration.builtinId === null ? undefined : catalog.byBuiltin.get(registration.builtinId);
+  const exact = catalog.byName.get(registration.name.trim().toLowerCase());
+  // Built-in identity comes from its ordinal, never from a same-name custom row.
+  return registration.builtinId === null ? exact : builtin;
+};
+
+const canReuseNamedStyle = (
+  wb: WorkbookHandle,
+  registration: NamedStyleRegistration,
+  existing: NamedStyleCatalogEntry | undefined,
+): existing is NamedStyleCatalogEntry =>
+  existing !== undefined &&
+  (registration.builtinId !== null ||
+    sameNamedStyleFormat(wb, registration.format, existing.xfId) ||
+    sameImportedNativeBuiltinFormat(wb, registration, existing));
+
+const namedStyleRecordFor = (
+  registration: NamedStyleRegistration,
+  xfId: number,
+  existing: NamedStyleCatalogEntry | undefined,
+): NamedCellStyleRecord => {
+  if (existing && isImportedNativeBuiltin(registration, existing)) {
+    return {
+      name: existing.name,
+      xfId,
+      builtinId: existing.builtinId,
+      iLevel: existing.iLevel,
+      hidden: existing.hidden,
+      customBuiltin: true,
+    };
+  }
+  return {
+    name: registration.name,
+    xfId,
+    builtinId: writableBuiltinId(registration.builtinId),
+  };
+};
+
 /** Built-in ordinals in the OOXML catalog are accepted by formulon 0.13. */
 const writableBuiltinId = (builtinId: number | null): number | null =>
   builtinId !== null && builtinId >= 0 && builtinId <= 53 ? builtinId : null;
@@ -209,23 +296,10 @@ export function planNamedCellStylesToEngine(
   }
 
   const registrations = collectNamedStyles(state, localeForWorkbook(wb));
-  // Rollback must see the entire catalog, including entries hidden from the
-  // gallery; a same-name write replaces those entries too.
-  const named =
-    typeof wb.cellStyleCount === 'function' && typeof wb.getCellStyle === 'function'
-      ? Array.from({ length: wb.cellStyleCount() }, (_, index) => {
-          const style = wb.getCellStyle(index);
-          return style ? [{ ...style, index }] : [];
-        }).flat()
-      : wb.getNamedCellStyles();
-  const byBuiltin = new Map<number, (typeof named)[number]>();
-  const byName = new Map<string, (typeof named)[number]>();
-  for (const entry of named) {
-    byName.set(entry.name.trim().toLowerCase(), entry);
-    if (entry.builtinId >= 0) byBuiltin.set(entry.builtinId, entry);
-  }
+  // Keep hidden gallery entries too, since a same-name write can replace them.
+  const catalog = namedStyleCatalog(wb);
 
-  const existingNormal = byBuiltin.get(getCellStyle('normal')?.builtinId ?? 0);
+  const existingNormal = catalog.byBuiltin.get(getCellStyle('normal')?.builtinId ?? 0);
   if (existingNormal) {
     styleXfIds.set('normal', existingNormal.xfId);
   } else if (wb.cellStyleXfCount() === 0) {
@@ -238,30 +312,24 @@ export function planNamedCellStylesToEngine(
     }
     styleXfIds.set('normal', NORMAL_STYLE_XF_ID);
     pending.push({
-      name: 'Normal',
-      xfId: NORMAL_STYLE_XF_ID,
-      builtinId: writableBuiltinId(getCellStyle('normal')?.builtinId ?? null),
+      record: {
+        name: 'Normal',
+        xfId: NORMAL_STYLE_XF_ID,
+        builtinId: writableBuiltinId(getCellStyle('normal')?.builtinId ?? null),
+      },
     });
   }
 
-  if (registrations.length === 0) {
+  if (registrations.length === 0 && pending.length === 0) {
     return { styleXfIds, commit: () => undefined };
   }
 
   for (const reg of registrations) {
-    const builtin = reg.builtinId === null ? undefined : byBuiltin.get(reg.builtinId);
-    const exact = byName.get(reg.name.trim().toLowerCase());
-    // Built-in identity comes from its ordinal, never from a same-name
-    // custom/imported row. Keep an exact row only as the replacement target so
-    // a failed strict publication can restore it.
-    const existing = reg.builtinId === null ? exact : builtin;
-    // Native writes replace only an exactly spelled name. A case-insensitive
-    // semantic match may instead append a row, which rollback must remove.
-    const replacement = named.find((entry) => entry.name === reg.name);
-    if (
-      existing &&
-      (reg.builtinId !== null || sameNamedStyleFormat(wb, reg.format, existing.xfId))
-    ) {
+    const existing = existingNamedStyle(catalog, reg);
+    // Native writes replace only an exact name (kept so a failed strict publication can
+    // restore it); a case-insensitive match may append a row that rollback must remove.
+    const replacement = catalog.entries.find((entry) => entry.name === reg.name);
+    if (canReuseNamedStyle(wb, reg, existing)) {
       styleXfIds.set(reg.key, existing.xfId);
       continue;
     }
@@ -271,17 +339,15 @@ export function planNamedCellStylesToEngine(
     }
     styleXfIds.set(reg.key, xfId);
     pending.push({
-      name: reg.name,
-      xfId,
-      builtinId: writableBuiltinId(reg.builtinId),
+      record: namedStyleRecordFor(reg, xfId, replacement),
       ...(replacement
         ? {
             previous: {
               name: replacement.name,
               xfId: replacement.xfId,
-              builtinId: writableBuiltinId(replacement.builtinId),
+              builtinId: replacement.builtinId,
               iLevel: replacement.iLevel,
-              hidden: wb.getCellStyle(replacement.index)?.hidden ?? false,
+              hidden: replacement.hidden,
               customBuiltin: replacement.customBuiltin,
             },
           }
@@ -295,21 +361,23 @@ export function planNamedCellStylesToEngine(
       let committed = 0;
       const applied: PendingNamedStyleRegistration[] = [];
       for (const registration of pending) {
-        if (wb.setNamedCellStyle(registration.name, registration.xfId, registration.builtinId)) {
+        if (wb.setNamedCellStyleRecord(registration.record)) {
           committed += 1;
           applied.push(registration);
           continue;
         }
         const failure = new Error(
-          `Strict engine sync failed: setNamedCellStyle ${registration.name}`,
+          `Strict engine sync failed: setNamedCellStyle ${registration.record.name}`,
         );
         if (committed > 0) {
           const rollbackErrors: unknown[] = [];
           for (const appliedRegistration of applied.reverse()) {
             if (!appliedRegistration.previous) {
-              if (!wb.removeNamedCellStyle(appliedRegistration.name)) {
+              if (!wb.removeNamedCellStyle(appliedRegistration.record.name)) {
                 rollbackErrors.push(
-                  new Error(`Named-style catalog rollback failed: ${appliedRegistration.name}`),
+                  new Error(
+                    `Named-style catalog rollback failed: ${appliedRegistration.record.name}`,
+                  ),
                 );
               }
               continue;
@@ -352,26 +420,12 @@ export function syncNamedCellStylesToEngine(
   const resolved = new Map<string, number>();
   if (!wb.capabilities.cellStyleMutate) return resolved;
   const registrations = collectNamedStyles(state, localeForWorkbook(wb));
-  // Rollback must see the entire catalog, including entries hidden from the
-  // gallery; a same-name write replaces those entries too.
-  const named =
-    typeof wb.cellStyleCount === 'function' && typeof wb.getCellStyle === 'function'
-      ? Array.from({ length: wb.cellStyleCount() }, (_, index) => {
-          const style = wb.getCellStyle(index);
-          return style ? [{ ...style, index }] : [];
-        }).flat()
-      : wb.getNamedCellStyles();
-  const byBuiltin = new Map<number, (typeof named)[number]>();
-  const byName = new Map<string, (typeof named)[number]>();
-  for (const entry of named) {
-    byName.set(entry.name.trim().toLowerCase(), entry);
-    if (entry.builtinId >= 0) byBuiltin.set(entry.builtinId, entry);
-  }
+  const catalog = namedStyleCatalog(wb);
 
   // A workbook that has never carried a named style has an empty
   // `<cellStyleXfs>` table, so the first row added would land at index 0 —
   // the row every unstyled cell inherits. Seed Normal there first.
-  const existingNormal = byBuiltin.get(getCellStyle('normal')?.builtinId ?? 0);
+  const existingNormal = catalog.byBuiltin.get(getCellStyle('normal')?.builtinId ?? 0);
   if (existingNormal) {
     resolved.set('normal', existingNormal.xfId);
   } else if (wb.cellStyleXfCount() === 0) {
@@ -385,21 +439,14 @@ export function syncNamedCellStylesToEngine(
   }
 
   for (const reg of registrations) {
-    const builtin = reg.builtinId === null ? undefined : byBuiltin.get(reg.builtinId);
-    const exact = byName.get(reg.name.trim().toLowerCase());
-    // A same-name custom row is not the built-in row when the ordinal is
-    // absent; publish the desired built-in identity instead of reusing it.
-    const existing = reg.builtinId === null ? exact : builtin;
-    if (
-      existing &&
-      (reg.builtinId !== null || sameNamedStyleFormat(wb, reg.format, existing.xfId))
-    ) {
+    const existing = existingNamedStyle(catalog, reg);
+    if (canReuseNamedStyle(wb, reg, existing)) {
       resolved.set(reg.key, existing.xfId);
       continue;
     }
     const xfId = resolveStyleXf(reg.format);
     if (xfId < 0) continue;
-    if (!wb.setNamedCellStyle(reg.name, xfId, writableBuiltinId(reg.builtinId))) continue;
+    if (!wb.setNamedCellStyleRecord(namedStyleRecordFor(reg, xfId, existing))) continue;
     resolved.set(reg.key, xfId);
   }
   return resolved;

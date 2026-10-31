@@ -96,6 +96,11 @@ interface HarnessOptions {
   readonly addXfResult?: (record: CellXf, call: number) => number;
   readonly setXfResult?: (addr: Addr, call: number) => boolean;
   readonly phonetic?: boolean;
+  readonly effectiveStyle?: boolean;
+  readonly effectiveStyles?: ReadonlyMap<
+    string,
+    { readonly source: number; readonly xfIndex: number }
+  >;
 }
 
 interface Harness {
@@ -103,6 +108,7 @@ interface Harness {
   readonly counts: {
     getIndex: number;
     getXf: number;
+    getEffectiveStyle: number;
     addFont: number;
     addFill: number;
     addBorder: number;
@@ -129,6 +135,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   const counts = {
     getIndex: 0,
     getXf: 0,
+    getEffectiveStyle: 0,
     addFont: 0,
     addFill: 0,
     addBorder: 0,
@@ -170,6 +177,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   const wb = {
     capabilities: {
       cellFormatting: true,
+      ...(options.effectiveStyle ? { effectiveStyle: true } : {}),
       ...(options.phonetic
         ? { phoneticRuns: true, phoneticProperties: true, showPhonetic: true }
         : {}),
@@ -194,6 +202,10 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
       counts.getXf += 1;
       if (options.missingXfIndexes?.has(xfIndex)) return null;
       return xfs.get(xfIndex) ?? null;
+    },
+    getEffectiveStyle(sheet: number, row: number, col: number) {
+      counts.getEffectiveStyle += 1;
+      return options.effectiveStyles?.get([sheet, row, col].join(':')) ?? null;
     },
     getFontRecord(index: number): FontRecord | null {
       return fonts.get(index) ?? null;
@@ -760,5 +772,179 @@ describe('syncCellFormatsToEngine resolution cache', () => {
     syncCellFormatsToEngine(harness.wb, storeWithFormats(formats), 0);
 
     expect(harness.counts.addXf).toBe(258);
+  });
+
+  it('preserves raw font metadata from an inherited row XF', () => {
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    const harness = makeHarness({
+      effectiveStyle: true,
+      effectiveStyles: new Map([[key, { source: 1, xfIndex: 2 }]]),
+      indices: new Map([[key, 0]]),
+      xfs: new Map([[2, sourceXf({ fontIndex: 2, applyFont: false, quotePrefix: true })]]),
+    });
+    harness.fonts.set(
+      2,
+      font({ hasCharset: true, charset: 128, color: { ...color(), kind: 2, theme: 4 } }),
+    );
+
+    syncCellFormatsToEngine(
+      harness.wb,
+      storeWithFormats([[key, { fill: '#fff2cc' } as CellFormat]]),
+      0,
+    );
+
+    expect(harness.counts.getEffectiveStyle).toBe(1);
+    expect(harness.addedXfs[0]).toMatchObject({
+      fontIndex: 2,
+      applyFont: false,
+      quotePrefix: true,
+    });
+    expect(harness.fonts.get(harness.addedXfs[0]?.fontIndex ?? -1)).toMatchObject({
+      hasCharset: true,
+      charset: 128,
+      color: { kind: 2, theme: 4 },
+    });
+  });
+
+  it('preserves raw font metadata from an inherited column XF', () => {
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    const harness = makeHarness({
+      effectiveStyle: true,
+      effectiveStyles: new Map([[key, { source: 2, xfIndex: 3 }]]),
+      indices: new Map([[key, 0]]),
+      xfs: new Map([[3, sourceXf({ fontIndex: 3, applyFont: true, quotePrefix: false })]]),
+    });
+    harness.fonts.set(
+      3,
+      font({ hasCharset: true, charset: 134, color: { ...color(), kind: 2, theme: 5 } }),
+    );
+
+    syncCellFormatsToEngine(
+      harness.wb,
+      storeWithFormats([[key, { fill: '#fff2cc' } as CellFormat]]),
+      0,
+    );
+
+    expect(harness.counts.getEffectiveStyle).toBe(1);
+    expect(harness.addedXfs[0]).toMatchObject({
+      fontIndex: 3,
+      applyFont: true,
+      quotePrefix: false,
+    });
+    expect(harness.fonts.get(harness.addedXfs[0]?.fontIndex ?? -1)).toMatchObject({
+      hasCharset: true,
+      charset: 134,
+      color: { kind: 2, theme: 5 },
+    });
+  });
+
+  it('keys repeated format resolutions by the inherited XF', () => {
+    const keys = [0, 1, 2].map((row) => addrKey({ sheet: 0, row, col: 0 }));
+    const harness = makeHarness({
+      effectiveStyle: true,
+      effectiveStyles: new Map(
+        keys.map((key, index) => [
+          key,
+          index === 1 ? { source: 2, xfIndex: 3 } : { source: 1, xfIndex: 2 },
+        ]),
+      ),
+      indices: new Map(keys.map((key) => [key, 0] as const)),
+      xfs: new Map([
+        [2, sourceXf({ fontIndex: 2 })],
+        [3, sourceXf({ fontIndex: 3 })],
+      ]),
+    });
+    const format = { fill: '#fff2cc' } as CellFormat;
+
+    syncCellFormatsToEngine(
+      harness.wb,
+      storeWithFormats(keys.map((key) => [key, { ...format }] as const)),
+      0,
+    );
+
+    expect(harness.counts.getEffectiveStyle).toBe(3);
+    expect(harness.counts.addXf).toBe(2);
+    expect(harness.assignedXfs).toEqual([100, 101, 100]);
+    expect(harness.addedXfs.map((xf) => xf.fontIndex)).toEqual([2, 3]);
+  });
+
+  it('uses direct XFs for cell/default sources, null indexes, and unsupported effective style', () => {
+    const key0 = addrKey({ sheet: 0, row: 0, col: 0 });
+    const key1 = addrKey({ sheet: 0, row: 1, col: 0 });
+    const key2 = addrKey({ sheet: 0, row: 2, col: 0 });
+    const key3 = addrKey({ sheet: 0, row: 3, col: 0 });
+    const keys = [key0, key1, key2, key3];
+    const harness = makeHarness({
+      effectiveStyle: true,
+      effectiveStyles: new Map([
+        [key0, { source: 0, xfIndex: 2 }],
+        [key1, { source: 3, xfIndex: 3 }],
+        [key2, { source: 1, xfIndex: 3 }],
+        [key3, { source: 1, xfIndex: 3 }],
+      ]),
+      indices: new Map([
+        [key0, 0],
+        [key1, 0],
+        [key3, 2],
+      ]),
+      nullIndexes: new Set([key2]),
+      xfs: new Map([
+        [0, sourceXf({ fontIndex: 1, quotePrefix: true })],
+        [2, sourceXf({ fontIndex: 2 })],
+        [3, sourceXf({ fontIndex: 3 })],
+      ]),
+    });
+
+    syncCellFormatsToEngine(
+      harness.wb,
+      storeWithFormats(keys.map((key) => [key, { fill: '#fff2cc' } as CellFormat] as const)),
+      0,
+    );
+
+    expect(harness.counts.getEffectiveStyle).toBe(2);
+    expect(harness.counts.addXf).toBe(3);
+    expect(harness.assignedXfs).toEqual([100, 100, 101, 102]);
+    expect(harness.addedXfs[0]).toMatchObject({ fontIndex: 1, quotePrefix: true });
+    expect(harness.addedXfs[1]?.fontIndex).not.toBe(3);
+    expect(harness.addedXfs[2]).toMatchObject({ fontIndex: 2 });
+
+    const unsupported = makeHarness({
+      effectiveStyles: new Map([[key0, { source: 1, xfIndex: 3 }]]),
+      indices: new Map([[key0, 0]]),
+      xfs: new Map([
+        [0, sourceXf({ fontIndex: 1, quotePrefix: true })],
+        [3, sourceXf({ fontIndex: 3 })],
+      ]),
+    });
+    syncCellFormatsToEngine(
+      unsupported.wb,
+      storeWithFormats([[key0, { fill: '#fff2cc' } as CellFormat]]),
+      0,
+    );
+
+    expect(unsupported.counts.getEffectiveStyle).toBe(0);
+    expect(unsupported.addedXfs[0]).toMatchObject({ fontIndex: 1, quotePrefix: true });
+  });
+
+  it('keeps an explicit font size ahead of an inherited axis font', () => {
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    const harness = makeHarness({
+      effectiveStyle: true,
+      effectiveStyles: new Map([[key, { source: 1, xfIndex: 2 }]]),
+      indices: new Map([[key, 0]]),
+      xfs: new Map([[2, sourceXf({ fontIndex: 2 })]]),
+    });
+    harness.fonts.set(2, font({ size: 24 }));
+
+    syncCellFormatsToEngine(
+      harness.wb,
+      storeWithFormats([[key, { fontSize: (11 * 96) / 72 } as CellFormat]]),
+      0,
+    );
+
+    expect(harness.counts.getEffectiveStyle).toBe(1);
+    const resolved = harness.addedXfs[0];
+    expect(resolved).toBeDefined();
+    expect(harness.fonts.get(resolved?.fontIndex ?? -1)?.size).toBeCloseTo(11);
   });
 });

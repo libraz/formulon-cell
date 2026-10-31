@@ -355,10 +355,16 @@ const axisBudgetAvailable = (
   return used <= 100_000;
 };
 
-const directSnapshot = (wb: WorkbookHandle, addr: Addr): SheetAxisDirectXf | null => {
+type EffectiveStyle = NonNullable<ReturnType<WorkbookHandle['getEffectiveStyle']>>;
+
+const directSnapshot = (
+  wb: WorkbookHandle,
+  addr: Addr,
+  prefetchedEffective?: EffectiveStyle,
+): SheetAxisDirectXf | null => {
   const directXfIndex = wb.getCellXfIndex(addr.sheet, addr.row, addr.col);
   if (directXfIndex === null) return null;
-  const effective = wb.getEffectiveStyle(addr.sheet, addr.row, addr.col);
+  const effective = prefetchedEffective ?? wb.getEffectiveStyle(addr.sheet, addr.row, addr.col);
   return {
     key: addrKey(addr),
     before: {
@@ -554,7 +560,7 @@ export function prepareAxisFormatOverrideWithWorkbook(
           // materialized by an earlier column operation its effective source
           // is Cell (0), so retain it as a derived target as well.
           if (effective?.source !== 1 && !priorDirect) continue;
-          const before = directSnapshot(wb, addr);
+          const before = directSnapshot(wb, addr, effective ?? undefined);
           if (!before) return null;
           const baseXf =
             effective && effective.source !== 0 ? effective.xfIndex : before.before.directXfIndex;
@@ -599,7 +605,7 @@ export function prepareAxisFormatOverrideWithWorkbook(
           const priorDirect = direct.get(key);
           const effective = wb.getEffectiveStyle(sheet, row, col);
           if (effective?.source !== 2 && effective?.source !== 3 && !priorDirect) continue;
-          const before = directSnapshot(wb, addr);
+          const before = directSnapshot(wb, addr, effective ?? undefined);
           if (!before) return null;
           const baseXf = effective?.xfIndex ?? before.before.directXfIndex;
           const resolvedPatch = resolvePatch?.(wb, baseXf, addr) ?? patch;
@@ -629,7 +635,7 @@ export function prepareAxisFormatOverrideWithWorkbook(
       )
         continue;
       const effective = wb.getEffectiveStyle(sheet, addr.row, addr.col);
-      const before = directSnapshot(wb, addr);
+      const before = directSnapshot(wb, addr, effective ?? undefined);
       if (!effective || !before) return null;
       const resolvedPatch = resolvePatch?.(wb, effective.xfIndex, addr) ?? patch;
       const cacheKey = `${effective.xfIndex}|${JSON.stringify(resolvedPatch)}`;
@@ -681,10 +687,18 @@ export function prepareAxisFormatOverrideWithWorkbook(
       const before = directSnapshot(wb, addr);
       if (!before) return null;
       const priorDirect = direct.get(key);
-      const effective = wb.getEffectiveStyle(addr.sheet, addr.row, addr.col);
       if (!selectedRow(addr) && !selectedColumn(addr)) continue;
+      let effectiveXfIndex = before.before.effectiveXfIndex;
+      let effectiveSource = before.before.source;
+      if (effectiveXfIndex === null) {
+        const effective = wb.getEffectiveStyle(addr.sheet, addr.row, addr.col);
+        effectiveXfIndex = effective?.xfIndex ?? null;
+        effectiveSource = effective?.source ?? null;
+      }
       const baseXf =
-        effective && effective.source !== 0 ? effective.xfIndex : before.before.directXfIndex;
+        effectiveXfIndex !== null && effectiveSource !== 0
+          ? effectiveXfIndex
+          : before.before.directXfIndex;
       const resolvedPatch = resolvePatch?.(wb, baseXf, addr) ?? patch;
       const cacheKey = `${baseXf}|${JSON.stringify(resolvedPatch)}`;
       const afterXfIndex =
