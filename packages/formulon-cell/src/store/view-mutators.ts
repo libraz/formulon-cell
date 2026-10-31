@@ -2,6 +2,7 @@ import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import { frozenColEnd, frozenColStart, frozenRowEnd, frozenRowStart } from './freeze-band.js';
+import { MAX_ROW_HEIGHT_PX } from './layout-limits.js';
 import { clampZoom, renderScale } from './render-scale.js';
 import { clampSplitPaneOrigin } from './split-panes.js';
 import type { SpreadsheetStore } from './store.js';
@@ -15,9 +16,6 @@ import type {
   StatusAggKey,
   StatusBarOptionKey,
 } from './types.js';
-
-/** Row height ceiling: 409 pt in canonical CSS px. */
-const MAX_ROW_HEIGHT_PX = (409 * 96) / 72;
 
 /** Round canonical px to whole screen px under the layout's screen scale. */
 const snapToScreenPx = (layout: State['layout'], px: number): number => {

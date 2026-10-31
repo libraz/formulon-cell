@@ -26,6 +26,7 @@ import {
   registerFormatHistoryBridge,
   unregisterFormatHistoryBridge,
 } from './format-history-bridge.js';
+import { advanceNativeFormatEpoch } from './native-format-epoch.js';
 import { syncPageSetupToEngine } from './print-sync.js';
 import { syncSheetPrToEngine } from './sheet-pr-sync.js';
 import { TableMirror } from './table-mirror.js';
@@ -326,10 +327,18 @@ export class StoreMirror {
       const pageSetupChanged = nextPageSetup !== this.lastPageSetupMap;
       if (pageSetupChanged) this.lastPageSetupMap = nextPageSetup;
       if (this.storeSyncMuted > 0) return;
-      for (const sheet of formatSheets) {
-        if (sheet < this.handle.sheetCount) flushFormatToEngine(this.handle, store, sheet);
+      const formatPublicationSheets = [...formatSheets].filter(
+        (sheet) => sheet < this.handle.sheetCount,
+      );
+      const formatPublicationAttempted = formatPublicationSheets.length > 0 || stylesChanged;
+      try {
+        for (const sheet of formatPublicationSheets) {
+          flushFormatToEngine(this.handle, store, sheet);
+        }
+        if (stylesChanged) syncNamedStyleCatalogToEngine(this.handle, store);
+      } finally {
+        if (formatPublicationAttempted) advanceNativeFormatEpoch(this.handle);
       }
-      if (stylesChanged) syncNamedStyleCatalogToEngine(this.handle, store);
       for (const sheet of sheetPrSheets) {
         if (sheet < this.handle.sheetCount) syncSheetPrToEngine(this.handle, store, sheet);
       }
@@ -371,7 +380,11 @@ export class StoreMirror {
       return fn();
     } finally {
       this.storeSyncMuted -= 1;
-      this.rebase();
+      try {
+        this.rebase();
+      } finally {
+        if (this.storeSyncMuted === 0) advanceNativeFormatEpoch(this.handle);
+      }
     }
   }
 

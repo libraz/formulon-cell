@@ -160,6 +160,12 @@ export function associatePaginationEngine(state: State, engine: WorkbookHandle |
   resetPaginationCache();
 }
 
+/** Internal read-only lookup used by view projections that need workbook
+ * geometry without making the handle part of persisted or public state. */
+export function associatedPaginationEngine(state: State): WorkbookHandle | null {
+  return paginationEngines.get(state) ?? null;
+}
+
 function reach(through: number | undefined, content: number): number {
   const wanted = Math.max(through ?? 0, content, 0);
   return (Math.floor(wanted / REACH_CHUNK) + 1) * REACH_CHUNK;

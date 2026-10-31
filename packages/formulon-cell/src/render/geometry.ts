@@ -10,6 +10,11 @@ import {
 import { renderScale } from '../store/render-scale.js';
 import { isRowHidden } from '../store/row-visibility.js';
 import type { LayoutSlice, State, UiSlice, ViewportSlice } from '../store/store.js';
+import {
+  automaticFontRowLayout,
+  isAutomaticFontRowLayoutProjected,
+  markAutomaticFontRowLayoutProjected,
+} from './automatic-font-row-layout.js';
 
 export interface Rect {
   x: number;
@@ -133,20 +138,29 @@ export function layoutForView(
   overrides: { showHeaders?: boolean } = {},
 ): ViewLayout {
   const showHeaders = overrides.showHeaders ?? state.ui.showHeaders !== false;
+  const projectedLayout =
+    state.data && state.format && state.merges
+      ? automaticFontRowLayout(state as State)
+      : state.layout;
+  const gapsState =
+    projectedLayout === state.layout ? state : ({ ...state, layout: projectedLayout } as State);
   const base = {
-    ...state.layout,
+    ...projectedLayout,
     ...(state.ui.showOutlineSymbols === false && { outlineRowGutter: 0, outlineColGutter: 0 }),
     rtl: state.ui.rightToLeft === true,
     viewWidth: state.viewport.widthPx,
-    ...pageGapsFor(state),
+    ...pageGapsFor(gapsState),
   };
-  if (showHeaders) return base;
-  return { ...base, headerColWidth: 0, headerRowHeight: 0 };
+  const view = showHeaders ? base : { ...base, headerColWidth: 0, headerRowHeight: 0 };
+  if (isAutomaticFontRowLayoutProjected(projectedLayout)) {
+    markAutomaticFontRowLayoutProjected(view);
+  }
+  return view;
 }
 
-/** What `layoutForView` needs. The slices beyond layout/ui/viewport are only
- *  read in Page Layout view, so callers that never enter it — and the unit
- *  tests — may hand over the three-slice subset. */
+/** What `layoutForView` needs. Page Layout view reads the extra slices; Normal view reads
+ *  data/format/merges for the automatic font row projection, which is skipped when only
+ *  layout/ui/viewport are passed. */
 export type LayoutForViewInput = {
   layout: LayoutSlice;
   ui: UiSlice;

@@ -9,6 +9,7 @@ import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import type { State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
+import { automaticFontRowLayout } from './automatic-font-row-layout.js';
 import { createConditionalCache } from './conditional.js';
 import {
   type AxisLayout,
@@ -246,10 +247,15 @@ export class GridRenderer {
   }
 
   invalidate(): void {
+    // Resize now; the frame pass repeats it after the native format epoch settles.
     if (this.cssWidth > 0 && this.cssHeight > 0) this.resizeViewport();
     if (this.rafId) return;
     this.rafId = requestAnimationFrame(() => {
-      this.rafId = 0;
+      try {
+        this.resizeViewport();
+      } finally {
+        this.rafId = 0;
+      }
       this.paint();
     });
   }
@@ -313,9 +319,14 @@ export class GridRenderer {
    *  already laid out when the user scrolls onto it. */
   private paginationForView(state: ViewState): SheetPagination | null {
     if (state.ui.workbookView === 'normal') return null;
+    const baseState = this.getState();
+    const projectedLayout = automaticFontRowLayout(baseState);
+    const geometryChanged = projectedLayout !== baseState.layout;
+    const paginationState = geometryChanged ? { ...baseState, layout: projectedLayout } : baseState;
     const { viewport } = state;
-    return paginationFor(this.getState(), state.data.sheetIndex, {
-      engine: this.getWb() ?? undefined,
+    const engine = geometryChanged ? null : this.getWb();
+    return paginationFor(paginationState, state.data.sheetIndex, {
+      ...(engine ? { engine } : {}),
       throughRow: viewport.rowStart + viewport.rowCount,
       throughCol: viewport.colStart + viewport.colCount,
     });

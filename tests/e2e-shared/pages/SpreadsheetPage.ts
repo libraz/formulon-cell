@@ -12,9 +12,9 @@ export async function gridCellCenter(page: Page, row: number, col: number) {
   const point = await page.evaluate(
     async ({ row, col, moduleUrl }) => {
       const instance = (window as unknown as { __fcInst: SpreadsheetInstance }).__fcInst;
-      const { layout, viewport } = instance.store.getState();
-      const { cellRectUnclamped } = await import(moduleUrl);
-      const rect = cellRectUnclamped(layout, viewport, row, col);
+      const state = instance.store.getState();
+      const { cellRectUnclamped, layoutForView } = await import(moduleUrl);
+      const rect = cellRectUnclamped(layoutForView(state), state.viewport, row, col);
       return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
     },
     { row, col, moduleUrl },
