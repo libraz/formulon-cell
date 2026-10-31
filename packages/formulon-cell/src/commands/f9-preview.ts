@@ -1,6 +1,7 @@
 import { addrKey, colFromLetters, parseA1Atom } from '../engine/address.js';
-import type { CellValue, EvalArrayResult, EvalResult } from '../engine/types.js';
+import type { Addr, CellValue, EvalArrayResult, EvalResult } from '../engine/types.js';
 import { fromEngineValue } from '../engine/value.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 
 /**
  * the spreadsheet's F9 key, while editing a formula, replaces the highlighted
@@ -320,4 +321,43 @@ export function replaceFormulaSelectionWithF9Preview(
   const text = `${formula.slice(0, left)}${preview.display}${formula.slice(right)}`;
   const caret = left + preview.display.length;
   return { text, start: caret, end: caret, preview };
+}
+
+/** F9 over a localized formula draft, evaluated by `wb` with `base` as the
+ *  cell the formula belongs to (the anchor for relative refs, ROW() and the
+ *  like). The substituted literal is localized back into the draft syntax. */
+export function replaceFormulaSelectionWithWorkbookF9(
+  wb: WorkbookHandle,
+  base: Addr,
+  data: {
+    sheetIndex: number;
+    cells: ReadonlyMap<string, { value: CellValue; formula: string | null }>;
+  },
+  formula: string,
+  start: number,
+  end: number,
+): F9Replacement | null {
+  const sheetByName = (name: string): number => {
+    for (let index = 0; index < wb.sheetCount; index += 1) {
+      if (wb.sheetName(index) === name) return index;
+    }
+    return -1;
+  };
+  return replaceFormulaSelectionWithF9Preview(
+    formula,
+    start,
+    end,
+    data.sheetIndex,
+    data.cells,
+    sheetByName,
+    (text) => wb.evaluateFormulaText(base, wb.canonicalizeLocalizedFormula(text)),
+    true,
+    (text) => wb.evaluateFormulaArray(base, wb.canonicalizeLocalizedFormula(text)),
+    {
+      localizeLiteral: (literal) => {
+        const localized = wb.localizeFormulaText(`=${literal}`);
+        return localized.startsWith('=') ? localized.slice(1) : literal;
+      },
+    },
+  );
 }

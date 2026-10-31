@@ -1,8 +1,8 @@
 import { commitCellInput } from '../commands/cell-input-commit.js';
-import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
+import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
-import { extractRefs, rotateRefAt } from '../commands/refs.js';
+import { editorRefHighlights, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -153,6 +153,7 @@ export interface FormulaBarController {
   notifyAutocompleteInsert?(outcome?: AutocompleteInsertOutcome): void;
   isEditing(): boolean;
   isFormulaEdit(): boolean;
+  editedCell(): Addr;
   refreshActions(): void;
   syncFxRefs(): void;
 }
@@ -271,19 +272,17 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     formulabar.dataset.fcEditing = fxEditing ? '1' : '0';
   };
 
+  /** The cell the draft belongs to: the base for relative refs, F4 and F9. */
+  const draftAnchor = (): Addr =>
+    editingAnchor ?? externalDraft?.anchor ?? store.getState().selection.active;
+
   const syncFxRefs = (): void => {
     if (detached || (externalDraft && externalDraft.status !== 'open')) return;
-    const active = editingAnchor ?? externalDraft?.anchor ?? store.getState().selection.active;
-    const refs = extractRefs(fxInput.value, {
-      r1c1: store.getState().ui.r1c1 === true,
-      base: { row: active.row, col: active.col },
-    }).map((r) => ({
-      r0: r.r0,
-      c0: r.c0,
-      r1: r.r1,
-      c1: r.c1,
-      colorIndex: r.colorIndex,
-    }));
+    const refs = editorRefHighlights(
+      fxInput.value,
+      draftAnchor(),
+      store.getState().ui.r1c1 === true,
+    );
     ownedEditorRefs = refs;
     mutators.setEditorRefs(store, refs);
   };
@@ -606,6 +605,31 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     if (notify) notifyExternalInput();
   };
 
+  /** Replace the draft with a one-step rewrite recorded as its own Undo entry. */
+  const applyRecordedEdit = (value: string, start: number, end: number, identity: string): void => {
+    draftHistory.recordCommand(
+      captureDraftSnapshot(),
+      { value, start, end, direction: 'none', mode: arrowMode },
+      identity,
+    );
+    referenceGesture = null;
+    pointNavigation = null;
+    fxInput.value = value;
+    fxInput.setSelectionRange(start, end);
+    syncFormulaBarInputState();
+  };
+
+  /** F4 / Cmd+T: cycle the absolute/relative form of the ref under the caret. */
+  const rotateReferenceAtCaret = (): void => {
+    draftHistory.endGroup();
+    const anchor = draftAnchor();
+    const r = rotateRefAt(fxInput.value, fxInput.selectionStart ?? fxInput.value.length, {
+      r1c1: store.getState().ui.r1c1 === true,
+      base: { row: anchor.row, col: anchor.col },
+    });
+    if (r.text !== fxInput.value) applyRecordedEdit(r.text, r.caret, r.caret, 'f4');
+  };
+
   const discardStaleLeaseDraft = (draft: ExternalDraftState): void => {
     finishExternalDraft(draft, 'discarded', false, false);
   };
@@ -619,27 +643,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       discardStaleLeaseDraft(draft);
       return;
     }
-    const before = captureDraftSnapshot();
-    draftHistory.endGroup();
-    referenceGesture = null;
-    pointNavigation = null;
     const nextCaret = Math.max(0, Math.min(caret ?? raw.length, raw.length));
-    draftHistory.recordCommand(
-      before,
-      {
-        value: raw,
-        start: nextCaret,
-        end: nextCaret,
-        direction: 'none',
-        mode: arrowMode,
-      },
-      'external-set-value',
-    );
-    fxInput.value = raw;
-    fxInput.setSelectionRange(nextCaret, nextCaret);
     commitRejected = false;
-    syncFormulaBarInputState(false);
-    notifyExternalInput();
+    applyRecordedEdit(raw, nextCaret, nextCaret, 'external-set-value');
   };
 
   const notifyValidation = (outcome: {
@@ -1266,32 +1272,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     ) {
       e.preventDefault();
       e.stopPropagation();
-      const caret = fxInput.selectionStart ?? fxInput.value.length;
-      const before = captureDraftSnapshot();
-      draftHistory.endGroup();
-      const anchor = editingAnchor ?? externalDraft?.anchor ?? store.getState().selection.active;
-      const r = rotateRefAt(fxInput.value, caret, {
-        r1c1: store.getState().ui.r1c1 === true,
-        base: { row: anchor.row, col: anchor.col },
-      });
-      if (r.text !== fxInput.value) {
-        draftHistory.recordCommand(
-          before,
-          {
-            value: r.text,
-            start: r.caret,
-            end: r.caret,
-            direction: 'none',
-            mode: arrowMode,
-          },
-          'f4',
-        );
-        referenceGesture = null;
-        pointNavigation = null;
-        fxInput.value = r.text;
-        fxInput.setSelectionRange(r.caret, r.caret);
-        syncFormulaBarInputState();
-      }
+      if (draftActive()) rotateReferenceAtCaret();
       return;
     }
     if (e.key === 'Enter') {
@@ -1354,85 +1335,23 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       cancelFx();
     } else if (e.key === 'F9' && draftActive()) {
       const start = fxInput.selectionStart ?? 0;
-      const end = fxInput.selectionEnd ?? start;
-      const currentWb = wb();
-      const sheetByName = (name: string): number => {
-        for (let index = 0; index < currentWb.sheetCount; index += 1) {
-          if (currentWb.sheetName(index) === name) return index;
-        }
-        return -1;
-      };
-      const active = editingAnchor ?? externalDraft?.anchor ?? store.getState().selection.active;
-      const result = replaceFormulaSelectionWithF9Preview(
+      const result = replaceFormulaSelectionWithWorkbookF9(
+        wb(),
+        draftAnchor(),
+        store.getState().data,
         fxInput.value,
         start,
-        end,
-        store.getState().data.sheetIndex,
-        store.getState().data.cells,
-        sheetByName,
-        (formula) =>
-          currentWb.evaluateFormulaText(active, currentWb.canonicalizeLocalizedFormula(formula)),
-        true,
-        (formula) =>
-          currentWb.evaluateFormulaArray(active, currentWb.canonicalizeLocalizedFormula(formula)),
-        {
-          localizeLiteral: (literal) => {
-            const localized = currentWb.localizeFormulaText(`=${literal}`);
-            return localized.startsWith('=') ? localized.slice(1) : literal;
-          },
-        },
+        fxInput.selectionEnd ?? start,
       );
       if (result) {
         e.preventDefault();
         e.stopPropagation();
-        const before = captureDraftSnapshot();
-        draftHistory.endGroup();
-        draftHistory.recordCommand(
-          before,
-          {
-            value: result.text,
-            start: result.start,
-            end: result.end,
-            direction: 'none',
-            mode: arrowMode,
-          },
-          'f9',
-        );
-        referenceGesture = null;
-        pointNavigation = null;
-        fxInput.value = result.text;
-        fxInput.setSelectionRange(result.start, result.end);
-        syncFormulaBarInputState();
+        applyRecordedEdit(result.text, result.start, result.end, 'f9');
       }
     } else if (e.key === 'F4' && draftActive()) {
       e.preventDefault();
       e.stopPropagation();
-      const caret = fxInput.selectionStart ?? fxInput.value.length;
-      const before = captureDraftSnapshot();
-      draftHistory.endGroup();
-      const anchor = editingAnchor ?? externalDraft?.anchor ?? store.getState().selection.active;
-      const r = rotateRefAt(fxInput.value, caret, {
-        r1c1: store.getState().ui.r1c1 === true,
-        base: { row: anchor.row, col: anchor.col },
-      });
-      if (r.text !== fxInput.value) {
-        draftHistory.recordCommand(
-          before,
-          {
-            value: r.text,
-            start: r.caret,
-            end: r.caret,
-            direction: 'none',
-            mode: arrowMode,
-          },
-          'f4',
-        );
-        referenceGesture = null;
-        pointNavigation = null;
-        fxInput.value = r.text;
-        fxInput.setSelectionRange(r.caret, r.caret);
-        syncFormulaBarInputState();
-      }
+      rotateReferenceAtCaret();
     }
   };
 
@@ -1515,7 +1434,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       gesture: picked,
       inserted: result,
       ref,
-      editedCell: editingAnchor ?? externalDraft?.anchor ?? store.getState().selection.active,
+      editedCell: draftAnchor(),
       r1c1,
     });
     fxInput.value = result.text;
@@ -1669,6 +1588,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     },
     isEditing: () => fxEditing,
     isFormulaEdit,
+    editedCell: draftAnchor,
     refreshActions,
     syncFxRefs,
     suspendForFormulaPalette,

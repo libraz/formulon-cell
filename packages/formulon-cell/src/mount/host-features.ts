@@ -30,8 +30,6 @@ import type { InlineEditor } from '../interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from '../interact/error-menu.js';
 import { attachFormatDialog } from '../interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from '../interact/format-painter.js';
-import { resolveFormulaHelperDetails } from '../interact/formula-helper-catalog.js';
-import { catalogLocaleOrdinal, catalogLocaleTag } from '../interact/function-catalog-text.js';
 import { attachFxDialog, type FxDialogHandle } from '../interact/fx-dialog.js';
 import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
@@ -56,6 +54,10 @@ import { attachStatusBar, type StatusBarDeps } from '../interact/status-bar.js';
 import { attachViewToolbar, type ViewToolbarHandle } from '../interact/view-toolbar.js';
 import { attachWatchPanel } from '../interact/watch-panel.js';
 import { attachWheel } from '../interact/wheel.js';
+import {
+  workbookArgHelperCatalog,
+  workbookAutocompleteCatalog,
+} from '../interact/workbook-function-catalog.js';
 import {
   attachWorkbookObjectsPanel,
   type WorkbookObjectsPanelHandle,
@@ -836,55 +838,15 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             ),
           getCustomFunctions: () => input.formulaRegistry.list(),
           getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
-          getFunctionNames: () => input.wb().functionNames(),
-          getFunctionDisplayNames: () => {
-            const wb = input.wb();
-            const names = wb.functionNames();
-            if (!names) return null;
-            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
-            return names.map((name) => wb.localizeFunctionName(name, locale) || name);
-          },
-          resolveFunctionName: (rawName) => {
-            const wb = input.wb();
-            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
-            return wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase();
-          },
-          getListSeparator: () => input.wb().localeFacts()?.listSeparator ?? ',',
-          getFunctionDetails: (canonicalName) => {
-            const wb = input.wb();
-            const localeTag = catalogLocaleTag(inputLocaleForWorkbook(wb) ?? 'en-US');
-            return resolveFormulaHelperDetails(canonicalName, {
-              localeTag,
-              listSeparator: wb.localeFacts()?.listSeparator ?? ',',
-              getMetadata: (name, locale) => wb.functionMetadataForLocale(name, locale),
-              localizeName: (name) =>
-                wb.localizeFunctionName(name, catalogLocaleOrdinal(localeTag)) || name,
-              getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
-            });
-          },
+          ...workbookAutocompleteCatalog(
+            input.wb,
+            (name) => input.formulaRegistry.get(name)?.meta.args,
+          ),
           labels: strings.autocomplete,
         });
         s.fxArgHelper = attachArgHelper({
           input: input.fxInput,
-          getListSeparator: () => input.wb().localeFacts()?.listSeparator ?? ',',
-          getFunctionDisplayName: (canonicalName) => {
-            const wb = input.wb();
-            const localeTag = catalogLocaleTag(inputLocaleForWorkbook(wb) ?? 'en-US');
-            const metadataName = wb.functionMetadataForLocale(
-              canonicalName,
-              localeTag,
-            )?.localizedName;
-            return (
-              metadataName ||
-              wb.localizeFunctionName(canonicalName, catalogLocaleOrdinal(localeTag)) ||
-              canonicalName
-            );
-          },
-          resolveFunctionName: (rawName) => {
-            const wb = input.wb();
-            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
-            return wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase();
-          },
+          ...workbookArgHelperCatalog(input.wb),
           getCustomFunctionArgs: (name) => input.formulaRegistry.get(name)?.meta.args,
           labels: strings.argHelper,
         });

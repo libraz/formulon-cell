@@ -210,6 +210,7 @@ describe('attachPointer', () => {
       const insertRefAtCaret = vi.fn();
       detach = attachPointer(host, store, wb, undefined, null, () => ({
         isFormulaEdit: () => true,
+        editedCell: () => ({ sheet: 0, row: 3, col: 3 }),
         insertRefAtCaret,
       }));
 
@@ -226,10 +227,30 @@ describe('attachPointer', () => {
       store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
       detach = attachPointer(host, store, wb, undefined, null, () => ({
         isFormulaEdit: () => true,
+        editedCell: () => ({ sheet: 0, row: 3, col: 3 }),
         insertRefAtCaret,
       }));
 
       fireDown(host, 200, 70); // B2, two rows/cols before D4.
+      fireMove(host, 300, 100); // C3.
+
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'R[-2]C[-2]', { phase: 'start' });
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(2, 'R[-2]C[-2]:R[-1]C[-1]', {
+        phase: 'update',
+      });
+    });
+
+    it('builds relative R1C1 references from the edited cell after the selection moves mid-edit', () => {
+      const insertRefAtCaret = vi.fn();
+      mutators.setActive(store, { sheet: 0, row: 9, col: 9 }); // Selection moved away from D4.
+      store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
+      detach = attachPointer(host, store, wb, undefined, null, () => ({
+        isFormulaEdit: () => true,
+        editedCell: () => ({ sheet: 0, row: 3, col: 3 }),
+        insertRefAtCaret,
+      }));
+
+      fireDown(host, 200, 70); // B2, two rows/cols before the edited D4.
       fireMove(host, 300, 100); // C3.
 
       expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'R[-2]C[-2]', { phase: 'start' });

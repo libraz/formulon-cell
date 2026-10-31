@@ -540,7 +540,8 @@ export function attachPointer(
         ...rawAnchor,
       });
       const anchor = { row: mergedAnchor.row, col: mergedAnchor.col };
-      const base = { row: s.selection.active.row, col: s.selection.active.col };
+      const { row, col } = editor.editedCell();
+      const base = { row, col };
       const r1c1 = s.ui.r1c1 === true;
       editor.insertRefAtCaret(refOf(anchor.row, anchor.col, { r1c1, base }), { phase: 'start' });
       drag = { kind: 'range-insert', anchor, tip: anchor, base, r1c1 };

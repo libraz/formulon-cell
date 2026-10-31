@@ -770,6 +770,36 @@ describe('InlineEditor', () => {
     }
   });
 
+  it('evaluates F9 against the edited cell after the selection moves mid-edit', async () => {
+    const realWorkbook = await WorkbookHandle.createDefault();
+    expect(realWorkbook.isStub).toBe(false);
+    const localStore = createSpreadsheetStore();
+    const localHost = document.createElement('div');
+    const localGrid = document.createElement('div');
+    localHost.append(localGrid);
+    document.body.append(localHost);
+    const localEditor = new InlineEditor({
+      host: localHost,
+      grid: localGrid,
+      store: localStore,
+      wb: realWorkbook,
+      onAfterCommit: vi.fn(),
+    });
+    try {
+      mutators.setActive(localStore, { sheet: 0, row: 4, col: 2 });
+      localEditor.begin('=ROW()+COLUMN()');
+      mutators.setActive(localStore, { sheet: 0, row: 0, col: 0 });
+      const input = localGrid.querySelector('textarea') as HTMLTextAreaElement;
+      input.setSelectionRange(1, input.value.length);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F9', cancelable: true }));
+      expect(input.value).toBe('=8');
+    } finally {
+      localEditor.cancel();
+      realWorkbook.dispose();
+      localHost.remove();
+    }
+  });
+
   it('follows its cell when the sheet scrolls mid-edit', () => {
     mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
     editor.begin('hi');

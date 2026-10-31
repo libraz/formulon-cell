@@ -1403,6 +1403,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       return null;
     return {
       isFormulaEdit: () => Boolean((activeDraft || postCommit) && synchronized && callProjection),
+      editedCell: currentAnchor,
       insertRefAtCaret: (ref: string) => {
         if (mode === 'arguments-committed' && !ensurePostCommitDraft()) return;
         if (!activeDraft || !synchronized) return;

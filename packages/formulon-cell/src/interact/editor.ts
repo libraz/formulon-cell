@@ -1,9 +1,8 @@
 import { commitCellInput, inputOperation } from '../commands/cell-input-commit.js';
-import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
-import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
+import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { dblClickRange, extractRefs, rotateRefAt } from '../commands/refs.js';
+import { dblClickRange, editorRefHighlights, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -39,13 +38,11 @@ import {
   navigateFormulaReference,
   pickedReferenceNavigation,
 } from './formula-edit-navigation.js';
-import { resolveFormulaHelperDetails } from './formula-helper-catalog.js';
 import { classifyFormulaReferenceArrow } from './formula-reference-arrow.js';
 import {
   createFormulaReferenceGesture,
   type FormulaReferenceGesture,
 } from './formula-reference-gesture.js';
-import { catalogLocaleOrdinal, catalogLocaleTag } from './function-catalog-text.js';
 import { navigationPolicyFor, nextTabStop, scrollActiveIntoView } from './navigation-policy.js';
 import {
   buildSelectionInputBatch,
@@ -53,21 +50,16 @@ import {
   writeSelectionInput,
 } from './selection-input.js';
 import { advanceAfterCommit } from './selection-navigation.js';
+import {
+  workbookArgHelperCatalog,
+  workbookAutocompleteCatalog,
+} from './workbook-function-catalog.js';
 
-const syncEditorRefs = (store: SpreadsheetStore, text: string, editedAddr?: Addr | null): void => {
-  const state = store.getState();
-  const active = editedAddr ?? state.selection.active;
-  const refs = extractRefs(text, {
-    r1c1: state.ui.r1c1 === true,
-    base: { row: active.row, col: active.col },
-  }).map((r) => ({
-    r0: r.r0,
-    c0: r.c0,
-    r1: r.r1,
-    c1: r.c1,
-    colorIndex: r.colorIndex,
-  }));
-  mutators.setEditorRefs(store, refs);
+const syncEditorRefs = (store: SpreadsheetStore, text: string, editedAddr: Addr): void => {
+  mutators.setEditorRefs(
+    store,
+    editorRefHighlights(text, editedAddr, store.getState().ui.r1c1 === true),
+  );
 };
 
 const policyRejection = (operation: string): { severity: 'stop'; message: string } => ({
@@ -160,6 +152,12 @@ export class InlineEditor {
    *  and is therefore willing to accept range-insert clicks. */
   isFormulaEdit(): boolean {
     return this.input?.value.startsWith('=') ?? false;
+  }
+
+  /** Cell being edited; only valid while an edit is open. */
+  editedCell(): Addr {
+    if (!this.editingAddr) throw new Error('no cell is being edited');
+    return this.editingAddr;
   }
 
   /** Insert `ref` at the current caret, replacing any selection. Used by the
@@ -340,7 +338,7 @@ export class InlineEditor {
     this.pendingHistoryInput = null;
     this.ignoredHistoryInput = null;
     this.draftHistory.reset(this.captureDraftSnapshot());
-    syncEditorRefs(this.deps.store, seed, this.editingAddr);
+    syncEditorRefs(this.deps.store, seed, a);
   }
 
   cancel(): void {
@@ -611,35 +609,7 @@ export class InlineEditor {
     ) {
       e.preventDefault();
       e.stopPropagation();
-      const caret = this.input?.selectionStart ?? this.input?.value.length ?? 0;
-      if (this.input) {
-        const before = this.captureDraftSnapshot();
-        this.draftHistory.endGroup();
-        const r = rotateRefAt(this.input.value, caret, {
-          r1c1: this.deps.store.getState().ui.r1c1 === true,
-          base: this.editingAddr
-            ? { row: this.editingAddr.row, col: this.editingAddr.col }
-            : undefined,
-        });
-        if (r.text !== this.input.value) {
-          this.draftHistory.recordCommand(
-            before,
-            {
-              value: r.text,
-              start: r.caret,
-              end: r.caret,
-              direction: 'none',
-              mode: this.arrowMode,
-            },
-            'f4',
-          );
-          this.pointNavigation = null;
-          this.referenceGesture = null;
-          this.input.value = r.text;
-          this.input.setSelectionRange(r.caret, r.caret);
-          this.syncInputState();
-        }
-      }
+      this.rotateReferenceAtCaret();
       return;
     }
     if (e.key === 'Enter') {
@@ -719,92 +689,53 @@ export class InlineEditor {
     } else if (e.key === 'F4' && this.input) {
       // Rotate the cell ref under the cursor: A1 → $A$1 → A$1 → $A1 → A1
       e.preventDefault();
-      const caret = this.input.selectionStart ?? this.input.value.length;
-      const before = this.captureDraftSnapshot();
-      this.draftHistory.endGroup();
-      const r = rotateRefAt(this.input.value, caret, {
-        r1c1: this.deps.store.getState().ui.r1c1 === true,
-        base: this.editingAddr
-          ? { row: this.editingAddr.row, col: this.editingAddr.col }
-          : undefined,
-      });
-      if (r.text !== this.input.value) {
-        this.draftHistory.recordCommand(
-          before,
-          {
-            value: r.text,
-            start: r.caret,
-            end: r.caret,
-            direction: 'none',
-            mode: this.arrowMode,
-          },
-          'f4',
-        );
-        this.pointNavigation = null;
-        this.referenceGesture = null;
-        this.input.value = r.text;
-        this.input.setSelectionRange(r.caret, r.caret);
-        this.syncInputState();
-      }
-    } else if (e.key === 'F9' && this.input) {
+      this.rotateReferenceAtCaret();
+    } else if (e.key === 'F9' && this.input && this.editingAddr) {
       const start = this.input.selectionStart ?? 0;
-      const end = this.input.selectionEnd ?? start;
-      const sheetByName = (name: string): number => {
-        for (let i = 0; i < this.deps.wb.sheetCount; i += 1) {
-          if (this.deps.wb.sheetName(i) === name) return i;
-        }
-        return -1;
-      };
-      const active = this.deps.store.getState().selection.active;
-      const result = replaceFormulaSelectionWithF9Preview(
+      const result = replaceFormulaSelectionWithWorkbookF9(
+        this.deps.wb,
+        this.editingAddr,
+        this.deps.store.getState().data,
         this.input.value,
         start,
-        end,
-        this.deps.store.getState().data.sheetIndex,
-        this.deps.store.getState().data.cells,
-        sheetByName,
-        (formula) =>
-          this.deps.wb.evaluateFormulaText(
-            active,
-            this.deps.wb.canonicalizeLocalizedFormula(formula),
-          ),
-        true,
-        (formula) =>
-          this.deps.wb.evaluateFormulaArray(
-            active,
-            this.deps.wb.canonicalizeLocalizedFormula(formula),
-          ),
-        {
-          localizeLiteral: (literal) => {
-            const localized = this.deps.wb.localizeFormulaText(`=${literal}`);
-            return localized.startsWith('=') ? localized.slice(1) : literal;
-          },
-        },
+        this.input.selectionEnd ?? start,
       );
       if (result) {
         e.preventDefault();
         e.stopPropagation();
-        const before = this.captureDraftSnapshot();
-        this.draftHistory.endGroup();
-        this.draftHistory.recordCommand(
-          before,
-          {
-            value: result.text,
-            start: result.start,
-            end: result.end,
-            direction: 'none',
-            mode: this.arrowMode,
-          },
-          'f9',
-        );
-        this.pointNavigation = null;
-        this.referenceGesture = null;
-        this.input.value = result.text;
-        this.input.setSelectionRange(result.start, result.end);
-        this.syncInputState();
+        this.applyRecordedEdit(result.text, result.start, result.end, 'f9');
       }
     }
   };
+
+  /** Replace the draft with a one-step rewrite recorded as its own Undo entry. */
+  private applyRecordedEdit(value: string, start: number, end: number, identity: string): void {
+    const input = this.input;
+    if (!input) return;
+    this.draftHistory.recordCommand(
+      this.captureDraftSnapshot(),
+      { value, start, end, direction: 'none', mode: this.arrowMode },
+      identity,
+    );
+    this.pointNavigation = null;
+    this.referenceGesture = null;
+    input.value = value;
+    input.setSelectionRange(start, end);
+    this.syncInputState();
+  }
+
+  /** F4 / Cmd+T: cycle the absolute/relative form of the ref under the caret. */
+  private rotateReferenceAtCaret(): void {
+    const input = this.input;
+    const base = this.editingAddr;
+    if (!input || !base) return;
+    this.draftHistory.endGroup();
+    const r = rotateRefAt(input.value, input.selectionStart ?? input.value.length, {
+      r1c1: this.deps.store.getState().ui.r1c1 === true,
+      base: { row: base.row, col: base.col },
+    });
+    if (r.text !== input.value) this.applyRecordedEdit(r.text, r.caret, r.caret, 'f4');
+  }
 
   private readonly onKeyUp = (): void => {
     this.refreshHelpersAfterSelection();
@@ -917,7 +848,7 @@ export class InlineEditor {
   private syncInputState(): void {
     fitEditorToContent(this.input, this.editingAddr, this.deps);
     if (this.input) alignEditorText(this.input, this.editingAddr, this.deps, this.input.value);
-    if (this.input) {
+    if (this.input && this.editingAddr) {
       mutators.setEditor(this.deps.store, {
         kind: 'edit',
         raw: this.input.value,
@@ -1024,28 +955,15 @@ export class InlineEditor {
   private insertNewline(): void {
     const el = this.input;
     if (!el) return;
-    const before = this.captureDraftSnapshot();
-    this.draftHistory.endGroup();
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? start;
-    const value = `${el.value.slice(0, start)}\n${el.value.slice(end)}`;
     const caret = start + 1;
-    this.draftHistory.recordCommand(
-      before,
-      {
-        value,
-        start: caret,
-        end: caret,
-        direction: 'none',
-        mode: this.arrowMode,
-      },
+    this.applyRecordedEdit(
+      `${el.value.slice(0, start)}\n${el.value.slice(end)}`,
+      caret,
+      caret,
       'newline',
     );
-    el.value = value;
-    el.setSelectionRange(caret, caret);
-    this.referenceGesture = null;
-    this.pointNavigation = null;
-    this.syncInputState();
   }
 
   /** Remove the transient editor DOM and its subscriptions without changing
@@ -1180,53 +1098,15 @@ export class InlineEditor {
         pickListValues(this.deps.wb.cells(sheet), col, beforeRow),
       getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
       getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
-      getFunctionNames: () => this.deps.wb.functionNames(),
-      getFunctionDisplayNames: () => {
-        const wb = this.deps.wb;
-        const names = wb.functionNames();
-        if (!names) return null;
-        const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(wb) ?? 'en-US');
-        return names.map((name) => wb.localizeFunctionName(name, locale) || name);
-      },
-      resolveFunctionName: (rawName) => {
-        const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US');
-        return (
-          this.deps.wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase()
-        );
-      },
-      getListSeparator: () => this.deps.wb.localeFacts()?.listSeparator ?? ',',
-      getFunctionDetails: (canonicalName) =>
-        resolveFormulaHelperDetails(canonicalName, {
-          localeTag: catalogLocaleTag(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US'),
-          listSeparator: this.deps.wb.localeFacts()?.listSeparator ?? ',',
-          getMetadata: (name, locale) => this.deps.wb.functionMetadataForLocale(name, locale),
-          localizeName: (name) => {
-            const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US');
-            return this.deps.wb.localizeFunctionName(name, locale) || name;
-          },
-          getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
-        }),
+      ...workbookAutocompleteCatalog(
+        () => this.deps.wb,
+        (name) => this.deps.getCustomFunctionArgs?.(name),
+      ),
       labels: this.deps.getLabels?.().autocomplete,
     });
     this.argHelper = attachArgHelper({
       input,
-      getListSeparator: () => this.deps.wb.localeFacts()?.listSeparator ?? ',',
-      getFunctionDisplayName: (canonicalName) => {
-        const wb = this.deps.wb;
-        const localeTag = catalogLocaleTag(inputLocaleForWorkbook(wb) ?? 'en-US');
-        const metadataName = wb.functionMetadataForLocale(canonicalName, localeTag)?.localizedName;
-        return (
-          metadataName ||
-          wb.localizeFunctionName(canonicalName, catalogLocaleOrdinal(localeTag)) ||
-          canonicalName
-        );
-      },
-      resolveFunctionName: (rawName) => {
-        const locale = catalogLocaleOrdinal(inputLocaleForWorkbook(this.deps.wb) ?? 'en-US');
-        return (
-          this.deps.wb.canonicalizeFunctionName(rawName, locale) || rawName.toLocaleUpperCase()
-        );
-      },
+      ...workbookArgHelperCatalog(() => this.deps.wb),
       getCustomFunctionArgs: (name) => this.deps.getCustomFunctionArgs?.(name),
       labels: this.deps.getLabels?.().argHelper,
     });

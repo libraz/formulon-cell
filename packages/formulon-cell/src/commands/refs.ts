@@ -1,4 +1,5 @@
 import { colFromLetters, formatA1Cell, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
+import type { EditorRefHighlight } from '../store/types.js';
 import { formulaCaretContext, formulaIdentifierPrefix } from './formula-edit-context.js';
 import { FUNCTION_NAMES } from './formula-function-names.js';
 import { rewriteRefs } from './formula-ref-lexer.js';
@@ -169,6 +170,18 @@ export function extractRefs(
     ? r1c1ReferenceCandidates(text, options.base)
     : a1ReferenceCandidates(text);
   return assignReferenceColors(candidates);
+}
+
+/** Grid highlights for the references in a formula draft, with relative R1C1
+ *  refs resolved against `base`, the cell the draft belongs to. */
+export function editorRefHighlights(
+  text: string,
+  base: { row: number; col: number },
+  r1c1: boolean,
+): EditorRefHighlight[] {
+  return extractRefs(text, { r1c1, base: { row: base.row, col: base.col } }).map(
+    ({ r0, c0, r1, c1, colorIndex }) => ({ r0, c0, r1, c1, colorIndex }),
+  );
 }
 
 /** Distinct accent colors used for formula-edit reference highlighting. They

@@ -106,6 +106,22 @@ describe('mount/formula-bar — active draft history', () => {
     harness.detach();
   });
 
+  it('leaves a read-only formula display untouched on Cmd+T', () => {
+    sheet.host.dataset.fcPlatform = 'mac';
+    const harness = attachFormulaBarHarness(sheet, vi.fn());
+    const { fxInput: input } = harness;
+    input.readOnly = true;
+    input.value = '=A1+1';
+    input.focus();
+    input.dispatchEvent(new FocusEvent('focus'));
+    input.setSelectionRange(3, 3);
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 't', metaKey: true, cancelable: true }),
+    );
+    expect(input.value).toBe('=A1+1');
+    harness.detach();
+  });
+
   it('undoes ordinary typing and prevents a cancelled history event from undoing twice', () => {
     const harness = attachFormulaBarHarness(sheet, vi.fn());
     const { controller, fxInput: input } = harness;

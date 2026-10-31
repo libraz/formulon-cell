@@ -1,9 +1,12 @@
 import { formatA1Cell } from '../engine/address.js';
+import type { Addr } from '../engine/types.js';
 
 /** Capability surfaced by the inline editor used by the pointer layer to
  *  detect a live formula edit and inject clicked cell references. */
 export interface RangeInsertTarget {
   isFormulaEdit: () => boolean;
+  /** Cell whose formula is being edited; the base for relative references. */
+  editedCell: () => Addr;
   insertRefAtCaret: (ref: string, options?: { phase: 'start' | 'update' }) => void;
 }
 
