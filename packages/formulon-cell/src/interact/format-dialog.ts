@@ -2,23 +2,22 @@ import {
   canonicalizeLocalizedFormulaForInput,
   inputLocaleForWorkbook,
 } from '../commands/coerce-input.js';
-import {
-  planSelectionFormat,
-  type SelectionFormatAction,
-  type SelectionFormatPlan,
-  setFont,
-} from '../commands/format.js';
+import { type SelectionFormatAction, setFont } from '../commands/format.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAt, mergeWillLoseData } from '../commands/merge.js';
 import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
+import {
+  planSelectionFormat,
+  type SelectionFormatPlan,
+} from '../commands/selection-format-plan.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../components/color-palette.js';
 import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
 import {
   displayCellFormatFromXf,
   effectiveCellFormatWithPending,
-} from '../engine/cell-format-sync.js';
+} from '../engine/cell-format-projection.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';

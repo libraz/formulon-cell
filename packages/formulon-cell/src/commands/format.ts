@@ -4,7 +4,10 @@ import {
   type AxisFormatPatchResolver,
   prepareAxisFormatOverrideWithWorkbook,
 } from '../engine/axis-format-sync.js';
-import { cellFormatFromXf, effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import {
+  cellFormatFromXf,
+  effectiveCellFormatWithPending,
+} from '../engine/cell-format-projection.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import { numFmtWithDecimals } from '../engine/format-writeback.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -39,8 +42,6 @@ import {
 } from './selection-format-plan.js';
 
 export { formatNumber } from '../format/number-format.js';
-export type { BorderPreset } from './border-presets.js';
-export { planSelectionFormat, type SelectionFormatPlan } from './selection-format-plan.js';
 
 type ToggleKey = 'bold' | 'italic' | 'underline' | 'strike';
 

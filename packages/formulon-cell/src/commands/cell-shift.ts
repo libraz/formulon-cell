@@ -7,7 +7,7 @@ import {
 import {
   captureSyncedFormatKeysForStructure,
   restoreSyncedFormatKeysForStructure,
-} from '../engine/cell-format-sync.js';
+} from '../engine/synced-format-keys.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import {

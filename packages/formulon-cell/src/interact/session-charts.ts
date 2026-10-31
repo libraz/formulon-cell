@@ -50,10 +50,10 @@ import {
   chartSettingsDefaults,
   createSessionChartSettings,
   type SessionChartSettingsHandle,
-  type SessionChartSettingsLabels,
-  type SessionChartSettingsShape,
   type SettingsTab,
 } from './session-chart-settings.js';
+import type { SessionChartSettingsLabels } from './session-chart-settings-labels.js';
+import type { SessionChartSettingsShape } from './session-chart-settings-model.js';
 
 export interface SessionChartsHandle {
   refresh(): void;

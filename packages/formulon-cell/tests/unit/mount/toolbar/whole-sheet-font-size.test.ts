@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { effectiveCellFormatFromEngine } from '../../../../src/engine/cell-format-sync.js';
+import { effectiveCellFormatFromEngine } from '../../../../src/engine/cell-format-projection.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createDefaultRibbonHelpers } from '../../../../src/mount/toolbar-defaults.js';
 import { Spreadsheet } from '../../../../src/mount.js';

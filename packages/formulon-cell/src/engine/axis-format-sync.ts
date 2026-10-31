@@ -5,7 +5,7 @@ import {
   remapAxisFormatOverride,
   remapAxisSnapshot,
 } from './axis-structure-remap.js';
-import { patchXfIndexFromBase } from './cell-format-sync.js';
+import { patchXfIndexFromBase } from './cell-xf-writeback.js';
 import { formatHistoryBridgeFor } from './format-history-bridge.js';
 import type {
   Addr,

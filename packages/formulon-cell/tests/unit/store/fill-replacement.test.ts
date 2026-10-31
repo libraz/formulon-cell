@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applySelectionFormatPatch, setFillColor } from '../../../src/commands/format.js';
-import { patchXfIndexFromBase } from '../../../src/engine/cell-format-sync.js';
+import { patchXfIndexFromBase } from '../../../src/engine/cell-xf-writeback.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { formatWithPending } from '../../../src/store/pending-format.js';
 import {

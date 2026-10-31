@@ -52,6 +52,7 @@ export {
 export { type AutoSumFunction, autoSum } from './commands/auto-sum.js';
 export type { AutofitCellFormat, AutofitOptions } from './commands/autofit-measurement.js';
 export { autofitColWidth, autofitRowHeight } from './commands/autofit-measurement.js';
+export type { BorderPreset } from './commands/border-presets.js';
 export type { DeleteCellsDirection, InsertCellsDirection } from './commands/cell-shift.js';
 export { deleteCells, insertCells } from './commands/cell-shift.js';
 export type {
@@ -221,7 +222,6 @@ export {
   applyFlashFillPattern,
   inferFlashFillPattern,
 } from './commands/flash-fill.js';
-export type { BorderPreset } from './commands/format.js';
 export {
   bumpDecimals,
   bumpIndent,

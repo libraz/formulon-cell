@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { axisTitleText } from '../../../src/charts/axes.js';
 import { layoutChart } from '../../../src/charts/index.js';
 import {
   chartLabelPositions,
   defaultChartLabelPosition,
   resolveChartLabelPosition,
 } from '../../../src/charts/label-options.js';
-import {
-  axisTitleText,
-  chartTitleText,
-  layoutUnsupportedChart,
-} from '../../../src/charts/layout.js';
+import { chartTitleText, layoutUnsupportedChart } from '../../../src/charts/layout.js';
 import type {
   ChartAxisSpec,
   ChartData,

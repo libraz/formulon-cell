@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../../src/engine/address.js';
-import { effectiveCellFormatFromEngine } from '../../../../src/engine/cell-format-sync.js';
+import { effectiveCellFormatFromEngine } from '../../../../src/engine/cell-format-projection.js';
 import { defaultFontForLocale, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { BUILT_IN_LOCALES } from '../../../../src/i18n/locales.js';
 import { createDefaultRibbonHelpers } from '../../../../src/mount/toolbar-defaults.js';

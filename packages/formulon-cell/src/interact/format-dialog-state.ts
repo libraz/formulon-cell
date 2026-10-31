@@ -1,4 +1,4 @@
-import type { SelectionFormatPlan } from '../commands/format.js';
+import type { SelectionFormatPlan } from '../commands/selection-format-plan.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { effectiveCellFormatFromEngine } from '../../../src/engine/cell-format-projection.js';
 import {
-  effectiveCellFormatFromEngine,
   hydrateCellFormatsFromEngine,
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';

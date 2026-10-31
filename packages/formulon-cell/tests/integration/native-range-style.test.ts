@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { MAX_COL, MAX_ROW } from '../../src/engine/address.js';
-import { patchXfIndexFromBase } from '../../src/engine/cell-format-sync.js';
+import { patchXfIndexFromBase } from '../../src/engine/cell-xf-writeback.js';
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 
 describe('updated native range-style API', () => {

@@ -1,5 +1,5 @@
 import { parseAddrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
 import { phoneticGuideSize } from '../engine/phonetic-sync.js';
 /** Content-fit column widths and row heights. Every autofit entry point — header

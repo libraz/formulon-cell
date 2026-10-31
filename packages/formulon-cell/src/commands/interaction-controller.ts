@@ -1,5 +1,5 @@
 import { addrKey } from '../engine/address.js';
-import { cellFormatFromXf } from '../engine/cell-format-sync.js';
+import { cellFormatFromXf } from '../engine/cell-format-projection.js';
 import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import type { Addr, Range } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';

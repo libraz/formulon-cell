@@ -12,13 +12,7 @@ import { parseAddrKey } from './address.js';
 import { syncAutoFilterToEngine, syncHiddenRowsToEngine } from './auto-filter-sync.js';
 import { remapActiveAxisFormatOverrides, remapAxisFormatOverrides } from './axis-format-sync.js';
 import { bindCalcSettingsStore } from './calc-settings-sync.js';
-import {
-  captureSyncedFormatKeyMembership,
-  flushFormatToEngine,
-  remapSyncedFormatKeys,
-  restoreSyncedFormatKeyMembership,
-  syncNamedStyleCatalogToEngine,
-} from './cell-format-sync.js';
+import { flushFormatToEngine, syncNamedStyleCatalogToEngine } from './cell-format-sync.js';
 import { DrawingObjectMirror } from './drawing-object-mirror.js';
 import {
   createFormatHistoryBridge,
@@ -29,6 +23,11 @@ import {
 import { advanceNativeFormatEpoch } from './native-format-epoch.js';
 import { syncPageSetupToEngine } from './print-sync.js';
 import { syncSheetPrToEngine } from './sheet-pr-sync.js';
+import {
+  captureSyncedFormatKeyMembership,
+  remapSyncedFormatKeys,
+  restoreSyncedFormatKeyMembership,
+} from './synced-format-keys.js';
 import { TableMirror } from './table-mirror.js';
 import type { SheetAxisFormatOverride, SheetFontOverride } from './types.js';
 import { syncViewStateToEngine } from './view-state-sync.js';

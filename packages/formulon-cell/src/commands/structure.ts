@@ -13,11 +13,6 @@ import {
   remapAxisFormatOverride,
   remapSheetFontOverride,
 } from '../engine/axis-structure-remap.js';
-import {
-  captureSyncedFormatKeysForStructure,
-  remapSyncedFormatKeysForStructure,
-  restoreSyncedFormatKeysForStructure,
-} from '../engine/cell-format-sync.js';
 import { hydrateChartsFromEngine } from '../engine/charts-sync.js';
 import {
   type FormatHistoryTrackingSnapshot,
@@ -33,6 +28,11 @@ import {
   hydrateSlicersFromEngine,
 } from '../engine/slicer-sync.js';
 import { captureSparklineGroups, hydrateSparklinesFromEngine } from '../engine/sparkline-sync.js';
+import {
+  captureSyncedFormatKeysForStructure,
+  remapSyncedFormatKeysForStructure,
+  restoreSyncedFormatKeysForStructure,
+} from '../engine/synced-format-keys.js';
 import type {
   Addr,
   CellValue,

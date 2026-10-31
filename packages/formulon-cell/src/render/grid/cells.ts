@@ -1,7 +1,7 @@
 import { isHeaderRow, tableForCell } from '../../commands/format-as-table.js';
 import { formatA1FormulaAsR1C1 } from '../../commands/refs.js';
 import { addrKey } from '../../engine/address.js';
-import { effectiveCellFormatFromEngine } from '../../engine/cell-format-sync.js';
+import { effectiveCellFormatFromEngine } from '../../engine/cell-format-projection.js';
 import { evaluateCfFromEngine } from '../../engine/cf-sync.js';
 import { formulaForEdit } from '../../engine/edit-seed.js';
 import { numFmtToFormatCode } from '../../engine/format-writeback.js';

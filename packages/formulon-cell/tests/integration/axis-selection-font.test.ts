@@ -5,7 +5,7 @@ import { applySelectionFormatAction, setFont, setFontColor } from '../../src/com
 import { History } from '../../src/commands/history.js';
 import { recordFormatChange } from '../../src/commands/slice-history.js';
 import { MAX_COL, MAX_ROW } from '../../src/engine/address.js';
-import { patchXfIndexFromBase } from '../../src/engine/cell-format-sync.js';
+import { patchXfIndexFromBase } from '../../src/engine/cell-xf-writeback.js';
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import { createDefaultRibbonHelpers } from '../../src/mount/toolbar-defaults.js';
 import { Spreadsheet } from '../../src/mount.js';

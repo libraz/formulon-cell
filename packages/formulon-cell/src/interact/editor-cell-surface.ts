@@ -1,5 +1,5 @@
 import { coerceInput, inputLocaleForWorkbook, workbookDate1904 } from '../commands/coerce-input.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView, type Rect } from '../render/geometry.js';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { planSelectionFormat } from '../../../src/commands/format.js';
 import { History } from '../../../src/commands/history.js';
+import { planSelectionFormat } from '../../../src/commands/selection-format-plan.js';
 import { addrKey } from '../../../src/engine/address.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { runFormatDialogTransaction } from '../../../src/interact/format-dialog-transaction.js';

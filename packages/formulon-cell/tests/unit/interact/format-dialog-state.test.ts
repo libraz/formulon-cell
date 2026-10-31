@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { planSelectionFormat, type SelectionFormatPlan } from '../../../src/commands/format.js';
+import {
+  planSelectionFormat,
+  type SelectionFormatPlan,
+} from '../../../src/commands/selection-format-plan.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../src/engine/address.js';
 import type { Range } from '../../../src/engine/types.js';
 import {

@@ -22,7 +22,7 @@ import { executeNoteVisibilityAction } from '../commands/ribbon-comment.js';
 import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-dimension.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { type Addr, PivotSortOrder } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';

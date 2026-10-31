@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { effectiveCellFormatWithPending } from '../../../src/engine/cell-format-projection.js';
 import {
-  captureSyncedFormatKeyMembership,
-  effectiveCellFormatWithPending,
   flushFormatToEngine,
   hydrateCellFormatsFromEngine,
-  restoreSyncedFormatKeyMembership,
-  seedSyncedFormatKeys,
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';
+import {
+  captureSyncedFormatKeyMembership,
+  restoreSyncedFormatKeyMembership,
+  seedSyncedFormatKeys,
+} from '../../../src/engine/synced-format-keys.js';
 import type {
   Addr,
   BorderRecord,

@@ -1,6 +1,6 @@
 import type { PaginationPage, PaginationResult } from '@libraz/formulon';
 import { colLetter, formatA1Cell, parseAddrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { numFmtToFormatCode } from '../engine/format-writeback.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.

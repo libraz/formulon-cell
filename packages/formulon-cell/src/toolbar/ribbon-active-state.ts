@@ -1,13 +1,13 @@
+import type { BorderPreset as CommandBorderPreset } from '../commands/border-presets.js';
 import { activeCellStyleId } from '../commands/cell-styles.js';
 import { allNotesVisible, commentAt, noteVisibleAt } from '../commands/comment.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
-import type { BorderPreset as CommandBorderPreset } from '../commands/format.js';
 import { tableForCell } from '../commands/format-as-table.js';
 import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { fontCssPxToDisplayPoints, fontPointsToCssPx } from '../engine/font-units.js';
 import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount.js';

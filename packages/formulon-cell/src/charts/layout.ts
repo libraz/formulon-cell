@@ -44,8 +44,6 @@ import type {
   XYChartData,
 } from './types.js';
 
-export { axisTitleText } from './axes.js';
-
 const finite = (value: number, fallback: number): number =>
   Number.isFinite(value) ? value : fallback;
 

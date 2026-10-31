@@ -1,5 +1,5 @@
 import { addrKey } from '../engine/address.js';
-import { cellFormatFromXf } from '../engine/cell-format-sync.js';
+import { cellFormatFromXf } from '../engine/cell-format-projection.js';
 import { localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { CellXf, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -25,10 +25,11 @@ import {
   stylePayloadMatches,
 } from './cell-style-groups.js';
 import { recordDialogFormatChange } from './dialog-format-history.js';
-import { applyFormatPatch, applySelectionFormatAction, planSelectionFormat } from './format.js';
+import { applyFormatPatch, applySelectionFormatAction } from './format.js';
 import type { History } from './history.js';
 import type { InteractionOrigin } from './interaction-policy.js';
 import { mergeAnchorOf } from './merge.js';
+import { planSelectionFormat } from './selection-format-plan.js';
 import { recordFormatChange, recordFormatChangeWithRepeat } from './slice-history.js';
 
 export type {

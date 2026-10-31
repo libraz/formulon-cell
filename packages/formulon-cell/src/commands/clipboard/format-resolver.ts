@@ -1,5 +1,5 @@
 import { addrKey } from '../../engine/address.js';
-import { effectiveCellFormatWithPending } from '../../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../../engine/cell-format-projection.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { CellFormat, State } from '../../store/store.js';
 import type { ClipboardFormatResolver } from './snapshot.js';

@@ -12,7 +12,7 @@ import {
   stylePayloadMatchesNative,
 } from '../commands/cell-styles.js';
 import type { CellFormat, CustomCellStyle, State } from '../store/store.js';
-import { cellFormatFromXf } from './cell-format-sync.js';
+import { cellFormatFromXf } from './cell-format-projection.js';
 import { localeForWorkbook } from './profile-text-semantics.js';
 import type { CellXf } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';

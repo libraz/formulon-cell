@@ -24,7 +24,7 @@ import {
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';

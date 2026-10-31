@@ -4,14 +4,13 @@
 // half-applied dialog never reaches history.
 
 import { recordDialogFormatChange } from '../commands/dialog-format-history.js';
-import {
-  applySelectionFormatAction,
-  planSelectionFormat,
-  type SelectionFormatAction,
-  type SelectionFormatPlan,
-} from '../commands/format.js';
+import { applySelectionFormatAction, type SelectionFormatAction } from '../commands/format.js';
 import { History } from '../commands/history.js';
 import { applyMerge, applyUnmerge } from '../commands/merge.js';
+import {
+  planSelectionFormat,
+  type SelectionFormatPlan,
+} from '../commands/selection-format-plan.js';
 import { recordMergesChangeWithEngine } from '../commands/slice-history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';

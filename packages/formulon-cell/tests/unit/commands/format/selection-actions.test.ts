@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applySelectionFormatAction,
-  planSelectionFormat,
-} from '../../../../src/commands/format.js';
+import { applySelectionFormatAction } from '../../../../src/commands/format.js';
 import { History } from '../../../../src/commands/history.js';
 import {
   InteractionController,
@@ -10,6 +7,7 @@ import {
 } from '../../../../src/commands/interaction-controller.js';
 import { fixedFormPolicy } from '../../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../../src/commands/protection.js';
+import { planSelectionFormat } from '../../../../src/commands/selection-format-plan.js';
 import { MAX_COL, MAX_ROW } from '../../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';

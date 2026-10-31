@@ -1,4 +1,4 @@
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { NumFmt, SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';

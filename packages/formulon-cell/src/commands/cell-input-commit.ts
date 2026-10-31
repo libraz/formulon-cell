@@ -4,7 +4,8 @@
 // workbook path serves only controller-less (standalone) hosts.
 
 import { addrKey } from '../engine/address.js';
-import { effectiveCellFormatWithPending, flushFormatToEngine } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
+import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import { sheetFontPatchFor } from '../engine/whole-sheet-font-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';

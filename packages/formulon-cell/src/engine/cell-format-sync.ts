@@ -32,24 +32,6 @@ import { syncValidationsToEngine } from './validation-sync.js';
 import { sheetFontPatchFor, syncWholeSheetFontOverrides } from './whole-sheet-font-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-export {
-  cellFormatFromXf,
-  displayCellFormatFromXf,
-  effectiveCellFormatFromEngine,
-  effectiveCellFormatWithPending,
-} from './cell-format-projection.js';
-export { patchXfIndexFromBase } from './cell-xf-writeback.js';
-export { flattenPhoneticRuns } from './phonetic-sync.js';
-export {
-  captureSyncedFormatKeyMembership,
-  captureSyncedFormatKeysForStructure,
-  remapSyncedFormatKeys,
-  remapSyncedFormatKeysForStructure,
-  restoreSyncedFormatKeyMembership,
-  restoreSyncedFormatKeysForStructure,
-  seedSyncedFormatKeys,
-} from './synced-format-keys.js';
-
 const MAX_RESOLVED_XF_CACHE_ENTRIES = 256;
 
 interface ResolvedXfCacheEntry {

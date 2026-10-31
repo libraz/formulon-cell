@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planSelectionFormat } from '../../../src/commands/format.js';
+import { planSelectionFormat } from '../../../src/commands/selection-format-plan.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../../../src/engine/address.js';
 import type { Range } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';

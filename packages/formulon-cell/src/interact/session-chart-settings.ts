@@ -37,13 +37,6 @@ import {
   type StylesState,
 } from './session-chart-settings-tabs/styles.js';
 
-export type { SessionChartSettingsLabels } from './session-chart-settings-labels.js';
-export type {
-  SessionChartSeriesRefs,
-  SessionChartSettingsPatch,
-  SessionChartSettingsShape,
-} from './session-chart-settings-model.js';
-
 /** The host may use this hook to format values according to its workbook
  * profile. The renderer keeps the hook optional so the chart package remains
  * usable without a workbook engine. */

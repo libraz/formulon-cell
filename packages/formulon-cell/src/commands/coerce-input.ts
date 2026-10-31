@@ -1,4 +1,4 @@
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { formatCodeToNumFmt } from '../engine/format-writeback.js';
 import {
   canonicalizeFormula,

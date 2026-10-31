@@ -1,10 +1,10 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
+import { flushFormatToEngine } from '../engine/cell-format-sync.js';
+import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
 import {
   captureSyncedFormatKeyMembership,
-  flushFormatToEngine,
   restoreSyncedFormatKeyMembership,
-} from '../engine/cell-format-sync.js';
-import { formatHistoryBridgeFor } from '../engine/format-history-bridge.js';
+} from '../engine/synced-format-keys.js';
 import type { Addr, SheetAxisFormatOverride, SheetFontOverride } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';

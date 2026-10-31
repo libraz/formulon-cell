@@ -2,7 +2,7 @@
 // raw draft over the anchor cell, hiding itself whenever the cell is off-sheet,
 // scrolled behind a frozen band, or outside the grid.
 
-import { effectiveCellFormatWithPending } from '../engine/cell-format-sync.js';
+import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
