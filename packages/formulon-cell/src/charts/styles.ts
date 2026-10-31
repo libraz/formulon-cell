@@ -150,3 +150,10 @@ export const markerSize = (marker: ChartMarkerSpec): number =>
   marker.size !== undefined && Number.isFinite(marker.size) ? clamp(marker.size, 2, 72) : 5;
 
 export const markerVisible = (marker: ChartMarkerSpec): boolean => marker.visible !== false;
+
+/** A series' key colour: a line or scatter series shows its line, or its markers when it has none. */
+export const keyColor = (spec: ChartSpec, style: ReturnType<typeof resolveChartStyle>): string => {
+  if (spec.kind !== 'line' && spec.kind !== 'scatter') return fillColor(style.fill, style.color);
+  const lineless = spec.kind === 'scatter' && (spec.scatterStyle ?? 'marker') === 'marker';
+  return (lineless ? style.marker.fill?.color : style.line?.color) ?? style.color;
+};
