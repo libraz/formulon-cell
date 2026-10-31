@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://formulon.libraz.net/cell/
+    about: Guides, options and the API surface
+  - name: Wrong formula results
+    url: https://github.com/libraz/formulon/issues
+    about: Formula evaluation, recalculation and xlsx parsing belong to the formulon engine
+  - name: Security vulnerabilities
+    url: https://github.com/libraz/formulon-cell/blob/main/SECURITY.md
+    about: Report privately as described in the security policy
