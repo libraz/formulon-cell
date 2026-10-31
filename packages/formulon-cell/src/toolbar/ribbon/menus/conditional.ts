@@ -5,7 +5,8 @@
 // sets, plain menu items for highlight rules. All clicks emit a `data-cf-*`
 // attribute the playground main dispatcher reads.
 
-import { conditionalMenuText, type ToolbarLang } from '../../../index.js';
+import { conditionalMenuText } from '../../menu-text.js';
+import type { ToolbarLang } from '../../ribbon-model.js';
 
 import {
   createMenu,

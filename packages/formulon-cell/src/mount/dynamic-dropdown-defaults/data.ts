@@ -3,18 +3,17 @@ import {
   recordValidationCirclesChange,
 } from '../../commands/error-indicators.js';
 import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
-import { textToColumnsTargets } from '../../commands/text-to-columns.js';
-import { circleInvalidValidationDataWithEngine } from '../../commands/validate.js';
+import { textToColumns, textToColumnsTargets } from '../../commands/text-to-columns.js';
+import {
+  circleInvalidValidationDataWithEngine,
+  clearValidationInRangeWithEngine,
+} from '../../commands/validate.js';
 import { parseAddrKey } from '../../engine/address.js';
 import { makeRangeResolver } from '../../engine/range-resolver.js';
-import {
-  clearValidationInRangeWithEngine,
-  mutators,
-  type SpreadsheetInstance,
-  textToColumns,
-} from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import { rangeValidationsIntersect } from '../../store/range-validations.js';
 import { rangeContainsAddr } from '../../store/selection-geometry.js';
+import { mutators } from '../../store/store.js';
 import { showTextToColumnsDialog } from '../../toolbar/dialogs/text-to-columns.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled } from './menu-feedback.js';

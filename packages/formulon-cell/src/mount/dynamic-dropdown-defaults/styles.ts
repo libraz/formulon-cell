@@ -5,6 +5,7 @@ import {
   createCellStyleFromActiveFormat,
   mergeCellStylesFromWorkbook,
 } from '../../commands/cell-styles.js';
+import { addConditionalRule } from '../../commands/conditional-format.js';
 import {
   applyPivotTableStyleById,
   type CustomTableStyle,
@@ -20,19 +21,12 @@ import {
   updateTableOverlay,
 } from '../../commands/format-as-table.js';
 import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
+import { recordConditionalRulesChange, recordTablesChange } from '../../commands/slice-history.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
+import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
-import {
-  addConditionalRule,
-  type ConditionalRule,
-  formatSheetAbsoluteRange,
-  mutators,
-  parseA1Range,
-  type Range,
-  recordConditionalRulesChange,
-  recordTablesChange,
-  type SpreadsheetInstance,
-} from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import { type ConditionalRule, mutators } from '../../store/store.js';
 import { showCellStyleDialog } from '../../toolbar/dialogs/cell-style.js';
 import { showChoiceDialog } from '../../toolbar/dialogs/choice.js';
 import {
@@ -44,6 +38,7 @@ import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import { showTableStyleDialog } from '../../toolbar/dialogs/table-style.js';
 import { applyConditionalMenuAction } from '../../toolbar/ribbon/conditional-menu-action.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import { formatSheetAbsoluteRange, parseA1Range } from '../../wrappers/toolbar-a1.js';
 import { showInstanceReport } from './menu-feedback.js';
 import { normalizedSelectionRange } from './selection.js';
 

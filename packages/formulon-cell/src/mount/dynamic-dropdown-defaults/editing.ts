@@ -1,39 +1,43 @@
-import { fillOutputRange } from '../../commands/fill.js';
-import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
-import { parseAddrKey } from '../../engine/address.js';
+import { conditionalRulesForRange } from '../../commands/conditional-format.js';
 import {
-  activeFilterRange,
-  applyAdvancedFilter,
-  colLetter,
-  conditionalRulesForRange,
-  copyAdvancedFilterResult,
-  executeRibbonClearAction,
   executeRibbonFillAction,
-  executeRibbonFilterDataAction,
-  executeRibbonFindAction,
+  fillOutputRange,
   fillRange,
-  formatA1Cell,
-  formatA1Range,
-  inferAutoFilterRange,
-  inferFillSeriesDirection,
-  inferSortHasHeader,
-  mutators,
-  parseA1Range,
-  type Range,
   type RibbonFillAction,
-  type RibbonFillSeriesMode,
-  recordFormatChange,
+} from '../../commands/fill.js';
+import {
+  applyAdvancedFilter,
+  copyAdvancedFilterResult,
+  inferAutoFilterRange,
+} from '../../commands/filter.js';
+import { activeFilterRange } from '../../commands/filter-ranges.js';
+import { executeRibbonFindAction } from '../../commands/goto-special.js';
+import { runAfterAllowedRangeUnlock, selectionEditRanges } from '../../commands/protection.js';
+import { executeRibbonClearAction } from '../../commands/ribbon-clear.js';
+import { recordFormatChange } from '../../commands/slice-history.js';
+import {
+  inferSortHasHeader,
   removeDuplicates,
-  type SpreadsheetInstance,
   sortActiveColumnAuto,
   sortRangeWithHistory,
-} from '../../index.js';
+} from '../../commands/sort.js';
+import { colLetter, formatA1Cell, formatA1Range, parseAddrKey } from '../../engine/address.js';
+import type { Range } from '../../engine/types.js';
+import { executeRibbonFilterDataAction } from '../../interact/ribbon-filter-data.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import { selectionContainsAddr } from '../../store/selection-geometry.js';
+import { mutators } from '../../store/store.js';
 import { showAdvancedFilterDialog } from '../../toolbar/dialogs/advanced-filter.js';
 import { showRemoveDuplicatesDialog } from '../../toolbar/dialogs/remove-duplicates.js';
 import { type SortDialogColumn, showSortDialog } from '../../toolbar/dialogs/sort.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
-import { fillSeriesSourceRange, showFillSeriesDialog } from '../../toolbar/ribbon/fill-series.js';
+import {
+  fillSeriesSourceRange,
+  inferFillSeriesDirection,
+  type RibbonFillSeriesMode,
+  showFillSeriesDialog,
+} from '../../toolbar/ribbon/fill-series.js';
+import { parseA1Range } from '../../wrappers/toolbar-a1.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
 import { normalizedSelectionRange } from './selection.js';
 

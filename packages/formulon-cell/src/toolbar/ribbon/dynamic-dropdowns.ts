@@ -6,8 +6,9 @@
 
 import type { RibbonFillAction } from '../../commands/fill.js';
 import type { WorkbookThemePresetId } from '../../engine/workbook-theme-presets.js';
-import type { SessionChartKind, SpreadsheetInstance } from '../../index.js';
 import { clamp, viewportSize } from '../../interact/overlay-position.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import type { SessionChartKind } from '../../store/store.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import { RIBBON_DROPDOWN_MENU_FOR_COMMAND } from './activation.js';

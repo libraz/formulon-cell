@@ -1,4 +1,4 @@
-import type { ToolbarMenuText } from '../../index.js';
+import type { ToolbarMenuText } from '../menu-text.js';
 
 import { toolbarSymbolGroups } from '../ribbon/symbols.js';
 import {

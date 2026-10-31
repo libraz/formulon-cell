@@ -1,10 +1,10 @@
+import type { SpreadsheetInstance } from '../../mount.js';
+import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import {
   dispatchHostClipboard,
   handlePasteAction,
   type PasteAction,
-  type SpreadsheetInstance,
-} from '../../index.js';
-import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+} from '../../wrappers/toolbar-actions.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
 
 const buildCopyAction =

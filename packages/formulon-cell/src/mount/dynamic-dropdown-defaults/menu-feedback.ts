@@ -1,4 +1,4 @@
-import type { SpreadsheetInstance } from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import { reportDialogLabels, showReport } from '../../toolbar/dialogs/report.js';
 import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 

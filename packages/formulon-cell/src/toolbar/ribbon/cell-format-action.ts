@@ -4,28 +4,26 @@ import {
   autofitRowsHeightForRanges,
 } from '../../commands/row-col-layout.js';
 import type { Locale } from '../../i18n/strings.js';
+
 // Cell Format ribbon dispatcher. Extracted from main.ts so the playground
 // doesn't carry the dispatch table in module scope. Side effects live on the
 // caller's side via the `deps` struct (status text, tab list refresh, etc).
 
+import { setCellLocked } from '../../commands/protection.js';
 import {
   hiddenExtentInSelection,
   hideCols,
   hideRows,
-  moveSheet,
-  mutators,
-  type Range,
-  recordFormatChange,
-  recordLayoutChange,
-  renameSheet,
-  resolveTheme,
-  type SpreadsheetInstance,
-  setCellLocked,
-  setSheetHidden,
   showCols,
   showRows,
-  type ToolbarMenuText,
-} from '../../index.js';
+} from '../../commands/row-col-layout.js';
+import { moveSheet, renameSheet, setSheetHidden } from '../../commands/sheet-mutate.js';
+import { recordFormatChange, recordLayoutChange } from '../../commands/slice-history.js';
+import type { Range } from '../../engine/types.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import { mutators } from '../../store/store.js';
+import { resolveTheme } from '../../theme/resolve.js';
+import type { ToolbarMenuText } from '../menu-text.js';
 
 type CellFormatMenuText = ToolbarMenuText & {
   rowHeightLabel: string;

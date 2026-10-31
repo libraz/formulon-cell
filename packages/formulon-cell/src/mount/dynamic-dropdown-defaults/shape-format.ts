@@ -18,7 +18,7 @@ import {
   syncColorPaletteTheme,
   themeColorColumns,
 } from '../../components/color-palette.js';
-import type { SpreadsheetInstance } from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import type { SessionIllustration, SessionShapeLineDash } from '../../store/store.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled } from './menu-feedback.js';

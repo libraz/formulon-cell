@@ -1,26 +1,26 @@
-import { autoSumTargets } from '../../commands/auto-sum.js';
+import { type AutoSumFunction, autoSum, autoSumTargets } from '../../commands/auto-sum.js';
+import { cellValueIsFormulaError } from '../../commands/error-indicators.js';
 import { recordRecentFunction } from '../../commands/function-history.js';
-import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
-import { addrKey } from '../../engine/address.js';
 import {
-  type AutoSumFunction,
-  autoSum,
-  cellValueIsFormulaError,
-  clearTraceArrowsByKind,
-  clearWatchedCells,
   createDefinedNamesFromSelection,
-  executeRibbonFormulaAuditingAction,
   insertDefinedNameFormula,
   listDefinedNames,
-  mutators,
   recordDefinedNamesChange,
+} from '../../commands/named-ranges.js';
+import { runAfterAllowedRangeUnlock } from '../../commands/protection.js';
+import { executeRibbonFormulaAuditingAction } from '../../commands/ribbon-formula-auditing.js';
+import { clearTraceArrowsByKind } from '../../commands/traces.js';
+import {
+  clearWatchedCells,
   recordWatchesChange,
-  type SpreadsheetInstance,
   unwatchCell,
   watchRange,
-} from '../../index.js';
+} from '../../commands/watch.js';
+import { addrKey } from '../../engine/address.js';
 import { openDataTableDialog } from '../../interact/data-table-dialog.js';
 import { openMacGoalSeekDialog } from '../../interact/mac-goal-seek-dialog.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import { mutators } from '../../store/store.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';

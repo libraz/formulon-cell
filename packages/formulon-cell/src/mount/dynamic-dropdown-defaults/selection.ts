@@ -1,4 +1,5 @@
-import type { Range, SpreadsheetInstance } from '../../index.js';
+import type { Range } from '../../engine/types.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 
 export const normalizedSelectionRange = (instance: SpreadsheetInstance): Range => {
   const r = instance.store.getState().selection.range;

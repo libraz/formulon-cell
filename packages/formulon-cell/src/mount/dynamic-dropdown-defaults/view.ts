@@ -1,6 +1,7 @@
-import { type FreezeAction, handleFreezeAction, type SpreadsheetInstance } from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuIcon } from '../../toolbar/ribbon/menus/general.js';
+import { type FreezeAction, handleFreezeAction } from '../../wrappers/toolbar-actions.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
 
 const freezeActionFromMenu = (action: string): FreezeAction | null => {

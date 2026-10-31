@@ -4,15 +4,13 @@
 // getter/setters on the ctx, because there are many external read/write sites
 // in main.ts that would otherwise need rewriting.
 
-import {
-  findNext,
-  mutators,
-  type RibbonReportItem,
-  type RibbonTab,
-  type SpreadsheetInstance,
-} from '../../index.js';
+import { findNext } from '../../commands/find.js';
 import { overlayPortalFor } from '../../interact/overlay-portal.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import { mutators } from '../../store/store.js';
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
+import type { RibbonReportItem } from '../review-tools.js';
+import type { RibbonTab } from '../ribbon-model.js';
 import { createMenu, menuIconButton, menuSeparator } from './menus/general.js';
 
 export interface BackstageTitleShellText {

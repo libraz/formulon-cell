@@ -3,33 +3,27 @@
 // Each handler accepts a `SpreadsheetInstance | null` (matching the prop
 // shape both wrappers expose) and short-circuits if no instance is mounted.
 
-import { type AutoSumFunction, autoSumTargets } from '../commands/auto-sum.js';
+import { type AutoSumFunction, autoSum, autoSumTargets } from '../commands/auto-sum.js';
+import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { ConditionalPresetAction } from '../commands/conditional-format.js';
+import { applyConditionalPresetAction } from '../commands/conditional-format.js';
 import { recordRecentFunction } from '../commands/function-history.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import {
-  addSheet,
-  applyConditionalPresetAction,
   applyFreezeMode,
-  autoSum,
-  deleteCells,
-  deleteCols,
-  deleteRows,
   type FreezeMode,
   hiddenExtentInSelection,
   hideCols,
   hideRows,
-  insertCells,
-  insertCols,
-  insertRows,
-  mutators,
-  recordConditionalRulesChange,
-  removeSheet,
   showColsAroundSelection,
   showRowsAroundSelection,
-} from '../index.js';
+} from '../commands/row-col-layout.js';
+import { addSheet, removeSheet } from '../commands/sheet-mutate.js';
+import { recordConditionalRulesChange } from '../commands/slice-history.js';
+import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { mutators } from '../store/store.js';
 import { applyMergeAction, type MergeAction } from '../toolbar/merge-action.js';
 
 export type AutoSumAction = AutoSumFunction | 'MORE';

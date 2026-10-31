@@ -5,7 +5,7 @@ import {
   createRibbonImageFromSelection,
   createRibbonShapeFromSelection,
 } from '../../commands/session-illustration.js';
-import type { SpreadsheetInstance } from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import { pickImageFileDataUrl } from '../../toolbar/dialogs/image-file.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';

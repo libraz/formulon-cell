@@ -15,18 +15,17 @@
 // Engine and command helpers come through `../index.js`, the same entry
 // point hosts use, so `SpreadsheetInstance`, `History` and `WorkbookHandle`
 // keep a single type identity.
+import { applyTextScriptToRange } from '../commands/text-script.js';
+import { formatA1Range } from '../engine/address.js';
 import {
-  applyTextScriptToRange,
   buildRibbonAddInReport,
-  formatA1Range,
-  mutators,
-  parseScriptCommand,
   type RibbonAddInAction,
-  type RibbonPdfAction,
-  resolveRibbonPdfAction,
-  type SpreadsheetInstance,
-} from '../index.js';
+} from '../interact/ribbon-add-in-report.js';
+import { type RibbonPdfAction, resolveRibbonPdfAction } from '../interact/ribbon-pdf-report.js';
+import type { SpreadsheetInstance } from '../mount.js';
+import { mutators } from '../store/store.js';
 import { showScriptCommandDialog } from '../toolbar/dialogs/script-command.js';
+import { parseScriptCommand } from '../toolbar/review-tools.js';
 import type { DynamicDropdownsCtx } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import { createCellsDropdownDefaults } from './dynamic-dropdown-defaults/cells.js';
 import { createChartDesignDropdownDefaults } from './dynamic-dropdown-defaults/chart-design.js';

@@ -6,24 +6,23 @@
 // Home tab's Styles group.
 
 import {
-  type CellStyleFallbackProfile,
-  resolveCellStyleFormat,
-} from '../../../commands/cell-styles.js';
-import type { WorkbookHandle } from '../../../engine/workbook-handle.js';
-import {
   CELL_STYLE_GROUPS,
   CELL_STYLES,
+  type CellStyleFallbackProfile,
   type CellStyleGroupId,
   type CellStyleId,
-  dictionaries,
+  resolveCellStyleFormat,
+} from '../../../commands/cell-styles.js';
+import {
   TABLE_STYLE_COLORS,
   type TableStyle,
-  type ToolbarLang,
-  type ToolbarMenuText,
-  type ToolbarText,
   tableStyleSwatch,
-} from '../../../index.js';
+} from '../../../commands/format-as-table.js';
+import type { WorkbookHandle } from '../../../engine/workbook-handle.js';
+import { dictionaries } from '../../../i18n/strings.js';
 import type { CellFormat } from '../../../store/types.js';
+import type { ToolbarMenuText } from '../../menu-text.js';
+import type { ToolbarLang, ToolbarText } from '../../ribbon-model.js';
 
 import {
   createMenu,

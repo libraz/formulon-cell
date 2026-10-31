@@ -1,19 +1,18 @@
 import { blockDataTableCells } from '../../commands/data-table-guard.js';
 import { hyperlinkAt, isFollowableHyperlinkTarget } from '../../commands/hyperlinks.js';
 import {
+  executeRibbonPivotTableAction,
+  type RibbonPivotTableAction,
+} from '../../commands/pivot-table.js';
+import {
   isCellWritable,
   runAfterAllowedRangeUnlock,
   warnProtected,
 } from '../../commands/protection.js';
-import {
-  createRibbonChartFromSelection,
-  executeRibbonHyperlinkAction,
-  executeRibbonPivotTableAction,
-  mutators,
-  type RibbonPivotTableAction,
-  type SessionChartKind,
-  type SpreadsheetInstance,
-} from '../../index.js';
+import { createRibbonChartFromSelection } from '../../commands/session-chart.js';
+import { executeRibbonHyperlinkAction } from '../../interact/ribbon-hyperlink.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import { mutators, type SessionChartKind } from '../../store/store.js';
 import { showSymbolDialog } from '../../toolbar/dialogs/symbol.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';

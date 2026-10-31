@@ -2,7 +2,7 @@
 // shared i18n dictionary so toolbar/context-menu copy stays localized in one
 // place while the primary ribbon label keeps the Office-like wording.
 
-import type { Strings } from '../../../index.js';
+import type { Strings } from '../../../i18n/strings.js';
 
 import { createMenu, menuIconButton, menuSeparator } from './general.js';
 

@@ -1,7 +1,7 @@
 // Review tab menus: comments, watch window, sheet/workbook protection. Each
 // factory builds shared icon menu rows extracted from main.ts.
 
-import type { ToolbarMenuText } from '../../../index.js';
+import type { ToolbarMenuText } from '../../menu-text.js';
 
 import { createMenu, menuIconButton, menuIdForCommand, menuSeparator } from './general.js';
 

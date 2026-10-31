@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-
-import { SHEET_TAB_COLOR_ACTIONS } from '../../src/index.js';
 import {
   SHEET_TAB_COLOR_CHOICES,
   sheetTabColorActionForColor,
   sheetTabColorByAction,
 } from '../../src/sheet-tab-colors.js';
+import { SHEET_TAB_COLOR_ACTIONS } from '../../src/wrappers/toolbar-types.js';
 
 describe('sheet tab color shared choices', () => {
   it('keeps ribbon actions, wrapper actions, and color lookup in one palette', () => {

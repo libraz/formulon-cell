@@ -3,7 +3,8 @@
 // menuitem/menuitemradio entries so the parent can toggle the radio state after
 // rendering.
 
-import type { ToolbarLang, ToolbarMenuText } from '../../../index.js';
+import type { ToolbarMenuText } from '../../menu-text.js';
+import type { ToolbarLang } from '../../ribbon-model.js';
 
 import {
   createMenu,

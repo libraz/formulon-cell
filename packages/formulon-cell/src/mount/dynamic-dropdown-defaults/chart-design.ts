@@ -13,7 +13,7 @@ import {
   chartUsesPalette,
   selectedSessionChart,
 } from '../../commands/chart-design.js';
-import type { SpreadsheetInstance } from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
 

@@ -1,19 +1,18 @@
 import type { Locale } from '../../i18n/strings.js';
+
 // Extracted from main.ts. Dispatches the ribbon's conditional formatting menu
 // actions: opens the new-rule / manage dialogs, prompts for inline rule input,
 // or applies preset actions on the store. State (workbook instance, locale,
 // fills, prompt closures) is injected via a deps struct so the function stays
 // host-agnostic.
 
-import type {
-  CellFormat,
-  ConditionalDialogOpenOptions,
-  ConditionalPresetAction,
-  ConditionalRule,
-  Range,
-  SpreadsheetInstance,
-} from '../../index.js';
-import { applyConditionalPresetAction, recordConditionalRulesChange } from '../../index.js';
+import type { ConditionalPresetAction } from '../../commands/conditional-format.js';
+import { applyConditionalPresetAction } from '../../commands/conditional-format.js';
+import { recordConditionalRulesChange } from '../../commands/slice-history.js';
+import type { Range } from '../../engine/types.js';
+import type { ConditionalDialogOpenOptions } from '../../interact/conditional-dialog.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import type { CellFormat, ConditionalRule } from '../../store/store.js';
 
 import { buildCfMenuText } from './menus/conditional.js';
 

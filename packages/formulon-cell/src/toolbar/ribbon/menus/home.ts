@@ -8,8 +8,10 @@
 // `dictionaries[lang].sheetTabs` for the sheet-management entries — so the
 // factory takes a `HomeMenuDeps` bundle instead of just the menu dict.
 
-import type { Strings, ToolbarLang, ToolbarMenuText, ToolbarText } from '../../../index.js';
+import type { Strings } from '../../../i18n/strings.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../../../sheet-tab-colors.js';
+import type { ToolbarMenuText } from '../../menu-text.js';
+import type { ToolbarLang, ToolbarText } from '../../ribbon-model.js';
 import {
   colorSwatchButton,
   colorSwatchGrid,

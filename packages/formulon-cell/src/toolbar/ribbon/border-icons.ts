@@ -3,7 +3,7 @@
 // has no dependency on the playground's runtime state — only the
 // surrounding menu factory in main.ts wires these into the actual DOM.
 
-import type { CellBorderStyle } from '../../index.js';
+import type { CellBorderStyle } from '../../store/store.js';
 
 export type BorderPreviewSide = 'thin' | 'thick' | 'double' | null;
 

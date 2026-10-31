@@ -1,21 +1,21 @@
 import { insertCopiedBand } from '../../commands/clipboard/insert-copied-cells.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
+import { hiddenExtentInSelection } from '../../commands/row-col-layout.js';
 import { addrKey } from '../../engine/address.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
-import {
-  handleDeleteCellsAction,
-  handleInsertCellsAction,
-  hiddenExtentInSelection,
-  mutators,
-  type SpreadsheetInstance,
-} from '../../index.js';
 import { openCellShiftDialog } from '../../interact/cell-shift-dialog.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../../sheet-tab-colors.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
+import { mutators } from '../../store/store.js';
 import { showDimensionDialog } from '../../toolbar/dialogs/dimension.js';
 import { showRenameSheetDialog } from '../../toolbar/dialogs/rename-sheet.js';
 import { applyCellFormatAction } from '../../toolbar/ribbon/cell-format-action.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import {
+  handleDeleteCellsAction,
+  handleInsertCellsAction,
+} from '../../wrappers/toolbar-actions.js';
 import type { DefaultDynamicDropdownsOptions } from '../dynamic-dropdowns-defaults.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
 import { hasActiveCopy, normalizedSelectionRange } from './selection.js';

@@ -1,3 +1,4 @@
+import { commentAt, listComments } from '../../commands/comment.js';
 import {
   addAllowedEditRange,
   allowedEditRangeHasPassword,
@@ -14,19 +15,15 @@ import {
   verifyWorkbookStructurePassword,
   workbookStructureHasPassword,
 } from '../../commands/protection.js';
+import { executeRibbonCommentAction } from '../../commands/ribbon-comment.js';
+import { executeRibbonProtectionAction } from '../../commands/ribbon-protection.js';
+import { formatA1Range } from '../../engine/address.js';
 import {
   allowedEditRangeAreas,
   areasFromSqref,
   sqrefFromAreas,
 } from '../../engine/protection-sync.js';
-import {
-  commentAt,
-  executeRibbonCommentAction,
-  executeRibbonProtectionAction,
-  formatA1Range,
-  listComments,
-  type SpreadsheetInstance,
-} from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
   showAllowEditRangeDialog,

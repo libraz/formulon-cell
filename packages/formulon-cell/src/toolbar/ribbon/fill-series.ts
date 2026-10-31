@@ -1,11 +1,12 @@
 import type { Locale } from '../../i18n/strings.js';
+
 // Fill Series subsystem: direction/mode types, the source-range collapse
 // helper, the auto-direction heuristic, and the modal dialog that lets the
 // user pick direction + series type. Kept self-contained so main.ts only
 // owns the imperative `runFillSeries` / `applyFillSeries` glue.
 
+import type { Range } from '../../engine/types.js';
 import { dictionaries, type Strings } from '../../i18n/strings.js';
-import type { Range } from '../../index.js';
 import {
   appendDialogActions,
   createDialogShell,

@@ -5,7 +5,8 @@
 // main dropdown. The line-color submenu hosts a shared color palette; picks
 // update the playground-owned `selectedBorderColor` via `onPickColor`.
 
-import { createColorPalette, type ToolbarText } from '../../../index.js';
+import { createColorPalette } from '../../../components/color-palette.js';
+import type { ToolbarText } from '../../ribbon-model.js';
 
 import { RIBBON_BORDERS_MENU_ID } from '../activation.js';
 import {

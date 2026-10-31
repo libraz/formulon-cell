@@ -1,11 +1,12 @@
-import { applySelectionFormatPatch, withSelectionFormatOrigin } from '../../commands/format.js';
-import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import {
-  recordRepeatableFormatChange,
-  type SpreadsheetInstance,
+  applySelectionFormatPatch,
   setNumFmt,
   setRotation,
-} from '../../index.js';
+  withSelectionFormatOrigin,
+} from '../../commands/format.js';
+import { toggleShowPhonetic } from '../../commands/phonetic.js';
+import { recordRepeatableFormatChange } from '../../commands/slice-history.js';
+import type { SpreadsheetInstance } from '../../mount.js';
 import { formatWithPending } from '../../store/pending-format.js';
 import { applyMergeAction } from '../../toolbar/merge-action.js';
 import { openPhoneticEditor, openPhoneticSettings } from '../../toolbar/phonetic-actions.js';

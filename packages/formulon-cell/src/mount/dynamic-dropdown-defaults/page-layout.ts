@@ -1,19 +1,18 @@
 import type { OperationIntent } from '../../commands/interaction-policy.js';
-import { workbookThemeMatchesPreset } from '../../engine/workbook-theme-presets.js';
 import {
   addPrintArea,
   clearPrintArea,
-  clearSheetBackgroundImage,
-  formatA1Range,
-  getPageSetup,
   insertManualPageBreak,
   removeManualPageBreak,
   resetManualPageBreaks,
-  type SpreadsheetInstance,
   setPrintArea,
-  setSheetBackgroundImage,
-  type ThemeName,
-} from '../../index.js';
+} from '../../commands/page-setup.js';
+import { clearSheetBackgroundImage, setSheetBackgroundImage } from '../../commands/view.js';
+import { formatA1Range } from '../../engine/address.js';
+import { workbookThemeMatchesPreset } from '../../engine/workbook-theme-presets.js';
+import type { ThemeName } from '../../extensions/index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import { getPageSetup } from '../../store/store.js';
 import { pickImageFileDataUrl } from '../../toolbar/dialogs/image-file.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import { applyWorkbookTheme } from '../workbook-theme-action.js';

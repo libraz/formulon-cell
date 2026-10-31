@@ -4,8 +4,10 @@
 // the grid) and exposes two submenus for the line color & line style
 // brush settings.
 
+import { setBorderPreset } from '../../commands/format.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../../components/color-palette.js';
-import { type CellBorderStyle, type SpreadsheetInstance, setBorderPreset } from '../../index.js';
+import type { SpreadsheetInstance } from '../../mount.js';
+import type { CellBorderStyle } from '../../store/store.js';
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import { RIBBON_BORDERS_MENU_ID } from './activation.js';
 
