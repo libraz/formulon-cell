@@ -128,6 +128,7 @@ Only a direct import of `@libraz/formulon/threads` needs `worker: { format: 'es'
 ## What's inside
 
 - Desktop-spreadsheet chrome: formula bar, status bar, ribbon, sheet tabs, context menu, and dialogs (format cells, paste special, find/replace, Go To, conditional formatting, named ranges, validation, PivotTable creation, and more).
+- Formula editing as on the desktop: arrow keys and F4 pick and cycle references, Ctrl+arrow jumps to the data edge while pointing, Ctrl+Z undoes inside the draft, F9 evaluates the selected part, and the R1C1 reference style works throughout. A typed web address becomes a hyperlink when the cell is committed.
 - A canvas-rendered grid themed through CSS tokens. `paper` (light), `ink` (dark), and `contrast` ship in the box.
 - Charts (column, bar, line, area, pie, doughnut and scatter) with a settings panel. Charts in loaded workbooks are edited in place and saved back.
 - XLSX persistence for threaded comments and notes, images, charts, shapes, sparklines, tables and table styles, PivotTables, slicers, workbook themes, filters, sheet and workbook protection, view settings and calculation options. Loaded pictures can be moved, resized and reordered unless they use an absolute anchor. Save As can also write `.xlsb`, with a warning that lists what the binary format drops.
@@ -157,7 +158,7 @@ yarn build
 yarn test
 ```
 
-Releases follow the manual tag-based flow in [`docs/releasing.md`](./docs/releasing.md).
+Pull requests are welcome; [`CONTRIBUTING.md`](./CONTRIBUTING.md) lists the checks CI runs. Releases follow the manual tag-based flow in [`docs/releasing.md`](./docs/releasing.md).
 
 ## Non-goals
 

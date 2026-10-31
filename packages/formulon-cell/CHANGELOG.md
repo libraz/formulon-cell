@@ -4,6 +4,42 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.13.0 — 2026-10-31
+
+### Added
+
+- Keyboard point mode for formulas, in the cell editor and the formula bar. At an empty operand position (after `=`, an operator, a comma or an open parenthesis) the arrow keys insert a reference to the neighbouring cell and keep moving or extending it; F2 switches between edit and point mode, typing into a cell starts in point mode, and a reference picked with the mouse continues with the next arrow key. Ctrl+Arrow in point mode jumps to the edge of the data, and on the grid it stays fast across long gaps of empty cells.
+- Ctrl+Z (Cmd+Z on a Mac) in the cell editor and the formula bar undoes within the formula draft and Ctrl+Y or Ctrl+Shift+Z redoes, separately from the sheet's undo stack.
+- With R1C1 references on, formulas are read relative to the edited cell: the cell editor, F4 and the reference highlight resolve `R[-1]C[2]` against the cell being edited, references to other workbooks are converted when the entry is committed, and Ctrl+Enter fills the selection with the formula.
+- A URL typed into a cell becomes a hyperlink when the editor commits.
+- A row with no explicit height grows to fit the largest font size in it, so a larger font no longer clips and a smaller one no longer leaves extra space. The height follows format changes made in the workbook file and is used for layout, painting and hit-testing.
+- `--fc-tb-on-accent` is the foreground colour for text and icons on the toolbar accent, used by the ribbon, backstage and command bar.
+
+### Changed
+
+- **Breaking:** The root entry point exports only the documented API: the names the documentation, the React and Vue packages and the demos use, and the types their signatures refer to. The remaining internal names are no longer exported. Type re-exports of `@libraz/formulon` are removed; import those types from `@libraz/formulon`.
+- Dialogs for Find and Replace, Manage Rules, Evaluate Formula, External Links, Iterative Calculation and Cell Styles share the Format Cells dialog's look. Confirm buttons are ordered by platform, single-page dialogs size to their content, and native controls and focus rings take the theme accent.
+- Dark-theme dialogs use recessed lists and inputs, and the status bar border is neutral.
+- Copy, Cut and context-menu clipboard refresh plan the copied range without building the text, so the copied-band outline no longer localizes formulas it never shows.
+- Conditional formats are evaluated only for the rows and columns on screen, frozen panes included, instead of the whole rule range.
+- The demo toolbar's save, undo, redo and search icons and the avatar take their colour from the toolbar instead of fixed colours.
+
+### Fixed
+
+- A formula being edited keeps its text while the pointer or the keyboard picks references, and F9 in the formula bar previews the result only while editing. F9 and a clicked R1C1 reference resolve against the cell being edited even after the active cell moves, and F4 and Cmd+T no longer rewrite a read-only formula display. Text results in the preview escape embedded quotes.
+- Sheet names with apostrophes or spaces are read correctly in references, a function call followed by a space is no longer taken for a range intersection, and a caret inside a quoted sheet name, a string or a structured-reference header no longer offers function completions.
+- Formula suggestions line up with the caret, Tab and Enter complete into an existing parenthesis, and names with special characters in structured references are escaped in completions.
+- The Format Cells dialog shows a mixed state for a selection whose cells differ, including cells that inherit a row or column format, and whole-sheet font and number format changes apply quickly.
+- Cell formats resolve from the row or column format a cell inherits, and named styles are written back for the workbook's built-in styles; a workbook with no styles starts with Normal.
+- Copying a whole sheet copies only the area holding cells, formats or merges, and Cut refuses a whole-sheet selection without replacing the clipboard. Pasting values from text or a rectangle is one engine write and one undo step.
+- Popup menus, chip buttons and context menus are created in the host element's own document, so they work in an iframe. A menu opened from the keyboard appears at the active cell and closes when the window is resized.
+- The Mac formula palette and Insert Function resolve localized function names the same way, and opening the palette on a disposed workbook no longer throws.
+- A doughnut chart without series no longer shrinks its plot for an empty legend, and unnamed series are measured with their own index.
+- The object menu keeps one highlighted item as focus and pointer move, and Enter or Space does nothing unless an enabled item has focus.
+- The ribbon tab rail no longer shows a scrollbar over the tabs on a narrow window, so a click right after scrolling the rail selects the tab instead of landing on the scrollbar.
+- Choosing a colour from a ribbon dropdown closes the menu and returns focus to the button before the command runs, so a command that takes focus keeps it.
+- The icon-set threshold input rule applies only to the icon-set rows of the conditional format dialog.
+
 ## 0.12.0 — 2026-10-30
 
 ### Added
@@ -843,6 +879,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.13.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.13.0
 [0.12.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.12.0
 [0.11.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.11.0
 [0.10.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.10.0
