@@ -320,7 +320,7 @@
   .fc-conddlg__icon-threshold-row > span:first-child {
     min-width: 0;
   }
-  .fc-conddlg__icon-threshold-row > input,
+  .fc-conddlg__form .fc-conddlg__icon-threshold-row > input[type="number"],
   .fc-conddlg__icon-threshold-row > select,
   .fc-conddlg__icon-threshold-row > .fc-select {
     width: 100%;
