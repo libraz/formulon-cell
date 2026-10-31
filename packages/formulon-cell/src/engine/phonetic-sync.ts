@@ -1,6 +1,6 @@
 import type { KanaForm } from '../format/kana.js';
 import type { CellFormat } from '../store/store.js';
-import type { Addr, PhoneticProperties } from './types.js';
+import type { Addr, CellValue, PhoneticProperties, PhoneticRun } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /** Kana forms by the engine's `<phoneticPr type>` code. */
@@ -117,4 +117,55 @@ export function writeShowPhonetic(
   const show = format.showPhonetic === true;
   if (wb.getCellShowPhonetic(addr.sheet, addr.row, addr.col) === show) return true;
   return wb.setCellShowPhonetic(addr.sheet, addr.row, addr.col, show);
+}
+
+/** Concatenate a guide's readings into the single string the whole-cell
+ *  phonetic entry points carry. */
+export const flattenPhoneticRuns = (runs: readonly PhoneticRun[] | undefined): string =>
+  runs === undefined ? '' : runs.map((run) => run.text).join('');
+
+/**
+ * Trim a guide to the spans that actually cover the cell's own text. A guide
+ * travels with the format it belongs to, so pasting formats onto a shorter
+ * cell would otherwise state runs reaching past the end of the string — the
+ * engine takes those verbatim and writes them into the file, where no reader
+ * can resolve them. A cell holding anything but text carries no guide at all.
+ */
+export function boundPhoneticRuns(
+  wb: WorkbookHandle,
+  addr: Addr,
+  runs: readonly PhoneticRun[] | undefined,
+): readonly PhoneticRun[] {
+  if (runs === undefined || runs.length === 0) return [];
+  const value = wb.getValue(addr);
+  const length = value.kind === 'text' ? value.value.length : 0;
+  if (length === 0) return [];
+  const bounded: PhoneticRun[] = [];
+  for (const run of runs) {
+    const start = Math.max(0, Math.min(run.start, length));
+    const end = Math.max(start, Math.min(run.end, length));
+    if (end === start) continue;
+    bounded.push(start === run.start && end === run.end ? run : { start, end, text: run.text });
+  }
+  return bounded;
+}
+
+/** Read a cell's phonetic guide as runs, preferring the per-run surface. An
+ *  engine that carries only the whole-cell reading reports one run spanning
+ *  the cell text, which is how OOXML spells the same thing. */
+export function readPhoneticRuns(
+  wb: WorkbookHandle,
+  addr: Addr,
+  value: CellValue,
+): readonly PhoneticRun[] | null {
+  if (wb.capabilities.phoneticRuns && typeof wb.getCellPhoneticRuns === 'function') {
+    const runs = wb.getCellPhoneticRuns(addr.sheet, addr.row, addr.col);
+    return runs !== null && runs.length > 0 ? runs : null;
+  }
+  if (wb.capabilities.phonetic && typeof wb.getCellPhonetic === 'function') {
+    const text = wb.getCellPhonetic(addr.sheet, addr.row, addr.col);
+    if (!text) return null;
+    return [{ start: 0, end: value.kind === 'text' ? value.value.length : 0, text }];
+  }
+  return null;
 }
