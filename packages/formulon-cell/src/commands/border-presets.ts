@@ -2,7 +2,7 @@
 
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
-import type { CellBorderSide, CellBorders } from '../store/store.js';
+import type { CellBorderSide, CellBorderStyle, CellBorders } from '../store/store.js';
 import type { SelectionFormatEntry } from './selection-format-plan.js';
 
 export type BorderPreset =
@@ -26,6 +26,16 @@ export type BorderPreset =
   | 'diagonalUp';
 
 type BorderSideName = keyof CellBorders;
+
+/** The regular, thick and double sides for a style/color pair. */
+export const borderSidesFor = (
+  style: CellBorderStyle,
+  color: string | undefined,
+): { side: CellBorderSide; thickSide: CellBorderSide; doubleSide: CellBorderSide } => ({
+  side: color === undefined ? { style } : { style, color },
+  thickSide: color === undefined ? { style: 'thick' } : { style: 'thick', color },
+  doubleSide: color === undefined ? { style: 'double' } : { style: 'double', color },
+});
 
 export const borderEntriesForPlan = (
   plan: { ranges: readonly Range[]; cells: readonly Addr[] },

@@ -37,7 +37,7 @@ export const selectionRanges = (state: State): Range[] | null => {
   return ranges.map((range) => ({ ...range }));
 };
 
-export const disjointRanges = (ranges: readonly Range[]): Range[] => {
+const disjointRanges = (ranges: readonly Range[]): Range[] => {
   const result: Range[] = [];
   for (const range of ranges) {
     let pieces = [{ ...range }];
@@ -50,7 +50,7 @@ export const disjointRanges = (ranges: readonly Range[]): Range[] => {
   return result;
 };
 
-export const mergeCoverageValid = (state: State, ranges: readonly Range[]): boolean => {
+const mergeCoverageValid = (state: State, ranges: readonly Range[]): boolean => {
   const selection = { range: ranges[0] as Range, extraRanges: ranges.slice(1) as Range[] };
   for (const merge of state.merges.byAnchor.values()) {
     if (ranges.some((range) => rangesIntersect(range, merge))) {
@@ -150,3 +150,21 @@ export interface SelectionFormatEntry {
   addr: Addr;
   patch: Partial<CellFormat> | null;
 }
+
+/** Disjoint selection ranges plus the already-authored cells (stored formats
+ *  and the pending cell) they cover; blank cells stay implicit. */
+export const sparseSelectionGeometry = (
+  state: State,
+): { ranges: Range[]; cells: Addr[] } | null => {
+  const ranges = selectionRanges(state);
+  if (!ranges || !mergeCoverageValid(state, ranges)) return null;
+  const normalized = disjointRanges(ranges);
+  const cells: Addr[] = [];
+  for (const key of state.format.formats.keys()) {
+    const addr = parseAddrKey(key);
+    if (addr && selectionIncludes(normalized, addr)) cells.push(addr);
+  }
+  const pending = state.ui.pendingFormat?.addr;
+  if (pending && selectionIncludes(normalized, pending)) cells.push(pending);
+  return { ranges: normalized, cells };
+};

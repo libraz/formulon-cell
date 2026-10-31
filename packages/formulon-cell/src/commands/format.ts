@@ -16,7 +16,6 @@ import { subtractFromRangeValidations } from '../store/range-validations.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import {
   type CellAlign,
-  type CellBorderSide,
   type CellBorderStyle,
   type CellBorders,
   type CellFormat,
@@ -26,18 +25,17 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
-import { type BorderPreset, borderEntriesForPlan } from './border-presets.js';
+import { type BorderPreset, borderEntriesForPlan, borderSidesFor } from './border-presets.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOperation, InteractionOrigin } from './interaction-policy.js';
 import { gateProtection, isCellWritable, isSheetProtected } from './protection.js';
 import {
-  disjointRanges,
   MAX_MATERIALIZED_FORMAT_CELLS,
-  mergeCoverageValid,
   type SelectionFormatEntry,
   selectionIncludes,
   selectionPlan,
   selectionRanges,
+  sparseSelectionGeometry,
 } from './selection-format-plan.js';
 
 export { formatNumber } from '../format/number-format.js';
@@ -301,14 +299,15 @@ const applyAxisFormatPatch = (
   return true;
 };
 
-export function applySelectionFormatPatch(
+/** Apply one patch to an already computed selection plan: the axis route for
+ *  row/column selections, otherwise a per-cell commit. */
+const applyPatchToPlan = (
   state: State,
   store: SpreadsheetStore,
+  plan: NonNullable<ReturnType<typeof selectionPlan>>,
   patch: Partial<CellFormat> | null,
   options: SelectionFormatOptions = {},
-): boolean {
-  const plan = selectionPlan(state);
-  if (!plan) return false;
+): boolean => {
   if (plan.axisBands.length > 0) {
     return applyAxisFormatPatch(state, store, plan, patch ?? {}, options);
   }
@@ -320,6 +319,17 @@ export function applySelectionFormatPatch(
     plan.cells.map((addr) => ({ addr, patch })),
     options,
   );
+};
+
+export function applySelectionFormatPatch(
+  state: State,
+  store: SpreadsheetStore,
+  patch: Partial<CellFormat> | null,
+  options: SelectionFormatOptions = {},
+): boolean {
+  const plan = selectionPlan(state);
+  if (!plan) return false;
+  return applyPatchToPlan(state, store, plan, patch, options);
 }
 
 /** Apply `patch` to the selection's cells that `accept` lets through: the
@@ -357,18 +367,10 @@ const sparseSelectionPlan = (
   store: SpreadsheetStore,
   options: SelectionFormatOptions,
 ): { ranges: Range[]; cells: Addr[] } | null => {
-  const ranges = selectionRanges(state);
-  if (!ranges || !mergeCoverageValid(state, ranges)) return null;
-  const normalized = disjointRanges(ranges);
-  const cells: Addr[] = [];
-  for (const key of state.format.formats.keys()) {
-    const addr = parseAddrKey(key);
-    if (addr && selectionIncludes(normalized, addr)) cells.push(addr);
-  }
-  const pending = state.ui.pendingFormat?.addr;
-  if (pending && selectionIncludes(normalized, pending)) cells.push(pending);
-  if (!authorizeSelection(store, normalized, cells, options)) return null;
-  return { ranges: normalized, cells };
+  const geometry = sparseSelectionGeometry(state);
+  if (!geometry) return null;
+  if (!authorizeSelection(store, geometry.ranges, geometry.cells, options)) return null;
+  return geometry;
 };
 
 const clearSelectionFormat = (
@@ -638,19 +640,7 @@ function toggleFlag(state: State, store: SpreadsheetStore, key: ToggleKey): void
   const plan = selectionPlan(state);
   if (!plan) return;
   const allOn = selectionAllHaveEffective(state, store, plan, (f) => f?.[key] === true);
-  const patch = { [key]: !allOn } as Partial<CellFormat>;
-  if (plan.axisBands.length > 0) {
-    applyAxisFormatPatch(state, store, plan, patch);
-    return;
-  }
-  commitSelectionFormatEntries(
-    state,
-    store,
-    plan.ranges,
-    plan.cells,
-    plan.cells.map((addr) => ({ addr, patch })),
-    {},
-  );
+  applyPatchToPlan(state, store, plan, { [key]: !allOn } as Partial<CellFormat>);
 }
 
 export function toggleBold(state: State, store: SpreadsheetStore): void {
@@ -681,19 +671,10 @@ export function toggleWrap(state: State, store: SpreadsheetStore): void {
   const plan = selectionPlan(state);
   if (!plan) return;
   const allOn = selectionAllHaveEffective(state, store, plan, (f) => f?.wrap === true);
-  if (plan.axisBands.length > 0) {
-    applyAxisFormatPatch(state, store, plan, { wrap: !allOn });
-    return;
-  }
-  commitSelectionFormatEntries(
-    state,
-    store,
-    plan.ranges,
-    plan.cells,
-    plan.cells.map((addr) => ({ addr, patch: { wrap: !allOn } })),
-    {},
-  );
+  applyPatchToPlan(state, store, plan, { wrap: !allOn });
 }
+
+const clampIndent = (n: number): number => Math.max(0, Math.min(15, n));
 
 export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const plan = selectionPlan(state);
@@ -707,7 +688,7 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
             return xf ? cellFormatFromXf(wb, xf, wb.workbookDefaultFont) : null;
           })();
       const indent = current?.indent ?? 0;
-      return { indent: Math.max(0, Math.min(15, indent + delta)) };
+      return { indent: clampIndent(indent + delta) };
     };
     applyAxisFormatPatch(state, store, plan, {}, {}, resolveIndent);
     return;
@@ -716,7 +697,7 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
     const cur = formatWithPending(state, addr)?.indent ?? 0;
     return {
       addr,
-      patch: { indent: Math.max(0, Math.min(15, cur + delta)) },
+      patch: { indent: clampIndent(cur + delta) },
     };
   });
   commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
@@ -745,18 +726,7 @@ export function cycleCurrency(state: State, store: SpreadsheetStore, locale = 'e
   const next: NumFmt = hasCurrency
     ? { kind: 'general' }
     : { kind: 'currency', decimals: 2, symbol: defaultCurrencySymbol(locale) };
-  if (plan.axisBands.length > 0) {
-    applyAxisFormatPatch(state, store, plan, { numFmt: next });
-    return;
-  }
-  commitSelectionFormatEntries(
-    state,
-    store,
-    plan.ranges,
-    plan.cells,
-    plan.cells.map((addr) => ({ addr, patch: { numFmt: next } })),
-    {},
-  );
+  applyPatchToPlan(state, store, plan, { numFmt: next });
 }
 
 export function cyclePercent(state: State, store: SpreadsheetStore): void {
@@ -769,21 +739,24 @@ export function cyclePercent(state: State, store: SpreadsheetStore): void {
     (f) => f?.numFmt?.kind === 'percent',
   );
   const next: NumFmt = hasPercent ? { kind: 'general' } : { kind: 'percent', decimals: 0 };
-  if (plan.axisBands.length > 0) {
-    applyAxisFormatPatch(state, store, plan, { numFmt: next });
-    return;
-  }
-  commitSelectionFormatEntries(
-    state,
-    store,
-    plan.ranges,
-    plan.cells,
-    plan.cells.map((addr) => ({ addr, patch: { numFmt: next } })),
-    {},
-  );
+  applyPatchToPlan(state, store, plan, { numFmt: next });
 }
 
 const clampDecimals = (n: number): number => Math.max(0, Math.min(10, n));
+
+const bumpedNumFmt = (cur: NumFmt | undefined, delta: 1 | -1): NumFmt | undefined => {
+  if (!cur || cur.kind === 'general')
+    return delta === 1 ? { kind: 'fixed', decimals: 2 } : undefined;
+  if (cur.kind === 'fixed') return { kind: 'fixed', decimals: clampDecimals(cur.decimals + delta) };
+  if (cur.kind === 'currency') return numFmtWithDecimals(cur, clampDecimals(cur.decimals + delta));
+  if (cur.kind === 'percent') {
+    return { kind: 'percent', decimals: clampDecimals(cur.decimals + delta) };
+  }
+  if (cur.kind === 'accounting') {
+    return numFmtWithDecimals(cur, clampDecimals(cur.decimals + delta));
+  }
+  return undefined;
+};
 
 export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const plan = selectionPlan(state);
@@ -796,42 +769,15 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
             const xf = wb.getCellXf(baseXfIndex);
             return xf ? cellFormatFromXf(wb, xf, wb.workbookDefaultFont) : null;
           })();
-      const cur = current?.numFmt;
-      if (!cur || cur.kind === 'general') {
-        return delta === 1 ? { numFmt: { kind: 'fixed', decimals: 2 } } : {};
-      }
-      if (cur.kind === 'fixed') {
-        return { numFmt: { kind: 'fixed', decimals: clampDecimals(cur.decimals + delta) } };
-      }
-      if (cur.kind === 'currency') {
-        return { numFmt: numFmtWithDecimals(cur, clampDecimals(cur.decimals + delta)) };
-      }
-      if (cur.kind === 'percent') {
-        return { numFmt: { kind: 'percent', decimals: clampDecimals(cur.decimals + delta) } };
-      }
-      if (cur.kind === 'accounting') {
-        return { numFmt: numFmtWithDecimals(cur, clampDecimals(cur.decimals + delta)) };
-      }
-      return {};
+      const nextFmt = bumpedNumFmt(current?.numFmt, delta);
+      return nextFmt ? { numFmt: nextFmt } : {};
     };
     applyAxisFormatPatch(state, store, plan, {}, {}, resolveDecimals);
     return;
   }
   const entries: SelectionFormatEntry[] = [];
   for (const addr of plan.cells) {
-    const cur = formatWithPending(state, addr)?.numFmt;
-    let nextFmt: NumFmt | undefined;
-    if (!cur || cur.kind === 'general') {
-      if (delta === 1) nextFmt = { kind: 'fixed', decimals: 2 };
-    } else if (cur.kind === 'fixed') {
-      nextFmt = { kind: 'fixed', decimals: clampDecimals(cur.decimals + delta) };
-    } else if (cur.kind === 'currency') {
-      nextFmt = numFmtWithDecimals(cur, clampDecimals(cur.decimals + delta));
-    } else if (cur.kind === 'percent') {
-      nextFmt = { kind: 'percent', decimals: clampDecimals(cur.decimals + delta) };
-    } else if (cur.kind === 'accounting') {
-      nextFmt = numFmtWithDecimals(cur, clampDecimals(cur.decimals + delta));
-    }
+    const nextFmt = bumpedNumFmt(formatWithPending(state, addr)?.numFmt, delta);
     if (nextFmt) entries.push({ addr, patch: { numFmt: nextFmt } });
   }
   if (entries.length > 0)
@@ -979,17 +925,10 @@ export function applySelectionFormatAction(
   const entries = new Map<string, Partial<CellFormat>>();
   for (const addr of plan.cells) entries.set(addrKey(addr), { ...action.patch });
   if (action.border) {
-    const style = action.border.style ?? 'thin';
-    const side: CellBorderSide =
-      action.border.color === undefined ? { style } : { style, color: action.border.color };
-    const thickSide: CellBorderSide =
-      action.border.color === undefined
-        ? { style: 'thick' }
-        : { style: 'thick', color: action.border.color };
-    const doubleSide: CellBorderSide =
-      action.border.color === undefined
-        ? { style: 'double' }
-        : { style: 'double', color: action.border.color };
+    const { side, thickSide, doubleSide } = borderSidesFor(
+      action.border.style ?? 'thin',
+      action.border.color,
+    );
     for (const entry of borderEntriesForPlan(
       plan,
       action.border.preset,
@@ -1047,11 +986,7 @@ export function setBorderPreset(
   // carry a constant border, but cannot encode an edge/inside geometry over a
   // full axis without expanding every cell.
   if (plan.axisBands.length > 0) return;
-  const side: CellBorderSide = color === undefined ? { style } : { style, color };
-  const thickSide: CellBorderSide =
-    color === undefined ? { style: 'thick' } : { style: 'thick', color };
-  const doubleSide: CellBorderSide =
-    color === undefined ? { style: 'double' } : { style: 'double', color };
+  const { side, thickSide, doubleSide } = borderSidesFor(style, color);
   const entries = borderEntriesForPlan(plan, preset, side, thickSide, doubleSide);
   if (entries.length === 0) return;
   commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
