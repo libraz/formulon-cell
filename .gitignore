@@ -38,6 +38,7 @@ test-results
 # Local ad-hoc screenshot scratch directory at the repo root — not
 # referenced by any tool, ignored so manual captures don't pollute the index.
 /screenshots/
+/.scratch/
 
 # editor / OS
 .DS_Store
