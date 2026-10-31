@@ -283,14 +283,14 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     const pickOption = (option: HTMLButtonElement): void => {
       const nextValue = option.dataset.value;
       if (nextValue == null) return;
+      close();
+      button.focus({ preventScroll: true });
       applyRibbonControl(command.id, nextValue);
       // The command may reject the requested value (for example, a protected
       // selection can reject a font change), or may normalize it to a
       // different value. Read the control again after dispatch so the ribbon
       // reflects the workbook state instead of echoing the clicked option.
       updateRibbonSelectDisplay(wrap, command);
-      close();
-      button.focus({ preventScroll: true });
     };
     const open = (): void => {
       closeOpenRibbonDropdowns(wrap);
@@ -519,9 +519,9 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         automatic:
           command.id === 'fontColor' ? { label: ribbonText.automatic, color: '#000000' } : null,
         onPick: (color) => {
-          apply(color);
           close();
           button.focus({ preventScroll: true });
+          apply(color);
         },
         onMoreColors: () => {
           close();
