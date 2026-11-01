@@ -16,7 +16,7 @@ const towardWhite = (color: string, share: number): string | null => {
           .match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i)
           ?.slice(1, 4)
           .map(Number);
-  if (!rgb || rgb.length !== 3) return null;
+  if (rgb?.length !== 3) return null;
   const [r, g, b] = rgb.map((v) => Math.round(v + (255 - v) * share));
   return `rgb(${r}, ${g}, ${b})`;
 };
