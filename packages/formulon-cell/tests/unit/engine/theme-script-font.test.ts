@@ -60,4 +60,18 @@ describe('theme-linked fonts without a charset', () => {
       wb.dispose();
     }
   });
+
+  it('keep the pinned font script profile across a profile change', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'en' });
+    try {
+      const base = wb.getFontRecord(0);
+      if (!base) throw new Error('font 0 missing');
+      const index = wb.addFontRecord({ ...base, name: 'Calibri', scheme: 2, hasCharset: false });
+      wb.fontScriptProfile = wb.spreadsheetProfileId();
+      expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
+      expect(wb.getResolvedFontRecord(index)?.name).toBe('Aptos Narrow');
+    } finally {
+      wb.dispose();
+    }
+  });
 });

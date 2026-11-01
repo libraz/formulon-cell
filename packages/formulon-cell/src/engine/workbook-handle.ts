@@ -35,6 +35,7 @@ import type {
   FormulonModule,
   FunctionMetadataProvider,
   Range,
+  SpreadsheetProfileId,
   Workbook,
 } from './types.js';
 import { fromEngineValue } from './value.js';
@@ -211,6 +212,12 @@ export class WorkbookHandle {
    *  engine's raw widths. Set by `createDefault` and by the mount, whose
    *  `ui.platform` wins over the value a host-created handle carries. */
   geometryPlatform: SpreadsheetPlatform = 'default';
+
+  /** Profile whose language picks the theme script face of a charset-less
+   *  theme font. The mount pins it when it binds the workbook, so a later UI
+   *  locale switch keeps the faces the book opened with; null follows the
+   *  current profile. */
+  fontScriptProfile: SpreadsheetProfileId | null = null;
 
   /** Windows default row height `createDefault` stated, repeated on added sheets. */
   private newSheetRowHeight: number | undefined;

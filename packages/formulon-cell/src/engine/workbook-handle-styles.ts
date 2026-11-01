@@ -80,7 +80,8 @@ const SCRIPT_FOR_PROFILE_LOCALE: ReadonlyMap<string, string> = new Map([
 ]);
 
 function profileScript(handle: WorkbookHandleStylesMethods): string | undefined {
-  const profile = (handle as unknown as WorkbookHandle).spreadsheetProfileId();
+  const wbh = handle as unknown as WorkbookHandle;
+  const profile = wbh.fontScriptProfile ?? wbh.spreadsheetProfileId();
   const locale = profile?.slice(profile.indexOf('-') + 1);
   return locale ? SCRIPT_FOR_PROFILE_LOCALE.get(locale) : undefined;
 }
