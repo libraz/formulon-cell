@@ -499,9 +499,10 @@ describe('shared wrapped text behavior', () => {
       };
     };
 
-    expect(renderedAt(0.5)).toEqual({ lines: ['ab', 'cd'], x: 7.5, lineGap: 8.5 });
+    // The line pitch rounds in rendered pixels: round(13 * zoom * 1.28).
+    expect(renderedAt(0.5)).toEqual({ lines: ['ab', 'cd'], x: 7.5, lineGap: 8 });
     expect(renderedAt(1)).toEqual({ lines: ['ab', 'cd'], x: 15, lineGap: 17 });
-    expect(renderedAt(2)).toEqual({ lines: ['ab', 'cd'], x: 30, lineGap: 34 });
+    expect(renderedAt(2)).toEqual({ lines: ['ab', 'cd'], x: 30, lineGap: 33 });
   });
 
   it('wraps with logical font metrics and restores the scaled paint font', () => {

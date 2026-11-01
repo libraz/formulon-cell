@@ -109,9 +109,14 @@ export const stableTextMetricsBox = (fontSize: number): TextMetricsBox => ({
 
 /** The face's own ascent and descent at the current `ctx.font`. The
  *  spreadsheet places a run by these, not by the ink of the glyphs in it;
- *  the stable ratios stand in where the canvas does not report them. */
+ *  the stable ratios stand in where the canvas does not report them. The
+ *  canvas reports them from the current `textBaseline`, so measure from the
+ *  alphabetic one whatever an earlier painter left set. */
 export const fontMetricsBox = (ctx: CanvasRenderingContext2D, fontSize: number): TextMetricsBox => {
+  const baseline = ctx.textBaseline;
+  ctx.textBaseline = 'alphabetic';
   const m = ctx.measureText('Hg');
+  ctx.textBaseline = baseline;
   const ascent = m.fontBoundingBoxAscent;
   const descent = m.fontBoundingBoxDescent;
   return Number.isFinite(ascent) && ascent > 0 && Number.isFinite(descent) && descent >= 0
@@ -170,12 +175,12 @@ export const cssCellFontSize = (
   return factor === 1 ? '' : `calc(${fallback} * ${factor})`;
 };
 
-/** Shared shrink-to-fit calculation for DOM previews and canvas painting. */
+/** Shrink-to-fit font size. The spreadsheet has no minimum size: a long run
+ *  shrinks as far as the cell needs, down to a one-pixel floor. */
 export const shrinkFontSizeToFit = (
   fontSize: number,
   measuredWidth: number,
   availableWidth: number,
-  minimum = 8,
 ): number => {
   if (
     !Number.isFinite(fontSize) ||
@@ -186,10 +191,7 @@ export const shrinkFontSizeToFit = (
   ) {
     return fontSize;
   }
-  return Math.max(
-    Math.min(fontSize, minimum),
-    Math.floor(fontSize * (availableWidth / measuredWidth)),
-  );
+  return Math.max(1, Math.floor(fontSize * (availableWidth / measuredWidth)));
 };
 
 export const textBaselineY = (
@@ -308,8 +310,27 @@ export const cellFont = (
 export const cellFontCss = (font: CellFont, size = font.size): string =>
   `${font.slant}${font.weight} ${size}px ${fontCss(font.family)}`;
 
-const isDoubleUnderline = (underline: CellFormat['underline']): boolean =>
-  underline === 'double' || underline === 'doubleAccounting';
+/** Rule rows relative to the single underline, as measured at 11 px: double
+ *  brackets it, the accounting styles sit one pixel lower. */
+const underlineRows = (underline: CellFormat['underline']): number[] => {
+  switch (underline) {
+    case 'double':
+      return [-2, 0];
+    case 'singleAccounting':
+      return [1];
+    case 'doubleAccounting':
+      return [1, 3];
+    default:
+      return [0];
+  }
+};
+
+/** Horizontal extent of a text cell's padded area; an accounting underline
+ *  on text spans it. */
+interface DecorationSpan {
+  left: number;
+  right: number;
+}
 
 /** Set up the Outline / Shadow font effects on `ctx` (inside the caller's
  *  save) and return the glyph painter: outlined text is a hollow stroke in the
@@ -344,6 +365,7 @@ const paintTextDecorations = (
   width: number,
   baselineY: number,
   fontSize: number,
+  cellSpan?: DecorationSpan,
 ): void => {
   const underline = format?.underline !== false && (!!format?.underline || isHyperlink);
   if (!underline && !format?.strike) return;
@@ -353,11 +375,16 @@ const paintTextDecorations = (
   // starts 0.1 em under the baseline and strikeout sits 0.26 em above it.
   if (underline) {
     const underlineY = Math.round(baselineY + Math.max(1, fontSize * 0.1)) + 0.5;
-    const ys = isDoubleUnderline(format?.underline) ? [underlineY, underlineY + 2] : [underlineY];
-    for (const y of ys) {
+    const accounting =
+      format?.underline === 'singleAccounting' || format?.underline === 'doubleAccounting';
+    // Accounting rules cover the padded cell for text and the run for
+    // numbers, on whole pixels.
+    const x0 = accounting ? Math.round(cellSpan?.left ?? lineX0) : lineX0;
+    const x1 = accounting ? Math.round(cellSpan?.right ?? lineX0 + width) : lineX0 + width;
+    for (const row of underlineRows(format?.underline)) {
       ctx.beginPath();
-      ctx.moveTo(lineX0, y);
-      ctx.lineTo(lineX0 + width, y);
+      ctx.moveTo(x0, underlineY + row);
+      ctx.lineTo(x1, underlineY + row);
       ctx.stroke();
     }
   }
@@ -373,6 +400,7 @@ const paintTextDecorations = (
 export function paintCellText({
   ctx,
   bounds,
+  clip,
   theme,
   value,
   formula,
@@ -427,13 +455,17 @@ export function paintCellText({
   const indentPx = horizontal.indentPx;
   const fontSize = font.size;
   const paintFontCss = cellFontCss(font);
+  const cellSpan = isNumeric
+    ? undefined
+    : { left: bounds.x + padX, right: alignedTextAnchor(bounds, 'right', padX, 0) };
   // Bottom-aligned runs in a row share the baseline the deepest descent sets.
   const withRowDescent = (box: TextMetricsBox, vAlign: TextVAlign): TextMetricsBox => {
     if (vAlign !== 'bottom' || !rowBaselineFont) return box;
     const rowFont = cellFont(rowBaselineFont, theme, false);
+    const current = ctx.font;
     ctx.font = cellFontCss({ ...rowFont, size: rowFont.size * zoomScale });
     const rowBox = fontMetricsBox(ctx, rowFont.size * zoomScale);
-    ctx.font = paintFontCss;
+    ctx.font = current;
     return { ascent: box.ascent, descent: Math.max(box.descent, rowBox.descent) };
   };
   ctx.font = paintFontCss;
@@ -476,17 +508,68 @@ export function paintCellText({
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(bounds.x, bounds.y, bounds.w, bounds.h);
+  const area = clip ?? bounds;
+  ctx.rect(area.x, area.y, area.w, area.h);
   ctx.clip();
   const drawText = applyFontEffects(ctx, fontEffects ? format : undefined, fontSize);
 
-  // Rotated text — render around cell center, ignore wrap/indent for
-  // simplicity. (Real desktop spreadsheets are more elaborate but this covers ±90° common case.)
+  // Rotated text (positive = counterclockwise) is a single line placed by
+  // its rotated line box; wrap does not apply.
   if (rotation !== 0) {
-    ctx.translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    const theta = (rotation * Math.PI) / 180;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    const width = ctx.measureText(text).width;
+    const { ascent, descent } = fontMetricsBox(ctx, fontSize);
+    // Line-box corners relative to the run's start on the baseline.
+    const xs = [
+      -ascent * sin,
+      descent * sin,
+      width * cos - ascent * sin,
+      width * cos + descent * sin,
+    ];
+    const ys = [
+      -ascent * cos,
+      descent * cos,
+      -width * sin - ascent * cos,
+      -width * sin + descent * cos,
+    ];
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    // General: a slanted run sits on the side of its lower end, a vertical
+    // one on the side its descent faces.
+    const side: CanvasTextAlign = format?.align
+      ? align
+      : Math.abs(rotation) === 90
+        ? rotation > 0
+          ? 'right'
+          : 'left'
+        : rotation > 0
+          ? 'left'
+          : 'right';
+    // Rotated runs keep one more padding width clear of the right edge.
+    const right = alignedTextAnchor(bounds, 'right', padX, indentPx) - padX;
+    const originX =
+      side === 'right'
+        ? right - maxX
+        : side === 'center'
+          ? bounds.x + bounds.w / 2 - (minX + maxX) / 2
+          : bounds.x + padX + indentPx - minX;
+    const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
+    // Bottom: the lower end of the baseline sits on the horizontal bottom
+    // baseline. Top and middle place the line box.
+    const originY =
+      vAlign === 'bottom'
+        ? textBaselineY(bounds, { ascent, descent }, 'bottom', padY) - Math.max(0, -width * sin)
+        : vAlign === 'top'
+          ? bounds.y + padY - minY
+          : bounds.y + (bounds.h - (maxY - minY)) / 2 - minY;
+    ctx.translate(originX, originY);
+    ctx.rotate(-theta);
     drawText(text, 0, 0);
     ctx.restore();
     return;
@@ -506,7 +589,8 @@ export function paintCellText({
       locale,
     });
     ctx.font = paintFontCss;
-    const lineH = Math.round(baseFont.size * 1.28) * zoomScale;
+    // Line pitch rounds in rendered pixels: 14 px for an 11 px run.
+    const lineH = Math.round(fontSize * 1.28);
     const totalH = lineH * lines.length;
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = withRowDescent(fontMetricsBox(ctx, fontSize), vAlign);
@@ -524,7 +608,7 @@ export function paintCellText({
       const tx = anchor;
       drawText(line, tx, baselineY);
       const lineX0 = align === 'right' ? tx - width : align === 'center' ? tx - width / 2 : tx;
-      paintTextDecorations(ctx, format, isHyperlink, lineX0, width, baselineY, fontSize);
+      paintTextDecorations(ctx, format, isHyperlink, lineX0, width, baselineY, fontSize, cellSpan);
     }
     ctx.restore();
     return;
@@ -538,15 +622,12 @@ export function paintCellText({
   const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
   const availableTextWidthForCell = horizontal.availableWidth;
   let drawFontSize = fontSize;
+  let fullSizeDescent = 0;
   if (format?.shrinkToFit) {
     const measuredWidth = ctx.measureText(text).width;
     if (measuredWidth > availableTextWidthForCell && availableTextWidthForCell > 0) {
-      drawFontSize = shrinkFontSizeToFit(
-        fontSize,
-        measuredWidth,
-        availableTextWidthForCell,
-        8 * zoomScale,
-      );
+      fullSizeDescent = fontMetricsBox(ctx, fontSize).descent;
+      drawFontSize = shrinkFontSizeToFit(fontSize, measuredWidth, availableTextWidthForCell);
       ctx.font = cellFontCss(font, drawFontSize);
     }
   }
@@ -576,8 +657,22 @@ export function paintCellText({
       );
     }
   }
+  // Fill repeats the run as many whole times as the cell holds.
+  if (format?.align === 'fill' && !isFormulaDisplay) {
+    const runWidth = ctx.measureText(text).width;
+    if (runWidth > 0) {
+      text = text.repeat(Math.max(1, Math.floor(availableTextWidthForCell / runWidth)));
+    }
+  }
   const metrics = ctx.measureText(text);
-  const box = withRowDescent(fontMetricsBox(ctx, drawFontSize), vAlign);
+  const ownBox = fontMetricsBox(ctx, drawFontSize);
+  // A shrunk bottom-aligned run keeps the baseline of its full-size font.
+  const box = withRowDescent(
+    vAlign === 'bottom'
+      ? { ...ownBox, descent: Math.max(ownBox.descent, fullSizeDescent) }
+      : ownBox,
+    vAlign,
+  );
   let ty = textBaselineY(bounds, box, vAlign, padY);
   ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
 
@@ -667,6 +762,6 @@ export function paintCellText({
 
   const lineX0 =
     align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
-  paintTextDecorations(ctx, format, isHyperlink, lineX0, metrics.width, ty, drawFontSize);
+  paintTextDecorations(ctx, format, isHyperlink, lineX0, metrics.width, ty, drawFontSize, cellSpan);
   ctx.restore();
 }

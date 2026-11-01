@@ -9,6 +9,9 @@ export interface CellPaintCtx {
   ctx: CanvasRenderingContext2D;
   theme: ResolvedTheme;
   bounds: Rect;
+  /** Area overflowing text may paint into; `bounds` when omitted. Text still
+   *  aligns within `bounds`. */
+  clip?: Rect;
   value: CellValue;
   formula: string | null;
   isActive: boolean;
