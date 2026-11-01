@@ -91,21 +91,28 @@ export function formatEditableNumber(value: number, locale = 'en-US'): string {
   return language === 'de' || language === 'fr' ? text.replace('.', ',') : text;
 }
 
-export function formatGeneralNumber(
-  value: number,
-  locale = 'en-US',
-  options: { useGrouping?: boolean } = {},
-): string {
+/** General's scientific form: at most `decimals` mantissa digits, trailing
+ *  zeros dropped (`1E+20`, `1.23457E+11`). */
+export function formatGeneralScientific(value: number, decimals: number, locale = 'en-US'): string {
+  const text = formatScientificNumber(value, decimals, locale);
+  const at = text.indexOf('E');
+  if (at < 0) return text;
+  const mantissa = text
+    .slice(0, at)
+    .replace(/([.,]\d*?)0+$/, '$1')
+    .replace(/[.,]$/, '');
+  return `${mantissa}${text.slice(at)}`;
+}
+
+/** Render a number in the General format. General never groups thousands. */
+export function formatGeneralNumber(value: number, locale = 'en-US'): string {
   if (!Number.isFinite(value)) return String(value);
   const abs = Math.abs(value);
   if (abs > 0 && (abs >= 1e11 || abs < 1e-9)) {
-    return formatScientificNumber(value, 5, locale);
+    return formatGeneralScientific(value, 5, locale);
   }
   return intlFormatterCache
-    .numberFormat(locale, {
-      maximumFractionDigits: 12,
-      ...options,
-    })
+    .numberFormat(locale, { maximumFractionDigits: 12, useGrouping: false })
     .format(value);
 }
 

@@ -9,21 +9,17 @@ import {
 } from '../../../src/engine/value.js';
 
 describe('formatGeneralNumber', () => {
-  it('uses locale grouping for ordinary General numbers', () => {
-    expect(formatGeneralNumber(1234.5, 'en-US')).toBe('1,234.5');
+  it('never groups thousands, as the spreadsheet shows General', () => {
+    expect(formatGeneralNumber(1234.5, 'en-US')).toBe('1234.5');
+    expect(formatGeneralNumber(1234.5, 'de-DE')).toBe('1234,5');
   });
 
-  it('can omit grouping while keeping General scientific notation', () => {
-    expect(formatGeneralNumber(1234.5, 'en-US', { useGrouping: false })).toBe('1234.5');
-    expect(formatGeneralNumber(123456789012, 'en-US', { useGrouping: false })).toBe('1.23457E+11');
-    expect(formatGeneralNumber(-0.0000000001234, 'en-US', { useGrouping: false })).toBe(
-      '-1.23400E-10',
-    );
-  });
-
-  it('uses spreadsheet-like scientific notation for very large or tiny numbers', () => {
+  it('uses spreadsheet-like scientific notation without trailing mantissa zeros', () => {
     expect(formatGeneralNumber(123456789012)).toBe('1.23457E+11');
-    expect(formatGeneralNumber(0.0000000001234)).toBe('1.23400E-10');
+    expect(formatGeneralNumber(0.0000000001234)).toBe('1.234E-10');
+    expect(formatGeneralNumber(-0.0000000001234)).toBe('-1.234E-10');
+    expect(formatGeneralNumber(1e20)).toBe('1E+20');
+    expect(formatGeneralNumber(1.5e20, 'de-DE')).toBe('1,5E+20');
   });
 
   it.each([

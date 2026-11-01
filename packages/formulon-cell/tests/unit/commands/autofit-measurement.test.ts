@@ -166,11 +166,11 @@ describe('computeAutofitColWidth', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true, fontSize: 16 });
     const { ctx, measured } = fakeMeasureCtx();
     computeAutofitColWidth(store.getState(), 0, ctx, { locale: 'de-DE' });
-    expect(measured).toEqual(['1.234.567,5']);
+    expect(measured).toEqual(['1234567,5']);
     expect(ctx.font).toBe('700 16px system-ui, sans-serif');
     measured.length = 0;
     computeAutofitColWidth(store.getState(), 0, ctx);
-    expect(measured).toEqual(['1,234,567.5']);
+    expect(measured).toEqual(['1234567.5']);
   });
 });
 

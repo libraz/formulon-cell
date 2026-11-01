@@ -59,8 +59,8 @@ describe('IntlFormatterCache', () => {
       formatGeneralNumber(1000 + index / 10, 'sv-SE'),
     );
 
-    expect(outputs[0]).toBe('1 000');
-    expect(outputs.at(-1)).toBe('1 006,3');
+    expect(outputs[0]).toBe('1000');
+    expect(outputs.at(-1)).toBe('1006,3');
     expect(numberFormatSpy).toHaveBeenCalledTimes(1);
   });
 

@@ -99,7 +99,7 @@ describe('attachFormatDialog', () => {
       },
     });
     expect(document.querySelector<HTMLElement>('.fc-fmtdlg__preview-cell')?.textContent).toBe(
-      '12,345',
+      '12345',
     );
     document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]')?.click();
     document.querySelector<HTMLButtonElement>('button[data-fc-tab="border"]')?.click();

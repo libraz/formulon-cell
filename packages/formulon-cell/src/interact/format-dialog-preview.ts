@@ -263,7 +263,7 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
       value.kind === 'number'
         ? synthetic || numFmt.kind !== 'general'
           ? formatNumber(value.value, numFmt, getLocale(), getDate1904())
-          : formatGeneralNumber(value.value, getLocale(), { useGrouping: false })
+          : formatGeneralNumber(value.value, getLocale())
         : formatCell(value, getLocale());
     previewCell.textContent = numericText;
     const basePreviewSize =

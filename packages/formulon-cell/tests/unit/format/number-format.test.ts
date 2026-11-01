@@ -8,7 +8,7 @@ describe('formatNumber', () => {
   });
 
   it('uses general formatting when no format is supplied', () => {
-    expect(formatNumber(1234.5, undefined)).toBe('1,234.5');
+    expect(formatNumber(1234.5, undefined)).toBe('1234.5');
   });
 
   it.each(['en-US', 'ja-JP', 'de-DE', 'fr-FR', 'zh-CN', 'ko-KR', 'th-TH'])(

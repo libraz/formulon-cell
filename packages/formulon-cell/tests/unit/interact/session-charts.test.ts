@@ -977,9 +977,9 @@ describe('attachSessionCharts', () => {
     });
     const label = (): string | null =>
       host.querySelector<SVGTextElement>('[data-chart-role="data-label"]')?.textContent ?? null;
-    expect(label()).toBe('1,234.5');
+    expect(label()).toBe('1234.5');
     handle.setLabels({}, 'de-DE');
-    expect(label()).toBe('1.234,5');
+    expect(label()).toBe('1234,5');
     handle.detach();
   });
 
