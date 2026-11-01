@@ -179,7 +179,8 @@ describe('grid conditional-format viewport includes actual visible axes', () => 
         .map(({ rect }) => rect);
       const expectedRects = visibleAddrs.map(({ row, col }) => {
         const rect = cellRectIn(view.layout, cols, rows, row, col);
-        return [rect.x, rect.y, rect.w, rect.h];
+        // A fill also covers the gridline before the cell (one device pixel).
+        return [rect.x - 1, rect.y - 1, rect.w + 1, rect.h + 1];
       });
       expect(conditionalRects).toEqual(expectedRects);
     },

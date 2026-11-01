@@ -3,6 +3,7 @@ import type { NumberFormatPaint } from '../../format/number-format.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
+import type { RowBaselineFont } from '../row-baseline.js';
 
 export interface CellPaintCtx {
   ctx: CanvasRenderingContext2D;
@@ -40,6 +41,11 @@ export interface CellPaintCtx {
   formatPaint?: NumberFormatPaint | null;
   /** Draw the Outline and Shadow font effects; only the Mac profile does. */
   fontEffects?: boolean;
+  /** Device pixel ratio the fill snaps to; 1 when omitted. */
+  dpr?: number;
+  /** Largest font among the row's bottom-aligned cells; bottom-aligned text
+   *  sits on the baseline its descent sets. */
+  rowBaselineFont?: RowBaselineFont;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

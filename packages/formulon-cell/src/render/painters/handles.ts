@@ -5,7 +5,9 @@ import type { Rect } from '../geometry.js';
  *
  *  Desktop spreadsheets paint a crisp 2px accent border that covers the
  *  range's own gridlines plus one pixel outside them, so no gridline shows
- *  between the border and the neighbouring cells. A shaded range keeps a
+ *  between the border and the neighbouring cells. A cell owns the rule on
+ *  its trailing edges, so the range's leading rules sit just before it — the
+ *  column rules sit after each edge instead in RTL. A shaded range keeps a
  *  1px sheet-coloured gap inside the border (`inset`). Drawn in a separate
  *  pass after all cell text so neighbouring cell rects never clip it. */
 export function paintSelectionOutline(
@@ -13,21 +15,27 @@ export function paintSelectionOutline(
   bounds: Rect,
   theme: ResolvedTheme,
   inset = false,
+  rtl = false,
 ): void {
   const left = Math.round(bounds.x);
   const top = Math.round(bounds.y);
   const right = Math.round(bounds.x + bounds.w);
   const bottom = Math.round(bounds.y + bounds.h);
+  // Centre lines of the 2px border: on the outer edge of each rule.
+  const x0 = rtl ? left : left - 1;
+  const x1 = rtl ? right + 1 : right;
+  const y0 = top - 1;
+  const y1 = bottom;
   ctx.save();
   ctx.setLineDash([]);
-  if (inset && right - left > 3 && bottom - top > 3) {
+  if (inset && x1 - x0 > 4 && y1 - y0 > 4) {
     ctx.strokeStyle = theme.bg;
     ctx.lineWidth = 1;
-    ctx.strokeRect(left + 1.5, top + 1.5, right - left - 2, bottom - top - 2);
+    ctx.strokeRect(x0 + 1.5, y0 + 1.5, x1 - x0 - 3, y1 - y0 - 3);
   }
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 2;
-  ctx.strokeRect(left, top, right + 1 - left, bottom + 1 - top);
+  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
   ctx.restore();
 }
 
@@ -47,9 +55,10 @@ export function paintFillHandle(
 ): Rect {
   const hs = FILL_HANDLE_SIZE;
   const half = Math.floor(hs / 2);
+  // The trailing corner rule ends at the boundary (starts at it in RTL).
   const cornerX = Math.round(rtl ? bounds.x : bounds.x + bounds.w);
-  const x = cornerX - half;
-  const y = Math.round(bounds.y + bounds.h) - half;
+  const x = rtl ? cornerX - half : cornerX - half - 1;
+  const y = Math.round(bounds.y + bounds.h) - half - 1;
   const gapX = rtl ? x : x - 1;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(gapX, y - 1, hs + 1, hs + 1);

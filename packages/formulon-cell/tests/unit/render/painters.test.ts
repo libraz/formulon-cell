@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildColLayout,
+  buildRowLayout,
+  cellRectIn,
+  layoutForView,
+} from '../../../src/render/geometry.js';
+import { paintBorders } from '../../../src/render/grid/borders.js';
+import {
   cellFont,
   cellFontFamily,
   shrinkFontSizeToFit,
 } from '../../../src/render/painters/text.js';
 import {
   FILL_HANDLE_SIZE,
-  paintCellBorders,
+  paintCellDiagonals,
   paintCellText,
   paintCopyMarquee,
   paintFillHandle,
@@ -15,6 +22,7 @@ import {
   stableTextMetricsBox,
   textBaselineY,
 } from '../../../src/render/painters.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../src/theme/resolve.js';
 
 /**
@@ -69,6 +77,8 @@ function makeStrokeSpy(): {
     save(): void {},
     restore(): void {},
     beginPath(): void {},
+    rect(): void {},
+    clip(): void {},
     moveTo(): void {},
     lineTo(): void {},
     setLineDash(v: number[]): void {
@@ -159,6 +169,7 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     cellFormulaFg: '#333',
     cellBoolFg: '#060',
     cellNumFg: '#000',
+    cellAutoFg: '#000',
     hoverStripe: 'rgba(0,0,0,0.04)',
     headerBg: '#eee',
     headerRule: '#ccc',
@@ -178,24 +189,24 @@ describe('paintFillHandle', () => {
 
   it('centres a 5px accent square on the trailing gridline corner with an inner white gap', () => {
     const { ctx, fills } = makeCtxSpy();
-    // Bottom-right gridlines sit at x = 110, y = 50.
+    // The cell owns its bottom-right rules at x = 109, y = 49.
     const hit = paintFillHandle(ctx, { x: 10, y: 20, w: 100, h: 30 }, theme({ accent: '#0078d4' }));
 
     expect(fills).toHaveLength(2);
     const [gap, square] = fills;
     expect(square?.style).toBe('#0078d4');
-    expect(square?.rect).toEqual([108, 48, 5, 5]);
+    expect(square?.rect).toEqual([107, 47, 5, 5]);
     // The gap only faces into the selection (top and left).
     expect(gap?.style).toBe('#ffffff');
-    expect(gap?.rect).toEqual([107, 47, 6, 6]);
-    expect(hit).toEqual({ x: 107, y: 47, w: 7, h: 7 });
+    expect(gap?.rect).toEqual([106, 46, 6, 6]);
+    expect(hit).toEqual({ x: 106, y: 46, w: 7, h: 7 });
   });
 
   it('snaps fractional bounds and mirrors the gap in a right-to-left sheet', () => {
     const { ctx, fills } = makeCtxSpy();
     paintFillHandle(ctx, { x: 10.4, y: 20.4, w: 100, h: 29.8 }, theme({ accent: '#0078d4' }), true);
-    expect(fills[1]?.rect).toEqual([8, 48, 5, 5]);
-    expect(fills[0]?.rect).toEqual([8, 47, 6, 6]);
+    expect(fills[1]?.rect).toEqual([8, 47, 5, 5]);
+    expect(fills[0]?.rect).toEqual([8, 46, 6, 6]);
   });
 
   it('falls back to #0078d4 when theme.accent is empty', () => {
@@ -242,52 +253,109 @@ describe('paintTableHeaderChevron', () => {
   });
 });
 
-describe('paintCellBorders', () => {
-  it('uses the spreadsheet-like automatic border color instead of the gridline color', () => {
+describe('paintCellDiagonals', () => {
+  const paint = (themeOver: Partial<ResolvedTheme>, borders: object) => {
     const { ctx, strokes } = makeStrokeSpy();
-    paintCellBorders({
+    paintCellDiagonals({
       ctx,
       bounds: { x: 0, y: 0, w: 80, h: 24 },
-      theme: theme({ fgStrong: '#111111', ruleStrong: '#999999' }),
+      theme: theme(themeOver),
       value: { kind: 'blank' },
       formula: null,
       isActive: false,
       isInRange: false,
-      format: { borders: { bottom: true } },
+      format: { borders },
     });
+    return strokes;
+  };
 
+  it('uses the automatic ink colour instead of the gridline colour', () => {
+    const strokes = paint({ cellAutoFg: '#111111', ruleStrong: '#999999' }, { diagonalDown: true });
     expect(strokes).toHaveLength(1);
     expect(strokes[0]?.style).toBe('#111111');
   });
 
-  it('honors explicit border colors from cell format', () => {
-    const { ctx, strokes } = makeStrokeSpy();
-    paintCellBorders({
-      ctx,
-      bounds: { x: 0, y: 0, w: 80, h: 24 },
-      theme: theme({ fgStrong: '#111111' }),
-      value: { kind: 'blank' },
-      formula: null,
-      isActive: false,
-      isInRange: false,
-      format: { borders: { bottom: { style: 'thin', color: '#c00000' } } },
-    });
-
+  it('honors explicit diagonal colors from cell format', () => {
+    const strokes = paint(
+      { cellAutoFg: '#111111' },
+      { diagonalUp: { style: 'thin', color: '#c00000' } },
+    );
     expect(strokes[0]?.style).toBe('#c00000');
+  });
+
+  it('draws nothing for edge-only borders', () => {
+    expect(paint({}, { bottom: true, left: true })).toHaveLength(0);
+  });
+});
+
+describe('paintBorders', () => {
+  const run = (borders: object) => {
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { borders });
+    store.setState((state) => ({
+      ...state,
+      viewport: { ...state.viewport, rowCount: 3, colCount: 3, widthPx: 400 },
+    }));
+    const view = { ...store.getState(), layout: layoutForView(store.getState()) };
+    const cols = buildColLayout(view.layout, view.viewport);
+    const rows = buildRowLayout(view.layout, view.viewport);
+    const fills: Array<{ style: string; rect: [number, number, number, number] }> = [];
+    const target: Record<string, unknown> = {
+      fillStyle: '',
+      fillRect: (x: number, y: number, w: number, h: number) =>
+        fills.push({ style: String(target.fillStyle), rect: [x, y, w, h] }),
+    };
+    const ctx = new Proxy(target, {
+      get: (o, k) => (k in o ? o[k as string] : () => undefined),
+      set: (o, k, v) => {
+        o[k as string] = v;
+        return true;
+      },
+    }) as unknown as CanvasRenderingContext2D;
+    paintBorders(ctx, 1, view, theme({ cellAutoFg: '#111111' }), cols, rows);
+    return { fills, rect: cellRectIn(view.layout, cols, rows, 0, 0) };
+  };
+
+  it('paints an automatic bottom edge in the automatic ink on the pixel before the boundary', () => {
+    const { fills, rect } = run({ bottom: true });
+    const ink = fills.filter((fill) => fill.style === '#111111');
+    expect(ink).toEqual([
+      { style: '#111111', rect: [rect.x - 1, rect.y + rect.h - 1, rect.w + 1, 1] },
+    ]);
+  });
+
+  it('honors explicit border colors from cell format', () => {
+    const { fills } = run({ bottom: { style: 'thin', color: '#c00000' } });
+    expect(fills.some((fill) => fill.style === '#c00000')).toBe(true);
+    expect(fills.some((fill) => fill.style === '#111111')).toBe(false);
   });
 });
 
 describe('paintSelectionOutline', () => {
   it('covers the range gridlines plus one pixel outside them', () => {
     const { ctx, rects } = makeStrokeSpy();
-    // Gridlines snap to x = 10 / 91 and y = 21 / 45.
+    // The range snaps to x = 10..91, y = 21..45; its rules are the ones
+    // ending at those edges, so the border is centred one pixel further out.
     paintSelectionOutline(
       ctx,
       { x: 10.2, y: 20.7, w: 80.4, h: 24.2 },
       theme({ accent: '#107c41' }),
     );
 
-    expect(rects).toEqual([{ x: 10, y: 21, w: 82, h: 25, width: 2 }]);
+    expect(rects).toEqual([{ x: 9, y: 20, w: 82, h: 25, width: 2 }]);
+  });
+
+  it('keeps the column rules after each edge in a right-to-left sheet', () => {
+    const { ctx, rects } = makeStrokeSpy();
+    paintSelectionOutline(
+      ctx,
+      { x: 10, y: 21, w: 81, h: 24 },
+      theme({ accent: '#107c41' }),
+      false,
+      true,
+    );
+
+    expect(rects).toEqual([{ x: 10, y: 20, w: 82, h: 25, width: 2 }]);
   });
 });
 
@@ -508,8 +576,8 @@ describe('paintCellText font strictness', () => {
     paintCellText({ ...base, ctx: indented.ctx, format: { indent: 2 } });
 
     expect(plain.fills[0]?.x).toBe(13);
-    expect(indented.fills[0]?.x).toBe(29);
-    expect((indented.fills[0]?.x ?? 0) - (plain.fills[0]?.x ?? 0)).toBe(16);
+    expect(indented.fills[0]?.x).toBe(37);
+    expect((indented.fills[0]?.x ?? 0) - (plain.fills[0]?.x ?? 0)).toBe(24);
   });
 
   it('renders a phonetic guide above the base cell text', () => {

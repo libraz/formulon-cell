@@ -4,7 +4,7 @@ import {
   phoneticGuideSize,
   phoneticKanaForm,
 } from '../../engine/phonetic-sync.js';
-import { formatCell, formatScientificNumber } from '../../engine/value.js';
+import { formatCell, formatGeneralScientific } from '../../engine/value.js';
 import { intlFormatterCache } from '../../format/intl-cache.js';
 import { convertKana } from '../../format/kana.js';
 import type { CellFormat } from '../../store/store.js';
@@ -41,43 +41,54 @@ function canvasTextVAlign(align: CellFormat['vAlign'] | undefined): TextVAlign {
   }
 }
 
-/** Excel-style "General" number rendering with overflow handling. Tries the
- *  initial Intl.NumberFormat output first; if it doesn't fit, walks fractional
- *  digits down to integer, then falls through to scientific notation, and
- *  finally returns a #### filler sized to the cell. */
+/** Width the spreadsheet charges a General number: every character, sign
+ *  and separator included, costs one digit advance. */
+const generalTextWidth = (ctx: CanvasRenderingContext2D, text: string): number =>
+  [...text].length * ctx.measureText('0').width;
+
+/** Excel-style "General" number rendering when the value does not fit. Drops
+ *  fractional digits while a significant digit survives; a value that would
+ *  round away to zero takes scientific notation if that fits, else the
+ *  rounded zero; anything else falls back to scientific, then a `#` filler.
+ *  General never groups thousands. */
 function fitGeneralNumberToWidth(
   ctx: CanvasRenderingContext2D,
   value: number,
   availableWidth: number,
   locale: string,
-  fontSize: number,
 ): string {
   if (!Number.isFinite(value)) return String(value);
-  const toSci = (prec: number): string => formatScientificNumber(value, prec, locale);
+  const fits = (t: string): boolean => generalTextWidth(ctx, t) <= availableWidth;
+  const scientific = (): string | null => {
+    for (let prec = 5; prec >= 0; prec -= 1) {
+      const t = formatGeneralScientific(value, prec, locale);
+      if (fits(t)) return t;
+    }
+    return null;
+  };
   const abs = Math.abs(value);
   // Already in scientific range (matches formatGeneralNumber's threshold) —
   // only the exponent precision can be reduced.
   if (abs > 0 && (abs >= 1e11 || abs < 1e-9)) {
-    for (let prec = 5; prec >= 0; prec -= 1) {
-      const t = toSci(prec);
-      if (ctx.measureText(t).width <= availableWidth) return t;
-    }
+    const sci = scientific();
+    if (sci) return sci;
   } else {
+    let roundedToZero: string | null = null;
     for (let digits = 12; digits >= 0; digits -= 1) {
       const t = intlFormatterCache
-        .numberFormat(locale, {
-          maximumFractionDigits: digits,
-        })
+        .numberFormat(locale, { maximumFractionDigits: digits, useGrouping: false })
         .format(value);
-      if (ctx.measureText(t).width <= availableWidth) return t;
+      if (!fits(t)) continue;
+      if (value === 0 || /[1-9]/.test(t)) return t;
+      roundedToZero = t;
+      break;
     }
-    for (let prec = 5; prec >= 0; prec -= 1) {
-      const t = toSci(prec);
-      if (ctx.measureText(t).width <= availableWidth) return t;
-    }
+    const sci = scientific();
+    if (sci) return sci;
+    if (roundedToZero !== null) return roundedToZero;
   }
-  const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
-  return '#'.repeat(Math.max(1, Math.floor(availableWidth / hashWidth)));
+  const digit = Math.max(1, ctx.measureText('0').width);
+  return '#'.repeat(Math.max(1, Math.floor(availableWidth / digit)));
 }
 
 export const textMetricsBox = (metrics: TextMetrics, fontSize: number): TextMetricsBox => ({
@@ -95,6 +106,32 @@ export const stableTextMetricsBox = (fontSize: number): TextMetricsBox => ({
   ascent: fontSize * 0.72,
   descent: fontSize * 0.22,
 });
+
+/** The face's own ascent and descent at the current `ctx.font`. The
+ *  spreadsheet places a run by these, not by the ink of the glyphs in it;
+ *  the stable ratios stand in where the canvas does not report them. */
+export const fontMetricsBox = (ctx: CanvasRenderingContext2D, fontSize: number): TextMetricsBox => {
+  const m = ctx.measureText('Hg');
+  const ascent = m.fontBoundingBoxAscent;
+  const descent = m.fontBoundingBoxDescent;
+  return Number.isFinite(ascent) && ascent > 0 && Number.isFinite(descent) && descent >= 0
+    ? { ascent, descent }
+    : stableTextMetricsBox(fontSize);
+};
+
+/** Anchor x for text aligned in a cell; the indent applies on the side the
+ *  text is aligned to. The right inset also clears half of the one-pixel
+ *  gridline the cell owns on that edge, as measured against the spreadsheet. */
+export const alignedTextAnchor = (
+  bounds: Rect,
+  align: CanvasTextAlign,
+  padX: number,
+  indentPx: number,
+): number => {
+  if (align === 'right') return bounds.x + bounds.w - 0.5 - padX - indentPx;
+  if (align === 'center') return bounds.x + bounds.w / 2;
+  return bounds.x + padX + indentPx;
+};
 
 /** Normalize the view multiplier at the painter/DOM boundary. A malformed or
  * missing view value must not make a cell disappear by producing a zero-sized
@@ -161,9 +198,11 @@ export const textBaselineY = (
   vAlign: TextVAlign,
   padY: number,
 ): number => {
-  if (vAlign === 'top') return bounds.y + padY + box.ascent;
-  if (vAlign === 'middle') return bounds.y + (bounds.h - box.ascent - box.descent) / 2 + box.ascent;
-  return bounds.y + bounds.h - padY - box.descent;
+  if (vAlign === 'top') return Math.round(bounds.y + padY + box.ascent);
+  if (vAlign === 'middle') {
+    return Math.round(bounds.y + (bounds.h - box.ascent - box.descent) / 2 + box.ascent);
+  }
+  return Math.round(bounds.y + bounds.h - padY - box.descent);
 };
 
 const splitFontFamily = (family: string): string[] => {
@@ -304,14 +343,16 @@ const paintTextDecorations = (
   lineX0: number,
   width: number,
   baselineY: number,
-  box: TextMetricsBox,
+  fontSize: number,
 ): void => {
   const underline = format?.underline !== false && (!!format?.underline || isHyperlink);
   if (!underline && !format?.strike) return;
   ctx.strokeStyle = ctx.fillStyle as string;
   ctx.lineWidth = 1;
+  // Placed from the run's own size, not the row-shared descent: the rule
+  // starts 0.1 em under the baseline and strikeout sits 0.26 em above it.
   if (underline) {
-    const underlineY = Math.round(baselineY + Math.max(2, box.descent * 0.55)) + 0.5;
+    const underlineY = Math.round(baselineY + Math.max(1, fontSize * 0.1)) + 0.5;
     const ys = isDoubleUnderline(format?.underline) ? [underlineY, underlineY + 2] : [underlineY];
     for (const y of ys) {
       ctx.beginPath();
@@ -321,7 +362,7 @@ const paintTextDecorations = (
     }
   }
   if (format?.strike) {
-    const strikeY = Math.round(baselineY - box.ascent * 0.34) + 0.5;
+    const strikeY = Math.round(baselineY - fontSize * 0.26) + 0.5;
     ctx.beginPath();
     ctx.moveTo(lineX0, strikeY);
     ctx.lineTo(lineX0 + width, strikeY);
@@ -345,12 +386,15 @@ export function paintCellText({
   zoom,
   formatPaint: formatPaintFor,
   fontEffects = false,
+  rowBaselineFont,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
   if (showZeros === false && value.kind === 'number' && value.value === 0 && !showFormulas) return;
 
-  const padY = 3;
+  // Text keeps clear of the gridline the cell owns on its bottom edge and of
+  // the one before it; the face's own ascent and descent do the rest.
+  const padY = 1;
   let text: string;
   if (displayOverride != null) {
     text = displayOverride;
@@ -383,6 +427,15 @@ export function paintCellText({
   const indentPx = horizontal.indentPx;
   const fontSize = font.size;
   const paintFontCss = cellFontCss(font);
+  // Bottom-aligned runs in a row share the baseline the deepest descent sets.
+  const withRowDescent = (box: TextMetricsBox, vAlign: TextVAlign): TextMetricsBox => {
+    if (vAlign !== 'bottom' || !rowBaselineFont) return box;
+    const rowFont = cellFont(rowBaselineFont, theme, false);
+    ctx.font = cellFontCss({ ...rowFont, size: rowFont.size * zoomScale });
+    const rowBox = fontMetricsBox(ctx, rowFont.size * zoomScale);
+    ctx.font = paintFontCss;
+    return { ascent: box.ascent, descent: Math.max(box.descent, rowBox.descent) };
+  };
   ctx.font = paintFontCss;
   const isHyperlink = !!format?.hyperlink;
   // A number-format colour tag outranks the cell's font colour.
@@ -398,7 +451,7 @@ export function paintCellText({
             ? theme.cellBoolFg
             : isNumeric
               ? theme.cellNumFg
-              : theme.fg;
+              : theme.cellAutoFg;
 
   let align: CanvasTextAlign;
   if (format?.align) {
@@ -456,24 +509,22 @@ export function paintCellText({
     const lineH = Math.round(baseFont.size * 1.28) * zoomScale;
     const totalH = lineH * lines.length;
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
-    const measured = stableTextMetricsBox(fontSize);
+    const measured = withRowDescent(fontMetricsBox(ctx, fontSize), vAlign);
     let startY = textBaselineY(bounds, measured, vAlign, padY);
     startY += cellTextVerticalOffset(fontSize, fontVertAlign);
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
     else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = align;
-    let tx: number;
-    if (align === 'right') tx = bounds.x + bounds.w - padX - (rtl ? indentPx : 0);
-    else if (align === 'center') tx = bounds.x + bounds.w / 2;
-    else tx = bounds.x + padX + indentPx;
+    const anchor = alignedTextAnchor(bounds, align, padX, indentPx);
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i] ?? '';
       const baselineY = startY + i * lineH;
-      drawText(line, tx, baselineY);
       const width = ctx.measureText(line).width;
+      const tx = anchor;
+      drawText(line, tx, baselineY);
       const lineX0 = align === 'right' ? tx - width : align === 'center' ? tx - width / 2 : tx;
-      paintTextDecorations(ctx, format, isHyperlink, lineX0, width, baselineY, measured);
+      paintTextDecorations(ctx, format, isHyperlink, lineX0, width, baselineY, fontSize);
     }
     ctx.restore();
     return;
@@ -482,10 +533,7 @@ export function paintCellText({
   // Single-line path with vertical alignment.
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = align;
-  let tx: number;
-  if (align === 'right') tx = bounds.x + bounds.w - padX - (rtl ? indentPx : 0);
-  else if (align === 'center') tx = bounds.x + bounds.w / 2;
-  else tx = bounds.x + padX + indentPx;
+  const tx = alignedTextAnchor(bounds, align, padX, indentPx);
 
   const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
   const availableTextWidthForCell = horizontal.availableWidth;
@@ -502,7 +550,14 @@ export function paintCellText({
       ctx.font = cellFontCss(font, drawFontSize);
     }
   }
-  if (isNumeric && ctx.measureText(text).width > availableTextWidthForCell) {
+  const generalNumber =
+    !isFormulaDisplay &&
+    value.kind === 'number' &&
+    (!format?.numFmt || format.numFmt.kind === 'general');
+  const overflows = generalNumber
+    ? generalTextWidth(ctx, text) > availableTextWidthForCell
+    : ctx.measureText(text).width > availableTextWidthForCell;
+  if (isNumeric && overflows) {
     if (format?.numFmt && format.numFmt.kind !== 'general') {
       // Explicit number format: Excel shows #### when the formatted value
       // can't shrink without losing the user's chosen presentation.
@@ -518,12 +573,11 @@ export function paintCellText({
         value.value,
         availableTextWidthForCell,
         locale ?? 'en-US',
-        drawFontSize,
       );
     }
   }
   const metrics = ctx.measureText(text);
-  const box = stableTextMetricsBox(drawFontSize);
+  const box = withRowDescent(fontMetricsBox(ctx, drawFontSize), vAlign);
   let ty = textBaselineY(bounds, box, vAlign, padY);
   ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
 
@@ -554,7 +608,7 @@ export function paintCellText({
       ctx.textAlign = 'left';
       drawText(fill.char.repeat(Math.floor(gap / charWidth)), left + leadingWidth, ty);
     }
-    paintTextDecorations(ctx, format, isHyperlink, left, right - left, ty, box);
+    paintTextDecorations(ctx, format, isHyperlink, left, right - left, ty, drawFontSize);
     ctx.restore();
     return;
   }
@@ -613,6 +667,6 @@ export function paintCellText({
 
   const lineX0 =
     align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
-  paintTextDecorations(ctx, format, isHyperlink, lineX0, metrics.width, ty, box);
+  paintTextDecorations(ctx, format, isHyperlink, lineX0, metrics.width, ty, drawFontSize);
   ctx.restore();
 }

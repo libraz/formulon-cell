@@ -1,5 +1,11 @@
-import type { CellGradientFill, ConditionalIconSet } from '../../store/store.js';
+import type {
+  CellBorderSide,
+  CellBorderStyle,
+  CellGradientFill,
+  ConditionalIconSet,
+} from '../../store/store.js';
 import type { Rect } from '../geometry.js';
+import { fillRect } from '../grid/chrome-context.js';
 import type { CellPaintCtx } from './types.js';
 
 /* ---- Base painters wired in MS-A. Future slots (formatting, CF, DV,
@@ -368,7 +374,9 @@ function paintGradientFill(
 
 /** User-set background fill — drawn above range tint and active highlight so
  *  cells with explicit fill stay visually filled even when selected. */
-export function paintCellFill({ ctx, bounds, format }: CellPaintCtx): void {
+export function paintCellFill({ ctx, bounds: cell, format, dpr, rtl }: CellPaintCtx): void {
+  // A fill covers the gridline before the cell as well as its own.
+  const bounds = fillRect(cell, dpr ?? 1, rtl === true);
   if (format?.fillGradient) {
     paintGradientFill(ctx, bounds, format.fillGradient);
     return;
@@ -488,89 +496,62 @@ export function paintCellFill({ ctx, bounds, format }: CellPaintCtx): void {
   ctx.restore();
 }
 
-/** Per-cell border lines. Drawn after gridlines + cell text but before the
- *  active outline so user borders sit above the hairline grid. Each side may
- *  be a boolean (legacy thin solid) or an object with `{style, color}`. */
-export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): void {
+/** Perpendicular width of a diagonal border, in CSS px at one rule per px. */
+const DIAGONAL_WIDTH: Partial<Record<CellBorderStyle, number>> = {
+  medium: 2.67,
+  mediumDashed: 2.67,
+  mediumDashDot: 2.67,
+  mediumDashDotDot: 2.67,
+  slantDashDot: 2.67,
+  thick: 3.46,
+};
+
+/** Diagonal dash runs in CSS px, measured along x as the spreadsheet does. */
+const DIAGONAL_DASH: Partial<Record<CellBorderStyle, readonly number[]>> = {
+  dashed: [2, 2],
+  dotted: [1, 1, 1, 1, 1, 5],
+  mediumDashed: [9, 3],
+  dashDot: [9, 3, 3, 3],
+  mediumDashDot: [9, 3, 3, 3],
+  dashDotDot: [9, 3, 3, 3, 3, 3],
+  mediumDashDotDot: [9, 3, 3, 3, 3, 3],
+};
+
+/** Diagonal border lines across the cell surface. They run between the
+ *  centres of the corner gridlines and are clipped to the fill rectangle, so
+ *  wide strokes end square. Edge borders are painted per edge by
+ *  `render/grid/borders.ts`. */
+export function paintCellDiagonals({ ctx, bounds, theme, format, dpr = 1 }: CellPaintCtx): void {
   const sides = format?.borders;
-  if (!sides) return;
-  const drawSide = (
-    side: typeof sides.top,
-    x0: number,
-    y0: number,
-    x1: number,
-    y1: number,
-    doubleInside: 1 | -1,
-  ): void => {
+  if (!sides?.diagonalDown && !sides?.diagonalUp) return;
+  const g = Math.max(1, Math.round(dpr));
+  const rule = g / dpr;
+  const l = Math.round(bounds.x * dpr) / dpr;
+  const r = Math.round((bounds.x + bounds.w) * dpr) / dpr;
+  const t = Math.round(bounds.y * dpr) / dpr;
+  const b = Math.round((bounds.y + bounds.h) * dpr) / dpr;
+  const x0 = l - rule / 2;
+  const x1 = r - rule / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(l - rule, t - rule, r - l + rule, b - t + rule);
+  ctx.clip();
+  const draw = (side: CellBorderSide | undefined, ya: number, yb: number): void => {
     if (!side) return;
-    const cfg = typeof side === 'object' ? side : { style: 'thin' as const };
-    const color =
-      (typeof side === 'object' && side.color) || theme.fgStrong || theme.fg || '#000000';
-    const widthMap: Record<string, number> = {
-      thin: 1,
-      medium: 1.6,
-      thick: 2.5,
-      dashed: 1,
-      dotted: 1,
-      double: 1,
-      hair: 0.5,
-      mediumDashed: 1.6,
-      dashDot: 1,
-      mediumDashDot: 1.6,
-      dashDotDot: 1,
-      mediumDashDotDot: 1.6,
-      slantDashDot: 1,
-    };
-    const dashMap: Record<string, number[]> = {
-      thin: [],
-      medium: [],
-      thick: [],
-      dashed: [4, 3],
-      dotted: [1, 2],
-      double: [],
-      hair: [1, 1],
-      mediumDashed: [6, 3],
-      dashDot: [4, 2, 1, 2],
-      mediumDashDot: [6, 2, 2, 2],
-      dashDotDot: [4, 2, 1, 2, 1, 2],
-      mediumDashDotDot: [6, 2, 2, 2, 2, 2],
-      slantDashDot: [5, 2, 1, 2],
-    };
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = widthMap[cfg.style] ?? 1;
-    ctx.setLineDash(dashMap[cfg.style] ?? []);
-    if (cfg.style === 'double') {
-      // Spreadsheets keep double borders inside the owning cell. Drawing both
-      // strokes inward avoids clipping on viewport and sheet edges.
-      const gap = 3;
-      const horizontal = y0 === y1;
-      const dx = horizontal ? 0 : doubleInside * gap;
-      const dy = horizontal ? doubleInside * gap : 0;
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(x1, y1);
-      ctx.moveTo(x0 + dx, y0 + dy);
-      ctx.lineTo(x1 + dx, y1 + dy);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(x1, y1);
-      ctx.stroke();
+    const style = typeof side === 'object' ? side.style : 'thin';
+    ctx.strokeStyle = (typeof side === 'object' && side.color) || theme.cellAutoFg;
+    ctx.lineWidth = (DIAGONAL_WIDTH[style] ?? 1) * rule;
+    const stretch = Math.hypot(x1 - x0, yb - ya) / Math.max(x1 - x0, 1);
+    ctx.setLineDash((DIAGONAL_DASH[style] ?? []).map((d) => d * rule * stretch));
+    ctx.beginPath();
+    // A double diagonal is two single lines one rule above and below.
+    for (const dy of style === 'double' ? [-rule, rule] : [0]) {
+      ctx.moveTo(x0, ya + dy);
+      ctx.lineTo(x1, yb + dy);
     }
-    ctx.restore();
+    ctx.stroke();
   };
-  const yt = Math.round(bounds.y) + 0.5;
-  const yb = Math.round(bounds.y + bounds.h) - 0.5;
-  const xl = Math.round(bounds.x) + 0.5;
-  const xr = Math.round(bounds.x + bounds.w) - 0.5;
-  // Keep user borders inside the cell rect. This is especially important for
-  // row/column 1 and viewport edges, where centered strokes can be clipped.
-  drawSide(sides.top, xl, yt, xr, yt, 1);
-  drawSide(sides.bottom, xl, yb, xr, yb, -1);
-  drawSide(sides.left, xl, yt, xl, yb, 1);
-  drawSide(sides.right, xr, yt, xr, yb, -1);
-  drawSide(sides.diagonalDown, xl, yt, xr, yb, 1);
-  drawSide(sides.diagonalUp, xl, yb, xr, yt, 1);
+  draw(sides.diagonalDown, t - rule / 2, b - rule / 2);
+  draw(sides.diagonalUp, b - rule / 2, t - rule / 2);
+  ctx.restore();
 }

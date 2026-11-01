@@ -214,13 +214,13 @@ describe('paintHeaders', () => {
       cols,
       rows,
     );
-    // The accent bars cover the rule beside the header and one pixel inside it.
+    // The accent bars sit on the two pixels just before the header edge.
     const view = layoutForView(state);
     const bars = shown.fills.filter((fill) => fill.style === '#107c41').map((fill) => fill.rect);
     const oy = Math.round(view.headerRowHeight);
     const ox = Math.round(view.headerColWidth);
-    expect(bars.some((rect) => rect?.[1] === oy - 1 && rect[3] === 2)).toBe(true);
-    expect(bars.some((rect) => rect?.[0] === ox - 1 && rect[2] === 2)).toBe(true);
+    expect(bars.some((rect) => rect?.[1] === oy - 2 && rect[3] === 2)).toBe(true);
+    expect(bars.some((rect) => rect?.[0] === ox - 2 && rect[2] === 2)).toBe(true);
   });
 
   it('parks the row rail and the corner chip on the right for a right-to-left sheet', () => {

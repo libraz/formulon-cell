@@ -56,8 +56,8 @@ describe('render/grid/controls — painter → cache → hit-zone contract', () 
       const cornerX = cell.x + cell.w; // 180
       const cornerY = cell.y + cell.h; // 80
       expect(hit).toEqual({
-        x: cornerX - Math.floor(hs / 2) - 1, // 177
-        y: cornerY - Math.floor(hs / 2) - 1, // 77
+        x: cornerX - Math.floor(hs / 2) - 2, // 176: the corner rule ends at 180
+        y: cornerY - Math.floor(hs / 2) - 2, // 76
         w: hs + 2, // 7
         h: hs + 2, // 7
       });

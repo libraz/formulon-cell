@@ -91,13 +91,12 @@ export function paintErrorTriangle(
   const y = bounds.y;
   ctx.save();
   ctx.fillStyle = color;
-  ctx.beginPath();
-  // Right angle at the cell's leading corner; the hypotenuse falls inwards.
-  ctx.moveTo(rtl ? x + size : x, y);
-  ctx.lineTo(rtl ? x : x + size, y);
-  ctx.lineTo(rtl ? x + size : x, y + size);
-  ctx.closePath();
-  ctx.fill();
+  // Right angle at the cell's leading corner; the hypotenuse falls inwards as
+  // a whole-pixel staircase, unsmoothed as the spreadsheet draws it.
+  for (let row = 0; row < size; row += 1) {
+    const w = size - row;
+    ctx.fillRect(rtl ? x + size - w : x, y + row, w, 1);
+  }
   ctx.restore();
   return { x, y, w: size, h: size };
 }

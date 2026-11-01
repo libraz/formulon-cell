@@ -28,6 +28,7 @@ const theme: ResolvedTheme = {
   cellErrorFg: '#c00',
   cellFormulaFg: '#333',
   cellNumFg: '#000',
+  cellAutoFg: '#000',
   cellBoolFg: '#060',
   hoverStripe: 'rgba(0,0,0,0.04)',
   headerBg: '#eee',
@@ -434,18 +435,18 @@ describe('shared wrapped text behavior', () => {
   it('uses scaled horizontal metrics as one canvas contract', () => {
     expect(cellTextHorizontalMetrics(100, 2, 0.5)).toEqual({
       padX: 1.5,
-      indentPx: 8,
-      availableWidth: 89,
+      indentPx: 12,
+      availableWidth: 85,
     });
     expect(cellTextHorizontalMetrics(100, 2, 1)).toEqual({
       padX: 3,
-      indentPx: 16,
-      availableWidth: 78,
+      indentPx: 24,
+      availableWidth: 70,
     });
     expect(cellTextHorizontalMetrics(100, 2, 2)).toEqual({
       padX: 6,
-      indentPx: 32,
-      availableWidth: 56,
+      indentPx: 48,
+      availableWidth: 40,
     });
   });
 
@@ -498,9 +499,9 @@ describe('shared wrapped text behavior', () => {
       };
     };
 
-    expect(renderedAt(0.5)).toEqual({ lines: ['ab', 'cd'], x: 5.5, lineGap: 8.5 });
-    expect(renderedAt(1)).toEqual({ lines: ['ab', 'cd'], x: 11, lineGap: 17 });
-    expect(renderedAt(2)).toEqual({ lines: ['ab', 'cd'], x: 22, lineGap: 34 });
+    expect(renderedAt(0.5)).toEqual({ lines: ['ab', 'cd'], x: 7.5, lineGap: 8.5 });
+    expect(renderedAt(1)).toEqual({ lines: ['ab', 'cd'], x: 15, lineGap: 17 });
+    expect(renderedAt(2)).toEqual({ lines: ['ab', 'cd'], x: 30, lineGap: 34 });
   });
 
   it('wraps with logical font metrics and restores the scaled paint font', () => {

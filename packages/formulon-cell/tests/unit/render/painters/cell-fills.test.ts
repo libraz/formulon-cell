@@ -229,9 +229,10 @@ describe('render/painters — gradient fills', () => {
     });
     expect(spy.created).toHaveLength(1);
     const [x0, y0, x1, y1] = spy.created[0]?.args ?? [];
-    expect(x0).toBeCloseTo(40, 5);
-    expect(x1).toBeCloseTo(40, 5);
-    expect(y0).toBeCloseTo(20, 5);
+    // The fill rect is {39,19,81,31}: the cell grown over the gridline before it.
+    expect(x0).toBeCloseTo(39.5, 5);
+    expect(x1).toBeCloseTo(39.5, 5);
+    expect(y0).toBeCloseTo(19, 5);
     expect(y1).toBeCloseTo(50, 5);
     expect(spy.created[0]?.stops).toEqual([
       [0, '#ff0000'],
@@ -259,8 +260,8 @@ describe('render/painters — gradient fills', () => {
     });
     expect(spy.created[0]?.kind).toBe('radial');
     const [cx, cy] = spy.created[0]?.args ?? [];
-    expect(cx).toBeCloseTo(40, 5);
-    expect(cy).toBeCloseTo(35, 5);
+    expect(cx).toBeCloseTo(39.5, 5);
+    expect(cy).toBeCloseTo(34.5, 5);
   });
 
   it('a gradient replaces the solid fill colour', () => {

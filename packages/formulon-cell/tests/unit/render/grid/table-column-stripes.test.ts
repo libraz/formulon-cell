@@ -94,7 +94,8 @@ function bandedCells(over: Partial<TableOverlay>): string[] {
   for (let row = 0; row < 4; row += 1) {
     for (let col = 0; col < 4; col += 1) {
       const rect = cellRectIn(view.layout, cols, rows, row, col);
-      if (fills.some((f) => f.style === band && f.x === rect.x && f.y === rect.y)) {
+      // A fill is grown over the gridline before the cell.
+      if (fills.some((f) => f.style === band && f.x === rect.x - 1 && f.y === rect.y - 1)) {
         out.push(`${row},${col}`);
       }
     }

@@ -26,6 +26,7 @@ const theme = {
   bgElev: '#f5f5f5',
   bgRail: '#eeeeee',
   fg: '#1f1f1f',
+  cellAutoFg: '#000000',
   rule: '#cccccc',
   fontUi: 'Arial',
   fontMono: 'monospace',
@@ -84,6 +85,7 @@ function canvasSpy(): CanvasSpy {
     },
     clip(): void {},
     translate(): void {},
+    setTransform(): void {},
     rotate(): void {},
     ellipse(): void {},
     arc(): void {},
@@ -218,10 +220,11 @@ describe('GridRenderer merged selection parity', () => {
     const { view } = viewParts(state);
     const [mergeRect] = rangeRects(view.layout, view.viewport, state.selection.range);
     if (!mergeRect) throw new Error('expected the merged range to be visible');
-    // The outline covers the merge's gridlines plus one pixel outside them.
+    // The outline covers the merge's gridlines plus one pixel outside them;
+    // the leading rules belong to the cells before the merge.
     expect(spy.strokeRects[0]).toEqual([
-      mergeRect.x,
-      mergeRect.y,
+      mergeRect.x - 1,
+      mergeRect.y - 1,
       mergeRect.w + 1,
       mergeRect.h + 1,
     ]);
@@ -231,8 +234,8 @@ describe('GridRenderer merged selection parity', () => {
     expect(hitsOf(renderer).validationChevron).toMatchObject({ row: 1, col: 1 });
     expect(hitsOf(renderer).validationChevron?.rect.x).toBe(mergeRect.x + mergeRect.w - 18);
     expect(hitsOf(renderer).fillHandle).toMatchObject({
-      x: mergeRect.x + mergeRect.w - 3,
-      y: mergeRect.y + mergeRect.h - 3,
+      x: mergeRect.x + mergeRect.w - 4,
+      y: mergeRect.y + mergeRect.h - 4,
     });
   });
 
@@ -251,8 +254,8 @@ describe('GridRenderer merged selection parity', () => {
     if (!rangeRect) throw new Error('expected the range to be visible');
     // A 1px sheet-coloured gap inside the border, then the border itself.
     expect(spy.strokeRects).toEqual([
-      [rangeRect.x + 1.5, rangeRect.y + 1.5, rangeRect.w - 2, rangeRect.h - 2],
-      [rangeRect.x, rangeRect.y, rangeRect.w + 1, rangeRect.h + 1],
+      [rangeRect.x + 0.5, rangeRect.y + 0.5, rangeRect.w - 2, rangeRect.h - 2],
+      [rangeRect.x - 1, rangeRect.y - 1, rangeRect.w + 1, rangeRect.h + 1],
     ]);
   });
 
@@ -274,9 +277,10 @@ describe('GridRenderer merged selection parity', () => {
       c1: 1,
     });
     if (!mergeRect) throw new Error('expected the merged range to be visible');
+    // The merge surface stops short of its own trailing rule.
     expect(spy.fills).toContainEqual({
       style: theme.bg,
-      rect: [mergeRect.x, mergeRect.y, mergeRect.w, mergeRect.h],
+      rect: [mergeRect.x, mergeRect.y, mergeRect.w - 1, mergeRect.h - 1],
     });
   });
 
@@ -340,9 +344,20 @@ describe('GridRenderer merged selection parity', () => {
 
     paintBorders(renderer, state);
 
-    // Four cells with all sides would draw 16 paths. Only the eight perimeter
-    // sides remain after suppressing the four internal boundaries.
-    expect(spy.strokes).toBe(8);
+    // Four cells with all sides would draw 16 edge pieces. Only the eight
+    // perimeter pieces remain after suppressing the four internal boundaries.
+    // Edges are device-pixel fills in the automatic ink colour. Cell (0,0) spans
+    // x 32..96, y 20..40 and the merge ends at x 160, y 60, so each rule sits one
+    // pixel before its boundary: x 31 / 159 and y 19 / 59. Nothing lands on the
+    // interior boundaries (x 95, y 39).
+    const ink = spy.fills.filter((fill) => fill.style === theme.cellAutoFg);
+    expect(ink).toHaveLength(8);
+    for (const { rect } of ink) {
+      const [x, y, w, h] = rect;
+      const vertical = w === 1 && (x === 31 || x === 159);
+      const horizontal = h === 1 && (y === 19 || y === 59);
+      expect(vertical || horizontal).toBe(true);
+    }
   });
 
   it('draws a uniform merged diagonal once across the merged surface', () => {
@@ -415,10 +430,11 @@ describe('GridRenderer merged selection parity', () => {
     const readsAfterFirstPaint = tracked.formats.reads;
     paintBorders(renderer, tracked.state);
 
-    // Each paint reads the four visible perimeter formats. Only the first
-    // paint also needs four reads to establish diagonal uniformity.
-    expect(readsAfterFirstPaint).toBe(8);
-    expect(tracked.formats.reads - readsAfterFirstPaint).toBe(4);
+    // Each paint reads the four cells for the edge pass and again for the
+    // per-cell diagonal pass. Only the first paint also needs four reads to
+    // establish diagonal uniformity.
+    expect(readsAfterFirstPaint).toBe(12);
+    expect(tracked.formats.reads - readsAfterFirstPaint).toBe(8);
     expect(spy.strokes).toBe(2);
   });
 
@@ -456,7 +472,7 @@ describe('GridRenderer merged selection parity', () => {
     // A non-uniform diagonal is suppressed; reusing the previous Map's result
     // would incorrectly leave a stroke on the canvas.
     expect(spy.strokes).toBe(1);
-    expect(second.formats.reads).toBe(8);
+    expect(second.formats.reads).toBe(12);
   });
 
   it('recomputes a cached diagonal summary when the merge object changes coordinates', () => {
@@ -604,10 +620,12 @@ describe('GridRenderer merged selection parity', () => {
     // The custom fill must be emitted once for each visible quadrant. This
     // catches the old path that reused the first rect as content bounds for
     // all merged formatting.
+    // The fill covers the gridline before the cell: above it, and on the right
+    // in a right-to-left sheet.
     for (const rect of visibleMergeRects) {
       expect(spy.fills).toContainEqual({
         style: '#ffe0b0',
-        rect: [rect.x, rect.y, rect.w, rect.h],
+        rect: [rect.x, rect.y - 1, rect.w + 1, rect.h + 1],
       });
     }
   });

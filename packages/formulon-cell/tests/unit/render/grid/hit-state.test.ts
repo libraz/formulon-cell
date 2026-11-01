@@ -14,7 +14,7 @@ import {
 describe('render/grid/hit-state', () => {
   describe('error/validation triangle colors', () => {
     it('exposes distinct sentinel colors for error vs validation triangles', () => {
-      expect(ERROR_TRIANGLE_COLOR).toBe('#2ea043');
+      expect(ERROR_TRIANGLE_COLOR).toBe('#008000');
       expect(VALIDATION_TRIANGLE_COLOR).toBe('#d24545');
     });
   });

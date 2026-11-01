@@ -1,3 +1,4 @@
+import { formulaErrorIsFlagged } from '../../commands/error-indicators.js';
 import { isHeaderRow, tableForCell } from '../../commands/format-as-table.js';
 import { formatA1FormulaAsR1C1 } from '../../commands/refs.js';
 import { addrKey } from '../../engine/address.js';
@@ -27,7 +28,6 @@ import {
 import {
   CONDITIONAL_ICON_GUTTER,
   paintCellBackground,
-  paintCellBorders,
   paintCellFill,
   paintCellText,
   paintCommentMarker,
@@ -38,10 +38,11 @@ import {
   paintValidationCircle,
   paintValidationTriangle,
 } from '../painters.js';
+import { rowBaselineFonts } from '../row-baseline.js';
 import { paintCellSparkline } from '../sparkline.js';
+import { surfaceRect } from './chrome-context.js';
 import { paintDataBar } from './data-bar.js';
 import {
-  detectErrorKind,
   detectValidationViolation,
   ERROR_TRIANGLE_COLOR,
   type ErrorTriangleHit,
@@ -70,6 +71,8 @@ export interface CellPaintContext {
   fontEffects: boolean;
   /** The renderer's conditional-format overlay cache. */
   conditionalCache: ConditionalCache;
+  /** Device pixel ratio fills and merge surfaces snap to; 1 when omitted. */
+  dpr?: number;
 }
 
 export function paintCells(
@@ -158,6 +161,7 @@ export function paintCells(
     }
   }
 
+  const rowFonts = rowBaselineFonts(format.formats, data.sheetIndex);
   const rng = selection.range;
   const objectSelected = state.ui.selectedObject !== null;
   if (!objectSelected && (rng.r0 !== rng.r1 || rng.c0 !== rng.c1)) {
@@ -192,7 +196,9 @@ export function paintCells(
   // merge before its content so internal gridlines cannot show through. If
   // the background image is already loaded, restore the same repeat pattern
   // instead of replacing it with an opaque theme fill.
-  const paintMergeBase = (bounds: Rect): void => {
+  const paintMergeBase = (cell: Rect): void => {
+    // Keep the merge's own trailing rule; only interior gridlines go.
+    const bounds = surfaceRect(cell, cellCtx.dpr ?? 1, layout.rtl === true);
     const image = cellCtx.sheetBackgroundImage;
     const pattern =
       image &&
@@ -310,6 +316,8 @@ export function paintCells(
         paintCellFill({
           ctx,
           theme,
+          dpr: cellCtx.dpr,
+          rtl: layout.rtl === true,
           bounds: rect,
           value: { kind: 'blank' },
           formula: null,
@@ -473,6 +481,8 @@ export function paintCells(
         locale,
         date1904: state.ui.date1904 === true,
         rtl,
+        dpr: cellCtx.dpr,
+        rowBaselineFont: rowFonts.get(r),
         zoom: renderScale(state.layout, state.viewport),
         formatPaint:
           formatCode && customDisplay === null && value.kind === 'number'
@@ -545,18 +555,6 @@ export function paintCells(
       }
       if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme, rtl);
       if (spark) paintCellSparkline(ctx, bounds, spark, state, cellCtx.wb);
-      if (engineFmt?.borders && !fmt?.borders) {
-        paintCellBorders({
-          ctx,
-          theme,
-          bounds,
-          value,
-          formula,
-          isActive,
-          isInRange,
-          format: effectiveFmt,
-        });
-      }
       if (fmt?.comment || hasThreadedComment) paintCommentMarker(ctx, bounds, rtl);
       if (hasValidationCircle) paintValidationCircle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);
       // Lock-icon overlay — only when the sheet is protected AND the cell
@@ -573,7 +571,7 @@ export function paintCells(
       const cellKey = key;
       if (!ignored.has(cellKey)) {
         const validation = fmt?.validation ?? rangeValidationAt(format, cellAddr);
-        if (detectErrorKind(value)) {
+        if (formulaErrorIsFlagged(value, storedFormula)) {
           const hit = paintErrorTriangle(ctx, bounds, ERROR_TRIANGLE_COLOR, rtl);
           triangleHits.push({ rect: hit, addr: cellAddr, kind: 'error' });
         } else if (validation && detectValidationViolation(value, validation, getResolver())) {

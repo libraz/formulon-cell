@@ -38,8 +38,9 @@ describe('paintGridLines', () => {
     );
 
     expect(lineWidth).toBe(1);
-    // A rule sits on the cell's leading edge and covers one whole CSS pixel.
-    expect(moves.every((x) => x === 0 || x % 1 === 0.5)).toBe(true);
+    // Each cell owns the rule on its trailing edge: [E - 1px, E) centres half a CSS pixel before E.
+    expect(moves.length).toBeGreaterThan(0);
+    expect(moves.every((x) => x % 1 === 0.5 || x === 0)).toBe(true);
   });
 });
 
@@ -77,11 +78,11 @@ describe('paintFreezeDividers', () => {
 
     expect(strokes).toEqual(['#9b9b9b']);
     expect(lineWidth).toBe(1);
-    // Header 20 + two 20px rows, header 32 + one 64px column, plus half the
-    // rule width so the stroke covers a whole pixel.
+    // Header 20 + two 20px rows, header 32 + one 64px column, minus half the
+    // rule width so the stroke covers the pixel just before the boundary.
     expect(moves).toEqual([
-      [0, 60.5],
-      [96.5, 0],
+      [0, 59.5],
+      [95.5, 0],
     ]);
   });
 });

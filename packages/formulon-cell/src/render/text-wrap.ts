@@ -1,8 +1,9 @@
 /** Horizontal cell padding used by both canvas painting and AutoFit. */
 export const CELL_TEXT_HORIZONTAL_PADDING_PX = 6;
 
-/** Pixels added to the leading edge for each Excel indent level. */
-export const CELL_TEXT_INDENT_PX = 8;
+/** Pixels added on the aligned side for each indent level: 9 pt on the Mac
+ *  spreadsheet at 100%, which the 0.75 Mac render scale maps from 12. */
+export const CELL_TEXT_INDENT_PX = 12;
 
 export interface CellTextHorizontalMetrics {
   /** Horizontal inset on each side of the cell. */

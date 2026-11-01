@@ -1,12 +1,13 @@
 import { totalsCellAt } from '../commands/format-as-table.js';
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { effectiveCellFormatFromEngine } from '../engine/cell-format-projection.js';
 import { findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
-import type { State } from '../store/store.js';
+import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { automaticFontRowLayout } from './automatic-font-row-layout.js';
@@ -486,6 +487,7 @@ export class GridRenderer {
       fontEffects:
         (this.host.closest?.<HTMLElement>('.fc-host') ?? this.host).dataset?.fcPlatform === 'mac',
       conditionalCache: this.conditionalCache,
+      dpr: this.dpr,
     };
   }
 
@@ -504,7 +506,15 @@ export class GridRenderer {
     cols: AxisLayout,
     rows: AxisLayout,
   ): void {
-    paintBorders(this.ctx, state, theme, cols, rows);
+    const wb = this.getWb();
+    const sheet = state.data.sheetIndex;
+    const effective = new Map<string, Partial<CellFormat> | null>();
+    const inherited =
+      wb?.capabilities.effectiveStyle && typeof wb.getEffectiveStyle === 'function'
+        ? (row: number, col: number) =>
+            effectiveCellFormatFromEngine(wb, sheet, row, col, effective)?.borders
+        : undefined;
+    paintBorders(this.ctx, this.dpr, state, theme, cols, rows, inherited);
   }
 
   private paintHeaders(
@@ -639,7 +649,7 @@ export class GridRenderer {
     const rangeOutline = multiCell ? rangeRects(layout, viewport, r) : activeRects;
     const outlineRects = sameRectList(activeRects, rangeOutline) ? activeRects : rangeOutline;
     for (const bounds of outlineRects) {
-      paintSelectionOutline(this.ctx, bounds, theme, outlineRects !== activeRects);
+      paintSelectionOutline(this.ctx, bounds, theme, outlineRects !== activeRects, layout.rtl);
     }
 
     const activeAnchor = activeMerge

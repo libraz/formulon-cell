@@ -10,7 +10,7 @@ import {
   mirrorX,
   type ViewState,
 } from '../geometry.js';
-import { type ChromePaintContext, ruleWidth } from './chrome-context.js';
+import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
 
 export function paintGridLines(
   pc: ChromePaintContext,
@@ -22,7 +22,7 @@ export function paintGridLines(
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const { layout } = state;
   const width = ruleWidth(dpr);
-  const align = width / 2;
+  const rtl = layout.rtl === true;
 
   ctx.strokeStyle = theme.rule;
   ctx.lineWidth = width;
@@ -31,30 +31,27 @@ export function paintGridLines(
   const firstRow = rows.visible[0] ?? 0;
   const firstCol = cols.visible[0] ?? 0;
 
+  // Each cell owns the rule on its trailing edges; the leading edge of the
+  // first visible column / row carries the rule of the one before it.
+  const xs = new Set<number>();
   for (const c of cols.visible) {
     const rect = cellRectIn(layout, cols, rows, firstRow, c);
-    const xx = Math.round(rect.x) + align;
+    xs.add(rect.x);
+    xs.add(rect.x + rect.w);
+  }
+  for (const x of xs) {
+    const xx = ruleCenter(x, dpr, rtl);
     ctx.moveTo(xx, 0);
     ctx.lineTo(xx, cssHeight);
   }
-  const lastCol = cols.visible[cols.visible.length - 1];
-  if (lastCol !== undefined) {
-    const rect = cellRectIn(layout, cols, rows, firstRow, lastCol);
-    const xx = Math.round(rect.x + rect.w) + align;
-    ctx.moveTo(xx, 0);
-    ctx.lineTo(xx, cssHeight);
-  }
-
+  const ys = new Set<number>();
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
-    const yy = Math.round(rect.y) + align;
-    ctx.moveTo(0, yy);
-    ctx.lineTo(cssWidth, yy);
+    ys.add(rect.y);
+    ys.add(rect.y + rect.h);
   }
-  const lastRow = rows.visible[rows.visible.length - 1];
-  if (lastRow !== undefined) {
-    const rect = cellRectIn(layout, cols, rows, lastRow, firstCol);
-    const yy = Math.round(rect.y + rect.h) + align;
+  for (const y of ys) {
+    const yy = ruleCenter(y, dpr);
     ctx.moveTo(0, yy);
     ctx.lineTo(cssWidth, yy);
   }
@@ -79,15 +76,18 @@ export function paintFreezeDividers(
   const width = ruleWidth(dpr);
   ctx.strokeStyle = theme.freezeRule;
   ctx.lineWidth = width;
-  const align = width / 2;
   ctx.beginPath();
   if (layout.freezeRows > 0) {
-    const yy = Math.round(gridOriginY(layout) + rows.frozenTotal) + align;
+    const yy = ruleCenter(gridOriginY(layout) + rows.frozenTotal, dpr);
     ctx.moveTo(0, yy);
     ctx.lineTo(cssWidth, yy);
   }
   if (layout.freezeCols > 0) {
-    const xx = Math.round(mirrorX(layout, gridOriginX(layout) + cols.frozenTotal)) + align;
+    const xx = ruleCenter(
+      mirrorX(layout, gridOriginX(layout) + cols.frozenTotal),
+      dpr,
+      layout.rtl === true,
+    );
     ctx.moveTo(xx, 0);
     ctx.lineTo(xx, cssHeight);
   }

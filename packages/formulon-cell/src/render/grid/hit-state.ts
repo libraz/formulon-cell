@@ -34,7 +34,7 @@ export interface ErrorTriangleHit {
 }
 
 /** Color used for formula-error triangles (spreadsheet-style green). */
-export const ERROR_TRIANGLE_COLOR = '#2ea043';
+export const ERROR_TRIANGLE_COLOR = '#008000';
 /** Color used for data-validation violation triangles (spreadsheet-style red). */
 export const VALIDATION_TRIANGLE_COLOR = '#d24545';
 

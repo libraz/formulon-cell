@@ -15,7 +15,7 @@ import {
 } from '../geometry.js';
 import { paintOutlineGutters } from '../painters/controls.js';
 import type { OutlineToggleHit } from '../painters.js';
-import { type ChromePaintContext, ruleWidth } from './chrome-context.js';
+import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
 
 export function paintHeaders(
   pc: ChromePaintContext,
@@ -65,12 +65,15 @@ export function paintHeaders(
   ctx.strokeStyle = theme.ruleStrong;
   const width = ruleWidth(dpr);
   ctx.lineWidth = width;
-  const align = width / 2;
+  // Header separators sit on the same trailing rule as the gridlines, so the
+  // header band ends with its own rule rather than covering the first row.
+  const headerRuleY = ruleCenter(oy, dpr);
+  const headerRuleX = ruleCenter(innerX, dpr, rtl);
   ctx.beginPath();
-  ctx.moveTo(0, Math.round(oy) + align);
-  ctx.lineTo(cssWidth, Math.round(oy) + align);
-  ctx.moveTo(Math.round(innerX) + align, 0);
-  ctx.lineTo(Math.round(innerX) + align, cssHeight);
+  ctx.moveTo(0, headerRuleY);
+  ctx.lineTo(cssWidth, headerRuleY);
+  ctx.moveTo(headerRuleX, 0);
+  ctx.lineTo(headerRuleX, cssHeight);
   ctx.stroke();
 
   const firstRow = rows.visible[0] ?? 0;
@@ -107,8 +110,9 @@ export function paintHeaders(
     ctx.strokeStyle = theme.headerRule;
     ctx.lineWidth = width;
     ctx.beginPath();
-    ctx.moveTo(Math.round(rect.x + w) + align, labelTopY);
-    ctx.lineTo(Math.round(rect.x + w) + align, oy);
+    const sepX = ruleCenter(rtl ? rect.x : rect.x + w, dpr, rtl);
+    ctx.moveTo(sepX, labelTopY);
+    ctx.lineTo(sepX, oy);
     ctx.stroke();
     ctx.fillStyle = isActiveCol
       ? theme.headerFgActive
@@ -121,7 +125,7 @@ export function paintHeaders(
     // The accent bar covers the rule under the header and one pixel above it.
     if (isActiveCol || isSelectedCol) {
       ctx.fillStyle = theme.accent;
-      ctx.fillRect(rect.x, Math.round(oy) - 1, w, 2);
+      ctx.fillRect(rect.x, Math.round(oy) - 2, w, 2);
     }
 
     // Autofilter chevron — small ▼ in the right edge of the header for any
@@ -205,8 +209,9 @@ export function paintHeaders(
     ctx.strokeStyle = theme.headerRule;
     ctx.lineWidth = width;
     ctx.beginPath();
-    ctx.moveTo(labelLeftX, Math.round(rect.y + h) + align);
-    ctx.lineTo(labelLeftX + layout.headerColWidth, Math.round(rect.y + h) + align);
+    const sepY = ruleCenter(rect.y + h, dpr);
+    ctx.moveTo(labelLeftX, sepY);
+    ctx.lineTo(labelLeftX + layout.headerColWidth, sepY);
     ctx.stroke();
     ctx.fillStyle = isActiveRow
       ? theme.headerFgActive
@@ -218,7 +223,7 @@ export function paintHeaders(
     ctx.fillText(rowLabel, rtl ? innerX + 8 : innerX - 8, rect.y + h / 2 + 0.5);
     if (isActiveRow || isSelectedRow) {
       ctx.fillStyle = theme.accent;
-      ctx.fillRect(Math.round(innerX) - 1, rect.y, 2, h);
+      ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);
     }
   }
 

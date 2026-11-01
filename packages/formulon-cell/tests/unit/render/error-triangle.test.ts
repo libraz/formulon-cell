@@ -20,9 +20,11 @@ function makeStubCtx(): {
   ctx: CanvasRenderingContext2D;
   calls: string[];
   fills: string[];
+  rects: [number, number, number, number][];
 } {
   const calls: string[] = [];
   const fills: string[] = [];
+  const rects: [number, number, number, number][] = [];
   let fillStyle = '';
   const ctx = {
     save: vi.fn(() => calls.push('save')),
@@ -32,6 +34,10 @@ function makeStubCtx(): {
     moveTo: vi.fn(() => calls.push('moveTo')),
     lineTo: vi.fn(() => calls.push('lineTo')),
     fill: vi.fn(() => calls.push('fill')),
+    fillRect: vi.fn((x: number, y: number, w: number, h: number) => {
+      calls.push('fillRect');
+      rects.push([x, y, w, h]);
+    }),
     get fillStyle(): string {
       return fillStyle;
     },
@@ -40,7 +46,7 @@ function makeStubCtx(): {
       fills.push(v);
     },
   };
-  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls, fills };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls, fills, rects };
 }
 
 describe('detectErrorKind', () => {
@@ -138,14 +144,19 @@ describe('detectValidationViolation', () => {
 });
 
 describe('paintErrorTriangle / paintValidationTriangle', () => {
-  it('paintErrorTriangle uses the supplied color and emits a filled triangle path', () => {
-    const { ctx, calls, fills } = makeStubCtx();
+  it('paintErrorTriangle fills a whole-pixel staircase in the supplied color', () => {
+    const { ctx, fills, rects } = makeStubCtx();
     const rect = paintErrorTriangle(ctx, { x: 10, y: 20, w: 80, h: 22 }, ERROR_TRIANGLE_COLOR);
     expect(fills).toContain(ERROR_TRIANGLE_COLOR);
-    expect(calls).toContain('beginPath');
-    expect(calls).toContain('moveTo');
-    expect(calls).toContain('lineTo');
-    expect(calls).toContain('fill');
+    // One unsmoothed row per pixel, narrowing away from the corner.
+    expect(rects).toEqual([
+      [10, 20, 6, 1],
+      [10, 21, 5, 1],
+      [10, 22, 4, 1],
+      [10, 23, 3, 1],
+      [10, 24, 2, 1],
+      [10, 25, 1, 1],
+    ]);
     // Returned hit-rect is anchored at the cell's top-left.
     expect(rect.x).toBe(10);
     expect(rect.y).toBe(20);
