@@ -8,6 +8,8 @@ function makeCanvasContext(): CanvasRenderingContext2D {
     {
       canvas: document.createElement('canvas'),
       measureText: (text: string) => ({ width: text.length * 7 }),
+      createLinearGradient: () => ({ addColorStop: vi.fn() }),
+      createRadialGradient: () => ({ addColorStop: vi.fn() }),
     },
     {
       get(target, prop) {

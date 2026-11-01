@@ -68,13 +68,18 @@ export async function runWrappedText(page: Page): Promise<void> {
         const height = computeAutofitRowHeight(instance.store.getState(), 0, ctx, {
           locale,
           theme,
+          workbookDisplayFont: font,
         });
+        // The cell uses the Normal font, so the row padding is the default
+        // height minus one Normal line pitch.
+        const defaultHeight = instance.store.getState().layout.defaultRowHeight;
+        const pitch = Math.round(format.fontSize * 1.28);
         return {
           painted,
           height,
           expectedHeight: Math.max(
-            instance.store.getState().layout.defaultRowHeight,
-            painted[1].length * Math.round(format.fontSize * 1.28) + 8,
+            defaultHeight,
+            painted[1].length * pitch + Math.max(0, defaultHeight - pitch),
           ),
         };
       },
