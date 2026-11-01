@@ -4,6 +4,34 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.14.0 — 2026-11-02
+
+### Added
+
+- Stacked vertical text (`rotation: 'vertical'`, OOXML text rotation 255) is read from and written back to the workbook and painted one character per line; wrapped text stacks into columns laid right to left. The Format Cells Orientation tile toggles it, and the ribbon's Vertical Text item applies it instead of a 90 degree rotation and shows as active.
+- `--fc-cell-auto-fg` (`ResolvedTheme.cellAutoFg`) is the automatic cell text colour: pure black in the paper and contrast themes, following `--fc-fg` in ink. Text, number, boolean and error values in the paper theme use it, and the Mac platform no longer colours booleans green.
+
+### Changed
+
+- Grid rules, fills, borders and text are drawn on device pixels the way the desktop spreadsheet draws them: gridlines sit on each cell's trailing rule, shared border edges resolve by style precedence with matching joins and dash phases, and text shares a row baseline. The selection outline, fill handle and in-cell editor frame line up with the new rules.
+- Left, right and centre-aligned text, indented text and formula results overflow into empty neighbours in the direction their alignment implies, and the gridlines and border edges they cross are hidden. Fills and borders no longer stop overflow; shrink-to-fit text never overflows.
+- Rotated, wrapped and underlined text, conditional-format icon sets, data bars, the list-validation dropdown button, the note marker, the error indicator and row numbers take the desktop sizes and placement. Icon sets are redrawn per family and follow the cell's vertical alignment and the sheet zoom; gradient data bars fade to the bar colour mixed 82% toward white.
+- Column and row headings use the workbook's Normal font.
+- The Format Cells dialog follows the desktop layout: the number tab's sample shows only the formatted value, vertical alignment has no General entry, the border preset is Inside, the line-style gallery uses the desktop order, protection checkboxes stack, and Japanese alignment labels are added.
+- The ribbon's currency and percent buttons use desktop-style tooltips.
+- General numbers never group thousands, and General scientific notation drops trailing mantissa zeros (`1E+20`).
+
+### Fixed
+
+- Engine colours with a zero alpha byte, common in files from other writers, no longer paint fills, colour scales and data bars transparent.
+- Theme fonts without a charset resolve through the script face of the profile the workbook was opened with, so a Japanese-profile sheet gets its theme typeface and the matching default row height, and switching the UI language keeps the faces the book opened with. `WorkbookHandle.fontScriptProfile` holds that profile.
+- The error indicator marks only formula cells whose result is an error, and a bare `=NA()` is not flagged.
+- The active cell clears only its own surface, so range shading under the rules it owns stays visible.
+- Editing a merged cell frames the whole merge.
+- The find and replace panel stays within a short host and scrolls its body while the title bar, tabs and footer stay in view.
+- A column or row resize cursor is no longer cleared by pointer moves over the grid.
+- AutoFit returns a single line in the Normal font to the default row height.
+
 ## 0.13.0 — 2026-10-31
 
 ### Added
