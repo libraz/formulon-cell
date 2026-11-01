@@ -120,7 +120,6 @@ export const applySelectionRectangle = (
   gesture: Range,
   mode: SelectionGestureMode,
   anchor: Addr,
-  tip: Addr,
 ): SelectionSlice | null => {
   const ranges = [base.range, ...(base.extraRanges ?? [])];
 

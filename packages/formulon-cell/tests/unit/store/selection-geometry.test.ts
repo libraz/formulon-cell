@@ -70,21 +70,11 @@ describe('store/selection-geometry', () => {
 
   it('adds a rectangle as primary and removes overlap from prior ranges', () => {
     const base = selection(range(0, 0, 2, 2), [range(4, 4, 5, 5)]);
-    const next = applySelectionRectangle(
-      base,
-      range(2, 2, 4, 4),
-      'add',
-      {
-        sheet: 0,
-        row: 2,
-        col: 2,
-      },
-      {
-        sheet: 0,
-        row: 4,
-        col: 4,
-      },
-    );
+    const next = applySelectionRectangle(base, range(2, 2, 4, 4), 'add', {
+      sheet: 0,
+      row: 2,
+      col: 2,
+    });
     if (!next) throw new Error('Expected add gesture to retain a selected range');
     expect(next?.range).toEqual(range(2, 2, 4, 4));
     expect(next?.extraRanges).toEqual([
@@ -102,21 +92,11 @@ describe('store/selection-geometry', () => {
     const base = selection(range(0, 0, 4, 4));
     base.active = { sheet: 0, row: 2, col: 0 };
     base.anchor = { sheet: 0, row: 0, col: 0 };
-    const next = applySelectionRectangle(
-      base,
-      range(1, 0, 3, 4),
-      'subtract',
-      {
-        sheet: 0,
-        row: 1,
-        col: 0,
-      },
-      {
-        sheet: 0,
-        row: 3,
-        col: 4,
-      },
-    );
+    const next = applySelectionRectangle(base, range(1, 0, 3, 4), 'subtract', {
+      sheet: 0,
+      row: 1,
+      col: 0,
+    });
     expect(next?.range).toEqual(range(0, 0, 0, 4));
     expect(next?.active).toEqual({ sheet: 0, row: 0, col: 0 });
     expect(next?.anchor).toEqual(next?.active);
@@ -127,39 +107,19 @@ describe('store/selection-geometry', () => {
     const base = selection(range(0, 0, 2, 2));
     base.active = { sheet: 0, row: 2, col: 2 };
     base.anchor = { sheet: 0, row: 2, col: 2 };
-    const next = applySelectionRectangle(
-      base,
-      range(0, 0, 1, 2),
-      'subtract',
-      {
-        sheet: 0,
-        row: 0,
-        col: 0,
-      },
-      {
-        sheet: 0,
-        row: 1,
-        col: 2,
-      },
-    );
+    const next = applySelectionRectangle(base, range(0, 0, 1, 2), 'subtract', {
+      sheet: 0,
+      row: 0,
+      col: 0,
+    });
     expect(next?.range).toEqual(range(2, 0, 2, 2));
     expect(next?.active).toEqual(base.active);
     expect(
-      applySelectionRectangle(
-        selection(range(0, 0)),
-        range(0, 0),
-        'subtract',
-        {
-          sheet: 0,
-          row: 0,
-          col: 0,
-        },
-        {
-          sheet: 0,
-          row: 0,
-          col: 0,
-        },
-      ),
+      applySelectionRectangle(selection(range(0, 0)), range(0, 0), 'subtract', {
+        sheet: 0,
+        row: 0,
+        col: 0,
+      }),
     ).toBeNull();
   });
 

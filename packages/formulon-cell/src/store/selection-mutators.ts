@@ -311,7 +311,7 @@ export const selectionMutators = {
     let changed = false;
     store.setState((s) => {
       if (!selectionRangeAllowed(store, s, gesture)) return s;
-      const next = applySelectionRectangle(base, gesture, mode, anchor, tip);
+      const next = applySelectionRectangle(base, gesture, mode, anchor);
       if (!next) return s;
 
       const active = selectionForAddr(s, next.active).active;
