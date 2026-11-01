@@ -45,3 +45,19 @@ describe('getResolvedFontRecord theme script faces', () => {
     }
   });
 });
+
+describe('theme-linked fonts without a charset', () => {
+  it("take the profile language's script face", async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'en' });
+    try {
+      const base = wb.getFontRecord(0);
+      if (!base) throw new Error('font 0 missing');
+      const index = wb.addFontRecord({ ...base, name: 'Calibri', scheme: 2, hasCharset: false });
+      expect(wb.getResolvedFontRecord(index)?.name).toBe('Aptos Narrow');
+      expect(wb.setSpreadsheetProfileId('windows-ja_JP')).toBe(true);
+      expect(wb.getResolvedFontRecord(index)?.name).toBe('游ゴシック');
+    } finally {
+      wb.dispose();
+    }
+  });
+});

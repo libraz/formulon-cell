@@ -86,11 +86,14 @@ function displayWidthModel(handle: unknown, sheet: number): WidthModelResult | n
   }
 }
 
-/** `sheet`'s raw Normal font, or null when the engine cannot report it. */
+/** `sheet`'s Normal font as displayed — a theme-linked record takes the face
+ *  the theme resolves it to — or null when the engine cannot report it. */
 function sheetNormalFont(handle: unknown, sheet: number): { name: string; size: number } | null {
   const model = displayWidthModel(handle, sheet);
   if (!model || !Number.isFinite(model.normalFontSize)) return null;
-  return { name: model.normalFontName, size: model.normalFontSize };
+  const normal = (handle as WorkbookHandle).getResolvedFontRecord(0);
+  const name = normal?.scheme ? normal.name : model.normalFontName;
+  return { name, size: model.normalFontSize };
 }
 
 /** CSS px per platform screen pixel: 1 at 96 DPI, 4/3 where Mac draws 1 pt as 1 px. */

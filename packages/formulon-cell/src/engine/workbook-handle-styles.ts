@@ -68,6 +68,23 @@ const SCRIPT_FOR_CHARSET: ReadonlyMap<number, string> = new Map([
   [222, 'Thai'],
 ]);
 
+/** Theme script of the editing language a profile models; a theme-linked font
+ *  without a charset takes that script's face, as a Japanese host shows a
+ *  minor-scheme Calibri record in the theme's Jpan typeface. */
+const SCRIPT_FOR_PROFILE_LOCALE: ReadonlyMap<string, string> = new Map([
+  ['ja_JP', 'Jpan'],
+  ['ko_KR', 'Hang'],
+  ['zh_CN', 'Hans'],
+  ['zh_TW', 'Hant'],
+  ['th_TH', 'Thai'],
+]);
+
+function profileScript(handle: WorkbookHandleStylesMethods): string | undefined {
+  const profile = (handle as unknown as WorkbookHandle).spreadsheetProfileId();
+  const locale = profile?.slice(profile.indexOf('-') + 1);
+  return locale ? SCRIPT_FOR_PROFILE_LOCALE.get(locale) : undefined;
+}
+
 function readTheme(handle: WorkbookHandleStylesMethods): ThemeResult | null {
   if (themeCache.has(handle)) return themeCache.get(handle) ?? null;
   const native = wb(handle) as unknown as {
@@ -377,7 +394,7 @@ export abstract class WorkbookHandleStylesMethods {
       const script =
         record.hasCharset && record.charset !== undefined
           ? SCRIPT_FOR_CHARSET.get(record.charset)
-          : undefined;
+          : profileScript(this);
       const scriptFace = script
         ? (major ? theme?.majorScripts : theme?.minorScripts)?.find((s) => s.script === script)
             ?.typeface
