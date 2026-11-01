@@ -1,15 +1,26 @@
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
 
-/** Selection outline shared by the active cell and a multi-cell range.
- *
- *  Desktop spreadsheets paint a crisp 2px accent border that covers the
- *  range's own gridlines plus one pixel outside them, so no gridline shows
- *  between the border and the neighbouring cells. A cell owns the rule on
- *  its trailing edges, so the range's leading rules sit just before it — the
- *  column rules sit after each edge instead in RTL. A shaded range keeps a
- *  1px sheet-coloured gap inside the border (`inset`). Drawn in a separate
- *  pass after all cell text so neighbouring cell rects never clip it. */
+/** Outer box of the 2px selection outline around `bounds`. Desktop
+ *  spreadsheets cover the range's own gridlines plus one pixel outside them,
+ *  so no gridline shows between the border and the neighbouring cells. A cell
+ *  owns the rule on its trailing edges, so the range's leading rules sit just
+ *  before it — the column rules sit after each edge instead in RTL. The cell
+ *  editor takes the same box so editing keeps the frame. */
+export function selectionOutlineFrame(bounds: Rect, rtl = false): Rect {
+  const left = Math.round(bounds.x);
+  const top = Math.round(bounds.y);
+  const right = Math.round(bounds.x + bounds.w);
+  const bottom = Math.round(bounds.y + bounds.h);
+  const x = rtl ? left - 1 : left - 2;
+  const y = top - 2;
+  return { x, y, w: (rtl ? right + 2 : right + 1) - x, h: bottom + 1 - y };
+}
+
+/** Selection outline shared by the active cell and a multi-cell range,
+ *  stroked inside `selectionOutlineFrame`. A shaded range keeps a 1px
+ *  sheet-coloured gap inside the border (`inset`). Drawn in a separate pass
+ *  after all cell text so neighbouring cell rects never clip it. */
 export function paintSelectionOutline(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
@@ -17,25 +28,22 @@ export function paintSelectionOutline(
   inset = false,
   rtl = false,
 ): void {
-  const left = Math.round(bounds.x);
-  const top = Math.round(bounds.y);
-  const right = Math.round(bounds.x + bounds.w);
-  const bottom = Math.round(bounds.y + bounds.h);
-  // Centre lines of the 2px border: on the outer edge of each rule.
-  const x0 = rtl ? left : left - 1;
-  const x1 = rtl ? right + 1 : right;
-  const y0 = top - 1;
-  const y1 = bottom;
+  const frame = selectionOutlineFrame(bounds, rtl);
+  // Centre lines of the 2px border.
+  const x0 = frame.x + 1;
+  const y0 = frame.y + 1;
+  const w = frame.w - 2;
+  const h = frame.h - 2;
   ctx.save();
   ctx.setLineDash([]);
-  if (inset && x1 - x0 > 4 && y1 - y0 > 4) {
+  if (inset && w > 4 && h > 4) {
     ctx.strokeStyle = theme.bg;
     ctx.lineWidth = 1;
-    ctx.strokeRect(x0 + 1.5, y0 + 1.5, x1 - x0 - 3, y1 - y0 - 3);
+    ctx.strokeRect(x0 + 1.5, y0 + 1.5, w - 3, h - 3);
   }
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 2;
-  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.strokeRect(x0, y0, w, h);
   ctx.restore();
 }
 

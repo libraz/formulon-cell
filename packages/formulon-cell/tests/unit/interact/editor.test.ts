@@ -699,8 +699,8 @@ describe('InlineEditor', () => {
     // defaultColW=104, defaultRowH=28). Cell (1, 1): x=52+104=156,
     // y=30+28=58, w=104, h=28. The frame lies on the selection outline: over
     // the cell's gridlines and one pixel outside them.
-    expect(input.style.left).toBe('155px');
-    expect(input.style.top).toBe('57px');
+    expect(input.style.left).toBe('154px');
+    expect(input.style.top).toBe('56px');
     expect(input.style.width).toBe('107px');
     expect(input.style.height).toBe('31px');
   });
@@ -804,15 +804,15 @@ describe('InlineEditor', () => {
     mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
     editor.begin('hi');
     const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
-    expect(input.style.top).toBe(`${30 + 5 * 28 - 1}px`);
+    expect(input.style.top).toBe(`${30 + 5 * 28 - 2}px`);
 
     mutators.scrollBy(store, 2, 0);
     // Two rows scrolled away → the cell (and the editor) climb two rows.
-    expect(input.style.top).toBe(`${30 + 3 * 28 - 1}px`);
-    expect(input.style.left).toBe('155px');
+    expect(input.style.top).toBe(`${30 + 3 * 28 - 2}px`);
+    expect(input.style.left).toBe('154px');
 
     mutators.scrollBy(store, 0, 1);
-    expect(input.style.left).toBe(`${52 + 0 * 104 - 1}px`);
+    expect(input.style.left).toBe(`${52 + 0 * 104 - 2}px`);
   });
 
   it('parks the editor outside the grid once its cell scrolls off the leading edge', () => {
@@ -831,8 +831,8 @@ describe('InlineEditor', () => {
     expect(editor.isActive()).toBe(true);
 
     mutators.scrollBy(store, -4, 0);
-    expect(input.style.top).toBe('57px');
-    expect(input.style.left).toBe('155px');
+    expect(input.style.top).toBe('56px');
+    expect(input.style.left).toBe('154px');
   });
 
   it('keeps the editor on a frozen cell in place while the body scrolls', () => {

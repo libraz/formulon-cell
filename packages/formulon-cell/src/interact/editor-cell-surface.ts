@@ -4,6 +4,7 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView, type Rect } from '../render/geometry.js';
 import { mergeRangeAt } from '../render/grid/merged-cells.js';
+import { selectionOutlineFrame } from '../render/painters/handles.js';
 import {
   cellFontFamily,
   cellTextVerticalOffset,
@@ -44,20 +45,6 @@ const editedCellRect = (
   };
 };
 
-/** The editor's frame for a cell: its 2px border lies exactly where the
- *  selection outline is painted, over the cell's gridlines and one pixel
- *  outside them, so editing keeps the same frame. */
-const editorFrame = (cell: Rect): Rect => {
-  const x = Math.round(cell.x);
-  const y = Math.round(cell.y);
-  return {
-    x: x - 1,
-    y: y - 1,
-    w: Math.round(cell.x + cell.w) - x + 3,
-    h: Math.round(cell.y + cell.h) - y + 3,
-  };
-};
-
 export const fitEditorToContent = (
   input: HTMLTextAreaElement | null,
   addr: Addr | null,
@@ -89,7 +76,7 @@ const refreshWidth = (
   if (!input || !addr) return;
   const state = s.store.getState();
   const layout = layoutForView(state);
-  const r = editorFrame(editedCellRect(state, layout, addr));
+  const r = selectionOutlineFrame(editedCellRect(state, layout, addr), layout.rtl);
   // Reset to the cell width first so the editor can shrink back as content
   //  is deleted, then measure the natural content width.
   input.style.width = `${r.w}px`;
@@ -201,7 +188,7 @@ export const positionEditorOverCell = (
   const state = s.store.getState();
   const layout = layoutForView(state);
   const cell = editedCellRect(state, layout, addr);
-  const r = editorFrame(cell);
+  const r = selectionOutlineFrame(cell, layout.rtl);
   if (!input) return;
   // A cell scrolled off the leading edge sits behind the frozen band and the
   // headers. Park the editor outside the grid's clip rect instead of letting

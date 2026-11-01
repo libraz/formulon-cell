@@ -49,9 +49,10 @@ describe('InlineEditor under a platform screen scale', () => {
     mutators.setCellFormat(store, anchor, { fontSize: 16 });
     mutators.setActive(store, anchor);
     editor.begin('x');
-    // Cell (1, 1) spans x 101..176, y 40..60; the frame sits 1 px outside it.
-    expect(input().style.left).toBe('100px');
-    expect(input().style.top).toBe('39px');
+    // Cell (1, 1) spans x 101..176, y 40..60; the frame takes the selection
+    // outline's box, from 2 px before the cell to 1 px past it.
+    expect(input().style.left).toBe('99px');
+    expect(input().style.top).toBe('38px');
     expect(input().style.width).toBe('78px');
     expect(input().style.height).toBe('23px');
     expect(input().style.fontSize).toBe('12px');
@@ -62,9 +63,9 @@ describe('InlineEditor under a platform screen scale', () => {
     mutators.mergeRange(store, { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 });
     mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
     editor.begin('x');
-    // B2:C4 spans x 101..251, y 40..100; the frame sits 1 px outside it.
-    expect(input().style.left).toBe('100px');
-    expect(input().style.top).toBe('39px');
+    // B2:C4 spans x 101..251, y 40..100; the frame takes the outline's box.
+    expect(input().style.left).toBe('99px');
+    expect(input().style.top).toBe('38px');
     expect(input().style.width).toBe('153px');
     expect(input().style.height).toBe('63px');
   });
