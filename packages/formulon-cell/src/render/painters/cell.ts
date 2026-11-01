@@ -2,10 +2,13 @@ import type {
   CellBorderSide,
   CellBorderStyle,
   CellGradientFill,
+  CellVAlign,
   ConditionalIconSet,
 } from '../../store/store.js';
 import type { Rect } from '../geometry.js';
 import { fillRect, surfaceRect } from '../grid/chrome-context.js';
+import { drawConditionalIconArt } from './cf-icons.js';
+import { visualZoom } from './text.js';
 import type { CellPaintCtx } from './types.js';
 
 /* ---- Base painters wired in MS-A. Future slots (formatting, CF, DV,
@@ -39,298 +42,45 @@ export function paintCellBackground({
  *  present so the artwork and value don't overlap. */
 export const CONDITIONAL_ICON_GUTTER = 16;
 
-const ARROWS_3 = [Math.PI / 2, 0, -Math.PI / 2];
-const ARROWS_4 = [Math.PI / 2, Math.PI / 4, -Math.PI / 4, -Math.PI / 2];
-const ARROWS_5 = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2];
+/** Icon box edge, its inset from the leading edge and its clearance above
+ *  the cell's own bottom gridline, in CSS px at 100% zoom. */
+const ICON_BOX = 11;
+const ICON_INSET = 1;
+const ICON_BOTTOM_GAP = 2;
 
-/** Arrow directions per slot, low → high (0 = right, π/2 = down). */
-const ARROW_ANGLES: Partial<Record<ConditionalIconSet, readonly number[]>> = {
-  arrows3: ARROWS_3,
-  arrowsGray3: ARROWS_3,
-  arrows4: ARROWS_4,
-  arrowsGray4: ARROWS_4,
-  arrows5: ARROWS_5,
-  arrowsGray5: ARROWS_5,
-};
-
-const RAMP: Readonly<Record<number, readonly string[]>> = {
-  3: ['#d24545', '#cfa64a', '#3aa055'],
-  4: ['#d24545', '#cfa64a', '#cfa64a', '#3aa055'],
-  5: ['#d24545', '#e07a4d', '#cfa64a', '#7fb352', '#3aa055'],
-};
-
-const rampColor = (slots: number, idx: number): string | undefined => RAMP[slots]?.[idx];
-
-/** Paint a small icon-set glyph at the left of a cell rect. The artwork is
- *  drawn with primitive shapes — no SVG / image asset — so the renderer
- *  stays self-contained. `slot` is 0-based; the family decides the count
- *  (3 or 5) and how the slot maps to color/direction. */
+/** Paint a small icon-set glyph at the leading edge of a cell rect. The
+ *  artwork is drawn with primitive shapes — no SVG / image asset — so the
+ *  renderer stays self-contained. `slot` is 0-based; the family decides the
+ *  count and how the slot maps to colour/direction. The glyph follows the
+ *  cell's vertical alignment the way its text does (bottom by default) and
+ *  scales with `zoom`. */
 export function paintConditionalIcon(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
   kind: ConditionalIconSet,
   slot: number,
   rtl = false,
+  vAlign?: CellVAlign,
+  zoom?: number,
 ): void {
-  const cx = rtl
-    ? rect.x + rect.w - CONDITIONAL_ICON_GUTTER / 2
-    : rect.x + CONDITIONAL_ICON_GUTTER / 2;
-  const cy = rect.y + rect.h / 2;
-  const r = Math.min(5, Math.floor(rect.h * 0.32));
+  const z = visualZoom(zoom);
+  const size = ICON_BOX * z;
+  // The last CSS px row of `rect` is the cell's own gridline.
+  const bottom = rect.y + rect.h - 1 - ICON_BOTTOM_GAP * z;
+  const y =
+    vAlign === 'top'
+      ? rect.y
+      : vAlign === undefined || vAlign === 'bottom'
+        ? bottom - size
+        : (rect.y + bottom - size) / 2;
+  const x = rtl ? rect.x + rect.w - (ICON_INSET + ICON_BOX) * z : rect.x + ICON_INSET * z;
   ctx.save();
-  if (ARROW_ANGLES[kind]) {
-    // Direction tracks the slot (low → down, high → up); colour runs
-    // red → amber → green, or stays gray for the gray families.
-    const angles = ARROW_ANGLES[kind] ?? [];
-    const idx = Math.max(0, Math.min(angles.length - 1, slot));
-    const color = kind.startsWith('arrowsGray')
-      ? '#7f7f7f'
-      : (rampColor(angles.length, idx) ?? '#777');
-    const a = angles[idx] ?? 0;
-    const len = r + 2;
-    const dx = Math.cos(a) * len;
-    const dy = Math.sin(a) * len;
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - dx, cy - dy);
-    ctx.lineTo(cx + dx, cy + dy);
-    ctx.stroke();
-    // Arrow head — small triangle perpendicular to the direction.
-    const px = -Math.sin(a);
-    const py = Math.cos(a);
-    const headLen = 3;
-    const headHalf = 2.5;
-    const baseX = cx + dx - Math.cos(a) * headLen;
-    const baseY = cy + dy - Math.sin(a) * headLen;
-    ctx.beginPath();
-    ctx.moveTo(cx + dx, cy + dy);
-    ctx.lineTo(baseX + px * headHalf, baseY + py * headHalf);
-    ctx.lineTo(baseX - px * headHalf, baseY - py * headHalf);
-    ctx.closePath();
-    ctx.fill();
-  } else if (kind === 'triangles3') {
-    const idx = Math.max(0, Math.min(2, slot));
-    const colors = ['#d24545', '#cfa64a', '#3aa055'];
-    ctx.fillStyle = colors[idx] ?? '#777';
-    if (idx === 1) {
-      ctx.fillRect(cx - r, cy - 1, r * 2, 2);
-    } else {
-      const up = idx === 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + (up ? -r : r));
-      ctx.lineTo(cx - r, cy + (up ? r : -r));
-      ctx.lineTo(cx + r, cy + (up ? r : -r));
-      ctx.closePath();
-      ctx.fill();
-    }
-  } else if (
-    kind === 'traffic3' ||
-    kind === 'trafficRim3' ||
-    kind === 'traffic4' ||
-    kind === 'redToBlack4'
-  ) {
-    // One solid circle in the slot's colour; the rimmed set adds a housing.
-    const colors =
-      kind === 'traffic4'
-        ? ['#404040', '#d24545', '#cfa64a', '#3aa055']
-        : kind === 'redToBlack4'
-          ? ['#404040', '#8c8c8c', '#e8a0a0', '#d24545']
-          : ['#d24545', '#cfa64a', '#3aa055'];
-    const idx = Math.max(0, Math.min(colors.length - 1, slot));
-    const color = colors[idx] ?? '#777';
-    if (kind === 'trafficRim3') {
-      ctx.strokeStyle = '#4f4f4f';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.rect(cx - r - 2, cy - r - 2, (r + 2) * 2, (r + 2) * 2);
-      ctx.stroke();
-    }
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (kind === 'signs3') {
-    // Red diamond, amber triangle, green circle.
-    const idx = Math.max(0, Math.min(2, slot));
-    ctx.fillStyle = ['#d24545', '#cfa64a', '#3aa055'][idx] ?? '#777';
-    ctx.beginPath();
-    if (idx === 0) {
-      ctx.moveTo(cx, cy - r);
-      ctx.lineTo(cx + r, cy);
-      ctx.lineTo(cx, cy + r);
-      ctx.lineTo(cx - r, cy);
-      ctx.closePath();
-    } else if (idx === 1) {
-      ctx.moveTo(cx, cy - r);
-      ctx.lineTo(cx + r, cy + r);
-      ctx.lineTo(cx - r, cy + r);
-      ctx.closePath();
-    } else {
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    }
-    ctx.fill();
-  } else if (kind === 'symbols3' || kind === 'symbolsCircled3') {
-    const idx = Math.max(0, Math.min(2, slot));
-    ctx.lineWidth = 1.6;
-    if (kind === 'symbolsCircled3') {
-      // Coloured disc with the symbol knocked out in white.
-      ctx.fillStyle = ['#d24545', '#cfa64a', '#3aa055'][idx] ?? '#777';
-      ctx.beginPath();
-      ctx.arc(cx, cy, r + 1, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      if (idx === 2) {
-        ctx.moveTo(cx - r + 2, cy);
-        ctx.lineTo(cx - 1, cy + r - 2);
-        ctx.lineTo(cx + r - 2, cy - r + 2);
-      } else if (idx === 1) {
-        ctx.moveTo(cx, cy - r + 2);
-        ctx.lineTo(cx, cy + 1);
-      } else {
-        ctx.moveTo(cx - r + 2, cy - r + 2);
-        ctx.lineTo(cx + r - 2, cy + r - 2);
-        ctx.moveTo(cx + r - 2, cy - r + 2);
-        ctx.lineTo(cx - r + 2, cy + r - 2);
-      }
-      ctx.stroke();
-      ctx.restore();
-      return;
-    }
-    if (idx === 2) {
-      ctx.strokeStyle = '#3aa055';
-      ctx.beginPath();
-      ctx.moveTo(cx - r, cy);
-      ctx.lineTo(cx - 1, cy + r - 1);
-      ctx.lineTo(cx + r, cy - r);
-      ctx.stroke();
-    } else if (idx === 1) {
-      ctx.strokeStyle = '#cfa64a';
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - r);
-      ctx.lineTo(cx, cy + 1);
-      ctx.stroke();
-      ctx.fillStyle = '#cfa64a';
-      ctx.beginPath();
-      ctx.arc(cx, cy + r - 1, 1.2, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = '#d24545';
-      ctx.beginPath();
-      ctx.moveTo(cx - r, cy - r);
-      ctx.lineTo(cx + r, cy + r);
-      ctx.moveTo(cx + r, cy - r);
-      ctx.lineTo(cx - r, cy + r);
-      ctx.stroke();
-    }
-  } else if (kind === 'flags3') {
-    const idx = Math.max(0, Math.min(2, slot));
-    const colors = ['#d24545', '#cfa64a', '#3aa055'];
-    ctx.strokeStyle = '#5c5c5c';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx - r, cy + r);
-    ctx.lineTo(cx - r, cy - r);
-    ctx.stroke();
-    ctx.fillStyle = colors[idx] ?? '#777';
-    ctx.beginPath();
-    ctx.moveTo(cx - r, cy - r);
-    ctx.lineTo(cx + r, cy - r + 1.5);
-    ctx.lineTo(cx - r, cy + 1);
-    ctx.closePath();
-    ctx.fill();
-  } else if (kind === 'quarters5') {
-    const idx = Math.max(0, Math.min(4, slot));
-    ctx.strokeStyle = '#5c5c5c';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = '#3f7ad8';
-    if (idx > 0) {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (idx / 4) * Math.PI * 2);
-      ctx.closePath();
-      ctx.fill();
-    }
-  } else if (kind === 'ratings4' || kind === 'ratings5') {
-    // Four signal bars; the slot sets how many are lit.
-    const lit =
-      kind === 'ratings4' ? Math.max(0, Math.min(3, slot)) + 1 : Math.max(0, Math.min(4, slot));
-    ctx.fillStyle = '#3f7ad8';
-    const baseX = cx - 6;
-    for (let i = 0; i < 4; i += 1) {
-      const h = 3 + i * 2.5;
-      ctx.globalAlpha = i < lit ? 1 : 0.25;
-      ctx.fillRect(baseX + i * 3.2, cy + r - h, 2.2, h);
-    }
-    ctx.globalAlpha = 1;
-  } else if (kind === 'bars5' || kind === 'boxes5') {
-    const idx = Math.max(0, Math.min(4, slot));
-    ctx.fillStyle = '#3f7ad8';
-    if (kind === 'bars5') {
-      const barW = 2;
-      const gap = 1;
-      const baseX = cx - 5;
-      for (let i = 0; i < 5; i += 1) {
-        const h = 3 + i * 2;
-        ctx.globalAlpha = i <= idx ? 1 : 0.25;
-        ctx.fillRect(baseX + i * (barW + gap), cy + r - h, barW, h);
-      }
-      ctx.globalAlpha = 1;
-    } else {
-      const size = 3;
-      const baseX = cx - 5;
-      const baseY = cy - 4;
-      for (let i = 0; i < 5; i += 1) {
-        ctx.globalAlpha = i <= idx ? 1 : 0.25;
-        ctx.fillRect(baseX + (i % 3) * 4, baseY + Math.floor(i / 3) * 4, size, size);
-      }
-      ctx.globalAlpha = 1;
-    }
-  } else {
-    // stars3 — outlined or filled 5-pointed star. slot 0 = empty,
-    // slot 1 = half (filled lower-half), slot 2 = full.
-    const idx = Math.max(0, Math.min(2, slot));
-    const star = (filled: boolean): void => {
-      ctx.beginPath();
-      const spikes = 5;
-      const outerR = r;
-      const innerR = r * 0.45;
-      for (let i = 0; i < spikes * 2; i += 1) {
-        const angle = (i * Math.PI) / spikes - Math.PI / 2;
-        const radius = i % 2 === 0 ? outerR : innerR;
-        const px = cx + Math.cos(angle) * radius;
-        const py = cy + Math.sin(angle) * radius;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      if (filled) ctx.fill();
-      else ctx.stroke();
-    };
-    ctx.strokeStyle = '#cfa64a';
-    ctx.fillStyle = '#cfa64a';
-    ctx.lineWidth = 1;
-    if (idx === 2) {
-      star(true);
-    } else if (idx === 1) {
-      // Half-fill — clip the right half then fill, then outline whole.
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(rect.x, cy - r - 1, cx - rect.x, (r + 1) * 2);
-      ctx.clip();
-      star(true);
-      ctx.restore();
-      star(false);
-    } else {
-      star(false);
-    }
-  }
+  ctx.beginPath();
+  ctx.rect(rect.x, rect.y, rect.w, rect.h);
+  ctx.clip();
+  ctx.translate(x, y);
+  ctx.scale(z, z);
+  drawConditionalIconArt(ctx, kind, slot);
   ctx.restore();
 }
 

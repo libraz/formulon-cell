@@ -12,8 +12,15 @@ import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 function makeFillSpy() {
   const rects: { style: string; rect: [number, number, number, number] }[] = [];
   const strokes: string[] = [];
+  const transforms: { op: 'translate' | 'scale'; x: number; y: number }[] = [];
+  const stops: string[] = [];
   let fillStyle = '';
   let strokeStyle = '';
+  const gradient = () => ({
+    addColorStop(_offset: number, color: string) {
+      stops.push(color);
+    },
+  });
   const ctx = {
     get fillStyle() {
       return fillStyle;
@@ -40,12 +47,22 @@ function makeFillSpy() {
       strokes.push(strokeStyle);
     },
     setLineDash() {},
+    translate(x: number, y: number) {
+      transforms.push({ op: 'translate', x, y });
+    },
+    scale(x: number, y: number) {
+      transforms.push({ op: 'scale', x, y });
+    },
+    createLinearGradient: gradient,
+    createRadialGradient: gradient,
     set strokeStyle(v: string) {
       strokeStyle = v;
     },
     set lineWidth(_v: number) {},
+    set lineCap(_v: string) {},
+    set lineJoin(_v: string) {},
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, rects, strokes };
+  return { ctx, rects, strokes, transforms, stops };
 }
 
 const theme = {
@@ -169,6 +186,53 @@ describe('render/painters — paintConditionalIcon', () => {
     expect(() =>
       paintConditionalIcon(spy.ctx, { x: 0, y: 0, w: 20, h: 20 }, 'traffic3', 99),
     ).not.toThrow();
+  });
+
+  it('places the 11px icon box 1px in and follows the vertical alignment', () => {
+    const origin = (vAlign?: 'top' | 'middle' | 'bottom', zoom?: number, rtl = false) => {
+      const spy = makeFillSpy();
+      const rect = { x: 10, y: 100, w: 48, h: 40 };
+      paintConditionalIcon(spy.ctx, rect, 'traffic3', 0, rtl, vAlign, zoom);
+      return spy.transforms;
+    };
+    // Bottom (default): 2px clear of the 1px gridline the cell owns.
+    expect(origin()[0]).toEqual({ op: 'translate', x: 11, y: 100 + 40 - 1 - 2 - 11 });
+    expect(origin('bottom')[0]).toEqual(origin()[0]);
+    expect(origin('top')[0]).toEqual({ op: 'translate', x: 11, y: 100 });
+    expect(origin('middle')[0]).toEqual({ op: 'translate', x: 11, y: 100 + (40 - 1 - 2 - 11) / 2 });
+    expect(origin(undefined, undefined, true)[0]).toEqual({
+      op: 'translate',
+      x: 10 + 48 - 12,
+      y: 126,
+    });
+    expect(origin('top', 2)).toEqual([
+      { op: 'translate', x: 12, y: 100 },
+      { op: 'scale', x: 2, y: 2 },
+    ]);
+  });
+
+  it('shades 4/5-arrow middle slots yellow and the ends red / green', () => {
+    const tones = (kind: 'arrows4' | 'arrows5', slot: number) => {
+      const spy = makeFillSpy();
+      paintConditionalIcon(spy.ctx, { x: 0, y: 0, w: 20, h: 20 }, kind, slot);
+      return spy.stops[0];
+    };
+    expect(tones('arrows5', 0)).toBe(tones('arrows4', 0));
+    expect(tones('arrows5', 4)).toBe(tones('arrows4', 3));
+    for (const slot of [1, 2, 3]) expect(tones('arrows5', slot)).toBe(tones('arrows4', 1));
+    expect(tones('arrows4', 2)).toBe(tones('arrows4', 1));
+    expect(tones('arrows4', 1)).not.toBe(tones('arrows4', 0));
+    expect(tones('arrows4', 1)).not.toBe(tones('arrows4', 3));
+  });
+
+  it('lights one rating bar per level, starting from one (4) or none (5)', () => {
+    const lit = (kind: 'ratings4' | 'ratings5', slot: number) => {
+      const spy = makeFillSpy();
+      paintConditionalIcon(spy.ctx, { x: 0, y: 0, w: 20, h: 20 }, kind, slot);
+      return spy.rects.filter((r) => r.style === '#153a6a').length;
+    };
+    expect([0, 1, 2, 3].map((slot) => lit('ratings4', slot))).toEqual([1, 2, 3, 4]);
+    expect([0, 1, 2, 3, 4].map((slot) => lit('ratings5', slot))).toEqual([0, 1, 2, 3, 4]);
   });
 
   it('paints expanded icon families without external assets', () => {
