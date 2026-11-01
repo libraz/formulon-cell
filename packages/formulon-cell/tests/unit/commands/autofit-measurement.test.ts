@@ -136,7 +136,7 @@ describe('computeAutofitColWidth', () => {
     expect(ctx.font).toBe('400 15px "Code Mono"');
     expect(
       computeAutofitRowHeight(store.getState(), 0, null, { theme: { ...theme, textCell: 30 } }),
-    ).toBe(46);
+    ).toBe(38);
   });
 
   it('measures a missing cell font with the workbook Normal font in CSS pixels', () => {
@@ -175,24 +175,24 @@ describe('computeAutofitColWidth', () => {
 });
 
 describe('computeAutofitRowHeight', () => {
-  it('grows for explicit and wrapped lines, never below the default height', () => {
+  it('fits one Normal-font line to the default height and grows by a pitch per extra line', () => {
     expect(computeAutofitRowHeight(storeWith([]).getState(), 0, null)).toBe(20);
-    expect(computeAutofitRowHeight(storeWith([[0, 0, 'HeaderName']]).getState(), 0, null)).toBe(25);
-    expect(computeAutofitRowHeight(storeWith([[0, 0, 'a\nb\nc']]).getState(), 0, null)).toBe(59);
+    expect(computeAutofitRowHeight(storeWith([[0, 0, 'HeaderName']]).getState(), 0, null)).toBe(20);
+    expect(computeAutofitRowHeight(storeWith([[0, 0, 'a\nb\nc']]).getState(), 0, null)).toBe(54);
 
     const wrapped = storeWith([[0, 0, 'alpha beta gamma delta epsilon zeta']]);
     mutators.setColWidth(wrapped, 0, 70);
     mutators.setCellFormat(wrapped, { sheet: 0, row: 0, col: 0 }, { wrap: true });
-    expect(computeAutofitRowHeight(wrapped.getState(), 0, null)).toBe(110);
+    expect(computeAutofitRowHeight(wrapped.getState(), 0, null)).toBe(105);
   });
 
   it('restricts the scan to a column span and leaves clamping to the store', () => {
     const state = storeWith([[0, 5, 'y\ny\ny\ny']]).getState();
-    expect(computeAutofitRowHeight(state, 0, null)).toBe(76);
+    expect(computeAutofitRowHeight(state, 0, null)).toBe(71);
     expect(computeAutofitRowHeight(state, 0, null, { span: { from: 0, to: 2 } })).toBe(20);
 
     const tall = storeWith([[0, 0, 'a\n'.repeat(40)]]);
-    expect(computeAutofitRowHeight(tall.getState(), 0, null)).toBe(705);
+    expect(computeAutofitRowHeight(tall.getState(), 0, null)).toBe(700);
     autofitRowsHeight(tall, null, 0, 0);
     expect(tall.getState().layout.rowHeights.get(0)).toBe(MAX_ROW_HEIGHT_PX);
   });
@@ -206,7 +206,7 @@ describe('computeAutofitRowHeight', () => {
     // 63px of text fits the old 64px (width - 12) calculation, but not the
     // shared renderer contract: 76 - 6px padding - 8px indent = 62px.
     expect(availableTextWidth(76, 8)).toBe(62);
-    expect(computeAutofitRowHeight(wrapped.getState(), 0, ctx)).toBe(42);
+    expect(computeAutofitRowHeight(wrapped.getState(), 0, ctx)).toBe(37);
   });
 });
 
@@ -220,7 +220,7 @@ describe('public autofitColWidth / autofitRowHeight', () => {
     const host = document.createElement('div');
     expect(autofitColWidth({ store, host }, 0, 0, 2, 'en')).toBe(105);
     expect(autofitColWidth({ store, host }, 0, 0, 10, 'en')).toBe(297);
-    expect(autofitRowHeight({ store, host }, 0, 0, 0, 'ja')).toBe(25);
+    expect(autofitRowHeight({ store, host }, 0, 0, 0, 'ja')).toBe(20);
   });
 
   it('measure in the font the host theme sets', () => {

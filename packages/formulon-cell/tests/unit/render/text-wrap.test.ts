@@ -115,7 +115,9 @@ describe('shared wrapped text behavior', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, format);
 
     const autoHeight = computeAutofitRowHeight(store.getState(), 0, ctx, { locale: 'ja-JP' });
-    expect(autoHeight).toBe(fills.length * Math.round(theme.textCell * 1.28) + 8);
+    // One line of the Normal font fills the default height; each further line adds a pitch.
+    const pitch = Math.round(theme.textCell * 1.28);
+    expect(autoHeight).toBe(store.getState().layout.defaultRowHeight + (fills.length - 1) * pitch);
     expect(availableTextWidth(bounds.w, format.indent * 8)).toBe(
       bounds.w - CELL_TEXT_HORIZONTAL_PADDING_PX - format.indent * 8,
     );
@@ -580,6 +582,6 @@ describe('shared wrapped text behavior', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { indent: 1, wrap: true });
 
     const { ctx } = textContext();
-    expect(computeAutofitRowHeight(store.getState(), 0, ctx, { locale: 'en-US' })).toBe(42);
+    expect(computeAutofitRowHeight(store.getState(), 0, ctx, { locale: 'en-US' })).toBe(37);
   });
 });

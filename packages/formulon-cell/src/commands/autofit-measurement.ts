@@ -100,7 +100,16 @@ export function computeAutofitRowHeight(
   const sheet = state.data.sheetIndex;
   const locale = normalizeFormatLocale(opts.locale ?? '');
   const theme = opts.theme ?? DEFAULT_CELL_FONT_THEME;
-  let max = state.layout.defaultRowHeight;
+  const defaultHeight = state.layout.defaultRowHeight;
+  let max = defaultHeight;
+  // The default height is one Normal-font line plus the row's padding, so a
+  // single line of the Normal font fits back to exactly the default height.
+  const normalFont = cellFont(
+    formatForMeasurement(undefined, opts.workbookDisplayFont, false),
+    theme,
+    false,
+  );
+  const padding = Math.max(0, defaultHeight - Math.round(normalFont.size * 1.28));
 
   for (const [key, cell] of state.data.cells) {
     const parsed = parseAddrKey(key);
@@ -128,7 +137,7 @@ export function computeAutofitRowHeight(
       format?.showPhonetic && format.phonetic?.length && !formulaDisplay
         ? phoneticGuideSize(font.size)
         : 0;
-    const height = Math.ceil(lines * lineHeight + 8 + guide);
+    const height = Math.ceil(lines * lineHeight + guide) + padding;
     if (height > max) max = height;
   }
 
