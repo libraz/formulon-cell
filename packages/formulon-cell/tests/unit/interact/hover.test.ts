@@ -271,6 +271,17 @@ describe('attachHover', () => {
     handle.detach();
   });
 
+  it('leaves a cursor another pointer layer set, such as a header resize', () => {
+    const handle = attachHover({ grid, store });
+    grid.style.cursor = 'col-resize';
+    const plain = cellPoint(store, 0, 1);
+    grid.dispatchEvent(new PointerEvent('pointermove', { clientX: plain.x, clientY: plain.y }));
+    expect(grid.style.cursor).toBe('col-resize');
+    grid.dispatchEvent(new PointerEvent('pointerleave'));
+    expect(grid.style.cursor).toBe('col-resize');
+    handle.detach();
+  });
+
   it('keeps cell hover notes as compact rectangular Excel-style tips', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/panels/hover-tip.css'), 'utf8');
 

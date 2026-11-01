@@ -35,6 +35,14 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   overlayPortalFor(grid).appendChild(tip);
 
   let modifier = false;
+  // The grid's cursor is shared with the pointer layer's resize and fill
+  // cursors; only the link cursor this layer set is ever cleared here.
+  let linkCursor = false;
+  const setLinkCursor = (on: boolean): void => {
+    if (on) grid.style.cursor = 'pointer';
+    else if (linkCursor) grid.style.cursor = '';
+    linkCursor = on;
+  };
 
   const cellAt = (e: MouseEvent | PointerEvent): { row: number; col: number } | null => {
     const rect = grid.getBoundingClientRect();
@@ -84,23 +92,22 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     } else {
       tip.hidden = true;
     }
-    grid.style.cursor =
-      fmt?.hyperlink && modifier && isFollowableHyperlinkTarget(fmt.hyperlink) ? 'pointer' : '';
+    setLinkCursor(!!fmt?.hyperlink && modifier && isFollowableHyperlinkTarget(fmt.hyperlink));
   };
 
   const onLeave = (): void => {
     tip.hidden = true;
-    grid.style.cursor = '';
+    setLinkCursor(false);
   };
 
   const onViewportChange = (): void => {
     tip.hidden = true;
-    grid.style.cursor = '';
+    setLinkCursor(false);
   };
 
   const onModifier = (e: KeyboardEvent): void => {
     modifier = e.ctrlKey || e.metaKey;
-    if (!modifier) grid.style.cursor = '';
+    if (!modifier) setLinkCursor(false);
   };
 
   grid.addEventListener('pointermove', onMove);
@@ -118,7 +125,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       ownerWindow?.removeEventListener('keyup', onModifier);
       ownerDocument.removeEventListener('scroll', onViewportChange, true);
       ownerWindow?.removeEventListener('resize', onViewportChange);
-      grid.style.cursor = '';
+      setLinkCursor(false);
       tip.remove();
     },
   };
