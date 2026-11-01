@@ -23,6 +23,7 @@ export function paintHeaders(
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
+  labelFamily: string = theme.fontUi,
 ): OutlineToggleHit[] {
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const { layout, selection } = state;
@@ -119,7 +120,7 @@ export function paintHeaders(
       : isSelectedCol
         ? theme.headerFgActive
         : theme.headerFg;
-    ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
+    ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${labelFamily}`;
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
     ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
     // The accent bar covers the rule under the header and one pixel above it.
@@ -193,7 +194,11 @@ export function paintHeaders(
     }
   }
 
-  ctx.textAlign = rtl ? 'left' : 'right';
+  // Row numbers centre on the strip between the rail edge and its rule.
+  ctx.textAlign = 'center';
+  const rowLabelX = rtl
+    ? innerX + (layout.headerColWidth + 1) / 2
+    : innerX - (layout.headerColWidth + 1) / 2;
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
@@ -218,9 +223,9 @@ export function paintHeaders(
       : isSelectedRow
         ? theme.headerFgActive
         : theme.headerFg;
-    ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
+    ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${theme.textHeader}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
-    ctx.fillText(rowLabel, rtl ? innerX + 8 : innerX - 8, rect.y + h / 2 + 0.5);
+    ctx.fillText(rowLabel, rowLabelX, rect.y + h / 2 + 0.5);
     if (isActiveRow || isSelectedRow) {
       ctx.fillStyle = theme.accent;
       ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);

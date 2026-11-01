@@ -46,6 +46,7 @@ import {
 } from './grid/page-view.js';
 import { sameRectList, trailingRect } from './grid/range-rects.js';
 import { paintTraces } from './grid/traces.js';
+import { cellFontFamily } from './painters/text.js';
 import {
   paintChartSourceHighlight,
   paintCopyMarquee,
@@ -527,7 +528,16 @@ export class GridRenderer {
     cols: AxisLayout,
     rows: AxisLayout,
   ): void {
-    this.hits.outlineToggles = paintHeaders(this.chromeCtx(), state, theme, cols, rows);
+    // Headings take the workbook's Normal font, as the desktop draws them.
+    const normalFont = this.getWb()?.workbookDisplayFont?.name;
+    this.hits.outlineToggles = paintHeaders(
+      this.chromeCtx(),
+      state,
+      theme,
+      cols,
+      rows,
+      cellFontFamily(normalFont, theme.fontUi),
+    );
   }
 
   private paintFreezeDividers(

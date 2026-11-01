@@ -39,12 +39,12 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
 function makeCtxSpy(): {
   ctx: CanvasRenderingContext2D;
   fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }>;
-  texts: Array<{ text: string; font: string; style: string }>;
+  texts: Array<{ text: string; font: string; style: string; x: number; align: string }>;
   strokes: string[];
 } {
   const fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }> =
     [];
-  const texts: Array<{ text: string; font: string; style: string }> = [];
+  const texts: Array<{ text: string; font: string; style: string; x: number; align: string }> = [];
   const strokes: string[] = [];
   let fillStyle = '';
   let strokeStyle = '';
@@ -102,14 +102,40 @@ function makeCtxSpy(): {
     fillRect(x: number, y: number, w: number, h: number): void {
       fills.push({ style: fillStyle, alpha, rect: [x, y, w, h] });
     },
-    fillText(text: string): void {
-      texts.push({ text, font, style: fillStyle });
+    fillText(this: { textAlign: string }, text: string, x: number): void {
+      texts.push({ text, font, style: fillStyle, x, align: this.textAlign });
     },
   } as unknown as CanvasRenderingContext2D;
   return { ctx, fills, texts, strokes };
 }
 
 describe('paintHeaders', () => {
+  it('centres row numbers in the strip and sets labels in the given family', () => {
+    const state = createSpreadsheetStore().getState();
+    state.viewport = { rowStart: 0, rowCount: 12, colStart: 0, colCount: 2, zoom: 1, widthPx: 320 };
+    const cols = buildColLayout(state.layout, state.viewport);
+    const rows = buildRowLayout(state.layout, state.viewport);
+    const { ctx, texts } = makeCtxSpy();
+    const view = { ...state, layout: layoutForView(state) };
+
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 320, cssHeight: 400 },
+      view,
+      theme(),
+      cols,
+      rows,
+      'Courier New, sans-serif',
+    );
+
+    // The strip ends in a 1px rule at the data edge; labels centre on the rest.
+    const centre = view.layout.headerColWidth / 2 - 0.5;
+    for (const label of ['1', '9', '10', '12']) {
+      expect(texts.find((t) => t.text === label)).toMatchObject({ x: centre, align: 'center' });
+    }
+    expect(texts.find((t) => t.text === 'A')?.font).toContain('Courier New, sans-serif');
+    expect(texts.find((t) => t.text === '10')?.font).toContain('Courier New, sans-serif');
+  });
+
   it('draws the accent bar on every selected column and row header', () => {
     const state = createSpreadsheetStore().getState();
     state.selection = {
