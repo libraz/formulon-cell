@@ -12,6 +12,8 @@ export interface ResolvedTheme {
   fgMute: string;
   fgFaint: string;
   fgStrong: string;
+  /** Automatic colour of cell text and borders. */
+  cellAutoFg: string;
   rule: string;
   ruleStrong: string;
   /** Freeze-pane divider. */
@@ -73,6 +75,7 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     fgMute: v('--fc-fg-mute', '#6f6a5d'),
     fgFaint: v('--fc-fg-faint', '#a8a294'),
     fgStrong: v('--fc-fg-strong', '#0a0c10'),
+    cellAutoFg: v('--fc-cell-auto-fg', v('--fc-fg-strong', '#0a0c10')),
 
     rule: v('--fc-rule', '#e2dccd'),
     ruleStrong: v('--fc-rule-strong', '#cdc6b3'),

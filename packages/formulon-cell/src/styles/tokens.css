@@ -72,6 +72,8 @@
     --fc-cell-bool-fg: initial;
     /* Right-aligned numbers. */
     --fc-cell-num-fg: initial;
+    /* Automatic colour: cell text and borders without an explicit colour. */
+    --fc-cell-auto-fg: initial;
 
     /* === HEADER RAIL === */
     /* Idle column letter / row number text. */

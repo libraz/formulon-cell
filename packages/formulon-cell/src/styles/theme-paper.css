@@ -31,11 +31,13 @@
     --fc-accent-soft: rgba(0, 0, 0, 0.2);
     --fc-accent-fg: #ffffff;
 
-    /* Cell-state tints */
-    --fc-cell-error-fg: #a4262c;
-    --fc-cell-formula-fg: #201f1e;
-    --fc-cell-bool-fg: #107c41;
-    --fc-cell-num-fg: var(--fc-fg-strong);
+    /* Spreadsheet automatic colour: text of every kind and borders paint pure
+     * black. */
+    --fc-cell-auto-fg: #000000;
+    --fc-cell-error-fg: var(--fc-cell-auto-fg);
+    --fc-cell-formula-fg: var(--fc-cell-auto-fg);
+    --fc-cell-bool-fg: var(--fc-cell-auto-fg);
+    --fc-cell-num-fg: var(--fc-cell-auto-fg);
 
     /* Header — spreadsheet uses cool gray rail with darker active text */
     --fc-header-fg: #605e5c;

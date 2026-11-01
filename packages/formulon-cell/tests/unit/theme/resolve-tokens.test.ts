@@ -94,7 +94,8 @@ describe('theme/resolve — token completeness', () => {
     expect(css).toContain('--fc-rule-strong: #bfbfbf;');
     expect(css).toContain('--fc-accent: #107c41;');
     expect(css).toContain('--fc-accent-strong: #0b5f31;');
-    expect(css).toContain('--fc-cell-bool-fg: #107c41;');
+    expect(css).toContain('--fc-cell-auto-fg: #000000;');
+    expect(css).toContain('--fc-cell-bool-fg: var(--fc-cell-auto-fg);');
     expect(css).toContain('--fc-header-fg-active: #107c41;');
   });
 
