@@ -80,6 +80,15 @@ describe('render/painters — paintCellBackground', () => {
     expect(spy.rects[0]?.style).toBe(theme.bgElev);
   });
 
+  it('clears only the active surface, keeping the trailing rules shaded', () => {
+    const spy = makeFillSpy();
+    paintCellBackground({ ...makeCtx({ isActive: true, dpr: 2 }), ctx: spy.ctx });
+    expect(spy.rects[0]?.rect).toEqual([10, 20, 59, 29]);
+    const rtl = makeFillSpy();
+    paintCellBackground({ ...makeCtx({ isActive: true, dpr: 2, rtl: true }), ctx: rtl.ctx });
+    expect(rtl.rects[0]?.rect).toEqual([11, 20, 59, 29]);
+  });
+
   it('paints accentSoft for in-range cells', () => {
     const spy = makeFillSpy();
     paintCellBackground({ ...makeCtx({ isInRange: true }), ctx: spy.ctx });

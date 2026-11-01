@@ -235,6 +235,8 @@ export function paintCells(
         formula: null,
         isActive: true,
         isInRange: false,
+        dpr: cellCtx.dpr,
+        rtl: layout.rtl === true,
       });
     } else if (isSelected) {
       paintCellBackground({

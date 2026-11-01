@@ -5,7 +5,7 @@ import type {
   ConditionalIconSet,
 } from '../../store/store.js';
 import type { Rect } from '../geometry.js';
-import { fillRect } from '../grid/chrome-context.js';
+import { fillRect, surfaceRect } from '../grid/chrome-context.js';
 import type { CellPaintCtx } from './types.js';
 
 /* ---- Base painters wired in MS-A. Future slots (formatting, CF, DV,
@@ -17,10 +17,14 @@ export function paintCellBackground({
   theme,
   isInRange,
   isActive,
+  dpr,
+  rtl,
 }: CellPaintCtx): void {
   if (isActive) {
+    // Only the surface clears: the rules the cell owns keep the range shading.
+    const surface = surfaceRect(bounds, dpr ?? 1, rtl === true);
     ctx.fillStyle = theme.bgElev;
-    ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+    ctx.fillRect(surface.x, surface.y, surface.w, surface.h);
     return;
   }
   if (isInRange) {
