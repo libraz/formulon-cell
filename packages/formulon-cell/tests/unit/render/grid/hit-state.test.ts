@@ -7,6 +7,7 @@ import {
   gridHitState,
   isPlainTextOverflowCandidate,
   normalizeFormatLocale,
+  overflowSides,
   shouldShowValidationChevron,
   VALIDATION_TRIANGLE_COLOR,
 } from '../../../../src/render/grid/hit-state.js';
@@ -119,12 +120,31 @@ describe('render/grid/hit-state', () => {
       expect(isPlainTextOverflowCandidate({ ...baseInput, isMergeAnchor: true })).toBe(false);
     });
 
-    it('rejects formatted text (wrap / rotation / align)', () => {
+    it('rejects wrapped, rotated, shrunk and fill/justify-style text', () => {
       expect(isPlainTextOverflowCandidate({ ...baseInput, format: { wrap: true } })).toBe(false);
       expect(isPlainTextOverflowCandidate({ ...baseInput, format: { rotation: 45 } })).toBe(false);
-      expect(isPlainTextOverflowCandidate({ ...baseInput, format: { align: 'center' } })).toBe(
+      expect(isPlainTextOverflowCandidate({ ...baseInput, format: { shrinkToFit: true } })).toBe(
         false,
       );
+      for (const align of ['fill', 'justify', 'distributed', 'centerContinuous'] as const) {
+        expect(isPlainTextOverflowCandidate({ ...baseInput, format: { align } })).toBe(false);
+      }
+    });
+
+    it('accepts left, right, centred, indented and formula-result text', () => {
+      for (const align of ['left', 'right', 'center'] as const) {
+        expect(isPlainTextOverflowCandidate({ ...baseInput, format: { align, indent: 1 } })).toBe(
+          true,
+        );
+      }
+      expect(isPlainTextOverflowCandidate({ ...baseInput, formula: '="long"' })).toBe(true);
+    });
+
+    it('spills toward the side the alignment grows', () => {
+      expect(overflowSides(undefined, false)).toEqual({ left: false, right: true });
+      expect(overflowSides(undefined, true)).toEqual({ left: true, right: false });
+      expect(overflowSides('right', false)).toEqual({ left: true, right: false });
+      expect(overflowSides('center', true)).toEqual({ left: true, right: true });
     });
 
     it('rejects formula cells when "show formulas" is on', () => {

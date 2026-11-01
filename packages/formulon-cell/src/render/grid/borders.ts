@@ -42,6 +42,7 @@ export function paintBorders(
   cols: AxisLayout,
   rows: AxisLayout,
   inherited?: InheritedBorders,
+  coveredRules?: ReadonlySet<string>,
 ): void {
   const { layout, data, format } = state;
   if (format.formats.size === 0 && !inherited) return;
@@ -69,6 +70,10 @@ export function paintBorders(
     return borders;
   };
 
+  /** Overflowing text hides the vertical rule between two columns it spans. */
+  const covered = (row: number, a: number, b: number): boolean =>
+    coveredRules?.has(`${row}:${Math.min(a, b)}`) === true;
+
   /** The edge shown on `side` of a cell once its neighbour's opposite side
    *  is taken into account. Screen-left in RTL is the next column. */
   const edgeAt = (row: number, col: number, side: Side): BorderEdge | null => {
@@ -79,10 +84,12 @@ export function paintBorders(
       case 'bottom':
         return resolveBorderEdge(own, borderEdge(sidesAt(row + 1, col)?.top));
       case 'left': {
+        if (covered(row, col, rtl ? col + 1 : col - 1)) return null;
         const neighbour = borderEdge(sidesAt(row, rtl ? col + 1 : col - 1)?.right);
         return rtl ? resolveBorderEdge(own, neighbour) : resolveBorderEdge(neighbour, own);
       }
       case 'right': {
+        if (covered(row, col, rtl ? col - 1 : col + 1)) return null;
         const neighbour = borderEdge(sidesAt(row, rtl ? col - 1 : col + 1)?.left);
         return rtl ? resolveBorderEdge(neighbour, own) : resolveBorderEdge(own, neighbour);
       }

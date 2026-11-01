@@ -92,9 +92,9 @@ describe('isPlainTextOverflowCandidate', () => {
     expect(isPlainTextOverflowCandidate(base)).toBe(true);
   });
 
-  it('keeps wrapped, aligned, formula-display, and table cells clipped', () => {
+  it('keeps wrapped, filled, formula-display, and table cells clipped', () => {
     expect(isPlainTextOverflowCandidate({ ...base, format: { wrap: true } })).toBe(false);
-    expect(isPlainTextOverflowCandidate({ ...base, format: { align: 'center' } })).toBe(false);
+    expect(isPlainTextOverflowCandidate({ ...base, format: { align: 'fill' } })).toBe(false);
     expect(
       isPlainTextOverflowCandidate({
         ...base,

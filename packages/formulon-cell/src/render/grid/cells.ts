@@ -8,6 +8,7 @@ import { formulaForEdit } from '../../engine/edit-seed.js';
 import { numFmtToFormatCode } from '../../engine/format-writeback.js';
 import { makeRangeResolver, type RangeResolver } from '../../engine/range-resolver.js';
 import type { CellValue } from '../../engine/types.js';
+import { formatCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { numberFormatPaint } from '../../format/number-format.js';
 import { rangeValidationAt } from '../../store/range-validations.js';
@@ -25,6 +26,7 @@ import {
   rangeRects,
   type ViewState,
 } from '../geometry.js';
+import { alignedTextAnchor, cellFont, cellFontCss, visualZoom } from '../painters/text.js';
 import {
   CONDITIONAL_ICON_GUTTER,
   paintCellBackground,
@@ -40,7 +42,8 @@ import {
 } from '../painters.js';
 import { rowBaselineFonts } from '../row-baseline.js';
 import { paintCellSparkline } from '../sparkline.js';
-import { surfaceRect } from './chrome-context.js';
+import { cellTextHorizontalMetrics } from '../text-wrap.js';
+import { ruleCenter, ruleWidth, surfaceRect } from './chrome-context.js';
 import { paintDataBar } from './data-bar.js';
 import {
   detectValidationViolation,
@@ -48,6 +51,7 @@ import {
   type ErrorTriangleHit,
   isPlainTextOverflowCandidate,
   normalizeFormatLocale,
+  overflowSides,
   VALIDATION_TRIANGLE_COLOR,
 } from './hit-state.js';
 import { connectedRects } from './range-rects.js';
@@ -75,13 +79,43 @@ export interface CellPaintContext {
   dpr?: number;
 }
 
+/** What the cell pass leaves for later passes. */
+export interface CellPaintResult {
+  errorTriangles: ErrorTriangleHit[];
+  /** Vertical rules overflowing text runs across, keyed `row:col` for the
+   *  rule between `col` and `col + 1`; borders skip them too. */
+  coveredRules: Set<string>;
+}
+
+/** Horizontal extent of an overflow candidate's single-line run, laid out as
+ *  `paintCellText` lays it out. */
+const overflowRunSpan = (
+  ctx: CanvasRenderingContext2D,
+  p: Parameters<typeof paintCellText>[0],
+): { left: number; right: number } | null => {
+  const text = p.displayOverride ?? formatCell(p.value, p.locale);
+  if (!text) return null;
+  const zoom = visualZoom(p.zoom);
+  const font = cellFont(p.format, p.theme, false);
+  ctx.save();
+  ctx.font = cellFontCss({ ...font, size: font.size * zoom });
+  const width = ctx.measureText(text).width;
+  ctx.restore();
+  const align = p.format?.align ?? (p.rtl ? 'right' : 'left');
+  const canvasAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
+  const { padX, indentPx } = cellTextHorizontalMetrics(p.bounds.w, p.format?.indent ?? 0, zoom);
+  const x = alignedTextAnchor(p.bounds, canvasAlign, padX, indentPx);
+  const left = canvasAlign === 'right' ? x - width : canvasAlign === 'center' ? x - width / 2 : x;
+  return { left, right: left + width };
+};
+
 export function paintCells(
   cellCtx: CellPaintContext,
   state: ViewState,
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
-): ErrorTriangleHit[] {
+): CellPaintResult {
   const ctx = cellCtx.ctx;
   const {
     layout,
@@ -255,26 +289,81 @@ export function paintCells(
   // the widened rect has to move its left edge as well as grow.
   const spillRect = (base: Rect, extra: number): Rect =>
     layout.rtl ? { ...base, x: base.x - extra, w: base.w + extra } : { ...base, w: base.w + extra };
-  const overflowBounds = (row: number, col: number, base: Rect): Rect => {
-    let w = 0;
-    for (let nextCol = col + 1; cols.positionAt.has(nextCol); nextCol += 1) {
-      const nextKey = addrKey({ sheet: data.sheetIndex, row, col: nextCol });
-      const nextCell = data.cells.get(nextKey);
-      const nextFmt = format.formats.get(nextKey);
-      const nextTable = tableForCell(tables.tables, data.sheetIndex, row, nextCol);
-      if (
-        merges.byCell.has(nextKey) ||
-        merges.byAnchor.has(nextKey) ||
-        nextTable ||
-        nextFmt?.fill ||
-        nextFmt?.borders ||
-        (nextCell && (nextCell.formula || nextCell.value.kind !== 'blank'))
-      ) {
-        break;
-      }
-      w += cols.sizeAt.get(nextCol) ?? 0;
+  // An empty neighbour takes overflow even under a fill or border; the
+  // run paints after every fill and hides the vertical rules it crosses.
+  const blocksOverflow = (row: number, col: number): boolean => {
+    const key = addrKey({ sheet: data.sheetIndex, row, col });
+    const cell = data.cells.get(key);
+    return (
+      merges.byCell.has(key) ||
+      merges.byAnchor.has(key) ||
+      !!tableForCell(tables.tables, data.sheetIndex, row, col) ||
+      !!(cell && (cell.formula || cell.value.kind !== 'blank'))
+    );
+  };
+  /** Columns from `col` (exclusive) an overflowing run may cover, walking `step`. */
+  const overflowColumns = (row: number, col: number, step: 1 | -1): number[] => {
+    const out: number[] = [];
+    for (let next = col + step; cols.positionAt.has(next); next += step) {
+      if (blocksOverflow(row, next)) break;
+      out.push(next);
     }
-    return w === 0 ? base : spillRect(base, w);
+    return out;
+  };
+  const coveredRules = new Set<string>();
+  const deferredOverflow: (() => void)[] = [];
+  /** Paint an overflowing single-line run: aligned in its own cell, clipped
+   *  to the empty neighbours on the sides its alignment grows toward. */
+  const paintOverflowText = (
+    paintCtx: Parameters<typeof paintCellText>[0],
+    row: number,
+    col: number,
+  ): void => {
+    const fmt = paintCtx.format;
+    const sides = overflowSides(fmt?.align, layout.rtl === true);
+    // Columns run right-to-left on an RTL sheet.
+    const rightStep: 1 | -1 = layout.rtl ? -1 : 1;
+    const leftCols = sides.left ? overflowColumns(row, col, -rightStep as 1 | -1) : [];
+    const rightCols = sides.right ? overflowColumns(row, col, rightStep) : [];
+    if (leftCols.length === 0 && rightCols.length === 0) {
+      paintCellText(paintCtx);
+      return;
+    }
+    const base = paintCtx.bounds;
+    const widthOf = (list: number[]): number =>
+      list.reduce((sum, c) => sum + (cols.sizeAt.get(c) ?? 0), 0);
+    const leftW = widthOf(leftCols);
+    const clip = { ...base, x: base.x - leftW, w: base.w + leftW + widthOf(rightCols) };
+    const span = overflowRunSpan(ctx, paintCtx);
+    deferredOverflow.push(() => {
+      const dpr = cellCtx.dpr ?? 1;
+      const rule = ruleWidth(dpr);
+      const surface = surfaceRect(base, dpr, layout.rtl === true);
+      // Each boundary between two columns of the span; `owner` holds the rule.
+      const ordered = [...leftCols.slice().reverse(), col, ...rightCols];
+      for (let i = 0; i + 1 < ordered.length; i += 1) {
+        const a = ordered[i] as number;
+        const b = ordered[i + 1] as number;
+        const owner = Math.min(a, b);
+        const ownerRect = cellRectIn(layout, cols, rows, row, owner);
+        const boundary = layout.rtl ? ownerRect.x : ownerRect.x + ownerRect.w;
+        if (!span || boundary <= span.left || boundary >= span.right) continue;
+        coveredRules.add(`${row}:${owner}`);
+        if (state.ui.showGridLines === false) continue;
+        const next = format.formats.get(addrKey({ sheet: data.sheetIndex, row, col: owner + 1 }));
+        // The following cell's fill already covers the rule before it.
+        if (next?.fill || next?.fillPattern || next?.fillGradient) continue;
+        const own = format.formats.get(addrKey({ sheet: data.sheetIndex, row, col: owner }));
+        ctx.fillStyle = own?.fill ?? theme.bg;
+        ctx.fillRect(
+          ruleCenter(boundary, dpr, layout.rtl === true) - rule / 2,
+          surface.y,
+          rule,
+          surface.h,
+        );
+      }
+      paintCellText({ ...paintCtx, clip });
+    });
   };
   const centerContinuousBounds = (row: number, col: number, base: Rect): Rect => {
     let extra = 0;
@@ -515,12 +604,24 @@ export function paintCells(
       // the gutter width so the value reads cleanly next to the icon.
       const tableHeader = table ? isHeaderRow(table, r, c) : false;
       if (overlay?.iconKind && overlay.iconSlot !== undefined) {
-        paintConditionalIcon(ctx, bounds, overlay.iconKind, overlay.iconSlot, rtl);
+        // Icons are screen pixels at 100%: they follow the sheet zoom only,
+        // not the platform screen scale.
+        const iconZoom = visualZoom(state.viewport.zoom);
+        paintConditionalIcon(
+          ctx,
+          bounds,
+          overlay.iconKind,
+          overlay.iconSlot,
+          rtl,
+          effectiveFmt?.vAlign,
+          iconZoom,
+        );
+        const gutter = CONDITIONAL_ICON_GUTTER * iconZoom;
         if (!hideConditionalValue) {
           const insetBounds = {
-            x: rtl ? bounds.x : bounds.x + CONDITIONAL_ICON_GUTTER,
+            x: rtl ? bounds.x : bounds.x + gutter,
             y: bounds.y,
-            w: bounds.w - CONDITIONAL_ICON_GUTTER,
+            w: bounds.w - gutter,
             h: bounds.h,
           };
           paintCellText({ ...paintCtx, bounds: insetBounds });
@@ -551,7 +652,11 @@ export function paintCells(
           isMergeAnchor,
         })
       ) {
-        paintCellText({ ...paintCtx, bounds: overflowBounds(r, c, bounds) });
+        paintOverflowText(paintCtx, r, c);
+      } else if (isMergeAnchor && effectiveFmt?.vAlign === 'middle') {
+        // A merge centres its text one pixel higher than a single cell of the
+        // same height (measured on 2- to 5-row and 1-row-2-column merges).
+        paintCellText({ ...paintCtx, bounds: { ...bounds, h: bounds.h - 2 }, clip: bounds });
       } else {
         paintCellText(paintCtx);
       }
@@ -583,5 +688,6 @@ export function paintCells(
       }
     }
   }
-  return triangleHits;
+  for (const paint of deferredOverflow) paint();
+  return { errorTriangles: triangleHits, coveredRules };
 }

@@ -17,10 +17,26 @@ export function isPlainTextOverflowCandidate(input: {
   isMergeAnchor: boolean;
 }): boolean {
   if (input.tableHeader || input.hasIcon || input.isMergeAnchor) return false;
-  if (input.format?.wrap || input.format?.rotation || input.format?.align) return false;
+  const format = input.format;
+  if (format?.wrap || format?.rotation || format?.shrinkToFit) return false;
+  if (format?.align && !overflowAligns.has(format.align)) return false;
   if (input.showFormulas && input.formula) return false;
-  if (input.displayOverride != null) return input.value.kind === 'text';
-  return input.value.kind === 'text' && !input.formula;
+  // Text a formula returns overflows like typed text.
+  return input.value.kind === 'text';
+}
+
+/** Alignments whose text runs past the cell into empty neighbours. */
+const overflowAligns = new Set<CellFormat['align']>(['left', 'right', 'center']);
+
+/** The physical sides an overflowing run may spill to: left-aligned text
+ *  grows rightward, right-aligned leftward, centred text both ways. General
+ *  alignment follows the sheet's reading order. */
+export function overflowSides(
+  align: CellFormat['align'] | undefined,
+  rtl: boolean,
+): { left: boolean; right: boolean } {
+  const physical = align ?? (rtl ? 'right' : 'left');
+  return { left: physical !== 'left', right: physical !== 'right' };
 }
 
 export type ErrorTriangleKind = 'error' | 'validation';

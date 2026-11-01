@@ -161,6 +161,8 @@ export class GridRenderer {
   private readonly conditionalCache = createConditionalCache();
 
   private dpr = 1;
+  /** Vertical rules the last cell pass's overflowing text covers. */
+  private coveredRules = new Set<string>();
 
   private cssWidth = 0;
 
@@ -497,7 +499,9 @@ export class GridRenderer {
     cols: AxisLayout,
     rows: AxisLayout,
   ): void {
-    this.hits.errorTriangles = paintCells(this.cellCtx(state), state, theme, cols, rows);
+    const result = paintCells(this.cellCtx(state), state, theme, cols, rows);
+    this.hits.errorTriangles = result.errorTriangles;
+    this.coveredRules = result.coveredRules;
   }
 
   private paintBorders(
@@ -514,7 +518,7 @@ export class GridRenderer {
         ? (row: number, col: number) =>
             effectiveCellFormatFromEngine(wb, sheet, row, col, effective)?.borders
         : undefined;
-    paintBorders(this.ctx, this.dpr, state, theme, cols, rows, inherited);
+    paintBorders(this.ctx, this.dpr, state, theme, cols, rows, inherited, this.coveredRules);
   }
 
   private paintHeaders(
