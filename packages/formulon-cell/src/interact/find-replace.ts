@@ -200,7 +200,12 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   closeFooterBtn.classList.add('fc-find__btn--close');
   footer.append(findAllBtn, prevBtn, nextBtn, replaceBtn, replaceAllBtn, closeFooterBtn);
 
-  overlay.append(titlebar, tabs, form, results, footer);
+  // The form and results scroll together when the host is shorter than the panel.
+  const body = document.createElement('div');
+  body.className = 'fc-find__body';
+  body.append(form, results);
+
+  overlay.append(titlebar, tabs, body, footer);
   host.appendChild(overlay);
 
   const relabel = (): void => {

@@ -511,6 +511,33 @@ describe('attachFindReplace', () => {
     handle.detach();
   });
 
+  it('keeps the title bar, tabs and footer outside the scrolling body', () => {
+    const handle = attachFindReplace({ host, store, wb });
+    const overlay = $<HTMLElement>(host, '.fc-find');
+    const parts = Array.from(overlay.children, (el) => el.classList[0]);
+    expect(parts).toEqual([
+      'fc-fmtdlg__header',
+      'fc-fmtdlg__tabs',
+      'fc-find__body',
+      'fc-fmtdlg__footer',
+    ]);
+    const body = $<HTMLElement>(overlay, '.fc-find__body');
+    expect(body.querySelector('.fc-find__form')).not.toBeNull();
+    expect(body.querySelector('.fc-find__results')).not.toBeNull();
+    handle.detach();
+  });
+
+  it('bounds the Find/Replace panel to its host and scrolls the body', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/overlays/find-bar.css'), 'utf8');
+
+    expect(css).toMatch(
+      /max-height: min\(92vh, 640px, calc\(100% - var\(--fc-find-inset-block\)\)\);/,
+    );
+    expect(css).toMatch(/min-height: min\(206px, calc\(100% - var\(--fc-find-inset-block\)\)\);/);
+    expect(css).toMatch(/\.fc-find__body\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow-y: auto;/);
+    expect(css).toMatch(/\.fc-find > \.fc-find__footer\s*\{[\s\S]*?flex: none;/);
+  });
+
   it('keeps the Find/Replace floating panel on compact desktop geometry', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/overlays/find-bar.css'), 'utf8');
 

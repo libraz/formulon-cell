@@ -14,10 +14,26 @@
      panel content-sized and anchored under the formula bar. */
   .fc-find.fc-fmtdlg__panel,
   .fc-find.fc-fmtdlg__panel:has(> .fc-fmtdlg__tabs) {
+    --fc-find-inset-block: 62px;
     width: min(520px, calc(100% - 32px));
     height: auto;
-    min-height: 206px;
+    min-height: min(206px, calc(100% - var(--fc-find-inset-block)));
+    max-height: min(92vh, 640px, calc(100% - var(--fc-find-inset-block)));
     transform: translateX(-50%);
+  }
+
+  /* A host shorter than the panel scrolls the body; the title bar, tabs and
+     footer stay in view. */
+  .fc-find > .fc-fmtdlg__header,
+  .fc-find > .fc-fmtdlg__tabs,
+  .fc-find > .fc-find__footer {
+    flex: none;
+  }
+
+  .fc-find__body {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .fc-find[hidden] {
@@ -209,6 +225,7 @@
 
     .fc-find.fc-fmtdlg__panel,
     .fc-find.fc-fmtdlg__panel:has(> .fc-fmtdlg__tabs) {
+      --fc-find-inset-block: 56px;
       width: calc(100% - 18px);
     }
 
