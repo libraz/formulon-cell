@@ -54,8 +54,9 @@ describe('cssColorToArgb / argbToCssColor', () => {
     expect(argbToCssColor(0xff000000)).toBe('#000000');
   });
 
-  it('emits rgba() for non-opaque colors', () => {
-    expect(argbToCssColor(0x80ff0000)).toMatch(/rgba\(255, 0, 0, 0\.50\)/);
+  it('ignores the alpha byte like the spreadsheet does', () => {
+    expect(argbToCssColor(0x80ff0000)).toBe('#ff0000');
+    expect(argbToCssColor(0x00ff0000)).toBe('#ff0000');
   });
 });
 

@@ -935,16 +935,13 @@ export function cssColorToArgb(color: string): number | null {
   return null;
 }
 
-/** Render an ARGB packed integer as a CSS color string. */
+/** Render an ARGB packed integer as `#rrggbb`. The spreadsheet ignores the
+ *  alpha byte of cell colours (`00FF0000` paints opaque red), so it is dropped. */
 export function argbToCssColor(argb: number): string {
-  const a = (argb >>> 24) & 0xff;
   const r = (argb >>> 16) & 0xff;
   const g = (argb >>> 8) & 0xff;
   const b = argb & 0xff;
-  if (a === 0xff) {
-    return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
-  }
-  return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(2)})`;
+  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
 }
 
 function packArgb(a: number, r: number, g: number, b: number): number {
