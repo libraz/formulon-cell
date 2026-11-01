@@ -365,15 +365,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fluentui/react-icons@npm:^2.0.344":
-  version: 2.0.344
-  resolution: "@fluentui/react-icons@npm:2.0.344"
+"@fluentui/react-icons@npm:^2.0.345":
+  version: 2.0.345
+  resolution: "@fluentui/react-icons@npm:2.0.345"
   dependencies:
     "@griffel/react": "npm:^1.6.1"
     tslib: "npm:^2.1.0"
   peerDependencies:
     react: ">=16.8.0 <20.0.0"
-  checksum: 10c0/f2bd63a565b771603525fb30b14a09fe6ab9c107e3f07ebdf3c59cad14a558159907e4da0732c4dcb6d43ddf1eef7cfc66e3c66285b7606159d6fedae374134d
+  checksum: 10c0/8a66f7eed150a05a6c856f64f67f969aa8bb8e2c15bc0dec82bf97c3432c829df0dd3eb61f6240316c3d49b9010fb08e0fb7eb8137f58ecae40a7a635944aedc
   languageName: node
   linkType: hard
 
@@ -381,7 +381,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@formulon-cell/react-demo@workspace:apps/react-demo"
   dependencies:
-    "@fluentui/react-icons": "npm:^2.0.344"
+    "@fluentui/react-icons": "npm:^2.0.345"
     "@libraz/formulon-cell": "workspace:*"
     "@libraz/formulon-cell-react": "workspace:*"
     "@types/node": "npm:^26"
