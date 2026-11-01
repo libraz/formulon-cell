@@ -218,6 +218,10 @@ export interface RibbonStrings {
     currency: string;
     percent: string;
     commaStyle: string;
+    /** Tooltip of the currency-format button. */
+    currencyStyle: string;
+    /** Tooltip of the percent-style button. */
+    percentStyle: string;
     decreaseDecimals: string;
     increaseDecimals: string;
     top: string;

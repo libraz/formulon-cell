@@ -217,6 +217,8 @@ export const ribbonFr: RibbonStrings = {
     currency: 'Monétaire',
     percent: 'Pourcentage',
     commaStyle: 'Séparateur de milliers',
+    currencyStyle: 'Format Nombre Comptabilité',
+    percentStyle: 'Style de pourcentage',
     decreaseDecimals: 'Réduire les décimales',
     increaseDecimals: 'Ajouter des décimales',
     top: 'Haut',

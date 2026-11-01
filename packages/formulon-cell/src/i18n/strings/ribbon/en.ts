@@ -216,6 +216,8 @@ export const ribbonEn: RibbonStrings = {
     currency: 'Currency',
     percent: 'Percent',
     commaStyle: 'Comma Style',
+    currencyStyle: 'Accounting Number Format',
+    percentStyle: 'Percent Style',
     decreaseDecimals: 'Decrease Decimals',
     increaseDecimals: 'Increase Decimals',
     top: 'Top',

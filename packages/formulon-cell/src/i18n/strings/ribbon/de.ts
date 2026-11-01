@@ -218,6 +218,8 @@ export const ribbonDe: RibbonStrings = {
     currency: 'Währung',
     percent: 'Prozent',
     commaStyle: 'Tausendertrennzeichen',
+    currencyStyle: 'Buchhaltungszahlenformat',
+    percentStyle: 'Prozentformat',
     decreaseDecimals: 'Dezimalstellen löschen',
     increaseDecimals: 'Dezimalstellen hinzufügen',
     top: 'Oben',

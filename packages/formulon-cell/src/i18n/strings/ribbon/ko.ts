@@ -216,6 +216,8 @@ export const ribbonKo: RibbonStrings = {
     currency: '통화',
     percent: '백분율',
     commaStyle: '쉼표 스타일',
+    currencyStyle: '회계 표시 형식',
+    percentStyle: '백분율 스타일',
     decreaseDecimals: '소수 자릿수 줄이기',
     increaseDecimals: '소수 자릿수 늘리기',
     top: '위쪽',

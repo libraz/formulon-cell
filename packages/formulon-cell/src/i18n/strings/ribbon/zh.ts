@@ -214,6 +214,8 @@ export const ribbonZh: RibbonStrings = {
     currency: '货币',
     percent: '百分比',
     commaStyle: '千位分隔样式',
+    currencyStyle: '会计数字格式',
+    percentStyle: '百分比样式',
     decreaseDecimals: '减少小数位数',
     increaseDecimals: '增加小数位数',
     top: '顶端',

@@ -214,6 +214,8 @@ export const ribbonTh: RibbonStrings = {
     currency: 'สกุลเงิน',
     percent: 'เปอร์เซ็นต์',
     commaStyle: 'สไตล์จุลภาค',
+    currencyStyle: 'รูปแบบตัวเลขทางบัญชี',
+    percentStyle: 'ลักษณะเปอร์เซ็นต์',
     decreaseDecimals: 'ลดตำแหน่งทศนิยม',
     increaseDecimals: 'เพิ่มตำแหน่งทศนิยม',
     top: 'บน',
