@@ -163,12 +163,16 @@ describe('render/painters — paintRefHighlight', () => {
 });
 
 describe('render/painters — paintValidationChevron', () => {
-  it('returns a hit rect at the cell right edge of width 18', () => {
+  it('hangs a 16x17px button from the trailing edge, 1px below the top', () => {
     const spy = makeSpy();
-    const hit = paintValidationChevron(spy.ctx, { x: 0, y: 0, w: 100, h: 30 }, baseTheme);
-    expect(hit.w).toBe(18);
-    expect(hit.x).toBe(100 - 18);
-    expect(hit.h).toBeLessThanOrEqual(22);
+    const hit = paintValidationChevron(spy.ctx, { x: 0, y: 10, w: 100, h: 30 }, baseTheme);
+    expect(hit).toEqual({ x: 100, y: 11, w: 16, h: 17 });
+  });
+
+  it('mirrors the button past the leading edge on a right-to-left sheet', () => {
+    const spy = makeSpy();
+    const hit = paintValidationChevron(spy.ctx, { x: 50, y: 0, w: 100, h: 30 }, baseTheme, true);
+    expect(hit).toEqual({ x: 34, y: 1, w: 16, h: 17 });
   });
 
   it('paints both a filled rail background and a stroked outline', () => {
@@ -201,7 +205,7 @@ describe('render/painters — paintCommentMarker', () => {
   it('fills a triangle in the upper-right corner using a fixed red', () => {
     const spy = makeSpy();
     paintCommentMarker(spy.ctx, { x: 0, y: 0, w: 60, h: 30 });
-    expect(spy.fillStyles).toContain('#d24545');
+    expect(spy.fillStyles).toContain('#ff0000');
     expect(spy.ops).toContain('closePath');
     expect(spy.ops).toContain('fill');
   });

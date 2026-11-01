@@ -232,7 +232,7 @@ describe('GridRenderer merged selection parity', () => {
     // second time over the active merge outline. The chevron adds one stroke.
     expect(spy.strokeRects).toHaveLength(2);
     expect(hitsOf(renderer).validationChevron).toMatchObject({ row: 1, col: 1 });
-    expect(hitsOf(renderer).validationChevron?.rect.x).toBe(mergeRect.x + mergeRect.w - 18);
+    expect(hitsOf(renderer).validationChevron?.rect.x).toBe(mergeRect.x + mergeRect.w);
     expect(hitsOf(renderer).fillHandle).toMatchObject({
       x: mergeRect.x + mergeRect.w - 4,
       y: mergeRect.y + mergeRect.h - 4,

@@ -1,31 +1,37 @@
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import { mirrorInRect, type Rect } from '../geometry.js';
 
-/** Paint a small ▼ chevron at the right edge of the cell to indicate the
- *  cell has a list validation. Returned rect is the click hit-area. */
+/** In-cell dropdown button, measured at 100%: 16x17px, hung from the cell's
+ *  trailing edge 1px below its top (covering the outer half of the selection
+ *  outline), with a gray frame and a 9x5 gray arrow. */
+const DROPDOWN_W = 16;
+const DROPDOWN_H = 17;
+const DROPDOWN_FRAME = '#999999';
+const DROPDOWN_ARROW = '#808080';
+
+/** Paint the list-validation / totals dropdown button beside the active cell.
+ *  Returned rect is the click hit-area. */
 export function paintValidationChevron(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
   rtl = false,
 ): Rect {
-  const w = 18;
-  const h = Math.min(bounds.h, 22);
-  const x = mirrorInRect(bounds, bounds.x + bounds.w - w, w, rtl);
-  const y = bounds.y + (bounds.h - h) / 2;
+  const w = DROPDOWN_W;
+  const h = DROPDOWN_H;
+  const x = mirrorInRect(bounds, bounds.x + bounds.w, w, rtl);
+  const y = bounds.y + 1;
   ctx.save();
-  ctx.fillStyle = theme.bgRail;
+  ctx.fillStyle = theme.bg;
   ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = theme.rule;
+  ctx.strokeStyle = DROPDOWN_FRAME;
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  ctx.fillStyle = theme.fg;
+  ctx.fillStyle = DROPDOWN_ARROW;
   ctx.beginPath();
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  ctx.moveTo(cx - 4, cy - 2);
-  ctx.lineTo(cx + 4, cy - 2);
-  ctx.lineTo(cx, cy + 3);
+  ctx.moveTo(x + 3, y + 6.5);
+  ctx.lineTo(x + 12, y + 6.5);
+  ctx.lineTo(x + 7.5, y + 11.5);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -165,14 +171,14 @@ export function paintLockMarker(
   ctx.restore();
 }
 
-/** Paint a small filled triangle in the upper-right of the cell to indicate
- *  an attached comment (spreadsheet convention). */
+/** Paint the note indicator: a red right triangle, 6px a side, in the cell's
+ *  trailing top corner inside its gridline (measured at 100%). */
 export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect, rtl = false): void {
-  const size = 5;
-  const x = mirrorInRect(bounds, bounds.x + bounds.w - size, size, rtl);
+  const size = 6;
+  const x = mirrorInRect(bounds, bounds.x + bounds.w - 1 - size, size, rtl);
   const y = bounds.y;
   ctx.save();
-  ctx.fillStyle = '#d24545';
+  ctx.fillStyle = '#ff0000';
   ctx.beginPath();
   // Right angle at the cell's trailing top corner.
   ctx.moveTo(rtl ? x : x + size, y);
