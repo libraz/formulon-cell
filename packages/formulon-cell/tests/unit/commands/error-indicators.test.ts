@@ -5,6 +5,7 @@ import {
   clearIgnoredCellErrors,
   clearValidationCircles,
   formulaErrorCellsInRange,
+  formulaErrorIsFlagged,
   ignoreCellError,
   isCellErrorIgnored,
   recordIgnoredErrorsChange,
@@ -197,7 +198,7 @@ describe('error indicator commands', () => {
     mutators.setCell(
       store,
       { sheet: 0, row: 1, col: 0 },
-      { kind: 'text', value: '#REF!' },
+      { kind: 'error', code: 3, text: '#REF!' },
       '=A999',
     );
     mutators.setCell(store, { sheet: 0, row: 1, col: 1 }, { kind: 'text', value: '#N/A' });
@@ -229,7 +230,7 @@ describe('error indicator commands', () => {
     mutators.setCell(
       store,
       { sheet: 0, row: 5, col: 2 },
-      { kind: 'text', value: '#REF!' },
+      { kind: 'error', code: 3, text: '#REF!' },
       '=A999',
     );
     mutators.setCell(
@@ -251,6 +252,18 @@ describe('error indicator commands', () => {
       { sheet: 0, row: 5, col: 2 },
       { sheet: 0, row: 10, col: 2 },
     ]);
+  });
+
+  it('flags formula errors the way spreadsheet error checking does', () => {
+    const error = { kind: 'error', code: 6, text: '#N/A' } as const;
+    expect(formulaErrorIsFlagged(error, '=VLOOKUP("zz",A1:A2,1,FALSE)')).toBe(true);
+    expect(formulaErrorIsFlagged(error, '=#N/A')).toBe(true);
+    // A bare NA() marks a value missing on purpose.
+    expect(formulaErrorIsFlagged(error, '=NA()')).toBe(false);
+    expect(formulaErrorIsFlagged(error, '= na( )')).toBe(false);
+    // A text result that reads like an error, and a constant error, are not flagged.
+    expect(formulaErrorIsFlagged({ kind: 'text', value: '#N/A' }, '="#N/A"')).toBe(false);
+    expect(formulaErrorIsFlagged(error, null)).toBe(false);
   });
 
   it('skips ignored formula errors when selecting the next error cell', () => {

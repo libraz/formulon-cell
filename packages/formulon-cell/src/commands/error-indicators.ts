@@ -24,6 +24,18 @@ export function cellValueIsFormulaError(value: CellValue): boolean {
   return false;
 }
 
+/** The spreadsheet's "formulas that result in an error" check, which puts
+ *  the indicator on a cell and drives Error Checking: a formula whose value
+ *  is an error. A bare `=NA()` marks a value as missing on purpose and is not
+ *  flagged, nor is a text result that only reads like an error. */
+export function formulaErrorIsFlagged(
+  value: CellValue,
+  formula: string | null | undefined,
+): boolean {
+  if (!formula || value.kind !== 'error') return false;
+  return formula.replace(/^=/, '').replace(/\s+/g, '').toUpperCase() !== 'NA()';
+}
+
 export function recordValidationCirclesChange<T>(
   history: History | null,
   store: SpreadsheetStore,
@@ -93,7 +105,7 @@ export function formulaErrorCellsInRange(store: SpreadsheetStore, range?: Range)
   const target = range ?? state.selection.range;
   const out: Addr[] = [];
   for (const [key, cell] of state.data.cells) {
-    if (!cell.formula || !cellValueIsFormulaError(cell.value)) continue;
+    if (!formulaErrorIsFlagged(cell.value, cell.formula)) continue;
     if (state.errorIndicators.ignoredErrors.has(key)) continue;
     const addr = parseAddrKey(key);
     if (addr && rangeContainsAddr(target, addr)) out.push(addr);
