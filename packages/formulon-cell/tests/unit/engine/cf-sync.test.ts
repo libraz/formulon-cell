@@ -70,12 +70,12 @@ describe('evaluateCfFromEngine', () => {
     expect(out.get(addrKey({ sheet: 0, row: 1, col: 2 }))?.fill).toBe('rgb(10, 20, 30)');
   });
 
-  it('emits rgba() when alpha is below 255', () => {
+  it('ignores the alpha byte like the spreadsheet does', () => {
     const wb = fakeWb(true, [
-      { row: 0, col: 0, matches: [{ kind: KIND_COLOR_SCALE, color: c(10, 20, 30, 128) }] },
+      { row: 0, col: 0, matches: [{ kind: KIND_COLOR_SCALE, color: c(10, 20, 30, 0) }] },
     ]);
     const out = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9);
-    expect(out.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill).toBe('rgba(10, 20, 30, 0.502)');
+    expect(out.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill).toBe('rgb(10, 20, 30)');
   });
 
   it('lifts DataBar to overlay.bar (0..1), axis, direction, and color', () => {

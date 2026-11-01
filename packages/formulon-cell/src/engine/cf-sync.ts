@@ -78,10 +78,10 @@ const ENGINE_CELL_IS_OP: Record<number, Extract<ConditionalRule, { kind: 'cell-v
 
 type ConditionalFormatEntry = ReturnType<WorkbookHandle['getConditionalFormats']>[number];
 
+/** CSS colour of an engine RGBA. The spreadsheet ignores the alpha byte of
+ *  rule colours (`00F8696B` paints opaque), so it is dropped. */
 const rgba = (c: { r: number; g: number; b: number; a: number }): string =>
-  c.a >= 255
-    ? `rgb(${c.r}, ${c.g}, ${c.b})`
-    : `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a / 255).toFixed(3)})`;
+  `rgb(${c.r}, ${c.g}, ${c.b})`;
 
 const sameColor = (
   a: { r: number; g: number; b: number; a: number },
