@@ -181,7 +181,7 @@ export interface CellFormatStrings {
     borderStyleSlantDashDot: string;
     borderPresetNone: string;
     borderPresetOutline: string;
-    borderPresetAll: string;
+    borderPresetInside: string;
     fill: string;
     fillNone: string;
     fillPatternStyle: string;
@@ -261,6 +261,8 @@ export interface CellFormatStrings {
     validationErrorTitle: string;
     validationErrorMessage: string;
     clearField: string;
+    /** Heading of the number and fill tabs' value sample. */
+    sample: string;
     preview: string;
     cancel: string;
     ok: string;

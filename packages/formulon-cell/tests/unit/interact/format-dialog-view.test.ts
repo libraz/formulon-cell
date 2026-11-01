@@ -59,7 +59,7 @@ describe('interact/format-dialog-view', () => {
   it('renders the Excel-style horizontal and vertical alignment choices', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
     expect(view.hAlignRadios.size).toBe(8); // default + left/center/right + fill/justify/center-across/distributed
-    expect(view.vAlignRadios.size).toBe(6); // default + top/middle/bottom + justify/distributed
+    expect(view.vAlignRadios.size).toBe(5); // top/middle/bottom + justify/distributed
   });
 
   it('wires data-fc-check on the font + alignment checkboxes', () => {

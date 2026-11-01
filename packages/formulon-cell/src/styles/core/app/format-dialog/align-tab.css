@@ -42,8 +42,13 @@
     grid-row: 2;
   }
 
-  .fc-fmtdlg__text-direction-row {
+  .fc-fmtdlg__justify-distributed-row {
+    grid-column: 1;
     grid-row: 3;
+  }
+
+  .fc-fmtdlg__text-direction-row {
+    grid-row: 4;
   }
 
   .fc-fmtdlg__align-select-row > span:first-child,

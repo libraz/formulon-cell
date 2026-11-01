@@ -3,7 +3,7 @@
 
 import type { Strings } from '../../i18n/strings.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
-import { createLineSamplePreview, LINE_STYLES_ALL } from '../../toolbar/ribbon/border-icons.js';
+import { createLineSamplePreview } from '../../toolbar/ribbon/border-icons.js';
 import { createDialogToggleButton } from '../dialog-shell.js';
 import {
   makeButton,
@@ -24,7 +24,7 @@ export interface BorderTabRefs {
   borderSwatchesFlyout: HTMLDivElement;
   presetNone: HTMLButtonElement;
   presetOutline: HTMLButtonElement;
-  presetAll: HTMLButtonElement;
+  presetInside: HTMLButtonElement;
   topCk: ReturnType<typeof makeCheckbox>;
   bottomCk: ReturnType<typeof makeCheckbox>;
   leftCk: ReturnType<typeof makeCheckbox>;
@@ -35,6 +35,23 @@ export interface BorderTabRefs {
   borderVisualPreview: HTMLDivElement;
   visualSideButtons: Map<SideKey, HTMLButtonElement[]>;
 }
+
+/** The desktop dialog's line styles, down the left column then the right. */
+const DIALOG_LINE_STYLES: readonly BorderStyleKey[] = [
+  'hair',
+  'dotted',
+  'dashDotDot',
+  'dashDot',
+  'dashed',
+  'thin',
+  'mediumDashDotDot',
+  'slantDashDot',
+  'mediumDashDot',
+  'mediumDashed',
+  'medium',
+  'thick',
+  'double',
+];
 
 export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog']): BorderTabRefs {
   // Active style + color row
@@ -57,9 +74,7 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
     mediumDashDotDot: t.borderStyleMediumDashDotDot,
     slantDashDot: t.borderStyleSlantDashDot,
   };
-  const styleOptions = LINE_STYLES_ALL.filter(
-    (style): style is BorderStyleKey => style !== 'none',
-  ).map((id) => ({ id, label: styleLabels[id] }));
+  const styleOptions = DIALOG_LINE_STYLES.map((id) => ({ id, label: styleLabels[id] }));
   const borderStyleSelect = createDialogSelect(
     styleOptions.map((s) => ({ value: s.id, label: s.label })),
     'thin',
@@ -129,11 +144,11 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   panel.appendChild(presetRow);
   const presetNone = makeButton(t.borderPresetNone);
   const presetOutline = makeButton(t.borderPresetOutline);
-  const presetAll = makeButton(t.borderPresetAll);
+  const presetInside = makeButton(t.borderPresetInside);
   presetNone.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--none');
   presetOutline.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--outline');
-  presetAll.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--inside');
-  presetRow.append(presetNone, presetOutline, presetAll);
+  presetInside.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--inside');
+  presetRow.append(presetNone, presetOutline, presetInside);
 
   // Per-side checkboxes
   const sideRow = document.createElement('div');
@@ -214,7 +229,7 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
     borderSwatchesFlyout,
     presetNone,
     presetOutline,
-    presetAll,
+    presetInside,
     topCk,
     bottomCk,
     leftCk,

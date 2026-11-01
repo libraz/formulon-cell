@@ -370,6 +370,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       (!multiCell && activeMerge === null) ||
       (!getWb() && mergeHasNonAnchorContent(state, mergeRange));
     alignTab.hydrateMerge(mergeSelectionState(state, range), mergeDisabled);
+    borderTab.setInsideAvailable(multiCell || hasExtraRanges);
     renderPreview();
     setActiveTab('number');
   };

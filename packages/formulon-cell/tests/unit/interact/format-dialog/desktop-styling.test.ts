@@ -81,7 +81,10 @@ describe('attachFormatDialog', () => {
     // the horizontal-alignment select below the indent field beside it.
     expect(alignCss).toMatch(/\.fc-fmtdlg__align-select-row--h\s*\{\s*grid-row: 1;/);
     expect(alignCss).toMatch(/\.fc-fmtdlg__align-select-row--v\s*\{\s*grid-row: 2;/);
-    expect(alignCss).toMatch(/\.fc-fmtdlg__text-direction-row\s*\{\s*grid-row: 3;/);
+    expect(alignCss).toMatch(
+      /\.fc-fmtdlg__justify-distributed-row\s*\{\s*grid-column: 1;\s*grid-row: 3;/,
+    );
+    expect(alignCss).toMatch(/\.fc-fmtdlg__text-direction-row\s*\{\s*grid-row: 4;/);
     expect(alignCss).toMatch(
       /\.fc-fmtdlg__indent-row\s*\{[\s\S]*?grid-row: 1;[\s\S]*?justify-self: end;/,
     );

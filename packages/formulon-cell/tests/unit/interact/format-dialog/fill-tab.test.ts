@@ -133,7 +133,6 @@ describe('attachFormatDialog', () => {
       'distributed',
     ]);
     expect(Array.from(vAlign?.options ?? []).map((option) => option.value)).toEqual([
-      'default',
       'top',
       'middle',
       'bottom',
@@ -166,19 +165,19 @@ describe('attachFormatDialog', () => {
     );
     expect(borderStyle?.getAttribute('aria-label')).toBe('スタイル');
     expect(Array.from(borderStyle?.options ?? []).map((option) => option.value)).toEqual([
-      'thin',
       'hair',
       'dotted',
-      'dashed',
-      'dashDot',
       'dashDotDot',
-      'mediumDashed',
-      'mediumDashDot',
+      'dashDot',
+      'dashed',
+      'thin',
       'mediumDashDotDot',
-      'medium',
-      'double',
-      'thick',
       'slantDashDot',
+      'mediumDashDot',
+      'mediumDashed',
+      'medium',
+      'thick',
+      'double',
     ]);
 
     handle.detach();

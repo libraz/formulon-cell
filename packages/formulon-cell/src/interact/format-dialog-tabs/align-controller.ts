@@ -24,6 +24,10 @@ export interface AlignTabController extends FormatTabController {
   mergeAction(): 'merge' | 'unmerge' | null;
 }
 
+/** Bottom is the unset vertical alignment, so choosing it clears the field. */
+const vAlignDraft = (value: CellVAlign): CellVAlign | undefined =>
+  value === 'bottom' ? undefined : value;
+
 export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): AlignTabController {
   const { draft, t, on, touch, isMixed, renderPreview } = ctx;
   const {
@@ -76,7 +80,7 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
     const hKey: 'default' | CellAlign = draft.align ?? 'default';
     for (const [id, r] of hAlignRadios) r.checked = id === hKey;
     hAlignSelect.value = hKey;
-    const vKey: 'default' | CellVAlign = draft.vAlign ?? 'default';
+    const vKey: CellVAlign = draft.vAlign ?? 'bottom';
     for (const [id, r] of vAlignRadios) r.checked = id === vKey;
     vAlignSelect.value = vKey;
     wrapCk.input.checked = draft.wrap;
@@ -158,7 +162,7 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
     const r = e.target as HTMLInputElement;
     if (!r.checked) return;
     touch('vAlign');
-    draft.vAlign = r.value === 'default' ? undefined : (r.value as CellVAlign);
+    draft.vAlign = vAlignDraft(r.value as CellVAlign);
     vAlignSelect.value = r.value;
     renderPreview();
   };
@@ -173,9 +177,9 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
     renderPreview();
   };
   const onVAlignSelectChange = (): void => {
-    const value = vAlignSelect.value as 'default' | CellVAlign;
+    const value = vAlignSelect.value as CellVAlign;
     touch('vAlign');
-    draft.vAlign = value === 'default' ? undefined : value;
+    draft.vAlign = vAlignDraft(value);
     for (const [id, r] of vAlignRadios) r.checked = id === value;
     renderPreview();
   };

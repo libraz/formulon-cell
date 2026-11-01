@@ -1,5 +1,5 @@
-// Live preview for the Format Cells dialog: projects the draft onto the
-// shared preview cell plus the font, fill and border tabs' sample boxes.
+// Live preview for the Format Cells dialog: the number tab's sample value plus
+// the font, fill and border tabs' sample boxes.
 // Read-only with respect to the draft.
 
 import { formatNumber } from '../commands/format.js';
@@ -10,14 +10,12 @@ import {
   cellFontFamily,
   cellTextVerticalOffset,
   fontSizeWithVerticalAlign,
-  shrinkFontSizeToFit,
 } from '../render/painters/text.js';
-import type { CellAlign, CellBorderSide, CellVAlign, FillPattern } from '../store/store.js';
+import type { CellBorderSide, FillPattern } from '../store/store.js';
 import type { DraftState, NumberCategory, SideKey } from './format-dialog-model.js';
 import { activeDraftSide, computeDialogNumFmt } from './format-dialog-state.js';
 
 export interface FormatPreviewRefs {
-  preview: HTMLDivElement;
   previewCell: HTMLDivElement;
   fontPreviewBox: HTMLDivElement;
   fillSample: HTMLDivElement;
@@ -85,34 +83,6 @@ export const fillPatternImage = (pattern: FillPattern | undefined, color = '#000
   }
 };
 
-const cssHorizontalAlign = (align: CellAlign | undefined): CSSStyleDeclaration['textAlign'] => {
-  switch (align) {
-    case 'center':
-    case 'centerContinuous':
-      return 'center';
-    case 'right':
-      return 'right';
-    case 'justify':
-    case 'distributed':
-      return 'justify';
-    default:
-      return 'left';
-  }
-};
-
-const cssVerticalJustify = (
-  align: CellVAlign | undefined,
-): CSSStyleDeclaration['justifyContent'] => {
-  switch (align) {
-    case 'top':
-      return 'flex-start';
-    case 'bottom':
-      return 'flex-end';
-    default:
-      return 'center';
-  }
-};
-
 const cssBorder = (s: CellBorderSide | undefined): string => {
   if (!s) return '0 solid transparent';
   const cfg = typeof s === 'object' ? s : { style: 'thin' as const };
@@ -133,7 +103,7 @@ const cssBorder = (s: CellBorderSide | undefined): string => {
 /** Returns the preview renderer; call it after every draft change. */
 export function createFormatPreview(input: FormatPreviewInput): () => void {
   const { refs, draft, getLocale, getDate1904, defaultPatternFor } = input;
-  const { preview, previewCell, fontPreviewBox, fillSample, borderVisualPreview } = refs;
+  const { previewCell, fontPreviewBox, fillSample, borderVisualPreview } = refs;
   return (): void => {
     const cssFontVertAlign =
       draft.fontVertAlign === 'superscript'
@@ -181,17 +151,6 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
         draft.fillPattern === 'gray125' || draft.fillPattern === 'gray25' ? '4px 4px' : '';
     };
 
-    preview.style.fontWeight = draft.bold ? 'bold' : 'normal';
-    preview.style.fontStyle = draft.italic ? 'italic' : 'normal';
-    const decos: string[] = [];
-    if (draft.underline) decos.push('underline');
-    if (draft.strike) decos.push('line-through');
-    preview.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
-    preview.style.textDecorationStyle =
-      draft.underline === 'double' || draft.underline === 'doubleAccounting' ? 'double' : '';
-    preview.style.verticalAlign = cssFontVertAlign;
-    preview.style.textAlign = cssHorizontalAlign(draft.align);
-    applyFontPreview(previewCell);
     applyFontPreview(fontPreviewBox);
     const fontPreviewRun = fontPreviewBox.querySelector<HTMLElement>(
       '.fc-fmtdlg__font-preview-run',
@@ -206,16 +165,7 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
           ? `translateY(${cellTextVerticalOffset(size, draft.fontVertAlign)}px)`
           : '';
     }
-    previewCell.style.textAlign = cssHorizontalAlign(draft.align);
-    previewCell.style.direction = draft.textDirection === 'context' ? '' : draft.textDirection;
-    applyFillPreview(previewCell);
     applyFillPreview(fillSample);
-    previewCell.style.whiteSpace = draft.wrap ? 'pre-wrap' : 'nowrap';
-    previewCell.style.justifyContent = cssVerticalJustify(draft.vAlign);
-    previewCell.style.borderTop = cssBorder(draft.borders.top);
-    previewCell.style.borderRight = cssBorder(draft.borders.right);
-    previewCell.style.borderBottom = cssBorder(draft.borders.bottom);
-    previewCell.style.borderLeft = cssBorder(draft.borders.left);
     borderVisualPreview.style.borderTop = cssBorder(draft.borders.top);
     borderVisualPreview.style.borderRight = cssBorder(draft.borders.right);
     borderVisualPreview.style.borderBottom = cssBorder(draft.borders.bottom);
@@ -265,35 +215,14 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
           ? formatNumber(value.value, numFmt, getLocale(), getDate1904())
           : formatGeneralNumber(value.value, getLocale())
         : formatCell(value, getLocale());
+    // The number tab's sample shows only the formatted value, not the cell's
+    // font, fill, borders or alignment.
     previewCell.textContent = numericText;
-    const basePreviewSize =
-      draft.fontSize !== undefined
-        ? fontSizeWithVerticalAlign(draft.fontSize, draft.fontVertAlign)
-        : undefined;
-    let previewSize = basePreviewSize;
-    if (draft.shrinkToFit && !draft.wrap && basePreviewSize !== undefined) {
-      // Use the browser's rendered width in the selected family. Headless DOMs
-      // report zero geometry, so they retain the authored size instead of the
-      // old arbitrary reduction applied to every preview.
-      previewSize = shrinkFontSizeToFit(
-        basePreviewSize,
-        previewCell.scrollWidth,
-        previewCell.clientWidth,
-      );
-    }
-    previewCell.style.fontSize = previewSize !== undefined ? `${previewSize}px` : '';
-    previewCell.style.lineHeight = previewSize !== undefined ? `${previewSize * 1.25}px` : '';
-    if (previewSize !== undefined && draft.fontVertAlign) {
-      const offset = cellTextVerticalOffset(previewSize, draft.fontVertAlign);
-      previewCell.style.paddingTop = `${Math.max(0, 8 + offset)}px`;
-      previewCell.style.paddingBottom = `${Math.max(0, 8 - offset)}px`;
-    } else {
-      previewCell.style.paddingTop = '';
-      previewCell.style.paddingBottom = '';
-    }
-    if (!draft.color && value.kind === 'number' && value.value < 0) {
-      previewCell.style.color =
-        draft.negativeStyle === 'red' || draft.negativeStyle === 'red-parens' ? '#ff0000' : '';
-    }
+    previewCell.style.color =
+      value.kind === 'number' &&
+      value.value < 0 &&
+      (draft.negativeStyle === 'red' || draft.negativeStyle === 'red-parens')
+        ? '#ff0000'
+        : '';
   };
 }

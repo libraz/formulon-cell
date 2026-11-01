@@ -3,6 +3,7 @@
 // remembered separately from the per-side draft so OK can apply it as a
 // selection-shaped action (outline vs. every inner edge).
 
+import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 import type { BorderStyleKey, SideKey } from '../format-dialog-model.js';
 import { isHexColor } from '../format-dialog-model.js';
 import { createPaletteFlyout, type PaletteFlyout } from '../format-dialog-palette-flyout.js';
@@ -10,13 +11,15 @@ import { activeDraftSide, type FormatDialogField, setDraftSide } from '../format
 import type { BorderTabRefs } from './border.js';
 import { type FormatTabContext, type FormatTabController, markMixed } from './controller.js';
 
-export type BorderPreset = 'none' | 'outline' | 'all';
+export type BorderPreset = 'none' | 'outline' | 'inside';
 
 export interface BorderTabController extends FormatTabController {
   readonly palette: PaletteFlyout;
   /** The preset clicked since the last per-side edit, if any. */
   pendingPreset(): BorderPreset | null;
   clearPendingPreset(): void;
+  /** Inside has no edges to draw on a single cell, so it is disabled there. */
+  setInsideAvailable(available: boolean): void;
 }
 
 const SIDES = ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'] as const;
@@ -34,7 +37,7 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     borderSwatchesFlyout,
     presetNone,
     presetOutline,
-    presetAll,
+    presetInside,
     topCk,
     bottomCk,
     leftCk,
@@ -151,16 +154,9 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     syncControls();
     renderPreview();
   };
-  const onPresetAll = (): void => {
-    touch('border.top', 'border.right', 'border.bottom', 'border.left');
-    pendingPreset = 'all';
-    draft.borders = {
-      top: activeSide(),
-      right: activeSide(),
-      bottom: activeSide(),
-      left: activeSide(),
-    };
-    syncControls();
+  // Inside lines are a selection-shaped edit with no per-cell side to draft.
+  const onPresetInside = (): void => {
+    pendingPreset = 'inside';
     renderPreview();
   };
   /** Per-side checkbox change: the checkbox is the source of truth. */
@@ -189,7 +185,7 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
   on(borderSwatches.el, 'click', onBorderSwatchClick);
   on(presetNone, 'click', onPresetNone);
   on(presetOutline, 'click', onPresetOutline);
-  on(presetAll, 'click', onPresetAll);
+  on(presetInside, 'click', onPresetInside);
   on(topCk.input, 'change', sideChange('top'));
   on(bottomCk.input, 'change', sideChange('bottom'));
   on(leftCk.input, 'change', sideChange('left'));
@@ -205,6 +201,9 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     pendingPreset: () => pendingPreset,
     clearPendingPreset: () => {
       pendingPreset = null;
+    },
+    setInsideAvailable: (available) => {
+      projectDisabledState(presetInside, !available, null);
     },
   };
 }

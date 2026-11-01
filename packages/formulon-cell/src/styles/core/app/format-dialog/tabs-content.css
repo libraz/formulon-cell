@@ -45,7 +45,7 @@
     line-height: 1.45;
   }
 
-  .fc-fmtdlg__protection-checks {
+  .fc-fmtdlg__row.fc-fmtdlg__protection-checks {
     display: grid;
     grid-template-columns: 1fr;
     gap: 2px;

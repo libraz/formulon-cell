@@ -12,7 +12,7 @@ import { makeCheckbox } from '../format-dialog-dom.js';
 export interface AlignTabRefs {
   hAlignRadios: Map<'default' | CellAlign, HTMLInputElement>;
   hAlignSelect: HTMLSelectElement;
-  vAlignRadios: Map<'default' | CellVAlign, HTMLInputElement>;
+  vAlignRadios: Map<CellVAlign, HTMLInputElement>;
   vAlignSelect: HTMLSelectElement;
   wrapCk: ReturnType<typeof makeCheckbox>;
   justifyLastLineCk: ReturnType<typeof makeCheckbox>;
@@ -89,15 +89,15 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   panel.appendChild(vAlignFieldset);
 
   const vAlignName = `fc-fmtdlg-valign-${Math.random().toString(36).slice(2, 8)}`;
-  const vAlignDefs: { id: 'default' | CellVAlign; label: string }[] = [
-    { id: 'default', label: t.alignDefault },
+  // Vertical alignment has no General entry: an unset cell reads as Bottom.
+  const vAlignDefs: { id: CellVAlign; label: string }[] = [
     { id: 'top', label: t.vAlignTop },
     { id: 'middle', label: t.vAlignMiddle },
     { id: 'bottom', label: t.vAlignBottom },
     { id: 'justify', label: t.vAlignJustify },
     { id: 'distributed', label: t.vAlignDistributed },
   ];
-  const vAlignRadios = new Map<'default' | CellVAlign, HTMLInputElement>();
+  const vAlignRadios = new Map<CellVAlign, HTMLInputElement>();
   for (const a of vAlignDefs) {
     const wrap = document.createElement('label');
     wrap.className = 'fc-fmtdlg__radio';
@@ -119,7 +119,7 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   vAlignSelectLabel.textContent = t.verticalAlign;
   const vAlignSelect = createDialogSelect(
     vAlignDefs.map((a) => ({ value: a.id, label: a.label })),
-    'default',
+    'bottom',
     { ariaLabel: t.verticalAlign, className: '' },
   );
   vAlignSelect.dataset.fcSelect = 'vAlign';
@@ -138,7 +138,11 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   // Only meaningful with distributed horizontal alignment; the dialog re-enables
   // it from the draft state.
   projectDisabledState(justifyLastLineCk.input, true, null);
-  wrapRow.append(justifyLastLineCk.wrap);
+  // Justify distributed sits under the vertical alignment, as on the desktop.
+  const justifyRow = document.createElement('div');
+  justifyRow.className = 'fc-fmtdlg__justify-distributed-row';
+  justifyRow.append(justifyLastLineCk.wrap);
+  panel.appendChild(justifyRow);
 
   const indentRow = document.createElement('label');
   indentRow.className = 'fc-fmtdlg__row fc-fmtdlg__indent-row';

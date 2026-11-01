@@ -24,7 +24,7 @@ describe('attachFormatDialog', () => {
     document.body.innerHTML = '';
   });
 
-  it('border presets toggle all sides', () => {
+  it('border presets: outline, none, and inside disabled on one cell', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
@@ -32,13 +32,14 @@ describe('attachFormatDialog', () => {
     const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
     const presetOutline = buttons.find((b) => b.textContent === '外枠') as HTMLButtonElement;
     const presetNone = buttons.find((b) => b.textContent === 'なし') as HTMLButtonElement;
-    const presetAll = buttons.find((b) => b.textContent === '格子') as HTMLButtonElement;
+    const presetInside = buttons.find((b) => b.textContent === '内側') as HTMLButtonElement;
     const presetRow = presetOutline.parentElement;
 
     expect(presetRow?.classList.contains('fc-fmtdlg__border-presets')).toBe(true);
     expect(presetNone.classList.contains('fc-fmtdlg__border-preset--none')).toBe(true);
     expect(presetOutline.classList.contains('fc-fmtdlg__border-preset--outline')).toBe(true);
-    expect(presetAll.classList.contains('fc-fmtdlg__border-preset--inside')).toBe(true);
+    expect(presetInside.classList.contains('fc-fmtdlg__border-preset--inside')).toBe(true);
+    expect(presetInside.disabled).toBe(true);
 
     presetOutline.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     let okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
@@ -68,20 +69,31 @@ describe('attachFormatDialog', () => {
       diagonalUp: false,
     });
 
-    handle.open();
-    presetAll.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
-    okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    borders = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders;
-    expect(borders).toEqual({
-      top: thinSide,
-      right: thinSide,
-      bottom: thinSide,
-      left: thinSide,
-      diagonalDown: false,
-      diagonalUp: false,
-    });
+    handle.detach();
+  });
 
+  it('border Inside preset draws only the inner edges of a multi-cell selection', () => {
+    setRange(store, 0, 0, 1, 1);
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
+    const presetInside = buttons.find((b) => b.textContent === '内側') as HTMLButtonElement;
+    expect(presetInside.disabled).toBe(false);
+    presetInside.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const fmt = store.getState().format.formats;
+    const thinSide = { style: 'thin' };
+    expect(fmt.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders).toBeUndefined();
+    expect(fmt.get(addrKey({ sheet: 0, row: 0, col: 1 }))?.borders).toEqual({ left: thinSide });
+    expect(fmt.get(addrKey({ sheet: 0, row: 1, col: 0 }))?.borders).toEqual({ top: thinSide });
+    expect(fmt.get(addrKey({ sheet: 0, row: 1, col: 1 }))?.borders).toEqual({
+      top: thinSide,
+      left: thinSide,
+    });
     handle.detach();
   });
 

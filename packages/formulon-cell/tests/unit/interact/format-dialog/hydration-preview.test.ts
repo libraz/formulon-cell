@@ -284,12 +284,13 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
-  it('preview reflects current draft and includes formatted number', () => {
+  it('number sample shows only the formatted value', () => {
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'number', value: 12345 });
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
     const preview = document.querySelector<HTMLElement>('.fc-fmtdlg__preview') as HTMLElement;
+    const sample = document.querySelector<HTMLElement>('.fc-fmtdlg__preview-cell') as HTMLElement;
 
     const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -298,36 +299,16 @@ describe('attachFormatDialog', () => {
     const bold = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="bold"]',
     ) as HTMLInputElement;
-    const italic = document.querySelector<HTMLInputElement>(
-      'input[data-fc-check="italic"]',
-    ) as HTMLInputElement;
-    const underline = document.querySelector<HTMLSelectElement>(
-      'select[data-fc-input="underline"]',
-    ) as HTMLSelectElement;
-    const strike = document.querySelector<HTMLInputElement>(
-      'input[data-fc-check="strike"]',
-    ) as HTMLInputElement;
     bold.checked = true;
     bold.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(preview.style.fontWeight).toBe('bold');
-
-    italic.checked = true;
-    italic.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(preview.style.fontStyle).toBe('italic');
-
-    underline.value = 'double';
-    underline.dispatchEvent(new Event('change', { bubbles: true }));
-    strike.checked = true;
-    strike.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(preview.style.textDecoration).toMatch(/underline/);
-    expect(preview.style.textDecoration).toMatch(/line-through/);
-
     const right = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="right"]',
     ) as HTMLInputElement;
     right.checked = true;
     right.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(preview.style.textAlign).toBe('right');
+    expect(sample.style.fontWeight).toBe('');
+    expect(sample.style.textAlign).toBe('');
+    expect(sample.style.backgroundColor).toBe('');
 
     handle.detach();
   });

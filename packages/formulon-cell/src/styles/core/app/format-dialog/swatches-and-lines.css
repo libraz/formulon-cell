@@ -265,12 +265,19 @@
     border: 1px solid var(--fc-fmtdlg-preview-border);
   }
 
+  /* Desktop order runs down two columns of seven; the first slot belongs to
+     None, which this gallery leaves to the presets. */
   .fc-fmtdlg__line-gallery {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(7, auto);
+    grid-auto-flow: column;
     gap: 0 8px;
     width: 216px;
     margin-left: 0;
+  }
+  .fc-fmtdlg__line-gallery > :first-child {
+    grid-row-start: 2;
   }
   .fc-fmtdlg__line-style {
     display: grid;

@@ -192,7 +192,7 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   sample.className = 'fc-fmtdlg__fill-sample';
   const sampleLabel = document.createElement('div');
   sampleLabel.className = 'fc-fmtdlg__fill-sample-label';
-  sampleLabel.textContent = t.preview;
+  sampleLabel.textContent = t.sample;
   const fillSample = document.createElement('div');
   fillSample.className = 'fc-fmtdlg__fill-sample-box';
   sample.append(sampleLabel, fillSample);

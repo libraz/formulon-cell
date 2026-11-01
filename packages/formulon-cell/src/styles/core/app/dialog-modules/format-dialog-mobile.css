@@ -70,7 +70,12 @@
     }
     .fc-fmtdlg__line-gallery {
       grid-template-columns: 1fr;
+      grid-template-rows: none;
+      grid-auto-flow: row;
       margin-left: 0;
+    }
+    .fc-fmtdlg__line-gallery > :first-child {
+      grid-row-start: auto;
     }
     .fc-fmtdlg__border-visual {
       grid-template-columns: 1fr;

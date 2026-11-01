@@ -102,7 +102,6 @@ describe('attachFormatDialog', () => {
       'distributed',
     ]);
     expect([...vertical.options].map((o) => o.value)).toEqual([
-      'default',
       'top',
       'middle',
       'bottom',

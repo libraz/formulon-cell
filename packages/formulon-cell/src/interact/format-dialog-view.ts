@@ -51,7 +51,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   preview.className = 'fc-fmtdlg__preview';
   const previewLabel = document.createElement('div');
   previewLabel.className = 'fc-fmtdlg__preview-label';
-  previewLabel.textContent = t.preview;
+  previewLabel.textContent = t.sample;
   const previewCell = document.createElement('div');
   previewCell.className = 'fc-fmtdlg__preview-cell';
   preview.append(previewLabel, previewCell);
@@ -366,7 +366,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     borderSwatchesFlyout,
     presetNone,
     presetOutline,
-    presetAll,
+    presetInside,
     topCk,
     bottomCk,
     leftCk,
@@ -547,7 +547,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     borderSwatchesFlyout,
     presetNone,
     presetOutline,
-    presetAll,
+    presetInside,
     topCk,
     bottomCk,
     leftCk,
