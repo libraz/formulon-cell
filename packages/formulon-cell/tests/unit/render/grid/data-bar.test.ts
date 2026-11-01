@@ -3,9 +3,9 @@ import { paintDataBar } from '../../../../src/render/grid/data-bar.js';
 
 describe('data-bar painting', () => {
   it.each([
-    { axis: 0, direction: 'right' as const, start: 10, end: 50, x: 10 },
-    { axis: 0.5, direction: 'left' as const, start: 60, end: 20, x: 20 },
-    { axis: 1, direction: 'left' as const, start: 110, end: 70, x: 70 },
+    { axis: 0, direction: 'right' as const, start: 11, end: 49.8, x: 11 },
+    { axis: 0.5, direction: 'left' as const, start: 59.5, end: 20.7, x: 20.7 },
+    { axis: 1, direction: 'left' as const, start: 108, end: 69.2, x: 69.2 },
   ])(
     'fades from axis $axis toward the $direction endpoint',
     ({ axis, direction, start, end, x }) => {
@@ -31,12 +31,17 @@ describe('data-bar painting', () => {
         },
       );
 
-      expect(createLinearGradient).toHaveBeenCalledWith(start, 0, end, 0);
+      const [gx0, , gx1] = createLinearGradient.mock.calls[0] as unknown as number[];
+      expect(gx0).toBeCloseTo(start);
+      expect(gx1).toBeCloseTo(end);
       expect(addColorStop.mock.calls).toEqual([
         [0, '#0078d4'],
-        [1, 'rgba(255,255,255,0.25)'],
+        [1, 'rgb(209, 231, 247)'],
       ]);
-      expect(fillRect).toHaveBeenCalledWith(x, 21, 40, 28);
+      const [fx, fy, fw, fh] = fillRect.mock.calls[0] as unknown as number[];
+      expect([fy, fh]).toEqual([21, 26]);
+      expect(fx).toBeCloseTo(x);
+      expect(fw).toBeCloseTo(38.8);
     },
   );
 
@@ -70,9 +75,10 @@ describe('data-bar painting', () => {
     );
 
     expect(events).toEqual(['fill', 'border', 'fill']);
-    expect(fillRect).toHaveBeenNthCalledWith(1, 60, 21, 40, 28);
-    expect(strokeRect).toHaveBeenCalledWith(60, 21, 40, 28);
-    expect(fillRect).toHaveBeenNthCalledWith(2, 59.5, 21, 1, 28);
+    // Track: x 11, width 97, so the axis sits at 59.5 and the bar is 38.8 wide.
+    expect(fillRect).toHaveBeenNthCalledWith(1, 59.5, 21, expect.closeTo(38.8), 26);
+    expect(strokeRect).toHaveBeenCalledWith(59.5, 21, expect.closeTo(38.8), 26);
+    expect(fillRect).toHaveBeenNthCalledWith(2, 59, 21, 1, 26);
     expect(alphaValues).toEqual([1, 1, 1]);
   });
 
