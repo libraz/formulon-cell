@@ -231,3 +231,24 @@ describe('wrapped text', () => {
     expect((spy.fills[1]?.y ?? 0) - (spy.fills[0]?.y ?? 0)).toBe(14);
   });
 });
+
+describe('stacked vertical text', () => {
+  // 11 px font: line pitch 14, font box 10 over 2, padX 3 and padY 1.
+  it('stacks one character per line on a centred axis, bottom-aligned by default', () => {
+    const spy = paint(text('Ab'), { rotation: 'vertical' });
+    // Column box [4.5, 53.5]; the axis is half an em inside its centred block.
+    expect(spy.fills).toEqual([
+      { text: 'A', x: 29, y: 29 },
+      { text: 'b', x: 29, y: 43 },
+    ]);
+  });
+
+  it('lays wrapped columns right to left, each from the aligned edge', () => {
+    const spy = paint(text('ab cd'), { rotation: 'vertical', wrap: true, vAlign: 'top' });
+    const at = (char: string) => spy.fills.find((fill) => fill.text === char);
+    expect(at('a')?.y).toBe(11);
+    expect(at('c')?.y).toBe(11);
+    expect(at('b')?.y).toBe(25);
+    expect((at('a')?.x ?? 0) - (at('c')?.x ?? 0)).toBe(14);
+  });
+});

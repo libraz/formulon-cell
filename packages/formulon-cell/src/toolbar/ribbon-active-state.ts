@@ -54,6 +54,7 @@ export interface ActiveState {
   textOrientation:
     | 'angleCounterclockwise'
     | 'angleClockwise'
+    | 'verticalText'
     | 'rotateTextUp'
     | 'rotateTextDown'
     | 'horizontalText';
@@ -406,15 +407,17 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     formatAsTable: activeTable != null,
     cellStyle: activeCellStyleId(s),
     textOrientation:
-      f?.rotation === 45
-        ? 'angleCounterclockwise'
-        : f?.rotation === -45
-          ? 'angleClockwise'
-          : f?.rotation === 90
-            ? 'rotateTextUp'
-            : f?.rotation === -90
-              ? 'rotateTextDown'
-              : 'horizontalText',
+      f?.rotation === 'vertical'
+        ? 'verticalText'
+        : f?.rotation === 45
+          ? 'angleCounterclockwise'
+          : f?.rotation === -45
+            ? 'angleClockwise'
+            : f?.rotation === 90
+              ? 'rotateTextUp'
+              : f?.rotation === -90
+                ? 'rotateTextDown'
+                : 'horizontalText',
     currency: f?.numFmt?.kind === 'currency',
     percent: f?.numFmt?.kind === 'percent',
     commaStyle: f?.numFmt?.kind === 'fixed' && f.numFmt.thousands === true,

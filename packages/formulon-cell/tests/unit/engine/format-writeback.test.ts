@@ -651,8 +651,10 @@ describe('alignment XF translators', () => {
     expect(textRotationToCellRotation(raw)).toBe(degrees);
   });
 
-  it('leaves the vertical-text sentinel outside the degree model', () => {
-    expect(textRotationToCellRotation(255)).toBeUndefined();
+  it('maps the stacked-text sentinel to vertical both ways', () => {
+    expect(textRotationToCellRotation(255)).toBe('vertical');
+    expect(cellRotationToTextRotation('vertical')).toBe(255);
+    expect(textRotationToCellRotation(undefined)).toBeUndefined();
     expect(textRotationToCellRotation(undefined)).toBeUndefined();
     expect(cellRotationToTextRotation(undefined)).toBeUndefined();
   });

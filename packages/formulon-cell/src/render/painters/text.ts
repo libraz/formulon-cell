@@ -10,7 +10,7 @@ import { convertKana } from '../../format/kana.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
-import { cellTextHorizontalMetrics, wrapText } from '../text-wrap.js';
+import { cellTextHorizontalMetrics, graphemes, wrapText } from '../text-wrap.js';
 import type { CellPaintCtx, TextMetricsBox, TextVAlign } from './types.js';
 
 function canvasTextAlign(align: CellFormat['align'] | undefined): CanvasTextAlign | null {
@@ -397,6 +397,72 @@ const paintTextDecorations = (
   }
 };
 
+/** Stacked text: one character per line, centred on its column's axis. Wrap
+ *  breaks words into columns no taller than the cell, laid right to left;
+ *  each column takes the vertical alignment on its own. The indent moves the
+ *  run away from the vertical edge it is aligned to. */
+function paintStackedText(
+  ctx: CanvasRenderingContext2D,
+  drawText: (text: string, x: number, y: number) => void,
+  text: string,
+  bounds: Rect,
+  opts: {
+    format: CellFormat | undefined;
+    wrap: boolean;
+    locale: string | undefined;
+    fontSize: number;
+    padX: number;
+    padY: number;
+    indentPx: number;
+  },
+): void {
+  const { format, fontSize, padX, padY, indentPx } = opts;
+  const lineH = Math.round(fontSize * 1.28);
+  const maxLines = Math.max(1, Math.floor((bounds.h - padY * 2) / lineH));
+  const columns = (
+    opts.wrap
+      ? wrapText(text, {
+          maxWidth: maxLines,
+          measureText: (run) => graphemes(run, opts.locale).length,
+          locale: opts.locale,
+        })
+      : [text.replace(/\r?\n/g, '')]
+  ).map((run) => graphemes(run, opts.locale));
+  // Columns are an em wide on axes one line pitch apart. Measured against the
+  // desktop, the left side keeps half a padding more clear and the right side
+  // one more padding, as rotated runs do.
+  const blockW = fontSize + (columns.length - 1) * lineH;
+  const left = bounds.x + padX * 1.5;
+  const right = alignedTextAnchor(bounds, 'right', padX, 0) - padX;
+  const blockRight =
+    format?.align === 'left'
+      ? left + blockW
+      : format?.align === 'right'
+        ? right
+        : (left + right) / 2 + blockW / 2;
+  const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
+  const { ascent } = fontMetricsBox(ctx, fontSize);
+  const vertOffset = cellTextVerticalOffset(fontSize, format?.fontVertAlign);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  columns.forEach((chars, column) => {
+    const axis = blockRight - fontSize / 2 - column * lineH;
+    // Each character owns a line box one pitch tall with its baseline an
+    // ascent below the box top; the column's boxes take the alignment.
+    const blockH = chars.length * lineH;
+    const top =
+      vAlign === 'top'
+        ? bounds.y + padY + indentPx
+        : vAlign === 'middle'
+          ? bounds.y + (bounds.h - blockH) / 2
+          : bounds.y + bounds.h - padY - blockH - indentPx;
+    const firstY = Math.round(top + ascent) + vertOffset;
+    chars.forEach((char, line) => {
+      drawText(char, axis, firstY + line * lineH);
+    });
+  });
+}
+
 export function paintCellText({
   ctx,
   bounds,
@@ -512,6 +578,20 @@ export function paintCellText({
   ctx.rect(area.x, area.y, area.w, area.h);
   ctx.clip();
   const drawText = applyFontEffects(ctx, fontEffects ? format : undefined, fontSize);
+
+  if (rotation === 'vertical') {
+    paintStackedText(ctx, drawText, text, bounds, {
+      format,
+      wrap,
+      locale,
+      fontSize,
+      padX,
+      padY,
+      indentPx,
+    });
+    ctx.restore();
+    return;
+  }
 
   // Rotated text (positive = counterclockwise) is a single line placed by
   // its rotated line box; wrap does not apply.

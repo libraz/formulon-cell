@@ -136,6 +136,7 @@ export const cellFormatJa: CellFormatStrings = {
     directionLeftToRight: '左から右',
     directionRightToLeft: '右から左',
     rotation: '度',
+    verticalText: '縦書き',
     fontFamily: 'フォント',
     fontSize: 'サイズ',
     fontBold: '太字',

@@ -291,7 +291,7 @@ describe('WorkbookHandle store format writeback', () => {
     }
   });
 
-  it('preserves raw vertical-text rotation through unrelated edits but not an explicit degree reset', async () => {
+  it('keeps stacked text through unrelated edits but not an explicit degree reset', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.isStub).toBe(false);
@@ -316,7 +316,7 @@ describe('WorkbookHandle store format writeback', () => {
       const store = createSpreadsheetStore();
       hydrateCellFormatsFromEngine(wb, store, 0);
       const key = formatAt(0);
-      expect(store.getState().format.formats.get(key)?.rotation).toBeUndefined();
+      expect(store.getState().format.formats.get(key)?.rotation).toBe('vertical');
       mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
       syncCellFormatsToEngine(wb, store, 0, { strict: true });
       const preserved = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);

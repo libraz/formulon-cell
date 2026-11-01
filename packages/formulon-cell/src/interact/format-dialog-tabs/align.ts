@@ -21,6 +21,7 @@ export interface AlignTabRefs {
   indentInput: HTMLInputElement;
   textDirectionSelect: HTMLSelectElement;
   rotationInput: HTMLInputElement;
+  alignPreviewVertical: HTMLButtonElement;
   alignPreviewDial: HTMLDivElement;
   alignPreviewDialDots: HTMLButtonElement[];
   alignPreviewDialPointer: HTMLSpanElement;
@@ -195,8 +196,11 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   alignPreviewTitle.textContent = t.direction;
   const alignPreviewBox = document.createElement('div');
   alignPreviewBox.className = 'fc-fmtdlg__align-preview-box';
-  const alignPreviewVertical = document.createElement('div');
-  alignPreviewVertical.className = 'fc-fmtdlg__align-preview-vertical';
+  const alignPreviewVertical = createDialogToggleButton({
+    label: t.verticalText,
+    baseClass: 'fc-fmtdlg__align-preview-vertical',
+    title: t.verticalText,
+  });
   alignPreviewVertical.textContent = t.previewText;
   const alignPreviewDial = document.createElement('div');
   alignPreviewDial.className = 'fc-fmtdlg__align-preview-dial';
@@ -268,6 +272,7 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
     indentInput,
     textDirectionSelect,
     rotationInput,
+    alignPreviewVertical,
     alignPreviewDial,
     alignPreviewDialDots,
     alignPreviewDialPointer,

@@ -135,6 +135,7 @@ export const cellFormatDe: CellFormatStrings = {
     directionLeftToRight: 'Von links nach rechts',
     directionRightToLeft: 'Von rechts nach links',
     rotation: 'Drehung (Grad)',
+    verticalText: 'Vertikaler Text',
     fontFamily: 'Schriftart',
     fontSize: 'Größe',
     fontBold: 'Fett',

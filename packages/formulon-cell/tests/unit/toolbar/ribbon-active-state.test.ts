@@ -224,6 +224,9 @@ describe('toolbar/ribbon-active-state', () => {
     setRotation(instance.store.getState(), instance.store, -90);
     expect(projectActiveState(instance).textOrientation).toBe('rotateTextDown');
 
+    setRotation(instance.store.getState(), instance.store, 'vertical');
+    expect(projectActiveState(instance).textOrientation).toBe('verticalText');
+
     setRotation(instance.store.getState(), instance.store, 0);
     expect(projectActiveState(instance).textOrientation).toBe('horizontalText');
   });

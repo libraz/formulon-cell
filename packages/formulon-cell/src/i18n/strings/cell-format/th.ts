@@ -135,6 +135,7 @@ export const cellFormatTh: CellFormatStrings = {
     directionLeftToRight: 'จากซ้ายไปขวา',
     directionRightToLeft: 'จากขวาไปซ้าย',
     rotation: 'การหมุน (องศา)',
+    verticalText: 'ข้อความแนวตั้ง',
     fontFamily: 'ฟอนต์',
     fontSize: 'ขนาด',
     fontBold: 'ตัวหนา',

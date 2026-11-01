@@ -406,9 +406,15 @@ export function valignOrdinal(vAlign: CellFormat['vAlign']): number {
   }
 }
 
+/** OOXML's textRotation sentinel for characters stacked one per line. */
+const STACKED_TEXT_ROTATION = 255;
+
 /** Translate the CellFormat's signed rotation into OOXML's unsigned angle.
  * OOXML represents negative angles as the lower-half turn (90 - degrees). */
-export function cellRotationToTextRotation(degrees: number | undefined): number | undefined {
+export function cellRotationToTextRotation(
+  degrees: CellFormat['rotation'] | undefined,
+): number | undefined {
+  if (degrees === 'vertical') return STACKED_TEXT_ROTATION;
   if (degrees === undefined || !Number.isFinite(degrees)) return undefined;
   const clamped = Math.max(-90, Math.min(90, degrees));
   const rounded = Math.round(clamped);
@@ -416,12 +422,13 @@ export function cellRotationToTextRotation(degrees: number | undefined): number 
   return rounded < 0 ? 90 - rounded : rounded;
 }
 
-/** Translate an ordinary OOXML rotation back to the CellFormat's signed range.
- * The 255 Vertical Text sentinel deliberately remains outside that model. */
-export function textRotationToCellRotation(raw: number | undefined): number | undefined {
-  if (raw === undefined || !Number.isFinite(raw) || raw === 255 || raw < 0 || raw > 180) {
-    return undefined;
-  }
+/** Translate an OOXML rotation back to the CellFormat's signed range, or to
+ * `'vertical'` for the stacked-text sentinel. */
+export function textRotationToCellRotation(
+  raw: number | undefined,
+): CellFormat['rotation'] | undefined {
+  if (raw === STACKED_TEXT_ROTATION) return 'vertical';
+  if (raw === undefined || !Number.isFinite(raw) || raw < 0 || raw > 180) return undefined;
   const rounded = Math.round(raw);
   return rounded <= 90 ? rounded : 90 - rounded;
 }

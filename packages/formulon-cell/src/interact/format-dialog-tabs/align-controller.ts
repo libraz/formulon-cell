@@ -42,6 +42,7 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
     indentInput,
     textDirectionSelect,
     rotationInput,
+    alignPreviewVertical,
     alignPreviewDial,
     alignPreviewDialDots,
     alignPreviewDialPointer,
@@ -49,8 +50,14 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
   } = refs;
   const merge = { touched: false, initialChecked: false, initialIndeterminate: false };
 
+  // Stacked text leaves the dial and the degree box at zero.
+  const dialAngle = (): number => (draft.rotation === 'vertical' ? 0 : draft.rotation);
+
   const syncRotationDial = (): void => {
-    const rotation = draft.rotation;
+    const vertical = draft.rotation === 'vertical';
+    alignPreviewVertical.classList.toggle('fc-fmtdlg__align-preview-vertical--active', vertical);
+    alignPreviewVertical.setAttribute('aria-pressed', vertical ? 'true' : 'false');
+    const rotation = dialAngle();
     for (const dot of alignPreviewDialDots) {
       const angle = Number.parseInt(dot.dataset.fcAngle ?? '0', 10);
       const active = angle === rotation;
@@ -89,7 +96,7 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
     shrinkCk.input.checked = draft.shrinkToFit;
     indentInput.value = String(draft.indent);
     textDirectionSelect.value = draft.textDirection;
-    rotationInput.value = String(draft.rotation);
+    rotationInput.value = String(dialAngle());
     syncRotationDial();
   };
 
@@ -215,6 +222,12 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
     if (Number.isFinite(n)) draft.rotation = Math.max(-90, Math.min(90, n));
     renderPreview();
   };
+  const onVerticalClick = (): void => {
+    touch('rotation');
+    draft.rotation = draft.rotation === 'vertical' ? 0 : 'vertical';
+    rotationInput.value = String(dialAngle());
+    renderPreview();
+  };
   const onMergeChange = (): void => {
     merge.touched = true;
     mergeCk.input.indeterminate = false;
@@ -242,6 +255,7 @@ export function attachAlignTab(ctx: FormatTabContext, refs: AlignTabRefs): Align
   on(indentInput, 'input', onIndentInput);
   on(textDirectionSelect, 'change', onTextDirectionChange);
   on(rotationInput, 'input', onRotationInput);
+  on(alignPreviewVertical, 'click', onVerticalClick);
   on(alignPreviewDial, 'click', onDialClick);
 
   return { sync, syncMixed, syncRotationDial, hydrateMerge, mergeAction };

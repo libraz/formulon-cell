@@ -159,8 +159,9 @@ export interface CellFormat {
   shrinkToFit?: boolean;
   /** Indent level (left-align padding in increments of ~8px). 0..15. */
   indent?: number;
-  /** Text rotation in degrees, -90..90. 0 = horizontal. */
-  rotation?: number;
+  /** Text rotation in degrees, -90..90 (0 = horizontal), or `'vertical'` for
+   *  characters stacked one per line. */
+  rotation?: number | 'vertical';
   /** Text reading direction. Context maps to Excel's default/context mode. */
   textDirection?: TextDirection;
   borders?: CellBorders;

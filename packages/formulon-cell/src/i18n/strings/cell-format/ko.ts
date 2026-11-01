@@ -135,6 +135,7 @@ export const cellFormatKo: CellFormatStrings = {
     directionLeftToRight: '왼쪽에서 오른쪽',
     directionRightToLeft: '오른쪽에서 왼쪽',
     rotation: '회전(도)',
+    verticalText: '세로 텍스트',
     fontFamily: '글꼴',
     fontSize: '크기',
     fontBold: '굵게',

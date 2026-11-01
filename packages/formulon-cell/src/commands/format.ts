@@ -704,8 +704,13 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
   commitSelectionFormatEntries(state, store, plan.ranges, plan.cells, entries, {});
 }
 
-export function setRotation(state: State, store: SpreadsheetStore, deg: number): void {
-  const r = Math.max(-90, Math.min(90, Math.round(deg)));
+/** Apply an angle (clamped to -90..90) or stacked `'vertical'` text. */
+export function setRotation(
+  state: State,
+  store: SpreadsheetStore,
+  rotation: number | 'vertical',
+): void {
+  const r = rotation === 'vertical' ? rotation : Math.max(-90, Math.min(90, Math.round(rotation)));
   applySelectionFormatPatch(state, store, { rotation: r });
 }
 

@@ -135,6 +135,7 @@ export const cellFormatZh: CellFormatStrings = {
     directionLeftToRight: '从左到右',
     directionRightToLeft: '从右到左',
     rotation: '旋转（度）',
+    verticalText: '竖排文字',
     fontFamily: '字体',
     fontSize: '大小',
     fontBold: '粗体',

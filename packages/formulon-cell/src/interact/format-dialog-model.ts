@@ -57,7 +57,7 @@ export interface DraftState {
   justifyLastLine: boolean;
   shrinkToFit: boolean;
   indent: number;
-  rotation: number;
+  rotation: number | 'vertical';
   textDirection: TextDirection;
   bold: boolean;
   italic: boolean;

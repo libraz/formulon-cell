@@ -43,7 +43,6 @@ function rawAlignmentHasAuthoredDifference(fmt: CellFormat, raw: CellXf): boolea
   if (fmt.justifyLastLine !== undefined && raw.hasJustifyLastLine !== true) return true;
   if (fmt.rotation !== undefined) {
     if (raw.textRotation === undefined) return true;
-    if (raw.textRotation === 255) return true;
     if (textRotationToCellRotation(raw.textRotation) !== fmt.rotation) return true;
   }
   if (fmt.indent !== undefined) {

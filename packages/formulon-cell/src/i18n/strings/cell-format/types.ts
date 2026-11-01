@@ -132,6 +132,8 @@ export interface CellFormatStrings {
     directionLeftToRight: string;
     directionRightToLeft: string;
     rotation: string;
+    /** Toggle for characters stacked one per line. */
+    verticalText: string;
     fontFamily: string;
     fontSize: string;
     fontBold: string;

@@ -857,7 +857,7 @@ describe('named-style engine publication', () => {
     }
   });
 
-  it('preserves named raw rotation 255 until an explicit degree reset', async () => {
+  it('writes stacked text from a named style as rotation 255 until an explicit degree reset', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
       expect(wb.isStub).toBe(false);
@@ -879,7 +879,11 @@ describe('named-style engine publication', () => {
       expect(wb.setNamedCellStyle('Normal', raw255Style, 0)).toBe(true);
 
       const store = createSpreadsheetStore();
-      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { cellStyle: 'normal' });
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        { cellStyle: 'normal', rotation: 'vertical' },
+      );
       syncCellFormatsToEngine(wb, store, 0, { strict: true });
       const preserved = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);
       expect(preserved?.textRotation).toBe(255);

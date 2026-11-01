@@ -147,7 +147,8 @@ const fallbackGraphemes = (text: string): string[] => {
   return out;
 };
 
-const graphemes = (text: string, locale: string | undefined): string[] =>
+/** Split `text` into user-perceived characters. */
+export const graphemes = (text: string, locale: string | undefined): string[] =>
   segmentWithIntl(text, locale, 'grapheme') ?? fallbackGraphemes(text);
 
 const NON_BREAKING_CONNECTORS = new Set(['\u00a0', '\u202f', '\u2060']);

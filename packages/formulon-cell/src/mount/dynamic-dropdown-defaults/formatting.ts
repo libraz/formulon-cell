@@ -8,6 +8,7 @@ import { toggleShowPhonetic } from '../../commands/phonetic.js';
 import { recordRepeatableFormatChange } from '../../commands/slice-history.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { formatWithPending } from '../../store/pending-format.js';
+import type { CellFormat } from '../../store/store.js';
 import { applyMergeAction } from '../../toolbar/merge-action.js';
 import { openPhoneticEditor, openPhoneticSettings } from '../../toolbar/phonetic-actions.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
@@ -71,16 +72,16 @@ const buildTextOrientation =
       instance.openFormatDialog();
       return;
     }
-    const rotations: Record<string, number> = {
+    const rotations: Record<string, NonNullable<CellFormat['rotation']>> = {
       horizontal: 0,
       ccw: 45,
       cw: -45,
-      vertical: 90,
+      vertical: 'vertical',
       up: 90,
       down: -90,
     };
     const rotation = rotations[action];
-    if (typeof rotation !== 'number') return;
+    if (rotation === undefined) return;
     recordRepeatableFormatChange(instance.history, instance.store, () => {
       withSelectionFormatOrigin(
         instance.store,
@@ -123,15 +124,17 @@ const updateTextOrientationMenu =
     const active = state.selection.active;
     const rotation = formatWithPending(state, active)?.rotation ?? 0;
     const current =
-      rotation === 45
-        ? 'ccw'
-        : rotation === -45
-          ? 'cw'
-          : rotation === 90
-            ? 'up'
-            : rotation === -90
-              ? 'down'
-              : 'horizontal';
+      rotation === 'vertical'
+        ? 'vertical'
+        : rotation === 45
+          ? 'ccw'
+          : rotation === -45
+            ? 'cw'
+            : rotation === 90
+              ? 'up'
+              : rotation === -90
+                ? 'down'
+                : 'horizontal';
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-text-orientation]')) {
       const action = button.dataset.textOrientation;
       if (action === 'format') continue;
