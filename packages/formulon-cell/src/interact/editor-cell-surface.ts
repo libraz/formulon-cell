@@ -3,6 +3,7 @@ import { effectiveCellFormatWithPending } from '../engine/cell-format-projection
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView, type Rect } from '../render/geometry.js';
+import { mergeRangeAt } from '../render/grid/merged-cells.js';
 import {
   cellFontFamily,
   cellTextVerticalOffset,
@@ -21,6 +22,27 @@ export interface EditorSurfaceDeps {
   wb: WorkbookHandle;
   grid: Pick<HTMLElement, 'clientWidth'>;
 }
+
+/** The rect the editor covers for `addr`: the whole merge when the cell is
+ *  part of one, as the spreadsheet edits a merge across its full area. */
+const editedCellRect = (
+  state: ReturnType<SpreadsheetStore['getState']>,
+  layout: ReturnType<typeof layoutForView>,
+  addr: Addr,
+): Rect => {
+  const merge = mergeRangeAt(state, addr);
+  if (!merge) return cellRectUnclamped(layout, state.viewport, addr.row, addr.col);
+  const a = cellRectUnclamped(layout, state.viewport, merge.r0, merge.c0);
+  const b = cellRectUnclamped(layout, state.viewport, merge.r1, merge.c1);
+  const x0 = Math.min(a.x, b.x);
+  const y0 = Math.min(a.y, b.y);
+  return {
+    x: x0,
+    y: y0,
+    w: Math.max(a.x + a.w, b.x + b.w) - x0,
+    h: Math.max(a.y + a.h, b.y + b.h) - y0,
+  };
+};
 
 /** The editor's frame for a cell: its 2px border lies exactly where the
  *  selection outline is painted, over the cell's gridlines and one pixel
@@ -67,7 +89,7 @@ const refreshWidth = (
   if (!input || !addr) return;
   const state = s.store.getState();
   const layout = layoutForView(state);
-  const r = editorFrame(cellRectUnclamped(layout, state.viewport, addr.row, addr.col));
+  const r = editorFrame(editedCellRect(state, layout, addr));
   // Reset to the cell width first so the editor can shrink back as content
   //  is deleted, then measure the natural content width.
   input.style.width = `${r.w}px`;
@@ -178,7 +200,7 @@ export const positionEditorOverCell = (
   if (!input || !addr) return;
   const state = s.store.getState();
   const layout = layoutForView(state);
-  const cell = cellRectUnclamped(layout, state.viewport, addr.row, addr.col);
+  const cell = editedCellRect(state, layout, addr);
   const r = editorFrame(cell);
   if (!input) return;
   // A cell scrolled off the leading edge sits behind the frozen band and the

@@ -58,6 +58,17 @@ describe('InlineEditor under a platform screen scale', () => {
     expect(input().style.lineHeight).toBe('15px');
   });
 
+  it('frames the whole merge when editing a merged cell', () => {
+    mutators.mergeRange(store, { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 });
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    editor.begin('x');
+    // B2:C4 spans x 101..251, y 40..100; the frame sits 1 px outside it.
+    expect(input().style.left).toBe('100px');
+    expect(input().style.top).toBe('39px');
+    expect(input().style.width).toBe('153px');
+    expect(input().style.height).toBe('63px');
+  });
+
   it('grows a two-line edit by two screen rows', () => {
     host.classList.add('fc-host');
     host.dataset.fcPlatform = 'mac';
