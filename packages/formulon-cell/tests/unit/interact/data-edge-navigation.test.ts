@@ -76,4 +76,47 @@ describe('data-edge navigation', () => {
     expect(has.mock.calls.length).toBeLessThanOrEqual(35);
     expect(keys).toHaveBeenCalledTimes(1);
   });
+
+  describe('hidden rows and columns', () => {
+    const hide = (
+      store: ReturnType<typeof createSpreadsheetStore>,
+      rows: number[],
+      cols: number[] = [],
+    ): void => {
+      store.setState((state) => ({
+        ...state,
+        layout: { ...state.layout, hiddenRows: new Set(rows), hiddenCols: new Set(cols) },
+      }));
+    };
+
+    it('passes through a hidden row inside the run', () => {
+      const store = createSpreadsheetStore();
+      setCellKeys(
+        store,
+        [0, 1, 2, 3, 4].map((row) => addrKey({ sheet: 0, row, col: 0 })),
+      );
+      hide(store, [2]);
+      expect(jumpToDataEdge(store.getState(), { sheet: 0, row: 0, col: 0 }, 1, 0).row).toBe(4);
+    });
+
+    it('stops on the last visible cell when the run ends on a hidden row', () => {
+      const store = createSpreadsheetStore();
+      setCellKeys(
+        store,
+        [0, 1, 2].map((row) => addrKey({ sheet: 0, row, col: 0 })),
+      );
+      hide(store, [2]);
+      expect(jumpToDataEdge(store.getState(), { sheet: 0, row: 0, col: 0 }, 1, 0).row).toBe(1);
+    });
+
+    it('does the same across columns', () => {
+      const store = createSpreadsheetStore();
+      setCellKeys(
+        store,
+        [0, 1, 2].map((col) => addrKey({ sheet: 0, row: 0, col })),
+      );
+      hide(store, [], [1, 2]);
+      expect(jumpToDataEdge(store.getState(), { sheet: 0, row: 0, col: 0 }, 0, 1).col).toBe(0);
+    });
+  });
 });

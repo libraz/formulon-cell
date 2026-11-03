@@ -160,7 +160,8 @@ describe('formula edit point navigation', () => {
       jump: true,
     });
 
-    expect(result?.tip).toEqual({ sheet: 0, row: 1, col: 4 });
+    // The run B:E ends on hidden E, so the jump stops on the last visible cell, D.
+    expect(result?.tip).toEqual({ sheet: 0, row: 1, col: 3 });
   });
 
   it('formats a Ctrl range jump in R1C1 relative to the edited cell', () => {

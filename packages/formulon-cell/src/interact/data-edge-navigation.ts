@@ -1,6 +1,7 @@
 import { formatHasContent, isPopulated } from '../commands/current-region.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
+import { isRowHidden } from '../store/row-visibility.js';
 import type { State } from '../store/store.js';
 
 const MIN_JUMP_EDGE_GAP_PROBES = 32;
@@ -83,6 +84,13 @@ export function jumpToDataEdge(s: State, a: Addr, dRow: number, dCol: number): A
     ) {
       r += dRow;
       c += dCol;
+    }
+    // A run ending on hidden cells stops on its last visible cell.
+    const hidden = (row: number, col: number): boolean =>
+      dRow !== 0 ? isRowHidden(s.layout, row) : s.layout.hiddenCols.has(col);
+    while ((r !== a.row || c !== a.col) && hidden(r, c)) {
+      r -= dRow;
+      c -= dCol;
     }
     return clamp(a, r, c);
   }
