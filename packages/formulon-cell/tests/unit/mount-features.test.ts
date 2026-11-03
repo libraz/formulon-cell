@@ -332,9 +332,9 @@ describe('Spreadsheet feature registry', () => {
     expect(mirror.getAttribute('aria-hidden')).toBe('true');
     expect(mirror.hidden).toBe(false);
     expect(mirror.textContent?.startsWith('=')).toBe(true);
-    // Mac stub grid: 26 px row header, 75 × 20 screen px cells.
-    expect(mirror.style.left).toBe(`${26 + 75 * 2}px`);
-    expect(mirror.style.top).toBe(`${20 + 20 * 2}px`);
+    // Mac stub grid: 23 × 22 px header strips, 75 × 20 screen px cells.
+    expect(mirror.style.left).toBe(`${23 + 75 * 2}px`);
+    expect(mirror.style.top).toBe(`${22 + 20 * 2}px`);
     expect(mirror.style.background).not.toBe('');
     expect(mirror.style.color).not.toBe('');
 
@@ -366,8 +366,8 @@ describe('Spreadsheet feature registry', () => {
     if (!grid) throw new Error('expected grid');
     mutators.setViewportSize(instance.store, 20, 12, 500);
     const cell = (row: number, col: number): { clientX: number; clientY: number } => ({
-      clientX: 26 + 75 * col + 10,
-      clientY: 20 + 20 * row + 10,
+      clientX: 23 + 75 * col + 10,
+      clientY: 22 + 20 * row + 10,
     });
     const fireDown = (row: number, col: number): PointerEvent => {
       const event = new PointerEvent('pointerdown', {

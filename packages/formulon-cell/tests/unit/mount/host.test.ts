@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import en from '../../../src/i18n/en.js';
 import type { Strings } from '../../../src/i18n/strings.js';
-import { prepareMountHost, releaseMountHost } from '../../../src/mount/host.js';
+import {
+  applyPlatformChrome,
+  prepareMountHost,
+  releaseMountHost,
+} from '../../../src/mount/host.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 describe('mount/host', () => {
   let host: HTMLElement;
@@ -103,6 +108,31 @@ describe('mount/host', () => {
       expect(host.children.length).toBe(1);
       expect(host.classList.contains('fc-host')).toBe(true);
       expect(host.dataset.fcInstId).toBe('fc-someone-else');
+    });
+  });
+});
+
+describe('applyPlatformChrome', () => {
+  it('sizes the mac header strips as Excel draws them', () => {
+    // Excel for Mac (DPR 2, default Normal font): row-number strip 46 device
+    // px wide and column-letter strip 44 px tall, each including its rule.
+    const store = createSpreadsheetStore();
+    applyPlatformChrome(store, 'mac');
+    expect(store.getState().layout).toMatchObject({
+      screenScale: 0.75,
+      headerColWidth: 23,
+      headerRowHeight: 22,
+    });
+  });
+
+  it('keeps the default profile header strips', () => {
+    const store = createSpreadsheetStore();
+    applyPlatformChrome(store, 'mac');
+    applyPlatformChrome(store, 'default');
+    expect(store.getState().layout).toMatchObject({
+      screenScale: 1,
+      headerColWidth: 32,
+      headerRowHeight: 20,
     });
   });
 });

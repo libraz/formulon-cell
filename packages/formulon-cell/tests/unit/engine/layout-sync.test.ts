@@ -126,7 +126,11 @@ const makeFake = (opts: {
   rows?: FakeRowLayout[];
   view?: FakeSheetView | null;
   views?: Record<number, FakeSheetView>;
-  defaults?: { defaultColWidth: number; defaultRowHeight: number } | null;
+  defaults?: {
+    defaultColWidth: number;
+    defaultRowHeight: number;
+    headerDigitWidth?: number;
+  } | null;
 }): FakeWb => {
   const colCalls: SetColCall[] = [];
   const rowCalls: SetRowCall[] = [];
@@ -290,6 +294,23 @@ describe('hydrateLayoutFromEngine', () => {
     expect(layout.rowHeights.has(1)).toBe(false);
     expect(layout.hiddenCols.has(1)).toBe(true);
     expect(layout.hiddenRows.has(1)).toBe(true);
+  });
+
+  it('carries the Normal font digit width for the row header, and clears it', () => {
+    const store = createSpreadsheetStore();
+    const mac = makeFake({
+      colRowSize: true,
+      defaults: { defaultColWidth: 71, defaultRowHeight: 22, headerDigitWidth: 7 },
+    });
+    hydrateLayoutFromEngine(mac.wb, store, 0);
+    expect(store.getState().layout.headerDigitWidth).toBe(7);
+
+    const other = makeFake({
+      colRowSize: true,
+      defaults: { defaultColWidth: 64, defaultRowHeight: 20, headerDigitWidth: undefined },
+    });
+    hydrateLayoutFromEngine(other.wb, store, 0);
+    expect(store.getState().layout.headerDigitWidth).toBeUndefined();
   });
 
   it('is a no-op under the stub (capability off, empty engine arrays)', () => {

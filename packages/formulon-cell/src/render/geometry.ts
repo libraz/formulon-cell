@@ -1,5 +1,6 @@
 import { pageLayoutGaps } from '../commands/pagination.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { MAC_COLUMN_PADDING_PT } from '../engine/mac-column-model.js';
 import type { Range } from '../engine/types.js';
 import {
   frozenColEnd,
@@ -151,11 +152,40 @@ export function layoutForView(
     viewWidth: state.viewport.widthPx,
     ...pageGapsFor(gapsState),
   };
-  const view = showHeaders ? base : { ...base, headerColWidth: 0, headerRowHeight: 0 };
+  const header = showHeaders
+    ? fontHeaderSize(projectedLayout, state.viewport)
+    : { headerColWidth: 0, headerRowHeight: 0 };
+  const view = { ...base, ...header };
   if (isAutomaticFontRowLayoutProjected(projectedLayout)) {
     markAutomaticFontRowLayoutProjected(view);
   }
   return view;
+}
+
+/** Fewest digits the row-number strip is sized for. */
+const MIN_ROW_HEADER_DIGITS = 3;
+
+/** Header strip sizes. With a Normal-font digit width (Mac), the row-number
+ *  strip is a column as many digits wide as the last visible row number (at
+ *  least three) plus the column padding, and the column-letter strip is at
+ *  least one default row tall; otherwise the fixed chrome sizes stand. */
+function fontHeaderSize(
+  layout: LayoutSlice,
+  viewport: ViewportSlice,
+): Pick<LayoutSlice, 'headerColWidth' | 'headerRowHeight'> {
+  const digitWidth = layout.headerDigitWidth;
+  if (digitWidth === undefined) {
+    return { headerColWidth: layout.headerColWidth, headerRowHeight: layout.headerRowHeight };
+  }
+  const lastRowNumber = viewport.rowStart + viewport.rowCount;
+  const digits = Math.max(MIN_ROW_HEADER_DIGITS, String(lastRowNumber).length);
+  return {
+    headerColWidth: MAC_COLUMN_PADDING_PT + digits * digitWidth,
+    headerRowHeight: Math.max(
+      layout.headerRowHeight,
+      layout.defaultRowHeight * (layout.screenScale ?? 1),
+    ),
+  };
 }
 
 /** What `layoutForView` needs. Page Layout view reads the extra slices; Normal view reads

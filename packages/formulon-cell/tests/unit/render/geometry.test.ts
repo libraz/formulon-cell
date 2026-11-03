@@ -664,3 +664,36 @@ describe('right-to-left sheet', () => {
     }
   });
 });
+
+describe('font-derived row header', () => {
+  // Excel for Mac (DPR 2): the row-number strip is a column max(3, digits)
+  // Normal-font digits wide plus the 5 pt column padding — 46 / 52 device px
+  // for MS PGothic / Courier New 11 at rows 1..100, 58 / 66 past row 999 —
+  // and the column-letter strip is never shorter than the default row.
+  const view = (over: Partial<ViewLayout>, rowStart: number, rowCount = 40) =>
+    layoutForView({
+      layout: makeLayout({ headerColWidth: 23, headerRowHeight: 22, screenScale: 0.75, ...over }),
+      ui: {} as never,
+      viewport: makeViewport({ rowStart, rowCount }),
+    });
+
+  it('sizes the strip from the Normal font digit width and the visible row numbers', () => {
+    expect(view({ headerDigitWidth: 6 }, 0).headerColWidth).toBe(23);
+    expect(view({ headerDigitWidth: 7 }, 0).headerColWidth).toBe(26);
+    expect(view({ headerDigitWidth: 6 }, 994).headerColWidth).toBe(29);
+    expect(view({ headerDigitWidth: 7 }, 994).headerColWidth).toBe(33);
+  });
+
+  it('grows the column strip to the default row height', () => {
+    // Courier New 20: a 27 pt default row and a 54 device px strip.
+    expect(view({ headerDigitWidth: 12, defaultRowHeight: 36 }, 0).headerRowHeight).toBe(27);
+    expect(view({ headerDigitWidth: 6, defaultRowHeight: (14 * 4) / 3 }, 0).headerRowHeight).toBe(
+      22,
+    );
+  });
+
+  it('keeps the fixed chrome when the engine reports no digit width', () => {
+    const plain = view({}, 994);
+    expect([plain.headerColWidth, plain.headerRowHeight]).toEqual([23, 22]);
+  });
+});

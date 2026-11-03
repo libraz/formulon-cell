@@ -73,6 +73,9 @@ export interface LayoutSlice {
   defaultRowHeight: number;
   headerColWidth: number;
   headerRowHeight: number;
+  /** Mac only: the Normal font's maximum digit width in screen px. When set,
+   *  the view sizes the row-number strip from it instead of `headerColWidth`. */
+  headerDigitWidth?: number;
   /** Number of rows pinned at the top (the desktop-spreadsheet "Freeze Panes"). 0 = none. */
   freezeRows: number;
   /** Number of cols pinned at the left. 0 = none. */

@@ -35,6 +35,7 @@ const FAMILY_EM: ReadonlyMap<string, number> = new Map(
       ['Tahoma', 0.546],
       ['等线', 0.5],
       ['맑은 고딕', 0.56],
+      ['Courier New', 0.6],
     ] as const
   ).map(([name, em]) => [normalizeFontName(name), em]),
 );

@@ -8,12 +8,21 @@ import { MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-type AxisDefaults = Pick<LayoutSlice, 'defaultColWidth' | 'defaultRowHeight'>;
+type AxisDefaults = Pick<LayoutSlice, 'defaultColWidth' | 'defaultRowHeight' | 'headerDigitWidth'>;
 
 /** Canonical size defaults when the engine reports no sheet geometry: Mac
- *  75 pt × 20 pt, default profile 48 pt × 15 pt. */
-const MAC_AXIS_DEFAULTS: AxisDefaults = { defaultColWidth: 100, defaultRowHeight: 80 / 3 };
-const DEFAULT_AXIS_DEFAULTS: AxisDefaults = { defaultColWidth: 64, defaultRowHeight: 20 };
+ *  75 pt × 20 pt, default profile 48 pt × 15 pt; the header keeps its fixed
+ *  chrome. */
+const MAC_AXIS_DEFAULTS: AxisDefaults = {
+  defaultColWidth: 100,
+  defaultRowHeight: 80 / 3,
+  headerDigitWidth: undefined,
+};
+const DEFAULT_AXIS_DEFAULTS: AxisDefaults = {
+  defaultColWidth: 64,
+  defaultRowHeight: 20,
+  headerDigitWidth: undefined,
+};
 
 const engineAxisDefaults = (wb: WorkbookHandle, sheet: number): AxisDefaults | null =>
   typeof wb.getSheetDefaultLayoutPx === 'function' ? wb.getSheetDefaultLayoutPx(sheet) : null;

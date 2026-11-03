@@ -17,6 +17,10 @@ import { paintOutlineGutters } from '../painters/controls.js';
 import type { OutlineToggleHit } from '../painters.js';
 import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
 
+/** Row numbers sit on a baseline this far above the row's bottom edge, CSS px:
+ *  Excel bottom-anchors them, 6 device px up at DPR 2 on any row height. */
+const ROW_LABEL_BASELINE_GAP = 3;
+
 export function paintHeaders(
   pc: ChromePaintContext,
   state: ViewState,
@@ -122,7 +126,9 @@ export function paintHeaders(
         : theme.headerFg;
     ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${labelFamily}`;
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
-    ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
+    // Letters centre on the header cell less its trailing separator.
+    const labelX = rtl ? rect.x + (w + width) / 2 : rect.x + (w - width) / 2;
+    ctx.fillText(label, labelX, labelTopY + layout.headerRowHeight / 2 + 0.5);
     // The accent bar covers the rule under the header and one pixel above it.
     if (isActiveCol || isSelectedCol) {
       ctx.fillStyle = theme.accent;
@@ -196,9 +202,10 @@ export function paintHeaders(
 
   // Row numbers centre on the strip between the rail edge and its rule.
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
   const rowLabelX = rtl
-    ? innerX + (layout.headerColWidth + 1) / 2
-    : innerX - (layout.headerColWidth + 1) / 2;
+    ? innerX + (layout.headerColWidth + width) / 2
+    : innerX - (layout.headerColWidth + width) / 2;
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
@@ -225,7 +232,7 @@ export function paintHeaders(
         : theme.headerFg;
     ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${theme.textHeader}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
-    ctx.fillText(rowLabel, rowLabelX, rect.y + h / 2 + 0.5);
+    ctx.fillText(rowLabel, rowLabelX, rect.y + h - ROW_LABEL_BASELINE_GAP);
     if (isActiveRow || isSelectedRow) {
       ctx.fillStyle = theme.accent;
       ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);

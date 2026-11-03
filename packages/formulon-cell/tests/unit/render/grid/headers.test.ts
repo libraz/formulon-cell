@@ -39,12 +39,28 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
 function makeCtxSpy(): {
   ctx: CanvasRenderingContext2D;
   fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }>;
-  texts: Array<{ text: string; font: string; style: string; x: number; align: string }>;
+  texts: Array<{
+    text: string;
+    font: string;
+    style: string;
+    x: number;
+    y: number;
+    align: string;
+    baseline: string;
+  }>;
   strokes: string[];
 } {
   const fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }> =
     [];
-  const texts: Array<{ text: string; font: string; style: string; x: number; align: string }> = [];
+  const texts: Array<{
+    text: string;
+    font: string;
+    style: string;
+    x: number;
+    y: number;
+    align: string;
+    baseline: string;
+  }> = [];
   const strokes: string[] = [];
   let fillStyle = '';
   let strokeStyle = '';
@@ -102,8 +118,21 @@ function makeCtxSpy(): {
     fillRect(x: number, y: number, w: number, h: number): void {
       fills.push({ style: fillStyle, alpha, rect: [x, y, w, h] });
     },
-    fillText(this: { textAlign: string }, text: string, x: number): void {
-      texts.push({ text, font, style: fillStyle, x, align: this.textAlign });
+    fillText(
+      this: { textAlign: string; textBaseline: string },
+      text: string,
+      x: number,
+      y: number,
+    ): void {
+      texts.push({
+        text,
+        font,
+        style: fillStyle,
+        x,
+        y,
+        align: this.textAlign,
+        baseline: this.textBaseline,
+      });
     },
   } as unknown as CanvasRenderingContext2D;
   return { ctx, fills, texts, strokes };
@@ -330,5 +359,62 @@ describe('paintHeaders', () => {
     // One chevron fill disappears and one arrow stroke appears for column B.
     expect(sorted.fills.length).toBe(plain.fills.length - 1);
     expect(sorted.strokes.length).toBe(plain.strokes.length + 1);
+  });
+
+  it('sets row numbers on a baseline just above the row bottom, as Excel does on tall rows', () => {
+    // Excel (DPR 2): a 48 px row puts the digit ink at y 26..41 and a 100 px
+    // row at 174..189, both 6 device px above the row's bottom edge.
+    const state = createSpreadsheetStore().getState();
+    state.layout.rowHeights = new Map([
+      [0, 24],
+      [2, 50],
+    ]);
+    state.viewport = { rowStart: 0, rowCount: 4, colStart: 0, colCount: 2, zoom: 1, widthPx: 320 };
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const { ctx, texts } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 2, cssWidth: 320, cssHeight: 400 },
+      { ...state, layout },
+      theme(),
+      cols,
+      rows,
+    );
+
+    const oy = layout.headerRowHeight;
+    expect(texts.find((t) => t.text === '1')).toMatchObject({
+      y: oy + 24 - 3,
+      baseline: 'alphabetic',
+    });
+    expect(texts.find((t) => t.text === '3')).toMatchObject({
+      y: oy + 24 + 20 + 50 - 3,
+      baseline: 'alphabetic',
+    });
+  });
+
+  it('centres column letters on the header cell less its trailing separator', () => {
+    // Excel (DPR 2): column A spans x 0..119 with its separator on 118..119;
+    // the letter's ink centres on 58.5, the middle of 0..117.
+    const state = createSpreadsheetStore().getState();
+    state.layout.colWidths = new Map([[0, 60]]);
+    state.viewport = { rowStart: 0, rowCount: 2, colStart: 0, colCount: 2, zoom: 1, widthPx: 320 };
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const { ctx, texts } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 2, cssWidth: 320, cssHeight: 200 },
+      { ...state, layout },
+      theme(),
+      cols,
+      rows,
+    );
+
+    const ox = layout.headerColWidth;
+    expect(texts.find((t) => t.text === 'A')).toMatchObject({ x: ox + 29.5, align: 'center' });
+    expect(texts.find((t) => t.text === 'B')).toMatchObject({ x: ox + 60 + 31.5, align: 'center' });
   });
 });

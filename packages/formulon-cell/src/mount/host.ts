@@ -69,16 +69,17 @@ export function renderMountError(
 }
 
 /** Apply the platform's grid chrome: the screen scale the grid renders at and
- *  the row-header width. Never touches cell sizes, which come from the
- *  workbook, so it is safe on every `setUi`. */
+ *  the header strip sizes. The mac strips are Excel for Mac's at the default
+ *  Normal font (46 x 44 device px at DPR 2, rules included). Never touches
+ *  cell sizes, which come from the workbook, so it is safe on every `setUi`. */
 export function applyPlatformChrome(
   store: ReturnType<typeof createSpreadsheetStore>,
   platform: ReturnType<typeof resolveSpreadsheetUiOptions>['platform'],
 ): void {
   const chrome =
     platform === 'mac'
-      ? { screenScale: 0.75, headerColWidth: 26 }
-      : { screenScale: 1, headerColWidth: 32 };
+      ? { screenScale: 0.75, headerColWidth: 23, headerRowHeight: 22 }
+      : { screenScale: 1, headerColWidth: 32, headerRowHeight: 20 };
   store.setState((state) => ({
     ...state,
     layout: { ...state.layout, ...chrome },

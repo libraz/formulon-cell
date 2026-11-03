@@ -39,6 +39,14 @@ describe('engine/mac-column-model', () => {
     expect(macMdw(font, size)).toBe(mdw);
   });
 
+  it.each([
+    ['Courier New', 11, 7],
+    ['Courier New', 20, 12],
+  ])('gives %s %d pt the %d pt digit pitch Mac Excel shows', (font, size, mdw) => {
+    // A 10-char column is 122 / 206 device px at DPR 2 (14 / 24 px per char).
+    expect(macMdw(font, size)).toBe(mdw);
+  });
+
   it('writes back raw widths the way Mac Excel saves them', () => {
     expect(macPtToRaw(64, 7)).toBe(9.140625);
     expect(macPtToRaw(75, 7)).toBe(10.7109375);
