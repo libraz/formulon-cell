@@ -297,7 +297,7 @@ describe('findMatchingRanges', () => {
     expect(find('visible-cells')).toEqual(['0:0-0:0', '0:2-0:2', '2:0-3:0', '2:2-3:2']);
   });
 
-  it('row-differences — cells that differ from the active row', () => {
+  it("row-differences — cells that differ from their row's cell in the active column", () => {
     wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
     wb.setNumber({ sheet: 0, row: 0, col: 1 }, 2);
     wb.setNumber({ sheet: 0, row: 1, col: 0 }, 1);
@@ -306,10 +306,10 @@ describe('findMatchingRanges', () => {
     wb.recalc();
     sync(store, wb);
     select(store, 0, 0, 2, 1);
-    expect(find('row-differences')).toEqual(['1:1-2:1', '2:0-2:0']);
+    expect(find('row-differences')).toEqual(['0:1-2:1']);
   });
 
-  it('column-differences — cells that differ from the active column', () => {
+  it("column-differences — cells that differ from their column's cell in the active row", () => {
     wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
     wb.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
     wb.setNumber({ sheet: 0, row: 0, col: 1 }, 1);
@@ -317,7 +317,7 @@ describe('findMatchingRanges', () => {
     wb.recalc();
     sync(store, wb);
     select(store, 0, 0, 1, 2);
-    expect(find('column-differences')).toEqual(['0:2-0:2', '1:1-1:2']);
+    expect(find('column-differences')).toEqual(['1:0-1:0', '1:1-1:1']);
   });
 
   it('precedents — direct only versus all levels', () => {

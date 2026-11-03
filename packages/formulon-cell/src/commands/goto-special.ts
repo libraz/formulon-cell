@@ -1,4 +1,4 @@
-import { addrKey, parseAddrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { findDependents, findPrecedents } from '../engine/refs-graph.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -152,6 +152,10 @@ const mergeRuns = (sheet: number, runs: readonly Run[]): Range[] => {
   return merged.map((r) => ({ sheet, r0: r.r0, c0: r.c0, r1: r.r1, c1: r.c1 }));
 };
 
+/** Blank, or an empty string, which the desktop app also counts as blank. */
+const isEmptyValue = (value: CellValue): boolean =>
+  value.kind === 'blank' || (value.kind === 'text' && value.value === '');
+
 const valueKey = (value: CellValue | undefined): string =>
   JSON.stringify(value ?? { kind: 'blank' });
 
@@ -193,7 +197,7 @@ const matchesKind = (
     case 'formulas':
       return !!formula && valueMatchesFilters(value, filters);
     case 'constants':
-      return !formula && value.kind !== 'blank' && valueMatchesFilters(value, filters);
+      return !formula && !isEmptyValue(value) && valueMatchesFilters(value, filters);
     case 'numbers':
       return value.kind === 'number';
     case 'text':
@@ -234,7 +238,7 @@ const blankRuns = (areas: readonly Range[], entries: readonly CellEntry[]): Run[
   for (const area of areas) {
     const colsByRow = new Map<number, number[]>();
     for (const { addr, value } of entries) {
-      if (value.kind === 'blank' || !inRange(area, addr.row, addr.col)) continue;
+      if (isEmptyValue(value) || !inRange(area, addr.row, addr.col)) continue;
       const cols = colsByRow.get(addr.row);
       if (cols) cols.push(addr.col);
       else colsByRow.set(addr.row, [addr.col]);
@@ -282,8 +286,8 @@ const visibleRuns = (state: State, areas: readonly Range[]): Run[] => {
   return runs;
 };
 
-/** Cells whose value differs from the active cell's row (`row`) or column
- *  (`col`) counterpart on the same line, inside the areas. */
+/** Cells whose value differs from their line's cell in the active row
+ *  (`row`) or the active column (`col`), inside the areas. */
 const differenceRuns = (
   ctx: SearchContext,
   areas: readonly Range[],
@@ -292,8 +296,7 @@ const differenceRuns = (
   const { sheet, entries } = ctx;
   const active = ctx.state.selection.active;
   const keys = new Map<string, string>();
-  for (const e of entries)
-    if (e.value.kind !== 'blank') keys.set(addrKey(e.addr), valueKey(e.value));
+  for (const e of entries) if (!isEmptyValue(e.value)) keys.set(addrKey(e.addr), valueKey(e.value));
   const blank = valueKey(undefined);
   const refPos = axis === 'row' ? active.row : active.col;
   const runs: Run[] = [];
@@ -302,7 +305,7 @@ const differenceRuns = (
       axis === 'row' ? [area.c0, area.c1, area.r0, area.r1] : [area.r0, area.r1, area.c0, area.c1];
     const posByLine = new Map<number, Map<number, string>>();
     for (const { addr, value } of entries) {
-      if (value.kind === 'blank' || !inRange(area, addr.row, addr.col)) continue;
+      if (isEmptyValue(value) || !inRange(area, addr.row, addr.col)) continue;
       const line = axis === 'row' ? addr.col : addr.row;
       const pos = axis === 'row' ? addr.row : addr.col;
       const map = posByLine.get(line) ?? new Map<number, string>();
@@ -443,9 +446,10 @@ const validationAddrs = (ctx: SearchContext): Addr[] => {
   return out;
 };
 
-const finish = (sheet: number, runs: readonly Run[]): GoToSpecialResult => {
+const finish = (sheet: number, runs: readonly Run[], capped = true): GoToSpecialResult => {
   if (runs.length === 0) return { status: 'none' };
   const ranges = mergeRuns(sheet, runs);
+  if (!capped) return { status: 'found', ranges };
   let total = 0;
   for (const r of ranges) {
     total += runArea({ r0: r.r0, r1: r.r1, c0: r.c0, c1: r.c1 });
@@ -506,7 +510,9 @@ export function findMatchingRanges(
     case 'column-differences':
       return finish(
         sheet,
-        differenceRuns(ctx, searchAreas(ctx), kind === 'row-differences' ? 'row' : 'col'),
+        // Row differences compare each row with its cell in the active column;
+        // column differences each column with its cell in the active row.
+        differenceRuns(ctx, searchAreas(ctx), kind === 'row-differences' ? 'col' : 'row'),
       );
     case 'precedents':
     case 'dependents': {
@@ -518,7 +524,15 @@ export function findMatchingRanges(
       return finish(sheet, used ? [{ r0: used.r1, r1: used.r1, c0: used.c1, c1: used.c1 }] : []);
     }
     case 'visible-cells':
-      return finish(sheet, visibleRuns(state, searchAreas(ctx)));
+      // From a single cell the desktop app selects every visible cell of the
+      // sheet; the result is a handful of rectangles, so no cell cap applies.
+      return ctx.single
+        ? finish(
+            sheet,
+            visibleRuns(state, [{ sheet, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL }]),
+            false,
+          )
+        : finish(sheet, visibleRuns(state, searchAreas(ctx)));
     case 'conditional-format': {
       const addrs = conditionalAddrs(ctx);
       return addrs ? finish(sheet, addrsToRuns(addrs)) : TOO_LARGE;
