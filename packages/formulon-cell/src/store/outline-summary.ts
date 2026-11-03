@@ -16,6 +16,9 @@ export const OUTLINE_GUTTER_PER_LEVEL = 14;
 /** Mac lane width in CSS px: Excel for Mac draws 24 device px per level at 2x. */
 export const MAC_OUTLINE_LANE = 12;
 
+/** Mac gutter pad before the first lane, CSS px (4 device px at 2x). */
+export const MAC_OUTLINE_PAD = 2;
+
 /** Mac gutter margin past the lanes, CSS px (6 device px at 2x). */
 const MAC_OUTLINE_MARGIN = 3;
 
@@ -28,7 +31,7 @@ export const outlineDepth = (levels: ReadonlyMap<number, number>): number => {
 
 /** Gutter width an axis's outline levels call for. On the Mac point model
  *  (screen scale other than 1) Excel reserves one lane more than the deepest
- *  level, for the detail dots and the level buttons, plus a small margin. */
+ *  level, for the detail dots and the level buttons, an outer pad and a margin. */
 export const outlineGutterWidth = (
   levels: ReadonlyMap<number, number>,
   layout: Pick<LayoutSlice, 'screenScale'>,
@@ -36,6 +39,6 @@ export const outlineGutterWidth = (
   const max = outlineDepth(levels);
   if (max === 0) return 0;
   return (layout.screenScale ?? 1) !== 1
-    ? (max + 1) * MAC_OUTLINE_LANE + MAC_OUTLINE_MARGIN
+    ? MAC_OUTLINE_PAD + (max + 1) * MAC_OUTLINE_LANE + MAC_OUTLINE_MARGIN
     : max * OUTLINE_GUTTER_PER_LEVEL;
 };

@@ -52,6 +52,8 @@ export interface ResolvedTheme {
   outlineButtonBorder: string;
   outlineButtonFg: string;
   outlineButtonShadow: string;
+  /** Row under a level button's top border; `transparent` draws none. */
+  outlineButtonHighlight: string;
 
   /** Page Layout / Page Break Preview chrome. */
   pageBackdrop: string;
@@ -138,6 +140,7 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     outlineButtonBorder: v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
     outlineButtonFg: v('--fc-outline-button-fg', v('--fc-header-fg', '#6f6a5d')),
     outlineButtonShadow: v('--fc-outline-button-shadow', 'transparent'),
+    outlineButtonHighlight: v('--fc-outline-button-highlight', 'transparent'),
 
     pageBackdrop: v('--fc-page-backdrop', '#9b968a'),
     pagePaper: v('--fc-page-paper', '#ffffff'),

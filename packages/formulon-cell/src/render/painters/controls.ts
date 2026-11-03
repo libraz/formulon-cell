@@ -1,5 +1,10 @@
 import { isColGroupCollapsed, isRowGroupCollapsed } from '../../commands/outline.js';
-import { MAC_OUTLINE_LANE, outlineDepth, outlineSummaryFor } from '../../store/outline-summary.js';
+import {
+  MAC_OUTLINE_LANE,
+  MAC_OUTLINE_PAD,
+  outlineDepth,
+  outlineSummaryFor,
+} from '../../store/outline-summary.js';
 import { isRowHidden } from '../../store/row-visibility.js';
 import type { Sparkline } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
@@ -171,7 +176,7 @@ export interface OutlineLevelButtonHit {
 export type OutlineToggleHit = OutlineGroupToggleHit | OutlineLevelButtonHit;
 
 /** Paint a level-number button with its top-left at (x, y): Excel for Mac's
- *  1 device px border, a vertically shaded face with a right bevel, and a
+ *  1 device px border, a vertically shaded face with a top highlight and a right bevel, and a
  *  1 device px shadow on the right and bottom (halved for the 2x model). */
 function paintLevelButton(
   ctx: CanvasRenderingContext2D,
@@ -196,6 +201,10 @@ function paintLevelButton(
   ctx.fillRect(x + hair, y + hair, size - 3 * hair, size - 3 * hair);
   ctx.fillStyle = theme.outlineButtonFaceBottom;
   ctx.fillRect(x + size - 3 * hair, y + hair, hair, size - 3 * hair);
+  if (theme.outlineButtonHighlight !== 'transparent') {
+    ctx.fillStyle = theme.outlineButtonHighlight;
+    ctx.fillRect(x + hair, y + hair, size - 3 * hair, hair);
+  }
   if (theme.outlineButtonShadow !== 'transparent') {
     ctx.fillStyle = theme.outlineButtonShadow;
     ctx.fillRect(x + size - hair, y, hair, size);
@@ -239,8 +248,12 @@ export function paintOutlineGutters(
   const lane = mac ? MAC_OUTLINE_LANE : OUTLINE_BRACKET_SLOT;
   const toggleSize = mac ? MAC_TOGGLE_SIZE : TOGGLE_SIZE;
   /** Leading edge of a level's lane, measured inwards from the gutter edge. */
+  // Mac lanes start past a pad at the gutter's outer edge.
+  const pad = mac ? MAC_OUTLINE_PAD : 0;
   const laneX = (lvl: number): number =>
-    rtl ? cssWidth - lvl * lane : gutterLeft + (lvl - 1) * lane;
+    rtl ? cssWidth - pad - lvl * lane : gutterLeft + pad + (lvl - 1) * lane;
+  /** Top edge of a column level's lane. */
+  const laneY = (lvl: number): number => gutterTop + pad + (lvl - 1) * lane;
   /** Where a level's spine and its toggle centre sit across the gutter. */
   const slotX = (lvl: number): number =>
     mac
@@ -347,7 +360,7 @@ export function paintOutlineGutters(
     const maxLvl = outlineDepth(layout.outlineCols);
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
       const slotCy = mac
-        ? gutterTop + (lvl - 1) * lane + MAC_SPINE_INSET + MAC_SPINE_WIDTH / 2
+        ? laneY(lvl) + MAC_SPINE_INSET + MAC_SPINE_WIDTH / 2
         : gutterTop + (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
       let runStartIdx = -1;
       for (let i = 0; i <= cols.visible.length; i += 1) {
@@ -402,7 +415,7 @@ export function paintOutlineGutters(
             ctx.lineTo(footX, slotCy + 5.5);
           }
           ctx.stroke();
-          const toggleCy = mac ? gutterTop + (lvl - 1) * lane + lane / 2 : slotCy;
+          const toggleCy = mac ? laneY(lvl) + lane / 2 : slotCy;
           const rect = paintToggle(ctx, theme, summaryX, toggleCy, collapsed, toggleSize);
           hits.push({ kind: 'toggle', axis: 'col', level: lvl, i0: c0, i1: c1, rect });
           runStartIdx = -1;
@@ -420,7 +433,7 @@ export function paintOutlineGutters(
         );
         ctx.fillRect(
           Math.round(cx - MAC_DOT_SIZE / 2),
-          gutterTop + level * lane + MAC_SPINE_INSET,
+          laneY(level + 1) + MAC_SPINE_INSET,
           MAC_DOT_SIZE,
           MAC_DOT_SIZE,
         );
@@ -445,7 +458,7 @@ export function paintOutlineGutters(
       ? cssWidth - layout.outlineRowGutter - MAC_LEVEL_BUTTON_INSET - MAC_LEVEL_BUTTON_SIZE
       : gutterLeft + layout.outlineRowGutter + MAC_LEVEL_BUTTON_INSET;
     for (let lvl = 1; colDepth > 0 && lvl <= colDepth + 1; lvl += 1) {
-      const rect = paintLevelButton(ctx, theme, colButtonX, gutterTop + (lvl - 1) * lane, lvl);
+      const rect = paintLevelButton(ctx, theme, colButtonX, laneY(lvl), lvl);
       hits.push({ kind: 'level', axis: 'col', level: lvl, rect });
     }
     ctx.restore();

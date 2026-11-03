@@ -45,6 +45,7 @@ const theme: ResolvedTheme = {
   outlineButtonBorder: '#ccc',
   outlineButtonFg: '#666',
   outlineButtonShadow: 'transparent',
+  outlineButtonHighlight: 'transparent',
   headerFgActiveWeight: 600,
   pageBackdrop: '#999',
   pagePaper: '#fff',

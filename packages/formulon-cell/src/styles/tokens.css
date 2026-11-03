@@ -102,6 +102,8 @@
     --fc-outline-button-border: initial;
     --fc-outline-button-fg: initial;
     --fc-outline-button-shadow: initial;
+    /* Row under a level button's top border; transparent for none (the default). */
+    --fc-outline-button-highlight: initial;
 
     /* === HOVER === */
     /* Stripe painted across the hovered row + column. */

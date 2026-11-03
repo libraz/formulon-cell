@@ -27,6 +27,7 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     outlineButtonBorder: '#bfbfbf',
     outlineButtonFg: '#605e5c',
     outlineButtonShadow: 'transparent',
+    outlineButtonHighlight: 'transparent',
     accentFg: '#fff',
     accentSoft: 'rgba(16,124,65,0.12)',
     cellErrorFg: '#a4262c',

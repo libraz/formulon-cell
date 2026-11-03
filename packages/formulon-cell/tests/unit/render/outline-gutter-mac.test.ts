@@ -8,7 +8,8 @@ import type { ResolvedTheme } from '../../../src/theme/resolve.js';
 // Excel for Mac at DPR 2: 24 device px per level lane (12 CSS px), a 4 px spine
 // (2 CSS px) 6 px inside the lane, 24x24 toggles (12x12 CSS) filling the lane
 // and centred on the summary row, 4x4 detail dots (2x2 CSS) in the next lane,
-// and one more lane plus 6 device px (3 CSS) for the level buttons.
+// one more lane for the level buttons, a 4 device px (2 CSS) outer pad and a
+// 6 device px (3 CSS) margin.
 const theme = new Proxy({}, { get: () => '#000' }) as unknown as ResolvedTheme;
 
 const recorder = () => {
@@ -56,12 +57,12 @@ const axis = (count: number, size: number): AxisLayout => ({
 });
 
 describe('outline gutter on the Mac point model', () => {
-  it('reserves a lane per level, one for the level buttons, and 3 px', () => {
+  it('reserves a lane per level, one for the level buttons, a 2 px pad and 3 px', () => {
     const levels = new Map([
       [2, 1],
       [3, 2],
     ]);
-    expect(outlineGutterWidth(levels, { screenScale: 0.75 })).toBe(39);
+    expect(outlineGutterWidth(levels, { screenScale: 0.75 })).toBe(41);
     expect(outlineGutterWidth(levels, {})).toBe(28);
   });
 
@@ -94,19 +95,19 @@ describe('outline gutter on the Mac point model', () => {
     const level1 = hits.find((h) => h.level === 1);
     const level2 = hits.find((h) => h.level === 2);
     // Toggles fill their lane and centre on the row after the group.
-    expect(level1?.rect).toEqual({ x: 0, y: oy + 8 * 24 + 6, w: 12, h: 12 });
-    expect(level2?.rect).toEqual({ x: 12, y: oy + 5 * 24 + 6, w: 12, h: 12 });
+    expect(level1?.rect).toEqual({ x: 2, y: oy + 8 * 24 + 6, w: 12, h: 12 });
+    expect(level2?.rect).toEqual({ x: 14, y: oy + 5 * 24 + 6, w: 12, h: 12 });
     // The spine is 2 px wide, 3 px inside its lane.
     const spines = strokes.filter((s) => s.width === 2 && s.from[0] === s.to[0]);
-    expect(spines.map((s) => s.from[0])).toEqual([4, 16]);
+    expect(spines.map((s) => s.from[0])).toEqual([6, 18]);
     // Detail dots: level-1-only rows in lane 2, level-2 rows in lane 3.
     const dots = fills.filter(([, , w, h]) => w === 2 && h === 2);
     expect(dots).toEqual(
       expect.arrayContaining([
-        [15, oy + 2 * 24 + 11, 2, 2],
-        [27, oy + 3 * 24 + 11, 2, 2],
-        [27, oy + 4 * 24 + 11, 2, 2],
-        [15, oy + 7 * 24 + 11, 2, 2],
+        [17, oy + 2 * 24 + 11, 2, 2],
+        [29, oy + 3 * 24 + 11, 2, 2],
+        [29, oy + 4 * 24 + 11, 2, 2],
+        [17, oy + 7 * 24 + 11, 2, 2],
       ]),
     );
   });
@@ -152,11 +153,11 @@ describe('outline gutter on the Mac point model', () => {
     const rowTop = view.layout.outlineColGutter + 5;
     const colLeft = view.layout.outlineRowGutter + 5;
     expect(levelHits.map((h) => [h.axis, h.level, h.rect])).toEqual([
-      ['row', 1, { x: 0, y: rowTop, w: 12, h: 12 }],
-      ['row', 2, { x: 12, y: rowTop, w: 12, h: 12 }],
-      ['row', 3, { x: 24, y: rowTop, w: 12, h: 12 }],
-      ['col', 1, { x: colLeft, y: 0, w: 12, h: 12 }],
-      ['col', 2, { x: colLeft, y: 12, w: 12, h: 12 }],
+      ['row', 1, { x: 2, y: rowTop, w: 12, h: 12 }],
+      ['row', 2, { x: 14, y: rowTop, w: 12, h: 12 }],
+      ['row', 3, { x: 26, y: rowTop, w: 12, h: 12 }],
+      ['col', 1, { x: colLeft, y: 2, w: 12, h: 12 }],
+      ['col', 2, { x: colLeft, y: 14, w: 12, h: 12 }],
     ]);
     expect(texts.map((t) => t.text)).toEqual(['1', '2', '3', '1', '2']);
   });
@@ -177,7 +178,7 @@ describe('outline gutter on the Mac point model', () => {
 
   it('paints the gutters and level buttons in the outline tokens', () => {
     // Excel (Mac light, DPR 2): gutter 230; each 24 device px button has a
-    // 1 px 198 border, a face shading 251 -> 234 with a 234 right bevel, the
+    // 1 px 198 border, a 239 row under it, a face shading 251 -> 234 with a 234 right bevel, the
     // 102 digit, and a 1 px 247 shadow on its right and bottom.
     const view = outlinedView(0.75);
     const tokens: Record<string, string> = {
@@ -187,6 +188,7 @@ describe('outline gutter on the Mac point model', () => {
       outlineButtonBorder: '#c6c6c8',
       outlineButtonFg: '#666666',
       outlineButtonShadow: '#f7f7f7',
+      outlineButtonHighlight: '#efefef',
     };
     const painted = new Proxy(tokens, {
       get: (t, k: string) => t[k] ?? '#000',
@@ -247,6 +249,7 @@ describe('outline gutter on the Mac point model', () => {
       stops: ['#fbfbfb', '#eaeaee'],
     });
     expect(at(x + 10.5, y + 0.5, 0.5, 10.5)).toBe('#eaeaee');
+    expect(at(x + 0.5, y + 0.5, 10.5, 0.5)).toBe('#efefef');
     expect(at(x + 11.5, y, 0.5, 12)).toBe('#f7f7f7');
     expect(at(x, y + 11.5, 12, 0.5)).toBe('#f7f7f7');
     expect(texts.filter((t) => t.style === '#666666').map((t) => t.text)).toEqual([
