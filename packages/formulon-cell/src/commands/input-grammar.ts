@@ -273,7 +273,11 @@ interface PlainNumber {
 
 /** Parse a signed decimal with the locale's grouping, rejecting malformed
  *  groups instead of deleting punctuation. */
-function parsePlainNumber(raw: string, profile: InputProfile): PlainNumber | null {
+function parsePlainNumber(
+  raw: string,
+  profile: InputProfile,
+  maxDigits: number,
+): PlainNumber | null {
   const exponentMatch = raw.match(/^(.+?)[eE]([+-]?\d+)$/);
   let unsigned = exponentMatch?.[1] ?? raw;
   let sign = 1;
@@ -310,7 +314,7 @@ function parsePlainNumber(raw: string, profile: InputProfile): PlainNumber | nul
     grouped = true;
   }
   const exponent = exponentMatch?.[2] ?? '';
-  const [intDigits, fracDigits] = significantDigits(digits, fracPart);
+  const [intDigits, fracDigits] = significantDigits(digits, fracPart, maxDigits);
   const value =
     sign *
     Number(
@@ -320,25 +324,31 @@ function parsePlainNumber(raw: string, profile: InputProfile): PlainNumber | nul
   return { value, grouped, fractional: fracPart !== '', exponent: exponent !== '' };
 }
 
-/** Significant digits a typed number keeps. */
-const MAX_SIGNIFICANT_DIGITS = 15;
+/** Significant digits a number typed into a cell keeps. */
+const CELL_ENTRY_SIGNIFICANT_DIGITS = 15;
 
-/** Keep the first 15 significant digits of a typed mantissa and zero the
- *  rest, as Excel does: 12345678901234567890 is stored as
- *  12345678901234500000 (truncated, not rounded). */
-function significantDigits(intPart: string, fracPart: string): [string, string] {
+/** Keep the first `maxDigits` significant digits of a mantissa and zero the
+ *  rest. Cell entry keeps 15, as Excel does: 12345678901234567890 is stored
+ *  as 12345678901234500000 (truncated, not rounded). */
+function significantDigits(intPart: string, fracPart: string, maxDigits: number): [string, string] {
   const all = intPart + fracPart;
   const first = all.search(/[1-9]/);
-  if (first < 0 || all.length - first <= MAX_SIGNIFICANT_DIGITS) return [intPart, fracPart];
-  const keep = first + MAX_SIGNIFICANT_DIGITS;
+  if (first < 0 || all.length - first <= maxDigits) return [intPart, fracPart];
+  const keep = first + maxDigits;
   const kept = all.slice(0, keep) + '0'.repeat(all.length - keep);
   return [kept.slice(0, intPart.length), kept.slice(intPart.length)];
 }
 
 const SCIENTIFIC = '0.00E+00';
 
-/** Numbers, percents and currency amounts. */
-export function parseNumberInput(text: string, locale: string | undefined): TypedValue | null {
+/** Numbers, percents and currency amounts. `maxDigits` caps the significant
+ *  digits kept: cell entry passes 15, a dialog field keeps every digit so a
+ *  stored value round-trips. */
+export function parseNumberInput(
+  text: string,
+  locale: string | undefined,
+  maxDigits = Number.POSITIVE_INFINITY,
+): TypedValue | null {
   const profile = profileFor(locale);
   let body = foldWideForms(text.trim(), locale);
   let negative = false;
@@ -385,7 +395,7 @@ export function parseNumberInput(text: string, locale: string | undefined): Type
     (profile.ignoredCurrency.some(takePrefix) || profile.ignoredCurrency.some(takeSuffix));
   if ((currency || ignored) && percent) return null;
 
-  const parsed = parsePlainNumber(body, profile);
+  const parsed = parsePlainNumber(body, profile, maxDigits);
   if (!parsed) return null;
   let value = negative ? -Math.abs(parsed.value) : parsed.value;
   if (percent) value /= 100;
@@ -676,7 +686,7 @@ export function parseTypedValue(
   date1904 = false,
 ): TypedValue | null {
   return (
-    parseNumberInput(text, locale) ??
+    parseNumberInput(text, locale, CELL_ENTRY_SIGNIFICANT_DIGITS) ??
     parseFraction(foldWideForms(text.trim(), locale)) ??
     parseDateTimeInput(text, locale, date1904)
   );
