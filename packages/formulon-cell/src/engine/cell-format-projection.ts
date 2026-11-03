@@ -52,7 +52,7 @@ export function cellFormatFromXfWithStatus(
     typeof resolved.getResolvedFillRecord === 'function'
       ? resolved.getResolvedFillRecord(xf.fillIndex)
       : wb.getFillRecord(xf.fillIndex);
-  if (fill) Object.assign(patch, fillRecordToFormat(fill));
+  if (fill) Object.assign(patch, fillRecordToFormat(fill, { cell: true }));
   else complete = false;
   const border =
     typeof resolved.getResolvedBorderRecord === 'function'

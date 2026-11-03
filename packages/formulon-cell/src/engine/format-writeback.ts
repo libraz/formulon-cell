@@ -19,6 +19,8 @@ const DEFAULT_FONT_SIZE = 11;
 const BLACK_ARGB = 0xff000000;
 /** ARGB packed value for "auto" (transparent — caller-defined default). */
 const NO_COLOR_ARGB = 0;
+/** `ColorSpec.kind` of a literal RGB colour. */
+const LITERAL_COLOR_KIND = 1;
 
 const UNDERLINE_ORDINALS = {
   single: 1,
@@ -579,7 +581,10 @@ export function fontRecordToFormat(
 }
 
 /** Translate an engine FillRecord back into the CellFormat fill fields. */
-export function fillRecordToFormat(rec: FillRecord): Partial<CellFormat> {
+export function fillRecordToFormat(
+  rec: FillRecord,
+  options: { cell?: boolean } = {},
+): Partial<CellFormat> {
   if (rec.gradient) {
     const g = rec.gradient;
     return {
@@ -599,7 +604,12 @@ export function fillRecordToFormat(rec: FillRecord): Partial<CellFormat> {
   }
   if (rec.pattern === 0) return {};
   if (rec.pattern === 1) {
-    return rec.fgArgb === NO_COLOR_ARGB ? {} : { fill: argbToCssColor(rec.fgArgb) };
+    // A cell's solid fill without a foreground (`00000000` is read as none)
+    // paints black; a differential format's fill takes its colour elsewhere.
+    if (rec.fgArgb === NO_COLOR_ARGB && rec.fg?.kind !== LITERAL_COLOR_KIND) {
+      return options.cell ? { fill: argbToCssColor(NO_COLOR_ARGB) } : {};
+    }
+    return { fill: argbToCssColor(rec.fgArgb) };
   }
   const pattern = FILL_PATTERN_FROM_ORDINAL.get(rec.pattern);
   if (!pattern) {

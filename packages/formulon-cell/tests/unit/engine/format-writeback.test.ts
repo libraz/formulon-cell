@@ -241,6 +241,14 @@ describe('fillRecordFromFormat / fillRecordToFormat', () => {
     expect(rec.fgArgb).toBe(0xffffff00);
   });
 
+  it('paints a cell solid fill without a foreground colour black, and a dxf one not at all', () => {
+    const rec = { pattern: 1, fgArgb: 0, bgArgb: 0xffff00 };
+    expect(fillRecordToFormat(rec, { cell: true })).toEqual({ fill: '#000000' });
+    expect(fillRecordToFormat(rec)).toEqual({});
+    const literal = { kind: 1, rgb: 0, theme: 0, tint: 0, indexed: 0 };
+    expect(fillRecordToFormat({ ...rec, fg: literal })).toEqual({ fill: '#000000' });
+  });
+
   it('round-trips back to CellFormat', () => {
     const rec = fillRecordFromFormat({ fill: '#abcdef' });
     expect(fillRecordToFormat(rec)).toEqual({ fill: '#abcdef' });

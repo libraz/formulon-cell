@@ -286,8 +286,30 @@ const patternTile = (
   return pattern;
 };
 
+/** Single-pixel lines of a slant dash-dot stroke that ends a line. The
+ *  spreadsheet closes the last dash on a slanted cut instead of a flat one:
+ *  line `c` (counted from the stroke's first pixel across) ends where
+ *  `along + 2c` reaches 1.5 gridline widths past the stroke's end, which trims
+ *  the slow lines and extends the fast ones. */
+export const slantTailLines = (rect: EdgeRect, horizontal: boolean, g: number): EdgeRect[] => {
+  const reach = Math.round(1.5 * g);
+  const lines: EdgeRect[] = [];
+  const count = horizontal ? rect.h : rect.w;
+  for (let c = 0; c < count; c += 1) {
+    const length = (horizontal ? rect.w : rect.h) + reach - 2 * c;
+    if (length <= 0) continue;
+    lines.push(
+      horizontal
+        ? { x: rect.x, y: rect.y + c, w: length, h: 1 }
+        : { x: rect.x + c, y: rect.y, w: 1, h: length },
+    );
+  }
+  return lines;
+};
+
 /** Fill one stroke rectangle (device px, identity transform). Patterns are
- *  phased from `origin`, the grid's top-left corner in device px. */
+ *  phased from `origin`, the grid's top-left corner in device px; slant
+ *  strokes phase their across axis from `anchorRect` (default `rect`). */
 export const fillEdgeRect = (
   ctx: CanvasRenderingContext2D,
   edge: BorderEdge,
@@ -296,6 +318,7 @@ export const fillEdgeRect = (
   color: string,
   g: number,
   origin: { x: number; y: number },
+  anchorRect: EdgeRect = rect,
 ): void => {
   if (rect.w <= 0 || rect.h <= 0) return;
   if (borderPixelInk(edge.style, 0, 0, g) === null) {
@@ -306,8 +329,8 @@ export const fillEdgeRect = (
   // Slant cuts restart on every stroke, so their across phase is the rect's.
   const slant = edge.style === 'slantDashDot';
   const anchor = {
-    x: slant && !horizontal ? rect.x : origin.x,
-    y: slant && horizontal ? rect.y : origin.y,
+    x: slant && !horizontal ? anchorRect.x : origin.x,
+    y: slant && horizontal ? anchorRect.y : origin.y,
   };
   const pattern = patternTile(ctx, edge.style, horizontal, color, g);
   if (pattern) {

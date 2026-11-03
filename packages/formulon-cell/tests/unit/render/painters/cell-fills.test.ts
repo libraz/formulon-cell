@@ -142,7 +142,7 @@ describe('render/painters — paintCellFill', () => {
       ctx: spy.ctx,
     });
     expect(spy.rects[0]?.style).toBe('#ffeecc');
-    expect(spy.strokes).toContain('#336699');
+    expect(spy.rects.some((r) => r.style === '#336699')).toBe(true);
   });
 
   it('no-ops when format.fill is missing', () => {
@@ -281,6 +281,11 @@ describe('render/painters — gradient fills', () => {
       },
       save() {},
       restore() {},
+      beginPath() {},
+      moveTo() {},
+      lineTo() {},
+      closePath() {},
+      clip() {},
       createLinearGradient: make('linear'),
       createRadialGradient: make('radial'),
     } as unknown as CanvasRenderingContext2D;
@@ -314,7 +319,7 @@ describe('render/painters — gradient fills', () => {
     expect(spy.rects).toHaveLength(1);
   });
 
-  it('paints a path gradient outward from its inner rectangle', () => {
+  it('paints a path gradient as a box: one linear ramp per side from the inner rectangle', () => {
     const spy = gradientSpy();
     paintCellFill({
       ...makeCtx({}),
@@ -331,10 +336,14 @@ describe('render/painters — gradient fills', () => {
         },
       },
     });
-    expect(spy.created[0]?.kind).toBe('radial');
-    const [cx, cy] = spy.created[0]?.args ?? [];
-    expect(cx).toBeCloseTo(39.5, 5);
-    expect(cy).toBeCloseTo(34.5, 5);
+    expect(spy.created.map((g) => g.kind)).toEqual(['linear', 'linear', 'linear', 'linear']);
+    // Fill rect {9,19,61,31}: centre (39.5,34.5) to top, right, bottom, left edges.
+    expect(spy.created.map((g) => g.args)).toEqual([
+      [39.5, 34.5, 39.5, 19],
+      [39.5, 34.5, 70, 34.5],
+      [39.5, 34.5, 39.5, 50],
+      [39.5, 34.5, 9, 34.5],
+    ]);
   });
 
   it('a gradient replaces the solid fill colour', () => {

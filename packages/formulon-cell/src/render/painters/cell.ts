@@ -85,50 +85,145 @@ export function paintConditionalIcon(
 }
 
 /** OOXML gradient fill. A linear gradient's `degree` turns clockwise from
- *  left-to-right; a path gradient is approximated by a radial one spreading
- *  from the centre of its inner rectangle to the farthest cell corner. */
+ *  left-to-right. A path gradient is a box: each of the four triangles between
+ *  the centre of its inner rectangle and the cell corners ramps linearly from
+ *  the centre to the edge it faces. */
 function paintGradientFill(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   gradient: CellGradientFill,
 ): void {
-  let paint: CanvasGradient;
-  if (gradient.type === 'path') {
-    const cx = bounds.x + ((gradient.left + gradient.right) / 2) * bounds.w;
-    const cy = bounds.y + ((gradient.top + gradient.bottom) / 2) * bounds.h;
-    const radius = Math.max(
-      Math.hypot(cx - bounds.x, cy - bounds.y),
-      Math.hypot(bounds.x + bounds.w - cx, cy - bounds.y),
-      Math.hypot(cx - bounds.x, bounds.y + bounds.h - cy),
-      Math.hypot(bounds.x + bounds.w - cx, bounds.y + bounds.h - cy),
-    );
-    paint = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-  } else {
-    const angle = (gradient.degree * Math.PI) / 180;
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    const half = (Math.abs(bounds.w * dx) + Math.abs(bounds.h * dy)) / 2;
-    const cx = bounds.x + bounds.w / 2;
-    const cy = bounds.y + bounds.h / 2;
-    paint = ctx.createLinearGradient(
-      cx - dx * half,
-      cy - dy * half,
-      cx + dx * half,
-      cy + dy * half,
-    );
-  }
-  for (const stop of gradient.stops) {
-    paint.addColorStop(Math.max(0, Math.min(1, stop.position)), stop.color);
-  }
+  const addStops = (paint: CanvasGradient): CanvasGradient => {
+    for (const stop of gradient.stops) {
+      paint.addColorStop(Math.max(0, Math.min(1, stop.position)), stop.color);
+    }
+    return paint;
+  };
   ctx.save();
-  ctx.fillStyle = paint;
+  if (gradient.type === 'path') {
+    const l = bounds.x;
+    const t = bounds.y;
+    const r = bounds.x + bounds.w;
+    const b = bounds.y + bounds.h;
+    const cx = l + ((gradient.left + gradient.right) / 2) * bounds.w;
+    const cy = t + ((gradient.top + gradient.bottom) / 2) * bounds.h;
+    const sides: [number, number, number, number, number, number][] = [
+      [l, t, r, t, cx, t],
+      [r, t, r, b, r, cy],
+      [r, b, l, b, cx, b],
+      [l, b, l, t, l, cy],
+    ];
+    // Each wedge reaches a pixel past its seams, so antialiased clip edges
+    // never leave the background showing between two wedges.
+    const bleed = 1;
+    for (const [ax, ay, bx, by, ex, ey] of sides) {
+      const ux = Math.sign(bx - ax) * bleed;
+      const uy = Math.sign(by - ay) * bleed;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(ax - ux, ay - uy);
+      ctx.lineTo(bx + ux, by + uy);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = addStops(ctx.createLinearGradient(cx, cy, ex, ey));
+      ctx.fillRect(l, t, bounds.w, bounds.h);
+      ctx.restore();
+    }
+    ctx.restore();
+    return;
+  }
+  const angle = (gradient.degree * Math.PI) / 180;
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const half = (Math.abs(bounds.w * dx) + Math.abs(bounds.h * dy)) / 2;
+  const cx = bounds.x + bounds.w / 2;
+  const cy = bounds.y + bounds.h / 2;
+  ctx.fillStyle = addStops(
+    ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half),
+  );
   ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
   ctx.restore();
 }
 
+/** Excel's 8x8 pattern bitmaps (X = foreground), one device pixel per bitmap
+ *  pixel, anchored at sheet pixel (0,0). Rows repeat to fill all eight. */
+const PATTERN_TILES: Record<string, readonly string[]> = {
+  mediumGray: ['X.X.X.X.', '.X.X.X.X'],
+  darkGray: ['X.XXX.XX', 'XXX.XXX.'],
+  lightGray: ['..X...X.', 'X...X...'],
+  darkHorizontal: ['........', '........', 'XXXXXXXX', 'XXXXXXXX'],
+  darkVertical: ['..XX..XX'],
+  darkDown: ['XX..XX..', '.XX..XX.', '..XX..XX', 'X..XX..X'],
+  darkUp: ['..XX..XX', '.XX..XX.', 'XX..XX..', 'X..XX..X'],
+  darkGrid: ['X..XX..X', '.XX..XX.', '.XX..XX.', 'X..XX..X'],
+  darkTrellis: ['XXXXXXXX', '.XX..XX.', 'XXXXXXXX', 'X..XX..X'],
+  lightHorizontal: ['........', '........', 'XXXXXXXX', '........'],
+  lightVertical: ['..X...X.'],
+  lightDown: ['X...X...', '.X...X..', '..X...X.', '...X...X'],
+  lightUp: ['...X...X', '..X...X.', '.X...X..', 'X...X...'],
+  lightGrid: ['..X...X.', '..X...X.', 'XXXXXXXX', '..X...X.'],
+  lightTrellis: ['X...X...', '.X.X.X.X', '..X...X.', '.X.X.X.X'],
+  gray125: ['X...X...', '........', '..X...X.', '........'],
+  gray0625: ['......X.', '........', '..X.....', '........'],
+};
+
+/** Spreadsheet-format pattern names that share another pattern's bitmap. */
+const PATTERN_ALIAS: Record<string, string> = {
+  gray50: 'mediumGray',
+  gray75: 'darkGray',
+  gray25: 'lightGray',
+  horizontal: 'darkHorizontal',
+  vertical: 'darkVertical',
+  diagonalDown: 'darkDown',
+  diagonalUp: 'darkUp',
+};
+
+/** Foreground runs `[start, length]` along one 8-pixel tile row. */
+const tileRuns = (row: string): [number, number][] => {
+  const runs: [number, number][] = [];
+  for (let x = 0; x < 8; x++) {
+    if (row[x] !== 'X') continue;
+    const last = runs[runs.length - 1];
+    if (last && last[0] + last[1] === x) last[1]++;
+    else runs.push([x, 1]);
+  }
+  return runs;
+};
+
+/** Pattern ink over `bounds`, drawn per device pixel from the sheet-anchored
+ *  tile so the phase does not depend on the cell the pattern sits in. */
+function paintPatternTile(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  tile: readonly string[],
+  color: string,
+  dpr: number,
+): void {
+  const x0 = Math.round(bounds.x * dpr);
+  const y0 = Math.round(bounds.y * dpr);
+  const x1 = Math.round((bounds.x + bounds.w) * dpr);
+  const y1 = Math.round((bounds.y + bounds.h) * dpr);
+  const runs = tile.map(tileRuns);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let y = y0; y < y1; y++) {
+    const rowRuns = runs[y % tile.length] ?? [];
+    if (rowRuns.length === 0) continue;
+    for (let base = x0 - (((x0 % 8) + 8) % 8); base < x1; base += 8) {
+      for (const [start, len] of rowRuns) {
+        const a = Math.max(base + start, x0);
+        const b = Math.min(base + start + len, x1);
+        if (b > a) ctx.rect(a / dpr, y / dpr, (b - a) / dpr, 1 / dpr);
+      }
+    }
+  }
+  ctx.fill();
+}
+
 /** User-set background fill — drawn above range tint and active highlight so
  *  cells with explicit fill stay visually filled even when selected. */
-export function paintCellFill({ ctx, bounds: cell, format, dpr, rtl }: CellPaintCtx): void {
+export function paintCellFill({ ctx, bounds: cell, theme, format, dpr, rtl }: CellPaintCtx): void {
   // A fill covers the gridline before the cell as well as its own.
   const bounds = fillRect(cell, dpr ?? 1, rtl === true);
   if (format?.fillGradient) {
@@ -138,116 +233,23 @@ export function paintCellFill({ ctx, bounds: cell, format, dpr, rtl }: CellPaint
   const fill = format?.fill;
   const pattern = format?.fillPattern;
   if (!fill && !pattern) return;
-  if (fill) {
-    ctx.fillStyle = fill;
-    ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
-  }
+  // A pattern without a background still replaces what lay under the cell,
+  // neighbours' fills on the shared gridline included.
+  ctx.fillStyle = fill ?? theme.bg;
+  ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
   if (!pattern) return;
-  const color = format?.fillPatternColor ?? '#000000';
+  const tile = PATTERN_TILES[PATTERN_ALIAS[pattern] ?? pattern];
+  if (!tile) return;
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(bounds.x, bounds.y, bounds.w, bounds.h);
-  ctx.clip();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 1;
-  switch (pattern) {
-    case 'gray0625':
-    case 'gray125':
-    case 'gray25':
-    case 'gray50':
-    case 'gray75': {
-      const step =
-        pattern === 'gray0625'
-          ? 8
-          : pattern === 'gray125'
-            ? 6
-            : pattern === 'gray25'
-              ? 4
-              : pattern === 'gray50'
-                ? 3
-                : 2;
-      const size = pattern === 'gray50' ? 1.5 : pattern === 'gray75' ? 2 : 1;
-      for (let y = bounds.y + 2; y < bounds.y + bounds.h; y += step) {
-        for (let x = bounds.x + 2; x < bounds.x + bounds.w; x += step) {
-          ctx.fillRect(x, y, size, size);
-        }
-      }
-      break;
-    }
-    case 'horizontal':
-    case 'darkHorizontal':
-    case 'lightHorizontal': {
-      const step = pattern === 'lightHorizontal' ? 7 : 4;
-      for (let y = bounds.y + step - 1; y < bounds.y + bounds.h; y += step) {
-        ctx.beginPath();
-        ctx.moveTo(bounds.x, y);
-        ctx.lineTo(bounds.x + bounds.w, y);
-        ctx.stroke();
-      }
-      break;
-    }
-    case 'vertical':
-    case 'darkVertical':
-    case 'lightVertical': {
-      const step = pattern === 'lightVertical' ? 7 : 4;
-      for (let x = bounds.x + step - 1; x < bounds.x + bounds.w; x += step) {
-        ctx.beginPath();
-        ctx.moveTo(x, bounds.y);
-        ctx.lineTo(x, bounds.y + bounds.h);
-        ctx.stroke();
-      }
-      break;
-    }
-    case 'diagonalDown':
-    case 'diagonalUp':
-    case 'darkDown':
-    case 'darkUp':
-    case 'lightDown':
-    case 'lightUp': {
-      const direction =
-        pattern === 'diagonalDown' || pattern === 'darkDown' || pattern === 'lightDown' ? 1 : -1;
-      const step = pattern === 'lightDown' || pattern === 'lightUp' ? 9 : 6;
-      for (let x = bounds.x - bounds.h; x < bounds.x + bounds.w; x += step) {
-        ctx.beginPath();
-        ctx.moveTo(x, direction > 0 ? bounds.y : bounds.y + bounds.h);
-        ctx.lineTo(x + bounds.h, direction > 0 ? bounds.y + bounds.h : bounds.y);
-        ctx.stroke();
-      }
-      break;
-    }
-    case 'darkGrid':
-    case 'lightGrid': {
-      const step = pattern === 'lightGrid' ? 7 : 4;
-      for (let y = bounds.y + step - 1; y < bounds.y + bounds.h; y += step) {
-        ctx.beginPath();
-        ctx.moveTo(bounds.x, y);
-        ctx.lineTo(bounds.x + bounds.w, y);
-        ctx.stroke();
-      }
-      for (let x = bounds.x + step - 1; x < bounds.x + bounds.w; x += step) {
-        ctx.beginPath();
-        ctx.moveTo(x, bounds.y);
-        ctx.lineTo(x, bounds.y + bounds.h);
-        ctx.stroke();
-      }
-      break;
-    }
-    case 'darkTrellis':
-    case 'lightTrellis': {
-      const step = pattern === 'lightTrellis' ? 9 : 6;
-      for (const direction of [1, -1]) {
-        for (let x = bounds.x - bounds.h; x < bounds.x + bounds.w; x += step) {
-          ctx.beginPath();
-          ctx.moveTo(x, direction > 0 ? bounds.y : bounds.y + bounds.h);
-          ctx.lineTo(x + bounds.h, direction > 0 ? bounds.y + bounds.h : bounds.y);
-          ctx.stroke();
-        }
-      }
-      break;
-    }
-  }
+  paintPatternTile(ctx, bounds, tile, format?.fillPatternColor ?? '#000000', dpr ?? 1);
   ctx.restore();
+}
+
+/** Selected cells other than the active one darken their fill by 0.776. */
+export function paintSelectedFillShade({ ctx, bounds: cell, dpr, rtl }: CellPaintCtx): void {
+  const bounds = fillRect(cell, dpr ?? 1, rtl === true);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.224)';
+  ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
 }
 
 /** Perpendicular width of a diagonal border, in CSS px at one rule per px. */
@@ -259,6 +261,13 @@ const DIAGONAL_WIDTH: Partial<Record<CellBorderStyle, number>> = {
   slantDashDot: 2.67,
   thick: 3.46,
 };
+
+/** A rule-wide diagonal sits this many device px right (down-diagonal) or left
+ *  (up-diagonal) of the corner-gridline centres and is this fraction of a rule wide (Skia coverage matches Excel ink to 0.5%);
+ *  wider ones do not. Excel antialiases analytically, so edge pixels still
+ *  differ by a few levels. */
+const RULE_DIAGONAL_SHIFT = 1.41;
+const RULE_DIAGONAL_INK = 0.95;
 
 /** Diagonal dash runs in CSS px, measured along x as the spreadsheet does. */
 const DIAGONAL_DASH: Partial<Record<CellBorderStyle, readonly number[]>> = {
@@ -290,22 +299,24 @@ export function paintCellDiagonals({ ctx, bounds, theme, format, dpr = 1 }: Cell
   ctx.beginPath();
   ctx.rect(l - rule, t - rule, r - l + rule, b - t + rule);
   ctx.clip();
-  const draw = (side: CellBorderSide | undefined, ya: number, yb: number): void => {
+  const draw = (side: CellBorderSide | undefined, ya: number, yb: number, dir = 1): void => {
     if (!side) return;
     const style = typeof side === 'object' ? side.style : 'thin';
     ctx.strokeStyle = (typeof side === 'object' && side.color) || theme.cellAutoFg;
-    ctx.lineWidth = (DIAGONAL_WIDTH[style] ?? 1) * rule;
+    const wide = DIAGONAL_WIDTH[style] !== undefined;
+    ctx.lineWidth = (DIAGONAL_WIDTH[style] ?? RULE_DIAGONAL_INK) * rule;
+    const shift = wide ? 0 : (dir * RULE_DIAGONAL_SHIFT) / dpr;
     const stretch = Math.hypot(x1 - x0, yb - ya) / Math.max(x1 - x0, 1);
     ctx.setLineDash((DIAGONAL_DASH[style] ?? []).map((d) => d * rule * stretch));
     ctx.beginPath();
     // A double diagonal is two single lines one rule above and below.
     for (const dy of style === 'double' ? [-rule, rule] : [0]) {
-      ctx.moveTo(x0, ya + dy);
-      ctx.lineTo(x1, yb + dy);
+      ctx.moveTo(x0 + shift, ya + dy);
+      ctx.lineTo(x1 + shift, yb + dy);
     }
     ctx.stroke();
   };
   draw(sides.diagonalDown, t - rule / 2, b - rule / 2);
-  draw(sides.diagonalUp, b - rule / 2, t - rule / 2);
+  draw(sides.diagonalUp, b - rule / 2, t - rule / 2, -1);
   ctx.restore();
 }

@@ -20,6 +20,7 @@ import {
   fillEdgeRect,
   isDashed,
   resolveBorderEdge,
+  slantTailLines,
   strokeSpans,
 } from './border-edges.js';
 import { mergedDiagonalBorders, mergeRangeAt } from './merged-cells.js';
@@ -136,23 +137,39 @@ export function paintBorders(
     start: { before: BorderEdge | null; after: BorderEdge | null },
     end: { before: BorderEdge | null; after: BorderEdge | null },
     under: string | undefined,
+    tail = false,
   ): void => {
     if (drawn.has(key)) return;
     drawn.add(key);
     if (state.ui.showGridLines !== false) {
+      // A medium band is wider than the gridline, so the gridlines crossing
+      // its upper half go too.
+      const band = -Math.min(-g, ...borderStrokes(edge.style, g).map((s) => s[0]));
       const gap = toScreen(
         horizontal
-          ? { x: a0 - g, y: e - g, w: a1 - a0 + g, h: g }
-          : { x: e - g, y: a0 - g, w: g, h: a1 - a0 + g },
+          ? { x: a0 - g, y: e - band, w: a1 - a0 + g, h: band }
+          : { x: e - band, y: a0 - g, w: band, h: a1 - a0 + g },
       );
       ctx.fillStyle = under ?? theme.bg;
       ctx.fillRect(gap.x, gap.y, gap.w, gap.h);
     }
-    const spans = strokeSpans(edge, g, a0, a1, start, end, continued);
+    let spans = strokeSpans(edge, g, a0, a1, start, end, continued);
+    // At a slant dash-dot corner the horizontal edges run through it; a
+    // vertical edge starts flush with its boundary.
+    if (!horizontal && edge.style === 'slantDashDot' && (start.before || start.after)) {
+      spans = spans.map(([from, to]) => [Math.max(from, a0), to] as const);
+    }
     const color = edge.color || automatic;
     strokes.push(() => {
       for (const rect of edgeRects(edge, horizontal, e, spans, g)) {
-        fillEdgeRect(ctx, edge, horizontal, toScreen(rect), color, g, origin);
+        const screen = toScreen(rect);
+        if (tail && !rtl && edge.style === 'slantDashDot') {
+          for (const line of slantTailLines(screen, horizontal, g)) {
+            fillEdgeRect(ctx, edge, horizontal, line, color, g, origin, screen);
+          }
+        } else {
+          fillEdgeRect(ctx, edge, horizontal, screen, color, g, origin);
+        }
       }
     });
     if (!horizontal || !isDashed(edge.style)) return;
@@ -208,28 +225,32 @@ export function paintBorders(
         const end = { before: trailEdge(r - 1, c), after: trail };
         const continued = follows(cols, c) && edgeAt(r, c - 1, 'top') !== null;
         const under = fillAt(r, c) ?? fillAt(r - 1, c);
-        drawEdge(`h${r}:${c}`, continued, top, true, T, L, R, start, end, under);
+        const tail = !!(end.before || end.after);
+        drawEdge(`h${r}:${c}`, continued, top, true, T, L, R, start, end, under, tail);
       }
       if (bottom) {
         const start = { before: lead, after: leadEdge(r + 1, c) };
         const end = { before: trail, after: trailEdge(r + 1, c) };
         const continued = follows(cols, c) && edgeAt(r, c - 1, 'bottom') !== null;
         const under = fillAt(r + 1, c) ?? fillAt(r, c);
-        drawEdge(`h${r + 1}:${c}`, continued, bottom, true, B, L, R, start, end, under);
+        const tail = !!(end.before || end.after);
+        drawEdge(`h${r + 1}:${c}`, continued, bottom, true, B, L, R, start, end, under, tail);
       }
       if (lead) {
         const start = { before: edgeAt(r, c - 1, 'top'), after: top };
         const end = { before: edgeAt(r, c - 1, 'bottom'), after: bottom };
         const continued = follows(rows, r) && leadEdge(r - 1, c) !== null;
         const under = fillAt(r, c) ?? fillAt(r, c - 1);
-        drawEdge(`v${r}:${c}`, continued, lead, false, L, T, B, start, end, under);
+        const tail = !(follows(rows, r + 1) && leadEdge(r + 1, c) !== null);
+        drawEdge(`v${r}:${c}`, continued, lead, false, L, T, B, start, end, under, tail);
       }
       if (trail) {
         const start = { before: top, after: edgeAt(r, c + 1, 'top') };
         const end = { before: bottom, after: edgeAt(r, c + 1, 'bottom') };
         const continued = follows(rows, r) && trailEdge(r - 1, c) !== null;
         const under = fillAt(r, c + 1) ?? fillAt(r, c);
-        drawEdge(`v${r}:${c + 1}`, continued, trail, false, R, T, B, start, end, under);
+        const tail = !(follows(rows, r + 1) && trailEdge(r + 1, c) !== null);
+        drawEdge(`v${r}:${c + 1}`, continued, trail, false, R, T, B, start, end, under, tail);
       }
     }
   }
