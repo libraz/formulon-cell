@@ -771,6 +771,19 @@ describe('painted row heights', () => {
     expect(hitTest(layout, viewport, row4.x + 2, row4.y - 0.5)).toEqual({ row: 2, col: 0 });
   });
 
+  it('paints 2 x floor(pt) device px per row at DPR 2 on Mac', () => {
+    // Excel for Mac at 2x: 12.5 -> 24, 13.5 -> 26, 14.75 -> 28, 15.5 -> 30,
+    // 22.5 -> 44, 30.25 -> 60 device px: floor in screen points, then scale.
+    const points = [12.5, 13.5, 14.75, 15.5, 22.5, 30.25];
+    const layout = makeLayout({
+      screenScale: 0.75,
+      rowHeights: new Map(points.map((pt, row) => [row, (pt * 4) / 3])),
+    });
+    const dpr = 2;
+    const device = points.map((_, row) => rowHeight(layout, row, makeViewport()) * dpr);
+    expect(device).toEqual([24, 26, 28, 30, 44, 60]);
+  });
+
   it('rounds to whole screen px elsewhere, as the store snap did before', () => {
     // 12.5 pt is 16.67 canonical px; the old store snap stored it as 17.
     const layout = makeLayout({ rowHeights: new Map([[0, (12.5 * 4) / 3]]) });
