@@ -1,6 +1,7 @@
 import { parseAddrKey } from '../engine/address.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
+import { macDefaultRowPt } from '../engine/mac-row-model.js';
 import { phoneticGuideSize } from '../engine/phonetic-sync.js';
 /** Content-fit column widths and row heights. Every autofit entry point — header
  *  double-click, the structure commands, the ribbon AutoFit items and the
@@ -130,6 +131,7 @@ export function computeAutofitRowHeight(
     false,
   );
   const padding = Math.max(0, defaultHeight - Math.round(normalFont.size * 1.28));
+  const mac = wholePointAdvances(state.layout);
 
   for (const [key, cell] of state.data.cells) {
     const parsed = parseAddrKey(key);
@@ -162,7 +164,17 @@ export function computeAutofitRowHeight(
       lineHeight,
       textMeasure(ctx, font, state.layout),
     );
-    const height = Math.ceil(extent) + padding;
+    const tabulated =
+      mac && !format?.rotation && guide === 0
+        ? macDefaultRowPt(
+            format?.fontFamily ?? opts.workbookDisplayFont?.name ?? '',
+            Math.round(font.size * POINTS_PER_CSS_PX * 100) / 100,
+          )
+        : null;
+    const height =
+      tabulated === null
+        ? Math.ceil(extent) + padding
+        : macLinesHeight(fontPointsToCssPx(tabulated), lines);
     if (height > max) max = height;
   }
 
@@ -289,6 +301,15 @@ function headerButtonWidth(state: State, sheet: number, row: number, col: number
   const chevron = table && isHeaderRow(table, row, col) ? TABLE_HEADER_RESERVED_WIDTH : 0;
   return Math.max(filter, chevron);
 }
+
+/** Points per canonical CSS px. */
+const POINTS_PER_CSS_PX = 0.75;
+
+/** Mac Excel fits one line of a tabulated font to that font's default row and
+ *  gives each line of a wrapped block one point more (Arial 11: 14 pt for one
+ *  line, 30 / 45 pt for two / three). */
+const macLinesHeight = (rowPx: number, lines: number): number =>
+  lines <= 1 ? rowPx : lines * (rowPx + fontPointsToCssPx(1));
 
 /** Vertical extent of a cell's text block. Rotated text stands its run up in
  *  the row (Excel: 'rot' at 90 degrees takes a 14 pt row to 19 pt); stacked

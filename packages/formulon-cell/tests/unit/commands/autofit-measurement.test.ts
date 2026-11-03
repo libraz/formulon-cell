@@ -200,6 +200,49 @@ describe('computeAutofitColWidth, Excel exclusions', () => {
   });
 });
 
+describe('computeAutofitRowHeight on the Mac point model', () => {
+  // Excel for Mac (default 14 pt rows): one Arial 11 line fits the 14 pt
+  // tabulated row, Arial 28 takes 35 pt, and a wrapped Arial 11 cell takes
+  // 15 pt per line: 30 pt for two lines, 45 pt for three.
+  const pt = (points: number) => (points * 4) / 3;
+  const macStore = (cells: Seed[]) => {
+    const store = storeWith(cells);
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, screenScale: 0.75, defaultRowHeight: pt(14) },
+    }));
+    return store;
+  };
+  const arial = (store: SpreadsheetStore, row: number, points: number, wrap = false) =>
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row, col: 0 },
+      { fontFamily: 'Arial', fontSize: pt(points), ...(wrap ? { wrap: true } : {}) },
+    );
+
+  it('sizes a single line to the tabulated row of its font', () => {
+    const store = macStore([
+      [0, 0, 'plain'],
+      [1, 0, 'Big'],
+    ]);
+    arial(store, 0, 11);
+    arial(store, 1, 28);
+    expect(computeAutofitRowHeight(store.getState(), 0, null)).toBeCloseTo(pt(14), 6);
+    expect(computeAutofitRowHeight(store.getState(), 1, null)).toBeCloseTo(pt(35), 6);
+  });
+
+  it('gives each wrapped Arial 11 line 15 pt', () => {
+    const store = macStore([
+      [0, 0, 'line1\nline2'],
+      [1, 0, 'line1\nline2\nline3'],
+    ]);
+    arial(store, 0, 11, true);
+    arial(store, 1, 11, true);
+    expect(computeAutofitRowHeight(store.getState(), 0, null)).toBeCloseTo(pt(30), 6);
+    expect(computeAutofitRowHeight(store.getState(), 1, null)).toBeCloseTo(pt(45), 6);
+  });
+});
+
 describe('computeAutofitRowHeight, rotated text', () => {
   // Excel: 'rot' at 90 degrees in a 14 pt row autofits the row to 19 pt — the
   // run's length stands up in the row.

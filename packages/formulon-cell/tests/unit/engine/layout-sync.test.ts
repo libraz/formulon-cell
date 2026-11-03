@@ -313,6 +313,17 @@ describe('hydrateLayoutFromEngine', () => {
     expect(store.getState().layout.headerDigitAdvance).toBeUndefined();
   });
 
+  it('reads loaded row heights to the quarter point, as Excel does', () => {
+    // Excel reads a stored 20.9 pt row back as 21.0 and paints it 42 device px.
+    const store = createSpreadsheetStore();
+    const { wb } = makeFake({
+      colRowSize: true,
+      rows: [{ row: 0, height: (20.9 * 4) / 3, hidden: false, outlineLevel: 0, hasHeight: true }],
+    });
+    hydrateLayoutFromEngine(wb, store, 0);
+    expect(store.getState().layout.rowHeights.get(0)).toBeCloseTo((21 * 4) / 3, 9);
+  });
+
   it('is a no-op under the stub (capability off, empty engine arrays)', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeFake({ colRowSize: false });

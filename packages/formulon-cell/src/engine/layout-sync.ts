@@ -1,4 +1,5 @@
 import type { LayoutSnapshot } from '../commands/slice-history.js';
+import { snapRowHeightPx } from '../store/layout-limits.js';
 import { outlineGutterWidth } from '../store/outline-summary.js';
 import { clampZoom } from '../store/render-scale.js';
 import { isRowHidden } from '../store/row-visibility.js';
@@ -44,9 +45,11 @@ const addColumnWidths = (widths: Map<number, number>, cols: ColumnLayouts): Map<
   return widths;
 };
 
+/** Stored row heights read back to the quarter point, as the desktop
+ *  spreadsheet reads them (20.9 pt shows and paints as 21). */
 const addRowHeights = (heights: Map<number, number>, rows: RowLayouts): Map<number, number> => {
   for (const r of rows) {
-    if (r.height > 0 && r.hasHeight !== false) heights.set(r.row, r.height);
+    if (r.height > 0 && r.hasHeight !== false) heights.set(r.row, snapRowHeightPx(r.height));
   }
   return heights;
 };

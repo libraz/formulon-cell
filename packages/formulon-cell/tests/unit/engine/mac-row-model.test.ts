@@ -24,6 +24,7 @@ describe('macDefaultRowPt', () => {
     ['Arial', 16, 20],
     ['Arial', 20, 25],
     ['Arial', 24, 30],
+    ['Arial', 28, 35],
     ['Arial', 36, 45],
     ['Courier New', 11, 15],
     ['Courier New', 20, 27],
