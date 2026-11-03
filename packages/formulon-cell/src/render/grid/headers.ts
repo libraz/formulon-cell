@@ -83,6 +83,8 @@ export function paintHeaders(
   ctx.lineTo(headerRuleX, cssHeight);
   ctx.stroke();
 
+  // A transparent bar token means the platform draws no selection bar.
+  const activeBar = theme.headerActiveBar !== 'transparent';
   const firstRow = rows.visible[0] ?? 0;
   const firstCol = cols.visible[0] ?? 0;
 
@@ -120,14 +122,14 @@ export function paintHeaders(
       : isSelectedCol
         ? theme.headerFgActive
         : theme.headerFg;
-    ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${labelSize}px ${labelFamily}`;
+    ctx.font = `${isActiveCol || isSelectedCol ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
     // Letters centre on the header cell less its trailing separator.
     const labelX = rtl ? rect.x + (w + width) / 2 : rect.x + (w - width) / 2;
     ctx.fillText(label, labelX, labelTopY + layout.headerRowHeight / 2 + 0.5);
     // The accent bar covers the rule under the header and one pixel above it.
-    if (isActiveCol || isSelectedCol) {
-      ctx.fillStyle = theme.accent;
+    if ((isActiveCol || isSelectedCol) && activeBar) {
+      ctx.fillStyle = theme.headerActiveBar;
       ctx.fillRect(rect.x, Math.round(oy) - 2, w, 2);
     }
   }
@@ -164,15 +166,15 @@ export function paintHeaders(
       : isSelectedRow
         ? theme.headerFgActive
         : theme.headerFg;
-    ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${labelSize}px ${labelFamily}`;
+    ctx.font = `${isActiveRow || isSelectedRow ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     ctx.fillText(
       rowLabel,
       rowLabelX,
       textBaselineY({ ...rect, h }, rowLabelBox, 'bottom', ROW_LABEL_PAD_Y),
     );
-    if (isActiveRow || isSelectedRow) {
-      ctx.fillStyle = theme.accent;
+    if ((isActiveRow || isSelectedRow) && activeBar) {
+      ctx.fillStyle = theme.headerActiveBar;
       ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);
     }
   }

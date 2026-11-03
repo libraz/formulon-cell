@@ -84,6 +84,10 @@
     --fc-header-bg: initial;
     /* Header rule under the column letters. */
     --fc-header-rule: initial;
+    /* Bar under a selected header; transparent for none. Defaults to the accent. */
+    --fc-header-active-bar: initial;
+    /* Font weight of a selected header label. Defaults to 600. */
+    --fc-header-fg-active-weight: initial;
 
     /* === HOVER === */
     /* Stripe painted across the hovered row + column. */

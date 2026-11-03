@@ -110,3 +110,26 @@ describe('theme/resolve — token completeness', () => {
     expect(css).toContain('--fc-statusbar-control: #c8c6c4;');
   });
 });
+
+describe('theme/resolve — selected header tokens', () => {
+  it('defaults to an accent bar and a semibold label', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    host.style.setProperty('--fc-accent', '#123456');
+    const theme = resolveTheme(host);
+    expect(theme.headerActiveBar).toBe('#123456');
+    expect(theme.headerFgActiveWeight).toBe(600);
+    host.remove();
+  });
+
+  it('reads the bar colour and the label weight from their tokens', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    host.style.setProperty('--fc-header-active-bar', 'transparent');
+    host.style.setProperty('--fc-header-fg-active-weight', '400');
+    const theme = resolveTheme(host);
+    expect(theme.headerActiveBar).toBe('transparent');
+    expect(theme.headerFgActiveWeight).toBe(400);
+    host.remove();
+  });
+});

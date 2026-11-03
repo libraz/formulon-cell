@@ -27,3 +27,15 @@ describe('Mac light header palette', () => {
     expect(token(block, '--fc-rule-strong')).toBe('#bcbbba');
   });
 });
+
+// Selected headers (cells-header-selected-light): flat 243 fill, green label
+// ink 35,115,68 (sRGB), no accent line, label geometry unchanged (not bold).
+describe('Mac light selected header', () => {
+  it('fills 243 with a regular-weight green label and no accent bar', () => {
+    const block = macLightPalette();
+    expect(token(block, '--fc-bg-header')).toBe('#f3f3f3');
+    expect(token(block, '--fc-header-fg-active')).toBe('#217346');
+    expect(token(block, '--fc-header-active-bar')).toBe('transparent');
+    expect(token(block, '--fc-header-fg-active-weight')).toBe('400');
+  });
+});

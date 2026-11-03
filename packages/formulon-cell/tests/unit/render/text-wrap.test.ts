@@ -35,6 +35,8 @@ const theme: ResolvedTheme = {
   headerRule: '#ccc',
   headerFg: '#666',
   headerFgActive: '#000',
+  headerActiveBar: '#06c',
+  headerFgActiveWeight: 600,
   pageBackdrop: '#999',
   pagePaper: '#fff',
   pageEdge: '#666',

@@ -18,6 +18,8 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     ruleStrong: '#bfbfbf',
     freezeRule: '#9b9b9b',
     accent: '#107c41',
+    headerActiveBar: '#107c41',
+    headerFgActiveWeight: 600,
     accentFg: '#fff',
     accentSoft: 'rgba(16,124,65,0.12)',
     cellErrorFg: '#a4262c',
@@ -202,6 +204,34 @@ describe('paintHeaders', () => {
     const rowBars = bars.filter((f) => f.rect?.[2] === 2 && (f.rect?.[3] ?? 0) > 2);
     expect(colBars).toHaveLength(2);
     expect(rowBars).toHaveLength(2);
+  });
+
+  it('drops the accent bar and keeps the label weight where the theme says so (Mac light)', () => {
+    const state = createSpreadsheetStore().getState();
+    state.selection = {
+      active: { sheet: 0, row: 1, col: 1 },
+      range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+      anchor: { sheet: 0, row: 1, col: 1 },
+      extraRanges: [],
+    };
+    state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 3, zoom: 1, widthPx: 260 };
+    const cols = buildColLayout(state.layout, state.viewport);
+    const rows = buildRowLayout(state.layout, state.viewport);
+    const { ctx, fills, texts } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 260, cssHeight: 140 },
+      { ...state, layout: layoutForView(state) },
+      theme({ headerActiveBar: 'transparent', headerFgActiveWeight: 400 }),
+      cols,
+      rows,
+    );
+
+    expect(fills.filter((f) => f.style === '#107c41' || f.style === 'transparent')).toEqual([]);
+    expect(texts.find((entry) => entry.text === 'B')).toMatchObject({
+      font: '400 11.5px Aptos, sans-serif',
+      style: '#107c41',
+    });
   });
 
   it('uses regular idle header text and semibold selected header text', () => {

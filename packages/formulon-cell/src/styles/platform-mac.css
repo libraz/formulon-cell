@@ -35,6 +35,9 @@
     --fc-header-bg: #fafafa;
     --fc-header-rule: #e9e9e7;
     --fc-header-fg: #5e5e5e;
+    /* A selected header is only refilled and recoloured: no bar, same weight. */
+    --fc-header-active-bar: transparent;
+    --fc-header-fg-active-weight: 400;
     --fc-rule: #d4d4d4;
     --fc-rule-strong: #bcbbba;
     --fc-accent-soft: rgba(0, 0, 0, 0.224);

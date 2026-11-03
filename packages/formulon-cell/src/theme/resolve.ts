@@ -32,6 +32,10 @@ export interface ResolvedTheme {
   headerRule: string;
   headerFg: string;
   headerFgActive: string;
+  /** Bar under a selected row/column header; `transparent` draws none. */
+  headerActiveBar: string;
+  /** Font weight of a selected header label. */
+  headerFgActiveWeight: number;
 
   /** Page Layout / Page Break Preview chrome. */
   pageBackdrop: string;
@@ -95,6 +99,8 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     headerRule: v('--fc-header-rule', v('--fc-rule', '#e2dccd')),
     headerFg: v('--fc-header-fg', '#6f6a5d'),
     headerFgActive: v('--fc-header-fg-active', '#15171c'),
+    headerActiveBar: v('--fc-header-active-bar', v('--fc-accent', '#d83a14')),
+    headerFgActiveWeight: num(v('--fc-header-fg-active-weight', '600'), 600),
 
     pageBackdrop: v('--fc-page-backdrop', '#9b968a'),
     pagePaper: v('--fc-page-paper', '#ffffff'),
