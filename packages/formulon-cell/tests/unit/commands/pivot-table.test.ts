@@ -87,6 +87,7 @@ const makeWb = () => {
       return true;
     },
     pivotTableCacheId: (_sheet: number, pivotIndex: number) => (pivotIndex === 2 ? 4 : -1),
+    pivotFieldCount: () => 0,
     getPivotTables: () => [
       {
         sheetIndex: 0,

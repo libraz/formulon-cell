@@ -1,12 +1,13 @@
 import { formatA1Range } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
-import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
+import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
 import {
   PIVOT_SHOW_AS_BASE_NEXT,
   PIVOT_SHOW_AS_BASE_PREVIOUS,
   PivotAggregation,
   PivotAxis,
+  PivotShowValuesAs,
   PivotSortOrder,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -30,6 +31,20 @@ export interface PivotFieldItemVisibility {
   itemName: string;
   visible: boolean;
 }
+
+/** Show-as kinds that yield a ratio; the desktop app formats them "0.00%". */
+const PERCENT_SHOW_AS: ReadonlySet<PivotShowValuesAs> = new Set([
+  PivotShowValuesAs.PercentOfRow,
+  PivotShowValuesAs.PercentOfCol,
+  PivotShowValuesAs.PercentOfTotal,
+  PivotShowValuesAs.PercentOf,
+  PivotShowValuesAs.PercentDifferenceFrom,
+  PivotShowValuesAs.PercentOfParentRow,
+  PivotShowValuesAs.PercentOfParentCol,
+  PivotShowValuesAs.PercentOfParent,
+  PivotShowValuesAs.PercentOfRunningTotal,
+]);
+const PERCENT_FORMAT = '0.00%';
 
 export interface PivotValueFieldSettings {
   fieldName: string;
@@ -501,7 +516,12 @@ export function createPivotTableFromRange(
       settings?.aggregation ??
       opts.aggregation ??
       (valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count);
-    const numberFormat = settings?.numberFormat?.trim() || opts.valueNumberFormat?.trim();
+    const numberFormat =
+      settings?.numberFormat?.trim() ||
+      opts.valueNumberFormat?.trim() ||
+      (settings?.showValuesAs !== undefined && PERCENT_SHOW_AS.has(settings.showValuesAs)
+        ? PERCENT_FORMAT
+        : undefined);
 
     // Left unnamed, the engine names the field from the workbook profile.
     const dataField = wb.addPivotDataField(opts.destination.sheet, pivotIndex, {
@@ -521,6 +541,33 @@ export function createPivotTableFromRange(
   return { ok: true, cacheId, pivotIndex };
 }
 
+/** Labels of each cache field's items in cache-index order, read from a
+ *  report drawing on the cache (the engine cannot list shared items). */
+const cachedItemLabels = (wb: WorkbookHandle, cacheId: number): Map<number, string[]> => {
+  const out = new Map<number, string[]>();
+  const report = wb
+    .getPivotTables()
+    .find((p) => wb.pivotTableCacheId(p.sheetIndex, p.pivotIndex) === cacheId);
+  if (!report) return out;
+  const { sheetIndex: sheet, pivotIndex } = report;
+  const count = wb.pivotFieldCount(sheet, pivotIndex);
+  for (let fieldIdx = 0; fieldIdx < count; fieldIdx += 1) {
+    const items = wb.getPivotField(sheet, pivotIndex, fieldIdx)?.items ?? [];
+    const labels: string[] = [];
+    for (const item of items) if (item.cacheIndex >= 0) labels[item.cacheIndex] = item.label;
+    if (labels.length > 0) out.set(fieldIdx, labels);
+  }
+  return out;
+};
+
+/** Position of `value` among previously cached labels; unseen values sort after. */
+const rankByLabel = (labels: readonly string[] | undefined, value: CellValue): number => {
+  const label =
+    value.kind === 'text' ? value.value : value.kind === 'number' ? String(value.value) : null;
+  const at = label === null || !labels ? -1 : labels.indexOf(label);
+  return at < 0 ? Number.MAX_SAFE_INTEGER : at;
+};
+
 export function refreshPivotCacheFromRange(
   wb: WorkbookHandle,
   opts: RefreshPivotCacheOptions,
@@ -537,13 +584,13 @@ export function refreshPivotCacheFromRange(
     return { ok: false, reason: 'invalid-field' };
   }
 
+  const previousOrder = cachedItemLabels(wb, opts.cacheId);
   const sharedItemIndexesByField = new Map<number, Map<string, number>>();
   for (const field of fields) {
     if (!wb.clearPivotCacheSharedItems(opts.cacheId, field.index)) {
       return { ok: false, reason: 'engine-failed', step: 'shared-item-clear' };
     }
-    const seen = new Set<string>();
-    const indexes = new Map<string, number>();
+    const values = new Map<string, CellValue>();
     for (let r = opts.source.r0 + 1; r <= opts.source.r1; r += 1) {
       const value = wb.getValue({
         sheet: opts.source.sheet,
@@ -551,9 +598,18 @@ export function refreshPivotCacheFromRange(
         col: opts.source.c0 + field.index,
       });
       const key = valueKey(value);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      indexes.set(key, indexes.size);
+      if (!values.has(key)) values.set(key, value);
+    }
+    // The report's field items point at cache indices, so values the cache
+    // held keep their old order and new ones follow, as the desktop app does.
+    const ordered = [...values.values()].sort(
+      (a, b) =>
+        rankByLabel(previousOrder.get(field.index), a) -
+        rankByLabel(previousOrder.get(field.index), b),
+    );
+    const indexes = new Map<string, number>();
+    for (const value of ordered) {
+      indexes.set(valueKey(value), indexes.size);
       if (!wb.addPivotCacheSharedItem(opts.cacheId, field.index, value)) {
         return { ok: false, reason: 'engine-failed', step: 'shared-item' };
       }
