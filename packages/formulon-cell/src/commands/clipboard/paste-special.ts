@@ -110,6 +110,17 @@ const combine = (op: PasteOperation, dest: number, src: number): number => {
 
 const errorCodeForNonFiniteOperation = (op: PasteOperation): number => (op === 'divide' ? 1 : 5); // #DIV/0! for divide, #NUM! for arithmetic overflow.
 
+/** Cell-format fields a Formats paste leaves to the destination: data
+ *  validation and the hyperlink (Excel pastes neither as a format). */
+const FORMATS_PASTE_KEEPS = [
+  'validation',
+  'hyperlink',
+  'hyperlinkDisplay',
+  'hyperlinkTooltip',
+  'hyperlinkLocation',
+  'hyperlinkSpan',
+] as const satisfies readonly (keyof CellFormat)[];
+
 /** The kinds that paste every layer. A paste within one workbook shares its
  *  theme, so the source-theme variant pastes exactly what All does. */
 const pastesAll = (what: PasteKind): boolean =>
@@ -597,25 +608,30 @@ const subtractFromRule = (rule: ConditionalRule, cut: Range): ConditionalRule[] 
 };
 
 /** All and Formats replace the conditional formats of the pasted cells: the
- *  destination's rules lose those cells and the copied rules take them
- *  (an uncovered source leaves none). Cells outside the paste keep theirs. */
+ *  rules lose every `cleared` range (the destination, and a cut's source) and
+ *  the copied rules take the destination (an uncovered source leaves none).
+ *  Cells outside keep theirs. */
 const replaceConditionalRules = (
   store: SpreadsheetStore,
   history: History | null,
   added: readonly ConditionalRule[],
-  destination: Range,
+  cleared: readonly Range[],
 ): void => {
   const current = store.getState().conditional.rules;
-  if (added.length === 0 && !current.some((rule) => rangesIntersect(rule.range, destination))) {
-    return;
-  }
+  const touched = current.some((rule) =>
+    cleared.some((range) => rangesIntersect(rule.range, range)),
+  );
+  if (added.length === 0 && !touched) return;
   recordConditionalRulesChange(history, store, () => {
     store.setState((s) => ({
       ...s,
       conditional: {
         ...s.conditional,
         rules: [
-          ...s.conditional.rules.flatMap((rule) => subtractFromRule(rule, destination)),
+          ...cleared.reduce<ConditionalRule[]>(
+            (rules, range) => rules.flatMap((rule) => subtractFromRule(rule, range)),
+            s.conditional.rules,
+          ),
           ...added,
         ],
       },
@@ -1039,11 +1055,13 @@ function applyPaste(
         });
       } else if (opt.what === 'formats') {
         // Formats copies the source's *absence* of formatting too, but not its
-        // validation: the destination keeps its own rule.
-        const validation = state.format.formats.get(addrKey(addr))?.validation;
+        // validation or hyperlink: the destination keeps its own.
+        const existing = state.format.formats.get(addrKey(addr));
         const next = formatWithoutComment(fmt) ?? {};
-        delete next.validation;
-        if (validation) next.validation = validation;
+        for (const field of FORMATS_PASTE_KEEPS) {
+          delete next[field];
+          if (existing?.[field] !== undefined) Object.assign(next, { [field]: existing[field] });
+        }
         formatWrites.push({
           key: addrKey(addr),
           format: Object.keys(next).length > 0 ? next : null,
@@ -1130,11 +1148,12 @@ function applyPaste(
     if (!opt.transpose && !bandDestination)
       pasteMergedConditionalRules(store, history, snap, destination);
   } else if (wantsFormats(opt.what)) {
+    // A cut moves the rules: the source keeps none of them.
     replaceConditionalRules(
       store,
       history,
       opt.transpose || bandDestination ? [] : translatedConditionalRules(snap, destination),
-      destination,
+      sourceCut ? [destination, sourceLogical] : [destination],
     );
   }
 

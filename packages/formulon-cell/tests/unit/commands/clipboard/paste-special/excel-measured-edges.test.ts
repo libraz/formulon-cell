@@ -186,4 +186,36 @@ describe('paste special edges as Excel measures them', () => {
     pasteFrom(4, 'all', true);
     expect(fmt(0, 2)?.comment).toBe('dst note');
   });
+
+  // pr-cvh.xlsx: a formats paste carries CF but not validation, notes or links.
+  it('formats leaves the destination hyperlink and takes none from the source', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        hyperlink: 'https://example.com/x',
+        hyperlinkTooltip: 'tip',
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 2 },
+      { hyperlink: 'https://dest.example' },
+    );
+    pasteFrom(0, 'formats');
+    expect(fmt(0, 2)?.hyperlink).toBeUndefined();
+    expect(fmt(0, 2)?.hyperlinkTooltip).toBeUndefined();
+    expect(fmt(1, 2)?.hyperlink).toBe('https://dest.example');
+  });
+
+  it('a cut moves the conditional formats with the cells', () => {
+    const snap = captureSnapshot(store.getState(), range(0, 0, 2, 0), 'cut');
+    assertSnap(snap);
+    setActive(store, 0, 6);
+    pasteSpecial(store.getState(), store, wb, snap, opts('all'));
+    for (const row of [0, 1, 2]) {
+      expect(rulesAt(row, 6)).toEqual([2]);
+      expect(rulesAt(row, 0)).toEqual([]);
+    }
+  });
 });
