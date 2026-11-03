@@ -116,7 +116,7 @@ describe('copy', () => {
       expect(copied?.tsv).toBe(expectedTsv);
 
       setRange(localizedStore, 1, 0, 1, 2);
-      pasteTSV(localizedStore.getState(), localizedWb, copied?.tsv ?? '');
+      pasteTSV(localizedStore.getState(), localizedStore, localizedWb, copied?.tsv ?? '');
       expect(localizedWb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
         kind: 'number',
         value: 1.5,
@@ -376,12 +376,12 @@ describe('pasteTSV', () => {
   });
 
   it('returns null on empty payload', () => {
-    expect(pasteTSV(store.getState(), wb, '')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, '')).toBeNull();
   });
 
   it('writes coerced values starting at the active cell', () => {
     setRange(store, 1, 2, 1, 2);
-    const got = pasteTSV(store.getState(), wb, 'foo\t42\r\nTRUE\t=A1');
+    const got = pasteTSV(store.getState(), store, wb, 'foo\t42\r\nTRUE\t=A1');
     wb.recalc();
     expect(got?.writtenRange).toEqual({ sheet: 0, r0: 1, c0: 2, r1: 2, c1: 3 });
     const v00 = wb.getValue({ sheet: 0, row: 1, col: 2 });
@@ -400,7 +400,7 @@ describe('pasteTSV', () => {
       expect(localizedWb.setSpreadsheetProfileId('windows-de_DE')).toBe(true);
       setRange(store, 0, 0, 0, 1);
 
-      pasteTSV(store.getState(), localizedWb, '1,25\t1.234');
+      pasteTSV(store.getState(), store, localizedWb, '1,25\t1.234');
 
       expect(localizedWb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
         kind: 'number',
@@ -420,7 +420,7 @@ describe('pasteTSV', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { numFmt: { kind: 'text' } });
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { numFmt: { kind: 'text' } });
 
-    pasteTSV(store.getState(), wb, '00123\t=A1');
+    pasteTSV(store.getState(), store, wb, '00123\t=A1');
     wb.recalc();
 
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: '00123' });
@@ -430,7 +430,7 @@ describe('pasteTSV', () => {
 
   it('reports the widest row in writtenRange when rows have unequal column counts', () => {
     setRange(store, 0, 0, 0, 0);
-    const got = pasteTSV(store.getState(), wb, 'a\nb\tc\td');
+    const got = pasteTSV(store.getState(), store, wb, 'a\nb\tc\td');
     expect(got?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 2 });
   });
 });

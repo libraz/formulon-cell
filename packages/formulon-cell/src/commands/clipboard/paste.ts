@@ -1,6 +1,7 @@
+import { addrKey } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
-import type { State } from '../../store/store.js';
+import type { CellFormat, SpreadsheetStore, State } from '../../store/store.js';
 import {
   coercedInputToPatch,
   coerceInputForCell,
@@ -11,7 +12,9 @@ import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
 import { isCellWritable } from '../protection.js';
+import { recordFormatChange } from '../slice-history.js';
 import { applyPatchesAtomic } from './apply-patches-atomic.js';
+import { extendTablesForPaste } from './table-extension.js';
 import { parseTSV } from './tsv.js';
 
 export interface PasteResult {
@@ -26,9 +29,15 @@ export interface PasteResult {
  * protected) are silently skipped, mirroring the spreadsheet's paste behaviour.
  * With `history`, the cells are written in one atomic engine call and recorded
  * as a single undo step; without it, each cell goes through the scalar path.
+ *
+ * Like Excel's, the paste also shapes the sheet around the values: a General
+ * cell takes the number format its text implies (`1,234` #,##0, a date,
+ * `12:30` h:mm, `1e3` scientific), and a table the paste lands against grows
+ * over it (see {@link extendTablesForPaste}).
  */
 export function pasteTSV(
   state: State,
+  store: SpreadsheetStore,
   wb: WorkbookHandle,
   text: string,
   history: History | null = null,
@@ -66,6 +75,7 @@ export function pasteTSV(
   const formulas = writes.map(({ input }) => (input.kind === 'formula' ? input.text : null));
   if (blockTableFunction(wb, formulas)) return null;
 
+  const transaction = history?.begin();
   if (history) {
     applyPatchesAtomic(
       wb,
@@ -78,13 +88,41 @@ export function pasteTSV(
     });
   }
 
-  return {
-    writtenRange: {
-      sheet,
-      r0: origin.row,
-      c0: origin.col,
-      r1: origin.row + rows.length - 1,
-      c1: origin.col + Math.max(0, maxCols - 1),
-    },
+  const writtenRange: Range = {
+    sheet,
+    r0: origin.row,
+    c0: origin.col,
+    r1: origin.row + rows.length - 1,
+    c1: origin.col + Math.max(0, maxCols - 1),
   };
+  applyImplicitFormats(store, history, writes);
+  extendTablesForPaste(store, history, writtenRange);
+  if (transaction !== undefined) history?.end(transaction);
+  return { writtenRange };
+}
+
+/** Give each General destination the number format its pasted text implies;
+ *  an explicit format stays. */
+function applyImplicitFormats(
+  store: SpreadsheetStore,
+  history: History | null,
+  writes: readonly { addr: Addr; input: ReturnType<typeof coerceInputForCell> }[],
+): void {
+  const state = store.getState();
+  const updates: { key: string; numFmt: NonNullable<CellFormat['numFmt']> }[] = [];
+  for (const { addr, input } of writes) {
+    if (input.kind !== 'number' || !input.implicitFormat) continue;
+    const key = addrKey(addr);
+    const current = state.format.formats.get(key)?.numFmt;
+    if (current && current.kind !== 'general') continue;
+    updates.push({ key, numFmt: input.implicitFormat });
+  }
+  if (updates.length === 0) return;
+  recordFormatChange(history, store, () => {
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      for (const { key, numFmt } of updates) formats.set(key, { ...formats.get(key), numFmt });
+      return { ...s, format: { ...s.format, formats } };
+    });
+  });
 }

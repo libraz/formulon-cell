@@ -47,7 +47,7 @@ describe('integration: clipboard copy → paste', () => {
 
     // Paste at D5.
     mutators.setActive(instance.store, { sheet: 0, row: 4, col: 3 });
-    const res = pasteTSV(instance.store.getState(), workbook, cp?.tsv ?? '');
+    const res = pasteTSV(instance.store.getState(), instance.store, workbook, cp?.tsv ?? '');
     expect(res).not.toBeNull();
     expect(workbook.getValue({ sheet: 0, row: 4, col: 3 })).toEqual({ kind: 'number', value: 1 });
     expect(workbook.getValue({ sheet: 0, row: 5, col: 4 })).toEqual({ kind: 'number', value: 4 });
@@ -60,14 +60,14 @@ describe('integration: clipboard copy → paste', () => {
     syncToStore();
 
     mutators.setActive(instance.store, { sheet: 0, row: 2, col: 0 });
-    pasteTSV(instance.store.getState(), workbook, '=A1+A2');
+    pasteTSV(instance.store.getState(), instance.store, workbook, '=A1+A2');
 
     expect(workbook.cellFormula({ sheet: 0, row: 2, col: 0 })).toBe('=A1+A2');
   });
 
   it('refuses to paste empty payload', () => {
     const { instance, workbook } = sheet;
-    const res = pasteTSV(instance.store.getState(), workbook, '');
+    const res = pasteTSV(instance.store.getState(), instance.store, workbook, '');
     expect(res).toBeNull();
   });
 

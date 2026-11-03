@@ -99,10 +99,10 @@ describe('PivotTable edit guard', () => {
   it('refuses a paste that reaches a report', async () => {
     const { wb, store } = await setup();
     mutators.setActive(store, { sheet: 0, row: 4, col: 0 });
-    expect(pasteTSV(store.getState(), wb, 'a\tb\nc\td')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, 'a\tb\nc\td')).toBeNull();
     expect(wb.getValue({ sheet: 0, row: 4, col: 0 }).kind).toBe('blank');
     mutators.setActive(store, { sheet: 0, row: 20, col: 0 });
-    expect(pasteTSV(store.getState(), wb, 'a')).not.toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, 'a')).not.toBeNull();
     wb.dispose();
   });
 });

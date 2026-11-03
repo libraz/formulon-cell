@@ -7,9 +7,14 @@
 import { addrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
-import type { CellFormat, State } from '../../store/store.js';
+import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { formatNumber } from '../format.js';
+import type { History } from '../history.js';
+import { recordFormatChange } from '../slice-history.js';
+import { type PasteResult, pasteTSV } from './paste.js';
 import type { ClipboardFormatResolver } from './snapshot.js';
+import { encodeTSV } from './tsv.js';
 
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -157,3 +162,98 @@ export function encodeHtml(
   }
   return `<table>${rows.join('')}</table>`;
 }
+
+/** One cell of a pasted HTML table: its text and the one format Excel keeps. */
+export interface HtmlTableCell {
+  text: string;
+  bold: boolean;
+}
+
+const boldWeight = (weight: string): boolean =>
+  weight === 'bold' || weight === 'bolder' || Number.parseInt(weight, 10) >= 600;
+
+/** Whether all of `cell`'s text is set bold, by its own style or by a
+ *  `<b>` / `<strong>` / bold-weight element around it. */
+const htmlCellBold = (cell: Element): boolean => {
+  const text = (cell.textContent ?? '').trim();
+  if (!text) return false;
+  if (boldWeight((cell as HTMLElement).style?.fontWeight ?? '')) return true;
+  for (const el of Array.from(cell.querySelectorAll('*'))) {
+    const bold =
+      el.tagName === 'B' ||
+      el.tagName === 'STRONG' ||
+      boldWeight((el as HTMLElement).style?.fontWeight ?? '');
+    if (bold && (el.textContent ?? '').trim() === text) return true;
+  }
+  return false;
+};
+
+/**
+ * Read the first `<table>` of an HTML clipboard payload as Excel does: each
+ * row's cells left to right in reading order, `colspan` and `rowspan` ignored
+ * (a spanned cell takes one cell and opens no merge), text and bold kept,
+ * fills and colours dropped. Null when the payload holds no table or no
+ * `DOMParser` is available.
+ */
+export function parseHtmlTable(html: string): HtmlTableCell[][] | null {
+  const Parser = (globalThis as { DOMParser?: typeof DOMParser }).DOMParser;
+  if (!Parser) return null;
+  const table = new Parser().parseFromString(html, 'text/html').querySelector('table');
+  if (!table) return null;
+  return Array.from(table.querySelectorAll('tr')).map((tr) =>
+    Array.from(tr.children)
+      .filter((cell) => cell.tagName === 'TD' || cell.tagName === 'TH')
+      .map((cell) => ({ text: (cell.textContent ?? '').trim(), bold: htmlCellBold(cell) })),
+  );
+}
+
+/**
+ * Paste an HTML table at the active cell: the cells as {@link parseHtmlTable}
+ * reads them, typed as pasted text is, with bold applied where the source
+ * set it. Null when the payload holds no table.
+ */
+export function pasteHtml(
+  state: State,
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  html: string,
+  history: History | null = null,
+): PasteResult | null {
+  const rows = parseHtmlTable(html);
+  if (!rows || rows.length === 0) return null;
+  const transaction = history?.begin();
+  try {
+    const result = pasteTSV(
+      state,
+      store,
+      wb,
+      encodeTSV(rows.map((row) => row.map((cell) => cell.text))),
+      history,
+    );
+    if (!result) return null;
+    const { sheet, r0, c0 } = result.writtenRange;
+    const bold = rows.flatMap((row, r) =>
+      row.flatMap((cell, c) => (cell.bold ? [{ sheet, row: r0 + r, col: c0 + c }] : [])),
+    );
+    if (bold.length > 0) {
+      recordFormatChange(history, store, () => {
+        for (const addr of bold) mutators.setCellFormat(store, addr, { bold: true });
+      });
+    }
+    return result;
+  } finally {
+    if (transaction !== undefined) history?.end(transaction);
+  }
+}
+
+/** Marks the HTML this workbook writes to the system clipboard. That HTML
+ *  shows numbers as displayed, so a paste of it goes through the lossless
+ *  plain text written beside it instead of {@link pasteHtml}. */
+const CLIPBOARD_HTML_GENERATOR = '<meta name="generator" content="formulon-cell">';
+
+/** The clipboard HTML for `tables`, marked as this workbook's own. */
+export const clipboardHtml = (tables: string): string => `${CLIPBOARD_HTML_GENERATOR}${tables}`;
+
+/** Whether `html` is clipboard HTML this workbook wrote. */
+export const isOwnClipboardHtml = (html: string): boolean =>
+  html.includes(CLIPBOARD_HTML_GENERATOR);

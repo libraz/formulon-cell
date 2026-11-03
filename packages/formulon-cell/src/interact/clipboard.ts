@@ -2,7 +2,13 @@ import { type CopyResult, copy, planCopyRanges } from '../commands/clipboard/cop
 import { cut } from '../commands/clipboard/cut.js';
 import { createDrawingClipboard } from '../commands/clipboard/drawing.js';
 import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.js';
-import { encodeHtml } from '../commands/clipboard/html.js';
+import {
+  clipboardHtml,
+  encodeHtml,
+  isOwnClipboardHtml,
+  parseHtmlTable,
+  pasteHtml,
+} from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import {
   materializedPasteCells,
@@ -356,9 +362,11 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     result: CopyResult,
     resolveFormat = formatResolverFor(state),
   ): string =>
-    materializedRanges(result)
-      .map((range) => encodeHtml(state, range, inputLocaleForWorkbook(wb), resolveFormat))
-      .join('');
+    clipboardHtml(
+      materializedRanges(result)
+        .map((range) => encodeHtml(state, range, inputLocaleForWorkbook(wb), resolveFormat))
+        .join(''),
+    );
   const hasPastePayload = (text: string): boolean =>
     text.length > 0 ||
     (snapshot !== null && snapshotText === text && hasLiveInternalPayload(store.getState()));
@@ -394,9 +402,13 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     payloadRevision = null;
   };
 
-  const pasteFromClipboardText = (
+  /** Paste the clipboard: the internal copy when it is still what the
+   *  clipboard holds, else an HTML table from another application, else the
+   *  plain text. */
+  const pasteFromClipboard = (
     state: State,
     text: string,
+    html: string,
   ): { result: { writtenRange: Range } | null; activation: PasteOptionsActivation | null } => {
     if (snapshot && snapshotText === text && hasLiveInternalPayload(state)) {
       const source = snapshot;
@@ -428,7 +440,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     snapshot = null;
     snapshotText = null;
     payloadRevision = null;
-    return { result: pasteTSV(state, wb, text, history), activation: null };
+    if (html && !isOwnClipboardHtml(html) && parseHtmlTable(html)?.length) {
+      return { result: pasteHtml(state, store, wb, html, history), activation: null };
+    }
+    return { result: pasteTSV(state, store, wb, text, history), activation: null };
   };
 
   const onCopy = (e: ClipboardEvent): void => {
@@ -510,6 +525,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
     const text = e.clipboardData?.getData('text/plain') ?? '';
+    const html = e.clipboardData?.getData('text/html') ?? '';
     if (pasteDrawing(text)) {
       e.preventDefault();
       return;
@@ -535,7 +551,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       let r: { writtenRange: Range } | null = null;
       let activation: PasteOptionsActivation | null = null;
       try {
-        ({ result: r, activation } = pasteFromClipboardText(store.getState(), text));
+        ({ result: r, activation } = pasteFromClipboard(store.getState(), text, html));
       } finally {
         if (history) history.end();
       }
@@ -555,12 +571,39 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   host.addEventListener('cut', onCut);
   host.addEventListener('paste', onPaste);
 
-  const writeClipboardText = async (tsv: string): Promise<void> => {
+  /** Write `text` and, where the browser takes a ClipboardItem, `html` beside
+   *  it, as the native copy event does; plain text alone otherwise. */
+  const writeClipboard = async (text: string, html: string | null): Promise<void> => {
     try {
-      await navigator.clipboard?.writeText(tsv);
+      const Item = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+      if (html !== null && Item && navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new Item({
+            'text/plain': new Blob([text], { type: 'text/plain' }),
+            'text/html': new Blob([html], { type: 'text/html' }),
+          }),
+        ]);
+        return;
+      }
+      await navigator.clipboard?.writeText(text);
     } catch (err) {
       console.warn('formulon-cell: clipboard write failed', err);
     }
+  };
+
+  /** Read the clipboard's plain text and HTML; HTML only where the browser
+   *  can read typed items, plain text through readText otherwise. */
+  const readClipboard = async (): Promise<{ text: string; html: string }> => {
+    const clipboard = navigator.clipboard;
+    if (clipboard?.read) {
+      const items = await clipboard.read();
+      const typed = async (type: string): Promise<string> => {
+        const item = items.find((entry) => entry.types.includes(type));
+        return item ? (await item.getType(type)).text() : '';
+      };
+      return { text: await typed('text/plain'), html: await typed('text/html') };
+    }
+    return { text: (await clipboard?.readText?.()) ?? '', html: '' };
   };
 
   const runShortcut = async (kind: 'copy' | 'cut' | 'paste'): Promise<void> => {
@@ -569,7 +612,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (s.ui.editor.kind !== 'idle') return;
     if (kind !== 'paste' && s.ui.selectedObject) {
       const text = takeDrawing(kind);
-      if (text !== null) await writeClipboardText(text);
+      if (text !== null) await writeClipboard(text, null);
       return;
     }
     if (kind === 'copy') {
@@ -590,7 +633,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       if (r.ranges) mutators.setCopyRanges(store, r.ranges);
       else mutators.setCopyRange(store, r.range);
       payloadRevision = store.getState().ui.copyRevision ?? 0;
-      await writeClipboardText(snapshotText ?? r.tsv);
+      await writeClipboard(
+        snapshotText ?? r.tsv,
+        isRestricted() ? null : encodeMaterializedHtml(s, r),
+      );
       return;
     }
     if (kind === 'cut') {
@@ -602,20 +648,21 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       snapshotText = r.tsv;
       mutators.setCopyRange(store, r.range, 'cut');
       payloadRevision = store.getState().ui.copyRevision ?? 0;
-      await writeClipboardText(r.tsv);
+      await writeClipboard(r.tsv, encodeMaterializedHtml(s, r));
       return;
     }
     // paste
     const requestedRevision = s.ui.copyRevision ?? 0;
     let text = '';
+    let html = '';
     try {
-      if (!navigator.clipboard?.readText) {
+      if (!navigator.clipboard?.readText && !navigator.clipboard?.read) {
         if (pasteDrawing(null)) return;
         const internal = activeInternalText();
         if (internal === null) return;
         text = internal;
       } else {
-        text = (await navigator.clipboard.readText()) ?? '';
+        ({ text, html } = await readClipboard());
       }
     } catch (err) {
       if ((store.getState().ui.copyRevision ?? 0) !== requestedRevision) return;
@@ -650,7 +697,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       let r: { writtenRange: Range } | null = null;
       let activation: PasteOptionsActivation | null = null;
       try {
-        ({ result: r, activation } = pasteFromClipboardText(store.getState(), text));
+        ({ result: r, activation } = pasteFromClipboard(store.getState(), text, html));
       } finally {
         if (history) history.end();
       }

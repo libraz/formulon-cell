@@ -23,7 +23,7 @@ describe('integration: formula input reference style', () => {
         mutators.setActive(store, D4);
         workbook.setNumber(E4, 19);
 
-        expect(pasteTSV(store.getState(), workbook, '=RC5')).not.toBeNull();
+        expect(pasteTSV(store.getState(), store, workbook, '=RC5')).not.toBeNull();
         expect(workbook.cellFormula(D4)).toBe(r1c1 ? '=$E4' : '=RC5');
         if (r1c1) expect(workbook.getValue(D4)).toEqual({ kind: 'number', value: 19 });
       } finally {

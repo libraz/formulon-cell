@@ -2,7 +2,8 @@ import { addrKey } from '../../engine/address.js';
 import type { Addr, CellValue, Range } from '../../engine/types.js';
 import { isDataTableFormula } from '../../engine/workbook-handle-data-tables.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
-import type { CellFormat, State } from '../../store/store.js';
+import type { CellFormat, ConditionalRule, State } from '../../store/store.js';
+import { shiftFormulaRefs } from '../formula-refs.js';
 import type { CopyRangePlan, CopyResult } from './copy.js';
 
 /**
@@ -55,6 +56,9 @@ export interface ClipboardSnapshot {
   /** Captured column widths keyed by offset from `logicalRange.c0`. These are
    *  populated for whole-column copies; ordinary snapshots leave them empty. */
   colWidths?: Map<number, number>;
+  /** The part of each conditional-format rule that covers `range`, in sheet
+   *  coordinates; a formula rule is re-anchored to its clipped top-left. */
+  conditional?: ConditionalRule[];
 }
 
 /**
@@ -80,6 +84,31 @@ const cloneFormat = (format: Partial<CellFormat>): CellFormat => {
   if (format.borders) clone.borders = { ...format.borders };
   if (format.phonetic) clone.phonetic = format.phonetic.map((run) => ({ ...run }));
   return clone;
+};
+
+const clippedConditionalRules = (state: State, range: Range): ConditionalRule[] => {
+  const out: ConditionalRule[] = [];
+  for (const rule of state.conditional.rules) {
+    const r = rule.range;
+    if (r.sheet !== range.sheet) continue;
+    const clip = {
+      sheet: r.sheet,
+      r0: Math.max(r.r0, range.r0),
+      c0: Math.max(r.c0, range.c0),
+      r1: Math.min(r.r1, range.r1),
+      c1: Math.min(r.c1, range.c1),
+    };
+    if (clip.r0 > clip.r1 || clip.c0 > clip.c1) continue;
+    const copy = structuredClone(rule);
+    copy.range = clip;
+    // A loaded rule's engine id belongs to the source; a pasted copy is new.
+    delete copy.engineId;
+    if (copy.kind === 'formula') {
+      copy.formula = shiftFormulaRefs(copy.formula, clip.r0 - r.r0, clip.c0 - r.c0);
+    }
+    out.push(copy);
+  }
+  return out;
 };
 
 export function captureSnapshot(
@@ -152,6 +181,7 @@ export function captureSnapshot(
     cols,
     cells: grid,
     merges,
+    conditional: clippedConditionalRules(state, range),
     mode,
     rowHeights: new Map(),
     colWidths: new Map(),

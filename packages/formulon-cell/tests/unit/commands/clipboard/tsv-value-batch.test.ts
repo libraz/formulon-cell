@@ -96,7 +96,7 @@ describe('TSV paste value batching', () => {
       mutators.setCellFormat(store, { sheet: 0, row: 0, col: 3 }, { numFmt: { kind: 'text' } });
       const tsv = "1,25\t5%\t31.12.2024\t00123\t'0042\t=SUM(RC[-5]:RC[-5])\t#NV\ntail";
 
-      const result = pasteTSV(store.getState(), wb, tsv, history);
+      const result = pasteTSV(store.getState(), store, wb, tsv, history);
       const expectedDate = coerceInput('31.12.2024', { locale: 'de-DE' });
 
       expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 6 });
@@ -125,8 +125,15 @@ describe('TSV paste value batching', () => {
       });
       expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'tail' });
       expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'blank' });
-      expect(store.getState().format.formats.has('0:0:1')).toBe(false);
-      expect(store.getState().format.formats.has('0:0:2')).toBe(false);
+      // A General cell takes the format the pasted text implies, as Excel does.
+      const percent = coerceInput('5%', { locale: 'de-DE' });
+      if (percent.kind !== 'number' || !percent.implicitFormat || !expectedDate.implicitFormat) {
+        throw new Error('expected implied formats');
+      }
+      expect(store.getState().format.formats.get('0:0:1')?.numFmt).toEqual(percent.implicitFormat);
+      expect(store.getState().format.formats.get('0:0:2')?.numFmt).toEqual(
+        expectedDate.implicitFormat,
+      );
     } finally {
       wb.dispose();
     }
@@ -141,7 +148,7 @@ describe('TSV paste value batching', () => {
       setProtectedSheet(store, 0, true);
       mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { locked: false });
 
-      const result = pasteTSV(store.getState(), wb, 'allowed\tlocked', history);
+      const result = pasteTSV(store.getState(), store, wb, 'allowed\tlocked', history);
 
       expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
@@ -172,7 +179,7 @@ describe('TSV paste value batching', () => {
         if (event.kind === 'recalc') recalcs += 1;
       });
 
-      const result = pasteTSV(store.getState(), wb, '=1+1\t3', history);
+      const result = pasteTSV(store.getState(), store, wb, '=1+1\t3', history);
       unsubscribe();
 
       expect(result).not.toBeNull();
@@ -222,7 +229,7 @@ describe('TSV paste value batching', () => {
       const historyPush = vi.spyOn(history, 'push');
 
       try {
-        expect(() => pasteTSV(store.getState(), wb, '1\t2\t3', history)).toThrow(
+        expect(() => pasteTSV(store.getState(), store, wb, '1\t2\t3', history)).toThrow(
           'injected TSV failure',
         );
         expect(addresses.map((addr) => wb.getValue(addr))).toEqual([
@@ -331,7 +338,7 @@ describe('TSV paste value batching', () => {
     const store = createSpreadsheetStore();
     try {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
-      expect(pasteTSV(store.getState(), wb, '11\t22')).not.toBeNull();
+      expect(pasteTSV(store.getState(), store, wb, '11\t22')).not.toBeNull();
       expect(wb.undo()).toBe(true);
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 11 });
       expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });

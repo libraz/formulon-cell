@@ -106,11 +106,11 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
   it('refuses a paste that reaches the results', async () => {
     const { wb, store, alerts } = await setup();
     mutators.setActive(store, at(4, 1));
-    expect(pasteTSV(store.getState(), wb, 'a\tb')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, 'a\tb')).toBeNull();
     expect(alerts).toEqual([en.dataTableDialog.cannotChange]);
     expect(wb.getValue(at(4, 1))).toEqual({ kind: 'number', value: 3 });
     mutators.setActive(store, at(10, 0));
-    expect(pasteTSV(store.getState(), wb, 'a')).not.toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, 'a')).not.toBeNull();
     wb.dispose();
   });
 
@@ -347,7 +347,7 @@ describe.skipIf(!canLoadWasm())('data table edit guard', () => {
     expect(text.status).toBe('applied');
 
     mutators.setActive(store, at(10, 0));
-    expect(pasteTSV(store.getState(), wb, '1\t=SUM(1,TABLE(,A1))')).toBeNull();
+    expect(pasteTSV(store.getState(), store, wb, '1\t=SUM(1,TABLE(,A1))')).toBeNull();
     expect(alerts).toEqual([en.dataTableDialog.tableFunction]);
     expect(wb.getValue(at(10, 0))).toEqual({ kind: 'blank' });
     wb.dispose();

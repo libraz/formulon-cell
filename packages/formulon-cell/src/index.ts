@@ -60,7 +60,10 @@ export type {
   PasteSpecialResult,
   PasteWhat,
 } from './commands/clipboard/paste-special.js';
-export { pasteSpecial as applyPasteSpecial } from './commands/clipboard/paste-special.js';
+export {
+  pasteLink,
+  pasteSpecial as applyPasteSpecial,
+} from './commands/clipboard/paste-special.js';
 export type {
   ClipboardCell,
   ClipboardSnapshot,

@@ -109,7 +109,7 @@ function runInsertCopiedBand(ctx: ContextMenuInsertCopiedContext, kind: 'row' | 
           history,
         );
       } else {
-        pasteTSV(next, wb, text, history);
+        pasteTSV(next, store, wb, text, history);
       }
     } catch (err) {
       console.warn('formulon-cell: insert copied cells failed', err);

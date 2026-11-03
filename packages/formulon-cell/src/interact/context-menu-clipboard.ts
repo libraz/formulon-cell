@@ -243,7 +243,7 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
                   history,
                 )
               : text
-                ? pasteTSV(store.getState(), wb, text, history)
+                ? pasteTSV(store.getState(), store, wb, text, history)
                 : null;
           } finally {
             if (history) history.end();

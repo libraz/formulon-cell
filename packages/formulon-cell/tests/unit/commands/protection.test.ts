@@ -505,7 +505,7 @@ describe('pasteTSV protection gate', () => {
     // Unlock B1 only.
     setCellLocked(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, false);
     mutators.setSheetProtected(store, 0, true);
-    const result = pasteTSV(store.getState(), wb, 'foo\tbar\tbaz');
+    const result = pasteTSV(store.getState(), store, wb, 'foo\tbar\tbaz');
     wb.recalc();
     // A1 (locked) — engine cell should remain blank.
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');

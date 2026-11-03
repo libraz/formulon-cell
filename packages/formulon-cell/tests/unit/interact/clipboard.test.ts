@@ -171,7 +171,12 @@ describe('attachClipboard', () => {
       expect(transfer.getData('text/html')).toContain(expectedTsv.split('\t')[1] ?? '');
 
       setRange(localizedStore, 1, 0, 1, 2);
-      pasteTSV(localizedStore.getState(), localizedWb, transfer.getData('text/plain'));
+      pasteTSV(
+        localizedStore.getState(),
+        localizedStore,
+        localizedWb,
+        transfer.getData('text/plain'),
+      );
       expect(localizedWb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
         kind: 'number',
         value: 1.5,

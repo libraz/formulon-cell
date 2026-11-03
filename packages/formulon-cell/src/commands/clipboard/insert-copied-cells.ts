@@ -12,6 +12,7 @@ import { mutators, type SpreadsheetStore, type State } from '../../store/store.j
 import {
   canShiftMerges,
   captureShiftReplayCheckpoint,
+  deleteCells,
   restoreShiftReplayCheckpoint,
   type ShiftHistoryReplayRecovery,
   shiftCellsWithHistory,
@@ -64,6 +65,95 @@ export type InsertCopiedBandTarget = Range | Addr;
 const MAX_INSERT_COPIED_CELLS = 100_000;
 
 export function insertCopiedCellsFromTSV(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  text: string,
+  direction: InsertCopiedCellsDirection,
+  snapshot?: ClipboardSnapshot | null,
+): InsertCopiedCellsResult | null {
+  if (snapshot?.mode !== 'cut') {
+    return insertCellsAtActive(store, wb, history, text, direction, snapshot);
+  }
+  return insertCutCells(store, wb, history, text, direction, snapshot);
+}
+
+/**
+ * Insert Cut Cells moves the cut block: the source closes up (shift up for a
+ * downward insert, left for a rightward one) and the cells are inserted at
+ * the target, which moves with that close-up when it sits past the source in
+ * the same columns (rows). Cutting AD1:AD2 of 1..4 and inserting at AD4
+ * leaves 3, 1, 2, 4. A target that only partly shares the source's columns
+ * (rows), or lies inside the source, is refused.
+ */
+function insertCutCells(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  text: string,
+  direction: InsertCopiedCellsDirection,
+  snapshot: ClipboardSnapshot,
+): InsertCopiedCellsResult | null {
+  const source = snapshot.range;
+  const origin = store.getState().selection.active;
+  let target = origin;
+  if (origin.sheet === source.sheet) {
+    const down = direction === 'down';
+    const span0 = down ? origin.col : origin.row;
+    const span1 = span0 + (down ? snapshot.cols : snapshot.rows) - 1;
+    const src0 = down ? source.c0 : source.r0;
+    const src1 = down ? source.c1 : source.r1;
+    const along = down ? origin.row : origin.col;
+    const alongStart = down ? source.r0 : source.c0;
+    const alongEnd = down ? source.r1 : source.c1;
+    const shared = span0 <= src1 && span1 >= src0;
+    if (shared) {
+      if (span0 !== src0 || span1 !== src1) return null;
+      if (along >= alongStart && along <= alongEnd) return null;
+      if (along > alongEnd) {
+        const size = alongEnd - alongStart + 1;
+        target = down
+          ? { ...origin, row: origin.row - size }
+          : { ...origin, col: origin.col - size };
+      }
+    }
+  }
+  // Both steps run against checkpoints of every sheet they touch, so a
+  // failure after the close-up puts the workbook back whether or not a
+  // history is recording.
+  const checkpoints = [...new Set([source.sheet, target.sheet])].map((sheet) => {
+    const span: Range = { sheet, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL };
+    return { span, checkpoint: captureShiftReplayCheckpoint(wb, store, span) };
+  });
+  const rollback = (): void => {
+    for (const { span, checkpoint } of checkpoints) {
+      restoreShiftReplayCheckpoint(wb, store, span, checkpoint);
+    }
+  };
+  const transaction = history?.begin();
+  let result: InsertCopiedCellsResult | null = null;
+  try {
+    if (deleteCells(store, wb, history, source, direction === 'down' ? 'up' : 'left')) {
+      mutators.setActive(store, target);
+      result = insertCellsAtActive(store, wb, history, text, direction, snapshot);
+    }
+  } catch (error) {
+    if (transaction !== undefined) history?.abort(transaction);
+    rollback();
+    throw error;
+  }
+  if (!result) {
+    if (transaction !== undefined) history?.abort(transaction);
+    rollback();
+    return null;
+  }
+  mutators.setCopyRange(store, null);
+  mutators.setCopyRanges(store, null);
+  if (transaction !== undefined) history?.end(transaction);
+  return result;
+}
+
+function insertCellsAtActive(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   history: History | null,
