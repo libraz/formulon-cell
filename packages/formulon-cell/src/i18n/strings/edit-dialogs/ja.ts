@@ -68,6 +68,22 @@ export const editDialogsJa: EditDialogsStrings = {
     cancel: 'キャンセル',
     ok: 'OK',
   },
+  dimensionDialog: {
+    rowHeightTitle: '行の高さ',
+    rowHeightLabel: '行の高さ:',
+    colWidthTitle: '列の幅',
+    colWidthLabel: '列の幅:',
+  },
+  cellShiftDialog: {
+    insertTitle: '挿入',
+    deleteTitle: '削除',
+    shiftRight: '右方向にシフト',
+    shiftDown: '下方向にシフト',
+    shiftLeft: '左方向にシフト',
+    shiftUp: '上方向にシフト',
+    entireRow: '行全体',
+    entireColumn: '列全体',
+  },
   insertCopiedCellsDialog: {
     title: 'コピーしたセルを挿入',
     shiftRight: '右方向にシフト',

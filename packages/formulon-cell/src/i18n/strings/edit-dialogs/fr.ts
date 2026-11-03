@@ -68,6 +68,22 @@ export const editDialogsFr: EditDialogsStrings = {
     cancel: 'Annuler',
     ok: 'OK',
   },
+  dimensionDialog: {
+    rowHeightTitle: 'Hauteur de ligne',
+    rowHeightLabel: 'Hauteur de ligne :',
+    colWidthTitle: 'Largeur de colonne',
+    colWidthLabel: 'Largeur de colonne :',
+  },
+  cellShiftDialog: {
+    insertTitle: 'Insertion de cellule',
+    deleteTitle: 'Supprimer',
+    shiftRight: 'Décaler les cellules vers la droite',
+    shiftDown: 'Décaler les cellules vers le bas',
+    shiftLeft: 'Décaler les cellules vers la gauche',
+    shiftUp: 'Décaler les cellules vers le haut',
+    entireRow: 'Ligne entière',
+    entireColumn: 'Colonne entière',
+  },
   insertCopiedCellsDialog: {
     title: 'Insérer les cellules copiées',
     shiftRight: 'Décaler les cellules vers la droite',

@@ -16,6 +16,7 @@
 @import "./app/format-dialog/swatches-and-lines.css";
 @import "./app/format-dialog/borders.css";
 @import "./app/format-dialog/footer.css";
+@import "./app/format-dialog/mac.css";
 @import "./app/dialog-modules/format-dialog-mobile.css";
 @import "./app/dialog-modules/conditional-and-names.css";
 @import "./app/dialog-modules/pivot.css";
@@ -28,6 +29,7 @@
 @import "./app/dialog-modules/mac-formula-palette.css";
 @import "./app/dialog-modules/paste-special.css";
 @import "./app/dialog-modules/insert-copied-cells.css";
+@import "./app/dialog-modules/dimension.css";
 @import "./app/dialog-modules/custom-select.css";
 @import "./app/editor-popups.css";
 @import "./app/dialogs/iterative.css";

@@ -181,7 +181,7 @@ describe('attachContextMenu', () => {
       const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
       const input = dialog?.querySelector<HTMLInputElement>('input');
       if (!input) throw new Error('Row height prompt input was not rendered');
-      expect(dialog?.textContent).toContain(en.ribbonMenu.rowHeightLabel);
+      expect(dialog?.textContent).toContain(en.dimensionDialog.rowHeightLabel);
       expect(input.value).toBe('15');
       input.value = '30';
       dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));

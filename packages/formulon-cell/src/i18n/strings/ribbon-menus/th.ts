@@ -31,8 +31,6 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     autoFitRowHeight: 'ปรับความสูงของแถวให้พอดีอัตโนมัติ',
     colWidth: 'ความกว้างของคอลัมน์…',
     autoFitColWidth: 'ปรับความกว้างของคอลัมน์ให้พอดีอัตโนมัติ',
-    rowHeightLabel: 'ความสูงของแถว:',
-    colWidthLabel: 'ความกว้างของคอลัมน์:',
     sheetNameLabel: 'ชื่อแผ่นงาน',
     sheetNameRequired: 'ใส่ชื่อแผ่นงาน',
     renameSheet: 'เปลี่ยนชื่อแผ่นงาน',

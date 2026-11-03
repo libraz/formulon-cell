@@ -30,8 +30,6 @@ export interface RibbonMenusStrings {
     autoFitRowHeight: string;
     colWidth: string;
     autoFitColWidth: string;
-    rowHeightLabel: string;
-    colWidthLabel: string;
     sheetNameLabel: string;
     sheetNameRequired: string;
     renameSheet: string;

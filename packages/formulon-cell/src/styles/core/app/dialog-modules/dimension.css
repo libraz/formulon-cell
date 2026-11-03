@@ -1,0 +1,85 @@
+@layer fc.app {
+  /* Mac Row Height / Column Width, measured from Excel for Mac (pt = CSS px):
+   * a 221 px panel, the title in a 32 px header over a rule, the label and a
+   * 91 / 72 px field, and Cancel / OK as two 86 px buttons filling the last
+   * row. The two dialogs place the field at different depths. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg {
+    width: 221px;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-fmtdlg__header {
+    height: 32px;
+    min-height: 0;
+    margin: 0;
+    padding: 8px 17px 0;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--fc-rule);
+    line-height: 16px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-fmtdlg__body {
+    margin: 0;
+    padding: 18px 18px 0;
+    border: 0;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg--col .fc-fmtdlg__body {
+    padding-top: 7px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-fmtdlg__row {
+    margin: 0;
+    padding: 0;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-tb__dlg__label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-tb__dlg__input {
+    flex: none;
+    width: 91px;
+    height: 26px;
+    box-sizing: border-box;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg--col .fc-tb__dlg__input {
+    width: 72px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-fmtdlg__footer {
+    display: grid;
+    grid-template-columns: 86px 86px;
+    justify-content: start;
+    gap: 10px;
+    margin: 0;
+    padding: 8px 19px 19px 18px;
+    border-top: 0;
+    background: none;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg--col .fc-fmtdlg__footer {
+    padding-top: 11px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-fmtdlg__btn {
+    min-width: 0;
+    height: 26px;
+    padding: 0;
+    white-space: nowrap;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-tb__dlg__error {
+    margin: 0;
+  }
+}

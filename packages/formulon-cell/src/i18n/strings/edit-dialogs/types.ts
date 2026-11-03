@@ -66,6 +66,24 @@ export interface EditDialogsStrings {
     cancel: string;
     ok: string;
   };
+  /** Row Height / Column Width: window titles and field labels. */
+  dimensionDialog: {
+    rowHeightTitle: string;
+    rowHeightLabel: string;
+    colWidthTitle: string;
+    colWidthLabel: string;
+  };
+  /** Insert / Delete cells: the shift-or-whole-line chooser. */
+  cellShiftDialog: {
+    insertTitle: string;
+    deleteTitle: string;
+    shiftRight: string;
+    shiftDown: string;
+    shiftLeft: string;
+    shiftUp: string;
+    entireRow: string;
+    entireColumn: string;
+  };
   insertCopiedCellsDialog: {
     title: string;
     shiftRight: string;

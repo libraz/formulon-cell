@@ -66,6 +66,22 @@ export const editDialogsTh: EditDialogsStrings = {
     cancel: 'ยกเลิก',
     ok: 'ตกลง',
   },
+  dimensionDialog: {
+    rowHeightTitle: 'ความสูงของแถว',
+    rowHeightLabel: 'ความสูงของแถว:',
+    colWidthTitle: 'ความกว้างของคอลัมน์',
+    colWidthLabel: 'ความกว้างของคอลัมน์:',
+  },
+  cellShiftDialog: {
+    insertTitle: 'แทรก',
+    deleteTitle: 'ลบ',
+    shiftRight: 'เลื่อนเซลล์ไปทางขวา',
+    shiftDown: 'เลื่อนเซลล์ลง',
+    shiftLeft: 'เลื่อนเซลล์ไปทางซ้าย',
+    shiftUp: 'เลื่อนเซลล์ขึ้น',
+    entireRow: 'ทั้งแถว',
+    entireColumn: 'ทั้งคอลัมน์',
+  },
   insertCopiedCellsDialog: {
     title: 'แทรกเซลล์ที่คัดลอก',
     shiftRight: 'เลื่อนเซลล์ไปทางขวา',

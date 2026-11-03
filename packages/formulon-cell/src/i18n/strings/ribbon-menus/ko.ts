@@ -31,8 +31,6 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     autoFitRowHeight: '행 높이 자동 맞춤',
     colWidth: '열 너비…',
     autoFitColWidth: '열 너비 자동 맞춤',
-    rowHeightLabel: '행 높이:',
-    colWidthLabel: '열 너비:',
     sheetNameLabel: '시트 이름',
     sheetNameRequired: '시트 이름을 입력하세요.',
     renameSheet: '시트 이름 바꾸기',

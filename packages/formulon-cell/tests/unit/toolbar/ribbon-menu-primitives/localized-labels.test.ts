@@ -156,8 +156,9 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(cellFormatSource).toContain('showRenameSheetDialog');
     expect(cellFormatSource).toContain('t.sheetNameLabel');
     expect(cellFormatSource).toContain('t.sheetNameRequired');
-    expect(cellFormatSource).toContain('t.rowHeightLabel');
-    expect(cellFormatSource).toContain('t.colWidthLabel');
+    // Row Height / Column Width wording lives with the dimension dialog itself.
+    expect(cellFormatSource).toContain("deps.promptDimension('row'");
+    expect(cellFormatSource).toContain("deps.promptDimension('col'");
     expect(dynamicDefaultsSource).toContain('showDimensionDialog({');
     expect(cellFormatSource).not.toContain("ribbonLang === 'ja' ? 'シート名'");
     expect(cellFormatSource).not.toContain('Enter a sheet name.');

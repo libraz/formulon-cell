@@ -36,6 +36,8 @@ export interface NumberPromptOptions {
   locale?: string | (() => string);
   /** Require a whole number. `step` controls the spinner increment only. */
   integer?: boolean;
+  /** Extra classes on the dialog panel, for a dialog-specific layout. */
+  panelClasses?: readonly string[];
 }
 
 export interface ConfirmOptions {
@@ -93,6 +95,7 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> =>
 export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | null> =>
   new Promise<number | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title });
+    if (opts.panelClasses) shell.panel.classList.add(...opts.panelClasses);
     const getLocale = (): string =>
       typeof opts.locale === 'function' ? opts.locale() : (opts.locale ?? 'en-US');
     const locale = getLocale();

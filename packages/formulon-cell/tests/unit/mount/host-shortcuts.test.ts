@@ -243,7 +243,7 @@ describe('mount/host-shortcuts', () => {
     s.handler(e);
     expect(document.querySelector('.fc-cellshift')).not.toBeNull();
     expect(document.querySelector('.fc-cellshift')?.getAttribute('aria-label')).toBe(
-      kind === 'insert' ? en.ribbonMenu.insertCells : en.ribbonMenu.deleteCells,
+      kind === 'insert' ? en.cellShiftDialog.insertTitle : en.cellShiftDialog.deleteTitle,
     );
     expect(e.defaultPrevented).toBe(true);
   });

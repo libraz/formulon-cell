@@ -1215,8 +1215,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       case 'rowHeight':
       case 'colWidth': {
         const rows = id === 'rowHeight';
-        const title = rows ? strings.ribbonMenu.rowHeight : strings.ribbonMenu.colWidth;
-        const label = rows ? strings.ribbonMenu.rowHeightLabel : strings.ribbonMenu.colWidthLabel;
         const run = rows ? runRowHeightDialog : runColumnWidthDialog;
         void run({
           store,
@@ -1225,12 +1223,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           range: state.selection.range,
           prompt: (initial, max) =>
             showDimensionDialog({
-              title,
-              label,
+              axis: rows ? 'row' : 'col',
+              strings,
               initial,
               max,
-              okLabel: strings.hyperlinkDialog.ok,
-              cancelLabel: strings.hyperlinkDialog.cancel,
               locale: deps.getLocale,
             }),
         });

@@ -31,8 +31,6 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     autoFitRowHeight: '行の高さの自動調整',
     colWidth: '列の幅...',
     autoFitColWidth: '列の幅の自動調整',
-    rowHeightLabel: '行の高さ:',
-    colWidthLabel: '列の幅:',
     sheetNameLabel: 'シート名',
     sheetNameRequired: 'シート名を入力してください。',
     renameSheet: 'シート名の変更',

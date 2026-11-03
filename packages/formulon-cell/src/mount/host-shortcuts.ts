@@ -1,4 +1,3 @@
-import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction, fillOutputRange } from '../commands/fill.js';
@@ -36,7 +35,7 @@ import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { excelSerialFromParts } from '../format/date-serial.js';
 import type { Strings } from '../i18n/strings.js';
-import { openCellShiftDialog } from '../interact/cell-shift-dialog.js';
+import { openCellShiftDialog, runCellShiftChoice } from '../interact/cell-shift-dialog.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -332,17 +331,10 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         host: input.host,
         strings: input.strings(),
         kind,
-        onSubmit: (direction) => {
+        onSubmit: (choice) => {
           const range = input.store.getState().selection.range;
-          const changed =
-            kind === 'insert'
-              ? direction === 'down' || direction === 'right'
-                ? insertCells(input.store, currentWb, input.history, range, direction)
-                : false
-              : direction === 'up' || direction === 'left'
-                ? deleteCells(input.store, currentWb, input.history, range, direction)
-                : false;
-          if (!changed) return;
+          const target = { store: input.store, wb: currentWb, history: input.history };
+          if (!runCellShiftChoice(target, kind, range, choice)) return;
           mutators.replaceCells(
             input.store,
             currentWb.cells(input.store.getState().data.sheetIndex),

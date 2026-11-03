@@ -66,6 +66,22 @@ export const editDialogsZh: EditDialogsStrings = {
     cancel: '取消',
     ok: '确定',
   },
+  dimensionDialog: {
+    rowHeightTitle: '行高',
+    rowHeightLabel: '行高:',
+    colWidthTitle: '列宽',
+    colWidthLabel: '列宽:',
+  },
+  cellShiftDialog: {
+    insertTitle: '插入',
+    deleteTitle: '删除',
+    shiftRight: '活动单元格右移',
+    shiftDown: '活动单元格下移',
+    shiftLeft: '右侧单元格左移',
+    shiftUp: '下方单元格上移',
+    entireRow: '整行',
+    entireColumn: '整列',
+  },
   insertCopiedCellsDialog: {
     title: '插入复制的单元格',
     shiftRight: '右移单元格',

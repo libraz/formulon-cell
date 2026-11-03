@@ -3,7 +3,7 @@ import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { hiddenExtentInSelection } from '../../commands/row-col-layout.js';
 import { addrKey } from '../../engine/address.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
-import { openCellShiftDialog } from '../../interact/cell-shift-dialog.js';
+import { openCellShiftDialog, runCellShiftChoice } from '../../interact/cell-shift-dialog.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../../sheet-tab-colors.js';
 import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
@@ -21,6 +21,12 @@ import { setMenuControlDisabled } from './menu-feedback.js';
 import { hasActiveCopy, normalizedSelectionRange } from './selection.js';
 
 const noop = (): void => undefined;
+
+const cellShiftTarget = (instance: SpreadsheetInstance) => ({
+  store: instance.store,
+  wb: instance.workbook,
+  history: instance.history,
+});
 
 const buildCellInsertAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellInsertAction'] =>
@@ -65,9 +71,8 @@ const buildCellInsertAction =
         host: instance.host,
         strings: instance.i18n.strings,
         kind: 'insert',
-        onSubmit: (direction) => {
-          if (direction !== 'down' && direction !== 'right') return;
-          handleInsertCellsAction(instance, direction === 'down' ? 'shiftDown' : 'shiftRight');
+        onSubmit: (choice) => {
+          if (!runCellShiftChoice(cellShiftTarget(instance), 'insert', range, choice)) return;
           mutators.replaceCells(
             instance.store,
             instance.workbook.cells(instance.store.getState().data.sheetIndex),
@@ -108,9 +113,8 @@ const buildCellDeleteAction =
         host: instance.host,
         strings: instance.i18n.strings,
         kind: 'delete',
-        onSubmit: (direction) => {
-          if (direction !== 'up' && direction !== 'left') return;
-          handleDeleteCellsAction(instance, direction === 'up' ? 'shiftUp' : 'shiftLeft');
+        onSubmit: (choice) => {
+          if (!runCellShiftChoice(cellShiftTarget(instance), 'delete', range, choice)) return;
           mutators.replaceCells(
             instance.store,
             instance.workbook.cells(instance.store.getState().data.sheetIndex),
@@ -161,15 +165,13 @@ const buildCellFormatAction =
           cancelLabel: strings.hyperlinkDialog.cancel,
           ...opts,
         }),
-      promptDimension: (title, label, initial, max) =>
+      promptDimension: (axis, initial, max) =>
         showDimensionDialog({
-          title,
+          axis,
+          strings,
           locale: () => instance.locale,
-          label,
           initial,
           max,
-          okLabel: strings.hyperlinkDialog.ok,
-          cancelLabel: strings.hyperlinkDialog.cancel,
         }),
       renderSheetTabs: opts.renderSheetTabs ?? noop,
       switchSheet: (idx) => {

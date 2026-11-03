@@ -1,4 +1,3 @@
-import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { History } from '../commands/history.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import {
@@ -12,7 +11,7 @@ import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/stru
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
-import { openCellShiftDialog } from './cell-shift-dialog.js';
+import { openCellShiftDialog, runCellShiftChoice } from './cell-shift-dialog.js';
 import type { ItemId } from './context-menu-spec.js';
 
 export interface ContextMenuStructureContext {
@@ -40,11 +39,8 @@ export function runContextMenuStructureItem(
         host,
         strings: ctx.strings(),
         kind: 'insert',
-        onSubmit: (direction) => {
-          if (direction !== 'down' && direction !== 'right') return;
-          if (insertCells(store, wb, history, state.selection.range, direction)) {
-            ctx.afterCommit();
-          }
+        onSubmit: (choice) => {
+          if (runCellShiftChoice(ctx, 'insert', state.selection.range, choice)) ctx.afterCommit();
         },
       });
       return true;
@@ -54,11 +50,8 @@ export function runContextMenuStructureItem(
         host,
         strings: ctx.strings(),
         kind: 'delete',
-        onSubmit: (direction) => {
-          if (direction !== 'up' && direction !== 'left') return;
-          if (deleteCells(store, wb, history, state.selection.range, direction)) {
-            ctx.afterCommit();
-          }
+        onSubmit: (choice) => {
+          if (runCellShiftChoice(ctx, 'delete', state.selection.range, choice)) ctx.afterCommit();
         },
       });
       return true;

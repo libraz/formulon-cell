@@ -66,6 +66,22 @@ export const editDialogsKo: EditDialogsStrings = {
     cancel: '취소',
     ok: '확인',
   },
+  dimensionDialog: {
+    rowHeightTitle: '행 높이',
+    rowHeightLabel: '행 높이:',
+    colWidthTitle: '열 너비',
+    colWidthLabel: '열 너비:',
+  },
+  cellShiftDialog: {
+    insertTitle: '삽입',
+    deleteTitle: '삭제',
+    shiftRight: '셀을 오른쪽으로 밀기',
+    shiftDown: '셀을 아래로 밀기',
+    shiftLeft: '셀을 왼쪽으로 밀기',
+    shiftUp: '셀을 위로 밀기',
+    entireRow: '행 전체',
+    entireColumn: '열 전체',
+  },
   insertCopiedCellsDialog: {
     title: '복사한 셀 삽입',
     shiftRight: '셀을 오른쪽으로 이동',

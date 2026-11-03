@@ -26,8 +26,6 @@ import { resolveTheme } from '../../theme/resolve.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 
 type CellFormatMenuText = ToolbarMenuText & {
-  rowHeightLabel: string;
-  colWidthLabel: string;
   sheetNameLabel: string;
   sheetNameRequired: string;
 };
@@ -49,8 +47,7 @@ export interface CellFormatActionDeps {
     requiredMessage: string;
   }) => Promise<string | null>;
   promptDimension: (
-    title: string,
-    label: string,
+    axis: 'row' | 'col',
     initial: number | undefined,
     max: number,
   ) => Promise<number | null>;
@@ -163,7 +160,7 @@ export const applyCellFormatAction = async (
       history: i.history,
       wb: i.workbook,
       range,
-      prompt: (initial, max) => deps.promptDimension(t.rowHeight, t.rowHeightLabel, initial, max),
+      prompt: (initial, max) => deps.promptDimension('row', initial, max),
     });
     return;
   }
@@ -186,7 +183,7 @@ export const applyCellFormatAction = async (
       history: i.history,
       wb: i.workbook,
       range,
-      prompt: (initial, max) => deps.promptDimension(t.colWidth, t.colWidthLabel, initial, max),
+      prompt: (initial, max) => deps.promptDimension('col', initial, max),
     });
     return;
   }

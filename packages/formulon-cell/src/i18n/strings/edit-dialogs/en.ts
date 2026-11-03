@@ -66,6 +66,22 @@ export const editDialogsEn: EditDialogsStrings = {
     cancel: 'Cancel',
     ok: 'OK',
   },
+  dimensionDialog: {
+    rowHeightTitle: 'Row Height',
+    rowHeightLabel: 'Row height:',
+    colWidthTitle: 'Column Width',
+    colWidthLabel: 'Column width:',
+  },
+  cellShiftDialog: {
+    insertTitle: 'Insert',
+    deleteTitle: 'Delete',
+    shiftRight: 'Shift cells right',
+    shiftDown: 'Shift cells down',
+    shiftLeft: 'Shift cells left',
+    shiftUp: 'Shift cells up',
+    entireRow: 'Entire row',
+    entireColumn: 'Entire column',
+  },
   insertCopiedCellsDialog: {
     title: 'Insert Copied Cells',
     shiftRight: 'Shift cells right',

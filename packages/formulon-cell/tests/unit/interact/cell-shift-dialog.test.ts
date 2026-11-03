@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as cellShift from '../../../src/commands/cell-shift.js';
+import * as structure from '../../../src/commands/structure.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
+import { ja } from '../../../src/i18n/strings/ja.js';
 import {
   disposeCellShiftDialog,
   openCellShiftDialog,
+  runCellShiftChoice,
 } from '../../../src/interact/cell-shift-dialog.js';
 import { createDialogShell } from '../../../src/interact/dialog-shell.js';
 import { disposeOverlayPortal } from '../../../src/interact/overlay-portal.js';
+import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 describe('openCellShiftDialog', () => {
   let host: HTMLElement;
@@ -22,9 +28,11 @@ describe('openCellShiftDialog', () => {
     document.body.replaceChildren();
   });
 
+  // Excel: '挿入' / '削除' with four choices — two shifts, then Entire row and
+  // Entire column — and the downward / upward shift selected.
   it.each([
-    ['insert', ['right', 'down'], 'down', en.ribbonMenu.insertCells],
-    ['delete', ['left', 'up'], 'up', en.ribbonMenu.deleteCells],
+    ['insert', ['right', 'down', 'rows', 'cols'], 'down', en.cellShiftDialog.insertTitle],
+    ['delete', ['left', 'up', 'rows', 'cols'], 'up', en.cellShiftDialog.deleteTitle],
   ] as const)(
     '%s keeps its direction choices, default selection, and submits after closing',
     (kind, values, defaultValue, title) => {
@@ -55,6 +63,40 @@ describe('openCellShiftDialog', () => {
       expect(document.activeElement).toBe(host);
     },
   );
+
+  it('labels the choices with the dialog wording, not the menu wording', () => {
+    openCellShiftDialog({ host, strings: ja, kind: 'insert', onSubmit: vi.fn() });
+    const dialog = document.querySelector<HTMLElement>('.fc-cellshift');
+    expect(dialog?.querySelector('.fc-cellshift__title')?.textContent).toBe('挿入');
+    expect(
+      Array.from(dialog?.querySelectorAll('.fc-cellshift__choice') ?? [], (c) => c.textContent),
+    ).toEqual(['右方向にシフト', '下方向にシフト', '行全体', '列全体']);
+    document.querySelector<HTMLButtonElement>('.fc-cellshift__button--secondary')?.click();
+  });
+
+  it('defaults the Mac delete dialog to the left shift', () => {
+    // Excel for Mac: '削除' opens with 左方向にシフト selected (insert keeps 下方向).
+    host.dataset.fcPlatform = 'mac';
+    openCellShiftDialog({ host, strings: ja, kind: 'delete', onSubmit: vi.fn() });
+    const checked = document.querySelector<HTMLInputElement>('.fc-cellshift input:checked');
+    expect(checked?.value).toBe('left');
+    document.querySelector<HTMLButtonElement>('.fc-cellshift__button--secondary')?.click();
+    openCellShiftDialog({ host, strings: ja, kind: 'insert', onSubmit: vi.fn() });
+    expect(document.querySelector<HTMLInputElement>('.fc-cellshift input:checked')?.value).toBe(
+      'down',
+    );
+    document.querySelector<HTMLButtonElement>('.fc-cellshift__button--secondary')?.click();
+  });
+
+  it('submits an entire-row choice', () => {
+    const onSubmit = vi.fn();
+    openCellShiftDialog({ host, strings: en, kind: 'delete', onSubmit });
+    const dialog = document.querySelector<HTMLElement>('.fc-cellshift');
+    const rows = dialog?.querySelector<HTMLInputElement>('input[value="rows"]');
+    if (rows) rows.checked = true;
+    dialog?.querySelector<HTMLButtonElement>('.fc-cellshift__button--primary')?.click();
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('rows');
+  });
 
   it('wraps Tab from OK to the checked radio, then Shift+Tab back to OK', () => {
     openCellShiftDialog({ host, strings: en, kind: 'insert', onSubmit: vi.fn() });
@@ -222,5 +264,39 @@ describe('openCellShiftDialog', () => {
     expect(oldDialog?.isConnected).toBe(false);
     expect(replacement).not.toBeNull();
     document.querySelector<HTMLButtonElement>('.fc-cellshift__button--secondary')?.click();
+  });
+});
+
+describe('runCellShiftChoice', () => {
+  const setup = async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const store = createSpreadsheetStore();
+    return { wb, store };
+  };
+
+  it('routes each dialog choice to its command over the normalized selection', async () => {
+    const { wb, store } = await setup();
+    const range = { sheet: 0, r0: 4, c0: 3, r1: 2, c1: 1 };
+    const spies = {
+      insertCells: vi.spyOn(cellShift, 'insertCells').mockReturnValue(true),
+      deleteCells: vi.spyOn(cellShift, 'deleteCells').mockReturnValue(true),
+      insertRows: vi.spyOn(structure, 'insertRows').mockReturnValue(true),
+      deleteRows: vi.spyOn(structure, 'deleteRows').mockReturnValue(true),
+      insertCols: vi.spyOn(structure, 'insertCols').mockReturnValue(true),
+      deleteCols: vi.spyOn(structure, 'deleteCols').mockReturnValue(true),
+    };
+    const norm = { sheet: 0, r0: 2, c0: 1, r1: 4, c1: 3 };
+    expect(runCellShiftChoice({ store, wb, history: null }, 'insert', range, 'down')).toBe(true);
+    expect(spies.insertCells).toHaveBeenCalledWith(store, wb, null, norm, 'down');
+    runCellShiftChoice({ store, wb, history: null }, 'delete', range, 'left');
+    expect(spies.deleteCells).toHaveBeenCalledWith(store, wb, null, norm, 'left');
+    runCellShiftChoice({ store, wb, history: null }, 'insert', range, 'rows');
+    expect(spies.insertRows).toHaveBeenCalledWith(store, wb, null, 2, 3);
+    runCellShiftChoice({ store, wb, history: null }, 'delete', range, 'cols');
+    expect(spies.deleteCols).toHaveBeenCalledWith(store, wb, null, 1, 3);
+    // A direction that belongs to the other dialog does nothing.
+    expect(runCellShiftChoice({ store, wb, history: null }, 'insert', range, 'up')).toBe(false);
+    vi.restoreAllMocks();
+    wb.dispose();
   });
 });
