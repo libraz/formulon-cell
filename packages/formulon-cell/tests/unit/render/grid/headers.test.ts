@@ -21,6 +21,12 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     accent: '#107c41',
     headerActiveBar: '#107c41',
     headerFgActiveWeight: 600,
+    outlineGutterBg: '#faf9f8',
+    outlineButtonFaceTop: '#faf9f8',
+    outlineButtonFaceBottom: '#faf9f8',
+    outlineButtonBorder: '#bfbfbf',
+    outlineButtonFg: '#605e5c',
+    outlineButtonShadow: 'transparent',
     accentFg: '#fff',
     accentSoft: 'rgba(16,124,65,0.12)',
     cellErrorFg: '#a4262c',
@@ -32,6 +38,7 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     headerStripOuter: '#faf9f8',
     headerStripInner: '#faf9f8',
     headerRule: '#d9d9d9',
+    headerRuleOuter: '#d9d9d9',
     headerFg: '#605e5c',
     headerFgActive: '#107c41',
     fontUi: 'Aptos, sans-serif',
@@ -56,6 +63,7 @@ function makeCtxSpy(): {
   strokes: string[];
   ops: string[];
   gradients: Array<{ from: [number, number]; to: [number, number]; stops: string[] }>;
+  paths: Array<{ style: unknown; points: [number, number][] }>;
 } {
   const fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }> =
     [];
@@ -71,6 +79,8 @@ function makeCtxSpy(): {
   const strokes: string[] = [];
   const ops: string[] = [];
   const gradients: Array<{ from: [number, number]; to: [number, number]; stops: string[] }> = [];
+  const paths: Array<{ style: unknown; points: [number, number][] }> = [];
+  let points: [number, number][] = [];
   let fillStyle = '';
   let strokeStyle = '';
   let lineWidth = 1;
@@ -113,12 +123,19 @@ function makeCtxSpy(): {
     restore(): void {
       alpha = 1;
     },
-    beginPath(): void {},
+    beginPath(): void {
+      points = [];
+    },
     closePath(): void {},
-    moveTo(): void {},
-    lineTo(): void {},
+    moveTo(x: number, y: number): void {
+      points.push([x, y]);
+    },
+    lineTo(x: number, y: number): void {
+      points.push([x, y]);
+    },
     quadraticCurveTo(): void {},
     stroke(): void {
+      paths.push({ style: strokeStyle, points });
       strokes.push(strokeStyle);
       ops.push(`stroke ${strokeStyle}`);
     },
@@ -168,7 +185,7 @@ function makeCtxSpy(): {
       });
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fills, texts, strokes, ops, gradients };
+  return { ctx, fills, texts, strokes, ops, gradients, paths };
 }
 
 describe('paintHeaders', () => {
@@ -199,9 +216,8 @@ describe('paintHeaders', () => {
         rows,
       );
 
-      const centre = layout.outlineRowGutter + layout.headerColWidth / 2 - 0.25;
-      // Whole device px at DPR 2.
-      const left = Math.floor((centre - (3 * pitch) / 2) * 2) / 2;
+      // The run centres on whole points from the strip's outer edge.
+      const left = layout.outlineRowGutter + Math.floor((layout.headerColWidth - 3 * pitch) / 2);
       const digits = texts.filter(
         (t) => t.align === 'left' && t.y === texts.find((u) => u.text === '9')?.y,
       );
@@ -212,6 +228,40 @@ describe('paintHeaders', () => {
       ]);
     },
   );
+
+  it('centres Mac row-number runs on whole points (Courier New 11)', () => {
+    // Excel (Mac light, DPR 2): row 1 ink at x -32, row 10 at -38 / -24 device
+    // px from the grid edge, with Courier's 4 device px left bearing.
+    const state = createSpreadsheetStore().getState();
+    state.layout = {
+      ...state.layout,
+      screenScale: 0.75,
+      headerDigitAdvance: macDigitAdvance('Courier New', 11),
+    };
+    state.viewport = { rowStart: 0, rowCount: 10, colStart: 0, colCount: 2, zoom: 1, widthPx: 320 };
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const { ctx, texts } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 2, cssWidth: 320, cssHeight: 400 },
+      { ...state, layout },
+      theme(),
+      cols,
+      rows,
+      'Courier New',
+      11,
+    );
+
+    const ox = layout.outlineRowGutter + layout.headerColWidth;
+    const digits = texts.filter((t) => t.align === 'left');
+    expect(digits[0]).toMatchObject({ text: '1', x: ox - 17 });
+    expect(digits.slice(-2).map((t) => [t.text, t.x])).toEqual([
+      ['1', ox - 20],
+      ['0', ox - 13],
+    ]);
+  });
 
   it.each([
     // Courier New 11: 15 pt rows in a 22 pt strip, Excel baseline 16 device px up.
@@ -312,6 +362,41 @@ describe('paintHeaders', () => {
       { from: [0, top], to: [0, oy], stops: ['#fdfdfd', '#f7f7f7'] },
       { from: [left, 0], to: [ox, 0], stops: ['#fdfdfd', '#f7f7f7'] },
     ]);
+  });
+
+  it('shades header separators like the strip and stops them at its border', () => {
+    // Excel (Mac light): separators run 251 at the outer edge to 221 beside
+    // the strip border, whose 2 device px (1 CSS px) stay 188 under them.
+    const state = createSpreadsheetStore().getState();
+    state.viewport = { rowStart: 0, rowCount: 2, colStart: 0, colCount: 2, zoom: 1, widthPx: 260 };
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const { ctx, gradients, paths } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 2, cssWidth: 260, cssHeight: 140 },
+      { ...state, layout },
+      theme({ headerRuleOuter: '#fbfbfb', headerRule: '#dddcda' }),
+      cols,
+      rows,
+    );
+
+    const top = layout.outlineColGutter;
+    const oy = top + layout.headerRowHeight;
+    const left = layout.outlineRowGutter;
+    const ox = left + layout.headerColWidth;
+    const shades = gradients.filter((g) => g.stops[0] === '#fbfbfb');
+    expect(shades).toEqual([
+      { from: [0, top], to: [0, oy - 1], stops: ['#fbfbfb', '#dddcda'] },
+      { from: [left, 0], to: [ox - 1, 0], stops: ['#fbfbfb', '#dddcda'] },
+    ]);
+    const colSeps = paths.filter((p) => p.style !== '' && p.points[0]?.[1] === top);
+    expect(colSeps.length).toBeGreaterThan(0);
+    for (const sep of colSeps) expect(sep.points[1]?.[1]).toBe(oy - 1);
+    const rowSeps = paths.filter((p) => p.points[0]?.[0] === left && p.points[1]?.[0] !== 260);
+    expect(rowSeps.length).toBe(2);
+    for (const sep of rowSeps) expect(sep.points[1]?.[0]).toBe(ox - 1);
   });
 
   it('centres row numbers in the strip and sets labels in the given family', () => {

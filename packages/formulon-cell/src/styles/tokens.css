@@ -87,10 +87,21 @@
     --fc-header-strip-inner: initial;
     /* Header rule under the column letters. */
     --fc-header-rule: initial;
+    /* Header rule at the strip's outer edge; defaults to --fc-header-rule. */
+    --fc-header-rule-outer: initial;
     /* Bar under a selected header; transparent for none. Defaults to the accent. */
     --fc-header-active-bar: initial;
     /* Font weight of a selected header label. Defaults to 600. */
     --fc-header-fg-active-weight: initial;
+    /* Outline gutter fill. Defaults to --fc-header-bg. */
+    --fc-outline-gutter-bg: initial;
+    /* Outline level buttons: face shaded top to bottom (both default to
+     * --fc-header-bg), border, digit, and a right/bottom shadow (transparent for none). */
+    --fc-outline-button-face-top: initial;
+    --fc-outline-button-face-bottom: initial;
+    --fc-outline-button-border: initial;
+    --fc-outline-button-fg: initial;
+    --fc-outline-button-shadow: initial;
 
     /* === HOVER === */
     /* Stripe painted across the hovered row + column. */

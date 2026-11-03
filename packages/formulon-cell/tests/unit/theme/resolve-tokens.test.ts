@@ -128,6 +128,16 @@ describe('theme/resolve — header strip shading', () => {
     });
     host.remove();
   });
+
+  it('keeps header separators flat in the header rule unless the outer end is set', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    host.style.setProperty('--fc-header-rule', '#dddcda');
+    expect(resolveTheme(host)).toMatchObject({ headerRule: '#dddcda', headerRuleOuter: '#dddcda' });
+    host.style.setProperty('--fc-header-rule-outer', '#fbfbfb');
+    expect(resolveTheme(host)).toMatchObject({ headerRuleOuter: '#fbfbfb' });
+    host.remove();
+  });
 });
 
 describe('theme/resolve — selected header tokens', () => {

@@ -14,32 +14,16 @@ import {
   rulerTop,
   type ViewState,
 } from '../geometry.js';
-import { paintOutlineGutters } from '../painters/controls.js';
+import { linearShade, paintOutlineGutters } from '../painters/controls.js';
 import { fontMetricsBox, textBaselineY } from '../painters/text.js';
 import type { OutlineToggleHit } from '../painters.js';
-import { wholePointAdvances, wholePxStart } from '../text-metrics.js';
+import { wholePointAdvances } from '../text-metrics.js';
 import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
 
 /** Row numbers are bottom-aligned like cell text: the baseline sits the
  *  label font's descent plus one px above the row's bottom edge (6 device px
  *  at DPR 2 for the default font, 8 for Courier New 11, 14 for Courier 20). */
 const ROW_LABEL_PAD_Y = 1;
-
-/** Flat strip colour, or a gradient from the outer point to the inner one. */
-function stripFill(
-  ctx: CanvasRenderingContext2D,
-  theme: ResolvedTheme,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-): string | CanvasGradient {
-  if (theme.headerStripOuter === theme.headerStripInner) return theme.headerStripOuter;
-  const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
-  gradient.addColorStop(0, theme.headerStripOuter);
-  gradient.addColorStop(1, theme.headerStripInner);
-  return gradient;
-}
 
 export function paintHeaders(
   pc: ChromePaintContext,
@@ -85,12 +69,22 @@ export function paintHeaders(
   ctx.restore();
 
   // Each strip shades from its outer edge towards the grid.
-  ctx.fillStyle = stripFill(ctx, theme, 0, labelTopY, 0, oy);
-  ctx.fillRect(rtl ? 0 : ox, 0, cssWidth - ox, oy);
-  ctx.fillStyle = stripFill(
+  const rowStripOuterX = rtl ? labelLeftX + layout.headerColWidth : labelLeftX;
+  ctx.fillStyle = linearShade(
     ctx,
-    theme,
-    rtl ? labelLeftX + layout.headerColWidth : labelLeftX,
+    theme.headerStripOuter,
+    theme.headerStripInner,
+    0,
+    labelTopY,
+    0,
+    oy,
+  );
+  ctx.fillRect(rtl ? 0 : ox, 0, cssWidth - ox, oy);
+  ctx.fillStyle = linearShade(
+    ctx,
+    theme.headerStripOuter,
+    theme.headerStripInner,
+    rowStripOuterX,
     0,
     innerX,
     0,
@@ -161,16 +155,26 @@ export function paintHeaders(
     : labelTopY + layout.headerRowHeight / 2 + 0.5;
   ctx.textBaseline = macLetters ? 'alphabetic' : 'middle';
   const r1c1 = state.ui.r1c1 === true;
+  // Separators shade along their own length and stop short of the strip's border rule.
+  const colSepStyle = linearShade(
+    ctx,
+    theme.headerRuleOuter,
+    theme.headerRule,
+    0,
+    labelTopY,
+    0,
+    oy - width,
+  );
   for (const c of cols.visible) {
     const rect = cellRectIn(layout, cols, rows, firstRow, c);
     const w = cols.sizeAt.get(c) ?? 0;
     const lit = isLitCol(c);
-    ctx.strokeStyle = theme.headerRule;
+    ctx.strokeStyle = colSepStyle;
     ctx.lineWidth = width;
     ctx.beginPath();
     const sepX = ruleCenter(rtl ? rect.x : rect.x + w, dpr, rtl);
     ctx.moveTo(sepX, labelTopY);
-    ctx.lineTo(sepX, oy);
+    ctx.lineTo(sepX, oy - width);
     ctx.stroke();
     ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
     ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
@@ -192,25 +196,40 @@ export function paintHeaders(
     ? innerX + (layout.headerColWidth + width) / 2
     : innerX - (layout.headerColWidth + width) / 2;
   const digitPitch = headerDigitPitch(layout, state.viewport.zoom);
+  const rowSepX0 = rtl ? innerX + width : labelLeftX;
+  const rowSepX1 = rtl ? innerX + layout.headerColWidth : innerX - width;
+  const rowSepStyle = linearShade(
+    ctx,
+    theme.headerRuleOuter,
+    theme.headerRule,
+    rtl ? rowSepX1 : rowSepX0,
+    0,
+    rtl ? rowSepX0 : rowSepX1,
+    0,
+  );
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
     const lit = isLitRow(r);
-    ctx.strokeStyle = theme.headerRule;
+    ctx.strokeStyle = rowSepStyle;
     ctx.lineWidth = width;
     ctx.beginPath();
     const sepY = ruleCenter(rect.y + h, dpr);
-    ctx.moveTo(labelLeftX, sepY);
-    ctx.lineTo(labelLeftX + layout.headerColWidth, sepY);
+    ctx.moveTo(rowSepX0, sepY);
+    ctx.lineTo(rowSepX1, sepY);
     ctx.stroke();
     ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
     ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     const rowLabelY = textBaselineY({ ...rect, h }, labelBox, 'bottom', ROW_LABEL_PAD_Y);
     if (digitPitch !== undefined && !r1c1) {
-      // Digits sit on the strip's digit width from a whole device px start.
+      // Digits step by the strip's digit width; the run centres on whole
+      // points from the strip's outer edge (Excel Courier 11 row 10: -40 dev px).
       ctx.textAlign = 'left';
-      const left = wholePxStart((rowLabelX - (rowLabel.length * digitPitch) / 2) * dpr) / dpr;
+      const inset = Math.floor((layout.headerColWidth - rowLabel.length * digitPitch) / 2);
+      const left = rtl
+        ? innerX + layout.headerColWidth - inset - rowLabel.length * digitPitch
+        : labelLeftX + inset;
       for (let i = 0; i < rowLabel.length; i += 1) {
         ctx.fillText(rowLabel.charAt(i), left + i * digitPitch, rowLabelY);
       }

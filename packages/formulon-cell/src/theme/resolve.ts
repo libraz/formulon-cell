@@ -32,14 +32,26 @@ export interface ResolvedTheme {
    *  both default to `headerBg` (flat). */
   headerStripOuter: string;
   headerStripInner: string;
-  /** Rule between two header cells. */
+  /** Rule between two header cells, at the grid edge and at the strip's
+   *  outer edge; the outer end defaults to `headerRule` (flat). */
   headerRule: string;
+  headerRuleOuter: string;
   headerFg: string;
   headerFgActive: string;
   /** Bar under a selected row/column header; `transparent` draws none. */
   headerActiveBar: string;
   /** Font weight of a selected header label. */
   headerFgActiveWeight: number;
+  /** Outline gutter fill; defaults to `headerBg`. */
+  outlineGutterBg: string;
+  /** Outline level buttons: face shaded top to bottom (defaults flat
+   *  `headerBg`), border, digit, and a right/bottom shadow (`transparent`
+   *  draws none). */
+  outlineButtonFaceTop: string;
+  outlineButtonFaceBottom: string;
+  outlineButtonBorder: string;
+  outlineButtonFg: string;
+  outlineButtonShadow: string;
 
   /** Page Layout / Page Break Preview chrome. */
   pageBackdrop: string;
@@ -109,10 +121,23 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
       v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
     ),
     headerRule: v('--fc-header-rule', v('--fc-rule', '#e2dccd')),
+    headerRuleOuter: v('--fc-header-rule-outer', v('--fc-header-rule', v('--fc-rule', '#e2dccd'))),
     headerFg: v('--fc-header-fg', '#6f6a5d'),
     headerFgActive: v('--fc-header-fg-active', '#15171c'),
     headerActiveBar: v('--fc-header-active-bar', v('--fc-accent', '#d83a14')),
     headerFgActiveWeight: num(v('--fc-header-fg-active-weight', '600'), 600),
+    outlineGutterBg: v('--fc-outline-gutter-bg', v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6'))),
+    outlineButtonFaceTop: v(
+      '--fc-outline-button-face-top',
+      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
+    ),
+    outlineButtonFaceBottom: v(
+      '--fc-outline-button-face-bottom',
+      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
+    ),
+    outlineButtonBorder: v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
+    outlineButtonFg: v('--fc-outline-button-fg', v('--fc-header-fg', '#6f6a5d')),
+    outlineButtonShadow: v('--fc-outline-button-shadow', 'transparent'),
 
     pageBackdrop: v('--fc-page-backdrop', '#9b968a'),
     pagePaper: v('--fc-page-paper', '#ffffff'),

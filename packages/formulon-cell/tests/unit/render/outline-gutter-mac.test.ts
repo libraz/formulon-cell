@@ -161,6 +161,103 @@ describe('outline gutter on the Mac point model', () => {
     expect(texts.map((t) => t.text)).toEqual(['1', '2', '3', '1', '2']);
   });
 
+  it('runs each Mac spine on to its toggle', () => {
+    // Excel (Mac, DPR 2): the level-1 bracket of rows 3:8 runs unbroken from
+    // y 98 to the toggle border at 396, past the group's end at 384.
+    const view = outlinedView(0.75);
+    const { ctx, strokes } = recorder();
+    const hits = paintOutlineGutters(ctx, view, theme, axis(10, 50), axis(12, 24), 800, 600);
+    const rowToggles = hits.filter((h) => h.kind === 'toggle' && h.axis === 'row');
+    const rowSpines = strokes.filter((s) => s.width === 2 && s.from[0] === s.to[0]);
+    expect(rowSpines.map((s) => s.to[1])).toEqual(rowToggles.map((h) => h.rect.y));
+    const colToggle = hits.find((h) => h.kind === 'toggle' && h.axis === 'col');
+    const colSpine = strokes.find((s) => s.width === 2 && s.from[1] === s.to[1]);
+    expect(colSpine?.to[0]).toBe(colToggle?.rect.x);
+  });
+
+  it('paints the gutters and level buttons in the outline tokens', () => {
+    // Excel (Mac light, DPR 2): gutter 230; each 24 device px button has a
+    // 1 px 198 border, a face shading 251 -> 234 with a 234 right bevel, the
+    // 102 digit, and a 1 px 247 shadow on its right and bottom.
+    const view = outlinedView(0.75);
+    const tokens: Record<string, string> = {
+      outlineGutterBg: '#e6e6e6',
+      outlineButtonFaceTop: '#fbfbfb',
+      outlineButtonFaceBottom: '#eaeaee',
+      outlineButtonBorder: '#c6c6c8',
+      outlineButtonFg: '#666666',
+      outlineButtonShadow: '#f7f7f7',
+    };
+    const painted = new Proxy(tokens, {
+      get: (t, k: string) => t[k] ?? '#000',
+    }) as unknown as ResolvedTheme;
+    const fills: Array<{ style: unknown; rect: [number, number, number, number] }> = [];
+    const texts: Array<{ text: string; style: unknown }> = [];
+    const gradients: Array<{ from: [number, number]; to: [number, number]; stops: string[] }> = [];
+    const ctx = {
+      fillStyle: '' as unknown,
+      strokeStyle: '' as unknown,
+      lineWidth: 1,
+      font: '',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+      save() {},
+      restore() {},
+      beginPath() {},
+      rect() {},
+      clip() {},
+      moveTo() {},
+      lineTo() {},
+      stroke() {},
+      strokeRect() {},
+      fillRect(this: { fillStyle: unknown }, x: number, y: number, w: number, h: number) {
+        fills.push({ style: this.fillStyle, rect: [x, y, w, h] });
+      },
+      fillText(this: { fillStyle: unknown }, text: string) {
+        texts.push({ text, style: this.fillStyle });
+      },
+      createLinearGradient(x0: number, y0: number, x1: number, y1: number) {
+        const g = {
+          from: [x0, y0] as [number, number],
+          to: [x1, y1] as [number, number],
+          stops: [] as string[],
+        };
+        gradients.push(g);
+        return { addColorStop: (_: number, c: string) => g.stops.push(c) };
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    const hits = paintOutlineGutters(ctx, view, painted, axis(10, 50), axis(12, 24), 800, 600);
+
+    const { outlineRowGutter, outlineColGutter } = view.layout;
+    expect(fills).toEqual(
+      expect.arrayContaining([
+        { style: '#e6e6e6', rect: [0, 0, outlineRowGutter, 600] },
+        { style: '#e6e6e6', rect: [0, 0, 800, outlineColGutter] },
+      ]),
+    );
+    const button = hits.find((h) => h.kind === 'level' && h.axis === 'row' && h.level === 1);
+    const { x, y } = button?.rect ?? { x: 0, y: 0 };
+    const at = (rx: number, ry: number, w: number, h: number) =>
+      fills.find((f) => f.rect.join() === [rx, ry, w, h].join())?.style;
+    expect(at(x, y, 11.5, 11.5)).toBe('#c6c6c8');
+    expect(gradients).toContainEqual({
+      from: [0, y + 1],
+      to: [0, y + 11],
+      stops: ['#fbfbfb', '#eaeaee'],
+    });
+    expect(at(x + 10.5, y + 0.5, 0.5, 10.5)).toBe('#eaeaee');
+    expect(at(x + 11.5, y, 0.5, 12)).toBe('#f7f7f7');
+    expect(at(x, y + 11.5, 12, 0.5)).toBe('#f7f7f7');
+    expect(texts.filter((t) => t.style === '#666666').map((t) => t.text)).toEqual([
+      '1',
+      '2',
+      '3',
+      '1',
+      '2',
+    ]);
+  });
+
   it('keeps the level buttons off the default profile', () => {
     const view = outlinedView(1);
     const { ctx, texts } = recorder();

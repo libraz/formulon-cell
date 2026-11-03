@@ -16,9 +16,8 @@ const token = (block: string, name: string): string | undefined =>
   block.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1]?.trim();
 
 // Excel for Mac, light appearance: strip 249-251, label ink 94, strip border
-// (188,187,186); separators 2 device px of (226,225,223) / (226,226,224).
-// The captures are Display P3; these
-// greys read the same in sRGB.
+// (188,187,186); separators shade from 251 at the outer edge to 221 beside the border.
+// The captures are Display P3; these greys read the same in sRGB.
 describe('Mac light header palette', () => {
   it('matches the measured strip, separator, label and border colours', () => {
     const block = macLightPalette();
@@ -26,7 +25,8 @@ describe('Mac light header palette', () => {
     // Unselected strips: 253 at the outer edge to 247 beside the border.
     expect(token(block, '--fc-header-strip-outer')).toBe('#fdfdfd');
     expect(token(block, '--fc-header-strip-inner')).toBe('#f7f7f7');
-    expect(token(block, '--fc-header-rule')).toBe('#e2e1df');
+    expect(token(block, '--fc-header-rule-outer')).toBe('#fbfbfb');
+    expect(token(block, '--fc-header-rule')).toBe('#dddcda');
     expect(token(block, '--fc-header-fg')).toBe('#5e5e5e');
     expect(token(block, '--fc-rule-strong')).toBe('#bcbbba');
   });

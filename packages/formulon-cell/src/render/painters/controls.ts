@@ -14,6 +14,23 @@ import {
   type ViewState,
 } from '../geometry.js';
 import { wholePointAdvances } from '../text-metrics.js';
+/** Flat colour, or a linear gradient from `from` at (x0, y0) to `to` at (x1, y1). */
+export function linearShade(
+  ctx: CanvasRenderingContext2D,
+  from: string,
+  to: string,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): string | CanvasGradient {
+  if (from === to) return from;
+  const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
+  gradient.addColorStop(0, from);
+  gradient.addColorStop(1, to);
+  return gradient;
+}
+
 export interface CheckboxHit {
   rect: Rect;
 }
@@ -153,7 +170,9 @@ export interface OutlineLevelButtonHit {
 
 export type OutlineToggleHit = OutlineGroupToggleHit | OutlineLevelButtonHit;
 
-/** Paint a level-number button with its top-left at (x, y). */
+/** Paint a level-number button with its top-left at (x, y): Excel for Mac's
+ *  1 device px border, a vertically shaded face with a right bevel, and a
+ *  1 device px shadow on the right and bottom (halved for the 2x model). */
 function paintLevelButton(
   ctx: CanvasRenderingContext2D,
   theme: ResolvedTheme,
@@ -162,12 +181,27 @@ function paintLevelButton(
   level: number,
 ): Rect {
   const size = MAC_LEVEL_BUTTON_SIZE;
-  ctx.fillStyle = theme.headerBg;
-  ctx.fillRect(x, y, size, size);
-  ctx.strokeStyle = theme.ruleStrong;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
-  ctx.fillStyle = theme.headerFg;
+  const hair = 0.5;
+  ctx.fillStyle = theme.outlineButtonBorder;
+  ctx.fillRect(x, y, size - hair, size - hair);
+  ctx.fillStyle = linearShade(
+    ctx,
+    theme.outlineButtonFaceTop,
+    theme.outlineButtonFaceBottom,
+    0,
+    y + 1,
+    0,
+    y + size - 1,
+  );
+  ctx.fillRect(x + hair, y + hair, size - 3 * hair, size - 3 * hair);
+  ctx.fillStyle = theme.outlineButtonFaceBottom;
+  ctx.fillRect(x + size - 3 * hair, y + hair, hair, size - 3 * hair);
+  if (theme.outlineButtonShadow !== 'transparent') {
+    ctx.fillStyle = theme.outlineButtonShadow;
+    ctx.fillRect(x + size - hair, y, hair, size);
+    ctx.fillRect(x, y + size - hair, size, hair);
+  }
+  ctx.fillStyle = theme.outlineButtonFg;
   ctx.font = `400 ${MAC_LEVEL_BUTTON_FONT_PX}px ${theme.fontUi}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -223,6 +257,8 @@ export function paintOutlineGutters(
     ctx.beginPath();
     ctx.rect(rowGutterX, gutterTop, layout.outlineRowGutter, cssHeight);
     ctx.clip();
+    ctx.fillStyle = theme.outlineGutterBg;
+    ctx.fillRect(rowGutterX, gutterTop, layout.outlineRowGutter, cssHeight - gutterTop);
     const maxLvl = outlineDepth(layout.outlineRows);
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
       const slotCx = slotX(lvl);
@@ -242,25 +278,6 @@ export function paintOutlineGutters(
           const bottomRow = rows.positionAt.get(r1) ?? 0;
           const bottomH = rows.sizeAt.get(r1) ?? 0;
           const bottom = oy + bottomRow + bottomH;
-          ctx.strokeStyle = theme.rule;
-          if (mac) {
-            // Excel for Mac: a 2 px spine from just inside the group to its toggle.
-            ctx.lineWidth = MAC_SPINE_WIDTH;
-            ctx.beginPath();
-            ctx.moveTo(slotCx, top + 1);
-            ctx.lineTo(slotCx, bottom);
-            ctx.stroke();
-          } else {
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(slotCx + 0.5, top);
-            ctx.lineTo(slotCx + 0.5, bottom);
-            // Foot tick on the summary side, pointing at the data area.
-            const footY = summary.below ? bottom - 0.5 : top + 0.5;
-            ctx.moveTo(slotCx + 0.5, footY);
-            ctx.lineTo(slotCx + (rtl ? -4.5 : 5.5), footY);
-            ctx.stroke();
-          }
           const collapsed = isRowGroupCollapsed(layout, r0, r1);
           // Toggle sits on the row that should remain visible: the row just
           // below the band by default, just above it when the summary rows
@@ -273,6 +290,26 @@ export function paintOutlineGutters(
               : summary.below
                 ? bottom + toggleSize / 2 + 2
                 : top - toggleSize / 2 - 2;
+          ctx.strokeStyle = theme.rule;
+          if (mac) {
+            // Excel for Mac: a 2 px spine from just inside the group on to its toggle.
+            const toggleTop = Math.round(summaryY - toggleSize / 2);
+            ctx.lineWidth = MAC_SPINE_WIDTH;
+            ctx.beginPath();
+            ctx.moveTo(slotCx, summary.below ? top + 1 : toggleTop + toggleSize);
+            ctx.lineTo(slotCx, summary.below ? toggleTop : bottom);
+            ctx.stroke();
+          } else {
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(slotCx + 0.5, top);
+            ctx.lineTo(slotCx + 0.5, bottom);
+            // Foot tick on the summary side, pointing at the data area.
+            const footY = summary.below ? bottom - 0.5 : top + 0.5;
+            ctx.moveTo(slotCx + 0.5, footY);
+            ctx.lineTo(slotCx + (rtl ? -4.5 : 5.5), footY);
+            ctx.stroke();
+          }
           // A Mac toggle fills its lane; elsewhere it centres on the spine.
           const toggleCx = mac ? laneX(lvl) + lane / 2 : slotCx;
           const rect = paintToggle(ctx, theme, toggleCx, summaryY, collapsed, toggleSize);
@@ -305,6 +342,8 @@ export function paintOutlineGutters(
     ctx.beginPath();
     ctx.rect(gutterLeft, gutterTop, cssWidth, layout.outlineColGutter);
     ctx.clip();
+    ctx.fillStyle = theme.outlineGutterBg;
+    ctx.fillRect(gutterLeft, gutterTop, cssWidth - gutterLeft, layout.outlineColGutter);
     const maxLvl = outlineDepth(layout.outlineCols);
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
       const slotCy = mac
@@ -335,20 +374,6 @@ export function paintOutlineGutters(
           // or its left on a mirrored sheet.
           const summaryOnRight = summary.right !== rtl;
           const footX = summaryOnRight ? right - 0.5 : left + 0.5;
-          ctx.strokeStyle = theme.rule;
-          ctx.beginPath();
-          if (mac) {
-            ctx.lineWidth = MAC_SPINE_WIDTH;
-            ctx.moveTo(left + 1, slotCy);
-            ctx.lineTo(right, slotCy);
-          } else {
-            ctx.lineWidth = 1;
-            ctx.moveTo(left, slotCy + 0.5);
-            ctx.lineTo(right, slotCy + 0.5);
-            ctx.moveTo(footX, slotCy + 0.5);
-            ctx.lineTo(footX, slotCy + 5.5);
-          }
-          ctx.stroke();
           const collapsed = isColGroupCollapsed(layout, c0, c1);
           const summaryCol = summary.right ? c1 + 1 : c0 - 1;
           const summaryX =
@@ -362,6 +387,21 @@ export function paintOutlineGutters(
               : summaryOnRight
                 ? right + toggleSize / 2 + 2
                 : left - toggleSize / 2 - 2;
+          ctx.strokeStyle = theme.rule;
+          ctx.beginPath();
+          if (mac) {
+            const toggleLeft = Math.round(summaryX - toggleSize / 2);
+            ctx.lineWidth = MAC_SPINE_WIDTH;
+            ctx.moveTo(summaryOnRight ? left + 1 : toggleLeft + toggleSize, slotCy);
+            ctx.lineTo(summaryOnRight ? toggleLeft : right, slotCy);
+          } else {
+            ctx.lineWidth = 1;
+            ctx.moveTo(left, slotCy + 0.5);
+            ctx.lineTo(right, slotCy + 0.5);
+            ctx.moveTo(footX, slotCy + 0.5);
+            ctx.lineTo(footX, slotCy + 5.5);
+          }
+          ctx.stroke();
           const toggleCy = mac ? gutterTop + (lvl - 1) * lane + lane / 2 : slotCy;
           const rect = paintToggle(ctx, theme, summaryX, toggleCy, collapsed, toggleSize);
           hits.push({ kind: 'toggle', axis: 'col', level: lvl, i0: c0, i1: c1, rect });

@@ -36,11 +36,20 @@
     /* The strips shade from 253 at the outer edge to 247 at the grid. */
     --fc-header-strip-outer: #fdfdfd;
     --fc-header-strip-inner: #f7f7f7;
-    --fc-header-rule: #e2e1df;
+    /* Separators shade from 251 at the outer edge to 221 at the grid. */
+    --fc-header-rule-outer: #fbfbfb;
+    --fc-header-rule: #dddcda;
     --fc-header-fg: #5e5e5e;
     /* A selected header is only refilled and recoloured: no bar, same weight. */
     --fc-header-active-bar: transparent;
     --fc-header-fg-active-weight: 400;
+    /* Outline gutter 230; level buttons 198 border, face 251 -> 234, digit 102, 247 shadow. */
+    --fc-outline-gutter-bg: #e6e6e6;
+    --fc-outline-button-face-top: #fbfbfb;
+    --fc-outline-button-face-bottom: #eaeaee;
+    --fc-outline-button-border: #c6c6c8;
+    --fc-outline-button-fg: #666666;
+    --fc-outline-button-shadow: #f7f7f7;
     --fc-rule: #d4d4d4;
     --fc-rule-strong: #bcbbba;
     --fc-accent-soft: rgba(0, 0, 0, 0.224);
