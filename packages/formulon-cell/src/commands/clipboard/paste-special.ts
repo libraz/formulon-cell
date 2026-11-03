@@ -555,7 +555,8 @@ const translatedConditionalRules = (
 };
 
 /** All, Merging Conditional Formats: the copied rules land on every pasted
- *  tile beside the destination's own rules, which stay. */
+ *  tile ahead of the destination's own rules, which stay (Excel lists a
+ *  merged cell's rules source first). */
 const pasteMergedConditionalRules = (
   store: SpreadsheetStore,
   history: History | null,
@@ -567,7 +568,7 @@ const pasteMergedConditionalRules = (
   recordConditionalRulesChange(history, store, () => {
     store.setState((s) => ({
       ...s,
-      conditional: { ...s.conditional, rules: [...s.conditional.rules, ...added] },
+      conditional: { ...s.conditional, rules: [...added, ...s.conditional.rules] },
     }));
   });
 };

@@ -170,6 +170,18 @@ describe('paste special edges as Excel measures them', () => {
     expect(fmt(1, 2)?.comment).toBeUndefined();
   });
 
+  it('merging conditional formats lists the source rule first, then the destination rule', () => {
+    // C1 reads [>2, <5]; C5, outside the paste, keeps only <5.
+    pasteFrom(0, 'all-merging-conditional-formats');
+    for (const row of [0, 1, 2]) expect(rulesAt(row, 2)).toEqual([2, 5]);
+    expect(rulesAt(3, 2)).toEqual([5]);
+  });
+
+  it('merging from a rule-less source keeps the destination rules', () => {
+    pasteFrom(4, 'all-merging-conditional-formats');
+    for (const row of [0, 1, 2]) expect(rulesAt(row, 2)).toEqual([5]);
+  });
+
   it('all with skip blanks from a noteless source keeps the destination note', () => {
     pasteFrom(4, 'all', true);
     expect(fmt(0, 2)?.comment).toBe('dst note');

@@ -217,9 +217,8 @@ describe('paste special as Excel measures it', () => {
     expect(num(wb, 0, 5)).toBe(9);
     const rules = store.getState().conditional.rules;
     expect(rules).toHaveLength(5);
-    // Unmeasured (the kind needs the dialog radio): the destination's own rule
-    // stays; the copied part of each source rule lands on the pasted cells, a
-    // formula re-anchored with it.
+    // The destination's own rule stays; the copied part of each source rule
+    // lands on the pasted cells, a formula re-anchored with it.
     expect(rules).toContainEqual(
       expect.objectContaining({ kind: 'blanks', range: { sheet: 0, r0: 0, c0: 5, r1: 1, c1: 5 } }),
     );
