@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { macDigitAdvance } from '../../../../src/engine/mac-column-model.js';
 import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
 import { paintHeaders } from '../../../../src/render/grid/headers.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
@@ -171,6 +172,47 @@ function makeCtxSpy(): {
 }
 
 describe('paintHeaders', () => {
+  it.each([
+    // MS PGothic 11: Excel '995' glyphs start 12 device px apart at 100%, 6 at 50%.
+    [1, 6],
+    [0.5, 3],
+  ] as const)(
+    'sets Mac row-number digits on the whole-point digit width (zoom %d)',
+    (zoom, pitch) => {
+      const state = createSpreadsheetStore().getState();
+      state.layout = {
+        ...state.layout,
+        screenScale: 0.75,
+        headerDigitAdvance: macDigitAdvance('MS PGothic', 11),
+      };
+      state.viewport = { rowStart: 994, rowCount: 2, colStart: 0, colCount: 2, zoom, widthPx: 320 };
+      const layout = layoutForView(state);
+      const cols = buildColLayout(layout, state.viewport);
+      const rows = buildRowLayout(layout, state.viewport);
+      const { ctx, texts } = makeCtxSpy();
+
+      paintHeaders(
+        { ctx, dpr: 2, cssWidth: 320, cssHeight: 200 },
+        { ...state, layout },
+        theme(),
+        cols,
+        rows,
+      );
+
+      const centre = layout.outlineRowGutter + layout.headerColWidth / 2 - 0.25;
+      // Whole device px at DPR 2.
+      const left = Math.floor((centre - (3 * pitch) / 2) * 2) / 2;
+      const digits = texts.filter(
+        (t) => t.align === 'left' && t.y === texts.find((u) => u.text === '9')?.y,
+      );
+      expect(digits.map((t) => [t.text, t.x])).toEqual([
+        ['9', left],
+        ['9', left + pitch],
+        ['5', left + 2 * pitch],
+      ]);
+    },
+  );
+
   it.each([
     // Courier New 11: 15 pt rows in a 22 pt strip, Excel baseline 16 device px up.
     [11, 20, 22, -8],

@@ -26,6 +26,17 @@ export function headerLabelScale(
   return zoomedDigitPt(advance, stripZoom(zoom)) / zoomedDigitPt(advance, 1);
 }
 
+/** Pitch of the row-number digits: the strip's zoomed whole-point digit
+ *  (Excel '995' glyphs 12 device px apart for MS PGothic 11, 14 for Courier
+ *  New 11), or undefined for fixed chrome strips. */
+export function headerDigitPitch(
+  layout: Pick<LayoutSlice, 'headerDigitAdvance'>,
+  zoom: number | undefined,
+): number | undefined {
+  const advance = layout.headerDigitAdvance;
+  return advance === undefined ? undefined : zoomedDigitPt(advance, stripZoom(zoom));
+}
+
 type HeaderLayout = Pick<
   LayoutSlice,
   'headerColWidth' | 'headerRowHeight' | 'headerDigitAdvance' | 'defaultRowHeight' | 'screenScale'

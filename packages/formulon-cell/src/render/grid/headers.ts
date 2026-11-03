@@ -2,6 +2,7 @@
 // a single pass after cell painting so headers sit above the gridlines.
 
 import { colLetter } from '../../engine/address.js';
+import { headerDigitPitch } from '../../store/header-strip.js';
 import { renderScale } from '../../store/render-scale.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
@@ -16,7 +17,7 @@ import {
 import { paintOutlineGutters } from '../painters/controls.js';
 import { fontMetricsBox, textBaselineY } from '../painters/text.js';
 import type { OutlineToggleHit } from '../painters.js';
-import { wholePointAdvances } from '../text-metrics.js';
+import { wholePointAdvances, wholePxStart } from '../text-metrics.js';
 import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
 
 /** Row numbers are bottom-aligned like cell text: the baseline sits the
@@ -190,6 +191,7 @@ export function paintHeaders(
   const rowLabelX = rtl
     ? innerX + (layout.headerColWidth + width) / 2
     : innerX - (layout.headerColWidth + width) / 2;
+  const digitPitch = headerDigitPitch(layout, state.viewport.zoom);
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
@@ -204,11 +206,18 @@ export function paintHeaders(
     ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
     ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
-    ctx.fillText(
-      rowLabel,
-      rowLabelX,
-      textBaselineY({ ...rect, h }, labelBox, 'bottom', ROW_LABEL_PAD_Y),
-    );
+    const rowLabelY = textBaselineY({ ...rect, h }, labelBox, 'bottom', ROW_LABEL_PAD_Y);
+    if (digitPitch !== undefined && !r1c1) {
+      // Digits sit on the strip's digit width from a whole device px start.
+      ctx.textAlign = 'left';
+      const left = wholePxStart((rowLabelX - (rowLabel.length * digitPitch) / 2) * dpr) / dpr;
+      for (let i = 0; i < rowLabel.length; i += 1) {
+        ctx.fillText(rowLabel.charAt(i), left + i * digitPitch, rowLabelY);
+      }
+      ctx.textAlign = 'center';
+    } else {
+      ctx.fillText(rowLabel, rowLabelX, rowLabelY);
+    }
     if (lit && activeBar) {
       ctx.fillStyle = theme.headerActiveBar;
       ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);
