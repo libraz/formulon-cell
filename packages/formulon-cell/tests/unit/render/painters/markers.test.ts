@@ -17,6 +17,8 @@ function makeSpy() {
   const fillStyles: string[] = [];
   const strokeStyles: string[] = [];
   const dashes: number[][] = [];
+  const rects: number[][] = [];
+  const gradients: number[][] = [];
   let fillStyle = '';
   let strokeStyle = '';
   let lineWidth = 1;
@@ -69,7 +71,12 @@ function makeSpy() {
       ops.push('stroke');
       strokeStyles.push(strokeStyle);
     },
-    fillRect() {
+    createLinearGradient(...args: number[]) {
+      gradients.push(args);
+      return { addColorStop() {} };
+    },
+    fillRect(...args: number[]) {
+      rects.push(args);
       ops.push('fillRect');
       fillStyles.push(fillStyle);
     },
@@ -88,6 +95,8 @@ function makeSpy() {
     fillStyles,
     strokeStyles,
     dashes,
+    rects,
+    gradients,
     get dash() {
       return dash;
     },
@@ -175,11 +184,14 @@ describe('render/painters — paintValidationChevron', () => {
     expect(hit).toEqual({ x: 34, y: 1, w: 16, h: 17 });
   });
 
-  it('paints both a filled rail background and a stroked outline', () => {
+  it('paints a gradient face, a three-sided frame and the arrow', () => {
     const spy = makeSpy();
     paintValidationChevron(spy.ctx, { x: 0, y: 0, w: 100, h: 30 }, baseTheme);
     expect(spy.ops).toContain('fillRect');
-    expect(spy.ops).toContain('strokeRect');
+    expect(spy.ops).toContain('stroke');
+    expect(spy.ops).not.toContain('strokeRect');
+    expect(spy.gradients).toEqual([[0, 2, 0, 18]]);
+    expect(spy.fillStyles).toContain('#838383');
     // Chevron triangle path → beginPath, moveTo, lineTo, lineTo, closePath, fill.
     expect(spy.ops).toContain('beginPath');
     expect(spy.ops).toContain('closePath');
@@ -206,7 +218,18 @@ describe('render/painters — paintCommentMarker', () => {
     const spy = makeSpy();
     paintCommentMarker(spy.ctx, { x: 0, y: 0, w: 60, h: 30 });
     expect(spy.fillStyles).toContain('#ff0000');
-    expect(spy.ops).toContain('closePath');
-    expect(spy.ops).toContain('fill');
+  });
+
+  it('draws a 6x6 staircase of one-pixel steps ending at the trailing gridline', () => {
+    const spy = makeSpy();
+    paintCommentMarker(spy.ctx, { x: 10, y: 20, w: 60, h: 30 });
+    expect(spy.rects).toEqual([
+      [63, 20, 6, 1],
+      [64, 21, 5, 1],
+      [65, 22, 4, 1],
+      [66, 23, 3, 1],
+      [67, 24, 2, 1],
+      [68, 25, 1, 1],
+    ]);
   });
 });

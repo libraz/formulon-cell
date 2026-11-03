@@ -27,8 +27,13 @@ export function paintSelectionOutline(
   theme: ResolvedTheme,
   inset = false,
   rtl = false,
+  limit?: { x?: number; y?: number },
 ): void {
-  const frame = selectionOutlineFrame(bounds, rtl);
+  const raw = selectionOutlineFrame(bounds, rtl);
+  // With no header strip the frame of a full-axis selection stays inside the grid.
+  const x = Math.max(raw.x, limit?.x ?? raw.x);
+  const y = Math.max(raw.y, limit?.y ?? raw.y);
+  const frame = { x, y, w: raw.x + raw.w - x, h: raw.y + raw.h - y };
   // Centre lines of the 2px border.
   const x0 = frame.x + 1;
   const y0 = frame.y + 1;
@@ -47,6 +52,58 @@ export function paintSelectionOutline(
   ctx.restore();
 }
 
+/** Rule of a range in a multi-range selection (measured light grey). */
+const MULTI_RANGE_RULE = '#a5a5a5';
+
+/** Outline of one range of a multi-range selection: a one-pixel grey rule on
+ *  the range's gridlines with a one-pixel sheet-coloured inset, in place of
+ *  the single-range accent frame. */
+export function paintRangeOutlineThin(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  theme: ResolvedTheme,
+  rtl = false,
+): void {
+  const left = Math.round(bounds.x);
+  const top = Math.round(bounds.y);
+  const right = Math.round(bounds.x + bounds.w);
+  const bottom = Math.round(bounds.y + bounds.h);
+  const x = rtl ? left : left - 1;
+  const y = top - 1;
+  const w = (rtl ? right + 1 : right) - x;
+  const h = bottom - y;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = MULTI_RANGE_RULE;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  if (w > 4 && h > 4) {
+    ctx.strokeStyle = theme.bg;
+    ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+  }
+  ctx.restore();
+}
+
+/** Box around the active cell inside a multi-range selection: one accent
+ *  pixel, one pixel inside the cell's surface. */
+export function paintActiveCellBox(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  theme: ResolvedTheme,
+  rtl = false,
+): void {
+  const left = Math.round(bounds.x);
+  const top = Math.round(bounds.y);
+  const right = Math.round(bounds.x + bounds.w);
+  const bottom = Math.round(bounds.y + bounds.h);
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = theme.accent || '#0078d4';
+  ctx.strokeRect((rtl ? left + 1 : left) + 1.5, top + 1.5, right - left - 4, bottom - top - 4);
+  ctx.restore();
+}
+
 /** Visible side length of the fill handle in CSS pixels: a 5px accent square
  *  centred on the selection's trailing bottom gridline intersection. */
 export const FILL_HANDLE_SIZE = 5;
@@ -54,12 +111,14 @@ export const FILL_HANDLE_SIZE = 5;
 /** Spreadsheet-style fill handle at the selection range's trailing bottom
  *  corner. A 1px white gap separates it from the outline on the two sides
  *  that face into the selection. Returns the square padded by 1px on every
- *  side, so the grab zone stays centred on the corner. */
+ *  side, so the grab zone stays centred on the corner. `ring` puts the white
+ *  gap on all four sides, for a handle moved off the bottom-right corner. */
 export function paintFillHandle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
   rtl = false,
+  ring = false,
 ): Rect {
   const hs = FILL_HANDLE_SIZE;
   const half = Math.floor(hs / 2);
@@ -69,7 +128,8 @@ export function paintFillHandle(
   const y = Math.round(bounds.y + bounds.h) - half - 1;
   const gapX = rtl ? x : x - 1;
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(gapX, y - 1, hs + 1, hs + 1);
+  if (ring) ctx.fillRect(x - 1, y - 1, hs + 2, hs + 2);
+  else ctx.fillRect(gapX, y - 1, hs + 1, hs + 1);
   ctx.fillStyle = theme.accent || '#0078d4';
   ctx.fillRect(x, y, hs, hs);
   return { x: x - 1, y: y - 1, w: hs + 2, h: hs + 2 };

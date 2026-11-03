@@ -23,7 +23,12 @@ const ctxStub = (): CanvasRenderingContext2D =>
   new Proxy(
     {},
     {
-      get: (_target, key) => (key === 'measureText' ? () => ({ width: 0 }) : () => undefined),
+      get: (_target, key) =>
+        key === 'measureText'
+          ? () => ({ width: 0 })
+          : key === 'createLinearGradient'
+            ? () => ({ addColorStop: () => undefined })
+            : () => undefined,
       set: () => true,
     },
   ) as unknown as CanvasRenderingContext2D;

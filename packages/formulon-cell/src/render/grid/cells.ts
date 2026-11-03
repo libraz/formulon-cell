@@ -36,6 +36,7 @@ import {
   paintConditionalIcon,
   paintErrorTriangle,
   paintLockMarker,
+  paintSelectedFillShade,
   paintTableHeaderChevron,
   paintValidationCircle,
   paintValidationTriangle,
@@ -468,7 +469,8 @@ export function paintCells(
         !tableFmt?.borders &&
         !spark &&
         !hasValidationCircle &&
-        !hasThreadedComment
+        !hasThreadedComment &&
+        !fmt?.comment
       )
         continue;
       const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
@@ -574,6 +576,7 @@ export function paintCells(
         rtl,
         dpr: cellCtx.dpr,
         rowBaselineFont: rowFonts.get(r),
+        merged: isMergeAnchor,
         zoom: renderScale(state.layout, state.viewport),
         formatPaint:
           formatCode && customDisplay === null && value.kind === 'number'
@@ -592,6 +595,20 @@ export function paintCells(
           }
         } else {
           paintCellFill(paintCtx);
+        }
+      }
+      if (
+        !isActive &&
+        !objectSelected &&
+        (isInRange || isInExtraRange) &&
+        (effectiveFmt?.fill || effectiveFmt?.fillPattern || effectiveFmt?.fillGradient)
+      ) {
+        if (isMergeAnchor && mergedRects.length > 0) {
+          for (const mergedRect of mergedRects) {
+            paintSelectedFillShade({ ...paintCtx, bounds: mergedRect });
+          }
+        } else {
+          paintSelectedFillShade(paintCtx);
         }
       }
       if (isActive && !effectiveFmt?.fill && !effectiveFmt?.fillGradient)

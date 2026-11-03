@@ -7,6 +7,7 @@ import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
@@ -48,10 +49,12 @@ import { sameRectList, trailingRect } from './grid/range-rects.js';
 import { paintTraces } from './grid/traces.js';
 import { cellFontFamily } from './painters/text.js';
 import {
+  paintActiveCellBox,
   paintChartSourceHighlight,
   paintCopyMarquee,
   paintFillHandle,
   paintFillPreview,
+  paintRangeOutlineThin,
   paintRefHighlight,
   paintSelectionOutline,
   paintSpillBlocker,
@@ -662,8 +665,32 @@ export class GridRenderer {
     const multiCell = r.r0 !== r.r1 || r.c0 !== r.c1;
     const rangeOutline = multiCell ? rangeRects(layout, viewport, r) : activeRects;
     const outlineRects = sameRectList(activeRects, rangeOutline) ? activeRects : rangeOutline;
-    for (const bounds of outlineRects) {
-      paintSelectionOutline(this.ctx, bounds, theme, outlineRects !== activeRects, layout.rtl);
+    // Disjoint ranges: every range gets a thin rule and the active cell a thin
+    // box, with no thick frame and no fill handle.
+    const extraRanges = selection.extraRanges ?? [];
+    const multiRange = extraRanges.length > 0;
+    if (multiRange) {
+      for (const range of [r, ...extraRanges]) {
+        for (const bounds of rangeRects(layout, viewport, range)) {
+          paintRangeOutlineThin(this.ctx, bounds, theme, layout.rtl);
+        }
+      }
+      for (const bounds of activeRects) paintActiveCellBox(this.ctx, bounds, theme, layout.rtl);
+    } else {
+      const limit = {
+        x: layout.headerColWidth === 0 && !layout.rtl ? gridOriginX(layout) : undefined,
+        y: layout.headerRowHeight === 0 ? gridOriginY(layout) : undefined,
+      };
+      for (const bounds of outlineRects) {
+        paintSelectionOutline(
+          this.ctx,
+          bounds,
+          theme,
+          outlineRects !== activeRects,
+          layout.rtl,
+          limit,
+        );
+      }
     }
 
     const activeAnchor = activeMerge
@@ -713,9 +740,20 @@ export class GridRenderer {
     }
 
     const handleRange = activeMerge && r.r0 === r.r1 && r.c0 === r.c1 ? activeVisualRange : r;
-    const handleBounds = trailingRect(rangeRects(layout, viewport, handleRange), layout.rtl);
-    if (handleBounds) {
-      this.hits.fillHandle = paintFillHandle(this.ctx, handleBounds, theme, layout.rtl);
+    const handleRects = rangeRects(layout, viewport, handleRange);
+    let handleBounds = trailingRect(handleRects, layout.rtl);
+    let handleRing = false;
+    // A whole-column selection has no visible bottom and a whole-row one no
+    // visible end: the handle sits on the first row's top / first column's edge.
+    if (handleBounds && isWholeColumnRange(handleRange)) {
+      handleBounds = { ...handleBounds, y: Math.min(...handleRects.map((rect) => rect.y)), h: 4 };
+      handleRing = true;
+    } else if (handleBounds && isWholeRowRange(handleRange) && !layout.rtl) {
+      handleBounds = { ...handleBounds, x: Math.min(...handleRects.map((rect) => rect.x)), w: 4 };
+      handleRing = true;
+    }
+    if (handleBounds && !multiRange) {
+      this.hits.fillHandle = paintFillHandle(this.ctx, handleBounds, theme, layout.rtl, handleRing);
     }
   }
 

@@ -99,6 +99,9 @@ function canvasSpy(): CanvasSpy {
     strokeRect(x: number, y: number, w: number, h: number): void {
       strokeRects.push([x, y, w, h]);
     },
+    createLinearGradient() {
+      return { addColorStop() {} };
+    },
     setLineDash(value: number[]): void {
       dashes.push([...value]);
     },
@@ -229,8 +232,8 @@ describe('GridRenderer merged selection parity', () => {
       mergeRect.h + 1,
     ]);
     // The selection outline is the same rectangle and must not be painted a
-    // second time over the active merge outline. The chevron adds one stroke.
-    expect(spy.strokeRects).toHaveLength(2);
+    // second time over the active merge outline; the chevron frame is a path.
+    expect(spy.strokeRects).toHaveLength(1);
     expect(hitsOf(renderer).validationChevron).toMatchObject({ row: 1, col: 1 });
     expect(hitsOf(renderer).validationChevron?.rect.x).toBe(mergeRect.x + mergeRect.w);
     expect(hitsOf(renderer).fillHandle).toMatchObject({

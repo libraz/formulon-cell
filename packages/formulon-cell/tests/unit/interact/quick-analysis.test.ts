@@ -115,6 +115,20 @@ describe('attachQuickAnalysis', () => {
     handle.detach();
   });
 
+  it('keeps the launcher hidden on the mac platform profile', () => {
+    const fcHost = document.createElement('div');
+    fcHost.className = 'fc-host';
+    fcHost.dataset.fcPlatform = 'mac';
+    fcHost.appendChild(host);
+    document.body.appendChild(fcHost);
+    setRange(store, 0, 0, 0, 1);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    expect(host.querySelector<HTMLButtonElement>('.fc-quick__button')?.hidden).toBe(true);
+    handle.open();
+    expect(host.querySelector<HTMLElement>('.fc-quick')?.hidden).toBe(false);
+    handle.detach();
+  });
+
   it.each([
     [0, 1, 1_048_575, 1],
     [1, 0, 1, 16_383],

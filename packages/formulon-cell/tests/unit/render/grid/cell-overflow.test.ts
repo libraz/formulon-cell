@@ -8,6 +8,7 @@ import {
   layoutForView,
 } from '../../../../src/render/geometry.js';
 import { paintCells } from '../../../../src/render/grid/cells.js';
+import { stableTextMetricsBox, textBaselineY } from '../../../../src/render/painters/text.js';
 import type { CellFormat } from '../../../../src/store/store.js';
 import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
@@ -136,7 +137,10 @@ describe('text overflow', () => {
 });
 
 describe('merged text placement', () => {
-  it('centres a merge one pixel higher than a single cell', () => {
+  it('centres a merge one pixel higher, rounding where a single cell floors', () => {
+    // Excel: a merge centres its text one pixel above a single cell of the same
+    // height, and rounds the half-pixel offset a single cell floors (3 x 15 pt
+    // merge C2:C4 inks at y 36..56, single 15 pt G2 at 6..26).
     const middle: CellFormat = { vAlign: 'middle' };
     const single = paintRow([{ col: 1, text: 'Hxg', format: middle }]);
     const merged = paintRow([{ col: 1, text: 'Hxg', format: middle }], {
@@ -146,9 +150,11 @@ describe('merged text placement', () => {
       c1: 1,
     });
     const y = (ops: Op[]) => ops.find((op) => op.kind === 'text' && op.text === 'Hxg');
-    const rowH = single.rect(1).h;
+    const cell = single.rect(1);
+    const box = stableTextMetricsBox(theme.textCell);
+    expect(y(single.ops)).toMatchObject({ y: textBaselineY(cell, box, 'middle', 1) });
     expect(y(merged.ops)).toMatchObject({
-      y: (y(single.ops) as { y: number }).y + rowH / 2 - 1,
+      y: textBaselineY({ ...cell, h: cell.h * 2 - 2 }, box, 'middle', 1, true),
     });
   });
 });

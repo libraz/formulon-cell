@@ -21,7 +21,9 @@ function ctxStub(): CanvasRenderingContext2D {
   const target: Record<string, unknown> = {};
   return new Proxy(target, {
     get: (object, property) =>
-      property in object ? object[property as string] : () => ({ width: 0 }),
+      property in object
+        ? object[property as string]
+        : () => ({ width: 0, addColorStop: () => undefined }),
     set: (object, property, value) => {
       object[property as string] = value;
       return true;

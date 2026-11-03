@@ -3,18 +3,21 @@ import { mirrorInRect, type Rect } from '../geometry.js';
 
 /** In-cell dropdown button, measured at 100%: 16x17px, hung from the cell's
  *  trailing edge 1px below its top (covering the outer half of the selection
- *  outline), with a gray frame and a 9x5 gray arrow. */
+ *  outline), with a gray frame (no leading side), a vertical face gradient and a 9x6 gray arrow. */
 const DROPDOWN_W = 16;
 const DROPDOWN_H = 17;
 const DROPDOWN_FRAME = '#999999';
-const DROPDOWN_ARROW = '#808080';
+const DROPDOWN_ARROW = '#838383';
+const DROPDOWN_FACE_TOP = '#ffffff';
+const DROPDOWN_FACE_BOTTOM = '#f7f7f7';
+const DROPDOWN_HIGHLIGHT = '#f0f0f0';
 
 /** Paint the list-validation / totals dropdown button beside the active cell.
  *  Returned rect is the click hit-area. */
 export function paintValidationChevron(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
-  theme: ResolvedTheme,
+  _theme: ResolvedTheme,
   rtl = false,
 ): Rect {
   const w = DROPDOWN_W;
@@ -22,16 +25,29 @@ export function paintValidationChevron(
   const x = mirrorInRect(bounds, bounds.x + bounds.w, w, rtl);
   const y = bounds.y + 1;
   ctx.save();
-  ctx.fillStyle = theme.bg;
-  ctx.fillRect(x, y, w, h);
+  // The face starts one pixel below the top so the selection outline's
+  // corner stays visible; the top frame starts one pixel in.
+  const body = ctx.createLinearGradient(0, y + 1, 0, y + h);
+  body.addColorStop(0, DROPDOWN_FACE_TOP);
+  body.addColorStop(1, DROPDOWN_FACE_BOTTOM);
+  ctx.fillStyle = body;
+  ctx.fillRect(x, y + 1, w, h - 1);
+  ctx.fillStyle = DROPDOWN_HIGHLIGHT;
+  ctx.fillRect(rtl ? x : x + 1, y + 1, w - 1, 0.5);
+  // No leading border: the active-cell outline abuts the button.
   ctx.strokeStyle = DROPDOWN_FRAME;
   ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  ctx.beginPath();
+  ctx.moveTo(rtl ? x + w - 1 : x + 1, y + 0.5);
+  ctx.lineTo(rtl ? x + 0.5 : x + w - 0.5, y + 0.5);
+  ctx.lineTo(rtl ? x + 0.5 : x + w - 0.5, y + h - 0.5);
+  ctx.lineTo(rtl ? x + w : x, y + h - 0.5);
+  ctx.stroke();
   ctx.fillStyle = DROPDOWN_ARROW;
   ctx.beginPath();
-  ctx.moveTo(x + 3, y + 6.5);
-  ctx.lineTo(x + 12, y + 6.5);
-  ctx.lineTo(x + 7.5, y + 11.5);
+  ctx.moveTo(x + 3, y + 6.25);
+  ctx.lineTo(x + 12, y + 6.25);
+  ctx.lineTo(x + 7.5, y + 11.9);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -171,20 +187,18 @@ export function paintLockMarker(
   ctx.restore();
 }
 
-/** Paint the note indicator: a red right triangle, 6px a side, in the cell's
- *  trailing top corner inside its gridline (measured at 100%). */
+/** Paint the note indicator: a red right triangle, 6 CSS px a side, in the
+ *  cell's trailing top corner inside its gridline. It is a staircase of
+ *  one-CSS-px steps (12x12 device px in 84 pixels at 2x), not an antialiased
+ *  diagonal. */
 export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect, rtl = false): void {
   const size = 6;
   const x = mirrorInRect(bounds, bounds.x + bounds.w - 1 - size, size, rtl);
-  const y = bounds.y;
   ctx.save();
   ctx.fillStyle = '#ff0000';
-  ctx.beginPath();
-  // Right angle at the cell's trailing top corner.
-  ctx.moveTo(rtl ? x : x + size, y);
-  ctx.lineTo(rtl ? x : x + size, y + size);
-  ctx.lineTo(rtl ? x + size : x, y);
-  ctx.closePath();
-  ctx.fill();
+  for (let row = 0; row < size; row += 1) {
+    const width = size - row;
+    ctx.fillRect(rtl ? x : x + size - width, bounds.y + row, width, 1);
+  }
   ctx.restore();
 }
