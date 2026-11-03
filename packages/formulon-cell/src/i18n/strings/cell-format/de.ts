@@ -71,6 +71,7 @@ export const cellFormatDe: CellFormatStrings = {
     tabMore: 'Weitere',
     moreHint:
       'Verwenden Sie Einfügen für Hyperlinks, Überprüfen für Kommentare und Daten für die Datenüberprüfung. Diese Registerkarte ist ein sekundärer Editor für die ausgewählte Zelle.',
+    categoryLabel: 'Kategorie',
     catGeneral: 'Standard',
     catFixed: 'Zahl',
     catCurrency: 'Währung',

@@ -5,6 +5,7 @@ type FormatDialogStrings = CellFormatStrings['formatDialog'];
 /** The `formatDialog` keys the Mac host can override. A locale whose Mac wording
  *  is not measured repeats its own shared text for them. */
 const MAC_FORMAT_DIALOG_KEYS = [
+  'categoryLabel',
   'fontFamily',
   'fontStyle',
   'fontSize',

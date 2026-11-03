@@ -529,6 +529,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     const t = copy();
     findTab.setAttribute('aria-selected', activeTab === 'find' ? 'true' : 'false');
     replaceTab.setAttribute('aria-selected', activeTab === 'replace' ? 'true' : 'false');
+    overlay.dataset.fcFindTab = activeTab;
     replaceRow.row.hidden = activeTab === 'find';
     replaceBtn.hidden = activeTab === 'find';
     replaceAllBtn.hidden = activeTab === 'find';
@@ -577,6 +578,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   const syncOptions = (): void => {
     optionsPanel.hidden = !optionsOpen;
+    overlay.classList.toggle('fc-find--options', optionsOpen);
     optionsBtn.textContent = optionsOpen ? copy().optionsLess : copy().optionsMore;
   };
 

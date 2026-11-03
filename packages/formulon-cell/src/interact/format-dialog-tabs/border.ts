@@ -200,6 +200,21 @@ export function createBorderTab(
   presetOutline.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--outline');
   presetInside.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--inside');
   presetRow.append(presetNone, presetOutline, presetInside);
+  if (mac) {
+    // The Mac app captions each preset below its button, outside the button.
+    for (const [button, key, text] of [
+      [presetNone, 'none', t.borderPresetNone],
+      [presetOutline, 'outline', t.borderPresetOutline],
+      [presetInside, 'inside', t.borderPresetInside],
+    ] as const) {
+      button.textContent = '';
+      button.setAttribute('aria-label', text);
+      const caption = document.createElement('span');
+      caption.className = `fc-fmtdlg__border-preset-caption fc-fmtdlg__border-preset-caption--${key}`;
+      caption.textContent = text;
+      presetRow.appendChild(caption);
+    }
+  }
 
   // Per-side checkboxes
   const sideRow = document.createElement('div');

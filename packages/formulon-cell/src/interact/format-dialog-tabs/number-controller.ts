@@ -199,6 +199,14 @@ export function attachNumberTab(
     syncPatternListItems(patterns, current, specialLabels);
   };
 
+  // The Mac currency list writes its minus rows with the sign after the symbol.
+  const currencyMinus = (style: NegativeStyle): NegativeStyle => {
+    if (!ctx.isMacPlatform() || draft.numberCategory !== 'currency') return style;
+    return style === 'minus' ? 'symbol-minus' : style === 'red' ? 'red-symbol-minus' : style;
+  };
+  const listRowFor = (style: NegativeStyle): NegativeStyle =>
+    style === 'symbol-minus' ? 'minus' : style === 'red-symbol-minus' ? 'red' : style;
+
   const syncNegativeSamples = (): void => {
     const cat = draft.numberCategory;
     const items = negativeOptions.querySelectorAll<HTMLButtonElement>('[data-fc-negative-style]');
@@ -208,7 +216,7 @@ export function attachNumberTab(
       // The triangle rows belong to the plain number category only.
       item.hidden = style.startsWith('triangle') && cat !== 'fixed';
       const sampleFmt = computeDialogNumFmt(
-        { ...draft, numberCategory: cat, negativeStyle: style },
+        { ...draft, numberCategory: cat, negativeStyle: currencyMinus(style) },
         defaultPatternFor,
       );
       item.textContent = formatNumber(-1234, sampleFmt, ctx.getLocale());
@@ -261,7 +269,7 @@ export function attachNumberTab(
     )) {
       item.setAttribute(
         'aria-selected',
-        item.dataset.fcNegativeStyle === draft.negativeStyle ? 'true' : 'false',
+        item.dataset.fcNegativeStyle === listRowFor(draft.negativeStyle) ? 'true' : 'false',
       );
     }
     symbolSelect.value = draft.currencySymbol;
@@ -383,7 +391,7 @@ export function attachNumberTab(
     const style = item?.dataset.fcNegativeStyle as NegativeStyle | undefined;
     if (!style) return;
     touch('numFmt');
-    draft.negativeStyle = style;
+    draft.negativeStyle = currencyMinus(style);
     ctx.syncControls();
     ctx.renderPreview();
   };

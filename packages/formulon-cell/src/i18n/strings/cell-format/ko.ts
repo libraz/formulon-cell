@@ -71,6 +71,7 @@ export const cellFormatKo: CellFormatStrings = {
     tabMore: '기타',
     moreHint:
       '하이퍼링크는 삽입 탭에서, 노트는 검토 탭에서, 데이터 유효성 검사는 데이터 탭에서 사용합니다. 이 탭은 선택한 셀의 보조 편집기입니다.',
+    categoryLabel: '범주',
     catGeneral: '일반',
     catFixed: '숫자',
     catCurrency: '통화',

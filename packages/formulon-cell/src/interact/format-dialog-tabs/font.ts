@@ -125,7 +125,13 @@ export function createFontTab(
   italicCk.input.dataset.fcCheck = 'italic';
   const underlineLabel = document.createElement('label');
   underlineLabel.className = 'fc-fmtdlg__font-underline';
-  underlineLabel.textContent = t.fontUnderline;
+  if (mac) {
+    const caption = document.createElement('span');
+    caption.textContent = t.fontUnderline;
+    underlineLabel.appendChild(caption);
+  } else {
+    underlineLabel.textContent = t.fontUnderline;
+  }
   const underlineSelect = createDialogSelect(
     [
       { value: '', label: t.fontUnderlineNone },
@@ -241,7 +247,13 @@ export function createFontTab(
   // caption to keep the three column headings on one line.
   const fontStyleLabel = document.createElement('div');
   fontStyleLabel.className = 'fc-fmtdlg__font-style-label';
-  fontStyleLabel.textContent = t.fontStyle;
+  if (mac) {
+    const caption = document.createElement('span');
+    caption.textContent = t.fontStyle;
+    fontStyleLabel.appendChild(caption);
+  } else {
+    fontStyleLabel.textContent = t.fontStyle;
+  }
   let fontStyleField: HTMLInputElement | null = null;
   if (mac) {
     // The Mac app shows the chosen style in a field above the list.

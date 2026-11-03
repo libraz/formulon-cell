@@ -72,6 +72,9 @@ export function formatNumber(
         useGrouping: true,
       })
       .format(Math.abs(value));
+    if (value < 0 && (negStyle === 'symbol-minus' || negStyle === 'red-symbol-minus')) {
+      return placeCurrencySymbol(`-${body}`, symbol, locale);
+    }
     return applyNegative(value, placeCurrencySymbol(body, symbol, locale), '', negStyle);
   }
   if (fmt.kind === 'percent') {
@@ -181,14 +184,18 @@ function formatCustomPattern(
   const selected = selectNumberSection(pattern, value);
   // Strip style-only directives. Quoted literals must stay quoted until the
   // numeric/date renderer decides whether a token is active or literal.
-  const active = stripFormatDirectives(selected.section);
+  const active = stripFormatDirectives(selected.section, true);
 
   // If the section contains date/time tokens, render as date.
-  if (/y|m|d|h|s/i.test(stripLiterals(active))) {
+  if (/y|m|d|h|s|aaa/i.test(stripLiterals(active))) {
     return renderDateTimePattern(value, active, locale, date1904);
   }
 
-  return renderNumericPattern(selected.useAbs ? Math.abs(value) : value, active, locale);
+  return renderNumericPattern(
+    selected.useAbs ? Math.abs(value) : value,
+    active.replace(/\[\$-[^\]]+\]/g, ''),
+    locale,
+  );
 }
 
 /** Pick the section of `pattern` that renders `value`. Spreadsheets allow
@@ -377,12 +384,15 @@ function normalizeFormatSection(section: string): string {
   return stripFormatDirectives(section).replace(/"([^"]*)"/g, '$1');
 }
 
-function stripFormatDirectives(section: string): string {
+/** Locale tags other than the ones that pick month/day-name language. */
+const NAME_TAG_STRIP = /\[\$-(?!(?:411|ja-JP|409|en-US)\])[^\]]+\]/g;
+
+function stripFormatDirectives(section: string, keepNameTags = false): string {
   return (
     section
       // Locale/currency tags: [$¥-411]#,##0 → ¥#,##0; [$-ja-JP] is locale-only.
       .replace(/\[\$([^\]-]+)(?:-[^\]]+)?\]/g, '$1')
-      .replace(/\[\$-[^\]]+\]/g, '')
+      .replace(keepNameTags ? NAME_TAG_STRIP : /\[\$-[^\]]+\]/g, '')
       // Color tags are a style concern; the formatter returns text only.
       .replace(/\[(?:Red|Green|Blue|Black|White|Yellow|Magenta|Cyan|Color\d+)\]/gi, '')
       // Alignment/fill directives. `_x` reserves one char width; `*x`
@@ -515,18 +525,13 @@ function renderDateTimePattern(
   const has12h = /a\/?p|am\/pm/i.test(pattern);
   const hh12 = ((hh + 11) % 12) + 1;
   const ampm = hh < 12 ? 'AM' : 'PM';
-  let daysLong: readonly string[] | undefined;
-  let daysShort: readonly string[] | undefined;
-  let monthsLong: readonly string[] | undefined;
-  let monthsShort: readonly string[] | undefined;
-  const getDaysLong = (): readonly string[] =>
-    (daysLong ??= dateNameTable(locale, 'weekday', 'long'));
-  const getDaysShort = (): readonly string[] =>
-    (daysShort ??= dateNameTable(locale, 'weekday', 'short'));
-  const getMonthsLong = (): readonly string[] =>
-    (monthsLong ??= dateNameTable(locale, 'month', 'long'));
-  const getMonthsShort = (): readonly string[] =>
-    (monthsShort ??= dateNameTable(locale, 'month', 'short'));
+  // Unlabelled month/day names are English under a ja host; a [$-411]-style
+  // tag switches the names that follow, and aaa/aaaa are always Japanese.
+  let nameLocale = normalizeFormatLocale(locale).split('-')[0] === 'ja' ? 'en-US' : locale;
+  const getDaysLong = (): readonly string[] => dateNameTable(nameLocale, 'weekday', 'long');
+  const getDaysShort = (): readonly string[] => dateNameTable(nameLocale, 'weekday', 'short');
+  const getMonthsLong = (): readonly string[] => dateNameTable(nameLocale, 'month', 'long');
+  const getMonthsShort = (): readonly string[] => dateNameTable(nameLocale, 'month', 'short');
   let out = '';
   let prevWasH = false;
   for (let i = 0; i < pattern.length; ) {
@@ -553,6 +558,12 @@ function renderDateTimePattern(
       const close = pattern.indexOf(']', i + 1);
       if (close > i) {
         const inner = pattern.slice(i + 1, close);
+        const tag = /^\$-(411|ja-JP|409|en-US)$/i.exec(inner);
+        if (tag) {
+          nameLocale = /^(411|ja-JP)$/i.test(tag[1] ?? '') ? 'ja-JP' : 'en-US';
+          i = close + 1;
+          continue;
+        }
         if (/^h+$/i.test(inner)) {
           out += String(elapsedHours).padStart(inner.length, '0');
           i = close + 1;
@@ -588,6 +599,8 @@ function renderDateTimePattern(
     else if (lowerRest.startsWith('dd')) tok = 'dd';
     else if (lowerRest.startsWith('hh')) tok = 'hh';
     else if (lowerRest.startsWith('ss')) tok = 'ss';
+    else if (lowerRest.startsWith('aaaa')) tok = 'aaaa';
+    else if (lowerRest.startsWith('aaa')) tok = 'aaa';
     else if (/^am\/pm/i.test(rest)) tok = 'am/pm';
     else if (/^a\/p/i.test(rest)) tok = 'a/p';
     else if (lowerRest[0] === 'm') tok = 'm';
@@ -629,6 +642,12 @@ function renderDateTimePattern(
         break;
       case 'ddd':
         out += getDaysShort()[dow] ?? '';
+        break;
+      case 'aaaa':
+        out += dateNameTable('ja-JP', 'weekday', 'long')[dow] ?? '';
+        break;
+      case 'aaa':
+        out += dateNameTable('ja-JP', 'weekday', 'short')[dow] ?? '';
         break;
       case 'dd':
         out += pad2(dd);

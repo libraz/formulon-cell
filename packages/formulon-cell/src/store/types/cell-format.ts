@@ -25,7 +25,8 @@ export type NumFmt =
 
 /** How negative numbers display. */
 /** How a negative number reads: `red` and `red-plain` colour it red (with and
- *  without the minus sign); the triangle styles replace the sign. */
+ *  without the minus sign); the triangle styles replace the sign; the
+ *  symbol-minus styles (currency) put the minus after the symbol. */
 export type NegativeStyle =
   | 'minus'
   | 'parens'
@@ -33,7 +34,9 @@ export type NegativeStyle =
   | 'red-parens'
   | 'red-plain'
   | 'triangle'
-  | 'triangle-filled';
+  | 'triangle-filled'
+  | 'symbol-minus'
+  | 'red-symbol-minus';
 
 export type CellAlign =
   | 'left'

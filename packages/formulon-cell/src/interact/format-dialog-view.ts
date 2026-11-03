@@ -113,6 +113,11 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   numberLayout.className = 'fc-fmtdlg__number-layout';
   numberPanel.appendChild(numberLayout);
 
+  const catLabel = document.createElement('div');
+  catLabel.className = 'fc-fmtdlg__cat-label';
+  catLabel.textContent = t.categoryLabel;
+  numberLayout.appendChild(catLabel);
+
   const catList = document.createElement('div');
   catList.className = 'fc-fmtdlg__cat';
   catList.setAttribute('role', 'listbox');
@@ -161,7 +166,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   numberControls.appendChild(preview);
 
   const decimalsRow = document.createElement('label');
-  decimalsRow.className = 'fc-fmtdlg__row';
+  decimalsRow.className = 'fc-fmtdlg__row fc-fmtdlg__decimals-row';
   const decimalsLabel = document.createElement('span');
   decimalsLabel.textContent = t.decimals;
   const decimalsInput = document.createElement('input');
@@ -180,7 +185,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   numberControls.appendChild(thousandsCk.wrap);
 
   const symbolRow = document.createElement('label');
-  symbolRow.className = 'fc-fmtdlg__row';
+  symbolRow.className = 'fc-fmtdlg__row fc-fmtdlg__symbol-row';
   const symbolLabel = document.createElement('span');
   symbolLabel.textContent = t.symbol;
   const symbolSelect = createDialogSelect(
@@ -192,7 +197,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   numberControls.appendChild(symbolRow);
 
   const patternPresetRow = document.createElement('label');
-  patternPresetRow.className = 'fc-fmtdlg__row';
+  patternPresetRow.className = 'fc-fmtdlg__row fc-fmtdlg__pattern-preset-row';
   const patternPresetLabel = document.createElement('span');
   patternPresetLabel.textContent = t.patternType;
   const patternPresetSelect = createDialogSelect([], '', {
@@ -221,7 +226,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
 
   // Pattern row — visible for custom categories.
   const patternRow = document.createElement('label');
-  patternRow.className = 'fc-fmtdlg__row';
+  patternRow.className = 'fc-fmtdlg__row fc-fmtdlg__pattern-row';
   const patternLabel = document.createElement('span');
   patternLabel.textContent = t.pattern;
   const patternInput = document.createElement('input');
@@ -235,7 +240,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   numberControls.appendChild(patternRow);
 
   const localeRow = document.createElement('label');
-  localeRow.className = 'fc-fmtdlg__row';
+  localeRow.className = 'fc-fmtdlg__row fc-fmtdlg__locale-row';
   const localeLabel = document.createElement('span');
   localeLabel.textContent = t.languageLocation;
   const localeSelect = createDialogSelect(
@@ -260,7 +265,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   // Office365's Gregorian/Japanese options; pattern output is unchanged
   // since downstream rendering does not yet implement era formatting.
   const calendarRow = document.createElement('label');
-  calendarRow.className = 'fc-fmtdlg__row';
+  calendarRow.className = 'fc-fmtdlg__row fc-fmtdlg__calendar-row';
   const calendarLabel = document.createElement('span');
   calendarLabel.textContent = t.calendarType;
   const calendarSelect = createDialogSelect(

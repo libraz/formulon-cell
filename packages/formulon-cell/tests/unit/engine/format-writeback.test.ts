@@ -382,6 +382,8 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     ['red-plain', '[$¥-411]#,##0;[Red][$¥-411]#,##0'],
     ['triangle', '[$¥-411]#,##0;"△ "[$¥-411]#,##0'],
     ['triangle-filled', '[$¥-411]#,##0;"▲ "[$¥-411]#,##0'],
+    ['symbol-minus', '[$¥-411]#,##0;[$¥-411]-#,##0'],
+    ['red-symbol-minus', '[$¥-411]#,##0;[Red][$¥-411]-#,##0'],
   ] as const)('currency negative style %s round-trips', (negativeStyle, expectedCode) => {
     const code = numFmtToFormatCode({ kind: 'currency', decimals: 0, symbol: '¥', negativeStyle });
     expect(code).toBe(expectedCode);
@@ -484,7 +486,7 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
       kind: 'currency',
       decimals: 0,
       symbol: '¥',
-      negativeStyle: 'red',
+      negativeStyle: 'red-symbol-minus',
       pattern: yen,
     });
     expect(numFmtToFormatCode(formatCodeToNumFmt(yen) ?? undefined)).toBe(yen);

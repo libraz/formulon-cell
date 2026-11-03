@@ -243,4 +243,289 @@
       grid-template-columns: 1fr;
     }
   }
+
+  /* ── Mac: Excel for Mac's fixed frames (pt = CSS px, window-relative) ──
+     638 x 226 collapsed, 638 x 310 with オプション open. Every control sits at
+     the frame Excel reports, so the wrappers only group; the replace tab adds
+     its row in space the find tab leaves empty and narrows the popups to 74. */
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-fmtdlg__panel,
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-fmtdlg__panel:has(> .fc-fmtdlg__tabs) {
+    width: 638px;
+    height: 226px;
+    min-height: 0;
+    max-height: none;
+    padding: 0;
+    overflow: hidden;
+    /* The frame is drawn inset so control offsets count from the outer edge. */
+    border: 0;
+    outline: 1px solid var(--fc-fmtdlg-rule, var(--fc-rule-strong));
+    outline-offset: -1px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-find--options.fc-fmtdlg__panel {
+    height: 310px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find > .fc-fmtdlg__header,
+  .fc-host[data-fc-platform="mac"] .fc-find > .fc-fmtdlg__tabs,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__body,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__form,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__field,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options-row,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__checks,
+  .fc-host[data-fc-platform="mac"] .fc-find > .fc-find__footer {
+    position: static;
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options[hidden] {
+    display: none;
+  }
+
+  /* The find tab keeps the replace row's space empty. */
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__replace-row[hidden] {
+    display: block !important;
+    visibility: hidden;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__title,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__tab,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__field label,
+  .fc-host[data-fc-platform="mac"] .fc-find input[type="text"],
+  .fc-host[data-fc-platform="mac"] .fc-find select,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__check,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__btn,
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__status {
+    position: absolute;
+    box-sizing: border-box;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__title {
+    top: 8px;
+    left: 82px;
+    height: 16px;
+    line-height: 16px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__btn--icon {
+    top: 8px;
+    left: 8px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__tab {
+    top: 43px;
+    left: 272px;
+    width: 47px;
+    height: 24px;
+    padding: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__tab + .fc-find__tab {
+    left: 319px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__field label {
+    left: 41px;
+    width: 90px;
+    height: 18px;
+    line-height: 18px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find input[type="text"] {
+    left: 137px;
+    width: 462px;
+    height: 26px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__form > .fc-find__field:first-child label {
+    top: 78px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__form > .fc-find__field:first-child input {
+    top: 74px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__replace-row label {
+    top: 106px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__replace-row input {
+    top: 102px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options-btn {
+    top: 140px;
+    left: 530px;
+    width: 86px;
+    height: 26px;
+    padding: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-find--options .fc-find__options-btn {
+    top: 224px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options > .fc-find__field label {
+    left: 42px;
+    width: 54px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find select {
+    left: 106px;
+    width: 86px;
+    height: 26px;
+    padding: 0 14px 0 6px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find[data-fc-find-tab="replace"] select {
+    width: 74px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options > .fc-find__field:nth-child(1) label {
+    top: 143px;
+  }
+
+  .fc-host[data-fc-platform="mac"]
+    .fc-find
+    .fc-find__options
+    > .fc-find__field:nth-child(1)
+    select {
+    top: 139px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options > .fc-find__field:nth-child(2) label {
+    top: 171px;
+  }
+
+  .fc-host[data-fc-platform="mac"]
+    .fc-find
+    .fc-find__options
+    > .fc-find__field:nth-child(2)
+    select {
+    top: 167px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__options > .fc-find__field:nth-child(3) label {
+    top: 199px;
+  }
+
+  .fc-host[data-fc-platform="mac"]
+    .fc-find
+    .fc-find__options
+    > .fc-find__field:nth-child(3)
+    select {
+    top: 195px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__check {
+    left: 229px;
+    height: 18px;
+    gap: 4px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find[data-fc-find-tab="replace"] .fc-find__check {
+    left: 217px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__check:nth-child(1) {
+    top: 141px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__check:nth-child(2) {
+    top: 163px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__check:nth-child(3) {
+    top: 185px;
+  }
+
+  /* The checkbox sits inside its label, which carries the frame. */
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__check input {
+    position: static;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__footer .fc-fmtdlg__btn {
+    top: 184px;
+    width: 86px;
+    height: 26px;
+    padding: 0;
+    white-space: nowrap;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-find--options .fc-find__footer .fc-fmtdlg__btn {
+    top: 268px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__btn--replace {
+    left: 11px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__btn--replace-all {
+    left: 114px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__btn--find-all {
+    left: 214px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__btn--prev {
+    left: 310px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__footer .fc-find__btn--next {
+    left: 416px;
+    width: 105px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__btn--close {
+    left: 540px;
+  }
+
+  /* Excel clips its cell count under the window's bottom edge. */
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__status {
+    top: 221px;
+    left: 11px;
+    height: 2px;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-find--options .fc-find__status {
+    top: 305px;
+  }
+
+  /* Find All lists its matches under the buttons, the panel growing with it. */
+  .fc-host[data-fc-platform="mac"] .fc-find:has(.fc-find__results:not([hidden])) {
+    height: 386px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-find--options:has(.fc-find__results:not([hidden])) {
+    height: 470px;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find .fc-find__results {
+    position: absolute;
+    top: 226px;
+    right: 11px;
+    left: 11px;
+    height: 150px;
+    margin: 0;
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-find.fc-find--options .fc-find__results {
+    top: 310px;
+  }
 }

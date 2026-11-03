@@ -71,6 +71,7 @@ export const cellFormatTh: CellFormatStrings = {
     tabMore: 'เพิ่มเติม',
     moreHint:
       'ใช้ แทรก สำหรับไฮเปอร์ลิงก์ ใช้ รีวิว สำหรับข้อคิดเห็น และใช้ ข้อมูล สำหรับการตรวจสอบ แท็บนี้เป็นตัวแก้ไขรองสำหรับเซลล์ที่เลือก',
+    categoryLabel: 'หมวดหมู่',
     catGeneral: 'ทั่วไป',
     catFixed: 'ตัวเลข',
     catCurrency: 'สกุลเงิน',

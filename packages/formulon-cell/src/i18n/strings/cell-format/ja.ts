@@ -71,6 +71,7 @@ export const cellFormatJa: CellFormatStrings = {
     tabMore: 'その他',
     moreHint:
       'ハイパーリンクは［挿入］、コメントは［校閲］、入力規則は［データ］が主な入口です。このタブは選択セルの補助編集に使用します。',
+    categoryLabel: '分類',
     catGeneral: '標準',
     catFixed: '数値',
     catCurrency: '通貨',

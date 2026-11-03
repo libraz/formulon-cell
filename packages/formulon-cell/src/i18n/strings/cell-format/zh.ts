@@ -71,6 +71,7 @@ export const cellFormatZh: CellFormatStrings = {
     tabMore: '其他',
     moreHint:
       '使用“插入”处理超链接，使用“审阅”处理批注，使用“数据”处理验证。此选项卡用于编辑所选单元格的辅助设置。',
+    categoryLabel: '分类',
     catGeneral: '常规',
     catFixed: '数字',
     catCurrency: '货币',

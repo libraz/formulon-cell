@@ -71,6 +71,7 @@ export const cellFormatFr: CellFormatStrings = {
     tabMore: 'Plus',
     moreHint:
       'Utilisez Insérer pour les liens hypertexte, Révision pour les commentaires et Données pour la validation. Cet onglet est un éditeur secondaire pour la cellule sélectionnée.',
+    categoryLabel: 'Catégorie',
     catGeneral: 'Général',
     catFixed: 'Nombre',
     catCurrency: 'Monétaire',

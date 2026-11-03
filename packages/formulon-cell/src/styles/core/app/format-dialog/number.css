@@ -192,4 +192,9 @@
   .fc-fmtdlg__panel-tab[data-number-category="time"] .fc-fmtdlg__preview {
     margin-bottom: 8px;
   }
+
+  /* The category caption is a Mac presentation element. */
+  .fc-fmtdlg__cat-label {
+    display: none;
+  }
 }

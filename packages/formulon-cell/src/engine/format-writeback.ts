@@ -344,7 +344,11 @@ export function numFmtToFormatCode(
       const dec = '0'.repeat(fmt.decimals);
       const body = dec ? `0.${dec}` : '0';
       const sym = fmt.symbol ?? '$';
-      return withNegativeSection(`${currencyToken(sym)}#,##${body}`, fmt.negativeStyle);
+      return withNegativeSection(
+        `${currencyToken(sym)}#,##${body}`,
+        fmt.negativeStyle,
+        `${currencyToken(sym)}-#,##${body}`,
+      );
     }
     case 'percent': {
       const dec = '0'.repeat(fmt.decimals);
@@ -826,7 +830,12 @@ function splitFormatSections(s: string): string[] {
   return out;
 }
 
-function withNegativeSection(positive: string, style: NegativeStyle | undefined): string {
+function withNegativeSection(
+  positive: string,
+  style: NegativeStyle | undefined,
+  /** The positive code with its minus after the currency symbol. */
+  symbolMinus = `-${positive}`,
+): string {
   switch (style) {
     // `_)` pads positives by a paren's width so they align with parenthesized negatives.
     case 'parens':
@@ -837,6 +846,10 @@ function withNegativeSection(positive: string, style: NegativeStyle | undefined)
       return joinFormatSections(`${positive}_)`, `[Red](${positive})`);
     case 'red-plain':
       return joinFormatSections(positive, `[Red]${positive}`);
+    case 'symbol-minus':
+      return joinFormatSections(positive, symbolMinus);
+    case 'red-symbol-minus':
+      return joinFormatSections(positive, `[Red]${symbolMinus}`);
     case 'triangle':
       return joinFormatSections(positive, `"△ "${positive}`);
     case 'triangle-filled':
@@ -860,8 +873,13 @@ function negativeStyleFromSections(sections: string[]): NegativeStyle {
   const unsigned = normalized.replace(/\[(?:Red|Color3)\]/gi, '').trim();
   if (unsigned.startsWith('△')) return 'triangle';
   if (unsigned.startsWith('▲')) return 'triangle-filled';
-  if (red) return /^[^0#?]*-/.test(unsigned) ? 'red' : 'red-plain';
-  return parens ? 'parens' : 'minus';
+  const symbolFirst = /^[^0#?-]+-/.test(unsigned);
+  if (red) {
+    if (unsigned.startsWith('-')) return 'red';
+    return symbolFirst ? 'red-symbol-minus' : /^[^0#?]*-/.test(unsigned) ? 'red' : 'red-plain';
+  }
+  if (parens) return 'parens';
+  return symbolFirst ? 'symbol-minus' : 'minus';
 }
 
 function firstFormatSection(code: string): string {

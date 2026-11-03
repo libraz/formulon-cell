@@ -71,6 +71,7 @@ export const cellFormatEn: CellFormatStrings = {
     tabMore: 'More',
     moreHint:
       'Use Insert for hyperlinks, Review for comments, and Data for validation. This tab is a secondary editor for the selected cell.',
+    categoryLabel: 'Category',
     catGeneral: 'General',
     catFixed: 'Number',
     catCurrency: 'Currency',

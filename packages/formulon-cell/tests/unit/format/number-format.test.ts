@@ -161,6 +161,17 @@ describe('formatNumber', () => {
     ).toBe('△ ¥1,234');
   });
 
+  it('puts the minus after the currency symbol for the symbol-minus styles', () => {
+    for (const negativeStyle of ['symbol-minus', 'red-symbol-minus'] as const) {
+      expect(
+        formatNumber(-1234, { kind: 'currency', decimals: 0, symbol: '¥', negativeStyle }, 'ja-JP'),
+      ).toBe('¥-1,234');
+    }
+    expect(formatNumber(-1234, { kind: 'currency', decimals: 0, symbol: '¥' }, 'ja-JP')).toBe(
+      '-¥1,234',
+    );
+  });
+
   it('falls back to "$" when currency symbol is missing', () => {
     expect(formatNumber(7.5, { kind: 'currency', decimals: 1 })).toBe('$7.5');
   });
@@ -321,5 +332,33 @@ describe('date name formatting', () => {
 
     expect(formatFresh(45652, weekday, 'en-US')).toBe('Thursday');
     expect(formatGetter).toHaveBeenCalledTimes(7 * 130);
+  });
+});
+
+describe('formatNumber date names under ja', () => {
+  const serial = 46329; // 2026-11-03, Tuesday
+  const f = (pattern: string, locale = 'ja-JP') =>
+    formatNumber(serial, { kind: 'custom', pattern } as const, locale);
+
+  it('renders unlabelled month and day names in English', () => {
+    expect(f('mmm')).toBe('Nov');
+    expect(f('mmmm')).toBe('November');
+    expect(f('mmmmm')).toBe('N');
+    expect(f('ddd')).toBe('Tue');
+    expect(f('dddd')).toBe('Tuesday');
+    expect(f('d-mmm')).toBe('3-Nov');
+  });
+
+  it('keeps aaa/aaaa Japanese and honours locale tags', () => {
+    expect(f('aaa')).toBe('火');
+    expect(f('aaaa')).toBe('火曜日');
+    expect(f('[$-411]mmm')).toBe('11月');
+    expect(f('[$-ja-JP]dddd')).toBe('火曜日');
+    expect(f('[$-en-US]mmm', 'ja-JP')).toBe('Nov');
+  });
+
+  it('leaves other locales on their own names', () => {
+    expect(f('mmmm', 'de-DE')).toBe('November');
+    expect(f('dddd', 'de-DE')).toBe('Dienstag');
   });
 });

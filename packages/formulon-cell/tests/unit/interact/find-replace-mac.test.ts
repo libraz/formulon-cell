@@ -73,6 +73,19 @@ describe('find and replace, Mac Japanese presentation', () => {
     expect(selected).toEqual(['シート', '行', '数式']);
   });
 
+  it('exposes the tab and options state the Mac layout positions by', () => {
+    // Excel lays the dialog out per state: 638x226 collapsed, 638x310 with
+    // オプション open, and the replace tab narrows the popups to 74 pt.
+    ctx.handle.open('find');
+    const panel = q<HTMLElement>(ctx.host, '.fc-find');
+    expect(panel.dataset.fcFindTab).toBe('find');
+    expect(panel.classList.contains('fc-find--options')).toBe(false);
+    q<HTMLButtonElement>(ctx.host, '.fc-find__options-btn').click();
+    expect(panel.classList.contains('fc-find--options')).toBe(true);
+    ctx.handle.open('replace');
+    expect(panel.dataset.fcFindTab).toBe('replace');
+  });
+
   it('shows the cell count at the foot from the start', () => {
     ctx.handle.open('find');
     expect(q<HTMLElement>(ctx.host, '.fc-find__status').textContent).toBe('0セルが見つかりました');

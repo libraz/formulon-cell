@@ -68,6 +68,7 @@ export interface CellFormatStrings {
     tabFill: string;
     tabMore: string;
     moreHint: string;
+    categoryLabel: string;
     catGeneral: string;
     catFixed: string;
     catCurrency: string;

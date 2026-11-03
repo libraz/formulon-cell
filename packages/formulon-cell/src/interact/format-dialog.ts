@@ -437,8 +437,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     // Other tabs collapse the bar so the body keeps its space.
     if (activeTab === 'number') {
       hintBar.textContent = numberCategoryDescription(draft.numberCategory, t);
+      hintBar.dataset.fcCat = draft.numberCategory;
     } else {
       hintBar.textContent = '';
+      delete hintBar.dataset.fcCat;
     }
   };
 

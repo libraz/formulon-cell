@@ -141,6 +141,16 @@ describe('format dialog negative-number lists', () => {
     ]);
   });
 
+  it('shows the currency minus rows with the minus after the symbol, as Excel writes them', () => {
+    expect(rows('mac', 'currency').map((row) => row.split(':').slice(1).join(':'))).toEqual([
+      '(¥1,234)',
+      '(¥1,234)',
+      '¥1,234',
+      '¥-1,234',
+      '¥-1,234',
+    ]);
+  });
+
   it('keeps the four shared rows elsewhere', () => {
     expect(rows('default', 'fixed').map((row) => row.split(':')[0])).toEqual([
       'parens',
