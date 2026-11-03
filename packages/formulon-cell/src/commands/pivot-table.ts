@@ -15,6 +15,7 @@ import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { currentRegion } from './current-region.js';
+import { defaultObjectNames } from './format-as-table.js';
 import type { History } from './history.js';
 import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
 
@@ -250,6 +251,20 @@ export function inferPivotFieldItems(
   return items;
 }
 
+/** The first free "<stem>N" report name, stem in the workbook's language;
+ *  names compare case-insensitively. */
+export const nextPivotTableName = (wb: WorkbookHandle): string => {
+  const taken = new Set(
+    wb
+      .getPivotTables()
+      .map((p) => wb.pivotTableName(p.sheetIndex, p.pivotIndex)?.toLocaleLowerCase()),
+  );
+  const { pivot } = defaultObjectNames(wb);
+  let n = 1;
+  while (taken.has(`${pivot}${n}`.toLocaleLowerCase())) n += 1;
+  return `${pivot}${n}`;
+};
+
 export function createPivotTableFromRange(
   wb: WorkbookHandle,
   opts: CreatePivotTableOptions,
@@ -373,7 +388,7 @@ export function createPivotTableFromRange(
 
   const pivotIndex = wb.createPivotTable(
     opts.destination.sheet,
-    opts.name?.trim() || 'PivotTable1',
+    opts.name?.trim() || nextPivotTableName(wb),
     cacheId,
     { row: opts.destination.row, col: opts.destination.col },
   );
@@ -1057,7 +1072,7 @@ export const executeRibbonPivotTableAction = (
     { store, workbook, history },
     {
       source,
-      name: `PivotTable${workbook.getPivotTables().length + 1}`,
+      name: nextPivotTableName(workbook),
       rowField: rowField.name,
       valueField: valueField.name,
       aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,

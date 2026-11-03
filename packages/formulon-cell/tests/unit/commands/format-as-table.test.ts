@@ -7,7 +7,7 @@ import {
   createTableStyleFromActiveTable,
   customPivotTableStyleId,
   customTableStyleId,
-  defaultTableNames,
+  defaultObjectNames,
   defaultTableOverlay,
   engineTableOverlays,
   formatAsTable,
@@ -445,11 +445,21 @@ describe('formatAsTable command helpers', () => {
 
 describe('default table and header names follow the workbook language', () => {
   const wbFor = (profile: string | null) =>
-    ({ spreadsheetProfileId: () => profile }) as unknown as Parameters<typeof defaultTableNames>[0];
+    ({ spreadsheetProfileId: () => profile }) as unknown as Parameters<
+      typeof defaultObjectNames
+    >[0];
 
   it('spells them as Excel does in Japanese and English', () => {
-    expect(defaultTableNames(wbFor('mac-ja_JP'))).toEqual({ table: 'テーブル', column: '列' });
-    expect(defaultTableNames(wbFor(null))).toEqual({ table: 'Table', column: 'Column' });
+    expect(defaultObjectNames(wbFor('mac-ja_JP'))).toEqual({
+      table: 'テーブル',
+      column: '列',
+      pivot: 'ピボットテーブル',
+    });
+    expect(defaultObjectNames(wbFor(null))).toEqual({
+      table: 'Table',
+      column: 'Column',
+      pivot: 'PivotTable',
+    });
   });
 
   it('numbers blank headers with the localized label', () => {

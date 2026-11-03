@@ -241,16 +241,23 @@ export const overlayStyleName = (
   table: Pick<TableOverlay, 'style' | 'color' | 'styleName'>,
 ): string => table.styleName ?? tableStyleName(table.style, table.color);
 
-/** Names a new table and its blank headers start with, as the workbook's language
- *  spells them. */
-const DEFAULT_NAMES: Record<string, { table: string; column: string }> = {
-  ja: { table: 'テーブル', column: '列' },
+interface DefaultObjectNames {
+  table: string;
+  column: string;
+  pivot: string;
+}
+
+/** Names a new table, its blank headers and a new PivotTable start with, as the
+ *  workbook's language spells them. */
+const DEFAULT_NAMES: Record<string, DefaultObjectNames> = {
+  ja: { table: 'テーブル', column: '列', pivot: 'ピボットテーブル' },
 };
 
-export const defaultTableNames = (wb: WorkbookHandle): { table: string; column: string } =>
+export const defaultObjectNames = (wb: WorkbookHandle): DefaultObjectNames =>
   DEFAULT_NAMES[inputLocaleForWorkbook(wb)?.split('-')[0] ?? ''] ?? {
     table: 'Table',
     column: 'Column',
+    pivot: 'PivotTable',
   };
 
 /** Unique column names for a table over `range`, from its header row when present. */
@@ -282,7 +289,7 @@ export const tableColumns = (
 const nextTableName = (workbook: WorkbookHandle, overlays: readonly TableOverlay[]): string => {
   const existing = new Set(workbook.getTables().map((table) => table.name.toLocaleLowerCase()));
   for (const overlay of overlays) if (overlay.name) existing.add(overlay.name.toLocaleLowerCase());
-  const { table } = defaultTableNames(workbook);
+  const { table } = defaultObjectNames(workbook);
   let n = 1;
   while (existing.has(`${table}${n}`.toLocaleLowerCase())) n += 1;
   return `${table}${n}`;

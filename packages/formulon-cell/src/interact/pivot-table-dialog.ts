@@ -3,6 +3,7 @@ import {
   createPivotTableAtPlacement,
   inferPivotFieldItems,
   inferPivotSourceFields,
+  nextPivotTableName,
   type PivotPlacement,
   type PivotSourceField,
   pivotSourceForSelection,
@@ -349,7 +350,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     body.replaceChildren();
 
     sourceInput.value = sourceInput.value || sourceRangeLabel(range);
-    nameInput.value = nameInput.value || `PivotTable${wb.getPivotTables().length + 1}`;
+    nameInput.value = nameInput.value || nextPivotTableName(wb);
     // The Mac dialog leaves the location blank until the user gives one.
     const dest = mac ? '' : formatA1Cell(range.r1 + 2, range.c0);
     destInput.value = destInput.value || dest;
