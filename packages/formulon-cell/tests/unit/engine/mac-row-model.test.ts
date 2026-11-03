@@ -38,6 +38,13 @@ describe('macDefaultRowPt', () => {
     ['Courier New', 28, 37],
     ['MS PGothic', 24, 28],
     ['MS PGothic', 28, 33],
+    // Small Normal fonts.
+    ['Courier New', 6, 9],
+    ['Courier New', 7, 10],
+    ['Courier New', 8, 11],
+    ['Arial', 6, 10],
+    ['Arial', 7, 11],
+    ['Arial', 8, 11],
   ] as const)('gives %s %d pt a %d pt row', (name, size, row) => {
     expect(macDefaultRowPt(name, size)).toBe(row);
   });
