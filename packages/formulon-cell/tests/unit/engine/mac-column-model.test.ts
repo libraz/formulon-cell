@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  macColumnPaddingPt,
   macDefaultColumnPt,
   macMdw,
   macPtToRaw,
@@ -45,6 +46,19 @@ describe('engine/mac-column-model', () => {
   ])('gives %s %d pt the %d pt digit pitch Mac Excel shows', (font, size, mdw) => {
     // A 10-char column is 122 / 206 device px at DPR 2 (14 / 24 px per char).
     expect(macMdw(font, size)).toBe(mdw);
+  });
+
+  it('pads the default column of a large Normal font by its digit width', () => {
+    // Courier New 20 (12 pt digits), no defaultColWidth: Excel 103 pt
+    // (label pitch 206 device px), 8 x 12 + 7.
+    expect(macDefaultColumnPt(8, macMdw('Courier New', 20))).toBe(103);
+    expect(macColumnPaddingPt(12)).toBe(7);
+    expect(macColumnPaddingPt(14)).toBe(9);
+    expect(macColumnPaddingPt(17)).toBe(11);
+  });
+
+  it('keeps the 5 pt pad below the measured digit widths', () => {
+    for (const mdw of [3, 4, 5, 6, 7, 8]) expect(macColumnPaddingPt(mdw)).toBe(5);
   });
 
   it('writes back raw widths the way Mac Excel saves them', () => {

@@ -1,13 +1,8 @@
-import { roundDigitAdvance } from '../engine/mac-column-model.js';
+import { macColumnPaddingPt, roundDigitAdvance } from '../engine/mac-column-model.js';
 import type { LayoutSlice, ViewportSlice } from './types.js';
 
 /** Fewest digits the row-number strip is sized for. */
 const MIN_ROW_HEADER_DIGITS = 3;
-
-/** Room the row-number strip adds to its digits: a quarter digit, rounded
- *  up, on each side plus the 1 px rule; 5 px at the default fonts (Mac Excel
- *  Normal-font ladder: 7 at 9-12 px digits, 9 at 14, 11 at 17). */
-const rowNumberPad = (digitWidth: number): number => 2 * Math.ceil(digitWidth / 4) + 1;
 
 type HeaderLayout = Pick<
   LayoutSlice,
@@ -40,7 +35,7 @@ export function headerStripSize(
   const digits = Math.max(MIN_ROW_HEADER_DIGITS, String(lastRowNumber).length);
   const digitWidth = roundDigitAdvance(advance * zoom);
   return {
-    headerColWidth: Math.max(headerRowHeight, digits * digitWidth + rowNumberPad(digitWidth)),
+    headerColWidth: Math.max(headerRowHeight, digits * digitWidth + macColumnPaddingPt(digitWidth)),
     headerRowHeight,
   };
 }

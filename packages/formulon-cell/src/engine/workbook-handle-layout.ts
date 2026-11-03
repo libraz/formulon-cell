@@ -2,7 +2,7 @@ import { GeometryMode, type SheetFormatDefaults, type WidthModelResult } from '@
 import type { WorkbookViewMode } from '../store/types.js';
 import { displayCharsForScreenPx, screenPxForDisplayChars } from './column-display-width.js';
 import {
-  MAC_COLUMN_PADDING_PT,
+  macColumnPaddingPt,
   macDefaultColumnPt,
   macDigitAdvance,
   macMdw,
@@ -105,10 +105,8 @@ function cssPxPerScreenPx(handle: unknown): number {
 /** `sheet`'s digit width and column padding in platform screen pixels. */
 function screenColumnMetrics(handle: unknown, sheet: number): { mdw: number; padding: number } {
   if (usesMacColumnModel(handle)) {
-    return {
-      mdw: macSheetMdw(handle, sheet) ?? FALLBACK_DIGIT_WIDTH_PX,
-      padding: MAC_COLUMN_PADDING_PT,
-    };
+    const mdw = macSheetMdw(handle, sheet) ?? FALLBACK_DIGIT_WIDTH_PX;
+    return { mdw, padding: macColumnPaddingPt(mdw) };
   }
   const model = displayWidthModel(handle, sheet);
   if (!model) return { mdw: FALLBACK_DIGIT_WIDTH_PX, padding: FALLBACK_COLUMN_PADDING_PX };
