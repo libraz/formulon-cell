@@ -388,7 +388,8 @@ const numberAtom = (
     prefix,
     suffix: extra.ordinal ? suffix.replace(ORDINAL_SUFFIX, '') : suffix,
     n: Number(asciiDigits(digits)),
-    width: digits.length,
+    // Only a zero-led counter keeps its width; A10 going up gives A4, not A04.
+    width: asciiDigits(digits).startsWith('0') ? digits.length : 0,
     fullwidth,
     ordinal: extra.ordinal ?? false,
     wrap: extra.wrap ?? false,

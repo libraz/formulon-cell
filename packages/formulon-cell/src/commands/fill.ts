@@ -261,7 +261,7 @@ function numberRun(cells: SourceCell[], ctx: ProjectionContext, lone: boolean): 
   if (values.length === 1) {
     const v = values[0] ?? 0;
     // A lone number repeats unless Fill Series asks for steps; inside a mixed
-    // source it steps by one per cycle.
+    // source it steps by one per cycle, except right after a blank cell.
     const step = lone && !ctx.series ? 0 : ctx.sign;
     return { length: 1, at: (x) => ({ kind: 'number', value: v + step * x }) };
   }
@@ -347,7 +347,7 @@ function buildProjection(line: SourceCell[], ctx: ProjectionContext): SeriesProj
     const cells = line.slice(start, end);
     const run =
       kind.type === 'number'
-        ? numberRun(cells, ctx, line.length === 1)
+        ? numberRun(cells, ctx, line.length === 1 || line[start - 1]?.blank === true)
         : kind.type === 'date'
           ? dateRun(cells, ctx)
           : kind.type === 'text'
