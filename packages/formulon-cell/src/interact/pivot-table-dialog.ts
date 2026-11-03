@@ -20,7 +20,12 @@ import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialog
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import type { SheetRange } from '../wrappers/toolbar-types.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogButton,
+  createDialogShell,
+} from './dialog-shell.js';
 import { createPivotFieldAreas } from './pivot-table-field-areas.js';
 import { renderPivotFieldList } from './pivot-table-field-list.js';
 import { attachRangePickerButton } from './range-picker-control.js';
@@ -259,11 +264,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     }
     const connection = document.createElement('div');
     connection.className = 'fc-pivotdlg__connection';
-    const chooseConnection = document.createElement('button');
-    chooseConnection.type = 'button';
-    chooseConnection.className = 'fc-pivotdlg__connection-btn';
-    chooseConnection.disabled = true;
-    chooseConnection.textContent = strings.macPivotTableDialog.chooseConnection;
+    const chooseConnection = createDialogButton({
+      label: strings.macPivotTableDialog.chooseConnection,
+      baseClass: 'fc-pivotdlg__connection-btn',
+    });
+    projectDisabledState(chooseConnection, true, null);
     connection.append(chooseConnection, externalUnavailable);
     wrap.append(legend, rangeChoice, sourceField, externalChoice, connection);
     return wrap;
