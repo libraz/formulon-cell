@@ -63,6 +63,7 @@ import {
   overflowSides,
   VALIDATION_TRIANGLE_COLOR,
 } from './hit-state.js';
+import { gridLinesShown } from './lines.js';
 import { connectedRects } from './range-rects.js';
 import { tableCellFormat } from './table-format.js';
 
@@ -372,7 +373,7 @@ export function paintCells(
         const boundary = layout.rtl ? ownerRect.x : ownerRect.x + ownerRect.w;
         if (!span || boundary <= span.left || boundary >= span.right) continue;
         coveredRules.add(`${row}:${owner}`);
-        if (state.ui.showGridLines === false) continue;
+        if (!gridLinesShown(state)) continue;
         const next = format.formats.get(addrKey({ sheet: data.sheetIndex, row, col: owner + 1 }));
         // The following cell's fill already covers the rule before it.
         if (next?.fill || next?.fillPattern || next?.fillGradient) continue;

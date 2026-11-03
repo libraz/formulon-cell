@@ -10,7 +10,21 @@ import {
   mirrorX,
   type ViewState,
 } from '../geometry.js';
+import { wholePointAdvances } from '../text-metrics.js';
 import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
+
+/** Excel for Mac drops gridlines below this zoom (none at 33%, drawn at 40%). */
+const MAC_GRIDLINE_MIN_ZOOM = 0.4;
+
+/** Whether the sheet's gridlines are painted at the current zoom. */
+export function gridLinesShown(state: {
+  ui: Pick<ViewState['ui'], 'showGridLines'>;
+  layout: Pick<ViewState['layout'], 'screenScale'>;
+  viewport: Pick<ViewState['viewport'], 'zoom'>;
+}): boolean {
+  if (state.ui.showGridLines === false) return false;
+  return !wholePointAdvances(state.layout) || state.viewport.zoom >= MAC_GRIDLINE_MIN_ZOOM;
+}
 
 export function paintGridLines(
   pc: ChromePaintContext,

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
 import { ruleWidth } from '../../../../src/render/grid/chrome-context.js';
-import { paintFreezeDividers, paintGridLines } from '../../../../src/render/grid/lines.js';
+import {
+  gridLinesShown,
+  paintFreezeDividers,
+  paintGridLines,
+} from '../../../../src/render/grid/lines.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
@@ -84,5 +88,30 @@ describe('paintFreezeDividers', () => {
       [0, 59.5],
       [95.5, 0],
     ]);
+  });
+});
+
+describe('gridLinesShown', () => {
+  // Excel for Mac draws no gridlines at 33% and 25% zoom, and draws them at 40%.
+  const at = (zoom: number, screenScale: number, showGridLines = true) => {
+    const state = createSpreadsheetStore().getState();
+    return {
+      ...state,
+      layout: { ...state.layout, screenScale },
+      viewport: { ...state.viewport, zoom },
+      ui: { ...state.ui, showGridLines },
+    };
+  };
+
+  it('hides Mac gridlines below 40% zoom', () => {
+    expect(gridLinesShown(at(1, 0.75))).toBe(true);
+    expect(gridLinesShown(at(0.4, 0.75))).toBe(true);
+    expect(gridLinesShown(at(0.33, 0.75))).toBe(false);
+    expect(gridLinesShown(at(0.25, 0.75))).toBe(false);
+  });
+
+  it('keeps the default profile and the sheet toggle as they were', () => {
+    expect(gridLinesShown(at(0.25, 1))).toBe(true);
+    expect(gridLinesShown(at(1, 0.75, false))).toBe(false);
   });
 });

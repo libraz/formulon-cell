@@ -37,7 +37,7 @@ import { type CellDisplayResolver, type CellPaintContext, paintCells } from './g
 import type { ChromePaintContext } from './grid/chrome-context.js';
 import { paintHeaders } from './grid/headers.js';
 import { type GridHitState, gridHitState, shouldShowValidationChevron } from './grid/hit-state.js';
-import { paintFreezeDividers, paintGridLines } from './grid/lines.js';
+import { gridLinesShown, paintFreezeDividers, paintGridLines } from './grid/lines.js';
 import { mergeRangeAt } from './grid/merged-cells.js';
 import { paintVisibleNotes } from './grid/notes.js';
 import {
@@ -308,7 +308,7 @@ export class GridRenderer {
     }
 
     this.paintSheetBackground(state);
-    if (state.ui.showGridLines !== false) this.paintGridLines(state, theme, cols, rows);
+    if (gridLinesShown(state)) this.paintGridLines(state, theme, cols, rows);
     this.paintCells(state, theme, cols, rows);
     this.hits.outlineToggles = [];
     if (state.ui.showHeaders !== false) this.paintHeaders(state, theme, cols, rows);

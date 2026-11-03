@@ -23,6 +23,7 @@ import {
   slantTailLines,
   strokeSpans,
 } from './border-edges.js';
+import { gridLinesShown } from './lines.js';
 import { mergedDiagonalBorders, mergeRangeAt } from './merged-cells.js';
 import { connectedRects } from './range-rects.js';
 
@@ -141,7 +142,7 @@ export function paintBorders(
   ): void => {
     if (drawn.has(key)) return;
     drawn.add(key);
-    if (state.ui.showGridLines !== false) {
+    if (gridLinesShown(state)) {
       // A medium band is wider than the gridline, so the gridlines crossing
       // its upper half go too.
       const band = -Math.min(-g, ...borderStrokes(edge.style, g).map((s) => s[0]));
