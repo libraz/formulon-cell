@@ -1,5 +1,6 @@
 import { withFilterRange } from '../commands/filter-ranges.js';
 import {
+  defaultTableNames,
   overlayStyleName,
   type TableColumnTotals,
   type TableOverlay,
@@ -91,7 +92,7 @@ const createEngineTable = (
     ref: formatA1Range(table.range, { collapse: false }),
     name: table.name,
     displayName,
-    columns: tableColumns(wb, table.range, table.showHeader),
+    columns: tableColumns(wb, table.range, table.showHeader, defaultTableNames(wb).column),
     styleName: overlayStyleName(table),
     showRowStripes: table.banded,
     showFirstColumn: !!table.firstCol,

@@ -3,6 +3,7 @@ import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { inputLocaleForWorkbook } from './coerce-input.js';
 import type { History } from './history.js';
 import { blockedByProtection } from './protection.js';
 import { recordTablesChange } from './slice-history.js';
@@ -240,11 +241,24 @@ export const overlayStyleName = (
   table: Pick<TableOverlay, 'style' | 'color' | 'styleName'>,
 ): string => table.styleName ?? tableStyleName(table.style, table.color);
 
+/** Names a new table and its blank headers start with, as the workbook's language
+ *  spells them. */
+const DEFAULT_NAMES: Record<string, { table: string; column: string }> = {
+  ja: { table: 'テーブル', column: '列' },
+};
+
+export const defaultTableNames = (wb: WorkbookHandle): { table: string; column: string } =>
+  DEFAULT_NAMES[inputLocaleForWorkbook(wb)?.split('-')[0] ?? ''] ?? {
+    table: 'Table',
+    column: 'Column',
+  };
+
 /** Unique column names for a table over `range`, from its header row when present. */
 export const tableColumns = (
   workbook: Pick<WorkbookHandle, 'getValue'>,
   range: Range,
   hasHeaders: boolean,
+  columnLabel: string,
 ): string[] => {
   const used = new Set<string>();
   const columns: string[] = [];
@@ -255,7 +269,7 @@ export const tableColumns = (
     const base =
       value.kind === 'text' && value.value.trim()
         ? value.value.trim()
-        : `Column${col - range.c0 + 1}`;
+        : `${columnLabel}${col - range.c0 + 1}`;
     let name = base;
     let suffix = 2;
     while (used.has(name.toLocaleLowerCase())) name = `${base}${suffix++}`;
@@ -268,9 +282,10 @@ export const tableColumns = (
 const nextTableName = (workbook: WorkbookHandle, overlays: readonly TableOverlay[]): string => {
   const existing = new Set(workbook.getTables().map((table) => table.name.toLocaleLowerCase()));
   for (const overlay of overlays) if (overlay.name) existing.add(overlay.name.toLocaleLowerCase());
+  const { table } = defaultTableNames(workbook);
   let n = 1;
-  while (existing.has(`table${n}`)) n += 1;
-  return `Table${n}`;
+  while (existing.has(`${table}${n}`.toLocaleLowerCase())) n += 1;
+  return `${table}${n}`;
 };
 
 /** Excel pre-checks "My table has headers" only when the selection looks like

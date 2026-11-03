@@ -7,6 +7,7 @@ import {
   createTableStyleFromActiveTable,
   customPivotTableStyleId,
   customTableStyleId,
+  defaultTableNames,
   defaultTableOverlay,
   engineTableOverlays,
   formatAsTable,
@@ -21,6 +22,7 @@ import {
   removeTable,
   sessionTableOverlays,
   type TableOverlay,
+  tableColumns,
   tableForCell,
   tableOverlayAt,
   tableOverlayById,
@@ -438,5 +440,22 @@ describe('formatAsTable command helpers', () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe('default table and header names follow the workbook language', () => {
+  const wbFor = (profile: string | null) =>
+    ({ spreadsheetProfileId: () => profile }) as unknown as Parameters<typeof defaultTableNames>[0];
+
+  it('spells them as Excel does in Japanese and English', () => {
+    expect(defaultTableNames(wbFor('mac-ja_JP'))).toEqual({ table: 'テーブル', column: '列' });
+    expect(defaultTableNames(wbFor(null))).toEqual({ table: 'Table', column: 'Column' });
+  });
+
+  it('numbers blank headers with the localized label', () => {
+    const blank = { getValue: () => ({ kind: 'blank' as const }) };
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 };
+    expect(tableColumns(blank, range, true, '列')).toEqual(['列1', '列2']);
+    expect(tableColumns(blank, range, true, 'Column')).toEqual(['Column1', 'Column2']);
   });
 });
