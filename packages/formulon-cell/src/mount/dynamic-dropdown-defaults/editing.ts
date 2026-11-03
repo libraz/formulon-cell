@@ -97,27 +97,7 @@ const updateFillMenu =
 const buildFillSeries = (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillSeries'] => {
   const apply: DynamicDropdownsCtx['applyFillSeries'] = async (mode) => {
     const range = normalizedSelectionRange(instance);
-    const fillSeriesDialogStrings = (
-      instance.i18n.strings as typeof instance.i18n.strings & {
-        fillSeriesDialog: {
-          title: string;
-          seriesIn: string;
-          columns: string;
-          rows: string;
-          up: string;
-          left: string;
-          type: string;
-          autoFill: string;
-          copy: string;
-          day: string;
-          weekday: string;
-          month: string;
-          year: string;
-          ok: string;
-          cancel: string;
-        };
-      }
-    ).fillSeriesDialog;
+    const fillSeriesDialogStrings = instance.i18n.strings.fillSeriesDialog;
     const choice = mode
       ? { direction: inferFillSeriesDirection(range), mode }
       : await showFillSeriesDialog(range, fillSeriesDialogStrings);
@@ -139,6 +119,8 @@ const buildFillSeries = (instance: SpreadsheetInstance): DynamicDropdownsCtx['ap
         recordFormatChange(instance.history, instance.store, () => {
           fillRange(instance.store.getState(), instance.workbook, src, range, {
             copyOnly: choice.mode === 'copy',
+            series: choice.mode === 'linear' || undefined,
+            growth: choice.mode === 'growth' || undefined,
             dateUnit,
             formatting: 'with',
             store: instance.store,

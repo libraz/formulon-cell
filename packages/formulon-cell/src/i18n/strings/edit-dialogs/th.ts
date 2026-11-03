@@ -11,6 +11,8 @@ export const editDialogsTh: EditDialogsStrings = {
     type: 'ชนิด',
     autoFill: 'เติมอัตโนมัติ',
     copy: 'คัดลอก',
+    linear: 'เชิงเส้น',
+    growth: 'การเติบโต',
     day: 'วัน',
     weekday: 'วันธรรมดา',
     month: 'เดือน',

@@ -9,6 +9,8 @@ export interface EditDialogsStrings {
     type: string;
     autoFill: string;
     copy: string;
+    linear: string;
+    growth: string;
     day: string;
     weekday: string;
     month: string;

@@ -11,6 +11,8 @@ export const editDialogsJa: EditDialogsStrings = {
     type: '種類',
     autoFill: 'オートフィル',
     copy: 'コピー',
+    linear: '加算',
+    growth: '乗算',
     day: '日',
     weekday: '週日',
     month: '月',

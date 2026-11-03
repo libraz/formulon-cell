@@ -15,7 +15,15 @@ import {
 } from '../dialogs/shell.js';
 
 export type RibbonFillDirection = 'down' | 'right' | 'up' | 'left';
-export type RibbonFillSeriesMode = 'auto' | 'copy' | 'days' | 'weekdays' | 'months' | 'years';
+export type RibbonFillSeriesMode =
+  | 'auto'
+  | 'copy'
+  | 'linear'
+  | 'growth'
+  | 'days'
+  | 'weekdays'
+  | 'months'
+  | 'years';
 export type FillSeriesDialogText = Strings['fillSeriesDialog'];
 
 export const fillSeriesSourceRange = (range: Range, direction: RibbonFillDirection): Range => {
@@ -108,6 +116,8 @@ export const showFillSeriesDialog = (
     const modeOptions: Array<{ value: RibbonFillSeriesMode; label: string }> = [
       { value: 'auto', label: t.autoFill },
       { value: 'copy', label: t.copy },
+      { value: 'linear', label: t.linear },
+      { value: 'growth', label: t.growth },
       { value: 'days', label: t.day },
       { value: 'weekdays', label: t.weekday },
       { value: 'months', label: t.month },

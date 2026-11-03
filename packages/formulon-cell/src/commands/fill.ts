@@ -125,6 +125,8 @@ interface ProjectionContext {
   dateUnit?: DateFillUnit;
   /** Fill Series: a lone number steps by one instead of repeating. */
   series?: boolean;
+  /** Growth trend: numbers extend along a least-squares exponential fit. */
+  growth?: boolean;
   /** -1 when filling up or left, where the line arrives reversed. */
   sign: 1 | -1;
 }
@@ -201,6 +203,13 @@ const linearFit = (ys: readonly number[]): ((x: number) => number) => {
   return (x) => meanY + slope * (x - meanX);
 };
 
+/** Least-squares exponential y = b * m^x through `ys`; non-positive values fit to 0. */
+const growthFit = (ys: readonly number[]): ((x: number) => number) => {
+  if (ys.some((y) => !(y > 0))) return () => 0;
+  const line = linearFit(ys.map(Math.log));
+  return (x) => Math.exp(line(x));
+};
+
 /** A run of consecutive source cells that extend as one series. `at(x)` is the
  *  value at series position x, where the source occupies 0..length-1. */
 interface Run {
@@ -262,10 +271,10 @@ function numberRun(cells: SourceCell[], ctx: ProjectionContext, lone: boolean): 
     const v = values[0] ?? 0;
     // A lone number repeats unless Fill Series asks for steps; inside a mixed
     // source it steps by one per cycle, except right after a blank cell.
-    const step = lone && !ctx.series ? 0 : ctx.sign;
+    const step = ctx.growth || (lone && !ctx.series) ? 0 : ctx.sign;
     return { length: 1, at: (x) => ({ kind: 'number', value: v + step * x }) };
   }
-  const trend = linearFit(values);
+  const trend = ctx.growth ? growthFit(values) : linearFit(values);
   return { length: values.length, at: (x) => ({ kind: 'number', value: trend(x) }) };
 }
 
@@ -472,6 +481,8 @@ export interface FillOptions {
   dateUnit?: DateFillUnit;
   /** Fill Series Auto Fill option: a lone number steps by one instead of repeating. */
   series?: boolean;
+  /** Growth trend: numeric seeds extend along an exponential fit. */
+  growth?: boolean;
   /** Required when `formatting` should write cell formats. */
   store?: SpreadsheetStore;
 }
@@ -537,6 +548,7 @@ function applyFillRange(
     date1904: state.ui.date1904 === true,
     dateUnit: opts?.dateUnit,
     series: opts?.series,
+    growth: opts?.growth,
   };
   const writeValues = opts?.formatting !== 'only';
   const writeFormats = opts?.store && opts.formatting !== 'without';

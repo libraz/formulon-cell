@@ -11,6 +11,8 @@ export const editDialogsDe: EditDialogsStrings = {
     type: 'Typ',
     autoFill: 'AutoAusfüllen',
     copy: 'Kopieren',
+    linear: 'Linear',
+    growth: 'Geometrisch',
     day: 'Tag',
     weekday: 'Wochentag',
     month: 'Monat',

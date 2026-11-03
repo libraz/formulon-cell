@@ -43,6 +43,7 @@ const OPTIONS: Record<number, FillOptions> = {
   6: { dateUnit: 'weekdays' },
   7: { dateUnit: 'months' },
   8: { dateUnit: 'years' },
+  10: { growth: true },
 };
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -145,11 +146,8 @@ describe('series autofill matches desktop Excel', () => {
     });
   };
 
-  // Growth trend is offered only by the Series dialog, which has no trend types.
-  const GROWTH_TREND = 10;
-
   describe('numeric seeds down (linear trends)', () => {
-    for (const c of fixture.linear.filter((x) => x.type !== GROWTH_TREND)) {
+    for (const c of fixture.linear) {
       it(`${JSON.stringify(c.seeds)} type ${c.type}`, () => {
         const n = c.seeds.length;
         const out = run(
@@ -168,7 +166,7 @@ describe('series autofill matches desktop Excel', () => {
   });
 
   describe('fills above and to the left of the seeds', () => {
-    for (const c of fixture.reverse.filter((x) => x.type !== GROWTH_TREND)) {
+    for (const c of fixture.reverse) {
       it(c.name, () => {
         const n = c.seeds.length;
         const options = OPTIONS[c.type ?? -1] ?? {};
@@ -228,6 +226,51 @@ describe('series autofill matches desktop Excel', () => {
         want.forEach((row, r) => {
           sameOut(out[r] ?? [], Array.isArray(row) ? row : [row]);
         });
+      });
+    }
+  });
+
+  describe('growth trend fits', () => {
+    const cases: Array<[number[], number[]]> = [
+      [
+        [2, 4],
+        [8, 16, 32, 64],
+      ],
+      [
+        [1, 2, 3],
+        [5.451362, 9.442036, 16.354085, 28.326107],
+      ],
+      [
+        [1, 3, 2],
+        [3.634241, 5.139593, 7.268482, 10.279186],
+      ],
+      [
+        [3, 2],
+        [1.333333, 0.888889, 0.592593, 0.395062],
+      ],
+      [
+        [-2, -4],
+        [0, 0, 0, 0],
+      ],
+      [
+        [0, 1, 2],
+        [0, 0, 0, 0],
+      ],
+    ];
+    for (const [seeds, want] of cases) {
+      it(JSON.stringify(seeds), () => {
+        const n = seeds.length;
+        const out = run(
+          seeds.map((s) => [s]),
+          null,
+          { r0: 0, c0: 0 },
+          { r0: 0, c0: 0, r1: n + 3, c1: 0 },
+          { growth: true },
+        );
+        sameOut(
+          out.slice(n).map((row) => row[0] ?? null),
+          want,
+        );
       });
     }
   });

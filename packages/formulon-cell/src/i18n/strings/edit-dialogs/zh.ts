@@ -11,6 +11,8 @@ export const editDialogsZh: EditDialogsStrings = {
     type: '类型',
     autoFill: '自动填充',
     copy: '复制',
+    linear: '等差序列',
+    growth: '等比序列',
     day: '日',
     weekday: '工作日',
     month: '月',

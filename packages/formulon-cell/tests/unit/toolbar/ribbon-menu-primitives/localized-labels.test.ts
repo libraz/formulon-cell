@@ -135,6 +135,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(fillSeriesSource).toContain('t.seriesIn');
     expect(fillSeriesSource).toContain('t.autoFill');
     expect(fillSeriesSource).toContain('t.weekday');
+    expect(fillSeriesSource).toContain('t.growth');
     expect(defaultsSource).toContain('fillSeriesDialogStrings');
     expect(defaultsSource).toContain('fillSeriesDialog: {');
     expect(fillSeriesSource).not.toContain("ribbonLang === 'ja'");

@@ -11,6 +11,8 @@ export const editDialogsKo: EditDialogsStrings = {
     type: '종류',
     autoFill: '자동 채우기',
     copy: '복사',
+    linear: '선형',
+    growth: '급수',
     day: '일',
     weekday: '평일',
     month: '월',

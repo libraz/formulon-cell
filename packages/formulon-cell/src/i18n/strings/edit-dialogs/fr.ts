@@ -11,6 +11,8 @@ export const editDialogsFr: EditDialogsStrings = {
     type: 'Type',
     autoFill: 'Recopie incrémentée',
     copy: 'Copier',
+    linear: 'Linéaire',
+    growth: 'Géométrique',
     day: 'Jour',
     weekday: 'Jour de la semaine',
     month: 'Mois',
