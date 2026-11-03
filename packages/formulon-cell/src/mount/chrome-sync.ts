@@ -8,16 +8,19 @@ import {
 } from '../commands/named-ranges.js';
 import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formulaForEdit } from '../engine/edit-seed.js';
+import { numFmtToFormatCode } from '../engine/format-writeback.js';
 import { syncActiveSheet } from '../engine/layout-sync.js';
 import { formatBoolean, formatEditableNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
+import { formatNumber } from '../format/number-format.js';
 import type { Strings } from '../i18n/strings.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import type { NumFmt } from '../store/types/cell-format.js';
 import { createHostButton } from './chrome-buttons.js';
 import {
   formatSelectionRef,
@@ -106,6 +109,62 @@ const cellDisplayText = (
       return lambda ? wb.getFormulaForDisplay(`=${lambda}`) : '';
     }
   }
+};
+
+/** Date, time and percent formats show their formatted text in the formula
+ *  bar; every other number shows the raw value. */
+const barShowsFormatted = (fmt: NumFmt | undefined): boolean => {
+  if (!fmt) return false;
+  switch (fmt.kind) {
+    case 'date':
+    case 'time':
+    case 'datetime':
+    case 'percent':
+      return true;
+    case 'custom': {
+      const bare = fmt.pattern.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '');
+      return /[ymdhs%]/i.test(bare);
+    }
+    default:
+      return false;
+  }
+};
+
+/** Text of the formula bar for the active cell: the cell source, except that
+ *  dynamic-array spill members show their anchor's formula. */
+const formulaBarText = (
+  state: State,
+  wb: WorkbookHandle,
+  addr: { sheet: number; row: number; col: number },
+  display: string,
+): string => {
+  const key = `${addr.sheet}:${addr.row}:${addr.col}`;
+  const cell = state.data.cells.get(key);
+  if (!cell?.formula) {
+    const spill = cell ? wb.spillInfo(addr.sheet, addr.row, addr.col) : null;
+    if (spill && (spill.anchorRow !== addr.row || spill.anchorCol !== addr.col)) {
+      return cellDisplayText(state, wb, {
+        sheet: addr.sheet,
+        row: spill.anchorRow,
+        col: spill.anchorCol,
+      });
+    }
+    const numFmt = state.format.formats.get(key)?.numFmt;
+    if (cell?.value.kind === 'number' && barShowsFormatted(numFmt)) {
+      const code = numFmtToFormatCode(numFmt, wb);
+      const native = code ? wb.formatValueForDisplay(cell.value, code) : null;
+      return (
+        native ??
+        formatNumber(
+          cell.value.value,
+          numFmt,
+          inputLocaleForWorkbook(wb),
+          state.ui.date1904 === true,
+        )
+      );
+    }
+  }
+  return display;
 };
 
 export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncController {
@@ -444,7 +503,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const object = s.ui.selectedObject;
     if (document.activeElement !== tag) tag.value = object ? object.name : nameBoxText(ref);
     if (!getFormulaEditing()) {
-      fxInput.value = object ? '' : display;
+      fxInput.value = object ? '' : formulaBarText(s, wb, active, display);
       fxInput.readOnly =
         !object &&
         isDataTableFormula(
