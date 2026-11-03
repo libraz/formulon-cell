@@ -310,11 +310,29 @@ function parsePlainNumber(raw: string, profile: InputProfile): PlainNumber | nul
     grouped = true;
   }
   const exponent = exponentMatch?.[2] ?? '';
+  const [intDigits, fracDigits] = significantDigits(digits, fracPart);
   const value =
     sign *
-    Number(`${digits || '0'}${fracPart ? `.${fracPart}` : ''}${exponent ? `e${exponent}` : ''}`);
+    Number(
+      `${intDigits || '0'}${fracDigits ? `.${fracDigits}` : ''}${exponent ? `e${exponent}` : ''}`,
+    );
   if (!Number.isFinite(value)) return null;
   return { value, grouped, fractional: fracPart !== '', exponent: exponent !== '' };
+}
+
+/** Significant digits a typed number keeps. */
+const MAX_SIGNIFICANT_DIGITS = 15;
+
+/** Keep the first 15 significant digits of a typed mantissa and zero the
+ *  rest, as Excel does: 12345678901234567890 is stored as
+ *  12345678901234500000 (truncated, not rounded). */
+function significantDigits(intPart: string, fracPart: string): [string, string] {
+  const all = intPart + fracPart;
+  const first = all.search(/[1-9]/);
+  if (first < 0 || all.length - first <= MAX_SIGNIFICANT_DIGITS) return [intPart, fracPart];
+  const keep = first + MAX_SIGNIFICANT_DIGITS;
+  const kept = all.slice(0, keep) + '0'.repeat(all.length - keep);
+  return [kept.slice(0, intPart.length), kept.slice(intPart.length)];
 }
 
 const SCIENTIFIC = '0.00E+00';
@@ -506,8 +524,12 @@ function parseNumericDate(
   if (monthDay !== null) return { value: monthDay, formatCode: profile.monthDayCode };
   // A second field that cannot be the day (m/d) or the month (d/m) is read as
   // a two-digit year: `1/0` is January 2000 in en-US, `12.30` December 1930
-  // in de-DE.
-  const yearFallback = profile.order === 'mdy' || (profile.order === 'dmy' && second > 12);
+  // in de-DE. Year-first locales only take a field past any day: `1/32` is
+  // January 1932 in ja-JP while `1/0` stays text.
+  const yearFallback =
+    profile.order === 'mdy' ||
+    (profile.order === 'dmy' && second > 12) ||
+    (profile.order === 'ymd' && second > 31);
   if (!yearFallback) return null;
   const serial = dateSerial(windowYear(b), first, 1, date1904);
   return serial === null ? null : { value: serial, formatCode: 'mmm-yy' };
