@@ -10,7 +10,7 @@ import type { CellValue, FontRecord } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { normalizeFormatLocale } from '../format/locale.js';
-import { FILTER_BTN_INSET, FILTER_BTN_SIZE } from '../render/geometry.js';
+import { FILTER_BUTTON_SIZE } from '../render/painters/filter-button.js';
 import {
   TABLE_HEADER_CHEVRON_INSET,
   TABLE_HEADER_CHEVRON_SIZE,
@@ -22,8 +22,9 @@ import { DEFAULT_CELL_FONT_THEME, resolveTheme } from '../theme/resolve.js';
 import { formatNumber } from './format.js';
 import { isHeaderRow, tableForCell } from './format-as-table.js';
 
-/** Width the autofilter dropdown button occupies at a header's trailing edge. */
-export const FILTER_DROPDOWN_RESERVED_WIDTH = FILTER_BTN_INSET + FILTER_BTN_SIZE;
+/** Width the in-cell AutoFilter button occupies at a header cell's trailing
+ *  edge: the button plus its one-pixel inset. */
+export const FILTER_DROPDOWN_RESERVED_WIDTH = FILTER_BUTTON_SIZE + 1;
 
 /** Width the table header dropdown chevron occupies at a cell's trailing edge. */
 export const TABLE_HEADER_RESERVED_WIDTH = TABLE_HEADER_CHEVRON_INSET + TABLE_HEADER_CHEVRON_SIZE;

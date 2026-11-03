@@ -18,14 +18,8 @@ import {
 import type { CellValue } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
-import {
-  buildColLayout,
-  buildRowLayout,
-  gridOriginX,
-  hitZone,
-  layoutForView,
-} from '../../../src/render/geometry.js';
-import { paintHeaders } from '../../../src/render/grid/headers.js';
+import { gridOriginX, gridOriginY, hitZone, layoutForView } from '../../../src/render/geometry.js';
+import { filterButtonRect } from '../../../src/render/painters/filter-button.js';
 import { paintTableHeaderChevron } from '../../../src/render/painters/markers.js';
 import { availableTextWidth } from '../../../src/render/text-wrap.js';
 import {
@@ -497,51 +491,27 @@ describe('FILTER_DROPDOWN_RESERVED_WIDTH', () => {
     return state;
   };
 
-  it('matches the hit zone of the header filter button', () => {
+  it('matches the hit zone of the in-cell filter button', () => {
     const state = filterState();
     const layout = layoutForView(state);
     const colRight = gridOriginX(layout) + state.layout.defaultColWidth;
+    const y = gridOriginY(layout) + 5;
     const fr = state.ui.filterRanges;
     const buttonLeft = colRight - FILTER_DROPDOWN_RESERVED_WIDTH;
-    expect(hitZone(layout, state.viewport, buttonLeft, 10, fr)).toEqual({
+    expect(hitZone(layout, state.viewport, buttonLeft, y, fr)).toEqual({
       kind: 'col-filter-btn',
       col: 0,
       range: fr[0],
     });
-    expect(hitZone(layout, state.viewport, buttonLeft - 1, 10, fr)).toEqual({
-      kind: 'col-header',
+    expect(hitZone(layout, state.viewport, buttonLeft - 1, y, fr)).toEqual({
+      kind: 'cell',
+      row: 0,
       col: 0,
     });
   });
 
-  it('matches the painted header filter button', () => {
-    const state = filterState();
-    const xs: number[] = [];
-    const noop = (): void => {};
-    const ctx = new Proxy(
-      {
-        quadraticCurveTo(_cx: number, _cy: number, x: number) {
-          xs.push(x);
-        },
-      } as Record<string | symbol, unknown>,
-      {
-        get: (target, prop) => (prop in target ? target[prop] : noop),
-        set: () => true,
-      },
-    ) as unknown as CanvasRenderingContext2D;
-    const layout = layoutForView(state);
-    paintHeaders(
-      { ctx, dpr: 1, cssWidth: 300, cssHeight: 140 },
-      { ...state, layout },
-      {
-        textHeader: 11,
-        fontUi: 'sans-serif',
-      } as ResolvedTheme,
-      buildColLayout(state.layout, state.viewport),
-      buildRowLayout(state.layout, state.viewport),
-    );
-    expect(xs.length).toBeGreaterThan(0);
-    const colRight = gridOriginX(layout) + state.layout.defaultColWidth;
-    expect(colRight - Math.min(...xs)).toBe(FILTER_DROPDOWN_RESERVED_WIDTH);
+  it('matches the painted in-cell filter button', () => {
+    const cell = { x: 10, y: 20, w: 80, h: 20 };
+    expect(cell.x + cell.w - filterButtonRect(cell).x).toBe(FILTER_DROPDOWN_RESERVED_WIDTH);
   });
 });

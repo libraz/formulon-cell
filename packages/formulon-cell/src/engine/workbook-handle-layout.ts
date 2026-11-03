@@ -4,6 +4,7 @@ import { displayCharsForScreenPx, screenPxForDisplayChars } from './column-displ
 import {
   MAC_COLUMN_PADDING_PT,
   macDefaultColumnPt,
+  macDigitAdvance,
   macMdw,
   macPtToRaw,
   macRawToPt,
@@ -263,14 +264,14 @@ export abstract class WorkbookHandleLayoutMethods {
    *  `baseColWidth`, the default profile uses the engine's effective width.
    *  Mac rows take the Normal font's height when it is tabulated, unless
    *  `customHeight` pins the stated default; otherwise rows without a stated
-   *  default use 102/7 points. On Mac `headerDigitWidth` is the Normal
-   *  font's maximum digit width, which sizes the row-number strip; it is
-   *  undefined elsewhere. Null means the engine
+   *  default use 102/7 points. On Mac `headerDigitAdvance` is the Normal
+   *  font's unrounded digit advance in points, which sizes the row-number
+   *  strip at every zoom; it is undefined elsewhere. Null means the engine
    *  lacks geometry support or a native read/conversion failed. */
   getSheetDefaultLayoutPx(sheet: number): {
     defaultColWidth: number;
     defaultRowHeight: number;
-    headerDigitWidth: number | undefined;
+    headerDigitAdvance: number | undefined;
   } | null {
     assertAlive(this);
     if (this.capabilities.geometry !== true) return null;
@@ -300,11 +301,9 @@ export abstract class WorkbookHandleLayoutMethods {
     if (colWidth === null || !Number.isFinite(rowPoints)) return null;
     const rowHeight = rowPoints * CSS_PX_PER_POINT;
     if (!Number.isFinite(rowHeight)) return null;
-    // Mac draws 1 pt as one screen px, so the digit width in points is px.
-    const headerDigitWidth = usesMacColumnModel(this)
-      ? (macSheetMdw(this, sheet) ?? undefined)
-      : undefined;
-    return { defaultColWidth: colWidth, defaultRowHeight: rowHeight, headerDigitWidth };
+    const normal = usesMacColumnModel(this) ? sheetNormalFont(this, sheet) : null;
+    const headerDigitAdvance = normal ? macDigitAdvance(normal.name, normal.size) : undefined;
+    return { defaultColWidth: colWidth, defaultRowHeight: rowHeight, headerDigitAdvance };
   }
 
   /** Width a column `widthPx` CSS px wide shows in the Column Width dialog,

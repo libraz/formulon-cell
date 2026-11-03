@@ -1,8 +1,7 @@
-// Row + column header bar, autofilter chevron, and outline gutters. Drawn in
+// Row + column header bar and outline gutters. Drawn in
 // a single pass after cell painting so headers sit above the gridlines.
 
 import { colLetter } from '../../engine/address.js';
-import { sameRange } from '../../store/selection-geometry.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
@@ -28,6 +27,7 @@ export function paintHeaders(
   cols: AxisLayout,
   rows: AxisLayout,
   labelFamily: string = theme.fontUi,
+  labelSize: number = theme.textHeader,
 ): OutlineToggleHit[] {
   const { ctx, dpr, cssWidth, cssHeight } = pc;
   const { layout, selection } = state;
@@ -87,12 +87,6 @@ export function paintHeaders(
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   const r1c1 = state.ui.r1c1 === true;
-  const filterRanges = state.ui.filterRanges.filter((r) => r.sheet === state.data.sheetIndex);
-  const filterSorts = (state.ui.filterSorts ?? []).filter(
-    (spec) =>
-      spec.range.sheet === state.data.sheetIndex &&
-      filterRanges.some((range) => sameRange(range, spec.range)),
-  );
   // A selected chart or picture takes the highlight off the headers, as in Excel.
   const objectSelected = state.ui.selectedObject !== null;
   const selectedRanges = objectSelected ? [] : [selection.range, ...(selection.extraRanges ?? [])];
@@ -124,7 +118,7 @@ export function paintHeaders(
       : isSelectedCol
         ? theme.headerFgActive
         : theme.headerFg;
-    ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${labelFamily}`;
+    ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${labelSize}px ${labelFamily}`;
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
     // Letters centre on the header cell less its trailing separator.
     const labelX = rtl ? rect.x + (w + width) / 2 : rect.x + (w - width) / 2;
@@ -133,70 +127,6 @@ export function paintHeaders(
     if (isActiveCol || isSelectedCol) {
       ctx.fillStyle = theme.accent;
       ctx.fillRect(rect.x, Math.round(oy) - 2, w, 2);
-    }
-
-    // Autofilter chevron — small ▼ in the right edge of the header for any
-    // column inside a filter range.
-    if (w >= 28 && filterRanges.some((fr) => c >= fr.c0 && c <= fr.c1)) {
-      // The chevron hugs the column's trailing edge, which the mirror puts on
-      // the physical left of the header cell for a right-to-left sheet.
-      const btnLeft = rtl ? rect.x + 4 : rect.x + w - 4 - 14;
-      const btnRight = btnLeft + 14;
-      const cy = labelTopY + layout.headerRowHeight / 2;
-      const filterActive = state.layout.hiddenRows.size > 0;
-      ctx.save();
-      ctx.fillStyle = filterActive ? theme.accent : theme.bgHeader;
-      ctx.strokeStyle = filterActive ? theme.accent : theme.ruleStrong;
-      ctx.lineWidth = 1 / dpr;
-      const radius = 2;
-      const bx = btnLeft;
-      const by = cy - 7;
-      const bw = btnRight - btnLeft;
-      const bh = 14;
-      // Subtle background pill.
-      ctx.beginPath();
-      ctx.moveTo(bx + radius, by);
-      ctx.lineTo(bx + bw - radius, by);
-      ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + radius);
-      ctx.lineTo(bx + bw, by + bh - radius);
-      ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - radius, by + bh);
-      ctx.lineTo(bx + radius, by + bh);
-      ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - radius);
-      ctx.lineTo(bx, by + radius);
-      ctx.quadraticCurveTo(bx, by, bx + radius, by);
-      ctx.closePath();
-      if (filterActive) ctx.fill();
-      else ctx.stroke();
-      ctx.fillStyle = filterActive ? theme.bg : theme.headerFg;
-      ctx.beginPath();
-      const tx = bx + bw / 2;
-      const ty = cy + 1;
-      const sorted = filterSorts
-        .flatMap((spec) => spec.keys)
-        .find((key) => key.byCol === c)?.direction;
-      if (sorted) {
-        // Sorted column: a stemmed arrow, pointing up for ascending.
-        const up = sorted === 'asc';
-        const tip = up ? ty - 4 : ty + 4;
-        const tail = up ? ty + 4 : ty - 4;
-        const wing = up ? ty - 0.5 : ty + 0.5;
-        ctx.strokeStyle = ctx.fillStyle;
-        ctx.lineWidth = 1.25;
-        ctx.moveTo(tx, tail);
-        ctx.lineTo(tx, tip);
-        ctx.moveTo(tx - 3, wing);
-        ctx.lineTo(tx, tip);
-        ctx.lineTo(tx + 3, wing);
-        ctx.stroke();
-      } else {
-        // Chevron triangle.
-        ctx.moveTo(tx - 3.5, ty - 2);
-        ctx.lineTo(tx + 3.5, ty - 2);
-        ctx.lineTo(tx, ty + 2);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
     }
   }
 
@@ -230,13 +160,40 @@ export function paintHeaders(
       : isSelectedRow
         ? theme.headerFgActive
         : theme.headerFg;
-    ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${theme.textHeader}px ${labelFamily}`;
+    ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${labelSize}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     ctx.fillText(rowLabel, rowLabelX, rect.y + h - ROW_LABEL_BASELINE_GAP);
     if (isActiveRow || isSelectedRow) {
       ctx.fillStyle = theme.accent;
       ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);
     }
+  }
+
+  // A hidden span leaves a bar across the strip: 4 device px before its
+  // boundary and 2 after (colour measured in the dark appearance only).
+  const barBefore = 4 / dpr;
+  const barLength = 6 / dpr;
+  ctx.fillStyle = theme.accent;
+  for (const c of cols.visible) {
+    if (!layout.hiddenCols.has(c + 1)) continue;
+    const rect = cellRectIn(layout, cols, rows, firstRow, c);
+    const edge = rtl ? rect.x : rect.x + (cols.sizeAt.get(c) ?? 0);
+    ctx.fillRect(
+      rtl ? edge - (barLength - barBefore) : edge - barBefore,
+      labelTopY,
+      barLength,
+      oy - labelTopY,
+    );
+  }
+  for (const r of rows.visible) {
+    if (!layout.hiddenRows.has(r + 1)) continue;
+    const rect = cellRectIn(layout, cols, rows, r, firstCol);
+    ctx.fillRect(
+      labelLeftX,
+      rect.y + (rows.sizeAt.get(r) ?? 0) - barBefore,
+      ox - (labelLeftX - 0),
+      barLength,
+    );
   }
 
   // Bracket gutters for outline groups.

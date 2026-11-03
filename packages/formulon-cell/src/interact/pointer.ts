@@ -28,8 +28,8 @@ import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
+  cellRect,
   colLeadingEdge,
-  gridOriginY,
   hitTest,
   hitZone,
   layoutForView,
@@ -38,6 +38,7 @@ import {
 } from '../render/geometry.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
 import { gridHitState } from '../render/grid.js';
+import { filterButtonRect } from '../render/painters/filter-button.js';
 import { renderScale } from '../store/render-scale.js';
 import {
   isWholeColumnRange,
@@ -581,6 +582,11 @@ export function attachPointer(
         // the filter dropdown anchored under the chevron.
         e.preventDefault();
         const rect = host.getBoundingClientRect();
+        // The dropdown hangs from the bottom of the in-cell button.
+        const button = filterButtonRect(
+          cellRect(geometryLayout(s), s.viewport, zone.range.r0, zone.col),
+          s.ui.rightToLeft === true,
+        );
         host.dispatchEvent(
           new CustomEvent('fc:openfilter', {
             bubbles: true,
@@ -589,8 +595,8 @@ export function attachPointer(
               col: zone.col,
               anchor: {
                 x: e.clientX - rect.left,
-                y: gridOriginY(geometryLayout(s)) - s.layout.headerRowHeight,
-                h: s.layout.headerRowHeight,
+                y: button.y,
+                h: button.h,
                 clientX: e.clientX,
                 clientY: e.clientY,
               },

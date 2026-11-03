@@ -46,11 +46,11 @@ describe('getSheetDefaultLayoutPx on a loaded book', () => {
       // The Windows book states 18.75 pt; Mac Excel shows 游ゴシック 11 rows at 18 pt.
       loaded.geometryPlatform = 'default';
       expect(loaded.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(18.75 * PX_PER_PT, 8);
-      expect(loaded.getSheetDefaultLayoutPx(0)?.headerDigitWidth).toBeUndefined();
+      expect(loaded.getSheetDefaultLayoutPx(0)?.headerDigitAdvance).toBeUndefined();
       loaded.geometryPlatform = 'mac';
       expect(loaded.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(18 * PX_PER_PT, 8);
-      // 游ゴシック 11: maximum digit width round(0.56 x 11) = 6 pt.
-      expect(loaded.getSheetDefaultLayoutPx(0)?.headerDigitWidth).toBe(6);
+      // 游ゴシック 11: digit advance 0.56 x 11 pt.
+      expect(loaded.getSheetDefaultLayoutPx(0)?.headerDigitAdvance).toBeCloseTo(6.16, 8);
     } finally {
       loaded.dispose();
     }

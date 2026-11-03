@@ -1,6 +1,5 @@
 import { pageLayoutGaps } from '../commands/pagination.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
-import { MAC_COLUMN_PADDING_PT } from '../engine/mac-column-model.js';
 import type { Range } from '../engine/types.js';
 import {
   frozenColEnd,
@@ -8,6 +7,7 @@ import {
   frozenRowEnd,
   frozenRowStart,
 } from '../store/freeze-band.js';
+import { headerStripSize } from '../store/header-strip.js';
 import { renderScale } from '../store/render-scale.js';
 import { isRowHidden } from '../store/row-visibility.js';
 import type { LayoutSlice, State, UiSlice, ViewportSlice } from '../store/store.js';
@@ -16,6 +16,7 @@ import {
   isAutomaticFontRowLayoutProjected,
   markAutomaticFontRowLayoutProjected,
 } from './automatic-font-row-layout.js';
+import { filterButtonRect } from './painters/filter-button.js';
 
 export interface Rect {
   x: number;
@@ -34,10 +35,6 @@ export type HitZone =
   | { kind: 'col-filter-btn'; col: number; range: Range };
 
 const RESIZE_SLACK = 4;
-/** Chevron sits flush with the right edge of the header cell, just inboard of
- *  the col-resize handle. ~14px wide for a comfortable click target. */
-export const FILTER_BTN_SIZE = 14;
-export const FILTER_BTN_INSET = 4;
 
 function viewportRowStart(layout: LayoutSlice, viewport: ViewportSlice): number {
   return Math.max(frozenRowEnd(layout), viewport.rowStart, viewport.navigationRange?.r0 ?? 0);
@@ -153,39 +150,13 @@ export function layoutForView(
     ...pageGapsFor(gapsState),
   };
   const header = showHeaders
-    ? fontHeaderSize(projectedLayout, state.viewport)
+    ? headerStripSize(projectedLayout, state.viewport)
     : { headerColWidth: 0, headerRowHeight: 0 };
   const view = { ...base, ...header };
   if (isAutomaticFontRowLayoutProjected(projectedLayout)) {
     markAutomaticFontRowLayoutProjected(view);
   }
   return view;
-}
-
-/** Fewest digits the row-number strip is sized for. */
-const MIN_ROW_HEADER_DIGITS = 3;
-
-/** Header strip sizes. With a Normal-font digit width (Mac), the row-number
- *  strip is a column as many digits wide as the last visible row number (at
- *  least three) plus the column padding, and the column-letter strip is at
- *  least one default row tall; otherwise the fixed chrome sizes stand. */
-function fontHeaderSize(
-  layout: LayoutSlice,
-  viewport: ViewportSlice,
-): Pick<LayoutSlice, 'headerColWidth' | 'headerRowHeight'> {
-  const digitWidth = layout.headerDigitWidth;
-  if (digitWidth === undefined) {
-    return { headerColWidth: layout.headerColWidth, headerRowHeight: layout.headerRowHeight };
-  }
-  const lastRowNumber = viewport.rowStart + viewport.rowCount;
-  const digits = Math.max(MIN_ROW_HEADER_DIGITS, String(lastRowNumber).length);
-  return {
-    headerColWidth: MAC_COLUMN_PADDING_PT + digits * digitWidth,
-    headerRowHeight: Math.max(
-      layout.headerRowHeight,
-      layout.defaultRowHeight * (layout.screenScale ?? 1),
-    ),
-  };
 }
 
 /** What `layoutForView` needs. Page Layout view reads the extra slices; Normal view reads
@@ -583,14 +554,6 @@ export function hitZone(
     ) {
       return { kind: 'col-resize', col: found.col - 1 };
     }
-    const filterRange = filterRanges.find((r) => found.col >= r.c0 && found.col <= r.c1);
-    if (filterRange) {
-      const btnRight = found.rightEdge - RESIZE_SLACK;
-      const btnLeft = btnRight - FILTER_BTN_SIZE;
-      if (x >= btnLeft && x < btnRight) {
-        return { kind: 'col-filter-btn', col: found.col, range: filterRange };
-      }
-    }
     return { kind: 'col-header', col: found.col };
   }
 
@@ -612,6 +575,16 @@ export function hitZone(
 
   const cell = hitTest(layout, viewport, screenX, y);
   if (!cell) return null;
+  // The AutoFilter button sits inside each header cell of a filter range.
+  const filterRange = filterRanges.find(
+    (r) => r.r0 === cell.row && cell.col >= r.c0 && cell.col <= r.c1,
+  );
+  if (filterRange) {
+    const btn = filterButtonRect(cellRect(layout, viewport, cell.row, cell.col), layout.rtl);
+    if (screenX >= btn.x && screenX < btn.x + btn.w && y >= btn.y && y < btn.y + btn.h) {
+      return { kind: 'col-filter-btn', col: cell.col, range: filterRange };
+    }
+  }
   return { kind: 'cell', row: cell.row, col: cell.col };
 }
 

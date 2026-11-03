@@ -403,31 +403,67 @@ describe('hitZone', () => {
     expect(z).toEqual({ kind: 'cell', row: 3, col: 2 });
   });
 
-  it('returns "col-filter-btn" near the right edge of a header inside a filter range', () => {
+  it('returns "col-filter-btn" on the in-cell button of a filter range header cell', () => {
     const layout = makeLayout();
     const viewport = makeViewport();
-    // Col 0 right edge = 150. Resize slack = 4 → 146..150 is col-resize.
-    // Filter btn is the next 14 px inboard: 132..146.
+    // Cell (0,0) spans x 50..150, y 30..50; its 17 px button sits 1 px inside
+    // the right edge and 1 px below the top: x 132..149, y 31..48.
     const fr = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 2 };
-    const z = hitZone(layout, viewport, 140, 5, [fr]);
-    expect(z).toEqual({ kind: 'col-filter-btn', col: 0, range: fr });
+    expect(hitZone(layout, viewport, 140, 40, [fr])).toEqual({
+      kind: 'col-filter-btn',
+      col: 0,
+      range: fr,
+    });
+    expect(hitZone(layout, viewport, 131, 40, [fr])).toEqual({ kind: 'cell', row: 0, col: 0 });
+    // Only the range's first row carries buttons.
+    expect(hitZone(layout, viewport, 140, 60, [fr])).toEqual({ kind: 'cell', row: 1, col: 0 });
   });
 
-  it('reports the chevron of the filter range covering the hit column', () => {
+  it('no longer takes the filter button from the column header strip', () => {
+    const fr = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 2 };
+    expect(hitZone(makeLayout(), makeViewport(), 140, 5, [fr])).toEqual({
+      kind: 'col-header',
+      col: 0,
+    });
+  });
+
+  it('reports the button of the filter range covering the hit cell', () => {
     const layout = makeLayout();
     const viewport = makeViewport();
-    // Col 1 spans 150..250; its chevron sits at 232..246.
+    // Col 1 spans 150..250; its button sits at 232..249.
     const first = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 };
-    const second = { sheet: 0, r0: 0, c0: 1, r1: 5, c1: 2 };
-    expect(hitZone(layout, viewport, 140, 5, [first, second])).toEqual({
+    const second = { sheet: 0, r0: 2, c0: 1, r1: 5, c1: 2 };
+    expect(hitZone(layout, viewport, 140, 40, [first, second])).toEqual({
       kind: 'col-filter-btn',
       col: 0,
       range: first,
     });
-    expect(hitZone(layout, viewport, 240, 5, [first, second])).toEqual({
+    // The second range's header row is row 2: y 70..90.
+    expect(hitZone(layout, viewport, 240, 80, [first, second])).toEqual({
       kind: 'col-filter-btn',
       col: 1,
       range: second,
+    });
+    expect(hitZone(layout, viewport, 240, 40, [first, second])).toEqual({
+      kind: 'cell',
+      row: 0,
+      col: 1,
+    });
+  });
+
+  it('mirrors the in-cell filter button on a right-to-left sheet', () => {
+    // Cell (0,0) mirrors to x 450..550; the button hugs its leading edge: 451..468.
+    const layout = makeLayout({ rtl: true, viewWidth: 600 });
+    const fr = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 2 };
+    expect(hitZone(layout, makeViewport(), 460, 40, [fr])).toEqual({
+      kind: 'col-filter-btn',
+      col: 0,
+      range: fr,
+    });
+    expect(hitZone(layout, makeViewport(), 540, 40, [fr])).toEqual({
+      kind: 'cell',
+      row: 0,
+      col: 0,
     });
   });
 
@@ -670,26 +706,41 @@ describe('font-derived row header', () => {
   // Normal-font digits wide plus the 5 pt column padding — 46 / 52 device px
   // for MS PGothic / Courier New 11 at rows 1..100, 58 / 66 past row 999 —
   // and the column-letter strip is never shorter than the default row.
-  const view = (over: Partial<ViewLayout>, rowStart: number, rowCount = 40) =>
+  const view = (over: Partial<ViewLayout>, rowStart: number, zoom = 1) =>
     layoutForView({
       layout: makeLayout({ headerColWidth: 23, headerRowHeight: 22, screenScale: 0.75, ...over }),
       ui: {} as never,
-      viewport: makeViewport({ rowStart, rowCount }),
+      viewport: makeViewport({ rowStart, rowCount: 40, zoom }),
     });
 
   it('sizes the strip from the Normal font digit width and the visible row numbers', () => {
-    expect(view({ headerDigitWidth: 6 }, 0).headerColWidth).toBe(23);
-    expect(view({ headerDigitWidth: 7 }, 0).headerColWidth).toBe(26);
-    expect(view({ headerDigitWidth: 6 }, 994).headerColWidth).toBe(29);
-    expect(view({ headerDigitWidth: 7 }, 994).headerColWidth).toBe(33);
+    // Digit advances: MS PGothic 11 = 5.5 pt, Courier New 11 = 6.6 pt.
+    expect(view({ headerDigitAdvance: 5.5 }, 0).headerColWidth).toBe(23);
+    expect(view({ headerDigitAdvance: 6.6 }, 0).headerColWidth).toBe(26);
+    expect(view({ headerDigitAdvance: 5.5 }, 994).headerColWidth).toBe(29);
+    expect(view({ headerDigitAdvance: 6.6 }, 994).headerColWidth).toBe(33);
   });
 
   it('grows the column strip to the default row height', () => {
     // Courier New 20: a 27 pt default row and a 54 device px strip.
-    expect(view({ headerDigitWidth: 12, defaultRowHeight: 36 }, 0).headerRowHeight).toBe(27);
-    expect(view({ headerDigitWidth: 6, defaultRowHeight: (14 * 4) / 3 }, 0).headerRowHeight).toBe(
-      22,
-    );
+    expect(view({ headerDigitAdvance: 12, defaultRowHeight: 36 }, 0).headerRowHeight).toBe(27);
+    expect(
+      view({ headerDigitAdvance: 5.5, defaultRowHeight: (14 * 4) / 3 }, 0).headerRowHeight,
+    ).toBe(22);
+  });
+
+  it('scales both strips with the sheet zoom', () => {
+    // Excel for Mac, MS PGothic 11 Normal font (DPR 2): 34x34 at 75%, 46x44 at
+    // 100%, 56x56 at 125%, 88x88 at 200% — the row strip never narrower than
+    // the column strip is tall.
+    const strips = (zoom: number) => {
+      const v = view({ headerDigitAdvance: 5.5, defaultRowHeight: (14 * 4) / 3 }, 0, zoom);
+      return [v.headerColWidth, v.headerRowHeight];
+    };
+    expect(strips(0.75)).toEqual([17, 17]);
+    expect(strips(1)).toEqual([23, 22]);
+    expect(strips(1.25)).toEqual([28, 28]);
+    expect(strips(2)).toEqual([44, 44]);
   });
 
   it('keeps the fixed chrome when the engine reports no digit width', () => {

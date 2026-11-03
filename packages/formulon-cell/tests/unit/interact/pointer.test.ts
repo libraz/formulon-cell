@@ -940,10 +940,10 @@ describe('attachPointer', () => {
       detach = attachPointer(host, store, wb);
       const events: CustomEvent[] = [];
       host.addEventListener('fc:openfilter', (e) => events.push(e as CustomEvent));
-      // Col 0 right edge x=156, resize slack 4 → 152..156 is col-resize.
-      // Filter chevron sits at 138..152.
-      const evt = fireDown(host, 145, 10);
-      fireUp(host, 145, 10);
+      // Col 0 right edge x=156; the in-cell button of header row 0 (y 30..58)
+      // sits 1 px inside it: x 138..155, y 31..48.
+      const evt = fireDown(host, 145, 40);
+      fireUp(host, 145, 40);
       expect(evt.defaultPrevented).toBe(true);
       expect(events).toHaveLength(1);
       const detail = events[0]?.detail as {
@@ -958,15 +958,15 @@ describe('attachPointer', () => {
       setFilterRange({ sheet: 0, r0: 0, c0: 0, r1: 5, c1: 2 });
       mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
       detach = attachPointer(host, store, wb);
-      fireDown(host, 145, 10);
-      fireUp(host, 145, 10);
+      fireDown(host, 145, 40);
+      fireUp(host, 145, 40);
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 3 });
     });
 
     it('hovering over the chevron sets the pointer cursor', () => {
       setFilterRange({ sheet: 0, r0: 0, c0: 0, r1: 5, c1: 2 });
       detach = attachPointer(host, store, wb);
-      fireMove(host, 145, 10);
+      fireMove(host, 145, 40);
       expect(host.style.cursor).toBe('pointer');
     });
 

@@ -1,5 +1,6 @@
+import { headerStripSize } from './header-strip.js';
 import { isRowHidden } from './row-visibility.js';
-import type { LayoutSlice, State, UiSlice } from './types.js';
+import type { LayoutSlice, State, UiSlice, ViewportSlice } from './types.js';
 
 /** OOXML stores a split in twips of screen space: 20 per point, 15 per CSS px. */
 const TWIPS_PER_CSS_PX = 15;
@@ -17,11 +18,14 @@ type SplitLayout = Pick<
   | 'hiddenCols'
   | 'headerRowHeight'
   | 'headerColWidth'
+  | 'headerDigitAdvance'
   | 'outlineRowGutter'
   | 'outlineColGutter'
   | 'screenScale'
 >;
 type SplitUi = Pick<UiSlice, 'showHeaders' | 'showOutlineSymbols'>;
+/** The rows in view, which size the row-number strip. */
+type SplitView = Pick<ViewportSlice, 'rowStart' | 'rowCount'>;
 
 const sizeAt = (layout: SplitLayout, axis: SplitAxis, i: number): number =>
   axis === 'row'
@@ -35,9 +39,16 @@ const sizeAt = (layout: SplitLayout, axis: SplitAxis, i: number): number =>
 /** The header strip and outline gutter a split's position is measured across,
  *  in canonical px. They draw in screen px and do not zoom, but the file
  *  measures them zoomed, as the desktop spreadsheet draws them. */
-const headerExtent = (layout: SplitLayout, ui: SplitUi, axis: SplitAxis): number => {
+const headerExtent = (
+  layout: SplitLayout,
+  ui: SplitUi,
+  view: SplitView,
+  axis: SplitAxis,
+): number => {
+  // The file scales the 100% strips by the zoom, below.
+  const strip = headerStripSize(layout, { ...view, zoom: 1 });
   const header =
-    ui.showHeaders === false ? 0 : axis === 'row' ? layout.headerRowHeight : layout.headerColWidth;
+    ui.showHeaders === false ? 0 : axis === 'row' ? strip.headerRowHeight : strip.headerColWidth;
   const gutter =
     ui.showOutlineSymbols === false
       ? 0
@@ -51,13 +62,14 @@ const headerExtent = (layout: SplitLayout, ui: SplitUi, axis: SplitAxis): number
 export function splitTwips(
   layout: SplitLayout,
   ui: SplitUi,
+  view: SplitView,
   axis: SplitAxis,
   origin: number,
   count: number,
   zoom: number,
 ): number {
   if (count <= 0) return 0;
-  let px = headerExtent(layout, ui, axis);
+  let px = headerExtent(layout, ui, view, axis);
   for (let i = origin; i < origin + count; i += 1) px += sizeAt(layout, axis, i);
   return Math.round(px * zoom * TWIPS_PER_CSS_PX);
 }
@@ -67,6 +79,7 @@ export function splitTwips(
 export function splitCount(
   layout: SplitLayout,
   ui: SplitUi,
+  view: SplitView,
   axis: SplitAxis,
   origin: number,
   twips: number,
@@ -74,7 +87,7 @@ export function splitCount(
   limit: number,
 ): number {
   if (!(twips > 0) || !(zoom > 0)) return 0;
-  const target = twips / TWIPS_PER_CSS_PX / zoom - headerExtent(layout, ui, axis);
+  const target = twips / TWIPS_PER_CSS_PX / zoom - headerExtent(layout, ui, view, axis);
   let px = 0;
   let count = 0;
   while (origin + count < limit) {
@@ -93,8 +106,24 @@ export function splitPosition(
   const { layout, ui, viewport } = state;
   if (layout.splitPanes !== true) return null;
   return {
-    x: splitTwips(layout, ui, 'col', layout.freezeOriginCol ?? 0, layout.freezeCols, viewport.zoom),
-    y: splitTwips(layout, ui, 'row', layout.freezeOriginRow ?? 0, layout.freezeRows, viewport.zoom),
+    x: splitTwips(
+      layout,
+      ui,
+      viewport,
+      'col',
+      layout.freezeOriginCol ?? 0,
+      layout.freezeCols,
+      viewport.zoom,
+    ),
+    y: splitTwips(
+      layout,
+      ui,
+      viewport,
+      'row',
+      layout.freezeOriginRow ?? 0,
+      layout.freezeRows,
+      viewport.zoom,
+    ),
   };
 }
 

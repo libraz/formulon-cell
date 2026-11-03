@@ -8,7 +8,10 @@ import { MAX_COL, MAX_ROW, parseAddrKey } from './address.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
-type AxisDefaults = Pick<LayoutSlice, 'defaultColWidth' | 'defaultRowHeight' | 'headerDigitWidth'>;
+type AxisDefaults = Pick<
+  LayoutSlice,
+  'defaultColWidth' | 'defaultRowHeight' | 'headerDigitAdvance'
+>;
 
 /** Canonical size defaults when the engine reports no sheet geometry: Mac
  *  75 pt × 20 pt, default profile 48 pt × 15 pt; the header keeps its fixed
@@ -16,12 +19,12 @@ type AxisDefaults = Pick<LayoutSlice, 'defaultColWidth' | 'defaultRowHeight' | '
 const MAC_AXIS_DEFAULTS: AxisDefaults = {
   defaultColWidth: 100,
   defaultRowHeight: 80 / 3,
-  headerDigitWidth: undefined,
+  headerDigitAdvance: undefined,
 };
 const DEFAULT_AXIS_DEFAULTS: AxisDefaults = {
   defaultColWidth: 64,
   defaultRowHeight: 20,
-  headerDigitWidth: undefined,
+  headerDigitAdvance: undefined,
 };
 
 const engineAxisDefaults = (wb: WorkbookHandle, sheet: number): AxisDefaults | null =>
@@ -167,8 +170,10 @@ export function hydrateLayoutFromEngine(
           showHeaders: view.showRowColHeaders !== false,
           showOutlineSymbols: view.showOutlineSymbols !== false,
         };
+        // The saved view opens at its top-left row, which sizes the row-number strip.
+        const rows = { rowStart: view.topLeftRow ?? 0, rowCount: s.viewport.rowCount };
         const count = (axis: 'row' | 'col', origin: number, twips: number, limit: number) =>
-          splitCount(layout, ui, axis, origin, twips, zoom, limit);
+          splitCount(layout, ui, rows, axis, origin, twips, zoom, limit);
         layout.freezeRows = count('row', view.topLeftRow ?? 0, view.splitY ?? 0, MAX_ROW + 1);
         layout.freezeCols = count('col', view.topLeftCol ?? 0, view.splitX ?? 0, MAX_COL + 1);
         layout.splitPanes = layout.freezeRows > 0 || layout.freezeCols > 0;

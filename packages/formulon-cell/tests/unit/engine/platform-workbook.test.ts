@@ -79,11 +79,11 @@ describe('WorkbookHandle.createDefault platform', () => {
       expect(wb.workbookDefaultFont).toMatchObject({ name: '游ゴシック', size: 12 });
       const raw = rawWorkbook(wb);
       expect(raw.getRowHeightPt(0, 0).value).toBe(20);
-      // 游ゴシック 12: digit width round(0.56 x 12) = 7 pt, so 10 x 7 + 5 = 75 pt columns.
+      // 游ゴシック 12: digit advance 0.56 x 12 pt rounds to 7, so 10 x 7 + 5 = 75 pt columns.
       expect(wb.getSheetDefaultLayoutPx(0)).toEqual({
         defaultColWidth: 75 * PX_PER_PT,
         defaultRowHeight: 20 * PX_PER_PT,
-        headerDigitWidth: 7,
+        headerDigitAdvance: expect.closeTo(6.72, 8),
       });
 
       const added = wb.addSheet();
@@ -103,11 +103,11 @@ describe('WorkbookHandle.createDefault platform', () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'en', platform: 'mac' });
     try {
       expect(wb.workbookDefaultFont).toMatchObject({ name: 'Aptos Narrow', size: 12 });
-      // Aptos Narrow 12: digit width round(0.52 x 12) = 6 pt, so 10 x 6 + 5 = 65 pt columns.
+      // Aptos Narrow 12: digit advance 0.52 x 12 pt rounds to 6, so 10 x 6 + 5 = 65 pt columns.
       expect(wb.getSheetDefaultLayoutPx(0)).toEqual({
         defaultColWidth: 65 * PX_PER_PT,
         defaultRowHeight: 16 * PX_PER_PT,
-        headerDigitWidth: 6,
+        headerDigitAdvance: expect.closeTo(6.24, 8),
       });
     } finally {
       wb.dispose();

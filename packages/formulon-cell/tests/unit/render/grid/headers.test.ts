@@ -325,14 +325,12 @@ describe('paintHeaders', () => {
     expect(fills[1]).toMatchObject({ style: '#605e5c', alpha: 0.34 });
   });
 
-  it('draws a sort arrow instead of the chevron on a sorted filter column', () => {
-    const paint = (sorted: boolean) => {
+  it('draws no filter chevron in the strip: the button lives in the first row of the range', () => {
+    const paint = (filtered: boolean) => {
       const state = createSpreadsheetStore().getState();
-      const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 };
       state.ui = {
         ...state.ui,
-        filterRanges: [range],
-        filterSorts: sorted ? [{ range, keys: [{ byCol: 1, direction: 'desc' }] }] : [],
+        filterRanges: filtered ? [{ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }] : [],
       };
       state.viewport = {
         rowStart: 0,
@@ -355,10 +353,9 @@ describe('paintHeaders', () => {
       return spy;
     };
     const plain = paint(false);
-    const sorted = paint(true);
-    // One chevron fill disappears and one arrow stroke appears for column B.
-    expect(sorted.fills.length).toBe(plain.fills.length - 1);
-    expect(sorted.strokes.length).toBe(plain.strokes.length + 1);
+    const filtered = paint(true);
+    expect(filtered.fills.length).toBe(plain.fills.length);
+    expect(filtered.strokes.length).toBe(plain.strokes.length);
   });
 
   it('sets row numbers on a baseline just above the row bottom, as Excel does on tall rows', () => {

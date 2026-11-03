@@ -53,11 +53,19 @@ const FAMILY_ALIASES: ReadonlyMap<string, string> = new Map(
   ).map(([alias, name]) => [normalizeFontName(alias), normalizeFontName(name)]),
 );
 
-/** Maximum digit width in whole points for a Normal font on Mac. */
-export function macMdw(fontName: string, sizePt: number): number {
+/** Digit advance in points, before Mac Excel rounds it to whole points. */
+export function macDigitAdvance(fontName: string, sizePt: number): number {
   const key = normalizeFontName(fontName);
   const em = FAMILY_EM.get(FAMILY_ALIASES.get(key) ?? key) ?? UNKNOWN_FAMILY_EM;
-  return Math.floor(em * sizePt + 0.5);
+  return em * sizePt;
+}
+
+/** Whole-point digit width for a digit advance, rounding half up. */
+export const roundDigitAdvance = (advance: number): number => Math.floor(advance + 0.5);
+
+/** Maximum digit width in whole points for a Normal font on Mac. */
+export function macMdw(fontName: string, sizePt: number): number {
+  return roundDigitAdvance(macDigitAdvance(fontName, sizePt));
 }
 
 /** Displayed width in points of a stored raw column width. */

@@ -129,7 +129,7 @@ const makeFake = (opts: {
   defaults?: {
     defaultColWidth: number;
     defaultRowHeight: number;
-    headerDigitWidth?: number;
+    headerDigitAdvance?: number;
   } | null;
 }): FakeWb => {
   const colCalls: SetColCall[] = [];
@@ -300,17 +300,17 @@ describe('hydrateLayoutFromEngine', () => {
     const store = createSpreadsheetStore();
     const mac = makeFake({
       colRowSize: true,
-      defaults: { defaultColWidth: 71, defaultRowHeight: 22, headerDigitWidth: 7 },
+      defaults: { defaultColWidth: 71, defaultRowHeight: 22, headerDigitAdvance: 6.6 },
     });
     hydrateLayoutFromEngine(mac.wb, store, 0);
-    expect(store.getState().layout.headerDigitWidth).toBe(7);
+    expect(store.getState().layout.headerDigitAdvance).toBe(6.6);
 
     const other = makeFake({
       colRowSize: true,
-      defaults: { defaultColWidth: 64, defaultRowHeight: 20, headerDigitWidth: undefined },
+      defaults: { defaultColWidth: 64, defaultRowHeight: 20, headerDigitAdvance: undefined },
     });
     hydrateLayoutFromEngine(other.wb, store, 0);
-    expect(store.getState().layout.headerDigitWidth).toBeUndefined();
+    expect(store.getState().layout.headerDigitAdvance).toBeUndefined();
   });
 
   it('is a no-op under the stub (capability off, empty engine arrays)', () => {

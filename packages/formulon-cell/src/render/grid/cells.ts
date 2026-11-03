@@ -13,7 +13,7 @@ import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { numberFormatPaint } from '../../format/number-format.js';
 import { rangeValidationAt } from '../../store/range-validations.js';
 import { renderScale } from '../../store/render-scale.js';
-import { rangeContainsAddr } from '../../store/selection-geometry.js';
+import { rangeContainsAddr, sameRange } from '../../store/selection-geometry.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import { type ConditionalCache, evaluateConditional } from '../conditional.js';
@@ -26,6 +26,7 @@ import {
   rangeRects,
   type ViewState,
 } from '../geometry.js';
+import { filterButtonRect, paintFilterButton } from '../painters/filter-button.js';
 import { alignedTextAnchor, cellFont, cellFontCss, visualZoom } from '../painters/text.js';
 import {
   CONDITIONAL_ICON_GUTTER,
@@ -196,6 +197,11 @@ export function paintCells(
     }
   }
 
+  const filterRanges = state.ui.filterRanges.filter((fr) => fr.sheet === data.sheetIndex);
+  const filterSorts = (state.ui.filterSorts ?? []).filter(
+    (spec) =>
+      spec.range.sheet === data.sheetIndex && filterRanges.some((fr) => sameRange(fr, spec.range)),
+  );
   const rowFonts = rowBaselineFonts(format.formats, data.sheetIndex);
   const rng = selection.range;
   const objectSelected = state.ui.selectedObject !== null;
@@ -450,6 +456,7 @@ export function paintCells(
       const isActive = r === active.row && c === active.col;
       const hasValidationCircle = validationCircles.has(key);
       const hasThreadedComment = threadedRootKeys.has(key);
+      const filterHeader = filterRanges.some((fr) => fr.r0 === r && c >= fr.c0 && c <= fr.c1);
       // Render-worthy when there's data, a merge anchor, a static fill, or a
       // sparkline/table host — all reasons to paint into an otherwise blank cell.
       if (
@@ -470,7 +477,8 @@ export function paintCells(
         !spark &&
         !hasValidationCircle &&
         !hasThreadedComment &&
-        !fmt?.comment
+        !fmt?.comment &&
+        !filterHeader
       )
         continue;
       const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
@@ -678,6 +686,13 @@ export function paintCells(
         paintCellText(paintCtx);
       }
       if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme, rtl);
+      if (filterHeader) {
+        paintFilterButton(ctx, filterButtonRect(bounds, rtl), theme, {
+          active: layout.hiddenRows.size > 0,
+          sorted: filterSorts.flatMap((spec) => spec.keys).find((key) => key.byCol === c)
+            ?.direction,
+        });
+      }
       if (spark) paintCellSparkline(ctx, bounds, spark, state, cellCtx.wb);
       if (fmt?.comment || hasThreadedComment) paintCommentMarker(ctx, bounds, rtl);
       if (hasValidationCircle) paintValidationCircle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);

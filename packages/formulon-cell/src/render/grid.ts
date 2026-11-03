@@ -62,6 +62,12 @@ import {
   paintValidationChevron,
 } from './painters.js';
 
+/** Header labels follow a Normal font larger than the default one at its own size. */
+export const headerLabelSize = (normalSize: number | undefined, fallback: number): number =>
+  normalSize !== undefined && normalSize > DEFAULT_NORMAL_SIZE ? normalSize : fallback;
+
+const DEFAULT_NORMAL_SIZE = 11;
+
 type SpillCandidateCells = ReadonlyMap<string, { value: CellValue; formula: string | null }>;
 type SpillErrorCandidate = { row: number; col: number };
 
@@ -532,14 +538,15 @@ export class GridRenderer {
     rows: AxisLayout,
   ): void {
     // Headings take the workbook's Normal font, as the desktop draws them.
-    const normalFont = this.getWb()?.workbookDisplayFont?.name;
+    const normalFont = this.getWb()?.workbookDisplayFont;
     this.hits.outlineToggles = paintHeaders(
       this.chromeCtx(),
       state,
       theme,
       cols,
       rows,
-      cellFontFamily(normalFont, theme.fontUi),
+      cellFontFamily(normalFont?.name, theme.fontUi),
+      headerLabelSize(normalFont?.size, theme.textHeader),
     );
   }
 
