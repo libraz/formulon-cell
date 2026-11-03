@@ -144,22 +144,34 @@ export const alignedTextAnchor = (
 export const visualZoom = (zoom: number | undefined): number =>
   zoom !== undefined && Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
 
+/** Whole-cell superscript/subscript size, as a fraction of the base size. */
+const SCRIPT_SIZE = 0.7;
+/** Script baseline shifts in em of the base size: Arial's OS/2 offsets, which
+ *  match Excel's 10 px rise and 3-4 px drop at 11 pt, DPR 2. */
+const SUPERSCRIPT_RISE_EM = 0.477;
+const SUBSCRIPT_DROP_EM = 0.138;
+
 /** The size reduction used by Excel for whole-cell superscript/subscript. */
 export const fontSizeWithVerticalAlign = (
   size: number,
   verticalAlign: CellFormat['fontVertAlign'] | undefined,
-): number => (verticalAlign ? size * 0.7 : size);
+): number => (verticalAlign ? size * SCRIPT_SIZE : size);
 
-/** Baseline displacement matching the stable metrics used by the canvas
- * painter. Positive values move the run down (subscript). */
+/** Baseline displacement for a run drawn at the reduced script `fontSize`.
+ *  Positive values move the run down (subscript). */
 export const cellTextVerticalOffset = (
   fontSize: number,
   verticalAlign: CellFormat['fontVertAlign'] | undefined,
 ): number => {
-  if (verticalAlign === 'superscript') return -fontSize * 0.72 * 0.35;
-  if (verticalAlign === 'subscript') return fontSize * 0.22 * 0.65;
+  const base = fontSize / SCRIPT_SIZE;
+  if (verticalAlign === 'superscript') return -base * SUPERSCRIPT_RISE_EM;
+  if (verticalAlign === 'subscript') return base * SUBSCRIPT_DROP_EM;
   return 0;
 };
+
+/** An accounting underline in a row lifts the row's shared bottom baseline by
+ *  this many em of the row font: 4 device px at Arial 11, DPR 2. */
+const ACCOUNTING_BASELINE_RISE_EM = 2 / 11;
 
 /** Return a CSS font-size suitable for a DOM cell surface. The variable
  * fallback keeps an inherited workbook/default font zoomable when the native
@@ -194,15 +206,20 @@ export const shrinkFontSizeToFit = (
   return Math.max(1, Math.floor(fontSize * (availableWidth / measuredWidth)));
 };
 
+/** `merged`: the cell is a merged range, whose centred line box rounds a
+ *  half pixel down the sheet where a single cell floors it. */
 export const textBaselineY = (
   bounds: Rect,
   box: TextMetricsBox,
   vAlign: TextVAlign,
   padY: number,
+  merged = false,
 ): number => {
   if (vAlign === 'top') return Math.round(bounds.y + padY + box.ascent);
   if (vAlign === 'middle') {
-    return Math.round(bounds.y + (bounds.h - box.ascent - box.descent) / 2 + box.ascent);
+    const centredTop = bounds.y + (bounds.h - box.ascent - box.descent) / 2;
+    const top = merged ? centredTop : Math.floor(centredTop);
+    return Math.round(top + box.ascent);
   }
   return Math.round(bounds.y + bounds.h - padY - box.descent);
 };
@@ -481,6 +498,7 @@ export function paintCellText({
   formatPaint: formatPaintFor,
   fontEffects = false,
   rowBaselineFont,
+  merged = false,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
@@ -532,7 +550,13 @@ export function paintCellText({
     ctx.font = cellFontCss({ ...rowFont, size: rowFont.size * zoomScale });
     const rowBox = fontMetricsBox(ctx, rowFont.size * zoomScale);
     ctx.font = current;
-    return { ascent: box.ascent, descent: Math.max(box.descent, rowBox.descent) };
+    const accountingRise = rowBaselineFont.accountingUnderline
+      ? rowFont.size * zoomScale * ACCOUNTING_BASELINE_RISE_EM
+      : 0;
+    return {
+      ascent: box.ascent,
+      descent: Math.max(box.descent, rowBox.descent) + accountingRise,
+    };
   };
   ctx.font = paintFontCss;
   const isHyperlink = !!format?.hyperlink;
@@ -674,7 +698,7 @@ export function paintCellText({
     const totalH = lineH * lines.length;
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = withRowDescent(fontMetricsBox(ctx, fontSize), vAlign);
-    let startY = textBaselineY(bounds, measured, vAlign, padY);
+    let startY = textBaselineY(bounds, measured, vAlign, padY, merged);
     startY += cellTextVerticalOffset(fontSize, fontVertAlign);
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
     else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
@@ -694,7 +718,9 @@ export function paintCellText({
     return;
   }
 
-  // Single-line path with vertical alignment.
+  // Single-line path with vertical alignment. A distributed single word has
+  // no gaps to spread and sits centred.
+  if (format?.align === 'distributed' && !/\s/.test(text)) align = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = align;
   const tx = alignedTextAnchor(bounds, align, padX, indentPx);
@@ -753,7 +779,7 @@ export function paintCellText({
       : ownBox,
     vAlign,
   );
-  let ty = textBaselineY(bounds, box, vAlign, padY);
+  let ty = textBaselineY(bounds, box, vAlign, padY, merged);
   ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
 
   // A `*x` fill spans the cell whatever the alignment: one part sits at

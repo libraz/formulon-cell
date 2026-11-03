@@ -4,6 +4,7 @@ import {
   fontMetricsBox,
   paintCellText,
   shrinkFontSizeToFit,
+  textBaselineY,
 } from '../../../../src/render/painters/text.js';
 import type { CellFormat } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
@@ -250,5 +251,87 @@ describe('stacked vertical text', () => {
     expect(at('c')?.y).toBe(11);
     expect(at('b')?.y).toBe(25);
     expect((at('a')?.x ?? 0) - (at('c')?.x ?? 0)).toBe(14);
+  });
+});
+
+describe('vertically centred text', () => {
+  // Excel starts a centred line box on a whole CSS px, flooring the exact
+  // offset: Arial 11 'Hxg' ink starts at 6 device px in both 14 and 15 pt rows.
+  const box = { ascent: 7, descent: 1 };
+  const at = (h: number) => textBaselineY({ x: 0, y: 0, w: 60, h }, box, 'middle', 1);
+
+  it('floors a half-pixel centring offset on odd-height rows', () => {
+    expect(at(14)).toBe(10);
+    expect(at(15)).toBe(10);
+    expect(at(16)).toBe(11);
+    expect(at(45)).toBe(25);
+  });
+
+  it('rounds the half pixel up in a merged range', () => {
+    // Excel: Arial 11 centred in a 3 x 15 pt merge inks at y 36..56 and in a
+    // one-row 2-col 15 pt merge at 6..26, a whole CSS px below the floored
+    // single-cell placement.
+    const merged = (h: number) => textBaselineY({ x: 0, y: 0, w: 60, h }, box, 'middle', 1, true);
+    expect(merged(15)).toBe(11);
+    expect(merged(45)).toBe(26);
+    expect(merged(16)).toBe(at(16));
+    const spy = makeSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 60, h: 45 },
+      theme,
+      value: text('Hxg'),
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { vAlign: 'middle' },
+      merged: true,
+    });
+    // Font box 10 over 2 at 11 px: (45 - 12) / 2 = 16.5 rounds to 17.
+    expect(spy.fills[0]?.y).toBe(27);
+  });
+});
+
+describe('distributed alignment', () => {
+  it('centres a single word', () => {
+    // Excel: 'Distributed' in a 120 px cell sits at x 9..111, centred.
+    expect(paint(text('Distributed'), { align: 'distributed' }).fills[0]?.x).toBe(30);
+  });
+});
+
+describe('superscript and subscript', () => {
+  // Excel shifts the run by the base font's script offsets (Arial 11: up 10,
+  // down 3..4 device px at DPR 2) and draws it at 0.7 of the base size.
+  const bottomBaseline = 46;
+
+  it('raises a superscript by 0.477 em of the base size', () => {
+    const y = paint(text('x2'), { fontVertAlign: 'superscript' }).fills[0]?.y ?? 0;
+    expect(y).toBeCloseTo(bottomBaseline - 0.477 * 11, 3);
+  });
+
+  it('drops a subscript by 0.138 em of the base size', () => {
+    const y = paint(text('x2'), { fontVertAlign: 'subscript' }).fills[0]?.y ?? 0;
+    expect(y).toBeCloseTo(bottomBaseline + 0.138 * 11, 3);
+  });
+});
+
+describe('accounting underline rows', () => {
+  it('raises the shared bottom baseline of a row holding an accounting underline', () => {
+    // Excel (DPR 2): every bottom-aligned run in such a row sits 4 device px
+    // higher than in a plain row, Arial 11.
+    const plain = paint(text('Hxg'), {});
+    const spy = makeSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds,
+      theme,
+      value: text('Hxg'),
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: {},
+      rowBaselineFont: { accountingUnderline: true },
+    });
+    expect(spy.fills[0]?.y).toBe((plain.fills[0]?.y ?? 0) - 2);
   });
 });

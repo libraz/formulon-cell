@@ -3,6 +3,7 @@ import { setFont } from '../../../src/commands/format.js';
 import { associatePaginationEngine } from '../../../src/commands/pagination.js';
 import { MAX_COL } from '../../../src/engine/address.js';
 import { fontPointsToCssPx } from '../../../src/engine/font-units.js';
+import { macDefaultRowPt } from '../../../src/engine/mac-row-model.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { cellRect, hitTest, layoutForView } from '../../../src/render/geometry.js';
 import { MAX_ROW_HEIGHT_PX } from '../../../src/store/layout-limits.js';
@@ -372,6 +373,61 @@ describe('automatic font row layout', () => {
       const invalid = layoutForView(store.getState());
       expect(invalid.rowHeights.get(0)).toBeUndefined();
       expect(invalid.defaultRowHeight).toBe(store.getState().layout.defaultRowHeight);
+    } finally {
+      mounted.dispose();
+      workbook.dispose();
+    }
+  });
+});
+
+describe('automatic font row layout on the mac profile', () => {
+  it('sizes a row to the tabulated default row of its font, as Excel autofits on load', async () => {
+    // Excel for Mac autofits a row to the height its default-row table gives
+    // the row's font (Arial 12 / 14: 16 / 18 pt), never below the sheet default.
+    const workbook = await WorkbookHandle.createDefault({ locale: 'en-US', platform: 'mac' });
+    const mounted = await mountStubSheet({ workbook, ui: { platform: 'mac' } });
+    try {
+      const store = mounted.instance.store;
+      const base = layoutForView(store.getState()).defaultRowHeight;
+      const font = (row: number, fontFamily: string, points: number) =>
+        mutators.setCellFormat(
+          store,
+          { sheet: 0, row, col: 0 },
+          {
+            fontFamily,
+            fontSize: fontPointsToCssPx(points),
+          },
+        );
+      font(0, 'Calibri', 18);
+      font(1, 'Calibri', 16);
+      font(2, 'Arial', 14);
+      const layout = layoutForView(store.getState());
+      const height = (row: number) => layout.rowHeights.get(row) ?? layout.defaultRowHeight;
+      expect(base).toBeLessThan(fontPointsToCssPx(21));
+      expect(height(0)).toBeCloseTo(fontPointsToCssPx(24), 6);
+      expect(height(1)).toBeCloseTo(fontPointsToCssPx(21), 6);
+      expect(height(2)).toBeCloseTo(Math.max(base, fontPointsToCssPx(18)), 6);
+    } finally {
+      mounted.dispose();
+      workbook.dispose();
+    }
+  });
+
+  it('sizes a row whose cell names only a family, at the Normal size', async () => {
+    // Excel for Mac autofits a Courier New 11 row under MS PGothic 11 to 15 pt;
+    // the store omits a size equal to the Normal font's.
+    const workbook = await WorkbookHandle.createDefault({ locale: 'en-US', platform: 'mac' });
+    const mounted = await mountStubSheet({ workbook, locale: 'en', ui: { platform: 'mac' } });
+    try {
+      const store = mounted.instance.store;
+      const size = workbook.workbookDisplayFont?.size ?? 0;
+      const meiryoRow = fontPointsToCssPx(macDefaultRowPt('Meiryo UI', size) ?? 0);
+      mutators.setCellFormat(store, A1, { fontFamily: 'Meiryo UI' });
+      mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { fontFamily: 'Arial' });
+      const layout = layoutForView(store.getState());
+      expect(layout.defaultRowHeight).toBeLessThan(meiryoRow);
+      expect(layout.rowHeights.get(0)).toBeCloseTo(meiryoRow, 6);
+      expect(layout.rowHeights.get(1)).toBeUndefined();
     } finally {
       mounted.dispose();
       workbook.dispose();

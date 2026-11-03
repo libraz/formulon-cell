@@ -49,6 +49,8 @@ export interface CellPaintCtx {
   /** Largest font among the row's bottom-aligned cells; bottom-aligned text
    *  sits on the baseline its descent sets. */
   rowBaselineFont?: RowBaselineFont;
+  /** `bounds` is a merged range; centred text rounds rather than floors. */
+  merged?: boolean;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

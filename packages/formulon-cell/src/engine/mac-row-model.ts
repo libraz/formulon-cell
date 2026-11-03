@@ -5,7 +5,8 @@
  * `<sheetFormatPr customHeight="1">` pins it, the default row is a whole-point
  * height derived from the Normal font. No closed form fits the measurements, so
  * the heights are tabulated per family and size from xlwings reads of Mac
- * Excel 16.x (`Worksheet.StandardHeight`). Font names match after NFKC and case
+ * Excel 16.x (`Worksheet.StandardHeight`) and from the heights Mac Excel
+ * autofits single-font rows to at load, which agree where both were read. Font names match after NFKC and case
  * folding; "Yu Gothic" is a different face from 游ゴシック on Mac and is kept apart.
  */
 
@@ -16,7 +17,8 @@ const FAMILY_ROW_PT: ReadonlyArray<readonly [string, Readonly<Record<number, num
   ['Calibri', { 8: 11, 9: 12, 10: 14, 11: 15, 12: 16, 14: 19, 16: 21, 18: 24 }],
   ['Aptos Narrow', { 10: 14, 11: 15, 12: 16, 14: 19 }],
   ['Aptos', { 10: 14, 11: 15, 12: 16, 14: 19 }],
-  ['Arial', { 10: 13, 11: 14, 12: 16, 14: 18 }],
+  ['Arial', { 10: 13, 11: 14, 12: 16, 14: 18, 16: 20, 20: 25, 24: 30, 36: 45 }],
+  ['Courier New', { 11: 15, 20: 27 }],
   ['Tahoma', { 10: 13, 11: 14, 12: 15, 14: 18 }],
   ['游ゴシック', { 8: 13, 9: 16, 10: 17, 11: 18, 12: 20, 14: 24, 16: 27, 18: 31 }],
   ['Yu Gothic', { 10: 17, 11: 17, 12: 18, 14: 22 }],

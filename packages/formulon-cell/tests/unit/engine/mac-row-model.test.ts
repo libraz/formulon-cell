@@ -21,6 +21,12 @@ describe('macDefaultRowPt', () => {
     ['Malgun Gothic', 12, 18],
     ['新細明體', 12, 15],
     ['Tahoma', 12, 15],
+    ['Arial', 16, 20],
+    ['Arial', 20, 25],
+    ['Arial', 24, 30],
+    ['Arial', 36, 45],
+    ['Courier New', 11, 15],
+    ['Courier New', 20, 27],
   ] as const)('gives %s %d pt a %d pt row', (name, size, row) => {
     expect(macDefaultRowPt(name, size)).toBe(row);
   });
@@ -40,8 +46,11 @@ describe('getSheetDefaultLayoutPx on a loaded book', () => {
       // The Windows book states 18.75 pt; Mac Excel shows 游ゴシック 11 rows at 18 pt.
       loaded.geometryPlatform = 'default';
       expect(loaded.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(18.75 * PX_PER_PT, 8);
+      expect(loaded.getSheetDefaultLayoutPx(0)?.headerDigitWidth).toBeUndefined();
       loaded.geometryPlatform = 'mac';
       expect(loaded.getSheetDefaultLayoutPx(0)?.defaultRowHeight).toBeCloseTo(18 * PX_PER_PT, 8);
+      // 游ゴシック 11: maximum digit width round(0.56 x 11) = 6 pt.
+      expect(loaded.getSheetDefaultLayoutPx(0)?.headerDigitWidth).toBe(6);
     } finally {
       loaded.dispose();
     }

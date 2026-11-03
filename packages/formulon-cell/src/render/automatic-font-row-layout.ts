@@ -1,6 +1,7 @@
 import { associatedPaginationEngine } from '../commands/pagination.js';
 import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { fontPointsToCssPx } from '../engine/font-units.js';
+import { macDefaultRowPt } from '../engine/mac-row-model.js';
 import { nativeFormatEpoch } from '../engine/native-format-epoch.js';
 import type {
   SheetAxisFormatOverride,
@@ -43,27 +44,40 @@ const lineHeight = (fontSizeCss: number): number | null => {
   return Number.isFinite(line) ? line : null;
 };
 
-function fontSizeForStyleXf(
+interface RowFont {
+  readonly size: number;
+  readonly family: string | undefined;
+}
+
+function fontForStyleXf(
   workbook: WorkbookHandle,
   styleXf: number,
-  normalFontCss: number,
-  cache: Map<number, number | null>,
-): number | null {
+  normalFont: RowFont,
+  cache: Map<number, RowFont | null>,
+): RowFont | null {
   if (cache.has(styleXf)) return cache.get(styleXf) ?? null;
   const xf = workbook.getCellXf(styleXf);
   const font = xf ? workbook.getResolvedFontRecord(xf.fontIndex) : null;
   const size = font && validFontSize(font.size) ? fontPointsToCssPx(font.size) : null;
-  const result = validFontSize(size) ? size : styleXf === 0 ? normalFontCss : null;
+  const result = validFontSize(size)
+    ? { size, family: font?.name }
+    : styleXf === 0
+      ? normalFont
+      : null;
   cache.set(styleXf, result);
   return result;
 }
+
+/** Point size of a CSS font size, to the hundredth so table keys match. */
+const cssToPoints = (fontSizeCss: number): number =>
+  Math.round((fontSizeCss / fontPointsToCssPx(1)) * 100) / 100;
 
 /** A sparse axis snapshot leaves ordinary columns implicit at style XF zero. */
 function uniformColumnFontSize(
   snapshot: SheetFontAxisSnapshot,
   workbook: WorkbookHandle,
-  normalFontCss: number,
-  styleCache: Map<number, number | null>,
+  normalFont: RowFont,
+  styleCache: Map<number, RowFont | null>,
 ): number | null {
   const entries = [...snapshot.columns]
     .filter(
@@ -83,9 +97,9 @@ function uniformColumnFontSize(
 
   const sizes: number[] = [];
   const add = (styleXf: number): boolean => {
-    const size = fontSizeForStyleXf(workbook, styleXf, normalFontCss, styleCache);
-    if (size === null) return false;
-    sizes.push(size);
+    const font = fontForStyleXf(workbook, styleXf, normalFont, styleCache);
+    if (font === null) return false;
+    sizes.push(font.size);
     return true;
   };
 
@@ -159,16 +173,25 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
   const cached = getProjectionCache(state, workbook, normalFontCss, currentNativeFormatEpoch);
   if (cached) return cached.layout;
 
-  const styleCache = new Map<number, number | null>();
+  const styleCache = new Map<number, RowFont | null>();
+  const normalFont: RowFont = { size: normalFontCss, family: displayFont.name };
   const axisOverride = state.format.sheetAxisOverrides?.get(sheet);
   const axisSnapshot = axisOverride?.desired ??
     workbook.getSheetFontAxisSnapshot(sheet) ?? { columns: [], rows: [] };
   const patchSize = state.format.sheetFontOverrides?.get(sheet)?.patch.fontSize;
-  const columnSize = uniformColumnFontSize(axisSnapshot, workbook, normalFontCss, styleCache);
+  const columnSize = uniformColumnFontSize(axisSnapshot, workbook, normalFont, styleCache);
   const globalFontCss = validFontSize(patchSize) ? patchSize : (columnSize ?? normalFontCss);
   if (lineHeight(globalFontCss) === null) return state.layout;
 
-  const heightFor = (fontSizeCss: number): number | null => {
+  // Mac Excel autofits a row to the default-row height its table gives the
+  // row's font; elsewhere, and off the table, the row grows by line height.
+  const macRows = workbook.geometryPlatform === 'mac';
+  const heightFor = (fontSizeCss: number, family?: string): number | null => {
+    const tabulated =
+      macRows && family !== undefined ? macDefaultRowPt(family, cssToPoints(fontSizeCss)) : null;
+    if (tabulated !== null) {
+      return Math.min(MAX_ROW_HEIGHT_PX, Math.max(rawDefaultHeight, fontPointsToCssPx(tabulated)));
+    }
     const line = lineHeight(fontSizeCss);
     if (line === null) return null;
     return Math.min(MAX_ROW_HEIGHT_PX, rawDefaultHeight + Math.max(0, line - normalLine));
@@ -177,21 +200,25 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
   const defaultRowHeight = heightFor(globalFontCss);
   if (defaultRowHeight === null) return state.layout;
 
-  const rowFonts = new Map<number, number>();
+  // A row font replaces the sheet base for its row; cell fonts only raise it.
+  const rowFontHeights = new Map<number, number>();
   const canProjectRow = (row: number): boolean =>
     Number.isInteger(row) && row >= 0 && row <= MAX_ROW && !state.layout.rowHeights.has(row);
 
   for (const entry of axisSnapshot.rows) {
-    const size = fontSizeForStyleXf(workbook, entry.styleXf, normalFontCss, styleCache);
-    if (size === null || !canProjectRow(entry.row)) continue;
-    rowFonts.set(entry.row, Math.max(rowFonts.get(entry.row) ?? size, size));
+    const font = fontForStyleXf(workbook, entry.styleXf, normalFont, styleCache);
+    const height = font && heightFor(font.size, font.family);
+    if (height == null || !canProjectRow(entry.row)) continue;
+    rowFontHeights.set(entry.row, Math.max(rowFontHeights.get(entry.row) ?? height, height));
   }
 
-  const includeCellFont = (row: number, fontSizeCss: number): void => {
+  const includeCellFont = (row: number, fontSizeCss: number, family: string | undefined): void => {
     if (!canProjectRow(row) || !validFontSize(fontSizeCss)) {
       return;
     }
-    rowFonts.set(row, Math.max(rowFonts.get(row) ?? globalFontCss, fontSizeCss));
+    const height = heightFor(fontSizeCss, family ?? normalFont.family);
+    if (height === null) return;
+    rowFontHeights.set(row, Math.max(rowFontHeights.get(row) ?? defaultRowHeight, height));
   };
 
   for (const [key, format] of state.format.formats) {
@@ -206,14 +233,17 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
     ) {
       continue;
     }
-    const size = (format as CellFormat | undefined)?.fontSize;
-    if (validFontSize(size)) includeCellFont(addr.row, size);
+    const cellFormat = format as CellFormat | undefined;
+    const size = cellFormat?.fontSize;
+    const family = cellFormat?.fontFamily ?? undefined;
+    // A size equal to the Normal font's is left off the stored format.
+    if (validFontSize(size)) includeCellFont(addr.row, size, family);
+    else if (family) includeCellFont(addr.row, normalFontCss, family);
   }
 
   const rowHeights = new Map(state.layout.rowHeights);
-  for (const [row, fontSizeCss] of rowFonts) {
-    const height = heightFor(fontSizeCss);
-    if (height !== null && height !== defaultRowHeight) rowHeights.set(row, height);
+  for (const [row, height] of rowFontHeights) {
+    if (height !== defaultRowHeight) rowHeights.set(row, height);
   }
 
   if (defaultRowHeight === rawDefaultHeight && rowHeights.size === state.layout.rowHeights.size) {
