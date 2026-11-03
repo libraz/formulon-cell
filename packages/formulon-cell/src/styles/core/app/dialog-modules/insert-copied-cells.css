@@ -130,17 +130,20 @@
     font: inherit;
   }
 
-  /* Mac Insert / Delete cells, measured from Excel for Mac (pt = CSS px): a
-   * 221 px panel, the title in a 32 px header over a rule, four radios on an
-   * 18 px pitch, and Cancel / OK as two 86 px buttons filling the last row. */
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__panel {
+  /* Mac Insert / Delete cells and Insert Copied Cells, measured from Excel for
+   * Mac (pt = CSS px): a 221 px panel, the title in a 32 px header over a
+   * rule, radios on an 18 px pitch, and Cancel / OK as two 86 px buttons
+   * filling the last row. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__panel,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__panel {
     width: 221px;
     padding: 0;
     border-radius: 10px;
     overflow: hidden;
   }
 
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__title {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__title,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__title {
     height: 32px;
     margin: 0;
     padding: 8px 18px 0;
@@ -149,35 +152,45 @@
     line-height: 16px;
   }
 
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__choices {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__choices,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__choices {
     gap: 2px;
     margin: 0;
     padding: 18px 19px 0 20px;
   }
 
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__choice {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__choice,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__choice {
     min-height: 16px;
     column-gap: 7px;
     line-height: 16px;
   }
 
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__radio {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__radio,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__radio {
     width: 16px;
     height: 16px;
   }
 
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__footer {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__footer,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__footer {
     display: grid;
     grid-template-columns: 86px 86px;
     gap: 10px;
     padding: 19px 20px 19px 19px;
   }
 
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__button {
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cellshift__button,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__button {
     min-width: 0;
     height: 26px;
     padding: 0;
     white-space: nowrap;
     border-radius: 6px;
+  }
+
+  /* Insert Copied Cells has two radios; Excel sits its buttons 15 pt under them. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-insertcopied__footer {
+    padding-top: 15px;
   }
 }
