@@ -88,8 +88,13 @@ const isNameChar = (ch: string, first: boolean): boolean => {
   return !(first && ch === '。');
 };
 
+/** A name that starts like a numbered R1C1 reference (`R1C1x`, `R2Cx`), or
+ *  in the `_xlnm.` namespace Excel keeps for built-in names, is refused
+ *  even though it is not a reference itself. */
+const RESERVED_PREFIX = /^(?:R\d+C\d*|R\d*C\d+|_xlnm\.)/i;
+
 const isReservedName = (name: string): boolean =>
-  /^(?:true|false|[rc])$/i.test(name) || looksLikeCellRef(name);
+  /^(?:true|false|[rc])$/i.test(name) || RESERVED_PREFIX.test(name) || looksLikeCellRef(name);
 
 /**
  * Validate a defined name against spreadsheet naming rules. Surrounding
@@ -300,13 +305,30 @@ export function upsertDefinedName(
   if (!isValidDefinedName(trimmedName)) return { ok: false, reason: 'invalid-name' };
   if (!trimmedFormula) return { ok: false, reason: 'empty-formula' };
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
-  if (!wb.setDefinedNameEntry(trimmedName, trimmedFormula, localSheetId)) {
+  // Redefining a name under another casing renames it to the new spelling
+  // (Excel: adding `DUP` over `dup` stores `DUP`); its note and hidden flag stay.
+  const previous = [...wb.definedNames()].find(
+    (e) =>
+      e.localSheetId === localSheetId &&
+      isSameDefinedName(e.name, trimmedName) &&
+      e.name !== trimmedName,
+  );
+  if (previous && !wb.setDefinedNameEntry(previous.name, '', localSheetId)) {
     return { ok: false, reason: 'engine-failed' };
   }
+  if (!wb.setDefinedNameEntry(trimmedName, trimmedFormula, localSheetId)) {
+    if (previous) wb.setDefinedNameEntry(previous.name, previous.formula, localSheetId);
+    return { ok: false, reason: 'engine-failed' };
+  }
+  const keptAttrs: DefinedNameAttrs = {
+    ...(previous?.comment !== undefined ? { comment: previous.comment } : {}),
+    ...(previous?.hidden !== undefined ? { hidden: previous.hidden } : {}),
+    ...attrs,
+  };
   if (
     wb.capabilities.definedNameAttrs &&
-    (attrs.comment !== undefined || attrs.hidden !== undefined) &&
-    !wb.setDefinedNameAttrs(trimmedName, localSheetId, attrs)
+    (keptAttrs.comment !== undefined || keptAttrs.hidden !== undefined) &&
+    !wb.setDefinedNameAttrs(trimmedName, localSheetId, keptAttrs)
   ) {
     return { ok: false, reason: 'engine-failed' };
   }
