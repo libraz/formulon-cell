@@ -326,13 +326,6 @@ const buildFindSelectAction =
     if (result.kind === 'selected') instance.host.focus();
   };
 
-const sortColumnsForRange = (range: Range): SortDialogColumn[] =>
-  Array.from({ length: range.c1 - range.c0 + 1 }, (_, i) => {
-    const col = range.c0 + i;
-    const letter = colLetter(col);
-    return { value: String(col), label: letter };
-  });
-
 /** Text a header cell shows, or undefined when it is blank. */
 const headerText = (
   instance: SpreadsheetInstance,
@@ -345,6 +338,18 @@ const headerText = (
   const cell = instance.store.getState().data.cells.get(addrKey({ sheet, row, col }));
   return cell && cell.value.kind !== 'blank' ? formatCell(cell.value) : undefined;
 };
+
+/** The range's key columns by letter, each with its first-row text as the
+ *  heading the dialogs show while that row counts as headers. */
+const sortColumnsForRange = (instance: SpreadsheetInstance, range: Range): SortDialogColumn[] =>
+  Array.from({ length: range.c1 - range.c0 + 1 }, (_, i) => {
+    const col = range.c0 + i;
+    return {
+      value: String(col),
+      label: colLetter(col),
+      heading: headerText(instance, range.sheet, range.r0, col),
+    };
+  });
 
 const buildSortMenuAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applySortMenuAction'] =>
@@ -366,11 +371,17 @@ const buildSortMenuAction =
       return;
     }
     if (action === 'custom') {
-      const strings = instance.i18n.strings.ribbonMenu;
+      const mac = instance.host.dataset.fcPlatform === 'mac';
+      // The dialog's strings, with the Mac wording laid over them on the Mac host.
+      const strings = mac
+        ? { ...instance.i18n.strings.ribbonMenu, ...instance.i18n.strings.macSortDialog }
+        : instance.i18n.strings.ribbonMenu;
       const state = instance.store.getState();
       const range = inferAutoFilterRange(state);
-      const columns = sortColumnsForRange(range);
+      const columns = sortColumnsForRange(instance, range);
       const result = await showSortDialog({
+        host: instance.host,
+        mac: mac ? instance.i18n.strings.macSortDialog : undefined,
         title: strings.sortDialogTitle,
         columnLabel: strings.sortDialogColumn,
         thenByLabel: strings.sortThenBy,
@@ -422,11 +433,7 @@ const buildSortMenuAction =
         : instance.i18n.strings.ribbonMenu;
       const state = instance.store.getState();
       const range = inferAutoFilterRange(state);
-      // Each column row reads its header cell's text while the first row is a header.
-      const columns = sortColumnsForRange(range).map((column) => ({
-        ...column,
-        heading: headerText(instance, range.sheet, range.r0, Number(column.value)),
-      }));
+      const columns = sortColumnsForRange(instance, range);
       const result = await showRemoveDuplicatesDialog({
         host: instance.host,
         title: strings.removeDuplicatesDialogTitle,

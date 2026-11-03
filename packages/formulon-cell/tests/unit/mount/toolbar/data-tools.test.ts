@@ -274,6 +274,41 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('opens the Mac Custom Sort layout with header-text columns', async () => {
+    // Excel for Mac: 列 lists the header names; sort-on and Options... sit beside the order.
+    sheet.dispose();
+    sheet = await mountStubSheet({ locale: 'ja', ui: { platform: 'mac' } });
+    seedText(sheet, 0, 0, '名前');
+    seedText(sheet, 0, 1, '数量');
+    seedText(sheet, 1, 0, 'a');
+    seedNumber(sheet, 1, 1, 1);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 0 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="sortFilterHome"]')?.click();
+    const customButton = host.querySelector<HTMLButtonElement>('[data-sort="custom"]');
+    const customEvent = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(customEvent, 'target', { value: customButton });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(customEvent)).toBe(true);
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    expect(dialog?.querySelector('.fc-sortdlg__heading')?.textContent).toBe(
+      '並べ替えるレベルを追加:',
+    );
+    expect(dialog?.querySelector('.fc-sortdlg__header')?.textContent?.trim()).toBe(
+      '先頭行を列見出しとする',
+    );
+    const column = dialog?.querySelector<HTMLSelectElement>('.fc-sortdlg__column');
+    expect(Array.from(column?.options ?? [], (option) => option.text)).toEqual(['名前', '数量']);
+    dialog
+      ?.querySelector<HTMLButtonElement>(
+        '.fc-fmtdlg__footer .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary):not(.fc-sortdlg__options)',
+      )
+      ?.click();
+    tb.dispose();
+  });
+
   it('opens Text to Columns delimiter dialog from primary click and keeps presets secondary', async () => {
     seedText(sheet, 0, 0, 'alpha,beta');
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });

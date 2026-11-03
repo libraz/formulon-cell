@@ -10,12 +10,6 @@ import {
 } from './shell.js';
 import type { SortDialogColumn } from './sort.js';
 
-/** A key column: its letter label, and the header cell's text shown in its
- *  place while the first row counts as headers. */
-export interface RemoveDuplicatesColumn extends SortDialogColumn {
-  heading?: string;
-}
-
 export interface RemoveDuplicatesDialogOptions {
   /** The spreadsheet host; anchors the dialog and picks its platform layout. */
   host?: HTMLElement;
@@ -25,7 +19,7 @@ export interface RemoveDuplicatesDialogOptions {
   selectAllLabel: string;
   unselectAllLabel: string;
   noColumnsLabel: string;
-  columns: readonly RemoveDuplicatesColumn[];
+  columns: readonly SortDialogColumn[];
   initialColumns: readonly string[];
   initialHasHeader: boolean;
   okLabel: string;
@@ -83,7 +77,7 @@ export const showRemoveDuplicatesDialog = (
     list.setAttribute('aria-label', opts.columnsLabel);
     fieldset.appendChild(list);
     const checks: HTMLInputElement[] = [];
-    const labels: { text: HTMLSpanElement; item: RemoveDuplicatesColumn }[] = [];
+    const labels: { text: HTMLSpanElement; item: SortDialogColumn }[] = [];
     const initialColumns = new Set(opts.initialColumns);
     const row = (
       text: string,

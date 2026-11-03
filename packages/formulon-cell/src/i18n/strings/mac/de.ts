@@ -1,10 +1,12 @@
 import { cellFormatDe } from '../cell-format/de.js';
 import { editDialogsDe } from '../edit-dialogs/de.js';
+import { gridPopupsDe } from '../grid-popups/de.js';
 import { ribbonMenusDe } from '../ribbon-menus/de.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macSortDialogFrom } from './sort-dialog.js';
 import type { MacStrings } from './types.js';
 
 export const macDe: MacStrings = {
@@ -162,6 +164,15 @@ export const macDe: MacStrings = {
   macFormatDialog: macFormatDialogFrom(cellFormatDe.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusDe.ribbonMenu),
+  macSortDialog: macSortDialogFrom(ribbonMenusDe.ribbonMenu, {
+    levelsHeading: 'Sortierebene hinzufügen:',
+    columnHeading: 'Spalte',
+    sortOnHeading: 'Sortieren nach',
+    sortOnValues: editDialogsDe.findReplace.values,
+    colorHeading: 'Farbe/Symbol',
+    copyLevel: gridPopupsDe.contextMenu.copy,
+    options: 'Optionen...',
+  }),
   macFindReplace: macFindReplaceFrom(
     editDialogsDe.findReplace,
     'Halbbreite und Vollbreite unterscheiden',

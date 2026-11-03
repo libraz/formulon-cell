@@ -1,3 +1,4 @@
+import type { MacSortDialogLabels } from '../../i18n/strings/mac/sort-dialog.js';
 import { projectDisabledState } from '../menu-a11y.js';
 import { createDialogSelect } from './form-controls.js';
 import {
@@ -11,9 +12,16 @@ import {
 export interface SortDialogColumn {
   value: string;
   label: string;
+  /** The header cell's text, shown in place of `label` on the Mac host while
+   *  the first row counts as headers. */
+  heading?: string;
 }
 
 export interface SortDialogOptions {
+  /** The spreadsheet host; anchors the dialog and picks its platform layout. */
+  host?: HTMLElement;
+  /** Labels of the Mac layout; the Mac host uses the shared layout without them. */
+  mac?: MacSortDialogLabels;
   title: string;
   columnLabel: string;
   thenByLabel: string;
@@ -72,6 +80,7 @@ interface SortLevelControls {
 const appendSortLevelRow = (
   body: HTMLElement,
   opts: SortDialogOptions,
+  mac: MacSortDialogLabels | undefined,
   rowLabel: string,
   columnValue: string,
   directionValue: 'asc' | 'desc',
@@ -86,21 +95,41 @@ const appendSortLevelRow = (
   label.setAttribute('role', 'rowheader');
 
   const column = buildColumnSelect(opts.columns, columnValue);
+  column.classList.add('fc-sortdlg__column');
   column.setAttribute('aria-label', rowLabel);
   column.setAttribute('role', 'cell');
 
   const direction = buildDirectionSelect(opts.ascendingLabel, opts.descendingLabel, directionValue);
+  direction.classList.add('fc-sortdlg__direction');
   direction.setAttribute('aria-label', opts.orderLabel);
   direction.setAttribute('role', 'cell');
 
-  row.append(label, column, direction);
+  if (mac) {
+    // Values are the only sort-on key; colour and icon sorts are not offered.
+    const sortOn = createDialogSelect([{ value: 'values', label: mac.sortOnValues }], 'values', {
+      ariaLabel: mac.sortOnHeading,
+      role: 'cell',
+    });
+    sortOn.classList.add('fc-sortdlg__sort-on');
+    const color = createDialogSelect([], '', { ariaLabel: mac.colorHeading, role: 'cell' });
+    color.classList.add('fc-sortdlg__color');
+    projectDisabledState(color, true, null);
+    row.append(label, column, sortOn, direction, color);
+  } else {
+    row.append(label, column, direction);
+  }
   body.appendChild(row);
   return { row, label, column, direction };
 };
 
 export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResult | null> =>
   new Promise<SortDialogResult | null>((resolve) => {
-    const shell = createDialogShell({ title: opts.title });
+    const shell = createDialogShell({ host: opts.host, title: opts.title });
+    shell.panel.classList.add('fc-sortdlg');
+    const mac =
+      shell.overlay.closest<HTMLElement>('[data-fc-platform]')?.dataset.fcPlatform === 'mac'
+        ? opts.mac
+        : undefined;
 
     const toolbar = document.createElement('div');
     toolbar.className = 'fc-sortdlg__toolbar';
@@ -110,12 +139,28 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     deleteLevelBtn.classList.add('fc-sortdlg__delete-level');
     const copyLevelBtn = appendDialogButton(toolbar, { label: opts.copyLevelLabel });
     copyLevelBtn.classList.add('fc-sortdlg__copy-level');
+    if (mac) {
+      // The Mac app captions the level buttons + / − / Copy under the table.
+      addLevelBtn.textContent = '+';
+      deleteLevelBtn.textContent = '−';
+      copyLevelBtn.textContent = mac.copyLevel;
+      addLevelBtn.setAttribute('aria-label', opts.addLevelLabel);
+      deleteLevelBtn.setAttribute('aria-label', opts.deleteLevelLabel);
+      copyLevelBtn.setAttribute('aria-label', opts.copyLevelLabel);
+      const heading = document.createElement('span');
+      heading.className = 'fc-sortdlg__heading';
+      heading.textContent = mac.levelsHeading;
+      shell.body.appendChild(heading);
+    }
     shell.body.appendChild(toolbar);
 
     const headerRow = document.createElement('div');
     headerRow.className = 'fc-sortdlg__grid-head';
     headerRow.setAttribute('role', 'row');
-    for (const label of ['', opts.columnLabel, opts.orderLabel]) {
+    const headings = mac
+      ? ['', mac.columnHeading, mac.sortOnHeading, opts.orderLabel, mac.colorHeading]
+      : ['', opts.columnLabel, opts.orderLabel];
+    for (const label of headings) {
       const cell = document.createElement('span');
       cell.setAttribute('role', 'columnheader');
       cell.textContent = label;
@@ -131,6 +176,25 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
 
     const levels: SortLevelControls[] = [];
     let selectedLevelIndex = 0;
+
+    const dataHeaderRow = document.createElement('label');
+    dataHeaderRow.className = 'fc-fmtdlg__row fc-tb__dlg__label fc-sortdlg__header';
+    const hasHeader = document.createElement('input');
+    hasHeader.type = 'checkbox';
+    hasHeader.checked = opts.initialHasHeader;
+    dataHeaderRow.append(hasHeader, document.createTextNode(` ${opts.headerLabel}`));
+
+    // On the Mac host header text names the columns while the first row counts as headers.
+    const relabelColumns = (level: SortLevelControls): void => {
+      if (!mac) return;
+      opts.columns.forEach((item, index) => {
+        const option = level.column.options[index];
+        if (option) option.text = hasHeader.checked && item.heading ? item.heading : item.label;
+      });
+    };
+    hasHeader.addEventListener('change', () => {
+      for (const level of levels) relabelColumns(level);
+    });
 
     const selectLevel = (index: number): void => {
       selectedLevelIndex = Math.max(0, Math.min(index, levels.length - 1));
@@ -167,6 +231,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
       const level = appendSortLevelRow(
         levelsWrap,
         opts,
+        mac,
         levels.length === 0 ? opts.columnLabel : opts.thenByLabel,
         columnValue,
         directionValue,
@@ -174,6 +239,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
       level.row.addEventListener('click', () => selectLevel(levels.indexOf(level)));
       level.row.addEventListener('focusin', () => selectLevel(levels.indexOf(level)));
       levels.push(level);
+      relabelColumns(level);
       selectedLevelIndex = levels.length - 1;
       refreshLabels();
       if (focus) level.column.focus({ preventScroll: true });
@@ -202,14 +268,14 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
       addLevel(source.column.value, source.direction.value === 'desc' ? 'desc' : 'asc');
     });
 
-    const dataHeaderRow = document.createElement('label');
-    dataHeaderRow.className = 'fc-fmtdlg__row fc-tb__dlg__label';
-    const hasHeader = document.createElement('input');
-    hasHeader.type = 'checkbox';
-    hasHeader.checked = opts.initialHasHeader;
-    dataHeaderRow.append(hasHeader, document.createTextNode(` ${opts.headerLabel}`));
     shell.body.appendChild(dataHeaderRow);
 
+    if (mac) {
+      // Case-sensitive and left-to-right sorts are not offered.
+      const optionsBtn = appendDialogButton(shell.footer, { label: mac.options });
+      optionsBtn.classList.add('fc-sortdlg__options');
+      projectDisabledState(optionsBtn, true, null);
+    }
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
       cancelLabel: opts.cancelLabel,
       okLabel: opts.okLabel,
