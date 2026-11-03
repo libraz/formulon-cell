@@ -91,4 +91,39 @@ describe('textToColumns', () => {
       ]),
     );
   });
+
+  it('splits as Excel does with the double-quote qualifier', () => {
+    // Excel (comma, qualifier "): 'a,b,c' -> a|b|c; '1,"x,y",3' -> 1|x,y|3;
+    // '007,2026-11-03,1,234' -> 7 | 2026-11-03 as a date | 1 | 234; 'a,,c' -> a|blank|c.
+    const store = createSpreadsheetStore();
+    const rows = ['a,b,c', '1,"x,y",3', '007,2026-11-03,1,234', 'a,,c'];
+    rows.forEach((value, row) => {
+      mutators.setCell(store, { sheet: 0, row, col: 0 }, { kind: 'text', value }, null);
+    });
+    const wb = fakeWorkbook();
+    textToColumns(store.getState(), store, wb, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }, ',');
+    const at = (row: number, col: number) => wb.writes.get(`0:${row}:${col}`);
+    expect([at(0, 0), at(0, 1), at(0, 2)]).toEqual([
+      { kind: 'text', value: 'a' },
+      { kind: 'text', value: 'b' },
+      { kind: 'text', value: 'c' },
+    ]);
+    expect([at(1, 0), at(1, 1), at(1, 2), at(1, 3)]).toEqual([
+      { kind: 'number', value: 1 },
+      { kind: 'text', value: 'x,y' },
+      { kind: 'number', value: 3 },
+      undefined,
+    ]);
+    expect([at(2, 0), at(2, 1), at(2, 2), at(2, 3)]).toEqual([
+      { kind: 'number', value: 7 },
+      { kind: 'number', value: 46329 },
+      { kind: 'number', value: 1 },
+      { kind: 'number', value: 234 },
+    ]);
+    expect([at(3, 0), at(3, 1), at(3, 2)]).toEqual([
+      { kind: 'text', value: 'a' },
+      { kind: 'blank' },
+      { kind: 'text', value: 'c' },
+    ]);
+  });
 });

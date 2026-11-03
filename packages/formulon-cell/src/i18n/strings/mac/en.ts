@@ -2,6 +2,7 @@ import { cellFormatEn } from '../cell-format/en.js';
 import { editDialogsEn } from '../edit-dialogs/en.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macPasteSpecialFrom } from './paste-special.js';
 import type { MacStrings } from './types.js';
 
 export const macEn: MacStrings = {
@@ -44,6 +45,8 @@ export const macEn: MacStrings = {
       unsupportedOption: 'This option is not supported yet.',
       run: 'OK',
       cancel: 'Cancel',
+      groupTotal: '{group} Total',
+      grandTotal: 'Grand Total',
     },
     functions: { sum: 'Sum', average: 'Average', count: 'Count', min: 'Min', max: 'Max' },
     errors: {
@@ -153,5 +156,6 @@ export const macEn: MacStrings = {
     autoSum: 'AutoSum',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatEn.formatDialog),
+  macPasteSpecial: macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog),
   macFindReplace: macFindReplaceFrom(editDialogsEn.findReplace, 'Match half-width and full-width'),
 };

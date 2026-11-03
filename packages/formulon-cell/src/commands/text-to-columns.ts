@@ -12,7 +12,12 @@ const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
 
 export interface TextToColumnsOptions {
   collapseConsecutiveDelimiters?: boolean;
+  /** Quote that keeps delimiters inside a field, a doubled quote standing
+   *  for itself; `null` turns quoting off. The desktop default is `"`. */
+  textQualifier?: string | null;
 }
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const splitText = (
   value: string,
@@ -23,14 +28,46 @@ const splitText = (
     (delimiter) => delimiter !== '',
   );
   if (list.length === 0) return [value];
-  if (list.length === 1 && !options.collapseConsecutiveDelimiters)
-    return value.split(list[0] ?? '');
-  const pattern = new RegExp(
-    `(?:${list.map((delimiter) => delimiter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})${
-      options.collapseConsecutiveDelimiters ? '+' : ''
-    }`,
+  const delimiter = new RegExp(
+    `(?:${list.map(escapeRegExp).join('|')})${options.collapseConsecutiveDelimiters ? '+' : ''}`,
+    'y',
   );
-  return value.split(pattern);
+  const quote = options.textQualifier === undefined ? '"' : options.textQualifier;
+  const fields: string[] = [];
+  let pos = 0;
+  for (;;) {
+    let field = '';
+    // A field that opens with the qualifier runs to its closing qualifier.
+    if (quote && value.startsWith(quote, pos)) {
+      let end = pos + quote.length;
+      for (;;) {
+        const close = value.indexOf(quote, end);
+        if (close < 0) {
+          field += value.slice(end);
+          end = value.length;
+          break;
+        }
+        field += value.slice(end, close);
+        end = close + quote.length;
+        if (!value.startsWith(quote, end)) break;
+        field += quote;
+        end += quote.length;
+      }
+      pos = end;
+    }
+    // Text after a closing qualifier, or an unquoted field, runs to the delimiter.
+    let next = pos;
+    let match: RegExpExecArray | null = null;
+    for (; next <= value.length; next += 1) {
+      delimiter.lastIndex = next;
+      match = next < value.length ? delimiter.exec(value) : null;
+      if (match) break;
+    }
+    field += value.slice(pos, Math.min(next, value.length));
+    fields.push(field);
+    if (!match) return fields;
+    pos = next + match[0].length;
+  }
 };
 
 /** The cells `textToColumns` writes for `range`: each text cell that splits, and

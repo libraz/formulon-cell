@@ -138,6 +138,22 @@ describe('renameSheet', () => {
     expect(renameSheet(wb, 0, 'Sheet1')).toBe(false);
   });
 
+  it("applies Excel's sheet-name rules before reaching the engine", () => {
+    // Excel: names compare case-insensitively, ':' and a leading or trailing
+    // apostrophe are rejected, and 31 characters fit.
+    const { wb, fake } = makeFake();
+    for (const name of ['sheet2', 'SHEET3', 'a:b', "'abc", "abc'", '']) {
+      expect(renameSheet(wb, 0, name)).toBe(false);
+    }
+    expect(fake.rename).toEqual([]);
+    expect(renameSheet(wb, 0, 'SHEET1')).toBe(true);
+    expect(renameSheet(wb, 1, 'x'.repeat(31))).toBe(true);
+    expect(renameSheet(wb, 2, 'x'.repeat(32))).toBe(false);
+    expect(renameSheet(wb, 2, "it's")).toBe(true);
+    // 'History' is an ordinary name (object model accepts it; UI unmeasured).
+    expect(renameSheet(wb, 2, 'History')).toBe(true);
+  });
+
   it('returns false without touching the engine when workbook structure is protected', () => {
     const store = createSpreadsheetStore();
     const { wb, fake } = makeFake();

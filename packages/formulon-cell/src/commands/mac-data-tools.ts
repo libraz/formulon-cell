@@ -747,10 +747,9 @@ export function formatMacRangeAddress(wb: WorkbookHandle, range: Range): string 
   return `${prefix}${first === last ? first : `${first}:${last}`}`;
 }
 
-const formulaRange = (sheet: string, col: number, row0: number, row1: number): string => {
-  const quoted = /[^A-Za-z0-9_]/.test(sheet) ? `'${sheet.replaceAll("'", "''")}'` : sheet;
-  return `${quoted}!$${colLetter(col)}$${row0 + 1}:$${colLetter(col)}$${row1 + 1}`;
-};
+/** The relative same-sheet range a SUBTOTAL row sums, as Excel writes it. */
+const formulaRange = (col: number, row0: number, row1: number): string =>
+  `${colLetter(col)}${row0 + 1}:${colLetter(col)}${row1 + 1}`;
 
 const subtotalOutputCells = (
   range: Range,
@@ -762,16 +761,23 @@ const subtotalOutputCells = (
   if (groups.length > MAX_SUBTOTAL_GROUPS || groups.length > maxGroupsByOutput) return null;
   const outputCells: Addr[] = [];
   const formulaCells: Addr[] = [];
-  for (const [index, group] of groups.entries()) {
-    const finalSubtotalRow = group.insertAt + index;
-    if (finalSubtotalRow >= MAX_ROW) return null;
-    outputCells.push({ sheet: range.sheet, row: finalSubtotalRow, col: range.c0 });
+  const addRow = (row: number): void => {
+    outputCells.push({ sheet: range.sheet, row, col: range.c0 });
     for (const col of columns) {
-      const addr = { sheet: range.sheet, row: finalSubtotalRow, col };
+      const addr = { sheet: range.sheet, row, col };
       outputCells.push(addr);
       formulaCells.push(addr);
     }
+  };
+  for (const [index, group] of groups.entries()) {
+    const finalSubtotalRow = group.insertAt + index;
+    if (finalSubtotalRow >= MAX_ROW) return null;
+    addRow(finalSubtotalRow);
   }
+  // The grand total lands under the last subtotal row.
+  const grandTotalRow = range.r1 + groups.length + 1;
+  if (grandTotalRow >= MAX_ROW) return null;
+  addRow(grandTotalRow);
   return { outputCells, formulaCells };
 };
 
@@ -856,7 +862,7 @@ export function planMacSubtotal(
   const intents = subtotalIntents(range, output.outputCells, output.formulaCells);
   const authorization = firstDeniedSubtotalIntent(instance, intents);
   if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
-  return success({ range: { ...range }, insertedRows: groups.length, groups });
+  return success({ range: { ...range }, insertedRows: groups.length + 1, groups });
 }
 
 /** Commit Subtotal using the existing structural and outline history
@@ -877,12 +883,12 @@ export function commitMacSubtotal(
   ) {
     return failure('stale', 'stale');
   }
-  if (solution.insertedRows !== solution.groups.length) {
+  if (solution.insertedRows !== solution.groups.length + 1) {
     return failure('stale', 'stale');
   }
   const range = { ...solution.range };
   if (blockSubtotalOverDataTable(wb, range)) return failure('rejected', 'notEditable');
-  const sheetName = wb.sheetName(range.sheet);
+  const labels = instance.i18n.strings.macData.subtotal;
   const functionCode = subtotalFunctionCode(request.function);
   const columns = [...new Set(request.subtotalColumns)].filter(
     (col) => col >= range.c0 && col <= range.c1,
@@ -912,17 +918,38 @@ export function commitMacSubtotal(
       if (!insertRows(store, wb, history, group.insertAt, 1))
         throw new Error('Could not insert subtotal row.');
       const subtotalRow = group.insertAt;
-      wb.setText({ sheet: range.sheet, row: subtotalRow, col: range.c0 }, `${group.label} Total`);
+      wb.setText(
+        { sheet: range.sheet, row: subtotalRow, col: range.c0 },
+        labels.groupTotal.replace('{group}', group.label),
+      );
       wb.withBatchedRecalc(() => {
         for (const col of columns) {
           wb.setFormula(
             { sheet: range.sheet, row: subtotalRow, col },
-            `=SUBTOTAL(${functionCode},${formulaRange(sheetName, col, group.start, group.end)})`,
+            `=SUBTOTAL(${functionCode},${formulaRange(col, group.start, group.end)})`,
           );
         }
       });
       if (group.end >= group.start) groupRows(store, history, group.start, group.end, wb);
     }
+    // The grand total sums every data row; SUBTOTAL skips the nested subtotals.
+    // Excel's outline puts detail rows at level 3, subtotal rows at 2 and the
+    // header and grand total at 1, so one more group spans data and subtotals.
+    const dataStart = range.r0 + 1;
+    const lastSubtotalRow = range.r1 + solution.groups.length;
+    const grandTotalRow = lastSubtotalRow + 1;
+    if (!insertRows(store, wb, history, grandTotalRow, 1))
+      throw new Error('Could not insert the grand total row.');
+    wb.setText({ sheet: range.sheet, row: grandTotalRow, col: range.c0 }, labels.grandTotal);
+    wb.withBatchedRecalc(() => {
+      for (const col of columns) {
+        wb.setFormula(
+          { sheet: range.sheet, row: grandTotalRow, col },
+          `=SUBTOTAL(${functionCode},${formulaRange(col, dataStart, lastSubtotalRow - 1)})`,
+        );
+      }
+    });
+    groupRows(store, history, dataStart, lastSubtotalRow, wb);
     history.end(token);
     return success(undefined);
   } catch (error) {

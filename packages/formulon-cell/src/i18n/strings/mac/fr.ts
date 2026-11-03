@@ -2,6 +2,7 @@ import { cellFormatFr } from '../cell-format/fr.js';
 import { editDialogsFr } from '../edit-dialogs/fr.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macPasteSpecialFrom } from './paste-special.js';
 import type { MacStrings } from './types.js';
 
 export const macFr: MacStrings = {
@@ -44,6 +45,8 @@ export const macFr: MacStrings = {
       unsupportedOption: 'Cette option n’est pas encore prise en charge.',
       run: 'OK',
       cancel: 'Annuler',
+      groupTotal: 'Total {group}',
+      grandTotal: 'Total général',
     },
     functions: { sum: 'Somme', average: 'Moyenne', count: 'Nombre', min: 'Min', max: 'Max' },
     errors: {
@@ -154,6 +157,7 @@ export const macFr: MacStrings = {
     autoSum: 'Somme automatique',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatFr.formatDialog),
+  macPasteSpecial: macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog),
   macFindReplace: macFindReplaceFrom(
     editDialogsFr.findReplace,
     'Distinguer demi-chasse et pleine chasse',

@@ -2,6 +2,7 @@ import {
   type PasteOperation,
   type PasteSpecialOptions,
   type PasteWhat,
+  pasteLink,
   pasteSpecial,
   resolvePasteDestination,
 } from '../commands/clipboard/paste-special.js';
@@ -12,7 +13,13 @@ import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogButton,
+  createDialogShell,
+} from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 
 export interface PasteSpecialDeps {
@@ -50,20 +57,26 @@ export interface PasteSpecialHandle {
   detach(): void;
 }
 
-const buildWhatOptions = (s: Strings): { id: PasteWhat; label: string }[] => {
-  const t = s.pasteSpecialDialog;
-  return [
-    { id: 'all', label: t.pasteAll },
-    { id: 'formulas', label: t.pasteFormulas },
-    { id: 'values', label: t.pasteValues },
-    { id: 'formats', label: t.pasteFormats },
-    { id: 'formulas-and-numfmt', label: t.pasteFormulasAndNumFmt },
-    { id: 'values-and-numfmt', label: t.pasteValuesAndNumFmt },
-  ];
-};
+type PasteSpecialText = Strings['pasteSpecialDialog'];
 
-const buildOpOptions = (s: Strings): { id: PasteOperation; label: string }[] => {
-  const t = s.pasteSpecialDialog;
+/** Excel's twelve paste kinds in reading order of its two-column grid: the
+ *  left column top to bottom, then the right. */
+const buildWhatOptions = (t: PasteSpecialText): { id: PasteWhat; label: string }[] => [
+  { id: 'all', label: t.pasteAll },
+  { id: 'formulas', label: t.pasteFormulas },
+  { id: 'values', label: t.pasteValues },
+  { id: 'formats', label: t.pasteFormats },
+  { id: 'comments', label: t.pasteComments },
+  { id: 'validation', label: t.pasteValidation },
+  { id: 'all-using-source-theme', label: t.pasteAllUsingSourceTheme },
+  { id: 'all-except-borders', label: t.pasteAllExceptBorders },
+  { id: 'column-widths', label: t.pasteColumnWidths },
+  { id: 'formulas-and-numfmt', label: t.pasteFormulasAndNumFmt },
+  { id: 'values-and-numfmt', label: t.pasteValuesAndNumFmt },
+  { id: 'all-merging-conditional-formats', label: t.pasteAllMergingCF },
+];
+
+const buildOpOptions = (t: PasteSpecialText): { id: PasteOperation; label: string }[] => {
   return [
     { id: 'none', label: t.opNone },
     { id: 'add', label: t.opAdd },
@@ -82,9 +95,13 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const { host, store, wb } = deps;
   if (deps.history) wb.attachHistory(deps.history);
   const strings = deps.strings ?? defaultStrings;
-  const t = strings.pasteSpecialDialog;
-  const whatOptions = buildWhatOptions(strings);
-  const opOptions = buildOpOptions(strings);
+  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  // The dialog's strings, with the Mac wording laid over them on the Mac host.
+  const t: PasteSpecialText = mac
+    ? { ...strings.pasteSpecialDialog, ...strings.macPasteSpecial }
+    : strings.pasteSpecialDialog;
+  const whatOptions = buildWhatOptions(t);
+  const opOptions = buildOpOptions(t);
 
   const shell = createDialogShell({
     host,
@@ -100,7 +117,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     bodyClass: 'fc-fmtdlg__body fc-pastesp__body',
   });
 
-  // Two-column layout: paste section (left), operation section (right).
+  // Paste section over operation section, each a two-column radio grid.
   const cols = document.createElement('div');
   cols.className = 'fc-pastesp__cols';
   body.appendChild(cols);
@@ -134,6 +151,10 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const transpose = makeCheck(t.transpose);
   bottomRow.append(skipBlanks.label, transpose.label);
 
+  // Paste Link leads the button row; a cut cannot be linked to.
+  const linkBtn = createDialogButton({ label: t.pasteLink });
+  linkBtn.classList.add('fc-pastesp__link');
+  footer.appendChild(linkBtn);
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: t.cancel,
     okLabel: t.ok,
@@ -171,42 +192,66 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     }
     openSnapshot = openOpts?.snapshot ?? null;
     setDefaults();
+    projectDisabledState(linkBtn, snap.mode === 'cut', null);
     shell.open();
     // Focus first radio for keyboard nav.
     whatRadios.get('all')?.focus();
   };
 
   const history = deps.history ?? null;
-  const applyOptions = (opts: PasteSpecialOptions, openOpts?: PasteSpecialOpenOptions): boolean => {
-    const snap = openOpts?.snapshot ?? openSnapshot ?? deps.getSnapshot();
-    if (!snap) {
+  /** Run one paste into the snapshot's destination as a single undoable step:
+   *  cell writes go through the workbook, the format slice through
+   *  recordFormatChange. A locked destination defers to the unlock prompt. */
+  const runPaste = (
+    snap: ClipboardSnapshot,
+    transpose: boolean,
+    paste: () => ReturnType<typeof pasteSpecial>,
+    retry: () => void,
+  ): boolean => {
+    const destination = resolvePasteDestination(store.getState(), snap, transpose);
+    if (destination && deferForAllowedRangeUnlock(store, [destination], retry)) {
       return false;
     }
-    const destination = resolvePasteDestination(store.getState(), snap, opts.transpose);
-    if (
-      destination &&
-      deferForAllowedRangeUnlock(store, [destination], () => void applyOptions(opts, openOpts))
-    ) {
-      return false;
-    }
-    // Bundle every value/format mutation into one undoable step. Cell writes
-    // route through the workbook (which pushes to the same history); the
-    // format slice change goes through recordFormatChange to capture both.
     let result: ReturnType<typeof pasteSpecial> = null;
     if (history) {
       history.begin();
       try {
         recordFormatChange(history, store, () => {
-          result = pasteSpecial(store.getState(), store, wb, snap, opts, history);
+          result = paste();
         });
       } finally {
         history.end();
       }
     } else {
-      result = pasteSpecial(store.getState(), store, wb, snap, opts, history);
+      result = paste();
     }
     if (result) deps.onAfterCommit();
     return !!result;
+  };
+
+  const currentSnapshot = (openOpts?: PasteSpecialOpenOptions): ClipboardSnapshot | null =>
+    openOpts?.snapshot ?? openSnapshot ?? deps.getSnapshot();
+
+  const applyOptions = (opts: PasteSpecialOptions, openOpts?: PasteSpecialOpenOptions): boolean => {
+    const snap = currentSnapshot(openOpts);
+    if (!snap) return false;
+    return runPaste(
+      snap,
+      opts.transpose,
+      () => pasteSpecial(store.getState(), store, wb, snap, opts, history),
+      () => void applyOptions(opts, openOpts),
+    );
+  };
+
+  const applyLink = (): boolean => {
+    const snap = currentSnapshot();
+    if (!snap) return false;
+    return runPaste(
+      snap,
+      false,
+      () => pasteLink(store.getState(), store, wb, snap, history),
+      () => void applyLink(),
+    );
   };
 
   const apply = (): void => {
@@ -223,6 +268,10 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     close();
   };
 
+  shell.on(linkBtn, 'click', () => {
+    applyLink();
+    close();
+  });
   shell.on(cancelBtn, 'click', close);
   shell.on(okBtn, 'click', apply);
   const onOverlayKey = (e: KeyboardEvent): void => {

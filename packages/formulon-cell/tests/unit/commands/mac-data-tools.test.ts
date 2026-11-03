@@ -19,6 +19,7 @@ import {
   supportsSubtotal,
 } from '../../../src/commands/mac-data-tools.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { ja } from '../../../src/i18n/strings/ja.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import {
   createSpreadsheetStore,
@@ -61,7 +62,13 @@ const makeControllerInstance = (
     history,
   });
   wb.attachHistory(history);
-  return { workbook: wb, store, commands, history } as unknown as SpreadsheetInstance;
+  return {
+    workbook: wb,
+    store,
+    commands,
+    history,
+    i18n: { strings: ja },
+  } as unknown as SpreadsheetInstance;
 };
 
 const readU16 = (bytes: Uint8Array, offset: number): number =>
@@ -407,6 +414,54 @@ describe('Mac Data command operations', () => {
     expect(history.canUndo()).toBe(true);
     expect(history.undo()).toBe(true);
     expect(wb.getValue({ sheet: 0, row: 4, col: 1 })).toEqual({ kind: 'number', value: 5 });
+  });
+
+  it('lays Subtotal out as Excel does: labels, a grand total, relative SUBTOTAL refs, three levels', async () => {
+    // Excel (ja), A1:B6 grouped on A (x,x,y,y,z; 1..5), SUM on B: rows
+    // 'x 集計' =SUBTOTAL(9,B2:B3), 'y 集計' =SUBTOTAL(9,B5:B6), 'z 集計'
+    // =SUBTOTAL(9,B8:B8), '総計' =SUBTOTAL(9,B2:B8); outline levels 3 for detail
+    // rows, 2 for subtotal rows, 1 for the header and the grand total.
+    const wb = await WorkbookHandle.createDefault();
+    handles.push(wb);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'key');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'value');
+    for (const [index, group] of ['x', 'x', 'y', 'y', 'z'].entries()) {
+      wb.setText({ sheet: 0, row: index + 1, col: 0 }, group);
+      wb.setNumber({ sheet: 0, row: index + 1, col: 1 }, index + 1);
+    }
+    wb.recalc();
+    const instance = makeControllerInstance(wb, store, history);
+    const request: SubtotalRequest = {
+      range: 'A1:B6',
+      groupByColumn: 0,
+      subtotalColumns: [1],
+      function: 'sum',
+    };
+    const plan = planMacSubtotal(instance, request);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(commitMacSubtotal(instance, request, plan.value).ok).toBe(true);
+    const text = (row: number) => wb.getValue({ sheet: 0, row, col: 0 });
+    const formula = (row: number) => wb.cellFormula({ sheet: 0, row, col: 1 });
+    expect([3, 6, 8, 9].map(text)).toEqual([
+      { kind: 'text', value: 'x 集計' },
+      { kind: 'text', value: 'y 集計' },
+      { kind: 'text', value: 'z 集計' },
+      { kind: 'text', value: '総計' },
+    ]);
+    expect([3, 6, 8, 9].map(formula)).toEqual([
+      '=SUBTOTAL(9,B2:B3)',
+      '=SUBTOTAL(9,B5:B6)',
+      '=SUBTOTAL(9,B8:B8)',
+      '=SUBTOTAL(9,B2:B8)',
+    ]);
+    expect(wb.getValue({ sheet: 0, row: 9, col: 1 })).toEqual({ kind: 'number', value: 15 });
+    const levels = store.getState().layout.outlineRows;
+    expect(Array.from({ length: 10 }, (_, row) => levels.get(row) ?? 0)).toEqual([
+      0, 2, 2, 1, 2, 2, 1, 2, 1, 0,
+    ]);
   });
 
   it('aborts every Subtotal mutation when a later structural step fails', async () => {

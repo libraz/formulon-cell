@@ -899,9 +899,9 @@ const runClipboardFlow = async (page: Page, row: FullCheckRow): Promise<void> =>
   const pasteDialog = page.locator('.fc-pastesp:visible').first();
   await expect(pasteDialog).toBeVisible();
   await expect(pasteDialog).toHaveAttribute('aria-label', labels.pasteSpecialTitle);
-  // Six paste-content choices and five arithmetic operations are rendered by
-  // the live Paste Special dialog.
-  await expect(pasteDialog.locator('input[type="radio"]')).toHaveCount(11);
+  // Excel's twelve paste-content choices and five arithmetic operations are
+  // rendered by the live Paste Special dialog.
+  await expect(pasteDialog.locator('input[type="radio"]')).toHaveCount(17);
   await withinViewport(page, pasteDialog);
   const nextLocale = localeAfter(row.locale);
   await attemptRejectedLocaleSwitchWithDraft(page, row.locale, nextLocale);

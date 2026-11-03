@@ -56,6 +56,14 @@ export interface EditDialogsStrings {
     pasteFormats: string;
     pasteFormulasAndNumFmt: string;
     pasteValuesAndNumFmt: string;
+    pasteComments: string;
+    pasteValidation: string;
+    pasteAllUsingSourceTheme: string;
+    pasteAllExceptBorders: string;
+    pasteColumnWidths: string;
+    pasteAllMergingCF: string;
+    /** The Paste Link button. */
+    pasteLink: string;
     opNone: string;
     opAdd: string;
     opSubtract: string;

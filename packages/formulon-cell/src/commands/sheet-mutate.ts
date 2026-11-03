@@ -129,6 +129,22 @@ export function addSheet(
   return added;
 }
 
+/** Longest sheet name the desktop spreadsheet accepts. */
+const MAX_SHEET_NAME_LENGTH = 31;
+
+/** Whether `name` is a legal name for the sheet at `idx`: 1-31 characters,
+ *  none of \\ / ? * [ ] :, no leading or trailing apostrophe, and unique among
+ *  the other sheets ignoring case. */
+export function isValidSheetName(wb: WorkbookHandle, idx: number, name: string): boolean {
+  if (name.length === 0 || name.length > MAX_SHEET_NAME_LENGTH) return false;
+  if (/[\\/?*[\]:]/.test(name) || name.startsWith("'") || name.endsWith("'")) return false;
+  const folded = name.toLocaleLowerCase();
+  for (let i = 0; i < wb.sheetCount; i += 1) {
+    if (i !== idx && wb.sheetName(i).toLocaleLowerCase() === folded) return false;
+  }
+  return true;
+}
+
 /** Rename the sheet at `idx`. Returns true on success. The store has no
  *  per-sheet name slot — the playground reads names from `wb.sheetName` —
  *  so this is a pass-through to the engine. */
@@ -140,6 +156,7 @@ export function renameSheet(
   history?: History | null,
 ): boolean {
   if (!structureAllowed(store, 'rename sheet')) return false;
+  if (!isValidSheetName(wb, idx, name)) return false;
   const beforeName = 'sheetName' in wb ? wb.sheetName(idx) : null;
   const ok = wb.renameSheet(idx, name);
   if (!ok) return false;

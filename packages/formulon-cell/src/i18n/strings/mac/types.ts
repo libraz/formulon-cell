@@ -1,11 +1,14 @@
 import type { CellFormatStrings } from '../cell-format/types.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
+import type { MacPasteSpecialStrings } from './paste-special.js';
 
 export interface MacStrings {
   /** Overrides of `formatDialog` that apply on the Mac host only. */
   macFormatDialog: Partial<CellFormatStrings['formatDialog']>;
   /** Overrides of `findReplace` that apply on the Mac host only. */
   macFindReplace: MacFindReplaceStrings;
+  /** Overrides of `pasteSpecialDialog` that apply on the Mac host only. */
+  macPasteSpecial: MacPasteSpecialStrings;
   macData: {
     goalSeek: {
       title: string;
@@ -45,6 +48,10 @@ export interface MacStrings {
       unsupportedOption: string;
       run: string;
       cancel: string;
+      /** Label of a subtotal row; `{group}` is the group's value. */
+      groupTotal: string;
+      /** Label of the grand-total row. */
+      grandTotal: string;
     };
     functions: { sum: string; average: string; count: string; min: string; max: string };
     /** Keyed by the error codes returned from the Data command planners. */

@@ -2,6 +2,7 @@ import { cellFormatKo } from '../cell-format/ko.js';
 import { editDialogsKo } from '../edit-dialogs/ko.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macPasteSpecialFrom } from './paste-special.js';
 import type { MacStrings } from './types.js';
 
 export const macKo: MacStrings = {
@@ -44,6 +45,8 @@ export const macKo: MacStrings = {
       unsupportedOption: '이 옵션은 아직 지원되지 않습니다.',
       run: '확인',
       cancel: '취소',
+      groupTotal: '{group} 요약',
+      grandTotal: '총합계',
     },
     functions: { sum: '합계', average: '평균', count: '개수', min: '최소', max: '최대' },
     errors: {
@@ -153,5 +156,6 @@ export const macKo: MacStrings = {
     autoSum: '자동 합계',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatKo.formatDialog),
+  macPasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
   macFindReplace: macFindReplaceFrom(editDialogsKo.findReplace, '반각과 전각 구분'),
 };

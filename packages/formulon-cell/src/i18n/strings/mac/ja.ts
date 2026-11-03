@@ -1,3 +1,4 @@
+import { macPasteSpecialJa } from './paste-special.js';
 import type { MacStrings } from './types.js';
 
 export const macJa: MacStrings = {
@@ -40,6 +41,8 @@ export const macJa: MacStrings = {
       unsupportedOption: 'このオプションはまだサポートされていません。',
       run: 'OK',
       cancel: 'キャンセル',
+      groupTotal: '{group} 集計',
+      grandTotal: '総計',
     },
     functions: {
       sum: '合計',
@@ -155,6 +158,7 @@ export const macJa: MacStrings = {
     autoSum: 'オート SUM',
   },
   /** Wording of the Mac app's Format Cells dialog, measured from the app. */
+  macPasteSpecial: macPasteSpecialJa,
   macFindReplace: {
     optionsMore: 'オプション',
     optionsLess: 'オプション',
@@ -166,6 +170,7 @@ export const macJa: MacStrings = {
     matchWidth: '半角と全角を区別する',
   },
   macFormatDialog: {
+    categoryLabel: '分類:',
     fontFamily: 'フォント名:',
     fontStyle: 'スタイル:',
     fontSize: 'サイズ:',

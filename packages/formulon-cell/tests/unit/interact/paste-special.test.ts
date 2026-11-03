@@ -2,9 +2,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import * as pasteCommands from '../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings/en.js';
+import { ja } from '../../../src/i18n/strings/ja.js';
+import { macPasteSpecialJa } from '../../../src/i18n/strings/mac/paste-special.js';
 import { attachHyperlinkDialog } from '../../../src/interact/hyperlink-dialog.js';
 import { attachPasteSpecial } from '../../../src/interact/paste-special.js';
 import {
@@ -296,7 +300,9 @@ describe('attachPasteSpecial', () => {
     handle.open();
 
     // Cancel is the first non-primary footer button.
-    const cancelBtn = document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn')[0];
+    const cancelBtn = document.querySelector<HTMLButtonElement>(
+      '.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary, .fc-pastesp__link)',
+    );
     cancelBtn?.click();
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 }).kind).toBe('blank');
@@ -318,9 +324,9 @@ describe('attachPasteSpecial', () => {
       onAfterCommit,
     });
     handle.open();
-    const cancelBtn = document.querySelectorAll<HTMLButtonElement>(
-      '.fc-pastesp .fc-fmtdlg__btn',
-    )[0];
+    const cancelBtn = document.querySelector<HTMLButtonElement>(
+      '.fc-pastesp .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary, .fc-pastesp__link)',
+    );
     if (!cancelBtn) throw new Error('expected Cancel button');
     const event = new KeyboardEvent('keydown', {
       key: 'Enter',
@@ -520,6 +526,117 @@ describe('attachPasteSpecial', () => {
     const panel = document.querySelector<HTMLElement>('.fc-pastesp__panel');
     panel?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(false);
+    handle.detach();
+  });
+
+  it("offers Excel's twelve paste kinds column by column, all of them enabled", () => {
+    // Excel: すべて / 数式 / 値 / 書式 / コメントとメモ / 入力規則 down the left column,
+    // the theme / borders / widths / number-format / merge kinds down the right,
+    // operations なし / 加算 / 減算 | 乗算 / 除算, and a Paste Link button.
+    seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      strings: en,
+      getSnapshot: () => snap,
+      onAfterCommit,
+    });
+    handle.open();
+    const [what, ops] = Array.from(
+      document.querySelectorAll<HTMLElement>('.fc-pastesp__list[role="radiogroup"]'),
+    );
+    const values = (group: HTMLElement | undefined) =>
+      Array.from(group?.querySelectorAll<HTMLInputElement>('input') ?? [], (i) => i.value);
+    expect(values(what)).toEqual([
+      'all',
+      'formulas',
+      'values',
+      'formats',
+      'comments',
+      'validation',
+      'all-using-source-theme',
+      'all-except-borders',
+      'column-widths',
+      'formulas-and-numfmt',
+      'values-and-numfmt',
+      'all-merging-conditional-formats',
+    ]);
+    const disabled = Array.from(
+      what?.querySelectorAll<HTMLInputElement>('input:disabled') ?? [],
+      (i) => i.value,
+    );
+    expect(disabled).toEqual([]);
+    expect(values(ops)).toEqual(['none', 'add', 'subtract', 'multiply', 'divide']);
+    const link = document.querySelector<HTMLButtonElement>('.fc-pastesp__link');
+    expect(link?.textContent).toBe('Paste Link');
+    expect(link?.disabled).toBe(false);
+    handle.detach();
+  });
+
+  it('applies a newly supported kind through the paste command', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const spy = vi.spyOn(pasteCommands, 'pasteSpecial');
+    const handle = attachPasteSpecial({ host, store, wb, getSnapshot: () => snap, onAfterCommit });
+    handle.open();
+    document.querySelector<HTMLInputElement>('input[value="column-widths"]')?.click();
+    document.querySelector<HTMLButtonElement>('.fc-pastesp .fc-fmtdlg__btn--primary')?.click();
+    expect(spy.mock.calls[0]?.[4]).toMatchObject({ what: 'column-widths' });
+    spy.mockRestore();
+    handle.detach();
+  });
+
+  it('Paste Link pastes references to a copied range and closes', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const spy = vi.spyOn(pasteCommands, 'pasteLink');
+    const handle = attachPasteSpecial({ host, store, wb, getSnapshot: () => snap, onAfterCommit });
+    handle.open();
+    document.querySelector<HTMLButtonElement>('.fc-pastesp__link')?.click();
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]?.[3]).toBe(snap);
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    spy.mockRestore();
+    handle.detach();
+  });
+
+  it('keeps Paste Link disabled for a cut, which it refuses', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    const cut = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, 'cut');
+    const handle = attachPasteSpecial({ host, store, wb, getSnapshot: () => cut, onAfterCommit });
+    handle.open();
+    expect(document.querySelector<HTMLButtonElement>('.fc-pastesp__link')?.disabled).toBe(true);
+    handle.detach();
+  });
+
+  it('uses the Mac wording on the Mac host', () => {
+    host.dataset.fcPlatform = 'mac';
+    seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      strings: { ...ja, macPasteSpecial: macPasteSpecialJa },
+      getSnapshot: () => snap,
+      onAfterCommit,
+    });
+    handle.open();
+    const overlay = document.querySelector<HTMLElement>('.fc-pastesp');
+    expect(overlay?.querySelector('.fc-fmtdlg__header')?.textContent).toContain(
+      '形式を選択してペースト',
+    );
+    const label = (value: string) =>
+      document.querySelector(`input[value="${value}"]`)?.closest('label')?.textContent;
+    expect(label('values')).toBe('数値');
+    expect(label('all-using-source-theme')).toBe('コピー元のテーマを使ってすべてペースト');
+    expect(label('all-merging-conditional-formats')).toBe('すべて、条件付き書式の結合');
+    expect(document.querySelector('.fc-pastesp__link')?.textContent).toBe('ペースト リンク');
+    expect(
+      Array.from(document.querySelectorAll('.fc-pastesp__legend'), (l) => l.textContent),
+    ).toEqual(['ペースト', '演算']);
     handle.detach();
   });
 

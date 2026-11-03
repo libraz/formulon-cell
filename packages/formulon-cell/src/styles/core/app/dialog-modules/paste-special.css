@@ -1,5 +1,5 @@
 @layer fc.app {
-  /* Paste Special — laid out as two side-by-side fieldsets, with a
+  /* Paste Special — the Paste and Operation fieldsets stacked, with a
      bottom row for the orthogonal options. */
   .fc-pastesp__panel {
     max-width: 480px;
@@ -7,9 +7,10 @@
   .fc-pastesp__body {
     padding: 12px 14px;
   }
+  /* Paste over Operation, as Excel stacks them. */
   .fc-pastesp__cols {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 12px;
     margin-bottom: 12px;
   }
@@ -30,10 +31,17 @@
     color: var(--fc-fg, currentColor);
     margin-bottom: 4px;
   }
+  /* Each section is a two-column radio grid filled column by column. */
   .fc-pastesp__list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: repeat(6, auto);
+    column-gap: 24px;
+    row-gap: 2px;
+  }
+  .fc-pastesp__group + .fc-pastesp__group .fc-pastesp__list {
+    grid-template-rows: repeat(3, auto);
   }
   .fc-pastesp__list .fc-fmtdlg__radio {
     padding: 2px 0;
@@ -48,4 +56,270 @@
 
   /* Filter dropdown — column header popover with checkboxes for distinct
      values. Lives in document.body so it can escape clipping ancestors. */
+
+  /* Mac, measured from Excel for Mac (pt = CSS px, window-relative): a 461 x 432
+     panel; ペースト radios on a 22 px pitch in columns at x 32 / 188, 演算 at
+     x 31 / 187, rules under each section, Paste Link left of Cancel / OK. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__panel {
+    position: relative;
+    width: 461px;
+    max-width: none;
+    height: 432px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    outline: 1px solid var(--fc-fmtdlg-rule, var(--fc-rule-strong));
+    outline-offset: -1px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__panel .fc-fmtdlg__header {
+    height: 32px;
+    min-height: 0;
+    margin: 0;
+    padding: 8px 18px 0;
+    box-sizing: border-box;
+    line-height: 16px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__body,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__group,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__list,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__panel .fc-fmtdlg__footer {
+    position: static;
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__legend,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__list > .fc-fmtdlg__radio,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow > .fc-fmtdlg__check {
+    position: absolute;
+    box-sizing: border-box;
+    height: 18px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__legend {
+    left: 19px;
+    font-size: inherit;
+    font-weight: 600;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__group:first-child .fc-pastesp__legend {
+    top: 51px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group
+    + .fc-pastesp__group
+    .fc-pastesp__legend {
+    top: 234px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(1) {
+    top: 76px;
+    left: 32px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(2) {
+    top: 98px;
+    left: 32px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(3) {
+    top: 120px;
+    left: 32px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(4) {
+    top: 142px;
+    left: 32px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(5) {
+    top: 164px;
+    left: 32px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(6) {
+    top: 186px;
+    left: 32px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(7) {
+    top: 76px;
+    left: 188px;
+    width: 252px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(8) {
+    top: 98px;
+    left: 188px;
+    width: 252px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(9) {
+    top: 120px;
+    left: 188px;
+    width: 252px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(10) {
+    top: 142px;
+    left: 188px;
+    width: 252px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(11) {
+    top: 164px;
+    left: 188px;
+    width: 252px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group:first-child
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(12) {
+    top: 186px;
+    left: 188px;
+    width: 252px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group
+    + .fc-pastesp__group
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(1) {
+    top: 258px;
+    left: 31px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group
+    + .fc-pastesp__group
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(2) {
+    top: 280px;
+    left: 31px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group
+    + .fc-pastesp__group
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(3) {
+    top: 302px;
+    left: 31px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group
+    + .fc-pastesp__group
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(4) {
+    top: 258px;
+    left: 187px;
+    width: 115px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__group
+    + .fc-pastesp__group
+    .fc-pastesp__list
+    > .fc-fmtdlg__radio:nth-child(5) {
+    top: 280px;
+    left: 187px;
+    width: 115px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__bottomrow > .fc-fmtdlg__check {
+    top: 351px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__bottomrow
+    > .fc-fmtdlg__check:nth-child(1) {
+    left: 31px;
+    width: 108px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__bottomrow
+    > .fc-fmtdlg__check:nth-child(2) {
+    left: 187px;
+    width: 115px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__panel
+    .fc-fmtdlg__footer
+    > .fc-fmtdlg__btn {
+    position: absolute;
+    top: 387px;
+    width: 86px;
+    height: 26px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    white-space: nowrap;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__panel
+    .fc-fmtdlg__footer
+    > .fc-pastesp__link {
+    left: 19px;
+    width: 114px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__panel
+    .fc-fmtdlg__footer
+    > .fc-pastesp__link
+    + .fc-fmtdlg__btn {
+    left: 259px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pastesp__panel
+    .fc-fmtdlg__footer
+    > .fc-fmtdlg__btn--primary {
+    left: 355px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols::before,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    width: 437px;
+    height: 1px;
+    background: var(--fc-fmtdlg-rule, var(--fc-rule));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols::before {
+    top: 218px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pastesp__cols::after {
+    top: 336px;
+  }
 }

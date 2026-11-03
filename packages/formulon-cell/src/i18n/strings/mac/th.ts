@@ -2,6 +2,7 @@ import { cellFormatTh } from '../cell-format/th.js';
 import { editDialogsTh } from '../edit-dialogs/th.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macPasteSpecialFrom } from './paste-special.js';
 import type { MacStrings } from './types.js';
 
 export const macTh: MacStrings = {
@@ -44,6 +45,8 @@ export const macTh: MacStrings = {
       unsupportedOption: 'ยังไม่รองรับตัวเลือกนี้',
       run: 'ตกลง',
       cancel: 'ยกเลิก',
+      groupTotal: '{group} รวม',
+      grandTotal: 'ผลรวมทั้งหมด',
     },
     functions: { sum: 'ผลรวม', average: 'ค่าเฉลี่ย', count: 'นับ', min: 'ต่ำสุด', max: 'สูงสุด' },
     errors: {
@@ -152,6 +155,7 @@ export const macTh: MacStrings = {
     autoSum: 'ผลรวมอัตโนมัติ',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatTh.formatDialog),
+  macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
   macFindReplace: macFindReplaceFrom(
     editDialogsTh.findReplace,
     'แยกอักขระครึ่งความกว้างและเต็มความกว้าง',

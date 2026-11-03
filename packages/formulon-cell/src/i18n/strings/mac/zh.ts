@@ -2,6 +2,7 @@ import { cellFormatZh } from '../cell-format/zh.js';
 import { editDialogsZh } from '../edit-dialogs/zh.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macPasteSpecialFrom } from './paste-special.js';
 import type { MacStrings } from './types.js';
 
 export const macZh: MacStrings = {
@@ -44,6 +45,8 @@ export const macZh: MacStrings = {
       unsupportedOption: '此选项尚不受支持。',
       run: '确定',
       cancel: '取消',
+      groupTotal: '{group} 汇总',
+      grandTotal: '总计',
     },
     functions: { sum: '求和', average: '平均值', count: '计数', min: '最小值', max: '最大值' },
     errors: {
@@ -152,5 +155,6 @@ export const macZh: MacStrings = {
     autoSum: '自动求和',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
+  macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
   macFindReplace: macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
 };

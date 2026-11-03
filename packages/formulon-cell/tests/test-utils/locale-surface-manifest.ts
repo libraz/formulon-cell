@@ -60,6 +60,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'macHomeRibbon',
   'macFormatDialog',
   'macFindReplace',
+  'macPasteSpecial',
   'pageView',
   'pageSetup',
   'pageScale',
