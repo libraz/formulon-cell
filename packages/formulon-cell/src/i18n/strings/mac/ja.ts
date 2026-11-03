@@ -1,4 +1,5 @@
 import { macPasteSpecialJa } from './paste-special.js';
+import { macRemoveDuplicatesJa } from './remove-duplicates.js';
 import type { MacStrings } from './types.js';
 
 export const macJa: MacStrings = {
@@ -159,6 +160,7 @@ export const macJa: MacStrings = {
   },
   /** Wording of the Mac app's Format Cells dialog, measured from the app. */
   macPasteSpecial: macPasteSpecialJa,
+  macRemoveDuplicates: macRemoveDuplicatesJa,
   macFindReplace: {
     optionsMore: 'オプション',
     optionsLess: 'オプション',

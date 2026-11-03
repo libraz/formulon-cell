@@ -61,6 +61,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'macFormatDialog',
   'macFindReplace',
   'macPasteSpecial',
+  'macRemoveDuplicates',
   'pageView',
   'pageSetup',
   'pageScale',

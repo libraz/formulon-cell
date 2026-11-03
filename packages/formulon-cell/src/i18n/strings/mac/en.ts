@@ -1,8 +1,10 @@
 import { cellFormatEn } from '../cell-format/en.js';
 import { editDialogsEn } from '../edit-dialogs/en.js';
+import { ribbonMenusEn } from '../ribbon-menus/en.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import type { MacStrings } from './types.js';
 
 export const macEn: MacStrings = {
@@ -157,5 +159,6 @@ export const macEn: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatEn.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog),
+  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusEn.ribbonMenu),
   macFindReplace: macFindReplaceFrom(editDialogsEn.findReplace, 'Match half-width and full-width'),
 };

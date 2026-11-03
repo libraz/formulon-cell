@@ -1,8 +1,10 @@
 import { cellFormatFr } from '../cell-format/fr.js';
 import { editDialogsFr } from '../edit-dialogs/fr.js';
+import { ribbonMenusFr } from '../ribbon-menus/fr.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import type { MacStrings } from './types.js';
 
 export const macFr: MacStrings = {
@@ -158,6 +160,7 @@ export const macFr: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatFr.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog),
+  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusFr.ribbonMenu),
   macFindReplace: macFindReplaceFrom(
     editDialogsFr.findReplace,
     'Distinguer demi-chasse et pleine chasse',

@@ -1,8 +1,10 @@
 import { cellFormatZh } from '../cell-format/zh.js';
 import { editDialogsZh } from '../edit-dialogs/zh.js';
+import { ribbonMenusZh } from '../ribbon-menus/zh.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import type { MacStrings } from './types.js';
 
 export const macZh: MacStrings = {
@@ -156,5 +158,6 @@ export const macZh: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
+  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusZh.ribbonMenu),
   macFindReplace: macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
 };

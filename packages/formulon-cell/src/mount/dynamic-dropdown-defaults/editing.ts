@@ -21,8 +21,15 @@ import {
   sortActiveColumnAuto,
   sortRangeWithHistory,
 } from '../../commands/sort.js';
-import { colLetter, formatA1Cell, formatA1Range, parseAddrKey } from '../../engine/address.js';
+import {
+  addrKey,
+  colLetter,
+  formatA1Cell,
+  formatA1Range,
+  parseAddrKey,
+} from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
+import { formatCell } from '../../engine/value.js';
 import { executeRibbonFilterDataAction } from '../../interact/ribbon-filter-data.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { selectionContainsAddr } from '../../store/selection-geometry.js';
@@ -326,6 +333,19 @@ const sortColumnsForRange = (range: Range): SortDialogColumn[] =>
     return { value: String(col), label: letter };
   });
 
+/** Text a header cell shows, or undefined when it is blank. */
+const headerText = (
+  instance: SpreadsheetInstance,
+  sheet: number,
+  row: number,
+  col: number,
+): string | undefined => {
+  const shown = instance.workbook.getDisplayText(sheet, row, col);
+  if (shown) return shown;
+  const cell = instance.store.getState().data.cells.get(addrKey({ sheet, row, col }));
+  return cell && cell.value.kind !== 'blank' ? formatCell(cell.value) : undefined;
+};
+
 const buildSortMenuAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applySortMenuAction'] =>
   async (action) => {
@@ -395,11 +415,20 @@ const buildSortMenuAction =
       return;
     }
     if (action === 'dedupe') {
-      const strings = instance.i18n.strings.ribbonMenu;
+      const mac = instance.host.dataset.fcPlatform === 'mac';
+      // The dialog's strings, with the Mac wording laid over them on the Mac host.
+      const strings = mac
+        ? { ...instance.i18n.strings.ribbonMenu, ...instance.i18n.strings.macRemoveDuplicates }
+        : instance.i18n.strings.ribbonMenu;
       const state = instance.store.getState();
       const range = inferAutoFilterRange(state);
-      const columns = sortColumnsForRange(range);
+      // Each column row reads its header cell's text while the first row is a header.
+      const columns = sortColumnsForRange(range).map((column) => ({
+        ...column,
+        heading: headerText(instance, range.sheet, range.r0, Number(column.value)),
+      }));
       const result = await showRemoveDuplicatesDialog({
+        host: instance.host,
         title: strings.removeDuplicatesDialogTitle,
         columnsLabel: strings.removeDuplicatesColumns,
         headerLabel: strings.sortDialogHeader,

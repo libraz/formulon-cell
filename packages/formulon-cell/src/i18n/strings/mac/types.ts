@@ -1,6 +1,7 @@
 import type { CellFormatStrings } from '../cell-format/types.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
 import type { MacPasteSpecialStrings } from './paste-special.js';
+import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
 
 export interface MacStrings {
   /** Overrides of `formatDialog` that apply on the Mac host only. */
@@ -9,6 +10,8 @@ export interface MacStrings {
   macFindReplace: MacFindReplaceStrings;
   /** Overrides of `pasteSpecialDialog` that apply on the Mac host only. */
   macPasteSpecial: MacPasteSpecialStrings;
+  /** Overrides of the Remove Duplicates wording that apply on the Mac host only. */
+  macRemoveDuplicates: MacRemoveDuplicatesStrings;
   macData: {
     goalSeek: {
       title: string;

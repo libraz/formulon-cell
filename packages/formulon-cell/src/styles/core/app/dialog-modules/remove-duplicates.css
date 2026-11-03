@@ -57,4 +57,104 @@
       min-width: 0;
     }
   }
+
+  /* Mac, measured from Excel for Mac (pt = CSS px): a 290 x 271 panel, the
+     header box under the title, one bordered list holding the Select All row
+     and the column rows on a 20 px pitch, then Cancel / OK. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg {
+    position: relative;
+    width: 290px;
+    min-width: 0;
+    max-width: none;
+    height: 271px;
+    padding: 0;
+    overflow: hidden;
+    /* The frame is drawn inset so control offsets count from the outer edge. */
+    border: 0;
+    outline: 1px solid var(--fc-fmtdlg-rule, var(--fc-rule-strong));
+    outline-offset: -1px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-fmtdlg__header {
+    height: 32px;
+    min-height: 0;
+    margin: 0;
+    padding: 8px 18px 0;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--fc-rule);
+    line-height: 16px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-fmtdlg__body,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-fmtdlg__footer {
+    position: static;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-dedupedlg__header {
+    position: absolute;
+    top: 37px;
+    left: 19px;
+    height: 18px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-dedupedlg__columns {
+    position: absolute;
+    top: 61px;
+    left: 19px;
+    width: 254px;
+    min-width: 0;
+    height: 140px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-dedupedlg__legend {
+    display: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-dedupedlg__column-list {
+    box-sizing: border-box;
+    height: 100%;
+    max-height: none;
+    align-content: start;
+    padding: 10px 0 0 26px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-dedupedlg__column {
+    min-height: 20px;
+    height: 20px;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-dedupedlg__column input,
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-dedupedlg__header input {
+    margin: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-tb__dlg__error {
+    position: absolute;
+    top: 205px;
+    left: 19px;
+    margin: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dedupedlg .fc-fmtdlg__footer .fc-fmtdlg__btn {
+    position: absolute;
+    top: 226px;
+    width: 84px;
+    min-width: 0;
+    height: 26px;
+    margin: 0;
+    padding: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-dedupedlg
+    .fc-fmtdlg__footer
+    .fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary) {
+    left: 72px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-dedupedlg
+    .fc-fmtdlg__footer
+    .fc-fmtdlg__btn--primary {
+    left: 175px;
+    width: 82px;
+  }
 }

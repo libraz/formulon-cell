@@ -54,6 +54,71 @@ describe('showRemoveDuplicatesDialog', () => {
     });
   });
 
+  const macOptions = (host: HTMLElement) => ({
+    host,
+    title: '重複の削除',
+    columnsLabel: '列',
+    headerLabel: '先頭行を列見出しとする',
+    selectAllLabel: 'すべて選択',
+    unselectAllLabel: 'すべて選択解除',
+    noColumnsLabel: '1 つ以上の列を選択してください。',
+    columns: [
+      { value: '0', label: 'A', heading: '名前' },
+      { value: '1', label: 'B', heading: '数量' },
+      { value: '2', label: 'C', heading: 'メモ' },
+    ],
+    initialColumns: ['0', '1', '2'],
+    initialHasHeader: true,
+    okLabel: 'OK',
+    cancelLabel: 'キャンセル',
+  });
+  const macHost = (): HTMLElement => {
+    const host = document.createElement('div');
+    host.className = 'fc-host';
+    host.dataset.fcPlatform = 'mac';
+    document.body.appendChild(host);
+    return host;
+  };
+
+  it('labels the columns by header text, column letters when there is no header row', () => {
+    // Excel: with 先頭行を列見出しとする checked the rows read 名前 / 数量 / メモ.
+    void showRemoveDuplicatesDialog(macOptions(macHost()));
+    const dialog = document.querySelector<HTMLElement>('.fc-tb__dlg');
+    const labels = () =>
+      Array.from(
+        dialog?.querySelectorAll('.fc-dedupedlg__column:not(.fc-dedupedlg__select-all)') ?? [],
+        (row) => row.textContent,
+      );
+    expect(labels()).toEqual(['名前', '数量', 'メモ']);
+    const header = dialog?.querySelector<HTMLInputElement>('.fc-dedupedlg__header input');
+    header?.click();
+    expect(labels()).toEqual(['A', 'B', 'C']);
+  });
+
+  it('puts a tri-state すべて選択 row at the top of the Mac list instead of buttons', async () => {
+    const pending = showRemoveDuplicatesDialog(macOptions(macHost()));
+    const dialog = document.querySelector<HTMLElement>('.fc-tb__dlg');
+    expect(dialog?.querySelector('.fc-dedupedlg__actions')).toBeNull();
+    const rows = Array.from(dialog?.querySelectorAll('.fc-dedupedlg__column') ?? []);
+    expect(rows.map((row) => row.textContent)).toEqual(['すべて選択', '名前', '数量', 'メモ']);
+    const all = rows[0]?.querySelector('input') as HTMLInputElement;
+    const first = rows[1]?.querySelector('input') as HTMLInputElement;
+    expect(all.checked).toBe(true);
+    first.click();
+    expect([all.checked, all.indeterminate]).toEqual([false, true]);
+    all.click();
+    expect(
+      rows.slice(1).every((row) => (row.querySelector('input') as HTMLInputElement).checked),
+    ).toBe(true);
+    all.click();
+    expect(
+      rows.slice(1).some((row) => (row.querySelector('input') as HTMLInputElement).checked),
+    ).toBe(false);
+    all.click();
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await expect(pending).resolves.toEqual({ columns: ['0', '1', '2'], hasHeader: true });
+  });
+
   it('keeps Remove Duplicates checklist on compact desktop list geometry', () => {
     const css = readFileSync(
       join(root, 'src/styles/core/app/dialog-modules/remove-duplicates.css'),

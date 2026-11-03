@@ -612,6 +612,59 @@ describe('removeDuplicates', () => {
     wb = await newWb();
   });
 
+  it.each([
+    ['stub', true],
+    ['native', false],
+  ] as const)(
+    'matches Excel on its fixture (%s): case-insensitive key, first kept, blanks collapse, tail cleared',
+    async (_kind, preferStub) => {
+      wb = await WorkbookHandle.createDefault({ preferStub });
+      // Excel: header 名前/数量/メモ over a,1,x / A,1,x / b,2,y / a,1,z / b,2,y and
+      // two blank rows; OK with every column leaves a|1|x, b|2|y, a|1|z and
+      // clears rows 5-8. Nothing outside the range moves.
+      const rows: (string | number | null)[][] = [
+        ['名前', '数量', 'メモ'],
+        ['a', 1, 'x'],
+        ['A', 1, 'x'],
+        ['b', 2, 'y'],
+        ['a', 1, 'z'],
+        ['b', 2, 'y'],
+        [null, null, null],
+        [null, null, null],
+      ];
+      rows.forEach((cells, row) => {
+        cells.forEach((value, col) => {
+          if (typeof value === 'string') seedText(store, wb, row, col, value);
+          else if (typeof value === 'number') seedNumber(store, wb, row, col, value);
+        });
+      });
+      seedText(store, wb, 8, 0, 'below');
+      removeDuplicates(
+        store.getState(),
+        store,
+        wb,
+        { sheet: 0, r0: 0, c0: 0, r1: 7, c1: 2 },
+        { hasHeader: true },
+      );
+      const text = (row: number) =>
+        [0, 1, 2].map((col) => {
+          const v = wb.getValue({ sheet: 0, row, col });
+          return v.kind === 'blank' ? null : v.kind === 'number' || v.kind === 'text' ? v.value : v;
+        });
+      expect(Array.from({ length: 9 }, (_, row) => text(row))).toEqual([
+        ['名前', '数量', 'メモ'],
+        ['a', 1, 'x'],
+        ['b', 2, 'y'],
+        ['a', 1, 'z'],
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+        ['below', null, null],
+      ]);
+    },
+  );
+
   it('removes duplicate rows and blanks empty cells moved over old content', () => {
     seedText(store, wb, 0, 0, 'alpha');
     seedNumber(store, wb, 0, 1, 1);

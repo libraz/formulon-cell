@@ -246,6 +246,34 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('names the Remove Duplicates columns by their header text', async () => {
+    // Excel: with a header row the list reads 名前 / 数量 rather than column letters.
+    seedText(sheet, 0, 0, '名前');
+    seedText(sheet, 0, 1, '数量');
+    seedText(sheet, 1, 0, 'a');
+    seedNumber(sheet, 1, 1, 1);
+    seedText(sheet, 2, 0, 'b');
+    seedNumber(sheet, 2, 1, 2);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 0 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    host.querySelector<HTMLButtonElement>('[data-ribbon-command="sortFilterHome"]')?.click();
+    const dedupeButton = host.querySelector<HTMLButtonElement>('[data-sort="dedupe"]');
+    const dedupeEvent = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(dedupeEvent, 'target', { value: dedupeButton });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(dedupeEvent)).toBe(true);
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    expect(
+      Array.from(dialog?.querySelectorAll('.fc-dedupedlg__column') ?? [], (row) => row.textContent),
+    ).toEqual(['名前', '数量']);
+    dialog
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
+    tb.dispose();
+  });
+
   it('opens Text to Columns delimiter dialog from primary click and keeps presets secondary', async () => {
     seedText(sheet, 0, 0, 'alpha,beta');
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });

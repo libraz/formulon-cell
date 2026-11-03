@@ -1,8 +1,10 @@
 import { cellFormatTh } from '../cell-format/th.js';
 import { editDialogsTh } from '../edit-dialogs/th.js';
+import { ribbonMenusTh } from '../ribbon-menus/th.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import type { MacStrings } from './types.js';
 
 export const macTh: MacStrings = {
@@ -156,6 +158,7 @@ export const macTh: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatTh.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
+  macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusTh.ribbonMenu),
   macFindReplace: macFindReplaceFrom(
     editDialogsTh.findReplace,
     'แยกอักขระครึ่งความกว้างและเต็มความกว้าง',
