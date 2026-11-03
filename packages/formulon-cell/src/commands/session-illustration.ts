@@ -792,7 +792,8 @@ export function copySessionIllustration(
 
 /**
  * Paste a copied picture or shape onto `at.sheet` with its top-left corner at
- * cell (row, col), as the spreadsheet does. Undo removes the pasted object.
+ * cell (row, col), as the spreadsheet does, moved by `offset` pixels. Undo
+ * removes the pasted object.
  */
 export function pasteSessionIllustration(
   store: SpreadsheetStore,
@@ -801,6 +802,7 @@ export function pasteSessionIllustration(
   history: History | null = null,
   wb?: WorkbookHandle,
   authorization?: IllustrationMutationAuthorization,
+  offset: { x: number; y: number } = { x: 0, y: 0 },
 ): SessionIllustration | null {
   const range = { sheet: at.sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
   if (
@@ -812,7 +814,7 @@ export function pasteSessionIllustration(
     store,
     clip,
     { ...at, id: duplicateId(store.getState(), clip.item.id) },
-    cellOrigin(store, at.row, at.col),
+    (({ x, y }) => ({ x: x + offset.x, y: y + offset.y }))(cellOrigin(store, at.row, at.col)),
     history,
     wb,
     {

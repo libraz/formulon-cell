@@ -16,6 +16,9 @@ import {
   sessionIllustrationById,
 } from '../session-illustration.js';
 
+/** Offset of each repeat paste at one anchor, on both axes. */
+const PASTE_CASCADE_PX = 12;
+
 type DrawingClip =
   | { kind: 'chart'; clip: ChartClip }
   | { kind: 'illustration'; clip: IllustrationClip };
@@ -44,7 +47,7 @@ export const createDrawingClipboard = (deps: {
   history: History | null;
 }): DrawingClipboard => {
   const { store, wb, history } = deps;
-  let held: { clip: DrawingClip; text: string } | null = null;
+  let held: { clip: DrawingClip; text: string; at: string | null; repeats: number } | null = null;
 
   const copySelected = (id: string): DrawingClip | null => {
     const state = store.getState();
@@ -74,7 +77,7 @@ export const createDrawingClipboard = (deps: {
       const clip = copySelected(selected.id);
       // Like the spreadsheet, a cut object leaves the sheet at once.
       if (!clip || (mode === 'cut' && !remove(clip, selected.id))) return null;
-      held = { clip, text: selected.name };
+      held = { clip, text: selected.name, at: null, repeats: 0 };
       return selected.name;
     },
     owns(text) {
@@ -82,16 +85,24 @@ export const createDrawingClipboard = (deps: {
     },
     paste() {
       if (!held) return false;
-      const { active } = store.getState().selection;
+      const { active, range } = store.getState().selection;
+      // A paste anchors at the selection's top-left; repeats at the same anchor
+      // cascade down and to the right.
+      const at = { sheet: active.sheet, row: range.r0, col: range.c0 };
+      const anchorKey = `${at.sheet}:${at.row}:${at.col}`;
+      const repeats = held.at === anchorKey ? held.repeats + 1 : 0;
+      const offset = { x: repeats * PASTE_CASCADE_PX, y: repeats * PASTE_CASCADE_PX };
       const authorization = {
         origin: 'clipboard',
         commandId: held.clip.kind === 'chart' ? 'chartPaste' : 'picturePaste',
       } as const;
       const pasted =
         held.clip.kind === 'chart'
-          ? pasteSessionChart(store, held.clip.clip, active, history, wb, authorization)
-          : pasteSessionIllustration(store, held.clip.clip, active, history, wb, authorization);
+          ? pasteSessionChart(store, held.clip.clip, at, history, wb, authorization, offset)
+          : pasteSessionIllustration(store, held.clip.clip, at, history, wb, authorization, offset);
       if (!pasted) return false;
+      held.at = anchorKey;
+      held.repeats = repeats;
       // The overlay showing the object selects it and names it.
       mutators.setSelectedObject(store, { id: pasted.id, name: '' });
       return true;

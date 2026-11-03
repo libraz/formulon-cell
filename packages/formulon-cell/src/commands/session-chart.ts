@@ -678,8 +678,8 @@ export function copySessionChart(
 
 /**
  * Paste a copied chart onto `sheet` with its top-left corner at cell
- * (row, col), as the spreadsheet does. Its data stays on the sheet it was
- * copied from. Undo removes the pasted chart.
+ * (row, col), as the spreadsheet does, moved by `offset` pixels. Its data stays
+ * on the sheet it was copied from. Undo removes the pasted chart.
  */
 export function pasteSessionChart(
   store: SpreadsheetStore,
@@ -688,6 +688,7 @@ export function pasteSessionChart(
   history: History | null,
   wb: WorkbookHandle,
   authorization: ChartMutationAuthorization = {},
+  offset: { x: number; y: number } = { x: 0, y: 0 },
 ): SessionChart | null {
   if (!wb.capabilities.charts) return null;
   const cell = { sheet: at.sheet, r0: at.row, c0: at.col, r1: at.row, c1: at.col };
@@ -697,11 +698,16 @@ export function pasteSessionChart(
     store,
     wb,
     { ...clip, sheet: at.sheet },
-    cellOrigin(store, at.row, at.col),
+    offsetPoint(cellOrigin(store, at.row, at.col), offset),
     intent,
     history,
   );
 }
+
+const offsetPoint = (p: { x: number; y: number }, by: { x: number; y: number }) => ({
+  x: p.x + by.x,
+  y: p.y + by.y,
+});
 
 /** Restore `source.drawing` onto its sheet as a new chart with its top-left
  *  corner at `to`, recorded as one undoable step. */
