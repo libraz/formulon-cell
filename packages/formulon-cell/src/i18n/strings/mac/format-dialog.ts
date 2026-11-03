@@ -1,0 +1,59 @@
+import type { CellFormatStrings } from '../cell-format/types.js';
+
+type FormatDialogStrings = CellFormatStrings['formatDialog'];
+
+/** The `formatDialog` keys the Mac host can override. A locale whose Mac wording
+ *  is not measured repeats its own shared text for them. */
+const MAC_FORMAT_DIALOG_KEYS = [
+  'fontFamily',
+  'fontStyle',
+  'fontSize',
+  'fontUnderline',
+  'color',
+  'fontEffects',
+  'descGeneral',
+  'descFixed',
+  'descCurrency',
+  'descAccounting',
+  'descPercent',
+  'descDate',
+  'descTime',
+  'descText',
+  'descOther',
+  'decimals',
+  'thousandsSeparator',
+  'negativeNumbers',
+  'symbol',
+  'patternType',
+  'languageLocation',
+  'calendarType',
+  'specialFormatLabels',
+  'horizontalAlign',
+  'verticalAlign',
+  'indent',
+  'textControl',
+  'direction',
+  'rotation',
+  'verticalText',
+  'borderStyle',
+  'borderColor',
+  'borderStyleHair',
+  'borderStyleDotted',
+  'borderStyleDashDotDot',
+  'borderStyleDashDot',
+  'borderStyleDashed',
+  'borderStyleThin',
+  'borderStyleMediumDashDotDot',
+  'borderStyleSlantDashDot',
+  'borderStyleMediumDashDot',
+  'borderStyleMediumDashed',
+  'borderStyleMedium',
+  'borderStyleThick',
+  'borderStyleDouble',
+  'fill',
+  'fillPatternColor',
+  'fillPatternStyle',
+] as const satisfies readonly (keyof FormatDialogStrings)[];
+
+export const macFormatDialogFrom = (dialog: FormatDialogStrings): Partial<FormatDialogStrings> =>
+  Object.fromEntries(MAC_FORMAT_DIALOG_KEYS.map((key) => [key, dialog[key]]));

@@ -1,0 +1,322 @@
+/* Format Cells dialog — Mac presentation: popup pickers, the fill tab's pattern
+   style popup and the border tab's headings and hint. The fill tab's two
+   columns come from the shared rules. */
+
+@layer fc.app {
+  .fc-fmtdlg--mac .fc-fmtdlg__popup {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: space-between;
+    width: auto;
+    min-width: 160px;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: var(--fc-fmtdlg-input-bg);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  /* The shared rules hide the pattern-style row (the gallery is the visible
+     control); on Mac the row is the popup, and the gallery hangs in its flyout. */
+  .fc-fmtdlg--mac .fc-fmtdlg__fill-pattern-row {
+    position: static;
+    grid-column: 2;
+    grid-row: 2;
+    width: auto;
+    height: auto;
+    padding: 0 26px 0 10px;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__fill-pattern-row .fc-select {
+    display: none;
+  }
+
+  /* Border tab, Excel arrangement: line style, picker and colour down the left;
+     presets and the outline preview down the right; the hint across the foot. */
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-style-row {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-style-row .fc-select {
+    display: none;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__line-gallery {
+    grid-column: 1;
+    grid-row: 2 / span 2;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__line-gallery > :first-child {
+    grid-row-start: auto;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__line-style--none span {
+    font-size: 12px;
+    text-align: center;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-color-row {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  .fc-fmtdlg--mac
+    .fc-fmtdlg__panel-tab[data-fc-tab="border"]
+    .fc-fmtdlg__border-heading:not(.fc-fmtdlg__border-title) {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-presets {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-visual {
+    grid-column: 2;
+    grid-row: 3 / span 2;
+    margin: 0;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-hint {
+    grid-column: 1 / -1;
+    grid-row: 5;
+  }
+
+  .fc-fmtdlg--mac .fc-fmtdlg__border-heading {
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hint {
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* The column rule stops at the sample's separator. */
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="fill"]::before {
+    height: 126px;
+  }
+
+  /* Line styles: a white bordered box, two columns of seven, ruled cells. */
+  .fc-fmtdlg--mac .fc-fmtdlg__line-gallery {
+    gap: 0;
+    width: 224px;
+    border: 1px solid var(--fc-fmtdlg-rule);
+    background: #fff;
+    color: #000;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__line-style {
+    min-height: 27px;
+    border-bottom: 1px solid var(--fc-fmtdlg-rule);
+    background: transparent;
+    color: #000;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__line-gallery > :nth-child(-n + 7) {
+    border-right: 1px solid var(--fc-fmtdlg-rule);
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__line-style[aria-pressed="true"] {
+    background: transparent;
+    outline: 2px solid var(--fc-fmtdlg-chip-checked-border);
+    outline-offset: -2px;
+  }
+
+  /* Line colour: the popup sits under its label at the list's width. */
+  .fc-fmtdlg--mac .fc-fmtdlg__border-color-row {
+    grid-template-columns: minmax(0, 224px);
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-color-row .fc-fmtdlg__color-control {
+    width: 224px;
+  }
+
+  /* Outline: a white 文字列 box with corner ticks; buttons down the left (top,
+     inside horizontal, bottom) and along the foot (diagonal, left, inside
+     vertical, right, diagonal). */
+  .fc-fmtdlg--mac .fc-fmtdlg__border-stage {
+    width: 212px;
+    height: 174px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-preview {
+    inset: 0 auto auto 37px;
+    width: 132px;
+    height: 132px;
+    border: 1px solid #8c8c8c;
+    outline: 1px solid #8c8c8c;
+    outline-offset: -1px;
+    background: #fff;
+    color: #000;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-tick {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border: 0 solid #888;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-tick--tl {
+    top: 6px;
+    left: 6px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-tick--tr {
+    top: 6px;
+    right: 6px;
+    border-left-width: 1px;
+    border-bottom-width: 1px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-tick--bl {
+    bottom: 6px;
+    left: 6px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-tick--br {
+    right: 6px;
+    bottom: 6px;
+    border-top-width: 1px;
+    border-left-width: 1px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit {
+    inset: auto;
+    width: 28px;
+    height: 28px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--top {
+    top: 0;
+    left: 0;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--inside-h {
+    top: 52px;
+    left: 0;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--inside-h::before {
+    inset: 13px 6px;
+    border-top: 2px dotted currentColor;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--bottom {
+    top: 105px;
+    left: 0;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--diagonalUp.fc-fmtdlg__border-hit--left-diag {
+    top: 146px;
+    left: 0;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--left {
+    top: 146px;
+    left: 39px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--inside-v {
+    top: 146px;
+    left: 89px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--inside-v::before {
+    inset: 6px 13px;
+    border-left: 2px dotted currentColor;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--right {
+    top: 146px;
+    left: 141px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--diagonalDown.fc-fmtdlg__border-hit--right-diag {
+    top: 146px;
+    left: 183px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--diagonalDown.fc-fmtdlg__border-hit--left-diag,
+  .fc-fmtdlg--mac .fc-fmtdlg__border-hit--diagonalUp.fc-fmtdlg__border-hit--right-diag {
+    display: none;
+  }
+
+  /* Font tab, Excel arrangement: name / style / size with their lists; underline,
+     colour and Normal font on one row; a rule; then the decorations beside the
+     preview. */
+  .fc-fmtdlg--mac .fc-fmtdlg__font-style-label {
+    display: grid;
+    gap: 4px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__font-style-field {
+    width: 100%;
+    border-radius: 7px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-underline--mac {
+    grid-column: 1;
+    grid-row: 3;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-left: 0;
+    font-weight: 600;
+  }
+  .fc-fmtdlg--mac
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"]
+    .fc-fmtdlg__row:has([data-fc-color="font"]) {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__normal-font {
+    grid-column: 3;
+    grid-row: 3;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="font"]::before {
+    grid-row: 4;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-deco {
+    grid-column: 1;
+    grid-row: 5 / span 2;
+    align-self: start;
+    display: grid;
+    gap: 6px;
+    padding: 0 0 0 12px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__font-deco-title {
+    font-weight: 600;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__font-deco .fc-fmtdlg__check {
+    min-height: 22px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-style-field,
+  .fc-fmtdlg--mac
+    .fc-fmtdlg__panel-tab[data-fc-tab="font"]
+    .fc-fmtdlg__font-underline--mac
+    .fc-select,
+  .fc-fmtdlg--mac .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-underline--mac select {
+    font-weight: 400;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__font-preview-box::before,
+  .fc-fmtdlg--mac .fc-fmtdlg__font-preview-box::after {
+    width: 24px;
+    margin: 0 8px;
+  }
+  .fc-fmtdlg--mac .fc-fmtdlg__font-preview-run {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Find and Replace, Mac arrangement: Replace buttons left, search buttons
+     right, the cell count on its own line below. */
+  .fc-host[data-fc-platform="mac"] .fc-find__btn--find-all {
+    margin-left: auto;
+  }
+  .fc-host[data-fc-platform="mac"] .fc-find__status {
+    order: 99;
+    flex: 0 0 100%;
+    padding: 2px 4px 0;
+    font-size: 12px;
+  }
+  .fc-host[data-fc-platform="mac"] .fc-find__options {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    grid-auto-rows: max-content;
+    column-gap: 24px;
+    row-gap: 6px;
+    align-items: center;
+  }
+  .fc-host[data-fc-platform="mac"] .fc-find__options > .fc-find__field {
+    grid-column: 1;
+  }
+  .fc-host[data-fc-platform="mac"] .fc-find__options > .fc-find__checks {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+    display: grid;
+    gap: 6px;
+  }
+}

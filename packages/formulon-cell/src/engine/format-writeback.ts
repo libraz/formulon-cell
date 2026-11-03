@@ -835,6 +835,12 @@ function withNegativeSection(positive: string, style: NegativeStyle | undefined)
       return joinFormatSections(positive, `[Red]-${positive}`);
     case 'red-parens':
       return joinFormatSections(`${positive}_)`, `[Red](${positive})`);
+    case 'red-plain':
+      return joinFormatSections(positive, `[Red]${positive}`);
+    case 'triangle':
+      return joinFormatSections(positive, `"△ "${positive}`);
+    case 'triangle-filled':
+      return joinFormatSections(positive, `"▲ "${positive}`);
     default:
       return positive;
   }
@@ -851,7 +857,10 @@ function negativeStyleFromSections(sections: string[]): NegativeStyle {
   const normalized = normalizeFormatCode(negative).trim();
   const parens = normalized.startsWith('(') && normalized.endsWith(')');
   if (red && parens) return 'red-parens';
-  if (red) return 'red';
+  const unsigned = normalized.replace(/\[(?:Red|Color3)\]/gi, '').trim();
+  if (unsigned.startsWith('△')) return 'triangle';
+  if (unsigned.startsWith('▲')) return 'triangle-filled';
+  if (red) return /^[^0#?]*-/.test(unsigned) ? 'red' : 'red-plain';
   return parens ? 'parens' : 'minus';
 }
 

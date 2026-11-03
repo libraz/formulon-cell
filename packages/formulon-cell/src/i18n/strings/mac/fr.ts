@@ -1,3 +1,7 @@
+import { cellFormatFr } from '../cell-format/fr.js';
+import { editDialogsFr } from '../edit-dialogs/fr.js';
+import { macFindReplaceFrom } from './find-replace.js';
+import { macFormatDialogFrom } from './format-dialog.js';
 import type { MacStrings } from './types.js';
 
 export const macFr: MacStrings = {
@@ -149,4 +153,9 @@ export const macFr: MacStrings = {
     cellStyles: 'Styles de cellule',
     autoSum: 'Somme automatique',
   },
+  macFormatDialog: macFormatDialogFrom(cellFormatFr.formatDialog),
+  macFindReplace: macFindReplaceFrom(
+    editDialogsFr.findReplace,
+    'Distinguer demi-chasse et pleine chasse',
+  ),
 };

@@ -11,7 +11,7 @@ import { activeDraftSide, type FormatDialogField, setDraftSide } from '../format
 import type { BorderTabRefs } from './border.js';
 import { type FormatTabContext, type FormatTabController, markMixed } from './controller.js';
 
-export type BorderPreset = 'none' | 'outline' | 'inside';
+export type BorderPreset = 'none' | 'outline' | 'inside' | 'insideHorizontal' | 'insideVertical';
 
 export interface BorderTabController extends FormatTabController {
   readonly palette: PaletteFlyout;
@@ -30,6 +30,8 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
+    borderNoneButton,
+    borderColorValue,
     borderColorInput,
     borderColorReset,
     borderSwatches,
@@ -45,9 +47,24 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     diagDownCk,
     diagUpCk,
     borderVisualStage,
+    insideButtons,
   } = refs;
   const palette = createPaletteFlyout(borderSwatchesToggle, borderSwatchesFlyout, borderSwatches);
   let pendingPreset: BorderPreset | null = null;
+  // The inside buttons toggle their own axis; both on is the Inside preset.
+  const inside = { h: false, v: false };
+  const setPending = (preset: BorderPreset | null): void => {
+    pendingPreset = preset;
+    inside.h = preset === 'inside' || preset === 'insideHorizontal';
+    inside.v = preset === 'inside' || preset === 'insideVertical';
+  };
+  const pendingFromInside = (): BorderPreset | null => {
+    if (inside.h && inside.v) return 'inside';
+    if (inside.h) return 'insideHorizontal';
+    return inside.v ? 'insideVertical' : null;
+  };
+  // The No line cell is a mode: edge clicks clear instead of drawing.
+  let noLine = false;
   const sideChecks: Record<SideKey, HTMLInputElement> = {
     top: topCk.input,
     right: rightCk.input,
@@ -67,6 +84,15 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     for (const [id, btn] of borderStyleButtons) {
       btn.setAttribute('aria-pressed', id === draft.borderStyle ? 'true' : 'false');
     }
+    borderNoneButton?.setAttribute('aria-pressed', noLine ? 'true' : 'false');
+    for (const button of insideButtons) {
+      const on = button.dataset.borderInside === 'h' ? inside.h : inside.v;
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    if (noLine) {
+      for (const btn of borderStyleButtons.values()) btn.setAttribute('aria-pressed', 'false');
+    }
+    if (borderColorValue) borderColorValue.textContent = draft.borderColor ?? ctx.t.automatic;
     borderColorInput.value =
       draft.borderColor && isHexColor(draft.borderColor) ? draft.borderColor : '#000000';
     borderSwatches.setValue(
@@ -94,17 +120,24 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
   // ── Events ─────────────────────────────────────────────────────────────
   const onBorderStyleChange = (): void => {
     draft.borderStyle = borderStyleSelect.value as BorderStyleKey;
-    pendingPreset = null;
+    setPending(null);
     syncControls();
     renderPreview();
   };
   const onBorderStyleGalleryClick = (e: Event): void => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-border-style]');
-    const style = btn?.dataset.borderStyle as BorderStyleKey | undefined;
-    if (!style) return;
+    const picked = btn?.dataset.borderStyle;
+    if (!picked) return;
+    noLine = picked === 'none';
+    if (noLine) {
+      setPending(null);
+      syncControls();
+      return;
+    }
+    const style = picked as BorderStyleKey;
     draft.borderStyle = style;
     borderStyleSelect.value = style;
-    pendingPreset = null;
+    setPending(null);
     syncControls();
     renderPreview();
   };
@@ -115,7 +148,9 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
   const onBorderColorReset = (): void => {
     draft.borderColor = undefined;
     borderSwatches.setValue(null);
+    syncControls();
     renderPreview();
+    palette.setOpen(false);
   };
   const onBorderSwatchesToggle = (): void => palette.setOpen(!palette.isOpen());
   const onBorderSwatchClick = (e: Event): void => {
@@ -124,6 +159,7 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     if (!color) return;
     draft.borderColor = color;
     borderColorInput.value = color;
+    syncControls();
     renderPreview();
     palette.setOpen(false);
     borderSwatchesToggle.focus();
@@ -137,14 +173,14 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
       'border.diagonalDown',
       'border.diagonalUp',
     );
-    pendingPreset = 'none';
+    setPending('none');
     draft.borders = {};
     syncControls();
     renderPreview();
   };
   const onPresetOutline = (): void => {
     touch('border.top', 'border.right', 'border.bottom', 'border.left');
-    pendingPreset = 'outline';
+    setPending('outline');
     draft.borders = {
       top: activeSide(),
       right: activeSide(),
@@ -156,23 +192,35 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
   };
   // Inside lines are a selection-shaped edit with no per-cell side to draft.
   const onPresetInside = (): void => {
-    pendingPreset = 'inside';
+    setPending('inside');
     renderPreview();
   };
   /** Per-side checkbox change: the checkbox is the source of truth. */
   const sideChange = (key: SideKey) => (): void => {
     touch(`border.${key}` as FormatDialogField);
-    pendingPreset = null;
+    setPending(null);
     setSide(key, sideChecks[key].checked);
     renderPreview();
   };
   const onVisualSideClick = (e: Event): void => {
+    const insideBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-border-inside]');
+    if (insideBtn) {
+      if (insideBtn.disabled) return;
+      const axis = insideBtn.dataset.borderInside === 'h' ? 'h' : 'v';
+      const next = { ...inside, [axis]: !inside[axis] };
+      inside.h = next.h;
+      inside.v = next.v;
+      pendingPreset = pendingFromInside();
+      syncControls();
+      renderPreview();
+      return;
+    }
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-border-side]');
     if (!btn) return;
     const key = btn.dataset.borderSide as SideKey;
     touch(`border.${key}` as FormatDialogField);
-    pendingPreset = null;
-    setSide(key, !draft.borders[key]);
+    setPending(null);
+    setSide(key, noLine ? false : !draft.borders[key]);
     syncControls();
     renderPreview();
   };
@@ -200,10 +248,11 @@ export function attachBorderTab(ctx: FormatTabContext, refs: BorderTabRefs): Bor
     palette,
     pendingPreset: () => pendingPreset,
     clearPendingPreset: () => {
-      pendingPreset = null;
+      setPending(null);
     },
     setInsideAvailable: (available) => {
       projectDisabledState(presetInside, !available, null);
+      for (const button of insideButtons) projectDisabledState(button, !available, null);
     },
   };
 }

@@ -73,17 +73,15 @@ describe('Format Cells font effects and Fill Effects', () => {
     document.body.replaceChildren();
   });
 
-  it('offers Outline and Shadow on the Mac and writes them', () => {
+  it('does not offer Outline and Shadow on the Mac either: the app has no such boxes', () => {
     host.dataset.fcPlatform = 'mac';
     const handle = attachFormatDialog({ host, store });
     handle.open('font');
-    expect(q<HTMLInputElement>('input[data-fc-check="fontOutline"]').closest('label')?.hidden).toBe(
-      false,
-    );
-    check('input[data-fc-check="fontOutline"]', true);
-    check('input[data-fc-check="fontShadow"]', true);
-    ok();
-    expect(formatA1()).toMatchObject({ fontOutline: true, fontShadow: true });
+    for (const key of ['fontOutline', 'fontShadow']) {
+      expect(q<HTMLInputElement>(`input[data-fc-check="${key}"]`).closest('label')?.hidden).toBe(
+        true,
+      );
+    }
     handle.detach();
   });
 

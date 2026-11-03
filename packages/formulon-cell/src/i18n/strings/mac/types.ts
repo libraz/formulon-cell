@@ -1,4 +1,11 @@
+import type { CellFormatStrings } from '../cell-format/types.js';
+import type { MacFindReplaceStrings } from './find-replace.js';
+
 export interface MacStrings {
+  /** Overrides of `formatDialog` that apply on the Mac host only. */
+  macFormatDialog: Partial<CellFormatStrings['formatDialog']>;
+  /** Overrides of `findReplace` that apply on the Mac host only. */
+  macFindReplace: MacFindReplaceStrings;
   macData: {
     goalSeek: {
       title: string;

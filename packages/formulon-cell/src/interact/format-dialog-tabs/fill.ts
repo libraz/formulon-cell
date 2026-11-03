@@ -4,8 +4,25 @@
 import type { Strings } from '../../i18n/strings.js';
 import type { FillPattern } from '../../store/store.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { createDialogToggleButton } from '../dialog-shell.js';
 import { makeButton, makeSwatches } from '../format-dialog-dom.js';
 import { GRADIENT_SHADING_STYLES, type GradientShadingStyle } from '../format-dialog-model.js';
+
+/** A popup trigger with its current-value text and flyout. */
+export interface FillPopup {
+  button: HTMLButtonElement;
+  value: HTMLElement;
+  flyout: HTMLElement;
+}
+
+export interface FillPopups {
+  fill: FillPopup;
+  patternColor: FillPopup;
+  pattern: FillPopup;
+  /** Flyout entries: No colour, Automatic. */
+  fillNone: HTMLButtonElement;
+  patternAuto: HTMLButtonElement;
+}
 
 export interface FillTabRefs {
   fillInput: HTMLInputElement;
@@ -17,6 +34,8 @@ export interface FillTabRefs {
   fillSample: HTMLDivElement;
   fillEffectsButton: HTMLButtonElement;
   fillEffects: HTMLDivElement;
+  /** Mac presentation: colour and pattern pickers shown as popups. */
+  popups: FillPopups | null;
   gradientColor1: HTMLInputElement;
   gradientColor2: HTMLInputElement;
   gradientStyleInputs: ReadonlyMap<GradientShadingStyle, HTMLInputElement>;
@@ -102,7 +121,11 @@ const createFillEffects = (
   return { fillEffects, gradientColor1, gradientColor2, gradientStyleInputs, gradientVariants };
 };
 
-export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog']): FillTabRefs {
+export function createFillTab(
+  panel: HTMLDivElement,
+  t: Strings['formatDialog'],
+  mac = false,
+): FillTabRefs {
   const fillSection = document.createElement('div');
   fillSection.className = 'fc-fmtdlg__section';
   const fillSectionTitle = document.createElement('div');
@@ -188,6 +211,24 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   const effects = createFillEffects(t);
   fillSection.appendChild(effects.fillEffects);
 
+  let popups: FillPopups | null = null;
+  if (mac) {
+    popups = macFillPopups(t, {
+      fillSection,
+      fillRow,
+      fillInput,
+      fillReset,
+      fillSwatches,
+      fillPatternColorRow,
+      fillPatternColorInput,
+      fillPatternRow,
+      fillPatternSelect,
+      fillPatternGallery,
+      fillEffectsButton,
+      effects: effects.fillEffects,
+    });
+  }
+
   const sample = document.createElement('div');
   sample.className = 'fc-fmtdlg__fill-sample';
   const sampleLabel = document.createElement('div');
@@ -207,6 +248,77 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     fillPatternColorInput,
     fillSample,
     fillEffectsButton,
+    popups,
     ...effects,
   };
+}
+
+interface MacFillParts {
+  fillSection: HTMLElement;
+  fillRow: HTMLElement;
+  fillInput: HTMLInputElement;
+  fillReset: HTMLButtonElement;
+  fillSwatches: ReturnType<typeof makeSwatches>;
+  fillPatternColorRow: HTMLElement;
+  fillPatternColorInput: HTMLInputElement;
+  fillPatternRow: HTMLElement;
+  fillPatternSelect: HTMLSelectElement;
+  fillPatternGallery: HTMLElement;
+  fillEffectsButton: HTMLButtonElement;
+  effects: HTMLElement;
+}
+
+const makePopup = (label: string, initial: string): FillPopup => {
+  const button = createDialogToggleButton({
+    label,
+    baseClass: 'fc-fmtdlg__popup fc-fmtdlg__fill-popup',
+    popup: true,
+  });
+  const value = document.createElement('span');
+  value.className = 'fc-fmtdlg__fill-popup-label';
+  value.textContent = initial;
+  const chevron = document.createElement('span');
+  chevron.className = 'fc-fmtdlg__color-toggle-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  button.append(value, chevron);
+  const flyout = document.createElement('div');
+  flyout.className = 'fc-fmtdlg__color-flyout fc-fmtdlg__fill-popup-flyout';
+  flyout.hidden = true;
+  return { button, value, flyout };
+};
+
+/** Mac presentation of the fill tab: two boxes (background colour; pattern
+ *  colour and style) whose pickers are popups starting on No colour and
+ *  Automatic. The colour inputs stay in the DOM, hidden, as the editing model. */
+function macFillPopups(t: Strings['formatDialog'], p: MacFillParts): FillPopups {
+  const fill = makePopup(t.fill, t.fillNoColor);
+  const patternColor = makePopup(t.fillPatternColor, t.automatic);
+  const pattern = makePopup(t.fillPatternStyle, '');
+
+  p.fillReset.textContent = t.fillNoColor;
+  p.fillReset.dataset.fcFillNone = '';
+  fill.flyout.append(p.fillReset, p.fillSwatches.el);
+  p.fillInput.hidden = true;
+  p.fillRow.replaceChildren(p.fillRow.firstElementChild as Node, fill.button, p.fillInput);
+  p.fillRow.appendChild(fill.flyout);
+
+  const patternAuto = makeButton(t.automatic);
+  patternAuto.dataset.fcFillPatternAuto = '';
+  patternColor.flyout.append(patternAuto, p.fillPatternColorInput);
+  p.fillPatternColorRow.replaceChildren(
+    p.fillPatternColorRow.firstElementChild as Node,
+    patternColor.button,
+    patternColor.flyout,
+  );
+
+  pattern.flyout.appendChild(p.fillPatternGallery);
+  const styleLabel = p.fillPatternRow.firstElementChild as Node;
+  p.fillPatternSelect.hidden = true;
+  p.fillPatternRow.replaceChildren(styleLabel, pattern.button, p.fillPatternSelect, pattern.flyout);
+  (p.fillPatternRow as HTMLElement).classList.add('fc-fmtdlg__fill-pattern-popup-row');
+
+  p.fillEffectsButton.hidden = true;
+  p.effects.hidden = true;
+  p.fillSection.classList.add('fc-fmtdlg__fill-boxes');
+  return { fill, patternColor, pattern, fillNone: p.fillReset, patternAuto };
 }

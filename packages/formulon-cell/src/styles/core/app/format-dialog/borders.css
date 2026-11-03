@@ -178,6 +178,12 @@
     font-size: 12px;
   }
 
+  .fc-fmtdlg__btn.fc-fmtdlg__border-preset:disabled,
+  .fc-fmtdlg__border-hit:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
   .fc-fmtdlg__btn.fc-fmtdlg__border-preset:hover,
   .fc-fmtdlg__btn.fc-fmtdlg__border-preset:focus-visible {
     border-color: transparent;

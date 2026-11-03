@@ -127,7 +127,7 @@ export function attachNumberTab(
     numberSummaryDesc,
   } = refs;
   const defaultPatternFor = (cat: NumberCategory): string =>
-    defaultPatternForLocale(cat, ctx.getLocale());
+    defaultPatternForLocale(cat, ctx.getLocale(), ctx.isMacPlatform());
 
   const syncPatternListItems = (
     patterns: string[],
@@ -183,7 +183,7 @@ export function attachNumberTab(
       cat === 'fraction' ||
       cat === 'special' ||
       cat === 'custom'
-        ? [...patternPresetsFor(ctx.getLocale())[cat]]
+        ? [...patternPresetsFor(ctx.getLocale(), ctx.isMacPlatform())[cat]]
         : [];
     const current = draft.pattern || defaultPatternFor(cat);
     if (current && !patterns.includes(current)) patterns.unshift(current);
@@ -205,6 +205,8 @@ export function attachNumberTab(
     for (const item of items) {
       const style = item.dataset.fcNegativeStyle as NegativeStyle | undefined;
       if (!style) continue;
+      // The triangle rows belong to the plain number category only.
+      item.hidden = style.startsWith('triangle') && cat !== 'fixed';
       const sampleFmt = computeDialogNumFmt(
         { ...draft, numberCategory: cat, negativeStyle: style },
         defaultPatternFor,

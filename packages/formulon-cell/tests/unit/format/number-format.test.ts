@@ -141,6 +141,26 @@ describe('formatNumber', () => {
     ).toBe('($99)');
   });
 
+  it('renders the red-plain and triangle negative styles', () => {
+    expect(formatNumber(-1234, { kind: 'fixed', decimals: 0, negativeStyle: 'red-plain' })).toBe(
+      '1234',
+    );
+    expect(formatNumber(-1234, { kind: 'fixed', decimals: 0, negativeStyle: 'triangle' })).toBe(
+      '△ 1234',
+    );
+    expect(
+      formatNumber(-1234, { kind: 'fixed', decimals: 0, negativeStyle: 'triangle-filled' }),
+    ).toBe('▲ 1234');
+    expect(
+      formatNumber(-1234, {
+        kind: 'currency',
+        decimals: 0,
+        symbol: '¥',
+        negativeStyle: 'triangle',
+      }),
+    ).toBe('△ ¥1,234');
+  });
+
   it('falls back to "$" when currency symbol is missing', () => {
     expect(formatNumber(7.5, { kind: 'currency', decimals: 1 })).toBe('$7.5');
   });

@@ -1,3 +1,7 @@
+import { cellFormatEn } from '../cell-format/en.js';
+import { editDialogsEn } from '../edit-dialogs/en.js';
+import { macFindReplaceFrom } from './find-replace.js';
+import { macFormatDialogFrom } from './format-dialog.js';
 import type { MacStrings } from './types.js';
 
 export const macEn: MacStrings = {
@@ -148,4 +152,6 @@ export const macEn: MacStrings = {
     cellStyles: 'Cell Styles',
     autoSum: 'AutoSum',
   },
+  macFormatDialog: macFormatDialogFrom(cellFormatEn.formatDialog),
+  macFindReplace: macFindReplaceFrom(editDialogsEn.findReplace, 'Match half-width and full-width'),
 };

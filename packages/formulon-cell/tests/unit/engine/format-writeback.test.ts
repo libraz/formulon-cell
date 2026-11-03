@@ -355,6 +355,9 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     ['parens', '#,##0.00_);(#,##0.00)'],
     ['red', '#,##0.00;[Red]-#,##0.00'],
     ['red-parens', '#,##0.00_);[Red](#,##0.00)'],
+    ['red-plain', '#,##0.00;[Red]#,##0.00'],
+    ['triangle', '#,##0.00;"△ "#,##0.00'],
+    ['triangle-filled', '#,##0.00;"▲ "#,##0.00'],
   ] as const)('fixed negative style %s round-trips', (negativeStyle, expectedCode) => {
     const code = numFmtToFormatCode({
       kind: 'fixed',
@@ -376,6 +379,9 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     ['parens', '[$¥-411]#,##0_);([$¥-411]#,##0)'],
     ['red', '[$¥-411]#,##0;[Red]-[$¥-411]#,##0'],
     ['red-parens', '[$¥-411]#,##0_);[Red]([$¥-411]#,##0)'],
+    ['red-plain', '[$¥-411]#,##0;[Red][$¥-411]#,##0'],
+    ['triangle', '[$¥-411]#,##0;"△ "[$¥-411]#,##0'],
+    ['triangle-filled', '[$¥-411]#,##0;"▲ "[$¥-411]#,##0'],
   ] as const)('currency negative style %s round-trips', (negativeStyle, expectedCode) => {
     const code = numFmtToFormatCode({ kind: 'currency', decimals: 0, symbol: '¥', negativeStyle });
     expect(code).toBe(expectedCode);

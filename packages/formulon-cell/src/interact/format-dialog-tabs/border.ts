@@ -3,6 +3,7 @@
 
 import type { Strings } from '../../i18n/strings.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 import { createLineSamplePreview } from '../../toolbar/ribbon/border-icons.js';
 import { createDialogToggleButton } from '../dialog-shell.js';
 import {
@@ -17,6 +18,10 @@ export interface BorderTabRefs {
   borderStyleSelect: HTMLSelectElement;
   borderStyleButtons: Map<BorderStyleKey, HTMLButtonElement>;
   borderStyleGallery: HTMLDivElement;
+  /** Mac presentation: the No line cell, which makes edge clicks clear. */
+  borderNoneButton: HTMLButtonElement | null;
+  /** Mac presentation: the colour popup's current-value text. */
+  borderColorValue: HTMLElement | null;
   borderColorInput: HTMLInputElement;
   borderColorReset: HTMLButtonElement;
   borderSwatches: ReturnType<typeof makeSwatches>;
@@ -34,6 +39,8 @@ export interface BorderTabRefs {
   borderVisualStage: HTMLDivElement;
   borderVisualPreview: HTMLDivElement;
   visualSideButtons: Map<SideKey, HTMLButtonElement[]>;
+  /** Mac presentation: the inside-horizontal and inside-vertical buttons. */
+  insideButtons: HTMLButtonElement[];
 }
 
 /** The desktop dialog's line styles, down the left column then the right. */
@@ -53,7 +60,11 @@ const DIALOG_LINE_STYLES: readonly BorderStyleKey[] = [
   'double',
 ];
 
-export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog']): BorderTabRefs {
+export function createBorderTab(
+  panel: HTMLDivElement,
+  t: Strings['formatDialog'],
+  mac = false,
+): BorderTabRefs {
   // Active style + color row
   const borderStyleRow = document.createElement('label');
   borderStyleRow.className = 'fc-fmtdlg__row fc-fmtdlg__border-style-row';
@@ -86,6 +97,20 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   const borderStyleGallery = document.createElement('div');
   borderStyleGallery.className = 'fc-fmtdlg__line-gallery';
   const borderStyleButtons = new Map<BorderStyleKey, HTMLButtonElement>();
+  let borderNoneButton: HTMLButtonElement | null = null;
+  if (mac) {
+    borderNoneButton = createDialogToggleButton({
+      label: t.borderStyleNone,
+      baseClass: 'fc-fmtdlg__line-style',
+      extraClass: 'fc-fmtdlg__line-style--none',
+      datasetKey: 'borderStyle',
+      value: 'none',
+    });
+    const label = document.createElement('span');
+    label.textContent = t.borderStyleNone;
+    borderNoneButton.appendChild(label);
+    borderStyleGallery.appendChild(borderNoneButton);
+  }
   for (const s of styleOptions) {
     const btn = createDialogToggleButton({
       label: s.label,
@@ -95,6 +120,12 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
       value: s.id,
     });
     const sample = createLineSamplePreview(s.id);
+    // The Mac app draws the hairline as a fine dotted rule.
+    if (mac && s.id === 'hair') {
+      const rule = sample.querySelector('line');
+      rule?.setAttribute('stroke-dasharray', '0.7 0.9');
+      rule?.setAttribute('stroke-width', '0.8');
+    }
     sample.classList.add('fc-fmtdlg__line-sample-svg');
     const label = document.createElement('span');
     label.textContent = s.label;
@@ -128,17 +159,37 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   const borderColorControl = document.createElement('span');
   borderColorControl.className = 'fc-fmtdlg__color-control';
   borderColorControl.append(borderColorInput, borderSwatchesToggle);
-  const borderColorReset = makeButton(t.resetToDefault);
-  borderColorRow.append(borderColorLabel, borderColorControl, borderColorReset);
+  const borderColorReset = makeButton(mac ? t.automatic : t.resetToDefault);
+  let borderColorValue: HTMLElement | null = null;
+  if (mac) {
+    // The colour reads as a popup: its text is the current colour, Automatic
+    // first, and the reset button becomes the flyout's Automatic entry.
+    borderColorValue = document.createElement('span');
+    borderColorValue.className = 'fc-fmtdlg__color-toggle-label';
+    borderColorValue.textContent = t.automatic;
+    borderSwatchesToggle.prepend(borderColorValue);
+    borderSwatchesToggle.classList.add('fc-fmtdlg__popup');
+    borderColorInput.hidden = true;
+    borderColorRow.append(borderColorLabel, borderColorControl);
+  } else {
+    borderColorRow.append(borderColorLabel, borderColorControl, borderColorReset);
+  }
   panel.appendChild(borderColorRow);
   const borderSwatches = makeSwatches('border', t.themeColors, t.standardColors);
   const borderSwatchesFlyout = document.createElement('div');
   borderSwatchesFlyout.className = 'fc-fmtdlg__color-flyout';
   borderSwatchesFlyout.hidden = true;
+  if (mac) borderSwatchesFlyout.appendChild(borderColorReset);
   borderSwatchesFlyout.appendChild(borderSwatches.el);
   panel.appendChild(borderSwatchesFlyout);
 
   // Presets
+  if (mac) {
+    const presetsHeading = document.createElement('div');
+    presetsHeading.className = 'fc-fmtdlg__border-heading';
+    presetsHeading.textContent = t.borderPresets;
+    panel.appendChild(presetsHeading);
+  }
   const presetRow = document.createElement('div');
   presetRow.className = 'fc-fmtdlg__row fc-fmtdlg__border-presets';
   panel.appendChild(presetRow);
@@ -177,12 +228,20 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   borderVisual.className = 'fc-fmtdlg__border-visual';
   const borderVisualTitle = document.createElement('div');
   borderVisualTitle.className = 'fc-fmtdlg__border-title';
-  borderVisualTitle.textContent = t.preview;
+  borderVisualTitle.textContent = mac ? t.borderOutline : t.preview;
+  if (mac) borderVisualTitle.classList.add('fc-fmtdlg__border-heading');
   const borderVisualStage = document.createElement('div');
   borderVisualStage.className = 'fc-fmtdlg__border-stage';
   const borderVisualPreview = document.createElement('div');
   borderVisualPreview.className = 'fc-fmtdlg__border-preview';
-  borderVisualPreview.textContent = t.previewText;
+  borderVisualPreview.textContent = mac ? t.borderPreviewText : t.previewText;
+  if (mac) {
+    for (const corner of ['tl', 'tr', 'bl', 'br']) {
+      const tick = document.createElement('span');
+      tick.className = `fc-fmtdlg__border-tick fc-fmtdlg__border-tick--${corner}`;
+      borderVisualPreview.appendChild(tick);
+    }
+  }
   const visualSideButtons = new Map<SideKey, HTMLButtonElement[]>();
   borderVisualStage.append(
     borderVisualPreview,
@@ -215,13 +274,38 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
       ' fc-fmtdlg__border-hit--right-diag',
     ),
   );
+  const insideButtons: HTMLButtonElement[] = [];
+  if (mac) {
+    for (const [axis, label] of [
+      ['h', t.borderInsideHorizontal],
+      ['v', t.borderInsideVertical],
+    ] as const) {
+      const btn = createDialogToggleButton({
+        label,
+        baseClass: `fc-fmtdlg__border-hit fc-fmtdlg__border-hit--inside-${axis}`,
+        datasetKey: 'borderInside',
+        value: axis,
+      });
+      projectDisabledState(btn, true, null);
+      insideButtons.push(btn);
+      borderVisualStage.appendChild(btn);
+    }
+  }
   borderVisual.append(borderVisualTitle, borderVisualStage);
   panel.appendChild(borderVisual);
+  if (mac) {
+    const hint = document.createElement('div');
+    hint.className = 'fc-fmtdlg__border-hint';
+    hint.textContent = t.borderHint;
+    panel.appendChild(hint);
+  }
 
   return {
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
+    borderNoneButton,
+    borderColorValue,
     borderColorInput,
     borderColorReset,
     borderSwatches,
@@ -239,5 +323,6 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
     borderVisualStage,
     borderVisualPreview,
     visualSideButtons,
+    insideButtons,
   };
 }

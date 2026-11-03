@@ -246,7 +246,7 @@ describe('attachFormatDialog', () => {
     }
   });
 
-  it('Alignment tab Merge cells projects a disabled reason for a single unmerged cell', () => {
+  it('Alignment tab Merge cells stays enabled on a single cell and applying it merges nothing', () => {
     setActive(store, 0, 0);
     const handle = attachFormatDialog({ host, store });
     handle.open();
@@ -256,14 +256,12 @@ describe('attachFormatDialog', () => {
 
     const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
     if (!merge) throw new Error('merge checkbox missing');
-    const wrap = merge.closest<HTMLElement>('label');
-    expect(merge.disabled).toBe(true);
-    expect(merge.dataset.disabledReason).toBe(
-      'セルを結合するには 2 つ以上のセルを選択してください。',
-    );
-    expect(wrap?.dataset.disabledReason).toBe(
-      'セルを結合するには 2 つ以上のセルを選択してください。',
-    );
+    expect(merge.disabled).toBe(false);
+    expect(merge.dataset.disabledReason).toBeUndefined();
+    merge.checked = true;
+    merge.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(store.getState().merges.byAnchor.size).toBe(0);
     handle.detach();
   });
 

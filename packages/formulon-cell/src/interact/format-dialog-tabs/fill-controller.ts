@@ -10,11 +10,12 @@ import {
   isHexColor,
   shadingForGradient,
 } from '../format-dialog-model.js';
+import { createPaletteFlyout } from '../format-dialog-palette-flyout.js';
 import { type FormatTabContext, type FormatTabController, markMixed } from './controller.js';
 import type { FillTabRefs } from './fill.js';
 
 export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatTabController {
-  const { draft, on, touch, isMixed, syncControls, renderPreview, isDxfMode } = ctx;
+  const { draft, t, on, touch, isMixed, syncControls, renderPreview, isDxfMode } = ctx;
   const {
     fillInput,
     fillReset,
@@ -28,6 +29,7 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
     gradientColor2,
     gradientStyleInputs,
     gradientVariants,
+    popups,
   } = refs;
 
   // Fill Effects selection; a loaded gradient seeds it on sync.
@@ -50,8 +52,10 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
       gradientColor2.value = stops[stops.length - 1]?.color ?? '#4472c4';
     }
     const offered = !isDxfMode();
-    fillEffectsButton.hidden = !offered;
-    fillEffects.hidden = !offered || (!effectsOpen && !draft.fillGradient);
+    // The Mac dialog has no Fill Effects entry.
+    fillEffectsButton.hidden = !offered || popups !== null;
+    fillEffects.hidden =
+      !offered || (popups !== null && !draft.fillGradient) || (!effectsOpen && !draft.fillGradient);
     fillEffectsButton.setAttribute('aria-expanded', fillEffects.hidden ? 'false' : 'true');
     for (const [style, input] of gradientStyleInputs) {
       input.checked = (loaded !== null || !draft.fillGradient) && style === shading.style;
@@ -69,7 +73,30 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
     });
   };
 
+  // Mac presentation: each popup trigger opens its flyout; only one is open.
+  const flyouts = popups
+    ? [popups.fill, popups.patternColor, popups.pattern].map((popup) => ({
+        popup,
+        flyout: createPaletteFlyout(popup.button, popup.flyout, { focus: () => undefined }),
+      }))
+    : [];
+  const closePopups = (): void => {
+    for (const { flyout } of flyouts) flyout.setOpen(false);
+  };
+  const syncPopups = (): void => {
+    if (!popups) return;
+    popups.fill.value.textContent = draft.fill ?? t.fillNoColor;
+    popups.patternColor.value.textContent = draft.fillPatternColor ?? t.automatic;
+    const chosen = draft.fillPattern
+      ? fillPatternGallery
+          .querySelector<HTMLElement>(`[data-fc-fill-pattern="${draft.fillPattern}"]`)
+          ?.getAttribute('aria-label')
+      : '';
+    popups.pattern.value.textContent = chosen ?? '';
+  };
+
   const sync = (): void => {
+    syncPopups();
     fillInput.value = draft.fill && isHexColor(draft.fill) ? draft.fill : '#ffffff';
     fillSwatches.setValue(draft.fill && isHexColor(draft.fill) ? draft.fill : null);
     fillPatternSelect.value = draft.fillPattern ?? '';
@@ -199,6 +226,27 @@ export function attachFillTab(ctx: FormatTabContext, refs: FillTabRefs): FormatT
     syncControls();
     renderPreview();
   };
+
+  const onPatternAuto = (): void => {
+    dropGradient();
+    touch('fillPatternColor');
+    draft.fillPatternColor = undefined;
+    syncControls();
+    renderPreview();
+  };
+  for (const { popup, flyout } of flyouts) {
+    on(popup.button, 'click', () => {
+      const open = !flyout.isOpen();
+      closePopups();
+      flyout.setOpen(open);
+    });
+    // A pick inside a flyout closes it, except the colour input's own dialog.
+    on(popup.flyout, 'click', (e) => {
+      if ((e.target as HTMLElement).closest('input')) return;
+      closePopups();
+    });
+  }
+  if (popups) on(popups.patternAuto, 'click', onPatternAuto);
 
   on(fillInput, 'input', onFillInput);
   on(fillReset, 'click', onFillReset);

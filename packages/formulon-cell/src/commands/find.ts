@@ -12,6 +12,10 @@ export interface FindOptions {
   caseSensitive?: boolean;
   /** Entire-cell match. */
   matchWhole?: boolean;
+  /** `false` compares half-width and full-width forms of a character as equal
+   *  (letters, digits, symbols, space, katakana). Left undefined, the
+   *  comparison stays exact. */
+  matchWidth?: boolean;
   /** Excel's "Within" option. Defaults to the active sheet. */
   within?: 'sheet' | 'workbook';
   /** Excel's "Search" option. Defaults to row-major traversal. */
@@ -234,7 +238,10 @@ const cellDisplayForSearch = (
         // Keep the hydrated store formula when the engine read is unavailable.
       }
     }
-    return formula ? formulaDisplay(formula, opts) : '';
+    // A constant is its own content in the formula bar, as in Excel's "Formulas".
+    return formula
+      ? formulaDisplay(formula, opts)
+      : workbookDisplay(opts.workbook, addr, valueDisplay(cell.value, opts));
   }
   return workbookDisplay(opts.workbook, addr, valueDisplay(cell.value, opts));
 };
@@ -250,10 +257,27 @@ function sortCellEntries(entries: CellEntry[], opts: FindOptions): CellEntry[] {
   return entries;
 }
 
+const HALFWIDTH_KATAKANA =
+  '。「」、・ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン゛゜';
+
+/** Width-insensitive form of a string: full-width ASCII and the ideographic
+ *  space become their half-width forms, half-width katakana become full-width,
+ *  and the length is unchanged (voiced half-width pairs stay two characters). */
+const foldWidth = (text: string): string =>
+  text.replace(/[\uFF01-\uFF5E\u3000\uFF61-\uFF9F]/g, (ch) => {
+    const code = ch.charCodeAt(0);
+    if (code >= 0xff01 && code <= 0xff5e) return String.fromCharCode(code - 0xfee0);
+    if (code === 0x3000) return ' ';
+    return HALFWIDTH_KATAKANA[code - 0xff61] ?? ch;
+  });
+
 function isMatch(display: string, opts: FindOptions): boolean {
   if (opts.query === '') return false;
-  const haystack = opts.caseSensitive ? display : display.toLowerCase();
-  const needle = opts.caseSensitive ? opts.query : opts.query.toLowerCase();
+  const fold = opts.matchWidth === false ? foldWidth : (text: string): string => text;
+  const shown = fold(display);
+  const query = fold(opts.query);
+  const haystack = opts.caseSensitive ? shown : shown.toLowerCase();
+  const needle = opts.caseSensitive ? query : query.toLowerCase();
   if (opts.matchWhole) return haystack === needle;
   return haystack.includes(needle);
 }
@@ -347,22 +371,27 @@ function substituteCaseAware(
   replacement: string,
   caseSensitive: boolean,
   matchWhole: boolean,
+  ignoreWidth = false,
 ): string {
+  const folded = ignoreWidth ? foldWidth(source) : source;
+  const foldedQuery = ignoreWidth ? foldWidth(query) : query;
   if (matchWhole) {
-    const eq = caseSensitive ? source === query : source.toLowerCase() === query.toLowerCase();
+    const eq = caseSensitive
+      ? folded === foldedQuery
+      : folded.toLowerCase() === foldedQuery.toLowerCase();
     return eq ? replacement : source;
   }
-  if (caseSensitive) return source.split(query).join(replacement);
-  // Case-insensitive scan that preserves untouched segments verbatim.
-  const lcSource = source.toLowerCase();
-  const lcQuery = query.toLowerCase();
-  if (!lcQuery) return source;
+  if (caseSensitive && !ignoreWidth) return source.split(query).join(replacement);
+  // Scan on the folded text; untouched segments stay verbatim from `source`.
+  const haystack = caseSensitive ? folded : folded.toLowerCase();
+  const needle = caseSensitive ? foldedQuery : foldedQuery.toLowerCase();
+  if (!needle) return source;
   let out = '';
   let i = 0;
-  while (i <= source.length - lcQuery.length) {
-    if (lcSource.startsWith(lcQuery, i)) {
+  while (i <= source.length - needle.length) {
+    if (haystack.startsWith(needle, i)) {
       out += replacement;
-      i += lcQuery.length;
+      i += needle.length;
     } else {
       out += source[i];
       i += 1;
@@ -430,8 +459,8 @@ export function replaceAll(
         continue;
       }
       const cur =
-        opts.lookIn === 'formulas'
-          ? formulaDisplay(formula ?? '', opts)
+        opts.lookIn === 'formulas' && formula !== null
+          ? formulaDisplay(formula, opts)
           : workbookDisplay(wb, m.addr, valueDisplay(wb.getValue(m.addr), opts));
       const next = substituteCaseAware(
         cur,
@@ -439,6 +468,7 @@ export function replaceAll(
         replacement,
         opts.caseSensitive ?? false,
         opts.matchWhole ?? false,
+        opts.matchWidth === false,
       );
       if (next === cur) continue;
       writeInput(wb, m.addr, next, store, opts.locale);
@@ -457,5 +487,6 @@ export function applySubstitution(source: string, opts: FindOptions, replacement
     replacement,
     opts.caseSensitive ?? false,
     opts.matchWhole ?? false,
+    opts.matchWidth === false,
   );
 }

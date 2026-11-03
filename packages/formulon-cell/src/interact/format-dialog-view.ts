@@ -21,10 +21,12 @@ interface CreateFormatDialogViewInput {
   strings: Strings;
   t: Strings['formatDialog'];
   fontLocale?: import('../i18n/strings.js').Locale;
+  /** Mac host: the negative-number list follows the Mac app's seven rows. */
+  mac?: boolean;
 }
 
 export function createFormatDialogView(input: CreateFormatDialogViewInput) {
-  const { host, strings, t, fontLocale = 'en' } = input;
+  const { host, strings, t, fontLocale = 'en', mac = false } = input;
   const shell = createDialogShell({
     host,
     className: 'fc-fmtdlg',
@@ -284,19 +286,29 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   negativeOptions.className = 'fc-fmtdlg__negative-list';
   negativeOptions.setAttribute('role', 'listbox');
   negativeOptions.setAttribute('aria-label', t.negativeNumbers);
-  const negativeSamples: Array<{ value: NegativeStyle; text: string; red?: boolean }> = [
-    { value: 'parens', text: '(1234)' },
-    { value: 'red-parens', text: '(1234)', red: true },
-    { value: 'red', text: '-1234', red: true },
-    { value: 'minus', text: '-1234' },
-  ];
-  for (const [index, sample] of negativeSamples.entries()) {
+  const negativeSamples: Array<{ value: NegativeStyle; text: string; red?: boolean }> = mac
+    ? [
+        { value: 'red-parens', text: '(1234)', red: true },
+        { value: 'parens', text: '(1234)' },
+        { value: 'red-plain', text: '1234', red: true },
+        { value: 'minus', text: '-1234' },
+        { value: 'red', text: '-1234', red: true },
+        { value: 'triangle', text: '△ 1234' },
+        { value: 'triangle-filled', text: '▲ 1234' },
+      ]
+    : [
+        { value: 'parens', text: '(1234)' },
+        { value: 'red-parens', text: '(1234)', red: true },
+        { value: 'red', text: '-1234', red: true },
+        { value: 'minus', text: '-1234' },
+      ];
+  for (const [_index, sample] of negativeSamples.entries()) {
     appendDialogOptionButton(negativeOptions, {
       label: sample.text,
       baseClass: 'fc-fmtdlg__negative-item',
       datasetKey: 'fcNegativeStyle',
       value: sample.value,
-      selected: index === 3,
+      selected: sample.value === 'minus',
       extraClass: sample.red ? 'fc-fmtdlg__negative-item--red' : undefined,
     });
   }
@@ -330,6 +342,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     t,
     fontLocale,
     strings.ribbon.fontFamilies,
+    mac,
   );
   const {
     boldCk,
@@ -350,16 +363,20 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fontSwatchesToggle,
     fontSwatchesFlyout,
     fontPreviewBox,
+    fontStyleField,
     syncFontFamilyOptions,
     syncFontSizeOptions,
   } = fontTab;
 
   // ── Border tab ─────────────────────────────────────────────────────────
-  const borderTab = createBorderTab(tabPanels.get('border') as HTMLDivElement, t);
+  const borderTab = createBorderTab(tabPanels.get('border') as HTMLDivElement, t, mac);
   const {
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
+    borderNoneButton,
+    borderColorValue,
+    insideButtons,
     borderColorInput,
     borderColorReset,
     borderSwatches,
@@ -380,7 +397,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   } = borderTab;
 
   // ── Fill tab ───────────────────────────────────────────────────────────
-  const fillTab = createFillTab(tabPanels.get('fill') as HTMLDivElement, t);
+  const fillTab = createFillTab(tabPanels.get('fill') as HTMLDivElement, t, mac);
   const {
     fillInput,
     fillReset,
@@ -390,6 +407,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fillPatternColorInput,
     fillSample,
     fillEffectsButton,
+    popups,
     fillEffects,
     gradientColor1,
     gradientColor2,
@@ -537,11 +555,15 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fontSwatchesToggle,
     fontSwatchesFlyout,
     fontPreviewBox,
+    fontStyleField,
     syncFontFamilyOptions,
     syncFontSizeOptions,
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
+    borderNoneButton,
+    borderColorValue,
+    insideButtons,
     borderColorInput,
     borderColorReset,
     borderSwatches,
@@ -567,6 +589,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fillPatternColorInput,
     fillSample,
     fillEffectsButton,
+    popups,
     fillEffects,
     gradientColor1,
     gradientColor2,

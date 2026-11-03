@@ -1,3 +1,7 @@
+import { cellFormatKo } from '../cell-format/ko.js';
+import { editDialogsKo } from '../edit-dialogs/ko.js';
+import { macFindReplaceFrom } from './find-replace.js';
+import { macFormatDialogFrom } from './format-dialog.js';
 import type { MacStrings } from './types.js';
 
 export const macKo: MacStrings = {
@@ -148,4 +152,6 @@ export const macKo: MacStrings = {
     cellStyles: '셀 스타일',
     autoSum: '자동 합계',
   },
+  macFormatDialog: macFormatDialogFrom(cellFormatKo.formatDialog),
+  macFindReplace: macFindReplaceFrom(editDialogsKo.findReplace, '반각과 전각 구분'),
 };

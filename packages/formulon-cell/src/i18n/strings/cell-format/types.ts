@@ -144,6 +144,7 @@ export interface CellFormatStrings {
     fontUnderlineDouble: string;
     fontUnderlineSingleAccounting: string;
     fontUnderlineDoubleAccounting: string;
+    fontEffects: string;
     fontStrike: string;
     fontSuperscript: string;
     fontSubscript: string;
@@ -186,6 +187,13 @@ export interface CellFormatStrings {
     borderPresetInside: string;
     fill: string;
     fillNone: string;
+    fillNoColor: string;
+    borderPresets: string;
+    borderOutline: string;
+    borderHint: string;
+    borderInsideHorizontal: string;
+    borderInsideVertical: string;
+    borderPreviewText: string;
     fillPatternStyle: string;
     fillPatternColor: string;
     fillPatternSolid: string;

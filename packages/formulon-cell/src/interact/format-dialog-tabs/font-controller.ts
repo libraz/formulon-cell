@@ -39,17 +39,7 @@ const NORMAL_FONT_FIELDS: readonly FormatDialogField[] = [
 ];
 
 export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTabController {
-  const {
-    draft,
-    getLocale,
-    on,
-    touch,
-    isMixed,
-    syncControls,
-    renderPreview,
-    isMacPlatform,
-    isDxfMode,
-  } = ctx;
+  const { draft, getLocale, on, touch, isMixed, syncControls, renderPreview, isMacPlatform } = ctx;
   const {
     boldCk,
     italicCk,
@@ -68,6 +58,8 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     fontSwatches,
     fontSwatchesToggle,
     fontSwatchesFlyout,
+    fontStyleField,
+    fontPreviewBox,
     fontLocale,
     syncFontFamilyOptions,
     syncFontSizeOptions,
@@ -121,6 +113,12 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
 
   const syncFontStyleList = (): void => {
     const id = isMixed('bold') || isMixed('italic') ? null : currentFontStyleId();
+    if (fontStyleField) {
+      fontStyleField.value =
+        id === null
+          ? ''
+          : (fontStyleList.querySelector(`[data-fc-font-style="${id}"]`)?.textContent ?? '');
+    }
     for (const item of fontStyleList.querySelectorAll<HTMLButtonElement>('[data-fc-font-style]')) {
       item.setAttribute(
         'aria-selected',
@@ -137,7 +135,8 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     strikeCk.input.checked = draft.strike;
     superscriptCk.input.checked = draft.fontVertAlign === 'superscript';
     subscriptCk.input.checked = draft.fontVertAlign === 'subscript';
-    const effectsOffered = isMacPlatform() && !isDxfMode();
+    // The Mac app's Font tab has no Outline or Shadow box.
+    const effectsOffered = false;
     outlineCk.wrap.hidden = !effectsOffered;
     shadowCk.wrap.hidden = !effectsOffered;
     outlineCk.input.checked = draft.fontOutline;
@@ -160,6 +159,11 @@ export function attachFontTab(ctx: FormatTabContext, refs: FontTabRefs): FontTab
     syncFontSizeOptions(
       draft.fontSize !== undefined ? fontCssPxToDisplayPoints(draft.fontSize) : undefined,
     );
+    if (isMacPlatform()) {
+      // The preview shows the font's own name.
+      const run = fontPreviewBox.querySelector('.fc-fmtdlg__font-preview-run');
+      if (run && draft.fontFamily) run.textContent = draft.fontFamily;
+    }
     colorInput.value = draft.color && isHexColor(draft.color) ? draft.color : '#000000';
     fontSwatches.setValue(draft.color && isHexColor(draft.color) ? draft.color : null);
   };

@@ -1,3 +1,7 @@
+import { cellFormatTh } from '../cell-format/th.js';
+import { editDialogsTh } from '../edit-dialogs/th.js';
+import { macFindReplaceFrom } from './find-replace.js';
+import { macFormatDialogFrom } from './format-dialog.js';
 import type { MacStrings } from './types.js';
 
 export const macTh: MacStrings = {
@@ -147,4 +151,9 @@ export const macTh: MacStrings = {
     cellStyles: 'สไตล์เซลล์',
     autoSum: 'ผลรวมอัตโนมัติ',
   },
+  macFormatDialog: macFormatDialogFrom(cellFormatTh.formatDialog),
+  macFindReplace: macFindReplaceFrom(
+    editDialogsTh.findReplace,
+    'แยกอักขระครึ่งความกว้างและเต็มความกว้าง',
+  ),
 };

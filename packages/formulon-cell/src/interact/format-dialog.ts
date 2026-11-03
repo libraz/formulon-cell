@@ -236,7 +236,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     );
   };
   const getDate1904 = (): boolean => store.getState().ui.date1904 === true;
-  const t = strings.formatDialog;
+  const t = isMacHost()
+    ? { ...strings.formatDialog, ...strings.macFormatDialog }
+    : strings.formatDialog;
 
   const localizeDialogFormula = (formula: string): string => {
     const wb = getWb();
@@ -263,6 +265,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     strings,
     t,
     fontLocale: dictionaryLocaleFor(getFormatLocale()),
+    mac: isMacHost(),
   });
   const {
     shell,
@@ -282,6 +285,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     cancelBtn,
     hintBar,
   } = view;
+  overlay.classList.toggle('fc-fmtdlg--mac', isMacHost());
+  // The Mac dialog has no text-direction control.
+  if (isMacHost()) {
+    overlay
+      .querySelector<HTMLElement>('.fc-fmtdlg__text-direction-row')
+      ?.setAttribute('hidden', '');
+  }
   attachRangePickerButton(validationListRangeInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
     getValue: () => formatA1Range(store.getState().selection.range),
@@ -356,19 +366,22 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const rangeValidation = applyDxf ? undefined : rangeValidationAt(state.format, displayAddr);
     const fmt =
       merged.validation || !rangeValidation ? merged : { ...merged, validation: rangeValidation };
-    hydrateDraftFromFormat(draft, fmt, getFormatLocale(), localizeDialogFormula);
+    hydrateDraftFromFormat(
+      draft,
+      fmt,
+      getFormatLocale(),
+      localizeDialogFormula,
+      isMacHost() ? 0 : 2,
+    );
     borderTab.clearPendingPreset();
 
     syncControlsFromDraft();
     const range = state.selection.range;
-    const activeMerge = mergeAt(state, state.selection.active);
     const multiCell = range.r0 !== range.r1 || range.c0 !== range.c1;
     const mergeRange = expandRangeWithMerges(state, range);
     const hasExtraRanges = (state.selection.extraRanges?.length ?? 0) > 0;
     const mergeDisabled =
-      hasExtraRanges ||
-      (!multiCell && activeMerge === null) ||
-      (!getWb() && mergeHasNonAnchorContent(state, mergeRange));
+      hasExtraRanges || (!getWb() && mergeHasNonAnchorContent(state, mergeRange));
     alignTab.hydrateMerge(mergeSelectionState(state, range), mergeDisabled);
     borderTab.setInsideAvailable(multiCell || hasExtraRanges);
     renderPreview();
@@ -400,12 +413,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const defaultPatternFor = (cat: NumberCategory): string =>
-    defaultPatternForLocale(cat, getFormatLocale());
+    defaultPatternForLocale(cat, getFormatLocale(), isMacHost());
 
   // ── Tab switch ─────────────────────────────────────────────────────────
   const tabOrder = Array.from(tabButtons.keys());
+  let lastUsedTab: TabId = 'number';
   const setActiveTab = (id: TabId): void => {
     activeTab = id;
+    if (id !== 'more') lastUsedTab = id;
     closePaletteFlyouts();
     for (const [tabId, btn] of tabButtons) {
       btn.setAttribute('aria-selected', tabId === id ? 'true' : 'false');
@@ -427,6 +442,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
   };
 
+  let showMoreTab = false;
   let dialogMode: NonNullable<FormatDialogOpenOptions['mode']> = 'format';
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
@@ -443,7 +459,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     commentSection.hidden = dataValidationMode;
     validationSection.classList.toggle('fc-fmtdlg__section--standalone', dataValidationMode);
     for (const [tabId, button] of tabButtons) {
-      button.hidden = dxfMode && (tabId === 'align' || tabId === 'protection' || tabId === 'more');
+      // The Mac app has no seventh tab; it opens only when asked for by name.
+      const macHidden = isMacHost() && tabId === 'more' && !showMoreTab;
+      button.hidden =
+        macHidden || (dxfMode && (tabId === 'align' || tabId === 'protection' || tabId === 'more'));
     }
     if (dxfMode && (activeTab === 'align' || activeTab === 'protection' || activeTab === 'more')) {
       setActiveTab('number');
@@ -469,7 +488,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const selectedRanges = [range, ...(state.selection.extraRanges ?? [])];
 
     const mergeRange = expandRangeWithMerges(state, range);
-    const mergeAction = alignTab.mergeAction();
+    // Merging a lone cell is a no-op, as in the spreadsheet app.
+    const loneCell = mergeRange.r0 === mergeRange.r1 && mergeRange.c0 === mergeRange.c1;
+    const mergeAction =
+      loneCell && alignTab.mergeAction() === 'merge' ? null : alignTab.mergeAction();
 
     // A multi-area selection has no single merge result. The control is also
     // disabled during hydration, but retain this guard for stale event state.
@@ -717,9 +739,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       dialogMode = options?.mode ?? 'format';
       applyDxf = options?.mode === 'dxf' ? (options.onApplyDxf ?? null) : null;
       syncColorPaletteTheme(overlay, themeColorColumns(getWb()?.getTheme()?.colors));
+      showMoreTab = tab === 'more';
+      const remembered = lastUsedTab;
       hydrateFromActive(options?.initialFormat);
       setDialogMode(options?.mode);
-      if (tab && tabButtons.has(tab)) setActiveTab(tab);
+      // The Mac app reopens on the tab used last.
+      const requested = tab ?? (isMacHost() && options?.mode !== 'dxf' ? remembered : undefined);
+      if (requested && tabButtons.has(requested)) setActiveTab(requested);
       if (options?.mode === 'dataValidation') setActiveTab('more');
       shell.open();
       if (mixedFields.size > 0) {

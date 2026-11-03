@@ -129,19 +129,50 @@ export const FRACTION_PATTERNS = [
 
 export const defaultCurrencySymbolFor = currencySymbolForLocale;
 
+/** The Japanese Mac app's date and time lists, in its order. */
+const MAC_JA_DATE_PATTERNS = [
+  'yyyy/m/d',
+  'yyyy"年"m"月"d"日" dddd',
+  'yyyy-mm-dd',
+  'yyyy"年"m"月"d"日"',
+  'yyyy"年"m"月"',
+  'm"月"d"日"',
+  'yyyy/m/d',
+  'yyyy/m/d h:mm AM/PM',
+  'yyyy/m/d h:mm',
+  'm/d',
+  'm/d/yy',
+  'mm/dd/yy',
+  'd-mmm',
+  'd-mmm-yy',
+  'dd-mmm-yy',
+  'mmm-yy',
+  'mmmm-yy',
+  'mmmmm',
+  'mmmmm-yy',
+];
+const MAC_JA_TIME_PATTERNS = [
+  'h:mm:ss',
+  'h:mm',
+  'h:mm AM/PM',
+  'h:mm:ss',
+  'h:mm:ss AM/PM',
+  'yyyy/m/d h:mm AM/PM',
+  'yyyy/m/d h:mm',
+  'h"時"mm"分"',
+  'h"時"mm"分"ss"秒"',
+];
+
 export const patternPresetsFor = (
   locale: string,
+  mac = false,
 ): Record<'date' | 'time' | 'fraction' | 'special' | 'custom', string[]> => {
   if (normalizeFormatLocale(locale).startsWith('ja')) {
     return {
-      date: [
-        'yyyy"年"m"月"d"日"',
-        'yyyy/m/d',
-        'yyyy-mm-dd',
-        'm"月"d"日"',
-        'yyyy"年"m"月"d"日" ddd',
-      ],
-      time: ['HH:MM', 'HH:MM:SS', 'h:MM AM/PM', 'h:MM:SS AM/PM'],
+      date: mac
+        ? [...MAC_JA_DATE_PATTERNS]
+        : ['yyyy"年"m"月"d"日"', 'yyyy/m/d', 'yyyy-mm-dd', 'm"月"d"日"', 'yyyy"年"m"月"d"日" ddd'],
+      time: mac ? [...MAC_JA_TIME_PATTERNS] : ['HH:MM', 'HH:MM:SS', 'h:MM AM/PM', 'h:MM:SS AM/PM'],
       fraction: [...FRACTION_PATTERNS],
       special: [
         '000',
@@ -185,14 +216,18 @@ export const patternPresetsFor = (
 
 /** First locale preset for a pattern-driven category, or a fixed fallback;
  *  '' for categories whose number format carries no pattern. */
-export const defaultPatternForLocale = (category: NumberCategory, locale: string): string => {
+export const defaultPatternForLocale = (
+  category: NumberCategory,
+  locale: string,
+  mac = false,
+): string => {
   const presets =
     category === 'date' ||
     category === 'time' ||
     category === 'fraction' ||
     category === 'special' ||
     category === 'custom'
-      ? patternPresetsFor(locale)[category]
+      ? patternPresetsFor(locale, mac)[category]
       : [];
   if (presets[0]) return presets[0];
   switch (category) {

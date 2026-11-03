@@ -1,3 +1,7 @@
+import { cellFormatZh } from '../cell-format/zh.js';
+import { editDialogsZh } from '../edit-dialogs/zh.js';
+import { macFindReplaceFrom } from './find-replace.js';
+import { macFormatDialogFrom } from './format-dialog.js';
 import type { MacStrings } from './types.js';
 
 export const macZh: MacStrings = {
@@ -147,4 +151,6 @@ export const macZh: MacStrings = {
     cellStyles: '单元格样式',
     autoSum: '自动求和',
   },
+  macFormatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
+  macFindReplace: macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
 };

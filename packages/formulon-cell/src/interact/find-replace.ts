@@ -57,6 +57,12 @@ const cellRange = (addr: Addr): Range => ({
 export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const { host, store, wb } = deps;
   let strings = deps.strings ?? defaultStrings;
+  const isMac = (): boolean =>
+    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  /** The dialog's strings, with the Mac wording laid over them on the Mac host. */
+  const copy = (): Strings['findReplace'] =>
+    isMac() ? { ...strings.findReplace, ...strings.macFindReplace } : strings.findReplace;
+  const widthText = (): string => strings.macFindReplace.matchWidth;
   let activeTab: FindTab = 'find';
   let optionsOpen = false;
 
@@ -123,21 +129,22 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     ['comments', 'Comments'],
     ['notes', 'Notes'],
   ]);
-  lookInSelect.value = 'values';
+  lookInSelect.value = isMac() ? 'formulas' : 'values';
 
   const withinRow = labeledControl('fc-find-within', withinSelect, 'fc-find__field--short');
   const searchRow = labeledControl('fc-find-search', searchSelect, 'fc-find__field--short');
   const lookInRow = labeledControl('fc-find-look-in', lookInSelect, 'fc-find__field--short');
 
   const formatBtn = makeBtn('fc-find__format-btn');
-  projectDisabledState(formatBtn, true, strings.findReplace.formatUnavailable, {
+  projectDisabledState(formatBtn, true, copy().formatUnavailable, {
     datasetKey: 'disabledReason',
-    titlePrefix: strings.findReplace.format,
+    titlePrefix: copy().format,
   });
   const formatRow = document.createElement('div');
   formatRow.className = 'fc-find__field fc-find__field--format';
   const formatSpacer = document.createElement('span');
   formatRow.append(formatSpacer, formatBtn);
+  formatRow.hidden = isMac();
 
   const caseToggle = document.createElement('input');
   caseToggle.type = 'checkbox';
@@ -155,9 +162,19 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const wholeText = document.createElement('span');
   wholeLabel.append(wholeToggle, wholeText);
 
+  const widthToggle = document.createElement('input');
+  widthToggle.type = 'checkbox';
+  widthToggle.id = 'fc-find-width';
+  const widthLabel = document.createElement('label');
+  widthLabel.className = 'fc-find__check';
+  const widthText_ = document.createElement('span');
+  widthLabel.append(widthToggle, widthText_);
+
   const checks = document.createElement('div');
   checks.className = 'fc-find__checks';
   checks.append(caseLabel, wholeLabel);
+  // The half-width / full-width option exists on the Mac host only.
+  if (isMac()) checks.append(widthLabel);
 
   optionsPanel.append(withinRow.row, searchRow.row, lookInRow.row, checks, formatRow);
   form.append(findRow.row, replaceRow.row, optionsRow, optionsPanel);
@@ -205,11 +222,21 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   body.className = 'fc-find__body';
   body.append(form, results);
 
+  // The Mac app keeps a cell count under the buttons.
+  const status = document.createElement('div');
+  status.className = 'fc-find__status';
+  status.setAttribute('aria-live', 'polite');
+  status.hidden = !isMac();
+  const setStatus = (count: number): void => {
+    status.textContent = copy().cellsFound.replace('{count}', String(count));
+  };
+
+  footer.append(status);
   overlay.append(titlebar, tabs, body, footer);
   host.appendChild(overlay);
 
   const relabel = (): void => {
-    const t = strings.findReplace;
+    const t = copy();
     overlay.setAttribute('aria-label', t.title);
     title.textContent = t.title;
     findTab.textContent = t.findTab;
@@ -227,6 +254,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     setOptions(lookInSelect, [t.formulas, t.values, t.comments, t.notes]);
     caseText.textContent = t.matchCase;
     wholeText.textContent = t.matchEntire;
+    widthText_.textContent = widthText();
     formatBtn.textContent = t.format;
     projectDisabledState(formatBtn, true, t.formatUnavailable, {
       datasetKey: 'disabledReason',
@@ -253,6 +281,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     query: findInput.value,
     caseSensitive: caseToggle.checked,
     matchWhole: wholeToggle.checked,
+    ...(isMac() ? { matchWidth: widthToggle.checked } : {}),
     within: withinSelect.value === 'workbook' ? 'workbook' : 'sheet',
     searchBy: searchSelect.value === 'columns' ? 'columns' : 'rows',
     lookIn:
@@ -337,7 +366,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   };
 
   const renderResults = (): void => {
-    const t = strings.findReplace;
+    const t = copy();
     const all = matchesForNavigation(store.getState(), opts());
     resultsBody.replaceChildren();
     for (const match of all) {
@@ -362,6 +391,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     }
     results.hidden = false;
     updateSummary(all.length);
+    setStatus(all.length);
     resultsSummary.textContent = t.cellsFound.replace('{count}', String(all.length));
   };
 
@@ -371,6 +401,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       return;
     }
     const allCount = count ?? matchesForNavigation(store.getState(), opts()).length;
+    setStatus(opts().query ? allCount : 0);
     if (!opts().query) {
       resultsSummary.textContent = '0 / 0';
       return;
@@ -491,17 +522,29 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     if (n > 0) deps.onAfterCommit?.();
     currentMatch = null;
     clearResults();
-    updateSummary(undefined, strings.findReplace.replacedCount.replace('{count}', String(n)));
+    updateSummary(undefined, copy().replacedCount.replace('{count}', String(n)));
   };
 
   const syncTab = (): void => {
-    const t = strings.findReplace;
+    const t = copy();
     findTab.setAttribute('aria-selected', activeTab === 'find' ? 'true' : 'false');
     replaceTab.setAttribute('aria-selected', activeTab === 'replace' ? 'true' : 'false');
     replaceRow.row.hidden = activeTab === 'find';
     replaceBtn.hidden = activeTab === 'find';
     replaceAllBtn.hidden = activeTab === 'find';
-    findAllBtn.hidden = activeTab === 'replace';
+    // The Mac replace tab keeps Find All, laid out after the replace buttons.
+    findAllBtn.hidden = activeTab === 'replace' && !isMac();
+    if (isMac()) {
+      footer.append(
+        replaceBtn,
+        replaceAllBtn,
+        findAllBtn,
+        prevBtn,
+        nextBtn,
+        closeFooterBtn,
+        status,
+      );
+    }
     // Find and Replace share the same projection.  Values remain the default
     // for a new replacement session, while Formula search stays available for
     // callers that explicitly choose it; both modes preserve their source
@@ -534,9 +577,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   const syncOptions = (): void => {
     optionsPanel.hidden = !optionsOpen;
-    optionsBtn.textContent = optionsOpen
-      ? strings.findReplace.optionsLess
-      : strings.findReplace.optionsMore;
+    optionsBtn.textContent = optionsOpen ? copy().optionsLess : copy().optionsMore;
   };
 
   const resetSearch = (): void => {
@@ -594,7 +635,14 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   findInput.addEventListener('keydown', onFindKey);
   findInput.addEventListener('input', resetSearch);
   replaceInput.addEventListener('keydown', onReplaceKey);
-  for (const control of [caseToggle, wholeToggle, withinSelect, searchSelect, lookInSelect]) {
+  for (const control of [
+    caseToggle,
+    wholeToggle,
+    widthToggle,
+    withinSelect,
+    searchSelect,
+    lookInSelect,
+  ]) {
     control.addEventListener('change', resetSearch);
   }
   overlay.addEventListener('keydown', onOverlayKey);
@@ -637,7 +685,14 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       findInput.removeEventListener('keydown', onFindKey);
       findInput.removeEventListener('input', resetSearch);
       replaceInput.removeEventListener('keydown', onReplaceKey);
-      for (const control of [caseToggle, wholeToggle, withinSelect, searchSelect, lookInSelect]) {
+      for (const control of [
+        caseToggle,
+        wholeToggle,
+        widthToggle,
+        withinSelect,
+        searchSelect,
+        lookInSelect,
+      ]) {
         control.removeEventListener('change', resetSearch);
       }
       overlay.removeEventListener('keydown', onOverlayKey);

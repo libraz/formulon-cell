@@ -1,3 +1,7 @@
+import { cellFormatDe } from '../cell-format/de.js';
+import { editDialogsDe } from '../edit-dialogs/de.js';
+import { macFindReplaceFrom } from './find-replace.js';
+import { macFormatDialogFrom } from './format-dialog.js';
 import type { MacStrings } from './types.js';
 
 export const macDe: MacStrings = {
@@ -150,4 +154,9 @@ export const macDe: MacStrings = {
     cellStyles: 'Zellenformatvorlagen',
     autoSum: 'AutoSumme',
   },
+  macFormatDialog: macFormatDialogFrom(cellFormatDe.formatDialog),
+  macFindReplace: macFindReplaceFrom(
+    editDialogsDe.findReplace,
+    'Halbbreite und Vollbreite unterscheiden',
+  ),
 };

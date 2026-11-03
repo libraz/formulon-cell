@@ -89,6 +89,8 @@ export interface FontTabRefs {
   fontSwatchesToggle: HTMLButtonElement;
   fontSwatchesFlyout: HTMLDivElement;
   fontPreviewBox: HTMLDivElement;
+  /** Mac presentation: the read-only style field above the style list. */
+  fontStyleField: HTMLInputElement | null;
   fontLocale?: Locale;
   syncFontFamilyOptions: (current: string, selectFirstWhenEmpty?: boolean) => void;
   syncFontSizeOptions: (current: number | undefined) => void;
@@ -99,6 +101,7 @@ export function createFontTab(
   t: Strings['formatDialog'],
   locale: Locale,
   sourceFamilies?: readonly string[],
+  mac = false,
 ): FontTabRefs {
   const ownerWindow = panel.ownerDocument.defaultView;
   const familySource = sourceFamilies ? fontFamilyCatalog(locale, sourceFamilies) : undefined;
@@ -146,16 +149,33 @@ export function createFontTab(
   outlineCk.input.dataset.fcCheck = 'fontOutline';
   const shadowCk = makeCheckbox(t.fontShadow);
   shadowCk.input.dataset.fcCheck = 'fontShadow';
-  styleRow.append(
-    boldCk.wrap,
-    italicCk.wrap,
-    underlineLabel,
-    strikeCk.wrap,
-    superscriptCk.wrap,
-    subscriptCk.wrap,
-    outlineCk.wrap,
-    shadowCk.wrap,
-  );
+  if (mac) {
+    // Mac presentation: the style list carries bold/italic and the app has no
+    // outline/shadow, so those boxes stay as the model but out of sight; the
+    // underline popup and the three decorations sit in their own places.
+    styleRow.hidden = true;
+    styleRow.append(boldCk.wrap, italicCk.wrap, outlineCk.wrap, shadowCk.wrap);
+    underlineLabel.className = 'fc-fmtdlg__font-underline fc-fmtdlg__font-underline--mac';
+    panel.appendChild(underlineLabel);
+    const deco = document.createElement('div');
+    deco.className = 'fc-fmtdlg__font-deco';
+    const decoTitle = document.createElement('div');
+    decoTitle.className = 'fc-fmtdlg__font-deco-title';
+    decoTitle.textContent = t.fontEffects;
+    deco.append(decoTitle, strikeCk.wrap, superscriptCk.wrap, subscriptCk.wrap);
+    panel.appendChild(deco);
+  } else {
+    styleRow.append(
+      boldCk.wrap,
+      italicCk.wrap,
+      underlineLabel,
+      strikeCk.wrap,
+      superscriptCk.wrap,
+      subscriptCk.wrap,
+      outlineCk.wrap,
+      shadowCk.wrap,
+    );
+  }
 
   const normalFontCk = makeCheckbox(t.normalFont);
   normalFontCk.input.dataset.fcCheck = 'normalFont';
@@ -222,6 +242,16 @@ export function createFontTab(
   const fontStyleLabel = document.createElement('div');
   fontStyleLabel.className = 'fc-fmtdlg__font-style-label';
   fontStyleLabel.textContent = t.fontStyle;
+  let fontStyleField: HTMLInputElement | null = null;
+  if (mac) {
+    // The Mac app shows the chosen style in a field above the list.
+    fontStyleField = document.createElement('input');
+    fontStyleField.type = 'text';
+    fontStyleField.readOnly = true;
+    fontStyleField.className = 'fc-fmtdlg__font-style-field';
+    fontStyleField.setAttribute('aria-label', t.fontStyle);
+    fontStyleLabel.appendChild(fontStyleField);
+  }
   panel.appendChild(fontStyleLabel);
 
   const fontStyleList = document.createElement('div');
@@ -333,13 +363,15 @@ export function createFontTab(
   const colorControl = document.createElement('span');
   colorControl.className = 'fc-fmtdlg__color-control';
   colorControl.append(colorInput, fontSwatchesToggle);
-  const colorReset = makeButton(t.resetToDefault);
-  colorRow.append(colorLabel, colorControl, colorReset);
+  const colorReset = makeButton(mac ? t.automatic : t.resetToDefault);
+  if (mac) colorRow.append(colorLabel, colorControl);
+  else colorRow.append(colorLabel, colorControl, colorReset);
   panel.appendChild(colorRow);
   const fontSwatches = makeSwatches('font', t.themeColors, t.standardColors);
   const fontSwatchesFlyout = document.createElement('div');
   fontSwatchesFlyout.className = 'fc-fmtdlg__color-flyout';
   fontSwatchesFlyout.hidden = true;
+  if (mac) fontSwatchesFlyout.appendChild(colorReset);
   fontSwatchesFlyout.appendChild(fontSwatches.el);
   panel.appendChild(fontSwatchesFlyout);
 
@@ -376,6 +408,7 @@ export function createFontTab(
     fontSwatchesToggle,
     fontSwatchesFlyout,
     fontPreviewBox,
+    fontStyleField,
     fontLocale: locale,
     syncFontFamilyOptions,
     syncFontSizeOptions,

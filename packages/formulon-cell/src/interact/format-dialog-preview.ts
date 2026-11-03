@@ -221,7 +221,9 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
     previewCell.style.color =
       value.kind === 'number' &&
       value.value < 0 &&
-      (draft.negativeStyle === 'red' || draft.negativeStyle === 'red-parens')
+      (draft.negativeStyle === 'red' ||
+        draft.negativeStyle === 'red-parens' ||
+        draft.negativeStyle === 'red-plain')
         ? '#ff0000'
         : '';
   };

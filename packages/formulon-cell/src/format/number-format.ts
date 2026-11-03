@@ -1,5 +1,5 @@
 import { formatGeneralNumber, formatScientificNumber } from '../engine/value.js';
-import type { NumFmt } from '../store/store.js';
+import type { NegativeStyle, NumFmt } from '../store/store.js';
 import { excelSerialToDate, excelSerialToDateParts } from './date-serial.js';
 import { intlFormatterCache } from './intl-cache.js';
 import { normalizeFormatLocale } from './locale.js';
@@ -142,12 +142,7 @@ function placeCurrencySymbol(body: string, symbol: string, locale: string): stri
   return `${affix(parts.slice(0, first))}${body}${affix(parts.slice(last + 1))}`;
 }
 
-function applyNegative(
-  value: number,
-  body: string,
-  symbol: string,
-  style: 'minus' | 'parens' | 'red' | 'red-parens',
-): string {
+function applyNegative(value: number, body: string, symbol: string, style: NegativeStyle): string {
   const positive = `${symbol}${body}`;
   if (value >= 0) return positive;
   switch (style) {
@@ -157,6 +152,12 @@ function applyNegative(
       return `-${symbol}${body}`; // color is applied at paint time
     case 'red-parens':
       return `(${symbol}${body})`;
+    case 'red-plain':
+      return positive; // color is applied at paint time
+    case 'triangle':
+      return `△ ${symbol}${body}`;
+    case 'triangle-filled':
+      return `▲ ${symbol}${body}`;
     default:
       return `-${symbol}${body}`;
   }

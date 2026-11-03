@@ -24,7 +24,16 @@ export type NumFmt =
   | { kind: 'custom'; pattern: string };
 
 /** How negative numbers display. */
-export type NegativeStyle = 'minus' | 'parens' | 'red' | 'red-parens';
+/** How a negative number reads: `red` and `red-plain` colour it red (with and
+ *  without the minus sign); the triangle styles replace the sign. */
+export type NegativeStyle =
+  | 'minus'
+  | 'parens'
+  | 'red'
+  | 'red-parens'
+  | 'red-plain'
+  | 'triangle'
+  | 'triangle-filled';
 
 export type CellAlign =
   | 'left'

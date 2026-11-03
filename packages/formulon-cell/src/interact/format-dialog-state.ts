@@ -525,6 +525,8 @@ export function hydrateDraftFromFormat(
   fmt: CellFormat,
   formatLocale: string,
   localizeFormula?: FormulaTransform,
+  /** Decimal places a number category starts with on a cell without one. */
+  defaultDecimals = 2,
 ): void {
   if (fmt.numFmt) {
     draft.numFmt = fmt.numFmt;
@@ -587,7 +589,7 @@ export function hydrateDraftFromFormat(
   } else {
     draft.numFmt = { kind: 'general' };
     draft.numberCategory = 'general';
-    draft.decimals = 2;
+    draft.decimals = defaultDecimals;
     draft.thousands = false;
     draft.negativeStyle = 'minus';
     draft.currencySymbol = defaultCurrencySymbolFor(formatLocale);
