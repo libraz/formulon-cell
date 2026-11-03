@@ -82,7 +82,7 @@ describe('interact/format-dialog-state', () => {
     hydrateDraftFromFormat(draft, summary.activeFormat, 'en');
     draft.align = 'center';
     const touched = new Set(['align'] as const);
-    expect(buildTouchedDialogPatch(draft, touched)).toEqual({ align: 'center' });
+    expect(buildTouchedDialogPatch(draft, touched, false)).toEqual({ align: 'center' });
   });
 
   it.each([
@@ -517,7 +517,7 @@ describe('interact/format-dialog-state', () => {
     it('produces a general kind for "general"', () => {
       const draft = makeEmptyDraft('en');
       draft.numberCategory = 'general';
-      expect(computeDialogNumFmt(draft, fallback)).toEqual({ kind: 'general' });
+      expect(computeDialogNumFmt(draft, fallback, false)).toEqual({ kind: 'general' });
     });
 
     it('produces a currency kind with symbol + decimals', () => {
@@ -525,18 +525,40 @@ describe('interact/format-dialog-state', () => {
       draft.numberCategory = 'currency';
       draft.decimals = 0;
       draft.currencySymbol = '€';
-      expect(computeDialogNumFmt(draft, fallback)).toEqual({
+      expect(computeDialogNumFmt(draft, fallback, false)).toEqual({
         kind: 'currency',
         decimals: 0,
         symbol: '€',
       });
     });
 
+    it('pads the plain and red-minus Number rows only when asked', () => {
+      const draft = makeEmptyDraft('en');
+      draft.numberCategory = 'fixed';
+      draft.decimals = 0;
+      expect(computeDialogNumFmt(draft, fallback, true)).toEqual({
+        kind: 'fixed',
+        decimals: 0,
+        trailingPad: true,
+      });
+      draft.negativeStyle = 'red';
+      expect(computeDialogNumFmt(draft, fallback, true)).toEqual({
+        kind: 'fixed',
+        decimals: 0,
+        negativeStyle: 'red',
+        trailingPad: true,
+      });
+      draft.negativeStyle = 'parens';
+      expect(computeDialogNumFmt(draft, fallback, true)).not.toHaveProperty('trailingPad');
+      draft.negativeStyle = 'minus';
+      expect(computeDialogNumFmt(draft, fallback, false)).toEqual({ kind: 'fixed', decimals: 0 });
+    });
+
     it('falls back to defaultPatternFor when pattern is empty', () => {
       const draft = makeEmptyDraft('en');
       draft.numberCategory = 'date';
       draft.pattern = '';
-      const out = computeDialogNumFmt(draft, fallback);
+      const out = computeDialogNumFmt(draft, fallback, false);
       expect(out).toEqual({ kind: 'date', pattern: 'default-date' });
     });
 
@@ -544,7 +566,7 @@ describe('interact/format-dialog-state', () => {
       const draft = makeEmptyDraft('en');
       draft.numberCategory = 'custom';
       draft.pattern = '#,##0.00';
-      expect(computeDialogNumFmt(draft, fallback)).toEqual({
+      expect(computeDialogNumFmt(draft, fallback, false)).toEqual({
         kind: 'custom',
         pattern: '#,##0.00',
       });
@@ -554,7 +576,7 @@ describe('interact/format-dialog-state', () => {
       const draft = makeEmptyDraft('en');
       draft.numberCategory = 'fraction';
       draft.pattern = '# ??/??';
-      expect(computeDialogNumFmt(draft, fallback)).toEqual({
+      expect(computeDialogNumFmt(draft, fallback, false)).toEqual({
         kind: 'custom',
         pattern: '# ??/??',
       });

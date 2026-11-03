@@ -1,7 +1,9 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { SelectionFormatPlan } from '../commands/selection-format-plan.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending } from '../store/pending-format.js';
 import type {
   CellBorderSide,
@@ -374,6 +376,7 @@ const defaultPatternFor = (category: NumberCategory): string => {
 export function buildTouchedDialogPatch(
   draft: DraftState,
   touched: ReadonlySet<FormatDialogField>,
+  padNumber: boolean,
   defaultPattern: (category: NumberCategory) => string = defaultPatternFor,
   canonicalizeFormula?: FormulaTransform,
 ): Partial<CellFormat> {
@@ -381,7 +384,7 @@ export function buildTouchedDialogPatch(
   const set = <K extends keyof CellFormat>(key: K, value: CellFormat[K]): void => {
     if (touched.has(key as FormatDialogField)) patch[key] = value;
   };
-  set('numFmt', computeDialogNumFmt(draft, defaultPattern));
+  set('numFmt', computeDialogNumFmt(draft, defaultPattern, padNumber));
   set('align', draft.align);
   set('vAlign', draft.vAlign);
   set('wrap', draft.wrap);
@@ -438,10 +441,11 @@ export function buildTouchedDialogPatch(
 export function buildDialogDxf(
   draft: DraftState,
   defaultPattern: (category: NumberCategory) => string,
+  padNumber: boolean,
 ): Partial<CellFormat> {
   const explicitBorders = explicitDraftBorders(draft);
   return {
-    numFmt: computeDialogNumFmt(draft, defaultPattern),
+    numFmt: computeDialogNumFmt(draft, defaultPattern, padNumber),
     bold: draft.bold,
     italic: draft.italic,
     underline: draft.underline,
@@ -682,6 +686,8 @@ export function explicitDraftBorders(draft: DraftState): CellBorders {
 export function computeDialogNumFmt(
   draft: DraftState,
   defaultPatternFor: (cat: NumberCategory) => string,
+  /** Write the Number rows without parentheses with a trailing `_ ` pad. */
+  padNumber: boolean,
 ): NumFmt {
   const cat = draft.numberCategory;
   switch (cat) {
@@ -693,6 +699,9 @@ export function computeDialogNumFmt(
         decimals: draft.decimals,
         ...(draft.thousands ? { thousands: true } : {}),
         ...(draft.negativeStyle !== 'minus' ? { negativeStyle: draft.negativeStyle } : {}),
+        ...(padNumber && (draft.negativeStyle === 'minus' || draft.negativeStyle === 'red')
+          ? { trailingPad: true }
+          : {}),
       };
     case 'currency':
       return {
@@ -882,3 +891,7 @@ function sideColor(s: CellBorderSide | undefined): string | undefined {
   if (typeof s === 'object') return s.color;
   return undefined;
 }
+
+/** Desktop Excel pads the plain and red-minus Number rows with `_ ` in Japanese workbooks. */
+export const padsNumberRows = (wb: WorkbookHandle | null): boolean =>
+  wb !== null && inputLocaleForWorkbook(wb)?.split('-')[0] === 'ja';

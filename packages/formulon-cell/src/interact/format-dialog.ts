@@ -44,6 +44,7 @@ import {
   type FormatDialogField,
   hydrateDraftFromFormat,
   makeEmptyDraft,
+  padsNumberRows,
   summarizeDialogFormats,
 } from './format-dialog-state.js';
 import { attachAlignTab, type MergeSelectionState } from './format-dialog-tabs/align-controller.js';
@@ -404,6 +405,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     getLocale: getFormatLocale,
     getDate1904,
     defaultPatternFor: (cat) => defaultPatternFor(cat),
+    padNumber: () => padsNumberRows(getWb()),
     previewValue: () => (applyDxf !== null ? null : previewValue),
     fontEffects: () => isMacHost(),
   });
@@ -474,7 +476,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── Apply OK ───────────────────────────────────────────────────────────
   const applyAndClose = async (): Promise<void> => {
     if (applyDxf) {
-      applyDxf(buildDialogDxf(draft, defaultPatternFor));
+      applyDxf(buildDialogDxf(draft, defaultPatternFor, padsNumberRows(getWb())));
       api.close();
       return;
     }
@@ -514,6 +516,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const touchedPatch = buildTouchedDialogPatch(
       draft,
       touchedFields,
+      padsNumberRows(liveWb),
       defaultPatternFor,
       canonicalizeDialogFormula,
     );

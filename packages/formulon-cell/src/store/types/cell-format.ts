@@ -2,7 +2,14 @@ import type { PhoneticProperties, PhoneticRun, Range } from '../../engine/types.
 
 export type NumFmt =
   | { kind: 'general' }
-  | { kind: 'fixed'; decimals: number; thousands?: boolean; negativeStyle?: NegativeStyle }
+  | {
+      kind: 'fixed';
+      decimals: number;
+      thousands?: boolean;
+      negativeStyle?: NegativeStyle;
+      /** Trailing `_ ` pad after the digits, as the Number list rows without parentheses write it. */
+      trailingPad?: boolean;
+    }
   | {
       kind: 'currency';
       decimals: number;

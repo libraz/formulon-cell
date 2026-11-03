@@ -29,6 +29,7 @@ export interface FormatPreviewInput {
   getLocale(): string;
   getDate1904(): boolean;
   defaultPatternFor(category: NumberCategory): string;
+  padNumber(): boolean;
   /** Active cell value; null while editing a differential format, where a
    *  representative synthetic sample stands in. */
   previewValue(): CellValue | null;
@@ -102,7 +103,7 @@ const cssBorder = (s: CellBorderSide | undefined): string => {
 
 /** Returns the preview renderer; call it after every draft change. */
 export function createFormatPreview(input: FormatPreviewInput): () => void {
-  const { refs, draft, getLocale, getDate1904, defaultPatternFor } = input;
+  const { refs, draft, getLocale, getDate1904, defaultPatternFor, padNumber } = input;
   const { previewCell, fontPreviewBox, fillSample, borderVisualPreview } = refs;
   return (): void => {
     const cssFontVertAlign =
@@ -191,7 +192,7 @@ export function createFormatPreview(input: FormatPreviewInput): () => void {
       }
     }
 
-    const numFmt = computeDialogNumFmt(draft, defaultPatternFor);
+    const numFmt = computeDialogNumFmt(draft, defaultPatternFor, padNumber());
     // Differential-format editing has no cell value to preview, so retain a
     // representative sample there. Normal Format Cells previews the active
     // cell, including text, booleans, errors, and blanks.

@@ -233,6 +233,7 @@ export function attachNumberTab(
       const sampleFmt = computeDialogNumFmt(
         { ...draft, numberCategory: cat, negativeStyle: currencyMinus(style) },
         defaultPatternFor,
+        false,
       );
       const star = ctx.isMacPlatform() && MAC_SYSTEM_NEGATIVE.has(style) ? '*' : '';
       item.textContent = star + formatNumber(-1234, sampleFmt, ctx.getLocale());

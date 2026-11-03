@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { addrKey } from '../../../../src/engine/address.js';
 import { ja } from '../../../../src/i18n/strings/ja.js';
 import { attachFormatDialog } from '../../../../src/interact/format-dialog.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
@@ -446,5 +447,51 @@ describe('format dialog, other platforms keep the shared wording', () => {
     expect(document.querySelector('.fc-fmtdlg__hintbar')?.textContent).toBe(
       ja.formatDialog.descGeneral,
     );
+  });
+});
+
+describe('format dialog Number category padding by workbook locale', () => {
+  const pick = (profile: string | undefined, row: string): unknown => {
+    const fcHost = document.createElement('div');
+    fcHost.className = 'fc-host';
+    fcHost.dataset.fcPlatform = 'mac';
+    const host = document.createElement('div');
+    host.tabIndex = -1;
+    fcHost.appendChild(host);
+    document.body.appendChild(fcHost);
+    const store = createSpreadsheetStore();
+    setActive(store, 0, 0);
+    const wb = {
+      capabilities: {},
+      getTheme: () => null,
+      getValue: () => ({ kind: 'blank' }),
+      spreadsheetProfileId: () => profile,
+    } as unknown as never;
+    const handle = attachFormatDialog({ host, store, strings: ja, getWb: () => wb });
+    handle.open('number');
+    const click = (el: Element | null): void => {
+      el?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    click(document.querySelector('button[data-fc-cat="fixed"]'));
+    click(document.querySelector(`[data-fc-negative-style="${row}"]`));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    const out = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.numFmt;
+    handle.detach();
+    document.body.innerHTML = '';
+    return out;
+  };
+
+  it('pads rows 4 and 5 in a ja workbook', () => {
+    expect(pick('excel-mac-ja_JP', 'minus')).toMatchObject({ kind: 'fixed', trailingPad: true });
+    expect(pick('excel-mac-ja_JP', 'red')).toMatchObject({
+      kind: 'fixed',
+      negativeStyle: 'red',
+      trailingPad: true,
+    });
+  });
+
+  it('leaves other workbook locales unpadded', () => {
+    expect(pick('excel-mac-en_US', 'minus')).not.toHaveProperty('trailingPad');
+    expect(pick(undefined, 'red')).not.toHaveProperty('trailingPad');
   });
 });

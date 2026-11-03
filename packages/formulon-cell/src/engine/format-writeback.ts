@@ -339,7 +339,14 @@ export function numFmtToFormatCode(
     case 'fixed': {
       const dec = '0'.repeat(fmt.decimals);
       const body = dec ? `0.${dec}` : '0';
-      return withNegativeSection(fmt.thousands ? `#,##${body}` : body, fmt.negativeStyle);
+      const positive = fmt.thousands ? `#,##${body}` : body;
+      if (fmt.trailingPad && (fmt.negativeStyle === undefined || fmt.negativeStyle === 'minus')) {
+        return `${positive}_ `;
+      }
+      if (fmt.trailingPad && fmt.negativeStyle === 'red') {
+        return joinFormatSections(`${positive}_ `, `[Red]\\-${positive}\\ `);
+      }
+      return withNegativeSection(positive, fmt.negativeStyle);
     }
     case 'currency': {
       if (fmt.pattern !== undefined) return fmt.pattern;
@@ -742,6 +749,8 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
     };
   }
   // Fixed with thousands
+  const trailingPad =
+    (negativeStyle === 'minus' || negativeStyle === 'red') && /_ $/.test(rawSections[0] ?? '');
   const tFixMatch = probe.match(/^#,##0(?:\.(0+))?$/);
   if (tFixMatch) {
     return {
@@ -749,9 +758,9 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
       decimals: tFixMatch[1] ? tFixMatch[1].length : 0,
       thousands: true,
       ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+      ...(trailingPad ? { trailingPad } : {}),
     };
   }
-  if (isSpecialFormatCode(code)) return { kind: 'special', pattern: original };
   // Plain fixed
   const fixMatch = probe.match(/^0(?:\.(0+))?$/);
   if (fixMatch) {
@@ -759,8 +768,10 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
       kind: 'fixed',
       decimals: fixMatch[1] ? fixMatch[1].length : 0,
       ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+      ...(trailingPad ? { trailingPad } : {}),
     };
   }
+  if (isSpecialFormatCode(code)) return { kind: 'special', pattern: original };
   const tokens = dateTimeTokens(firstFormatSection(original));
   const hasTime = /[hs]/i.test(tokens);
   // `m` is minutes next to hours or seconds, and a month otherwise.
@@ -918,14 +929,14 @@ function firstFormatSection(code: string): string {
 
 function normalizeFormatCode(code: string): string {
   return code
-    .trim()
     .replace(/\[\$([^\]-]+)(?:-[^\]]+)?\]/g, '$1')
     .replace(/\[\$-[^\]]+\]/g, '')
     .replace(/\[(?:Red|Green|Blue|Black|White|Yellow|Magenta|Cyan|Color\d+)\]/gi, '')
     .replace(/"([^"]*)"/g, '$1')
     .replace(/_.|\\ /g, '')
     .replace(/\*./g, '')
-    .replace(/\\(.)/g, '$1');
+    .replace(/\\(.)/g, '$1')
+    .trim();
 }
 
 /* ---------- Color helpers ---------- */
