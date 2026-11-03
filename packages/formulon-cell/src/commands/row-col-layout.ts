@@ -36,7 +36,7 @@ export function hideRows(
   wb?: WorkbookHandle,
 ): void {
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'hideRows')) return;
+  if (blockedByProtection(store, sheet, 'hideRows', 'formatRows')) return;
   if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
@@ -55,7 +55,7 @@ export function showRows(
   wb?: WorkbookHandle,
 ): void {
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'showRows')) return;
+  if (blockedByProtection(store, sheet, 'showRows', 'formatRows')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
@@ -112,7 +112,7 @@ export function hideCols(
   wb?: WorkbookHandle,
 ): void {
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'hideCols')) return;
+  if (blockedByProtection(store, sheet, 'hideCols', 'formatColumns')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
@@ -130,7 +130,7 @@ export function showCols(
   wb?: WorkbookHandle,
 ): void {
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'showCols')) return;
+  if (blockedByProtection(store, sheet, 'showCols', 'formatColumns')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
@@ -164,6 +164,8 @@ export function setRowsHeight(
   wb?: WorkbookHandle,
 ): void {
   if (!Number.isFinite(px)) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'setRowsHeight', 'formatRows'))
+    return;
   if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     for (let row = r0; row <= r1; row += 1) mutators.setRowHeight(store, row, px);
@@ -179,6 +181,8 @@ export function setColsWidth(
   wb?: WorkbookHandle,
 ): void {
   if (!Number.isFinite(px)) return;
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'setColsWidth', 'formatColumns'))
+    return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     for (let col = c0; col <= c1; col += 1) mutators.setColWidth(store, col, px);
   });
@@ -192,6 +196,8 @@ export function autofitRowsHeight(
   wb?: WorkbookHandle,
   opts?: AutofitOptions,
 ): void {
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'autofitRows', 'formatRows'))
+    return;
   if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
   const measurementOptions = withWorkbookDisplayFont(opts, wb);
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
@@ -214,6 +220,8 @@ export function autofitColsWidth(
   wb?: WorkbookHandle,
   opts?: AutofitOptions,
 ): void {
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'autofitCols', 'formatColumns'))
+    return;
   const measurementOptions = withWorkbookDisplayFont(opts, wb);
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const ctx = createAutofitMeasureContext();
@@ -246,6 +254,7 @@ export function autofitRowsHeightForRanges(
   opts?: AutofitOptions,
 ): void {
   const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'autofitRows', 'formatRows')) return;
   const normalized = normalizeAutofitRanges(ranges, sheet);
   if (!normalized || normalized.length === 0) return;
   // Count the raw axis/span planning work before allocating per-axis span
@@ -307,6 +316,7 @@ export function autofitColsWidthForRanges(
   opts?: AutofitOptions,
 ): void {
   const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'autofitCols', 'formatColumns')) return;
   const normalized = normalizeAutofitRanges(ranges, sheet);
   if (!normalized || normalized.length === 0) return;
   if (!withinAutofitPlanningBudget(normalized, 'col')) return;

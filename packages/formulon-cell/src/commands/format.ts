@@ -31,7 +31,7 @@ import {
 import { type BorderPreset, borderEntriesForPlan, borderSidesFor } from './border-presets.js';
 import { interactionControllerFor } from './interaction-controller.js';
 import type { InteractionOperation, InteractionOrigin } from './interaction-policy.js';
-import { gateProtection, isCellWritable, isSheetProtected } from './protection.js';
+import { gateProtection, isCellFormattable, sheetPermits } from './protection.js';
 import {
   MAX_MATERIALIZED_FORMAT_CELLS,
   type SelectionFormatEntry,
@@ -151,14 +151,14 @@ const commitSelectionFormatEntries = (
     pendingEntry.patch !== null &&
     options.allowPending !== false &&
     pendingAddr !== null &&
-    isCellWritable(state, pendingAddr) &&
+    isCellFormattable(state, pendingAddr) &&
     canStagePendingFormat(state, ranges[0] as Range)
   ) {
     stagePendingFormat(state, store, ranges[0] as Range, pendingEntry.patch);
     return true;
   }
 
-  const writable = entries.filter((entry) => isCellWritable(state, entry.addr));
+  const writable = entries.filter((entry) => isCellFormattable(state, entry.addr));
   if (writable.length === 0) return false;
   store.setState((current) => {
     const formats = new Map(current.format.formats);
@@ -234,7 +234,7 @@ const applyAxisFormatPatch = (
 ): boolean => {
   if (plan.axisBands.length === 0 || !axisPatchSupported(patch)) return false;
   const sheet = plan.ranges[0]?.sheet;
-  if (sheet === undefined || isSheetProtected(state, sheet)) return false;
+  if (sheet === undefined || !sheetPermits(state, sheet, 'formatCells')) return false;
   if (!authorizeSelection(store, plan.ranges, plan.cells, options)) return false;
   const controller = interactionControllerFor(store);
   if (controller?.policy?.editable !== undefined) return false;
@@ -259,7 +259,7 @@ const applyAxisFormatPatch = (
     budgetKeys,
   );
   if (!preparation) return false;
-  const writable = plan.cells.filter((addr) => isCellWritable(state, addr));
+  const writable = plan.cells.filter((addr) => isCellFormattable(state, addr));
   if (writable.length > MAX_MATERIALIZED_FORMAT_CELLS) return false;
   store.setState((current) => {
     const formats = new Map(current.format.formats);
@@ -411,7 +411,7 @@ const clearSelectionFormat = (
       const formats = new Map(current.format.formats);
       for (const key of selected) {
         const addr = parseAddrKey(key);
-        if (!addr || !isCellWritable(current, addr)) continue;
+        if (!addr || !isCellFormattable(current, addr)) continue;
         if (!visualOnly) formats.delete(key);
         else {
           const previous = formats.get(key);
@@ -431,7 +431,7 @@ const clearSelectionFormat = (
   }
   if (wholeRanges && isWholeSheetSelection(wholeRanges)) {
     const sheet = wholeRanges[0]?.sheet;
-    if (sheet === undefined || isSheetProtected(state, sheet)) return false;
+    if (sheet === undefined || !sheetPermits(state, sheet, 'formatCells')) return false;
     const controller = interactionControllerFor(store);
     if (controller) {
       if (!controller.hasWholeSheetFontStyles()) return false;
@@ -477,7 +477,7 @@ const clearSelectionFormat = (
   store.setState((current) => {
     const formats = new Map(current.format.formats);
     for (const [key, format] of current.format.formats) {
-      if (!selected.has(key) || !isCellWritable(current, parseAddrKey(key) as Addr)) continue;
+      if (!selected.has(key) || !isCellFormattable(current, parseAddrKey(key) as Addr)) continue;
       if (!visualOnly) formats.delete(key);
       else {
         const next = stripVisualFormat(format);
@@ -487,7 +487,7 @@ const clearSelectionFormat = (
     }
     const pending = current.ui.pendingFormat?.addr;
     const pendingSelected = pending
-      ? selectionIncludes(plan.ranges, pending) && isCellWritable(current, pending)
+      ? selectionIncludes(plan.ranges, pending) && isCellFormattable(current, pending)
       : false;
     return {
       ...current,
@@ -514,7 +514,9 @@ export function applyFormatPatch(
   patch: Partial<CellFormat> | null,
   opts: { allowPending?: boolean } = {},
 ): boolean {
-  const allowed = gateProtection(state, range);
+  const allowed = sheetPermits(state, range.sheet, 'formatCells')
+    ? range
+    : gateProtection(state, range);
   if (allowed === null) return false;
   if (isWholeColumnRange(range) || isWholeRowRange(range)) {
     const axisBands: AxisFormatBand[] = [
@@ -558,7 +560,7 @@ export function applyFormatPatch(
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       const addr = { sheet, row: r, col: c };
-      if (!isCellWritable(state, addr)) continue;
+      if (!isCellFormattable(state, addr)) continue;
       mutators.setCellFormat(store, addr, patch);
       wroteAny = true;
     }
@@ -921,7 +923,7 @@ export function applySelectionFormatAction(
     plan.cells.length === 1 &&
     plan.ranges.length === 1 &&
     plan.cells[0] !== undefined &&
-    isCellWritable(state, plan.cells[0]) &&
+    isCellFormattable(state, plan.cells[0]) &&
     canStagePendingFormat(state, plan.ranges[0] as Range)
   ) {
     stagePendingFormat(state, store, plan.ranges[0] as Range, action.patch);
@@ -951,7 +953,7 @@ export function applySelectionFormatAction(
     }
   }
 
-  const writable = plan.cells.filter((addr) => isCellWritable(state, addr));
+  const writable = plan.cells.filter((addr) => isCellFormattable(state, addr));
   if (writable.length === 0) return false;
   store.setState((current) => {
     const formats = new Map(current.format.formats);
@@ -1160,7 +1162,7 @@ function applyWholeSheetFontPatch(
   // A protected worksheet cannot safely be represented by one axis style:
   // locked and unlocked cells would need a per-cell authorization pass over
   // the entire grid. Keep the operation atomic and reject it instead.
-  if (isSheetProtected(state, sheet)) return false;
+  if (!sheetPermits(state, sheet, 'formatCells')) return false;
 
   const controller = interactionControllerFor(store);
   if (controller) {

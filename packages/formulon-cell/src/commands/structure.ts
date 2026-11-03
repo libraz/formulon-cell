@@ -77,7 +77,7 @@ import { recordFilterChange } from './filter.js';
 import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
 import type { History } from './history.js';
-import { blockedByProtection } from './protection.js';
+import { blockedByProtection, isBandUnlocked, sheetPermits } from './protection.js';
 import {
   captureLayoutSnapshot,
   recordConditionalRulesChange,
@@ -1134,7 +1134,23 @@ function editAxis(
   const n = edit.count;
   const delta = kind === 'insert' ? n : -n;
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, `${kind}${axis === 'row' ? 'Rows' : 'Cols'}`)) {
+  const permission =
+    kind === 'insert'
+      ? axis === 'row'
+        ? 'insertRows'
+        : 'insertColumns'
+      : axis === 'row'
+        ? 'deleteRows'
+        : 'deleteColumns';
+  if (blockedByProtection(store, sheet, `${kind}${axis === 'row' ? 'Rows' : 'Cols'}`, permission)) {
+    return false;
+  }
+  // A protected sheet deletes only rows (columns) that hold no locked cell.
+  if (
+    kind === 'delete' &&
+    !sheetPermits(store.getState(), sheet) &&
+    !isBandUnlocked(store.getState(), sheet, axis, split, n)
+  ) {
     return false;
   }
   if (kind === 'insert' && insertionWouldOverflow(store, wb, sheet, axis, split, n)) return false;

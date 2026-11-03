@@ -1,4 +1,4 @@
-import { addrKey, parseAddrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import {
   hashSheetProtectionPassword,
   legacySheetPasswordHash,
@@ -77,12 +77,29 @@ export function isSheetProtected(state: State, sheet: number): boolean {
   return state.protection.protectedSheets.has(sheet);
 }
 
-/** Spreadsheet-parity gate for row/col structure changes. When `sheet` is
- *  protected the operation is rejected (no-op + warning) regardless of
- *  per-cell locks — spreadsheets disable the insert/delete row/col commands
- *  wholesale on protected sheets. */
-export function blockedByProtection(store: SpreadsheetStore, sheet: number, op: string): boolean {
-  if (!isSheetProtected(store.getState(), sheet)) return false;
+/** Whether `sheet` lets an operation through: always when it is not
+ *  protected, and on a protected sheet only when the Protect Sheet option
+ *  `permission` is on (Excel: formatting, width/height and row insertion
+ *  are each blocked unless their option is set). Every protection gate on a
+ *  sheet-level operation goes through here. */
+export function sheetPermits(
+  state: State,
+  sheet: number,
+  permission?: keyof SheetProtectionPermissions,
+): boolean {
+  if (!isSheetProtected(state, sheet)) return true;
+  return permission !== undefined && protectedSheetPermissions(state, sheet)?.[permission] === true;
+}
+
+/** Spreadsheet-parity gate for sheet-level operations: rejected (no-op +
+ *  warning) on a protected sheet unless `permission` is allowed there. */
+export function blockedByProtection(
+  store: SpreadsheetStore,
+  sheet: number,
+  op: string,
+  permission?: keyof SheetProtectionPermissions,
+): boolean {
+  if (sheetPermits(store.getState(), sheet, permission)) return false;
   // eslint-disable-next-line no-console
   console.warn(`formulon-cell: ${op} blocked — sheet ${sheet} is protected`);
   return true;
@@ -828,6 +845,35 @@ export function isCellWritable(state: State, addr: Addr): boolean {
   if (!isSheetProtected(state, addr.sheet)) return true;
   if (isAddrInAllowedEditRange(state, addr)) return true;
   return !isCellLocked(state, addr);
+}
+
+/** Whether a format write may touch the cell: a writable cell, or any cell
+ *  of a protected sheet that allows formatting cells. */
+export function isCellFormattable(state: State, addr: Addr): boolean {
+  return sheetPermits(state, addr.sheet, 'formatCells') || isCellWritable(state, addr);
+}
+
+/** Whether every cell of rows (or columns) `start..start+count-1` is unlocked:
+ *  Excel deletes rows or columns on a protected sheet only then. A band too
+ *  large to inspect cell by cell counts as locked. */
+export function isBandUnlocked(
+  state: State,
+  sheet: number,
+  axis: 'row' | 'col',
+  start: number,
+  count: number,
+): boolean {
+  const range: Range =
+    axis === 'row'
+      ? { sheet, r0: start, c0: 0, r1: start + count - 1, c1: MAX_COL }
+      : { sheet, r0: 0, c0: start, r1: MAX_ROW, c1: start + count - 1 };
+  if (rangeArea(range) > MAX_MATERIALIZED_LOCK_CELLS) return false;
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      if (isCellLocked(state, { sheet, row, col })) return false;
+    }
+  }
+  return true;
 }
 
 /** Soft warn-and-return helper used by writeInput / writeCoerced wrappers.
