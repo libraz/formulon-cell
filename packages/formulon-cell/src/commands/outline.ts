@@ -1,6 +1,6 @@
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { outlineGutterWidth, outlineSummaryFor } from '../store/outline-summary.js';
+import { outlineDepth, outlineGutterWidth, outlineSummaryFor } from '../store/outline-summary.js';
 import { isRowHidden } from '../store/row-visibility.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { OutlineSummary } from '../store/types.js';
@@ -261,6 +261,94 @@ export function expandColGroup(
       const summary = summaryIndex(!outlineSummaryFor(s.layout, s.data.sheetIndex).right, c0, c1);
       const collapsedCols = withFlag(s.layout.collapsedCols, summary, false);
       return { ...s, layout: { ...s.layout, hiddenCols: next, collapsedCols } };
+    });
+  });
+}
+
+/** Every group on an axis: each contiguous run of indices at or past a level. */
+function outlineRuns(
+  levels: ReadonlyMap<number, number>,
+): { level: number; i0: number; i1: number }[] {
+  const indices = [...levels.keys()].sort((a, b) => a - b);
+  const runs: { level: number; i0: number; i1: number }[] = [];
+  for (let level = 1; level <= outlineDepth(levels); level += 1) {
+    let start = -1;
+    let prev = -1;
+    for (const i of indices) {
+      const inGroup = (levels.get(i) ?? 0) >= level;
+      if (start >= 0 && (!inGroup || i !== prev + 1)) {
+        runs.push({ level, i0: start, i1: prev });
+        start = -1;
+      }
+      if (inGroup && start < 0) start = i;
+      if (inGroup) prev = i;
+    }
+    if (start >= 0) runs.push({ level, i0: start, i1: prev });
+  }
+  return runs;
+}
+
+/** An axis's hidden set and collapsed flags once only levels below `level` show. */
+function atOutlineLevel(
+  levels: ReadonlyMap<number, number>,
+  hidden: ReadonlySet<number>,
+  collapsed: ReadonlySet<number> | undefined,
+  summaryBefore: boolean,
+  level: number,
+): { hidden: Set<number>; collapsed: Set<number> } {
+  const nextHidden = new Set(hidden);
+  for (const [i, lvl] of levels) {
+    if (lvl >= level) nextHidden.add(i);
+    else nextHidden.delete(i);
+  }
+  let nextCollapsed = new Set(collapsed);
+  for (const run of outlineRuns(levels)) {
+    nextCollapsed = withFlag(
+      nextCollapsed,
+      summaryIndex(summaryBefore, run.i0, run.i1),
+      run.level >= level,
+    );
+  }
+  return { hidden: nextHidden, collapsed: nextCollapsed };
+}
+
+/** The outline level buttons: show level `level` of an axis, hiding every
+ *  row or column at that level or deeper and showing the shallower ones. */
+export function showOutlineLevel(
+  store: SpreadsheetStore,
+  history: History | null,
+  axis: 'row' | 'col',
+  level: number,
+  wb?: WorkbookHandle,
+): void {
+  if (blockedByProtection(store, store.getState().data.sheetIndex, 'showOutlineLevel')) return;
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+    store.setState((s) => {
+      const summary = outlineSummaryFor(s.layout, s.data.sheetIndex);
+      if (axis === 'row') {
+        const next = atOutlineLevel(
+          s.layout.outlineRows,
+          s.layout.hiddenRows,
+          s.layout.collapsedRows,
+          !summary.below,
+          level,
+        );
+        return {
+          ...s,
+          layout: { ...s.layout, hiddenRows: next.hidden, collapsedRows: next.collapsed },
+        };
+      }
+      const next = atOutlineLevel(
+        s.layout.outlineCols,
+        s.layout.hiddenCols,
+        s.layout.collapsedCols,
+        !summary.right,
+        level,
+      );
+      return {
+        ...s,
+        layout: { ...s.layout, hiddenCols: next.hidden, collapsedCols: next.collapsed },
+      };
     });
   });
 }

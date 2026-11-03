@@ -1094,4 +1094,29 @@ describe('attachPointer', () => {
       expect(sel.extraRanges).toEqual([]);
     });
   });
+
+  describe('outline level buttons', () => {
+    it('shows the clicked level', () => {
+      store.setState((s) => ({
+        ...s,
+        layout: {
+          ...s.layout,
+          outlineRows: new Map([
+            [2, 1],
+            [3, 2],
+            [4, 2],
+            [5, 1],
+          ]),
+        },
+      }));
+      gridHitState(host).outlineToggles = [
+        { kind: 'level', axis: 'row', level: 2, rect: { x: 12, y: 5, w: 12, h: 12 } },
+      ];
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 18, 10);
+      fireUp(host, 18, 10);
+      expect([...store.getState().layout.hiddenRows].sort((a, b) => a - b)).toEqual([3, 4]);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
+    });
+  });
 });

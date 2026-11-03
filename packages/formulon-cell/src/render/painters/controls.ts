@@ -1,5 +1,5 @@
 import { isColGroupCollapsed, isRowGroupCollapsed } from '../../commands/outline.js';
-import { MAC_OUTLINE_LANE, outlineSummaryFor } from '../../store/outline-summary.js';
+import { MAC_OUTLINE_LANE, outlineDepth, outlineSummaryFor } from '../../store/outline-summary.js';
 import { isRowHidden } from '../../store/row-visibility.js';
 import type { Sparkline } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
@@ -66,6 +66,10 @@ const MAC_TOGGLE_SIZE = 12;
 const MAC_SPINE_WIDTH = 2;
 const MAC_SPINE_INSET = 3;
 const MAC_DOT_SIZE = 2;
+/** Mac level buttons: 12 px squares in the lanes, 5 px into the header band. */
+const MAC_LEVEL_BUTTON_SIZE = 12;
+const MAC_LEVEL_BUTTON_INSET = 5;
+const MAC_LEVEL_BUTTON_FONT_PX = 10;
 
 /** Paint a small +/- toggle button. (cx, cy) is the center. */
 function paintToggle(
@@ -128,13 +132,47 @@ function paintMacToggle(
   return { x, y, w: size, h: size };
 }
 
-export interface OutlineToggleHit {
+/** A group's +/- toggle. */
+export interface OutlineGroupToggleHit {
+  kind: 'toggle';
   axis: 'row' | 'col';
   level: number;
   /** First/last index of the contiguous run this toggle controls. */
   i0: number;
   i1: number;
   rect: Rect;
+}
+
+/** A level-number button in the gutter corner: shows that outline level. */
+export interface OutlineLevelButtonHit {
+  kind: 'level';
+  axis: 'row' | 'col';
+  level: number;
+  rect: Rect;
+}
+
+export type OutlineToggleHit = OutlineGroupToggleHit | OutlineLevelButtonHit;
+
+/** Paint a level-number button with its top-left at (x, y). */
+function paintLevelButton(
+  ctx: CanvasRenderingContext2D,
+  theme: ResolvedTheme,
+  x: number,
+  y: number,
+  level: number,
+): Rect {
+  const size = MAC_LEVEL_BUTTON_SIZE;
+  ctx.fillStyle = theme.headerBg;
+  ctx.fillRect(x, y, size, size);
+  ctx.strokeStyle = theme.ruleStrong;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+  ctx.fillStyle = theme.headerFg;
+  ctx.font = `400 ${MAC_LEVEL_BUTTON_FONT_PX}px ${theme.fontUi}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(level), x + size / 2, y + size / 2);
+  return { x, y, w: size, h: size };
 }
 
 /** Walk both gutters and paint brackets + toggles. Returns toggle hit-rects so
@@ -185,8 +223,7 @@ export function paintOutlineGutters(
     ctx.beginPath();
     ctx.rect(rowGutterX, gutterTop, layout.outlineRowGutter, cssHeight);
     ctx.clip();
-    let maxLvl = 0;
-    for (const v of layout.outlineRows.values()) if (v > maxLvl) maxLvl = v;
+    const maxLvl = outlineDepth(layout.outlineRows);
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
       const slotCx = slotX(lvl);
       let runStartIdx = -1;
@@ -239,7 +276,7 @@ export function paintOutlineGutters(
           // A Mac toggle fills its lane; elsewhere it centres on the spine.
           const toggleCx = mac ? laneX(lvl) + lane / 2 : slotCx;
           const rect = paintToggle(ctx, theme, toggleCx, summaryY, collapsed, toggleSize);
-          hits.push({ axis: 'row', level: lvl, i0: r0, i1: r1, rect });
+          hits.push({ kind: 'toggle', axis: 'row', level: lvl, i0: r0, i1: r1, rect });
           runStartIdx = -1;
         }
       }
@@ -268,8 +305,7 @@ export function paintOutlineGutters(
     ctx.beginPath();
     ctx.rect(gutterLeft, gutterTop, cssWidth, layout.outlineColGutter);
     ctx.clip();
-    let maxLvl = 0;
-    for (const v of layout.outlineCols.values()) if (v > maxLvl) maxLvl = v;
+    const maxLvl = outlineDepth(layout.outlineCols);
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
       const slotCy = mac
         ? gutterTop + (lvl - 1) * lane + MAC_SPINE_INSET + MAC_SPINE_WIDTH / 2
@@ -328,7 +364,7 @@ export function paintOutlineGutters(
                 : left - toggleSize / 2 - 2;
           const toggleCy = mac ? gutterTop + (lvl - 1) * lane + lane / 2 : slotCy;
           const rect = paintToggle(ctx, theme, summaryX, toggleCy, collapsed, toggleSize);
-          hits.push({ axis: 'col', level: lvl, i0: c0, i1: c1, rect });
+          hits.push({ kind: 'toggle', axis: 'col', level: lvl, i0: c0, i1: c1, rect });
           runStartIdx = -1;
         }
       }
@@ -349,6 +385,28 @@ export function paintOutlineGutters(
           MAC_DOT_SIZE,
         );
       }
+    }
+    ctx.restore();
+  }
+
+  // Excel for Mac's level buttons: one per level plus one, along the row lanes
+  // inside the column-header band and down the column lanes inside the
+  // row-header band.
+  if (mac) {
+    ctx.save();
+    const rowDepth = outlineDepth(layout.outlineRows);
+    const colDepth = outlineDepth(layout.outlineCols);
+    const rowButtonY = gutterTop + layout.outlineColGutter + MAC_LEVEL_BUTTON_INSET;
+    for (let lvl = 1; rowDepth > 0 && lvl <= rowDepth + 1; lvl += 1) {
+      const rect = paintLevelButton(ctx, theme, laneX(lvl), rowButtonY, lvl);
+      hits.push({ kind: 'level', axis: 'row', level: lvl, rect });
+    }
+    const colButtonX = rtl
+      ? cssWidth - layout.outlineRowGutter - MAC_LEVEL_BUTTON_INSET - MAC_LEVEL_BUTTON_SIZE
+      : gutterLeft + layout.outlineRowGutter + MAC_LEVEL_BUTTON_INSET;
+    for (let lvl = 1; colDepth > 0 && lvl <= colDepth + 1; lvl += 1) {
+      const rect = paintLevelButton(ctx, theme, colButtonX, gutterTop + (lvl - 1) * lane, lvl);
+      hits.push({ kind: 'level', axis: 'col', level: lvl, rect });
     }
     ctx.restore();
   }

@@ -13,6 +13,7 @@ const theme = new Proxy({}, { get: () => '#000' }) as unknown as ResolvedTheme;
 
 const recorder = () => {
   const fills: [number, number, number, number][] = [];
+  const texts: { text: string; x: number; y: number }[] = [];
   const strokes: { width: number; from: [number, number]; to: [number, number] }[] = [];
   let from: [number, number] = [0, 0];
   let width = 1;
@@ -33,6 +34,9 @@ const recorder = () => {
       fills.push([x, y, w, h]);
     },
     strokeRect() {},
+    fillText(text: string, x: number, y: number) {
+      texts.push({ text, x, y });
+    },
     set lineWidth(v: number) {
       width = v;
     },
@@ -40,7 +44,7 @@ const recorder = () => {
       return width;
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fills, strokes };
+  return { ctx, fills, strokes, texts };
 };
 
 const axis = (count: number, size: number): AxisLayout => ({
@@ -105,5 +109,63 @@ describe('outline gutter on the Mac point model', () => {
         [15, oy + 7 * 24 + 11, 2, 2],
       ]),
     );
+  });
+
+  // Excel for Mac at 2x halved: 12 px level buttons. The row buttons run along
+  // the row lanes, 5 px below the top of the column-header band; the column
+  // buttons stack down the column lanes, 5 px inside the row-header band.
+  const outlinedView = (screenScale: number) => {
+    const rowLevels = new Map([
+      [2, 1],
+      [3, 2],
+      [4, 2],
+      [5, 1],
+      [6, 1],
+      [7, 1],
+    ]);
+    const colLevels = new Map([
+      [2, 1],
+      [3, 1],
+      [4, 1],
+    ]);
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        screenScale,
+        outlineRows: rowLevels,
+        outlineCols: colLevels,
+        outlineRowGutter: outlineGutterWidth(rowLevels, { screenScale }),
+        outlineColGutter: outlineGutterWidth(colLevels, { screenScale }),
+      },
+    }));
+    const state = store.getState();
+    return { ...state, layout: layoutForView(state) } as ViewState;
+  };
+
+  it('paints the level buttons in the gutter corner', () => {
+    const view = outlinedView(0.75);
+    const { ctx, texts } = recorder();
+    const hits = paintOutlineGutters(ctx, view, theme, axis(10, 50), axis(12, 24), 800, 600);
+    const levelHits = hits.filter((h) => h.kind === 'level');
+    const rowTop = view.layout.outlineColGutter + 5;
+    const colLeft = view.layout.outlineRowGutter + 5;
+    expect(levelHits.map((h) => [h.axis, h.level, h.rect])).toEqual([
+      ['row', 1, { x: 0, y: rowTop, w: 12, h: 12 }],
+      ['row', 2, { x: 12, y: rowTop, w: 12, h: 12 }],
+      ['row', 3, { x: 24, y: rowTop, w: 12, h: 12 }],
+      ['col', 1, { x: colLeft, y: 0, w: 12, h: 12 }],
+      ['col', 2, { x: colLeft, y: 12, w: 12, h: 12 }],
+    ]);
+    expect(texts.map((t) => t.text)).toEqual(['1', '2', '3', '1', '2']);
+  });
+
+  it('keeps the level buttons off the default profile', () => {
+    const view = outlinedView(1);
+    const { ctx, texts } = recorder();
+    const hits = paintOutlineGutters(ctx, view, theme, axis(10, 50), axis(12, 24), 800, 600);
+    expect(hits.some((h) => h.kind === 'level')).toBe(false);
+    expect(texts).toEqual([]);
   });
 });

@@ -13,6 +13,7 @@ import {
   expandRowGroup,
   isColGroupCollapsed,
   isRowGroupCollapsed,
+  showOutlineLevel,
 } from '../commands/outline.js';
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
@@ -420,7 +421,7 @@ export function attachPointer(
       }
     };
 
-    // Outline toggles in the bracket gutters take precedence over hit-zoning;
+    // Outline toggles and level buttons in the gutters take precedence over hit-zoning;
     // they sit in territory the hitZone fall-through would otherwise treat as
     // a header/corner click.
     for (const t of hits.outlineToggles) {
@@ -432,7 +433,9 @@ export function attachPointer(
         return;
       }
       e.preventDefault();
-      if (t.axis === 'row') {
+      if (t.kind === 'level') {
+        showOutlineLevel(store, history, t.axis, t.level, wb);
+      } else if (t.axis === 'row') {
         const collapsed = isRowGroupCollapsed(s.layout, t.i0, t.i1);
         if (collapsed) expandRowGroup(store, history, t.i0, t.i1, wb);
         else collapseRowGroup(store, history, t.i0, t.i1, wb);

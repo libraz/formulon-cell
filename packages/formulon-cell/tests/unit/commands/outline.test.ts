@@ -13,6 +13,7 @@ import {
   MAX_OUTLINE_LEVEL,
   OUTLINE_GUTTER_PER_LEVEL,
   rowGroupRangeAt,
+  showOutlineLevel,
   ungroupCols,
   ungroupRows,
 } from '../../../src/commands/outline.js';
@@ -290,5 +291,57 @@ describe('outline engine sync', () => {
       { row: 3, hidden: true },
       { row: 4, hidden: true },
     ]);
+  });
+});
+
+describe('showOutlineLevel', () => {
+  // Rows 3:8 at level 1 with rows 4:5 at level 2, columns C:E at level 1,
+  // summaries below and right (0-based rows 2..7 / 3..4, columns 2..4).
+  const outlined = () => {
+    const store = createSpreadsheetStore();
+    groupRows(store, null, 2, 7);
+    groupRows(store, null, 3, 4);
+    groupCols(store, null, 2, 4);
+    return store;
+  };
+  const sorted = (set: ReadonlySet<number> | undefined) => [...(set ?? [])].sort((a, b) => a - b);
+
+  it('hides every row at or past the level and flags those groups collapsed', () => {
+    // Excel: level 2 hides rows 4:5; level 1 hides rows 3:8; level 3 shows all.
+    const store = outlined();
+    showOutlineLevel(store, null, 'row', 2);
+    expect(sorted(store.getState().layout.hiddenRows)).toEqual([3, 4]);
+    expect(sorted(store.getState().layout.collapsedRows)).toEqual([5]);
+    showOutlineLevel(store, null, 'row', 1);
+    expect(sorted(store.getState().layout.hiddenRows)).toEqual([2, 3, 4, 5, 6, 7]);
+    expect(sorted(store.getState().layout.collapsedRows)).toEqual([5, 8]);
+    showOutlineLevel(store, null, 'row', 3);
+    expect(sorted(store.getState().layout.hiddenRows)).toEqual([]);
+    expect(sorted(store.getState().layout.collapsedRows)).toEqual([]);
+  });
+
+  it('shows column level 1 by hiding C:E', () => {
+    const store = outlined();
+    showOutlineLevel(store, null, 'col', 1);
+    expect(sorted(store.getState().layout.hiddenCols)).toEqual([2, 3, 4]);
+    expect(sorted(store.getState().layout.collapsedCols)).toEqual([5]);
+    expect(sorted(store.getState().layout.hiddenRows)).toEqual([]);
+  });
+
+  it('leaves rows outside every group alone and records one history entry', () => {
+    const store = outlined();
+    store.setState((s) => ({ ...s, layout: { ...s.layout, hiddenRows: new Set([10]) } }));
+    const history = new History();
+    showOutlineLevel(store, history, 'row', 1);
+    expect(sorted(store.getState().layout.hiddenRows)).toEqual([2, 3, 4, 5, 6, 7, 10]);
+    history.undo();
+    expect(sorted(store.getState().layout.hiddenRows)).toEqual([10]);
+  });
+
+  it('refuses on a protected sheet', () => {
+    const store = outlined();
+    setProtectedSheet(store, 0, true);
+    showOutlineLevel(store, null, 'row', 1);
+    expect(sorted(store.getState().layout.hiddenRows)).toEqual([]);
   });
 });
