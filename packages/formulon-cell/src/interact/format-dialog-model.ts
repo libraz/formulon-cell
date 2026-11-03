@@ -132,7 +132,7 @@ export const defaultCurrencySymbolFor = currencySymbolForLocale;
 /** The Japanese Mac app's date and time lists, in its order. */
 const MAC_JA_DATE_PATTERNS = [
   'yyyy/m/d',
-  'yyyy"年"m"月"d"日" dddd',
+  'yyyy"年"m"月"d"日" aaaa',
   'yyyy-mm-dd',
   'yyyy"年"m"月"d"日"',
   'yyyy"年"m"月"',

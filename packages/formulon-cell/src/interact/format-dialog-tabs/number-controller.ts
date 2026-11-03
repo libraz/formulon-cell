@@ -79,14 +79,22 @@ export function numberCategoryDescription(cat: NumberCategory, t: Strings['forma
 
 // Pattern preview values per category — pick a value that exercises the
 // formatting rules so users see day-of-week, AM/PM, etc.
+/** The sample the Mac app renders its date and time lists with. */
+const DATE_SAMPLE = 40982 + 48655 / 86400;
+
+/** Mac app marks the formats that follow the system settings with '*'. */
+const MAC_SYSTEM_DATE_ROWS = 2;
+const MAC_SYSTEM_TIME_ROWS = 1;
+const MAC_SYSTEM_NEGATIVE: ReadonlySet<NegativeStyle> = new Set(['red-parens', 'red-plain', 'red']);
+
 const patternSampleValue = (cat: NumberCategory): number => {
   switch (cat) {
     case 'date':
-      return 41348.5625; // 2013-03-14 13:30
+      return DATE_SAMPLE; // 2012-03-14 13:30:55
     case 'fraction':
       return 1.25;
     case 'time':
-      return 0.5625; // 13:30:00
+      return DATE_SAMPLE % 1; // 13:30:55
     case 'special':
       return 12345;
     default:
@@ -163,6 +171,13 @@ export function attachNumberTab(
           label = pattern;
         }
         label = label || pattern;
+        if (
+          ctx.isMacPlatform() &&
+          ((cat === 'date' && index < MAC_SYSTEM_DATE_ROWS) ||
+            (cat === 'time' && index < MAC_SYSTEM_TIME_ROWS))
+        ) {
+          label = `*${label}`;
+        }
       }
       appendDialogOptionButton(patternList, {
         label,
@@ -219,7 +234,8 @@ export function attachNumberTab(
         { ...draft, numberCategory: cat, negativeStyle: currencyMinus(style) },
         defaultPatternFor,
       );
-      item.textContent = formatNumber(-1234, sampleFmt, ctx.getLocale());
+      const star = ctx.isMacPlatform() && MAC_SYSTEM_NEGATIVE.has(style) ? '*' : '';
+      item.textContent = star + formatNumber(-1234, sampleFmt, ctx.getLocale());
     }
   };
 

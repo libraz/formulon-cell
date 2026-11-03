@@ -100,6 +100,29 @@ describe('format dialog pattern lists', () => {
     return count;
   };
 
+  it('labels the Mac date and time lists with the Excel sample, marking system formats', () => {
+    const labels = (cat: string): string[] => {
+      const handle = mount('mac');
+      handle.open('number');
+      document
+        .querySelector<HTMLButtonElement>(`button[data-fc-cat="${cat}"]`)
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const out = text('.fc-fmtdlg__cat-controls .fc-fmtdlg__pattern-list button');
+      document.body.innerHTML = '';
+      return out;
+    };
+    expect(labels('date').slice(0, 4)).toEqual([
+      '*2012/3/14',
+      '*2012年3月14日 水曜日',
+      '2012-03-14',
+      '2012年3月14日',
+    ]);
+    expect(labels('date')[7]).toBe('2012/3/14 1:30 PM');
+    expect(labels('date')[12]).toBe('14-Mar');
+    expect(labels('time')[0]).toBe('*13:30:55');
+    expect(labels('time')[1]).toBe('13:30');
+  });
+
   it('lists the 19 date and 9 time formats of the Mac app, 5 and 4 elsewhere', () => {
     expect(itemsFor('mac', 'date')).toBe(19);
     expect(itemsFor('mac', 'time')).toBe(9);
@@ -124,11 +147,11 @@ describe('format dialog negative-number lists', () => {
 
   it('lists 7 number and 5 currency rows in the Mac app order', () => {
     expect(rows('mac', 'fixed')).toEqual([
-      'red-parens:(1234)',
+      'red-parens:*(1234)',
       'parens:(1234)',
-      'red-plain:1234',
+      'red-plain:*1234',
       'minus:-1234',
-      'red:-1234',
+      'red:*-1234',
       'triangle:△ 1234',
       'triangle-filled:▲ 1234',
     ]);
@@ -143,11 +166,11 @@ describe('format dialog negative-number lists', () => {
 
   it('shows the currency minus rows with the minus after the symbol, as Excel writes them', () => {
     expect(rows('mac', 'currency').map((row) => row.split(':').slice(1).join(':'))).toEqual([
+      '*(¥1,234)',
       '(¥1,234)',
-      '(¥1,234)',
-      '¥1,234',
+      '*¥1,234',
       '¥-1,234',
-      '¥-1,234',
+      '*¥-1,234',
     ]);
   });
 
