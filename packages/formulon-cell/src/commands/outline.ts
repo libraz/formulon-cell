@@ -40,7 +40,7 @@ const setRowOutline = (store: SpreadsheetStore, next: Map<number, number>): void
     layout: {
       ...s.layout,
       outlineRows: next,
-      outlineRowGutter: outlineGutterWidth(next),
+      outlineRowGutter: outlineGutterWidth(next, s.layout),
     },
   }));
 };
@@ -51,7 +51,7 @@ const setColOutline = (store: SpreadsheetStore, next: Map<number, number>): void
     layout: {
       ...s.layout,
       outlineCols: next,
-      outlineColGutter: outlineGutterWidth(next),
+      outlineColGutter: outlineGutterWidth(next, s.layout),
     },
   }));
 };

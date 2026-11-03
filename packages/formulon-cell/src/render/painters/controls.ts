@@ -1,5 +1,5 @@
 import { isColGroupCollapsed, isRowGroupCollapsed } from '../../commands/outline.js';
-import { outlineSummaryFor } from '../../store/outline-summary.js';
+import { MAC_OUTLINE_LANE, outlineSummaryFor } from '../../store/outline-summary.js';
 import { isRowHidden } from '../../store/row-visibility.js';
 import type { Sparkline } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
@@ -13,6 +13,7 @@ import {
   rulerTop,
   type ViewState,
 } from '../geometry.js';
+import { wholePointAdvances } from '../text-metrics.js';
 export interface CheckboxHit {
   rect: Rect;
 }
@@ -59,6 +60,13 @@ export function paintCheckbox(
 export const OUTLINE_BRACKET_SLOT = 14;
 const TOGGLE_SIZE = 11;
 
+/** Mac geometry, Excel for Mac at 2x halved: a 12 px toggle filling its lane,
+ *  a 2 px spine 3 px inside the lane, 2x2 detail dots. */
+const MAC_TOGGLE_SIZE = 12;
+const MAC_SPINE_WIDTH = 2;
+const MAC_SPINE_INSET = 3;
+const MAC_DOT_SIZE = 2;
+
 /** Paint a small +/- toggle button. (cx, cy) is the center. */
 function paintToggle(
   ctx: CanvasRenderingContext2D,
@@ -66,7 +74,9 @@ function paintToggle(
   cx: number,
   cy: number,
   collapsed: boolean,
+  size: number = TOGGLE_SIZE,
 ): Rect {
+  if (size !== TOGGLE_SIZE) return paintMacToggle(ctx, theme, cx, cy, collapsed, size);
   const half = TOGGLE_SIZE / 2;
   const x = Math.round(cx - half);
   const y = Math.round(cy - half);
@@ -90,6 +100,32 @@ function paintToggle(
   ctx.stroke();
   ctx.restore();
   return { x, y, w: TOGGLE_SIZE, h: TOGGLE_SIZE };
+}
+
+/** The Mac toggle: a square with a 1 px border and a 6x1 minus (plus a 1x6
+ *  bar when collapsed) centred inside, as Excel for Mac draws it. */
+function paintMacToggle(
+  ctx: CanvasRenderingContext2D,
+  theme: ResolvedTheme,
+  cx: number,
+  cy: number,
+  collapsed: boolean,
+  size: number,
+): Rect {
+  const x = Math.round(cx - size / 2);
+  const y = Math.round(cy - size / 2);
+  const glyph = size / 2;
+  ctx.save();
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(x, y, size, size);
+  ctx.strokeStyle = theme.ruleStrong;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+  ctx.fillStyle = theme.fg;
+  ctx.fillRect(x + (size - glyph) / 2, y + (size - 1) / 2, glyph, 1);
+  if (collapsed) ctx.fillRect(x + (size - 1) / 2, y + (size - glyph) / 2, 1, glyph);
+  ctx.restore();
+  return { x, y, w: size, h: size };
 }
 
 export interface OutlineToggleHit {
@@ -126,10 +162,22 @@ export function paintOutlineGutters(
   const gutterLeft = rulerLeft(layout);
   const gutterTop = rulerTop(layout);
   const rowGutterX = rtl ? cssWidth - layout.outlineRowGutter : gutterLeft;
+  // The Mac point model draws Excel for Mac's lanes; elsewhere a slot per level.
+  const mac = wholePointAdvances(layout);
+  const lane = mac ? MAC_OUTLINE_LANE : OUTLINE_BRACKET_SLOT;
+  const toggleSize = mac ? MAC_TOGGLE_SIZE : TOGGLE_SIZE;
+  /** Leading edge of a level's lane, measured inwards from the gutter edge. */
+  const laneX = (lvl: number): number =>
+    rtl ? cssWidth - lvl * lane : gutterLeft + (lvl - 1) * lane;
+  /** Where a level's spine and its toggle centre sit across the gutter. */
   const slotX = (lvl: number): number =>
-    rtl
-      ? cssWidth - (lvl - 1) * OUTLINE_BRACKET_SLOT - OUTLINE_BRACKET_SLOT / 2
-      : gutterLeft + (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
+    mac
+      ? rtl
+        ? laneX(lvl) + lane - MAC_SPINE_INSET - MAC_SPINE_WIDTH / 2
+        : laneX(lvl) + MAC_SPINE_INSET + MAC_SPINE_WIDTH / 2
+      : rtl
+        ? cssWidth - (lvl - 1) * OUTLINE_BRACKET_SLOT - OUTLINE_BRACKET_SLOT / 2
+        : gutterLeft + (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
 
   // ── Row gutter (outboard of the row-number column).
   if (layout.outlineRowGutter > 0) {
@@ -158,15 +206,24 @@ export function paintOutlineGutters(
           const bottomH = rows.sizeAt.get(r1) ?? 0;
           const bottom = oy + bottomRow + bottomH;
           ctx.strokeStyle = theme.rule;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(slotCx + 0.5, top);
-          ctx.lineTo(slotCx + 0.5, bottom);
-          // Foot tick on the summary side, pointing at the data area.
-          const footY = summary.below ? bottom - 0.5 : top + 0.5;
-          ctx.moveTo(slotCx + 0.5, footY);
-          ctx.lineTo(slotCx + (rtl ? -4.5 : 5.5), footY);
-          ctx.stroke();
+          if (mac) {
+            // Excel for Mac: a 2 px spine from just inside the group to its toggle.
+            ctx.lineWidth = MAC_SPINE_WIDTH;
+            ctx.beginPath();
+            ctx.moveTo(slotCx, top + 1);
+            ctx.lineTo(slotCx, bottom);
+            ctx.stroke();
+          } else {
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(slotCx + 0.5, top);
+            ctx.lineTo(slotCx + 0.5, bottom);
+            // Foot tick on the summary side, pointing at the data area.
+            const footY = summary.below ? bottom - 0.5 : top + 0.5;
+            ctx.moveTo(slotCx + 0.5, footY);
+            ctx.lineTo(slotCx + (rtl ? -4.5 : 5.5), footY);
+            ctx.stroke();
+          }
           const collapsed = isRowGroupCollapsed(layout, r0, r1);
           // Toggle sits on the row that should remain visible: the row just
           // below the band by default, just above it when the summary rows
@@ -177,12 +234,29 @@ export function paintOutlineGutters(
             rows.positionAt.has(summaryRow) && !isRowHidden(layout, summaryRow)
               ? oy + (rows.positionAt.get(summaryRow) ?? 0) + (rows.sizeAt.get(summaryRow) ?? 0) / 2
               : summary.below
-                ? bottom + TOGGLE_SIZE / 2 + 2
-                : top - TOGGLE_SIZE / 2 - 2;
-          const rect = paintToggle(ctx, theme, slotCx, summaryY, collapsed);
+                ? bottom + toggleSize / 2 + 2
+                : top - toggleSize / 2 - 2;
+          // A Mac toggle fills its lane; elsewhere it centres on the spine.
+          const toggleCx = mac ? laneX(lvl) + lane / 2 : slotCx;
+          const rect = paintToggle(ctx, theme, toggleCx, summaryY, collapsed, toggleSize);
           hits.push({ axis: 'row', level: lvl, i0: r0, i1: r1, rect });
           runStartIdx = -1;
         }
+      }
+    }
+    // Excel for Mac marks each grouped row with a dot in the lane past its level.
+    if (mac) {
+      ctx.fillStyle = theme.rule;
+      for (const r of rows.visible) {
+        const level = layout.outlineRows.get(r) ?? 0;
+        if (level === 0) continue;
+        const cy = oy + (rows.positionAt.get(r) ?? 0) + (rows.sizeAt.get(r) ?? 0) / 2;
+        ctx.fillRect(
+          slotX(level + 1) - MAC_DOT_SIZE / 2,
+          Math.round(cy - MAC_DOT_SIZE / 2),
+          MAC_DOT_SIZE,
+          MAC_DOT_SIZE,
+        );
       }
     }
     ctx.restore();
@@ -197,7 +271,9 @@ export function paintOutlineGutters(
     let maxLvl = 0;
     for (const v of layout.outlineCols.values()) if (v > maxLvl) maxLvl = v;
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
-      const slotCy = gutterTop + (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
+      const slotCy = mac
+        ? gutterTop + (lvl - 1) * lane + MAC_SPINE_INSET + MAC_SPINE_WIDTH / 2
+        : gutterTop + (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
       let runStartIdx = -1;
       for (let i = 0; i <= cols.visible.length; i += 1) {
         const c = cols.visible[i];
@@ -224,12 +300,18 @@ export function paintOutlineGutters(
           const summaryOnRight = summary.right !== rtl;
           const footX = summaryOnRight ? right - 0.5 : left + 0.5;
           ctx.strokeStyle = theme.rule;
-          ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(left, slotCy + 0.5);
-          ctx.lineTo(right, slotCy + 0.5);
-          ctx.moveTo(footX, slotCy + 0.5);
-          ctx.lineTo(footX, slotCy + 5.5);
+          if (mac) {
+            ctx.lineWidth = MAC_SPINE_WIDTH;
+            ctx.moveTo(left + 1, slotCy);
+            ctx.lineTo(right, slotCy);
+          } else {
+            ctx.lineWidth = 1;
+            ctx.moveTo(left, slotCy + 0.5);
+            ctx.lineTo(right, slotCy + 0.5);
+            ctx.moveTo(footX, slotCy + 0.5);
+            ctx.lineTo(footX, slotCy + 5.5);
+          }
           ctx.stroke();
           const collapsed = isColGroupCollapsed(layout, c0, c1);
           const summaryCol = summary.right ? c1 + 1 : c0 - 1;
@@ -242,12 +324,30 @@ export function paintOutlineGutters(
                     (cols.sizeAt.get(summaryCol) ?? 0) / 2,
                 )
               : summaryOnRight
-                ? right + TOGGLE_SIZE / 2 + 2
-                : left - TOGGLE_SIZE / 2 - 2;
-          const rect = paintToggle(ctx, theme, summaryX, slotCy, collapsed);
+                ? right + toggleSize / 2 + 2
+                : left - toggleSize / 2 - 2;
+          const toggleCy = mac ? gutterTop + (lvl - 1) * lane + lane / 2 : slotCy;
+          const rect = paintToggle(ctx, theme, summaryX, toggleCy, collapsed, toggleSize);
           hits.push({ axis: 'col', level: lvl, i0: c0, i1: c1, rect });
           runStartIdx = -1;
         }
+      }
+    }
+    if (mac) {
+      ctx.fillStyle = theme.rule;
+      for (const c of cols.visible) {
+        const level = layout.outlineCols.get(c) ?? 0;
+        if (level === 0) continue;
+        const cx = mirrorX(
+          layout,
+          ox + (cols.positionAt.get(c) ?? 0) + (cols.sizeAt.get(c) ?? 0) / 2,
+        );
+        ctx.fillRect(
+          Math.round(cx - MAC_DOT_SIZE / 2),
+          gutterTop + level * lane + MAC_SPINE_INSET,
+          MAC_DOT_SIZE,
+          MAC_DOT_SIZE,
+        );
       }
     }
     ctx.restore();

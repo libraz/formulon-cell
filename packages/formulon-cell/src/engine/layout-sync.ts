@@ -158,8 +158,8 @@ export function hydrateLayoutFromEngine(
       outlineRows,
       collapsedCols,
       collapsedRows,
-      outlineRowGutter: outlineGutterWidth(outlineRows),
-      outlineColGutter: outlineGutterWidth(outlineCols),
+      outlineRowGutter: outlineGutterWidth(outlineRows, s.layout),
+      outlineColGutter: outlineGutterWidth(outlineCols, s.layout),
       hiddenSheets,
       veryHiddenSheets,
     };
@@ -242,7 +242,17 @@ export function rehydrateAxisLayout(
         rowHeights: addRowHeights(new Map(), wb.getRowLayouts(sheet)),
       }
     : {};
-  store.setState((s) => ({ ...s, layout: { ...s.layout, ...defaults, ...sizes } }));
+  // The outline gutters follow the platform's lane width.
+  store.setState((s) => ({
+    ...s,
+    layout: {
+      ...s.layout,
+      ...defaults,
+      ...sizes,
+      outlineRowGutter: outlineGutterWidth(s.layout.outlineRows, s.layout),
+      outlineColGutter: outlineGutterWidth(s.layout.outlineCols, s.layout),
+    },
+  }));
 }
 
 /**
