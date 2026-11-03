@@ -101,15 +101,17 @@ describe('find and replace, Mac Japanese presentation', () => {
 });
 
 describe('find and replace, half-width / full-width', () => {
-  const found = (host: HTMLElement): string => {
+  const found = (host: HTMLElement, query = '123'): string => {
     const input = q<HTMLInputElement>(host, '#fc-find-find-input');
-    input.value = '123';
+    input.value = query;
     input.dispatchEvent(new Event('input', { bubbles: true }));
     q<HTMLButtonElement>(host, '.fc-find__btn--find-all').click();
     return q<HTMLElement>(host, '.fc-find__results-summary').textContent ?? '';
   };
 
-  it('treats 123 and １２３ as equal until 半角と全角を区別する is ticked (Mac)', async () => {
+  // Desktop app (Range.Find): letters, digits and plain kana fold their width
+  // either way; Match byte only tells ｶﾞ from ガ.
+  it('keeps 123 equal to １２３ when 半角と全角を区別する is ticked (Mac)', async () => {
     const { host, handle } = await mount('mac', '１２３');
     handle.open('find');
     expect(found(host)).toBe('1セルが見つかりました');
@@ -117,13 +119,24 @@ describe('find and replace, half-width / full-width', () => {
     const width = q<HTMLInputElement>(host, '#fc-find-width');
     width.checked = true;
     width.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(found(host)).toBe('0セルが見つかりました');
+    expect(found(host)).toBe('1セルが見つかりました');
   });
 
-  it('keeps the strict comparison on other platforms and offers no width box', async () => {
+  it('tells ｶﾞ from ガ only while 半角と全角を区別する is ticked (Mac)', async () => {
+    const { host, handle } = await mount('mac', 'ｶﾞ');
+    handle.open('find');
+    expect(found(host, 'ガ')).toBe('1セルが見つかりました');
+    q<HTMLButtonElement>(host, '.fc-find__options-btn').click();
+    const width = q<HTMLInputElement>(host, '#fc-find-width');
+    width.checked = true;
+    width.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(found(host, 'ガ')).toBe('0セルが見つかりました');
+  });
+
+  it('folds width on other platforms and offers no width box', async () => {
     const { host, handle } = await mount('default', '１２３');
     handle.open('find');
     expect(host.querySelector('#fc-find-width')).toBeNull();
-    expect(found(host)).toBe('0 個のセルが見つかりました');
+    expect(found(host)).toBe('1 個のセルが見つかりました');
   });
 });

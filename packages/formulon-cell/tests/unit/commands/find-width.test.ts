@@ -19,9 +19,21 @@ describe('find: half-width and full-width forms', () => {
     expect(applySubstitution('アイウ', options('ｱｲｳ', false), '-')).toBe('-');
   });
 
-  it('keeps the unmatched text untouched and the comparison exact by default', () => {
+  it('keeps the unmatched text untouched and folds width by default', () => {
     expect(applySubstitution('ＡＢ-12', options('ab', false), '_')).toBe('_-12');
-    expect(applySubstitution('ＡＢ-12', options('ab'), '_')).toBe('ＡＢ-12');
-    expect(applySubstitution('ｱｲｳ', options('アイウ', true), '-')).toBe('ｱｲｳ');
+    expect(applySubstitution('ＡＢ-12', options('ab'), '_')).toBe('_-12');
+  });
+
+  it('keeps folding letters and plain kana under Match byte, as the desktop app does', () => {
+    expect(applySubstitution('ＡＢ-12', options('ab', true), '_')).toBe('_-12');
+    expect(applySubstitution('ｱｲｳ', options('アイウ', true), '-')).toBe('-');
+    expect(applySubstitution('あいう', options('アイウ', true), '-')).toBe('-');
+  });
+
+  it('tells a half-width voiced pair from its composed kana only under Match byte', () => {
+    expect(applySubstitution('ｶﾞ', options('ガ'), '-')).toBe('-');
+    expect(applySubstitution('ガ', options('ｶﾞ'), '-')).toBe('-');
+    expect(applySubstitution('ｶﾞ', options('ガ', true), '-')).toBe('ｶﾞ');
+    expect(applySubstitution('ｶﾞ', options('ｶﾞ', true), '-')).toBe('-');
   });
 });

@@ -12,9 +12,10 @@ export interface FindOptions {
   caseSensitive?: boolean;
   /** Entire-cell match. */
   matchWhole?: boolean;
-  /** `false` compares half-width and full-width forms of a character as equal
-   *  (letters, digits, symbols, space, katakana). Left undefined, the
-   *  comparison stays exact. */
+  /** Excel's "Match byte": `true` tells a half-width voiced kana pair (ｶﾞ)
+   *  from its composed form (ガ). Half-width and full-width letters, digits,
+   *  symbols and katakana, and hiragana against katakana, always compare
+   *  equal, as they do in the desktop app. */
   matchWidth?: boolean;
   /** Excel's "Within" option. Defaults to the active sheet. */
   within?: 'sheet' | 'workbook';
@@ -260,33 +261,122 @@ function sortCellEntries(entries: CellEntry[], opts: FindOptions): CellEntry[] {
 const HALFWIDTH_KATAKANA =
   '。「」、・ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン゛゜';
 
-/** Width-insensitive form of a string: full-width ASCII and the ideographic
- *  space become their half-width forms, half-width katakana become full-width,
- *  and the length is unchanged (voiced half-width pairs stay two characters). */
-const foldWidth = (text: string): string =>
-  text.replace(/[\uFF01-\uFF5E\u3000\uFF61-\uFF9F]/g, (ch) => {
-    const code = ch.charCodeAt(0);
-    if (code >= 0xff01 && code <= 0xff5e) return String.fromCharCode(code - 0xfee0);
-    if (code === 0x3000) return ' ';
-    return HALFWIDTH_KATAKANA[code - 0xff61] ?? ch;
-  });
+const VOICED_MARK = '゛';
+const SEMI_VOICED_MARK = '゜';
+/** Katakana that take the voiced mark (one code point up) and the semi-voiced one (two up). */
+const VOICEABLE = 'カキクケコサシスセソタチツテトハヒフヘホ';
+const SEMI_VOICEABLE = 'ハヒフヘホ';
 
-function isMatch(display: string, opts: FindOptions): boolean {
-  if (opts.query === '') return false;
-  const fold = opts.matchWidth === false ? foldWidth : (text: string): string => text;
-  const shown = fold(display);
-  const query = fold(opts.query);
-  const haystack = opts.caseSensitive ? shown : shown.toLowerCase();
-  const needle = opts.caseSensitive ? query : query.toLowerCase();
-  if (opts.matchWhole) return haystack === needle;
-  return haystack.includes(needle);
+/** The composed kana a base and a following mark spell, if any. */
+const composeKana = (base: string, mark: string | undefined): string | null => {
+  if (mark === VOICED_MARK) {
+    if (base === 'ウ') return 'ヴ';
+    if (VOICEABLE.includes(base)) return String.fromCharCode(base.charCodeAt(0) + 1);
+  }
+  if (mark === SEMI_VOICED_MARK && SEMI_VOICEABLE.includes(base)) {
+    return String.fromCharCode(base.charCodeAt(0) + 2);
+  }
+  return null;
+};
+
+/** A composed voiced kana split into its base and mark, if it is one. */
+const decomposeKana = (ch: string): string | null => {
+  if (ch === 'ヴ') return `ウ${VOICED_MARK}`;
+  const code = ch.charCodeAt(0);
+  const voiced = String.fromCharCode(code - 1);
+  if (VOICEABLE.includes(voiced) && composeKana(voiced, VOICED_MARK) === ch) {
+    return voiced + VOICED_MARK;
+  }
+  const semi = String.fromCharCode(code - 2);
+  if (SEMI_VOICEABLE.includes(semi) && composeKana(semi, SEMI_VOICED_MARK) === ch) {
+    return semi + SEMI_VOICED_MARK;
+  }
+  return null;
+};
+
+/** One code unit as the desktop app compares it: full-width ASCII as
+ *  half-width, half-width katakana as full-width, hiragana as katakana, and
+ *  lower case unless the case must match. Always one code unit long, so a
+ *  folded string indexes like its source. */
+const foldChar = (ch: string, caseSensitive: boolean): string => {
+  const code = ch.charCodeAt(0);
+  let out = ch;
+  if (code >= 0xff01 && code <= 0xff5e) out = String.fromCharCode(code - 0xfee0);
+  else if (code === 0x3000) out = ' ';
+  else if (code >= 0xff61 && code <= 0xff9f) out = HALFWIDTH_KATAKANA[code - 0xff61] ?? ch;
+  else if (code >= 0x3041 && code <= 0x3096) out = String.fromCharCode(code + 0x60);
+  if (!caseSensitive) {
+    const lower = out.toLowerCase();
+    if (lower.length === 1) out = lower;
+  }
+  return out;
+};
+
+const foldText = (text: string, caseSensitive: boolean): string => {
+  let out = '';
+  for (let i = 0; i < text.length; i += 1) out += foldChar(text[i] ?? '', caseSensitive);
+  return out;
+};
+
+const escapeRegExp = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+
+/** A voiced kana that matches both its composed and its base-plus-mark
+ *  spelling, or only the query's own spelling under Match byte. */
+const kanaAlternatives = (composed: string, split: string, own: string, matchByte: boolean) =>
+  matchByte ? escapeRegExp(own) : `(?:${escapeRegExp(composed)}|${escapeRegExp(split)})`;
+
+/** The query as a pattern over folded text: `?` is one character, `*` any
+ *  run, and `~` makes the next character literal. */
+function queryPattern(opts: FindOptions): RegExp {
+  const caseSensitive = opts.caseSensitive ?? false;
+  const matchByte = opts.matchWidth === true;
+  const query = opts.query;
+  let source = '';
+  for (let i = 0; i < query.length; i += 1) {
+    let ch = query[i] ?? '';
+    if (ch === '*' || ch === '?') {
+      source += ch === '*' ? '[\\s\\S]*' : '[\\s\\S]';
+      continue;
+    }
+    if (ch === '~' && i + 1 < query.length) {
+      i += 1;
+      ch = query[i] ?? '';
+    }
+    const folded = foldChar(ch, caseSensitive);
+    const next = query[i + 1];
+    const composed =
+      next !== undefined && next !== '~'
+        ? composeKana(folded, foldChar(next, caseSensitive))
+        : null;
+    if (composed) {
+      const split = folded + foldChar(next ?? '', caseSensitive);
+      source += kanaAlternatives(composed, split, split, matchByte);
+      i += 1;
+      continue;
+    }
+    const split = decomposeKana(folded);
+    source += split ? kanaAlternatives(folded, split, folded, matchByte) : escapeRegExp(folded);
+  }
+  return new RegExp(opts.matchWhole ? `^(?:${source})$` : source, opts.matchWhole ? '' : 'g');
+}
+
+/** A predicate for cell texts the query finds. */
+function matcherFor(opts: FindOptions): (display: string) => boolean {
+  if (opts.query === '') return () => false;
+  const pattern = queryPattern(opts);
+  const caseSensitive = opts.caseSensitive ?? false;
+  return (display) => {
+    pattern.lastIndex = 0;
+    return pattern.test(foldText(display, caseSensitive));
+  };
 }
 
 export function findAll(state: State, opts: FindOptions): FindMatch[] {
   if (opts.query === '') return [];
   const out: FindMatch[] = [];
+  const isMatch = matcherFor(opts);
   for (const entry of cellsForSearch(state, opts)) {
-    if (isMatch(entry.display, opts)) out.push({ addr: entry.addr });
+    if (isMatch(entry.display)) out.push({ addr: entry.addr });
   }
   return out;
 }
@@ -301,7 +391,8 @@ export function findNext(
   const cells = cellsForSearch(state, opts);
   if (cells.length === 0) return null;
 
-  const matches = cells.filter((e) => isMatch(e.display, opts));
+  const isMatch = matcherFor(opts);
+  const matches = cells.filter((e) => isMatch(e.display));
   if (matches.length === 0) return null;
 
   // Locate the cursor: index of the first match strictly after / before `from`.
@@ -365,40 +456,22 @@ export function displayTextForFindMatch(state: State, addr: Addr, opts: FindOpti
   }
 }
 
-function substituteCaseAware(
-  source: string,
-  query: string,
-  replacement: string,
-  caseSensitive: boolean,
-  matchWhole: boolean,
-  ignoreWidth = false,
-): string {
-  const folded = ignoreWidth ? foldWidth(source) : source;
-  const foldedQuery = ignoreWidth ? foldWidth(query) : query;
-  if (matchWhole) {
-    const eq = caseSensitive
-      ? folded === foldedQuery
-      : folded.toLowerCase() === foldedQuery.toLowerCase();
-    return eq ? replacement : source;
-  }
-  if (caseSensitive && !ignoreWidth) return source.split(query).join(replacement);
-  // Scan on the folded text; untouched segments stay verbatim from `source`.
-  const haystack = caseSensitive ? folded : folded.toLowerCase();
-  const needle = caseSensitive ? foldedQuery : foldedQuery.toLowerCase();
-  if (!needle) return source;
+/** `source` with every text the query finds replaced, or the whole text on
+ *  an entire-cell match. Text outside the matches stays verbatim. */
+function substitute(source: string, opts: FindOptions, replacement: string): string {
+  if (opts.query === '') return source;
+  const pattern = queryPattern(opts);
+  const folded = foldText(source, opts.caseSensitive ?? false);
+  if (opts.matchWhole) return pattern.test(folded) ? replacement : source;
   let out = '';
-  let i = 0;
-  while (i <= source.length - needle.length) {
-    if (haystack.startsWith(needle, i)) {
-      out += replacement;
-      i += needle.length;
-    } else {
-      out += source[i];
-      i += 1;
-    }
+  let last = 0;
+  for (const match of folded.matchAll(pattern)) {
+    // An empty match (a bare `*`) replaces nothing on its own.
+    if (match[0] === '') continue;
+    out += source.slice(last, match.index) + replacement;
+    last = match.index + match[0].length;
   }
-  out += source.slice(i);
-  return out;
+  return out + source.slice(last);
 }
 
 export function replaceOne(
@@ -411,10 +484,10 @@ export function replaceOne(
 ): boolean {
   if (lookIn === 'comments' || lookIn === 'notes') return false;
   const formula = wb.cellFormula(match.addr);
-  // Formula replacement is an explicit mode of Find/Replace. Values mode
-  // still refuses formulas so a displayed result can never destroy its
-  // source expression.
-  if (lookIn === 'formulas' ? formula === null : formula !== null) return false;
+  // Formulas mode replaces cell contents, constants included, as the desktop
+  // app does. Values mode refuses formulas so a displayed result can never
+  // destroy its source expression.
+  if (lookIn !== 'formulas' && formula !== null) return false;
   if (store && !isCellWritable(store.getState(), match.addr)) {
     warnProtected(match.addr);
     return false;
@@ -436,10 +509,9 @@ export function replaceAll(
   if (opts.query === '' || (opts.lookIn ?? 'values') === 'comments' || opts.lookIn === 'notes') {
     return 0;
   }
-  const matches = findAll(state, opts).filter((m) => {
-    const formula = wb.cellFormula(m.addr);
-    return opts.lookIn === 'formulas' ? formula !== null : formula === null;
-  });
+  const matches = findAll(state, opts).filter(
+    (m) => opts.lookIn === 'formulas' || wb.cellFormula(m.addr) === null,
+  );
   // Refuse the whole replacement up front rather than stopping partway.
   if (
     blockDataTableCells(
@@ -462,14 +534,7 @@ export function replaceAll(
         opts.lookIn === 'formulas' && formula !== null
           ? formulaDisplay(formula, opts)
           : workbookDisplay(wb, m.addr, valueDisplay(wb.getValue(m.addr), opts));
-      const next = substituteCaseAware(
-        cur,
-        opts.query,
-        replacement,
-        opts.caseSensitive ?? false,
-        opts.matchWhole ?? false,
-        opts.matchWidth === false,
-      );
+      const next = substitute(cur, opts, replacement);
       if (next === cur) continue;
       writeInput(wb, m.addr, next, store, opts.locale);
       count += 1;
@@ -481,12 +546,5 @@ export function replaceAll(
 /** Compute the substituted display string for a single match. Exposed for the
  *  overlay so it can apply per-match replacements with consistent semantics. */
 export function applySubstitution(source: string, opts: FindOptions, replacement: string): string {
-  return substituteCaseAware(
-    source,
-    opts.query,
-    replacement,
-    opts.caseSensitive ?? false,
-    opts.matchWhole ?? false,
-    opts.matchWidth === false,
-  );
+  return substitute(source, opts, replacement);
 }
