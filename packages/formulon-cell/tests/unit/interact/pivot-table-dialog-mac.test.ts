@@ -62,7 +62,7 @@ describe('Create PivotTable dialog on the Mac host', () => {
       ).map((input) => [input.parentElement?.textContent, input.checked, input.disabled]);
       expect(radios).toEqual([
         ['テーブルまたは範囲を選択', true, false],
-        ['外部データ ソースを使用', false, true],
+        ['外部データ ソースを使用', false, false],
         ['新規ワークシート', true, false],
         ['既存のワークシート', false, false],
       ]);
@@ -81,6 +81,30 @@ describe('Create PivotTable dialog on the Mac host', () => {
           .map((b) => b.textContent)
           .slice(-2),
       ).toEqual(['キャンセル', 'OK']);
+    } finally {
+      handle.detach();
+      wb.dispose();
+    }
+  });
+
+  it('disables OK while the external-data choice has no connection', async () => {
+    const wb = await buildWorkbook();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: ja });
+    try {
+      handle.open();
+      const [range, external] = Array.from(
+        document.querySelectorAll<HTMLInputElement>('input[name="fc-pivotdlg-source-kind"]'),
+      );
+      const ok = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-pivotdlg button')).at(
+        -1,
+      );
+      expect(ok?.disabled).toBe(false);
+      external?.click();
+      expect(ok?.disabled).toBe(true);
+      range?.click();
+      expect(ok?.disabled).toBe(false);
     } finally {
       handle.detach();
       wb.dispose();

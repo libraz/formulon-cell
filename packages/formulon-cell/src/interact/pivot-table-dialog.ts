@@ -95,15 +95,6 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   externalSourceInput.type = 'radio';
   externalSourceInput.name = 'fc-pivotdlg-source-kind';
   externalSourceInput.value = 'external';
-  projectDisabledState(
-    externalSourceInput,
-    true,
-    strings.pivotTableDialog.externalSourceUnavailable,
-    {
-      describedById: 'fc-pivotdlg-external-unavailable',
-      datasetKey: 'disabledReason',
-    },
-  );
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.className = 'fc-namedlg__input';
@@ -250,7 +241,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const sourceField = labeled(t.source, sourceInput);
     sourceField.classList.add('fc-pivotdlg__source-field');
     const externalChoice = checked(t.externalSource, externalSourceInput);
-    externalChoice.classList.add('fc-pivotdlg__check--disabled');
+    projectDisabledState(externalSourceInput, !mac, t.externalSourceUnavailable, {
+      describedById: 'fc-pivotdlg-external-unavailable',
+      datasetKey: 'disabledReason',
+    });
+    if (!mac) externalChoice.classList.add('fc-pivotdlg__check--disabled');
     const externalUnavailable = document.createElement('span');
     externalUnavailable.id = 'fc-pivotdlg-external-unavailable';
     externalUnavailable.className = 'fc-pivotdlg__disabled-note';
@@ -314,6 +309,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const t = strings.pivotTableDialog;
     error.hidden = true;
     error.textContent = '';
+    // The Mac dialog offers the external-data choice, but no connection exists here.
+    if (mac && externalSourceInput.checked) {
+      setOkDisabled(true, t.externalSourceUnavailable);
+      return;
+    }
     const range = rangeFromSourceInput();
     if (!range) {
       showError(t.invalidRange);
@@ -551,6 +551,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   }
   shell.on(filterSelect, 'change', onFilterSelectChange as EventListener);
   shell.on(valueSelect, 'change', onValueSelectChange as EventListener);
+  shell.on(tableRangeInput, 'change', configureForSource as EventListener);
+  shell.on(externalSourceInput, 'change', configureForSource as EventListener);
   shell.on(newWorksheetInput, 'change', updateDestinationPlacementState as EventListener);
   shell.on(existingWorksheetInput, 'change', updateDestinationPlacementState as EventListener);
   shell.on(okBtn, 'click', onOk);
@@ -561,6 +563,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     open(opts = {}) {
       mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
       if (mac) destInput.value = '';
+      tableRangeInput.checked = true;
       sourceInput.value = selectedRangeLabel();
       // New worksheet is the dialog's default placement; only an explicit
       // "existing sheet" entry point starts on the other radio.
