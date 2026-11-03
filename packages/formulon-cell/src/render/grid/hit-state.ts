@@ -142,6 +142,7 @@ export function detectValidationViolation(
   validation: CellValidation | undefined,
   resolveRange?: RangeResolver,
 ): boolean {
+  if (value.kind === 'error') return false;
   return cellValueViolatesValidation(value, validation, resolveRange);
 }
 

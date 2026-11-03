@@ -293,7 +293,8 @@ export function cellValueViolatesValidation(
   resolveRange?: RangeResolver,
 ): boolean {
   if (!validation) return false;
-  if (value.kind === 'error') return false;
+  // An error value satisfies no rule (Excel's Validation.Value is false).
+  if (value.kind === 'error') return true;
   const outcome = validateAgainst(validation, coerceCellValue(value), resolveRange);
   return !outcome.ok;
 }
@@ -348,7 +349,8 @@ export function validateAgainst(
       // Range-backed list with no resolver / empty resolution: accept anything
       // (spreadsheet parity — it just disables the constraint silently).
       if (!Array.isArray(validation.source) && values.length === 0) return { ok: true };
-      return listValueMatches(values, text)
+      // A literal list compares exactly (Excel: `B` is not in `a,b,c`).
+      return listValueMatches(values, text, Array.isArray(validation.source))
         ? { ok: true }
         : reject(validation, listMessage(values));
     }
@@ -404,7 +406,12 @@ function normalizeListText(value: string): string {
   return value.toLocaleLowerCase();
 }
 
-function listValueMatches(values: readonly string[], text: string): boolean {
+function listValueMatches(
+  values: readonly string[],
+  text: string,
+  caseSensitive: boolean,
+): boolean {
+  if (caseSensitive) return values.includes(text);
   const normalized = normalizeListText(text);
   return values.some((value) => normalizeListText(value) === normalized);
 }
