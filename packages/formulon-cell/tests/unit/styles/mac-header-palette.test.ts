@@ -15,14 +15,15 @@ const macLightPalette = (): string => {
 const token = (block: string, name: string): string | undefined =>
   block.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1]?.trim();
 
-// Excel for Mac, light appearance: strip 249-251,
-// separators (233,233,231), label ink 94, strip border (188,187,186). The
-// captures are Display P3; these greys read the same in sRGB.
+// Excel for Mac, light appearance: strip 249-251, label ink 94, strip border
+// (188,187,186); separators 2 device px of (226,225,223) / (226,226,224)
+// (cells-header-separator-light-recheck). The captures are Display P3; these
+// greys read the same in sRGB.
 describe('Mac light header palette', () => {
   it('matches the measured strip, separator, label and border colours', () => {
     const block = macLightPalette();
     expect(token(block, '--fc-header-bg')).toBe('#fafafa');
-    expect(token(block, '--fc-header-rule')).toBe('#e9e9e7');
+    expect(token(block, '--fc-header-rule')).toBe('#e2e1df');
     expect(token(block, '--fc-header-fg')).toBe('#5e5e5e');
     expect(token(block, '--fc-rule-strong')).toBe('#bcbbba');
   });
