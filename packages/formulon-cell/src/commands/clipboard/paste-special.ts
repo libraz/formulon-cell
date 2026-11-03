@@ -23,7 +23,7 @@ import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
-import { isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
+import { blockedByProtection, isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import {
   recordConditionalRulesChange,
@@ -748,6 +748,18 @@ function applyPaste(
     resolvePasteDestination(beforeHydration, snap, opt.transpose),
   );
   if (!resolvedDestination) return null;
+  // Column widths write no cell: a protected sheet takes them when it allows
+  // formatting columns, whatever the destination cells' locks.
+  if (opt.what === 'column-widths') {
+    if (
+      blockedByProtection(store, resolvedDestination.sheet, 'paste column widths', 'formatColumns')
+    ) {
+      return null;
+    }
+    pasteColumnWidths(store, wb, history, snap, resolvedDestination);
+    selectWritten(store, resolvedDestination, false);
+    return { writtenRange: { ...resolvedDestination }, skippedNonFiniteOperations: 0 };
+  }
   const sourceLogical = logicalRangeFor(snap);
   hydrateEngineComments(store, wb, [
     resolvedDestination,
@@ -769,12 +781,6 @@ function applyPaste(
     )
   ) {
     return null;
-  }
-
-  if (opt.what === 'column-widths') {
-    pasteColumnWidths(store, wb, history, snap, checked.destination);
-    selectWritten(store, checked.destination, false);
-    return { writtenRange: { ...checked.destination }, skippedNonFiniteOperations: 0 };
   }
 
   // Excel treats cutting and pasting back onto the exact source rectangle as a

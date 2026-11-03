@@ -124,6 +124,31 @@ describe('paste special as Excel measures it', () => {
     expect(wb.getValue({ sheet: 0, row: 61, col: 13 })).toEqual({ kind: 'blank' });
   });
 
+  it('column widths on a protected sheet needs the format-columns option, not unlocked cells', async () => {
+    const { setCellLocked, setProtectedSheet } = await import(
+      '../../../../../src/commands/protection.js'
+    );
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 1 }]);
+    mutators.setColWidth(store, 0, 97);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    assertSnap(snap);
+    setActive(store, 61, 13);
+    // Unlocked destination cells do not open the widths.
+    setCellLocked(store, { sheet: 0, r0: 61, c0: 13, r1: 61, c1: 13 }, false);
+    setProtectedSheet(store, 0, true);
+    expect(
+      pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'column-widths' })),
+    ).toBeNull();
+    expect(store.getState().layout.colWidths.get(13)).toBeUndefined();
+    // The option opens them even over locked cells.
+    setActive(store, 61, 14);
+    setProtectedSheet(store, 0, true, { permissions: { formatColumns: true } });
+    expect(
+      pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'column-widths' })),
+    ).not.toBeNull();
+    expect(store.getState().layout.colWidths.get(14)).toBe(97);
+  });
+
   it('all except borders carries values and formats but not borders', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 7 },

@@ -437,6 +437,31 @@ describe('attachPointer', () => {
       fireUp(host, 10, 100);
     });
 
+    it('refuses header resizes on a protected sheet unless its format option allows them', () => {
+      mutators.setSheetProtected(store, 0, true);
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 154, 10);
+      fireMove(host, 200, 10);
+      fireUp(host, 200, 10);
+      fireDown(host, 10, 56);
+      fireMove(host, 10, 100);
+      fireUp(host, 10, 100);
+      expect(store.getState().layout.colWidths.get(0)).toBeUndefined();
+      expect(store.getState().layout.rowHeights.get(0)).toBeUndefined();
+
+      mutators.setSheetProtected(store, 0, true, {
+        permissions: { formatColumns: true, formatRows: true },
+      });
+      fireDown(host, 154, 10);
+      fireMove(host, 200, 10);
+      fireUp(host, 200, 10);
+      fireDown(host, 10, 56);
+      fireMove(host, 10, 100);
+      fireUp(host, 10, 100);
+      expect(store.getState().layout.colWidths.get(0)).toBe(148);
+      expect(store.getState().layout.rowHeights.get(0)).toBe(70);
+    });
+
     it('row-resize drag measures from the top edge when rows above are hidden', () => {
       store.setState((s) => ({
         ...s,

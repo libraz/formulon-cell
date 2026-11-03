@@ -17,8 +17,13 @@ import {
 } from '../commands/outline.js';
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
-import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { autofitColsWidth, autofitRowsHeight } from '../commands/row-col-layout.js';
+import { blockedByProtection, deferForAllowedRangeUnlock } from '../commands/protection.js';
+import {
+  autofitColsWidth,
+  autofitRowsHeight,
+  setColsWidth,
+  setRowsHeight,
+} from '../commands/row-col-layout.js';
 import {
   applyLayoutSnapshot,
   captureLayoutSnapshot,
@@ -629,7 +634,11 @@ export function attachPointer(
       }
 
       case 'col-resize': {
-        if (restricted) {
+        // A protected sheet refuses the drag unless it allows formatting columns.
+        if (
+          restricted ||
+          blockedByProtection(store, s.data.sheetIndex, 'col-resize', 'formatColumns')
+        ) {
           e.preventDefault();
           drag = { kind: 'none' };
           return;
@@ -648,7 +657,10 @@ export function attachPointer(
       }
 
       case 'row-resize': {
-        if (restricted) {
+        if (
+          restricted ||
+          blockedByProtection(store, s.data.sheetIndex, 'row-resize', 'formatRows')
+        ) {
           e.preventDefault();
           drag = { kind: 'none' };
           return;
@@ -731,15 +743,28 @@ export function attachPointer(
         return;
       }
       case 'col-resize': {
-        // Screen px → canonical px; the mutator snaps and clamps.
+        // Screen px → canonical px; the mutator snaps and clamps. The drag
+        // records one history entry on pointerup, so each move writes bare.
         const w = drag.rtl ? drag.leadingEdge - x : x - drag.leadingEdge;
-        mutators.setColWidth(store, drag.col, Math.round(w) / renderScale(s.layout, s.viewport));
+        setColsWidth(
+          store,
+          null,
+          drag.col,
+          drag.col,
+          Math.round(w) / renderScale(s.layout, s.viewport),
+        );
         host.style.cursor = 'col-resize';
         return;
       }
       case 'row-resize': {
         const h = y - drag.topEdge;
-        mutators.setRowHeight(store, drag.row, Math.round(h) / renderScale(s.layout, s.viewport));
+        setRowsHeight(
+          store,
+          null,
+          drag.row,
+          drag.row,
+          Math.round(h) / renderScale(s.layout, s.viewport),
+        );
         host.style.cursor = 'row-resize';
         return;
       }
