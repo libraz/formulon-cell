@@ -42,6 +42,7 @@ const AV_KERN_UNITS = -152;
  *  run, as a browser canvas reports them. */
 function arialCanvas() {
   const fills: Array<{ text: string; x: number; y: number }> = [];
+  const translates: [number, number][] = [];
   let font = '400 11px Arial';
   const size = (): number => Number(font.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? 11);
   const ctx = {
@@ -62,6 +63,10 @@ function arialCanvas() {
     beginPath(): void {},
     rect(): void {},
     clip(): void {},
+    translate(x: number, y: number): void {
+      translates.push([x, y]);
+    },
+    rotate(): void {},
     moveTo(): void {},
     lineTo(): void {},
     stroke(): void {},
@@ -87,6 +92,7 @@ function arialCanvas() {
   return {
     ctx: ctx as unknown as CanvasRenderingContext2D,
     fills,
+    translates,
     setFont: (f: string) => (font = f),
   };
 }
@@ -273,5 +279,26 @@ describe('single-line placement on whole-point advances', () => {
   it('floors a centred run that leaves a half px', () => {
     // 14 px: 'Hxg' is 10 + 7 + 8 = 25 px, centred at 23.5.
     expect(firstX(14, 'center')).toBe(23);
+  });
+});
+
+describe('rotated text on whole-point advances', () => {
+  it('keeps the whole-point inset rather than the zoomed padding', () => {
+    // Arial 11 at 200% paints at 22 px: inset 3.25 px, not 3 x 1.5 = 4.5.
+    const spy = arialCanvas();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 120, h: 48 },
+      theme: { ...theme, textCell: (11 * 4) / 3 } as ResolvedTheme,
+      value: { kind: 'text', value: 'Rot' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { rotation: 45 },
+      zoom: 1.5,
+      wholePointAdvances: true,
+    });
+    const ascent = (22 * 10) / 11;
+    expect(spy.translates[0]?.[0]).toBeCloseTo(3.25 + ascent * Math.sin(Math.PI / 4));
   });
 });

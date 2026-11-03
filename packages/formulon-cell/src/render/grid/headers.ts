@@ -13,12 +13,14 @@ import {
   type ViewState,
 } from '../geometry.js';
 import { paintOutlineGutters } from '../painters/controls.js';
+import { fontMetricsBox, textBaselineY } from '../painters/text.js';
 import type { OutlineToggleHit } from '../painters.js';
 import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
 
-/** Row numbers sit on a baseline this far above the row's bottom edge, CSS px:
- *  Excel bottom-anchors them, 6 device px up at DPR 2 on any row height. */
-const ROW_LABEL_BASELINE_GAP = 3;
+/** Row numbers are bottom-aligned like cell text: the baseline sits the
+ *  label font's descent plus one px above the row's bottom edge (6 device px
+ *  at DPR 2 for the default font, 8 for Courier New 11, 14 for Courier 20). */
+const ROW_LABEL_PAD_Y = 1;
 
 export function paintHeaders(
   pc: ChromePaintContext,
@@ -136,6 +138,8 @@ export function paintHeaders(
   const rowLabelX = rtl
     ? innerX + (layout.headerColWidth + width) / 2
     : innerX - (layout.headerColWidth + width) / 2;
+  ctx.font = `400 ${labelSize}px ${labelFamily}`;
+  const rowLabelBox = fontMetricsBox(ctx, labelSize);
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
@@ -162,7 +166,11 @@ export function paintHeaders(
         : theme.headerFg;
     ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${labelSize}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
-    ctx.fillText(rowLabel, rowLabelX, rect.y + h - ROW_LABEL_BASELINE_GAP);
+    ctx.fillText(
+      rowLabel,
+      rowLabelX,
+      textBaselineY({ ...rect, h }, rowLabelBox, 'bottom', ROW_LABEL_PAD_Y),
+    );
     if (isActiveRow || isSelectedRow) {
       ctx.fillStyle = theme.accent;
       ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);

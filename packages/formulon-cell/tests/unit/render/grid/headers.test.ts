@@ -118,6 +118,17 @@ function makeCtxSpy(): {
     fillRect(x: number, y: number, w: number, h: number): void {
       fills.push({ style: fillStyle, alpha, rect: [x, y, w, h] });
     },
+    // Font box as the canvas reports it: Courier New 0.3 em of descent, other
+    // faces 2 px at 11 px.
+    measureText(): TextMetrics {
+      const size = Number(font.match(/([\d.]+)px/)?.[1] ?? 11);
+      const courier = font.includes('Courier');
+      return {
+        width: 0,
+        fontBoundingBoxAscent: Math.round(size * (courier ? 0.83 : 0.91)),
+        fontBoundingBoxDescent: Math.round(size * (courier ? 0.3 : 2 / 11)),
+      } as TextMetrics;
+    },
     fillText(
       this: { textAlign: string; textBaseline: string },
       text: string,
@@ -389,6 +400,43 @@ describe('paintHeaders', () => {
       y: oy + 24 + 20 + 50 - 3,
       baseline: 'alphabetic',
     });
+  });
+
+  it('lifts row numbers by the label font descent, as Excel does for a large Normal font', () => {
+    // Excel Courier New 20 (27 pt rows): row-1 digit ink ends 14 device px
+    // above the row bottom; Courier New 11 (15 pt rows): 8 px.
+    const state = createSpreadsheetStore().getState();
+    state.layout.rowHeights = new Map([
+      [0, 27],
+      [1, 15],
+    ]);
+    state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 2, zoom: 1, widthPx: 320 };
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const big = makeCtxSpy();
+    paintHeaders(
+      { ctx: big.ctx, dpr: 2, cssWidth: 320, cssHeight: 400 },
+      { ...state, layout },
+      theme(),
+      cols,
+      rows,
+      'Courier New',
+      20,
+    );
+    const oy = layout.headerRowHeight;
+    expect(big.texts.find((t) => t.text === '1')?.y).toBe(oy + 27 - 7);
+    const small = makeCtxSpy();
+    paintHeaders(
+      { ctx: small.ctx, dpr: 2, cssWidth: 320, cssHeight: 400 },
+      { ...state, layout },
+      theme(),
+      cols,
+      rows,
+      'Courier New',
+      11,
+    );
+    expect(small.texts.find((t) => t.text === '2')?.y).toBe(oy + 27 + 15 - 4);
   });
 
   it('centres column letters on the header cell less its trailing separator', () => {

@@ -686,13 +686,14 @@ export function paintCellText({
           ? 'left'
           : 'right';
     // Rotated runs keep one more padding width clear of the right edge.
-    const right = alignedTextAnchor(bounds, 'right', padX, indentPx) - padX;
+    const rotatedPadX = wholePointAdvances ? wholePointPadX(fontSize) : padX;
+    const right = alignedTextAnchor(bounds, 'right', rotatedPadX, indentPx) - rotatedPadX;
     const originX =
       side === 'right'
         ? right - maxX
         : side === 'center'
           ? bounds.x + bounds.w / 2 - (minX + maxX) / 2
-          : bounds.x + padX + indentPx - minX;
+          : bounds.x + rotatedPadX + indentPx - minX;
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     // Bottom: the lower end of the baseline sits on the horizontal bottom
     // baseline. Top and middle place the line box.
