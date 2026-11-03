@@ -61,6 +61,8 @@ export interface CreatePivotTableOptions {
   source: Range;
   destination: { sheet: number; row: number; col: number };
   name?: string;
+  /** Empty, with no value, column or filter field, creates an empty report
+   *  whose fields are laid out afterwards from the field list. */
   rowField: string;
   columnField?: string;
   filterField?: string;
@@ -284,22 +286,27 @@ export function createPivotTableFromRange(
     (opts.valueFieldSettings ?? []).map((settings) => [settings.fieldName, settings]),
   );
   const filterItemFields = new Set((opts.filterItems ?? []).map((item) => item.fieldName));
+  const emptyReport =
+    !opts.rowField &&
+    valueFieldNames.length === 0 &&
+    !opts.columnField &&
+    filterFieldNames.length === 0;
   if (
-    !rowField ||
-    valueFields.length === 0 ||
+    (!emptyReport && (!rowField || valueFields.length === 0)) ||
+    (opts.rowField && !rowField) ||
     valueFields.some((field) => field === undefined) ||
     (opts.columnField && !columnField) ||
     filterFields.some((field) => field === undefined) ||
     Array.from(filterItemFields).some((name) => !filterFieldNames.includes(name)) ||
     Array.from(pivotFilterFields).some((name) => !filterFieldNames.includes(name)) ||
-    rowField.name === columnField?.name ||
+    (rowField !== undefined && rowField.name === columnField?.name) ||
     Array.from(valueFieldSettings.values()).some(
       (settings) =>
         settings.showAsBaseField !== undefined &&
-        settings.showAsBaseField !== rowField.name &&
+        settings.showAsBaseField !== rowField?.name &&
         settings.showAsBaseField !== columnField?.name,
     ) ||
-    filterFields.some((field) => field?.name === rowField.name) ||
+    filterFields.some((field) => field?.name === rowField?.name) ||
     (columnField !== undefined && filterFields.some((field) => field?.name === columnField.name))
   ) {
     return { ok: false, reason: 'invalid-field' };
@@ -394,7 +401,7 @@ export function createPivotTableFromRange(
   // Pivot field i binds to cache field i, so every cache field is added in
   // order; the ones the report does not use are then taken off their axis.
   const roles = new Map<string, PivotAxis>();
-  roles.set(rowField.name, PivotAxis.Row);
+  if (rowField) roles.set(rowField.name, PivotAxis.Row);
   if (columnField) roles.set(columnField.name, PivotAxis.Col);
   for (const filterField of filterFields) {
     if (filterField) roles.set(filterField.name, PivotAxis.Page);
@@ -427,8 +434,8 @@ export function createPivotTableFromRange(
     }
     pivotFieldByName.set(field.name, pivotField);
   }
-  const rowPivotField = pivotFieldByName.get(rowField.name) as number;
-  if (opts.rowSort && opts.rowSort !== 'none') {
+  const rowPivotField = rowField ? (pivotFieldByName.get(rowField.name) as number) : -1;
+  if (rowField && opts.rowSort && opts.rowSort !== 'none') {
     const ok = wb.setPivotFieldSort(
       opts.destination.sheet,
       pivotIndex,
@@ -478,7 +485,8 @@ export function createPivotTableFromRange(
   }
 
   // A specific base item is a position in the base field's items, so list them first.
-  const baseFieldIndexes = new Map<string, number>([[rowField.name, rowPivotField]]);
+  const baseFieldIndexes = new Map<string, number>();
+  if (rowField) baseFieldIndexes.set(rowField.name, rowPivotField);
   if (columnField) baseFieldIndexes.set(columnField.name, colPivotField);
   const itemsListed = new Set<string>();
   for (const settings of valueFieldSettings.values()) {

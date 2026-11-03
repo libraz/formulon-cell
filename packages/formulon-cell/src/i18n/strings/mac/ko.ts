@@ -1,10 +1,12 @@
 import { cellFormatKo } from '../cell-format/ko.js';
+import { dataObjectsKo } from '../data-objects/ko.js';
 import { editDialogsKo } from '../edit-dialogs/ko.js';
 import { gridPopupsKo } from '../grid-popups/ko.js';
 import { ribbonMenusKo } from '../ribbon-menus/ko.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import type { MacStrings } from './types.js';
@@ -161,6 +163,9 @@ export const macKo: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatKo.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
+  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
+    chooseConnection: '연결 선택...',
+  }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusKo.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusKo.ribbonMenu, {
     levelsHeading: '정렬 수준 추가:',

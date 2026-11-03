@@ -275,4 +275,20 @@
       grid-template-columns: minmax(0, 1fr);
     }
   }
+  /* Mac: source and destination only, one column, divider between them. */
+  .fc-pivotdlg--mac .fc-pivotdlg__section {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fc-pivotdlg--mac .fc-pivotdlg__section:first-child {
+    border-top: 0;
+  }
+  .fc-pivotdlg__connection {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 22px;
+  }
+  .fc-pivotdlg__connection .fc-pivotdlg__disabled-note {
+    margin-left: 0;
+  }
 }

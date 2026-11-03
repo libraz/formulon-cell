@@ -1,10 +1,12 @@
 import { cellFormatZh } from '../cell-format/zh.js';
+import { dataObjectsZh } from '../data-objects/zh.js';
 import { editDialogsZh } from '../edit-dialogs/zh.js';
 import { gridPopupsZh } from '../grid-popups/zh.js';
 import { ribbonMenusZh } from '../ribbon-menus/zh.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import type { MacStrings } from './types.js';
@@ -160,6 +162,9 @@ export const macZh: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
+  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
+    chooseConnection: '选择连接...',
+  }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusZh.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusZh.ribbonMenu, {
     levelsHeading: '添加排序级别:',

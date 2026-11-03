@@ -1,4 +1,5 @@
 import { macPasteSpecialJa } from './paste-special.js';
+import { macPivotTableDialogJa } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesJa } from './remove-duplicates.js';
 import { macSortDialogJa } from './sort-dialog.js';
 import type { MacStrings } from './types.js';
@@ -161,6 +162,7 @@ export const macJa: MacStrings = {
   },
   /** Wording of the Mac app's Format Cells dialog, measured from the app. */
   macPasteSpecial: macPasteSpecialJa,
+  macPivotTableDialog: macPivotTableDialogJa,
   macRemoveDuplicates: macRemoveDuplicatesJa,
   macSortDialog: macSortDialogJa,
   macFindReplace: {

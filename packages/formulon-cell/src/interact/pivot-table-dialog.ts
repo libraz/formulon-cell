@@ -3,6 +3,7 @@ import {
   createPivotTableAtPlacement,
   inferPivotFieldItems,
   inferPivotSourceFields,
+  type PivotPlacement,
   type PivotSourceField,
   pivotSourceForSelection,
 } from '../commands/pivot-table.js';
@@ -50,6 +51,13 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   let wb = deps.wb;
   let strings = deps.strings ?? defaultStrings;
   let open = false;
+  // The Mac dialog asks only for the source and the destination; the report
+  // starts empty and is laid out from the field list.
+  let mac = false;
+  const dialogStrings = () =>
+    mac
+      ? { ...strings.pivotTableDialog, ...strings.macPivotTableDialog }
+      : strings.pivotTableDialog;
   const shell = createDialogShell({
     host,
     className: 'fc-pivotdlg',
@@ -226,37 +234,51 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     return row;
   };
   const sourceSelection = (): HTMLDivElement => {
+    const t = dialogStrings();
     const wrap = document.createElement('div');
     wrap.className = 'fc-pivotdlg__source-choice';
     const legend = document.createElement('span');
     legend.className = 'fc-pivotdlg__placement-label';
-    legend.textContent = strings.pivotTableDialog.sourceSection;
-    const rangeChoice = checked(strings.pivotTableDialog.tableOrRange, tableRangeInput);
-    const sourceField = labeled(strings.pivotTableDialog.source, sourceInput);
+    legend.textContent = t.sourceSection;
+    const rangeChoice = checked(t.tableOrRange, tableRangeInput);
+    const sourceField = labeled(t.source, sourceInput);
     sourceField.classList.add('fc-pivotdlg__source-field');
-    const externalChoice = checked(strings.pivotTableDialog.externalSource, externalSourceInput);
+    const externalChoice = checked(t.externalSource, externalSourceInput);
     externalChoice.classList.add('fc-pivotdlg__check--disabled');
     const externalUnavailable = document.createElement('span');
     externalUnavailable.id = 'fc-pivotdlg-external-unavailable';
     externalUnavailable.className = 'fc-pivotdlg__disabled-note';
-    externalUnavailable.textContent = strings.pivotTableDialog.externalSourceUnavailable;
-    projectDisabledReason(externalChoice, strings.pivotTableDialog.externalSourceUnavailable, {
+    externalUnavailable.textContent = t.externalSourceUnavailable;
+    projectDisabledReason(externalChoice, t.externalSourceUnavailable, {
       ariaDescription: false,
     });
-    wrap.append(legend, rangeChoice, sourceField, externalChoice, externalUnavailable);
+    if (!mac) {
+      wrap.append(legend, rangeChoice, sourceField, externalChoice, externalUnavailable);
+      return wrap;
+    }
+    const connection = document.createElement('div');
+    connection.className = 'fc-pivotdlg__connection';
+    const chooseConnection = document.createElement('button');
+    chooseConnection.type = 'button';
+    chooseConnection.className = 'fc-pivotdlg__connection-btn';
+    chooseConnection.disabled = true;
+    chooseConnection.textContent = strings.macPivotTableDialog.chooseConnection;
+    connection.append(chooseConnection, externalUnavailable);
+    wrap.append(legend, rangeChoice, sourceField, externalChoice, connection);
     return wrap;
   };
   const destinationPlacement = (): HTMLDivElement => {
+    const t = dialogStrings();
     const wrap = document.createElement('div');
     wrap.className = 'fc-pivotdlg__placement';
     const legend = document.createElement('span');
     legend.className = 'fc-pivotdlg__placement-label';
-    legend.textContent = strings.pivotTableDialog.destinationSection;
+    legend.textContent = t.destinationSection;
     wrap.append(
       legend,
-      checked(strings.pivotTableDialog.newWorksheet, newWorksheetInput),
-      checked(strings.pivotTableDialog.existingWorksheet, existingWorksheetInput),
-      labeled(strings.pivotTableDialog.destination, destInput),
+      checked(t.newWorksheet, newWorksheetInput),
+      checked(t.existingWorksheet, existingWorksheetInput),
+      labeled(t.destination, destInput),
     );
     return wrap;
   };
@@ -304,12 +326,14 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       return;
     }
     setOkDisabled(false, null);
+    if (mac) return;
     areas.resetSource(fields, t.none);
     updateFieldList(fields);
   };
 
   const render = (): void => {
-    const t = strings.pivotTableDialog;
+    const t = dialogStrings();
+    overlay.classList.toggle('fc-pivotdlg--mac', mac);
     header.textContent = t.title;
     shell.setAriaLabel(t.title);
     cancelBtn.textContent = t.cancel;
@@ -326,7 +350,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
     sourceInput.value = sourceInput.value || sourceRangeLabel(range);
     nameInput.value = nameInput.value || `PivotTable${wb.getPivotTables().length + 1}`;
-    const dest = formatA1Cell(range.r1 + 2, range.c0);
+    // The Mac dialog leaves the location blank until the user gives one.
+    const dest = mac ? '' : formatA1Cell(range.r1 + 2, range.c0);
     destInput.value = destInput.value || dest;
     aggSelect.replaceChildren();
     appendDialogSelectOptions(aggSelect, [
@@ -352,30 +377,32 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       ]);
     }
 
-    body.append(
-      section(sourceSelection(), labeled(t.name, nameInput)),
-      section(destinationPlacement()),
-      fieldList,
-      section(
-        labeled(t.filtersArea, filterSelect),
-        labeled(t.rowField, rowSelect),
-        labeled(t.columnField, colSelect),
-        labeled(t.valueField, valueSelect),
-        labeled(t.aggregation, aggSelect),
-      ),
-      section(
-        labeled(t.rowSort, rowSortSelect),
-        labeled(t.columnSort, colSortSelect),
-        labeled(t.numberFormat, numberFormatInput),
-      ),
-      checkGrid(
-        checked(t.rowSubtotalTop, rowSubtotalTop),
-        checked(t.columnSubtotalTop, colSubtotalTop),
-        checked(t.rowGrandTotals, rowTotals),
-        checked(t.columnGrandTotals, colTotals),
-      ),
-      error,
-    );
+    if (mac) body.append(section(sourceSelection()), section(destinationPlacement()), error);
+    else
+      body.append(
+        section(sourceSelection(), labeled(t.name, nameInput)),
+        section(destinationPlacement()),
+        fieldList,
+        section(
+          labeled(t.filtersArea, filterSelect),
+          labeled(t.rowField, rowSelect),
+          labeled(t.columnField, colSelect),
+          labeled(t.valueField, valueSelect),
+          labeled(t.aggregation, aggSelect),
+        ),
+        section(
+          labeled(t.rowSort, rowSortSelect),
+          labeled(t.columnSort, colSortSelect),
+          labeled(t.numberFormat, numberFormatInput),
+        ),
+        checkGrid(
+          checked(t.rowSubtotalTop, rowSubtotalTop),
+          checked(t.columnSubtotalTop, colSubtotalTop),
+          checked(t.rowGrandTotals, rowTotals),
+          checked(t.columnGrandTotals, colTotals),
+        ),
+        error,
+      );
     attachRangePickerButton(sourceInput, {
       label: t.rangePickerSelect,
       getValue: selectedRangeLabel,
@@ -432,12 +459,37 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       showError(strings.ribbonMenu.workbookStructureProtectedBlocked);
       return;
     }
+    const placement = dest ?? 'new-sheet';
+    const result = mac
+      ? createPivotTableAtPlacement(
+          { store, workbook: wb, history: deps.history },
+          { source: range, name: nameInput.value, rowField: '', valueField: '' },
+          placement,
+        )
+      : createConfiguredPivot(range, placement);
+    if (!result.ok) {
+      showError(strings.pivotTableDialog.engineFailed);
+      return;
+    }
+    const { destination } = result;
+    if (destination.sheet !== store.getState().data.sheetIndex) {
+      mutators.replaceCells(store, wb.cells(destination.sheet));
+      mutators.setSheetIndex(store, destination.sheet);
+    }
+    mutators.setActive(store, destination);
+    deps.onAfterCreate?.();
+    deps.invalidate?.();
+    close();
+  };
+
+  /** Create the report the full dialog laid out. */
+  const createConfiguredPivot = (range: EngineRange, placement: PivotPlacement) => {
     const aggregation = Number(aggSelect.value) as PivotAggregation;
     const { filterItems, pivotFilters, valueFieldSettings } = areas.toCreateSpec({
       aggregation,
       numberFormat: numberFormatInput.value,
     });
-    const result = createPivotTableAtPlacement(
+    return createPivotTableAtPlacement(
       { store, workbook: wb, history: deps.history },
       {
         source: range,
@@ -460,21 +512,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
         showRowGrandTotals: rowTotals.checked,
         showColumnGrandTotals: colTotals.checked,
       },
-      dest ?? 'new-sheet',
+      placement,
     );
-    if (!result.ok) {
-      showError(strings.pivotTableDialog.engineFailed);
-      return;
-    }
-    const { destination } = result;
-    if (destination.sheet !== store.getState().data.sheetIndex) {
-      mutators.replaceCells(store, wb.cells(destination.sheet));
-      mutators.setSheetIndex(store, destination.sheet);
-    }
-    mutators.setActive(store, destination);
-    deps.onAfterCreate?.();
-    deps.invalidate?.();
-    close();
   };
 
   const onKey = (e: KeyboardEvent): void => {
@@ -514,6 +553,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   return {
     open(opts = {}) {
+      mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+      if (mac) destInput.value = '';
       sourceInput.value = selectedRangeLabel();
       // New worksheet is the dialog's default placement; only an explicit
       // "existing sheet" entry point starts on the other radio.

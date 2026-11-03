@@ -1,10 +1,12 @@
 import { cellFormatTh } from '../cell-format/th.js';
+import { dataObjectsTh } from '../data-objects/th.js';
 import { editDialogsTh } from '../edit-dialogs/th.js';
 import { gridPopupsTh } from '../grid-popups/th.js';
 import { ribbonMenusTh } from '../ribbon-menus/th.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import type { MacStrings } from './types.js';
@@ -160,6 +162,9 @@ export const macTh: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatTh.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
+  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
+    chooseConnection: 'เลือกการเชื่อมต่อ...',
+  }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusTh.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusTh.ribbonMenu, {
     levelsHeading: 'เพิ่มระดับการเรียงลำดับ:',

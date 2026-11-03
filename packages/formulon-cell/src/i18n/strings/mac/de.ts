@@ -1,10 +1,12 @@
 import { cellFormatDe } from '../cell-format/de.js';
+import { dataObjectsDe } from '../data-objects/de.js';
 import { editDialogsDe } from '../edit-dialogs/de.js';
 import { gridPopupsDe } from '../grid-popups/de.js';
 import { ribbonMenusDe } from '../ribbon-menus/de.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import type { MacStrings } from './types.js';
@@ -163,6 +165,9 @@ export const macDe: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatDe.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
+  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsDe.pivotTableDialog, {
+    chooseConnection: 'Verbindung auswählen...',
+  }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusDe.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusDe.ribbonMenu, {
     levelsHeading: 'Sortierebene hinzufügen:',

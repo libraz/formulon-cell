@@ -1,6 +1,7 @@
 import type { CellFormatStrings } from '../cell-format/types.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
 import type { MacPasteSpecialStrings } from './paste-special.js';
+import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
 import type { MacSortDialogStrings } from './sort-dialog.js';
 
@@ -11,6 +12,8 @@ export interface MacStrings {
   macFindReplace: MacFindReplaceStrings;
   /** Overrides of `pasteSpecialDialog` that apply on the Mac host only. */
   macPasteSpecial: MacPasteSpecialStrings;
+  /** Overrides of `pivotTableDialog`, plus its Mac-only labels, that apply on the Mac host only. */
+  macPivotTableDialog: MacPivotTableDialogStrings;
   /** Overrides of the Remove Duplicates wording that apply on the Mac host only. */
   macRemoveDuplicates: MacRemoveDuplicatesStrings;
   /** Overrides of the Sort dialog wording, plus its Mac-only labels, that apply on the Mac host only. */

@@ -1,10 +1,12 @@
 import { cellFormatFr } from '../cell-format/fr.js';
+import { dataObjectsFr } from '../data-objects/fr.js';
 import { editDialogsFr } from '../edit-dialogs/fr.js';
 import { gridPopupsFr } from '../grid-popups/fr.js';
 import { ribbonMenusFr } from '../ribbon-menus/fr.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import type { MacStrings } from './types.js';
@@ -162,6 +164,9 @@ export const macFr: MacStrings = {
   },
   macFormatDialog: macFormatDialogFrom(cellFormatFr.formatDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog),
+  macPivotTableDialog: macPivotTableDialogFrom(dataObjectsFr.pivotTableDialog, {
+    chooseConnection: 'Choisir la connexion...',
+  }),
   macRemoveDuplicates: macRemoveDuplicatesFrom(ribbonMenusFr.ribbonMenu),
   macSortDialog: macSortDialogFrom(ribbonMenusFr.ribbonMenu, {
     levelsHeading: 'Ajouter un niveau de tri :',
