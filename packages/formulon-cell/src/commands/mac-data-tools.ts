@@ -20,6 +20,12 @@ export const MAX_SUBTOTAL_ROWS = 100_000;
 export const MAX_SUBTOTAL_OUTPUT_CELLS = 100_000;
 export const MAX_SUBTOTAL_GROUPS = 1_000;
 export const MAX_GOAL_SEEK_ITERATIONS = 100;
+/** Desktop default Maximum Change: Goal Seek stops once |formula - target| is below it. */
+const GOAL_SEEK_MAX_CHANGE = 0.001;
+const GOAL_SEEK_PROBE = 2 ** -20;
+/** Measured on desktop: a flat formula from x0 ends at x0 - 0.01 * 2^25. */
+const GOAL_SEEK_FLAT_STEP = 0.01;
+const GOAL_SEEK_FLAT_DOUBLINGS = 25;
 
 export type MacDataFunction = 'sum' | 'average' | 'count' | 'min' | 'max';
 
@@ -63,6 +69,9 @@ export interface GoalSeekSolution {
   readonly changingValue: number;
   readonly formulaValue: number;
   readonly iterations: number;
+  /** False when the iteration stopped without reaching the target; the last
+   *  iterate is still the value the desktop app leaves in the cell. */
+  readonly converged: boolean;
 }
 
 interface GoalSeekProof {
@@ -434,9 +443,8 @@ export async function solveMacGoalSeek(
   if (!authorization.allowed) return failure('rejected', 'notEditable', authorization.reason);
 
   let scratch: WorkbookHandle | null = null;
-  let sourceBytes: Uint8Array | null = null;
   try {
-    sourceBytes = new Uint8Array(wb.save({ snapshot: true }));
+    const sourceBytes = new Uint8Array(wb.save({ snapshot: true }));
     scratch = await WorkbookHandle.loadBytes(sourceBytes, { preferStub: wb.isStub });
     // A workbook in Manual calculation mode can carry stale cached results in
     // its saved bytes. Goal Seek always starts from a fresh calculation and
@@ -446,14 +454,10 @@ export async function solveMacGoalSeek(
       return failure('unsupported', 'scratchUnsupported');
     }
     const initial = changing.kind === 'number' ? changing.value : 0;
-    const requestedTolerance = request.tolerance ?? 1e-8;
-    if (!Number.isFinite(requestedTolerance) || requestedTolerance < 0) {
+    const tolerance = request.tolerance ?? GOAL_SEEK_MAX_CHANGE;
+    if (!Number.isFinite(tolerance) || tolerance < 0) {
       return failure('invalid', 'invalidTolerance');
     }
-    const tolerance = Math.max(
-      Number.EPSILON * Math.max(1, Math.abs(request.targetValue)),
-      requestedTolerance,
-    );
     const requestedIterations = request.maxIterations ?? MAX_GOAL_SEEK_ITERATIONS;
     if (!Number.isFinite(requestedIterations) || requestedIterations < 1) {
       return failure('invalid', 'invalidIterations');
@@ -471,102 +475,66 @@ export async function solveMacGoalSeek(
       const formulaValue = formulaNumber(scratch as WorkbookHandle, request.formulaCell);
       return formulaValue === null ? null : formulaValue - request.targetValue;
     };
-    const f0 = evaluate(initial);
-    if (f0 === null) return failure('invalid', 'nonFiniteResult');
-    if (Math.abs(f0) <= tolerance) {
-      return registerGoalSeekSolution(request, sourceBytes, {
-        changingValue: initial,
-        formulaValue: request.targetValue + f0,
-        iterations: 0,
+    const finish = (
+      changingValue: number,
+      residual: number,
+      iterations: number,
+      converged: boolean,
+    ): MacDataResult<GoalSeekSolution> =>
+      registerGoalSeekSolution(request, sourceBytes, {
+        changingValue,
+        formulaValue: request.targetValue + residual,
+        iterations,
+        converged,
       });
-    }
-    let x0 = initial;
-    let fPrev = f0;
-    let x1 = initial === 0 ? 1 : initial + Math.max(1, Math.abs(initial) * 0.05);
-    if (x1 === x0) x1 = x0 + 1;
-    let f1 = evaluate(x1);
-    if (f1 === null) return failure('invalid', 'nonFiniteResult');
-    if (Math.abs(f1) <= tolerance) {
-      return registerGoalSeekSolution(request, sourceBytes, {
-        changingValue: x1,
-        formulaValue: request.targetValue + f1,
-        iterations: 1,
-      });
-    }
 
-    let bracketLow: number | null = null;
-    let bracketHigh: number | null = null;
-    let bracketLowValue = 0;
-    if (f0 * f1 < 0) {
-      bracketLow = Math.min(x0, x1);
-      bracketHigh = Math.max(x0, x1);
-      if (x0 < x1) {
-        bracketLowValue = f0;
-      } else {
-        bracketLowValue = f1;
-      }
-    }
-
-    for (let iteration = 2; iteration <= maxIterations; iteration += 1) {
+    let x = initial;
+    let residual = evaluate(x);
+    if (residual === null) return failure('invalid', 'nonFiniteResult');
+    if (Math.abs(residual) < tolerance) return finish(x, residual, 0, true);
+    let flatOrigin: number | null = null;
+    let flatDoublings = 0;
+    for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
+      // Newton step from the current point; the forward probe is a power of
+      // two scaled to x, so linear formulas land exactly in one step.
+      const step = GOAL_SEEK_PROBE * Math.max(1, Math.abs(x));
+      const probe = evaluate(x + step);
+      const slope = probe === null ? Number.NaN : (probe - residual) / step;
       let candidate: number;
-      const denominator = f1 - fPrev;
-      if (Math.abs(denominator) <= Number.EPSILON * Math.max(1, Math.abs(f1), Math.abs(fPrev))) {
-        candidate =
-          bracketLow !== null && bracketHigh !== null ? (bracketLow + bracketHigh) / 2 : x1 + 1;
+      let next: number | null;
+      if (slope === 0 || !Number.isFinite(slope)) {
+        // Flat formula: walk down from where it went flat, doubling the step.
+        if (flatOrigin === null) {
+          flatOrigin = x;
+        } else if (flatDoublings === GOAL_SEEK_FLAT_DOUBLINGS) {
+          return finish(x, residual, iteration - 1, false);
+        } else {
+          flatDoublings += 1;
+        }
+        candidate = flatOrigin - GOAL_SEEK_FLAT_STEP * 2 ** flatDoublings;
+        next = evaluate(candidate);
       } else {
-        candidate = x1 - (f1 * (x1 - x0)) / denominator;
-      }
-      if (!Number.isFinite(candidate)) candidate = x1 + Math.max(1, Math.abs(x1) * 0.1);
-      if (
-        bracketLow !== null &&
-        bracketHigh !== null &&
-        (candidate <= bracketLow || candidate >= bracketHigh)
-      ) {
-        candidate = (bracketLow + bracketHigh) / 2;
-      }
-      let nextResidual = evaluate(candidate);
-      if (nextResidual === null) return failure('invalid', 'nonFiniteResult');
-      // Without a bracket, a secant step that overshoots (a pole, a flat region)
-      // is halved toward the last point until it reduces the residual.
-      for (
-        let halvings = 0;
-        bracketLow === null && Math.abs(nextResidual) >= Math.abs(f1) && halvings < 30;
-        halvings += 1
-      ) {
-        candidate = x1 + (candidate - x1) / 2;
-        const retried = evaluate(candidate);
-        if (retried === null) break;
-        nextResidual = retried;
-      }
-      if (Math.abs(nextResidual) <= tolerance) {
-        return registerGoalSeekSolution(request, sourceBytes, {
-          changingValue: candidate,
-          formulaValue: request.targetValue + nextResidual,
-          iterations: iteration,
-        });
-      }
-      if (bracketLow !== null && bracketHigh !== null) {
-        if (bracketLowValue * nextResidual <= 0) {
-          bracketHigh = candidate;
-        } else {
-          bracketLow = candidate;
-          bracketLowValue = nextResidual;
-        }
-      } else if (f1 * nextResidual < 0) {
-        bracketLow = Math.min(x1, candidate);
-        bracketHigh = Math.max(x1, candidate);
-        if (x1 < candidate) {
-          bracketLowValue = f1;
-        } else {
-          bracketLowValue = nextResidual;
+        flatOrigin = null;
+        flatDoublings = 0;
+        candidate = x - residual / slope;
+        next = evaluate(candidate);
+        // A step that overshoots (a pole, a turning point) is halved toward x
+        // until it reduces the residual.
+        for (
+          let halvings = 0;
+          (next === null || Math.abs(next) >= Math.abs(residual)) && halvings < 30;
+          halvings += 1
+        ) {
+          candidate = x + (candidate - x) / 2;
+          next = evaluate(candidate);
         }
       }
-      x0 = x1;
-      fPrev = f1;
-      x1 = candidate;
-      f1 = nextResidual;
+      if (next === null) return finish(x, residual, iteration - 1, false);
+      x = candidate;
+      residual = next;
+      if (Math.abs(residual) < tolerance) return finish(x, residual, iteration, true);
     }
-    return failure('nonconverged', 'notConverged');
+    return finish(x, residual, maxIterations, false);
   } catch (error) {
     return failure('invalid', 'failed', thrownReason(error));
   } finally {
@@ -574,7 +542,7 @@ export async function solveMacGoalSeek(
   }
 }
 
-/** Apply a converged Goal Seek value exactly once through the interaction
+/** Apply a Goal Seek result (converged or the last iterate) exactly once through the interaction
  * controller. The controller rechecks protection/restrictions and creates the
  * real one-step undo/redo intent. */
 export function commitMacGoalSeek(
@@ -602,7 +570,8 @@ export function commitMacGoalSeek(
     !Object.is(proof.maxIterations, request.maxIterations) ||
     !Object.is(proof.solution.changingValue, solution.changingValue) ||
     !Object.is(proof.solution.formulaValue, solution.formulaValue) ||
-    !Object.is(proof.solution.iterations, solution.iterations)
+    !Object.is(proof.solution.iterations, solution.iterations) ||
+    proof.solution.converged !== solution.converged
   ) {
     return failure('stale', 'stale');
   }

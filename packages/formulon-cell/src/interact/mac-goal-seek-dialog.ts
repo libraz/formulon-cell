@@ -251,8 +251,12 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
       solution: result.value,
     };
     setInputsDisabled(true);
-    status.dataset.state = 'success';
-    status.textContent = `${t.converged} ${t.result}: ${result.value.changingValue}`;
+    // A non-converged run still offers its last iterate, as the desktop app keeps it.
+    status.dataset.state = result.value.converged ? 'success' : 'error';
+    const outcome = result.value.converged
+      ? t.converged
+      : instance.i18n.strings.macData.errors.notConverged;
+    status.textContent = `${outcome} ${t.result}: ${result.value.changingValue}`;
   };
 
   shell.on(okBtn, 'click', () => {

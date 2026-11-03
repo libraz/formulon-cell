@@ -108,6 +108,27 @@ describe('Goal Seek dialog', () => {
     await waitFor(() => status().dataset.state === 'success');
   });
 
+  it.each([
+    { action: 'goal-seek-ok', a1: -335543.32 },
+    { action: 'goal-seek-cancel', a1: 1 },
+  ])('offers the last iterate of a non-converged run ($action)', async ({ action, a1 }) => {
+    fx.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    fx.workbook.setFormula({ sheet: 0, row: 0, col: 1 }, '=5');
+    fx.workbook.recalc();
+    byId<HTMLInputElement>('fc-mac-goalseek-target-value').value = '7';
+    byAction('goal-seek-ok').click();
+    const notConverged = fx.instance.i18n.strings.macData.errors.notConverged;
+    await waitFor(() => status().textContent?.startsWith(notConverged) ?? false);
+    expect(status().dataset.state).toBe('error');
+    expect(status().textContent).toContain('-335543.32');
+
+    byAction(action).click();
+    expect(fx.workbook.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'number',
+      value: a1,
+    });
+  });
+
   it('relabels the dialog when the locale changes', () => {
     expect(document.querySelector('.fc-mac-goalseek .fc-fmtdlg__header')?.textContent).toBe(
       'Goal Seek',

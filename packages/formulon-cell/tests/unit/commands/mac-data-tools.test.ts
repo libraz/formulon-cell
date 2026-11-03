@@ -759,60 +759,91 @@ describe('Mac Data command operations', () => {
   });
 
   describe('Goal Seek results match desktop Excel', () => {
-    // Desktop Excel stops once |formula - target| < 0.001 (Maximum Change), so
-    // the exact stopping value depends on its iteration; the host solves more
-    // tightly. Each case checks the formula lands on the target within that
-    // bound and, where the root is exact, the changing cell too.
-    const CASES: Array<{
-      formula: string;
-      target: number;
-      start: number;
-      root?: number;
-    }> = [
-      { formula: '=2*A1+3', target: 11, start: 1, root: 4 },
-      { formula: '=A1*3-9', target: 0, start: 0, root: 3 },
-      { formula: '=A1*100', target: 1, start: 0, root: 0.01 },
-      { formula: '=2*A1+3', target: 11, start: 4, root: 4 },
-      { formula: '=A1^2', target: 2, start: 1, root: Math.SQRT2 },
-      { formula: '=A1^2', target: 2, start: 5, root: Math.SQRT2 },
-      { formula: '=EXP(A1)', target: 10, start: 1, root: Math.log(10) },
-      { formula: '=SIN(A1)', target: 0.5, start: 0, root: Math.asin(0.5) },
-      { formula: '=1/A1', target: 4, start: 1, root: 0.25 },
-    ];
-    it.each(CASES)('$formula = $target from $start', async ({ formula, target, start, root }) => {
+    const A1 = { sheet: 0, row: 0, col: 0 };
+    const B1 = { sheet: 0, row: 0, col: 1 };
+    const solve = async (formula: string, target: number, start: number) => {
       const wb = await WorkbookHandle.createDefault();
       handles.push(wb);
-      wb.setNumber({ sheet: 0, row: 0, col: 0 }, start);
-      wb.setFormula({ sheet: 0, row: 0, col: 1 }, formula);
+      wb.setNumber(A1, start);
+      wb.setFormula(B1, formula);
       wb.recalc();
       const result = await solveMacGoalSeek(makeInstance(wb, createSpreadsheetStore()), {
-        formulaCell: { sheet: 0, row: 0, col: 1 },
+        formulaCell: B1,
         targetValue: target,
-        changingCell: { sheet: 0, row: 0, col: 0 },
+        changingCell: A1,
       });
       expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(Math.abs(result.value.formulaValue - target)).toBeLessThan(1e-3);
-      if (root !== undefined) expect(result.value.changingValue).toBeCloseTo(root, 2);
-    });
+      if (!result.ok) throw new Error('goal seek failed');
+      return { wb, solution: result.value };
+    };
 
     it.each([
-      { formula: '=A1^2', target: -1, start: 1 },
-      { formula: '=5', target: 7, start: 0 },
-    ])('finds no solution for $formula = $target', async ({ formula, target, start }) => {
+      { formula: '=2*A1+3', target: 11, start: 1, a1: 4 },
+      { formula: '=A1*3-9', target: 0, start: 0, a1: 3 },
+      { formula: '=A1*100', target: 1, start: 0, a1: 0.01 },
+      { formula: '=2*A1+3', target: 11, start: 4, a1: 4 },
+    ])('lands exactly on $a1 for $formula = $target from $start', async (c) => {
+      const { solution } = await solve(c.formula, c.target, c.start);
+      expect(solution.converged).toBe(true);
+      expect(solution.changingValue).toBe(c.a1);
+      expect(solution.formulaValue).toBe(c.target);
+    });
+
+    // Desktop stops once |B1 - target| < 0.001, so A1 is an iterate rather
+    // than the root. Measured A1 values; the host iterate stays within 1e-3.
+    it.each([
+      { formula: '=A1^2', target: 2, start: 1, a1: 1.4142112625265164 },
+      { formula: '=A1^2', target: 2, start: 5, a1: 1.4143125598316881 },
+      { formula: '=EXP(A1)', target: 10, start: 1, a1: 2.3025843910299684 },
+      { formula: '=SIN(A1)', target: 0.5, start: 0, a1: 0.5228953821747103 },
+      { formula: '=1/A1', target: 4, start: 1, a1: 0.250001813273059 },
+    ])('stops within Maximum Change for $formula = $target from $start', async (c) => {
+      const { solution } = await solve(c.formula, c.target, c.start);
+      expect(solution.converged).toBe(true);
+      expect(Math.abs(solution.formulaValue - c.target)).toBeLessThan(1e-3);
+      expect(Math.abs(solution.changingValue - c.a1)).toBeLessThan(1e-3);
+    });
+
+    it('walks a flat formula down to start - 0.01 * 2^25 and keeps it', async () => {
+      const { solution } = await solve('=5', 7, 1);
+      expect(solution.converged).toBe(false);
+      expect(solution.changingValue).toBe(-335543.32);
+      expect(solution.formulaValue).toBe(5);
+    });
+
+    it('keeps the last iterate when no solution exists', async () => {
+      const { solution } = await solve('=A1^2', -1, 1);
+      expect(solution.converged).toBe(false);
+      expect(solution.changingValue).not.toBe(1);
+      expect(solution.formulaValue).toBeCloseTo(solution.changingValue ** 2, 9);
+    });
+
+    it('commits a non-converged iterate as one undoable step', async () => {
       const wb = await WorkbookHandle.createDefault();
       handles.push(wb);
-      wb.setNumber({ sheet: 0, row: 0, col: 0 }, start);
-      wb.setFormula({ sheet: 0, row: 0, col: 1 }, formula);
+      const store = createSpreadsheetStore();
+      const history = new History();
+      wb.setNumber(A1, 1);
+      wb.setFormula(B1, '=5');
       wb.recalc();
-      const result = await solveMacGoalSeek(makeInstance(wb, createSpreadsheetStore()), {
-        formulaCell: { sheet: 0, row: 0, col: 1 },
-        targetValue: target,
-        changingCell: { sheet: 0, row: 0, col: 0 },
-      });
-      expect(result.ok).toBe(false);
-      // The live cells stay as they were; only a committed solution changes them.
-      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: start });
+      const instance = makeControllerInstance(wb, store, history);
+      const request = { formulaCell: B1, targetValue: 7, changingCell: A1 } as const;
+      const solved = await solveMacGoalSeek(instance, request);
+      expect(solved.ok).toBe(true);
+      if (!solved.ok) return;
+      expect(solved.value.converged).toBe(false);
+      const committed = commitMacGoalSeek(
+        instance,
+        request,
+        solved.value,
+        cellSnapshot(wb, request.formulaCell),
+        cellSnapshot(wb, request.changingCell),
+      );
+      expect(committed.ok).toBe(true);
+      expect(wb.getValue(A1)).toEqual({ kind: 'number', value: -335543.32 });
+      expect(history.undo()).toBe(true);
+      expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 1 });
+      expect(history.canUndo()).toBe(false);
     });
   });
 });
