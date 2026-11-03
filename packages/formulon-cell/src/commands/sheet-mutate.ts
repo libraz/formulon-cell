@@ -99,6 +99,21 @@ function structureAllowed(store: SpreadsheetStore | null | undefined, op: string
   return false;
 }
 
+/** Highest `SheetN` number handed out per workbook. Excel keeps this counter
+ *  rising for the session: a deleted sheet's number is not reused. It starts
+ *  from the sheet count the first time a sheet is added. */
+const sheetNumbers = new WeakMap<WorkbookHandle, number>();
+
+/** The next default sheet number: the counter's next value that no sheet
+ *  already uses as `SheetN`, ignoring case. */
+function nextSheetNumber(wb: WorkbookHandle): number {
+  const taken = new Set<string>();
+  for (let i = 0; i < wb.sheetCount; i += 1) taken.add(wb.sheetName(i).toLocaleLowerCase());
+  let n = (sheetNumbers.get(wb) ?? wb.sheetCount) + 1;
+  while (taken.has(`sheet${n}`)) n += 1;
+  return n;
+}
+
 export function addSheet(
   store: SpreadsheetStore | null | undefined,
   wb: WorkbookHandle,
@@ -106,8 +121,10 @@ export function addSheet(
 ): number {
   if (!structureAllowed(store, 'add sheet')) return -1;
   const beforeActive = store?.getState().data.sheetIndex ?? 0;
-  const added = wb.addSheet();
+  const number = nextSheetNumber(wb);
+  const added = wb.addSheet(`Sheet${number}`);
   if (added < 0) return added;
+  sheetNumbers.set(wb, number);
   const name = 'sheetName' in wb ? wb.sheetName(added) : undefined;
   if (store && history && !history.isReplaying()) {
     history.push({

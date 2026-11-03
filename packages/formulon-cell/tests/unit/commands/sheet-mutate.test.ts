@@ -104,6 +104,23 @@ describe('addSheet', () => {
     expect(fake.sheetCount).toBe(3);
   });
 
+  it('names new sheets from a rising counter, as Excel does', () => {
+    // Excel: after deleting Sheet4 the next new sheet is Sheet7 — the counter
+    // keeps rising and a freed number is not reused; names compare ignoring case.
+    const store = createSpreadsheetStore();
+    const { wb, fake } = makeFake({ sheetCount: 2 });
+    fake.names = ['a', 'fb'];
+    addSheet(store, wb);
+    addSheet(store, wb);
+    expect(fake.names).toEqual(['a', 'fb', 'Sheet3', 'Sheet4']);
+    removeSheet(store, wb, 3);
+    addSheet(store, wb);
+    expect(fake.names).toEqual(['a', 'fb', 'Sheet3', 'Sheet5']);
+    wb.renameSheet(1, 'sheet6');
+    addSheet(store, wb);
+    expect(fake.names.at(-1)).toBe('Sheet7');
+  });
+
   it('records sheet insertion as an undoable workbook action', () => {
     const store = createSpreadsheetStore();
     const history = new History();
