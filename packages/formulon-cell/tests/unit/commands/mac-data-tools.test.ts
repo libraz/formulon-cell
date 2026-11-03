@@ -757,4 +757,62 @@ describe('Mac Data command operations', () => {
       value: 7,
     });
   });
+
+  describe('Goal Seek results match desktop Excel', () => {
+    // Desktop Excel stops once |formula - target| < 0.001 (Maximum Change), so
+    // the exact stopping value depends on its iteration; the host solves more
+    // tightly. Each case checks the formula lands on the target within that
+    // bound and, where the root is exact, the changing cell too.
+    const CASES: Array<{
+      formula: string;
+      target: number;
+      start: number;
+      root?: number;
+    }> = [
+      { formula: '=2*A1+3', target: 11, start: 1, root: 4 },
+      { formula: '=A1*3-9', target: 0, start: 0, root: 3 },
+      { formula: '=A1*100', target: 1, start: 0, root: 0.01 },
+      { formula: '=2*A1+3', target: 11, start: 4, root: 4 },
+      { formula: '=A1^2', target: 2, start: 1, root: Math.SQRT2 },
+      { formula: '=A1^2', target: 2, start: 5, root: Math.SQRT2 },
+      { formula: '=EXP(A1)', target: 10, start: 1, root: Math.log(10) },
+      { formula: '=SIN(A1)', target: 0.5, start: 0, root: Math.asin(0.5) },
+      { formula: '=1/A1', target: 4, start: 1, root: 0.25 },
+    ];
+    it.each(CASES)('$formula = $target from $start', async ({ formula, target, start, root }) => {
+      const wb = await WorkbookHandle.createDefault();
+      handles.push(wb);
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, start);
+      wb.setFormula({ sheet: 0, row: 0, col: 1 }, formula);
+      wb.recalc();
+      const result = await solveMacGoalSeek(makeInstance(wb, createSpreadsheetStore()), {
+        formulaCell: { sheet: 0, row: 0, col: 1 },
+        targetValue: target,
+        changingCell: { sheet: 0, row: 0, col: 0 },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(Math.abs(result.value.formulaValue - target)).toBeLessThan(1e-3);
+      if (root !== undefined) expect(result.value.changingValue).toBeCloseTo(root, 2);
+    });
+
+    it.each([
+      { formula: '=A1^2', target: -1, start: 1 },
+      { formula: '=5', target: 7, start: 0 },
+    ])('finds no solution for $formula = $target', async ({ formula, target, start }) => {
+      const wb = await WorkbookHandle.createDefault();
+      handles.push(wb);
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, start);
+      wb.setFormula({ sheet: 0, row: 0, col: 1 }, formula);
+      wb.recalc();
+      const result = await solveMacGoalSeek(makeInstance(wb, createSpreadsheetStore()), {
+        formulaCell: { sheet: 0, row: 0, col: 1 },
+        targetValue: target,
+        changingCell: { sheet: 0, row: 0, col: 0 },
+      });
+      expect(result.ok).toBe(false);
+      // The live cells stay as they were; only a committed solution changes them.
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: start });
+    });
+  });
 });

@@ -524,8 +524,20 @@ export async function solveMacGoalSeek(
       ) {
         candidate = (bracketLow + bracketHigh) / 2;
       }
-      const nextResidual = evaluate(candidate);
+      let nextResidual = evaluate(candidate);
       if (nextResidual === null) return failure('invalid', 'nonFiniteResult');
+      // Without a bracket, a secant step that overshoots (a pole, a flat region)
+      // is halved toward the last point until it reduces the residual.
+      for (
+        let halvings = 0;
+        bracketLow === null && Math.abs(nextResidual) >= Math.abs(f1) && halvings < 30;
+        halvings += 1
+      ) {
+        candidate = x1 + (candidate - x1) / 2;
+        const retried = evaluate(candidate);
+        if (retried === null) break;
+        nextResidual = retried;
+      }
       if (Math.abs(nextResidual) <= tolerance) {
         return registerGoalSeekSolution(request, sourceBytes, {
           changingValue: candidate,
