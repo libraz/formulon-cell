@@ -97,6 +97,8 @@ const MAC_TOGGLE_FACE_RADIUS = 1.5;
 const MAC_LEVEL_BUTTON_SIZE = 12;
 const MAC_LEVEL_BUTTON_INSET = 5;
 const MAC_LEVEL_BUTTON_FONT_PX = 10;
+/** Level button corners: Excel's corner px read half covered (1.5 device px). */
+const MAC_LEVEL_BUTTON_RADIUS = 0.75;
 
 /** Paint a small +/- toggle button. (cx, cy) is the center. */
 function paintToggle(
@@ -184,8 +186,10 @@ export interface OutlineLevelButtonHit {
 export type OutlineToggleHit = OutlineGroupToggleHit | OutlineLevelButtonHit;
 
 /** Paint a level-number button with its top-left at (x, y): Excel for Mac's
- *  1 device px border, a vertically shaded face with a top highlight and a right bevel, and a
- *  1 device px shadow on the right and bottom (halved for the 2x model). */
+ *  1 device px border (top and left edges ramped along their length), a
+ *  vertically shaded face with a top highlight and a right bevel, and a 1 device
+ *  px shadow that is the border square shifted right and down (halved for the
+ *  2x model). Every square has 1.5 device px rounded corners. */
 function paintLevelButton(
   ctx: CanvasRenderingContext2D,
   theme: ResolvedTheme,
@@ -195,8 +199,32 @@ function paintLevelButton(
 ): Rect {
   const size = MAC_LEVEL_BUTTON_SIZE;
   const hair = 0.5;
+  const outer = size - hair;
+  const face = size - 3 * hair;
+  const r = MAC_LEVEL_BUTTON_RADIUS;
+  ctx.save();
+  if (theme.outlineButtonShadow !== 'transparent') {
+    ctx.fillStyle = theme.outlineButtonShadow;
+    ctx.beginPath();
+    ctx.roundRect(x + hair, y, outer, outer, r);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(x, y + hair, outer, outer, r);
+    ctx.fill();
+  }
   ctx.fillStyle = theme.outlineButtonBorder;
-  ctx.fillRect(x, y, size - hair, size - hair);
+  ctx.beginPath();
+  ctx.roundRect(x, y, outer, outer, r);
+  ctx.fill();
+  // The ramp stops short of the corner px so they keep a single coverage.
+  const { outlineButtonEdgeStart: edge0, outlineButtonEdgeEnd: edge1 } = theme;
+  ctx.fillStyle = linearShade(ctx, edge0, edge1, x, 0, x + outer, 0);
+  ctx.fillRect(x + hair, y, outer - 2 * hair, hair);
+  ctx.fillStyle = linearShade(ctx, edge0, edge1, 0, y, 0, y + outer);
+  ctx.fillRect(x, y + hair, hair, outer - 2 * hair);
+  ctx.beginPath();
+  ctx.roundRect(x + hair, y + hair, face, face, r);
+  ctx.clip();
   ctx.fillStyle = linearShade(
     ctx,
     theme.outlineButtonFaceTop,
@@ -206,18 +234,14 @@ function paintLevelButton(
     0,
     y + size - 1,
   );
-  ctx.fillRect(x + hair, y + hair, size - 3 * hair, size - 3 * hair);
+  ctx.fillRect(x + hair, y + hair, face, face);
   ctx.fillStyle = theme.outlineButtonFaceBottom;
-  ctx.fillRect(x + size - 3 * hair, y + hair, hair, size - 3 * hair);
+  ctx.fillRect(x + size - 3 * hair, y + hair, hair, face);
   if (theme.outlineButtonHighlight !== 'transparent') {
     ctx.fillStyle = theme.outlineButtonHighlight;
-    ctx.fillRect(x + hair, y + hair, size - 3 * hair, hair);
+    ctx.fillRect(x + hair, y + hair, face, hair);
   }
-  if (theme.outlineButtonShadow !== 'transparent') {
-    ctx.fillStyle = theme.outlineButtonShadow;
-    ctx.fillRect(x + size - hair, y, hair, size);
-    ctx.fillRect(x, y + size - hair, size, hair);
-  }
+  ctx.restore();
   ctx.fillStyle = theme.outlineButtonFg;
   ctx.font = `400 ${MAC_LEVEL_BUTTON_FONT_PX}px ${theme.fontUi}`;
   ctx.textAlign = 'center';

@@ -25,6 +25,8 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     outlineButtonFaceTop: '#faf9f8',
     outlineButtonFaceBottom: '#faf9f8',
     outlineButtonBorder: '#bfbfbf',
+    outlineButtonEdgeStart: '#bfbfbf',
+    outlineButtonEdgeEnd: '#bfbfbf',
     outlineButtonFg: '#605e5c',
     outlineButtonShadow: 'transparent',
     outlineButtonHighlight: 'transparent',

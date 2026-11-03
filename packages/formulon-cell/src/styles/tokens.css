@@ -104,6 +104,10 @@
     --fc-outline-button-shadow: initial;
     /* Row under a level button's top border; transparent for none (the default). */
     --fc-outline-button-highlight: initial;
+    /* Level button top and left border, ramped start to end along each edge.
+     * Both default to --fc-outline-button-border. */
+    --fc-outline-button-edge-start: initial;
+    --fc-outline-button-edge-end: initial;
     /* Outline brackets and detail dots. Defaults to --fc-rule. */
     --fc-outline-rule: initial;
     /* Outline +/- toggle border and glyph. Default to --fc-rule-strong and --fc-fg. */

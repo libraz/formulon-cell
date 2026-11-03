@@ -54,6 +54,10 @@ export interface ResolvedTheme {
   outlineButtonShadow: string;
   /** Row under a level button's top border; `transparent` draws none. */
   outlineButtonHighlight: string;
+  /** Level button top and left border, ramped start to end along each edge;
+   *  both default to `outlineButtonBorder` (flat). */
+  outlineButtonEdgeStart: string;
+  outlineButtonEdgeEnd: string;
   /** Outline brackets and detail dots; defaults to `rule`. */
   outlineRule: string;
   /** Outline +/- toggle border and glyph; default `ruleStrong` and `fg`. */
@@ -143,6 +147,14 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
       v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
     ),
     outlineButtonBorder: v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
+    outlineButtonEdgeStart: v(
+      '--fc-outline-button-edge-start',
+      v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
+    ),
+    outlineButtonEdgeEnd: v(
+      '--fc-outline-button-edge-end',
+      v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
+    ),
     outlineButtonFg: v('--fc-outline-button-fg', v('--fc-header-fg', '#6f6a5d')),
     outlineButtonShadow: v('--fc-outline-button-shadow', 'transparent'),
     outlineButtonHighlight: v('--fc-outline-button-highlight', 'transparent'),

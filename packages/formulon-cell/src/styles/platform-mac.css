@@ -43,8 +43,8 @@
     /* A selected header is only refilled and recoloured: no bar, same weight. */
     --fc-header-active-bar: transparent;
     --fc-header-fg-active-weight: 400;
-    /* Outline gutter 230; level buttons 198 border, 239 top highlight, face
-     * 251 -> 234, digit 102, 247 shadow. */
+    /* Outline gutter 230; level buttons 198 border (top and left ramp
+     * 209 -> 190), 239 top highlight, face 251 -> 234, digit 102, 247 shadow. */
     --fc-outline-gutter-bg: #e6e6e6;
     --fc-outline-button-face-top: #fbfbfb;
     --fc-outline-button-face-bottom: #eaeaee;
@@ -52,6 +52,8 @@
     --fc-outline-button-fg: #666666;
     --fc-outline-button-shadow: #f7f7f7;
     --fc-outline-button-highlight: #efefef;
+    --fc-outline-button-edge-start: #d1d1d1;
+    --fc-outline-button-edge-end: #bebebe;
     /* Brackets and dots 153; toggle border 138, minus 51. */
     --fc-outline-rule: #999999;
     --fc-outline-toggle-border: #8a8a8a;

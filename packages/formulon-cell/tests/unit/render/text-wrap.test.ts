@@ -43,6 +43,8 @@ const theme: ResolvedTheme = {
   outlineButtonFaceTop: '#eee',
   outlineButtonFaceBottom: '#eee',
   outlineButtonBorder: '#ccc',
+  outlineButtonEdgeStart: '#ccc',
+  outlineButtonEdgeEnd: '#ccc',
   outlineButtonFg: '#666',
   outlineButtonShadow: 'transparent',
   outlineButtonHighlight: 'transparent',

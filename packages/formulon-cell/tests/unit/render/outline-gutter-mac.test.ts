@@ -181,7 +181,9 @@ describe('outline gutter on the Mac point model', () => {
   it('paints the gutters and level buttons in the outline tokens', () => {
     // Excel (Mac light, DPR 2): gutter 230; each 24 device px button has a
     // 1 px 198 border, a 239 row under it, a face shading 251 -> 234 with a 234 right bevel, the
-    // 102 digit, and a 1 px 247 shadow on its right and bottom.
+    // 102 digit, and a 1 px 247 shadow on its right and bottom. Corners round
+    // off (corner px 213 / 224 / 224 / 227 where a square reads 198), and the
+    // top and left borders ramp 209 -> 190 along their length.
     const view = outlinedView(0.75);
     const tokens: Record<string, string> = {
       outlineGutterBg: '#e6e6e6',
@@ -191,6 +193,8 @@ describe('outline gutter on the Mac point model', () => {
       outlineButtonFg: '#666666',
       outlineButtonShadow: '#f7f7f7',
       outlineButtonHighlight: '#efefef',
+      outlineButtonEdgeStart: '#d1d1d1',
+      outlineButtonEdgeEnd: '#bebebe',
     };
     const painted = new Proxy(tokens, {
       get: (t, k: string) => t[k] ?? '#000',
@@ -198,6 +202,9 @@ describe('outline gutter on the Mac point model', () => {
     const fills: Array<{ style: unknown; rect: [number, number, number, number] }> = [];
     const texts: Array<{ text: string; style: unknown }> = [];
     const gradients: Array<{ from: [number, number]; to: [number, number]; stops: string[] }> = [];
+    const rounds: Array<{ style: unknown; rect: [number, number, number, number]; r: number }> = [];
+    const clips: Array<{ rect: [number, number, number, number]; r: number }> = [];
+    let path: Array<{ rect: [number, number, number, number]; r: number }> = [];
     const ctx = {
       fillStyle: '' as unknown,
       strokeStyle: '' as unknown,
@@ -207,15 +214,23 @@ describe('outline gutter on the Mac point model', () => {
       textBaseline: 'alphabetic',
       save() {},
       restore() {},
-      beginPath() {},
+      beginPath() {
+        path = [];
+      },
       rect() {},
-      clip() {},
+      clip() {
+        clips.push(...path);
+      },
       moveTo() {},
       lineTo() {},
       stroke() {},
       strokeRect() {},
-      roundRect() {},
-      fill() {},
+      roundRect(x: number, y: number, w: number, h: number, r: number) {
+        path.push({ rect: [x, y, w, h], r });
+      },
+      fill(this: { fillStyle: unknown }) {
+        for (const p of path) rounds.push({ style: this.fillStyle, ...p });
+      },
       fillRect(this: { fillStyle: unknown }, x: number, y: number, w: number, h: number) {
         fills.push({ style: this.fillStyle, rect: [x, y, w, h] });
       },
@@ -246,7 +261,6 @@ describe('outline gutter on the Mac point model', () => {
     const { x, y } = button?.rect ?? { x: 0, y: 0 };
     const at = (rx: number, ry: number, w: number, h: number) =>
       fills.find((f) => f.rect.join() === [rx, ry, w, h].join())?.style;
-    expect(at(x, y, 11.5, 11.5)).toBe('#c6c6c8');
     expect(gradients).toContainEqual({
       from: [0, y + 1],
       to: [0, y + 11],
@@ -254,8 +268,25 @@ describe('outline gutter on the Mac point model', () => {
     });
     expect(at(x + 10.5, y + 0.5, 0.5, 10.5)).toBe('#eaeaee');
     expect(at(x + 0.5, y + 0.5, 10.5, 0.5)).toBe('#efefef');
-    expect(at(x + 11.5, y, 0.5, 12)).toBe('#f7f7f7');
-    expect(at(x, y + 11.5, 12, 0.5)).toBe('#f7f7f7');
+    // Rounded corners: the shadow is the border square shifted 1 device px
+    // right and down, both with 1.5 device px corners, and the face clips to
+    // a square of the same radius inside the border.
+    expect(rounds).toEqual(
+      expect.arrayContaining([
+        { style: '#f7f7f7', rect: [x + 0.5, y, 11.5, 11.5], r: 0.75 },
+        { style: '#f7f7f7', rect: [x, y + 0.5, 11.5, 11.5], r: 0.75 },
+        { style: '#c6c6c8', rect: [x, y, 11.5, 11.5], r: 0.75 },
+      ]),
+    );
+    expect(clips).toContainEqual({ rect: [x + 0.5, y + 0.5, 10.5, 10.5], r: 0.75 });
+    // Top and left borders ramp along their length, short of the corner px;
+    // right and bottom stay flat.
+    const top = gradients.find((g) => g.from.join() === [x, 0].join());
+    expect(top).toEqual({ from: [x, 0], to: [x + 11.5, 0], stops: ['#d1d1d1', '#bebebe'] });
+    const left = gradients.find((g) => g.from.join() === [0, y].join());
+    expect(left).toEqual({ from: [0, y], to: [0, y + 11.5], stops: ['#d1d1d1', '#bebebe'] });
+    expect(at(x + 0.5, y, 10.5, 0.5)).toBeDefined();
+    expect(at(x, y + 0.5, 0.5, 10.5)).toBeDefined();
     expect(texts.filter((t) => t.style === '#666666').map((t) => t.text)).toEqual([
       '1',
       '2',
