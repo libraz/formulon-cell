@@ -104,6 +104,11 @@
     --fc-outline-button-shadow: initial;
     /* Row under a level button's top border; transparent for none (the default). */
     --fc-outline-button-highlight: initial;
+    /* Outline brackets and detail dots. Defaults to --fc-rule. */
+    --fc-outline-rule: initial;
+    /* Outline +/- toggle border and glyph. Default to --fc-rule-strong and --fc-fg. */
+    --fc-outline-toggle-border: initial;
+    --fc-outline-toggle-fg: initial;
 
     /* === HOVER === */
     /* Stripe painted across the hovered row + column. */

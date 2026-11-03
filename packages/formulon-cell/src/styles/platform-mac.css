@@ -52,6 +52,10 @@
     --fc-outline-button-fg: #666666;
     --fc-outline-button-shadow: #f7f7f7;
     --fc-outline-button-highlight: #efefef;
+    /* Brackets and dots 153; toggle border 138, minus 51. */
+    --fc-outline-rule: #999999;
+    --fc-outline-toggle-border: #8a8a8a;
+    --fc-outline-toggle-fg: #333333;
     --fc-rule: #d4d4d4;
     --fc-rule-strong: #bcbbba;
     --fc-accent-soft: rgba(0, 0, 0, 0.224);

@@ -35,6 +35,8 @@ const recorder = () => {
       fills.push([x, y, w, h]);
     },
     strokeRect() {},
+    roundRect() {},
+    fill() {},
     fillText(text: string, x: number, y: number) {
       texts.push({ text, x, y });
     },
@@ -212,6 +214,8 @@ describe('outline gutter on the Mac point model', () => {
       lineTo() {},
       stroke() {},
       strokeRect() {},
+      roundRect() {},
+      fill() {},
       fillRect(this: { fillStyle: unknown }, x: number, y: number, w: number, h: number) {
         fills.push({ style: this.fillStyle, rect: [x, y, w, h] });
       },
@@ -267,5 +271,175 @@ describe('outline gutter on the Mac point model', () => {
     const hits = paintOutlineGutters(ctx, view, theme, axis(10, 50), axis(12, 24), 800, 600);
     expect(hits.some((h) => h.kind === 'level')).toBe(false);
     expect(texts).toEqual([]);
+  });
+});
+
+describe('outline brackets and toggles on the Mac point model', () => {
+  // Excel (Mac light, DPR 2): spines, caps and dots 153; toggle border 138 on a
+  // rounded 24 px square; minus glyph 51.
+  const tokens: Record<string, string> = {
+    outlineRule: '#999999',
+    outlineToggleBorder: '#8a8a8a',
+    outlineToggleFg: '#333333',
+    bg: '#ffffff',
+  };
+  const painted = new Proxy(tokens, {
+    get: (t, k: string) => t[k] ?? '#000',
+  }) as unknown as ResolvedTheme;
+
+  const styled = () => {
+    const fills: Array<{ style: unknown; rect: [number, number, number, number] }> = [];
+    const strokes: Array<{
+      style: unknown;
+      width: number;
+      from: [number, number];
+      to: [number, number];
+    }> = [];
+    const rounds: Array<{ style: unknown; rect: [number, number, number, number]; r: number }> = [];
+    const texts: Array<{ text: string; x: number }> = [];
+    let from: [number, number] = [0, 0];
+    let path: Array<{ rect: [number, number, number, number]; r: number }> = [];
+    const segs: Array<{ width: number; from: [number, number]; to: [number, number] }> = [];
+    const ctx = {
+      fillStyle: '' as unknown,
+      strokeStyle: '' as unknown,
+      lineWidth: 1,
+      font: '',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+      save() {},
+      restore() {},
+      beginPath() {
+        path = [];
+        segs.length = 0;
+      },
+      rect() {},
+      clip() {},
+      moveTo(x: number, y: number) {
+        from = [x, y];
+      },
+      lineTo(this: { lineWidth: number }, x: number, y: number) {
+        segs.push({ width: this.lineWidth, from, to: [x, y] });
+      },
+      stroke(this: { strokeStyle: unknown }) {
+        for (const s of segs) strokes.push({ style: this.strokeStyle, ...s });
+      },
+      roundRect(x: number, y: number, w: number, h: number, r: number) {
+        path.push({ rect: [x, y, w, h], r });
+      },
+      fill(this: { fillStyle: unknown }) {
+        for (const p of path) rounds.push({ style: this.fillStyle, ...p });
+      },
+      strokeRect() {},
+      fillRect(this: { fillStyle: unknown }, x: number, y: number, w: number, h: number) {
+        fills.push({ style: this.fillStyle, rect: [x, y, w, h] });
+      },
+      fillText(text: string, x: number) {
+        texts.push({ text, x });
+      },
+      createLinearGradient() {
+        return { addColorStop() {} };
+      },
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, fills, strokes, rounds, texts };
+  };
+
+  const view = () => {
+    const rowLevels = new Map([
+      [2, 1],
+      [3, 2],
+      [4, 2],
+      [5, 1],
+      [6, 1],
+      [7, 1],
+    ]);
+    const colLevels = new Map([
+      [2, 1],
+      [3, 1],
+      [4, 1],
+    ]);
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        screenScale: 0.75,
+        outlineRows: rowLevels,
+        outlineCols: colLevels,
+        outlineRowGutter: outlineGutterWidth(rowLevels, { screenScale: 0.75 }),
+        outlineColGutter: outlineGutterWidth(colLevels, { screenScale: 0.75 }),
+      },
+    }));
+    const state = store.getState();
+    return { ...state, layout: layoutForView(state) } as ViewState;
+  };
+
+  it('caps each bracket with a 6x2 stub at its open end', () => {
+    // Excel: level-1 spine x -118..-115 from y 98, cap 12x4 at x -118..-107,
+    // y 98..101; the column bracket caps 4x12 down from its start.
+    const v = view();
+    const { ctx, fills, strokes } = styled();
+    paintOutlineGutters(ctx, v, painted, axis(10, 50), axis(12, 24), 800, 600);
+    const oy = v.layout.outlineColGutter + v.layout.headerRowHeight;
+    const ox = v.layout.outlineRowGutter + v.layout.headerColWidth;
+    const caps = fills.filter((f) => f.style === '#999999' && f.rect[2] * f.rect[3] === 12);
+    const rowSpines = strokes.filter((s) => s.width === 2 && s.from[0] === s.to[0]);
+    const colSpine = strokes.find((s) => s.width === 2 && s.from[1] === s.to[1]);
+    expect(rowSpines.map((s) => s.from)).toEqual([
+      [6, oy + 2 * 24 + 1],
+      [18, oy + 3 * 24 + 1],
+    ]);
+    expect(caps.map((c) => c.rect)).toEqual(
+      expect.arrayContaining([
+        [5, oy + 2 * 24 + 1, 6, 2],
+        [17, oy + 3 * 24 + 1, 6, 2],
+        [ox + 2 * 50 + 1, (colSpine?.from[1] ?? 0) - 1, 2, 6],
+      ]),
+    );
+  });
+
+  it('leaves no detail dot under a toggle', () => {
+    // Excel: row 6 holds the level-2 toggle; its minus runs unbroken where the
+    // row's lane-2 dot would sit.
+    const v = view();
+    const { ctx, fills } = styled();
+    const hits = paintOutlineGutters(ctx, v, painted, axis(10, 50), axis(12, 24), 800, 600);
+    const toggles = hits.filter((h) => h.kind === 'toggle').map((h) => h.rect);
+    const dots = fills.filter((f) => f.rect[2] === 2 && f.rect[3] === 2);
+    expect(dots.length).toBeGreaterThan(0);
+    const inside = dots.filter(({ rect: [x, y] }) =>
+      toggles.some((t) => x >= t.x && x < t.x + t.w && y >= t.y && y < t.y + t.h),
+    );
+    expect(inside).toEqual([]);
+  });
+
+  it('paints brackets, dots and toggles in the outline tokens', () => {
+    const v = view();
+    const { ctx, fills, strokes, rounds } = styled();
+    const hits = paintOutlineGutters(ctx, v, painted, axis(10, 50), axis(12, 24), 800, 600);
+    const spines = strokes.filter((s) => s.width === 2);
+    expect(spines.length).toBe(3);
+    expect(spines.every((s) => s.style === '#999999')).toBe(true);
+    const dots = fills.filter((f) => f.rect[2] === 2 && f.rect[3] === 2);
+    expect(dots.every((d) => d.style === '#999999')).toBe(true);
+    // Rounded toggle: a radius-2.5 border square, a radius-1.5 face 1 px inside.
+    const t = hits.find((h) => h.kind === 'toggle' && h.axis === 'row' && h.level === 2)?.rect;
+    if (!t) throw new Error('no toggle');
+    expect(rounds).toEqual(
+      expect.arrayContaining([
+        { style: '#8a8a8a', rect: [t.x, t.y, 12, 12], r: 2.5 },
+        { style: '#ffffff', rect: [t.x + 1, t.y + 1, 10, 10], r: 1.5 },
+      ]),
+    );
+    expect(fills).toContainEqual({ style: '#333333', rect: [t.x + 3, t.y + 5.5, 6, 1] });
+  });
+
+  it('centres level digits on the face inside the bevel', () => {
+    // Excel: the '1' stem sits 1 device px left of the button's half width.
+    const v = view();
+    const { ctx, texts } = styled();
+    const hits = paintOutlineGutters(ctx, v, painted, axis(10, 50), axis(12, 24), 800, 600);
+    const buttons = hits.filter((h) => h.kind === 'level');
+    expect(texts.map((t) => t.x)).toEqual(buttons.map((b) => b.rect.x + 5.5));
   });
 });
