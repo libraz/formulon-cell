@@ -36,12 +36,19 @@ export const FILTER_DROPDOWN_RESERVED_WIDTH = FILTER_BUTTON_SIZE + 1;
 export const TABLE_HEADER_RESERVED_WIDTH = TABLE_HEADER_CHEVRON_INSET + TABLE_HEADER_CHEVRON_SIZE;
 
 const COL_PADDING = 16;
-const MIN_COL_WIDTH = 48;
 
 /** The cell-format fields autofit measurement reads. */
 export type AutofitCellFormat = Pick<
   CellFormat,
-  'fontSize' | 'fontFamily' | 'fontVertAlign' | 'bold' | 'italic' | 'numFmt' | 'wrap' | 'indent'
+  | 'fontSize'
+  | 'fontFamily'
+  | 'fontVertAlign'
+  | 'bold'
+  | 'italic'
+  | 'numFmt'
+  | 'wrap'
+  | 'indent'
+  | 'rotation'
 >;
 
 export interface AutofitOptions {
@@ -68,6 +75,12 @@ export function createAutofitMeasureContext(): CanvasRenderingContext2D | null {
   return canvas?.getContext?.('2d') ?? null;
 }
 
+/** Excel leaves merged cells out of AutoFit on either axis. */
+const isMerged = (state: State, key: string): boolean =>
+  state.merges.byCell.has(key) || state.merges.byAnchor.has(key);
+
+/** Column AutoFit, as Excel does it: wrapped and merged cells do not count, and
+ *  a column with nothing to measure takes the sheet's default width. */
 export function computeAutofitColWidth(
   state: State,
   col: number,
@@ -77,13 +90,14 @@ export function computeAutofitColWidth(
   const sheet = state.data.sheetIndex;
   const locale = normalizeFormatLocale(opts.locale ?? '');
   const theme = opts.theme ?? DEFAULT_CELL_FONT_THEME;
-  let max = 0;
+  let max: number | null = null;
 
   for (const [key, cell] of state.data.cells) {
     const parsed = parseAddrKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.col !== col) continue;
-    if (!inSpan(parsed.row, opts.span)) continue;
+    if (!inSpan(parsed.row, opts.span) || isMerged(state, key)) continue;
     const format = measurementFormat(state, key, parsed, opts, cell);
+    if (format?.wrap === true) continue;
     const text = autofitDisplayText(state, cell, format, locale);
     if (!text) continue;
     const formulaDisplay = showsFormula(state, cell);
@@ -91,10 +105,10 @@ export function computeAutofitColWidth(
     const width =
       maxExplicitLineWidth(text, textMeasure(ctx, font, state.layout)) +
       headerButtonWidth(state, parsed.sheet, parsed.row, parsed.col);
-    if (width > max) max = width;
+    if (max === null || width > max) max = width;
   }
 
-  return Math.max(MIN_COL_WIDTH, Math.ceil(max) + COL_PADDING);
+  return max === null ? state.layout.defaultColWidth : Math.ceil(max) + COL_PADDING;
 }
 
 export function computeAutofitRowHeight(
@@ -120,7 +134,7 @@ export function computeAutofitRowHeight(
   for (const [key, cell] of state.data.cells) {
     const parsed = parseAddrKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.row !== row) continue;
-    if (!inSpan(parsed.col, opts.span)) continue;
+    if (!inSpan(parsed.col, opts.span) || isMerged(state, key)) continue;
     const format = measurementFormat(state, key, parsed, opts, cell);
     const text = autofitDisplayText(state, cell, format, locale);
     if (!text) continue;
@@ -141,7 +155,14 @@ export function computeAutofitRowHeight(
       format?.showPhonetic && format.phonetic?.length && !formulaDisplay
         ? phoneticGuideSize(font.size)
         : 0;
-    const height = Math.ceil(lines * lineHeight + guide) + padding;
+    const extent = rotatedExtent(
+      format?.rotation,
+      text,
+      lines * lineHeight + guide,
+      lineHeight,
+      textMeasure(ctx, font, state.layout),
+    );
+    const height = Math.ceil(extent) + padding;
     if (height > max) max = height;
   }
 
@@ -242,10 +263,7 @@ function formatForMeasurement(
   format: CellFormat | undefined,
   workbookDisplayFont: AutofitOptions['workbookDisplayFont'],
   formulaDisplay: boolean,
-): Pick<
-  CellFormat,
-  'fontFamily' | 'fontSize' | 'fontVertAlign' | 'bold' | 'italic' | 'numFmt' | 'wrap' | 'indent'
-> {
+): AutofitCellFormat {
   if (!workbookDisplayFont) return format ?? {};
   return {
     ...(format ?? {}),
@@ -270,6 +288,23 @@ function headerButtonWidth(state: State, sheet: number, row: number, col: number
   const table = tableForCell(state.tables.tables, sheet, row, col);
   const chevron = table && isHeaderRow(table, row, col) ? TABLE_HEADER_RESERVED_WIDTH : 0;
   return Math.max(filter, chevron);
+}
+
+/** Vertical extent of a cell's text block. Rotated text stands its run up in
+ *  the row (Excel: 'rot' at 90 degrees takes a 14 pt row to 19 pt); stacked
+ *  text puts one character per line. */
+function rotatedExtent(
+  rotation: CellFormat['rotation'],
+  text: string,
+  blockHeight: number,
+  lineHeight: number,
+  measure: (text: string) => number,
+): number {
+  if (rotation === 'vertical') return [...text.replace(/\r?\n/g, '')].length * lineHeight;
+  if (!rotation) return blockHeight;
+  const angle = (Math.abs(rotation) * Math.PI) / 180;
+  const run = maxExplicitLineWidth(text, measure);
+  return run * Math.sin(angle) + blockHeight * Math.cos(angle);
 }
 
 function maxExplicitLineWidth(text: string, measure: (text: string) => number): number {

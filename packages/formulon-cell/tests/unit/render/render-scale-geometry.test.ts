@@ -24,6 +24,8 @@ import type { ResolvedTheme } from '../../../src/theme/resolve.js';
 // Mac new-book defaults in canonical px: 75 pt columns, 20 pt rows.
 const COL = 100;
 const ROW = 80 / 3;
+/** A row paints as whole screen px: the 80/3 px model height paints 27. */
+const ROW_PAINTED = Math.round(ROW);
 const HEADER_W = 26;
 const HEADER_H = 20;
 
@@ -116,7 +118,7 @@ describe('cellRectIn fallback without a viewport', () => {
     const empty = buildColLayout(layout, makeViewport({ colCount: 0, rowCount: 0 }));
     const r = cellRectIn(layout, empty, empty, 50, 50);
     expect(r.w).toBe(COL);
-    expect(r.h).toBe(ROW);
+    expect(r.h).toBe(ROW_PAINTED);
   });
 });
 
@@ -125,12 +127,12 @@ describe('absent screenScale', () => {
     const layout = makeLayout();
     const viewport = makeViewport({ zoom });
     expect(colWidth(layout, 0, viewport)).toBe(COL * zoom);
-    expect(rowHeight(layout, 0, viewport)).toBe(ROW * zoom);
+    expect(rowHeight(layout, 0, viewport)).toBe(ROW_PAINTED * zoom);
     expect(cellRect(layout, viewport, 1, 2)).toEqual({
       x: HEADER_W + 2 * COL * zoom,
-      y: HEADER_H + ROW * zoom,
+      y: HEADER_H + ROW_PAINTED * zoom,
       w: COL * zoom,
-      h: ROW * zoom,
+      h: ROW_PAINTED * zoom,
     });
     expect(hitTest(layout, viewport, HEADER_W + COL * zoom + 1, HEADER_H + 1)).toEqual({
       row: 0,

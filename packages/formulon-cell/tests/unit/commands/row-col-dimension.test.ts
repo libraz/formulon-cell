@@ -42,21 +42,46 @@ const setup = async (platform: 'default' | 'mac') => {
 const answering = (value: number | null) => vi.fn<DimensionPrompt>(async () => value);
 
 describe('runRowHeightDialog', () => {
-  it('shows points and snaps the typed height to whole 96-DPI pixels', async () => {
-    const { wb, store } = await setup('default');
-    const prompt = answering(15.3);
-    await runRowHeightDialog({ store, history: null, wb, range: range(1, 0, 2, 0), prompt });
-    expect(prompt).toHaveBeenCalledWith(15, ROW_HEIGHT_MAX_PT);
-    expect(store.getState().layout.rowHeights.get(1)).toBe(20);
-    expect(store.getState().layout.rowHeights.get(2)).toBe(20);
-  });
+  // Excel keeps row heights in quarter points up to 409.5: 12.7 -> 12.75,
+  // 15.3 -> 15.25, 15.4 -> 15.5, 410 -> 409.5. The model keeps that value on
+  // every platform; only painting snaps to screen pixels.
+  it.each(['default', 'mac'] as const)(
+    'snaps the typed height to a quarter point (%s)',
+    async (platform) => {
+      const { wb, store } = await setup(platform);
+      const prompt = answering(15.3);
+      await runRowHeightDialog({ store, history: null, wb, range: range(1, 0, 2, 0), prompt });
+      expect(ROW_HEIGHT_MAX_PT).toBe(409.5);
+      expect(store.getState().layout.rowHeights.get(1)).toBeCloseTo(15.25 * PX_PER_PT, 8);
+      expect(store.getState().layout.rowHeights.get(2)).toBeCloseTo(15.25 * PX_PER_PT, 8);
+      const again = answering(null);
+      await runRowHeightDialog({
+        store,
+        history: null,
+        wb,
+        range: range(1, 0, 1, 0),
+        prompt: again,
+      });
+      expect(again).toHaveBeenCalledWith(15.25, ROW_HEIGHT_MAX_PT);
+    },
+  );
 
-  it('snaps to whole points on Mac, where a point is one screen pixel', async () => {
+  it('round-trips a quarter-point height through save and reload', async () => {
+    // Excel reads a stored 12.75 pt row back as 12.75; so must the host.
     const { wb, store } = await setup('mac');
-    const prompt = answering(20.4);
-    await runRowHeightDialog({ store, history: null, wb, range: range(0, 0, 0, 0), prompt });
-    expect(prompt).toHaveBeenCalledWith(16, ROW_HEIGHT_MAX_PT);
-    expect(store.getState().layout.rowHeights.get(0)).toBeCloseTo(20 * PX_PER_PT, 8);
+    await runRowHeightDialog({
+      store,
+      history: null,
+      wb,
+      range: range(2, 0, 2, 0),
+      prompt: answering(12.75),
+    });
+    const reloaded = await WorkbookHandle.loadBytes(wb.save());
+    handles.push(reloaded);
+    const reloadedStore = createSpreadsheetStore();
+    hydrateLayoutFromEngine(reloaded, reloadedStore, 0);
+    const px = reloadedStore.getState().layout.rowHeights.get(2) ?? 0;
+    expect(reloaded.rowDisplayPt(px)).toBe(12.75);
   });
 
   it('leaves the field empty for rows of different heights', async () => {

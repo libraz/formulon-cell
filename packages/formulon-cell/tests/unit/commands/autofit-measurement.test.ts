@@ -34,7 +34,7 @@ import {
 } from '../../../src/toolbar/ribbon/cell-format-action.js';
 
 /** The layout mutator's row ceiling: 409 pt in canonical px. */
-const MAX_ROW_HEIGHT_PX = (409 * 96) / 72;
+const MAX_ROW_HEIGHT_PX = (409.5 * 96) / 72;
 
 type Seed = [row: number, col: number, value: string | number, formula?: string];
 
@@ -73,10 +73,8 @@ const fakeMeasureCtx = (): { ctx: CanvasRenderingContext2D; measured: string[] }
 // The headless DOM has no canvas, so these run on the 0.54em-per-char estimate:
 // 'HeaderName' at 13px measures 70.2px.
 describe('computeAutofitColWidth', () => {
-  it('fits content plus padding, never below the 48px floor', () => {
+  it('fits content plus padding', () => {
     expect(computeAutofitColWidth(storeWith([[0, 0, 'HeaderName']]).getState(), 0, null)).toBe(87);
-    expect(computeAutofitColWidth(storeWith([[0, 0, 'a']]).getState(), 0, null)).toBe(48);
-    expect(computeAutofitColWidth(storeWith([]).getState(), 0, null)).toBe(48);
   });
 
   it('measures the widest explicit line and leaves clamping to the store', () => {
@@ -144,7 +142,7 @@ describe('computeAutofitColWidth', () => {
 
   it('measures formula text when formulas are shown', () => {
     const store = storeWith([[0, 0, 'v', '=REPT("abcdefgh",3)']]);
-    expect(computeAutofitColWidth(store.getState(), 0, null)).toBe(48);
+    expect(computeAutofitColWidth(store.getState(), 0, null)).toBe(24);
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: true } }));
     expect(computeAutofitColWidth(store.getState(), 0, null)).toBe(150);
   });
@@ -152,7 +150,9 @@ describe('computeAutofitColWidth', () => {
   it('restricts the scan to a row span when one is given', () => {
     const state = storeWith([[5, 0, 'x'.repeat(40)]]).getState();
     expect(computeAutofitColWidth(state, 0, null)).toBe(297);
-    expect(computeAutofitColWidth(state, 0, null, { span: { from: 0, to: 2 } })).toBe(48);
+    expect(computeAutofitColWidth(state, 0, null, { span: { from: 0, to: 2 } })).toBe(
+      state.layout.defaultColWidth,
+    );
   });
 
   it('formats numbers with the requested locale and measures with the cell font', () => {
@@ -165,6 +165,70 @@ describe('computeAutofitColWidth', () => {
     measured.length = 0;
     computeAutofitColWidth(store.getState(), 0, ctx);
     expect(measured).toEqual(['1234567.5']);
+  });
+});
+
+describe('computeAutofitColWidth, Excel exclusions', () => {
+  // Excel: a wrapped cell does not widen its column, a column holding only a
+  // merged cell fits to its other cells, and an empty column takes the default
+  // width (8.0 chars) rather than a floor.
+  it('skips wrapped cells', () => {
+    const store = storeWith([
+      [0, 0, 'x'.repeat(40)],
+      [1, 0, 'HeaderName'],
+    ]);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { wrap: true });
+    expect(computeAutofitColWidth(store.getState(), 0, null)).toBe(87);
+  });
+
+  it('skips merged cells, anchor included', () => {
+    const store = storeWith([
+      [0, 2, 'merged wide text goes here'],
+      [1, 2, 'x'],
+    ]);
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 3 });
+    // 'x' at 13 px: 7.02 px of text plus the 16 px padding.
+    expect(computeAutofitColWidth(store.getState(), 2, null)).toBe(24);
+  });
+
+  it('fits an empty column to the default width and has no floor', () => {
+    const empty = storeWith([]);
+    expect(computeAutofitColWidth(empty.getState(), 0, null)).toBe(
+      empty.getState().layout.defaultColWidth,
+    );
+    expect(computeAutofitColWidth(storeWith([[0, 0, 'a']]).getState(), 0, null)).toBe(24);
+  });
+});
+
+describe('computeAutofitRowHeight, rotated text', () => {
+  // Excel: 'rot' at 90 degrees in a 14 pt row autofits the row to 19 pt — the
+  // run's length stands up in the row.
+  it('grows the row by the run projected onto the vertical', () => {
+    const { ctx } = fakeMeasureCtx();
+    const store = storeWith([[0, 0, 'rotated text']]);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { rotation: 90 });
+    // 12 chars x 7 px = 84 px standing up, plus the row's padding.
+    const padding = 20 - Math.round(13 * 1.28);
+    expect(computeAutofitRowHeight(store.getState(), 0, ctx)).toBe(84 + padding);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { rotation: 45 });
+    const line = Math.round(13 * 1.28);
+    expect(computeAutofitRowHeight(store.getState(), 0, ctx)).toBe(
+      Math.ceil(84 * Math.SQRT1_2 + line * Math.SQRT1_2) + padding,
+    );
+  });
+
+  it('skips merged cells, as Excel AutoFit does on either axis', () => {
+    const store = storeWith([[0, 0, 'a\nb\nc']]);
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    expect(computeAutofitRowHeight(store.getState(), 0, null)).toBe(20);
+  });
+
+  it('stacks vertical text one character per line', () => {
+    const { ctx } = fakeMeasureCtx();
+    const store = storeWith([[0, 0, 'abcd']]);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { rotation: 'vertical' });
+    const line = Math.round(13 * 1.28);
+    expect(computeAutofitRowHeight(store.getState(), 0, ctx)).toBe(4 * line + (20 - line));
   });
 });
 
@@ -286,7 +350,7 @@ describe('ribbon Format > AutoFit', () => {
     return { wb, history };
   };
 
-  it('fits columns to the selected rows with the shared floor and filter reserve', async () => {
+  it('fits columns to the selected rows with the filter reserve', async () => {
     const store = storeWith([
       [0, 0, 'a'],
       [0, 1, 'HeaderName'],
@@ -297,7 +361,8 @@ describe('ribbon Format > AutoFit', () => {
       ui: { ...s.ui, filterRanges: [{ sheet: 0, r0: 0, c0: 0, r1: 5, c1: 1 }] },
     }));
     const { history } = await run('col-autofit', store, { r0: 0, c0: 0, r1: 2, c1: 1 });
-    expect(store.getState().layout.colWidths.get(0)).toBe(48);
+    // 'a' (7.02 px) plus the 18 px filter reserve and the 16 px padding.
+    expect(store.getState().layout.colWidths.get(0)).toBe(42);
     expect(store.getState().layout.colWidths.get(1)).toBe(114);
     expect(history.undo()).toBe(true);
     expect(store.getState().layout.colWidths.size).toBe(0);

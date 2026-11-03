@@ -17,7 +17,8 @@ describe('showDimensionDialog', () => {
     const input = dialog?.querySelector<HTMLInputElement>('input[inputmode="decimal"]');
     expect(input?.min).toBe('0');
     expect(input?.max).toBe('409');
-    expect(input?.step).toBe('1');
+    // Row heights step in quarter points, as Excel stores them.
+    expect(input?.step).toBe('0.25');
     if (!input) throw new Error('Expected dimension input.');
     input.value = '48';
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();

@@ -37,13 +37,19 @@
     padding: 0;
   }
 
+  /* The field sits at a fixed x, whatever the label's text width. */
   .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-tb__dlg__label {
-    display: flex;
+    display: grid;
+    grid-template-columns: 54px 91px;
+    column-gap: 6px;
     align-items: center;
-    justify-content: flex-start;
-    gap: 6px;
     margin: 0;
     white-space: nowrap;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg--col .fc-tb__dlg__label {
+    grid-template-columns: 42px 72px;
+    column-gap: 5px;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-dimdlg .fc-tb__dlg__input {
@@ -63,7 +69,7 @@
     justify-content: start;
     gap: 10px;
     margin: 0;
-    padding: 8px 19px 19px 18px;
+    padding: 8px 19px 18px 18px;
     border-top: 0;
     background: none;
   }

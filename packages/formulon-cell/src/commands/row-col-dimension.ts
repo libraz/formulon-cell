@@ -1,8 +1,8 @@
 /**
  * @file Row Height and Column Width dialogs. The dialogs speak the desktop
- * spreadsheet's units: row heights in points and column widths in characters
- * of the Normal font, both snapped to whole screen pixels of the workbook's
- * platform. The field opens with the selection's shared size, or empty when
+ * spreadsheet's units: row heights in points, kept to the quarter point, and
+ * column widths in characters of the Normal font, snapped to whole screen
+ * pixels of the workbook's platform. The field opens with the selection's shared size, or empty when
  * the selected tracks differ; zero hides the tracks.
  */
 
@@ -13,7 +13,7 @@ import type { History } from './history.js';
 import { hideCols, hideRows, setColsWidth, setRowsHeight } from './row-col-layout.js';
 
 /** Largest row height the dialog accepts, in points. */
-export const ROW_HEIGHT_MAX_PT = 409;
+export const ROW_HEIGHT_MAX_PT = 409.5;
 
 /** Widest column the dialog accepts, in characters. */
 export const COLUMN_WIDTH_MAX_CHARS = 255;

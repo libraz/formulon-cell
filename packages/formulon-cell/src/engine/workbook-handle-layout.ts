@@ -322,16 +322,16 @@ export abstract class WorkbookHandleLayoutMethods {
     return screenPxForDisplayChars(chars, mdw, padding) * cssPxPerScreenPx(this);
   }
 
-  /** Height a row `heightPx` CSS px tall shows in the Row Height dialog, in points. */
+  /** Height a row `heightPx` CSS px tall shows in the Row Height dialog, in
+   *  points, to the quarter point the desktop spreadsheet stores. */
   rowDisplayPt(heightPx: number): number {
-    return Math.round(heightPx * POINTS_PER_CSS_PX * 100) / 100;
+    return Math.round(heightPx * POINTS_PER_CSS_PX * 4) / 4;
   }
 
-  /** CSS px of a row the Row Height dialog sets to `pt`, snapped to whole
-   *  screen pixels. */
+  /** CSS px of a row the Row Height dialog sets to `pt`, snapped to a quarter
+   *  point; painting snaps to screen pixels separately. */
   rowPxForDisplayPt(pt: number): number {
-    const perScreenPx = cssPxPerScreenPx(this);
-    return Math.round((pt * CSS_PX_PER_POINT) / perScreenPx) * perScreenPx;
+    return (Math.round(pt * 4) / 4) * CSS_PX_PER_POINT;
   }
 
   /** Persist frozen-pane counts on `sheet`. No-op (returns false) under stub. */

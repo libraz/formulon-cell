@@ -17,6 +17,7 @@ import {
   markAutomaticFontRowLayoutProjected,
 } from './automatic-font-row-layout.js';
 import { filterButtonRect } from './painters/filter-button.js';
+import { wholePointAdvances } from './text-metrics.js';
 
 export interface Rect {
   x: number;
@@ -65,9 +66,18 @@ export function colWidth(layout: LayoutSlice, col: number, viewport?: ViewportSl
   return (layout.colWidths.get(col) ?? layout.defaultColWidth) * renderScale(layout, viewport);
 }
 
+/** Painted height of a row in CSS px. The model keeps quarter points; each
+ *  row paints as whole screen px at 100%, then scales with the zoom. The Mac
+ *  point model floors (Excel paints a 12.75 pt row 12 px); elsewhere a row
+ *  rounds, as the store's size snap did. Every row position sums these, so
+ *  paint and hit-testing agree. */
 export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportSlice): number {
   if (isRowHidden(layout, row)) return 0;
-  return (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * renderScale(layout, viewport);
+  const screen = renderScale(layout);
+  const height = (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * screen;
+  // A hair of tolerance keeps 13 pt from flooring to 12 on float noise.
+  const screenPx = wholePointAdvances(layout) ? Math.floor(height + 1e-6) : Math.round(height);
+  return (screenPx / screen) * renderScale(layout, viewport);
 }
 
 /** Return the geometry layout for the current view. Excel's "Headings" view

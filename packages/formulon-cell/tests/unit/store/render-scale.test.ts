@@ -8,7 +8,7 @@ import {
 } from '../../../src/store/render-scale.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
-const ROW_MAX_PX = (409 * 96) / 72;
+const ROW_MAX_PX = (409.5 * 96) / 72;
 
 const withScale = (screenScale?: number) => {
   const store = createSpreadsheetStore();
@@ -43,22 +43,24 @@ describe('store/renderScale', () => {
   });
 });
 
-describe('store/setColWidth + setRowHeight — whole screen px', () => {
-  it('rounds to whole px at screenScale 1', () => {
+describe('store/setColWidth + setRowHeight — column screen px, row quarter points', () => {
+  // Columns snap to whole screen px; rows keep the quarter point the desktop
+  // spreadsheet stores (1/3 canonical px), whatever the screen scale.
+  it('snaps at screenScale 1', () => {
     const store = withScale();
     mutators.setColWidth(store, 0, 30.4);
     mutators.setRowHeight(store, 0, 30.6);
     expect(store.getState().layout.colWidths.get(0)).toBe(30);
-    expect(store.getState().layout.rowHeights.get(0)).toBe(31);
+    expect(store.getState().layout.rowHeights.get(0)).toBe(92 / 3);
   });
 
-  it('rounds to whole screen px at screenScale 0.75', () => {
+  it('snaps at screenScale 0.75', () => {
     const store = withScale(0.75);
     // 30.4 screen px = 40.5333 canonical px; snaps to 30 screen px = 40 canonical.
     mutators.setColWidth(store, 0, 30.4 / 0.75);
     mutators.setRowHeight(store, 0, 30.6 / 0.75);
     expect(store.getState().layout.colWidths.get(0)).toBe(40);
-    expect(store.getState().layout.rowHeights.get(0)).toBe(124 / 3);
+    expect(store.getState().layout.rowHeights.get(0)).toBe(122 / 3);
   });
 
   it('floors sizes at one screen pixel', () => {
@@ -69,7 +71,7 @@ describe('store/setColWidth + setRowHeight — whole screen px', () => {
     expect(store.getState().layout.rowHeights.get(0)).toBe(4 / 3);
   });
 
-  it('caps row height at 409 pt', () => {
+  it('caps row height at 409.5 pt', () => {
     const store = withScale();
     mutators.setRowHeight(store, 0, 2000);
     expect(store.getState().layout.rowHeights.get(0)).toBe(ROW_MAX_PX);
@@ -77,7 +79,7 @@ describe('store/setColWidth + setRowHeight — whole screen px', () => {
     expect(store.getState().layout.rowHeights.get(1)).toBe(500);
   });
 
-  it('caps row height at 409 pt under screenScale 0.75', () => {
+  it('caps row height at 409.5 pt under screenScale 0.75', () => {
     const store = withScale(0.75);
     mutators.setRowHeight(store, 0, 2000);
     expect(store.getState().layout.rowHeights.get(0)).toBe(ROW_MAX_PX);

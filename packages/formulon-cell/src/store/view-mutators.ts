@@ -2,7 +2,7 @@ import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import { frozenColEnd, frozenColStart, frozenRowEnd, frozenRowStart } from './freeze-band.js';
-import { MAX_ROW_HEIGHT_PX } from './layout-limits.js';
+import { MAX_ROW_HEIGHT_PX, snapRowHeightPx } from './layout-limits.js';
 import { clampZoom, renderScale } from './render-scale.js';
 import { clampSplitPaneOrigin } from './split-panes.js';
 import type { SpreadsheetStore } from './store.js';
@@ -248,7 +248,7 @@ export const viewMutators = {
       const rowHeights = new Map(s.layout.rowHeights);
       rowHeights.set(
         row,
-        Math.max(minScreenPx(s.layout), Math.min(MAX_ROW_HEIGHT_PX, snapToScreenPx(s.layout, px))),
+        Math.max(minScreenPx(s.layout), Math.min(MAX_ROW_HEIGHT_PX, snapRowHeightPx(px))),
       );
       return { ...s, layout: { ...s.layout, rowHeights } };
     });

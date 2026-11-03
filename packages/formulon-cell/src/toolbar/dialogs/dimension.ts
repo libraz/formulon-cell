@@ -22,7 +22,8 @@ export const showDimensionDialog = (opts: DimensionDialogOptions): Promise<numbe
     initial: opts.initial,
     min: 0,
     max: opts.max,
-    step: 1,
+    // Row heights go in quarter points; column widths step a character.
+    step: opts.axis === 'row' ? 0.25 : 1,
     okLabel: opts.strings.hyperlinkDialog.ok,
     cancelLabel: opts.strings.hyperlinkDialog.cancel,
     invalidMessage: label,

@@ -748,3 +748,33 @@ describe('font-derived row header', () => {
     expect([plain.headerColWidth, plain.headerRowHeight]).toEqual([23, 22]);
   });
 });
+
+describe('painted row heights', () => {
+  // Excel for Mac keeps 12.75 pt but paints floor(pt) px per row at 1x, and the
+  // rows below sit on the sum of those painted heights.
+  const quarter = (12.75 * 4) / 3;
+
+  it('floors each row to whole screen px on Mac, in paint and in hit-testing alike', () => {
+    const layout = makeLayout({
+      screenScale: 0.75,
+      rowHeights: new Map([
+        [0, quarter],
+        [1, quarter],
+        [2, quarter],
+      ]),
+    });
+    const viewport = makeViewport();
+    expect([0, 1, 2].map((r) => rowHeight(layout, r, viewport))).toEqual([12, 12, 12]);
+    const row4 = cellRect(layout, viewport, 3, 0);
+    expect(row4.y - cellRect(layout, viewport, 0, 0).y).toBe(36);
+    expect(hitTest(layout, viewport, row4.x + 2, row4.y + 0.5)).toEqual({ row: 3, col: 0 });
+    expect(hitTest(layout, viewport, row4.x + 2, row4.y - 0.5)).toEqual({ row: 2, col: 0 });
+  });
+
+  it('rounds to whole screen px elsewhere, as the store snap did before', () => {
+    // 12.5 pt is 16.67 canonical px; the old store snap stored it as 17.
+    const layout = makeLayout({ rowHeights: new Map([[0, (12.5 * 4) / 3]]) });
+    expect(rowHeight(layout, 0, makeViewport())).toBe(17);
+    expect(rowHeight(layout, 0, makeViewport({ zoom: 1.5 }))).toBe(25.5);
+  });
+});
