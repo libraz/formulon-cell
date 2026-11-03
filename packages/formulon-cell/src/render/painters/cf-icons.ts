@@ -16,9 +16,9 @@ interface Tone {
   dark: string;
 }
 
-const RED: Tone = { rim: '#9b3626', light: '#f7a3a2', dark: '#ec6d69' };
-const YELLOW: Tone = { rim: '#d87900', light: '#fdeaa0', dark: '#fbd544' };
-const GREEN: Tone = { rim: '#306422', light: '#7bc78c', dark: '#4cb062' };
+const RED: Tone = { rim: '#9e3c31', light: '#f69b9c', dark: '#f06b6b' };
+const YELLOW: Tone = { rim: '#db7d17', light: '#fee89e', dark: '#f8c948' };
+const GREEN: Tone = { rim: '#326b2b', light: '#75c48a', dark: '#4caa61' };
 const GRAY: Tone = { rim: '#4d4d4d', light: '#b5b5b5', dark: '#959595' };
 const BLACK: Tone = { rim: '#0b0b0b', light: '#5a5a5a', dark: '#161616' };
 
@@ -141,10 +141,10 @@ const roundedRect = (
  *  a `width`-unit rim inside it. */
 const shade = (ctx: CanvasRenderingContext2D, tone: Tone, width = 1): void => {
   const gradient = ctx.createLinearGradient(0, 0, 12, 12);
-  // The ramp runs over the middle half of the diagonal, so a glyph shows the
-  // full light-to-dark range.
-  gradient.addColorStop(0.25, tone.light);
-  gradient.addColorStop(0.75, tone.dark);
+  // Excel's glyphs hold their highlight to about a third of the diagonal and
+  // reach their shade by two thirds.
+  gradient.addColorStop(0.36, tone.light);
+  gradient.addColorStop(0.62, tone.dark);
   ctx.fillStyle = gradient;
   ctx.fill();
   ctx.save();
