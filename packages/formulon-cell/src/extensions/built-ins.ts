@@ -69,6 +69,7 @@ export const formatPainter = (): Extension => ({
       host: ctx.host,
       store: ctx.store,
       history: ctx.history,
+      wb: ctx.getWb,
       formatResolver: (addr) => {
         const wb = ctx.getWb();
         return !wb.isStub && wb.capabilities.effectiveStyle

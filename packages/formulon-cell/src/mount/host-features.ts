@@ -346,6 +346,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           host: input.host,
           store: input.store,
           history: input.history,
+          wb: input.wb,
           formatResolver: (addr) => {
             const wb = input.wb();
             return !wb.isStub && wb.capabilities.effectiveStyle

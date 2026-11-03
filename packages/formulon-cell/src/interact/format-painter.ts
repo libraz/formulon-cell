@@ -1,8 +1,10 @@
 import type { History } from '../commands/history.js';
+import { applyUnmerge } from '../commands/merge.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
-import { recordFormatChange } from '../commands/slice-history.js';
+import { recordFormatChange, recordMergesChangeWithEngine } from '../commands/slice-history.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { hitTest, layoutForView } from '../render/geometry.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
@@ -17,6 +19,8 @@ export interface FormatPainterDeps {
   /** Optional shared history. When provided, paint operations push a single
    *  format-snapshot entry per paste so Cmd+Z reverts the painted formats. */
   history?: History | null;
+  /** Engine handle, so merges painted onto the sheet reach the engine. */
+  wb: () => WorkbookHandle | null;
 }
 
 export interface FormatPainterHandle {
@@ -34,6 +38,8 @@ interface Snapshot {
   range: Range;
   // 2D (rows × cols) of CellFormat — undefined entries mean "no format on source cell".
   pattern: (CellFormat | undefined)[][];
+  /** Merges inside the source, as offsets from its top-left cell. */
+  merges: { r0: number; c0: number; r1: number; c1: number }[];
 }
 
 const MAX_FORMAT_PAINTER_CELLS = 100_000;
@@ -99,7 +105,12 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
       }
       pattern.push(row);
     }
-    return { range: r, pattern };
+    const merges = [...s.merges.byAnchor.values()]
+      .filter(
+        (m) => m.sheet === sheet && m.r0 >= r.r0 && m.r1 <= r.r1 && m.c0 >= r.c0 && m.c1 <= r.c1,
+      )
+      .map((m) => ({ r0: m.r0 - r.r0, c0: m.c0 - r.c0, r1: m.r1 - r.r0, c1: m.c1 - r.c0 }));
+    return { range: r, pattern, merges };
   };
 
   const activate = (sticky_ = false): void => {
@@ -159,6 +170,28 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
         return { ...s, format: { ...s.format, formats } };
       });
     });
+
+    // Merges follow the formats: the painted area is unmerged, then each whole
+    // source tile brings its merges.
+    const wb = deps.wb();
+    applyUnmerge(store, wb, history, dest);
+    if (snap.merges.length > 0) {
+      recordMergesChangeWithEngine(history, store, wb, sheet, () => {
+        for (let r = dest.r0; r + rows - 1 <= dest.r1; r += rows) {
+          for (let c = dest.c0; c + cols - 1 <= dest.c1; c += cols) {
+            for (const m of snap.merges) {
+              mutators.mergeRange(store, {
+                sheet,
+                r0: r + m.r0,
+                c0: c + m.c0,
+                r1: r + m.r1,
+                c1: c + m.c1,
+              });
+            }
+          }
+        }
+      });
+    }
 
     // Move selection to the painted range, matching the spreadsheet behavior.
     mutators.setActive(store, { sheet, row: dest.r0, col: dest.c0 });
