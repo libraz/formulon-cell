@@ -3,8 +3,8 @@ import { coerceInput } from '../../../src/commands/coerce-input.js';
 import { formatCodeToNumFmt } from '../../../src/engine/format-writeback.js';
 import { excelSerialFromParts } from '../../../src/format/date-serial.js';
 
-// Excel for Mac (ja UI), Range.Formula set on General cells
-// (interact-cell-input-coercion). Serials for year-less dates use the
+// Excel for Mac (ja UI), Range.Formula set on General cells.
+// Serials for year-less dates use the
 // capture year; `thisYear` re-bases them on the current one.
 type Case = [
   input: string,

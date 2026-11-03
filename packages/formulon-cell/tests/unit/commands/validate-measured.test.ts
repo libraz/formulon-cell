@@ -3,7 +3,7 @@ import { cellValueViolatesValidation } from '../../../src/commands/validate.js';
 import type { CellValue } from '../../../src/engine/types.js';
 import type { CellValidation } from '../../../src/store/store.js';
 
-// Excel Validation.Value per rule and value (dialogs-data-validation-results).
+// Excel Validation.Value per rule and value.
 const num = (value: number): CellValue => ({ kind: 'number', value });
 const text = (value: string): CellValue => ({ kind: 'text', value });
 const blank: CellValue = { kind: 'blank' };

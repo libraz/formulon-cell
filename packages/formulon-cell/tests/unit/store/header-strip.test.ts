@@ -61,7 +61,7 @@ const stripAt = (family: string, sizePt: number, zoom: number, digits: number): 
 };
 
 describe('headerStripSize at a small Normal font and a low zoom', () => {
-  // cells-default-colwidth-small-font: 3 / 4 / 5 / 6-digit strips at 100%.
+  // Small Normal font: 3 / 4 / 5 / 6-digit strips at 100%.
   it.each([
     ['Courier New', 6, [44, 44, 46, 54]],
     ['Courier New', 7, [44, 44, 46, 54]],
@@ -72,7 +72,7 @@ describe('headerStripSize at a small Normal font and a low zoom', () => {
     expect([3, 4, 5, 6].map((d) => stripAt(family, size, 1, d)[0])).toEqual(widths);
   });
 
-  // cells-row-strip-low-zoom (MS PGothic 11): [width for 3..6 digits, column strip height].
+  // Low zoom (MS PGothic 11): [width for 3..6 digits, column strip height].
   it.each([
     [1, [46, 58, 70, 82], 44],
     [0.5, [24, 30, 36, 42], 22],

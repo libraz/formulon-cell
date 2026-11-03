@@ -16,8 +16,8 @@ const token = (block: string, name: string): string | undefined =>
   block.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1]?.trim();
 
 // Excel for Mac, light appearance: strip 249-251, label ink 94, strip border
-// (188,187,186); separators 2 device px of (226,225,223) / (226,226,224)
-// (cells-header-separator-light-recheck). The captures are Display P3; these
+// (188,187,186); separators 2 device px of (226,225,223) / (226,226,224).
+// The captures are Display P3; these
 // greys read the same in sRGB.
 describe('Mac light header palette', () => {
   it('matches the measured strip, separator, label and border colours', () => {
@@ -29,7 +29,7 @@ describe('Mac light header palette', () => {
   });
 });
 
-// Selected headers (cells-header-selected-light): flat 243 fill, green label
+// Selected headers: flat 243 fill, green label
 // ink 35,115,68 (sRGB), no accent line, label geometry unchanged (not bold).
 describe('Mac light selected header', () => {
   it('fills 243 with a regular-weight green label and no accent bar', () => {

@@ -57,7 +57,7 @@ describe('engine/mac-column-model', () => {
     expect(macColumnPaddingPt(17)).toBe(11);
   });
 
-  // cells-default-colwidth-small-font: default columns 35 / 35 / 45 / 27 / 35 / 35 pt.
+  // Small Normal font: default columns 35 / 35 / 45 / 27 / 35 / 35 pt.
   it.each([
     ['Courier New', 6, 35],
     ['Courier New', 7, 35],
