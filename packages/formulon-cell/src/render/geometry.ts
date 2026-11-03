@@ -61,9 +61,23 @@ function viewportColEnd(viewport: ViewportSlice): number {
   );
 }
 
+/** Below 100% the Mac point model paints whole points: Excel for Mac rounds
+ *  the 100% size times the zoom (120 pt at 33% paints 40, a 14 pt row at 25%
+ *  paints 4). Other profiles and zooms keep the exact product. */
+function zoomedScreenSize(
+  layout: LayoutSlice,
+  screenSize: number,
+  viewport?: ViewportSlice,
+): number {
+  const zoom = renderScale({}, viewport);
+  const scaled = screenSize * zoom;
+  return zoom < 1 && wholePointAdvances(layout) ? Math.floor(scaled + 0.5 + 1e-9) : scaled;
+}
+
 export function colWidth(layout: LayoutSlice, col: number, viewport?: ViewportSlice): number {
   if (layout.hiddenCols.has(col)) return 0;
-  return (layout.colWidths.get(col) ?? layout.defaultColWidth) * renderScale(layout, viewport);
+  const screen = (layout.colWidths.get(col) ?? layout.defaultColWidth) * renderScale(layout);
+  return zoomedScreenSize(layout, screen, viewport);
 }
 
 /** Painted height of a row in CSS px. The model keeps quarter points; each
@@ -77,7 +91,7 @@ export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportS
   const height = (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * screen;
   // A hair of tolerance keeps 13 pt from flooring to 12 on float noise.
   const screenPx = wholePointAdvances(layout) ? Math.floor(height + 1e-6) : Math.round(height);
-  return (screenPx / screen) * renderScale(layout, viewport);
+  return zoomedScreenSize(layout, screenPx, viewport);
 }
 
 /** Return the geometry layout for the current view. Excel's "Headings" view

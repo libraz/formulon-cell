@@ -221,3 +221,29 @@ describe('Page Layout gutters', () => {
     expect(scaled).toBeCloseTo(base * 0.75, 5);
   });
 });
+
+describe('render geometry on the Mac point model below 100%', () => {
+  // Excel for Mac (MS PGothic 11, DPR 2): a 120 pt column and a 14 pt row
+  // paint 240/120/96/80/60 and 28/14/12/10/8 device px at 100/50/40/33/25%.
+  const layout = makeLayout({
+    screenScale: 0.75,
+    colWidths: new Map([[0, 160]]),
+    defaultRowHeight: 56 / 3,
+  });
+  it.each([
+    [1, 120, 14],
+    [0.5, 60, 7],
+    [0.4, 48, 6],
+    [0.33, 40, 5],
+    [0.25, 30, 4],
+  ])('rounds zoomed sizes to whole points (zoom %s)', (zoom, w, h) => {
+    const viewport = makeViewport({ zoom });
+    expect(colWidth(layout, 0, viewport)).toBe(w);
+    expect(rowHeight(layout, 0, viewport)).toBe(h);
+  });
+
+  it('keeps fractional sizes off the default profile', () => {
+    const plain = makeLayout({ colWidths: new Map([[0, 120]]) });
+    expect(colWidth(plain, 0, makeViewport({ zoom: 0.33 }))).toBeCloseTo(39.6, 9);
+  });
+});
