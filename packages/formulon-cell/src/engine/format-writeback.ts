@@ -45,6 +45,8 @@ const underlineOrdinal = (underline: CellFormat['underline']): number => {
 };
 
 const currencyToken = (symbol: string): string => {
+  // Excel stores the yen as a quoted literal rather than a locale tag.
+  if (symbol === '¥') return '"¥"';
   const lcid = symbol === '¥' ? '411' : symbol === '€' ? '407' : symbol === '£' ? '809' : '409';
   return `[$${symbol}-${lcid}]`;
 };
@@ -347,7 +349,7 @@ export function numFmtToFormatCode(
       return withNegativeSection(
         `${currencyToken(sym)}#,##${body}`,
         fmt.negativeStyle,
-        `${currencyToken(sym)}-#,##${body}`,
+        `${currencyToken(sym)}\\-#,##${body}`,
       );
     }
     case 'percent': {
@@ -839,11 +841,11 @@ function withNegativeSection(
   switch (style) {
     // `_)` pads positives by a paren's width so they align with parenthesized negatives.
     case 'parens':
-      return joinFormatSections(`${positive}_)`, `(${positive})`);
+      return joinFormatSections(`${positive}_)`, `\\(${positive}\\)`);
     case 'red':
       return joinFormatSections(positive, `[Red]-${positive}`);
     case 'red-parens':
-      return joinFormatSections(`${positive}_)`, `[Red](${positive})`);
+      return joinFormatSections(`${positive}_)`, `[Red]\\(${positive}\\)`);
     case 'red-plain':
       return joinFormatSections(positive, `[Red]${positive}`);
     case 'symbol-minus':
