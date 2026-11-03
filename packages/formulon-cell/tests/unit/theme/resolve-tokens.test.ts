@@ -111,6 +111,25 @@ describe('theme/resolve — token completeness', () => {
   });
 });
 
+describe('theme/resolve — header strip shading', () => {
+  it('stays flat in the header fill unless both ends are set', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    host.style.setProperty('--fc-header-bg', '#abcdef');
+    expect(resolveTheme(host)).toMatchObject({
+      headerStripOuter: '#abcdef',
+      headerStripInner: '#abcdef',
+    });
+    host.style.setProperty('--fc-header-strip-outer', '#fdfdfd');
+    host.style.setProperty('--fc-header-strip-inner', '#f7f7f7');
+    expect(resolveTheme(host)).toMatchObject({
+      headerStripOuter: '#fdfdfd',
+      headerStripInner: '#f7f7f7',
+    });
+    host.remove();
+  });
+});
+
 describe('theme/resolve — selected header tokens', () => {
   it('defaults to an accent bar and a semibold label', () => {
     const host = document.createElement('div');

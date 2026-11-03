@@ -9,6 +9,23 @@ const MIN_ROW_HEADER_DIGITS = 3;
 const MIN_ZOOMED_DIGIT_PT = 2;
 const MIN_ZOOMED_COLUMN_STRIP_PT = 8;
 
+const stripZoom = (zoom: number | undefined): number => (zoom !== undefined && zoom > 0 ? zoom : 1);
+
+const zoomedDigitPt = (advance: number, zoom: number): number =>
+  Math.max(MIN_ZOOMED_DIGIT_PT, roundDigitAdvance(advance * zoom));
+
+/** Header labels scale with the strip's zoomed digit, not the raw zoom, so
+ *  they keep fitting it (Excel 40-25%: one third, like the 4 px digit step).
+ *  Fixed chrome strips keep their labels at full size. */
+export function headerLabelScale(
+  layout: Pick<LayoutSlice, 'headerDigitAdvance'>,
+  zoom: number | undefined,
+): number {
+  const advance = layout.headerDigitAdvance;
+  if (advance === undefined) return 1;
+  return zoomedDigitPt(advance, stripZoom(zoom)) / zoomedDigitPt(advance, 1);
+}
+
 type HeaderLayout = Pick<
   LayoutSlice,
   'headerColWidth' | 'headerRowHeight' | 'headerDigitAdvance' | 'defaultRowHeight' | 'screenScale'
@@ -29,7 +46,7 @@ export function headerStripSize(
   if (advance === undefined) {
     return { headerColWidth: layout.headerColWidth, headerRowHeight: layout.headerRowHeight };
   }
-  const zoom = viewport.zoom !== undefined && viewport.zoom > 0 ? viewport.zoom : 1;
+  const zoom = stripZoom(viewport.zoom);
   const baseHeight = Math.max(
     layout.headerRowHeight,
     layout.defaultRowHeight * (layout.screenScale ?? 1),
@@ -38,7 +55,7 @@ export function headerStripSize(
   const headerRowHeight = Math.max(MIN_ZOOMED_COLUMN_STRIP_PT, Math.ceil(baseHeight * zoom - 1e-9));
   const lastRowNumber = viewport.rowStart + viewport.rowCount;
   const digits = Math.max(MIN_ROW_HEADER_DIGITS, String(lastRowNumber).length);
-  const digitWidth = Math.max(MIN_ZOOMED_DIGIT_PT, roundDigitAdvance(advance * zoom));
+  const digitWidth = zoomedDigitPt(advance, zoom);
   return {
     headerColWidth: Math.max(headerRowHeight, digits * digitWidth + macColumnPaddingPt(digitWidth)),
     headerRowHeight,

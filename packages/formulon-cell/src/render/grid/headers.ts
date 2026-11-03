@@ -2,6 +2,7 @@
 // a single pass after cell painting so headers sit above the gridlines.
 
 import { colLetter } from '../../engine/address.js';
+import { renderScale } from '../../store/render-scale.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
@@ -15,12 +16,29 @@ import {
 import { paintOutlineGutters } from '../painters/controls.js';
 import { fontMetricsBox, textBaselineY } from '../painters/text.js';
 import type { OutlineToggleHit } from '../painters.js';
+import { wholePointAdvances } from '../text-metrics.js';
 import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context.js';
 
 /** Row numbers are bottom-aligned like cell text: the baseline sits the
  *  label font's descent plus one px above the row's bottom edge (6 device px
  *  at DPR 2 for the default font, 8 for Courier New 11, 14 for Courier 20). */
 const ROW_LABEL_PAD_Y = 1;
+
+/** Flat strip colour, or a gradient from the outer point to the inner one. */
+function stripFill(
+  ctx: CanvasRenderingContext2D,
+  theme: ResolvedTheme,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): string | CanvasGradient {
+  if (theme.headerStripOuter === theme.headerStripInner) return theme.headerStripOuter;
+  const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
+  gradient.addColorStop(0, theme.headerStripOuter);
+  gradient.addColorStop(1, theme.headerStripInner);
+  return gradient;
+}
 
 export function paintHeaders(
   pc: ChromePaintContext,
@@ -65,9 +83,43 @@ export function paintHeaders(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = theme.headerBg;
+  // Each strip shades from its outer edge towards the grid.
+  ctx.fillStyle = stripFill(ctx, theme, 0, labelTopY, 0, oy);
   ctx.fillRect(rtl ? 0 : ox, 0, cssWidth - ox, oy);
+  ctx.fillStyle = stripFill(
+    ctx,
+    theme,
+    rtl ? labelLeftX + layout.headerColWidth : labelLeftX,
+    0,
+    innerX,
+    0,
+  );
   ctx.fillRect(railLeftX, oy, ox, cssHeight - oy);
+
+  const firstRow = rows.visible[0] ?? 0;
+  const firstCol = cols.visible[0] ?? 0;
+  // A selected chart or picture takes the highlight off the headers, as in Excel.
+  const objectSelected = state.ui.selectedObject !== null;
+  const selectedRanges = objectSelected ? [] : [selection.range, ...(selection.extraRanges ?? [])];
+  const colSelected = (col: number): boolean =>
+    selectedRanges.some((r) => col >= r.c0 && col <= r.c1);
+  const rowSelected = (row: number): boolean =>
+    selectedRanges.some((r) => row >= r.r0 && row <= r.r1);
+  const isLitCol = (c: number): boolean => (!objectSelected && c === active.col) || colSelected(c);
+  const isLitRow = (r: number): boolean => (!objectSelected && r === active.row) || rowSelected(r);
+
+  // Selected headers refill before the strip border, which stays on top of them.
+  ctx.fillStyle = theme.bgHeader;
+  for (const c of cols.visible) {
+    if (!isLitCol(c)) continue;
+    const rect = cellRectIn(layout, cols, rows, firstRow, c);
+    ctx.fillRect(rect.x, labelTopY, cols.sizeAt.get(c) ?? 0, layout.headerRowHeight);
+  }
+  for (const r of rows.visible) {
+    if (!isLitRow(r)) continue;
+    const rect = cellRectIn(layout, cols, rows, r, firstCol);
+    ctx.fillRect(labelLeftX, rect.y, layout.headerColWidth, rows.sizeAt.get(r) ?? 0);
+  }
 
   ctx.strokeStyle = theme.ruleStrong;
   const width = ruleWidth(dpr);
@@ -85,31 +137,33 @@ export function paintHeaders(
 
   // A transparent bar token means the platform draws no selection bar.
   const activeBar = theme.headerActiveBar !== 'transparent';
-  const firstRow = rows.visible[0] ?? 0;
-  const firstCol = cols.visible[0] ?? 0;
 
-  ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
+  ctx.font = `400 ${labelSize}px ${labelFamily}`;
+  const labelBox = fontMetricsBox(ctx, labelSize);
+  // Mac sets column letters like a row number in a default-height row centred
+  // on whole points in the strip: Excel's baseline sits 16 / 14 / 14 device px
+  // above the strip bottom for Courier New 11 / Courier New 20 / the default font.
+  const macLetters = wholePointAdvances(layout);
+  const letterRowH = Math.min(
+    layout.headerRowHeight,
+    layout.defaultRowHeight * renderScale(layout, state.viewport),
+  );
+  const letterRow = {
+    x: 0,
+    y: labelTopY + Math.floor((layout.headerRowHeight - letterRowH) / 2),
+    w: 0,
+    h: letterRowH,
+  };
+  const letterY = macLetters
+    ? textBaselineY(letterRow, labelBox, 'bottom', ROW_LABEL_PAD_Y)
+    : labelTopY + layout.headerRowHeight / 2 + 0.5;
+  ctx.textBaseline = macLetters ? 'alphabetic' : 'middle';
   const r1c1 = state.ui.r1c1 === true;
-  // A selected chart or picture takes the highlight off the headers, as in Excel.
-  const objectSelected = state.ui.selectedObject !== null;
-  const selectedRanges = objectSelected ? [] : [selection.range, ...(selection.extraRanges ?? [])];
-  const colSelected = (col: number): boolean =>
-    selectedRanges.some((r) => col >= r.c0 && col <= r.c1);
-  const rowSelected = (row: number): boolean =>
-    selectedRanges.some((r) => row >= r.r0 && row <= r.r1);
   for (const c of cols.visible) {
     const rect = cellRectIn(layout, cols, rows, firstRow, c);
     const w = cols.sizeAt.get(c) ?? 0;
-    const isActiveCol = !objectSelected && c === active.col;
-    const isSelectedCol = colSelected(c);
-    if (isActiveCol) {
-      ctx.fillStyle = theme.bgHeader;
-      ctx.fillRect(rect.x, labelTopY, w, layout.headerRowHeight);
-    } else if (isSelectedCol) {
-      ctx.fillStyle = theme.bgHeader;
-      ctx.fillRect(rect.x, labelTopY, w, layout.headerRowHeight);
-    }
+    const lit = isLitCol(c);
     ctx.strokeStyle = theme.headerRule;
     ctx.lineWidth = width;
     ctx.beginPath();
@@ -117,18 +171,14 @@ export function paintHeaders(
     ctx.moveTo(sepX, labelTopY);
     ctx.lineTo(sepX, oy);
     ctx.stroke();
-    ctx.fillStyle = isActiveCol
-      ? theme.headerFgActive
-      : isSelectedCol
-        ? theme.headerFgActive
-        : theme.headerFg;
-    ctx.font = `${isActiveCol || isSelectedCol ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
+    ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
+    ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
     const label = r1c1 ? `C${c + 1}` : colLetter(c);
     // Letters centre on the header cell less its trailing separator.
     const labelX = rtl ? rect.x + (w + width) / 2 : rect.x + (w - width) / 2;
-    ctx.fillText(label, labelX, labelTopY + layout.headerRowHeight / 2 + 0.5);
+    ctx.fillText(label, labelX, letterY);
     // The accent bar covers the rule under the header and one pixel above it.
-    if ((isActiveCol || isSelectedCol) && activeBar) {
+    if (lit && activeBar) {
       ctx.fillStyle = theme.headerActiveBar;
       ctx.fillRect(rect.x, Math.round(oy) - 2, w, 2);
     }
@@ -140,20 +190,10 @@ export function paintHeaders(
   const rowLabelX = rtl
     ? innerX + (layout.headerColWidth + width) / 2
     : innerX - (layout.headerColWidth + width) / 2;
-  ctx.font = `400 ${labelSize}px ${labelFamily}`;
-  const rowLabelBox = fontMetricsBox(ctx, labelSize);
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
-    const isActiveRow = !objectSelected && r === active.row;
-    const isSelectedRow = rowSelected(r);
-    if (isActiveRow) {
-      ctx.fillStyle = theme.bgHeader;
-      ctx.fillRect(labelLeftX, rect.y, layout.headerColWidth, h);
-    } else if (isSelectedRow) {
-      ctx.fillStyle = theme.bgHeader;
-      ctx.fillRect(labelLeftX, rect.y, layout.headerColWidth, h);
-    }
+    const lit = isLitRow(r);
     ctx.strokeStyle = theme.headerRule;
     ctx.lineWidth = width;
     ctx.beginPath();
@@ -161,19 +201,15 @@ export function paintHeaders(
     ctx.moveTo(labelLeftX, sepY);
     ctx.lineTo(labelLeftX + layout.headerColWidth, sepY);
     ctx.stroke();
-    ctx.fillStyle = isActiveRow
-      ? theme.headerFgActive
-      : isSelectedRow
-        ? theme.headerFgActive
-        : theme.headerFg;
-    ctx.font = `${isActiveRow || isSelectedRow ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
+    ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
+    ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     ctx.fillText(
       rowLabel,
       rowLabelX,
-      textBaselineY({ ...rect, h }, rowLabelBox, 'bottom', ROW_LABEL_PAD_Y),
+      textBaselineY({ ...rect, h }, labelBox, 'bottom', ROW_LABEL_PAD_Y),
     );
-    if ((isActiveRow || isSelectedRow) && activeBar) {
+    if (lit && activeBar) {
       ctx.fillStyle = theme.headerActiveBar;
       ctx.fillRect(rtl ? Math.round(innerX) : Math.round(innerX) - 2, rect.y, 2, h);
     }

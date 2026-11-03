@@ -33,6 +33,9 @@
     --fc-header-fg-active: #217346;
     --fc-bg-header: #f3f3f3;
     --fc-header-bg: #fafafa;
+    /* The strips shade from 253 at the outer edge to 247 at the grid. */
+    --fc-header-strip-outer: #fdfdfd;
+    --fc-header-strip-inner: #f7f7f7;
     --fc-header-rule: #e2e1df;
     --fc-header-fg: #5e5e5e;
     /* A selected header is only refilled and recoloured: no bar, same weight. */

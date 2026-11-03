@@ -7,6 +7,7 @@ import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
+import { headerLabelScale } from '../store/header-strip.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
@@ -546,7 +547,8 @@ export class GridRenderer {
       cols,
       rows,
       cellFontFamily(normalFont?.name, theme.fontUi),
-      headerLabelSize(normalFont?.size, theme.textHeader),
+      headerLabelSize(normalFont?.size, theme.textHeader) *
+        headerLabelScale(state.layout, state.viewport.zoom),
     );
   }
 

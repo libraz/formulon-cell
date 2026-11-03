@@ -32,6 +32,8 @@ const theme: ResolvedTheme = {
   cellBoolFg: '#060',
   hoverStripe: 'rgba(0,0,0,0.04)',
   headerBg: '#eee',
+  headerStripOuter: '#eee',
+  headerStripInner: '#eee',
   headerRule: '#ccc',
   headerFg: '#666',
   headerFgActive: '#000',

@@ -28,6 +28,10 @@ export interface ResolvedTheme {
   hoverStripe: string;
   /** Row and column header fill. */
   headerBg: string;
+  /** Unselected header strip fill at its outer edge and at the grid edge;
+   *  both default to `headerBg` (flat). */
+  headerStripOuter: string;
+  headerStripInner: string;
   /** Rule between two header cells. */
   headerRule: string;
   headerFg: string;
@@ -96,6 +100,14 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
 
     hoverStripe: v('--fc-hover-stripe', 'rgba(21,23,28,0.025)'),
     headerBg: v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
+    headerStripOuter: v(
+      '--fc-header-strip-outer',
+      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
+    ),
+    headerStripInner: v(
+      '--fc-header-strip-inner',
+      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
+    ),
     headerRule: v('--fc-header-rule', v('--fc-rule', '#e2dccd')),
     headerFg: v('--fc-header-fg', '#6f6a5d'),
     headerFgActive: v('--fc-header-fg-active', '#15171c'),

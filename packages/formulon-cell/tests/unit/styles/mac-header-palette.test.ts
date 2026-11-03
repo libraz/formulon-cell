@@ -23,6 +23,9 @@ describe('Mac light header palette', () => {
   it('matches the measured strip, separator, label and border colours', () => {
     const block = macLightPalette();
     expect(token(block, '--fc-header-bg')).toBe('#fafafa');
+    // Unselected strips: 253 at the outer edge to 247 beside the border.
+    expect(token(block, '--fc-header-strip-outer')).toBe('#fdfdfd');
+    expect(token(block, '--fc-header-strip-inner')).toBe('#f7f7f7');
     expect(token(block, '--fc-header-rule')).toBe('#e2e1df');
     expect(token(block, '--fc-header-fg')).toBe('#5e5e5e');
     expect(token(block, '--fc-rule-strong')).toBe('#bcbbba');

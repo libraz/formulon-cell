@@ -28,6 +28,8 @@ const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
     cellNumFg: '#11100f',
     hoverStripe: 'rgba(16,124,65,0.025)',
     headerBg: '#faf9f8',
+    headerStripOuter: '#faf9f8',
+    headerStripInner: '#faf9f8',
     headerRule: '#d9d9d9',
     headerFg: '#605e5c',
     headerFgActive: '#107c41',
@@ -51,6 +53,8 @@ function makeCtxSpy(): {
     baseline: string;
   }>;
   strokes: string[];
+  ops: string[];
+  gradients: Array<{ from: [number, number]; to: [number, number]; stops: string[] }>;
 } {
   const fills: Array<{ style: string; alpha: number; rect?: [number, number, number, number] }> =
     [];
@@ -64,6 +68,8 @@ function makeCtxSpy(): {
     baseline: string;
   }> = [];
   const strokes: string[] = [];
+  const ops: string[] = [];
+  const gradients: Array<{ from: [number, number]; to: [number, number]; stops: string[] }> = [];
   let fillStyle = '';
   let strokeStyle = '';
   let lineWidth = 1;
@@ -113,12 +119,25 @@ function makeCtxSpy(): {
     quadraticCurveTo(): void {},
     stroke(): void {
       strokes.push(strokeStyle);
+      ops.push(`stroke ${strokeStyle}`);
+    },
+    createLinearGradient(x0: number, y0: number, x1: number, y1: number): CanvasGradient {
+      const g = {
+        from: [x0, y0] as [number, number],
+        to: [x1, y1] as [number, number],
+        stops: [] as string[],
+      };
+      gradients.push(g);
+      return {
+        addColorStop: (_at: number, c: string) => g.stops.push(c),
+      } as unknown as CanvasGradient;
     },
     fill(): void {
       fills.push({ style: fillStyle, alpha });
     },
     fillRect(x: number, y: number, w: number, h: number): void {
       fills.push({ style: fillStyle, alpha, rect: [x, y, w, h] });
+      ops.push(`fill ${fillStyle}`);
     },
     // Font box as the canvas reports it: Courier New 0.3 em of descent, other
     // faces 2 px at 11 px.
@@ -148,10 +167,111 @@ function makeCtxSpy(): {
       });
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fills, texts, strokes };
+  return { ctx, fills, texts, strokes, ops, gradients };
 }
 
 describe('paintHeaders', () => {
+  it.each([
+    // Courier New 11: 15 pt rows in a 22 pt strip, Excel baseline 16 device px up.
+    [11, 20, 22, -8],
+    // Courier New 20: the strip is one 27 pt row, Excel baseline 14 device px up.
+    [20, 36, 27, -7],
+  ] as const)(
+    'sets Mac column letters like a row number in a default row centred in the strip (Courier New %d)',
+    (size, defaultRow, strip, expected) => {
+      const state = createSpreadsheetStore().getState();
+      state.layout = {
+        ...state.layout,
+        screenScale: 0.75,
+        defaultRowHeight: defaultRow,
+        headerRowHeight: strip,
+      };
+      state.viewport = {
+        rowStart: 0,
+        rowCount: 2,
+        colStart: 0,
+        colCount: 2,
+        zoom: 1,
+        widthPx: 320,
+      };
+      const layout = layoutForView(state);
+      const cols = buildColLayout(layout, state.viewport);
+      const rows = buildRowLayout(layout, state.viewport);
+      const { ctx, texts } = makeCtxSpy();
+
+      paintHeaders(
+        { ctx, dpr: 2, cssWidth: 320, cssHeight: 200 },
+        { ...state, layout },
+        theme(),
+        cols,
+        rows,
+        'Courier New',
+        size,
+      );
+
+      const oy = layout.outlineColGutter + layout.headerRowHeight;
+      expect(texts.find((t) => t.text === 'A')).toMatchObject({
+        y: oy + expected,
+        baseline: 'alphabetic',
+      });
+    },
+  );
+
+  it('keeps the strip border on top of selected header fills', () => {
+    // Excel (Mac light): selected headers fill 243 down to the strip's
+    // 2 device px (188,187,186) border, which stays drawn under them.
+    const state = createSpreadsheetStore().getState();
+    state.selection = {
+      active: { sheet: 0, row: 1, col: 1 },
+      range: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 3 },
+      anchor: { sheet: 0, row: 1, col: 1 },
+      extraRanges: [],
+    };
+    state.viewport = { rowStart: 0, rowCount: 5, colStart: 0, colCount: 5, zoom: 1, widthPx: 400 };
+    const cols = buildColLayout(state.layout, state.viewport);
+    const rows = buildRowLayout(state.layout, state.viewport);
+    const { ctx, ops } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 2, cssWidth: 400, cssHeight: 200 },
+      { ...state, layout: layoutForView(state) },
+      theme({ headerActiveBar: 'transparent' }),
+      cols,
+      rows,
+    );
+
+    expect(ops.filter((op) => op === 'fill #e6e6e6')).toHaveLength(6);
+    expect(ops.lastIndexOf('fill #e6e6e6')).toBeLessThan(ops.indexOf('stroke #bfbfbf'));
+  });
+
+  it('shades each strip from its outer edge to the grid when the theme says so', () => {
+    // Excel (Mac light): unselected strips run 253 at the outer edge to 247
+    // beside the border, down the column strip and across the row strip.
+    const state = createSpreadsheetStore().getState();
+    state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 3, zoom: 1, widthPx: 260 };
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const { ctx, gradients } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 2, cssWidth: 260, cssHeight: 140 },
+      { ...state, layout },
+      theme({ headerStripOuter: '#fdfdfd', headerStripInner: '#f7f7f7' }),
+      cols,
+      rows,
+    );
+
+    const top = layout.outlineColGutter;
+    const oy = top + layout.headerRowHeight;
+    const left = layout.outlineRowGutter;
+    const ox = left + layout.headerColWidth;
+    expect(gradients).toEqual([
+      { from: [0, top], to: [0, oy], stops: ['#fdfdfd', '#f7f7f7'] },
+      { from: [left, 0], to: [ox, 0], stops: ['#fdfdfd', '#f7f7f7'] },
+    ]);
+  });
+
   it('centres row numbers in the strip and sets labels in the given family', () => {
     const state = createSpreadsheetStore().getState();
     state.viewport = { rowStart: 0, rowCount: 12, colStart: 0, colCount: 2, zoom: 1, widthPx: 320 };

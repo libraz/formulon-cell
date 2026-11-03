@@ -82,6 +82,9 @@
     --fc-header-fg-active: initial;
     /* Header background — usually equal to --fc-bg-rail. */
     --fc-header-bg: initial;
+    /* Header strip gradient, outer edge to grid side. Both default to --fc-header-bg. */
+    --fc-header-strip-outer: initial;
+    --fc-header-strip-inner: initial;
     /* Header rule under the column letters. */
     --fc-header-rule: initial;
     /* Bar under a selected header; transparent for none. Defaults to the accent. */
