@@ -42,3 +42,45 @@ describe('headerStripSize on the Mac profile', () => {
     expect(strips(family, size)).toEqual(expected);
   });
 });
+
+/** Row-number strip width (device px) at `zoom` for a label of `digits`. */
+const stripAt = (family: string, sizePt: number, zoom: number, digits: number): number[] => {
+  const layout = {
+    headerColWidth: 23,
+    headerRowHeight: 22,
+    headerDigitAdvance: macDigitAdvance(family, sizePt),
+    defaultRowHeight: (macDefaultRowPt(family, sizePt) ?? 0) * PX_PER_PT,
+    screenScale: 0.75,
+  };
+  const size = headerStripSize(layout, {
+    rowStart: 10 ** (digits - 1) - 1,
+    rowCount: 1,
+    zoom,
+  });
+  return [size.headerColWidth * 2, size.headerRowHeight * 2];
+};
+
+describe('headerStripSize at a small Normal font and a low zoom', () => {
+  // cells-default-colwidth-small-font: 3 / 4 / 5 / 6-digit strips at 100%.
+  it.each([
+    ['Courier New', 6, [44, 44, 46, 54]],
+    ['Courier New', 7, [44, 44, 46, 54]],
+    ['Courier New', 8, [44, 50, 60, 70]],
+    ['Arial', 7, [44, 44, 46, 54]],
+    ['Arial', 8, [44, 44, 46, 54]],
+  ] as const)('sizes the row strip for %s %d pt as measured', (family, size, widths) => {
+    expect([3, 4, 5, 6].map((d) => stripAt(family, size, 1, d)[0])).toEqual(widths);
+  });
+
+  // cells-row-strip-low-zoom (MS PGothic 11): [width for 3..6 digits, column strip height].
+  it.each([
+    [1, [46, 58, 70, 82], 44],
+    [0.5, [24, 30, 36, 42], 22],
+    [0.4, [18, 22, 26, 30], 18],
+    [0.33, [18, 22, 26, 30], 16],
+    [0.25, [18, 22, 26, 30], 16],
+  ] as const)('sizes the strips at %d zoom as measured', (zoom, widths, height) => {
+    expect([3, 4, 5, 6].map((d) => stripAt('MS PGothic', 11, zoom, d)[0])).toEqual(widths);
+    expect(stripAt('MS PGothic', 11, zoom, 3)[1]).toBe(height);
+  });
+});

@@ -4,23 +4,19 @@
  * The engine's width models are Windows-calibrated; Mac Excel lays a column
  * out as `round(raw × MDW)` points, where `raw` is the stored OOXML width
  * (padding included) and MDW is the Normal font's maximum digit width in
- * whole points. A sheet without `defaultColWidth` uses `baseColWidth × MDW + 5`.
+ * whole points. A sheet without `defaultColWidth` uses `baseColWidth × MDW` plus the padding.
  *
  * MDW is `roundHalfUp(em × sizePt)` with a per-family digit-advance em fitted
  * to xlwings measurements of Mac Excel 16.x; families outside the table use
  * {@link UNKNOWN_FAMILY_EM}. Font names are matched after NFKC and case folding.
- * The padding grows with a large Normal font (see {@link macColumnPaddingPt}).
+ * The padding scales with the digit width (see {@link macColumnPaddingPt}).
  */
 
-/** Padding Mac Excel adds to a column's digit cells at the default fonts, in points. */
-export const MAC_COLUMN_PADDING_PT = 5;
-
 /** Padding Mac Excel adds around `mdw`-point digits, in points: a quarter
- *  digit each side, rounded up, plus the 1 pt rule. That gives 7 / 9 / 11 for
- *  9-12 / 14 / 17 pt digits (Courier New 20: 8 × 12 + 7 = 103 pt, and the row
- *  number strip). Below the measured 5-12 pt digits it stays 5. */
-export const macColumnPaddingPt = (mdw: number): number =>
-  Math.max(MAC_COLUMN_PADDING_PT, 2 * Math.ceil(mdw / 4) + 1);
+ *  digit each side, rounded up, plus the 1 pt rule. That gives 3 / 5 / 7 / 9 /
+ *  11 for 3-4 / 5-8 / 9-12 / 14 / 17 pt digits (Arial 6: 8 × 3 + 3 = 27 pt,
+ *  Courier New 20: 8 × 12 + 7 = 103 pt, and the row-number strip). */
+export const macColumnPaddingPt = (mdw: number): number => 2 * Math.ceil(mdw / 4) + 1;
 
 /** OOXML stores column widths in 1/256 character steps. */
 const RAW_WIDTH_STEPS = 256;

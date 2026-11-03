@@ -57,8 +57,16 @@ describe('engine/mac-column-model', () => {
     expect(macColumnPaddingPt(17)).toBe(11);
   });
 
-  it('keeps the 5 pt pad below the measured digit widths', () => {
-    for (const mdw of [3, 4, 5, 6, 7, 8]) expect(macColumnPaddingPt(mdw)).toBe(5);
+  // cells-default-colwidth-small-font: default columns 35 / 35 / 45 / 27 / 35 / 35 pt.
+  it.each([
+    ['Courier New', 6, 35],
+    ['Courier New', 7, 35],
+    ['Courier New', 8, 45],
+    ['Arial', 6, 27],
+    ['Arial', 7, 35],
+    ['Arial', 8, 35],
+  ] as const)('gives %s %d pt the measured %d pt default column', (font, size, width) => {
+    expect(macDefaultColumnPt(8, macMdw(font, size))).toBe(width);
   });
 
   it('writes back raw widths the way Mac Excel saves them', () => {

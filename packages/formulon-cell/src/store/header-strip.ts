@@ -4,6 +4,11 @@ import type { LayoutSlice, ViewportSlice } from './types.js';
 /** Fewest digits the row-number strip is sized for. */
 const MIN_ROW_HEADER_DIGITS = 3;
 
+/** Below 50% zoom the strips stop shrinking: a row-number digit keeps 2 pt
+ *  and the column-letter strip 8 pt (Excel 25-40%: 4 px digits, 16 px strip). */
+const MIN_ZOOMED_DIGIT_PT = 2;
+const MIN_ZOOMED_COLUMN_STRIP_PT = 8;
+
 type HeaderLayout = Pick<
   LayoutSlice,
   'headerColWidth' | 'headerRowHeight' | 'headerDigitAdvance' | 'defaultRowHeight' | 'screenScale'
@@ -30,10 +35,10 @@ export function headerStripSize(
     layout.defaultRowHeight * (layout.screenScale ?? 1),
   );
   // Guard the ceiling against float noise in a product like 22 x 1.1.
-  const headerRowHeight = Math.ceil(baseHeight * zoom - 1e-9);
+  const headerRowHeight = Math.max(MIN_ZOOMED_COLUMN_STRIP_PT, Math.ceil(baseHeight * zoom - 1e-9));
   const lastRowNumber = viewport.rowStart + viewport.rowCount;
   const digits = Math.max(MIN_ROW_HEADER_DIGITS, String(lastRowNumber).length);
-  const digitWidth = roundDigitAdvance(advance * zoom);
+  const digitWidth = Math.max(MIN_ZOOMED_DIGIT_PT, roundDigitAdvance(advance * zoom));
   return {
     headerColWidth: Math.max(headerRowHeight, digits * digitWidth + macColumnPaddingPt(digitWidth)),
     headerRowHeight,
