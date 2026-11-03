@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachGoToDialog } from '../../../src/interact/goto-dialog.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
@@ -270,6 +274,23 @@ describe('attachGoToDialog', () => {
     expect(sel.active).toEqual({ sheet: 0, row: 0, col: 0 });
     expect(sel.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     expect(sel.extraRanges).toEqual([{ sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 }]);
+    handle.detach();
+  });
+
+  it('Go To reads R2C3 as a reference only in R1C1 reference style', () => {
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
+    handle.open('go-to');
+    typeReference('R2C3');
+    okBtn()?.click();
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+
+    store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: false } }));
+    mutators.setActive(store, { sheet: 0, row: 9, col: 9 });
+    handle.open('go-to');
+    typeReference('R2C3');
+    okBtn()?.click();
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 9, col: 9 });
     handle.detach();
   });
 

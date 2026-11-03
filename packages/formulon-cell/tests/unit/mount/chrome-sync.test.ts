@@ -433,6 +433,22 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     expect(viewport.rowStart + viewport.rowCount).toBeGreaterThan(899);
   });
 
+  it('reads R2C3 as a reference only in R1C1 reference style', () => {
+    const store = sheet.instance.store;
+    store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
+    tag.focus();
+    tag.value = 'R2C3';
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 2 });
+
+    store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: false } }));
+    mutators.setActive(store, { sheet: 0, row: 9, col: 9 });
+    tag.focus();
+    tag.value = 'R2C3';
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 9, col: 9 });
+  });
+
   it('Enter on an A1:B3 range expands the selection range', () => {
     tag.focus();
     tag.value = 'A1:B3';

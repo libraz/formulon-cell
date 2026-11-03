@@ -112,21 +112,108 @@ function sheetIndexByName(wb: WorkbookHandle, name: string): number | null {
   return null;
 }
 
-/** Resolve a (possibly sheet-qualified) cell or range reference. Unqualified
- *  references land on `fallbackSheet`. Names are not followed. */
+/** Options for reading a Go To / Name Box reference. */
+export interface RefTextOptions {
+  /** Accept R1C1 cell references (`R2C3`). Excel's Go To grammar is A1 in A1
+   *  reference style, where `R2C3` is not a reference. */
+  r1c1?: boolean;
+}
+
+const R1C1_CELL = /^R[1-9][0-9]*C[1-9][0-9]*$/i;
+
+/** Split on runs of spaces that sit outside a quoted sheet name: Excel's
+ *  intersection operator. */
+function splitIntersection(text: string): string[] {
+  const out: string[] = [];
+  let quoted = false;
+  let current = '';
+  for (const ch of text) {
+    if (ch === "'") quoted = !quoted;
+    if (!quoted && /\s/.test(ch)) {
+      if (current) out.push(current);
+      current = '';
+    } else current += ch;
+  }
+  if (current) out.push(current);
+  return out;
+}
+
+const intersect = (a: SheetRange, b: SheetRange): SheetRange | null => {
+  if (a.sheet !== b.sheet) return null;
+  const r0 = Math.max(a.r0, b.r0);
+  const c0 = Math.max(a.c0, b.c0);
+  const r1 = Math.min(a.r1, b.r1);
+  const c1 = Math.min(a.c1, b.c1);
+  return r0 <= r1 && c0 <= c1 ? { sheet: a.sheet, r0, c0, r1, c1 } : null;
+};
+
+/** One reference operand: an optional sheet qualifier, then a cell, a chain of
+ *  cells (`A1:B2:C3` spans their bounding box), a column pair (`A:C`) or a row
+ *  pair (`2:4`). A bare column or row (`AB`, `5`) is not a reference. */
+function resolveOperand(
+  wb: WorkbookHandle,
+  text: string,
+  fallbackSheet: number,
+  opts: RefTextOptions,
+): SheetRange | null {
+  const { sheet: sheetName, ref } = splitSheetQualifier(text);
+  const sheet = sheetName === null ? fallbackSheet : sheetIndexByName(wb, sheetName);
+  if (sheet === null) return null;
+  const parts = ref.replace(/\$/g, '').toUpperCase().split(':');
+  if (parts.length === 2 && parts.every((part) => /^[A-Z]+$/.test(part))) {
+    const range = parseRangeRef(parts.join(':'));
+    return range && { sheet, ...range };
+  }
+  if (parts.length === 2 && parts.every((part) => /^[0-9]+$/.test(part))) {
+    const range = parseRangeRef(parts.join(':'));
+    return range && { sheet, ...range };
+  }
+  let box: SheetRange | null = null;
+  for (const part of parts) {
+    if (!opts.r1c1 && R1C1_CELL.test(part)) return null;
+    const cell = opts.r1c1 ? parseCellRef(part) : parseA1Atom(part);
+    if (!cell) return null;
+    box = box
+      ? {
+          sheet,
+          r0: Math.min(box.r0, cell.row),
+          c0: Math.min(box.c0, cell.col),
+          r1: Math.max(box.r1, cell.row),
+          c1: Math.max(box.c1, cell.col),
+        }
+      : { sheet, r0: cell.row, c0: cell.col, r1: cell.row, c1: cell.col };
+  }
+  return box;
+}
+
+/** Text as Excel reads a Go To reference: full-width forms folded to ASCII,
+ *  surrounding spaces, a leading `=` and enclosing parentheses dropped. */
+function normalizeRefText(text: string): string {
+  let t = text.normalize('NFKC').trim().replace(/^=/, '').trim();
+  while (t.startsWith('(') && t.endsWith(')')) t = t.slice(1, -1).trim();
+  return t;
+}
+
+/** Resolve a (possibly sheet-qualified) cell or range reference, Excel's Go To
+ *  grammar for one comma-separated area: operands separated by spaces
+ *  intersect. Unqualified references land on `fallbackSheet`. Names are not
+ *  followed. */
 export function resolveRangeText(
   wb: WorkbookHandle,
   text: string,
   fallbackSheet: number,
+  opts: RefTextOptions = {},
 ): SheetRange | null {
-  const { sheet: sheetName, ref } = splitSheetQualifier(text.replace(/^=/, ''));
-  const sheet = sheetName === null ? fallbackSheet : sheetIndexByName(wb, sheetName);
-  if (sheet === null) return null;
-  const clean = ref.replace(/\$/g, '');
-  const range = parseRangeRef(clean);
-  if (range) return { sheet, ...range };
-  const cell = parseCellRef(clean);
-  return cell ? { sheet, r0: cell.row, c0: cell.col, r1: cell.row, c1: cell.col } : null;
+  let result: SheetRange | null = null;
+  const operands = splitIntersection(normalizeRefText(text));
+  if (operands.length === 0) return null;
+  for (const operand of operands) {
+    const range = resolveOperand(wb, operand, fallbackSheet, opts);
+    if (!range) return null;
+    result = result ? intersect(result, range) : range;
+    if (!result) return null;
+  }
+  return result;
 }
 
 export interface RangeDefinedName {
@@ -203,13 +290,14 @@ export function resolveAreaText(
   wb: WorkbookHandle,
   text: string,
   sheetIndex: number,
+  opts: RefTextOptions = {},
 ): SheetRange | null {
-  const t = text.trim();
+  const t = normalizeRefText(text);
   if (!t) return null;
   const q = t.toLowerCase();
   const named = rangeDefinedNames(wb, sheetIndex).find((dn) => dn.name.toLowerCase() === q);
   if (named) return named.range;
-  return resolveRangeText(wb, t, sheetIndex);
+  return resolveRangeText(wb, t, sheetIndex, opts);
 }
 
 export function parseCellRef(raw: string): { row: number; col: number } | null {

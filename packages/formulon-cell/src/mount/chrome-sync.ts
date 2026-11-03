@@ -470,10 +470,11 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
 
   const resolveNameBoxAreas = (raw: string): SheetRange[] | null => {
     const wb = getWb();
-    const sheetIdx = store.getState().data.sheetIndex;
+    const state = store.getState();
+    const sheetIdx = state.data.sheetIndex;
     const areas: SheetRange[] = [];
     for (const text of splitAreas(raw)) {
-      const area = resolveAreaText(wb, text, sheetIdx);
+      const area = resolveAreaText(wb, text, sheetIdx, { r1c1: state.ui.r1c1 });
       if (!area) return null;
       areas.push(area);
     }

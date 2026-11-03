@@ -297,10 +297,11 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   /** Resolve the typed text into areas on a single sheet; null when any part is invalid. */
   const resolveReference = (text: string): Range[] | null => {
     const wb = getWb();
-    const current = store.getState().data.sheetIndex;
+    const state = store.getState();
+    const current = state.data.sheetIndex;
     const areas: Range[] = [];
     for (const part of splitAreas(text)) {
-      const area = resolveAreaText(wb, part, current);
+      const area = resolveAreaText(wb, part, current, { r1c1: state.ui.r1c1 });
       if (!area) return null;
       areas.push(area);
     }

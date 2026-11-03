@@ -221,4 +221,64 @@ describe('mount/ref-utils', () => {
       expect(nameForRange(wb, 0, { ...range, r1: 1 })).toBeNull();
     });
   });
+
+  describe('Go To grammar, as Excel resolves it', () => {
+    // Excel (Application.Goto): what selects and what is a silent no-op.
+    const wb = {
+      sheetCount: 2,
+      sheetName: (i: number) => ['a', 'fb'][i],
+      definedNames: () => [{ name: 'MyName', formula: 'a!$B$3:$C$4', localSheetId: -1 }],
+    } as unknown as WorkbookHandle;
+    const go = (text: string) => {
+      const areas = splitAreas(text).map((area) => resolveAreaText(wb, area, 0));
+      return areas.some((area) => area === null) ? null : areas;
+    };
+    const cell = (r: number, c: number, sheet = 0) => ({ sheet, r0: r, c0: c, r1: r, c1: c });
+
+    it.each([
+      ['=A1', [cell(0, 0)]],
+      ['(A1)', [cell(0, 0)]],
+      ['  A1  ', [cell(0, 0)]],
+      ['ａ１', [cell(0, 0)]],
+      ['Ａ１', [cell(0, 0)]],
+      ['１:１', [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 16383 }]],
+      ['A1:B2:C3', [{ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 }]],
+      ['A1:B2 B2:C3', [cell(1, 1)]],
+      ['B2:A1', [{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 }]],
+      ['A1:B2,C3', [{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 }, cell(2, 2)]],
+      ['MyName,A1', [{ sheet: 0, r0: 2, c0: 1, r1: 3, c1: 2 }, cell(0, 0)]],
+      ['fb!B5', [cell(4, 1, 1)]],
+      ['a!A:B', [{ sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 1 }]],
+      ['XFD1048576', [cell(1048575, 16383)]],
+      ['R2', [cell(1, 17)]],
+      ['R:R', [{ sheet: 0, r0: 0, c0: 17, r1: 1048575, c1: 17 }]],
+    ])('selects %s', (text, expected) => {
+      expect(go(text)).toEqual(expected);
+    });
+
+    it.each([
+      'R2C3',
+      'r2c3',
+      'R2C3:R4C5',
+      'R[1]C[1]',
+      'RC',
+      '1:A',
+      'A:1',
+      'A1:A',
+      'A0',
+      'XFE1',
+      'A1048577',
+      'A 1',
+      'A1 B2',
+      '1',
+      '5',
+      'AB',
+      'Sheet99!A1',
+      'a!A1:s2!B2',
+      'A1;B2',
+      '',
+    ])('rejects %s', (text) => {
+      expect(go(text)).toBeNull();
+    });
+  });
 });

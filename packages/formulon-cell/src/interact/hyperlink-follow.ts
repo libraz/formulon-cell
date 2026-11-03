@@ -33,6 +33,7 @@ export function followHyperlink(deps: HyperlinkFollowDeps, target: string): bool
   const { store, wb } = deps;
   const text = target.trim();
   if (isInDocumentHyperlinkTarget(text)) {
+    // Stored hyperlink targets are A1 whatever the UI reference style.
     const area = resolveAreaText(wb, text.slice(1), store.getState().data.sheetIndex);
     const range = area ? clampNavigationRange(store, area) : null;
     const anchor = range
