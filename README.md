@@ -10,7 +10,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**formulon-cell puts a working spreadsheet inside a web page.** Mount it into a DOM node, a React component, or a Vue component and you get a canvas-rendered grid with desktop-spreadsheet chrome (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. The core is framework-free TypeScript; the React and Vue packages are thin adapters over the same mount call.
+**formulon-cell puts a working, Excel-like spreadsheet inside a web page.** Mount it into a DOM node, a React component, or a Vue component and you get a canvas-rendered grid with desktop-spreadsheet chrome (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. The core is framework-free TypeScript; the React and Vue packages are thin adapters over the same mount call.
 
 Try it in the [live demo](https://formulon.libraz.net/cell/demo).
 
@@ -61,9 +61,7 @@ sheet.setLocale('ja'); // swap locale without re-mounting
 sheet.setTheme('ink');      // dark theme
 ```
 
-Pass `getWorkbookName: () => currentFilename` to show the current workbook name in Watch Window. The React and Vue components accept the same callback.
-
-The language selector is hidden by default. Enable it with `features.localeSwitcher: true`, or toggle it with `sheet.setFeatures({ localeSwitcher: false })`. `sheet.setLocale()` updates the dictionary and calculation profile together; it returns `false` when the change is rejected and keeps the current locale. Close open dialogs, Find/Replace, comment edits and filter menus before switching; their drafts are preserved when a switch is rejected.
+Options such as `getWorkbookName` and the language selector (`features.localeSwitcher`) are listed in [Options](https://formulon.libraz.net/cell/options) and [Language switching](https://formulon.libraz.net/cell/language-switching).
 
 React and Vue take the same options as component props:
 
@@ -87,20 +85,7 @@ import '@libraz/formulon-cell/styles.css';
 
 ## Restricted embedding
 
-The `embedded` UI profile mounts only the grid, and a policy decides what users may change. Hiding the ribbon does not make a cell readonly; the policy does.
-
-```ts
-import { Spreadsheet, fixedFormPolicy } from '@libraz/formulon-cell';
-
-const sheet = await Spreadsheet.mount(host, {
-  ui: { profile: 'embedded', features: { clipboard: true, shortcuts: true } },
-  policy: fixedFormPolicy([{ sheet: 0, r0: 1, c0: 1, r1: 9, c1: 2 }]),
-  viewport: { range: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 3 } },
-  contextMenu: { mode: 'builtIn', items: ['copy', 'paste', 'clear'] },
-});
-```
-
-`fixedFormPolicy` allows value edits, clears, pastes, and fills inside the given ranges; `viewerPolicy()` makes the sheet readonly while keeping selection and copy. Every input path (editor, formula bar, clipboard, keyboard, pointer, context menu, ribbon) goes through the same check, and undo/redo re-check the current policy. Runtime setters, host updates, and the list of supported operations are covered in [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
+The `embedded` UI profile mounts only the grid, and a policy decides what users may change: `fixedFormPolicy(ranges)` allows edits inside the given ranges, and `viewerPolicy()` makes the sheet readonly while keeping selection and copy. Hiding the ribbon does not make a cell readonly; the policy does, on every input path. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
 
 ## Bundler integration
 
@@ -114,28 +99,19 @@ export default defineConfig({
 });
 ```
 
-The `.wasm` file is fetched from next to the engine's JS. To serve it from a CDN or another path, create the workbook yourself and pass a resolver; the engine loads once per page, so the first load decides the URL:
-
-```ts
-const workbook = await WorkbookHandle.createDefault({
-  locateFile: (path) => `https://cdn.example.com/formulon/${path}`,
-});
-await Spreadsheet.mount(host, { workbook });
-```
-
-Only a direct import of `@libraz/formulon/threads` needs `worker: { format: 'es' }` and cross-origin isolation (`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`). The default formulon-cell loader starts no workers.
+Serving the `.wasm` from a CDN (`locateFile`) and the threaded engine build are covered in [Bundler setup](https://formulon.libraz.net/cell/bundler).
 
 ## What's inside
 
-- Desktop-spreadsheet chrome: formula bar, status bar, ribbon, sheet tabs, context menu, and dialogs (format cells, paste special, find/replace, Go To, conditional formatting, named ranges, validation, PivotTable creation, and more).
-- Formula editing as on the desktop: arrow keys and F4 pick and cycle references, Ctrl+arrow jumps to the data edge while pointing, Ctrl+Z undoes inside the draft, F9 evaluates the selected part, and the R1C1 reference style works throughout. A typed web address becomes a hyperlink when the cell is committed.
-- A canvas-rendered grid themed through CSS tokens. `paper` (light), `ink` (dark), and `contrast` ship in the box.
-- Charts (column, bar, line, area, pie, doughnut and scatter) with a settings panel. Charts in loaded workbooks are edited in place and saved back.
-- XLSX persistence for threaded comments and notes, images, charts, shapes, sparklines, tables and table styles, PivotTables, slicers, workbook themes, filters, sheet and workbook protection, view settings and calculation options. Loaded pictures can be moved, resized and reordered unless they use an absolute anchor. Save As can also write `.xlsb`, with a warning that lists what the binary format drops.
-- Feature flags and extension factories. `presets.minimal()`, `presets.standard()`, and `presets.full()` cover the common sets; any piece can be swapped or left out.
-- An opt-in Mac profile. `ui: { platform: 'mac' }` (or `'auto'` to detect it from the browser) switches to a Mac ribbon tab set, Mac shortcuts, and a nonmodal formula argument palette.
-- Runtime i18n. `en`, `ja`, `de`, `fr`, `zh`, `ko`, and `th` ship by default, and `sheet.i18n.register()` adds more without re-mounting.
-- A headless mode that keeps only the canvas and the store, for hosts that bring their own chrome.
+- **Desktop-spreadsheet chrome** — formula bar, status bar, ribbon, sheet tabs, context menu and dialogs. [Ribbon toolbar](https://formulon.libraz.net/cell/toolbar) · [Modals and dialogs](https://formulon.libraz.net/cell/modals)
+- **Desktop formula editing** — F4 and arrow-key reference picking, Ctrl+arrow while pointing, undo inside the draft, F9 on a selection, R1C1 references.
+- **Canvas grid with themes** — styled through CSS tokens; `paper`, `ink` and `contrast` ship in the box. [Theming](https://formulon.libraz.net/cell/theming)
+- **Charts** — seven chart types with a settings panel, edited in place and saved back. [Charts](https://formulon.libraz.net/cell/charts)
+- **XLSX persistence** — comments, images, charts, tables, PivotTables, slicers, protection and more survive a save; Save As can write `.xlsb`. [Host integration](https://formulon.libraz.net/cell/host-integration)
+- **Presets and extensions** — `presets.minimal()`, `standard()` and `full()`, with any piece swappable or left out. [Extensions](https://formulon.libraz.net/cell/extensions)
+- **Mac profile** — `ui: { platform: 'mac' }` switches to the Mac ribbon, shortcuts and argument palette. [Platform and Mac UI](https://formulon.libraz.net/cell/platform)
+- **Runtime i18n** — seven languages built in, more through `sheet.i18n.register()`. [Internationalization](https://formulon.libraz.net/cell/i18n)
+- **Headless mode** — keep only the canvas and the store when the host brings its own chrome.
 
 ## Documentation
 

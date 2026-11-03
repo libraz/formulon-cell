@@ -10,7 +10,7 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/ja/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/ja/cell/demo)
 
-**formulon-cell は、Web ページの中で動く表計算を提供します。** DOM 要素、React コンポーネント、Vue コンポーネントのどれにマウントしても、Canvas 描画のグリッドとデスクトップ表計算ソフト風の UI（数式バー、リボン、シートタブ、コンテキストメニュー）が表示され、計算は [formulon](https://github.com/libraz/formulon) の WASM エンジンが受け持ちます。コアはフレームワーク非依存の TypeScript で、React 版と Vue 版は同じマウント処理を包む薄いアダプタです。
+**formulon-cell は、Web ページの中で動く Excel 風の表計算を提供します。** DOM 要素、React コンポーネント、Vue コンポーネントのどれにマウントしても、Canvas 描画のグリッドとデスクトップ表計算ソフト風の UI（数式バー、リボン、シートタブ、コンテキストメニュー）が表示され、計算は [formulon](https://github.com/libraz/formulon) の WASM エンジンが受け持ちます。コアはフレームワーク非依存の TypeScript で、React 版と Vue 版は同じマウント処理を包む薄いアダプタです。
 
 [デモ](https://formulon.libraz.net/ja/cell/demo) でブラウザ上ですぐに試せます。
 
@@ -61,9 +61,7 @@ sheet.setLocale('en'); // 再マウントせずにロケールを切り替え
 sheet.setTheme('ink');      // ダークテーマ
 ```
 
-`getWorkbookName: () => currentFilename` を指定すると、ウォッチウィンドウに現在のブック名を表示します。React / Vueコンポーネントも同じコールバックを受け取ります。
-
-言語選択UIは初期状態では非表示です。`features.localeSwitcher: true` で表示し、`sheet.setFeatures({ localeSwitcher: false })` で動的に非表示へ戻せます。`sheet.setLocale()` は表示辞書と計算プロファイルを同時に切り替えます。切り替えが拒否された場合は `false` を返し、現在の言語を維持します。ダイアログ、検索・置換、コメント編集、フィルターメニューを閉じてから切り替えてください。拒否時は入力途中の内容を保持します。
+`getWorkbookName` や言語選択 UI（`features.localeSwitcher`）などのオプションは、[オプション](https://formulon.libraz.net/ja/cell/options)と[言語の切り替え](https://formulon.libraz.net/ja/cell/language-switching)にまとめています。
 
 React と Vue では、同じオプションをコンポーネントの props で渡します。
 
@@ -87,20 +85,7 @@ import '@libraz/formulon-cell/styles.css';
 
 ## 制限付きの埋め込み
 
-UI プロファイル `embedded` はグリッドだけをマウントし、ユーザーが変更できる範囲はポリシーで決めます。リボンを隠してもセルは読み取り専用になりません。読み取り専用にするのはポリシーです。
-
-```ts
-import { Spreadsheet, fixedFormPolicy } from '@libraz/formulon-cell';
-
-const sheet = await Spreadsheet.mount(host, {
-  ui: { profile: 'embedded', features: { clipboard: true, shortcuts: true } },
-  policy: fixedFormPolicy([{ sheet: 0, r0: 1, c0: 1, r1: 9, c1: 2 }]),
-  viewport: { range: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 3 } },
-  contextMenu: { mode: 'builtIn', items: ['copy', 'paste', 'clear'] },
-});
-```
-
-`fixedFormPolicy` は、指定した範囲での値の編集、クリア、貼り付け、フィルを許可します。`viewerPolicy()` は選択とコピーを残してシートを読み取り専用にします。エディタ、数式バー、クリップボード、キーボード、ポインタ、コンテキストメニュー、リボンのどこから操作しても同じ検査を通り、元に戻す／やり直しのときも現在のポリシーで検査し直します。実行時の設定変更、ホストからの更新、対応している操作の一覧は [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) にまとめています。
+UI プロファイル `embedded` はグリッドだけをマウントし、ユーザーが変更できる範囲はポリシーで決めます。`fixedFormPolicy(ranges)` は指定した範囲での編集を許可し、`viewerPolicy()` は選択とコピーを残してシートを読み取り専用にします。リボンを隠してもセルは読み取り専用になりません。どの入力経路でも、読み取り専用にするのはポリシーです。詳しくは [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
 
 ## バンドラの設定
 
@@ -114,28 +99,19 @@ export default defineConfig({
 });
 ```
 
-`.wasm` ファイルはエンジンの JS と同じ場所から取得されます。CDN や別のパスから配信する場合は、ワークブックを自分で作成してリゾルバを渡します。エンジンはページごとに一度だけ読み込まれるため、URL は最初の読み込みで決まります。
-
-```ts
-const workbook = await WorkbookHandle.createDefault({
-  locateFile: (path) => `https://cdn.example.com/formulon/${path}`,
-});
-await Spreadsheet.mount(host, { workbook });
-```
-
-`worker: { format: 'es' }` とクロスオリジン分離（`Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Embedder-Policy: require-corp`）が必要なのは、`@libraz/formulon/threads` を直接 import する場合だけです。formulon-cell の標準ローダーはワーカーを起動しません。
+CDN からの `.wasm` の配信（`locateFile`）とスレッド版エンジンについては、[バンドラの設定](https://formulon.libraz.net/ja/cell/bundler)にまとめています。
 
 ## 主な機能
 
-- デスクトップ表計算ソフト風の UI: 数式バー、ステータスバー、リボン、シートタブ、コンテキストメニュー、各種ダイアログ（セルの書式設定、形式を選択して貼り付け、検索と置換、ジャンプ、条件付き書式、名前の定義、データの入力規則、ピボットテーブルの作成など）。
-- デスクトップ版と同じ感覚の数式編集。矢印キーと F4 で参照を選んで切り替え、参照を指している間は Ctrl+矢印でデータの端へ移動でき、Ctrl+Z は入力途中の数式の中で元に戻し、F9 は選択した部分を評価します。R1C1 参照形式にも対応しています。入力した Web アドレスは確定時にハイパーリンクになります。
-- CSS トークンでテーマを切り替えられる Canvas 描画のグリッド。`paper`（ライト）、`ink`（ダーク）、`contrast` を同梱しています。
-- グラフ（縦棒、横棒、折れ線、面、円、ドーナツ、散布図）を設定パネル付きで扱えます。読み込んだブックのグラフもその場で編集して保存できます。
-- スレッドコメントとメモ、画像、グラフ、図形、スパークライン、テーブルとテーブルスタイル、ピボットテーブル、スライサー、ブックテーマ、フィルター、シートとブックの保護、表示設定、計算方法の設定を XLSX に保存できます。読み込んだ画像は、絶対位置で配置されたもの以外は移動、サイズ変更、重なり順の変更ができます。名前を付けて保存では `.xlsb` も書き出せ、バイナリ形式で失われる内容は保存前に一覧で警告します。
-- 機能フラグと拡張ファクトリ。よく使う組み合わせは `presets.minimal()`、`presets.standard()`、`presets.full()` で選べ、個々の部品は差し替えも省略もできます。
-- オプトインの Mac プロファイル。`ui: { platform: 'mac' }`（ブラウザから判定する場合は `'auto'`）で、Mac 向けのリボンタブ構成とショートカット、モードレスの関数引数パレットに切り替わります。
-- 実行時の言語切り替え。`en`、`ja`、`de`、`fr`、`zh`、`ko`、`th` の7言語を同梱し、`sheet.i18n.register()` で再マウントせずに言語を追加できます。
-- キャンバスとストアだけを残すヘッドレス構成。UI をホスト側で用意する場合に使います。
+- **デスクトップ風の UI** — 数式バー、ステータスバー、リボン、シートタブ、コンテキストメニュー、各種ダイアログ。[リボンツールバー](https://formulon.libraz.net/ja/cell/toolbar) · [モーダルとダイアログ](https://formulon.libraz.net/ja/cell/modals)
+- **デスクトップ版と同じ数式編集** — 矢印キーと F4 での参照の選択と切り替え、参照中の Ctrl+矢印、入力途中の取り消し、選択部分の F9 評価、R1C1 参照形式。
+- **テーマ付きの Canvas グリッド** — CSS トークンで見た目を変えられ、`paper`、`ink`、`contrast` を同梱しています。[テーマ](https://formulon.libraz.net/ja/cell/theming)
+- **グラフ** — 7 種類のグラフを設定パネルで扱い、読み込んだブックのグラフもその場で編集して保存できます。[グラフ](https://formulon.libraz.net/ja/cell/charts)
+- **XLSX への保存** — コメント、画像、グラフ、テーブル、ピボットテーブル、スライサー、保護などを保存でき、名前を付けて保存では `.xlsb` も書き出せます。[ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
+- **プリセットと拡張** — `presets.minimal()`、`standard()`、`full()` から選び、個々の部品は差し替えも省略もできます。[拡張](https://formulon.libraz.net/ja/cell/extensions)
+- **Mac プロファイル** — `ui: { platform: 'mac' }` で Mac 向けのリボン、ショートカット、関数引数パレットに切り替わります。[プラットフォームと Mac UI](https://formulon.libraz.net/ja/cell/platform)
+- **実行時の言語切り替え** — 7 言語を同梱し、`sheet.i18n.register()` で追加できます。[国際化](https://formulon.libraz.net/ja/cell/i18n)
+- **ヘッドレス構成** — UI をホスト側で用意する場合に、キャンバスとストアだけを残せます。
 
 ## ドキュメント
 
