@@ -51,6 +51,8 @@ export interface CellPaintCtx {
   rowBaselineFont?: RowBaselineFont;
   /** `bounds` is a merged range; centred text rounds rather than floors. */
   merged?: boolean;
+  /** Lay the text out on whole-point glyph advances (the Mac point model). */
+  wholePointAdvances?: boolean;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

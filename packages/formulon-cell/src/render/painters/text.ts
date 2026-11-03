@@ -10,6 +10,12 @@ import { convertKana } from '../../format/kana.js';
 import type { CellFormat } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
+import {
+  cellTextWidth,
+  drawCellTextRun,
+  paintedFontSize,
+  wholePointPadX,
+} from '../text-metrics.js';
 import { cellTextHorizontalMetrics, graphemes, wrapText } from '../text-wrap.js';
 import type { CellPaintCtx, TextMetricsBox, TextVAlign } from './types.js';
 
@@ -43,8 +49,8 @@ function canvasTextVAlign(align: CellFormat['vAlign'] | undefined): TextVAlign {
 
 /** Width the spreadsheet charges a General number: every character, sign
  *  and separator included, costs one digit advance. */
-const generalTextWidth = (ctx: CanvasRenderingContext2D, text: string): number =>
-  [...text].length * ctx.measureText('0').width;
+const generalTextWidth = (measure: (text: string) => number, text: string): number =>
+  [...text].length * measure('0');
 
 /** Excel-style "General" number rendering when the value does not fit. Drops
  *  fractional digits while a significant digit survives; a value that would
@@ -52,13 +58,13 @@ const generalTextWidth = (ctx: CanvasRenderingContext2D, text: string): number =
  *  rounded zero; anything else falls back to scientific, then a `#` filler.
  *  General never groups thousands. */
 function fitGeneralNumberToWidth(
-  ctx: CanvasRenderingContext2D,
+  measure: (text: string) => number,
   value: number,
   availableWidth: number,
   locale: string,
 ): string {
   if (!Number.isFinite(value)) return String(value);
-  const fits = (t: string): boolean => generalTextWidth(ctx, t) <= availableWidth;
+  const fits = (t: string): boolean => generalTextWidth(measure, t) <= availableWidth;
   const scientific = (): string | null => {
     for (let prec = 5; prec >= 0; prec -= 1) {
       const t = formatGeneralScientific(value, prec, locale);
@@ -87,7 +93,7 @@ function fitGeneralNumberToWidth(
     if (sci) return sci;
     if (roundedToZero !== null) return roundedToZero;
   }
-  const digit = Math.max(1, ctx.measureText('0').width);
+  const digit = Math.max(1, measure('0'));
   return '#'.repeat(Math.max(1, Math.floor(availableWidth / digit)));
 }
 
@@ -414,6 +420,24 @@ const paintTextDecorations = (
   }
 };
 
+/** Wrap at 100%: the canvas run widths of the unzoomed font against the
+ *  cell's stored width, so a zoom never moves a line break. */
+const wrapLogical = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  baseFont: CellFont,
+  logicalWidth: number,
+  indent: number,
+  locale: string | undefined,
+): string[] => {
+  ctx.font = cellFontCss(baseFont);
+  return wrapText(text, {
+    maxWidth: cellTextHorizontalMetrics(logicalWidth, indent, 1).availableWidth,
+    measureText: (value) => ctx.measureText(value).width,
+    locale,
+  });
+};
+
 /** Stacked text: one character per line, centred on its column's axis. Wrap
  *  breaks words into columns no taller than the cell, laid right to left;
  *  each column takes the vertical alignment on its own. The indent moves the
@@ -499,6 +523,7 @@ export function paintCellText({
   fontEffects = false,
   rowBaselineFont,
   merged = false,
+  wholePointAdvances = false,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
@@ -532,7 +557,7 @@ export function paintCellText({
   const zoomScale = visualZoom(zoom);
   const font = {
     ...baseFont,
-    size: baseFont.size * zoomScale,
+    size: paintedFontSize(baseFont.size, zoomScale, wholePointAdvances),
   };
   const horizontal = cellTextHorizontalMetrics(bounds.w, format?.indent ?? 0, zoomScale);
   const padX = horizontal.padX;
@@ -547,11 +572,12 @@ export function paintCellText({
     if (vAlign !== 'bottom' || !rowBaselineFont) return box;
     const rowFont = cellFont(rowBaselineFont, theme, false);
     const current = ctx.font;
-    ctx.font = cellFontCss({ ...rowFont, size: rowFont.size * zoomScale });
-    const rowBox = fontMetricsBox(ctx, rowFont.size * zoomScale);
+    const rowSize = paintedFontSize(rowFont.size, zoomScale, wholePointAdvances);
+    ctx.font = cellFontCss({ ...rowFont, size: rowSize });
+    const rowBox = fontMetricsBox(ctx, rowSize);
     ctx.font = current;
     const accountingRise = rowBaselineFont.accountingUnderline
-      ? rowFont.size * zoomScale * ACCOUNTING_BASELINE_RISE_EM
+      ? rowSize * ACCOUNTING_BASELINE_RISE_EM
       : 0;
     return {
       ascent: box.ascent,
@@ -601,7 +627,11 @@ export function paintCellText({
   const area = clip ?? bounds;
   ctx.rect(area.x, area.y, area.w, area.h);
   ctx.clip();
-  const drawText = applyFontEffects(ctx, fontEffects ? format : undefined, fontSize);
+  const drawGlyphs = applyFontEffects(ctx, fontEffects ? format : undefined, fontSize);
+  const measure = (run: string): number => cellTextWidth(ctx, run, wholePointAdvances);
+  // Paints a run by `ctx.textAlign` and returns its left edge.
+  const drawText = (run: string, x: number, y: number): number =>
+    drawCellTextRun(ctx, drawGlyphs, run, x, y, wholePointAdvances);
 
   if (rotation === 'vertical') {
     paintStackedText(ctx, drawText, text, bounds, {
@@ -625,7 +655,7 @@ export function paintCellText({
     const sin = Math.sin(theta);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    const width = ctx.measureText(text).width;
+    const width = measure(text);
     const { ascent, descent } = fontMetricsBox(ctx, fontSize);
     // Line-box corners relative to the run's start on the baseline.
     const xs = [
@@ -681,17 +711,11 @@ export function paintCellText({
 
   // Word-wrap path — split into lines, paint each.
   if (wrap) {
-    const logicalHorizontal = cellTextHorizontalMetrics(
-      bounds.w / zoomScale,
-      format?.indent ?? 0,
-      1,
-    );
-    ctx.font = cellFontCss(baseFont);
-    const lines = wrapText(text, {
-      maxWidth: logicalHorizontal.availableWidth,
-      measureText: (value) => ctx.measureText(value).width,
-      locale,
-    });
+    // Whole-point advances round at the painted size, so they wrap there;
+    // otherwise lines break at 100% whatever the zoom.
+    const lines = wholePointAdvances
+      ? wrapText(text, { maxWidth: horizontal.availableWidth, measureText: measure, locale })
+      : wrapLogical(ctx, text, baseFont, bounds.w / zoomScale, format?.indent ?? 0, locale);
     ctx.font = paintFontCss;
     // Line pitch rounds in rendered pixels: 14 px for an 11 px run.
     const lineH = Math.round(fontSize * 1.28);
@@ -704,14 +728,17 @@ export function paintCellText({
     else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = align;
-    const anchor = alignedTextAnchor(bounds, align, padX, indentPx);
+    const anchor = alignedTextAnchor(
+      bounds,
+      align,
+      wholePointAdvances ? wholePointPadX(fontSize) : padX,
+      indentPx,
+    );
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i] ?? '';
       const baselineY = startY + i * lineH;
-      const width = ctx.measureText(line).width;
-      const tx = anchor;
-      drawText(line, tx, baselineY);
-      const lineX0 = align === 'right' ? tx - width : align === 'center' ? tx - width / 2 : tx;
+      const width = measure(line);
+      const lineX0 = drawText(line, anchor, baselineY);
       paintTextDecorations(ctx, format, isHyperlink, lineX0, width, baselineY, fontSize, cellSpan);
     }
     ctx.restore();
@@ -723,32 +750,45 @@ export function paintCellText({
   if (format?.align === 'distributed' && !/\s/.test(text)) align = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = align;
-  const tx = alignedTextAnchor(bounds, align, padX, indentPx);
 
   const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
   const availableTextWidthForCell = horizontal.availableWidth;
   let drawFontSize = fontSize;
   let fullSizeDescent = 0;
   if (format?.shrinkToFit) {
-    const measuredWidth = ctx.measureText(text).width;
+    const measuredWidth = measure(text);
     if (measuredWidth > availableTextWidthForCell && availableTextWidthForCell > 0) {
       fullSizeDescent = fontMetricsBox(ctx, fontSize).descent;
       drawFontSize = shrinkFontSizeToFit(fontSize, measuredWidth, availableTextWidthForCell);
       ctx.font = cellFontCss(font, drawFontSize);
+      // Rounded advances can leave the scaled run too wide: step down a
+      // whole size until it fits (Arial 11 'A very very long shrink to fit
+      // sentence' in a 10-char column scales to 3 pt, 61 px, and paints at 2).
+      while (wholePointAdvances && drawFontSize > 1 && measure(text) > availableTextWidthForCell) {
+        drawFontSize -= 1;
+        ctx.font = cellFontCss(font, drawFontSize);
+      }
     }
   }
+  // Whole-point runs keep a size-dependent inset, from the size they paint at.
+  const tx = alignedTextAnchor(
+    bounds,
+    align,
+    wholePointAdvances ? wholePointPadX(drawFontSize) : padX,
+    indentPx,
+  );
   const generalNumber =
     !isFormulaDisplay &&
     value.kind === 'number' &&
     (!format?.numFmt || format.numFmt.kind === 'general');
   const overflows = generalNumber
-    ? generalTextWidth(ctx, text) > availableTextWidthForCell
-    : ctx.measureText(text).width > availableTextWidthForCell;
+    ? generalTextWidth(measure, text) > availableTextWidthForCell
+    : measure(text) > availableTextWidthForCell;
   if (isNumeric && overflows) {
     if (format?.numFmt && format.numFmt.kind !== 'general') {
       // Explicit number format: Excel shows #### when the formatted value
       // can't shrink without losing the user's chosen presentation.
-      const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
+      const hashWidth = Math.max(1, measure('#') || fontSize * 0.62);
       text = '#'.repeat(Math.max(1, Math.floor(availableTextWidthForCell / hashWidth)));
     } else if (!isFormulaDisplay && value.kind === 'number') {
       // General number: Excel progressively trims fractional digits before
@@ -756,7 +796,7 @@ export function paintCellText({
       // right-aligned text just clips and the user sees only the trailing
       // digits — making the result look corrupted.
       text = fitGeneralNumberToWidth(
-        ctx,
+        measure,
         value.value,
         availableTextWidthForCell,
         locale ?? 'en-US',
@@ -765,12 +805,12 @@ export function paintCellText({
   }
   // Fill repeats the run as many whole times as the cell holds.
   if (format?.align === 'fill' && !isFormulaDisplay) {
-    const runWidth = ctx.measureText(text).width;
+    const runWidth = measure(text);
     if (runWidth > 0) {
       text = text.repeat(Math.max(1, Math.floor(availableTextWidthForCell / runWidth)));
     }
   }
-  const metrics = ctx.measureText(text);
+  const metrics = { width: measure(text) };
   const ownBox = fontMetricsBox(ctx, drawFontSize);
   // A shrunk bottom-aligned run keeps the baseline of its full-size font.
   const box = withRowDescent(
@@ -797,13 +837,13 @@ export function paintCellText({
     const [leading = '', trailing = ''] = fillParts;
     const left = bounds.x + padX + indentPx;
     const right = bounds.x + bounds.w - padX;
-    const leadingWidth = ctx.measureText(leading).width;
-    const trailingWidth = ctx.measureText(trailing).width;
+    const leadingWidth = measure(leading);
+    const trailingWidth = measure(trailing);
     ctx.textAlign = 'left';
     drawText(leading, left, ty);
     ctx.textAlign = 'right';
     drawText(trailing, right, ty);
-    const charWidth = ctx.measureText(fill.char).width;
+    const charWidth = measure(fill.char);
     const gap = right - trailingWidth - (left + leadingWidth);
     if (fill.char.trim() && charWidth > 0 && gap >= charWidth) {
       ctx.textAlign = 'left';
@@ -829,8 +869,8 @@ export function paintCellText({
       const start = Math.max(0, Math.min(run.start, text.length));
       const end = Math.max(start, Math.min(run.end, text.length));
       if (end === start) return { left: textLeft, width: metrics.width };
-      const before = start === 0 ? 0 : ctx.measureText(text.slice(0, start)).width;
-      return { left: textLeft + before, width: ctx.measureText(text.slice(start, end)).width };
+      const before = start === 0 ? 0 : measure(text.slice(0, start));
+      return { left: textLeft + before, width: measure(text.slice(start, end)) };
     });
     const kana = phoneticKanaForm(format.phoneticProperties);
     const alignment = phoneticAlignment(format.phoneticProperties);
@@ -864,10 +904,7 @@ export function paintCellText({
     }
     ctx.restore();
   }
-  drawText(text, tx, ty);
-
-  const lineX0 =
-    align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
+  const lineX0 = drawText(text, tx, ty);
   paintTextDecorations(ctx, format, isHyperlink, lineX0, metrics.width, ty, drawFontSize, cellSpan);
   ctx.restore();
 }

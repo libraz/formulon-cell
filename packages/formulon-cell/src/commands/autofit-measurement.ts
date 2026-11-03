@@ -15,7 +15,13 @@ import {
   TABLE_HEADER_CHEVRON_INSET,
   TABLE_HEADER_CHEVRON_SIZE,
 } from '../render/painters/markers.js';
-import { type CellFontTheme, cellFont, cellFontCss } from '../render/painters/text.js';
+import {
+  type CellFont,
+  type CellFontTheme,
+  cellFont,
+  cellFontCss,
+} from '../render/painters/text.js';
+import { cellTextWidth, paintedFontSize, wholePointAdvances } from '../render/text-metrics.js';
 import { cellTextHorizontalMetrics, wrapText } from '../render/text-wrap.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { DEFAULT_CELL_FONT_THEME, resolveTheme } from '../theme/resolve.js';
@@ -82,9 +88,8 @@ export function computeAutofitColWidth(
     if (!text) continue;
     const formulaDisplay = showsFormula(state, cell);
     const font = cellFont(format, theme, formulaDisplay);
-    if (ctx) ctx.font = cellFontCss(font);
     const width =
-      maxExplicitLineWidth(text, ctx, font.size) +
+      maxExplicitLineWidth(text, textMeasure(ctx, font, state.layout)) +
       headerButtonWidth(state, parsed.sheet, parsed.row, parsed.col);
     if (width > max) max = width;
   }
@@ -121,15 +126,13 @@ export function computeAutofitRowHeight(
     if (!text) continue;
     const formulaDisplay = showsFormula(state, cell);
     const font = cellFont(format, theme, formulaDisplay);
-    if (ctx) ctx.font = cellFontCss(font);
     const lineHeight = Math.round(font.size * 1.28);
     const colW = state.layout.colWidths.get(parsed.col) ?? state.layout.defaultColWidth;
     const lines = autofitLineCount(
       text,
       format?.wrap === true,
       colW,
-      ctx,
-      font.size,
+      textMeasure(ctx, font, state.layout),
       locale,
       format?.indent,
     );
@@ -269,14 +272,10 @@ function headerButtonWidth(state: State, sheet: number, row: number, col: number
   return Math.max(filter, chevron);
 }
 
-function maxExplicitLineWidth(
-  text: string,
-  ctx: CanvasRenderingContext2D | null,
-  fontSize: number,
-): number {
+function maxExplicitLineWidth(text: string, measure: (text: string) => number): number {
   let max = 0;
   for (const line of text.split(/\r\n|\r|\n/)) {
-    const width = measureAutofitText(line, ctx, fontSize);
+    const width = measure(line);
     if (width > max) max = width;
   }
   return max;
@@ -286,25 +285,32 @@ function autofitLineCount(
   text: string,
   wrap: boolean,
   colWidth: number,
-  ctx: CanvasRenderingContext2D | null,
-  fontSize: number,
+  measure: (text: string) => number,
   locale: string,
   indent = 0,
 ): number {
   const horizontal = cellTextHorizontalMetrics(colWidth, indent, 1);
   return wrapText(text, {
     maxWidth: wrap ? horizontal.availableWidth : Infinity,
-    measureText: (value) => measureAutofitText(value, ctx, fontSize),
+    measureText: measure,
     locale,
   }).length;
 }
 
-// Character-width estimate when no canvas is available (headless test DOMs).
-function measureAutofitText(
-  text: string,
+/** Run widths in stored CSS px for `font`, laid out as the grid paints them:
+ *  on the point model the advances round at the screen size, so the run is
+ *  measured there and scaled back. Without a canvas (headless test DOMs) a
+ *  character-width estimate stands in. */
+function textMeasure(
   ctx: CanvasRenderingContext2D | null,
-  fontSize: number,
-): number {
-  const measured = ctx ? ctx.measureText(text).width : 0;
-  return measured > 0 ? measured : text.length * fontSize * 0.54;
+  font: CellFont,
+  layout: State['layout'],
+): (text: string) => number {
+  const wholePoint = wholePointAdvances(layout);
+  const scale = wholePoint ? (layout.screenScale ?? 1) : 1;
+  if (ctx) ctx.font = cellFontCss(font, paintedFontSize(font.size, scale, wholePoint));
+  return (text) => {
+    const measured = ctx ? cellTextWidth(ctx, text, wholePoint) / scale : 0;
+    return measured > 0 ? measured : text.length * font.size * 0.54;
+  };
 }

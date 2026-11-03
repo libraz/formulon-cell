@@ -44,6 +44,13 @@ import {
 } from '../painters.js';
 import { rowBaselineFonts } from '../row-baseline.js';
 import { paintCellSparkline } from '../sparkline.js';
+import {
+  cellTextWidth,
+  paintedFontSize,
+  wholePointAdvances,
+  wholePointPadX,
+  wholePxStart,
+} from '../text-metrics.js';
 import { cellTextHorizontalMetrics } from '../text-wrap.js';
 import { ruleCenter, ruleWidth, surfaceRect } from './chrome-context.js';
 import { paintDataBar } from './data-bar.js';
@@ -100,14 +107,23 @@ const overflowRunSpan = (
   const zoom = visualZoom(p.zoom);
   const font = cellFont(p.format, p.theme, false);
   ctx.save();
-  ctx.font = cellFontCss({ ...font, size: font.size * zoom });
-  const width = ctx.measureText(text).width;
+  const wholePoint = p.wholePointAdvances === true;
+  const size = paintedFontSize(font.size, zoom, wholePoint);
+  ctx.font = cellFontCss({ ...font, size });
+  const width = cellTextWidth(ctx, text, wholePoint);
   ctx.restore();
   const align = p.format?.align ?? (p.rtl ? 'right' : 'left');
   const canvasAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
   const { padX, indentPx } = cellTextHorizontalMetrics(p.bounds.w, p.format?.indent ?? 0, zoom);
-  const x = alignedTextAnchor(p.bounds, canvasAlign, padX, indentPx);
-  const left = canvasAlign === 'right' ? x - width : canvasAlign === 'center' ? x - width / 2 : x;
+  const x = alignedTextAnchor(
+    p.bounds,
+    canvasAlign,
+    wholePoint ? wholePointPadX(size) : padX,
+    indentPx,
+  );
+  const start = canvasAlign === 'right' ? x - width : canvasAlign === 'center' ? x - width / 2 : x;
+  // Whole-point runs start on a whole px, as the painter draws them.
+  const left = wholePoint ? wholePxStart(start) : start;
   return { left, right: left + width };
 };
 
@@ -586,6 +602,7 @@ export function paintCells(
         rowBaselineFont: rowFonts.get(r),
         merged: isMergeAnchor,
         zoom: renderScale(state.layout, state.viewport),
+        wholePointAdvances: wholePointAdvances(state.layout),
         formatPaint:
           formatCode && customDisplay === null && value.kind === 'number'
             ? numberFormatPaint(formatCode, value.value)

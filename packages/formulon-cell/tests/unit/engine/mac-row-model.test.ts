@@ -27,6 +27,16 @@ describe('macDefaultRowPt', () => {
     ['Arial', 36, 45],
     ['Courier New', 11, 15],
     ['Courier New', 20, 27],
+    // Normal-font ladder (default row height, device px / 2).
+    ['Courier New', 9, 13],
+    ['Courier New', 10, 14],
+    ['Courier New', 14, 19],
+    ['Courier New', 16, 22],
+    ['Courier New', 18, 24],
+    ['Courier New', 24, 32],
+    ['Courier New', 28, 37],
+    ['MS PGothic', 24, 28],
+    ['MS PGothic', 28, 33],
   ] as const)('gives %s %d pt a %d pt row', (name, size, row) => {
     expect(macDefaultRowPt(name, size)).toBe(row);
   });

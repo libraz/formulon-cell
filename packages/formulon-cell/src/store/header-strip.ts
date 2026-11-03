@@ -1,8 +1,13 @@
-import { MAC_COLUMN_PADDING_PT, roundDigitAdvance } from '../engine/mac-column-model.js';
+import { roundDigitAdvance } from '../engine/mac-column-model.js';
 import type { LayoutSlice, ViewportSlice } from './types.js';
 
 /** Fewest digits the row-number strip is sized for. */
 const MIN_ROW_HEADER_DIGITS = 3;
+
+/** Room the row-number strip adds to its digits: a quarter digit, rounded
+ *  up, on each side plus the 1 px rule; 5 px at the default fonts (Mac Excel
+ *  Normal-font ladder: 7 at 9-12 px digits, 9 at 14, 11 at 17). */
+const rowNumberPad = (digitWidth: number): number => 2 * Math.ceil(digitWidth / 4) + 1;
 
 type HeaderLayout = Pick<
   LayoutSlice,
@@ -13,7 +18,7 @@ type HeaderLayout = Pick<
  *  With a Normal-font digit advance (Mac), the column-letter strip is the
  *  larger of the chrome height and one default row, scaled by the zoom and
  *  rounded up; the row-number strip is a column as many zoomed digits wide as
- *  the last visible row number (at least three) plus the column padding, and
+ *  the last visible row number (at least three) plus a digit-scaled pad, and
  *  never narrower than the column strip is tall (Excel 75-200%). Otherwise
  *  the fixed chrome sizes stand. */
 export function headerStripSize(
@@ -35,7 +40,7 @@ export function headerStripSize(
   const digits = Math.max(MIN_ROW_HEADER_DIGITS, String(lastRowNumber).length);
   const digitWidth = roundDigitAdvance(advance * zoom);
   return {
-    headerColWidth: Math.max(headerRowHeight, MAC_COLUMN_PADDING_PT + digits * digitWidth),
+    headerColWidth: Math.max(headerRowHeight, digits * digitWidth + rowNumberPad(digitWidth)),
     headerRowHeight,
   };
 }

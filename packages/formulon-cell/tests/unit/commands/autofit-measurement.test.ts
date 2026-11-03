@@ -204,6 +204,29 @@ describe('computeAutofitRowHeight', () => {
   });
 });
 
+describe('autofit on the Mac point model', () => {
+  /** Arial 'A'/'V' advance (1366 / 2048 em) with the pair kern a canvas run applies. */
+  const arialAvCtx = (): CanvasRenderingContext2D =>
+    ({
+      font: '',
+      measureText(this: { font: string }, text: string) {
+        const size = Number(this.font.match(/([\d.]+)px/)?.[1] ?? 0);
+        const kerns = Math.max(0, text.length - 1);
+        return { width: ((text.length * 1366 - kerns * 152) / 2048) * size } as TextMetrics;
+      },
+    }) as unknown as CanvasRenderingContext2D;
+
+  it('fits the run laid out on whole-point advances at the screen size', () => {
+    const store = storeWith([[0, 0, 'AVAVAVAV']]);
+    // Arial 11 pt: 8 advances of round(7.34) = 7 pt = 56 pt, stored as 74.67 px.
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontSize: (11 * 4) / 3 });
+    const fractional = computeAutofitColWidth(store.getState(), 0, arialAvCtx());
+    store.setState((s) => ({ ...s, layout: { ...s.layout, screenScale: 0.75 } }));
+    expect(computeAutofitColWidth(store.getState(), 0, arialAvCtx())).toBe(75 + 16);
+    expect(fractional).toBe(Math.ceil(((8 * 1366 - 7 * 152) / 2048) * ((11 * 4) / 3)) + 16);
+  });
+});
+
 describe('public autofitColWidth / autofitRowHeight', () => {
   it('measure the given span through the shared implementation', () => {
     const store = storeWith([
