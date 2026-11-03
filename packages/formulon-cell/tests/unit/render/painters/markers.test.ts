@@ -178,6 +178,14 @@ describe('render/painters — paintValidationChevron', () => {
     expect(hit).toEqual({ x: 100, y: 11, w: 16, h: 17 });
   });
 
+  it('darkens the selection outline where it abuts the button', () => {
+    const spy = makeSpy();
+    paintValidationChevron(spy.ctx, { x: 0, y: 10, w: 100, h: 30 }, baseTheme);
+    expect(spy.rects).toContainEqual([99, 11, 2, 1]);
+    expect(spy.rects).toContainEqual([99, 12, 1, 16]);
+    expect(spy.fillStyles).toContain('#134529');
+  });
+
   it('mirrors the button past the leading edge on a right-to-left sheet', () => {
     const spy = makeSpy();
     const hit = paintValidationChevron(spy.ctx, { x: 50, y: 0, w: 100, h: 30 }, baseTheme, true);

@@ -7,6 +7,8 @@ import { mirrorInRect, type Rect } from '../geometry.js';
 const DROPDOWN_W = 16;
 const DROPDOWN_H = 17;
 const DROPDOWN_FRAME = '#999999';
+/** The selection outline reads darker along the button. */
+const DROPDOWN_OUTLINE_SHADE = '#134529';
 const DROPDOWN_ARROW = '#838383';
 const DROPDOWN_FACE_TOP = '#ffffff';
 const DROPDOWN_FACE_BOTTOM = '#f7f7f7';
@@ -43,6 +45,11 @@ export function paintValidationChevron(
   ctx.lineTo(rtl ? x + 0.5 : x + w - 0.5, y + h - 0.5);
   ctx.lineTo(rtl ? x + w : x, y + h - 0.5);
   ctx.stroke();
+  if (!rtl) {
+    ctx.fillStyle = DROPDOWN_OUTLINE_SHADE;
+    ctx.fillRect(x - 1, y, 2, 1);
+    ctx.fillRect(x - 1, y + 1, 1, h - 1);
+  }
   ctx.fillStyle = DROPDOWN_ARROW;
   ctx.beginPath();
   ctx.moveTo(x + 3, y + 6.25);

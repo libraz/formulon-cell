@@ -141,8 +141,10 @@ const roundedRect = (
  *  a `width`-unit rim inside it. */
 const shade = (ctx: CanvasRenderingContext2D, tone: Tone, width = 1): void => {
   const gradient = ctx.createLinearGradient(0, 0, 12, 12);
-  gradient.addColorStop(0, tone.light);
-  gradient.addColorStop(1, tone.dark);
+  // The ramp runs over the middle half of the diagonal, so a glyph shows the
+  // full light-to-dark range.
+  gradient.addColorStop(0.25, tone.light);
+  gradient.addColorStop(0.75, tone.dark);
   ctx.fillStyle = gradient;
   ctx.fill();
   ctx.save();
