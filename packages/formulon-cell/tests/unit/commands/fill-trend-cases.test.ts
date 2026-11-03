@@ -231,7 +231,7 @@ describe('series autofill matches desktop Excel', () => {
   });
 
   describe('growth trend fits', () => {
-    const cases: Array<[number[], number[]]> = [
+    const cases: [number[], number[]][] = [
       [
         [2, 4],
         [8, 16, 32, 64],
