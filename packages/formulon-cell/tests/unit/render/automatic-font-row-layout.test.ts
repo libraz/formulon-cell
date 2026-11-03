@@ -433,4 +433,39 @@ describe('automatic font row layout on the mac profile', () => {
       workbook.dispose();
     }
   });
+
+  it('autofits a content row below a pinned taller sheet default', async () => {
+    // Excel for Mac: with <sheetFormatPr defaultRowHeight="20" customHeight="1">
+    // empty rows stay 40 device px but a row holding Normal-font text autofits
+    // to the Normal font's row (28 px under MS PGothic 11).
+    const workbook = await WorkbookHandle.createDefault({ locale: 'en-US', platform: 'mac' });
+    const mounted = await mountStubSheet({ workbook, locale: 'en', ui: { platform: 'mac' } });
+    try {
+      const store = mounted.instance.store;
+      const normal = workbook.workbookDisplayFont;
+      const normalRow = fontPointsToCssPx(
+        macDefaultRowPt(normal?.name ?? '', normal?.size ?? 0) ?? 0,
+      );
+      const pinned = fontPointsToCssPx(20);
+      expect(normalRow).toBeLessThan(pinned);
+      store.setState((s) => ({ ...s, layout: { ...s.layout, defaultRowHeight: pinned } }));
+      mutators.setCell(store, { sheet: 0, row: 2, col: 1 }, { kind: 'text', value: 'Hxg' });
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 4, col: 1 },
+        {
+          fontFamily: 'Arial',
+          fontSize: fontPointsToCssPx(14),
+        },
+      );
+      const layout = layoutForView(store.getState());
+      expect(layout.defaultRowHeight).toBe(pinned);
+      expect(layout.rowHeights.get(2)).toBeCloseTo(normalRow, 6);
+      expect(layout.rowHeights.get(4)).toBeCloseTo(Math.max(normalRow, fontPointsToCssPx(18)), 6);
+      expect(layout.rowHeights.get(3)).toBeUndefined();
+    } finally {
+      mounted.dispose();
+      workbook.dispose();
+    }
+  });
 });

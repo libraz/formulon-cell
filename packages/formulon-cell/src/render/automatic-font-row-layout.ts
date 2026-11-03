@@ -24,6 +24,8 @@ interface ProjectionCache {
   readonly sheetAxisOverrides: State['format']['sheetAxisOverrides'];
   readonly sheetFontOverride: SheetFontOverride | undefined;
   readonly sheetAxisOverride: SheetAxisFormatOverride | undefined;
+  /** Cell data, keyed only where data rows autofit (Mac); null elsewhere. */
+  readonly cells: State['data']['cells'] | null;
   readonly normalFontCss: number;
   readonly nativeFormatEpoch: number;
   readonly layout: LayoutSlice;
@@ -118,6 +120,10 @@ function uniformColumnFontSize(
     : null;
 }
 
+/** Mac Excel autofits every row that holds data and has no stated height. */
+const contentCells = (state: State, workbook: WorkbookHandle): State['data']['cells'] | null =>
+  workbook.geometryPlatform === 'mac' ? state.data.cells : null;
+
 function getProjectionCache(
   state: State,
   workbook: WorkbookHandle,
@@ -140,6 +146,7 @@ function getProjectionCache(
     cached.sheetAxisOverrides === state.format.sheetAxisOverrides &&
     cached.sheetFontOverride === sheetFontOverride &&
     cached.sheetAxisOverride === sheetAxisOverride &&
+    cached.cells === contentCells(state, workbook) &&
     cached.normalFontCss === normalFontCss &&
     cached.nativeFormatEpoch === currentNativeFormatEpoch
   ) {
@@ -184,21 +191,31 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
   if (lineHeight(globalFontCss) === null) return state.layout;
 
   // Mac Excel autofits a row to the default-row height its table gives the
-  // row's font; elsewhere, and off the table, the row grows by line height.
+  // row's font, never below the Normal font's own row even when a pinned
+  // sheet default is taller; elsewhere, and off the table, the row grows by
+  // line height from the sheet default.
   const macRows = workbook.geometryPlatform === 'mac';
-  const heightFor = (fontSizeCss: number, family?: string): number | null => {
+  const normalTabulated = macRows
+    ? macDefaultRowPt(displayFont.name, cssToPoints(normalFontCss))
+    : null;
+  const contentFloor =
+    normalTabulated === null ? rawDefaultHeight : fontPointsToCssPx(normalTabulated);
+  const heightFor = (fontSizeCss: number, family?: string, floor = contentFloor): number | null => {
     const tabulated =
       macRows && family !== undefined ? macDefaultRowPt(family, cssToPoints(fontSizeCss)) : null;
     if (tabulated !== null) {
-      return Math.min(MAX_ROW_HEIGHT_PX, Math.max(rawDefaultHeight, fontPointsToCssPx(tabulated)));
+      return Math.min(MAX_ROW_HEIGHT_PX, Math.max(floor, fontPointsToCssPx(tabulated)));
     }
     const line = lineHeight(fontSizeCss);
     if (line === null) return null;
-    return Math.min(MAX_ROW_HEIGHT_PX, rawDefaultHeight + Math.max(0, line - normalLine));
+    return Math.min(MAX_ROW_HEIGHT_PX, floor + Math.max(0, line - normalLine));
   };
 
-  const defaultRowHeight = heightFor(globalFontCss);
-  if (defaultRowHeight === null) return state.layout;
+  // Empty rows keep the sheet default; rows holding content start from the
+  // autofit base instead.
+  const defaultRowHeight = heightFor(globalFontCss, undefined, rawDefaultHeight);
+  const contentRowHeight = heightFor(globalFontCss);
+  if (defaultRowHeight === null || contentRowHeight === null) return state.layout;
 
   // A row font replaces the sheet base for its row; cell fonts only raise it.
   const rowFontHeights = new Map<number, number>();
@@ -218,8 +235,18 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
     }
     const height = heightFor(fontSizeCss, family ?? normalFont.family);
     if (height === null) return;
-    rowFontHeights.set(row, Math.max(rowFontHeights.get(row) ?? defaultRowHeight, height));
+    rowFontHeights.set(row, Math.max(rowFontHeights.get(row) ?? contentRowHeight, height));
   };
+
+  const cells = contentCells(state, workbook);
+  if (cells) {
+    for (const key of cells.keys()) {
+      const addr = parseAddrKey(key);
+      if (!addr || addr.sheet !== sheet || !canProjectRow(addr.row)) continue;
+      if (state.merges.byCell.has(key) || state.merges.byAnchor.has(key)) continue;
+      if (!rowFontHeights.has(addr.row)) rowFontHeights.set(addr.row, contentRowHeight);
+    }
+  }
 
   for (const [key, format] of state.format.formats) {
     const addr = parseAddrKey(key);
@@ -257,6 +284,7 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
       sheetAxisOverrides: state.format.sheetAxisOverrides,
       sheetFontOverride: state.format.sheetFontOverrides?.get(sheet),
       sheetAxisOverride: state.format.sheetAxisOverrides?.get(sheet),
+      cells,
       normalFontCss,
       nativeFormatEpoch: currentNativeFormatEpoch,
       layout: state.layout,
@@ -282,6 +310,7 @@ export function automaticFontRowLayout(state: State): LayoutSlice {
     sheetAxisOverrides: state.format.sheetAxisOverrides,
     sheetFontOverride: state.format.sheetFontOverrides?.get(sheet),
     sheetAxisOverride: state.format.sheetAxisOverrides?.get(sheet),
+    cells,
     normalFontCss,
     nativeFormatEpoch: currentNativeFormatEpoch,
     layout: projected,
