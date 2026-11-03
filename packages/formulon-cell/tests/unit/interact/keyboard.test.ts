@@ -846,6 +846,22 @@ describe('attachKeyboard', () => {
   });
 
   describe('Ctrl+Arrow jumpEdge', () => {
+    it('stops on a merged block inside the run and selects the whole block', () => {
+      setup();
+      setCellKeys(
+        store,
+        [0, 1, 2, 3].map((row) => addrKey({ sheet: 0, row, col: 0 })),
+      );
+      mutators.mergeRange(store, { sheet: 0, r0: 1, r1: 2, c0: 0, c1: 0 });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      const sel = store.getState().selection;
+      expect(sel.active).toEqual({ sheet: 0, row: 1, col: 0 });
+      expect(sel.range).toMatchObject({ r0: 1, r1: 2, c0: 0, c1: 0 });
+    });
+
     it.each([
       { key: 'ArrowDown', start: 0, target: 900_000, vertical: true },
       { key: 'ArrowUp', start: 900_000, target: 100, vertical: true },

@@ -1,4 +1,5 @@
 import { formatHasContent, isPopulated } from '../commands/current-region.js';
+import { mergeAt } from '../commands/merge.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { isRowHidden } from '../store/row-visibility.js';
@@ -74,8 +75,18 @@ export function jumpToDataEdge(s: State, a: Addr, dRow: number, dCol: number): A
   const nextPop = isPopulated(s, sheet, r, c);
 
   if (originPop && nextPop) {
-    // Walk until next cell is empty.
+    // Walk until next cell is empty, or until the walk enters a merged block,
+    // which counts as one stop.
+    const mergeKey = (row: number, col: number): string | null => {
+      const m = mergeAt(s, { sheet, row, col });
+      return m ? `${m.r0}:${m.c0}` : null;
+    };
+    let current = mergeKey(a.row, a.col);
+    let entered = mergeKey(r, c);
+    let atMerge = entered !== null && entered !== current;
+    current = entered;
     while (
+      !atMerge &&
       r + dRow >= 0 &&
       r + dRow <= MAX_ROW &&
       c + dCol >= 0 &&
@@ -84,6 +95,9 @@ export function jumpToDataEdge(s: State, a: Addr, dRow: number, dCol: number): A
     ) {
       r += dRow;
       c += dCol;
+      entered = mergeKey(r, c);
+      atMerge = entered !== null && entered !== current;
+      current = entered;
     }
     // A run ending on hidden cells stops on its last visible cell.
     const hidden = (row: number, col: number): boolean =>
