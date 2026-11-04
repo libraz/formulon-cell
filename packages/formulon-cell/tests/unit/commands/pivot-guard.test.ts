@@ -63,7 +63,10 @@ describe('PivotTable edit guard', () => {
 
   it('shows the alert in the UI language', async () => {
     const { wb, store } = await setup();
-    setPivotGuardSink(wb, () => undefined, ja.pivotTableDialog.cannotChange);
+    setPivotGuardSink(wb, () => undefined, {
+      edit: ja.pivotTableDialog.cannotChange,
+      paste: ja.pivotTableDialog.cannotChangePaste,
+    });
     const result = commitCellInput({
       store,
       wb,
@@ -96,10 +99,18 @@ describe('PivotTable edit guard', () => {
     wb.dispose();
   });
 
-  it('refuses a paste that reaches a report', async () => {
+  it('refuses a paste that reaches a report with the paste wording', async () => {
     const { wb, store } = await setup();
+    const alerts: string[] = [];
+    setPivotGuardSink(wb, (alert) => alerts.push(alert.message), {
+      edit: ja.pivotTableDialog.cannotChange,
+      paste: ja.pivotTableDialog.cannotChangePaste,
+    });
     mutators.setActive(store, { sheet: 0, row: 4, col: 0 });
     expect(pasteTSV(store.getState(), store, wb, 'a\tb\nc\td')).toBeNull();
+    expect(alerts).toEqual([
+      'ピボットテーブルに影響するため、選択したセルに対してこの変更を行うことはできません。レポートを変更するには、フィールド リストを使ってください。セルを挿入または削除するには、ピボットテーブルを移動してからもう一度お試しください。',
+    ]);
     expect(wb.getValue({ sheet: 0, row: 4, col: 0 }).kind).toBe('blank');
     mutators.setActive(store, { sheet: 0, row: 20, col: 0 });
     expect(pasteTSV(store.getState(), store, wb, 'a')).not.toBeNull();

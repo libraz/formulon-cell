@@ -82,6 +82,8 @@ export const dataObjectsTh: DataObjectsStrings = {
     variance: 'Var',
     varianceP: 'Varp',
     cannotChange: 'Cannot change this part of a PivotTable report.',
+    cannotChangePaste:
+      "We can't make this change for the selected cells because it will affect a PivotTable. Use the field list to change the report. If you are trying to insert or delete cells, move the PivotTable and try again.",
     showValuesAs: 'แสดงค่าเป็น',
     showValuesAsNormal: 'ไม่มีการคำนวณ',
     showValuesAsPercentOfRow: '% ของผลรวมแถว',

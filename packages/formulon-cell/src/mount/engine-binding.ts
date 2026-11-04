@@ -188,11 +188,10 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       })
     : null;
 
-  setPivotGuardSink(
-    wb,
-    (alert) => validationAlert?.show(alert),
-    strings.pivotTableDialog.cannotChange,
-  );
+  setPivotGuardSink(wb, (alert) => validationAlert?.show(alert), {
+    edit: strings.pivotTableDialog.cannotChange,
+    paste: strings.pivotTableDialog.cannotChangePaste,
+  });
   setDataTableGuardSink(wb, (alert) => validationAlert?.show(alert), strings.dataTableDialog);
 
   const activateSheet = (sheet: number): boolean => {

@@ -777,7 +777,7 @@ function applyPaste(
   const current = store.getState();
   const checked = preflight(current, snap, resolvedDestination, opt.what, opt.transpose);
   if (!checked) return null;
-  if (blockPivotEdit(wb, checked.destination)) return null;
+  if (blockPivotEdit(wb, checked.destination, 'paste')) return null;
   // A cut would also clear the source, and a data table cannot move.
   const guarded =
     snap.mode === 'cut' ? [checked.destination, sourceLogical] : [checked.destination];

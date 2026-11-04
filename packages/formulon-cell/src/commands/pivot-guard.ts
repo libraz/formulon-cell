@@ -11,23 +11,38 @@ export interface PivotGuardAlert {
 
 type PivotGuardSink = (alert: PivotGuardAlert) => void;
 
-const ENGLISH_MESSAGE = 'Cannot change this part of a PivotTable report.';
+/** Which gesture hit the report: a paste gets its own, longer wording. */
+export type PivotEditKind = 'edit' | 'paste';
 
-const guards = new WeakMap<WorkbookHandle, { sink: PivotGuardSink; message: string }>();
+export interface PivotGuardMessages {
+  edit: string;
+  paste: string;
+}
+
+const ENGLISH_MESSAGES: PivotGuardMessages = {
+  edit: 'Cannot change this part of a PivotTable report.',
+  paste:
+    "We can't make this change for the selected cells because it will affect a PivotTable. Use the field list to change the report. If you are trying to insert or delete cells, move the PivotTable and try again.",
+};
+
+const guards = new WeakMap<
+  WorkbookHandle,
+  { sink: PivotGuardSink; messages: PivotGuardMessages }
+>();
 
 /** Route `blockPivotEdit` alerts for `wb` to the host's alert surface, worded
  *  in the UI language. */
 export function setPivotGuardSink(
   wb: WorkbookHandle,
   sink: PivotGuardSink | null,
-  message = ENGLISH_MESSAGE,
+  messages: PivotGuardMessages = ENGLISH_MESSAGES,
 ): void {
-  if (sink) guards.set(wb, { sink, message });
+  if (sink) guards.set(wb, { sink, messages });
   else guards.delete(wb);
 }
 
-export function pivotGuardAlert(wb: WorkbookHandle): PivotGuardAlert {
-  return { severity: 'stop', message: guards.get(wb)?.message ?? ENGLISH_MESSAGE };
+export function pivotGuardAlert(wb: WorkbookHandle, kind: PivotEditKind = 'edit'): PivotGuardAlert {
+  return { severity: 'stop', message: (guards.get(wb)?.messages ?? ENGLISH_MESSAGES)[kind] };
 }
 
 /** Whether a PivotTable report occupies any cell of `range`. */
@@ -36,15 +51,19 @@ export function pivotOccupies(wb: WorkbookHandle, range: Range): boolean {
 }
 
 /** Tell the user a write would touch part of a PivotTable report. */
-export function alertPivotEdit(wb: WorkbookHandle): void {
-  guards.get(wb)?.sink(pivotGuardAlert(wb));
+export function alertPivotEdit(wb: WorkbookHandle, kind: PivotEditKind = 'edit'): void {
+  guards.get(wb)?.sink(pivotGuardAlert(wb, kind));
 }
 
 /** Reject a write over `range` that touches a PivotTable: alerts the user and
  *  returns true when the caller must leave the sheet untouched. */
-export function blockPivotEdit(wb: WorkbookHandle, range: Range): boolean {
+export function blockPivotEdit(
+  wb: WorkbookHandle,
+  range: Range,
+  kind: PivotEditKind = 'edit',
+): boolean {
   if (!pivotOccupies(wb, range)) return false;
-  alertPivotEdit(wb);
+  alertPivotEdit(wb, kind);
   return true;
 }
 

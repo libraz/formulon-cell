@@ -86,6 +86,8 @@ export const dataObjectsFr: DataObjectsStrings = {
     variance: 'Var',
     varianceP: 'Varp',
     cannotChange: "Impossible de modifier cette partie d'un rapport de tableau croisé dynamique.",
+    cannotChangePaste:
+      "Nous ne pouvons pas apporter cette modification aux cellules sélectionnées, car elle affecterait un tableau croisé dynamique. Utilisez la liste des champs pour modifier le rapport. Si vous essayez d'insérer ou de supprimer des cellules, déplacez le tableau croisé dynamique et réessayez.",
     showValuesAs: 'Afficher les valeurs en tant que',
     showValuesAsNormal: 'Aucun calcul',
     showValuesAsPercentOfRow: '% du total de la ligne',

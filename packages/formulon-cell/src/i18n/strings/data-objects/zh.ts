@@ -82,6 +82,8 @@ export const dataObjectsZh: DataObjectsStrings = {
     variance: '方差',
     varianceP: '总体方差',
     cannotChange: '无法更改数据透视表的这一部分。',
+    cannotChangePaste:
+      '无法对所选单元格进行此更改，因为它会影响数据透视表。请使用字段列表更改报表。如果要插入或删除单元格，请移动数据透视表，然后重试。',
     showValuesAs: '值显示方式',
     showValuesAsNormal: '无计算',
     showValuesAsPercentOfRow: '行汇总的百分比',

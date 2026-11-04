@@ -81,6 +81,8 @@ export interface DataObjectsStrings {
     varianceP: string;
     /** Alert shown when an edit would write over a PivotTable cell. */
     cannotChange: string;
+    /** Alert shown when a paste would land on a PivotTable. */
+    cannotChangePaste: string;
     showValuesAs: string;
     showValuesAsNormal: string;
     showValuesAsPercentOfRow: string;

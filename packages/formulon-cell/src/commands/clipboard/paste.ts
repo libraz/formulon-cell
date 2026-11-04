@@ -56,7 +56,7 @@ export function pasteTSV(
     r1: origin.row + rows.length - 1,
     c1: origin.col + pastedCols - 1,
   };
-  if (blockPivotEdit(wb, pasteArea) || blockDataTableEdit(wb, pasteArea)) return null;
+  if (blockPivotEdit(wb, pasteArea, 'paste') || blockDataTableEdit(wb, pasteArea)) return null;
   const inputLocale = inputLocaleForWorkbook(wb);
   let maxCols = 0;
   const writes: { addr: Addr; input: ReturnType<typeof coerceInputForCell> }[] = [];

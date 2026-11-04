@@ -87,6 +87,8 @@ export const dataObjectsDe: DataObjectsStrings = {
     variance: 'Var',
     varianceP: 'Varp',
     cannotChange: 'Dieser Teil eines PivotTable-Berichts kann nicht geändert werden.',
+    cannotChangePaste:
+      'Diese Änderung kann für die ausgewählten Zellen nicht vorgenommen werden, da sie sich auf eine PivotTable auswirkt. Verwenden Sie die Feldliste, um den Bericht zu ändern. Wenn Sie Zellen einfügen oder löschen möchten, verschieben Sie die PivotTable, und versuchen Sie es erneut.',
     showValuesAs: 'Werte anzeigen als',
     showValuesAsNormal: 'Keine Berechnung',
     showValuesAsPercentOfRow: '% der Zeilensumme',

@@ -83,6 +83,8 @@ export const dataObjectsJa: DataObjectsStrings = {
     variance: '標本分散',
     varianceP: '分散',
     cannotChange: 'ピボットテーブルのこの部分は変更できません。',
+    cannotChangePaste:
+      'ピボットテーブルに影響するため、選択したセルに対してこの変更を行うことはできません。レポートを変更するには、フィールド リストを使ってください。セルを挿入または削除するには、ピボットテーブルを移動してからもう一度お試しください。',
     showValuesAs: '計算の種類',
     showValuesAsNormal: '計算なし',
     showValuesAsPercentOfRow: '行集計に対する比率',
