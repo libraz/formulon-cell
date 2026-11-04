@@ -856,6 +856,13 @@ export class GridRenderer {
         else paintFillPreview(this.ctx, r, theme);
       }
     }
+    // A drag-move's drop target takes the same mark as a fill target.
+    if (ui.movePreview) {
+      for (const r of rangeRects(layout, viewport, ui.movePreview)) {
+        if (macPt !== undefined) paintMoveBand(this.ctx, r, macPt);
+        else paintFillPreview(this.ctx, r, theme);
+      }
+    }
     const copyRanges = ui.copyRanges && ui.copyRanges.length > 0 ? ui.copyRanges : null;
     const rangesToPaint = (copyRanges ?? (ui.copyRange ? [ui.copyRange] : [])).filter(
       (copyRange) => copyRange.sheet === data.sheetIndex,

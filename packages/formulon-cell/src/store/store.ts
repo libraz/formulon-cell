@@ -49,6 +49,7 @@ export const createSpreadsheetStore = () =>
       hover: null,
       theme: 'paper',
       fillPreview: null,
+      movePreview: null,
       copyRange: null,
       copyRanges: null,
       copyMode: null,

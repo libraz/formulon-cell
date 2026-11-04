@@ -210,6 +210,10 @@ export const viewMutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, fillPreview: range } }));
   },
 
+  setMovePreview(store: SpreadsheetStore, range: Range | null): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, movePreview: range } }));
+  },
+
   setCopyRange(store: SpreadsheetStore, range: Range | null, mode: CopyMode = 'copy'): void {
     store.setState((s) => ({
       ...s,

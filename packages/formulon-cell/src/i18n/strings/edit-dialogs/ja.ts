@@ -175,6 +175,12 @@ export const editDialogsJa: EditDialogsStrings = {
     cancel: 'キャンセル',
     ok: 'OK',
   },
+  moveCells: {
+    title: 'セルの移動',
+    overwriteMessage: 'ここには既にデータがあります。置き換えますか?',
+    ok: 'OK',
+    cancel: 'キャンセル',
+  },
   protection: {
     protectedCellEdit:
       '変更しようとしているセルやグラフは保護されているシート上にあります。変更するには、シートの保護を解除してください。パスワードの入力が必要な場合があります。',

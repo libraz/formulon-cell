@@ -205,11 +205,15 @@ export const macFr: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonFr.ribbon, cellFormatFr.formatDialog),
-  macAlerts: macAlertsFrom(ribbonFr.ribbon, {
-    message: 'Cette feuille sera définitivement supprimée. Voulez-vous continuer ?',
-    confirm: 'Supprimer',
-    cancel: 'Annuler',
-  }),
+  macAlerts: macAlertsFrom(
+    ribbonFr.ribbon,
+    {
+      message: 'Cette feuille sera définitivement supprimée. Voulez-vous continuer ?',
+      confirm: 'Supprimer',
+      cancel: 'Annuler',
+    },
+    editDialogsFr.moveCells,
+  ),
   macProtectSheet: macProtectSheetFrom(editDialogsFr.protection, {
     heading: 'Protéger la feuille et le contenu des cellules verrouillées',
     note: 'Par défaut, toutes les cellules sont verrouillées, mais vous pouvez les déverrouiller.',

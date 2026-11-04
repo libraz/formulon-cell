@@ -203,11 +203,15 @@ export const macTh: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
-  macAlerts: macAlertsFrom(ribbonTh.ribbon, {
-    message: 'แผ่นงานนี้จะถูกลบอย่างถาวร คุณต้องการดำเนินการต่อหรือไม่',
-    confirm: 'ลบ',
-    cancel: 'ยกเลิก',
-  }),
+  macAlerts: macAlertsFrom(
+    ribbonTh.ribbon,
+    {
+      message: 'แผ่นงานนี้จะถูกลบอย่างถาวร คุณต้องการดำเนินการต่อหรือไม่',
+      confirm: 'ลบ',
+      cancel: 'ยกเลิก',
+    },
+    editDialogsTh.moveCells,
+  ),
   macProtectSheet: macProtectSheetFrom(editDialogsTh.protection, {
     heading: 'ป้องกันเวิร์กชีตและเนื้อหาของเซลล์ที่ถูกล็อก',
     note: 'ตามค่าเริ่มต้น เซลล์ทั้งหมดถูกล็อก แต่สามารถปลดล็อกได้',

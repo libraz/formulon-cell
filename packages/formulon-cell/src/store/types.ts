@@ -178,6 +178,9 @@ export interface UiSlice {
   /** Live preview range while dragging the fill handle. Painted as a dashed
    *  marquee; cleared when the drag ends. Null at rest. */
   fillPreview: Range | null;
+  /** Drop target while dragging the selection by its border. Painted as the
+   *  drag band; cleared when the drag ends. Null at rest. */
+  movePreview: Range | null;
   /** Source range currently held by the internal clipboard. Painted as a
    *  dashed copy marquee, similar to "marching ants". */
   copyRange: Range | null;

@@ -42,6 +42,7 @@ import type { GridRenderer } from '../render/grid.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { resolveTheme } from '../theme/resolve.js';
+import { confirmMoveOverwrite } from '../toolbar/dialogs/move-overwrite-confirm.js';
 import { hydrateActiveSheetFromEngine } from './hydration.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
 
@@ -252,6 +253,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       workbook: wb,
     }),
     hyperlinkFollow,
+    () => confirmMoveOverwrite(strings, wb),
   );
   // Header / footer slots are only reachable in Page Layout view, but the
   // listener is cheap and stateless until one is clicked.

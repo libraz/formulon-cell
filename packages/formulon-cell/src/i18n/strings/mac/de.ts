@@ -206,11 +206,15 @@ export const macDe: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonDe.ribbon, cellFormatDe.formatDialog),
-  macAlerts: macAlertsFrom(ribbonDe.ribbon, {
-    message: 'Dieses Blatt wird endgültig gelöscht. Möchten Sie fortfahren?',
-    confirm: 'Löschen',
-    cancel: 'Abbrechen',
-  }),
+  macAlerts: macAlertsFrom(
+    ribbonDe.ribbon,
+    {
+      message: 'Dieses Blatt wird endgültig gelöscht. Möchten Sie fortfahren?',
+      confirm: 'Löschen',
+      cancel: 'Abbrechen',
+    },
+    editDialogsDe.moveCells,
+  ),
   macProtectSheet: macProtectSheetFrom(editDialogsDe.protection, {
     heading: 'Arbeitsblatt und Inhalt gesperrter Zellen schützen',
     note: 'Standardmäßig sind alle Zellen gesperrt, die Sperre kann aber aufgehoben werden.',

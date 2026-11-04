@@ -7,6 +7,7 @@ import type { History } from '../commands/history.js';
 import { hyperlinkAt, isInDocumentHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
+import { moveSelectionTo, moveTargetRange } from '../commands/move-cells.js';
 import {
   collapseColGroup,
   collapseRowGroup,
@@ -80,6 +81,7 @@ import {
 import {
   indexAt,
   isFillHandleHit,
+  isSelectionBorderHit,
   marginInchesFor,
   pageBandAt,
   pageBreakHandleAt,
@@ -118,6 +120,9 @@ type DragMode =
     }
   | { kind: 'row-resize'; row: number; topEdge: number; preLayout: LayoutSnapshot }
   | { kind: 'fill'; src: Range }
+  /** Moving the selection by its frame; `grab` is the grabbed cell's offset
+   *  from the block's top-left. */
+  | { kind: 'move'; src: Range; grab: { row: number; col: number } }
   | { kind: 'page-break'; handle: PageBreakHandle; target: number }
   | { kind: 'ruler-margin'; handle: RulerHandle; inches: number }
   | {
@@ -262,6 +267,9 @@ export function attachPointer(
   getAutofitOptions: () => AutofitOptions = () => ({}),
   /** Sheet activation and invalid-target reporting for in-document links. */
   hyperlinkFollow: Pick<HyperlinkFollowDeps, 'activateSheet' | 'onInvalidTarget'> = {},
+  /** Asked before a drag-move overwrites data; a host without one overwrites,
+   *  as the desktop does with its alerts off. */
+  confirmMoveOverwrite: () => Promise<boolean> = async () => true,
 ): () => void {
   const hits = gridHitState(host);
   const fillTooltip = createFillValueTooltip(host);
@@ -607,6 +615,25 @@ export function attachPointer(
       return;
     }
 
+    // The selection frame moves the block. The cell under the pointer is the
+    // grab point, so a grab on the bottom edge counts from the row below it.
+    if (!restricted && !inFormula && isSelectionBorderHit(s, x, y)) {
+      const grabbed = hitTest(geometryLayout(s), s.viewport, x, y);
+      if (grabbed) {
+        e.preventDefault();
+        host.focus();
+        tryCapture();
+        const src = { ...s.selection.range };
+        drag = {
+          kind: 'move',
+          src,
+          grab: { row: grabbed.row - src.r0, col: grabbed.col - src.c0 },
+        };
+        host.style.cursor = 'move';
+        return;
+      }
+    }
+
     const layout = geometryLayout(s);
     const zone = hitZone(layout, s.viewport, x, y, headerFilterRanges(s));
     if (!zone) return;
@@ -911,6 +938,19 @@ export function attachPointer(
         else fillTooltip.show(last, e.clientX, e.clientY);
         return;
       }
+      case 'move': {
+        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        if (!cell) return;
+        const topLeft = {
+          row: Math.max(0, cell.row - drag.grab.row),
+          col: Math.max(0, cell.col - drag.grab.col),
+        };
+        const target = moveTargetRange(drag.src, topLeft);
+        const moved = target.r0 !== drag.src.r0 || target.c0 !== drag.src.c0;
+        mutators.setMovePreview(store, moved ? target : null);
+        host.style.cursor = 'move';
+        return;
+      }
       case 'ruler-margin': {
         const horizontal = drag.handle.side === 'left' || drag.handle.side === 'right';
         host.style.cursor = horizontal ? 'col-resize' : 'row-resize';
@@ -1039,6 +1079,21 @@ export function attachPointer(
       onAfterCommit?.();
       return;
     }
+    if (drag.kind === 'move') {
+      const target = store.getState().ui.movePreview;
+      mutators.setMovePreview(store, null);
+      drag = { kind: 'none' };
+      host.style.cursor = '';
+      if (target) {
+        void moveSelectionTo(
+          { store, wb, history, confirmOverwrite: confirmMoveOverwrite },
+          { row: target.r0, col: target.c0 },
+        ).then((moved) => {
+          if (moved) onAfterCommit?.();
+        });
+      }
+      return;
+    }
     if (drag.kind === 'fill') {
       const s = store.getState();
       const dest = s.ui.fillPreview;
@@ -1076,6 +1131,7 @@ export function attachPointer(
     drag = { kind: 'none' };
     mutators.setPageBreakDrag(store, null);
     mutators.setFillPreview(store, null);
+    mutators.setMovePreview(store, null);
     fillTooltip.hide();
     host.style.cursor = '';
   };

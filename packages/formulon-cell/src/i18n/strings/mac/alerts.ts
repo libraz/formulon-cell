@@ -1,3 +1,4 @@
+import type { EditDialogsStrings } from '../edit-dialogs/types.js';
 import type { RibbonStrings } from '../ribbon/types.js';
 
 /** A two-button confirm of the Mac desktop's compact alert panel. */
@@ -14,12 +15,15 @@ export interface MacAlertStrings {
   mergeLoseData: MacConfirmAlertStrings;
   /** Before deleting a sheet that holds data. */
   deleteSheet: MacConfirmAlertStrings;
+  /** Before a drag-move overwrites data. */
+  overwriteOnMove: MacConfirmAlertStrings;
 }
 
 /** A locale whose Mac wording is not measured keeps its shared merge warning. */
 export const macAlertsFrom = (
   ribbon: RibbonStrings['ribbon'],
   deleteSheet: MacConfirmAlertStrings,
+  moveCells: EditDialogsStrings['moveCells'],
 ): MacAlertStrings => ({
   mergeLoseData: {
     message: ribbon.mergeLoseDataMessage,
@@ -27,6 +31,11 @@ export const macAlertsFrom = (
     cancel: ribbon.mergeLoseDataCancel,
   },
   deleteSheet,
+  overwriteOnMove: {
+    message: moveCells.overwriteMessage,
+    confirm: moveCells.ok,
+    cancel: moveCells.cancel,
+  },
 });
 
 /** Japanese Mac app wording, measured from Excel for Mac. */
@@ -39,6 +48,11 @@ export const macAlertsJa: MacAlertStrings = {
   deleteSheet: {
     message: 'このシートは完全に削除されます。続けますか?',
     confirm: '削除',
+    cancel: 'キャンセル',
+  },
+  overwriteOnMove: {
+    message: '既にデータがありますが、置き換えますか?',
+    confirm: 'OK',
     cancel: 'キャンセル',
   },
 };

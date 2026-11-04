@@ -203,11 +203,15 @@ export const macZh: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonZh.ribbon, cellFormatZh.formatDialog),
-  macAlerts: macAlertsFrom(ribbonZh.ribbon, {
-    message: '此工作表将被永久删除。是否继续?',
-    confirm: '删除',
-    cancel: '取消',
-  }),
+  macAlerts: macAlertsFrom(
+    ribbonZh.ribbon,
+    {
+      message: '此工作表将被永久删除。是否继续?',
+      confirm: '删除',
+      cancel: '取消',
+    },
+    editDialogsZh.moveCells,
+  ),
   macProtectSheet: macProtectSheetFrom(editDialogsZh.protection, {
     heading: '保护工作表及锁定的单元格内容',
     note: '默认情况下所有单元格均已锁定，但可以解除锁定。',

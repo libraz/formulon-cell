@@ -662,6 +662,43 @@ describe('attachPointer', () => {
     });
   });
 
+  describe('drag-move by the selection border', () => {
+    it('grabs the border, previews the drop range and moves the block on release', async () => {
+      // Excel: grabbing A1:B2's bottom border counts the cell under the pointer
+      // (row 3) as the grab point; the drop band follows it and the block moves.
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 1, col: 1, value: 'x' },
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+      const confirm = vi.fn(async () => true);
+      detach = attachPointer(
+        host,
+        store,
+        wb,
+        undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        confirm,
+      );
+
+      fireMove(host, 150, 86);
+      expect(host.style.cursor).toBe('move');
+      fireDown(host, 150, 86);
+      fireMove(host, 300, 114);
+      expect(store.getState().ui.movePreview).toEqual({ sheet: 0, r0: 1, c0: 2, r1: 2, c1: 3 });
+      fireUp(host, 300, 114);
+      expect(store.getState().ui.movePreview).toBeNull();
+      await vi.waitFor(() =>
+        expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 1, c0: 2, r1: 2, c1: 3 }),
+      );
+      expect(confirm).not.toHaveBeenCalled();
+    });
+  });
+
   describe('fill handle', () => {
     it('shows the value the last target cell will receive by the cursor while dragging', () => {
       // Excel: a small dark box with the furthest cell's value follows the "+" cursor.

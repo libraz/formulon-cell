@@ -173,6 +173,12 @@ export const editDialogsKo: EditDialogsStrings = {
     cancel: '취소',
     ok: '확인',
   },
+  moveCells: {
+    title: '셀 이동',
+    overwriteMessage: '여기에 이미 데이터가 있습니다. 바꾸시겠습니까?',
+    ok: '확인',
+    cancel: '취소',
+  },
   protection: {
     protectedCellEdit:
       '변경하려는 셀 또는 차트가 보호된 시트에 있습니다. 변경하려면 시트 보호를 해제하세요. 암호를 입력해야 할 수도 있습니다.',

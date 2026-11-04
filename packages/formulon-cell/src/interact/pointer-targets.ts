@@ -1,5 +1,5 @@
 import { headerFilterRanges } from '../commands/filter-ranges.js';
-import { hitZone, layoutForView } from '../render/geometry.js';
+import { hitZone, layoutForView, rangeRects } from '../render/geometry.js';
 import {
   PAGE_BREAK_GRAB,
   type PageBandHit,
@@ -8,6 +8,7 @@ import {
   type RulerHandle,
 } from '../render/grid/page-view.js';
 import { type GridHitState, gridHitState } from '../render/grid.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 
 /** Pixels the fill-handle hit zone extends past the painted handle. */
@@ -92,6 +93,28 @@ export const indexAt = (s: State, x: number, y: number): { row: number; col: num
   return null;
 };
 
+/** Pixels either side of the selection frame that grab it for a drag-move. */
+const SELECTION_BORDER_GRAB = 3;
+
+/** Whether (x, y) sits on the frame of a single, bounded selection, where a
+ *  drag moves the block. Disjoint, whole-row/column and object selections and
+ *  an open editor have no movable frame. */
+export const isSelectionBorderHit = (s: State, x: number, y: number): boolean => {
+  const range = s.selection.range;
+  if ((s.selection.extraRanges?.length ?? 0) > 0) return false;
+  if (s.ui.selectedObject || s.ui.editor.kind !== 'idle') return false;
+  if (isWholeRowRange(range) || isWholeColumnRange(range)) return false;
+  const grab = SELECTION_BORDER_GRAB;
+  return rangeRects(layoutForView(s), s.viewport, range).some((rect) => {
+    const inX = x >= rect.x - grab && x <= rect.x + rect.w + grab;
+    const inY = y >= rect.y - grab && y <= rect.y + rect.h + grab;
+    if (!inX || !inY) return false;
+    const nearVertical = Math.abs(x - rect.x) <= grab || Math.abs(x - (rect.x + rect.w)) <= grab;
+    const nearHorizontal = Math.abs(y - rect.y) <= grab || Math.abs(y - (rect.y + rect.h)) <= grab;
+    return nearVertical || nearHorizontal;
+  });
+};
+
 export const isFillHandleHit = (hits: GridHitState, x: number, y: number): boolean => {
   const rect = hits.fillHandle;
   if (!rect) return false;
@@ -130,6 +153,10 @@ export function updateCursor(
   }
   if (isFillHandleHit(hits, x, y)) {
     host.style.cursor = 'crosshair';
+    return;
+  }
+  if (isSelectionBorderHit(s0, x, y)) {
+    host.style.cursor = 'move';
     return;
   }
   const s = store.getState();

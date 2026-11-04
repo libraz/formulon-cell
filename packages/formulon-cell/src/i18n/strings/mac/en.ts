@@ -204,11 +204,15 @@ export const macEn: MacStrings = {
   }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonEn.ribbon, cellFormatEn.formatDialog),
-  macAlerts: macAlertsFrom(ribbonEn.ribbon, {
-    message: 'This sheet will be permanently deleted. Do you want to continue?',
-    confirm: 'Delete',
-    cancel: 'Cancel',
-  }),
+  macAlerts: macAlertsFrom(
+    ribbonEn.ribbon,
+    {
+      message: 'This sheet will be permanently deleted. Do you want to continue?',
+      confirm: 'Delete',
+      cancel: 'Cancel',
+    },
+    editDialogsEn.moveCells,
+  ),
   macProtectSheet: macProtectSheetFrom(editDialogsEn.protection, {
     heading: 'Protect worksheet and contents of locked cells',
     note: 'By default, all cells are locked, but you can unlock them.',

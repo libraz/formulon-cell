@@ -34,6 +34,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'dimensionDialog',
   'findReplace',
   'goToDialog',
+  'moveCells',
   'protection',
   'namedRangeDialog',
   'iterativeDialog',

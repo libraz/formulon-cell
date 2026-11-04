@@ -173,6 +173,12 @@ export const editDialogsZh: EditDialogsStrings = {
     cancel: '取消',
     ok: '确定',
   },
+  moveCells: {
+    title: '移动单元格',
+    overwriteMessage: '此处已有数据。是否替换它?',
+    ok: '确定',
+    cancel: '取消',
+  },
   protection: {
     protectedCellEdit:
       '您试图更改的单元格或图表位于受保护的工作表中。若要进行更改，请取消工作表保护。您可能需要输入密码。',

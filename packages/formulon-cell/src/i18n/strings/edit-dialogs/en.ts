@@ -173,6 +173,12 @@ export const editDialogsEn: EditDialogsStrings = {
     cancel: 'Cancel',
     ok: 'OK',
   },
+  moveCells: {
+    title: 'Move Cells',
+    overwriteMessage: "There's already data here. Do you want to replace it?",
+    ok: 'OK',
+    cancel: 'Cancel',
+  },
   protection: {
     protectedCellEdit:
       "The cell or chart you're trying to change is on a protected sheet. To make a change, unprotect the sheet. You might be requested to enter a password.",

@@ -187,6 +187,14 @@ export interface EditDialogsStrings {
     cancel: string;
     ok: string;
   };
+  /** Drag-moving cells onto a range that holds data. */
+  moveCells: {
+    /** Confirm title, for assistive tech; the desktop panel shows none. */
+    title: string;
+    overwriteMessage: string;
+    ok: string;
+    cancel: string;
+  };
   protection: {
     /** Alert raised by an attempt to change a locked cell of a protected sheet. */
     protectedCellEdit: string;
