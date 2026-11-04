@@ -124,6 +124,44 @@ const conditionalRuleKindForPanel = (
   return undefined;
 };
 
+const isMacHost = (host: HTMLElement): boolean =>
+  (host.closest<HTMLElement>('[data-fc-platform]') ?? host).dataset.fcPlatform === 'mac';
+
+/** The full-dialog setup each Highlight Cells / Top-Bottom preset opens on the Mac profile. */
+const macPresetDialogOptions = (action: string): ConditionalDialogOpenOptions | null => {
+  switch (action) {
+    case 'cell-gt':
+      return { kind: 'cell-value', cellValueOp: '>' };
+    case 'cell-lt':
+      return { kind: 'cell-value', cellValueOp: '<' };
+    case 'cell-eq':
+      return { kind: 'cell-value', cellValueOp: '=' };
+    case 'cell-between':
+      return { kind: 'cell-value', cellValueOp: 'between' };
+    case 'text-contains':
+      return { kind: 'text-contains' };
+    case 'date-occurring':
+      return { kind: 'date-occurring', datePeriod: 'yesterday' };
+    case 'duplicates':
+      return { kind: 'duplicates' };
+    case 'top10':
+    case 'top10-percent':
+    case 'bottom10':
+    case 'bottom10-percent':
+      return {
+        kind: 'top-bottom',
+        topBottomMode: action.startsWith('top') ? 'top' : 'bottom',
+        topBottomPercent: action.endsWith('-percent'),
+      };
+    case 'above-avg':
+      return { kind: 'average', averageMode: 'above' };
+    case 'below-avg':
+      return { kind: 'average', averageMode: 'below' };
+    default:
+      return null;
+  }
+};
+
 export type CfFillStyle = { readonly fill: string; readonly color: string };
 export type CfApplyStyle = Partial<
   Pick<CellFormat, 'fill' | 'color' | 'bold' | 'italic' | 'underline' | 'strike'>
@@ -194,6 +232,11 @@ export const applyConditionalMenuAction = async (
   }
   if (action === 'manage') {
     i.openCfRulesDialog();
+    return;
+  }
+  const macDialog = macPresetDialogOptions(action);
+  if (macDialog && isMacHost(i.host)) {
+    i.openConditionalDialog({ mode: 'new', ...macDialog });
     return;
   }
   if (action === 'cell-gt' || action === 'cell-lt' || action === 'cell-eq') {

@@ -115,6 +115,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     if (typeof value === 'number') return localizedNumericInput(value);
     return value.startsWith('=') ? localizeFormulaForDisplay(value) : value;
   };
+  const isMacPlatform = (): boolean =>
+    (host.closest<HTMLElement>('[data-fc-platform]') ?? host).dataset.fcPlatform === 'mac';
   const shell = createDialogShell({
     host,
     className: 'fc-conddlg',
@@ -179,7 +181,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
 
   // Range
   const rangeRow = document.createElement('label');
-  rangeRow.className = 'fc-fmtdlg__row';
+  rangeRow.className = 'fc-fmtdlg__row fc-conddlg__range-row';
   const rangeLabel = document.createElement('span');
   rangeLabel.textContent = t.rangeLabel;
   const rangeInput = document.createElement('input');
@@ -264,8 +266,11 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   valueBRow.append(valueBLabel, valueBInput);
   cellValueGroup.appendChild(valueBRow);
 
-  // Apply: fill, color, bold, italic, underline, strike
-  const cellValueApplyControls = appendConditionalApplyFormatControls(cellValueGroup, t);
+  // Apply: fill, color, bold, italic, underline, strike. The Mac dialog leaves these to the format popup.
+  const cellValueApplyBox = document.createElement('div');
+  cellValueApplyBox.className = 'fc-conddlg__apply-box';
+  cellValueGroup.appendChild(cellValueApplyBox);
+  const cellValueApplyControls = appendConditionalApplyFormatControls(cellValueApplyBox, t);
 
   const cellPresetRow = document.createElement('label');
   cellPresetRow.className = 'fc-fmtdlg__row fc-conddlg__format-row';
@@ -462,7 +467,10 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   applyGroup.className = 'fc-conddlg__sub';
   form.appendChild(applyGroup);
 
-  const sharedApplyControls = appendConditionalApplyFormatControls(applyGroup, t);
+  const sharedApplyBox = document.createElement('div');
+  sharedApplyBox.className = 'fc-conddlg__apply-box';
+  applyGroup.appendChild(sharedApplyBox);
+  const sharedApplyControls = appendConditionalApplyFormatControls(sharedApplyBox, t);
 
   const sharedPresetRow = document.createElement('label');
   sharedPresetRow.className = 'fc-fmtdlg__row fc-conddlg__format-row';
@@ -608,6 +616,12 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     const title = isEdit ? t.editRuleTitle : isNew ? t.newRuleTitle : t.title;
     header.textContent = title;
     overlay.setAttribute('aria-label', title);
+    // Excel for Mac: a preset opens a compact rule form that takes its colours from the format popup.
+    const macNew = isNew && isMacPlatform();
+    overlay.classList.toggle('fc-conddlg--mac', macNew);
+    rangeRow.hidden = macNew;
+    cellValueApplyBox.hidden = macNew;
+    sharedApplyBox.hidden = macNew;
     shell.panel.classList.toggle('fc-conddlg__panel--new', isNew);
     body.classList.toggle('fc-conddlg__body--new', isNew);
     shell.panel.classList.toggle('fc-conddlg__panel--edit', isEdit);
@@ -962,11 +976,14 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
             ? kindSelect.value
             : 'classic';
       opSelect.value = options.cellValueOp ?? '>';
-      valueAInput.value = '0';
-      valueBInput.value = '0';
+      // A Mac preset starts with empty value fields.
+      const startValue = currentMode === 'new' && isMacPlatform() ? '' : '0';
+      valueAInput.value = startValue;
+      valueBInput.value = startValue;
       colorScale.reset();
       dataBar.reset();
-      iconSet.reset();
+      // Excel for Mac starts a new icon set rule on the unrimmed traffic lights.
+      iconSet.reset(currentMode === 'new' && isMacPlatform() ? 'traffic3' : 'arrows3');
       tbModeSelect.value = options.topBottomMode ?? 'top';
       tbPercentCk.checked = options.topBottomPercent ?? false;
       averageModeSelect.value = options.averageMode ?? 'above';

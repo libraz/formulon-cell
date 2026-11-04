@@ -272,7 +272,7 @@ describe('attachConditionalDialog', () => {
     const summary = document.querySelector<HTMLElement>('.fc-conddlg__list')?.textContent ?? '';
     expect(summary).toContain('2 段階');
     expect(summary).toContain('塗りつぶし (グラデーション)');
-    expect(summary).toContain('3 信号');
+    expect(summary).toContain('3 つの信号 (枠なし)');
     expect(summary).toContain('アイコンのみ表示');
     expect(summary).toContain('上位 3%');
     expect(summary).toContain('平均以下');

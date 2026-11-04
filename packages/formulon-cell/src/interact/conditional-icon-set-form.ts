@@ -32,7 +32,8 @@ export interface IconSetForm {
   syncThresholds(): void;
   /** Re-run each threshold type's change handling (value visibility). */
   refreshThresholdTypes(): void;
-  reset(): void;
+  /** `family` is the icon set a new rule starts on. */
+  reset(family?: ConditionalIconSet): void;
   populate(rule: IconSetRule): void;
   /** Null when a visible threshold value is not a number. */
   collect(range: Range): IconSetRule | null;
@@ -58,10 +59,10 @@ export function appendIconSetForm(
     { id: 'arrows3', label: t.iconSetArrows3 },
     { id: 'arrowsGray3', label: t.iconSetArrowsGray3 },
     { id: 'triangles3', label: t.iconSetTriangles3 },
-    { id: 'arrows4', label: t.iconSetArrows4 },
     { id: 'arrowsGray4', label: t.iconSetArrowsGray4 },
-    { id: 'arrows5', label: t.iconSetArrows5 },
+    { id: 'arrows4', label: t.iconSetArrows4 },
     { id: 'arrowsGray5', label: t.iconSetArrowsGray5 },
+    { id: 'arrows5', label: t.iconSetArrows5 },
     { id: 'traffic3', label: t.iconSetTraffic3 },
     { id: 'trafficRim3', label: t.iconSetTrafficRim3 },
     { id: 'signs3', label: t.iconSetSigns3 },
@@ -220,10 +221,10 @@ export function appendIconSetForm(
     for (const control of iconThresholdControls) control.type.dispatchEvent(new Event('change'));
   };
 
-  const reset = (): void => {
+  const reset = (family: ConditionalIconSet = 'arrows3'): void => {
     preservedIconFloor = undefined;
     pickerFamily = undefined;
-    iconSetSelect.value = 'arrows3';
+    iconSetSelect.value = family;
     iconReverseCk.checked = false;
     iconOnlyCk.checked = false;
     for (const control of iconThresholdControls) {
