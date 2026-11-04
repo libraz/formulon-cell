@@ -20,7 +20,7 @@ export interface PageTab {
 }
 
 export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): PageTab {
-  const { t } = ctx;
+  const { t, mac, on } = ctx;
 
   const printerRow = makeRow(t.printerProfile);
   const printerSelect = createDialogSelect([], '', {
@@ -50,7 +50,29 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
     'portrait',
     { className: 'fc-pgsetup__select', ariaLabel: t.orientation },
   );
-  orientRow.valueCell.appendChild(orientSelect);
+  // The Mac dialog shows orientation as two radios; the select stays the store of record.
+  const orientRadios = new Map<PageOrientation, HTMLInputElement>();
+  if (mac) {
+    const groupName = `fc-pgsetup-orientation-${Math.random().toString(36).slice(2, 8)}`;
+    for (const o of ORIENTATIONS) {
+      const label = document.createElement('label');
+      label.className = 'fc-fmtdlg__check';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = groupName;
+      input.value = o;
+      const text = document.createElement('span');
+      text.textContent = o === 'portrait' ? t.orientPortrait : t.orientLandscape;
+      label.append(input, text);
+      orientRow.valueCell.appendChild(label);
+      orientRadios.set(o, input);
+      on(input, 'change', () => {
+        if (input.checked) orientSelect.value = o;
+      });
+    }
+  } else {
+    orientRow.valueCell.appendChild(orientSelect);
+  }
   panel.appendChild(orientRow.row);
 
   // ── Paper size ──────────────────────────────────────────────────────────
@@ -61,6 +83,7 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
     { className: 'fc-pgsetup__select', ariaLabel: t.paperSize },
   );
   paperRow.valueCell.appendChild(paperSelect);
+  paperRow.row.hidden = mac;
   panel.appendChild(paperRow.row);
 
   // ── Scaling ─────────────────────────────────────────────────────────────
@@ -119,6 +142,7 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
     { className: 'fc-pgsetup__select', ariaLabel: t.printQuality },
   );
   printQualityRow.valueCell.appendChild(printQualitySelect);
+  printQualityRow.row.hidden = mac;
   panel.appendChild(printQualityRow.row);
 
   const firstPageRow = makeRow(t.firstPageNumber);
@@ -134,6 +158,7 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
     printerStatus,
     hydrate(setup) {
       orientSelect.value = setup.orientation;
+      for (const [o, input] of orientRadios) input.checked = o === setup.orientation;
       paperSelect.value = setup.paperSize;
       const hasFit = (setup.fitWidth ?? 0) > 0 || (setup.fitHeight ?? 0) > 0;
       adjustInput.checked = !hasFit;

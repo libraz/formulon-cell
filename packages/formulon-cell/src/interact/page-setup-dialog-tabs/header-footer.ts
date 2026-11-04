@@ -17,7 +17,7 @@ export function createHeaderFooterTab(
   panel: HTMLDivElement,
   ctx: PageSetupTabContext,
 ): HeaderFooterTab {
-  const { t, on } = ctx;
+  const { t, mac, on } = ctx;
 
   const makeTriple = (
     legendText: string,
@@ -138,6 +138,17 @@ export function createHeaderFooterTab(
     });
   });
 
+  // The Mac dialog edits the three slots only for a custom header or footer.
+  const syncSlotVisibility = (): void => {
+    if (!mac) return;
+    headerTriple.legendRow.hidden = headerPreset.select.value !== 'custom';
+    footerTriple.legendRow.hidden = footerPreset.select.value !== 'custom';
+  };
+  on(headerPreset.select, 'change', syncSlotVisibility);
+  on(footerPreset.select, 'change', syncSlotVisibility);
+  on(headerPreset.customButton, 'click', syncSlotVisibility);
+  on(footerPreset.customButton, 'click', syncSlotVisibility);
+
   const markCustomOnEdit = (select: HTMLSelectElement): void => {
     select.value = 'custom';
   };
@@ -241,6 +252,7 @@ export function createHeaderFooterTab(
                 footerTriple.centerInput.value === t.footerWorkbookPath
               ? 'path'
               : 'custom';
+      syncSlotVisibility();
     },
     collect() {
       return {

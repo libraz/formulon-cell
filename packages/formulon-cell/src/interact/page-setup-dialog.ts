@@ -133,7 +133,8 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const marginsPanel = tabPanels.get('margins') as HTMLDivElement;
   const headerFooterPanel = tabPanels.get('headerFooter') as HTMLDivElement;
   const sheetPanel = tabPanels.get('sheet') as HTMLDivElement;
-  const tabCtx = { t, strings, store, on: shell.on };
+  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const tabCtx = { t, strings, store, mac, on: shell.on };
   const pageTab = createPageTab(pagePanel, tabCtx);
   const { printerRow, printerSelect, printerRefreshBtn, printerStatus } = pageTab;
   printerRefreshBtn.hidden = !deps.refreshPrinterProfiles;

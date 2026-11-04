@@ -11,6 +11,8 @@ export interface PageSetupTabContext {
   readonly t: Strings['pageSetup'];
   readonly strings: Strings;
   readonly store: SpreadsheetStore;
+  /** The Mac layout drops the printer-driver rows and edits slots on demand. */
+  readonly mac: boolean;
   /** Shell-tracked listener registration. */
   readonly on: DialogShell['on'];
 }

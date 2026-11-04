@@ -13,7 +13,7 @@ export interface MarginsTab {
 }
 
 export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext): MarginsTab {
-  const { t } = ctx;
+  const { t, mac } = ctx;
 
   const marginRow = makeRow(t.margins);
   const marginGroup = document.createElement('div');
@@ -59,6 +59,8 @@ export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext
     labelize(t.marginLeft, printableLeftInput),
   );
   printableRow.valueCell.appendChild(printableGroup);
+  // The Mac dialog has no printer-minimum-margin row; its values pass through unchanged.
+  printableRow.row.hidden = mac;
   panel.appendChild(printableRow.row);
   const printableWarning = document.createElement('div');
   printableWarning.className = 'fc-pgsetup__warning';
