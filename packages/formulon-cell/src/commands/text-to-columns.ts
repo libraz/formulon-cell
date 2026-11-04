@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import { rememberTextToColumnsDelimiters } from './clipboard/paste-delimiters.js';
 import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from './coerce-input.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -121,6 +122,8 @@ export function textToColumns(
   options: TextToColumnsOptions = {},
 ): number {
   if (blockDataTableEdit(wb, ...textToColumnsTargets(state, range, delimiter, options))) return 0;
+  // A delimited run sets what later plain-text pastes split on.
+  if (!options.fixedBreaks) rememberTextToColumnsDelimiters(delimiter);
   let maxTokens = 0;
   const formatWrites: Array<{ key: string; format: CellFormat }> = [];
   const candidates = [...state.data.cells.entries()]

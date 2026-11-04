@@ -1,3 +1,5 @@
+import { pasteDelimiters } from './paste-delimiters.js';
+
 /**
  * Tab-separated parsing/encoding compatible with desktop spreadsheets.
  * RFC 4180 — but with `\t` as the delimiter and `\r\n` / `\n` as the row
@@ -16,7 +18,13 @@ function escapeCell(cell: string): string {
   return cell;
 }
 
-export function parseTSV(text: string): string[][] {
+/** Split clipboard text into rows and cells. Cells split on `delimiters`,
+ *  by default the session's paste delimiters (tab unless a Text to Columns
+ *  run changed them). */
+export function parseTSV(
+  text: string,
+  delimiters: readonly string[] = pasteDelimiters(),
+): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
@@ -47,10 +55,11 @@ export function parseTSV(text: string): string[][] {
       i += 1;
       continue;
     }
-    if (ch === '\t') {
+    const delimiter = delimiters.find((d) => src.startsWith(d, i));
+    if (delimiter) {
       row.push(cell);
       cell = '';
-      i += 1;
+      i += delimiter.length;
       continue;
     }
     if (ch === '\r' || ch === '\n') {
