@@ -122,3 +122,75 @@ describe('copying a whole PivotTable', () => {
     wb.dispose();
   });
 });
+
+describe('Paste Special from a PivotTable', () => {
+  const pasteAs = (
+    wb: WorkbookHandle,
+    store: ReturnType<typeof createSpreadsheetStore>,
+    range: { r0: number; c0: number; r1: number; c1: number },
+    at: { row: number; col: number },
+    what: 'values' | 'formats' | 'column-widths',
+  ) => {
+    const state = store.getState();
+    const snap = captureSnapshot(state, { sheet: 0, ...range }, 'copy', {
+      formatResolver: createCopyFormatResolver(wb, state),
+    });
+    if (!snap) throw new Error('no snapshot');
+    setActive(store, at.row, at.col);
+    const result = pasteSpecial(store.getState(), store, wb, snap, { ...ALL, what });
+    mutators.replaceCells(store, wb.cells(0));
+    return result;
+  };
+  const fmt = (store: ReturnType<typeof createSpreadsheetStore>, row: number, col: number) =>
+    store.getState().format.formats.get(addrKey({ sheet: 0, row, col }));
+
+  it('values: plain values, no formats and no second report', async () => {
+    const { wb, store } = await setup();
+    pasteAs(wb, store, { r0: 2, c0: 0, r1: 6, c1: 2 }, { row: 19, col: 5 }, 'values');
+    expect(wb.getPivotTables()).toHaveLength(1);
+    expect(wb.getValue({ sheet: 0, row: 19, col: 5 })).toEqual({
+      kind: 'text',
+      value: 'Row Labels',
+    });
+    expect(fmt(store, 19, 5)?.fill).toBeUndefined();
+    expect(fmt(store, 23, 5)?.bold).toBeFalsy();
+  });
+
+  it('formats: each style boundary lands on both cells it separates', async () => {
+    const { wb, store } = await setup();
+    const style = builtinPivotStyleElements('PivotStyleLight16', wb.getTheme()?.colors);
+    const rule = style?.headerRow?.borders?.bottom;
+    pasteAs(wb, store, { r0: 2, c0: 0, r1: 6, c1: 2 }, { row: 29, col: 5 }, 'formats');
+    for (const col of [5, 6, 7]) {
+      expect(fmt(store, 29, col)).toMatchObject({
+        fill: style?.headerRow?.fill,
+        bold: true,
+        borders: { bottom: rule },
+      });
+      expect(fmt(store, 30, col)?.borders?.top).toEqual(rule);
+      expect(fmt(store, 31, col)?.borders).toBeUndefined();
+      expect(fmt(store, 32, col)?.borders?.bottom).toEqual(rule);
+      expect(fmt(store, 33, col)).toMatchObject({
+        fill: style?.totalRow?.fill,
+        bold: true,
+        borders: { top: rule },
+      });
+    }
+    expect(wb.getValue({ sheet: 0, row: 29, col: 5 })).toEqual({ kind: 'blank' });
+  });
+
+  it('column widths: the destination takes the report columns widths', async () => {
+    const { wb, store } = await setup();
+    for (const [col, w] of [
+      [0, 70],
+      [1, 94],
+      [2, 92],
+    ] as const) {
+      mutators.setColWidth(store, col, w);
+    }
+    pasteAs(wb, store, { r0: 2, c0: 0, r1: 6, c1: 2 }, { row: 39, col: 5 }, 'column-widths');
+    const widths = store.getState().layout.colWidths;
+    expect([widths.get(5), widths.get(6), widths.get(7)]).toEqual([70, 94, 92]);
+    expect(fmt(store, 39, 5)).toBeUndefined();
+  });
+});

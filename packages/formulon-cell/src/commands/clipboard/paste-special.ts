@@ -2,6 +2,7 @@ import { addrKey, colLetter, MAX_COL, MAX_ROW, parseAddrKey } from '../../engine
 import type { Addr, Range } from '../../engine/types.js';
 import { writeCell } from '../../engine/value.js';
 import type { CellPatch, WorkbookHandle } from '../../engine/workbook-handle.js';
+import { styleElementFormatSource } from '../../render/grid/table-format.js';
 import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps.js';
 import {
   isWholeColumnRange,
@@ -11,6 +12,7 @@ import {
   sameRange,
 } from '../../store/selection-geometry.js';
 import {
+  type CellBorders,
   type CellFormat,
   type ConditionalRule,
   mutators,
@@ -812,6 +814,34 @@ function applyPaste(
   }
 
   const spilled = opt.transpose ? new Set<number>() : spilledSourceCells(wb, snap);
+  // A table or PivotTable style's boundary pastes as formats onto both cells it
+  // separates: a header's bottom rule also tops the row below it, a total's top
+  // rule also closes the row above it.
+  const sourceStyleAt =
+    opt.what === 'formats' && snap.range.sheet === current.data.sheetIndex
+      ? styleElementFormatSource(current, wb)
+      : null;
+  const withMirroredStyleBorders = (format: CellFormat, sr: number, sc: number): CellFormat => {
+    if (!sourceStyleAt) return format;
+    const row = snap.range.r0 + sr;
+    const col = snap.range.c0 + sc;
+    const inside = (r: number, c: number): boolean =>
+      r >= snap.range.r0 && r <= snap.range.r1 && c >= snap.range.c0 && c <= snap.range.c1;
+    const facing = (r: number, c: number, side: keyof CellBorders) =>
+      inside(r, c) ? sourceStyleAt(r, c)?.borders?.[side] : undefined;
+    const sides: CellBorders = {};
+    const top = format.borders?.top ? undefined : facing(row - 1, col, 'bottom');
+    const bottom = format.borders?.bottom ? undefined : facing(row + 1, col, 'top');
+    const left = format.borders?.left ? undefined : facing(row, col - 1, 'right');
+    const right = format.borders?.right ? undefined : facing(row, col + 1, 'left');
+    if (top) sides.top = top;
+    if (bottom) sides.bottom = bottom;
+    if (left) sides.left = left;
+    if (right) sides.right = right;
+    return Object.keys(sides).length > 0
+      ? { ...format, borders: { ...format.borders, ...sides } }
+      : format;
+  };
 
   // Pre-compute format patches we'll merge into the format slice in one pass.
   const formatWrites: { key: string; format: CellFormat | null }[] = [];
@@ -1083,7 +1113,7 @@ function applyPaste(
         // Formats copies the source's *absence* of formatting too, but not its
         // validation or hyperlink: the destination keeps its own.
         const existing = state.format.formats.get(addrKey(addr));
-        const next = formatWithoutComment(fmt) ?? {};
+        const next = withMirroredStyleBorders(formatWithoutComment(fmt) ?? {}, sr, sc);
         for (const field of FORMATS_PASTE_KEEPS) {
           delete next[field];
           if (existing?.[field] !== undefined) Object.assign(next, { [field]: existing[field] });
