@@ -63,6 +63,14 @@ const RIGHT_KINDS: readonly GoToSpecialKind[] = [
   'data-validation',
 ];
 
+/** The Mac dialog fills the left column with eight options and leaves seven on the right. */
+const MAC_LEFT_KINDS: readonly GoToSpecialKind[] = [
+  ...LEFT_KINDS,
+  'row-differences',
+  'column-differences',
+];
+const MAC_RIGHT_KINDS: readonly GoToSpecialKind[] = RIGHT_KINDS.slice(2);
+
 const MAX_RECENT_REFERENCES = 4;
 
 /** Areas last jumped to through the dialog, newest first, per mount. */
@@ -87,6 +95,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const strings = deps.strings ?? defaultStrings;
   const t = strings.goToDialog;
   let mode: 'go-to' | 'special' = 'special';
+  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
 
   const shell = createDialogShell({
     host,
@@ -133,12 +142,15 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   referenceInput.autocomplete = 'off';
   referenceInput.spellcheck = false;
   referenceRow.append(referenceLabel, referenceInput);
-  attachRangePickerButton(referenceInput, {
-    label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => formatA1Range(store.getState().selection.range),
-    subscribeToRangeChanges: (listener) => store.subscribe(listener),
-    kind: 'go-to-reference',
-  });
+  // The Mac reference field has no range picker.
+  if (!mac) {
+    attachRangePickerButton(referenceInput, {
+      label: strings.pivotTableDialog.rangePickerSelect,
+      getValue: () => formatA1Range(store.getState().selection.range),
+      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      kind: 'go-to-reference',
+    });
+  }
   body.appendChild(referenceRow);
 
   // ── Go To Special: category radios in two columns ─────────────────────
@@ -220,7 +232,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   };
   for (const [key, input] of Object.entries(valueFilterInputs)) input.value = key;
 
-  for (const kind of LEFT_KINDS) {
+  for (const kind of mac ? MAC_LEFT_KINDS : LEFT_KINDS) {
     addKind(leftColumn, kind);
     if (kind === 'formulas') leftColumn.appendChild(valueFilters);
   }
@@ -241,7 +253,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     all: makeRadio(document.createElement('div'), ruleName, 'all', t.ruleAll, 'rule'),
     same: makeRadio(document.createElement('div'), ruleName, 'same', t.ruleSame, 'rule'),
   };
-  for (const kind of RIGHT_KINDS) {
+  for (const kind of mac ? MAC_RIGHT_KINDS : RIGHT_KINDS) {
     addKind(rightColumn, kind);
     if (kind === 'dependents') {
       for (const input of Object.values(levelInputs))

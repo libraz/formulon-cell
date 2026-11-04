@@ -28,6 +28,24 @@ describe('attachHyperlinkDialog', () => {
     handle.detach();
   });
 
+  it('keeps OK disabled on Mac until an address is typed', () => {
+    host.dataset.fcPlatform = 'mac';
+    const store = createSpreadsheetStore();
+    const handle = attachHyperlinkDialog({ host, store });
+    handle.open();
+    const input = document.querySelector<HTMLInputElement>('.fc-hldlg input');
+    const ok = document.querySelector<HTMLButtonElement>('.fc-hldlg .fc-fmtdlg__btn--primary');
+    if (!input || !ok) throw new Error('expected controls');
+    expect(ok.disabled).toBe(true);
+    input.value = 'https://example.com';
+    input.dispatchEvent(new Event('input'));
+    expect(ok.disabled).toBe(false);
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    expect(ok.disabled).toBe(true);
+    handle.detach();
+  });
+
   it('OK with a non-empty URL writes hyperlink onto the active cell', () => {
     const store = createSpreadsheetStore();
     const history = new History();

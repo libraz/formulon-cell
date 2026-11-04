@@ -102,6 +102,31 @@ describe('attachGoToDialog', () => {
     while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
   });
 
+  it('splits the Mac options eight and seven and omits the range picker', () => {
+    host.dataset.fcPlatform = 'mac';
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    handle.open();
+    const columns = document.querySelectorAll<HTMLElement>(
+      '.fc-goto__kinds:not(.fc-goto__targets) > div',
+    );
+    const values = (col: Element | undefined): string[] =>
+      Array.from(
+        col?.querySelectorAll<HTMLInputElement>('input[type="radio"]:not([data-sub])') ?? [],
+      ).map((r) => r.value);
+    expect(values(columns[0])).toHaveLength(8);
+    expect(values(columns[0]).slice(-2)).toEqual(['row-differences', 'column-differences']);
+    expect(values(columns[1])).toEqual([
+      'precedents',
+      'dependents',
+      'last-cell',
+      'visible-cells',
+      'conditional-format',
+      'data-validation',
+    ]);
+    expect(document.querySelector('.fc-goto__reference button')).toBeNull();
+    handle.detach();
+  });
+
   it('renders the options in the two-column order with constants pre-checked', () => {
     const handle = attachGoToDialog({ host, store, getWb: () => wb });
     handle.open();

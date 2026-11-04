@@ -5,6 +5,7 @@ import { recordFormatChange } from '../commands/slice-history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -106,7 +107,16 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     });
   };
 
+  // The Mac dialog keeps OK disabled until an address is typed.
+  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const syncOk = (): void => {
+    if (!mac) return;
+    projectDisabledState(okBtn, urlInput.value.trim() === '', t.errorEmptyUrl);
+  };
+  urlInput.addEventListener('input', syncOk);
+
   const onOk = (): void => {
+    if (mac && okBtn.disabled) return;
     const url = urlInput.value.trim();
     if (!url) {
       showError(t.errorEmptyUrl);
@@ -144,6 +154,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
       const addr = state.selection.active;
       const current = hyperlinkAt(state, addr) ?? '';
       urlInput.value = current;
+      syncOk();
       // Hide Remove when there's nothing to remove.
       removeBtn.hidden = !current;
       clearError();
