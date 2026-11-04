@@ -85,10 +85,13 @@ export interface CreatePivotTableOptions {
   valueNumberFormat?: string;
   showRowGrandTotals?: boolean;
   showColumnGrandTotals?: boolean;
+  /** An existing cache of the same source for the report to share; omitted,
+   *  a new cache is built from the cells. */
+  cacheId?: number;
 }
 
 export type CreatePivotTableResult =
-  | { ok: true; cacheId: number; pivotIndex: number }
+  | { ok: true; cacheId: number; pivotIndex: number; sharedCache: boolean }
   | {
       ok: false;
       reason: 'unsupported' | 'invalid-range' | 'invalid-field' | 'engine-failed';
@@ -272,6 +275,74 @@ export const nextPivotTableName = (wb: WorkbookHandle): string => {
   return `${pivot}${n}`;
 };
 
+/** A new cache holding `source`: its fields, shared items and records. */
+function buildPivotCache(
+  wb: WorkbookHandle,
+  source: Range,
+  fields: readonly PivotSourceField[],
+): number | Extract<CreatePivotTableResult, { ok: false }> {
+  const cacheId = wb.createPivotCache(0);
+  if (cacheId < 0) return { ok: false, reason: 'engine-failed', step: 'cache' };
+  if (!writePivotCacheWorksheetSource(wb, cacheId, source)) {
+    wb.removePivotCache(cacheId);
+    return { ok: false, reason: 'engine-failed', step: 'cache-source' };
+  }
+
+  for (const field of fields) {
+    if (wb.addPivotCacheField(cacheId, field.name) < 0) {
+      wb.removePivotCache(cacheId);
+      return { ok: false, reason: 'engine-failed', step: 'cache-field' };
+    }
+  }
+
+  const sharedItemIndexesByField = new Map<number, Map<string, number>>();
+  for (const field of fields) {
+    const seen = new Set<string>();
+    const indexes = new Map<string, number>();
+    for (let r = source.r0 + 1; r <= source.r1; r += 1) {
+      const value = wb.getValue({
+        sheet: source.sheet,
+        row: r,
+        col: source.c0 + field.index,
+      });
+      const key = valueKey(value);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      indexes.set(key, indexes.size);
+      if (!wb.addPivotCacheSharedItem(cacheId, field.index, value)) {
+        wb.removePivotCache(cacheId);
+        return { ok: false, reason: 'engine-failed', step: 'shared-item' };
+      }
+    }
+    sharedItemIndexesByField.set(field.index, indexes);
+  }
+
+  for (let r = source.r0 + 1; r <= source.r1; r += 1) {
+    const recordIdx = wb.addPivotCacheRecord(cacheId);
+    if (recordIdx < 0) {
+      wb.removePivotCache(cacheId);
+      return { ok: false, reason: 'engine-failed', step: 'cache-record' };
+    }
+    for (let c = source.c0; c <= source.c1; c += 1) {
+      const ok = wb.setPivotCacheRecordValue(
+        cacheId,
+        recordIdx,
+        c - source.c0,
+        pivotCacheRecordValue(
+          wb.getValue({ sheet: source.sheet, row: r, col: c }),
+          sharedItemIndexesByField.get(c - source.c0) ?? new Map(),
+        ),
+      );
+      if (!ok) {
+        wb.removePivotCache(cacheId);
+        return { ok: false, reason: 'engine-failed', step: 'cache-value' };
+      }
+    }
+  }
+
+  return cacheId;
+}
+
 export function createPivotTableFromRange(
   wb: WorkbookHandle,
   opts: CreatePivotTableOptions,
@@ -313,8 +384,11 @@ export function createPivotTableFromRange(
     valueFieldNames.length === 0 &&
     !opts.columnField &&
     filterFieldNames.length === 0;
+  // Rows and columns with no values: the layout Recommended PivotTables inserts.
+  const layoutOnly =
+    rowField !== undefined && columnField !== undefined && valueFieldNames.length === 0;
   if (
-    (!emptyReport && (!rowField || valueFields.length === 0)) ||
+    (!emptyReport && !layoutOnly && (!rowField || valueFields.length === 0)) ||
     (opts.rowField && !rowField) ||
     valueFields.some((field) => field === undefined) ||
     (opts.columnField && !columnField) ||
@@ -334,64 +408,10 @@ export function createPivotTableFromRange(
     return { ok: false, reason: 'invalid-field' };
   }
 
-  const cacheId = wb.createPivotCache(0);
-  if (cacheId < 0) return { ok: false, reason: 'engine-failed', step: 'cache' };
-  if (!writePivotCacheWorksheetSource(wb, cacheId, opts.source)) {
-    wb.removePivotCache(cacheId);
-    return { ok: false, reason: 'engine-failed', step: 'cache-source' };
-  }
-
-  for (const field of fields) {
-    if (wb.addPivotCacheField(cacheId, field.name) < 0) {
-      wb.removePivotCache(cacheId);
-      return { ok: false, reason: 'engine-failed', step: 'cache-field' };
-    }
-  }
-
-  const sharedItemIndexesByField = new Map<number, Map<string, number>>();
-  for (const field of fields) {
-    const seen = new Set<string>();
-    const indexes = new Map<string, number>();
-    for (let r = opts.source.r0 + 1; r <= opts.source.r1; r += 1) {
-      const value = wb.getValue({
-        sheet: opts.source.sheet,
-        row: r,
-        col: opts.source.c0 + field.index,
-      });
-      const key = valueKey(value);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      indexes.set(key, indexes.size);
-      if (!wb.addPivotCacheSharedItem(cacheId, field.index, value)) {
-        wb.removePivotCache(cacheId);
-        return { ok: false, reason: 'engine-failed', step: 'shared-item' };
-      }
-    }
-    sharedItemIndexesByField.set(field.index, indexes);
-  }
-
-  for (let r = opts.source.r0 + 1; r <= opts.source.r1; r += 1) {
-    const recordIdx = wb.addPivotCacheRecord(cacheId);
-    if (recordIdx < 0) {
-      wb.removePivotCache(cacheId);
-      return { ok: false, reason: 'engine-failed', step: 'cache-record' };
-    }
-    for (let c = opts.source.c0; c <= opts.source.c1; c += 1) {
-      const ok = wb.setPivotCacheRecordValue(
-        cacheId,
-        recordIdx,
-        c - opts.source.c0,
-        pivotCacheRecordValue(
-          wb.getValue({ sheet: opts.source.sheet, row: r, col: c }),
-          sharedItemIndexesByField.get(c - opts.source.c0) ?? new Map(),
-        ),
-      );
-      if (!ok) {
-        wb.removePivotCache(cacheId);
-        return { ok: false, reason: 'engine-failed', step: 'cache-value' };
-      }
-    }
-  }
+  const sharedCache = opts.cacheId !== undefined;
+  const built = opts.cacheId ?? buildPivotCache(wb, opts.source, fields);
+  if (typeof built !== 'number') return built;
+  const cacheId = built;
 
   const pivotIndex = wb.createPivotTable(
     opts.destination.sheet,
@@ -400,12 +420,12 @@ export function createPivotTableFromRange(
     { row: opts.destination.row, col: opts.destination.col },
   );
   if (pivotIndex < 0) {
-    wb.removePivotCache(cacheId);
+    if (!sharedCache) wb.removePivotCache(cacheId);
     return { ok: false, reason: 'engine-failed', step: 'pivot' };
   }
   const failAfterPivot = (step: string): CreatePivotTableResult => {
     wb.removePivotTable(opts.destination.sheet, pivotIndex);
-    wb.removePivotCache(cacheId);
+    if (!sharedCache) wb.removePivotCache(cacheId);
     return { ok: false, reason: 'engine-failed', step };
   };
 
@@ -568,7 +588,7 @@ export function createPivotTableFromRange(
     if (dataField < 0) return failAfterPivot('data-field');
   }
 
-  return { ok: true, cacheId, pivotIndex };
+  return { ok: true, cacheId, pivotIndex, sharedCache };
 }
 
 /** Labels of each cache field's items in cache-index order, read from a
@@ -813,7 +833,7 @@ export function createPivotTableAtPlacement(
     history.push({
       undo: () => {
         wb.removePivotTable(destination.sheet, current.pivotIndex);
-        wb.removePivotCache(current.cacheId);
+        if (!current.sharedCache) wb.removePivotCache(current.cacheId);
         refresh();
       },
       redo: () => {
@@ -1076,6 +1096,7 @@ export function deletePivotTables(
 export type RibbonPivotTableAction =
   | 'dialog'
   | 'recommended'
+  | 'recommended-insert'
   | 'new-sheet'
   | 'existing-sheet'
   | 'refresh';
@@ -1117,6 +1138,83 @@ export interface ExecuteRibbonPivotTableActionDeps {
   action: RibbonPivotTableAction;
   strings: RibbonPivotTableActionStrings;
   history?: History | null;
+}
+
+/** An existing cache whose worksheet source is exactly `source`. */
+const cacheForSource = (wb: WorkbookHandle, source: Range): number | undefined =>
+  wb.pivotCacheIds().find((id) => {
+    const range = pivotCacheWorksheetSourceRange(wb, id);
+    return (
+      range !== null &&
+      range.sheet === source.sheet &&
+      range.r0 === source.r0 &&
+      range.c0 === source.c0 &&
+      range.r1 === source.r1 &&
+      range.c1 === source.c1
+    );
+  });
+
+/**
+ * Recommended PivotTables as the Mac desktop runs it: no dialog, a report on a
+ * new sheet before the source sheet at A3. Measured on one fixture only: the
+ * first text field goes to rows, the first numeric field to columns, and there
+ * are no values. A cache that already holds the source is shared, as there.
+ */
+function insertRecommendedPivotTable(
+  deps: ExecuteRibbonPivotTableActionDeps,
+): RibbonPivotTableActionResult {
+  const { store, workbook, strings, history = null } = deps;
+  const source = pivotSourceForSelection(store, workbook);
+  const fields = inferPivotSourceFields(workbook, source);
+  const rowField = fields.find((field) => field.numericCount === 0);
+  const columnField = fields.find((field) => field.numericCount > 0);
+  if (!workbook.capabilities.pivotTableMutate || !rowField || !columnField) {
+    return {
+      kind: 'report',
+      report: {
+        title: strings.recommendedPivotTables,
+        items: [
+          { severity: 'warning', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
+        ],
+      },
+    };
+  }
+  const cacheId = cacheForSource(workbook, source);
+  const result = createPivotTableAtPlacement(
+    { store, workbook, history },
+    {
+      source,
+      name: nextPivotTableName(workbook),
+      rowField: rowField.name,
+      columnField: columnField.name,
+      valueField: '',
+      ...(cacheId === undefined ? {} : { cacheId }),
+    },
+    'new-sheet',
+  );
+  if (!result.ok) {
+    return {
+      kind: 'report',
+      report: {
+        title: strings.recommendedPivotTables,
+        items: [
+          {
+            severity: 'warning',
+            label: strings.pivotTable,
+            detail:
+              result.reason === 'sheet-failed'
+                ? strings.workbookStructureProtectedBlocked
+                : strings.pivotAuthoringDetail,
+          },
+        ],
+      },
+    };
+  }
+  const { destination } = result;
+  mutators.setSheetIndex(store, destination.sheet);
+  refreshPivotReportsAfterEdit(store, workbook);
+  mutators.setActive(store, destination);
+  return { kind: 'created', destinationSheet: destination.sheet, destination };
 }
 
 /** Implements the cross-host "PivotTable" ribbon split-button. Returns one of:
@@ -1177,6 +1275,7 @@ export const executeRibbonPivotTableAction = (
   if (action === 'dialog' || action === 'existing-sheet') {
     return { kind: 'open-dialog' };
   }
+  if (action === 'recommended-insert') return insertRecommendedPivotTable(deps);
   if (action === 'recommended') {
     return {
       kind: 'report',

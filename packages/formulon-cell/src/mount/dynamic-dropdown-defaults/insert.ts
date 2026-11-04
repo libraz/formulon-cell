@@ -142,13 +142,19 @@ const buildPivotTableAction =
       });
       return;
     }
+    // The Mac desktop inserts its recommendation directly, without a dialog.
+    const mac =
+      (instance.host.closest<HTMLElement>('.fc-host') ?? instance.host).dataset.fcPlatform ===
+      'mac';
     const pivotAction = (
-      action === 'recommended' ||
-      action === 'new-sheet' ||
-      action === 'existing-sheet' ||
-      action === 'refresh'
-        ? action
-        : 'dialog'
+      action === 'recommended' && mac
+        ? 'recommended-insert'
+        : action === 'recommended' ||
+            action === 'new-sheet' ||
+            action === 'existing-sheet' ||
+            action === 'refresh'
+          ? action
+          : 'dialog'
     ) as RibbonPivotTableAction;
     const strings = instance.i18n.strings;
     const result = executeRibbonPivotTableAction({

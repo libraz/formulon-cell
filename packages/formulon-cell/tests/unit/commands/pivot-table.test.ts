@@ -229,7 +229,7 @@ describe('pivot-table command helpers', () => {
       valueNumberFormat: '#,##0',
     });
 
-    expect(result).toEqual({ ok: true, cacheId: 4, pivotIndex: 2 });
+    expect(result).toEqual({ ok: true, cacheId: 4, pivotIndex: 2, sharedCache: false });
     expect(calls).toContain('cache-source:true:Sheet1:A1:C3');
     expect(calls).toContain('cache-field:Region');
     expect(calls).toContain('shared:2:number');
