@@ -5,6 +5,7 @@ import {
   paintSpillBlocker,
   paintSpillOutline,
   paintSpillTarget,
+  paintSpillWarningTag,
 } from '../../../../src/render/painters.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
@@ -159,5 +160,53 @@ describe('render/painters — spill boxes off the Mac profile', () => {
     const blocker = makeStrokeSpy();
     paintSpillBlocker(blocker.ctx, { x: 0, y: 0, w: 60, h: 30 });
     expect(blocker.strokes[0]).toMatchObject({ style: '#d83b3b', width: 1.5, dash: [3, 3] });
+  });
+});
+
+describe('render/painters — paintSpillWarningTag', () => {
+  function tagSpy() {
+    const buttons: number[][] = [];
+    const fills: { style: string; rect: number[] }[] = [];
+    let fillStyle = '';
+    const ctx = {
+      get fillStyle() {
+        return fillStyle;
+      },
+      set fillStyle(v: string) {
+        fillStyle = v;
+      },
+      strokeStyle: '',
+      lineWidth: 1,
+      save() {},
+      restore() {},
+      beginPath() {},
+      closePath() {},
+      moveTo() {},
+      lineTo() {},
+      fill() {},
+      stroke() {},
+      createLinearGradient: () => ({ addColorStop() {} }),
+      roundRect(x: number, y: number, w: number, h: number) {
+        buttons.push([x, y, w, h]);
+      },
+      fillRect(x: number, y: number, w: number, h: number) {
+        fills.push({ style: fillStyle, rect: [x, y, w, h] });
+      },
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, buttons, fills };
+  }
+
+  it('sets a 24 x 22 button 13 px before the anchor cell, from its top edge', () => {
+    // Excel (Mac, 2x): the button spans device x 290-337 / y 42-85 beside
+    // D2 at x 364, y 42, with the triangle inset 4 px and a (120,90,21) mark.
+    const spy = tagSpy();
+    paintSpillWarningTag(spy.ctx, { x: 182, y: 21, w: 52, h: 14 });
+    // The 1 px border is stroked on the half pixel inside the 24 x 22 box.
+    expect(spy.buttons[0]).toEqual([145.5, 21.5, 23, 21]);
+    expect(spy.fills.every((f) => f.style === '#785a15')).toBe(true);
+    expect(spy.fills.length).toBe(2);
+    const rtl = tagSpy();
+    paintSpillWarningTag(rtl.ctx, { x: 182, y: 21, w: 52, h: 14 }, true);
+    expect(rtl.buttons[0]?.[0]).toBe(182 + 52 + 13 + 0.5);
   });
 });

@@ -7,6 +7,7 @@ import {
   type AxisLayout,
   buildColLayout,
   buildRowLayout,
+  gridOriginX,
   layoutForView,
   type ViewState,
 } from '../../../../src/render/geometry.js';
@@ -38,10 +39,13 @@ const theme = { bg: '#fff', accent: '#0078d4' } as unknown as ResolvedTheme;
 interface CanvasSpy {
   ctx: CanvasRenderingContext2D;
   strokes: { rect: [number, number, number, number]; dash: number[] }[];
+  /** Rounded boxes — the warning smart tag's button. */
+  buttons: [number, number, number, number][];
 }
 
 function canvasSpy(): CanvasSpy {
   const strokes: CanvasSpy['strokes'] = [];
+  const buttons: CanvasSpy['buttons'] = [];
   let dash: number[] = [];
   const ctx = {
     save(): void {},
@@ -52,8 +56,19 @@ function canvasSpy(): CanvasSpy {
     strokeRect(x: number, y: number, width: number, height: number): void {
       strokes.push({ rect: [x, y, width, height], dash: [...dash] });
     },
+    roundRect(x: number, y: number, width: number, height: number): void {
+      buttons.push([x, y, width, height]);
+    },
+    createLinearGradient: () => ({ addColorStop(): void {} }),
+    beginPath(): void {},
+    closePath(): void {},
+    moveTo(): void {},
+    lineTo(): void {},
+    fill(): void {},
+    stroke(): void {},
+    fillRect(): void {},
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, strokes };
+  return { ctx, strokes, buttons };
 }
 
 function stateWithCells(
@@ -455,6 +470,36 @@ describe('grid spill painting', () => {
         elsewhere,
       );
       expect(none.strokes).toHaveLength(0);
+    });
+
+    it('sets the warning tag before a blocked formula anchor while it is active', () => {
+      // Excel (Mac): a yellow-triangle button left of D2 (=SEQUENCE(5) blocked
+      // by D4). The engine reports no shape for a blocked anchor.
+      const cells = new Map<string, Cell>();
+      cells.set(addrKey({ sheet: 0, row: 10, col: 5 }), {
+        value: { kind: 'error', code: 8, text: '#SPILL!' },
+        formula: '=SEQUENCE(5)',
+      });
+      const workbook = makeWorkbook(
+        () => [],
+        () => null,
+      );
+      const anchored = withActive(stateWithCells(cells), 10, 5);
+      const canvas = canvasSpy();
+      paintSpills(
+        makeRenderer(() => anchored, canvas, workbook, 'mac'),
+        anchored,
+      );
+      expect(canvas.buttons).toHaveLength(1);
+      // F11 is the first visible column; the 24 px button ends 13 px before it.
+      expect(canvas.buttons[0]?.[0]).toBe(gridOriginX(layoutForView(anchored)) - 37 + 0.5);
+      const elsewhere = withActive(stateWithCells(cells), 11, 6);
+      const none = canvasSpy();
+      paintSpills(
+        makeRenderer(() => elsewhere, none, workbook, 'mac'),
+        elsewhere,
+      );
+      expect(none.buttons).toHaveLength(0);
     });
   });
 });

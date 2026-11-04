@@ -3,6 +3,9 @@ import type { Addr } from './types.js';
 import { type CellValue, type Value, ValueKind } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
+/** Engine error code of #SPILL!. */
+export const SPILL_ERROR_CODE = 8;
+
 const ERROR_NAME: Readonly<Record<number, string>> = {
   0: '#NULL!',
   1: '#DIV/0!',
@@ -69,7 +72,7 @@ export function formatError(code: number, fallbackText: string, locale = 'en-US'
   // Measured spellings: German #N/A, and Japanese #SPILL! (the only error the
   // ja desktop localizes). Other names stay canonical until captured.
   if (code === 6 && localeLanguage(locale) === 'de') return '#NV';
-  if (code === 8 && localeLanguage(locale) === 'ja') return '#スピル!';
+  if (code === SPILL_ERROR_CODE && localeLanguage(locale) === 'ja') return '#スピル!';
   return canonical;
 }
 

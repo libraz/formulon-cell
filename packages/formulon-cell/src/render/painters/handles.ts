@@ -244,26 +244,41 @@ export function paintSpillTarget(
   ctx.restore();
 }
 
-/** The warning smart tag beside a blocked PivotTable's anchor: a yellow
- *  triangle with an exclamation mark, just past the cell's trailing edge. */
-export function paintSpillWarningTag(ctx: CanvasRenderingContext2D, cell: Rect): void {
-  const size = 12;
-  const x = cell.x + cell.w + 2;
-  const y = cell.y + (cell.h - size) / 2;
+/** The warning smart tag beside a blocked spill's anchor: a rounded button
+ *  holding a yellow triangle, set before the cell's leading edge from its top
+ *  (Excel Mac: 24 x 22 px, 13 px clear of the cell). */
+export function paintSpillWarningTag(ctx: CanvasRenderingContext2D, cell: Rect, rtl = false): void {
+  const w = 24;
+  const h = 22;
+  const gap = 13;
+  const x = rtl ? cell.x + cell.w + gap : cell.x - gap - w;
+  const y = cell.y;
   ctx.save();
-  ctx.fillStyle = '#f5c242';
-  ctx.strokeStyle = '#a77d10';
+  const face = ctx.createLinearGradient(0, y, 0, y + h);
+  face.addColorStop(0, '#fbfbfb');
+  face.addColorStop(1, '#f5f5f5');
+  ctx.fillStyle = face;
+  ctx.strokeStyle = '#adadad';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(x + size / 2, y + 0.5);
-  ctx.lineTo(x + size - 0.5, y + size - 0.5);
-  ctx.lineTo(x + 0.5, y + size - 0.5);
+  ctx.roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 4);
+  ctx.fill();
+  ctx.stroke();
+  // Triangle 16 x 14, inset 4 px; mark stem 4.5 px over a 2 px dot.
+  const tx = x + 4;
+  const ty = y + 4;
+  ctx.fillStyle = '#f7db6f';
+  ctx.strokeStyle = '#c8ad4c';
+  ctx.beginPath();
+  ctx.moveTo(tx + 8, ty + 0.5);
+  ctx.lineTo(tx + 15.5, ty + 13.5);
+  ctx.lineTo(tx + 0.5, ty + 13.5);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = '#1f1f1f';
-  ctx.fillRect(x + size / 2 - 0.75, y + 4, 1.5, 4);
-  ctx.fillRect(x + size / 2 - 0.75, y + 9, 1.5, 1.5);
+  ctx.fillStyle = '#785a15';
+  ctx.fillRect(tx + 7, ty + 4, 2, 4.5);
+  ctx.fillRect(tx + 7, ty + 10, 2, 2);
   ctx.restore();
 }
 

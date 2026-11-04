@@ -5,6 +5,7 @@ import { effectiveCellFormatFromEngine } from '../engine/cell-format-projection.
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 import { findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { CellValue, Range } from '../engine/types.js';
+import { SPILL_ERROR_CODE } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
@@ -655,8 +656,24 @@ export class GridRenderer {
           r1: anchor.row,
           c1: anchor.col,
         })[0];
-        if (cell) paintSpillWarningTag(this.ctx, cell);
+        if (cell) paintSpillWarningTag(this.ctx, cell, layout.rtl);
       }
+    }
+    // A formula held at #SPILL! carries the same tag while its anchor is active.
+    const activeCell =
+      mac && active.sheet === data.sheetIndex ? data.cells.get(addrKey(active)) : null;
+    if (
+      activeCell?.formula &&
+      activeCell.value.kind === 'error' &&
+      activeCell.value.code === SPILL_ERROR_CODE
+    ) {
+      const cell = rangeRects(layout, viewport, {
+        r0: active.row,
+        c0: active.col,
+        r1: active.row,
+        c1: active.col,
+      })[0];
+      if (cell) paintSpillWarningTag(this.ctx, cell, layout.rtl);
     }
 
     // #SPILL! obstruction outline. The engine's `spillInfo` reports the

@@ -23,7 +23,7 @@ import {
   PivotShowValuesAs,
   type PivotSortOrder,
 } from './types.js';
-import { fromEngineValue } from './value.js';
+import { fromEngineValue, SPILL_ERROR_CODE } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
@@ -196,8 +196,6 @@ export interface PivotSpill {
  *  there are the report's own (cached values), so they do not block it. */
 const ownedExtents = new WeakMap<object, Map<string, Range>>();
 
-const SPILL_ERROR = 8;
-
 const inside = (range: Range, row: number, col: number): boolean =>
   row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
 
@@ -315,7 +313,7 @@ function effectiveLayout(
       {
         row: layout.top,
         col: layout.left,
-        value: { kind: 4, number: 0, boolean: 0, text: '', errorCode: SPILL_ERROR },
+        value: { kind: 4, number: 0, boolean: 0, text: '', errorCode: SPILL_ERROR_CODE },
         kind: PIVOT_CELL_KIND.Header,
         depth: 0,
         fieldName: '',
