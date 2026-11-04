@@ -61,6 +61,7 @@ import { createConditionalMenu } from '../toolbar/ribbon/menus/conditional.js';
 import { createFormulasMenuFactories } from '../toolbar/ribbon/menus/formulas.js';
 import { createHomeMenuFactories } from '../toolbar/ribbon/menus/home.js';
 import { createInsertMenuFactories } from '../toolbar/ribbon/menus/insert.js';
+import type { MenuVariant } from '../toolbar/ribbon/menus/mac-variants.js';
 import { createPageLayoutMenuFactories } from '../toolbar/ribbon/menus/page-layout.js';
 import { createPasteMenu } from '../toolbar/ribbon/menus/paste.js';
 import { createReviewMenuFactories } from '../toolbar/ribbon/menus/review.js';
@@ -188,13 +189,17 @@ export function createDefaultRibbonMenus(
     customTableStyles: () => listCustomTableStyles(instance.store.getState()),
     customPivotTableStyles: () => listCustomPivotTableStyles(instance.store.getState()),
   });
-  const buildBorders = (): HTMLDivElement =>
-    createBordersMenu({
-      ribbonText,
-      getBorderColor,
-      onPickColor: setBorderColor,
-    });
-  const buildConditional = (): HTMLDivElement => createConditionalMenu(lang);
+  const buildBorders = (_commandId?: string, variant?: MenuVariant): HTMLDivElement =>
+    createBordersMenu(
+      {
+        ribbonText,
+        getBorderColor,
+        onPickColor: setBorderColor,
+      },
+      variant,
+    );
+  const buildConditional = (_commandId?: string, variant?: MenuVariant): HTMLDivElement =>
+    createConditionalMenu(lang, variant);
   const buildPaste = (): HTMLDivElement => createPasteMenu(dictionaries[lang]);
   const buildTextOrientation = (): HTMLDivElement => createTextOrientationMenu(ribbonMenuText);
 

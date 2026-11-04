@@ -483,6 +483,8 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     clear: 'Regeln löschen',
     clearSelection: 'Regeln aus ausgewählten Zellen löschen',
     clearSheet: 'Regeln aus dem gesamten Blatt löschen',
+    clearTable: 'Regeln aus dieser Tabelle löschen',
+    clearPivot: 'Regeln aus dieser PivotTable löschen',
     manage: 'Regeln verwalten …',
     greater: 'Größer als …',
     less: 'Kleiner als …',

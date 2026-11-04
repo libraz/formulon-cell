@@ -1,9 +1,11 @@
 import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
+import { DEFAULT_PIVOT_TOGGLES, PIVOT_STYLE_TOGGLES } from '../../commands/pivot-style-info.js';
 import {
   activeTableOverlay,
   renameActiveTable,
   TABLE_OPTION_COMMANDS,
 } from '../../commands/table-design.js';
+import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { showMessage } from '../dialogs/prompt.js';
 import { projectDisabledState } from '../menu-a11y.js';
@@ -101,4 +103,51 @@ export const projectTableDesign = (host: HTMLElement, instance: SpreadsheetInsta
       delete button.dataset.tableSessionOnly;
     }
   }
+};
+
+/** Sync the PivotTable Design controls under `host` with the report under the active cell. */
+export const projectPivotDesign = (host: HTMLElement, instance: SpreadsheetInstance): void => {
+  const pivot = findPivotTableAtCell(instance.workbook, instance.store.getState().selection.active);
+  const info = pivot
+    ? instance.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex)
+    : null;
+  for (const [command, key] of Object.entries(PIVOT_STYLE_TOGGLES)) {
+    const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+    if (!button) continue;
+    const pressed = info ? info[key] : DEFAULT_PIVOT_TOGGLES[key];
+    button.classList.toggle('fc-tb__rb--active', pressed);
+    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  }
+  host
+    .querySelector('[data-ribbon-command="pivotStyleGallery"]')
+    ?.dispatchEvent(new Event('fc-ribbon-control-refresh'));
+};
+
+/** Read-only readout in a PivotTable tab: the report's name or its active field. */
+export const createPivotReadout = (
+  command: RibbonCommand,
+  ctx: TableNameInputCtx,
+): HTMLDivElement => {
+  const wrap = document.createElement('div');
+  wrap.className = 'fc-tb__rb-input';
+  wrap.dataset.ribbonCommand = command.id;
+  wrap.dataset.ribbonInput = command.id;
+  const label = document.createElement('span');
+  label.className = 'fc-tb__rb-input__label';
+  label.textContent = command.label;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'fc-tb__rb-input__field';
+  input.title = command.title;
+  input.setAttribute('aria-label', command.title);
+  input.readOnly = true;
+  if (command.id === 'pivotName') {
+    const inst = ctx.getInst();
+    const pivot =
+      inst && findPivotTableAtCell(inst.workbook, inst.store.getState().selection.active);
+    input.value =
+      (pivot && inst?.workbook.getPivotDefinition(pivot.sheetIndex, pivot.pivotIndex)?.name) || '';
+  }
+  wrap.append(label, input);
+  return wrap;
 };

@@ -465,6 +465,8 @@ export interface RibbonMenusStrings {
     clear: string;
     clearSelection: string;
     clearSheet: string;
+    clearTable: string;
+    clearPivot: string;
     manage: string;
     greater: string;
     less: string;

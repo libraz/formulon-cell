@@ -12,6 +12,7 @@ import {
   MAC_RIBBON_MENU_COMMAND_SET,
   macRibbonMenuIdForCommand,
 } from './mac/model.js';
+import { PIVOT_DISABLED_COMMAND_IDS } from './pivot-command-ids.js';
 
 export type RibbonActivationKind =
   | 'primaryAction'
@@ -382,6 +383,12 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'sheetBackground',
   'sheetViewDelete',
   'sheetViewSave',
+  'pivotFieldList',
+  'pivotOptions',
+  'pivotRowHeaders',
+  'pivotColHeaders',
+  'pivotRowStripes',
+  'pivotColStripes',
   'sortAsc',
   'sortData',
   'sortDesc',
@@ -475,7 +482,10 @@ export const RIBBON_TOGGLE_COMMANDS: ReadonlySet<string> = new Set([
   'showAllNotesReview',
 ]);
 
-export const RIBBON_DISABLED_COMMANDS: ReadonlySet<string> = new Set(['helpSearch']);
+export const RIBBON_DISABLED_COMMANDS: ReadonlySet<string> = new Set([
+  'helpSearch',
+  ...PIVOT_DISABLED_COMMAND_IDS,
+]);
 
 export type RibbonActivationCategoryEntry = readonly [
   kind: RibbonActivationKind,

@@ -473,6 +473,8 @@ export const ribbonMenusJa: RibbonMenusStrings = {
     clear: 'ルールのクリア',
     clearSelection: '選択したセルからルールをクリア',
     clearSheet: 'シート全体からルールをクリア',
+    clearTable: 'このテーブルからルールをクリア',
+    clearPivot: 'このピボットテーブルからルールをクリア',
     manage: 'ルールの管理...',
     greater: '指定の値より大きい...',
     less: '指定の値より小さい...',

@@ -466,6 +466,8 @@ export const ribbonMenusTh: RibbonMenusStrings = {
     clear: 'ล้างกฎ',
     clearSelection: 'ล้างกฎจากเซลล์ที่เลือก',
     clearSheet: 'ล้างกฎจากทั้งแผ่นงาน',
+    clearTable: 'ล้างกฎจากตารางนี้',
+    clearPivot: 'ล้างกฎจาก PivotTable นี้',
     manage: 'จัดการกฎ…',
     greater: 'มากกว่า…',
     less: 'น้อยกว่า…',

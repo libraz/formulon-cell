@@ -40,7 +40,12 @@ import {
   ribbonActivatableSurfaceCommandIds,
 } from '../../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
-import { CONTEXTUAL_SELECTIONS, dynamicDropdownNoopOverrides, stubHelpers } from './fixtures.js';
+import {
+  CONTEXTUAL_SELECTIONS,
+  dynamicDropdownNoopOverrides,
+  mountPivotSheet,
+  stubHelpers,
+} from './fixtures.js';
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -441,7 +446,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('renders exactly the shared activatable ribbon command surface as buttons', () => {
+  it('renders exactly the shared activatable ribbon command surface as buttons', async () => {
     // A contextual tab shows only while its kind of object is selected.
     const rendered = new Set<string>();
     for (const select of CONTEXTUAL_SELECTIONS) {
@@ -457,15 +462,35 @@ describe('Spreadsheet.mountToolbar', () => {
       }
       tb.dispose();
     }
+    const pivotSheet = await mountPivotSheet();
+    const pivotTb = Spreadsheet.mountToolbar(host, pivotSheet.instance, {
+      ribbonTabs: RIBBON_TABS,
+      helpers: stubHelpers(),
+    });
+    for (const button of host.querySelectorAll<HTMLButtonElement>('button[data-ribbon-command]')) {
+      rendered.add(button.dataset.ribbonCommand ?? '');
+    }
+    pivotTb.dispose();
+    pivotSheet.dispose();
 
     expect([...rendered].sort()).toEqual([...new Set(ribbonActivatableSurfaceCommandIds())].sort());
   });
 
-  it('renders disabled activation commands with disabled accessibility state', () => {
+  it('renders disabled activation commands with disabled accessibility state', async () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    const pivotSheet = await mountPivotSheet();
+    const pivotHost = document.createElement('div');
+    document.body.appendChild(pivotHost);
+    const pivotTb = Spreadsheet.mountToolbar(pivotHost, pivotSheet.instance, {
+      ribbonTabs: RIBBON_TABS,
+      helpers: stubHelpers(),
+    });
 
     for (const command of RIBBON_DISABLED_COMMANDS) {
-      const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+      const selector = `[data-ribbon-command="${command}"]`;
+      const button =
+        host.querySelector<HTMLButtonElement>(selector) ??
+        pivotHost.querySelector<HTMLButtonElement>(selector);
       expect(button, `${command} button`).toBeTruthy();
       expect(button?.disabled, `${command} disabled`).toBe(true);
       expect(button?.getAttribute('aria-disabled'), `${command} aria-disabled`).toBe('true');
@@ -480,6 +505,9 @@ describe('Spreadsheet.mountToolbar', () => {
       expect(button?.dataset.ribbonMenuId, `${command} menu`).toBeUndefined();
     }
 
+    pivotTb.dispose();
+    pivotSheet.dispose();
+    pivotHost.remove();
     tb.dispose();
   });
 

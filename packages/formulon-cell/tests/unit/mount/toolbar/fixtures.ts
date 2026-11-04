@@ -1,10 +1,12 @@
 import { vi } from 'vitest';
 import { defaultTableOverlay } from '../../../../src/commands/format-as-table.js';
+import { createPivotTableAtPlacement } from '../../../../src/commands/pivot-table.js';
 import { addrKey } from '../../../../src/engine/address.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../../../../src/store/store.js';
 import type { DynamicDropdownsCtx } from '../../../../src/toolbar/ribbon/dynamic-dropdowns.js';
 import type { RibbonRenderHelpers } from '../../../../src/toolbar/ribbon/render-ribbon.js';
-import type { MountedStubSheet } from '../../../test-utils/mount.js';
+import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount.js';
 
 // Minimal helpers stub: enough for the renderer to emit a shell, no real
 // dropdown DOM. The toolbar still needs `createSelect/Color/Icon/makeSvg`
@@ -82,6 +84,35 @@ export const CONTEXTUAL_SELECTIONS: readonly ((store: SpreadsheetStore) => void)
   selectStoreShape,
   selectStorePicture,
 ];
+
+/**
+ * A sheet on the real engine with the active cell inside a PivotTable report, so the ribbon
+ * shows the PivotTable tabs. The stub engine has no pivots.
+ */
+export const mountPivotSheet = async (locale: 'en' | 'ja' = 'en'): Promise<MountedStubSheet> => {
+  const workbook = await WorkbookHandle.createDefault();
+  const rows: (string | number)[][] = [
+    ['Region', 'Sales'],
+    ['East', 1],
+    ['West', 2],
+    ['East', 3],
+  ];
+  for (const [row, cols] of rows.entries()) {
+    for (const [col, value] of cols.entries()) {
+      if (typeof value === 'number') workbook.setNumber({ sheet: 0, row, col }, value);
+      else workbook.setText({ sheet: 0, row, col }, value);
+    }
+  }
+  const sheet = await mountStubSheet({ locale, workbook });
+  mutators.replaceCells(sheet.instance.store, workbook.cells(0));
+  createPivotTableAtPlacement(
+    { store: sheet.instance.store, workbook, history: sheet.instance.history },
+    { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
+    { row: 8, col: 4 },
+  );
+  mutators.setActive(sheet.instance.store, { sheet: 0, row: 9, col: 4 });
+  return sheet;
+};
 
 export const waitFor = async (predicate: () => boolean, timeoutMs = 250): Promise<void> => {
   const deadline = Date.now() + timeoutMs;

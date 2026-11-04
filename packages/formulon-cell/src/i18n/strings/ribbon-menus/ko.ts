@@ -470,6 +470,8 @@ export const ribbonMenusKo: RibbonMenusStrings = {
     clear: '규칙 지우기',
     clearSelection: '선택한 셀에서 규칙 지우기',
     clearSheet: '전체 시트에서 규칙 지우기',
+    clearTable: '이 표에서 규칙 지우기',
+    clearPivot: '이 피벗 테이블에서 규칙 지우기',
     manage: '규칙 관리…',
     greater: '보다 큼…',
     less: '보다 작음…',

@@ -464,6 +464,8 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     clear: '清除规则',
     clearSelection: '清除所选单元格中的规则',
     clearSheet: '清除整个工作表中的规则',
+    clearTable: '清除此表的规则',
+    clearPivot: '清除此数据透视表的规则',
     manage: '管理规则…',
     greater: '大于…',
     less: '小于…',

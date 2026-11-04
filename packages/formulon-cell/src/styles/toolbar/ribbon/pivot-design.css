@@ -1,0 +1,77 @@
+@layer fc.chrome {
+  /* The labelled name and active-field readouts take two of the group's three rows. */
+  .fc-tb__rb-input[data-ribbon-input^="pivot"] {
+    grid-row: span 2;
+  }
+
+  /* PivotTable Design: Quick Styles strip, 73 x 56 swatches between two arrows. */
+  .fc-tb__pivotstyle-gallery {
+    display: flex;
+    align-items: stretch;
+    width: 533px;
+    height: 60px;
+  }
+
+  .fc-tb__pivotstyle-strip {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .fc-tb__pivotstyle-chip {
+    flex: 0 0 73px;
+    width: 73px;
+    height: 56px;
+    padding: 2px;
+    border: 1px solid var(--fc-rule);
+    background: var(--fc-bg);
+    cursor: pointer;
+  }
+
+  .fc-tb__pivotstyle-chip[aria-pressed="true"] {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: -2px;
+  }
+
+  .fc-tb__pivotstyle-thumb {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    width: 100%;
+    height: 100%;
+  }
+
+  .fc-tb__pivotstyle-cell {
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-rule) 60%, transparent);
+  }
+
+  .fc-tb__pivotstyle-prev,
+  .fc-tb__pivotstyle-next {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 58px;
+    padding: 0;
+    border: 0;
+    background:
+      linear-gradient(45deg, transparent 50%, var(--fc-fg-mute) 50%) calc(50% - 2px) 50% / 4px 4px
+      no-repeat,
+      linear-gradient(135deg, var(--fc-fg-mute) 50%, transparent 50%) calc(50% + 2px) 50% / 4px 4px
+      no-repeat;
+    cursor: pointer;
+  }
+
+  .fc-tb__pivotstyle-prev {
+    transform: rotate(90deg);
+  }
+
+  .fc-tb__pivotstyle-next {
+    transform: rotate(-90deg);
+  }
+
+  .fc-tb__pivotstyle-prev:disabled,
+  .fc-tb__pivotstyle-next:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}

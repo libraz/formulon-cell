@@ -357,6 +357,8 @@ export const ribbonJa: RibbonStrings = {
       shapeFormat: '図形の書式',
       pictureFormat: '図の形式',
       tableDesign: 'テーブル デザイン',
+      pivotAnalyze: 'ピボットテーブル分析',
+      pivotDesign: 'デザイン',
     },
     functionArgumentsTitle: '{name} の引数',
     zoomToTitle: 'ズーム {percent}',

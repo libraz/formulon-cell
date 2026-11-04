@@ -356,6 +356,8 @@ export const ribbonEn: RibbonStrings = {
       shapeFormat: 'Shape Format',
       pictureFormat: 'Picture Format',
       tableDesign: 'Table Design',
+      pivotAnalyze: 'PivotTable Analyze',
+      pivotDesign: 'Design',
     },
     functionArgumentsTitle: '{name} Arguments',
     zoomToTitle: 'Zoom to {percent}',

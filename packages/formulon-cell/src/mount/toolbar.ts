@@ -2,6 +2,7 @@ import { selectedSessionChart } from '../commands/chart-design.js';
 import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { selectedSessionIllustration } from '../commands/session-illustration.js';
 import { activeTableOverlay } from '../commands/table-design.js';
+import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { attachRibbonScreenTips } from '../interact/ribbon-screen-tip.js';
 import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
@@ -81,6 +82,7 @@ import {
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   PICTURE_CONTEXTUAL_RIBBON_TABS,
+  PIVOT_CONTEXTUAL_RIBBON_TABS,
   type RibbonTab,
   SHAPE_CONTEXTUAL_RIBBON_TABS,
   TABLE_CONTEXTUAL_RIBBON_TABS,
@@ -375,7 +377,13 @@ export function mountToolbar(
   const selectedObjectTabs = (state: State): readonly RibbonTab[] => {
     if (selectedSessionChart(state)) return CHART_CONTEXTUAL_RIBBON_TABS;
     const item = selectedSessionIllustration(state);
-    if (!item) return activeTableOverlay(state) ? TABLE_CONTEXTUAL_RIBBON_TABS : NO_CONTEXTUAL_TABS;
+    if (!item) {
+      const workbook = getInstance()?.workbook;
+      if (workbook && findPivotTableAtCell(workbook, state.selection.active)) {
+        return PIVOT_CONTEXTUAL_RIBBON_TABS;
+      }
+      return activeTableOverlay(state) ? TABLE_CONTEXTUAL_RIBBON_TABS : NO_CONTEXTUAL_TABS;
+    }
     return item.kind === 'image' ? PICTURE_CONTEXTUAL_RIBBON_TABS : SHAPE_CONTEXTUAL_RIBBON_TABS;
   };
 

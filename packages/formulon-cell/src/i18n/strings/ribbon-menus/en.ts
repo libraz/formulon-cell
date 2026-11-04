@@ -470,6 +470,8 @@ export const ribbonMenusEn: RibbonMenusStrings = {
     clear: 'Clear Rules',
     clearSelection: 'Clear Rules from Selected Cells',
     clearSheet: 'Clear Rules from Entire Sheet',
+    clearTable: 'Clear Rules from This Table',
+    clearPivot: 'Clear Rules from This PivotTable',
     manage: 'Manage Rules...',
     greater: 'Greater Than...',
     less: 'Less Than...',

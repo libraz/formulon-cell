@@ -354,6 +354,8 @@ export const ribbonZh: RibbonStrings = {
       shapeFormat: '形状格式',
       pictureFormat: '图片格式',
       tableDesign: '表设计',
+      pivotAnalyze: '数据透视表分析',
+      pivotDesign: '设计',
     },
     functionArgumentsTitle: '{name} 参数',
     zoomToTitle: '缩放到 {percent}',

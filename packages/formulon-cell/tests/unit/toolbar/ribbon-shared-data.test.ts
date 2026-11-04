@@ -42,6 +42,7 @@ import {
   RIBBON_VIEW_MODES,
   RIBBON_ZOOM_PRESETS,
 } from '../../../src/toolbar/ribbon/command-tables.js';
+import { PIVOT_DISABLED_COMMAND_IDS } from '../../../src/toolbar/ribbon/pivot-command-ids.js';
 import { RIBBON_ACTIVE_COMMANDS } from '../../../src/toolbar/ribbon-active-state.js';
 import {
   EXCEL365_STANDARD_RIBBON_TABS,
@@ -376,8 +377,11 @@ describe('toolbar/ribbon shared data', () => {
     );
     expect(
       standardEntries.filter((entry) => entry.kind === 'disabled').map((entry) => entry.command),
-    ).toEqual(['helpSearch']);
-    expect(optionalEntries.filter((entry) => entry.kind === 'disabled')).toEqual([]);
+    ).toEqual(['helpSearch', ...PIVOT_DISABLED_COMMAND_IDS].sort());
+    // Every surface carries the contextual tabs, so the PivotTable stubs show up in both.
+    expect(
+      optionalEntries.filter((entry) => entry.kind === 'disabled').map((entry) => entry.command),
+    ).toEqual([...PIVOT_DISABLED_COMMAND_IDS].sort());
   });
 
   it('keeps effective activation categories mutually exclusive', () => {

@@ -15,6 +15,11 @@ import { selectedSessionChart, switchSessionChartRowColumn } from '../../command
 import { setFont, withSelectionFormatOrigin } from '../../commands/format.js';
 import { setOutlineSummaryPosition } from '../../commands/outline.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
+import {
+  DEFAULT_PIVOT_TOGGLES,
+  PIVOT_STYLE_TOGGLES,
+  updatePivotStyleInfo,
+} from '../../commands/pivot-style-info.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import { executeNoteVisibilityAction } from '../../commands/ribbon-comment.js';
 import { hideCols, hideRows } from '../../commands/row-col-layout.js';
@@ -42,6 +47,7 @@ import {
   setZerosVisible,
 } from '../../commands/view.js';
 import { fontPointsToCssPx } from '../../engine/font-units.js';
+import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { outlineSummaryFor } from '../../store/outline-summary.js';
@@ -368,6 +374,27 @@ const applyGenericRibbonCommand = (
     case 'formatTableHome':
       void hooks?.insert?.createTable?.('medium');
       return true;
+    case 'pivotFieldList':
+      i.openActivePivotFieldList();
+      runtime.focusSheet();
+      return true;
+    case 'pivotOptions':
+      i.openPivotOptions();
+      return true;
+    case 'pivotRowHeaders':
+    case 'pivotColHeaders':
+    case 'pivotRowStripes':
+    case 'pivotColStripes': {
+      const pivot = findPivotTableAtCell(i.workbook, i.store.getState().selection.active);
+      const key = PIVOT_STYLE_TOGGLES[id];
+      if (pivot && key) {
+        const current = i.workbook.getPivotStyleInfo(pivot.sheetIndex, pivot.pivotIndex);
+        updatePivotStyleInfo(i, pivot, { [key]: !(current?.[key] ?? DEFAULT_PIVOT_TOGGLES[key]) });
+      }
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    }
     case 'tableHeaderRow':
     case 'tableTotalRow':
     case 'tableBandedRows':

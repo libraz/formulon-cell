@@ -354,6 +354,8 @@ export const ribbonTh: RibbonStrings = {
       shapeFormat: 'รูปแบบรูปร่าง',
       pictureFormat: 'รูปแบบรูปภาพ',
       tableDesign: 'ออกแบบตาราง',
+      pivotAnalyze: 'วิเคราะห์ PivotTable',
+      pivotDesign: 'ออกแบบ',
     },
     functionArgumentsTitle: 'อาร์กิวเมนต์ของ {name}',
     zoomToTitle: 'ย่อ/ขยายเป็น {percent}',

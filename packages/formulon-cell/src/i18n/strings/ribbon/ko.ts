@@ -356,6 +356,8 @@ export const ribbonKo: RibbonStrings = {
       shapeFormat: '도형 서식',
       pictureFormat: '그림 서식',
       tableDesign: '표 디자인',
+      pivotAnalyze: '피벗 테이블 분석',
+      pivotDesign: '디자인',
     },
     functionArgumentsTitle: '{name} 인수',
     zoomToTitle: '{percent}(으)로 확대/축소',

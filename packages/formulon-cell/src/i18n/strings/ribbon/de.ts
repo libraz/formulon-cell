@@ -358,6 +358,8 @@ export const ribbonDe: RibbonStrings = {
       shapeFormat: 'Formformat',
       pictureFormat: 'Bildformat',
       tableDesign: 'Tabellenentwurf',
+      pivotAnalyze: 'PivotTable-Analyse',
+      pivotDesign: 'Entwurf',
     },
     functionArgumentsTitle: '{name}-Argumente',
     zoomToTitle: 'Auf {percent} zoomen',

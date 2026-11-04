@@ -357,6 +357,8 @@ export const ribbonFr: RibbonStrings = {
       shapeFormat: 'Format de la forme',
       pictureFormat: "Format de l'image",
       tableDesign: 'Création de tableau',
+      pivotAnalyze: 'Analyse de tableau croisé dynamique',
+      pivotDesign: 'Création',
     },
     functionArgumentsTitle: 'Arguments de {name}',
     zoomToTitle: 'Zoom à {percent}',

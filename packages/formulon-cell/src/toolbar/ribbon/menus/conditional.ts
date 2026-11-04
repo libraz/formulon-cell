@@ -5,9 +5,9 @@
 // sets, plain menu items for highlight rules. All clicks emit a `data-cf-*`
 // attribute the playground main dispatcher reads.
 
+import { projectDisabledState } from '../../menu-a11y.js';
 import { conditionalMenuText } from '../../menu-text.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
-
 import {
   createMenu,
   createMenuButton,
@@ -17,6 +17,7 @@ import {
   menuSeparator,
   menuSubmenuTrigger,
 } from './general.js';
+import type { MenuVariant } from './mac-variants.js';
 
 export type CfSubmenuKey =
   | 'highlight'
@@ -212,6 +213,8 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
     bars: t.bars,
     clearSelection: t.clearSelection,
     clearSheet: t.clearSheet,
+    clearTable: t.clearTable,
+    clearPivot: t.clearPivot,
     dataBarGradientBlue: t.dataBarGradientBlue,
     dataBarGradientGreen: t.dataBarGradientGreen,
     dataBarGradientRed: t.dataBarGradientRed,
@@ -252,7 +255,7 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
 
 type CfMenuText = ReturnType<typeof buildCfMenuText>;
 
-const buildHighlightSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
+const buildHighlightSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: boolean): void => {
   submenu.append(
     cfMenuItem(t.greater, 'cell-gt', 'rule'),
     cfMenuItem(t.less, 'cell-lt', 'rule'),
@@ -261,13 +264,28 @@ const buildHighlightSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => 
     cfMenuItem(t.text, 'text-contains', 'rule'),
     cfMenuItem(t.date, 'date-occurring', 'rule'),
     cfMenuItem(t.duplicate, 'duplicates', 'rule'),
-    cfMenuItem(t.unique, 'unique', 'rule'),
+    ...(mac ? [] : [cfMenuItem(t.unique, 'unique', 'rule')]),
     menuSeparator(),
     cfMenuItem(t.otherRules, 'new-rule', 'manage'),
   );
 };
 
-const buildTopBottomSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
+const buildTopBottomSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: boolean): void => {
+  if (mac) {
+    // The Mac menu orders the rules top 10, top %, bottom 10, bottom %, and each opens a dialog.
+    const prompt = (label: string): string => (label.endsWith('...') ? label : `${label}...`);
+    submenu.append(
+      cfMenuItem(prompt(t.top10), 'top10', 'top'),
+      cfMenuItem(prompt(t.top10Percent), 'top10-percent', 'top'),
+      cfMenuItem(prompt(t.bottom10), 'bottom10', 'top'),
+      cfMenuItem(prompt(t.bottom10Percent), 'bottom10-percent', 'top'),
+      cfMenuItem(prompt(t.aboveAvg), 'above-avg', 'top'),
+      cfMenuItem(prompt(t.belowAvg), 'below-avg', 'top'),
+      menuSeparator(),
+      cfMenuItem(t.otherRules, 'new-rule', 'manage'),
+    );
+    return;
+  }
   submenu.append(
     cfMenuItem(t.top10, 'top10', 'top'),
     cfMenuItem(t.bottom10, 'bottom10', 'top'),
@@ -362,14 +380,29 @@ const buildIconSetSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
   submenu.append(ratings, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 
-const buildClearSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
+const buildClearSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: boolean): void => {
   submenu.append(
     cfMenuItem(t.clearSelection, 'clear-selection', 'clear'),
     cfMenuItem(t.clearSheet, 'clear-sheet', 'clear'),
   );
+  if (!mac) return;
+  // Outside a table or PivotTable these two stay greyed out.
+  for (const [label, action] of [
+    [t.clearTable, 'clear-table'],
+    [t.clearPivot, 'clear-pivot'],
+  ] as const) {
+    const item = cfMenuItem(label, action, 'clear');
+    projectDisabledState(item, true, null);
+    submenu.appendChild(item);
+  }
 };
 
-const createCfPanelSubmenu = (key: CfSubmenuKey, label: string, t: CfMenuText): HTMLDivElement => {
+const createCfPanelSubmenu = (
+  key: CfSubmenuKey,
+  label: string,
+  t: CfMenuText,
+  mac: boolean,
+): HTMLDivElement => {
   const submenu = createSubmenu({
     id: cfSubmenuId(key),
     className: `fc-tb__submenu fc-tb__submenu--cf fc-tb__submenu--cf-${key}`,
@@ -378,10 +411,10 @@ const createCfPanelSubmenu = (key: CfSubmenuKey, label: string, t: CfMenuText): 
   });
   switch (key) {
     case 'highlight':
-      buildHighlightSubmenu(submenu, t);
+      buildHighlightSubmenu(submenu, t, mac);
       break;
     case 'topBottom':
-      buildTopBottomSubmenu(submenu, t);
+      buildTopBottomSubmenu(submenu, t, mac);
       break;
     case 'dataBar':
       buildDataBarSubmenu(submenu, t);
@@ -393,7 +426,7 @@ const createCfPanelSubmenu = (key: CfSubmenuKey, label: string, t: CfMenuText): 
       buildIconSetSubmenu(submenu, t);
       break;
     case 'clear':
-      buildClearSubmenu(submenu, t);
+      buildClearSubmenu(submenu, t, mac);
       break;
   }
   return submenu;
@@ -401,7 +434,11 @@ const createCfPanelSubmenu = (key: CfSubmenuKey, label: string, t: CfMenuText): 
 
 const cfSubmenuId = (key: CfSubmenuKey): string => `menu-conditional-${key}`;
 
-export const createConditionalMenu = (ribbonLang: ToolbarLang): HTMLDivElement => {
+export const createConditionalMenu = (
+  ribbonLang: ToolbarLang,
+  variant?: MenuVariant,
+): HTMLDivElement => {
+  const mac = variant?.mac === true;
   const t = buildCfMenuText(ribbonLang);
   const menu = createMenu('menu-conditional');
   menu.classList.add('fc-tb__menu--conditional');
@@ -418,12 +455,12 @@ export const createConditionalMenu = (ribbonLang: ToolbarLang): HTMLDivElement =
     cfMenuItem(t.manage, 'manage', 'manage'),
   );
   menu.append(
-    createCfPanelSubmenu('highlight', t.highlight, t),
-    createCfPanelSubmenu('topBottom', t.topBottom, t),
-    createCfPanelSubmenu('dataBar', t.dataBar, t),
-    createCfPanelSubmenu('colorScale', t.colorScale, t),
-    createCfPanelSubmenu('iconSet', t.iconSet, t),
-    createCfPanelSubmenu('clear', t.clear, t),
+    createCfPanelSubmenu('highlight', t.highlight, t, mac),
+    createCfPanelSubmenu('topBottom', t.topBottom, t, mac),
+    createCfPanelSubmenu('dataBar', t.dataBar, t, mac),
+    createCfPanelSubmenu('colorScale', t.colorScale, t, mac),
+    createCfPanelSubmenu('iconSet', t.iconSet, t, mac),
+    createCfPanelSubmenu('clear', t.clear, t, mac),
   );
   return menu;
 };

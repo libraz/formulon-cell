@@ -2,6 +2,7 @@ import { dictionaries, type Locale, type Strings } from '../i18n/strings.js';
 import { pageScaleMenuText, toolbarMenuText, viewToggleMenuText } from './menu-text.js';
 import { fontFamilyCatalog, fontFamilyLocaleForStrings } from './ribbon/font-family-options.js';
 import { buildMacRibbonModel } from './ribbon/mac/model.js';
+import { buildPivotContextualTabs } from './ribbon/pivot-tabs.js';
 
 export type RibbonTab =
   | 'file'
@@ -20,7 +21,9 @@ export type RibbonTab =
   | 'chartFormat'
   | 'shapeFormat'
   | 'pictureFormat'
-  | 'tableDesign';
+  | 'tableDesign'
+  | 'pivotAnalyze'
+  | 'pivotDesign';
 
 export type ToolbarLang = Locale;
 
@@ -110,6 +113,8 @@ export const SHAPE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['shapeFormat'
 export const PICTURE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['pictureFormat'];
 /** The tab the active cell adds while it is inside a table. */
 export const TABLE_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['tableDesign'];
+/** The tabs the active cell adds while it is inside a PivotTable report. */
+export const PIVOT_CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = ['pivotAnalyze', 'pivotDesign'];
 /** Every contextual tab. Only one object is selected at a time, so the
  *  ribbon shows at most one of these sets. */
 export const CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = [
@@ -117,6 +122,7 @@ export const CONTEXTUAL_RIBBON_TABS: readonly RibbonTab[] = [
   ...SHAPE_CONTEXTUAL_RIBBON_TABS,
   ...PICTURE_CONTEXTUAL_RIBBON_TABS,
   ...TABLE_CONTEXTUAL_RIBBON_TABS,
+  ...PIVOT_CONTEXTUAL_RIBBON_TABS,
 ];
 
 export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> =
@@ -904,7 +910,10 @@ export function buildRibbonModel(
   const requestedTabs =
     opts.tabs ?? (opts.profile === 'excel365Mac' ? EXCEL365_MAC_RIBBON_TABS : RIBBON_TABS);
   const tabsById = new Map(profileTabs.map((tab) => [tab.id, tab]));
-  const contextualById = new Map(contextualTabs.map((tab) => [tab.id, tab]));
+  const contextualById = new Map([
+    ...contextualTabs.map((tab) => [tab.id, tab] as const),
+    ...buildPivotContextualTabs(profileLang, tr.tabs).map((tab) => [tab.id, tab] as const),
+  ]);
   return [
     ...requestedTabs.flatMap((id) => {
       const tab = tabsById.get(id);

@@ -361,6 +361,8 @@ export interface RibbonStrings {
       shapeFormat: string;
       pictureFormat: string;
       tableDesign: string;
+      pivotAnalyze: string;
+      pivotDesign: string;
     };
     /** Composed-label templates. `{name}` / `{percent}` are interpolated at use. */
     functionArgumentsTitle: string;

@@ -36,7 +36,8 @@ import { createRibbonButton } from './button.js';
 import { createMacCellStylesGallery } from './mac/home-styles-gallery.js';
 import { createMacRibbonMenuFactory, type MacRibbonMenuFactory } from './mac/menus.js';
 import type { MenuVariant } from './menus/mac-variants.js';
-import { createTableNameInput } from './table-design.js';
+import { createPivotStyleGallery } from './pivot-style-gallery.js';
+import { createPivotReadout, createTableNameInput } from './table-design.js';
 
 export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
 
@@ -526,8 +527,17 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             continue;
           }
           if (c.kind === 'input') {
+            const inputCtx = { getInst: ctx.getInst, text: ctx.ribbonText };
+            if (c.id === 'pivotStyleGallery') {
+              tools.appendChild(
+                createPivotStyleGallery({ lang: ctx.ribbonLang, getInst: ctx.getInst }),
+              );
+              continue;
+            }
             tools.appendChild(
-              createTableNameInput(c, { getInst: ctx.getInst, text: ctx.ribbonText }),
+              c.id.startsWith('pivot')
+                ? createPivotReadout(c, inputCtx)
+                : createTableNameInput(c, inputCtx),
             );
             continue;
           }

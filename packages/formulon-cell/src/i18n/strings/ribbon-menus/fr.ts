@@ -479,6 +479,8 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     clear: 'Effacer les règles',
     clearSelection: 'Effacer les règles des cellules sélectionnées',
     clearSheet: 'Effacer les règles de toute la feuille',
+    clearTable: 'Effacer les règles de ce tableau',
+    clearPivot: 'Effacer les règles de ce tableau croisé dynamique',
     manage: 'Gérer les règles…',
     greater: 'Supérieur à…',
     less: 'Inférieur à…',

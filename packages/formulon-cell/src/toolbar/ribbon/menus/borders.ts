@@ -6,6 +6,7 @@
 // update the playground-owned `selectedBorderColor` via `onPickColor`.
 
 import { createColorPalette } from '../../../components/color-palette.js';
+import { projectDisabledState } from '../../menu-a11y.js';
 import type { ToolbarText } from '../../ribbon-model.js';
 
 import { RIBBON_BORDERS_MENU_ID } from '../activation.js';
@@ -30,6 +31,7 @@ import {
   menuSubmenuTrigger,
   submenuItemText,
 } from './general.js';
+import type { MenuVariant } from './mac-variants.js';
 
 export interface BordersMenuDeps {
   ribbonText: ToolbarText;
@@ -115,10 +117,16 @@ const createLineColorSubmenu = (label: string, deps: BordersMenuDeps): HTMLDivEl
   return submenu;
 };
 
-export const createBordersMenu = (deps: BordersMenuDeps): HTMLDivElement => {
+export const createBordersMenu = (deps: BordersMenuDeps, variant?: MenuVariant): HTMLDivElement => {
   const t = deps.ribbonText;
   const menu = createMenu(RIBBON_BORDERS_MENU_ID);
   menu.classList.add('fc-tb__menu--borders');
+  if (variant?.mac) {
+    // The Mac menu opens with a greyed heading naming the preset group.
+    const heading = menuSectionHeader(t.borders);
+    projectDisabledState(heading, true, null);
+    menu.appendChild(heading);
+  }
   menu.append(
     // Section 1: single-side edges
     presetMenuItem('bottom', t.bottomBorder),
