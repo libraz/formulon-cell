@@ -148,8 +148,25 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   const detachTabNavigationSession = attachTabNavigationSession(store);
   const pendingAtomic = new Map<number, PendingAtomicBatch>();
 
+  let cellRefreshes = 0;
   const refreshCells = (): void => {
+    cellRefreshes += 1;
     mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+  };
+
+  // A recalc changes cells besides the written one (dependents, spill ranges).
+  // The UI commits reload the grid's cells themselves; a write made straight
+  // through the workbook API does not, so reload once after the recalc unless
+  // something already did.
+  let recalcRefreshPending = false;
+  const scheduleRecalcRefresh = (): void => {
+    if (recalcRefreshPending) return;
+    recalcRefreshPending = true;
+    const seen = cellRefreshes;
+    queueMicrotask(() => {
+      recalcRefreshPending = false;
+      if (cellRefreshes === seen) refreshCells();
+    });
   };
 
   const validationAlert = flags.validation
@@ -520,6 +537,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       publishAtomicValue(e);
     } else if (e.kind === 'recalc') {
       refreshChartsAfterRecalc(wb, store);
+      scheduleRecalcRefresh();
       emitter.emit('recalc', { dirty: e.dirty });
     } else if (
       e.kind === 'sheet-add' ||
