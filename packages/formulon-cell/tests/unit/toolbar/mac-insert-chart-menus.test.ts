@@ -58,4 +58,17 @@ describe('Mac Insert chart galleries', () => {
     expect(none?.getAttribute('aria-disabled')).toBe('true');
     expect(menu?.querySelector('[data-ribbon-command="mac.insert.chartColumn"]')).toBeNull();
   });
+
+  it('lists the Data Types and From Picture entries greyed out without host support', () => {
+    const types = factory('mac.data.dataTypes');
+    expect(rows(types as HTMLElement)).toEqual([
+      '[DIS]株式 (English)',
+      '[DIS]通貨 (English)',
+      '[DIS]地理 (English)',
+    ]);
+    expect(rows(factory('mac.data.pictureFromData') as HTMLElement)).toEqual([
+      '[DIS]ファイルからの画像...',
+      '[DIS]クリップボードからの画像',
+    ]);
+  });
 });

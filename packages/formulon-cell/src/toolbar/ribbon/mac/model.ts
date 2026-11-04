@@ -425,7 +425,7 @@ const dataTab = (): RibbonTabModel =>
   macTab('data', t('data'), [
     group({ ja: 'データの取得と変換', en: 'Get & Transform Data' }, [
       disabledCommand('mac.data.powerQuery', t('powerQuery'), 'data', NOT_IMPLEMENTED),
-      disabledCommand('mac.data.pictureFromData', t('pictureFromData'), 'picture', OFFICE_REQUIRED),
+      menuCommand('mac.data.pictureFromData', t('pictureFromData'), 'picture'),
     ]),
     group(
       { ja: 'クエリと接続', en: 'Queries & Connections' },

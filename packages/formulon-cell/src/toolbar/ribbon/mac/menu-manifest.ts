@@ -3,7 +3,7 @@ import {
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
 import { MAC_AUTOMATION_GALLERY } from './automation-gallery.js';
-import { type Label, labelFor, labels, NOT_IMPLEMENTED, OFFICE_REQUIRED } from './labels.js';
+import { type Label, labelFor, labels, NOT_IMPLEMENTED } from './labels.js';
 
 /** A leaf rendered in one of the Mac Office-style command menus. */
 export interface MacRibbonMenuItem {
@@ -56,6 +56,7 @@ export const MAC_RIBBON_MENU_COMMANDS = [
   'mac.formulas.removeArrows',
   'mac.formulas.errorCheck',
   'mac.data.dataTypes',
+  'mac.data.pictureFromData',
   'mac.data.sortFilter',
   'mac.data.validation',
   'mac.data.whatIf',
@@ -316,10 +317,16 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     { id: 'mac.formulas.createNames.leftColumn', label: 'Left column' },
     { id: 'mac.formulas.createNames.rightColumn', label: 'Right column' },
   ]),
-  'mac.data.dataTypes': menu([
-    leaf('mac.data.dataTypes.stocks', 'dataTypes', true, OFFICE_REQUIRED),
-    leaf('mac.data.dataTypes.geography', 'dataTypes', true, OFFICE_REQUIRED),
-  ]),
+  // The host has no linked data types, so the gallery lists Excel's entries greyed out.
+  'mac.data.dataTypes': [
+    galleryItem('mac.data.dataTypes.stocks', 'Stocks (English)', '株式 (English)'),
+    galleryItem('mac.data.dataTypes.currencies', 'Currencies (English)', '通貨 (English)'),
+    galleryItem('mac.data.dataTypes.geography', 'Geography (English)', '地理 (English)'),
+  ],
+  'mac.data.pictureFromData': [
+    galleryItem('mac.data.pictureFromData.file', 'From File...', 'ファイルからの画像...'),
+    galleryItem('mac.data.pictureFromData.clipboard', 'From Clipboard', 'クリップボードからの画像'),
+  ],
   'mac.data.sortFilter': menu([
     leaf('mac.data.sortAsc', 'sortAsc'),
     leaf('mac.data.sortDesc', 'sortDesc'),
@@ -417,6 +424,7 @@ export const macRibbonMenuIdForCommand = (commandId: string): string | null => {
     'mac.formulas.removeArrows': 'menu-mac-formulas-remove-arrows',
     'mac.formulas.errorCheck': 'menu-mac-formulas-error-check',
     'mac.data.dataTypes': 'menu-mac-data-types',
+    'mac.data.pictureFromData': 'menu-mac-data-picture',
     'mac.data.sortFilter': 'menu-mac-data-sort-filter',
     'mac.data.validation': 'menu-mac-data-validation',
     'mac.data.whatIf': 'menu-mac-data-what-if',

@@ -440,8 +440,6 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.formulas.createNames.bottomRow': { ja: '下端行', en: 'Bottom row' },
   'mac.formulas.createNames.leftColumn': { ja: '左端列', en: 'Left column' },
   'mac.formulas.createNames.rightColumn': { ja: '右端列', en: 'Right column' },
-  'mac.data.dataTypes.stocks': { ja: '株式', en: 'Stocks' },
-  'mac.data.dataTypes.geography': { ja: '地理', en: 'Geography' },
   'mac.data.goalSeek': { ja: 'ゴール シーク', en: 'Goal Seek' },
   'mac.data.scenarioManager': { ja: 'シナリオ マネージャー', en: 'Scenario Manager' },
   'mac.data.dataTable': { ja: 'データ テーブル', en: 'Data Table' },

@@ -1278,14 +1278,6 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     ko: '오른쪽 열',
     th: 'คอลัมน์ขวาสุด',
   },
-  'mac.data.dataTypes.stocks': { de: 'Aktien', fr: 'Actions', zh: '股票', ko: '주식', th: 'หุ้น' },
-  'mac.data.dataTypes.geography': {
-    de: 'Geografie',
-    fr: 'Géographie',
-    zh: '地理',
-    ko: '지리',
-    th: 'ภูมิศาสตร์',
-  },
   'mac.data.goalSeek': {
     de: 'Zielwertsuche',
     fr: 'Valeur cible',
