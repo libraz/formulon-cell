@@ -67,11 +67,16 @@ function makeCtxSpy(): {
   fills: FillRecord[];
   texts: string[];
   textRecords: TextRecord[];
+  fonts: { text: string; font: string; style: string }[];
+  strokes: { style: string; width: number; dash: number[] }[];
 } {
   const fills: FillRecord[] = [];
   const texts: string[] = [];
   const textRecords: TextRecord[] = [];
+  const fonts: { text: string; font: string; style: string }[] = [];
+  const strokes: { style: string; width: number; dash: number[] }[] = [];
   let fillStyle = '';
+  let dash: number[] = [];
   const ctx = {
     get fillStyle(): string {
       return fillStyle;
@@ -91,21 +96,26 @@ function makeCtxSpy(): {
     closePath(): void {},
     rect(): void {},
     clip(): void {},
-    setLineDash(): void {},
+    setLineDash(value: number[]): void {
+      dash = [...value];
+    },
     moveTo(): void {},
     lineTo(): void {},
-    stroke(): void {},
+    stroke(this: { strokeStyle: string; lineWidth: number }): void {
+      strokes.push({ style: this.strokeStyle, width: this.lineWidth, dash });
+    },
     strokeRect(): void {},
     fill(): void {},
     fillRect(x: number, y: number, w: number, h: number): void {
       fills.push({ style: fillStyle, rect: [x, y, w, h] });
     },
-    fillText(text: string, x = 0, y = 0): void {
+    fillText(this: { font: string }, text: string, x = 0, y = 0): void {
       texts.push(text);
       textRecords.push({ text, x, y });
+      fonts.push({ text, font: this.font, style: fillStyle });
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fills, texts, textRecords };
+  return { ctx, fills, texts, textRecords, fonts, strokes };
 }
 
 const seed = (store: SpreadsheetStore, row: number, col: number): void => {
@@ -444,6 +454,72 @@ describe('Page Break Preview painting', () => {
 
 describe('Page Break Preview painting (Mac desktop)', () => {
   beforeEach(() => resetPaginationCache());
+
+  it('numbers every printed page down then over in regular grey, sized by the page width', () => {
+    // Excel (Mac, 60%, 2x): A1:L95 prints on 2 x 2 pages; '1 ページ' fills
+    // 170 of page 1's 570 device px width (ink 37 px tall), '3 ページ' 58 of the
+    // narrow page's 188, both grey (150,150,150) and regular weight. Automatic
+    // breaks are dashed 2 pt (9 on, 3 off) in the print-area blue.
+    const store = createSpreadsheetStore();
+    seed(store, 0, 0);
+    seed(store, 94, 11);
+    const px = (pt: number) => (pt * 96) / 72;
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, screenScale: 0.75, defaultColWidth: px(53), defaultRowHeight: px(14) },
+      viewport: { ...s.viewport, rowCount: 120, colCount: 20, widthPx: 2400 },
+    }));
+    mutators.setPageSetup(store, 0, {
+      margins: { top: 1, bottom: 1, left: 0.75, right: 0.75 },
+      headerMargin: 0.5,
+      footerMargin: 0.5,
+    });
+    setWorkbookView(store, 'pageBreakPreview');
+    const state = store.getState();
+    const { view, cols, rows } = viewFor(state);
+    const pagination = paginationFor(state, 0);
+    expect(pagination.rowBands[1]?.start).toBe(49);
+    expect(pagination.colBands[1]?.start).toBe(9);
+    const { ctx, fonts, textRecords, strokes } = makeCtxSpy();
+    paintPageBreakPreview(
+      { ctx, dpr: 2, cssWidth: 2400, cssHeight: 4000 },
+      view,
+      theme,
+      pagination,
+      getPageSetup(state, 0),
+      (page) => `${page} ページ`,
+      cols,
+      rows,
+    );
+
+    expect(fonts.map((f) => f.text).sort()).toEqual([
+      '1 ページ',
+      '2 ページ',
+      '3 ページ',
+      '4 ページ',
+    ]);
+    for (const f of fonts) {
+      expect(f.style).toBe('#969696');
+      expect(f.font).toMatch(/^400 /);
+    }
+    const sizeOf = (text: string) =>
+      Number(fonts.find((f) => f.text === text)?.font.match(/ ([\d.]+)px /)?.[1]);
+    const left = cellRectIn(view.layout, cols, rows, 0, 0);
+    const opener = cellRectIn(view.layout, cols, rows, 0, 9);
+    const page1W = opener.x - left.x;
+    expect(sizeOf('1 ページ')).toBeCloseTo(page1W * 0.074, 1);
+    // Down then over: page 3 is the narrow top-right page.
+    const page3 = textRecords.find((r) => r.text === '3 ページ');
+    expect(page3?.x).toBeGreaterThan(opener.x);
+    expect(page3?.y).toBeLessThan(cellRectIn(view.layout, cols, rows, 49, 0).y);
+    expect(sizeOf('3 ページ')).toBeLessThan(sizeOf('1 ページ'));
+
+    const breaks = strokes.filter((s) => s.dash.length > 0);
+    expect(breaks.length).toBe(2);
+    for (const line of breaks) {
+      expect(line).toMatchObject({ style: '#0008d0', width: 2, dash: [9, 3] });
+    }
+  });
 
   it('greys the non-printing area (160) and frames the print area in (0,8,208), 1 pt leading and 3 pt trailing', () => {
     const store = createSpreadsheetStore();

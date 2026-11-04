@@ -842,6 +842,12 @@ export const PAGE_BREAK_GRAB = 4;
  *  the print-area frame. */
 const MAC_PAGE_OUTSIDE = '#a0a0a0';
 const MAC_PRINT_AREA_FRAME = '#0008d0';
+/** Excel Mac page label: grey (150,150,150), regular, its font size a fixed
+ *  share of the page width (ink 170 of 570 device px, 37 px tall). */
+const MAC_PAGE_WATERMARK = '#969696';
+const MAC_WATERMARK_SIZE_PER_WIDTH = 0.074;
+/** Excel Mac automatic break: 2 pt dashed 9 on, 3 off, in the frame blue. */
+const MAC_AUTO_BREAK = { width: 2, dash: [9, 3] } as const;
 
 /**
  * Page Break Preview: wash out everything that will not print, frame the print
@@ -893,7 +899,7 @@ export function paintPageBreakPreview(
   // Page numbers, centred on the page they belong to.
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = theme.pageNumberFg;
+  ctx.fillStyle = mac ? MAC_PAGE_WATERMARK : theme.pageNumberFg;
   for (const rowRun of liveRows) {
     // The last page is usually only part-filled, so the number centres on the
     // printed part of it rather than on the empty paper below.
@@ -908,10 +914,13 @@ export function paintPageBreakPreview(
       const w = trail - colRun.start;
       const h = bottom - rowRun.start;
       // Below this the number would be unreadable and would only obscure the
-      // cells it sits on, so the page goes unlabelled.
-      if (w < 48 || h < 24) continue;
-      const size = Math.min(72, Math.max(20, Math.min(w, h) / 3));
-      ctx.font = `700 ${size}px ${theme.fontUi}`;
+      // cells it sits on, so the page goes unlabelled. The desktop on the Mac
+      // scales a regular-weight label with the page width instead.
+      if (!mac && (w < 48 || h < 24)) continue;
+      const size = mac
+        ? w * MAC_WATERMARK_SIZE_PER_WIDTH
+        : Math.min(72, Math.max(20, Math.min(w, h) / 3));
+      ctx.font = `${mac ? 400 : 700} ${size}px ${theme.fontUi}`;
       ctx.fillText(
         pageLabel(page),
         mirrorX(layout, colRun.start + w / 2),
@@ -930,11 +939,25 @@ export function paintPageBreakPreview(
     manual: boolean,
     index: number,
   ): void => {
-    ctx.strokeStyle = manual ? theme.pageBreakManual : theme.pageBreakAuto;
-    ctx.lineWidth = (manual ? 2.5 : 1.5) / dpr;
-    ctx.setLineDash(manual ? [] : [6 / dpr, 4 / dpr]);
+    const macAuto = mac && !manual;
+    ctx.strokeStyle = macAuto
+      ? MAC_PRINT_AREA_FRAME
+      : manual
+        ? theme.pageBreakManual
+        : theme.pageBreakAuto;
+    ctx.lineWidth = macAuto ? MAC_AUTO_BREAK.width : (manual ? 2.5 : 1.5) / dpr;
+    ctx.setLineDash(macAuto ? [...MAC_AUTO_BREAK.dash] : manual ? [] : [6 / dpr, 4 / dpr]);
     ctx.beginPath();
-    if (axis === 'row') {
+    if (macAuto) {
+      // Centred on the page boundary.
+      if (axis === 'row') {
+        ctx.moveTo(ox, position);
+        ctx.lineTo(cssWidth, position);
+      } else {
+        ctx.moveTo(position, oy);
+        ctx.lineTo(position, cssHeight);
+      }
+    } else if (axis === 'row') {
       const y = Math.round(position) + align;
       ctx.moveTo(ox, y);
       ctx.lineTo(cssWidth, y);
