@@ -1,4 +1,4 @@
-import { addrKey, parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey, quoteSheetName } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.js';
@@ -124,9 +124,6 @@ export const unquoteSheetName = (qualifier: string): string => {
   const name = qualifier.slice(0, -1);
   return name.startsWith("'") && name.endsWith("'") ? name.slice(1, -1).replace(/''/g, "'") : name;
 };
-
-export const quoteSheetName = (name: string): string =>
-  /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`;
 
 /** Re-point sparklines after a row/column insert or delete on `sheet`: host
  *  cells move with their cells (a deleted host drops its sparkline) and a

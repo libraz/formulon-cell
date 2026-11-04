@@ -5,9 +5,10 @@ import {
   selectionFromRanges,
 } from '../commands/goto-special.js';
 import { protectedCellMessage } from '../commands/protection.js';
-import { formatA1Range } from '../engine/address.js';
+import { formatA1Range, quoteSheetName } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { rangeDefinedNames, resolveAreaText, splitAreas } from '../mount/ref-utils.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -77,9 +78,6 @@ const MAX_RECENT_REFERENCES = 4;
 /** Areas last jumped to through the dialog, newest first, per mount. */
 const recentReferences = new WeakMap<SpreadsheetStore, Range[][]>();
 
-const quoteSheetName = (name: string): string =>
-  /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`;
-
 /**
  * Spreadsheet-style Go To / Go To Special dialog. Go To jumps to names,
  * recent references or typed (multi-area, sheet-qualified) references; its
@@ -95,7 +93,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const { host, store, getWb } = deps;
   const strings = deps.strings ?? defaultStrings;
   let mode: 'go-to' | 'special' = 'special';
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const mac = isMacHost(host);
   const macText = mac ? strings.macGoToDialog : null;
   const t = macText ? { ...strings.goToDialog, ...macText } : strings.goToDialog;
 

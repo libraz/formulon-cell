@@ -1,5 +1,4 @@
 import { createAccessibilityStatus } from '../commands/accessibility-check.js';
-import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { autofitPivotTableColumns, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
@@ -10,9 +9,9 @@ import {
 } from '../commands/session-illustration.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
-import { formatA1Range } from '../engine/address.js';
+import { addrKey, formatA1Range } from '../engine/address.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
-import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
+import { editSeedForAddr } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEmitter } from '../events.js';
@@ -363,7 +362,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             const wb = input.wb();
             return !wb.isStub && wb.capabilities.effectiveStyle
               ? effectiveCellFormat(wb, input.store.getState(), addr)
-              : input.store.getState().format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+              : input.store.getState().format.formats.get(addrKey(addr));
           },
         });
         input.featureRegistry.set(
@@ -826,16 +825,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           onEditCell: (addr) => {
             mutators.setActive(input.store, addr);
             const state = input.store.getState();
-            const key = `${addr.sheet}:${addr.row}:${addr.col}`;
-            const cell = state.data.cells.get(key);
-            const fmt = state.format.formats.get(key);
-            const storedFormula = input.wb().cellFormula(addr) ?? cell?.formula ?? null;
-            input.fxInput.value = formatCellForEdit(cell, input.wb(), addr, {
-              formulaOverride: formulaForEdit(input.wb(), addr, storedFormula, state.ui.r1c1),
-              formulaHidden: fmt?.formulaHidden === true,
-              sheetProtected: state.protection.protectedSheets.has(addr.sheet),
-              locale: inputLocaleForWorkbook(input.wb()),
-            });
+            input.fxInput.value = editSeedForAddr(state, input.wb(), addr);
             input.fxInput.focus();
             input.fxInput.setSelectionRange(input.fxInput.value.length, input.fxInput.value.length);
           },

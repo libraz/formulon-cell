@@ -15,7 +15,7 @@
  *    clamps to the band boundary instead of injecting `#REF!` mid-range.
  */
 
-import { colFromLetters, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { colFromLetters, MAX_COL, MAX_ROW, quoteSheetName } from '../engine/address.js';
 import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import {
   type Atom,
@@ -820,8 +820,7 @@ function qualifierForOutputSheet(sheet: number, context: CutPasteSheetContext): 
   if (sheet === context.outputSheet) return '';
   const name = context.sheetNames[sheet];
   if (name === undefined) return '';
-  const safe = /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name);
-  return `${safe ? name : `'${name.replace(/'/g, "''")}'`}!`;
+  return `${quoteSheetName(name)}!`;
 }
 
 /** Clamp a range against an edit so a partial deletion keeps the surviving

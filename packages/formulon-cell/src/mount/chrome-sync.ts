@@ -6,7 +6,14 @@ import {
   recordDefinedNamesChange,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
-import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
+import {
+  addrKey,
+  formatA1Cell,
+  formatA1Range,
+  MAX_COL,
+  MAX_ROW,
+  quoteSheetName,
+} from '../engine/address.js';
 import { formulaForEdit } from '../engine/edit-seed.js';
 import { numFmtToFormatCode } from '../engine/format-writeback.js';
 import { syncActiveSheet } from '../engine/layout-sync.js';
@@ -57,11 +64,6 @@ export interface ChromeSyncController {
   updateChrome(): void;
 }
 
-const quoteSheetName = (name: string): string => {
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return name;
-  return `'${name.replace(/'/g, "''")}'`;
-};
-
 const MAX_A11Y_VIEWPORT_ROWS = 20;
 const MAX_A11Y_VIEWPORT_COLS = 10;
 
@@ -78,7 +80,7 @@ const cellDisplayText = (
   wb: WorkbookHandle,
   addr: { sheet: number; row: number; col: number },
 ): string => {
-  const key = `${addr.sheet}:${addr.row}:${addr.col}`;
+  const key = addrKey(addr);
   const cell = state.data.cells.get(key);
   const fmt = state.format.formats.get(key);
   const formula = cell?.formula ?? '';
@@ -138,7 +140,7 @@ const formulaBarText = (
   addr: { sheet: number; row: number; col: number },
   display: string,
 ): string => {
-  const key = `${addr.sheet}:${addr.row}:${addr.col}`;
+  const key = addrKey(addr);
   const cell = state.data.cells.get(key);
   if (!cell?.formula) {
     const spill = cell ? wb.spillInfo(addr.sheet, addr.row, addr.col) : null;
@@ -214,7 +216,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   const selectionRef = (s: State): string => {
     const a = s.selection.active;
     const range = s.selection.range;
-    const merge = s.merges.byAnchor.get(`${a.sheet}:${a.row}:${a.col}`);
+    const merge = s.merges.byAnchor.get(addrKey(a));
     const logicalCell =
       merge &&
       merge.sheet === range.sheet &&
@@ -289,7 +291,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     left.inputLocale === right.inputLocale &&
     left.strings === right.strings;
 
-  const cellKey = (sheet: number, row: number, col: number): string => `${sheet}:${row}:${col}`;
+  const cellKey = (sheet: number, row: number, col: number): string => addrKey({ sheet, row, col });
   const ordinaryCells = new Map<string, HTMLElement>();
   const ordinaryDisplays = new Map<string, string>();
   const rowMirrors = new Map<number, HTMLElement>();
@@ -504,11 +506,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     if (document.activeElement !== tag) tag.value = object ? object.name : nameBoxText(ref);
     if (!getFormulaEditing()) {
       fxInput.value = object ? '' : formulaBarText(s, wb, active, display);
-      fxInput.readOnly =
-        !object &&
-        isDataTableFormula(
-          s.data.cells.get(`${active.sheet}:${active.row}:${active.col}`)?.formula,
-        );
+      fxInput.readOnly = !object && isDataTableFormula(s.data.cells.get(addrKey(active))?.formula);
     }
     activeCellMirror.setAttribute('aria-rowindex', String(active.row + 1));
     activeCellMirror.setAttribute('aria-colindex', String(active.col + 1));

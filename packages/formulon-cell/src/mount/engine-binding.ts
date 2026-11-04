@@ -1,16 +1,17 @@
-import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { setDataTableGuardSink } from '../commands/data-table-guard.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { setPivotGuardSink } from '../commands/pivot-guard.js';
 import { protectedCellMessage } from '../commands/protection.js';
+import { addrKey } from '../engine/address.js';
 import { refreshChartsAfterRecalc, reloadChartsFromEngine } from '../engine/charts-sync.js';
-import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
+import { editSeedForAddr } from '../engine/edit-seed.js';
 import { reloadImagesFromEngine } from '../engine/images-sync.js';
 import type { Addr, CellValue } from '../engine/types.js';
 import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellChangeEvent, SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
 import { attachAutoFillOptions } from '../interact/auto-fill-options.js';
@@ -440,15 +441,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   const beginEditActiveCell = (caretClientX?: number): void => {
     const s = store.getState();
     const a = s.selection.active;
-    const key = `${a.sheet}:${a.row}:${a.col}`;
-    const fmt = s.format.formats.get(key);
-    const storedFormula = wb.cellFormula(a) ?? s.data.cells.get(key)?.formula ?? null;
-    const seed = formatCellForEdit(s.data.cells.get(key), wb, a, {
-      formulaOverride: formulaForEdit(wb, a, storedFormula, s.ui.r1c1),
-      formulaHidden: fmt?.formulaHidden === true,
-      sheetProtected: s.protection.protectedSheets.has(a.sheet),
-      locale: inputLocaleForWorkbook(wb),
-    });
+    const seed = editSeedForAddr(s, wb, a);
     editor.begin(seed, {
       mode: 'edit',
       ...(caretClientX === undefined ? {} : { caretClientX }),
@@ -465,7 +458,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     // inline edit from the persisted, still-old formula while that draft is live.
     if (getFormulaBarEditor?.()?.isFormulaEdit()) return;
     // The Mac desktop puts the caret where the cell was double-clicked.
-    const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+    const mac = isMacHost(host);
     beginEditActiveCell(mac ? e.clientX : undefined);
     e.preventDefault();
   };
@@ -475,9 +468,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     const addresses = events.map((event) => event.addr);
     const formulas = wb.cellFormulas(addresses);
     const current = events.map((event) => ({
-      key: `${event.addr.sheet}:${event.addr.row}:${event.addr.col}`,
+      key: addrKey(event.addr),
       value: { ...wb.getValue(event.addr) },
-      formula: formulas.get(`${event.addr.sheet}:${event.addr.row}:${event.addr.col}`) ?? null,
+      formula: formulas.get(addrKey(event.addr)) ?? null,
     }));
     store.setState((s) => {
       const cells = new Map(s.data.cells);
@@ -492,7 +485,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     const cell = { value: e.next, formula };
     store.setState((s) => {
       const cells = new Map(s.data.cells);
-      cells.set(`${e.addr.sheet}:${e.addr.row}:${e.addr.col}`, cell);
+      cells.set(addrKey(e.addr), cell);
       return { ...s, data: { ...s.data, cells } };
     });
     emitter.emit('cellChange', { addr: e.addr, value: e.next, formula });

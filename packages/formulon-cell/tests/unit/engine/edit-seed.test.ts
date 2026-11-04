@@ -154,3 +154,24 @@ describe('formulaForEdit', () => {
     expect(getFormulaForDisplay).toHaveBeenCalledWith('=SUM(R[-2]C[-2],R2C2)');
   });
 });
+
+describe('editSeedForAddr', () => {
+  it('shows the stored formula, and nothing for a hidden formula on a protected sheet', async () => {
+    const { editSeedForAddr } = await import('../../../src/engine/edit-seed.js');
+    const wb = {
+      cellFormula: () => '=1+2',
+      capabilities: {},
+      sheetCount: 1,
+    } as unknown as WorkbookHandle;
+    const state = (hidden: boolean, protectedSheet: boolean) =>
+      ({
+        data: { cells: new Map([['0:0:0', { value: num(3), formula: '=1+2' }]]) },
+        format: { formats: new Map([['0:0:0', hidden ? { formulaHidden: true } : {}]]) },
+        protection: { protectedSheets: new Set(protectedSheet ? [0] : []) },
+        ui: { r1c1: false },
+      }) as never;
+    const addr = { sheet: 0, row: 0, col: 0 };
+    expect(editSeedForAddr(state(false, false), wb, addr)).toBe('=1+2');
+    expect(editSeedForAddr(state(true, true), wb, addr)).toBe('');
+  });
+});

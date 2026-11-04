@@ -13,6 +13,7 @@ import {
 import { editorRefHighlights, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import type { AutocompleteInsertOutcome } from '../interact/autocomplete.js';
 import { handleFormulaAutocompleteKey } from '../interact/formula-autocomplete-key.js';
@@ -200,8 +201,21 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   let ignoredHistoryInput: { action: 'undo' | 'redo'; snapshot: FormulaDraftSnapshot } | null =
     null;
 
-  const isMacPlatform = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const clearHistoryInput = (): void => {
+    pendingHistoryInput = null;
+    ignoredHistoryInput = null;
+  };
+  const clearReferenceState = (): void => {
+    referenceGesture = null;
+    pointNavigation = null;
+  };
+  const dismissAutocomplete = (): void => {
+    const autocomplete = getAutocomplete();
+    if (autocomplete.dismiss) autocomplete.dismiss();
+    else autocomplete.close();
+  };
+
+  const isMacPlatform = (): boolean => isMacHost(host);
 
   const isFormulaEdit = (): boolean => fxEditing && fxInput.value.trimStart().startsWith('=');
   const draftActive = (): boolean => fxEditing || externalDraft?.status === 'open';
@@ -220,8 +234,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const applyDraftSnapshot = (snapshot: FormulaDraftSnapshot): void => {
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     arrowMode = snapshot.mode;
     fxInput.value = snapshot.value;
     fxInput.setSelectionRange(snapshot.start, snapshot.end, snapshot.direction);
@@ -232,8 +245,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const applyDraftHistory = (action: 'undo' | 'redo'): FormulaDraftSnapshot => {
     const snapshot =
       (action === 'undo' ? draftHistory.undo() : draftHistory.redo()) ?? draftHistory.current();
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     applyDraftSnapshot(snapshot);
     return snapshot;
   };
@@ -308,15 +320,13 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const finishEditing = (): void => {
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     arrowMode = 'edit';
     fxEditing = false;
     editingAnchor = null;
     commitRejected = false;
     fxBaseline = fxInput.value;
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.clear();
     refreshActions();
     clearFxRefs();
@@ -362,8 +372,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     pointNavigation = null;
     suspended = false;
     commitRejected = false;
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.restoreState(restoredHistory);
     refreshActions();
     mutators.setEditorRefs(store, restoredRefs);
@@ -489,8 +498,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     suspended = false;
     referenceGesture = null;
     clearFxRefs();
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.clear();
   };
 
@@ -615,8 +623,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       { value, start, end, direction: 'none', mode: arrowMode },
       identity,
     );
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     fxInput.value = value;
     fxInput.setSelectionRange(start, end);
     syncFormulaBarInputState();
@@ -692,8 +699,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const commitSelection = (): void => {
     commitRejected = false;
     draftHistory.endGroup();
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     const state = store.getState();
     if (commitDeferred) return;
     if (
@@ -794,8 +800,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   function commitExternalDraft(draft: ExternalDraftState): boolean {
     draftHistory.endGroup();
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     if (detached || externalDraft !== draft || draft.status !== 'open') return false;
     if (externalDraftStale(draft)) {
       discardStaleLeaseDraft(draft);
@@ -865,8 +870,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const commitFx = (advance: 'down' | 'right' | 'up' | 'left' | 'none'): boolean => {
     draftHistory.endGroup();
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     if (externalDraft) {
       return externalDraft.status === 'open' ? commitExternalDraft(externalDraft) : false;
     }
@@ -898,11 +902,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const cancelFx = (): void => {
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     arrowMode = 'edit';
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.clear();
     if (externalDraft) {
       cancelExternalDraft();
@@ -922,11 +924,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const discardFx = (): void => {
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     arrowMode = 'edit';
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.clear();
     if (externalDraft) {
       discardExternalDraft();
@@ -942,8 +942,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     commitRejected = false;
     fxBaseline = fxInput.value;
     suspended = false;
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.clear();
     clearFxRefs();
     refreshDiscardedChrome();
@@ -964,12 +963,10 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     cancelBindingEditor();
     fxEditing = true;
     arrowMode = 'edit';
-    pointNavigation = null;
-    referenceGesture = null;
+    clearReferenceState();
     fxBaseline = baseline;
     editingAnchor = { ...store.getState().selection.active };
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.reset(captureDraftSnapshot());
     refreshActions();
     syncFxRefs();
@@ -1002,8 +999,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const onFxBeforeInput = (event: InputEvent): void => {
     if (detached || (externalDraft && externalDraft.status !== 'open')) {
-      pendingHistoryInput = null;
-      ignoredHistoryInput = null;
+      clearHistoryInput();
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -1011,8 +1007,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const currentDraft = externalDraft;
     if (currentDraft && externalDraftStale(currentDraft)) {
       discardStaleLeaseDraft(currentDraft);
-      pendingHistoryInput = null;
-      ignoredHistoryInput = null;
+      clearHistoryInput();
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -1037,8 +1032,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       }
       return;
     }
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     if (!composing) draftHistory.beforeInput(captureDraftSnapshot());
   };
 
@@ -1048,15 +1042,13 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       const snapshot = draftHistory.current();
       fxInput.value = snapshot.value;
       fxInput.setSelectionRange(snapshot.start, snapshot.end, snapshot.direction);
-      pendingHistoryInput = null;
-      ignoredHistoryInput = null;
+      clearHistoryInput();
       return;
     }
     const currentDraft = externalDraft;
     if (currentDraft && externalDraftStale(currentDraft)) {
       discardStaleLeaseDraft(currentDraft);
-      pendingHistoryInput = null;
-      ignoredHistoryInput = null;
+      clearHistoryInput();
       return;
     }
     const event = rawEvent as InputEvent | undefined;
@@ -1068,18 +1060,15 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
           ? 'redo'
           : null);
     if (composing) {
-      pendingHistoryInput = null;
-      ignoredHistoryInput = null;
-      referenceGesture = null;
-      pointNavigation = null;
+      clearHistoryInput();
+      clearReferenceState();
       draftHistory.input(captureDraftSnapshot(), { composing: true, inputType: event?.inputType });
       syncFormulaBarInputState();
       return;
     }
     const ignored = ignoredHistoryInput;
     if (historyAction && ignored?.action === historyAction) {
-      ignoredHistoryInput = null;
-      pendingHistoryInput = null;
+      clearHistoryInput();
       applyDraftSnapshot(ignored.snapshot);
       return;
     }
@@ -1089,8 +1078,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       applyDraftHistory(historyAction);
       return;
     }
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     // A system discard has already cached the current display in fxBaseline;
     // preserve it because the browser updates textarea.value before input.
     if (!fxEditing) beginFormulaBarEdit(fxBaseline);
@@ -1114,11 +1102,9 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       return;
     }
     composing = true;
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.startComposition(captureDraftSnapshot());
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     getAutocomplete().setComposing?.(true);
     getArgHelper()?.setComposing?.(true);
   };
@@ -1151,8 +1137,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const onFxClick = (): void => {
     arrowMode = 'edit';
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     onFxSelection();
   };
 
@@ -1224,9 +1209,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     fxInput.setSelectionRange(result.caret, result.caret);
     syncFormulaBarInputState();
     // The programmatic edit must not reopen suggestions that swallow the next arrow.
-    const autocomplete = getAutocomplete();
-    if (autocomplete.dismiss) autocomplete.dismiss();
-    else autocomplete.close();
+    dismissAutocomplete();
     scrollActiveIntoView(store, result.tip);
     return true;
   };
@@ -1252,11 +1235,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       draftHistory.endGroup();
       arrowMode = arrowMode === 'point' ? 'edit' : 'point';
       draftHistory.observeSelection(captureDraftSnapshot());
-      referenceGesture = null;
-      pointNavigation = null;
-      const autocomplete = getAutocomplete();
-      if (autocomplete.dismiss) autocomplete.dismiss();
-      else autocomplete.close();
+      clearReferenceState();
+      dismissAutocomplete();
       return;
     }
     const autocomplete = getAutocomplete();
@@ -1389,8 +1369,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       pointNavigation = null;
       arrowMode = 'edit';
       fxEditing = false;
-      pendingHistoryInput = null;
-      ignoredHistoryInput = null;
+      clearHistoryInput();
       draftHistory.clear();
       refreshActions();
       clearFxRefs();
@@ -1497,8 +1476,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       lease,
     };
     externalDraft = draft;
-    referenceGesture = null;
-    pointNavigation = null;
+    clearReferenceState();
     arrowMode = 'edit';
     fxEditing = true;
     suspended = lease !== null;
@@ -1511,8 +1489,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     } else {
       fxInput.setSelectionRange(draftSeed.length, draftSeed.length);
     }
-    pendingHistoryInput = null;
-    ignoredHistoryInput = null;
+    clearHistoryInput();
     draftHistory.reset(captureDraftSnapshot());
     refreshActions();
     syncFxRefs();
@@ -1586,8 +1563,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       if (externalDraft) discardExternalDraft();
       else {
         referenceGesture = null;
-        pendingHistoryInput = null;
-        ignoredHistoryInput = null;
+        clearHistoryInput();
         draftHistory.clear();
         invalidateLease();
       }
@@ -1601,8 +1577,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     },
     notifyAutocompleteInsert(outcome?: AutocompleteInsertOutcome): void {
       suppressSelectionNotifications = false;
-      pointNavigation = null;
-      referenceGesture = null;
+      clearReferenceState();
       if (outcome?.kind === 'function') arrowMode = 'point';
       draftHistory.finishCommand(captureDraftSnapshot());
       syncFormulaBarInputState(false);

@@ -1,13 +1,12 @@
 import { SparklineType } from '@libraz/formulon';
 import {
   newSparklineGroupId,
-  quoteSheetName,
   splitSourceQualifier,
   unquoteSheetName,
 } from '../commands/sparkline.js';
 import { DEFAULT_NEGATIVE_COLOR, DEFAULT_SPARKLINE_COLOR } from '../render/painters/controls.js';
 import type { Sparkline, SparklineKind, SpreadsheetStore, State } from '../store/store.js';
-import { addrKey, formatA1Cell, parseA1Atom, parseAddrKey } from './address.js';
+import { addrKey, formatA1Cell, parseA1Atom, parseAddrKey, quoteSheetName } from './address.js';
 import { argbFromCssColor, cssColorFromArgb } from './theme-color.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import type {

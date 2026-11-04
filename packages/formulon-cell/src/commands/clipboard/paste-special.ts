@@ -1,4 +1,11 @@
-import { addrKey, colLetter, MAX_COL, MAX_ROW, parseAddrKey } from '../../engine/address.js';
+import {
+  addrKey,
+  colLetter,
+  MAX_COL,
+  MAX_ROW,
+  parseAddrKey,
+  quoteSheetName,
+} from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import { writeCell } from '../../engine/value.js';
 import type { CellPatch, WorkbookHandle } from '../../engine/workbook-handle.js';
@@ -34,7 +41,6 @@ import {
   recordLayoutChangeWithEngine,
   recordMergesChangeWithEngine,
 } from '../slice-history.js';
-import { quoteSheetName } from '../sparkline.js';
 import { applyPatchesAtomic } from './apply-patches-atomic.js';
 import {
   bandAxisFor,

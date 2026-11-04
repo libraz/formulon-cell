@@ -110,12 +110,23 @@ export type { RibbonDisplayMode } from '../toolbar/ribbon/render-ribbon.js';
 const DEFAULT_BORDER_STYLE: CellBorderStyle = 'thin';
 const DEFAULT_BORDER_COLOR = '#000000';
 
+const SPLIT_CHEVRON_SELECTOR = '.fc-tb__rb-split-chevron';
+const MAC_MENU_SELECTOR = '.fc-tb__menu--mac';
+
+const isAriaDisabled = (el: Element): boolean => el.getAttribute('aria-disabled') === 'true';
+
+const scrollActiveTabIntoView = (host: HTMLElement): void => {
+  host
+    .querySelector<HTMLElement>('[data-ribbon-tab][aria-selected="true"]')
+    ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+};
+
 const isImmediateMacFormulaOpener = (commandId: string): boolean =>
   commandId === 'mac.formulas.insertFunction' || commandId.startsWith('mac.function.');
 
 const isImmediateMacFormulaPrimary = (target: Element, commandId: string): boolean =>
   isImmediateMacFormulaOpener(commandId) &&
-  !target.closest('.fc-tb__rb-split-chevron') &&
+  !target.closest(SPLIT_CHEVRON_SELECTOR) &&
   !isRibbonMenuFirstCommand(commandId);
 
 export interface MountToolbarOptions {
@@ -362,6 +373,8 @@ export function mountToolbar(
   let contextualTabs = NO_CONTEXTUAL_TABS;
   let contextualReturnTab: RibbonTab = 'home';
   let knownObjectIds: ReadonlySet<string> = new Set();
+  // Store slices the contextual tabs derive from; an unchanged tuple skips the sync.
+  let contextualInputs: readonly unknown[] = [];
   // Objects added in the current task: an insert or paste selects the object it adds.
   const freshObjectIds = new Set<string>();
   const isContextualTab = (tab: RibbonTab): boolean => CONTEXTUAL_RIBBON_TABS.includes(tab);
@@ -393,6 +406,25 @@ export function mountToolbar(
    *  True when the tabs changed. */
   const syncContextualTabs = (current: SpreadsheetInstance | null, adopt: boolean): boolean => {
     const state = current?.store.getState();
+    const inputs = state
+      ? [
+          current,
+          current?.workbook,
+          state.charts.charts,
+          state.illustrations.illustrations,
+          state.tables.tables,
+          state.ui.selectedObject,
+          state.selection.active,
+          state.data,
+        ]
+      : [current];
+    if (
+      inputs.length === contextualInputs.length &&
+      inputs.every((input, i) => input === contextualInputs[i])
+    ) {
+      return false;
+    }
+    contextualInputs = inputs;
     const previousIds = knownObjectIds;
     knownObjectIds = new Set(
       state
@@ -602,9 +634,7 @@ export function mountToolbar(
     ribbonFit.refit();
     wireBorderMenu();
     interactionPolicy.project();
-    host
-      .querySelector<HTMLElement>('[data-ribbon-tab][aria-selected="true"]')
-      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    scrollActiveTabIntoView(host);
   };
 
   const syncInheritedPlatform = (current: SpreadsheetInstance | null): boolean => {
@@ -710,9 +740,7 @@ export function mountToolbar(
   const projectRibbonTabs = (): void => {
     projectRibbonShell(host, { activeTab, displayMode, peekRequested: ribbonPeek });
     ribbonFit.refit();
-    host
-      .querySelector<HTMLElement>('[data-ribbon-tab][aria-selected="true"]')
-      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    scrollActiveTabIntoView(host);
   };
 
   const onRibbonFocus = (event: FocusEvent): void => {
@@ -735,7 +763,7 @@ export function mountToolbar(
 
   const activateRibbonTab = (tab: RibbonTab, reveal: boolean): void => {
     const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${tab}"]`);
-    if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
+    if (!button || button.disabled || isAriaDisabled(button)) return;
     dropdownsApi?.closeAllDynamicRibbonDropdowns();
     closeStaticRibbonMenus(host);
     const changed = tab !== activeTab;
@@ -769,7 +797,7 @@ export function mountToolbar(
       !cmdBtn ||
       !id ||
       cmdBtn.disabled ||
-      cmdBtn.getAttribute('aria-disabled') === 'true' ||
+      isAriaDisabled(cmdBtn) ||
       !isImmediateMacFormulaPrimary(target, id)
     )
       return;
@@ -835,7 +863,7 @@ export function mountToolbar(
         command &&
         !command.disabled &&
         !isRibbonMenuFirstCommand(command.dataset.ribbonCommand ?? '') &&
-        !target.closest('.fc-tb__rb-split-chevron')
+        !target.closest(SPLIT_CHEVRON_SELECTOR)
       )
         dismissRibbonPeek();
       return;
@@ -843,7 +871,7 @@ export function mountToolbar(
     const cmdBtn = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (cmdBtn?.dataset.ribbonCommand) {
       const id = cmdBtn.dataset.ribbonCommand;
-      if (cmdBtn.disabled || cmdBtn.getAttribute('aria-disabled') === 'true') return;
+      if (cmdBtn.disabled || isAriaDisabled(cmdBtn)) return;
       // WebKit follows the macOS convention of not focusing a <button> on
       // click. Ribbon keyboard navigation and host dialogs that restore focus
       // to the command that opened them both rely on the invoked command being
@@ -863,7 +891,7 @@ export function mountToolbar(
       // otherwise look identical to primary-face clicks. Route it to the
       // attached menu before the primary action; SVG paths are covered by
       // `closest()` just like the SVG element itself.
-      if (target.closest('.fc-tb__rb-split-chevron') && cmdBtn.dataset.ribbonMenuId) {
+      if (target.closest(SPLIT_CHEVRON_SELECTOR) && cmdBtn.dataset.ribbonMenuId) {
         const menuId = cmdBtn.dataset.ribbonMenuId;
         if (dropdownsApi) {
           dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
@@ -877,7 +905,7 @@ export function mountToolbar(
       // it. Split buttons with a primary face action skip this so
       // applyRibbonCommand can fire their primary handler; their chevron
       // routing is handled by the branch above.
-      if (isRibbonMenuFirstCommand(id) && !cmdBtn.closest('.fc-tb__menu--mac')) {
+      if (isRibbonMenuFirstCommand(id) && !cmdBtn.closest(MAC_MENU_SELECTOR)) {
         const menuId = cmdBtn.dataset.ribbonMenuId;
         if (dropdownsApi && menuId) {
           dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
@@ -888,8 +916,8 @@ export function mountToolbar(
       const immediateFunctionLeaf =
         id.startsWith('mac.function.') && isImmediateMacFormulaPrimary(target, id);
       let returnFocusTarget: HTMLElement | null = null;
-      if (cmdBtn.closest('.fc-tb__menu--mac')) {
-        const menu = cmdBtn.closest<HTMLElement>('.fc-tb__menu--mac');
+      if (cmdBtn.closest(MAC_MENU_SELECTOR)) {
+        const menu = cmdBtn.closest<HTMLElement>(MAC_MENU_SELECTOR);
         const spec = menu ? dropdownsApi?.dynamicDropdownSpecForMenu(menu) : null;
         returnFocusTarget =
           immediateFunctionLeaf && spec
@@ -937,8 +965,7 @@ export function mountToolbar(
     // Hidden tabs are filtered so custom tab profiles can omit optional
     // add-in surfaces without leaving dead stops in the roving tabindex.
     const tabs = Array.from(host.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')).filter(
-      (btn) =>
-        btn.offsetParent !== null && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
+      (btn) => btn.offsetParent !== null && !btn.disabled && !isAriaDisabled(btn),
     );
     if (tabs.length === 0) return;
     const currentIndex = tabs.indexOf(tabBtn);

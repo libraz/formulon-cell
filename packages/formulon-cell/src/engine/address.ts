@@ -71,3 +71,14 @@ export function formatA1Range(
   const end = formatA1Cell(range.r1, range.c1, opts.absolute);
   return start === end && opts.collapse !== false ? start : `${start}:${end}`;
 }
+
+/** Sheet-name prefix form for a formula reference: bare only when it is a
+ *  plain identifier that cannot be read as part of the address (`A1`, `R1C1`
+ *  and all-digit names keep their quotes). */
+export function quoteSheetName(name: string): string {
+  const bare =
+    /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
+    !/^[A-Za-z]{1,3}\d+$/.test(name) &&
+    !/^[Rr]\d+[Cc]\d+$/.test(name);
+  return bare ? name : `'${name.replace(/'/g, "''")}'`;
+}

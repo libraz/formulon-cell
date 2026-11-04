@@ -2,7 +2,9 @@ import type { History } from '../commands/history.js';
 import { clearHyperlink, hyperlinkAt, setHyperlink } from '../commands/hyperlinks.js';
 import { runAfterAllowedRangeUnlock } from '../commands/protection.js';
 import { recordFormatChange } from '../commands/slice-history.js';
+import { quoteSheetName } from '../engine/address.js';
 import { addrKey, type WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { showPrompt } from '../toolbar/dialogs/prompt.js';
@@ -47,7 +49,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
   const strings = deps.strings ?? defaultStrings;
   // The Mac dialog adds display text, a ScreenTip and Web / document / e-mail tabs.
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const mac = isMacHost(host);
   const m = mac ? strings.macHyperlinkDialog : null;
   const t = m ? { ...strings.hyperlinkDialog, ...m } : strings.hyperlinkDialog;
 
@@ -201,8 +203,6 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   let placeSheet: string | null = null;
   let tooltip: string | undefined;
   const recentEmails: string[] = [];
-  const quoteSheet = (name: string): string =>
-    /^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`;
   const unquoteSheet = (name: string): string =>
     name.startsWith("'") && name.endsWith("'") ? name.slice(1, -1).replace(/''/g, "'") : name;
   /** The link the active Mac tab describes; the plain dialog uses the address field. */
@@ -213,7 +213,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
       if (!ref) return '';
       const active = store.getState().selection.active;
       const sheet = placeSheet ?? getWb()?.sheetName(active.sheet) ?? '';
-      return sheet ? `#${quoteSheet(sheet)}!${ref}` : `#${ref}`;
+      return sheet ? `#${quoteSheetName(sheet)}!${ref}` : `#${ref}`;
     }
     const address = emailInput.value.trim();
     if (!address) return '';

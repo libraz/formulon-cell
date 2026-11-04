@@ -1,4 +1,7 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
+import type { State } from '../store/store.js';
+import { addrKey } from './address.js';
 import { localeOrdinalForSpreadsheetProfile, localizeFormula } from './function-locale.js';
 import type { Addr, CellValue } from './types.js';
 import { formatBoolean, formatEditableNumber } from './value.js';
@@ -99,4 +102,18 @@ export function formatCellForEdit(
     default:
       return '';
   }
+}
+
+/** Edit-seed text for the cell at `addr`, honouring the stored formula, R1C1
+ *  mode, hidden formulas on protected sheets and the workbook input locale. */
+export function editSeedForAddr(state: State, wb: WorkbookHandle, addr: Addr): string {
+  const key = addrKey(addr);
+  const cell = state.data.cells.get(key);
+  const storedFormula = wb.cellFormula(addr) ?? cell?.formula ?? null;
+  return formatCellForEdit(cell, wb, addr, {
+    formulaOverride: formulaForEdit(wb, addr, storedFormula, state.ui.r1c1),
+    formulaHidden: state.format.formats.get(key)?.formulaHidden === true,
+    sheetProtected: state.protection.protectedSheets.has(addr.sheet),
+    locale: inputLocaleForWorkbook(wb),
+  });
 }

@@ -177,16 +177,20 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     if (target?.isConnected) target.focus();
   };
 
+  const refreshAfterSheetChange = (): void => {
+    hydrateActiveSheet();
+    update();
+    refreshStatusBar();
+    invalidate();
+  };
+
   const switchSheet = (idx: number): void => {
     const wb = getWb();
     if (idx < 0 || idx >= wb.sheetCount) return;
     if (store.getState().layout.hiddenSheets.has(idx)) return;
     if (idx === store.getState().data.sheetIndex) return;
     mutators.setSheetIndex(store, idx);
-    hydrateActiveSheet();
-    update();
-    refreshStatusBar();
-    invalidate();
+    refreshAfterSheetChange();
   };
 
   const switchRelative = (delta: 1 | -1): void => {
@@ -259,10 +263,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const canVeryHide = canHide && wb.capabilities.sheetVisibility === true;
     const moveAndRefresh = (from: number, to: number): void => {
       if (!moveSheet(store, wb, from, to, history)) return;
-      hydrateActiveSheet();
-      update();
-      refreshStatusBar();
-      invalidate();
+      refreshAfterSheetChange();
     };
     const openMoveCopy = async (): Promise<void> => {
       const shown = visible();
@@ -378,17 +379,11 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const deleteSheetAction = async (): Promise<void> => {
       if (!(await confirmSheetDelete(strings, wb, idx))) return;
       if (!removeSheet(store, wb, idx)) return;
-      hydrateActiveSheet();
-      update();
-      refreshStatusBar();
-      invalidate();
+      refreshAfterSheetChange();
     };
     const hideSheetAction = (): void => {
       if (!setSheetHidden(store, wb, history, idx, true)) return;
-      hydrateActiveSheet();
-      update();
-      refreshStatusBar();
-      invalidate();
+      refreshAfterSheetChange();
     };
     const desktopItems: HTMLElement[] = [
       menuButton(
@@ -444,10 +439,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           if (!setSheetTabVisibility(store, wb, history, idx, SheetVisibility.VeryHidden)) {
             return;
           }
-          hydrateActiveSheet();
-          update();
-          refreshStatusBar();
-          invalidate();
+          refreshAfterSheetChange();
         },
         structureProtected || !canVeryHide || visibleIndexes.length <= 1,
         veryHideReason(),

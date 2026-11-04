@@ -1,5 +1,4 @@
 import { clearSelectedContents } from '../commands/clear-contents.js';
-import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import { currentRegion } from '../commands/current-region.js';
 import { blockDataTableCells } from '../commands/data-table-guard.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -11,9 +10,10 @@ import {
   warnProtected,
 } from '../commands/protection.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
-import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
+import { editSeedForAddr } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { selectionExtendEnd } from '../store/selection-mutators.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -74,8 +74,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
 
   // Read the host attribute for every event. `Spreadsheet.setUi()` can change
   // the platform while the binding remains attached.
-  const isMacPlatform = (): boolean =>
-    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const isMacPlatform = (): boolean => isMacHost(host);
 
   const clearCopySessionIfUnchanged = (revision: number): void => {
     if ((store.getState().ui.copyRevision ?? 0) !== revision) return;
@@ -138,7 +137,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     ) {
       e.preventDefault();
       e.stopImmediatePropagation();
-      deps.onBeginEdit(formatExisting(s, a, deps.wb), { mode: 'edit' });
+      deps.onBeginEdit(editSeedForAddr(s, deps.wb, a), { mode: 'edit' });
       return;
     }
 
@@ -423,7 +422,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       e.preventDefault();
       return;
     } else if (k === 'F2' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-      const seed = formatExisting(s, a, deps.wb);
+      const seed = editSeedForAddr(s, deps.wb, a);
       deps.onBeginEdit(seed, { mode: 'edit' });
       e.preventDefault();
       return;
@@ -558,20 +557,4 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
 
   host.addEventListener('keydown', onKey);
   return () => host.removeEventListener('keydown', onKey);
-}
-
-function formatExisting(
-  s: ReturnType<SpreadsheetStore['getState']>,
-  a: Addr,
-  wb: WorkbookHandle,
-): string {
-  const key = `${a.sheet}:${a.row}:${a.col}`;
-  const fmt = s.format.formats.get(key);
-  const storedFormula = wb.cellFormula(a) ?? s.data.cells.get(key)?.formula ?? null;
-  return formatCellForEdit(s.data.cells.get(key), wb, a, {
-    formulaOverride: formulaForEdit(wb, a, storedFormula, s.ui.r1c1),
-    formulaHidden: fmt?.formulaHidden === true,
-    sheetProtected: s.protection.protectedSheets.has(a.sheet),
-    locale: inputLocaleForWorkbook(wb),
-  });
 }
