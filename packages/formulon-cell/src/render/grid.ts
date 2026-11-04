@@ -59,6 +59,7 @@ import {
   paintErrorSmartTag,
   paintFillHandle,
   paintFillPreview,
+  paintMoveBand,
   paintRangeOutlineThin,
   paintRefHighlight,
   paintSelectionOutline,
@@ -818,18 +819,12 @@ export class GridRenderer {
       ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
       : a;
     const validationBounds = trailingRect(activeRects, layout.rtl);
-    // The Mac desktop sets its 14 pt button in points.
-    const dropdownPt = this.macProfile()
+    // The Mac desktop sets its chrome in points.
+    const macPt = this.macProfile()
       ? fontPointsToCssPx(1) * renderScale(layout, viewport)
       : undefined;
     if (validationBounds && shouldShowValidationChevron(validationAt(format, activeAnchor))) {
-      const rect = paintValidationChevron(
-        this.ctx,
-        validationBounds,
-        theme,
-        layout.rtl,
-        dropdownPt,
-      );
+      const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl, macPt);
       this.hits.validationChevron = {
         rect,
         cell: validationBounds,
@@ -839,13 +834,7 @@ export class GridRenderer {
     } else if (validationBounds) {
       const totals = totalsCellAt(state, a.sheet, activeAnchor.row, activeAnchor.col);
       if (totals) {
-        const rect = paintValidationChevron(
-          this.ctx,
-          validationBounds,
-          theme,
-          layout.rtl,
-          dropdownPt,
-        );
+        const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl, macPt);
         this.hits.totalsChevron = {
           rect,
           row: activeAnchor.row,
@@ -861,7 +850,11 @@ export class GridRenderer {
     const preview = ui.fillPreview;
     if (preview) {
       const rects = rangeRects(layout, viewport, preview);
-      for (const r of rects) paintFillPreview(this.ctx, r, theme);
+      // The Mac desktop shows the fill target as its green drag band.
+      for (const r of rects) {
+        if (macPt !== undefined) paintMoveBand(this.ctx, r, macPt);
+        else paintFillPreview(this.ctx, r, theme);
+      }
     }
     const copyRanges = ui.copyRanges && ui.copyRanges.length > 0 ? ui.copyRanges : null;
     const rangesToPaint = (copyRanges ?? (ui.copyRange ? [ui.copyRange] : [])).filter(

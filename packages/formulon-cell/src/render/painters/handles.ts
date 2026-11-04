@@ -151,6 +151,28 @@ export function paintFillPreview(
   ctx.restore();
 }
 
+/** Excel Mac's drag target band, in points: 3 wide centred on the range's
+ *  gridlines, light (192,213,199) round a 1 pt (162,183,169) centre line.
+ *  Fill-handle and drag-move previews share it. */
+const MOVE_BAND_LIGHT = '#c0d5c7';
+const MOVE_BAND_CENTRE = '#a2b7a9';
+
+export function paintMoveBand(ctx: CanvasRenderingContext2D, bounds: Rect, pt: number): void {
+  const { x, y, w, h } = bounds;
+  ctx.save();
+  ctx.fillStyle = MOVE_BAND_LIGHT;
+  ctx.fillRect(x - 2 * pt, y - 2 * pt, 3 * pt, h + 3 * pt);
+  ctx.fillRect(x + w - 2 * pt, y - 2 * pt, 3 * pt, h + 3 * pt);
+  ctx.fillRect(x - 2 * pt, y - 2 * pt, w + 3 * pt, 3 * pt);
+  ctx.fillRect(x - 2 * pt, y + h - 2 * pt, w + 3 * pt, 3 * pt);
+  ctx.fillStyle = MOVE_BAND_CENTRE;
+  ctx.fillRect(x - pt, y - pt, pt, h + pt);
+  ctx.fillRect(x + w - pt, y - pt, pt, h + pt);
+  ctx.fillRect(x - pt, y - pt, w + pt, pt);
+  ctx.fillRect(x - pt, y + h - pt, w + pt, pt);
+  ctx.restore();
+}
+
 /** Animated dashed copy-source marquee ("marching ants"). */
 export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect, phase = 0): void {
   ctx.save();

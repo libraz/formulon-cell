@@ -1,5 +1,6 @@
 import type { AutofitOptions } from '../commands/autofit-measurement.js';
-import { fillDestFor, fillOutputRange, fillRange } from '../commands/fill.js';
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { fillDestFor, fillLastValue, fillOutputRange, fillRange } from '../commands/fill.js';
 import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
 import { headerFilterRanges } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
@@ -68,6 +69,7 @@ import {
   type State,
 } from '../store/store.js';
 import { jumpToDataEdge } from './data-edge-navigation.js';
+import { createFillValueTooltip } from './fill-value-tooltip.js';
 import { followHyperlink, type HyperlinkFollowDeps } from './hyperlink-follow.js';
 import {
   isNavigationAddrAllowed,
@@ -262,6 +264,7 @@ export function attachPointer(
   hyperlinkFollow: Pick<HyperlinkFollowDeps, 'activateSheet' | 'onInvalidTarget'> = {},
 ): () => void {
   const hits = gridHitState(host);
+  const fillTooltip = createFillValueTooltip(host);
   let drag: DragMode = { kind: 'none' };
   const unsubscribeSheetChange = store.subscribe((state) => {
     if (drag.kind === 'selection-marquee' && state.data.sheetIndex !== drag.base.range.sheet) {
@@ -903,6 +906,9 @@ export function attachPointer(
         }
         mutators.setFillPreview(store, dest);
         host.style.cursor = 'crosshair';
+        const last = fillLastValue(s, drag.src, dest, inputLocaleForWorkbook(wb));
+        if (last === null) fillTooltip.hide();
+        else fillTooltip.show(last, e.clientX, e.clientY);
         return;
       }
       case 'ruler-margin': {
@@ -1037,6 +1043,7 @@ export function attachPointer(
       const s = store.getState();
       const dest = s.ui.fillPreview;
       mutators.setFillPreview(store, null);
+      fillTooltip.hide();
       if (dest) {
         if (!isNavigationRangeAllowed(store, dest)) {
           drag = { kind: 'none' };
@@ -1069,6 +1076,7 @@ export function attachPointer(
     drag = { kind: 'none' };
     mutators.setPageBreakDrag(store, null);
     mutators.setFillPreview(store, null);
+    fillTooltip.hide();
     host.style.cursor = '';
   };
 
@@ -1154,6 +1162,7 @@ export function attachPointer(
     host.removeEventListener('pointercancel', onCancel);
     host.removeEventListener('pointerleave', onLeave);
     host.removeEventListener('dblclick', onDblClick);
+    fillTooltip.dispose();
     host.style.cursor = '';
   };
 }

@@ -638,6 +638,47 @@ function applyFillRange(
   return wroteValues || wroteFormats;
 }
 
+/** Text of the value a fill drag's furthest cell would receive, for the fill
+ *  handle's tooltip: the first line's projection in the drag direction. Null
+ *  for no extension, a 2D tile, or a formula or blank result. */
+export function fillLastValue(
+  state: State,
+  src: Range,
+  dest: Range,
+  locale: string | undefined,
+): string | null {
+  if (dest.r0 === src.r0 && dest.r1 === src.r1 && dest.c0 === src.c0 && dest.c1 === src.c1) {
+    return null;
+  }
+  const dir = detectDirection(src, dest);
+  if (dir === 'copy') return null;
+  const source = readSource(state, src);
+  const vertical = dir === 'down' || dir === 'up';
+  const line: SourceCell[] = vertical
+    ? source.map((row) => row[0] as SourceCell)
+    : (source[0] ?? []);
+  const forward = dir === 'down' || dir === 'right';
+  const ext =
+    dir === 'down'
+      ? dest.r1 - src.r1
+      : dir === 'up'
+        ? src.r0 - dest.r0
+        : dir === 'right'
+          ? dest.c1 - src.c1
+          : src.c0 - dest.c0;
+  const ctx: ProjectionContext = {
+    locale,
+    date1904: state.ui.date1904 === true,
+    sign: forward ? 1 : -1,
+  };
+  const projected = buildProjection(forward ? line : [...line].reverse(), ctx).at(ext);
+  if (!projected) return null;
+  if (projected.kind === 'number') return String(projected.value);
+  if (projected.kind === 'text') return projected.value;
+  if (projected.kind === 'bool') return projected.value ? 'TRUE' : 'FALSE';
+  return null;
+}
+
 /** Compute the dest range for a drag from the source's bottom-right corner
  *  to a target cell (the cursor position). Spreadsheets lock the extension to
  *  whichever axis is most extended — diagonal drags don't extend both axes

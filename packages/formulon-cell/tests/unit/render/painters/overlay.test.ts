@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   paintFillPreview,
+  paintMoveBand,
   paintSpillBlocker,
   paintSpillOutline,
   paintSpillTarget,
@@ -208,5 +209,51 @@ describe('render/painters — paintSpillWarningTag', () => {
     const rtl = tagSpy();
     paintSpillWarningTag(rtl.ctx, { x: 182, y: 21, w: 52, h: 14 }, true);
     expect(rtl.buttons[0]?.[0]).toBe(182 + 52 + 13 + 0.5);
+  });
+});
+
+describe('render/painters — paintMoveBand (Mac desktop)', () => {
+  it('lays a 3 pt green band centred on the range gridlines with a darker centre line', () => {
+    // Excel (Mac, 2x): L1:L8 spans x 62-168 / y 14-238; the band covers
+    // x 58-63 and 164-169, y 234-239: light (192,213,199) round a darker
+    // (162,183,169) centre, the outer and centre lines 1 pt each.
+    const fills: { style: string; rect: number[] }[] = [];
+    let fillStyle = '';
+    const ctx = {
+      get fillStyle() {
+        return fillStyle;
+      },
+      set fillStyle(v: string) {
+        fillStyle = v;
+      },
+      save() {},
+      restore() {},
+      fillRect(...rect: number[]) {
+        fills.push({ style: fillStyle, rect });
+      },
+    } as unknown as CanvasRenderingContext2D;
+    paintMoveBand(ctx, { x: 31, y: 7, w: 53, h: 112 }, 1);
+    const light = fills.filter((f) => f.style === '#c0d5c7').map((f) => f.rect);
+    const centre = fills.filter((f) => f.style === '#a2b7a9').map((f) => f.rect);
+    expect(light).toEqual(
+      expect.arrayContaining([
+        [29, 5, 3, 115],
+        [82, 5, 3, 115],
+        [29, 5, 56, 3],
+        [29, 117, 56, 3],
+      ]),
+    );
+    expect(centre).toEqual(
+      expect.arrayContaining([
+        [30, 6, 1, 113],
+        [83, 6, 1, 113],
+        [30, 6, 54, 1],
+        [30, 118, 54, 1],
+      ]),
+    );
+    // Every centre line is painted over the light band.
+    const lastLight = fills.map((f) => f.style).lastIndexOf('#c0d5c7');
+    const firstCentre = fills.findIndex((f) => f.style === '#a2b7a9');
+    expect(firstCentre).toBeGreaterThan(lastLight);
   });
 });

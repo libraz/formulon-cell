@@ -663,6 +663,22 @@ describe('attachPointer', () => {
   });
 
   describe('fill handle', () => {
+    it('shows the value the last target cell will receive by the cursor while dragging', () => {
+      // Excel: a small dark box with the furthest cell's value follows the "+" cursor.
+      gridHitState(host).fillHandle = { x: 152, y: 54, w: 6, h: 6 };
+      seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      detach = attachPointer(host, store, wb);
+
+      fireDown(host, 155, 57);
+      fireMove(host, 100, 100);
+      const tip = document.querySelector<HTMLElement>('.fc-fill-tooltip');
+      expect(tip?.textContent).toBe('5');
+      expect(tip?.hidden).toBe(false);
+      fireUp(host, 100, 100);
+      expect(document.querySelector<HTMLElement>('.fc-fill-tooltip:not([hidden])')).toBeNull();
+    });
+
     it('drag from the fill handle previews and commits a fill', async () => {
       // Place a fake fill handle at the bottom-right of cell (0, 0).
       // Cell (0,0) is at x=52..156, y=30..58. Handle ~ (152, 54, 6, 6).
