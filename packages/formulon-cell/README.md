@@ -9,13 +9,13 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**A working spreadsheet for any web page, no framework required.** Mount it into a DOM element and you get a canvas-rendered grid with desktop-spreadsheet chrome (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Features are composed from presets and extension factories, and locales and themes swap at runtime without re-mounting.
+**A working spreadsheet for any web page, no framework required.** Mount it into a DOM element and you get a canvas-rendered grid with chrome built to match desktop Excel (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Features are composed from presets and extension factories, and locales and themes swap at runtime without re-mounting.
 
 Try it in the [live demo](https://formulon.libraz.net/cell/demo).
 
 This is the vanilla TypeScript / DOM core. [`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react) and [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue) are thin adapters over the same mount call.
 
-> Basic workbook workflows are ready to use. Dialogs, detailed control behaviour, keyboard interaction, and accessibility do not yet match desktop spreadsheets in every case, so do not present this as a finished end-user product yet.
+> **Beta, pre-1.0.** The UI is built to match desktop Excel and is compared against it one feature at a time. The public API may still change between minor versions, and behaviour that has not been compared yet may differ; please report a divergence as an [issue](https://github.com/libraz/formulon-cell/issues).
 
 ## Install
 
@@ -47,7 +47,24 @@ Pass `getWorkbookName: () => currentFilename` to show the current workbook name 
 
 The language selector is hidden by default. Enable it with `features.localeSwitcher: true`, or toggle it with `sheet.setFeatures({ localeSwitcher: false })`. `sheet.setLocale()` updates the dictionary and calculation profile together; it returns `false` when the change is rejected and keeps the current locale. Close open dialogs, Find/Replace, comment edits and filter menus before switching; their drafts are preserved when a switch is rejected.
 
-For a grid-only form or viewer, mount with `ui: { profile: 'embedded' }` and a policy such as `fixedFormPolicy(ranges)` or `viewerPolicy()`. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
+## Embedding
+
+`ui` decides what is shown, `policy` what users may change, and `viewport` which cells are visible and selectable; each has a runtime setter (`setUi`, `setPolicy`, `setViewportOptions`).
+
+```ts
+import { fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
+
+const form = await Spreadsheet.mount(host, {
+  workbook: wb,
+  ui: { profile: 'embedded', features: { formulaBar: true } }, // grid plus formula bar
+  policy: fixedFormPolicy(['B2:B11']), // only B2:B11 accept input, on every sheet
+  viewport: { range: 'A1:D12', tabNavigation: 'editable' },
+});
+
+form.setPolicy(viewerPolicy()); // after submit: select and copy only
+```
+
+A policy allows or denies 28 operations one by one, takes editable cells as A1 ranges (`'B2:B11'` applies on every sheet, `'Input!B2:B11'` on one) or a predicate, and applies to every input path: editor, clipboard, fill handle, context menu, ribbon and instance API. Its `restrict` hook can add a denial but never a grant. Under a policy, ribbon commands that are not classified by operation stay disabled, so a restricted sheet is best shown without the ribbon or with host-built controls. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
 
 ## Presets
 

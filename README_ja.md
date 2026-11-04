@@ -7,43 +7,54 @@
 [![codecov](https://codecov.io/gh/libraz/formulon-cell/branch/main/graph/badge.svg)](https://codecov.io/gh/libraz/formulon-cell)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/ja/cell/)
+[![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-2563eb)](https://formulon.libraz.net/ja/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/ja/cell/demo)
 
-**formulon-cell は、Web ページの中で動く Excel 風の表計算を提供します。** DOM 要素、React コンポーネント、Vue コンポーネントのどれにマウントしても、Canvas 描画のグリッドとデスクトップ表計算ソフト風の UI（数式バー、リボン、シートタブ、コンテキストメニュー）が表示され、計算は [formulon](https://github.com/libraz/formulon) の WASM エンジンが受け持ちます。コアはフレームワーク非依存の TypeScript で、React 版と Vue 版は同じマウント処理を包む薄いアダプタです。
+**formulon-cell は、デスクトップ版 Excel に合わせて作っている Web アプリ向けの表計算コンポーネントです。** DOM 要素、React コンポーネント、Vue コンポーネントのどれにでもマウントでき、Canvas 描画のグリッドに数式バー、リボン、シートタブ、コンテキストメニュー、ダイアログが付きます。計算は [formulon](https://github.com/libraz/formulon)（WebAssembly にコンパイルした C++ の計算エンジン）が受け持ちます。セルの描画、ダイアログ、キーボードショートカット、クリップボードの挙動は、機能ごとに Excel のデスクトップ版と突き合わせ、違いがあれば直しています。
 
-[デモ](https://formulon.libraz.net/ja/cell/demo) でブラウザ上ですぐに試せます。
+🧪 **[デモ](https://formulon.libraz.net/ja/cell/demo)** &nbsp;·&nbsp; 📖 **[ドキュメント](https://formulon.libraz.net/ja/cell/)** &nbsp;·&nbsp; **[インストール](https://formulon.libraz.net/ja/cell/install)**
 
-次のような用途に向いています。
+> **ベータ版（1.0 未満）です。** 公開 API はマイナーバージョンの間でも変わることがあります。まだ突き合わせていない挙動は Excel と異なる場合があります。違いを見つけたら [issue](https://github.com/libraz/formulon-cell/issues) で知らせてください。
 
-- **データグリッドではなく表計算を組み込みたい。** 選択、編集、数式入力、再計算、ファイルの読み書きが最初のマウントから動きます。
-- **数式を本物のエンジンで計算したい。** 評価するのは WebAssembly にコンパイルした C++ エンジンで、UI に後付けした JavaScript の数式パーサーではありません。
-- **使う機能だけを載せたい。** プリセットと拡張ファクトリでマウントする機能を選べます。UI を外してキャンバスとストアだけを使うこともできます。
-- **入力フォームや閲覧専用ビューとして固定したい。** 操作ポリシーで、ユーザーが触れるセルと操作を制限できます。表示する UI とは独立に設定します。
+## できること
 
-> **互換性の現状。** formulon-cell はデスクトップ表計算ソフト（Excel 互換）の操作感を目指しています。基本的なブック操作は使えますが、ダイアログ、細かなコントロールの挙動、キーボード操作、アクセシビリティはまだ同等の振る舞いを保証しておらず、不具合が残っている可能性もあります。現時点では、そのまま置き換えられる完成品として案内しないでください。
-
-## パッケージ
-
-| パッケージ | 概要 |
-|---------|------|
-| [`@libraz/formulon-cell`](./packages/formulon-cell) | Vanilla TS / DOM コア（グリッド、UI、拡張、i18n、テーマ） |
-| [`@libraz/formulon-cell-react`](./packages/formulon-cell-react) | React 18+ のコンポーネント、フック、リボンツールバー |
-| [`@libraz/formulon-cell-vue`](./packages/formulon-cell-vue) | Vue 3 のコンポーネント、コンポーザブル、リボンツールバー |
+- **デスクトップ版の UI** — 数式バー、ステータスバー、リボン、シートタブ、コンテキストメニュー、各種ダイアログ。[リボンツールバー](https://formulon.libraz.net/ja/cell/toolbar) · [モーダルとダイアログ](https://formulon.libraz.net/ja/cell/modals)
+- **デスクトップ版と同じ数式編集** — 矢印キーと F4 での参照の選択と切り替え、参照中の Ctrl+矢印、入力途中の取り消し、選択部分の F9 評価、R1C1 参照形式。
+- **テーマ付きの Canvas グリッド** — CSS トークンで見た目を変えられ、`paper`、`ink`、`contrast` を同梱しています。[テーマ](https://formulon.libraz.net/ja/cell/theming)
+- **グラフ** — 7 種類のグラフを設定パネルで扱い、その場で編集して保存できます。[グラフ](https://formulon.libraz.net/ja/cell/charts)
+- **XLSX への保存** — コメント、画像、グラフ、テーブル、ピボットテーブル、スライサー、保護などを保存でき、名前を付けて保存では `.xlsb` も書き出せます。[ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
+- **制限付きの埋め込み** — `fixedFormPolicy(ranges)` と `viewerPolicy()` で、ユーザーが変更できる範囲をすべての入力経路で制限します。表示する UI とは独立に設定します。[埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding)
+- **プリセットと拡張** — `presets.minimal()`、`standard()`、`full()` から選び、個々の部品は差し替えも省略もできます。キャンバスとストアだけのヘッドレス構成にもできます。[拡張](https://formulon.libraz.net/ja/cell/extensions)
+- **Mac プロファイル** — `ui: { platform: 'mac' }` で Mac 向けのリボン、ショートカット、関数引数パレットに切り替わります。[プラットフォームと Mac UI](https://formulon.libraz.net/ja/cell/platform)
+- **実行時の言語切り替え** — 7 言語を同梱し、`sheet.i18n.register()` で追加できます。[国際化](https://formulon.libraz.net/ja/cell/i18n)
 
 ## インストール
 
 ```sh
 npm install @libraz/formulon-cell zustand
-# React: npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zustand
-# Vue:   npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand
+npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zustand  # React 18+
+npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand                # Vue 3
 ```
 
-`zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。
+`zustand` はピア依存です。UI が購読しているストアを、ホスト側からも同じインスタンスで読めるようにしています。標準のエンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われます。Node.js で使う場合は 22 以降が必要です。
 
-formulon 0.18.0 の標準 WASM エンジンは単一スレッド版で、COOP/COEP ヘッダも `SharedArrayBuffer` も要りません。エンジンの初期化に失敗すると `WorkbookHandle.createDefault()` は reject し、別のエンジンに黙って切り替えることはありません。Node.js で使う場合は22以降が必要です。インメモリのスタブエンジンは `preferStub: true` を渡したときだけ使われ、テストと明示的なデモ専用です。
+### バンドラの設定
+
+エンジンは Emscripten のラッパー経由で WASM を読み込むため、バンドラ側で手を加えないようにします。Vite の場合は次のとおりです。
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  build: { target: 'es2022' }, // エンジンのファクトリがトップレベル await を使う
+  optimizeDeps: { exclude: ['@libraz/formulon-cell', '@libraz/formulon'] },
+});
+```
+
+CDN からの `.wasm` の配信（`locateFile`）とスレッド版エンジンについては、[バンドラの設定](https://formulon.libraz.net/ja/cell/bundler)にまとめています。
 
 ## クイックスタート
+
+### JavaScript / TypeScript
 
 ```ts
 import { Spreadsheet, WorkbookHandle, presets } from '@libraz/formulon-cell';
@@ -58,12 +69,12 @@ const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
 });
 
 sheet.setLocale('en'); // 再マウントせずにロケールを切り替え
-sheet.setTheme('ink');      // ダークテーマ
+sheet.setTheme('ink'); // ダークテーマ
 ```
 
-`getWorkbookName` や言語選択 UI（`features.localeSwitcher`）などのオプションは、[オプション](https://formulon.libraz.net/ja/cell/options)と[言語の切り替え](https://formulon.libraz.net/ja/cell/language-switching)にまとめています。
+→ [設定オプション](https://formulon.libraz.net/ja/cell/options)
 
-React と Vue では、同じオプションをコンポーネントの props で渡します。
+### React
 
 ```tsx
 import { Spreadsheet, presets } from '@libraz/formulon-cell-react';
@@ -71,6 +82,10 @@ import '@libraz/formulon-cell/styles.css';
 
 <Spreadsheet features={presets.full()} locale="ja" style={{ height: '100vh' }} />;
 ```
+
+→ [React / Vue](https://formulon.libraz.net/ja/cell/frameworks)
+
+### Vue
 
 ```vue
 <script setup lang="ts">
@@ -83,63 +98,56 @@ import '@libraz/formulon-cell/styles.css';
 </template>
 ```
 
-## 制限付きの埋め込み
+→ [React / Vue](https://formulon.libraz.net/ja/cell/frameworks)
 
-UI プロファイル `embedded` はグリッドだけをマウントし、ユーザーが変更できる範囲はポリシーで決めます。`fixedFormPolicy(ranges)` は指定した範囲での編集を許可し、`viewerPolicy()` は選択とコピーを残してシートを読み取り専用にします。リボンを隠してもセルは読み取り専用になりません。どの入力経路でも、読み取り専用にするのはポリシーです。詳しくは [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
-
-## バンドラの設定
-
-エンジンは Emscripten のラッパー経由で WASM を読み込むため、バンドラ側で手を加えないようにします。Vite の場合は次のとおりです。
-
-```ts
-// vite.config.ts
-export default defineConfig({
-  build: { target: 'es2022' }, // エンジンのファクトリがトップレベル await を使う
-  optimizeDeps: { exclude: ['@libraz/formulon-cell', '@libraz/formulon'] },
-});
-```
-
-CDN からの `.wasm` の配信（`locateFile`）とスレッド版エンジンについては、[バンドラの設定](https://formulon.libraz.net/ja/cell/bundler)にまとめています。
-
-## 主な機能
-
-- **デスクトップ風の UI** — 数式バー、ステータスバー、リボン、シートタブ、コンテキストメニュー、各種ダイアログ。[リボンツールバー](https://formulon.libraz.net/ja/cell/toolbar) · [モーダルとダイアログ](https://formulon.libraz.net/ja/cell/modals)
-- **デスクトップ版と同じ数式編集** — 矢印キーと F4 での参照の選択と切り替え、参照中の Ctrl+矢印、入力途中の取り消し、選択部分の F9 評価、R1C1 参照形式。
-- **テーマ付きの Canvas グリッド** — CSS トークンで見た目を変えられ、`paper`、`ink`、`contrast` を同梱しています。[テーマ](https://formulon.libraz.net/ja/cell/theming)
-- **グラフ** — 7 種類のグラフを設定パネルで扱い、読み込んだブックのグラフもその場で編集して保存できます。[グラフ](https://formulon.libraz.net/ja/cell/charts)
-- **XLSX への保存** — コメント、画像、グラフ、テーブル、ピボットテーブル、スライサー、保護などを保存でき、名前を付けて保存では `.xlsb` も書き出せます。[ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
-- **プリセットと拡張** — `presets.minimal()`、`standard()`、`full()` から選び、個々の部品は差し替えも省略もできます。[拡張](https://formulon.libraz.net/ja/cell/extensions)
-- **Mac プロファイル** — `ui: { platform: 'mac' }` で Mac 向けのリボン、ショートカット、関数引数パレットに切り替わります。[プラットフォームと Mac UI](https://formulon.libraz.net/ja/cell/platform)
-- **実行時の言語切り替え** — 7 言語を同梱し、`sheet.i18n.register()` で追加できます。[国際化](https://formulon.libraz.net/ja/cell/i18n)
-- **ヘッドレス構成** — UI をホスト側で用意する場合に、キャンバスとストアだけを残せます。
-
-## ドキュメント
-
-- [デモ](https://formulon.libraz.net/ja/cell/demo)
-- [インストール](https://formulon.libraz.net/ja/cell/install)
-- [設定オプション](https://formulon.libraz.net/ja/cell/options)
-- [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding)
-- [モーダルと全画面表示](https://formulon.libraz.net/ja/cell/modals)
-- [React / Vue](https://formulon.libraz.net/ja/cell/frameworks)
-- [テーマ](https://formulon.libraz.net/ja/cell/theming)
-- [言語と表示文言](https://formulon.libraz.net/ja/cell/i18n)
-
-## 開発
+## ソースからビルド
 
 ```sh
 yarn install
-yarn dev:react   # apps/react-demo
-yarn dev:vue     # apps/vue-demo
-yarn build
-yarn test
+yarn dev:react   # React デモ（apps/react-demo）
+yarn dev:vue     # Vue デモ（apps/vue-demo）
+yarn build       # ライブラリ
+yarn test        # コアの単体テスト
 ```
 
-プルリクエストを歓迎します。CI が実行するチェックは [`CONTRIBUTING.md`](./CONTRIBUTING.md) にあります。リリースは [`docs/releasing.md`](./docs/releasing.md) のタグを使った手動フローで行います。
+CI が実行するチェックは [`CONTRIBUTING.md`](./CONTRIBUTING.md) に、リリース手順は [`docs/releasing.md`](./docs/releasing.md) にあります。
 
-## 対象外
+## 埋め込み
+
+埋め込んだシートに何を表示し、ユーザーに何をさせるかは、独立した3つのオプションで決めます。どれもあとから再マウントせずに変更できます（`setUi`、`setPolicy`、`setViewportOptions`）。
+
+```ts
+import { Spreadsheet, WorkbookHandle, fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
+
+const sheet = await Spreadsheet.mount(host, {
+  workbook: await WorkbookHandle.createDefault(),
+  ui: { profile: 'embedded', features: { formulaBar: true } }, // グリッドと数式バーだけ
+  policy: fixedFormPolicy(['B2:B11']), // どのシートでも B2:B11 だけ入力可能
+  viewport: { range: 'A1:D12', tabNavigation: 'editable' },
+});
+
+sheet.setPolicy(viewerPolicy()); // 送信後は選択とコピーだけ
+```
+
+- **`ui`** — 何を表示するか。プロファイル（`embedded`、`minimal`、`standard`、`full`）と、`sheetTabs`、`contextMenu`、`charts`、`clipboard` など約 30 個のスイッチで指定します。
+- **`policy`** — ユーザーが何を変更できるか。値の編集、貼り付け、書式、行の挿入、並べ替えなど 28 種類の操作を個別に許可・拒否し、編集できるセルは A1 形式の範囲（`'B2:B11'` は全シート、`'Input!B2:B11'` はそのシートだけ）か述語で指定します。`restrict` フックは拒否を追加できますが、許可を足すことはできません。どの入力経路にも効くので、リボンを隠すことでセルが読み取り専用になるわけではありません。
+- **`viewport`** — 表示・選択できるセルの範囲と、Tab で編集可能なセルだけを巡回するかどうか。
+- **`contextMenu`** と **`overlays`** — 右クリックメニューの項目選択や差し替えと、ポップアップをホストのモーダルや全画面要素の中に収める設定。
+
+policy を設定すると、操作の分類がないリボンコマンドは無効のままになります。制限付きのシートは、リボンを出さずに表示するか、ホスト側で用意した操作 UI と組み合わせてください。詳しくは [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
+
+## ドキュメント
+
+ドキュメントは [formulon.libraz.net/ja/cell](https://formulon.libraz.net/ja/cell/) にあります。
+
+- **学ぶ** — [デモ](https://formulon.libraz.net/ja/cell/demo) · [インストール](https://formulon.libraz.net/ja/cell/install) · [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding)
+- **ガイド** — [リボンツールバー](https://formulon.libraz.net/ja/cell/toolbar) · [モーダルとダイアログ](https://formulon.libraz.net/ja/cell/modals) · [グラフ](https://formulon.libraz.net/ja/cell/charts) · [テーマ](https://formulon.libraz.net/ja/cell/theming) · [国際化](https://formulon.libraz.net/ja/cell/i18n) · [言語の切り替え](https://formulon.libraz.net/ja/cell/language-switching) · [プラットフォームと Mac UI](https://formulon.libraz.net/ja/cell/platform) · [React / Vue](https://formulon.libraz.net/ja/cell/frameworks) · [バンドラの設定](https://formulon.libraz.net/ja/cell/bundler)
+- **リファレンス** — [設定オプション](https://formulon.libraz.net/ja/cell/options) · [拡張](https://formulon.libraz.net/ja/cell/extensions) · [ホストとの連携](https://formulon.libraz.net/ja/cell/host-integration)
+
+## 含まないもの（Non-goals）
 
 formulon-cell は UI 層です。計算エンジンでもアプリケーションでもありません。数式の評価、再計算、xlsx の解析は [formulon](https://github.com/libraz/formulon) の担当です。サーバー、永続化、共同編集の通信、認証も持たず、これらはホスト側が用意します。React 版と Vue 版は薄いまま保ち、メニュー、コマンド、ダイアログはコアに置いているため、3 つのホストの挙動がずれることはありません。
 
 ## ライセンス
 
-[Apache-2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[Apache-2.0](LICENSE)

@@ -7,43 +7,54 @@
 [![codecov](https://codecov.io/gh/libraz/formulon-cell/branch/main/graph/badge.svg)](https://codecov.io/gh/libraz/formulon-cell)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/cell/)
+[![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-2563eb)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**formulon-cell puts a working, Excel-like spreadsheet inside a web page.** Mount it into a DOM node, a React component, or a Vue component and you get a canvas-rendered grid with desktop-spreadsheet chrome (formula bar, ribbon, sheet tabs, context menu) over the [formulon](https://github.com/libraz/formulon) WASM calc engine. The core is framework-free TypeScript; the React and Vue packages are thin adapters over the same mount call.
+**formulon-cell is a spreadsheet component for web apps, built to match desktop Excel.** It mounts into a DOM node, a React component or a Vue component and renders a canvas grid with the formula bar, ribbon, sheet tabs, context menu and dialogs; formulas run in [formulon](https://github.com/libraz/formulon), a C++ calc engine compiled to WebAssembly. Cell rendering, dialogs, keyboard shortcuts and clipboard behaviour are compared against the Excel desktop app one feature at a time, and corrected where they differ.
 
-Try it in the [live demo](https://formulon.libraz.net/cell/demo).
+🧪 **[Live demo](https://formulon.libraz.net/cell/demo)** &nbsp;·&nbsp; 📖 **[Documentation](https://formulon.libraz.net/cell/)** &nbsp;·&nbsp; **[Getting started](https://formulon.libraz.net/cell/install)**
 
-Reach for it when you need to:
+> **Beta, pre-1.0.** The public API may still change between minor versions. Behaviour that has not been compared yet may differ from Excel; please report a divergence as an [issue](https://github.com/libraz/formulon-cell/issues).
 
-- **Embed a spreadsheet, not a data grid.** Selection, editing, formula entry, recalculation, and file handling work from the first mount.
-- **Run formulas in a real engine.** Evaluation goes to a C++ engine compiled to WebAssembly, not to a JavaScript parser bolted onto the UI.
-- **Ship only the features you use.** Presets and extension factories decide what mounts. You can drop the chrome and keep only the canvas and the store.
-- **Lock a sheet down for a form or a viewer.** Interaction policies limit which cells and operations a user may touch, independently of which UI is visible.
+## What's inside
 
-> **Compatibility status.** formulon-cell aims at desktop-spreadsheet (Excel-compatible) behaviour. Basic workbook workflows are ready to use, but dialogs, detailed control behaviour, keyboard interaction, and accessibility do not yet guarantee equivalent behaviour, and bugs may remain. Do not present it as a drop-in replacement or a finished end-user product yet.
+- **Desktop spreadsheet chrome** — formula bar, status bar, ribbon, sheet tabs, context menu and dialogs. [Ribbon toolbar](https://formulon.libraz.net/cell/toolbar) · [Modals and dialogs](https://formulon.libraz.net/cell/modals)
+- **Desktop formula editing** — F4 and arrow-key reference picking, Ctrl+arrow while pointing, undo inside the draft, F9 on a selection, R1C1 references.
+- **Canvas grid with themes** — styled through CSS tokens; `paper`, `ink` and `contrast` ship in the box. [Theming](https://formulon.libraz.net/cell/theming)
+- **Charts** — seven chart types with a settings panel, edited in place and saved back. [Charts](https://formulon.libraz.net/cell/charts)
+- **XLSX persistence** — comments, images, charts, tables, PivotTables, slicers, protection and more survive a save; Save As can write `.xlsb`. [Host integration](https://formulon.libraz.net/cell/host-integration)
+- **Restricted embedding** — `fixedFormPolicy(ranges)` and `viewerPolicy()` limit what users may change on every input path, independently of which UI is shown. [Embedding and use cases](https://formulon.libraz.net/cell/embedding)
+- **Presets and extensions** — `presets.minimal()`, `standard()` and `full()`, with any piece swappable or left out, down to a headless canvas and store. [Extensions](https://formulon.libraz.net/cell/extensions)
+- **Mac profile** — `ui: { platform: 'mac' }` switches to the Mac ribbon, shortcuts and argument palette. [Platform and Mac UI](https://formulon.libraz.net/cell/platform)
+- **Runtime i18n** — seven languages built in, more through `sheet.i18n.register()`. [Internationalization](https://formulon.libraz.net/cell/i18n)
 
-## Packages
-
-| package | what it is |
-|---------|------------|
-| [`@libraz/formulon-cell`](./packages/formulon-cell) | Vanilla TS / DOM core: grid, chrome, extensions, i18n, themes |
-| [`@libraz/formulon-cell-react`](./packages/formulon-cell-react) | React 18+ component, hooks, and ribbon toolbar |
-| [`@libraz/formulon-cell-vue`](./packages/formulon-cell-vue) | Vue 3 component, composables, and ribbon toolbar |
-
-## Install
+## Installation
 
 ```sh
 npm install @libraz/formulon-cell zustand
-# React: npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zustand
-# Vue:   npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand
+npm install @libraz/formulon-cell-react @libraz/formulon-cell react react-dom zustand  # React 18+
+npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand                # Vue 3
 ```
 
-`zustand` is a peer dependency so the host can read the same store the chrome subscribes to.
+`zustand` is a peer dependency so the host can read the same store the chrome subscribes to. The default engine is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; there is no silent fallback, and the in-memory stub engine runs only when you pass `preferStub: true`. Node.js integrations require Node 22 or later.
 
-The default WASM engine in formulon 0.18.0 is single-threaded and needs neither COOP/COEP headers nor `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if the engine fails to initialize; there is no silent fallback. Node.js integrations require Node 22 or later. The in-memory stub engine is opt-in through `preferStub: true`, for tests and explicit demos only.
+### Bundler integration
+
+The engine loads its WASM through an Emscripten wrapper, so the bundler has to leave it alone. For Vite:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  build: { target: 'es2022' }, // the engine factory uses top-level await
+  optimizeDeps: { exclude: ['@libraz/formulon-cell', '@libraz/formulon'] },
+});
+```
+
+Serving the `.wasm` from a CDN (`locateFile`) and the threaded engine build are covered in [Bundler setup](https://formulon.libraz.net/cell/bundler).
 
 ## Quick start
+
+### JavaScript / TypeScript
 
 ```ts
 import { Spreadsheet, WorkbookHandle, presets } from '@libraz/formulon-cell';
@@ -58,12 +69,12 @@ const sheet = await Spreadsheet.mount(document.getElementById('sheet')!, {
 });
 
 sheet.setLocale('ja'); // swap locale without re-mounting
-sheet.setTheme('ink');      // dark theme
+sheet.setTheme('ink'); // dark theme
 ```
 
-Options such as `getWorkbookName` and the language selector (`features.localeSwitcher`) are listed in [Options](https://formulon.libraz.net/cell/options) and [Language switching](https://formulon.libraz.net/cell/language-switching).
+→ [Options](https://formulon.libraz.net/cell/options)
 
-React and Vue take the same options as component props:
+### React
 
 ```tsx
 import { Spreadsheet, presets } from '@libraz/formulon-cell-react';
@@ -71,6 +82,10 @@ import '@libraz/formulon-cell/styles.css';
 
 <Spreadsheet features={presets.full()} locale="en" style={{ height: '100vh' }} />;
 ```
+
+→ [React / Vue](https://formulon.libraz.net/cell/frameworks)
+
+### Vue
 
 ```vue
 <script setup lang="ts">
@@ -83,63 +98,56 @@ import '@libraz/formulon-cell/styles.css';
 </template>
 ```
 
-## Restricted embedding
+→ [React / Vue](https://formulon.libraz.net/cell/frameworks)
 
-The `embedded` UI profile mounts only the grid, and a policy decides what users may change: `fixedFormPolicy(ranges)` allows edits inside the given ranges, and `viewerPolicy()` makes the sheet readonly while keeping selection and copy. Hiding the ribbon does not make a cell readonly; the policy does, on every input path. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
-
-## Bundler integration
-
-The engine ships its WASM through an Emscripten wrapper, so the bundler has to leave it alone. For Vite:
-
-```ts
-// vite.config.ts
-export default defineConfig({
-  build: { target: 'es2022' }, // the engine factory uses top-level await
-  optimizeDeps: { exclude: ['@libraz/formulon-cell', '@libraz/formulon'] },
-});
-```
-
-Serving the `.wasm` from a CDN (`locateFile`) and the threaded engine build are covered in [Bundler setup](https://formulon.libraz.net/cell/bundler).
-
-## What's inside
-
-- **Desktop-spreadsheet chrome** — formula bar, status bar, ribbon, sheet tabs, context menu and dialogs. [Ribbon toolbar](https://formulon.libraz.net/cell/toolbar) · [Modals and dialogs](https://formulon.libraz.net/cell/modals)
-- **Desktop formula editing** — F4 and arrow-key reference picking, Ctrl+arrow while pointing, undo inside the draft, F9 on a selection, R1C1 references.
-- **Canvas grid with themes** — styled through CSS tokens; `paper`, `ink` and `contrast` ship in the box. [Theming](https://formulon.libraz.net/cell/theming)
-- **Charts** — seven chart types with a settings panel, edited in place and saved back. [Charts](https://formulon.libraz.net/cell/charts)
-- **XLSX persistence** — comments, images, charts, tables, PivotTables, slicers, protection and more survive a save; Save As can write `.xlsb`. [Host integration](https://formulon.libraz.net/cell/host-integration)
-- **Presets and extensions** — `presets.minimal()`, `standard()` and `full()`, with any piece swappable or left out. [Extensions](https://formulon.libraz.net/cell/extensions)
-- **Mac profile** — `ui: { platform: 'mac' }` switches to the Mac ribbon, shortcuts and argument palette. [Platform and Mac UI](https://formulon.libraz.net/cell/platform)
-- **Runtime i18n** — seven languages built in, more through `sheet.i18n.register()`. [Internationalization](https://formulon.libraz.net/cell/i18n)
-- **Headless mode** — keep only the canvas and the store when the host brings its own chrome.
-
-## Documentation
-
-- [Live demo](https://formulon.libraz.net/cell/demo)
-- [Getting started](https://formulon.libraz.net/cell/install)
-- [Options](https://formulon.libraz.net/cell/options)
-- [Embedding and use cases](https://formulon.libraz.net/cell/embedding)
-- [Modals and fullscreen](https://formulon.libraz.net/cell/modals)
-- [React / Vue](https://formulon.libraz.net/cell/frameworks)
-- [Theming](https://formulon.libraz.net/cell/theming)
-- [Language and labels](https://formulon.libraz.net/cell/i18n)
-
-## Development
+## Build from source
 
 ```sh
 yarn install
-yarn dev:react   # apps/react-demo
-yarn dev:vue     # apps/vue-demo
-yarn build
-yarn test
+yarn dev:react   # React demo (apps/react-demo)
+yarn dev:vue     # Vue demo (apps/vue-demo)
+yarn build       # libraries
+yarn test        # core unit tests
 ```
 
-Pull requests are welcome; [`CONTRIBUTING.md`](./CONTRIBUTING.md) lists the checks CI runs. Releases follow the manual tag-based flow in [`docs/releasing.md`](./docs/releasing.md).
+The checks CI runs are listed in [`CONTRIBUTING.md`](./CONTRIBUTING.md); releases follow [`docs/releasing.md`](./docs/releasing.md).
+
+## Embedding
+
+Three independent options decide what an embedded sheet shows and what users may do with it, and each one can be changed later without re-mounting (`setUi`, `setPolicy`, `setViewportOptions`).
+
+```ts
+import { Spreadsheet, WorkbookHandle, fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
+
+const sheet = await Spreadsheet.mount(host, {
+  workbook: await WorkbookHandle.createDefault(),
+  ui: { profile: 'embedded', features: { formulaBar: true } }, // grid plus formula bar
+  policy: fixedFormPolicy(['B2:B11']), // only B2:B11 accept input, on every sheet
+  viewport: { range: 'A1:D12', tabNavigation: 'editable' },
+});
+
+sheet.setPolicy(viewerPolicy()); // after submit: select and copy only
+```
+
+- **`ui`** — what is shown: a profile (`embedded`, `minimal`, `standard`, `full`) plus about thirty switches such as `sheetTabs`, `contextMenu`, `charts` or `clipboard`.
+- **`policy`** — what users may change: 28 operations (value edit, paste, format, row insert, sort, ...) allowed or denied one by one, editable cells as A1 ranges (`'B2:B11'` applies on every sheet, `'Input!B2:B11'` on one) or a predicate, and a `restrict` hook that can deny but never grant. It applies to every input path, so hiding the ribbon is not what makes a cell readonly.
+- **`viewport`** — which cells are visible and selectable, and whether Tab walks only the editable cells.
+- **`contextMenu`** and **`overlays`** — pick or replace the right-click menu, and keep popups inside a host modal or fullscreen element.
+
+Under a policy, ribbon commands that are not classified by operation stay disabled, so a restricted sheet is best shown without the ribbon or with host-built controls. See [Embedding and use cases](https://formulon.libraz.net/cell/embedding).
+
+## Documentation
+
+The documentation lives at [formulon.libraz.net/cell](https://formulon.libraz.net/cell/).
+
+- **Learn** — [Live demo](https://formulon.libraz.net/cell/demo) · [Getting started](https://formulon.libraz.net/cell/install) · [Embedding and use cases](https://formulon.libraz.net/cell/embedding)
+- **Guides** — [Ribbon toolbar](https://formulon.libraz.net/cell/toolbar) · [Modals and dialogs](https://formulon.libraz.net/cell/modals) · [Charts](https://formulon.libraz.net/cell/charts) · [Theming](https://formulon.libraz.net/cell/theming) · [Internationalization](https://formulon.libraz.net/cell/i18n) · [Language switching](https://formulon.libraz.net/cell/language-switching) · [Platform and Mac UI](https://formulon.libraz.net/cell/platform) · [React / Vue](https://formulon.libraz.net/cell/frameworks) · [Bundler setup](https://formulon.libraz.net/cell/bundler)
+- **Reference** — [Options](https://formulon.libraz.net/cell/options) · [Extensions](https://formulon.libraz.net/cell/extensions) · [Host integration](https://formulon.libraz.net/cell/host-integration)
 
 ## Non-goals
 
-formulon-cell is the UI layer, not the calculation engine and not an application. Formula evaluation, recalculation, and xlsx parsing belong to [formulon](https://github.com/libraz/formulon). There is no server, persistence layer, collaboration transport, or authentication; the host owns those. The React and Vue packages stay thin, with menus, commands, and dialogs living in core so the three hosts cannot drift apart.
+formulon-cell is the UI layer, not the calculation engine and not an application. Formula evaluation, recalculation and xlsx parsing belong to [formulon](https://github.com/libraz/formulon). There is no server, persistence layer, collaboration transport or authentication; the host owns those. The React and Vue packages stay thin, with menus, commands and dialogs living in core so the three hosts cannot drift apart.
 
 ## License
 
-[Apache-2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[Apache-2.0](LICENSE)

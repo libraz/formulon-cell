@@ -9,11 +9,13 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/cell/demo)
 
-**A working spreadsheet in a React tree.** `<Spreadsheet>` and `<SpreadsheetToolbar>` wrap [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell), a canvas-rendered grid with desktop-spreadsheet chrome over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Prop changes go through the core imperative API, so the canvas is never re-mounted and selection, focus, and event subscriptions survive.
+**A working spreadsheet in a React tree.** `<Spreadsheet>` and `<SpreadsheetToolbar>` wrap [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell), a canvas-rendered grid with chrome built to match desktop Excel, over the [formulon](https://github.com/libraz/formulon) WASM calc engine. Prop changes go through the core imperative API, so the canvas is never re-mounted and selection, focus, and event subscriptions survive.
 
 Try it in the [live demo](https://formulon.libraz.net/cell/demo).
 
 The grid, ribbon, menus, commands, and dialogs all live in core; this package only binds them to React.
+
+> **Beta, pre-1.0.** The UI is built to match desktop Excel and is compared against it one feature at a time. The public API may still change between minor versions, and behaviour that has not been compared yet may differ; please report a divergence as an [issue](https://github.com/libraz/formulon-cell/issues).
 
 ## Install
 
@@ -74,19 +76,19 @@ import '@libraz/formulon-cell-react/toolbar.css';
 />;
 ```
 
-## Restricted embedding
+## Embedding
 
-`ui`, `policy`, `viewport`, `contextMenu`, `overlays`, and `toolbar` props apply at runtime without re-mounting. `fixedFormPolicy` and `viewerPolicy` are re-exported, and successful batch updates arrive through `onChangeBatch`.
+`ui`, `policy`, `viewport`, `contextMenu`, `overlays`, and `toolbar` props apply at runtime without re-mounting. `fixedFormPolicy` and `viewerPolicy` are re-exported, a policy applies to every input path, and successful batch updates arrive through `onChangeBatch`.
 
 ```tsx
 <Spreadsheet
   ui={{ profile: 'embedded' }}
-  policy={fixedFormPolicy([{ sheet: 0, r0: 1, c0: 1, r1: 9, c1: 2 }])}
+  policy={fixedFormPolicy(['B2:C10'])}
   onChangeBatch={(batch) => save(batch)}
 />
 ```
 
-See [Embedding and use cases](https://formulon.libraz.net/cell/embedding) for viewport limits, context-menu composition, and host updates.
+See [Embedding and use cases](https://formulon.libraz.net/cell/embedding) for viewport limits, context-menu composition, and host updates. Under a policy, ribbon commands that are not classified by operation stay disabled, so a restricted sheet is best shown without the ribbon or with host-built controls.
 
 ## Documentation
 

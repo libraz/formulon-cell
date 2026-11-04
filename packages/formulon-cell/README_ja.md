@@ -9,13 +9,13 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/ja/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/ja/cell/demo)
 
-**フレームワークなしで、Web ページに表計算を組み込めます。** DOM 要素にマウントすると、Canvas 描画のグリッドとデスクトップ表計算ソフト風の UI（数式バー、リボン、シートタブ、コンテキストメニュー）が表示され、計算は [formulon](https://github.com/libraz/formulon) の WASM エンジンが受け持ちます。機能はプリセットと拡張ファクトリで組み合わせ、ロケールとテーマは再マウントせずに切り替えられます。
+**フレームワークなしで、Web ページに表計算を組み込めます。** DOM 要素にマウントすると、Canvas 描画のグリッドと、デスクトップ版 Excel に合わせた UI（数式バー、リボン、シートタブ、コンテキストメニュー）が表示され、計算は [formulon](https://github.com/libraz/formulon) の WASM エンジンが受け持ちます。機能はプリセットと拡張ファクトリで組み合わせ、ロケールとテーマは再マウントせずに切り替えられます。
 
 [デモ](https://formulon.libraz.net/ja/cell/demo) でブラウザ上ですぐに試せます。
 
 このパッケージは Vanilla TypeScript / DOM のコアです。[`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react) と [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue) は、同じマウント処理を包む薄いアダプタです。
 
-> 基本的なブック操作は使えます。ダイアログ、細かなコントロールの挙動、キーボード操作、アクセシビリティは、まだデスクトップ表計算ソフトと同じにならない場合があります。現時点では完成したエンドユーザー向け製品として案内しないでください。
+> **ベータ版（1.0 未満）です。** UI はデスクトップ版 Excel に合わせて作っており、機能ごとに突き合わせています。公開 API はマイナーバージョンの間でも変わることがあり、まだ突き合わせていない挙動は異なる場合があります。違いを見つけたら [issue](https://github.com/libraz/formulon-cell/issues) で知らせてください。
 
 ## インストール
 
@@ -47,7 +47,24 @@ sheet.setTheme('ink'); // グリッドとリボンのテーマをまとめて切
 
 言語選択UIは初期状態では非表示です。`features.localeSwitcher: true` で表示し、`sheet.setFeatures({ localeSwitcher: false })` で動的に非表示へ戻せます。`sheet.setLocale()` は表示辞書と計算プロファイルを同時に切り替えます。切り替えが拒否された場合は `false` を返し、現在の言語を維持します。ダイアログ、検索・置換、コメント編集、フィルターメニューを閉じてから切り替えてください。拒否時は入力途中の内容を保持します。
 
-グリッドだけの入力フォームや閲覧ビューにするときは、`ui: { profile: 'embedded' }` と、`fixedFormPolicy(ranges)` や `viewerPolicy()` などのポリシーを渡してマウントします。詳しくは [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
+## 埋め込み
+
+`ui` で何を表示するか、`policy` でユーザーが何を変更できるか、`viewport` でどのセルを表示・選択できるかを決めます。どれも実行時に変更できます（`setUi`、`setPolicy`、`setViewportOptions`）。
+
+```ts
+import { fixedFormPolicy, viewerPolicy } from '@libraz/formulon-cell';
+
+const form = await Spreadsheet.mount(host, {
+  workbook: wb,
+  ui: { profile: 'embedded', features: { formulaBar: true } }, // グリッドと数式バーだけ
+  policy: fixedFormPolicy(['B2:B11']), // どのシートでも B2:B11 だけ入力可能
+  viewport: { range: 'A1:D12', tabNavigation: 'editable' },
+});
+
+form.setPolicy(viewerPolicy()); // 送信後は選択とコピーだけ
+```
+
+ポリシーは 28 種類の操作を個別に許可・拒否し、編集できるセルは A1 形式の範囲（`'B2:B11'` は全シート、`'Input!B2:B11'` はそのシートだけ）か述語で指定します。エディタ、クリップボード、フィルハンドル、コンテキストメニュー、リボン、インスタンス API のどの入力経路にも効きます。`restrict` フックは拒否を追加できますが、許可を足すことはできません。policy を設定すると、操作の分類がないリボンコマンドは無効のままになります。制限付きのシートは、リボンを出さずに表示するか、ホスト側で用意した操作 UI と組み合わせてください。詳しくは [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
 
 ## プリセット
 

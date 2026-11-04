@@ -9,11 +9,13 @@
 [![Docs](https://img.shields.io/badge/docs-formulon.libraz.net-blue)](https://formulon.libraz.net/ja/cell/)
 [![Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://formulon.libraz.net/ja/cell/demo)
 
-**Vue アプリに表計算を組み込めます。** `<Spreadsheet>` と `SpreadsheetToolbar` は [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell) を包むコンポーネントで、Canvas 描画のグリッドとデスクトップ表計算ソフト風の UI を、[formulon](https://github.com/libraz/formulon) の WASM エンジンの上で動かします。props の変更はコアの命令型 API で反映するため、キャンバスは再マウントされず、選択状態、フォーカス、イベント購読はそのまま残ります。
+**Vue アプリに表計算を組み込めます。** `<Spreadsheet>` と `SpreadsheetToolbar` は [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell) を包むコンポーネントで、Canvas 描画のグリッドとデスクトップ版 Excel に合わせた UI を、[formulon](https://github.com/libraz/formulon) の WASM エンジンの上で動かします。props の変更はコアの命令型 API で反映するため、キャンバスは再マウントされず、選択状態、フォーカス、イベント購読はそのまま残ります。
 
 [デモ](https://formulon.libraz.net/ja/cell/demo) でブラウザ上ですぐに試せます。
 
 グリッド、リボン、メニュー、コマンド、ダイアログはすべてコアにあり、このパッケージは Vue との接続だけを受け持ちます。
+
+> **ベータ版（1.0 未満）です。** UI はデスクトップ版 Excel に合わせて作っており、機能ごとに突き合わせています。公開 API はマイナーバージョンの間でも変わることがあり、まだ突き合わせていない挙動は異なる場合があります。違いを見つけたら [issue](https://github.com/libraz/formulon-cell/issues) で知らせてください。
 
 ## インストール
 
@@ -76,19 +78,19 @@ import '@libraz/formulon-cell-vue/toolbar.css';
 </template>
 ```
 
-## 制限付きの埋め込み
+## 埋め込み
 
-`ui`、`policy`、`viewport`、`context-menu`、`overlays`、`toolbar` の各 props は、再マウントせずに実行時に反映されます。`fixedFormPolicy` と `viewerPolicy` はこのパッケージからも import でき、成功したバッチ更新は `change-batch` イベントで受け取れます。
+`ui`、`policy`、`viewport`、`context-menu`、`overlays`、`toolbar` の各 props は、再マウントせずに実行時に反映されます。`fixedFormPolicy` と `viewerPolicy` はこのパッケージからも import できます。ポリシーはどの入力経路にも効き、成功したバッチ更新は `change-batch` イベントで受け取れます。
 
 ```vue
 <Spreadsheet
   :ui="{ profile: 'embedded' }"
-  :policy="fixedFormPolicy([{ sheet: 0, r0: 1, c0: 1, r1: 9, c1: 2 }])"
+  :policy="fixedFormPolicy(['B2:C10'])"
   @change-batch="save"
 />
 ```
 
-表示範囲の制限、コンテキストメニューの組み立て、ホストからの更新は [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。
+表示範囲の制限、コンテキストメニューの組み立て、ホストからの更新は [埋め込みと利用例](https://formulon.libraz.net/ja/cell/embedding) を参照してください。policy を設定すると、操作の分類がないリボンコマンドは無効のままになります。制限付きのシートは、リボンを出さずに表示するか、ホスト側で用意した操作 UI と組み合わせてください。
 
 ## ドキュメント
 
