@@ -108,4 +108,25 @@ describe('PivotTable tabs of the ribbon', () => {
     expect(totals.length).toBeGreaterThan(0);
     tb.dispose();
   });
+
+  it('opens the field dialog from the Analyze tab', () => {
+    const store = sheet.instance.store;
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
+    createPivotTableAtPlacement(
+      { store, workbook: sheet.workbook, history: sheet.instance.history },
+      { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
+      { row: 8, col: 4 },
+    );
+    mutators.setActive(store, { sheet: 0, row: 9, col: 4 });
+    tb.setActiveTab('pivotAnalyze');
+    const open = vi.spyOn(sheet.instance, 'openPivotFieldSettings').mockReturnValue(true);
+    const button = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="pivotFieldSettings"]',
+    );
+    if (!button) throw new Error('missing Field Settings');
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(open).toHaveBeenCalledOnce();
+    tb.dispose();
+  });
 });

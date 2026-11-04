@@ -52,10 +52,13 @@ describe('PivotTable style gallery', () => {
     for (let i = 0; i < 20; i += 1) prev?.click();
     expect(labels()).toHaveLength(6);
     expect(labels()[0]).toBe('なし');
-    expect(labels()[1]).toBe('ピボット スタイル (淡色) 1');
+    expect(labels()[1]).toBe('白, ピボット スタイル (淡色) 1');
     const next = gallery.querySelector<HTMLButtonElement>('.fc-tb__pivotstyle-next');
+    for (let i = 0; i < 2; i += 1) next?.click();
+    // The third page holds None-relative items 13-18, which include Light 16.
+    expect(labels()).toContain('アイスブルー, ピボット スタイル (淡色) 16');
     for (let i = 0; i < 20; i += 1) next?.click();
-    expect(labels().at(-1)).toBe('ピボット スタイル (濃色) 28');
+    expect(labels().at(-1)).toBe('オレンジ, ピボット スタイル (濃色) 28');
     expect(next?.disabled).toBe(true);
     wb.dispose();
   });
@@ -77,7 +80,7 @@ describe('PivotTable style gallery', () => {
       'PivotStyleLight2',
     );
     const pressed = gallery.querySelector('.fc-tb__pivotstyle-chip[aria-pressed="true"]');
-    expect(pressed?.getAttribute('aria-label')).toBe('ピボット スタイル (淡色) 2');
+    expect(pressed?.getAttribute('aria-label')).toBe('白, ピボット スタイル (淡色) 2');
     expect(history.undo()).toBe(true);
     expect(wb.getPivotStyleInfo(before.sheetIndex, before.pivotIndex)?.name).not.toBe(
       'PivotStyleLight2',

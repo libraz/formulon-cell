@@ -1939,3 +1939,53 @@
     margin: 0 0 0 1px;
   }
 }
+
+@layer fc.chrome {
+  /* Conditional Formatting menu: 24 pt rows, 12 pt separators, 4 pt inset, and
+   * submenus that size to their content. */
+  [data-fc-platform="mac"] .fc-tb__menu--conditional {
+    width: 224px;
+    padding: 3px 0;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-highlight,
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-topBottom {
+    padding: 2px 0 3px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-clear {
+    padding: 3px 0;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-highlight {
+    width: max-content;
+    min-width: 193px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-topBottom {
+    width: max-content;
+    min-width: 151px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-clear {
+    width: max-content;
+    min-width: 286px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-clear .fc-tb__menu-item {
+    min-height: 23px;
+    padding-block: 3px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__menu--conditional .fc-tb__menu-item,
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-highlight .fc-tb__menu-item,
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-topBottom .fc-tb__menu-item {
+    min-height: 24px;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__menu--conditional .fc-tb__menu-sep,
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-highlight .fc-tb__menu-sep,
+  [data-fc-platform="mac"] .fc-tb__submenu--cf-topBottom .fc-tb__menu-sep {
+    margin: 5px 0 6px;
+  }
+}

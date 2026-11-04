@@ -18,6 +18,44 @@ const FAMILIES = [
 const PER_FAMILY = 28;
 const PAGE_SIZE = 6;
 
+/** Colour names Excel (ja) prefixes to each built-in style's accessible name, by family. */
+const JA_COLOUR_NAMES: Readonly<Record<(typeof FAMILIES)[number]['id'], readonly string[]>> = {
+  Light: [
+    ...Array<string>(8).fill('白'),
+    ...[
+      'アイスブルー',
+      'ローズ',
+      '薄い緑',
+      'ラベンダー',
+      'スカイブルー',
+      '薄いオレンジ',
+      '薄い灰色',
+    ],
+    ...['アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...Array<string>(7).fill('白'),
+  ],
+  Medium: [
+    ...['白', '薄い青', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...['白', 'アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...['白', 'アイスブルー', 'ローズ', '薄い緑', 'ラベンダー', 'スカイブルー', '薄いオレンジ'],
+    ...[
+      '薄い灰色',
+      'アイスブルー',
+      'ローズ',
+      '薄い緑',
+      'ラベンダー',
+      'スカイブルー',
+      '薄いオレンジ',
+    ],
+  ],
+  Dark: [
+    ...['薄い灰色', '濃い青', '濃い赤', '濃い緑', '濃い紫', '濃い青緑', '茶'],
+    ...Array<string>(7).fill('濃い灰色'),
+    ...['灰色', '青', '赤', 'オリーブ', '濃い紫', 'アクア', 'オレンジ'],
+    ...['灰色', '青', '赤', 'オリーブ', '濃い紫', 'アクア', 'オレンジ'],
+  ],
+};
+
 interface GalleryStyle {
   /** The style element's name; empty for no style. */
   name: string;
@@ -31,10 +69,13 @@ const galleryStyles = (lang: ToolbarLang): GalleryStyle[] => {
   return [
     { name: '', label: none },
     ...FAMILIES.flatMap((f) =>
-      Array.from({ length: PER_FAMILY }, (_, i) => ({
-        name: `PivotStyle${f.id}${i + 1}`,
-        label: `${word} (${family(f)}) ${i + 1}`,
-      })),
+      Array.from({ length: PER_FAMILY }, (_, i) => {
+        const colour = lang === 'ja' ? JA_COLOUR_NAMES[f.id][i] : undefined;
+        return {
+          name: `PivotStyle${f.id}${i + 1}`,
+          label: `${colour ? `${colour}, ` : ''}${word} (${family(f)}) ${i + 1}`,
+        };
+      }),
     ),
   ];
 };
