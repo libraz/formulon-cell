@@ -87,4 +87,30 @@ describe('Mac Home menu wording', () => {
     expect(items.at(-1)).toBe('形式を選択してペースト...');
     expect(itemsOf(createPasteMenu(dictionaries.ja, 'ja'))[0]).toBe('貼り付け');
   });
+
+  it('Merge & Center carries Center Across Selection as a fifth row', () => {
+    expect(itemsOf(factories.createMergeMenu('merge', MAC)).at(-1)).toBe('選択範囲内で中央');
+    expect(itemsOf(factories.createMergeMenu('merge'))).toHaveLength(4);
+  });
+
+  it('Format menu has greyed captions, Default Width and a single Lock Cell row', () => {
+    const menu = factories.createFormatCellsMenu('formatCellsHome', MAC);
+    const captions = Array.from(
+      menu.querySelectorAll<HTMLElement>(':scope > .fc-tb__menu-heading'),
+      (el) => [(el.textContent ?? '').trim(), el.getAttribute('aria-disabled')],
+    );
+    expect(captions).toEqual([
+      ['セルのサイズ', 'true'],
+      ['表示設定', 'true'],
+      ['シートの整理', 'true'],
+      ['保護', 'true'],
+    ]);
+    const items = itemsOf(menu);
+    expect(items).toContain('既定の幅...');
+    expect(items).toContain('シートの保護...');
+    expect(items.filter((label) => label.startsWith('セルのロック'))).toEqual(['セルのロック']);
+    const desktop = itemsOf(factories.createFormatCellsMenu('formatCellsHome'));
+    expect(desktop).not.toContain('既定の幅...');
+    expect(desktop).toContain('セルのロック解除');
+  });
 });

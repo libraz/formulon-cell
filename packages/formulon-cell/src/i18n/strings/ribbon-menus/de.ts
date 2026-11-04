@@ -31,6 +31,7 @@ export const ribbonMenusDe: RibbonMenusStrings = {
     autoFitRowHeight: 'Optimale Zeilenhöhe',
     colWidth: 'Spaltenbreite …',
     autoFitColWidth: 'Optimale Spaltenbreite',
+    defaultColWidth: 'Standardbreite...',
     sheetNameLabel: 'Blattname',
     sheetNameRequired: 'Geben Sie einen Blattnamen ein.',
     renameSheet: 'Blatt umbenennen',

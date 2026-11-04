@@ -3,6 +3,7 @@ import {
   autofitColsWidthForRanges,
   autofitRowsHeightForRanges,
 } from '../../commands/row-col-layout.js';
+import { addrKey } from '../../engine/address.js';
 import type { Locale } from '../../i18n/strings.js';
 
 // Cell Format ribbon dispatcher. Extracted from main.ts so the playground
@@ -122,8 +123,11 @@ export const applyCellFormatAction = async (
     deps.renderSheetTabs();
     return;
   }
-  if (action === 'lock-cell' || action === 'unlock-cell') {
-    const locked = action === 'lock-cell';
+  if (action === 'lock-cell' || action === 'unlock-cell' || action === 'toggle-lock') {
+    const first = i.store
+      .getState()
+      .format.formats.get(addrKey({ sheet: range.sheet, row: range.r0, col: range.c0 }));
+    const locked = action === 'toggle-lock' ? first?.locked === false : action === 'lock-cell';
     recordFormatChange(i.history, i.store, () => {
       setCellLocked(i.store, range, locked);
     });

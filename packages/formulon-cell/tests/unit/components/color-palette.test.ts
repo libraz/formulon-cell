@@ -112,6 +112,20 @@ describe('color palette', () => {
     }
   });
 
+  it('offers No Fill above the theme grid and picks the empty color', () => {
+    const onPick = vi.fn();
+    const palette = createColorPalette({
+      themeLabel: 'Theme Colors',
+      standardLabel: 'Standard Colors',
+      noFillLabel: 'No Fill',
+      onPick,
+    });
+    const none = palette.el.querySelector<HTMLButtonElement>('.fc-colorpalette__action--no-fill');
+    expect(none?.textContent).toBe('No Fill');
+    none?.click();
+    expect(onPick).toHaveBeenCalledWith('');
+  });
+
   it('exposes Automatic and More Colors actions without changing swatch roving state', () => {
     const onPick = vi.fn();
     const onMoreColors = vi.fn();

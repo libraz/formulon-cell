@@ -773,6 +773,18 @@ export function mountToolbar(
     const tabBtn = target.closest<HTMLButtonElement>('[data-ribbon-tab]');
     if (tabBtn) {
       const tab = tabBtn.dataset.ribbonTab as RibbonTab | undefined;
+      // Mac Excel has no display-options button; pressing the active tab collapses the ribbon.
+      if (
+        tab &&
+        platform === 'mac' &&
+        tab !== 'file' &&
+        tab === activeTab &&
+        !backstageOpen &&
+        !isCollapsedMode()
+      ) {
+        setDisplayMode('tabsOnly');
+        return;
+      }
       if (tab) activateRibbonTab(tab, true);
       return;
     }

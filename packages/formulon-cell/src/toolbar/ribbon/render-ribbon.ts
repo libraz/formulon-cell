@@ -592,7 +592,8 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
     let displayToggle: HTMLButtonElement | null = null;
     let displayMenu: HTMLDivElement | null = null;
-    if (!backstageOpen) {
+    // Mac Excel has no display-options button; the active tab collapses and expands the ribbon.
+    if (!backstageOpen && profile !== 'excel365Mac') {
       const display = document.createElement('div');
       display.className = 'fc-tb__ribbon-display';
       const toggle = createRibbonDisplayToggleButton(

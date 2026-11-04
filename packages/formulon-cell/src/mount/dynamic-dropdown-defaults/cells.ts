@@ -230,6 +230,7 @@ const updateFormatCellsMenu =
         return t.sheetMoveAtBoundary;
       }
       if (action === 'move-sheet-copy') return t.sheetActionUnavailable;
+      if (action === 'default-width') return instance.i18n.strings.ribbon.disabled;
       if (action === 'tab-color-high-contrast' || action === 'tab-color-more') {
         return t.sheetActionUnavailable;
       }
@@ -246,6 +247,7 @@ const updateFormatCellsMenu =
         (action === 'show-cols' && !colsHidden) ||
         (action === 'rename-sheet' && !canMoveSheet) ||
         action === 'move-sheet-copy' ||
+        action === 'default-width' ||
         (action === 'move-sheet-left' && (sheet <= 0 || !canMoveSheet)) ||
         (action === 'move-sheet-right' &&
           (sheet >= instance.workbook.sheetCount - 1 || !canMoveSheet)) ||
@@ -254,7 +256,7 @@ const updateFormatCellsMenu =
         action === 'tab-color-high-contrast' ||
         action === 'tab-color-more';
       setMenuControlDisabled(button, disabled, reasonForFormatAction(action));
-      if (action === 'lock-cell') {
+      if (action === 'lock-cell' || action === 'toggle-lock') {
         button.setAttribute('role', 'menuitemcheckbox');
         button.setAttribute('aria-checked', String(activeLocked));
         button.classList.toggle('fc-tb__menu-item--checked', activeLocked);

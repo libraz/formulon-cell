@@ -42,7 +42,7 @@ export interface HomeMenuFactories {
   createUnderlineMenu: () => HTMLDivElement;
   createPhoneticMenu: () => HTMLDivElement;
   createWrapMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
-  createMergeMenu: () => HTMLDivElement;
+  createMergeMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createFreezeMenu: () => HTMLDivElement;
   createFillMenu: () => HTMLDivElement;
   createClearMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
@@ -140,7 +140,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     return menu;
   };
 
-  const createMergeMenu = (): HTMLDivElement => {
+  const createMergeMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-merge');
     menu.append(
       menuIconButton(ribbonText.mergeAndCenter, 'mergeAction', 'mergeCenter', 'merge'),
@@ -148,6 +148,12 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuIconButton(ribbonText.mergeCells, 'mergeAction', 'mergeCells', 'merge'),
       menuIconButton(ribbonText.unmergeCells, 'mergeAction', 'unmergeCells', 'merge'),
     );
+    // Center Across Selection is a Mac menu row.
+    if (variant?.mac) {
+      menu.append(
+        menuIconButton(ribbonText.centerAcrossSelection, 'mergeAction', 'centerAcross', 'merge'),
+      );
+    }
     return menu;
   };
 
@@ -248,6 +254,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   };
 
   const createFormatCellsMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
+    const mac = variant?.mac === true;
     const menu = createMenu('menu-format-cells');
     const visibilitySubmenu = createSubmenu({
       id: formatSubmenuId('visibility'),
@@ -275,8 +282,12 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuSectionHeader(t.formatCellSize),
       menuIconButton(t.rowHeight, 'cellFormat', 'row-height', 'format-row-height'),
       menuIconButton(t.autoFitRowHeight, 'cellFormat', 'row-autofit', 'format-row-autofit'),
+      ...(mac ? [menuSeparator()] : []),
       menuIconButton(t.colWidth, 'cellFormat', 'col-width', 'format-col-width'),
       menuIconButton(t.autoFitColWidth, 'cellFormat', 'col-autofit', 'format-col-autofit'),
+      ...(mac
+        ? [menuIconButton(t.defaultColWidth, 'cellFormat', 'default-width', 'format-col-width')]
+        : []),
       menuSeparator(),
       menuSectionHeader(t.formatVisibility),
       formatSubmenuTrigger(t.formatHideUnhide, 'visibility', 'format-hide-rows'),
@@ -289,8 +300,13 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       tabColorSubmenu,
       menuSeparator(),
       menuSectionHeader(t.formatProtection),
-      menuIconButton(t.lockCell, 'cellFormat', 'lock-cell', 'format-lock'),
-      menuIconButton(t.unlockCell, 'cellFormat', 'unlock-cell', 'format-unlock'),
+      // The Mac menu has one Lock Cell check item that flips the state.
+      ...(mac
+        ? [menuIconButton(t.lockCell, 'cellFormat', 'toggle-lock', 'format-lock')]
+        : [
+            menuIconButton(t.lockCell, 'cellFormat', 'lock-cell', 'format-lock'),
+            menuIconButton(t.unlockCell, 'cellFormat', 'unlock-cell', 'format-unlock'),
+          ]),
       menuIconButton(t.protectSheet, 'cellFormat', 'protect-sheet', 'format-protect'),
       menuSeparator(),
       menuIconButton(t.formatCells, 'cellFormat', 'dialog', 'format-dialog'),

@@ -863,7 +863,7 @@ describe('Mac Excel ribbon profile', () => {
     for (const [root, items] of Object.entries(MAC_RIBBON_MENU_ITEMS)) {
       expect(MAC_RIBBON_MENU_COMMAND_SET.has(root)).toBe(true);
       expect(macRibbonMenuIdForCommand(root)).toMatch(/^menu-mac-/);
-      for (const item of items) {
+      for (const item of items.filter((candidate) => !candidate.heading)) {
         expect(MAC_RIBBON_COMMAND_IDS).toContain(item.id);
         const activation = ribbonActivationForCommand(item.id);
         const expectedKind = item.disabled

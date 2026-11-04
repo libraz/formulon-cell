@@ -1,4 +1,5 @@
 import { currencySymbolForLocale, datePatternsForLocale } from '../format/locale.js';
+import { formatNumber } from '../format/number-format.js';
 import type { NumFmt } from '../store/types.js';
 
 export type NumberFormatAction =
@@ -27,7 +28,7 @@ export const numberFormatForAction = (
     case 'general':
       return { kind: 'general' };
     case 'fixed':
-      return { kind: 'fixed', decimals: 0 };
+      return { kind: 'fixed', decimals: 2 };
     case 'currency':
       return { kind: 'currency', decimals: 2, symbol };
     case 'accounting':
@@ -39,7 +40,7 @@ export const numberFormatForAction = (
     case 'time':
       return { kind: 'time', pattern: patterns.time };
     case 'percent':
-      return { kind: 'percent', decimals: 0 };
+      return { kind: 'percent', decimals: 2 };
     case 'fraction':
       return { kind: 'custom', pattern: '# ?/?' };
     case 'scientific':
@@ -49,4 +50,15 @@ export const numberFormatForAction = (
     case 'more':
       return null;
   }
+};
+
+/** How `value` reads once the dropdown row `action` is applied; null for rows with no sample. */
+export const numberFormatSample = (
+  action: NumberFormatAction,
+  value: number,
+  locale: string,
+): string | null => {
+  if (action === 'general' || action === 'more') return null;
+  const fmt = numberFormatForAction(action, locale);
+  return fmt ? formatNumber(value, fmt, locale) : null;
 };

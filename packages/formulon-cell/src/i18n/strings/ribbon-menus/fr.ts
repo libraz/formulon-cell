@@ -31,6 +31,7 @@ export const ribbonMenusFr: RibbonMenusStrings = {
     autoFitRowHeight: 'Ajuster automatiquement la hauteur de ligne',
     colWidth: 'Largeur de colonne…',
     autoFitColWidth: 'Ajuster automatiquement la largeur de colonne',
+    defaultColWidth: 'Largeur par défaut...',
     sheetNameLabel: 'Nom de la feuille',
     sheetNameRequired: 'Entrez un nom de feuille.',
     renameSheet: 'Renommer la feuille',

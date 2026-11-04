@@ -20,6 +20,9 @@ const MAC_OMITTED_ROWS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
+/** Menus whose section captions are greyed rows on the Mac. */
+const MAC_DISABLED_HEADING_MENUS: ReadonlySet<string> = new Set(['menu-format-cells']);
+
 /** Greyed heading the Mac menu opens with, by menu id; Japanese is the measured wording. */
 const MAC_MENU_HEADINGS: Readonly<Record<string, { ja: string; en: string }>> = {
   'menu-paste': { ja: '貼り付けのオプション:', en: 'Paste Options:' },
@@ -32,6 +35,7 @@ const MAC_JA_ROW_LABELS: Readonly<Record<string, string>> = {
   'cellDelete:cells': 'セルの削除...',
   'cellFormat:col-autofit': '列の幅に合わせて自動調整',
   'clear:comments': 'コメントとメモをクリア',
+  'cellFormat:protect-sheet': 'シートの保護...',
   'sort:asc': '昇順',
   'sort:desc': '降順',
   'pasteAction:all': 'ペースト',
@@ -70,6 +74,11 @@ export const applyMenuVariant = (
     text.textContent = label;
     if (row.title === previous) row.title = label;
     if (row.getAttribute('aria-label') === previous) row.setAttribute('aria-label', label);
+  }
+  if (MAC_DISABLED_HEADING_MENUS.has(menu.id)) {
+    for (const caption of menu.querySelectorAll<HTMLElement>(':scope > .fc-tb__menu-heading')) {
+      projectDisabledState(caption, true, null);
+    }
   }
   const heading = MAC_MENU_HEADINGS[menu.id];
   if (heading) {

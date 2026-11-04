@@ -55,6 +55,7 @@ export interface RibbonStrings {
     fillColor: string;
     highContrastOnly: string;
     automatic: string;
+    noFill: string;
     themeColors: string;
     standardColors: string;
     moreColors: string;
@@ -70,6 +71,7 @@ export interface RibbonStrings {
     increaseIndent: string;
     mergeAndCenter: string;
     mergeAcross: string;
+    centerAcrossSelection: string;
     mergeCells: string;
     unmergeCells: string;
     /** Confirm dialog title shown before a merge discards data. */

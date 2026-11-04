@@ -229,6 +229,17 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('Mac has no display-options button; pressing the active tab collapses the ribbon', () => {
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      platform: 'mac',
+    });
+    expect(host.querySelector('[data-ribbon-toggle]')).toBeNull();
+    host.querySelector<HTMLButtonElement>('[data-ribbon-tab="home"]')?.click();
+    expect(tb.getDisplayMode()).toBe('tabsOnly');
+    tb.dispose();
+  });
+
   it('reveals collapsed tabs without replacing buttons or changing the saved display mode', () => {
     const onTabChange = vi.fn();
     const onDisplayModeChange = vi.fn();

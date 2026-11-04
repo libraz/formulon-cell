@@ -109,6 +109,20 @@ describe('applyMergeAction', () => {
     expect(store.getState().format.formats.get('0:0:0')?.align).toBe('center');
   });
 
+  it('centers across the selection without merging, as one undo step', async () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 });
+
+    expect(await applyMergeAction(contextFor(store, history), 'centerAcross')).toBe(true);
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    expect(store.getState().format.formats.get('0:0:0')?.align).toBe('centerContinuous');
+    expect(store.getState().format.formats.get('0:0:2')?.align).toBe('centerContinuous');
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().format.formats.get('0:0:0')).toBeUndefined();
+  });
+
   it('does not align when the merge command rejects a one-cell range', async () => {
     const store = createSpreadsheetStore();
     const history = new History();

@@ -83,6 +83,7 @@ export function formatNumber(
         style: 'percent',
         minimumFractionDigits: fmt.decimals,
         maximumFractionDigits: fmt.decimals,
+        useGrouping: false,
       })
       .format(value);
   }

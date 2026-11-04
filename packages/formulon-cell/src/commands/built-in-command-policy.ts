@@ -151,6 +151,7 @@ export const BUILT_IN_COMMAND_OPERATION: Readonly<Record<string, InteractionOper
   'mac.insert.chartLine': 'object',
   'mac.insert.chartArea': 'object',
   'mac.insert.chartPie': 'object',
+  'mac.insert.chartDoughnut': 'object',
   'mac.insert.chartScatter': 'object',
   'mac.insert.chartHierarchy': 'object',
   'mac.insert.chartStatistical': 'object',

@@ -16,7 +16,12 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { confirmMergeLoseData } from './dialogs/merge-confirm.js';
 
 /** Actions exposed by the merge controls in wrappers and ribbon menus. */
-export type MergeAction = 'mergeCenter' | 'mergeAcross' | 'mergeCells' | 'unmergeCells';
+export type MergeAction =
+  | 'mergeCenter'
+  | 'mergeAcross'
+  | 'mergeCells'
+  | 'unmergeCells'
+  | 'centerAcross';
 
 export interface MergeActionContext {
   store: SpreadsheetStore;
@@ -48,6 +53,13 @@ export async function applyMergeAction(
 
   if (action === 'unmergeCells') {
     return applyUnmerge(store, workbook, history, selection);
+  }
+
+  if (action === 'centerAcross') {
+    recordFormatChange(history, store, () => {
+      applyFormatPatch(store.getState(), store, selection, { align: 'centerContinuous' });
+    });
+    return true;
   }
 
   if (action === 'mergeAcross') {

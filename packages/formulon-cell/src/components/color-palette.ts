@@ -128,6 +128,8 @@ export interface ColorPaletteOptions {
   readonly value?: string | null;
   /** When set, renders an "Automatic" button above the theme grid. */
   readonly automatic?: AutomaticColorOption | null;
+  /** When set, renders a "No Fill" button above the theme grid; it picks the empty string. */
+  readonly noFillLabel?: string | null;
   /** Optional disabled Excel compatibility row shown above fill-color palettes. */
   readonly highContrastOnlyLabel?: string | null;
   /** When set, renders a "More Colors…" trigger below the standard row. */
@@ -328,6 +330,15 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
     const autoColor = options.automatic.color;
     auto.addEventListener('click', () => options.onPick(autoColor));
     root.appendChild(auto);
+  }
+
+  if (options.noFillLabel) {
+    const none = document.createElement('button');
+    none.type = 'button';
+    none.className = 'fc-colorpalette__action fc-colorpalette__action--no-fill';
+    none.textContent = options.noFillLabel;
+    none.addEventListener('click', () => options.onPick(''));
+    root.appendChild(none);
   }
 
   // ── Theme colors ──────────────────────────────────────────────────────

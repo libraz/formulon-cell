@@ -13,6 +13,10 @@ export interface MacRibbonMenuItem {
   disabled?: boolean;
   disabledReason?: string;
   icon?: string;
+  /** A section caption rather than a command. */
+  heading?: boolean;
+  /** The label is the gallery's own wording, not the command's ribbon label. */
+  own?: boolean;
 }
 
 /** Root command ids whose primary face opens a Mac menu. The mount can use
@@ -81,6 +85,103 @@ const leaf = (
   disabledReason: disabledReason?.en,
 });
 
+/** A gallery section caption. */
+const section = (id: string, label: string, labelJa: string): MacRibbonMenuItem => ({
+  id: `mac.insert.heading.${id}`,
+  label,
+  labelJa,
+  heading: true,
+  own: true,
+});
+
+/** A gallery entry; `enabled` entries run their chart command, the rest stay greyed out. */
+const galleryItem = (
+  id: string,
+  label: string,
+  labelJa: string,
+  enabled = false,
+): MacRibbonMenuItem => ({
+  id,
+  label,
+  labelJa,
+  own: true,
+  disabled: !enabled,
+  disabledReason: enabled ? undefined : NOT_IMPLEMENTED.en,
+});
+
+const chartGallery = {
+  column: [
+    section('column2d', '2-D Column', '2-D 縦棒'),
+    galleryItem('mac.insert.chartColumn', 'Clustered Column', '集合縦棒', true),
+    galleryItem('mac.insert.chartColumnStacked', 'Stacked Column', '積み上げ縦棒'),
+    galleryItem('mac.insert.chartColumn100', '100% Stacked Column', '100% 積み上げ縦棒'),
+    section('column3d', '3-D Column', '3-D 縦棒'),
+    galleryItem('mac.insert.chartColumn3d', '3-D Clustered Column', '3-D 集合縦棒'),
+    galleryItem('mac.insert.chartColumnStacked3d', '3-D Stacked Column', '3-D 積み上げ縦棒'),
+    galleryItem('mac.insert.chartColumn1003d', '3-D 100% Stacked Column', '3-D 100% 積み上げ縦棒'),
+    galleryItem('mac.insert.chartColumnTrue3d', '3-D Column', '3-D 縦棒グラフ'),
+    section('bar2d', '2-D Bar', '2-D 横棒'),
+    galleryItem('mac.insert.chartBar', 'Clustered Bar', '集合横棒', true),
+    galleryItem('mac.insert.chartBarStacked', 'Stacked Bar', '積み上げ横棒'),
+    galleryItem('mac.insert.chartBar100', '100% Stacked Bar', '100% 積み上げ横棒'),
+    section('bar3d', '3-D Bar', '3-D 横棒'),
+    galleryItem('mac.insert.chartBar3d', '3-D Clustered Bar', '3-D 集合横棒'),
+    galleryItem('mac.insert.chartBarStacked3d', '3-D Stacked Bar', '3-D 積み上げ横棒'),
+    galleryItem('mac.insert.chartBar1003d', '3-D 100% Stacked Bar', '3-D 100% 積み上げ横棒'),
+  ],
+  line: [
+    section('line2d', '2-D Line', '2-D 折れ線'),
+    galleryItem('mac.insert.chartLine', 'Line', '折れ線', true),
+    galleryItem('mac.insert.chartLineStacked', 'Stacked Line', '積み上げ折れ線'),
+    galleryItem('mac.insert.chartLine100', '100% Stacked Line', '100% 積み上げ折れ線'),
+    galleryItem('mac.insert.chartLineMarkers', 'Line with Markers', 'マーカー付き折れ線'),
+    galleryItem(
+      'mac.insert.chartLineStackedMarkers',
+      'Stacked Line with Markers',
+      'マーカー付き積み上げ折れ線',
+    ),
+    galleryItem(
+      'mac.insert.chartLine100Markers',
+      '100% Stacked Line with Markers',
+      'マーカー付き 100% 積み上げ折れ線',
+    ),
+    section('line3d', '3-D Line', '3-D 折れ線'),
+    galleryItem('mac.insert.chartLine3d', '3-D Line', '3-D 折れ線'),
+    section('area2d', '2-D Area', '2-D 面'),
+    galleryItem('mac.insert.chartArea', 'Area', '面', true),
+    galleryItem('mac.insert.chartAreaStacked', 'Stacked Area', '積み上げ面'),
+    galleryItem('mac.insert.chartArea100', '100% Stacked Area', '100% 積み上げ面'),
+    section('area3d', '3-D Area', '3-D 面'),
+    galleryItem('mac.insert.chartArea3d', '3-D Area', '3-D 面'),
+    galleryItem('mac.insert.chartAreaStacked3d', '3-D Stacked Area', '3-D 積み上げ面'),
+    galleryItem('mac.insert.chartArea1003d', '3-D 100% Stacked Area', '3-D 100% 積み上げ面'),
+  ],
+  pie: [
+    section('pie2d', '2-D Pie', '2-D 円'),
+    galleryItem('mac.insert.chartPie', 'Pie', '円', true),
+    galleryItem('mac.insert.chartPieOfPie', 'Pie of Pie', '補助円グラフ付き円'),
+    galleryItem('mac.insert.chartBarOfPie', 'Bar of Pie', '補助縦棒付き円'),
+    section('pie3d', '3-D Pie', '3-D 円'),
+    galleryItem('mac.insert.chartPie3d', '3-D Pie', '3-D 円'),
+    section('doughnut', 'Doughnut', 'ドーナツ'),
+    galleryItem('mac.insert.chartDoughnut', 'Doughnut', 'ドーナツ', true),
+  ],
+  scatter: [
+    section('scatter', 'Scatter', '散布図'),
+    galleryItem('mac.insert.chartScatter', 'Scatter', '散布図', true),
+    galleryItem('mac.insert.chartScatterSmooth', 'Scatter with Smooth Lines', '散布図 (平滑線)'),
+    galleryItem(
+      'mac.insert.chartScatterLinesMarkers',
+      'Scatter with Straight Lines and Markers',
+      '散布図 (直線とマーカー)',
+    ),
+    galleryItem('mac.insert.chartScatterLines', 'Scatter with Straight Lines', '散布図 (直線)'),
+    section('bubble', 'Bubble', 'バブル'),
+    galleryItem('mac.insert.chartBubble', 'Bubble', 'バブル'),
+    galleryItem('mac.insert.chartBubble3d', '3-D Bubble', '3-D 効果付きバブル'),
+  ],
+} as const satisfies Record<string, readonly MacRibbonMenuItem[]>;
+
 const functionMenu = (category: CatalogFunctionCategory): readonly MacRibbonMenuItem[] =>
   menu(
     supportedFunctionNames(category).map((name) => ({
@@ -118,18 +219,12 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
     leaf('mac.insert.chartMap', 'chartMap', true, OFFICE_REQUIRED),
     leaf('mac.insert.pivotChart', 'pivotChart', true, NOT_IMPLEMENTED),
   ]),
-  'mac.insert.chartColumn': menu([
-    leaf('mac.insert.chartColumn', 'chartColumn'),
-    leaf('mac.insert.chartBar', 'chartBar'),
-  ]),
+  'mac.insert.chartColumn': chartGallery.column,
   'mac.insert.chartBar': menu([leaf('mac.insert.chartBar', 'chartBar')]),
-  'mac.insert.chartLine': menu([
-    leaf('mac.insert.chartLine', 'chartLine'),
-    leaf('mac.insert.chartArea', 'chartArea'),
-  ]),
+  'mac.insert.chartLine': chartGallery.line,
   'mac.insert.chartArea': menu([leaf('mac.insert.chartArea', 'chartArea')]),
-  'mac.insert.chartPie': menu([leaf('mac.insert.chartPie', 'chartPie')]),
-  'mac.insert.chartScatter': menu([leaf('mac.insert.chartScatter', 'chartScatter')]),
+  'mac.insert.chartPie': chartGallery.pie,
+  'mac.insert.chartScatter': chartGallery.scatter,
   'mac.draw.eraser': menu([leaf('mac.draw.eraser', 'eraser'), leaf('mac.draw.toggle', 'draw')]),
   'mac.draw.add': menu([
     leaf('mac.draw.penBlack', 'penBlack'),

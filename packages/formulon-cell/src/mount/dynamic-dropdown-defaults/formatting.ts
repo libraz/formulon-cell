@@ -100,7 +100,8 @@ const buildMergeAction =
       action !== 'unmergeCells' &&
       action !== 'mergeAcross' &&
       action !== 'mergeCenter' &&
-      action !== 'mergeCells'
+      action !== 'mergeCells' &&
+      action !== 'centerAcross'
     ) {
       return;
     }

@@ -49,8 +49,9 @@ describe('padded plain and red-minus number codes', () => {
     expect(numFmtToFormatCode(fmt)).toBe(code);
   });
 
+  // The dropdown's Number row previews 1234.50 for 1234.5 (menus-home-number-format-dropdown facts, samples line).
   it.each(['ja-JP', 'en-US'])('keeps the ribbon Number action unpadded for %s', (locale) => {
-    expect(numFmtToFormatCode(numberFormatForAction('fixed', locale) ?? undefined)).toBe('0');
+    expect(numFmtToFormatCode(numberFormatForAction('fixed', locale) ?? undefined)).toBe('0.00');
   });
 
   it('keeps the unpadded default codes', () => {

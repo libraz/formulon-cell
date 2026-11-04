@@ -208,7 +208,8 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       value !== 'unmergeCells' &&
       value !== 'mergeAcross' &&
       value !== 'mergeCenter' &&
-      value !== 'mergeCells'
+      value !== 'mergeCells' &&
+      value !== 'centerAcross'
     ) {
       return;
     }
@@ -241,7 +242,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     } else if (id === 'fontColor') {
       applyRibbonFormat((state, store) => setFontColor(state, store, value), id);
     } else if (id === 'fillColor') {
-      applyRibbonFormat((state, store) => setFillColor(state, store, value), id);
+      applyRibbonFormat((state, store) => setFillColor(state, store, value || null), id);
     } else if (id === 'numberFormat') {
       if (value === 'more') {
         getInst()?.openFormatDialog();

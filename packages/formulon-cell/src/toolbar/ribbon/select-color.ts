@@ -5,7 +5,9 @@ import type { Locale } from '../../i18n/strings.js';
 // renderRibbon mounts.
 
 import { createColorPalette, themeColorColumns } from '../../components/color-palette.js';
+import { addrKey } from '../../engine/address.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
+import { type NumberFormatAction, numberFormatSample } from '../number-format.js';
 import type { RibbonCommand } from '../ribbon-model.js';
 import { createRibbonButton } from './button.js';
 import {
@@ -22,6 +24,7 @@ export interface SelectColorRibbonText {
   moreColors: string;
   highContrastOnly: string;
   automatic: string;
+  noFill: string;
   marginsCustomDialog: string;
   marginTop: string;
   marginBottom: string;
@@ -110,6 +113,16 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     icon.setAttribute('aria-hidden', 'true');
     icon.append(document.createElement('span'), document.createElement('span'));
     return icon;
+  };
+
+  /** The active cell's number as it would read under a dropdown row; null for an empty or non-numeric cell. */
+  const numberFormatSampleFor = (action: string): string | null => {
+    const inst = getInst();
+    if (!inst) return null;
+    const state = inst.store.getState();
+    const cell = state.data.cells.get(addrKey(state.selection.active));
+    if (cell?.value.kind !== 'number') return null;
+    return numberFormatSample(action as NumberFormatAction, cell.value.value, inst.i18n.locale);
   };
 
   const numberFormatHasSubtitle = (value: string): boolean => value === 'general';
@@ -371,12 +384,17 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           // FONT_SUBMENU_FAMILIES is retained as a compatibility export, but
           // no arrow is rendered until a real submenu interaction exists.
           if (FONT_SUBMENU_FAMILIES.has(option.value)) item.dataset.fcFontSubmenu = 'false';
-        } else if (command.id === 'numberFormat' && numberFormatHasSubtitle(option.value)) {
+        } else if (
+          command.id === 'numberFormat' &&
+          (numberFormatHasSubtitle(option.value) || numberFormatSampleFor(option.value))
+        ) {
           const text = document.createElement('span');
           text.className = 'fc-tb__rb-dd__numfmt-text';
           const detail = document.createElement('span');
           detail.className = 'fc-tb__rb-dd__numfmt-subtitle';
-          detail.textContent = numberFormatSubtitle(option.value);
+          detail.textContent = numberFormatHasSubtitle(option.value)
+            ? numberFormatSubtitle(option.value)
+            : (numberFormatSampleFor(option.value) ?? '');
           text.append(label, detail);
           item.append(check, text);
         } else {
@@ -500,7 +518,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     };
     const apply = (color: string): void => {
       applyRibbonControl(command.id, color);
-      swatch.style.background = color;
+      swatch.style.background = color || '#ffffff';
     };
     native.addEventListener('input', () => apply(native.value));
 
@@ -522,6 +540,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           command.id === 'fillColor' || getInst()?.host.dataset.fcPlatform === 'mac'
             ? ribbonText.highContrastOnly
             : null,
+        noFillLabel: command.id === 'fillColor' ? ribbonText.noFill : null,
         automatic:
           command.id === 'fontColor' ? { label: ribbonText.automatic, color: '#000000' } : null,
         onPick: (color) => {

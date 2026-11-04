@@ -31,6 +31,7 @@ export const ribbonMenusZh: RibbonMenusStrings = {
     autoFitRowHeight: '自动调整行高',
     colWidth: '列宽…',
     autoFitColWidth: '自动调整列宽',
+    defaultColWidth: '默认列宽...',
     sheetNameLabel: '工作表名称',
     sheetNameRequired: '请输入工作表名称。',
     renameSheet: '重命名工作表',

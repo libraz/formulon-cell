@@ -180,7 +180,11 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
               setNumFmt(
                 input.store.getState(),
                 input.store,
-                action === 'fixed' ? { kind: 'fixed', decimals: 2, thousands: true } : fmt,
+                action === 'fixed'
+                  ? { kind: 'fixed', decimals: 2, thousands: true }
+                  : action === 'percent'
+                    ? { kind: 'percent', decimals: 0 }
+                    : fmt,
               ),
             'numberFormat',
           );

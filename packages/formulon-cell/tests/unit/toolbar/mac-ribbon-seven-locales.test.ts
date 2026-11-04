@@ -91,7 +91,8 @@ describe('Mac ribbon seven-language localization', () => {
   it('localizes inline Mac menu leaves instead of retaining manifest English', () => {
     const staticMenuItems = Object.values(MAC_RIBBON_MENU_ITEMS)
       .flat()
-      .filter((item) => !item.id.startsWith('mac.function.'));
+      // Gallery entries carry Excel's own en/ja wording and headings are not commands.
+      .filter((item) => !item.id.startsWith('mac.function.') && !item.own);
     for (const locale of MAC_LOCALES) {
       for (const item of staticMenuItems) {
         expect(macRibbonLabelForCommand(item.id, locale), `${item.id}:${locale}`).not.toBe(item.id);

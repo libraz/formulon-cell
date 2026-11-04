@@ -78,6 +78,7 @@ const chartKinds = {
   'mac.insert.chartLine': 'line',
   'mac.insert.chartArea': 'area',
   'mac.insert.chartPie': 'pie',
+  'mac.insert.chartDoughnut': 'doughnut',
   'mac.insert.chartScatter': 'scatter',
 } as const;
 

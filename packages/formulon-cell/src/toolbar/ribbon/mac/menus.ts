@@ -16,6 +16,7 @@ import { focusMenuItem, prepareMenu, projectDisabledState } from '../../menu-a11
 import { createRibbonButton } from '../button.js';
 import {
   createSubmenu,
+  menuSectionHeader,
   menuSubmenuTrigger,
   type VisualTileIconSlug,
   visualMenuGrid,
@@ -275,7 +276,11 @@ const menuItemButton = (
       ? functionDisplayName(undefined, lang, functionName)
       : macRibbonLabelForCommand(item.id, lang));
   const label =
-    localized === item.id ? (item.labelJa && lang === 'ja' ? item.labelJa : item.label) : localized;
+    item.own || localized === item.id
+      ? item.labelJa && lang === 'ja'
+        ? item.labelJa
+        : item.label
+      : localized;
   const icon = CHART_ICONS[item.id] ?? SHAPE_ICONS[item.icon ?? ''];
   const button =
     visual && icon
@@ -364,15 +369,28 @@ export const createMacRibbonMenuFactory = (lang: Locale): MacRibbonMenuFactory =
         'fc-tb__menu--visual',
         shapes ? 'fc-tb__menu--shapes' : 'fc-tb__menu--charts',
       );
-      const grid = visualMenuGrid(
-        shapes ? 'fc-tb__visual-grid--shapes' : 'fc-tb__visual-grid--charts',
-      );
+      const gridClass = shapes ? 'fc-tb__visual-grid--shapes' : 'fc-tb__visual-grid--charts';
+      let grid: HTMLElement | null = null;
       for (const item of items) {
+        if (item.heading) {
+          menu.appendChild(
+            menuSectionHeader(lang === 'ja' && item.labelJa ? item.labelJa : item.label),
+          );
+          grid = null;
+          continue;
+        }
         const button = menuItemButton(item, lang, true);
-        if (button.classList.contains('fc-tb__visual-tile')) grid.appendChild(button);
-        else menu.appendChild(button);
+        if (button.classList.contains('fc-tb__visual-tile')) {
+          if (!grid) {
+            grid = visualMenuGrid(gridClass);
+            menu.appendChild(grid);
+          }
+          grid.appendChild(button);
+        } else {
+          menu.appendChild(button);
+          grid = null;
+        }
       }
-      menu.prepend(grid);
     } else {
       for (const item of items) menu.appendChild(menuItemButton(item, lang));
     }

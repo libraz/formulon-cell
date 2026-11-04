@@ -104,12 +104,15 @@
     outline: none;
   }
 
+  .fc-colorpalette__action--no-fill,
   .fc-colorpalette__action--automatic {
     justify-content: center;
     border-color: var(--fc-accent);
     background: var(--fc-bg, #ffffff);
   }
 
+  .fc-colorpalette__action--no-fill:hover,
+  .fc-colorpalette__action--no-fill:focus-visible,
   .fc-colorpalette__action--automatic:hover,
   .fc-colorpalette__action--automatic:focus-visible {
     border-color: var(--fc-accent);
