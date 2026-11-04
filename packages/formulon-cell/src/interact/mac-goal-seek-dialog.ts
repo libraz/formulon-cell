@@ -17,6 +17,7 @@ import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 interface GoalSeekDialogHandle {
@@ -101,13 +102,15 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
   iterationInput.max = '100';
   iterationInput.step = '1';
   iterationInput.value = '100';
-  const pickActiveCell = (): string =>
-    formatMacCellAddress(instance.workbook, instance.store.getState().selection.active);
+  const pickFormat = createRangePickFormatter({
+    store: instance.store,
+    sheetName: (index) => instance.workbook.sheetName(index),
+  });
   const pickers = [formulaInput, changingInput].map((input) =>
     attachRangePickerButton(input, {
       label: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
-      getValue: pickActiveCell,
-      subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+      getValue: () => pickFormat.cell(),
+      subscribeToRangeChanges: pickFormat.subscribe,
       kind: input.id,
     }),
   );
@@ -177,6 +180,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
   };
 
   const currentDefaults = (): void => {
+    pickFormat.begin();
     const active = instance.store.getState().selection.active;
     const next: Addr = { ...active, col: Math.min(MAX_COL, active.col + 1) };
     formulaInput.value = formatMacCellAddress(instance.workbook, active);

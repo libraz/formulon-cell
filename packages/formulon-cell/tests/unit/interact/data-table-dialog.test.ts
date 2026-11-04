@@ -190,7 +190,7 @@ describe.skipIf(!canLoadWasm())('Data Table dialog', () => {
     ]);
     pickers[1]?.querySelector<HTMLButtonElement>('.fc-range-picker__btn')?.click();
     mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
-    expect(field('col').value).toBe('A1');
+    expect(field('col').value).toBe('$A$1');
     ok();
     expect(workbook.dataTableAt({ sheet: 0, row: 3, col: 2 })?.range).toEqual({
       sheet: 0,

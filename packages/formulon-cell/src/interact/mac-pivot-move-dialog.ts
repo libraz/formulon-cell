@@ -5,6 +5,7 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
 import { movePivotTable } from './pivot-move.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 interface PivotMoveDialogHandle {
@@ -61,15 +62,17 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
   status.className = 'fc-mac-pivotmove__status';
   status.setAttribute('role', 'status');
   body.append(prompt, newSheet.row, existing.row, locationRow, status);
+  const pickFormat = createRangePickFormatter({
+    store: instance.store,
+    sheetName: (index) => instance.workbook.sheetName(index),
+  });
   const picker = attachRangePickerButton(location, {
     label: t.rangePickerSelect,
-    getValue: () =>
-      formatMacRangeAddress(instance.workbook, {
-        ...instance.store.getState().selection.range,
-        r1: instance.store.getState().selection.range.r0,
-        c1: instance.store.getState().selection.range.c0,
-      }),
-    subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+    getValue: () => {
+      const r = instance.store.getState().selection.range;
+      return pickFormat.range({ range: { ...r, r1: r.r0, c1: r.c0 } });
+    },
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'pivot-move-location',
   });
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
@@ -155,6 +158,7 @@ function attachPivotMoveDialog(instance: SpreadsheetInstance): PivotMoveDialogHa
       );
       if (!pivot) return false;
       target = { sheet: pivot.sheetIndex, pivotIndex: pivot.pivotIndex };
+      pickFormat.begin();
       applyLabels();
       const bounds = instance.workbook
         .pivotBounds(pivot.sheetIndex)

@@ -14,7 +14,6 @@ import {
   subscribeRecentFunctions,
 } from '../commands/function-history.js';
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
-import { formatA1Range } from '../engine/address.js';
 import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -36,6 +35,7 @@ import {
   nativeFunctionName,
   resolveCatalogFunctionName,
 } from './function-catalog-text.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 /** Heuristic locale detector for hosts that supply no `getLocale`. Built-in
@@ -59,6 +59,7 @@ export interface FxDialogOpenOptions {
 
 type FxWorkbookReader = FunctionCatalogReader &
   FunctionNameReader & {
+    sheetName?: (index: number) => string;
     functionMetadataForLocale?: (
       name: string,
       locale: string,
@@ -409,6 +410,11 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     renderList();
   });
 
+  const pickFormat = createRangePickFormatter({
+    store: deps.store,
+    sheetName: (index) => deps.getWb?.()?.sheetName?.(index) ?? '',
+  });
+
   const assembleFormula = (): string => {
     if (!selectedName) return '';
     const args = argInputs.map((i) => i.value);
@@ -468,8 +474,8 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       input.value = initialArgs[index] ?? previousValues[index] ?? '';
       attachRangePickerButton(input, {
         label: strings.pivotTableDialog.rangePickerSelect,
-        getValue: () => formatA1Range(deps.store.getState().selection.range),
-        subscribeToRangeChanges: (listener) => deps.store.subscribe(listener),
+        getValue: () => pickFormat.range(),
+        subscribeToRangeChanges: pickFormat.subscribe,
         kind: 'fx-argument',
       });
       argInputs.push(input);
@@ -727,6 +733,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const api: FxDialogHandle = {
     open(seedName?: string, options?: FxDialogOpenOptions): void {
       refreshCatalog();
+      pickFormat.begin();
       searchInput.value = '';
       highlightIndex = 0;
       argInputs = [];

@@ -1,9 +1,10 @@
 import { createDataTable, type DataTableRequestError } from '../commands/data-table.js';
-import { formatMacCellAddress, parseMacRange } from '../commands/mac-data-tools.js';
+import { parseMacRange } from '../commands/mac-data-tools.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 interface DataTableDialogHandle {
@@ -45,12 +46,15 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   };
   const rowField = field('row');
   const colField = field('col');
+  const pickFormat = createRangePickFormatter({
+    store: instance.store,
+    sheetName: (index) => instance.workbook.sheetName(index),
+  });
   const pickers = [rowField, colField].map(({ input }) =>
     attachRangePickerButton(input, {
       label: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
-      getValue: () =>
-        formatMacCellAddress(instance.workbook, instance.store.getState().selection.active),
-      subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+      getValue: () => pickFormat.cell(),
+      subscribeToRangeChanges: pickFormat.subscribe,
       kind: `data-table-${input.dataset.dataTableInput}`,
     }),
   );
@@ -140,6 +144,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
     open(): void {
       applyLabels();
       tableRange = instance.store.getState().selection.range;
+      pickFormat.begin();
       rowField.input.value = '';
       colField.input.value = '';
       delete status.dataset.state;

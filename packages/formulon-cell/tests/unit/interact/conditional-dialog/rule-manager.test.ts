@@ -108,7 +108,7 @@ describe('attachConditionalDialog', () => {
       document.querySelector('.fc-conddlg')?.classList.contains('fc-fmtdlg--range-picking'),
     ).toBe(true);
     setRange(store, 1, 1, 5, 3);
-    expect(rangeInput?.value).toBe('B2:D6');
+    expect(rangeInput?.value).toBe('$B$2:$D$6');
 
     handle.close();
     expect(picker?.dataset.rangePickerActive).toBe('false');

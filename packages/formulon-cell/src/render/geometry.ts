@@ -36,7 +36,11 @@ export type HitZone =
   | { kind: 'row-resize'; row: number }
   | { kind: 'col-filter-btn'; col: number; range: Range };
 
-const RESIZE_SLACK = 4;
+/** Header border grab distance either side of the boundary, in points. */
+const COL_RESIZE_SLACK_PT = 6;
+const ROW_RESIZE_SLACK_PT = 3;
+/** Float noise allowance so a point-exact offset still lands in the zone. */
+const SLACK_EPSILON = 1e-6;
 
 function viewportRowStart(layout: LayoutSlice, viewport: ViewportSlice): number {
   return Math.max(frozenRowEnd(layout), viewport.rowStart, viewport.navigationRange?.r0 ?? 0);
@@ -569,6 +573,9 @@ export function hitZone(
   // fall-through below must not claim them.
   if (y < rulerTop(layout) || x < rulerLeft(layout)) return null;
   const resizeHandles = opts?.resizeHandles !== false;
+  const pt = pointPx(layout, viewport);
+  const colSlack = COL_RESIZE_SLACK_PT * pt + SLACK_EPSILON;
+  const rowSlack = ROW_RESIZE_SLACK_PT * pt + SLACK_EPSILON;
   // Outline gutters sit outboard of the row/col header strips. Treat them as
   // header zones for now — the pointer layer routes outline-toggle clicks
   // through a dedicated hit-test before reaching this fall-through.
@@ -580,13 +587,14 @@ export function hitZone(
   if (inHeaderRows) {
     const found = colAtX(layout, viewport, x);
     if (!found) return null;
-    if (resizeHandles && found.rightEdge - x <= RESIZE_SLACK) {
+    if (resizeHandles && found.rightEdge - x <= colSlack) {
       return { kind: 'col-resize', col: found.col };
     }
+    // A hidden neighbour is grabbed from its right side only, to unhide it.
     if (
       resizeHandles &&
-      x - found.leftEdge <= RESIZE_SLACK &&
-      isColVisible(layout, viewport, found.col - 1)
+      x - found.leftEdge <= colSlack &&
+      (isColVisible(layout, viewport, found.col - 1) || layout.hiddenCols.has(found.col - 1))
     ) {
       return { kind: 'col-resize', col: found.col - 1 };
     }
@@ -596,13 +604,14 @@ export function hitZone(
   if (inHeaderCols) {
     const found = rowAtY(layout, viewport, y);
     if (!found) return null;
-    if (resizeHandles && found.bottomEdge - y <= RESIZE_SLACK) {
+    if (resizeHandles && found.bottomEdge - y <= rowSlack) {
       return { kind: 'row-resize', row: found.row };
     }
     if (
       resizeHandles &&
-      y - found.topEdge <= RESIZE_SLACK &&
-      isRowVisible(layout, viewport, found.row - 1)
+      y - found.topEdge <= rowSlack &&
+      found.row > 0 &&
+      (isRowVisible(layout, viewport, found.row - 1) || isRowHidden(layout, found.row - 1))
     ) {
       return { kind: 'row-resize', row: found.row - 1 };
     }

@@ -21,6 +21,7 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 /** Labels of the Select Data Source dialog. */
@@ -153,6 +154,10 @@ export function attachMacChartSelectDataDialog(
     body.appendChild(root);
     return { root, legend };
   };
+  const pickFormat = createRangePickFormatter({
+    store,
+    sheetName: (index) => getWb()?.sheetName(index) ?? '',
+  });
   const refField = (
     parent: HTMLElement,
     cls: string,
@@ -170,13 +175,10 @@ export function attachMacChartSelectDataDialog(
     parent.appendChild(row);
     attachRangePickerButton(input, {
       label: t.selectDataPicker,
-      getValue: () => {
-        const wb = getWb();
-        const range = store.getState().selection.range;
-        return wb ? `=${formatSheetAbsoluteRange(wb.sheetName(range.sheet), range)}` : '';
-      },
+      // Chart series refs are always sheet-qualified, like the text they replace.
+      getValue: () => `=${pickFormat.range({ prefix: 'always' })}`,
       onPicked: () => input.dispatchEvent(new Event('change', { bubbles: true })),
-      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      subscribeToRangeChanges: pickFormat.subscribe,
       kind: cls,
     });
     return { row, text, input };
@@ -572,6 +574,7 @@ export function attachMacChartSelectDataDialog(
           : []),
       ]);
       chartId = id;
+      pickFormat.begin();
       rows = [];
       selected = 0;
       txn = history ? history.begin() : null;

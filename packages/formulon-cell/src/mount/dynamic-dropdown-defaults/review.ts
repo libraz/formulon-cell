@@ -23,6 +23,7 @@ import {
   areasFromSqref,
   sqrefFromAreas,
 } from '../../engine/protection-sync.js';
+import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { showMessage } from '../../toolbar/dialogs/prompt.js';
 import {
@@ -114,6 +115,8 @@ const openAllowEditRangesManager = async (instance: SpreadsheetInstance): Promis
     const pivotStrings = strings.pivotTableDialog as typeof strings.pivotTableDialog & {
       rangePickerSelect: string;
     };
+    // Protected areas live on the dialog's sheet, so picks carry no sheet prefix.
+    const pickFormat = createRangePickFormatter({ store: instance.store, sheetName: () => '' });
     const result = await showAllowEditRangeDialog({
       strings: {
         title: menu.allowEditRangesDialogTitle,
@@ -133,9 +136,9 @@ const openAllowEditRangesManager = async (instance: SpreadsheetInstance): Promis
         : formatA1Range(selection),
       initialTitle: current?.title,
       hasPassword: !!current && allowedEditRangeHasPassword(state, current.id),
-      pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
+      pickRange: () => pickFormat.range({ prefix: 'never' }),
       validateRange: (value) => parseAreas(value) !== null,
-      subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+      subscribeToRangeChanges: pickFormat.subscribe,
     });
     if (result === null) return;
     const [range = selection, ...extraAreas] = parseAreas(result.range) ?? [];

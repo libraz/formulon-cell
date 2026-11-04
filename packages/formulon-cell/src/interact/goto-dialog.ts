@@ -27,6 +27,7 @@ import {
   scrollActiveIntoView,
   syncNavigationViewport,
 } from './navigation-policy.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 import { attachValidationAlert } from './validation.js';
 
@@ -137,6 +138,10 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   referenceRow.className = 'fc-goto__reference';
   const referenceLabel = document.createElement('span');
   referenceLabel.textContent = t.reference;
+  const pickFormat = createRangePickFormatter({
+    store,
+    sheetName: (index) => getWb().sheetName(index),
+  });
   const referenceInput = document.createElement('input');
   referenceInput.type = 'text';
   referenceInput.placeholder = t.referencePlaceholder;
@@ -147,8 +152,8 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   if (!mac) {
     attachRangePickerButton(referenceInput, {
       label: strings.pivotTableDialog.rangePickerSelect,
-      getValue: () => formatA1Range(store.getState().selection.range),
-      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      getValue: () => pickFormat.range(),
+      subscribeToRangeChanges: pickFormat.subscribe,
       kind: 'go-to-reference',
     });
   }
@@ -514,6 +519,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
 
   const api: GoToDialogHandle = {
     open(nextMode = 'special'): void {
+      pickFormat.begin();
       showMode(nextMode);
       if (nextMode === 'go-to') referenceInput.value = '';
       shell.open();

@@ -29,6 +29,7 @@ import { addrKey, formatA1Range } from '../../engine/address.js';
 import { findPivotTableAtCell } from '../../engine/passthrough-sync.js';
 import type { Range } from '../../engine/types.js';
 import { dictionaryLocaleFor } from '../../i18n/strings.js';
+import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { type ConditionalRule, mutators } from '../../store/store.js';
 import { describeCellStyleFormat, showCellStyleDialog } from '../../toolbar/dialogs/cell-style.js';
@@ -104,6 +105,10 @@ const buildConditionalMenuAction =
         instance.workbook.cells(instance.store.getState().data.sheetIndex),
       );
     };
+    const pickFormat = createRangePickFormatter({
+      store: instance.store,
+      sheetName: (index) => instance.workbook.sheetName(index),
+    });
     await applyConditionalMenuAction(
       {
         inst: instance,
@@ -119,9 +124,8 @@ const buildConditionalMenuAction =
               ? {
                   reference: {
                     pickerLabel: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
-                    getValue: () => `=${formatA1Range(instance.store.getState().selection.range)}`,
-                    subscribeToRangeChanges: (listener: () => void) =>
-                      instance.store.subscribe(listener),
+                    getValue: () => `=${pickFormat.range()}`,
+                    subscribeToRangeChanges: pickFormat.subscribe,
                   },
                 }
               : {}),
@@ -225,6 +229,10 @@ export const showCreateTableDialog = async (
     mac
       ? `=${formatA1Range(range, { absolute: true })}`
       : formatSheetAbsoluteRange(instance.workbook.sheetName(range.sheet), range);
+  const pickFormat = createRangePickFormatter({
+    store: instance.store,
+    sheetName: (index) => instance.workbook.sheetName(index),
+  });
   const result = await showFormatAsTableDialog({
     title: pivotDialogStrings.createTableTitle,
     rangeLabel: pivotDialogStrings.createTableRangeLabel,
@@ -234,8 +242,8 @@ export const showCreateTableDialog = async (
     okLabel: pivotDialogStrings.ok,
     cancelLabel: pivotDialogStrings.cancel,
     rangePickerLabel: pivotDialogStrings.rangePickerSelect,
-    pickRange: () => formatRange(normalizedSelectionRange(instance)),
-    subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+    pickRange: () => (mac ? `=${pickFormat.range()}` : pickFormat.range({ prefix: 'always' })),
+    subscribeToRangeChanges: pickFormat.subscribe,
     validateRange: (value) =>
       parsedRange(value) ? null : pivotDialogStrings.createTableInvalidRange,
     // The Mac dialog names the table up front; only an engine table carries a name.

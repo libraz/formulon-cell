@@ -1087,9 +1087,9 @@ describe('attachFxDialog grid picking', () => {
         range: { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 },
       },
     }));
-    expect(input.value).toBe('B2:C4');
+    expect(input.value).toBe('$B$2:$C$4');
     expect(overlay.hidden).toBe(false);
-    expect(document.querySelector('.fc-fxdialog__preview')?.textContent).toContain('B2:C4');
+    expect(document.querySelector('.fc-fxdialog__preview')?.textContent).toContain('$B$2:$C$4');
     handle.detach();
   });
 });

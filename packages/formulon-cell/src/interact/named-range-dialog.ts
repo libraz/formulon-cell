@@ -104,7 +104,13 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     deps.getSelectedRangeFormula && deps.subscribeToRangeChanges
       ? {
           label: strings.pivotTableDialog.rangePickerSelect,
-          getValue: deps.getSelectedRangeFormula,
+          // A name always refers to a sheet-qualified absolute reference.
+          getValue: (): string => {
+            const selection = deps.getSelection?.();
+            if (!selection) return deps.getSelectedRangeFormula?.() ?? '';
+            const { range } = selection;
+            return `=${formatSheetAbsoluteRange(wb.sheetName(range.sheet), range)}`;
+          },
           subscribeToRangeChanges: deps.subscribeToRangeChanges,
         }
       : null;

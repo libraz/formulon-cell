@@ -142,7 +142,7 @@ describe('attachMacSparklineDialog', () => {
     document
       .querySelectorAll<HTMLButtonElement>('.fc-macsparkdlg .fc-range-picker__btn')[1]
       ?.click();
-    expect(destination?.value).toBe('B5');
+    expect(destination?.value).toBe('$B$5');
     handle.detach();
   });
 });

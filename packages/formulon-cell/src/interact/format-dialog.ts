@@ -13,7 +13,7 @@ import {
 } from '../commands/selection-format-plan.js';
 import { recordFormatChange } from '../commands/slice-history.js';
 import { syncColorPaletteTheme, themeColorColumns } from '../components/color-palette.js';
-import { addrKey, formatA1Range, parseAddrKey } from '../engine/address.js';
+import { addrKey, parseAddrKey } from '../engine/address.js';
 import { displayCellFormatFromXf, effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { isWholeSheetSelection } from '../engine/whole-sheet-font-sync.js';
@@ -59,6 +59,7 @@ import {
 import { attachProtectionTab } from './format-dialog-tabs/protection-controller.js';
 import { runFormatDialogTransaction } from './format-dialog-transaction.js';
 import { createFormatDialogView } from './format-dialog-view.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface FormatDialogDeps {
@@ -295,16 +296,20 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       .querySelector<HTMLElement>('.fc-fmtdlg__text-direction-row')
       ?.setAttribute('hidden', '');
   }
+  const pickFormat = createRangePickFormatter({
+    store,
+    sheetName: (index) => getWb()?.sheetName(index) ?? '',
+  });
   attachRangePickerButton(validationListRangeInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => formatA1Range(store.getState().selection.range),
-    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    getValue: () => `=${pickFormat.range()}`,
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'format-validation-list-range',
   });
   attachRangePickerButton(view.validationFormulaInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => `=${formatA1Range(store.getState().selection.range)}`,
-    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    getValue: () => `=${pickFormat.range()}`,
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'format-validation-formula',
   });
 
@@ -819,6 +824,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const api: FormatDialogHandle = {
     open(tab?: TabId, options?: FormatDialogOpenOptions): void {
+      pickFormat.begin();
       dialogMode = options?.mode ?? 'format';
       const onNumberFormat = options?.onApplyNumberFormat;
       applyDxf =

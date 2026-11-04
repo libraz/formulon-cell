@@ -38,7 +38,7 @@ describe('attachFormatDialog', () => {
       kind.dispatchEvent(new Event('change', { bubbles: true }));
       input.focus();
       setRange(store, 1, 1, 3, 2);
-      expect(input.value).toBe('=B2:C4');
+      expect(input.value).toBe('=$B$2:$C$4');
       expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(false);
     } finally {
       handle.detach();
@@ -80,7 +80,7 @@ describe('attachFormatDialog', () => {
         document.querySelector('.fc-fmtdlg')?.classList.contains('fc-fmtdlg--range-picking'),
       ).toBe(true);
       setRange(store, 2, 1, 6, 1);
-      expect(rangeInput.value).toBe('B3:B7');
+      expect(rangeInput.value).toBe('=$B$3:$B$7');
 
       handle.close();
       expect(rangePicker?.dataset.rangePickerActive).toBe('false');

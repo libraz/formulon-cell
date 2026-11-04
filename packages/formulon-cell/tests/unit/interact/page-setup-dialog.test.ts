@@ -787,23 +787,44 @@ describe('attachPageSetupDialog', () => {
     expect(printAreaPicker?.dataset.rangePickerActive).toBe('true');
     expect(dialog()?.classList.contains('fc-fmtdlg--range-picking')).toBe(true);
     mutators.setRange(store, { sheet: 0, r0: 1, c0: 1, r1: 9, c1: 3 });
-    expect(printArea.value).toBe('B2:D10');
+    expect(printArea.value).toBe('$B$2:$D$10');
 
     rowsPicker?.click();
     expect(printAreaPicker?.dataset.rangePickerActive).toBe('false');
     expect(rowsPicker?.dataset.rangePickerActive).toBe('true');
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 5 });
-    expect(rows.value).toBe('1:2');
+    expect(rows.value).toBe('$1:$2');
 
     colsPicker?.click();
     expect(rowsPicker?.dataset.rangePickerActive).toBe('false');
     expect(colsPicker?.dataset.rangePickerActive).toBe('true');
     mutators.setRange(store, { sheet: 0, r0: 4, c0: 0, r1: 12, c1: 1 });
-    expect(cols.value).toBe('A:B');
+    expect(cols.value).toBe('$A:$B');
 
     handle.close();
     expect(colsPicker?.dataset.rangePickerActive).toBe('false');
     expect(dialog()?.classList.contains('fc-fmtdlg--range-picking')).toBe(false);
+    handle.detach();
+  });
+
+  it('picked print references are saved as written and still validate', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open('sheet');
+    const pick = (kind: string, range: { r0: number; c0: number; r1: number; c1: number }) => {
+      document.querySelector<HTMLButtonElement>(`[data-range-picker="${kind}"]`)?.click();
+      mutators.setRange(store, { sheet: 0, ...range });
+    };
+    pick('page-setup-print-area', { r0: 1, c0: 1, r1: 4, c1: 3 });
+    pick('page-setup-print-title-rows', { r0: 2, c0: 2, r1: 2, c1: 2 });
+    expect(inputByLabel('Print title rows')?.value).toBe('$3:$3');
+    pick('page-setup-print-title-cols', { r0: 0, c0: 1, r1: 3, c1: 3 });
+    expect(inputByLabel('Print title columns')?.value).toBe('$B:$D');
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+    const setup = getPageSetup(store.getState(), 0);
+    expect(setup.printArea).toBe('$B$2:$D$5');
+    expect(setup.printTitleRows).toBe('$3:$3');
+    expect(setup.printTitleCols).toBe('$B:$D');
     handle.detach();
   });
 

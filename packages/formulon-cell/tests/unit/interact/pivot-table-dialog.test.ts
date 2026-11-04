@@ -302,7 +302,7 @@ describe('attachPivotTableDialog', () => {
     mutators.setActive(store, { sheet: 0, row: 5, col: 2 });
     rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
     expect(rangeInputs[0]?.value).toBe('Sheet1!$A$1:$E$3');
-    expect(rangeInputs[1]?.value).toBe('C6');
+    expect(rangeInputs[1]?.value).toBe('$C$6');
     const cancelButton = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'),
     ).find((button) => button.textContent === 'Cancel');
@@ -323,6 +323,29 @@ describe('attachPivotTableDialog', () => {
     expect(calls).toContain('field:Sales');
     expect(calls).toContain('pivot');
     expect(calls).toContain('grand:true:true');
+    expect(document.querySelector('.fc-pivotdlg')?.hasAttribute('hidden')).toBe(true);
+    handle.detach();
+  });
+
+  it('picks a sheet-qualified absolute source and an absolute destination, and OK creates the report', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+    handle.open({ placement: 'existing' });
+    document.querySelector<HTMLButtonElement>('[data-range-picker="pivot-source"]')?.click();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const inputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
+    expect(inputs[0]?.value).toBe('Sheet1!$A$1');
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
+    expect(inputs[0]?.value).toBe('Sheet1!$A$1:$E$3');
+    document.querySelector<HTMLButtonElement>('[data-range-picker="pivot-destination"]')?.click();
+    mutators.setActive(store, { sheet: 0, row: 5, col: 7 });
+    expect(inputs[1]?.value).toBe('$H$6');
+    document
+      .querySelector('form')
+      ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+    expect(calls).toContain('pivot');
     expect(document.querySelector('.fc-pivotdlg')?.hasAttribute('hidden')).toBe(true);
     handle.detach();
   });

@@ -9,7 +9,7 @@ import {
   pivotSourceForSelection,
 } from '../commands/pivot-table.js';
 import { isWorkbookStructureProtected } from '../commands/protection.js';
-import { formatA1Cell, parseA1Atom } from '../engine/address.js';
+import { formatA1Cell } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range as EngineRange } from '../engine/types.js';
 import { PivotAggregation } from '../engine/types.js';
@@ -29,6 +29,7 @@ import {
 } from './dialog-shell.js';
 import { createPivotFieldAreas } from './pivot-table-field-areas.js';
 import { renderPivotFieldList } from './pivot-table-field-list.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface PivotTableDialogDeps {
@@ -186,9 +187,18 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   const selectedRangeLabel = (): string => sourceRangeLabel(pivotSourceForSelection(store, wb));
 
-  const activeCellLabel = (): string => {
-    const active = store.getState().selection.active;
-    return formatA1Cell(active.row, active.col);
+  const pickFormat = createRangePickFormatter({
+    store,
+    sheetName: (index) => wb.sheetName(index),
+  });
+
+  /** The single destination cell, on the source's sheet (placement carries no other sheet). */
+  const destinationFromInput = (sourceSheet: number): { row: number; col: number } | null => {
+    const parsed = parseRangeRef(destInput.value);
+    if (!parsed || parsed.r0 !== parsed.r1 || parsed.c0 !== parsed.c1) return null;
+    if (parsed.sheetName !== null && sheetIndexByName(parsed.sheetName) !== sourceSheet)
+      return null;
+    return { row: parsed.r0, col: parsed.c0 };
   };
 
   const areas = createPivotFieldAreas({ rowSelect, colSelect, filterSelect, valueSelect });
@@ -413,14 +423,14 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       );
     attachRangePickerButton(sourceInput, {
       label: t.rangePickerSelect,
-      getValue: selectedRangeLabel,
-      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      getValue: () => pickFormat.range({ prefix: 'always' }),
+      subscribeToRangeChanges: pickFormat.subscribe,
       kind: 'pivot-source',
     });
     attachRangePickerButton(destInput, {
       label: t.rangePickerSelect,
-      getValue: activeCellLabel,
-      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      getValue: () => pickFormat.cell(),
+      subscribeToRangeChanges: pickFormat.subscribe,
       kind: 'pivot-destination',
     });
     updateDestinationPlacementState();
@@ -457,7 +467,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       return;
     }
     const useNewWorksheet = newWorksheetInput.checked;
-    const dest = useNewWorksheet ? null : parseA1Atom(destInput.value);
+    const dest = useNewWorksheet ? null : destinationFromInput(range.sheet);
     if (!useNewWorksheet && !dest) {
       showError(strings.pivotTableDialog.invalidDestination);
       destInput.focus();
@@ -569,6 +579,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       mac = isMacHost(host);
       if (mac) destInput.value = '';
       tableRangeInput.checked = true;
+      pickFormat.begin();
       sourceInput.value = selectedRangeLabel();
       // New worksheet is the dialog's default placement; only an explicit
       // "existing sheet" entry point starts on the other radio.

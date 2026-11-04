@@ -25,7 +25,6 @@ import {
 import {
   addrKey,
   colLetter,
-  formatA1Cell,
   formatA1Range,
   MAX_COL,
   MAX_ROW,
@@ -33,6 +32,7 @@ import {
 } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
+import { createRangePickFormatter } from '../../interact/range-pick-format.js';
 import { executeRibbonFilterDataAction } from '../../interact/ribbon-filter-data.js';
 import type { SpreadsheetInstance } from '../../mount.js';
 import { selectionContainsAddr } from '../../store/selection-geometry.js';
@@ -467,6 +467,10 @@ const buildSortMenuAction =
         parseA1Range(value.trim(), range.sheet, sheetName) ? null : invalidRange;
       const validateAddress = (value: string): string | null =>
         parseA1Range(value.trim(), range.sheet, sheetName) ? null : invalidRange;
+      const pickFormat = createRangePickFormatter({
+        store: instance.store,
+        sheetName: (index) => instance.workbook.sheetName(index),
+      });
       const result = await showAdvancedFilterDialog({
         title: strings.advancedFilterDialogTitle,
         listRangeLabel: strings.advancedFilterListRange,
@@ -481,12 +485,10 @@ const buildSortMenuAction =
         okLabel: strings.sortDialogApply,
         cancelLabel: strings.sortDialogCancel,
         rangePickerLabel: strings.advancedFilterRangePicker,
-        pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
-        pickAddress: () => {
-          const active = instance.store.getState().selection.active;
-          return formatA1Cell(active.row, active.col);
-        },
-        subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+        // The list and criteria ranges are sheet-qualified from the first pick.
+        pickRange: () => pickFormat.range({ prefix: 'always' }),
+        pickAddress: () => pickFormat.cell(),
+        subscribeToRangeChanges: pickFormat.subscribe,
         validateRange,
         validateAddress,
       });

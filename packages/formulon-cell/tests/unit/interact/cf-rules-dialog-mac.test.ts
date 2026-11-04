@@ -233,7 +233,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
       expect(input.disabled).toBe(false);
       input.focus();
       setSelection(store, 1, 1, 3, 2);
-      expect(input.value).toBe('B2:C4');
+      expect(input.value).toBe('$B$2:$C$4');
       expect(q<HTMLElement>('.fc-cfrulesdlg').hidden).toBe(false);
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       expect(store.getState().conditional.rules[0]?.range).toMatchObject({

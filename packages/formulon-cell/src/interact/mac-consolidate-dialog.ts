@@ -18,6 +18,7 @@ import {
   createDialogShell,
 } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 interface ConsolidateDialogHandle {
@@ -99,11 +100,14 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
   sourceInput.autocomplete = 'off';
   sourceInput.spellcheck = false;
   sourceRow.row.appendChild(sourceInput);
+  const pickFormat = createRangePickFormatter({
+    store: instance.store,
+    sheetName: (index) => instance.workbook.sheetName(index),
+  });
   attachRangePickerButton(sourceInput, {
     label: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
-    getValue: () =>
-      formatMacRangeAddress(instance.workbook, instance.store.getState().selection.range),
-    subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+    getValue: () => pickFormat.range(),
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'mac-consolidate-source',
   });
 
@@ -224,6 +228,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
   };
 
   const defaults = (): void => {
+    pickFormat.begin();
     const selection = instance.store.getState().selection.range;
     sourceInput.value = formatMacRangeAddress(instance.workbook, selection);
     references.length = 0;

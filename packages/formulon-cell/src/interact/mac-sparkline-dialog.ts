@@ -1,6 +1,6 @@
 import type { History } from '../commands/history.js';
 import { setSparkline } from '../commands/sparkline.js';
-import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -14,6 +14,7 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 /** A small Insert Sparkline chooser. The source may be any
@@ -131,20 +132,21 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const destinationRow = labelRow(destinationInput);
   const kindRow = labelRow(kindSelect);
   body.append(sourceRow.row, destinationRow.row, kindRow.row, error);
-  const subscribeToRangeChanges = (listener: () => void): (() => void) => store.subscribe(listener);
+  const pickFormat = createRangePickFormatter({
+    store,
+    sheetName: (index) => deps.getWb?.()?.sheetName(index) ?? `Sheet${index + 1}`,
+  });
+  const subscribeToRangeChanges = pickFormat.subscribe;
   const pickers = [
     attachRangePickerButton(sourceInput, {
       label: strings.pivotTableDialog.rangePickerSelect,
-      getValue: () => formatA1Range(store.getState().selection.range),
+      getValue: () => pickFormat.range(),
       subscribeToRangeChanges,
       kind: 'sparkline-source',
     }),
     attachRangePickerButton(destinationInput, {
       label: strings.pivotTableDialog.rangePickerSelect,
-      getValue: () => {
-        const { row, col } = store.getState().selection.active;
-        return formatA1Cell(row, col);
-      },
+      getValue: () => pickFormat.cell(),
       subscribeToRangeChanges,
       kind: 'sparkline-location',
     }),
@@ -225,13 +227,12 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   };
 
   const sourceForSpec = (source: ResolvedRange, destination: Addr): string => {
-    const raw = sourceInput.value.trim().replace(/^=/, '');
     if (source.explicitSheet || source.sheet !== destination.sheet) {
       const wb = deps.getWb?.() ?? null;
       const name = wb?.sheetName(source.sheet) ?? `Sheet${source.sheet + 1}`;
       return formatSheetRange(name, source);
     }
-    return raw || formatA1Range(source);
+    return formatA1Range(source);
   };
 
   const onChange = (): void => {
@@ -301,6 +302,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const api: MacSparklineDialogHandle = {
     open(): void {
       const range = store.getState().selection.range;
+      pickFormat.begin();
       sourceInput.value = formatA1Range(range);
       // The desktop dialog opens with the location empty; OK stays disabled
       // without flagging an error the user has not made yet.

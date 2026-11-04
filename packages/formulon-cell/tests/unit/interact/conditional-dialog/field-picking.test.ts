@@ -40,10 +40,26 @@ describe('conditional rule dialog reference fields', () => {
     const input = fieldFor(kind);
     input.focus();
     setRange(store, 1, 1, 1, 1);
-    expect(input.value).toBe('=B2');
+    expect(input.value).toBe('=$B$2');
     setRange(store, 1, 1, 3, 2);
-    expect(input.value).toBe('=B2:C4');
+    expect(input.value).toBe('=$B$2:$C$4');
     expect(document.querySelector<HTMLElement>('.fc-conddlg')?.hidden).toBe(false);
+    handle.detach();
+  });
+  it('a picked formula reference is stored as an absolute formula when the rule is added', () => {
+    const handle = attachConditionalDialog({ host, store });
+    handle.open({ mode: 'new', kind: 'formula' });
+    const input = fieldFor('conditional-format-formula');
+    input.focus();
+    setRange(store, 2, 2, 2, 2);
+    expect(input.value).toBe('=$C$3');
+    document
+      .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      kind: 'formula',
+      formula: '=$C$3',
+    });
     handle.detach();
   });
 });

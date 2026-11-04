@@ -37,6 +37,7 @@ import { conditionalSelect } from './conditional-form-controls.js';
 import { appendIconSetForm } from './conditional-icon-set-form.js';
 import { appendDialogButton, createDialogShell, deferInitialFocus } from './dialog-shell.js';
 import { attachFormatDialog, type FormatDialogHandle } from './format-dialog.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface ConditionalDialogDeps {
@@ -116,12 +117,16 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     return value.startsWith('=') ? localizeFormulaForDisplay(value) : value;
   };
   // A picked reference is stored as a `=` formula, the same text a typed cell reference gets.
-  const pickedReference = (): string => `=${formatA1Range(store.getState().selection.range)}`;
+  const pickFormat = createRangePickFormatter({
+    store,
+    sheetName: (index) => deps.getWb?.()?.sheetName(index) ?? '',
+  });
+  const pickedReference = (): string => `=${pickFormat.range()}`;
   const attachReferencePicker = (input: HTMLInputElement, kind: string): void => {
     attachRangePickerButton(input, {
       label: strings.pivotTableDialog.rangePickerSelect,
       getValue: pickedReference,
-      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      subscribeToRangeChanges: pickFormat.subscribe,
       kind,
     });
   };
@@ -201,8 +206,9 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   rangeRow.append(rangeLabel, rangeInput);
   attachRangePickerButton(rangeInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => formatA1Range(store.getState().selection.range, { collapse: false }),
-    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    // The rule applies on the dialog's own sheet, so the field never carries a sheet prefix.
+    getValue: () => pickFormat.range({ prefix: 'never' }),
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'conditional-format-range',
   });
   form.appendChild(rangeRow);
@@ -1094,6 +1100,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
 
   const api: ConditionalDialogHandle = {
     open(options = {}): void {
+      pickFormat.begin();
       currentMode = options.mode ?? 'manage';
       currentEditIndex = currentMode === 'edit' ? (options.editIndex ?? null) : null;
       const sel = store.getState().selection.range;

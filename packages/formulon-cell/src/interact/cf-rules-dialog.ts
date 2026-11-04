@@ -20,6 +20,7 @@ import {
   createDialogButton,
   createDialogShell,
 } from './dialog-shell.js';
+import { createRangePickFormatter } from './range-pick-format.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface CfRulesDialogDeps {
@@ -324,12 +325,21 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       appliesToControls.push(button);
     }
     const store = deps.store;
+    // The rule's sheet is fixed, so the field never carries a sheet prefix.
+    const pickFormat = store
+      ? createRangePickFormatter({
+          store,
+          sheetName: (index) => deps.getWb()?.sheetName(index) ?? '',
+        })
+      : null;
     appliesToControls.push(
       attachRangePickerButton(appliesToInput, {
         label: strings.pivotTableDialog.rangePickerSelect,
-        getValue: () =>
-          formatA1Range(deps.getSelectionRange?.() ?? store?.getState().selection.range ?? EMPTY),
-        subscribeToRangeChanges: store ? (listener) => store.subscribe(listener) : undefined,
+        getValue: () => {
+          const range = deps.getSelectionRange?.() ?? store?.getState().selection.range ?? EMPTY;
+          return pickFormat?.range({ prefix: 'never', range }) ?? '';
+        },
+        subscribeToRangeChanges: pickFormat?.subscribe,
         kind: 'cf-rules-applies-to',
       }),
     );

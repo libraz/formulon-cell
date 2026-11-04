@@ -1,7 +1,6 @@
 // Sheet tab: print area and titles (with reference validation), print
 // options, comments / cell-error modes, and page order.
 import { parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from '../../commands/print.js';
-import { colLetter, formatA1Range } from '../../engine/address.js';
 import type {
   PageSetup,
   PrintCellErrorsMode,
@@ -10,6 +9,7 @@ import type {
 } from '../../store/store.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
 import { makeRow, makeTextInput } from '../page-setup-dialog-dom.js';
+import { createRangePickFormatter } from '../range-pick-format.js';
 import { attachRangePickerButton } from '../range-picker-control.js';
 import type { PageSetupTabContext } from './context.js';
 
@@ -26,6 +26,8 @@ export function createSheetTab(
   focusSheetTab: () => void,
 ): SheetTab {
   const { t, strings, store, mac, on } = ctx;
+  // Print references address the sheet being set up, so they never carry a sheet prefix.
+  const pickFormat = createRangePickFormatter({ store, sheetName: () => '' });
 
   const makeOptionSelect = (
     label: string,
@@ -44,8 +46,8 @@ export function createSheetTab(
   printAreaRow.valueCell.appendChild(printAreaInput);
   attachRangePickerButton(printAreaInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => formatA1Range(store.getState().selection.range),
-    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    getValue: () => pickFormat.range({ prefix: 'never' }),
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'page-setup-print-area',
   });
   panel.appendChild(printAreaRow.row);
@@ -57,11 +59,8 @@ export function createSheetTab(
   titleRowsRow.valueCell.appendChild(titleRowsInput);
   attachRangePickerButton(titleRowsInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => {
-      const range = store.getState().selection.range;
-      return `${range.r0 + 1}:${range.r1 + 1}`;
-    },
-    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    getValue: () => pickFormat.rows({ prefix: 'never' }),
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'page-setup-print-title-rows',
   });
   panel.appendChild(titleRowsRow.row);
@@ -72,11 +71,8 @@ export function createSheetTab(
   titleColsRow.valueCell.appendChild(titleColsInput);
   attachRangePickerButton(titleColsInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => {
-      const range = store.getState().selection.range;
-      return `${colLetter(range.c0)}:${colLetter(range.c1)}`;
-    },
-    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    getValue: () => pickFormat.cols({ prefix: 'never' }),
+    subscribeToRangeChanges: pickFormat.subscribe,
     kind: 'page-setup-print-title-cols',
   });
   panel.appendChild(titleColsRow.row);

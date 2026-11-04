@@ -426,12 +426,12 @@ describe('attachGoToDialog', () => {
     const input = referenceInput();
     expect(picker?.getAttribute('aria-label')).toBe('範囲の選択');
     picker?.click();
-    expect(input?.value).toBe('B2:D4');
+    expect(input?.value).toBe('$B$2:$D$4');
     expect(picker?.getAttribute('aria-pressed')).toBe('true');
     expect(overlay()?.classList.contains('fc-fmtdlg--range-picking')).toBe(true);
 
     setRange(store, 4, 2, 6, 4);
-    expect(input?.value).toBe('C5:E7');
+    expect(input?.value).toBe('$C$5:$E$7');
     handle.close();
     expect(picker?.getAttribute('aria-pressed')).toBe('false');
     expect(overlay()?.classList.contains('fc-fmtdlg--range-picking')).toBe(false);
