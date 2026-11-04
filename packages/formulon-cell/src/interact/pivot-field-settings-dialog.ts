@@ -466,8 +466,11 @@ export const showPivotFieldSettingsDialog = (
       };
       initialFocus = () => focusAndSelectInput(nameInput);
     } else {
-      // The engine has no setter for a field's caption; the name shows read-only.
-      projectDisabledState(nameInput, true, t.unavailable, { datasetKey: 'disabledReason' });
+      // The engine has no setter for a field's caption: the name stays focusable
+      // and selectable, as on the desktop, but read-only.
+      nameInput.readOnly = true;
+      nameInput.setAttribute('aria-readonly', 'true');
+      nameInput.title = t.unavailable;
       body.appendChild(labelledRow(t.customName, nameInput));
       const heading = document.createElement('div');
       heading.className = 'fc-pvfsdlg__heading';
@@ -555,7 +558,7 @@ export const showPivotFieldSettingsDialog = (
         subtotal: auto.checked ? 'auto' : custom.checked ? 'custom' : 'none',
         subtotalFns: [...chosen].sort((a, b) => a - b) as PivotAggregation[],
       });
-      initialFocus = () => (auto.checked ? auto : custom.checked ? custom : none).focus();
+      initialFocus = () => focusAndSelectInput(nameInput);
       queueMicrotask(sync);
     }
 
@@ -584,5 +587,7 @@ export const showPivotFieldSettingsDialog = (
       ok.click();
     });
     shell.open();
+    // The shell focuses its first control; the desktop opens on the name, selected.
+    initialFocus();
     deferInitialFocus(shell.overlay, () => initialFocus());
   });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { PivotAggregation, PivotAxis, PivotShowValuesAs } from '../../../src/engine/types.js';
@@ -88,6 +88,8 @@ describe('PivotTable Field dialog', () => {
     expect(root.querySelector('[data-pvfs-source]')?.textContent).toBe('Amt');
     const name = root.querySelector<HTMLInputElement>('[data-pvfs-name]');
     expect(name?.value).toBe(wb.getPivotDefinition(0, 0)?.dataFields[0]?.name);
+    expect(document.activeElement, 'the name opens focused').toBe(name);
+    expect([name?.selectionStart, name?.selectionEnd]).toEqual([0, name?.value.length]);
     expect(
       Array.from(root.querySelectorAll('[role="tab"]')).map((tab) => [
         tab.textContent,
@@ -196,6 +198,33 @@ describe('PivotTable Field dialog', () => {
     wb.dispose();
   });
 
+  it('reads the profile names on open without an undo step, a recalc, a change event or a cell change', async () => {
+    const wb = await setup();
+    const history = new History();
+    const handle = openPane(wb, en, history);
+    const events: unknown[] = [];
+    const unsubscribe = wb.subscribe((event) => events.push(event));
+    const recalc = vi.spyOn(wb, 'recalc');
+    const partial = vi.spyOn(wb, 'partialRecalc');
+    const cellsOf = () => JSON.stringify(Array.from(wb.cells(0)));
+    const beforeCells = cellsOf();
+    const beforeDefinition = JSON.stringify(wb.getPivotDefinition(0, 0));
+    chipInfo('values', 'Amt').click();
+    expect(
+      Array.from(dialog().querySelectorAll('[data-pvfs-aggregation] [role="option"]')).length,
+    ).toBe(11);
+    expect(history.canUndo()).toBe(false);
+    expect(recalc).not.toHaveBeenCalled();
+    expect(partial).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+    expect(JSON.stringify(wb.getPivotDefinition(0, 0))).toBe(beforeDefinition);
+    expect(cellsOf()).toBe(beforeCells);
+    click('[data-pvfs-cancel]');
+    unsubscribe();
+    handle.detach();
+    wb.dispose();
+  });
+
   it('opens number-only Format Cells from Number Format and writes the code', async () => {
     const wb = await setup();
     const { createSpreadsheetStore } = await import('../../../src/store/store.js');
@@ -284,6 +313,8 @@ describe('PivotTable Field dialog', () => {
     expect(root.dataset.pvfsKind).toBe('field');
     expect(root.querySelector('[data-pvfs-source]')).toBeNull();
     expect(root.querySelector<HTMLInputElement>('[data-pvfs-name]')?.value).toBe('Region');
+    expect(document.activeElement).toBe(root.querySelector('[data-pvfs-name]'));
+    expect(root.querySelector<HTMLInputElement>('[data-pvfs-name]')?.readOnly).toBe(true);
     expect(root.querySelector('.fc-pvfsdlg__heading')?.textContent).toBe('小計');
     expect(
       Array.from(root.querySelectorAll('.fc-pvfsdlg__radio')).map((label) => label.textContent),

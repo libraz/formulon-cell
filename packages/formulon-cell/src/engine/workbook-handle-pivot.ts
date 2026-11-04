@@ -246,6 +246,8 @@ export abstract class WorkbookHandlePivotMethods {
     kind: number;
     /** Header nesting depth; 0 for data cells and the outermost field's items. */
     depth: number;
+    /** Source field of a label, data field of a value; empty for captions. */
+    fieldName: string;
     numberFormat: string;
     pivotIndex: number;
   }> {
@@ -1217,6 +1219,7 @@ function pivotCellEntry(
   formula: string | null;
   kind: number;
   depth: number;
+  fieldName: string;
   numberFormat: string;
   pivotIndex: number;
 } {
@@ -1226,6 +1229,7 @@ function pivotCellEntry(
     formula: null,
     kind: cell.kind,
     depth: cell.depth ?? 0,
+    fieldName: cell.fieldName ?? '',
     numberFormat: pivotNumberFormatCode(handle, cell.numberFormat),
     pivotIndex,
   };

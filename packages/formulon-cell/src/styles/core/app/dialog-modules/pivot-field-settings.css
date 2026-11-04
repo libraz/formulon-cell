@@ -23,8 +23,12 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 18px 20px 0;
+    padding: 18px 13px 0;
     font-size: 13px;
+  }
+  .fc-pvfsdlg[data-pvfs-kind="field"] .fc-pvfsdlg__body {
+    gap: 8px;
+    padding-inline: 20px;
   }
   .fc-pvfsdlg__name-row {
     display: grid;
@@ -53,7 +57,7 @@
   .fc-pvfsdlg__group {
     position: relative;
     margin-top: 8px;
-    padding: 22px 20px 12px;
+    padding: 22px 25px 12px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 5px;
@@ -98,7 +102,9 @@
     outline: none;
   }
   .fc-pvfsdlg__list[data-pvfs-aggregation] {
+    width: 273px;
     height: calc(var(--fc-pvfsdlg-row) * 8);
+    margin-inline: auto;
   }
   .fc-pvfsdlg__list[aria-disabled="true"] {
     color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 40%, transparent));
@@ -124,12 +130,14 @@
   .fc-pvfsdlg__show-as,
   .fc-pvfsdlg__panel-tab .fc-select,
   .fc-pvfsdlg__panel-tab .fc-select__button {
-    width: 100%;
+    box-sizing: border-box;
+    width: 317px;
+    max-width: 100%;
   }
   .fc-pvfsdlg__bases {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px 18px;
+    grid-template-columns: repeat(2, 148px);
+    gap: 4px 21px;
     margin-top: 10px;
   }
   .fc-pvfsdlg__bases .fc-pvfsdlg__list {
@@ -158,6 +166,8 @@
     gap: 6px;
   }
   .fc-pvfsdlg__fn-list {
+    justify-self: end;
+    width: 285px;
     height: 101px;
   }
   .fc-pvfsdlg__footer {
@@ -166,6 +176,9 @@
     gap: 10px;
     padding: 18px 20px;
     border-top: 0;
+  }
+  .fc-pvfsdlg[data-pvfs-kind="field"] .fc-pvfsdlg__footer {
+    padding-block: 14px 16px;
   }
   .fc-pvfsdlg__spacer {
     flex: 1 1 auto;
@@ -186,5 +199,167 @@
   /* Format Cells opened from Number Format: its one tab sits centred. */
   .fc-fmtdlg--mac.fc-fmtdlg--number-format .fc-fmtdlg__panel .fc-fmtdlg__tab[data-fc-tab="number"] {
     left: calc(50% - 36px);
+  }
+}
+
+@layer fc.app {
+  /* PivotTable Options dialog: name row, then four tabs of grouped options. */
+  .fc-pvoptdlg {
+    --fc-pvoptdlg-width: 537px;
+    --fc-pvoptdlg-label-width: 98px;
+    --fc-pvoptdlg-panel-height: 330px;
+  }
+  .fc-pvoptdlg .fc-pvoptdlg__frame {
+    width: var(--fc-pvoptdlg-width);
+    max-width: 96vw;
+  }
+  .fc-pvoptdlg .fc-fmtdlg__header {
+    height: 32px;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+  .fc-pvoptdlg .fc-fmtdlg__panel > .fc-pvoptdlg__body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 16px 13px 0;
+    font-size: 13px;
+  }
+  .fc-pvoptdlg__name-row {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+  .fc-pvoptdlg__name,
+  .fc-pvoptdlg__field,
+  .fc-pvoptdlg__alt-title,
+  .fc-pvoptdlg__alt-description {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 0 6px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
+    border-radius: 4px;
+    background: var(--fc-bg, Canvas);
+    color: var(--fc-fg, CanvasText);
+    font: inherit;
+  }
+  .fc-pvoptdlg__name {
+    height: 26px;
+  }
+  .fc-pvoptdlg__tab-group {
+    position: relative;
+    margin-top: 16px;
+    padding: 26px 14px 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 5px;
+  }
+  .fc-pvoptdlg__tabs {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    display: flex;
+    padding: 1px;
+    border-radius: 6px;
+    background: var(--fc-bg-elev, color-mix(in srgb, CanvasText 8%, Canvas));
+    transform: translate(-50%, -50%);
+  }
+  .fc-pvoptdlg__panel-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: var(--fc-pvoptdlg-panel-height);
+  }
+  .fc-pvoptdlg__panel-tab[hidden] {
+    display: none;
+  }
+  .fc-pvoptdlg__group {
+    display: grid;
+    grid-template-columns: var(--fc-pvoptdlg-label-width) minmax(0, 1fr);
+    gap: 0 8px;
+  }
+  .fc-pvoptdlg__group-label {
+    padding-top: 1px;
+    text-align: end;
+  }
+  .fc-pvoptdlg__controls {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .fc-pvoptdlg__check,
+  .fc-pvoptdlg__radio,
+  .fc-pvoptdlg__popup-row {
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .fc-pvoptdlg__check--indent {
+    padding-inline-start: 26px;
+  }
+  .fc-pvoptdlg__field {
+    width: 96px;
+    height: 22px;
+  }
+  .fc-pvoptdlg__radio-row {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    gap: 8px 24px;
+  }
+  .fc-pvoptdlg__radios {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .fc-pvoptdlg__panel-tab[data-pvopt-panel="layout"] {
+    --fc-pvoptdlg-label-width: 122px;
+  }
+  .fc-pvoptdlg__panel-tab[data-pvopt-panel="layout"] .fc-pvoptdlg__group-label,
+  .fc-pvoptdlg__caption {
+    white-space: nowrap;
+  }
+  .fc-pvoptdlg__popup-row .fc-select,
+  .fc-pvoptdlg__popup-row .fc-select__button,
+  .fc-pvoptdlg__popup {
+    box-sizing: border-box;
+    flex: none;
+    width: 79px;
+    min-width: 0;
+  }
+  .fc-pvoptdlg__rule {
+    width: 100%;
+    margin: 2px 0;
+    border: 0;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-pvoptdlg__alt-title {
+    height: 26px;
+  }
+  .fc-pvoptdlg__alt-description {
+    height: 128px;
+    padding: 4px 6px;
+    resize: none;
+  }
+  .fc-pvoptdlg__alt-help {
+    margin: 4px 0 0;
+    white-space: pre-line;
+  }
+  .fc-pvoptdlg .fc-fmtdlg__panel > .fc-pvoptdlg__footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 13px 19px;
+    border-top: 0;
+  }
+  .fc-pvoptdlg__footer .fc-fmtdlg__btn {
+    box-sizing: border-box;
+    width: 86px;
+    height: 26px;
+    min-height: 0;
   }
 }

@@ -41,6 +41,7 @@ export type InstanceDialogApi = Pick<
   | 'openChartSettings'
   | 'openPivotFieldList'
   | 'openActivePivotFieldList'
+  | 'openPivotOptions'
   | 'openPivotTableDialog'
   | 'addSlicer'
   | 'removeSlicer'
@@ -210,6 +211,25 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
       return (
         featureState.workbookObjects?.openPivotFieldList(pivot.sheetIndex, pivot.pivotIndex) ??
         false
+      );
+    },
+    openPivotOptions(sheetIndex, pivotIndex) {
+      if (isRestricted()) return false;
+      const pivot =
+        sheetIndex !== undefined && pivotIndex !== undefined
+          ? { sheetIndex, pivotIndex }
+          : findPivotTableAtCell(getWb(), store.getState().selection.active);
+      if (!pivot) return false;
+      const userObjects = getUserHandle('workbookObjects') as
+        | (ExtensionHandle & {
+            openPivotOptions?: (sheetIndex: number, pivotIndex: number) => boolean;
+          })
+        | undefined;
+      if (userObjects?.openPivotOptions) {
+        return userObjects.openPivotOptions(pivot.sheetIndex, pivot.pivotIndex);
+      }
+      return (
+        featureState.workbookObjects?.openPivotOptions(pivot.sheetIndex, pivot.pivotIndex) ?? false
       );
     },
     openPivotTableDialog(opts) {

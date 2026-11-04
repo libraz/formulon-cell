@@ -19,6 +19,7 @@ import type { AutofitOptions } from './autofit-measurement.js';
 import { currentRegion } from './current-region.js';
 import { defaultObjectNames } from './format-as-table.js';
 import type { History } from './history.js';
+import { reflowPivotFormats } from './pivot-format-reflow.js';
 import { autofitColsWidthForRanges } from './row-col-layout.js';
 import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
 
@@ -890,6 +891,39 @@ export function recreatePivotTable(
   if (rebuild()) return pivotIndex;
   wb.removePivotTable(sheet, pivotIndex);
   return -1;
+}
+
+/** Pin a report's anchor to the top of the report proper. A report filter
+ *  block pushes a report with no room above it down; the report then stays
+ *  there when the filter goes, as on the desktop. */
+export function settlePivotAnchor(wb: WorkbookHandle, sheet: number, pivotIndex: number): void {
+  const bounds = wb.pivotBounds(sheet).find((b) => b.pivotIndex === pivotIndex)?.range;
+  const definition = bounds ? wb.getPivotDefinition(sheet, pivotIndex) : null;
+  if (!bounds || !definition) return;
+  const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
+  if (filterRows === 0) return;
+  const row = bounds.r0 + filterRows + 1;
+  wb.setPivotTableAnchor(sheet, pivotIndex, {
+    row,
+    col: bounds.c0,
+    rows: bounds.r1 - row + 1,
+    cols: bounds.c1 - bounds.c0 + 1,
+  });
+}
+
+/** Bring the active sheet's reports up to date after a report edit, an undo
+ *  or a redo: settle their anchors, reload the projected cells, move direct
+ *  formats with the items they belong to and refit the report columns. */
+export function refreshPivotReportsAfterEdit(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  opts?: AutofitOptions,
+): void {
+  const sheet = store.getState().data.sheetIndex;
+  for (const { pivotIndex } of wb.pivotBounds(sheet)) settlePivotAnchor(wb, sheet, pivotIndex);
+  mutators.replaceCells(store, wb.cells(sheet));
+  reflowPivotFormats(store, wb);
+  autofitPivotTableColumns(store, wb, opts);
 }
 
 /** The report whose whole extent is exactly `range`, or null. */

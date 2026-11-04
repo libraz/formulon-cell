@@ -24,6 +24,7 @@ import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogIconButton } from './dialog-shell.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
+import { openPivotOptions } from './pivot-options-dialog.js';
 import { compatibilityLabelKey } from './spreadsheet-compatibility-report.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 import { createWorkbookObjectsActionButton, pivotEditField } from './workbook-objects-dom.js';
@@ -71,6 +72,8 @@ export interface WorkbookObjectsPanelDeps {
 export interface WorkbookObjectsPanelHandle {
   open(): void;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
+  /** Opens the PivotTable Options dialog on a report; false when there is no such report. */
+  openPivotOptions(sheetIndex: number, pivotIndex: number): boolean;
   isPivotFieldListOpen(): boolean;
   close(): void;
   refresh(): void;
@@ -634,6 +637,24 @@ export function attachWorkbookObjectsPanel(
   return {
     open: openPanel,
     openPivotFieldList,
+    openPivotOptions: (sheetIndex, pivotIndex) => {
+      if (wb.pivotTableName(sheetIndex, pivotIndex) === null) return false;
+      void openPivotOptions(
+        {
+          host,
+          strings,
+          wb,
+          history: deps.history ?? null,
+          onChanged: () => {
+            deps.onAfterPivotEdit?.();
+            refresh();
+          },
+        },
+        sheetIndex,
+        pivotIndex,
+      );
+      return true;
+    },
     isPivotFieldListOpen: () => open && activePivotFieldListKey.length > 0,
     close,
     refresh,

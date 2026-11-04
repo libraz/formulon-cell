@@ -2,6 +2,7 @@ import { macAdvancedFilterJa } from './advanced-filter.js';
 import { macCfRulesDialogJa } from './cf-rules-dialog.js';
 import { macChromeJa } from './chrome.js';
 import { macCreateTableJa } from './create-table.js';
+import { macDataValidationJa } from './data-validation.js';
 import { macExternalLinksPaneJa } from './external-links-pane.js';
 import { macGoToDialogJa } from './goto-dialog.js';
 import { macHyperlinkDialogJa } from './hyperlink-dialog.js';
@@ -10,6 +11,7 @@ import { macNamedRangeDialogJa } from './named-range-dialog.js';
 import { macPageSetupJa } from './page-setup.js';
 import { macPasteSpecialJa } from './paste-special.js';
 import { macPivotFieldSettingsJa } from './pivot-field-settings.js';
+import { macPivotOptionsJa } from './pivot-options.js';
 import { macPivotTableDialogJa } from './pivot-table-dialog.js';
 import { macProtectSheetJa } from './protect-sheet.js';
 import { macRemoveDuplicatesJa } from './remove-duplicates.js';
@@ -198,9 +200,11 @@ export const macJa: MacStrings = {
   macStyleDialog: macStyleDialogJa,
   macExternalLinksPane: macExternalLinksPaneJa,
   macCreateTable: macCreateTableJa,
+  macDataValidation: macDataValidationJa,
   macGoToDialog: macGoToDialogJa,
   macHyperlinkDialog: macHyperlinkDialogJa,
   macPivotFieldSettings: macPivotFieldSettingsJa,
+  macPivotOptions: macPivotOptionsJa,
   macPivotTableDialog: macPivotTableDialogJa,
   macRemoveDuplicates: macRemoveDuplicatesJa,
   macSortDialog: macSortDialogJa,

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
+import { createPivotTableFromRange, settlePivotAnchor } from '../../../src/commands/pivot-table.js';
 import { PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
@@ -208,6 +208,65 @@ describe('PivotTable Fields pane', () => {
     if (!qty || !sales) throw new Error('missing value chips');
     drag(sales, qty);
     expect(wb.getPivotDefinition(0, 0)?.dataFields.map((d) => d.fieldIndex)).toEqual([2, 3]);
+    handle.detach();
+    wb.dispose();
+  });
+
+  it('restores the report position on undo when a filter field moved it', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    const rows: (string | number)[][] = [
+      ['Region', 'Product', 'Sales'],
+      ['East', 'Desk', 12],
+      ['West', 'Chair', 5],
+    ];
+    for (const [r, row] of rows.entries()) {
+      for (const [c, value] of row.entries()) {
+        const addr = { sheet: 0, row: r, col: c };
+        if (typeof value === 'number') wb.setNumber(addr, value);
+        else wb.setText(addr, value);
+      }
+    }
+    // No room above the report, so a filter block has to push it down.
+    expect(
+      createPivotTableFromRange(wb, {
+        source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+        destination: { sheet: 0, row: 0, col: 6 },
+        rowField: 'Region',
+        valueField: 'Sales',
+      }).ok,
+    ).toBe(true);
+    const top = () => wb.pivotBounds(0).find((b) => b.pivotIndex === 0)?.range.r0;
+    const reportTop = () => {
+      const filters =
+        wb.getPivotDefinition(0, 0)?.fields.filter((f) => f.axis === PivotAxis.Page).length ?? 0;
+      return (top() ?? 0) + (filters > 0 ? filters + 1 : 0);
+    };
+    expect(reportTop()).toBe(0);
+    const history = new History();
+    // The host pins a pushed-down report where it is after each edit.
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb,
+      strings: en,
+      history,
+      onAfterPivotEdit: () => settlePivotAnchor(wb, 0, 0),
+    });
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    const productBox = checkbox('Product');
+    productBox.checked = true;
+    productBox.dispatchEvent(new Event('change', { bubbles: true }));
+    const product = area('rows').querySelector('[data-pivot-area-field="Product"]');
+    if (!product) throw new Error('missing Product chip');
+    drag(product, area('filters'));
+    expect(wb.getPivotDefinition(0, 0)?.fields[1]?.axis).toBe(PivotAxis.Page);
+    const moved = reportTop();
+    expect(moved).toBeGreaterThan(0);
+
+    expect(history.undo()).toBe(true);
+    expect(wb.getPivotDefinition(0, 0)?.fields[1]?.axis).toBe(PivotAxis.Row);
+    expect(reportTop(), 'undo puts the report back where it was').toBe(0);
+    expect(history.redo()).toBe(true);
+    expect(reportTop()).toBe(moved);
     handle.detach();
     wb.dispose();
   });

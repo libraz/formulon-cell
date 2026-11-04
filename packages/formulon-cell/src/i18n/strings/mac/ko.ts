@@ -20,6 +20,7 @@ import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotFieldSettingsKo } from './pivot-field-settings.js';
+import { macPivotOptionsKo } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -235,6 +236,10 @@ export const macKo: MacStrings = {
     recentEmails: '최근에 사용한 전자 메일 주소:',
   }),
   macPageSetup: macPageSetupFrom(pageLayoutKo.pageSetup),
+  macDataValidation: {
+    inputCaption: '셀을 선택하면 나타낼 설명 메시지:',
+    errorCaption: '유효하지 않은 데이터를 입력하면 표시할 오류 메시지:',
+  },
   macCreateTable: { nameLabel: '표 이름은 무엇입니까?' },
   macGoToDialog: macGoToDialogFrom(editDialogsKo.goToDialog, {
     selectCaption: '선택',
@@ -242,6 +247,7 @@ export const macKo: MacStrings = {
     noOptions: '이 선택 항목에는 옵션이 없습니다.',
   }),
   macPivotFieldSettings: macPivotFieldSettingsKo,
+  macPivotOptions: macPivotOptionsKo,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
     chooseConnection: '연결 선택...',
   }),

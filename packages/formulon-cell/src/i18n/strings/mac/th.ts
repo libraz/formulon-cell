@@ -20,6 +20,7 @@ import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotFieldSettingsTh } from './pivot-field-settings.js';
+import { macPivotOptionsTh } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -234,6 +235,10 @@ export const macTh: MacStrings = {
     recentEmails: 'ที่อยู่อีเมลที่ใช้ล่าสุด:',
   }),
   macPageSetup: macPageSetupFrom(pageLayoutTh.pageSetup),
+  macDataValidation: {
+    inputCaption: 'เมื่อเลือกเซลล์ ให้แสดงข้อความป้อนข้อมูลนี้:',
+    errorCaption: 'เมื่อผู้ใช้ป้อนข้อมูลที่ไม่ถูกต้อง ให้แสดงการแจ้งเตือนข้อผิดพลาดนี้:',
+  },
   macCreateTable: { nameLabel: 'ตารางของคุณชื่ออะไร' },
   macGoToDialog: macGoToDialogFrom(editDialogsTh.goToDialog, {
     selectCaption: 'เลือก',
@@ -241,6 +246,7 @@ export const macTh: MacStrings = {
     noOptions: 'รายการที่เลือกนี้ไม่มีตัวเลือก',
   }),
   macPivotFieldSettings: macPivotFieldSettingsTh,
+  macPivotOptions: macPivotOptionsTh,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
     chooseConnection: 'เลือกการเชื่อมต่อ...',
   }),

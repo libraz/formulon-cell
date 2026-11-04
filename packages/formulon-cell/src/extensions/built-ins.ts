@@ -18,7 +18,7 @@
 // replacement registered under the same id participates correctly.
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
-import { autofitPivotTableColumns } from '../commands/pivot-table.js';
+import { autofitPivotTableColumns, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import {
   clearSessionIllustration,
   duplicateSessionIllustration,
@@ -298,9 +298,7 @@ export const workbookObjects = (): Extension => ({
         }),
       subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),
       onAfterPivotEdit: () => {
-        refreshCells(ctx);
-        const wb = ctx.getWb();
-        if (wb) autofitPivotTableColumns(ctx.store, wb, { theme: resolveTheme(ctx.host) });
+        refreshPivotReportsAfterEdit(ctx.store, ctx.getWb(), { theme: resolveTheme(ctx.host) });
         ctx.invalidate();
       },
     });
@@ -308,6 +306,8 @@ export const workbookObjects = (): Extension => ({
       open: () => handle.open(),
       openPivotFieldList: (sheetIndex: number, pivotIndex: number) =>
         handle.openPivotFieldList(sheetIndex, pivotIndex),
+      openPivotOptions: (sheetIndex: number, pivotIndex: number) =>
+        handle.openPivotOptions(sheetIndex, pivotIndex),
       close: () => handle.close(),
       refresh: () => handle.refresh(),
       rebindWorkbook: (wb) => handle.bindWorkbook(wb),

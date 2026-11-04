@@ -28,8 +28,30 @@ export interface PivotCommitContext {
   onChanged(): void;
 }
 
-/** Runs `apply` against one report as a single undo step: the definition read
- *  before and after is what undo and redo restore. Returns what `apply` did. */
+/** Where the report proper sits: its top-left below any filter block, and its size. */
+interface PivotAnchor {
+  row: number;
+  col: number;
+  rows: number;
+  cols: number;
+}
+
+function pivotAnchorOf(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+  pivotIndex: number,
+  definition: PivotDefinition,
+): PivotAnchor | null {
+  const range = wb.pivotBounds(sheetIndex).find((b) => b.pivotIndex === pivotIndex)?.range;
+  if (!range) return null;
+  const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
+  const row = range.r0 + (filterRows > 0 ? filterRows + 1 : 0);
+  return { row, col: range.c0, rows: range.r1 - row + 1, cols: range.c1 - range.c0 + 1 };
+}
+
+/** Runs `apply` against one report as a single undo step: the definition and
+ *  the report's position read before and after (after the host's own follow-up
+ *  in `onChanged`) are what undo and redo restore. Returns what `apply` did. */
 export function commitPivotChange(
   ctx: PivotCommitContext,
   sheetIndex: number,
@@ -37,18 +59,30 @@ export function commitPivotChange(
   apply: () => boolean,
 ): boolean {
   const { wb } = ctx;
-  const before = wb.getPivotDefinition(sheetIndex, pivotIndex);
+  const capture = () => {
+    const definition = wb.getPivotDefinition(sheetIndex, pivotIndex);
+    return definition
+      ? { definition, anchor: pivotAnchorOf(wb, sheetIndex, pivotIndex, definition) }
+      : null;
+  };
+  const before = capture();
   const ok = apply();
-  const after = before ? wb.getPivotDefinition(sheetIndex, pivotIndex) : null;
+  ctx.onChanged();
+  const after = before ? capture() : null;
   const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
   if (history && before && after) {
-    const restore = (target: PivotDefinition) => (): void => {
-      restorePivotFieldLayout(wb, sheetIndex, pivotIndex, target);
+    const restore = (target: NonNullable<typeof before>) => (): void => {
+      restorePivotFieldLayout(wb, sheetIndex, pivotIndex, target.definition);
+      const now = wb.getPivotDefinition(sheetIndex, pivotIndex);
+      const at = now ? pivotAnchorOf(wb, sheetIndex, pivotIndex, now) : null;
+      const anchor = target.anchor;
+      if (anchor && (at?.row !== anchor.row || at?.col !== anchor.col)) {
+        wb.setPivotTableAnchor(sheetIndex, pivotIndex, anchor);
+      }
       ctx.onChanged();
     };
     history.push({ undo: restore(before), redo: restore(after) });
   }
-  ctx.onChanged();
   return ok;
 }
 

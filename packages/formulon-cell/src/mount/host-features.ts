@@ -1,6 +1,6 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
-import { autofitPivotTableColumns } from '../commands/pivot-table.js';
+import { autofitPivotTableColumns, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
 import {
   clearSessionIllustration,
@@ -668,11 +668,9 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),
           onOpenPivotTableDialog: () => s.pivotTableDialog?.open(),
           onAfterPivotEdit: () => {
-            mutators.replaceCells(
-              input.store,
-              input.wb().cells(input.store.getState().data.sheetIndex),
-            );
-            autofitPivotTableColumns(input.store, input.wb(), { theme: resolveTheme(input.host) });
+            refreshPivotReportsAfterEdit(input.store, input.wb(), {
+              theme: resolveTheme(input.host),
+            });
             input.renderer.invalidate();
           },
         });

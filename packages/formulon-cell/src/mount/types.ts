@@ -208,6 +208,9 @@ export interface SpreadsheetInstance {
   openChartSettings(tab?: import('../interact/session-chart-settings.js').SettingsTab): boolean;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
   openActivePivotFieldList(): boolean;
+  /** Open the PivotTable Options dialog on a report, by default the one under
+   *  the active cell; false when there is none. Ribbon command id `pivotOptions`. */
+  openPivotOptions(sheetIndex?: number, pivotIndex?: number): boolean;
   openPivotTableDialog(opts?: { placement?: 'new' | 'existing' }): void;
   addSlicer(input: {
     tableName: string;

@@ -20,6 +20,7 @@ import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotFieldSettingsFr } from './pivot-field-settings.js';
+import { macPivotOptionsFr } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -236,6 +237,10 @@ export const macFr: MacStrings = {
     recentEmails: 'Adresses e-mail récemment utilisées :',
   }),
   macPageSetup: macPageSetupFrom(pageLayoutFr.pageSetup),
+  macDataValidation: {
+    inputCaption: 'Quand la cellule est sélectionnée, afficher ce message de saisie :',
+    errorCaption: 'Quand des données non valides sont tapées, afficher ce message d’alerte :',
+  },
   macCreateTable: { nameLabel: 'Quel est le nom de votre tableau ?' },
   macGoToDialog: macGoToDialogFrom(editDialogsFr.goToDialog, {
     selectCaption: 'Sélectionner',
@@ -243,6 +248,7 @@ export const macFr: MacStrings = {
     noOptions: 'Cette sélection n’a pas d’options.',
   }),
   macPivotFieldSettings: macPivotFieldSettingsFr,
+  macPivotOptions: macPivotOptionsFr,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsFr.pivotTableDialog, {
     chooseConnection: 'Choisir la connexion...',
   }),

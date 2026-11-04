@@ -20,6 +20,7 @@ import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotFieldSettingsZh } from './pivot-field-settings.js';
+import { macPivotOptionsZh } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -234,6 +235,10 @@ export const macZh: MacStrings = {
     recentEmails: '最近用过的电子邮件地址:',
   }),
   macPageSetup: macPageSetupFrom(pageLayoutZh.pageSetup),
+  macDataValidation: {
+    inputCaption: '选定单元格时显示下列输入信息:',
+    errorCaption: '输入无效数据时显示下列出错警告:',
+  },
   macCreateTable: { nameLabel: '表名称是什么?' },
   macGoToDialog: macGoToDialogFrom(editDialogsZh.goToDialog, {
     selectCaption: '选择',
@@ -241,6 +246,7 @@ export const macZh: MacStrings = {
     noOptions: '此选择项没有选项。',
   }),
   macPivotFieldSettings: macPivotFieldSettingsZh,
+  macPivotOptions: macPivotOptionsZh,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
     chooseConnection: '选择连接...',
   }),

@@ -41,9 +41,18 @@ export interface PivotStyleLayer {
   formatAt(row: number, col: number): CellFormat | undefined;
   /** Outline placement of a compact row label cell; undefined elsewhere. */
   outlineAt(row: number, col: number): PivotRowOutline | undefined;
+  /** The projected cells of every report that has fields, as last built. */
+  readonly reports: readonly PivotReportCells[];
   /** Reports with no field laid out yet, drawn as a placeholder over the
    *  area they reserve. */
   readonly placeholders: readonly PivotPlaceholder[];
+}
+
+/** A report's rectangle (report filter block included) and its non-blank cells. */
+export interface PivotReportCells {
+  readonly pivotIndex: number;
+  readonly range: Range;
+  readonly cells: readonly PivotLayoutCell[];
 }
 
 /** An empty report reserves this many columns and rows from its anchor. */
@@ -72,6 +81,7 @@ const EMPTY_LAYER: PivotStyleLayer = {
   formatAt: () => undefined,
   outlineAt: () => undefined,
   placeholders: [],
+  reports: [],
 };
 
 type PivotStyleReader = Pick<
@@ -118,7 +128,38 @@ export interface PivotLayoutCell {
   kind: number;
   /** Header nesting depth: 0 for the outermost row field's items. */
   depth: number;
+  /** Source or data field of the cell; empty for captions. */
+  fieldName?: string;
+  /** The cell's text as shown. */
+  text?: string;
 }
+
+/** Report filter rows above a report: each holds a field name and its
+ *  selection side by side; a blank row then separates them from the report. */
+export function pivotPageRows(range: Range, cells: readonly PivotLayoutCell[]): number {
+  const at = new Map(cells.map((c) => [`${c.row}:${c.col}`, c] as const));
+  let rows = 0;
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    const name = at.get(`${row}:${range.c0}`);
+    const value = at.get(`${row}:${range.c0 + 1}`);
+    if (
+      name?.kind !== PIVOT_CELL_KIND.Header ||
+      !name.fieldName ||
+      value?.kind !== PIVOT_CELL_KIND.Header ||
+      value.fieldName !== name.fieldName
+    ) {
+      break;
+    }
+    rows += 1;
+  }
+  return rows;
+}
+
+/** First row of the report proper, below any report filter block. */
+export const pivotReportTop = (range: Range, cells: readonly PivotLayoutCell[]): number => {
+  const pages = pivotPageRows(range, cells);
+  return range.r0 + (pages > 0 ? pages + 1 : 0);
+};
 
 const SUBHEADINGS = ['firstRowSubheading', 'secondRowSubheading', 'thirdRowSubheading'] as const;
 const SUBTOTALS = ['firstSubtotalRow', 'secondSubtotalRow', 'thirdSubtotalRow'] as const;
@@ -176,8 +217,10 @@ export function pivotStyleRegions(
   cells: readonly PivotLayoutCell[],
   info: Pick<PivotStyleDefinition, 'showRowHeaders' | 'showColHeaders' | 'showRowStripes'>,
 ): { regions: StyleElementRegion[]; buttons: { row: number; col: number }[] } {
-  const { r0, r1, c0, c1 } = range;
-  const lead = leadCells(cells);
+  const { r1, c0, c1 } = range;
+  const pages = pivotPageRows(range, cells);
+  const r0 = pivotReportTop(range, cells);
+  const lead = leadCells(cells.filter((c) => c.row >= r0));
   let bodyTop = r1 + 1;
   for (let row = r0; row <= r1; row += 1) {
     const kind = lead.get(row)?.kind;
@@ -223,6 +266,7 @@ export function pivotStyleRegions(
   const isCaption = (row: number, col: number): boolean =>
     cells.some((c) => c.row === row && c.col === col && c.kind === PIVOT_CELL_KIND.Header);
   const buttons: { row: number; col: number }[] = [];
+  for (let i = 0; i < pages; i += 1) buttons.push({ row: range.r0 + i, col: c0 + 1 });
   if (cells.some((c) => c.kind === PIVOT_CELL_KIND.RowLabel) && isCaption(bodyTop - 1, c0)) {
     buttons.push({ row: bodyTop - 1, col: c0 });
   }
@@ -276,7 +320,19 @@ export function buildPivotStyleLayer(
   const cellsByPivot = new Map<number, PivotLayoutCell[]>();
   for (const c of wb.pivotCells(sheet)) {
     const list = cellsByPivot.get(c.pivotIndex) ?? [];
-    list.push({ row: c.addr.row, col: c.addr.col, kind: c.kind, depth: c.depth });
+    list.push({
+      row: c.addr.row,
+      col: c.addr.col,
+      kind: c.kind,
+      depth: c.depth,
+      fieldName: c.fieldName,
+      text:
+        c.value.kind === 'text'
+          ? c.value.value
+          : c.value.kind === 'number'
+            ? String(c.value.value)
+            : '',
+    });
     cellsByPivot.set(c.pivotIndex, list);
   }
   const themeColors = wb.getTheme()?.colors;
@@ -284,6 +340,7 @@ export function buildPivotStyleLayer(
   const buttons = new Set<string>();
   const outlines = new Map<string, PivotRowOutline>();
   const placeholders: PivotPlaceholder[] = [];
+  const reports: PivotReportCells[] = [];
   for (const { pivotIndex, range } of bounds) {
     // The engine still projects a caption for a report with no fields.
     const cells = cellsByPivot.get(pivotIndex) ?? [];
@@ -301,6 +358,7 @@ export function buildPivotStyleLayer(
       });
       continue;
     }
+    reports.push({ pivotIndex, range, cells });
     for (const label of pivotRowOutline(range, cellsByPivot.get(pivotIndex) ?? [])) {
       outlines.set(addrKey({ sheet, row: label.row, col: label.col }), label.outline);
     }
@@ -325,12 +383,11 @@ export function buildPivotStyleLayer(
   }
   return {
     ranges: [
-      ...bounds
-        .filter((b) => !placeholders.some((p) => p.pivotIndex === b.pivotIndex))
-        .map((b) => b.range),
+      ...reports.map((r) => ({ ...r.range, r0: pivotReportTop(r.range, r.cells) })),
       ...placeholders.map((p) => p.range),
     ],
     placeholders,
+    reports,
     buttons,
     formatAt: (row, col) => formats.get(addrKey({ sheet, row, col })),
     outlineAt: (row, col) => outlines.get(addrKey({ sheet, row, col })),
@@ -365,4 +422,11 @@ export function pivotStyleLayer(
   const layer = buildPivotStyleLayer(wb, sheet, state.tables);
   layerCache.set(wb, { sheet, cells: state.data.cells, tables: state.tables, layer });
   return layer;
+}
+
+/** The style layer last built for `sheet`, whatever has changed since; null
+ *  when none was. A report edit reads the layout it replaced from here. */
+export function lastPivotStyleLayer(wb: object, sheet: number): PivotStyleLayer | null {
+  const cached = layerCache.get(wb);
+  return cached && cached.sheet === sheet ? cached.layer : null;
 }

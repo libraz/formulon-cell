@@ -5,6 +5,7 @@ import type { MacAdvancedFilterStrings } from './advanced-filter.js';
 import type { MacCfRulesDialogStrings } from './cf-rules-dialog.js';
 import type { MacChromeStrings } from './chrome.js';
 import type { MacCreateTableStrings } from './create-table.js';
+import type { MacDataValidationStrings } from './data-validation.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
 import type { MacGoToDialogStrings } from './goto-dialog.js';
 import type { MacHyperlinkDialogStrings } from './hyperlink-dialog.js';
@@ -13,6 +14,7 @@ import type { MacNamedRangeDialogStrings } from './named-range-dialog.js';
 import type { MacPageSetupStrings } from './page-setup.js';
 import type { MacPasteSpecialStrings } from './paste-special.js';
 import type { MacPivotFieldSettingsStrings } from './pivot-field-settings.js';
+import type { MacPivotOptionsStrings } from './pivot-options.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
@@ -35,6 +37,8 @@ export interface MacStrings {
   macPivotTableDialog: MacPivotTableDialogStrings;
   /** The PivotTable Field dialog for value and row/column fields. */
   macPivotFieldSettings: MacPivotFieldSettingsStrings;
+  /** The PivotTable Options dialog. */
+  macPivotOptions: MacPivotOptionsStrings;
   /** Overrides of the Remove Duplicates wording that apply on the Mac host only. */
   macRemoveDuplicates: MacRemoveDuplicatesStrings;
   /** Overrides of the Sort dialog wording, plus its Mac-only labels, that apply on the Mac host only. */
@@ -59,6 +63,8 @@ export interface MacStrings {
   macHyperlinkDialog: MacHyperlinkDialogStrings;
   /** Overrides of `pageSetup` that apply on the Mac host only. */
   macPageSetup: MacPageSetupStrings;
+  /** Captions only the Mac Data Validation message tabs show. */
+  macDataValidation: MacDataValidationStrings;
   /** Labels only the Mac Create Table dialog shows. */
   macCreateTable: MacCreateTableStrings;
   /** Labels of the Mac Zoom dialog. */
