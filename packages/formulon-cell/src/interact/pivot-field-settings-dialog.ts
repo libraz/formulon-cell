@@ -1,5 +1,6 @@
 import { formatCodeToNumFmt, numFmtToFormatCode } from '../engine/format-writeback.js';
 import {
+  type CellValue,
   PIVOT_SHOW_AS_BASE_NEXT,
   PIVOT_SHOW_AS_BASE_PREVIOUS,
   PivotAggregation,
@@ -25,7 +26,12 @@ import { pivotShowAsNeedsBaseField, pivotShowAsNeedsBaseItem } from './pivot-fie
 
 /** Opens Format Cells on `current` and calls `apply` with the chosen code
  *  (empty for General) when the user confirms. */
-export type PivotNumberFormatPicker = (current: string, apply: (code: string) => void) => void;
+export type PivotNumberFormatPicker = (
+  current: string,
+  apply: (code: string) => void,
+  /** The value the sample shows; the active cell's when omitted. */
+  sample?: CellValue,
+) => void;
 
 /** A picker backed by its own Format Cells instance in number-only mode, so
  *  the choice never touches the sheet. */
@@ -38,7 +44,7 @@ export function createPivotNumberFormatPicker(deps: {
 }): { pick: PivotNumberFormatPicker; detach(): void } {
   let dialog: FormatDialogHandle | null = null;
   return {
-    pick: (current, apply) => {
+    pick: (current, apply, sample) => {
       dialog ??= attachFormatDialog({
         host: deps.host,
         store: deps.store,
@@ -51,6 +57,7 @@ export function createPivotNumberFormatPicker(deps: {
         mode: 'numberFormat',
         initialFormat: numFmt ? { numFmt } : {},
         onApplyNumberFormat: (next) => apply(numFmtToFormatCode(next, deps.getWb()) ?? ''),
+        ...(sample ? { previewValue: sample } : {}),
       });
     },
     detach: () => {

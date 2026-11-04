@@ -91,6 +91,8 @@ export interface FormatDialogOpenOptions {
   onApplyDxf?: (format: Partial<CellFormat>) => void;
   /** Receives the chosen number format in `numberFormat` mode. */
   onApplyNumberFormat?: (numFmt: NumFmt) => void;
+  /** The value the sample shows in `numberFormat` mode; the active cell's by default. */
+  previewValue?: CellValue;
 }
 
 export interface FormatDialogHandle {
@@ -411,7 +413,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     getDate1904,
     defaultPatternFor: (cat) => defaultPatternFor(cat),
     padNumber: () => padsNumberRows(getWb()),
-    previewValue: () => (applyDxf !== null ? null : previewValue),
+    // A rule's differential format has no cell to preview; a number format has.
+    previewValue: () => (dialogMode === 'dxf' ? null : previewValue),
     fontEffects: () => isMacHost(),
   });
   const renderPreview = (): void => {
@@ -829,6 +832,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       showMoreTab = tab === 'more';
       const remembered = lastUsedTab;
       hydrateFromActive(options?.initialFormat);
+      if (options?.mode === 'numberFormat' && options.previewValue) {
+        previewValue = options.previewValue;
+        renderPreview();
+      }
       setDialogMode(options?.mode);
       // The Mac app reopens on the tab used last.
       const requested =

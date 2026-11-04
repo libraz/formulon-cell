@@ -1173,6 +1173,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     store,
     getStrings: () => strings,
     getWb: () => wb,
+    ...(deps.getLocale ? { getLocale: deps.getLocale } : {}),
   });
   function run(id: string): void {
     if (!isBuiltinItemId(id)) return;

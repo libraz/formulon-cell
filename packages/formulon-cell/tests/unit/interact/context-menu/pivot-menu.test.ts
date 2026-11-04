@@ -438,6 +438,19 @@ describe('PivotTable context menu, as measured on the Mac app', () => {
     expect(menu()).toContain('総計の削除');
     expect(menu()).toContain('値の集計方法 >');
   });
+
+  it('shows the clicked value cell in the Number Format sample', async () => {
+    const { layoutForView, cellRect } = await import('../../../../src/render/geometry.js');
+    setRange(store, CELL.header[0], CELL.header[1], CELL.header[0], CELL.header[1]);
+    const s = store.getState();
+    const rect = cellRect(layoutForView(s), s.viewport, CELL.value[0], CELL.value[1]);
+    fireContextMenu(host, rect.x + 4, rect.y + 4);
+    run('pivotNumberFormat');
+    const preview = Array.from(
+      document.querySelectorAll<HTMLElement>('.fc-fmtdlg__preview-cell'),
+    ).find((el) => el.closest<HTMLElement>('.fc-fmtdlg')?.hidden === false);
+    expect(preview?.textContent).toBe('300');
+  });
 });
 
 describe('Hide Field List in the PivotTable menu', () => {

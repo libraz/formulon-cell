@@ -188,9 +188,18 @@ export function runContextMenuPivotItem(
       const index = dataFieldIndex();
       const current = definition?.dataFields[index]?.numberFormat ?? '';
       if (index < 0) return true;
-      ctx.pickNumberFormat(current, (code) => {
-        updatePivotDataField(commit, pivot, index, { numberFormat: code }, false);
-      });
+      // The sample is the clicked cell's value, which a right-click need not make active.
+      let sample = wb.getValue(addr);
+      for (const entry of wb.pivotCells(sheet)) {
+        if (entry.addr.row === addr.row && entry.addr.col === addr.col) sample = entry.value;
+      }
+      ctx.pickNumberFormat(
+        current,
+        (code) => {
+          updatePivotDataField(commit, pivot, index, { numberFormat: code }, false);
+        },
+        sample,
+      );
       return true;
     }
     case 'pivotDelete': {
