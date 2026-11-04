@@ -623,7 +623,7 @@ const viewTab = (): RibbonTabModel =>
         disabledCompactCommand('mac.view.navigation', t('navigation'), 'show', NOT_IMPLEMENTED),
         disabledCompactCommand('mac.view.ruler', t('ruler'), 'show', NOT_IMPLEMENTED),
         checkboxCommand('mac.view.gridlines', t('gridlines'), 'show'),
-        compactCommand('mac.view.formulaBar', t('formulaBar'), 'show'),
+        checkboxCommand('mac.view.formulaBar', t('formulaBar'), 'show'),
         checkboxCommand('mac.view.headings', t('headings'), 'show'),
         disabledCompactCommand(
           'mac.view.dataTypeIcons',

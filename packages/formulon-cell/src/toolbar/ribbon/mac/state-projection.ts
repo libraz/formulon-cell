@@ -287,12 +287,17 @@ export const projectMacRibbonState = (
     'mac.draw.highlighter': inkTool === 'highlighter',
     'mac.draw.trackpad': ink?.isActive() === true && ink.getTrackpadMode(),
   };
-  // Task-pane toggles show pressed while their pane is open.
-  const paneStates: Readonly<Record<string, boolean>> = {
+  // Toggles that follow a pane or bar being shown, plus the fixed ones.
+  const toggleStates: Readonly<Record<string, boolean>> = {
     'mac.formulas.watch': instance.store.getState().ui.watchPanelOpen,
     objectSelectionPane: instance.store.getState().ui.workbookObjectsOpen,
+    'mac.view.formulaBar': instance.store.getState().ui.formulaBarVisible,
+    // The page-layout rulers are always on in this host; Zoom to Selection is a
+    // toggle the desktop never leaves pressed.
+    'mac.view.ruler': true,
+    'mac.view.zoomSelection': false,
   };
-  for (const [command, pressed] of Object.entries({ ...drawingStates, ...paneStates })) {
+  for (const [command, pressed] of Object.entries({ ...drawingStates, ...toggleStates })) {
     for (const button of buttons.get(command) ?? []) {
       button.classList.toggle('fc-tb__rb--active', pressed);
       button.setAttribute('aria-pressed', String(pressed));

@@ -86,6 +86,7 @@ export const createSpreadsheetStore = () =>
       filterSorts: [],
       watchPanelOpen: false,
       workbookObjectsOpen: false,
+      formulaBarVisible: true,
       sheetBackgroundImages: new Map(),
     },
     format: { formats: new Map(), customCellStyles: [] },

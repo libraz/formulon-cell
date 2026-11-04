@@ -60,6 +60,14 @@ export const viewMutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, rightToLeft: on } }));
   },
 
+  setFormulaBarVisible(store: SpreadsheetStore, visible: boolean): void {
+    store.setState((s) =>
+      s.ui.formulaBarVisible === visible
+        ? s
+        : { ...s, ui: { ...s.ui, formulaBarVisible: visible } },
+    );
+  },
+
   setShowFormulas(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: on } }));
   },

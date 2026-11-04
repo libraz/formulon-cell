@@ -36,6 +36,7 @@ import {
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensions/ui-options.js';
 import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-ink.js';
+import { mutators } from '../store/store.js';
 import type { CellBorderStyle, State } from '../store/types.js';
 import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
@@ -436,6 +437,11 @@ export function mountToolbar(
     });
   const refreshCells = opts.refreshCells ?? ((): void => undefined);
   const refreshZoom = opts.refreshZoom ?? ((): void => undefined);
+  // The store carries the formula bar's visibility so the ribbon toggle can project it.
+  const publishFormulaBarVisible = (): void => {
+    const instance = getInstance();
+    if (instance) mutators.setFormulaBarVisible(instance.store, formulaBarVisible);
+  };
   const projectFormatToolbar = (): void => {
     projectRibbonActiveState(host, getInstance(), {
       background: text.background,
@@ -679,6 +685,7 @@ export function mountToolbar(
         },
         setFormulaBarVisible: (next) => {
           formulaBarVisible = next;
+          publishFormulaBarVisible();
           opts.onFormulaBarChange?.(next);
         },
         featureFlags: renderApi.playgroundFeatureFlags,
@@ -1104,6 +1111,7 @@ export function mountToolbar(
     unsubFunctionHistory?.();
     unsubLocale?.();
     subscribedInstance = current;
+    publishFormulaBarVisible();
     syncInheritedPlatform(current);
     syncMacInkSubscription(current);
     unsubLocale =
@@ -1166,6 +1174,7 @@ export function mountToolbar(
     },
     setFormulaBarVisible: (next) => {
       formulaBarVisible = next;
+      publishFormulaBarVisible();
     },
     getFormulaBarVisible: () => formulaBarVisible,
     setTheme: (next) => {
