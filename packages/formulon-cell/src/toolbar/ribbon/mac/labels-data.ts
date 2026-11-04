@@ -115,6 +115,13 @@ export const MAC_LABEL_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>>
     ko: '데이터 형식 아이콘',
     th: 'ไอคอนชนิดข้อมูล',
   },
+  zoom100: {
+    de: 'Zoom (100 %)',
+    fr: 'Zoom (100 %)',
+    zh: '缩放 (100%)',
+    ko: '확대/축소 (100%)',
+    th: 'ซูม (100%)',
+  },
   cellFocus: {
     de: 'Zellfokus',
     fr: 'Focus sur la cellule',
@@ -1478,6 +1485,7 @@ export const MAC_JA_LABELS: Readonly<Record<string, string>> = {
   symbol: '記号/文字',
   dataCleanup: 'データのクリーニング',
   dataAnalysis: 'データの分析',
+  zoomSelection: '選択範囲に合わせて拡大/縮小',
 };
 
 const withMacJa = (key: string, label: Label): Label => {

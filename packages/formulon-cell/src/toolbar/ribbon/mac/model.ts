@@ -640,7 +640,7 @@ const viewTab = (): RibbonTabModel =>
       { ja: 'ズーム', en: 'Zoom' },
       [
         compactCommand('mac.view.zoom', t('zoom'), 'zoom'),
-        compactCommand('mac.view.zoom100', { ja: 'ズーム (100%)', en: 'Zoom (100%)' }, 'zoom'),
+        compactCommand('mac.view.zoom100', t('zoom100'), 'zoom'),
         compactCommand('mac.view.zoomSelection', t('zoomSelection'), 'zoom'),
       ],
       'compact',

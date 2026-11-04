@@ -221,6 +221,7 @@ const labelSeeds: Record<string, LegacyLabel> = {
   cellFocus: { ja: 'セルにフォーカス', en: 'Focus Cell' },
   zoom: { ja: 'ズーム', en: 'Zoom' },
   zoomSelection: { ja: '選択範囲に合わせて拡大/縮小', en: 'Zoom to Selection' },
+  zoom100: { ja: 'ズーム (100%)', en: 'Zoom (100%)' },
   newWindow: { ja: '新しいウィンドウ', en: 'New Window' },
   arrange: { ja: '整列', en: 'Arrange All' },
   freeze: { ja: 'ウィンドウ枠の固定', en: 'Freeze Panes' },
