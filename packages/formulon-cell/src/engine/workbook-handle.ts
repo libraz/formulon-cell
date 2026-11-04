@@ -2,6 +2,7 @@ import type { SaveDiagnosticsResult } from '@libraz/formulon';
 import type { History } from '../commands/history.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
+import { CALC_MODE_AUTO_NO_TABLE, CALC_MODE_MANUAL } from './calc-mode.js';
 import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
 import {
@@ -160,11 +161,6 @@ export interface WorkbookSaveOptions {
    *  Manual mode runs before saving, so the live workbook stays as it was. */
   snapshot?: boolean;
 }
-
-/** `<calcPr calcMode>` code for Manual. */
-const CALC_MODE_MANUAL = 1;
-/** `<calcPr calcMode>` code for Automatic Except for Data Tables. */
-const CALC_MODE_AUTO_NO_TABLE = 2;
 
 /** Mac Excel's 12 pt new-workbook family per profile locale; others use Aptos Narrow. */
 const MAC_DEFAULT_FONT_FAMILY: Readonly<Partial<Record<ProfileLocale, string>>> = {

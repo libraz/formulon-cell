@@ -113,13 +113,16 @@ const toContainingBlockPosition = (
   scale: number,
 ): number => (value - edge - clientEdge * scale + scroll * scale) / scale;
 
+/** Default gap, in CSS px, kept between a clamped panel and the viewport edge. */
+export const VIEWPORT_PANEL_PAD = 4;
+
 export const clampPanelToViewport = (
   panel: HTMLElement,
   x: number,
   y: number,
   options: ViewportPanelPositionOptions = {},
 ): ViewportPanelPosition => {
-  const pad = options.pad ?? 4;
+  const pad = options.pad ?? VIEWPORT_PANEL_PAD;
   const { width, height } = panelSize(panel, options.fallbackWidth, options.fallbackHeight);
   const viewport = viewportSize(panel.ownerDocument);
   const clientPosition = {

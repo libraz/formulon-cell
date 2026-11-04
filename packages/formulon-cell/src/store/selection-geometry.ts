@@ -6,7 +6,7 @@ export type SelectionGestureMode = 'add' | 'subtract';
 
 const cloneAddr = (addr: Addr): Addr => ({ sheet: addr.sheet, row: addr.row, col: addr.col });
 
-const cloneRange = (range: Range): Range => ({
+export const cloneRange = (range: Range): Range => ({
   sheet: range.sheet,
   r0: range.r0,
   c0: range.c0,
