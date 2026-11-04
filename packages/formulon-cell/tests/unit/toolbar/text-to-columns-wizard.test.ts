@@ -31,6 +31,12 @@ const wizard: TextToColumnsWizardStrings = {
   delimitedHint: '- コンマやタブなどの区切り文字によってフィールドごとに区切られたデータ',
   fixedWidth: '固定長',
   fixedHint: '- スペースによって右または左に揃えられた固定長フィールドのデータ',
+  fixedPrompt: 'フィールドの幅を指定してください。',
+  fixedSteps: [
+    '区切り位置を作成する場合は、その位置でマウスのボタンをクリックします。',
+    '区切り位置を削除する場合は、その矢印をダブル クリックします。',
+    '区切り位置を移動する場合は、矢印を目的の位置までドラッグします。',
+  ],
   preview: '選択したデータのプレビュー:',
   step2Prompt: 'フィールドの区切り文字を指定してください。',
   delimiters: '区切り文字',
@@ -167,6 +173,37 @@ describe('Text to Columns wizard', () => {
     fixed.dispatchEvent(new Event('change', { bubbles: true }));
     button('完了').click();
     expect(q('.fc-fmtdlg__header').textContent).toBe('区切り位置指定ウィザード - 2 / 3');
+    button('キャンセル').click();
+    return done;
+  });
+
+  it('shows the fixed-width heading, the three instructions and a ruler on step 2', () => {
+    const done = open({ previewRows: ['abc def ghi', '12345 678', 'x y'] });
+    step(1)
+      .querySelectorAll<HTMLInputElement>('input[type="radio"]')[1]
+      ?.dispatchEvent(new Event('change', { bubbles: true }));
+    const fixedRadio = step(1).querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];
+    if (!fixedRadio) throw new Error('missing fixed radio');
+    fixedRadio.checked = true;
+    fixedRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    button('次へ >').click();
+    expect(step(2).querySelector('.fc-textcols__prompt')?.textContent).toBe(
+      'フィールドの幅を指定してください。',
+    );
+    expect(
+      Array.from(step(2).querySelectorAll('.fc-textcols__fixed-step'), (el) => el.textContent),
+    ).toEqual([
+      '区切り位置を作成する場合は、その位置でマウスのボタンをクリックします。',
+      '区切り位置を削除する場合は、その矢印をダブル クリックします。',
+      '区切り位置を移動する場合は、矢印を目的の位置までドラッグします。',
+    ]);
+    const ticks = step(2).querySelectorAll('.fc-textcols__ruler-tick');
+    expect(ticks).toHaveLength(11);
+    expect(
+      Array.from(step(2).querySelectorAll('.fc-textcols__ruler-label'), (el) => el.textContent),
+    ).toEqual(['10']);
+    // Excel pre-places no break for this data.
+    expect(step(2).querySelectorAll('.fc-textcols__fixed-char--break')).toHaveLength(0);
     button('キャンセル').click();
     return done;
   });

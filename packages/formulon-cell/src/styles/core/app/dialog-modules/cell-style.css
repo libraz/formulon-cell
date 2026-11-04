@@ -335,6 +335,32 @@
     font: inherit;
     cursor: col-resize;
   }
+  .fc-textcols__fixed-step {
+    margin: 0 0 4px;
+  }
+  .fc-textcols__ruler {
+    display: flex;
+    margin: 14px 0 2px;
+    white-space: pre;
+  }
+  .fc-textcols__ruler-tick {
+    position: relative;
+    display: inline-block;
+    width: 1ch;
+    height: 8px;
+    margin: 0 1px;
+    border-left: 1px solid var(--fc-rule);
+  }
+  .fc-textcols__ruler-tick--long {
+    height: 12px;
+  }
+  .fc-textcols__ruler-label {
+    position: absolute;
+    top: -14px;
+    left: 0;
+    font-size: 10px;
+    color: var(--fc-fg-mute);
+  }
   .fc-textcols__fixed-char--break {
     border-left-color: var(--fc-accent);
   }

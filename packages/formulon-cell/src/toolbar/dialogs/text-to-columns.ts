@@ -43,6 +43,8 @@ export interface TextToColumnsWizardStrings {
   step2Prompt: string;
   /** Step 2 prompt for fixed-width data; falls back to `step2Prompt`. */
   fixedPrompt?: string;
+  /** Instruction lines shown under the fixed-width prompt, one per line. */
+  fixedSteps?: readonly string[];
   delimiters: string;
   other: string;
   qualifier: string;
@@ -226,6 +228,39 @@ const showTextToColumnsWizard = (
     const fixedEditor = document.createElement('div');
     fixedEditor.className = 'fc-textcols__fixed';
     fixedEditor.hidden = true;
+    // The ruler runs one tick per character, longer every fifth, numbered every tenth.
+    const rulerLength = Math.min(
+      120,
+      Math.max(0, ...(opts.previewRows ?? []).slice(0, 8).map((row) => row.length)),
+    );
+    if (wizard.fixedSteps?.length) {
+      const steps = document.createElement('div');
+      steps.className = 'fc-textcols__fixed-steps';
+      for (const text of wizard.fixedSteps) {
+        const line = document.createElement('p');
+        line.className = 'fc-textcols__fixed-step';
+        line.textContent = text;
+        steps.appendChild(line);
+      }
+      fixedEditor.appendChild(steps);
+    }
+    if (rulerLength > 0) {
+      const ruler = document.createElement('div');
+      ruler.className = 'fc-textcols__ruler';
+      for (let pos = 0; pos < rulerLength; pos += 1) {
+        const tick = document.createElement('span');
+        tick.className = 'fc-textcols__ruler-tick';
+        if ((pos + 1) % 5 === 0) tick.classList.add('fc-textcols__ruler-tick--long');
+        if ((pos + 1) % 10 === 0) {
+          const label = document.createElement('span');
+          label.className = 'fc-textcols__ruler-label';
+          label.textContent = String(pos + 1);
+          tick.appendChild(label);
+        }
+        ruler.appendChild(tick);
+      }
+      fixedEditor.appendChild(ruler);
+    }
     const fixedRows = (opts.previewRows ?? []).slice(0, 8).map((row) => {
       const line = document.createElement('div');
       line.className = 'fc-textcols__fixed-row';
