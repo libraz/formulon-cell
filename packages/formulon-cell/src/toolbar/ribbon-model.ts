@@ -36,7 +36,7 @@ export interface RibbonCommand {
   title: string;
   label: string;
   icon?: string;
-  kind?: 'button' | 'large' | 'wide' | 'mono' | 'select' | 'color' | 'input' | 'break';
+  kind?: 'button' | 'large' | 'wide' | 'mono' | 'select' | 'color' | 'input' | 'break' | 'label';
   layout?: 'stacked';
   disabled?: boolean;
   /** Human-readable explanation exposed through the shared disabled-state
@@ -933,10 +933,12 @@ export const ribbonCommands = (
   buildRibbonModel(input, opts)
     .flatMap((tab) => tab.groups)
     .flatMap((group) => group.commands)
-    .filter((command) => command.kind !== 'break');
+    .filter((command) => command.kind !== 'break' && command.kind !== 'label');
 
 export const isRibbonActivatableCommand = (command: RibbonCommand): boolean =>
-  command.kind !== 'break' && !['select', 'color', 'input'].includes(command.kind ?? 'button');
+  command.kind !== 'break' &&
+  command.kind !== 'label' &&
+  !['select', 'color', 'input'].includes(command.kind ?? 'button');
 
 export const ribbonActivatableCommands = (
   input: Strings | ToolbarLang,

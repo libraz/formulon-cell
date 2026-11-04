@@ -418,6 +418,10 @@ const outlineDetailTarget = (
   return col && { axis: 'col', ...col };
 };
 
+/** Whether Show/Hide Detail has a group to act on around the selection. */
+export const hasOutlineDetail = (store: SpreadsheetStore, range: Range): boolean =>
+  outlineDetailTarget(store, range) !== null;
+
 /** Data > Hide Detail: collapse the group around the selection. */
 export function hideOutlineDetail(
   store: SpreadsheetStore,

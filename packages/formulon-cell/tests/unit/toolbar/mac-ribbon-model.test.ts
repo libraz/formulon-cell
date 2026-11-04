@@ -579,8 +579,10 @@ describe('Mac Excel ribbon profile', () => {
     const sheetOptions = page?.groups.find((group) => group.title === 'Sheet Options');
     expect(sheetOptions?.variant).toBe('checks');
     expect(sheetOptions?.commands.map((command) => command.id)).toEqual([
+      'mac.page.gridlinesHeading',
       'mac.page.showGridlines',
       'mac.page.printGridlines',
+      'mac.page.headingsHeading',
       'mac.page.showHeadings',
       'mac.page.printHeadings',
     ]);
@@ -760,7 +762,6 @@ describe('Mac Excel ribbon profile', () => {
     expect(buttons.get('mac.formulas.removeArrows.all')?.disabled).toBe(true);
     expect(buttons.get('mac.formulas.errorCheck.trace')?.disabled).toBe(true);
     expect(buttons.get('mac.data.validation.circleInvalid')?.disabled).toBe(true);
-
     const range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
     store.setState((state) => ({
       ...state,
@@ -809,6 +810,16 @@ describe('Mac Excel ribbon profile', () => {
       expect(buttons.get(id)?.disabled, id).toBe(false);
       expect(buttons.get(id)?.getAttribute('aria-disabled'), id).toBe('false');
     }
+    i18n.dispose();
+  });
+
+  it('disables Show Detail, Hide Detail and Workbook Links when the document has nothing for them', () => {
+    const { instance, i18n } = testInstance();
+    const host = document.createElement('div');
+    const ids = ['mac.data.showDetail', 'mac.data.hideDetail', 'mac.data.workbookLinks'];
+    const buttons = ids.map((id) => projectedButton(host, id));
+    projectMacRibbonState(host, instance);
+    expect(buttons.map((button) => button.disabled)).toEqual([true, true, true]);
     i18n.dispose();
   });
 
@@ -934,6 +945,7 @@ describe('Mac Excel ribbon profile', () => {
       .filter(
         (command) =>
           command.id.startsWith('mac.') &&
+          command.kind !== 'label' &&
           !command.disabled &&
           !MAC_RIBBON_MENU_COMMAND_SET.has(command.id),
       );

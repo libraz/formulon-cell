@@ -1300,16 +1300,16 @@
     flex: 0 0 16px;
   }
 
-  /* Page Layout's native Sheet Options read as four labeled checkboxes in two
-   * columns: view and print settings for gridlines, then for headings. */
+  /* Page Layout's Sheet Options: a caption over View and Print checkboxes, one
+   * column for gridlines and one for headings. */
   [data-fc-platform="mac"]
     > .fc-tb__ribbon-shell
     .fc-tb__ribbon-group--checks
     .fc-tb__ribbon-tools {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: 128px;
-    grid-template-rows: repeat(2, 30px);
+    grid-auto-columns: 64px;
+    grid-template-rows: repeat(3, 24px);
     align-content: center;
     gap: 0 4px;
     width: max-content;
@@ -1323,14 +1323,22 @@
     flex-direction: row;
     justify-content: flex-start;
     gap: 6px;
-    width: 128px;
-    min-width: 128px;
-    max-width: 128px;
-    height: 28px;
-    min-height: 28px;
-    padding: 2px 4px;
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    height: 22px;
+    min-height: 22px;
+    padding: 1px 4px;
     font-size: 11px;
     text-align: left;
+    white-space: nowrap;
+  }
+
+  [data-fc-platform="mac"] > .fc-tb__ribbon-shell .fc-tb__ribbon-group--checks .fc-tb__rb-caption {
+    align-self: center;
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--fc-tb-fg-soft);
     white-space: nowrap;
   }
 

@@ -23,7 +23,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(pasteSource).not.toContain('const ja =');
     expect(pasteSource).not.toContain('貼り付け');
     expect(pasteSource).not.toContain('Paste Special');
-    expect(toolbarDefaultsSource).toContain('createPasteMenu(dictionaries[lang])');
+    expect(toolbarDefaultsSource).toContain('createPasteMenu(dictionaries[lang], lang, variant)');
   });
 
   it('keeps Home Insert and Delete cell menu labels backed by ribbonMenu strings', () => {

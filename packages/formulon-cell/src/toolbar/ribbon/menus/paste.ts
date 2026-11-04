@@ -4,9 +4,15 @@
 
 import type { Strings } from '../../../i18n/strings.js';
 
+import type { ToolbarLang } from '../../ribbon-model.js';
 import { createMenu, menuIconButton, menuSeparator } from './general.js';
+import { applyMenuVariant, type MenuVariant } from './mac-variants.js';
 
-export const createPasteMenu = (t: Strings): HTMLDivElement => {
+export const createPasteMenu = (
+  t: Strings,
+  lang: ToolbarLang,
+  variant?: MenuVariant,
+): HTMLDivElement => {
   const pasteText = t.contextMenu;
   const menu = createMenu('menu-paste');
   menu.append(
@@ -30,5 +36,5 @@ export const createPasteMenu = (t: Strings): HTMLDivElement => {
     menuIconButton(pasteText.pasteTranspose, 'pasteAction', 'transpose', 'paste-transpose'),
     menuIconButton(pasteText.pasteSpecialDialog, 'pasteAction', 'dialog', 'paste-special'),
   );
-  return menu;
+  return applyMenuVariant(menu, lang, variant);
 };

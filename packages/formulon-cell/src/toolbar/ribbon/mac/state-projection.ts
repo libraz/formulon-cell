@@ -1,6 +1,7 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
+import { hasOutlineDetail } from '../../../commands/outline.js';
 import { addrKey, parseAddrKey } from '../../../engine/address.js';
 import { getMacInk } from '../../../interact/mac-ink.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
@@ -67,6 +68,28 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.data.validation.clearCircles',
   'mac.data.validation.clearRules',
 ] as const;
+
+/** Commands whose availability follows the document alone, not the interaction policy. */
+const MAC_CONTENT_STATE_COMMANDS = [
+  'mac.data.showDetail',
+  'mac.data.hideDetail',
+  'mac.data.workbookLinks',
+] as const;
+
+const contentDisabledReason = (
+  instance: SpreadsheetInstance,
+  id: (typeof MAC_CONTENT_STATE_COMMANDS)[number],
+): string | null => {
+  const lang = toolbarLangForLocale(instance.i18n.locale);
+  if (id === 'mac.data.workbookLinks') {
+    return (instance.workbook?.getExternalLinks?.() ?? []).length === 0
+      ? MAC_CONTEXT_LABELS.externalLinksRequired[lang]
+      : null;
+  }
+  return hasOutlineDetail(instance.store, instance.store.getState().selection.range)
+    ? null
+    : MAC_CONTEXT_LABELS.outlineRequired[lang];
+};
 
 const hasValidationInSelection = (instance: SpreadsheetInstance): boolean => {
   const { format, selection } = instance.store.getState();
@@ -249,6 +272,17 @@ export const projectMacRibbonState = (
     button.textContent = label;
     button.title = label;
     button.setAttribute('aria-label', label);
+  }
+
+  for (const id of MAC_CONTENT_STATE_COMMANDS) {
+    const reason = contentDisabledReason(instance, id);
+    for (const button of buttons.get(id) ?? []) {
+      projectDisabledState(button, reason !== null, reason, {
+        datasetKey: 'ribbonDisabledReason',
+        titlePrefix:
+          button.getAttribute('aria-label')?.trim() || macRibbonLabelForCommand(id, lang),
+      });
+    }
   }
 
   for (const id of MAC_POLICY_PROJECTED_COMMANDS) {

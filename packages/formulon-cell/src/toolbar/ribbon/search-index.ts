@@ -201,7 +201,7 @@ export function buildRibbonSearchIndex(
     });
     for (const group of tab.groups) {
       for (const command of group.commands) {
-        if (command.kind === 'break') continue;
+        if (command.kind === 'break' || command.kind === 'label') continue;
         const disabled = searchCommandDisabled(command);
         if (disabled && opts.includeDisabled !== true) continue;
         const label = commandLabel(command.label, command.title);

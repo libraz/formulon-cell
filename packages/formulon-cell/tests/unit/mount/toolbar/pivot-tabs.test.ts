@@ -83,4 +83,29 @@ describe('PivotTable tabs of the ribbon', () => {
     expect(info()?.showRowStripes ?? false).toBe(before);
     tb.dispose();
   });
+
+  it('refreshes the report from its source through the Analyze tab', () => {
+    const store = sheet.instance.store;
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    createPivotTableAtPlacement(
+      { store, workbook: sheet.workbook, history: sheet.instance.history },
+      { source: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 }, rowField: 'Region', valueField: 'Sales' },
+      { row: 8, col: 4 },
+    );
+    mutators.setActive(store, { sheet: 0, row: 9, col: 4 });
+    tb.setActiveTab('pivotAnalyze');
+    const refresh = host.querySelector<HTMLButtonElement>('[data-ribbon-command="pivotRefresh"]');
+    if (!refresh) throw new Error('missing Refresh');
+    expect(refresh.disabled).toBe(false);
+    sheet.workbook.setNumber({ sheet: 0, row: 1, col: 1 }, 100);
+    refresh.click();
+    const totals = Array.from(sheet.instance.store.getState().data.cells.values()).filter(
+      (cell) => cell.value.kind === 'number' && cell.value.value === 105,
+    );
+    expect(totals.length).toBeGreaterThan(0);
+    tb.dispose();
+  });
 });

@@ -1,4 +1,6 @@
+import { projectDisabledState } from '../../menu-a11y.js';
 import type { ToolbarLang } from '../../ribbon-model.js';
+import { menuSectionHeader } from './general.js';
 
 /** Which command surface a menu is built for. */
 export interface MenuVariant {
@@ -18,6 +20,11 @@ const MAC_OMITTED_ROWS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
+/** Greyed heading the Mac menu opens with, by menu id; Japanese is the measured wording. */
+const MAC_MENU_HEADINGS: Readonly<Record<string, { ja: string; en: string }>> = {
+  'menu-paste': { ja: '貼り付けのオプション:', en: 'Paste Options:' },
+};
+
 /** Japanese wording of the Mac menus, by `dataset:value` row key. */
 const MAC_JA_ROW_LABELS: Readonly<Record<string, string>> = {
   'wrapAction:wrapText': '折り返して全体を表示する',
@@ -27,6 +34,8 @@ const MAC_JA_ROW_LABELS: Readonly<Record<string, string>> = {
   'clear:comments': 'コメントとメモをクリア',
   'sort:asc': '昇順',
   'sort:desc': '降順',
+  'pasteAction:all': 'ペースト',
+  'pasteAction:dialog': '形式を選択してペースト...',
   'findSelect:go-to-special': '選択オプション...',
   'findSelect:comments': 'メモ',
   'findSelect:selection-pane': '選択ウインドウ...',
@@ -61,6 +70,12 @@ export const applyMenuVariant = (
     text.textContent = label;
     if (row.title === previous) row.title = label;
     if (row.getAttribute('aria-label') === previous) row.setAttribute('aria-label', label);
+  }
+  const heading = MAC_MENU_HEADINGS[menu.id];
+  if (heading) {
+    const row = menuSectionHeader(lang === 'ja' ? heading.ja : heading.en);
+    projectDisabledState(row, true, null);
+    menu.prepend(row);
   }
   // A separator left at an edge, or doubled up, divides nothing.
   let previousWasSeparator = true;

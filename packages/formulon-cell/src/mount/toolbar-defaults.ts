@@ -200,7 +200,8 @@ export function createDefaultRibbonMenus(
     );
   const buildConditional = (_commandId?: string, variant?: MenuVariant): HTMLDivElement =>
     createConditionalMenu(lang, variant);
-  const buildPaste = (): HTMLDivElement => createPasteMenu(dictionaries[lang]);
+  const buildPaste = (_commandId?: string, variant?: MenuVariant): HTMLDivElement =>
+    createPasteMenu(dictionaries[lang], lang, variant);
   const buildTextOrientation = (): HTMLDivElement => createTextOrientationMenu(ribbonMenuText);
 
   return {
@@ -421,6 +422,7 @@ export function createDefaultRibbonHooks(
         dropdowns.insertScreenshotFromRibbon();
       },
       insertSymbol: (symbol) => dropdowns.applySymbolAction(symbol),
+      refreshPivot: () => dropdowns.applyPivotTableAction('refresh'),
     },
     page: {
       pageBreak: () => {

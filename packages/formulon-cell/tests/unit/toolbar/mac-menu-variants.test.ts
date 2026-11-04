@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import { createHomeMenuFactories } from '../../../src/toolbar/ribbon/menus/home.js';
+import { createPasteMenu } from '../../../src/toolbar/ribbon/menus/paste.js';
 import { toolbarText } from '../../../src/toolbar/ribbon-model.js';
 
 const factories = createHomeMenuFactories({
@@ -74,5 +75,16 @@ describe('Mac Home menu wording', () => {
 
   it('builds the full shared menu when no variant is asked for', () => {
     expect(itemsOf(factories.createSortMenu('sortFilterHome'))).toContain('詳細設定...');
+  });
+
+  it('Paste opens with a greyed options heading and Excel wording', () => {
+    const menu = createPasteMenu(dictionaries.ja, 'ja', MAC);
+    const first = menu.firstElementChild as HTMLElement;
+    expect(first.textContent).toBe('貼り付けのオプション:');
+    expect(first.getAttribute('aria-disabled')).toBe('true');
+    const items = itemsOf(menu);
+    expect(items[0]).toBe('ペースト');
+    expect(items.at(-1)).toBe('形式を選択してペースト...');
+    expect(itemsOf(createPasteMenu(dictionaries.ja, 'ja'))[0]).toBe('貼り付け');
   });
 });

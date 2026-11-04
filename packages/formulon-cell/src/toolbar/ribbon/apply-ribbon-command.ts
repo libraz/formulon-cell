@@ -127,6 +127,7 @@ export interface RibbonHooks {
     insertShape?: (shape: SessionShapeKind) => void;
     insertScreenshot?: () => void;
     insertSymbol?: (symbol: string) => Promise<unknown> | unknown;
+    refreshPivot?: () => Promise<unknown> | unknown;
   };
   page?: {
     pageBreak?: () => void;
@@ -380,6 +381,12 @@ const applyGenericRibbonCommand = (
       return true;
     case 'pivotOptions':
       i.openPivotOptions();
+      return true;
+    case 'pivotFieldSettings':
+      i.openPivotFieldSettings();
+      return true;
+    case 'pivotRefresh':
+      void hooks?.insert?.refreshPivot?.();
       return true;
     case 'pivotRowHeaders':
     case 'pivotColHeaders':

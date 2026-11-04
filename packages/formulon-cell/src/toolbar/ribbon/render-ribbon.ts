@@ -522,6 +522,14 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             tools.appendChild(rowBreak);
             continue;
           }
+          if (c.kind === 'label') {
+            const caption = document.createElement('span');
+            caption.className = 'fc-tb__rb-caption';
+            caption.dataset.ribbonCommand = c.id;
+            caption.textContent = c.label;
+            tools.appendChild(caption);
+            continue;
+          }
           if (c.kind === 'select') {
             tools.appendChild(createSelect(c));
             continue;

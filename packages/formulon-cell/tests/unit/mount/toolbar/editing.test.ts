@@ -121,7 +121,8 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(clearFormats?.getAttribute('aria-disabled')).toBe('true');
     expect(clearComments?.getAttribute('aria-disabled')).toBe('true');
-    expect(clearAll?.getAttribute('aria-disabled')).toBe('true');
+    // Clear All stays available on an empty cell.
+    expect(clearAll?.getAttribute('aria-disabled')).toBe('false');
 
     tb.dispose();
   });
@@ -494,15 +495,9 @@ describe('Spreadsheet.mountToolbar', () => {
     const pasteAll = host.querySelector<HTMLButtonElement>('[data-paste-action="all"]');
     expect(pasteSpecial).toBeTruthy();
     expect(pasteAll?.getAttribute('aria-disabled')).toBe('false');
-    expect(pasteSpecial?.disabled).toBe(true);
-    expect(pasteSpecial?.getAttribute('aria-disabled')).toBe('true');
-    expect(pasteSpecial?.getAttribute('aria-description')).toBe(
-      'Copy or cut cells before using this paste option.',
-    );
-    expect(pasteSpecial?.dataset.menuDisabledReason).toBe(
-      'Copy or cut cells before using this paste option.',
-    );
-    expect(pasteSpecial?.title).toContain('Copy or cut cells before using this paste option.');
+    // The dialog needs no copied cells, so it stays enabled beside the plain paste.
+    expect(pasteSpecial?.disabled).toBe(false);
+    expect(pasteSpecial?.getAttribute('aria-disabled')).toBe('false');
 
     tb.dispose();
   });

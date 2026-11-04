@@ -81,6 +81,12 @@
     flex-direction: column;
   }
 
+  .fc-tb__menu-item[hidden],
+  .fc-tb__submenu-item[hidden],
+  .fc-tb__menu-sep[hidden] {
+    display: none;
+  }
+
   .fc-tb__menu-item,
   .fc-tb__submenu-item {
     display: flex;

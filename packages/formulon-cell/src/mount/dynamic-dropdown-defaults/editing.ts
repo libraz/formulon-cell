@@ -254,13 +254,10 @@ const updateClearMenu =
     const hasConditional = [range, ...(state.selection.extraRanges ?? [])]
       .filter((selected) => selected.sheet === range.sheet)
       .some((selected) => conditionalRulesForRange(state, selected).length > 0);
-    const hasAny =
-      hasContentsSelection || hasFormats || hasComments || hasHyperlinks || hasConditional;
     const disabledReason = instance.i18n.strings.ribbon.clearRequiresTarget;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-clear]')) {
       const action = button.dataset.clear;
       const disabled =
-        (action === 'all' && !hasAny) ||
         (action === 'contents' && !hasContentsSelection) ||
         (action === 'formats' && !hasFormats) ||
         (action === 'comments' && !hasComments) ||

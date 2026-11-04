@@ -69,7 +69,7 @@ const updatePasteMenu =
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-paste-action]')) {
       const action = button.dataset.pasteAction;
       button.hidden = !hasSnapshot && action !== 'all' && action !== 'dialog';
-      const disabled = action !== 'all' && !hasSnapshot;
+      const disabled = action !== 'all' && action !== 'dialog' && !hasSnapshot;
       setMenuControlDisabled(button, disabled, disabledReason);
     }
     for (const separator of menu.querySelectorAll<HTMLElement>('.fc-tb__menu-sep')) {

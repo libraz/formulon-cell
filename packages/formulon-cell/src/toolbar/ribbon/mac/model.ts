@@ -108,6 +108,10 @@ const checkboxCommand = (id: string, label: LabelLike, icon?: string): RibbonCom
     className: 'fc-tb__rb--mac-checkbox',
   });
 
+/** A static caption inside a group; it carries no action. */
+const labelCommand = (id: string, label: LabelLike): RibbonCommand =>
+  command(id, label, undefined, { kind: 'label' });
+
 const selectCommand = (
   id: string,
   label: LabelLike,
@@ -350,8 +354,10 @@ const pageLayoutTab = (): RibbonTabModel =>
     group(
       { ja: 'シートのオプション', en: 'Sheet Options' },
       [
+        labelCommand('mac.page.gridlinesHeading', t('gridlinesHeading')),
         checkboxCommand('mac.page.showGridlines', t('showGridlines')),
         checkboxCommand('mac.page.printGridlines', t('printGridlines')),
+        labelCommand('mac.page.headingsHeading', t('headingsHeading')),
         checkboxCommand('mac.page.showHeadings', t('showHeadings')),
         checkboxCommand('mac.page.printHeadings', t('printHeadings')),
       ],
@@ -565,7 +571,7 @@ const reviewTab = (): RibbonTabModel =>
       'compact',
     ),
     group(
-      { ja: 'オプション', en: 'Options' },
+      { ja: '読み取り専用', en: 'Read-Only' },
       [
         disabledCompactCommand(
           'mac.review.alwaysReadOnly',
@@ -573,8 +579,12 @@ const reviewTab = (): RibbonTabModel =>
           'protect',
           NOT_IMPLEMENTED,
         ),
-        disabledCompactCommand('mac.review.hideInk', t('hideInk'), 'pen', EMBEDDED_UNSUPPORTED),
       ],
+      'compact',
+    ),
+    group(
+      { ja: 'インク', en: 'Ink' },
+      [disabledCompactCommand('mac.review.hideInk', t('hideInk'), 'pen', EMBEDDED_UNSUPPORTED)],
       'compact',
     ),
   ]);
@@ -630,7 +640,7 @@ const viewTab = (): RibbonTabModel =>
       { ja: 'ズーム', en: 'Zoom' },
       [
         compactCommand('mac.view.zoom', t('zoom'), 'zoom'),
-        compactCommand('mac.view.zoom100', { ja: '100%', en: '100%' }, 'zoom'),
+        compactCommand('mac.view.zoom100', { ja: 'ズーム (100%)', en: 'Zoom (100%)' }, 'zoom'),
         compactCommand('mac.view.zoomSelection', t('zoomSelection'), 'zoom'),
       ],
       'compact',
@@ -678,7 +688,16 @@ const viewTab = (): RibbonTabModel =>
     ),
     group(
       { ja: 'マクロ', en: 'Macros' },
-      [disabledCompactCommand('mac.view.macros', t('macros'), 'script', NOT_IMPLEMENTED)],
+      [
+        disabledCompactCommand('mac.view.macros', t('macros'), 'script', NOT_IMPLEMENTED),
+        disabledCompactCommand('mac.view.recordMacro', t('recordMacro'), 'script', NOT_IMPLEMENTED),
+        disabledCompactCommand(
+          'mac.view.relativeRecording',
+          t('relativeRecording'),
+          'script',
+          NOT_IMPLEMENTED,
+        ),
+      ],
       'compact',
     ),
   ]);
