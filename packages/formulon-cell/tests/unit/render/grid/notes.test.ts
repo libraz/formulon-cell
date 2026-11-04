@@ -165,4 +165,93 @@ describe('paintVisibleNotes', () => {
     const pane = clips[0] ?? [];
     expect((pane[0] ?? 0) + (pane[2] ?? 0)).toBe(1000 - gridOriginX(layout));
   });
+
+  it('sets the Mac note card: 105 x 77 pt, 1 pt black frame and leader, bold text, no author line', () => {
+    // Excel (Mac, 2x): the card spans device x 49-258 / y 13-166 beside a
+    // cell whose top-right corner is (22, 36); the leader runs from that
+    // corner to the card's top-left; "note text" is bold black at x 55.
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({ ...s, layout: { ...s.layout, screenScale: 0.75 } }));
+    setWidth(store, 1000);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 2, col: 1 },
+      { comment: 'note text', commentVisible: true },
+    );
+    const state = store.getState();
+    const view = { ...state, layout: layoutForView(state) };
+    const cols = buildColLayout(view.layout, view.viewport);
+    const rows = buildRowLayout(view.layout, view.viewport);
+    const cell = cellRectIn(view.layout, cols, rows, 2, 1);
+    const fills: { style: string; rect: number[] }[] = [];
+    const strokes: { style: string; width: number; rect?: number[]; path?: number[][] }[] = [];
+    const texts: {
+      text: string;
+      font: string;
+      style: string;
+      x: number;
+      y: number;
+      base: string;
+    }[] = [];
+    let path: number[][] = [];
+    const ctx = {
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 1,
+      font: '',
+      textBaseline: 'alphabetic',
+      textAlign: 'left',
+      save(): void {},
+      restore(): void {},
+      beginPath(): void {
+        path = [];
+      },
+      rect(): void {},
+      clip(): void {},
+      moveTo(x: number, y: number): void {
+        path.push([x, y]);
+      },
+      lineTo(x: number, y: number): void {
+        path.push([x, y]);
+      },
+      stroke(this: { strokeStyle: string; lineWidth: number }): void {
+        strokes.push({ style: this.strokeStyle, width: this.lineWidth, path });
+      },
+      strokeRect(this: { strokeStyle: string; lineWidth: number }, ...r: number[]): void {
+        strokes.push({ style: this.strokeStyle, width: this.lineWidth, rect: r });
+      },
+      measureText: (text: string) => ({ width: text.length * 6 }),
+      fillRect(this: { fillStyle: string }, ...r: number[]): void {
+        fills.push({ style: this.fillStyle, rect: r });
+      },
+      fillText(
+        this: { font: string; fillStyle: string; textBaseline: string },
+        text: string,
+        x: number,
+        y: number,
+      ): void {
+        texts.push({ text, font: this.font, style: this.fillStyle, x, y, base: this.textBaseline });
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    paintVisibleNotes(ctx, view, cols, rows);
+
+    const corner = cell.x + cell.w;
+    const box = fills.find((f) => f.style === NOTE_BOX_FILL)?.rect ?? [];
+    expect(box).toEqual([corner + 13.5, cell.y - 11.5, 105, 77]);
+    const frame = strokes.find((s) => s.rect);
+    expect(frame).toMatchObject({ style: '#000000', width: 1 });
+    expect(frame?.rect).toEqual([corner + 14, cell.y - 11, 104, 76]);
+    const leader = strokes.find((s) => s.path && s.path.length === 2);
+    expect(leader).toMatchObject({ style: '#000000', width: 1 });
+    expect(leader?.path).toEqual([
+      [corner, cell.y],
+      [corner + 13.5, cell.y - 11.5],
+    ]);
+    expect(texts).toHaveLength(1);
+    expect(texts[0]).toMatchObject({ text: 'note text', style: '#000000', base: 'alphabetic' });
+    expect(texts[0]?.font).toMatch(/^bold 9px /);
+    expect(texts[0]?.x).toBeCloseTo(corner + 13.5 + 2.5, 5);
+    expect(texts[0]?.y).toBeCloseTo(cell.y - 11.5 + 15.5, 5);
+  });
 });

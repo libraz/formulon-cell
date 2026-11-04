@@ -1,9 +1,11 @@
 // Shown notes: a yellow box beside the anchor cell with a leader line back to
 // it, clipped to the cell's freeze / split pane. The engine exposes no note
 // geometry, so the box takes the desktop default for a new note (15 px right
-// of the cell, 144 x 79 px at 100%); a right-to-left sheet mirrors it.
+// of the cell, 144 x 79 px at 100%), or the Mac card's measured points; a
+// right-to-left sheet mirrors it.
 
 import { parseAddrKey } from '../../engine/address.js';
+import { fontPointsToCssPx } from '../../engine/font-units.js';
 import type { Addr } from '../../engine/types.js';
 import { renderScale } from '../../store/render-scale.js';
 import type { CellFormat } from '../../store/store.js';
@@ -19,6 +21,7 @@ import {
   type ViewLayout,
   type ViewState,
 } from '../geometry.js';
+import { wholePointAdvances } from '../text-metrics.js';
 import { wrapText } from '../text-wrap.js';
 
 export const NOTE_BOX_FILL = '#ffffe1';
@@ -29,6 +32,21 @@ const NOTE_WIDTH = 144;
 const NOTE_HEIGHT = 79;
 const NOTE_PAD = 4;
 const NOTE_FONT_PX = 12;
+
+/** The Mac desktop's card, in points (Excel Mac at 2x: 105 x 77 incl. a 1 pt
+ *  black frame, 13.5 right of and 11.5 above the cell corner, bold 9 pt text
+ *  2.5 in with its baseline 15.5 down). */
+const MAC_NOTE = {
+  offsetX: 13.5,
+  offsetY: 11.5,
+  width: 105,
+  height: 77,
+  frame: '#000000',
+  textInset: 2.5,
+  baseline: 15.5,
+  fontPt: 9,
+  lineHeight: 11,
+} as const;
 
 export interface VisibleNote {
   addr: Addr;
@@ -86,6 +104,7 @@ export function paintVisibleNotes(
   const sheet = state.data.sheetIndex;
   const scale = renderScale(layout, viewport);
   const rtl = layout.rtl === true;
+  const macPt = wholePointAdvances(layout) ? fontPointsToCssPx(1) * scale : null;
   for (const note of visibleNotes(state.format.formats)) {
     const { addr } = note;
     if (addr.sheet !== sheet) continue;
@@ -94,6 +113,10 @@ export function paintVisibleNotes(
     }
     const cell = cellRectIn(layout, cols, rows, addr.row, addr.col);
     const pane = paneRect(layout, cols, rows, addr);
+    if (macPt !== null) {
+      paintMacNote(ctx, note, cell, pane, macPt, rtl);
+      continue;
+    }
     const w = NOTE_WIDTH * scale;
     const h = NOTE_HEIGHT * scale;
     const cornerX = rtl ? cell.x : cell.x + cell.w;
@@ -138,4 +161,52 @@ export function paintVisibleNotes(
     }
     ctx.restore();
   }
+}
+
+/** The Mac card: the whole note set bold in black, with no author line. */
+function paintMacNote(
+  ctx: CanvasRenderingContext2D,
+  note: VisibleNote,
+  cell: Rect,
+  pane: Rect,
+  pt: number,
+  rtl: boolean,
+): void {
+  const w = MAC_NOTE.width * pt;
+  const h = MAC_NOTE.height * pt;
+  const cornerX = rtl ? cell.x : cell.x + cell.w;
+  const x = rtl ? cornerX - MAC_NOTE.offsetX * pt - w : cornerX + MAC_NOTE.offsetX * pt;
+  const y = Math.max(pane.y, cell.y - MAC_NOTE.offsetY * pt);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(pane.x, pane.y, pane.w, pane.h);
+  ctx.clip();
+  ctx.strokeStyle = MAC_NOTE.frame;
+  ctx.lineWidth = pt;
+  ctx.beginPath();
+  ctx.moveTo(cornerX, cell.y);
+  ctx.lineTo(rtl ? x + w : x, y);
+  ctx.stroke();
+  ctx.fillStyle = NOTE_BOX_FILL;
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeRect(x + pt / 2, y + pt / 2, w - pt, h - pt);
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.fillStyle = MAC_NOTE.frame;
+  ctx.font = `bold ${MAC_NOTE.fontPt * pt}px Tahoma, sans-serif`;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = rtl ? 'right' : 'left';
+  const inset = MAC_NOTE.textInset * pt;
+  const lines = wrapText(note.text, {
+    maxWidth: Math.max(1, w - inset * 2),
+    measureText: (text) => ctx.measureText(text).width,
+  });
+  let lineY = y + MAC_NOTE.baseline * pt;
+  for (const line of lines) {
+    if (lineY > y + h) break;
+    ctx.fillText(line, rtl ? x + w - inset : x + inset, lineY);
+    lineY += MAC_NOTE.lineHeight * pt;
+  }
+  ctx.restore();
 }
