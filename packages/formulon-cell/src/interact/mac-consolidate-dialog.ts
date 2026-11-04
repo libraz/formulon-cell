@@ -108,6 +108,7 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
   });
 
   const listRow = appendRow(body);
+  listRow.row.classList.add('fc-mac-consolidate__row--list');
   const list = document.createElement('div');
   list.className = 'fc-mac-consolidate__list';
   list.setAttribute('role', 'listbox');

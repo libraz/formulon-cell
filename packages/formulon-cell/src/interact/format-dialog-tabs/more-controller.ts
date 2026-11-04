@@ -6,6 +6,7 @@ import { coerceInput, parseLocalizedNumericInput } from '../../commands/coerce-i
 import { formatEditableNumber } from '../../engine/value.js';
 import { excelSerialToIsoDate } from '../../format/date-serial.js';
 import type { ValidationErrorStyle, ValidationOp } from '../../store/store.js';
+import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 import type { ValidationKind } from '../format-dialog-model.js';
 import { type FormatTabContext, type FormatTabController, markMixed } from './controller.js';
 import type { MoreTabRefs } from './more.js';
@@ -146,7 +147,10 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     const isListLike = k === 'list';
     const isCustom = k === 'custom';
     const isActive = k !== 'none';
-    validationOpRow.hidden = !isBounded;
+    // With no rule yet the Data row and the blank option show greyed out, as on the desktop.
+    const noRule = k === 'none';
+    validationOpRow.hidden = !(isBounded || noRule);
+    projectDisabledState(validationOpSelect, noRule, null);
     validationARow.hidden = !isBounded;
     validationBRow.hidden =
       !isBounded || (draft.validationOp !== 'between' && draft.validationOp !== 'notBetween');
@@ -155,7 +159,8 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     validationRow.hidden = !isListLike || draft.validationListSourceKind !== 'literal';
     validationListRangeRow.hidden = !isListLike || draft.validationListSourceKind !== 'range';
     validationShowDropdownRow.hidden = !isListLike;
-    validationAllowBlankRow.hidden = !isActive;
+    validationAllowBlankRow.hidden = false;
+    projectDisabledState(validationAllowBlankInput, noRule, null);
     validationErrorStyleRow.hidden = !isActive;
     validationShowInputMessageRow.hidden = !isActive;
     validationPromptTitleRow.hidden = !isActive || !draft.validationShowInputMessage;
@@ -457,6 +462,12 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
   const clearAllButton = validationSection.querySelector<HTMLButtonElement>(
     '[data-fc-validation-clear-all]',
   );
+  // The Data Validation dialog keeps Clear All at the left of its footer.
+  const footerEl = dialog?.querySelector<HTMLElement>('.fc-fmtdlg__footer');
+  if (clearAllButton && footerEl) {
+    clearAllButton.style.marginRight = 'auto';
+    footerEl.prepend(clearAllButton);
+  }
   if (clearAllButton) on(clearAllButton, 'click', onValidationClearAll);
 
   on(hlInput, 'input', onHlInput);

@@ -282,6 +282,9 @@ export const cellFormatFr: CellFormatStrings = {
     validationTabErrorAlert: 'Alerte d’erreur',
     validationTabIme: 'Mode IME',
     validationClearAll: 'Effacer tout',
+    validationConditions: 'Critères de validation',
+    validationApplyToAll:
+      'Appliquer ces modifications à toutes les cellules ayant les mêmes paramètres',
     validationImeLabel: 'Mode IME :',
     validationImeNoControl: 'Aucun contrôle',
     clearField: 'Effacer',

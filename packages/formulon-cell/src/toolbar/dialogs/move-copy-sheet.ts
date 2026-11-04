@@ -20,6 +20,8 @@ export interface MoveCopySheetDialogStrings {
 
 export interface MoveCopySheetDialogOptions {
   strings: MoveCopySheetDialogStrings;
+  /** Element inside the spreadsheet host; anchors the dialog so it follows the host platform. */
+  host?: HTMLElement;
   bookName: string;
   sheets: readonly string[];
   /** The sheet being moved. */
@@ -37,7 +39,7 @@ export const showMoveCopySheetDialog = (
 ): Promise<MoveCopySheetDialogResult | null> =>
   new Promise<MoveCopySheetDialogResult | null>((resolve) => {
     const { strings } = opts;
-    const shell = createDialogShell({ title: strings.title, bodyVariant: 'app' });
+    const shell = createDialogShell({ host: opts.host, title: strings.title, bodyVariant: 'app' });
     shell.panel.classList.add('fc-movecopy');
 
     const bookLabel = document.createElement('div');

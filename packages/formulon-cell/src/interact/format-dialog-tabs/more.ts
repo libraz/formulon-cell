@@ -5,6 +5,7 @@
 import type { Strings } from '../../i18n/strings.js';
 import type { ValidationOp } from '../../store/store.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 import { makeButton, makeListSourceRadio, makeSection } from '../format-dialog-dom.js';
 import type { ValidationKind } from '../format-dialog-model.js';
 
@@ -372,6 +373,21 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   );
   imeRow.append(imeLabel, imeSelect);
   imePane.appendChild(imeRow);
+
+  // Settings tab furniture: the criteria caption and the apply-to-all checkbox.
+  const conditionsCaption = document.createElement('div');
+  conditionsCaption.className = 'fc-fmtdlg__vcaption';
+  conditionsCaption.textContent = t.validationConditions;
+  settingsPane.prepend(conditionsCaption);
+  const applyAllRow = document.createElement('label');
+  applyAllRow.className = 'fc-fmtdlg__check fc-fmtdlg__vapplyall';
+  const applyAllInput = document.createElement('input');
+  applyAllInput.type = 'checkbox';
+  projectDisabledState(applyAllInput, true, null);
+  const applyAllText = document.createElement('span');
+  applyAllText.textContent = t.validationApplyToAll;
+  applyAllRow.append(applyAllInput, applyAllText);
+  settingsPane.appendChild(applyAllRow);
 
   const validationClearAll = makeButton(t.validationClearAll);
   validationClearAll.dataset.fcValidationClearAll = '';

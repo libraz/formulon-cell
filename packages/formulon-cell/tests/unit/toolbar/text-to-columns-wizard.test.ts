@@ -132,4 +132,42 @@ describe('Text to Columns wizard', () => {
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__footer button')?.click();
     await done;
   });
+
+  it('splits at fixed column breaks set by clicking the data', async () => {
+    const done = open({ previewRows: ['abcdef', 'ghijkl'] });
+    const fixed = step(1).querySelectorAll<HTMLInputElement>('input[name="fc-textcols-type"]')[1];
+    expect(fixed?.disabled).toBe(false);
+    if (!fixed) throw new Error('missing fixed radio');
+    fixed.checked = true;
+    fixed.dispatchEvent(new Event('change', { bubbles: true }));
+    button('次へ >').click();
+    expect(step(2).querySelector<HTMLElement>('.fc-textcols__fixed')?.hidden).toBe(false);
+    expect(step(2).querySelector<HTMLElement>('.fc-textcols__delimiter-grid')?.hidden).toBe(true);
+    const chars = Array.from(
+      step(2).querySelectorAll<HTMLElement>('.fc-textcols__fixed-row')[0]?.children ?? [],
+    ) as HTMLElement[];
+    chars[2]?.click();
+    chars[4]?.click();
+    chars[4]?.click();
+    expect(q('.fc-textcols__preview pre').textContent).toBe('ab | cdef\ngh | ijkl');
+    button('完了').click();
+    expect(await done).toEqual({
+      delimiters: [],
+      collapseConsecutiveDelimiters: false,
+      textQualifier: null,
+      fixedBreaks: [2],
+    });
+  });
+
+  it('keeps the wizard open when no fixed break is set', () => {
+    const done = open({ previewRows: ['abcdef'] });
+    const fixed = step(1).querySelectorAll<HTMLInputElement>('input[name="fc-textcols-type"]')[1];
+    if (!fixed) throw new Error('missing fixed radio');
+    fixed.checked = true;
+    fixed.dispatchEvent(new Event('change', { bubbles: true }));
+    button('完了').click();
+    expect(q('.fc-fmtdlg__header').textContent).toBe('区切り位置指定ウィザード - 2 / 3');
+    button('キャンセル').click();
+    return done;
+  });
 });

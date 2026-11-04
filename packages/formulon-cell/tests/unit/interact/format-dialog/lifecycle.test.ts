@@ -77,7 +77,7 @@ describe('attachFormatDialog', () => {
     );
 
     expect(overlay?.classList.contains('fc-fmtdlg--data-validation')).toBe(true);
-    expect(title?.textContent).toBe('入力規則');
+    expect(title?.textContent).toBe('データの入力規則');
     expect(tabs?.hidden).toBe(true);
     expect(preview?.hidden).toBe(true);
     expect(sections.map((section) => section.hidden)).toEqual([true, true, false]);

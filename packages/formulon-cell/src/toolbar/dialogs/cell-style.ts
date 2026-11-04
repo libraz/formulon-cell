@@ -91,7 +91,7 @@ export const describeCellStyleFormat = (
       : f.vAlign === 'middle'
         ? t.vertical.middle
         : t.vertical.bottom;
-  const font = [f.fontFamily, f.fontSize].filter((part) => part !== undefined).join(' ');
+  const font = [f.fontFamily, f.fontSize ?? 11].filter((part) => part !== undefined).join(' ');
   return {
     number: f.numFmt && f.numFmt.kind !== 'general' ? String(f.numFmt.kind) : t.general,
     alignment: t.alignment.replace('{vertical}', vertical).replace('{horizontal}', horizontal),

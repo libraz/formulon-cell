@@ -279,6 +279,8 @@ export const cellFormatTh: CellFormatStrings = {
     validationTabErrorAlert: 'การแจ้งเตือนข้อผิดพลาด',
     validationTabIme: 'โหมด IME',
     validationClearAll: 'ล้างทั้งหมด',
+    validationConditions: 'เงื่อนไขการตรวจสอบ',
+    validationApplyToAll: 'ใช้การเปลี่ยนแปลงกับเซลล์อื่นทั้งหมดที่มีการตั้งค่าเดียวกัน',
     validationImeLabel: 'โหมด IME:',
     validationImeNoControl: 'ไม่ควบคุม',
     clearField: 'ล้าง',

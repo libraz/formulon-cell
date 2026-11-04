@@ -276,6 +276,8 @@ export interface CellFormatStrings {
     validationTabErrorAlert: string;
     validationTabIme: string;
     validationClearAll: string;
+    validationConditions: string;
+    validationApplyToAll: string;
     validationImeLabel: string;
     validationImeNoControl: string;
     clearField: string;

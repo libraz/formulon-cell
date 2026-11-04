@@ -126,4 +126,31 @@ describe('textToColumns', () => {
       { kind: 'text', value: 'c' },
     ]);
   });
+
+  it('splits at fixed column breaks instead of delimiters', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { kind: 'text', value: 'AB12 xyz' },
+      null,
+    );
+    const wb = fakeWorkbook();
+    const count = textToColumns(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      [],
+      { fixedBreaks: [2, 5] },
+    );
+    expect(count).toBe(3);
+    expect(wb.writes).toEqual(
+      new Map([
+        ['0:0:0', { kind: 'text', value: 'AB' }],
+        ['0:0:1', { kind: 'number', value: 12 }],
+        ['0:0:2', { kind: 'text', value: 'xyz' }],
+      ]),
+    );
+  });
 });

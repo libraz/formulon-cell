@@ -1,3 +1,4 @@
+import { createInteractionChipButton } from '../../interact/chip-button.js';
 import { projectDisabledReason, projectDisabledState } from '../menu-a11y.js';
 import { createDialogSelect } from './form-controls.js';
 import {
@@ -40,6 +41,8 @@ export interface TextToColumnsWizardStrings {
   fixedHint: string;
   preview: string;
   step2Prompt: string;
+  /** Step 2 prompt for fixed-width data; falls back to `step2Prompt`. */
+  fixedPrompt?: string;
   delimiters: string;
   other: string;
   qualifier: string;
@@ -63,6 +66,8 @@ export interface TextToColumnsDialogResult {
   collapseConsecutiveDelimiters: boolean;
   /** Set by the wizard: the quote that keeps delimiters inside a field, or null for none. */
   textQualifier?: string | null;
+  /** Set by the wizard for fixed-width data: positions that start a new column. */
+  fixedBreaks?: number[];
 }
 
 export interface TextToColumnsDialogOptions {
@@ -149,7 +154,6 @@ const showTextToColumnsWizard = (
     const fixed = document.createElement('input');
     fixed.type = 'radio';
     fixed.name = 'fc-textcols-type';
-    projectDisabledState(fixed, true, strings.fixedWidthUnavailable);
     step1.append(
       prompt(wizard.step1Intro),
       prompt(wizard.step1Prompt),
@@ -215,8 +219,44 @@ const showTextToColumnsWizard = (
     const delimiterLegend = document.createElement('div');
     delimiterLegend.className = 'fc-tb__dlg__label';
     delimiterLegend.textContent = wizard.delimiters;
+    const step2Prompt = prompt(wizard.step2Prompt);
+    // Fixed-width data: click between characters to set or clear a column break.
+    const fixedBreaks = new Set<number>();
+    const fixedEditor = document.createElement('div');
+    fixedEditor.className = 'fc-textcols__fixed';
+    fixedEditor.hidden = true;
+    const fixedRows = (opts.previewRows ?? []).slice(0, 8).map((row) => {
+      const line = document.createElement('div');
+      line.className = 'fc-textcols__fixed-row';
+      const chars = [...row.slice(0, 120)].map((char, pos) => {
+        const cell = createInteractionChipButton({
+          className: 'fc-textcols__fixed-char',
+          label: char === ' ' ? '\u00a0' : char,
+          dataset: { pos: String(pos) },
+        });
+        cell.addEventListener('click', () => {
+          if (pos === 0) return;
+          if (fixedBreaks.has(pos)) fixedBreaks.delete(pos);
+          else fixedBreaks.add(pos);
+          syncFixedBreaks();
+          updatePreview();
+        });
+        line.appendChild(cell);
+        return cell;
+      });
+      fixedEditor.appendChild(line);
+      return chars;
+    });
+    const syncFixedBreaks = (): void => {
+      for (const chars of fixedRows) {
+        for (const [pos, cell] of chars.entries()) {
+          cell.classList.toggle('fc-textcols__fixed-char--break', fixedBreaks.has(pos));
+        }
+      }
+    };
     step2.append(
-      prompt(wizard.step2Prompt),
+      step2Prompt,
+      fixedEditor,
       delimiterLegend,
       delimiterBox,
       collapseLabel,
@@ -283,13 +323,38 @@ const showTextToColumnsWizard = (
       if (otherInput.value) values.push(otherInput.value);
       return values;
     };
-    const updatePreview = (): void => {
-      preview.textContent = splitPreview(
-        opts.previewRows ?? [],
-        selectedDelimiters(),
-        collapse.checked,
-      );
+    const isFixed = (): boolean => fixed.checked;
+    function updatePreview(): void {
+      preview.textContent = isFixed()
+        ? (opts.previewRows ?? [])
+            .map((row) => {
+              const cuts = [...fixedBreaks].filter((c) => c < row.length).sort((a, b) => a - b);
+              const parts: string[] = [];
+              let from = 0;
+              for (const cut of [...cuts, row.length]) {
+                parts.push(row.slice(from, cut));
+                from = cut;
+              }
+              return parts.join(' | ');
+            })
+            .join('\n')
+        : splitPreview(opts.previewRows ?? [], selectedDelimiters(), collapse.checked);
+    }
+    /** Step 2 shows the delimiter choices or the break editor, whichever the data type needs. */
+    const syncKind = (): void => {
+      const fixedMode = isFixed();
+      fixedEditor.hidden = !fixedMode;
+      delimiterBox.hidden = fixedMode;
+      collapseLabel.hidden = fixedMode;
+      qualifierLabel.hidden = fixedMode;
+      delimiterLegend.hidden = fixedMode;
+      step2Prompt.textContent = fixedMode
+        ? (wizard.fixedPrompt ?? wizard.step2Prompt)
+        : wizard.step2Prompt;
+      updatePreview();
     };
+    delimited.addEventListener('change', syncKind);
+    fixed.addEventListener('change', syncKind);
     let current = 1;
     const showStep = (n: number): void => {
       current = n;
@@ -309,6 +374,20 @@ const showTextToColumnsWizard = (
       onSubmit: () => onFinish(),
     });
     const onFinish = (): void => {
+      if (isFixed()) {
+        if (fixedBreaks.size === 0) {
+          showStep(2);
+          showDialogError(errorRow, strings.noDelimited);
+          return;
+        }
+        lifecycle.finish({
+          delimiters: [],
+          collapseConsecutiveDelimiters: false,
+          textQualifier: null,
+          fixedBreaks: [...fixedBreaks].sort((a, b) => a - b),
+        });
+        return;
+      }
       const delimiters = selectedDelimiters();
       if (delimiters.length === 0) {
         showStep(2);

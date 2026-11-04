@@ -420,9 +420,9 @@ describe('attachFormatDialog', () => {
         ),
       ).toBe(true);
       expect(
-        [...morePanel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every(
-          (input) => input.indeterminate,
-        ),
+        [...morePanel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+          .filter((input) => !input.closest('.fc-fmtdlg__vapplyall'))
+          .every((input) => input.indeterminate),
       ).toBe(true);
       expect(
         [...morePanel.querySelectorAll<HTMLInputElement>('input[type="number"]')].every(

@@ -15,6 +15,8 @@ export interface TextToColumnsOptions {
   /** Quote that keeps delimiters inside a field, a doubled quote standing
    *  for itself; `null` turns quoting off. The desktop default is `"`. */
   textQualifier?: string | null;
+  /** Character positions that start a new column; when set, delimiters are ignored. */
+  fixedBreaks?: readonly number[];
 }
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -24,6 +26,18 @@ const splitText = (
   delimiters: string | readonly string[],
   options: TextToColumnsOptions = {},
 ): string[] => {
+  if (options.fixedBreaks) {
+    const cuts = [...new Set(options.fixedBreaks)]
+      .filter((cut) => cut > 0 && cut < value.length)
+      .sort((a, b) => a - b);
+    const out: string[] = [];
+    let from = 0;
+    for (const cut of [...cuts, value.length]) {
+      out.push(value.slice(from, cut));
+      from = cut;
+    }
+    return out;
+  }
   const list = (Array.isArray(delimiters) ? delimiters : [delimiters]).filter(
     (delimiter) => delimiter !== '',
   );

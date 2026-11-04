@@ -140,12 +140,10 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     replaceOption.text.textContent = t.replace;
     pageBreakOption.text.textContent = t.pageBreak;
     summaryOption.text.textContent = t.summaryBelow;
-    // Page breaks and summary rows above the data have no counterpart here.
-    for (const option of [pageBreakOption, summaryOption]) {
-      projectDisabledState(option.input, true, t.unsupportedOption, {
-        datasetKey: 'disabledReason',
-      });
-    }
+    // Summary rows above the data have no counterpart here.
+    projectDisabledState(summaryOption.input, true, t.unsupportedOption, {
+      datasetKey: 'disabledReason',
+    });
     removeAllBtn.textContent = t.removeAll;
     okBtn.textContent = t.run;
     cancelBtn.textContent = t.cancel;
@@ -194,6 +192,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     }
     functionSelect.value = 'sum';
     replaceOption.input.checked = true;
+    pageBreakOption.input.checked = false;
     syncCustomSelects(shell.panel);
   };
 
@@ -228,6 +227,7 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
       function: (FUNCTIONS.includes(functionSelect.value as MacDataFunction)
         ? functionSelect.value
         : 'sum') as MacDataFunction,
+      pageBreaks: pageBreakOption.input.checked,
     });
     // Replacing the old subtotals and writing the new ones is a single undo step.
     if (replaceOption.input.checked) {

@@ -279,6 +279,8 @@ export const cellFormatEn: CellFormatStrings = {
     validationTabErrorAlert: 'Error Alert',
     validationTabIme: 'IME Mode',
     validationClearAll: 'Clear All',
+    validationConditions: 'Validation criteria',
+    validationApplyToAll: 'Apply these changes to all other cells with the same settings',
     validationImeLabel: 'IME mode:',
     validationImeNoControl: 'No control',
     clearField: 'Clear',

@@ -136,7 +136,7 @@ describe('Subtotal dialog', () => {
     );
     expect(options).toEqual([
       ['現在の小計をすべて置き換える', true, false],
-      ['グループごとに改ページを挿入する', false, true],
+      ['グループごとに改ページを挿入する', false, false],
       ['集計行をデータの下に挿入する', true, true],
     ]);
     expect(

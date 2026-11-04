@@ -1,5 +1,10 @@
 @layer fc.app {
   /* Move or Copy sheet. */
+  .fc-movecopy {
+    width: 227px;
+    max-width: 96vw;
+  }
+
   .fc-movecopy__book {
     padding: 3px 8px;
     border: 1px solid var(--fc-rule);

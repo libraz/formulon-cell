@@ -279,6 +279,8 @@ export const cellFormatKo: CellFormatStrings = {
     validationTabErrorAlert: '오류 메시지',
     validationTabIme: 'IME 모드',
     validationClearAll: '모두 지우기',
+    validationConditions: '유효성 조건',
+    validationApplyToAll: '설정이 같은 다른 모든 셀에도 변경 내용 적용',
     validationImeLabel: 'IME 모드:',
     validationImeNoControl: '제어 안 함',
     clearField: '지우기',

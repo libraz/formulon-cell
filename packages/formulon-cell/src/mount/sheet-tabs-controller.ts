@@ -263,6 +263,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const openMoveCopy = async (): Promise<void> => {
       const shown = visible();
       const result = await showMoveCopySheetDialog({
+        host: sheetTabs,
         strings: {
           title: strings.sheetTabs.moveCopyTitle,
           targetBook: strings.sheetTabs.moveCopyTargetBook,

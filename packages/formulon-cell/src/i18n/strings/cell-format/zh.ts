@@ -279,6 +279,8 @@ export const cellFormatZh: CellFormatStrings = {
     validationTabErrorAlert: '出错警告',
     validationTabIme: '输入法模式',
     validationClearAll: '全部清除',
+    validationConditions: '验证条件',
+    validationApplyToAll: '对有同样设置的所有其他单元格应用这些更改',
     validationImeLabel: '输入法模式:',
     validationImeNoControl: '不控制',
     clearField: '清除',

@@ -459,6 +459,8 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     const wrap = document.createElement('div');
     wrap.className = 'fc-tb__rb-color';
     wrap.dataset.ribbonCommand = command.id;
+    wrap.setAttribute('role', 'group');
+    wrap.setAttribute('aria-label', command.title);
 
     const button = createRibbonControlButton({
       className: 'fc-tb__rb-color__btn',

@@ -5,11 +5,13 @@ import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js'
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
+import { getPageSetup, mutators } from '../store/store.js';
 import { blockDataTableShift } from './data-table-guard.js';
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows, ungroupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
 import { sameSavedWorkbook } from './saved-workbook-proof.js';
+import { recordPageSetupChange } from './slice-history.js';
 import { deleteRows, insertRows } from './structure.js';
 
 /** Data commands exposed by the Mac ribbon. The limits are
@@ -111,6 +113,8 @@ export interface SubtotalRequest {
   readonly groupByColumn: number;
   readonly subtotalColumns: readonly number[];
   readonly function: Exclude<MacDataFunction, 'count'> | 'count';
+  /** Start every group after the first on a new printed page. */
+  readonly pageBreaks?: boolean;
 }
 
 export interface SubtotalSolution {
@@ -1095,6 +1099,18 @@ export function commitMacSubtotal(
       }
     });
     groupRows(store, history, dataStart, lastSubtotalRow, wb);
+    if (request.pageBreaks) {
+      // Each group after the first starts below the subtotal rows inserted above it.
+      const breakRows = solution.groups.slice(1).map((group, index) => group.start + index + 1);
+      if (breakRows.length > 0) {
+        recordPageSetupChange(history, store, () => {
+          const current = getPageSetup(store.getState(), range.sheet).manualPageBreakRows ?? [];
+          mutators.setPageSetup(store, range.sheet, {
+            manualPageBreakRows: [...new Set([...current, ...breakRows])].sort((a, b) => a - b),
+          });
+        });
+      }
+    }
     history.end(token);
     return success(undefined);
   } catch (error) {

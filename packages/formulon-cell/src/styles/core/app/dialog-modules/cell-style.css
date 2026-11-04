@@ -5,6 +5,11 @@
     gap: 10px;
   }
 
+  .fc-cellstyledlg {
+    width: 431px;
+    max-width: 96vw;
+  }
+
   .fc-cellstyledlg__preview {
     padding: 2px 10px;
     font-size: 12px;
@@ -102,5 +107,120 @@
     align-items: center;
     gap: 6px;
     padding: 1px 8px;
+  }
+
+  .fc-mac-consolidate__panel {
+    width: 341px;
+    max-width: 96vw;
+  }
+  .fc-mac-subtotal__panel {
+    width: 316px;
+    max-width: 96vw;
+  }
+  .fc-mac-consolidate__row {
+    display: grid;
+    grid-template-columns: 79px minmax(0, 1fr);
+    align-items: center;
+    gap: 0 6px;
+  }
+  .fc-mac-consolidate__row--list {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .fc-mac-consolidate__row--list .fc-mac-consolidate__list {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .fc-mac-consolidate__option,
+  .fc-mac-subtotal__option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+  }
+  .fc-mac-subtotal__row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .fc-mac-subtotal__fields {
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .fc-mac-consolidate__list-actions .fc-fmtdlg__btn {
+    min-width: 0;
+    height: 26px;
+    padding: 0 10px;
+  }
+  .fc-mac-consolidate__list-actions .fc-mac-consolidate__small {
+    width: 23px;
+    padding: 0;
+  }
+
+  .fc-mac-subtotal__fields {
+    height: 83px;
+    min-height: 0;
+  }
+  .fc-mac-subtotal__btn,
+  .fc-mac-consolidate__btn {
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .fc-textcols__fixed {
+    font-family: var(--fc-font-mono, ui-monospace, monospace);
+    overflow-x: auto;
+  }
+  .fc-textcols__fixed[hidden] {
+    display: none;
+  }
+  .fc-textcols__fixed-row {
+    display: flex;
+    white-space: pre;
+  }
+  .fc-textcols__fixed-char {
+    min-width: 0;
+    padding: 0 1px;
+    border: 0;
+    border-left: 1px solid transparent;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: col-resize;
+  }
+  .fc-textcols__fixed-char--break {
+    border-left-color: var(--fc-accent);
+  }
+
+  /* Data Validation dialog: no Format Cells hint, Clear All only in that mode. */
+  .fc-fmtdlg--data-validation .fc-fmtdlg__more-hint {
+    display: none;
+  }
+  .fc-fmtdlg:not(.fc-fmtdlg--data-validation) [data-fc-validation-clear-all] {
+    display: none;
+  }
+  .fc-fmtdlg__vcaption {
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .fc-fmtdlg__vapplyall {
+    margin-top: 12px;
+  }
+
+  .fc-fmtdlg--mac
+    .fc-fmtdlg__panel
+    .fc-fmtdlg__footer
+    .fc-fmtdlg__btn[data-fc-validation-clear-all] {
+    left: 20px;
+    width: 98px;
+  }
+  .fc-fmtdlg__vpane .fc-fmtdlg__check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 }

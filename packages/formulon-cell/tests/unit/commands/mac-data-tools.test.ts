@@ -26,6 +26,7 @@ import { ja } from '../../../src/i18n/strings/ja.js';
 import type { SpreadsheetInstance } from '../../../src/mount/types.js';
 import {
   createSpreadsheetStore,
+  getPageSetup,
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
@@ -571,6 +572,34 @@ describe('Mac Data command operations', () => {
     expect(Array.from({ length: 10 }, (_, row) => levels.get(row) ?? 0)).toEqual([
       0, 2, 2, 1, 2, 2, 1, 2, 1, 0,
     ]);
+  });
+
+  it('inserts a page break before each group after the first when asked', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    handles.push(wb);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'key');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'value');
+    for (const [index, group] of ['x', 'x', 'y', 'y', 'z'].entries()) {
+      wb.setText({ sheet: 0, row: index + 1, col: 0 }, group);
+      wb.setNumber({ sheet: 0, row: index + 1, col: 1 }, index + 1);
+    }
+    wb.recalc();
+    const instance = makeControllerInstance(wb, store, history);
+    const request: SubtotalRequest = {
+      range: 'A1:B6',
+      groupByColumn: 0,
+      subtotalColumns: [1],
+      function: 'sum',
+      pageBreaks: true,
+    };
+    const plan = planMacSubtotal(instance, request);
+    if (!plan.ok) throw new Error('plan failed');
+    expect(commitMacSubtotal(instance, request, plan.value).ok).toBe(true);
+    expect(getPageSetup(store.getState(), 0).manualPageBreakRows).toEqual([4, 7]);
+    expect(history.undo()).toBe(true);
+    expect(getPageSetup(store.getState(), 0).manualPageBreakRows ?? []).toEqual([]);
   });
 
   it('removes every subtotal row and its outline again', async () => {

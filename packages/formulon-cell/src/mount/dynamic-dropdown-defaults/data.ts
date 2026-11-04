@@ -95,6 +95,7 @@ const buildTextToColumnsCustom =
     const splitOptions = {
       collapseConsecutiveDelimiters: result.collapseConsecutiveDelimiters,
       ...(result.textQualifier === undefined ? {} : { textQualifier: result.textQualifier }),
+      ...(result.fixedBreaks ? { fixedBreaks: result.fixedBreaks } : {}),
     };
     const targets = textToColumnsTargets(
       instance.store.getState(),
