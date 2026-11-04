@@ -54,6 +54,15 @@ describe('formatGeneralNumber', () => {
     expect(formatError(99, '#CUSTOM!', 'de-DE')).toBe('#CUSTOM!');
   });
 
+  it('shows only #SPILL! localized in Japanese, as the desktop does', () => {
+    expect(formatError(8, '#SPILL!', 'ja-JP')).toBe('#スピル!');
+    expect(formatCell({ kind: 'error', code: 8, text: '' }, 'ja')).toBe('#スピル!');
+    for (const code of [0, 1, 2, 3, 4, 5, 6, 9, 10, 11]) {
+      expect(formatError(code, '', 'ja-JP')).toBe(formatError(code, '', 'en-US'));
+    }
+    expect(formatError(8, '#SPILL!', 'en-US')).toBe('#SPILL!');
+  });
+
   it('keeps editable decimal precision while using German/French decimal marks', () => {
     expect(formatEditableNumber(1.5, 'de-DE')).toBe('1,5');
     expect(formatEditableNumber(1.5, 'fr-FR')).toBe('1,5');

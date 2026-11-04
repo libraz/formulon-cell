@@ -66,9 +66,10 @@ export function formatScientificNumber(
 export function formatError(code: number, fallbackText: string, locale = 'en-US'): string {
   const canonical = ERROR_NAME[code];
   if (canonical === undefined) return fallbackText;
-  // formulon currently has a measured German spelling only for #N/A. Keep all
-  // other error names canonical until their locale captures exist.
+  // Measured spellings: German #N/A, and Japanese #SPILL! (the only error the
+  // ja desktop localizes). Other names stay canonical until captured.
   if (code === 6 && localeLanguage(locale) === 'de') return '#NV';
+  if (code === 8 && localeLanguage(locale) === 'ja') return '#スピル!';
   return canonical;
 }
 

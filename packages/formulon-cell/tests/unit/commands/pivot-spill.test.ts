@@ -155,3 +155,25 @@ describe('a report moved by a row deletion', () => {
     wb.dispose();
   });
 });
+
+describe('a value typed where the report will put the same value', () => {
+  it('still blocks the report, which comes back once the cell is cleared', async () => {
+    const { wb, store } = await setup();
+    wb.setBlank({ sheet: 0, row: 9, col: 0 });
+    expect(wb.setPivotTableGrandTotals(0, 0, true, false)).toBe(true);
+    refreshPivotReportsAfterEdit(store, wb);
+    // A7 is free now; type the label the regrown report puts there.
+    wb.setText({ sheet: 0, row: 6, col: 0 }, 'Grand Total');
+    expect(wb.setPivotTableGrandTotals(0, 0, true, true)).toBe(true);
+    const { spilled } = refreshPivotReportsAfterEdit(store, wb);
+    expect(spilled[0]?.blockers).toEqual([{ sheet: 0, row: 6, col: 0 }]);
+    expect(wb.getValue({ sheet: 0, row: 6, col: 0 })).toEqual({
+      kind: 'text',
+      value: 'Grand Total',
+    });
+    wb.setBlank({ sheet: 0, row: 6, col: 0 });
+    expect(wb.pivotSpills(0)).toEqual([]);
+    expect(wb.pivotBounds(0)[0]?.range.r1).toBe(6);
+    wb.dispose();
+  });
+});

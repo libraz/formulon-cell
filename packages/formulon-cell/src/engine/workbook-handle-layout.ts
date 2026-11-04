@@ -13,6 +13,7 @@ import { macDefaultRowPt } from './mac-row-model.js';
 import type { EngineCapabilities, Range, Workbook } from './types.js';
 import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { shiftPivotOwnedAreas } from './workbook-handle-pivot.js';
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
@@ -645,6 +646,7 @@ export abstract class WorkbookHandleLayoutMethods {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
     const s = wb(this).insertRows(sheet, row, count);
+    if (s.ok) shiftPivotOwnedAreas(this, sheet, 'row', 'insert', row, count);
     return s.ok;
   }
 
@@ -654,6 +656,7 @@ export abstract class WorkbookHandleLayoutMethods {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
     const s = wb(this).deleteRows(sheet, row, count);
+    if (s.ok) shiftPivotOwnedAreas(this, sheet, 'row', 'delete', row, count);
     return s.ok;
   }
 
@@ -662,6 +665,7 @@ export abstract class WorkbookHandleLayoutMethods {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
     const s = wb(this).insertCols(sheet, col, count);
+    if (s.ok) shiftPivotOwnedAreas(this, sheet, 'col', 'insert', col, count);
     return s.ok;
   }
 
@@ -670,6 +674,7 @@ export abstract class WorkbookHandleLayoutMethods {
     assertAlive(this);
     if (!this.capabilities.insertDeleteRowsCols) return false;
     const s = wb(this).deleteCols(sheet, col, count);
+    if (s.ok) shiftPivotOwnedAreas(this, sheet, 'col', 'delete', col, count);
     return s.ok;
   }
 

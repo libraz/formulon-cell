@@ -198,20 +198,37 @@ const ownedExtents = new WeakMap<object, Map<string, Range>>();
 
 const SPILL_ERROR = 8;
 
-const sameCellValue = (a: CellValue, b: CellValue): boolean =>
-  a.kind === b.kind && JSON.stringify(a) === JSON.stringify(b);
-
 const inside = (range: Range, row: number, col: number): boolean =>
   row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
 
-/** Blockers of a report laid out over `needed`, updating the area it owns
- *  when nothing is in the way. */
+const sameArea = (a: Range, b: Range): boolean =>
+  a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
+
+/** Blank the sheet's own cells in `from` outside `keep`, unjournaled: values a
+ *  report cached where it no longer lays out, cleared as the desktop clears them. */
+function clearGivenUp(
+  handle: WorkbookHandlePivotMethods,
+  sheet: number,
+  from: Range,
+  keep: Range,
+): void {
+  const raw = internals(handle).wb;
+  for (const cell of [...handle.physicalCells(sheet)]) {
+    const { row, col } = cell.addr;
+    if (!inside(from, row, col) || inside(keep, row, col)) continue;
+    if (cell.formula === null && cell.value.kind === 'blank') continue;
+    raw.setBlank(sheet, row, col);
+  }
+}
+
+/** Blockers of a report laid out over `needed`: the sheet's non-empty cells
+ *  there outside the area the report owned. When nothing is in the way the
+ *  report owns `needed` from then on, and the cells it gave up are cleared. */
 function pivotBlockers(
   handle: WorkbookHandlePivotMethods,
   sheet: number,
   pivotIndex: number,
   needed: Range,
-  projected: readonly PivotCell[],
 ): Addr[] {
   let owned = ownedExtents.get(handle);
   if (!owned) {
@@ -220,41 +237,57 @@ function pivotBlockers(
   }
   const key = ownedKey(pivotWb(handle), sheet, pivotIndex);
   const previous = owned.get(key);
-  const within =
-    previous !== undefined &&
-    needed.r0 >= previous.r0 &&
-    needed.r1 <= previous.r1 &&
-    needed.c0 >= previous.c0 &&
-    needed.c1 <= previous.c1;
   if (!previous) {
     owned.set(key, needed);
     return [];
   }
-  if (within) return [];
-  // A sheet cell holding the very value the report shows there is a copy the
-  // report cached, wherever a row or column edit has since moved it.
-  const shown = new Map(projected.map((c) => [`${c.row}:${c.col}`, c.value] as const));
+  if (sameArea(previous, needed)) return [];
   const blockers: Addr[] = [];
   for (const cell of handle.physicalCells(sheet)) {
     const { row, col } = cell.addr;
     if (!inside(needed, row, col) || inside(previous, row, col)) continue;
     if (cell.formula === null && cell.value.kind === 'blank') continue;
-    const own = shown.get(`${row}:${col}`);
-    if (cell.formula === null && own && sameCellValue(fromEngineValue(own), cell.value)) continue;
     blockers.push({ sheet, row, col });
   }
-  // A report that shrank still owns the cells it cached there until they are
-  // cleared (`releasePivotCachedArea`), so growing back is never blocked by them.
-  if (blockers.length === 0) {
-    owned.set(key, {
-      sheet,
-      r0: Math.min(previous.r0, needed.r0),
-      c0: Math.min(previous.c0, needed.c0),
-      r1: Math.max(previous.r1, needed.r1),
-      c1: Math.max(previous.c1, needed.c1),
-    });
+  if (blockers.length > 0) return blockers;
+  clearGivenUp(handle, sheet, previous, needed);
+  owned.set(key, needed);
+  return [];
+}
+
+/** Move the areas reports own on `sheet` with a row or column insert or
+ *  delete, the shift the reports themselves go through. */
+export function shiftPivotOwnedAreas(
+  handle: object,
+  sheet: number,
+  axis: 'row' | 'col',
+  kind: 'insert' | 'delete',
+  at: number,
+  count: number,
+): void {
+  const owned = ownedExtents.get(handle);
+  if (!owned || count <= 0) return;
+  const end = at + count - 1;
+  // Where a line lands after the edit; null when it was deleted.
+  const map = (i: number): number | null =>
+    kind === 'insert' ? (i >= at ? i + count : i) : i < at ? i : i > end ? i - count : null;
+  for (const [key, area] of [...owned.entries()]) {
+    if (!key.startsWith(`${sheet}:`)) continue;
+    const lo = axis === 'row' ? area.r0 : area.c0;
+    const hi = axis === 'row' ? area.r1 : area.c1;
+    let first: number | null = null;
+    let last: number | null = null;
+    for (let i = lo; i <= hi && first === null; i += 1) first = map(i);
+    for (let i = hi; i >= lo && last === null; i -= 1) last = map(i);
+    if (first === null || last === null) {
+      owned.delete(key);
+      continue;
+    }
+    owned.set(
+      key,
+      axis === 'row' ? { ...area, r0: first, r1: last } : { ...area, c0: first, c1: last },
+    );
   }
-  return blockers;
 }
 
 /** The engine's layout of a report, collapsed to a #SPILL! anchor while
@@ -273,7 +306,7 @@ function effectiveLayout(
     r1: layout.top + layout.rows - 1,
     c1: layout.left + layout.cols - 1,
   };
-  if (pivotBlockers(handle, sheet, pivotIndex, needed, layout.cells).length === 0) return layout;
+  if (pivotBlockers(handle, sheet, pivotIndex, needed).length === 0) return layout;
   return {
     ...layout,
     rows: 1,
@@ -317,7 +350,7 @@ export abstract class WorkbookHandlePivotMethods {
         r1: layout.top + layout.rows - 1,
         c1: layout.left + layout.cols - 1,
       };
-      const blockers = pivotBlockers(this, sheet, pivotIndex, needed, layout.cells);
+      const blockers = pivotBlockers(this, sheet, pivotIndex, needed);
       if (blockers.length > 0) {
         out.push({
           pivotIndex,
