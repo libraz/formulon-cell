@@ -102,6 +102,34 @@ describe('attachStatusBar', () => {
     document.body.innerHTML = '';
   });
 
+  it('shows the accessibility status next to Ready and opens the checker from it', () => {
+    let issues = false;
+    const open = vi.fn();
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: ja,
+      getEngineLabel: () => 'stub',
+      accessibility: { hasIssues: () => issues, open },
+    });
+    const button = statusbar.querySelector<HTMLButtonElement>(
+      '.fc-host__statusbar-left .fc-host__statusbar-a11y',
+    );
+    expect(button?.textContent).toBe('アクセシビリティ: 問題ありません');
+    issues = true;
+    handle.refresh();
+    expect(button?.textContent).toBe('アクセシビリティ: 検討が必要です');
+    button?.click();
+    expect(open).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
+  it('leaves the accessibility status out without a checker', () => {
+    const handle = attachStatusBar({ statusbar, store, getEngineLabel: () => 'stub' });
+    expect(statusbar.querySelector('.fc-host__statusbar-a11y')).toBeNull();
+    handle.detach();
+  });
+
   it('renders left/center/right segments without leaking the engine label by default', () => {
     const handle = attachStatusBar({
       statusbar,

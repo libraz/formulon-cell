@@ -461,6 +461,7 @@ export function createDefaultRibbonHooks(
         );
       },
       accessibility: () => {
+        if (instance.openAccessibilityChecker()) return;
         showReviewReport(instance.i18n.strings.ribbon.accessibility, (cells) =>
           analyzeAccessibilityCells(cells, reportLang),
         );

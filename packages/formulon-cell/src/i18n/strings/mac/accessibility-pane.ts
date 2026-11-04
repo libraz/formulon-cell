@@ -40,6 +40,9 @@ export interface MacAccessibilityPaneStrings {
   tableHeaderTitle: string;
   tableHeaderText: string;
   insertHeaderRow: string;
+  /** The status-bar button beside Ready. */
+  statusClean: string;
+  statusIssues: string;
 }
 
 /** Mac wording for this locale; not measured. */
@@ -83,6 +86,8 @@ export const macAccessibilityPaneEn: MacAccessibilityPaneStrings = {
   tableHeaderText:
     'Table headers are essential to make the data in a table clear and easy to navigate and understand.',
   insertHeaderRow: 'Insert Header Row',
+  statusClean: 'Accessibility: Good to go',
+  statusIssues: 'Accessibility: Investigate',
 };
 
 /** Japanese Mac app wording, measured from Excel for Mac. */
@@ -126,6 +131,8 @@ export const macAccessibilityPaneJa: MacAccessibilityPaneStrings = {
   tableHeaderText:
     'テーブル ヘッダーは、テーブル内のデータをわかりやすくし、簡単に移動して理解を容易にするために不可欠です。',
   insertHeaderRow: 'ヘッダー行の挿入',
+  statusClean: 'アクセシビリティ: 問題ありません',
+  statusIssues: 'アクセシビリティ: 検討が必要です',
 };
 
 /** Mac wording for this locale; not measured. */
@@ -170,6 +177,8 @@ export const macAccessibilityPaneDe: MacAccessibilityPaneStrings = {
   tableHeaderText:
     'Tabellenüberschriften machen die Daten einer Tabelle verständlich und leicht navigierbar.',
   insertHeaderRow: 'Kopfzeile einfügen',
+  statusClean: 'Barrierefreiheit: Alles in Ordnung',
+  statusIssues: 'Barrierefreiheit: Untersuchen',
 };
 
 /** Mac wording for this locale; not measured. */
@@ -214,6 +223,8 @@ export const macAccessibilityPaneFr: MacAccessibilityPaneStrings = {
   tableHeaderText:
     'Les en-têtes de tableau rendent les données claires, faciles à parcourir et à comprendre.',
   insertHeaderRow: 'Insérer une ligne d’en-tête',
+  statusClean: 'Accessibilité : vous pouvez continuer',
+  statusIssues: 'Accessibilité : examen requis',
 };
 
 /** Mac wording for this locale; not measured. */
@@ -255,6 +266,8 @@ export const macAccessibilityPaneZh: MacAccessibilityPaneStrings = {
   tableHeaderTitle: '缺少表格标题',
   tableHeaderText: '表格标题对于使表格中的数据清晰、易于浏览和理解至关重要。',
   insertHeaderRow: '插入标题行',
+  statusClean: '辅助功能: 一切就绪',
+  statusIssues: '辅助功能: 需要调查',
 };
 
 /** Mac wording for this locale; not measured. */
@@ -296,6 +309,8 @@ export const macAccessibilityPaneKo: MacAccessibilityPaneStrings = {
   tableHeaderTitle: '표 머리글 없음',
   tableHeaderText: '표 머리글은 표의 데이터를 명확하고 쉽게 탐색하고 이해하는 데 필수적입니다.',
   insertHeaderRow: '머리글 행 삽입',
+  statusClean: '접근성: 문제 없음',
+  statusIssues: '접근성: 조사 필요',
 };
 
 /** Mac wording for this locale; not measured. */
@@ -337,4 +352,6 @@ export const macAccessibilityPaneTh: MacAccessibilityPaneStrings = {
   tableHeaderTitle: 'ไม่มีส่วนหัวของตาราง',
   tableHeaderText: 'ส่วนหัวของตารางจำเป็นต่อการทำให้ข้อมูลในตารางชัดเจน นำทางและเข้าใจได้ง่าย',
   insertHeaderRow: 'แทรกแถวส่วนหัว',
+  statusClean: 'การช่วยสำหรับการเข้าถึง: พร้อมใช้งาน',
+  statusIssues: 'การช่วยสำหรับการเข้าถึง: ตรวจสอบ',
 };

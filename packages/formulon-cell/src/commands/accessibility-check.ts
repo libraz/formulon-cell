@@ -158,6 +158,35 @@ export function checkAccessibility(state: State, wb: WorkbookHandle): Accessibil
   };
 }
 
+/**
+ * A memoised "does the workbook have accessibility issues" check for the
+ * status bar: the rules rerun only when the cells, formats, tables or active
+ * sheet behind them changed.
+ */
+export function createAccessibilityStatus(
+  getState: () => State,
+  getWb: () => WorkbookHandle,
+): () => boolean {
+  let key: readonly unknown[] = [];
+  let issues = false;
+  return () => {
+    const state = getState();
+    const wb = getWb();
+    const next = [
+      wb,
+      state.data.cells,
+      state.data.sheetIndex,
+      state.format.formats,
+      state.tables.tables,
+    ];
+    if (next.some((part, i) => part !== key[i])) {
+      key = next;
+      issues = hasAccessibilityIssues(checkAccessibility(state, wb));
+    }
+    return issues;
+  };
+}
+
 /** Whether any rule has a finding. */
 export const hasAccessibilityIssues = (findings: AccessibilityFindings): boolean =>
   Object.values(findings).some((list) => list.length > 0);

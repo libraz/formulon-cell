@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ACCESSIBILITY_SECTIONS,
   checkAccessibility,
   contrastRatio,
+  createAccessibilityStatus,
   suggestedTextColors,
 } from '../../../src/commands/accessibility-check.js';
 import { formatAsTable } from '../../../src/commands/format-as-table.js';
@@ -68,6 +69,23 @@ describe('checkAccessibility', () => {
     expect(found.redFormat).toEqual([]);
     expect(found.altText).toEqual([]);
     expect(found.restrictedAccess).toEqual([]);
+    wb.dispose();
+  });
+
+  it('reruns the status check only when the cells, formats or tables change', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const store = createSpreadsheetStore();
+    const cells = vi.spyOn(wb, 'cells');
+    const hasIssues = createAccessibilityStatus(
+      () => store.getState(),
+      () => wb,
+    );
+    expect(hasIssues()).toBe(false);
+    const runs = cells.mock.calls.length;
+    expect(hasIssues()).toBe(false);
+    expect(cells.mock.calls.length).toBe(runs);
+    formatAsTable(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, { showHeader: false });
+    expect(hasIssues()).toBe(true);
     wb.dispose();
   });
 });

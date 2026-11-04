@@ -21,6 +21,25 @@
     flex: 0 0 auto;
   }
 
+  /* The accessibility status beside Ready: a borderless text button that
+     opens the checker. */
+  .fc-host__statusbar-a11y {
+    appearance: none;
+    margin-left: 16px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .fc-host__statusbar-a11y:hover {
+    background: color-mix(in srgb, var(--fc-statusbar-fg-strong, CanvasText) 8%, transparent);
+  }
+
   .fc-host__statusbar-aggs {
     flex: 1 1 auto;
     text-align: center;

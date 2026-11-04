@@ -104,10 +104,23 @@
     font-weight: 600;
   }
   .fc-a11ypane__rule-pass {
+    position: relative;
     width: 16px;
     height: 16px;
     border-radius: 50%;
     background: var(--fc-accent);
+  }
+  /* The pass mark: a white tick inside the green dot. */
+  .fc-a11ypane__rule-pass::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 5.5px;
+    width: 3.5px;
+    height: 7px;
+    border-right: 1.5px solid var(--fc-accent-fg, #fff);
+    border-bottom: 1.5px solid var(--fc-accent-fg, #fff);
+    transform: rotate(45deg);
   }
   .fc-a11ypane__chevron,
   .fc-a11ypane__back::before {

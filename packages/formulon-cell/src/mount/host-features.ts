@@ -1,3 +1,4 @@
+import { createAccessibilityStatus } from '../commands/accessibility-check.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { autofitPivotTableColumns, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
@@ -18,6 +19,10 @@ import type { SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
 import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
+import {
+  type AccessibilityPaneHandle,
+  attachAccessibilityPane,
+} from '../interact/accessibility-pane.js';
 import { attachArgHelper } from '../interact/arg-helper.js';
 import {
   type AutocompleteInsertOutcome,
@@ -193,6 +198,8 @@ export interface HostFeatureState {
   hyperlinkDialog: ReturnType<typeof attachHyperlinkDialog> | null;
   commentDialog: ReturnType<typeof attachCommentDialog> | null;
   statusBar: ReturnType<typeof attachStatusBar> | null;
+  /** The Mac accessibility checker pane, attached with the status bar it reports to. */
+  accessibilityPane: AccessibilityPaneHandle | null;
   watchPanel: ReturnType<typeof attachWatchPanel> | null;
   unsubWatchRecalc: () => void;
   unsubWatchWb: () => void;
@@ -297,6 +304,7 @@ export function createHostFeatureState(autocompleteStub: AutocompleteHandle): Ho
     hyperlinkDialog: null,
     commentDialog: null,
     statusBar: null,
+    accessibilityPane: null,
     watchPanel: null,
     unsubWatchRecalc: (): void => {},
     unsubWatchWb: (): void => {},
@@ -592,9 +600,22 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           input.wrapHandle(s.commentDialog, () => s.commentDialog?.detach()),
         );
         break;
-      case 'statusBar':
+      case 'statusBar': {
         if (s.statusBar) return;
         input.setChromeAttached('statusbar', true);
+        // The Mac desktop reports accessibility beside Ready and opens its
+        // checker pane from there and from the Review tab.
+        if (input.isMacPlatform()) {
+          s.accessibilityPane = attachAccessibilityPane({
+            host: input.host,
+            store: input.store,
+            getWb: input.wb,
+            getStrings: input.strings,
+            history: input.history,
+            openFormatDialog: (tab) => s.formatDialog?.open(tab),
+          });
+        }
+        const accessibilityPane = s.accessibilityPane;
         s.statusBar = attachStatusBar({
           statusbar: input.statusbar,
           getLocale: input.i18nLocale,
@@ -628,12 +649,21 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             setWorkbookView(input.store, mode, input.wb());
             input.renderer.invalidate();
           },
+          ...(accessibilityPane
+            ? {
+                accessibility: {
+                  hasIssues: createAccessibilityStatus(() => input.store.getState(), input.wb),
+                  open: () => accessibilityPane.open(),
+                },
+              }
+            : {}),
         });
         input.featureRegistry.set(
           'statusBar',
           input.wrapHandle(s.statusBar, () => s.statusBar?.detach()),
         );
         break;
+      }
       case 'workbookObjects':
         if (s.workbookObjects) return;
         s.workbookObjects = attachWorkbookObjectsPanel({
@@ -816,6 +846,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         });
         if (!s.canvasErrorClickAttached) {
           const handler = input.getOnCanvasClick();
+          input.host.addEventListener('pointerdown', handler.onPointerDownCapture, true);
           input.host.addEventListener('pointerdown', handler.onPointerDown);
           input.host.addEventListener('pointermove', handler.onPointerMove);
           input.host.addEventListener('pointercancel', handler.onPointerCancel);
@@ -963,6 +994,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
       case 'statusBar':
         s.statusBar?.detach();
         s.statusBar = null;
+        s.accessibilityPane?.detach();
+        s.accessibilityPane = null;
         input.featureRegistry.delete('statusBar');
         input.setChromeAttached('statusbar', false);
         break;
@@ -1016,6 +1049,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.canvasErrorClickAttached) {
           const handler = s.errorIndicatorClickHandler;
           if (handler) {
+            input.host.removeEventListener('pointerdown', handler.onPointerDownCapture, true);
             input.host.removeEventListener('pointerdown', handler.onPointerDown);
             input.host.removeEventListener('pointermove', handler.onPointerMove);
             input.host.removeEventListener('pointercancel', handler.onPointerCancel);

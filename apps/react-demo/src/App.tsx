@@ -184,6 +184,8 @@ export const App = (): ReactElement => {
 
   const onAccessibilityCheck = useCallback(() => {
     if (!instance) return;
+    // The Mac host docks its own checker; other platforms keep the review list.
+    if (instance.openAccessibilityChecker()) return;
     setReviewDialog(buildDemoReviewFindings('accessibility', instance, locale, commandText));
   }, [commandText, instance, locale]);
 

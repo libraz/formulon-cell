@@ -40,6 +40,7 @@ export type InstanceDialogApi = Pick<
   | 'openQuickAnalysis'
   | 'openWorkbookObjects'
   | 'closeWorkbookObjects'
+  | 'openAccessibilityChecker'
   | 'openChartSettings'
   | 'openPivotFieldList'
   | 'openActivePivotFieldList'
@@ -179,6 +180,11 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
         return;
       }
       featureState.workbookObjects?.open();
+    },
+    openAccessibilityChecker() {
+      if (!featureState.accessibilityPane) return false;
+      featureState.accessibilityPane.open();
+      return true;
     },
     closeWorkbookObjects() {
       const userObjects = getUserHandle('workbookObjects') as

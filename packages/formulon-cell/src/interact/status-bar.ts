@@ -69,6 +69,12 @@ export interface StatusBarDeps {
   /** Applies a status-bar view-mode click. Defaults to a store-only switch;
    *  hosts with an engine pass one that also saves the mode on the sheet. */
   onViewModeChange?: (mode: WorkbookViewMode) => void;
+  /** The accessibility checker the status bar reports on and opens. The
+   *  Mac host passes one; the status is left out without it. */
+  accessibility?: {
+    hasIssues: () => boolean;
+    open: () => void;
+  };
 }
 
 export type StatusBarUploadStatus = 'saved' | 'saving' | 'error' | null;
@@ -233,6 +239,13 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   left.appendChild(dot);
   const readyText = document.createTextNode('');
   left.appendChild(readyText);
+  const accessibilityStatus = deps.accessibility
+    ? createStatusBarButton('fc-host__statusbar-a11y')
+    : null;
+  if (accessibilityStatus) {
+    accessibilityStatus.addEventListener('click', () => deps.accessibility?.open());
+    left.appendChild(accessibilityStatus);
+  }
 
   const center = document.createElement('span');
   center.className = 'fc-host__statusbar-aggs';
@@ -514,8 +527,17 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     return aggregateSelectionFromEntries(s, candidates ?? []);
   };
 
+  const refreshAccessibility = (): void => {
+    if (!accessibilityStatus || !deps.accessibility) return;
+    const t = strings.macAccessibilityPane;
+    accessibilityStatus.textContent = deps.accessibility.hasIssues()
+      ? t.statusIssues
+      : t.statusClean;
+  };
+
   const refresh = (): void => {
     const s = store.getState();
+    refreshAccessibility();
     if (
       aggregateIndex &&
       (aggregateIndex.cells !== s.data.cells || aggregateIndex.sheetIndex !== s.data.sheetIndex)

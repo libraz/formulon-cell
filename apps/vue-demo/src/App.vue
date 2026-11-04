@@ -178,6 +178,8 @@ const onSpellingReview = (): void => {
 const onAccessibilityCheck = (): void => {
   const inst = instance.value;
   if (!inst) return;
+  // The Mac host docks its own checker; other platforms keep the review list.
+  if (inst.openAccessibilityChecker()) return;
   reviewDialog.value = buildDemoReviewFindings(
     'accessibility',
     inst,
