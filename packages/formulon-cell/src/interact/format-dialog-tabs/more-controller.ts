@@ -429,6 +429,36 @@ export function attachMoreTab(ctx: FormatTabContext, refs: MoreTabRefs): FormatT
     syncControls();
   };
 
+  const onValidationClearAll = (): void => {
+    touch('validation');
+    draft.validationKind = 'none';
+    draft.validationList = '';
+    draft.validationListRange = '';
+    draft.validationListSourceKind = 'literal';
+    draft.validationFormula = '';
+    draft.validationOp = 'between';
+    draft.validationA = 0;
+    draft.validationB = 0;
+    draft.validationAFormula = undefined;
+    draft.validationBFormula = undefined;
+    draft.validationAllowBlank = true;
+    draft.validationErrorStyle = 'stop';
+    draft.validationShowInputMessage = true;
+    draft.validationPromptTitle = '';
+    draft.validationPromptMessage = '';
+    draft.validationShowErrorMessage = true;
+    draft.validationErrorTitle = '';
+    draft.validationErrorMessage = '';
+    draft.validationShowDropdown = true;
+    setBoundInputValidity(validationAInput, true);
+    setBoundInputValidity(validationBInput, true);
+    sync();
+  };
+  const clearAllButton = validationSection.querySelector<HTMLButtonElement>(
+    '[data-fc-validation-clear-all]',
+  );
+  if (clearAllButton) on(clearAllButton, 'click', onValidationClearAll);
+
   on(hlInput, 'input', onHlInput);
   on(hlClear, 'click', onHlClear);
   on(commentArea, 'input', onCommentInput);

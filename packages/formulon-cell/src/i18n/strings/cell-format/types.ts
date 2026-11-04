@@ -271,6 +271,13 @@ export interface CellFormatStrings {
     validationShowErrorMessage: string;
     validationErrorTitle: string;
     validationErrorMessage: string;
+    validationTabSettings: string;
+    validationTabInputMessage: string;
+    validationTabErrorAlert: string;
+    validationTabIme: string;
+    validationClearAll: string;
+    validationImeLabel: string;
+    validationImeNoControl: string;
     clearField: string;
     /** Heading of the number and fill tabs' value sample. */
     sample: string;

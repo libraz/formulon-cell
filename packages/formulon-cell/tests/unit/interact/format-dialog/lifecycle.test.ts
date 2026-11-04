@@ -73,7 +73,7 @@ describe('attachFormatDialog', () => {
       ),
     );
     const validationKind = document.querySelector<HTMLSelectElement>(
-      '.fc-fmtdlg__panel-tab[data-fc-tab="more"] select[aria-label="種類"]',
+      '.fc-fmtdlg__panel-tab[data-fc-tab="more"] select[aria-label="許可:"]',
     );
 
     expect(overlay?.classList.contains('fc-fmtdlg--data-validation')).toBe(true);

@@ -32,7 +32,9 @@ describe('attachFormatDialog', () => {
     try {
       handle.open('more');
 
-      const validationKind = document.querySelector<HTMLSelectElement>('select[aria-label="種類"]');
+      const validationKind = document.querySelector<HTMLSelectElement>(
+        'select[aria-label="許可:"]',
+      );
       const rangeRadio = document.querySelector<HTMLInputElement>(
         'input[name="fc-validation-list-source"][value="range"]',
       );
@@ -77,11 +79,11 @@ describe('attachFormatDialog', () => {
     return coerced.value;
   };
 
-  // The Number tab also carries a `種類` select, so pick the validation-kind
+  // The Number tab also carries a select of its own, so pick the validation-kind
   // select by an option only it owns.
   const findValidationKindSelect = (): HTMLSelectElement => {
     const select = Array.from(
-      document.querySelectorAll<HTMLSelectElement>('select[aria-label="種類"]'),
+      document.querySelectorAll<HTMLSelectElement>('select[aria-label="許可:"]'),
     ).find((s) => Array.from(s.options).some((o) => o.value === 'textLength'));
     if (!select) throw new Error('validation kind select missing');
     return select;
@@ -195,7 +197,7 @@ describe('attachFormatDialog', () => {
       handle.open('more', { mode: 'dataValidation', focus: 'validation' });
 
       const kind = findValidationKindSelect();
-      const op = document.querySelector<HTMLSelectElement>('select[aria-label="条件"]');
+      const op = document.querySelector<HTMLSelectElement>('select[aria-label="データ:"]');
       if (!op) throw new Error('validation op select missing');
       kind.value = 'time';
       kind.dispatchEvent(new Event('change', { bubbles: true }));

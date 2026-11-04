@@ -87,6 +87,51 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   const commentClear = makeButton(t.clearField);
   commentRow.append(commentArea, commentClear);
 
+  // The editor is split into the four tabs of the desktop dialog.
+  const paneDefs = [
+    { id: 'settings', label: t.validationTabSettings },
+    { id: 'input', label: t.validationTabInputMessage },
+    { id: 'error', label: t.validationTabErrorAlert },
+    { id: 'ime', label: t.validationTabIme },
+  ] as const;
+  const vtabs = document.createElement('div');
+  vtabs.className = 'fc-fmtdlg__vtabs';
+  vtabs.setAttribute('role', 'tablist');
+  vtabs.setAttribute('aria-label', t.validationLegend);
+  validationSection.appendChild(vtabs);
+  const paneEls = paneDefs.map((def) => {
+    const pane = document.createElement('div');
+    pane.className = 'fc-fmtdlg__vpane';
+    pane.dataset.fcPane = def.id;
+    pane.setAttribute('role', 'tabpanel');
+    validationSection.appendChild(pane);
+    return pane;
+  });
+  const [settingsPane, inputPane, errorPane, imePane] = paneEls as [
+    HTMLDivElement,
+    HTMLDivElement,
+    HTMLDivElement,
+    HTMLDivElement,
+  ];
+  const tabEls = paneDefs.map((def) => {
+    const tab = makeButton(def.label);
+    tab.setAttribute('role', 'tab');
+    tab.dataset.fcPane = def.id;
+    vtabs.appendChild(tab);
+    return tab;
+  });
+  const showPane = (index: number): void => {
+    tabEls.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', i === index ? 'true' : 'false');
+      tab.tabIndex = i === index ? 0 : -1;
+    });
+    paneEls.forEach((pane, i) => {
+      pane.hidden = i !== index;
+    });
+  };
+  for (const [i, tab] of tabEls.entries()) tab.addEventListener('click', () => showPane(i));
+  showPane(0);
+
   // Kind selector — drives the visibility of the bound/formula/list rows.
   const validationKindRow = document.createElement('label');
   validationKindRow.className = 'fc-fmtdlg__row';
@@ -108,7 +153,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     { className: '', ariaLabel: t.validationKind },
   );
   validationKindRow.append(validationKindLabel, validationKindSelect);
-  validationSection.appendChild(validationKindRow);
+  settingsPane.appendChild(validationKindRow);
 
   // Op selector — visible for whole/decimal/date/time/textLength.
   const validationOpRow = document.createElement('label');
@@ -131,7 +176,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     { className: '', ariaLabel: t.validationOp },
   );
   validationOpRow.append(validationOpLabel, validationOpSelect);
-  validationSection.appendChild(validationOpRow);
+  settingsPane.appendChild(validationOpRow);
 
   const validationARow = document.createElement('label');
   validationARow.className = 'fc-fmtdlg__row';
@@ -145,7 +190,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationAInput.setAttribute('aria-label', t.validationValueA);
   validationAInput.step = 'any';
   validationARow.append(validationALabel, validationAInput);
-  validationSection.appendChild(validationARow);
+  settingsPane.appendChild(validationARow);
 
   const validationBRow = document.createElement('label');
   validationBRow.className = 'fc-fmtdlg__row';
@@ -157,7 +202,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationBInput.setAttribute('aria-label', t.validationValueB);
   validationBInput.step = 'any';
   validationBRow.append(validationBLabel, validationBInput);
-  validationSection.appendChild(validationBRow);
+  settingsPane.appendChild(validationBRow);
 
   // Custom-kind formula.
   const validationFormulaRow = document.createElement('label');
@@ -171,7 +216,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationFormulaInput.autocomplete = 'off';
   validationFormulaInput.placeholder = t.validationFormulaPlaceholder;
   validationFormulaRow.append(validationFormulaLabel, validationFormulaInput);
-  validationSection.appendChild(validationFormulaRow);
+  settingsPane.appendChild(validationFormulaRow);
 
   // List source — visible only when kind === 'list'. The radio toggles between
   // an inline value list (textarea) and a range reference (single-line input).
@@ -186,7 +231,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     validationListLiteralRadio.wrap,
     validationListRangeRadio.wrap,
   );
-  validationSection.appendChild(validationListSourceKindRow);
+  settingsPane.appendChild(validationListSourceKindRow);
 
   const validationRow = document.createElement('div');
   validationRow.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
@@ -197,7 +242,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationArea.placeholder = t.validationListPlaceholder;
   const validationClear = makeButton(t.clearField);
   validationRow.append(validationArea, validationClear);
-  validationSection.appendChild(validationRow);
+  settingsPane.appendChild(validationRow);
 
   // Range-ref input. Hidden unless source kind === 'range'.
   const validationListRangeRow = document.createElement('label');
@@ -211,7 +256,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationListRangeInput.autocomplete = 'off';
   validationListRangeInput.placeholder = t.validationListRangePlaceholder;
   validationListRangeRow.append(validationListRangeLabel, validationListRangeInput);
-  validationSection.appendChild(validationListRangeRow);
+  settingsPane.appendChild(validationListRangeRow);
 
   const validationShowDropdownRow = document.createElement('label');
   validationShowDropdownRow.className = 'fc-fmtdlg__check';
@@ -220,7 +265,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   const validationShowDropdownSpan = document.createElement('span');
   validationShowDropdownSpan.textContent = t.validationShowDropdown;
   validationShowDropdownRow.append(validationShowDropdownInput, validationShowDropdownSpan);
-  validationSection.appendChild(validationShowDropdownRow);
+  settingsPane.appendChild(validationShowDropdownRow);
 
   // Allow-blank checkbox + error-style selector.
   const validationAllowBlankRow = document.createElement('label');
@@ -230,7 +275,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   const validationAllowBlankSpan = document.createElement('span');
   validationAllowBlankSpan.textContent = t.validationAllowBlank;
   validationAllowBlankRow.append(validationAllowBlankInput, validationAllowBlankSpan);
-  validationSection.appendChild(validationAllowBlankRow);
+  settingsPane.appendChild(validationAllowBlankRow);
 
   const validationErrorStyleRow = document.createElement('label');
   validationErrorStyleRow.className = 'fc-fmtdlg__row';
@@ -246,7 +291,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     { className: '', ariaLabel: t.validationErrorStyle },
   );
   validationErrorStyleRow.append(validationErrorStyleLabel, validationErrorStyleSelect);
-  validationSection.appendChild(validationErrorStyleRow);
+  errorPane.appendChild(validationErrorStyleRow);
 
   const validationShowInputMessageRow = document.createElement('label');
   validationShowInputMessageRow.className = 'fc-fmtdlg__check';
@@ -258,7 +303,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     validationShowInputMessageInput,
     validationShowInputMessageSpan,
   );
-  validationSection.appendChild(validationShowInputMessageRow);
+  inputPane.appendChild(validationShowInputMessageRow);
 
   const validationPromptTitleRow = document.createElement('label');
   validationPromptTitleRow.className = 'fc-fmtdlg__row';
@@ -268,7 +313,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationPromptTitleInput.type = 'text';
   validationPromptTitleInput.setAttribute('aria-label', t.validationPromptTitle);
   validationPromptTitleRow.append(validationPromptTitleLabel, validationPromptTitleInput);
-  validationSection.appendChild(validationPromptTitleRow);
+  inputPane.appendChild(validationPromptTitleRow);
 
   const validationPromptMessageRow = document.createElement('div');
   validationPromptMessageRow.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
@@ -276,8 +321,10 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationPromptMessageArea.className = 'fc-fmtdlg__textarea';
   validationPromptMessageArea.rows = 3;
   validationPromptMessageArea.setAttribute('aria-label', t.validationPromptMessage);
-  validationPromptMessageRow.appendChild(validationPromptMessageArea);
-  validationSection.appendChild(validationPromptMessageRow);
+  const validationPromptMessageLabel = document.createElement('span');
+  validationPromptMessageLabel.textContent = t.validationPromptMessage;
+  validationPromptMessageRow.append(validationPromptMessageLabel, validationPromptMessageArea);
+  inputPane.appendChild(validationPromptMessageRow);
 
   const validationShowErrorMessageRow = document.createElement('label');
   validationShowErrorMessageRow.className = 'fc-fmtdlg__check';
@@ -289,7 +336,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     validationShowErrorMessageInput,
     validationShowErrorMessageSpan,
   );
-  validationSection.appendChild(validationShowErrorMessageRow);
+  errorPane.appendChild(validationShowErrorMessageRow);
 
   const validationErrorTitleRow = document.createElement('label');
   validationErrorTitleRow.className = 'fc-fmtdlg__row';
@@ -299,7 +346,7 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationErrorTitleInput.type = 'text';
   validationErrorTitleInput.setAttribute('aria-label', t.validationErrorTitle);
   validationErrorTitleRow.append(validationErrorTitleLabel, validationErrorTitleInput);
-  validationSection.appendChild(validationErrorTitleRow);
+  errorPane.appendChild(validationErrorTitleRow);
 
   const validationErrorMessageRow = document.createElement('div');
   validationErrorMessageRow.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
@@ -307,8 +354,28 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationErrorMessageArea.className = 'fc-fmtdlg__textarea';
   validationErrorMessageArea.rows = 3;
   validationErrorMessageArea.setAttribute('aria-label', t.validationErrorMessage);
-  validationErrorMessageRow.appendChild(validationErrorMessageArea);
-  validationSection.appendChild(validationErrorMessageRow);
+  const validationErrorMessageLabel = document.createElement('span');
+  validationErrorMessageLabel.textContent = t.validationErrorMessage;
+  validationErrorMessageRow.append(validationErrorMessageLabel, validationErrorMessageArea);
+  errorPane.appendChild(validationErrorMessageRow);
+
+  // Japanese input tab: the host has no input-mode control, so only the
+  // default mode is offered.
+  const imeRow = document.createElement('label');
+  imeRow.className = 'fc-fmtdlg__row';
+  const imeLabel = document.createElement('span');
+  imeLabel.textContent = t.validationImeLabel;
+  const imeSelect = createDialogSelect(
+    [{ value: 'noControl', label: t.validationImeNoControl }],
+    'noControl',
+    { className: '', ariaLabel: t.validationImeLabel },
+  );
+  imeRow.append(imeLabel, imeSelect);
+  imePane.appendChild(imeRow);
+
+  const validationClearAll = makeButton(t.validationClearAll);
+  validationClearAll.dataset.fcValidationClearAll = '';
+  validationSection.appendChild(validationClearAll);
 
   return {
     hyperlinkSection,
