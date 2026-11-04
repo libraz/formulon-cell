@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   autofitPivotTableColumns,
   createPivotTableFromRange,
+  refreshPivotReportsAfterEdit,
   settlePivotAnchor,
 } from '../../../src/commands/pivot-table.js';
 import { buildPivotStyleLayer, pivotStyleLayer } from '../../../src/engine/pivot-style.js';
@@ -101,6 +102,49 @@ describe('report filter area', () => {
     const fitted = store.getState().layout.colWidths.get(1) ?? 0;
     expect(fitted).toBeGreaterThan(20);
     expect(pivotStyleLayer(wb, store.getState()).buttons.has('0:0:1')).toBe(true);
+    wb.dispose();
+  });
+});
+
+describe('cells a report leaves behind', () => {
+  /** A report whose old layout is also in the sheet's own cells, as in a saved file. */
+  const withCachedCells = async (at: { row: number; col: number }) => {
+    const wb = await setup(at);
+    for (const c of [...wb.pivotCells(0)]) {
+      if (c.value.kind === 'text') wb.setText(c.addr, c.value.value);
+      else if (c.value.kind === 'number') wb.setNumber(c.addr, c.value.value);
+    }
+    const store = createSpreadsheetStore();
+    mutators.replaceCells(store, wb.cells(0));
+    pivotStyleLayer(wb, store.getState());
+    return { wb, store };
+  };
+  const shown = (store: ReturnType<typeof createSpreadsheetStore>, row: number, col: number) =>
+    store.getState().data.cells.get(`0:${row}:${col}`)?.value;
+
+  it('clears the old extent when a column field widens the report', async () => {
+    const { wb, store } = await withCachedCells({ row: 2, col: 0 });
+    expect(shown(store, 3, 0)).toEqual({ kind: 'text', value: 'East' });
+    wb.setPivotFieldAxis(0, 0, PRODUCT, PivotAxis.Col);
+    wb.setPivotColFieldOrder(0, 0, [PRODUCT]);
+    refreshPivotReportsAfterEdit(store, wb);
+    const projected = new Set([...wb.pivotCells(0)].map((c) => `${c.addr.row}:${c.addr.col}`));
+    for (const [key, cell] of store.getState().data.cells) {
+      const [, row, col] = key.split(':').map(Number);
+      if ((col ?? 0) >= 10 || cell.value.kind === 'blank') continue;
+      expect(projected.has(`${row}:${col}`), `${key} ${JSON.stringify(cell.value)}`).toBe(true);
+    }
+    wb.dispose();
+  });
+
+  it('clears the rows a filter push-down vacates', async () => {
+    const { wb, store } = await withCachedCells({ row: 0, col: 0 });
+    wb.setPivotFieldAxis(0, 0, PRODUCT, PivotAxis.Page);
+    refreshPivotReportsAfterEdit(store, wb);
+    // Row 2 (index 1) is the blank separator now; the old East row is gone.
+    expect(shown(store, 1, 0)?.kind ?? 'blank').toBe('blank');
+    expect(shown(store, 1, 1)?.kind ?? 'blank').toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
     wb.dispose();
   });
 });

@@ -236,6 +236,15 @@ export abstract class WorkbookHandlePivotMethods {
     return null;
   }
 
+  /** Blank the sheet's own cells at `cells` without journaling them: values a
+   *  report cached in the sheet and has since moved away from. The caller
+   *  recalculates. */
+  clearPivotCachedCells(sheet: number, cells: readonly { row: number; col: number }[]): void {
+    assertAlive(this);
+    const raw = internals(this).wb;
+    for (const { row, col } of cells) raw.setBlank(sheet, row, col);
+  }
+
   /** Iterate over evaluated PivotTable layout cells on a sheet. The engine
    *  returns sparse cells; blanks are skipped so existing empty-grid behavior
    *  remains unchanged. */

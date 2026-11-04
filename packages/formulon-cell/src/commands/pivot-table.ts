@@ -1,6 +1,6 @@
 import { formatA1Range } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
-import { pivotStyleLayer } from '../engine/pivot-style.js';
+import { lastPivotStyleLayer, pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
 import {
@@ -911,6 +911,30 @@ export function settlePivotAnchor(wb: WorkbookHandle, sheet: number, pivotIndex:
   });
 }
 
+/** Blank the sheet's own cells inside the extents reports occupied before an
+ *  edit wherever the reports no longer show a value: a report owns its extent,
+ *  so values cached there from an earlier layout must not show through. */
+function clearVacatedReportCells(
+  wb: WorkbookHandle,
+  sheet: number,
+  extents: readonly Range[],
+): void {
+  if (extents.length === 0) return;
+  const shown = new Set<string>();
+  for (const cell of wb.pivotCells(sheet)) shown.add(`${cell.addr.row}:${cell.addr.col}`);
+  const stale: { row: number; col: number }[] = [];
+  for (const cell of wb.physicalCells(sheet)) {
+    const { row, col } = cell.addr;
+    if (shown.has(`${row}:${col}`)) continue;
+    if (extents.some((e) => row >= e.r0 && row <= e.r1 && col >= e.c0 && col <= e.c1)) {
+      stale.push({ row, col });
+    }
+  }
+  if (stale.length === 0) return;
+  wb.clearPivotCachedCells(sheet, stale);
+  wb.recalc();
+}
+
 /** Bring the active sheet's reports up to date after a report edit, an undo
  *  or a redo: settle their anchors, reload the projected cells, move direct
  *  formats with the items they belong to and refit the report columns. */
@@ -920,7 +944,9 @@ export function refreshPivotReportsAfterEdit(
   opts?: AutofitOptions,
 ): void {
   const sheet = store.getState().data.sheetIndex;
+  const before = lastPivotStyleLayer(wb, sheet);
   for (const { pivotIndex } of wb.pivotBounds(sheet)) settlePivotAnchor(wb, sheet, pivotIndex);
+  clearVacatedReportCells(wb, sheet, before?.reports.map((r) => r.range) ?? []);
   mutators.replaceCells(store, wb.cells(sheet));
   reflowPivotFormats(store, wb);
   autofitPivotTableColumns(store, wb, opts);
