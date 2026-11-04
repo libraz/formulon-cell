@@ -408,9 +408,18 @@ export function mountToolbar(
     const inserted =
       next !== NO_CONTEXTUAL_TABS && selectedId !== undefined && freshObjectIds.delete(selectedId);
     if (next === contextualTabs && !inserted) return false;
+    // Mac Excel switches to the table tab as the active cell enters a table.
+    const enteredTable =
+      adopt &&
+      platform === 'mac' &&
+      next.includes('tableDesign') &&
+      !contextualTabs.includes('tableDesign');
     contextualTabs = next;
     const previousTab = activeTab;
-    if (inserted) {
+    if (enteredTable && !inserted) {
+      if (!isContextualTab(activeTab)) contextualReturnTab = activeTab;
+      activeTab = 'tableDesign';
+    } else if (inserted) {
       if (!isContextualTab(activeTab)) contextualReturnTab = activeTab;
       activeTab = next[0] ?? activeTab;
     } else if (isContextualTab(activeTab) && !next.includes(activeTab)) {

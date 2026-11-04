@@ -250,6 +250,29 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('Mac switches to the table tab as the active cell enters a table, and not on the default profile', () => {
+    selectStoreTable(sheet.instance.store); // the table sits on the starting cell, A1:B3
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 8, col: 8 });
+    const mac = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      platform: 'mac',
+    });
+    expect(mac.getActiveTab()).toBe('home');
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 0 });
+    expect(mac.getActiveTab()).toBe('tableDesign');
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 8, col: 8 });
+    expect(mac.getActiveTab()).toBe('home');
+    mac.dispose();
+
+    const other = Spreadsheet.mountToolbar(host, sheet.instance, {
+      helpers: stubHelpers(),
+      platform: 'default',
+    });
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 0 });
+    expect(other.getActiveTab()).toBe('home');
+    other.dispose();
+  });
+
   it('Mac has no display-options button; pressing the active tab collapses the ribbon', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       helpers: stubHelpers(),

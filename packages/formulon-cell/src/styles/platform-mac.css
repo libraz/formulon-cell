@@ -2045,3 +2045,50 @@
     min-height: 24px;
   }
 }
+
+@layer fc.chrome {
+  /* A group folded into one named button opens its commands as a popup. */
+  .fc-tb__ribbon-group-collapse {
+    display: none;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--collapsed
+    > .fc-tb__ribbon-group-collapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 48px;
+    max-width: none;
+    height: 100%;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--collapsed
+    > .fc-tb__ribbon-tools,
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--collapsed
+    > .fc-tb__ribbon-label {
+    display: none;
+  }
+
+  [data-fc-platform="mac"]
+    > .fc-tb__ribbon-shell
+    .fc-tb__ribbon-group--collapsed.fc-tb__ribbon-group--open
+    > .fc-tb__ribbon-tools {
+    position: fixed;
+    z-index: 90;
+    display: flex;
+    padding: 6px;
+    border: 1px solid var(--fc-tb-ribbon-line);
+    border-radius: 4px;
+    background: var(--fc-tb-ribbon-bg, #ffffff);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
+  }
+}

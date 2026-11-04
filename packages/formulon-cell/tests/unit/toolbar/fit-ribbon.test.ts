@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   attachRibbonFit,
   fitRibbonPanel,
+  RIBBON_GROUP_COLLAPSED_CLASS,
   RIBBON_GROUP_CONDENSED_CLASS,
   RIBBON_GROUP_ICON_ONLY_CLASS,
   RIBBON_GROUP_NARROW_CLASS,
@@ -155,5 +156,83 @@ describe('toolbar/ribbon two-line label width', () => {
 
   it('falls back to the single-line width when no narrower width fits', () => {
     expect(twoLineLabelWidth(54, 90, () => 3)).toBe(90);
+  });
+});
+
+describe('toolbar/ribbon group collapse', () => {
+  const build = (initialWidth: number) => {
+    let clientWidth = initialWidth;
+    const panel = document.createElement('div');
+    panel.className = 'fc-tb__ribbon';
+    const groups = ['クリップボード', 'フォント', 'スタイル', '編集'].map((name, index) => {
+      const group = document.createElement('section');
+      group.className = `fc-tb__ribbon-group${index === 2 ? ' fc-tb__ribbon-group--styles' : ''}`;
+      group.setAttribute('aria-label', name);
+      const tools = document.createElement('div');
+      tools.className = 'fc-tb__ribbon-tools';
+      for (let i = 0; i < 3; i += 1) {
+        const button = document.createElement('button');
+        button.className = 'fc-tb__rb';
+        button.dataset.ribbonCommand = `cmd-${index}-${i}`;
+        tools.appendChild(button);
+      }
+      group.appendChild(tools);
+      group.getBoundingClientRect = () =>
+        ({
+          width: group.classList.contains(RIBBON_GROUP_COLLAPSED_CLASS) ? 48 : 200,
+          left: 0,
+          bottom: 0,
+        }) as DOMRect;
+      panel.appendChild(group);
+      return group;
+    });
+    Object.defineProperty(panel, 'clientWidth', { get: () => clientWidth });
+    Object.defineProperty(panel, 'scrollWidth', {
+      get: () => groups.reduce((sum, group) => sum + group.getBoundingClientRect().width, 0),
+    });
+    document.body.appendChild(panel);
+    return {
+      panel,
+      groups,
+      setWidth: (width: number) => {
+        clientWidth = width;
+      },
+    };
+  };
+
+  it('does nothing unless asked to collapse', () => {
+    const { panel, groups } = build(300);
+    fitRibbonPanel(panel);
+    expect(groups.some((group) => group.classList.contains(RIBBON_GROUP_COLLAPSED_CLASS))).toBe(
+      false,
+    );
+  });
+
+  it('folds groups into named buttons from the right, sparing the style gallery group', () => {
+    const { panel, groups } = build(520);
+    fitRibbonPanel(panel, { collapse: true });
+    expect(groups.map((group) => group.classList.contains(RIBBON_GROUP_COLLAPSED_CLASS))).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ]);
+    const button = groups[3]?.querySelector<HTMLButtonElement>('.fc-tb__ribbon-group-collapse');
+    expect(button?.textContent).toBe('編集');
+    button?.click();
+    expect(groups[3]?.classList.contains('fc-tb__ribbon-group--open')).toBe(true);
+    expect(button?.getAttribute('aria-expanded')).toBe('true');
+    groups[3]?.querySelector<HTMLElement>('.fc-tb__ribbon-tools')?.click();
+    expect(groups[3]?.classList.contains('fc-tb__ribbon-group--open')).toBe(false);
+  });
+
+  it('expands every group again once the panel fits', () => {
+    const { panel, groups, setWidth } = build(450);
+    fitRibbonPanel(panel, { collapse: true });
+    setWidth(2000);
+    fitRibbonPanel(panel, { collapse: true });
+    expect(groups.some((group) => group.classList.contains(RIBBON_GROUP_COLLAPSED_CLASS))).toBe(
+      false,
+    );
   });
 });

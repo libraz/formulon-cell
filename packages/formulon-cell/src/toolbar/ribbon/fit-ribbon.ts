@@ -6,12 +6,19 @@
  * wrap onto a second line, then large buttons drop to icon-and-label rows
  * stacked three high, and finally those rows drop their labels (the accessible
  * name and tooltip stay). Command order never changes; only density does. A
- * stage is kept on a group only if it made the group narrower.
+ * stage is kept on a group only if it made the group narrower. On the Mac
+ * profile a panel that still overflows then collapses whole groups, rightmost
+ * first, into one named button that opens the group as a popup.
  */
+
+import { createRibbonButton } from './button.js';
 
 export const RIBBON_GROUP_NARROW_CLASS = 'fc-tb__ribbon-group--narrow';
 export const RIBBON_GROUP_CONDENSED_CLASS = 'fc-tb__ribbon-group--condensed';
 export const RIBBON_GROUP_ICON_ONLY_CLASS = 'fc-tb__ribbon-group--icon-only';
+export const RIBBON_GROUP_COLLAPSED_CLASS = 'fc-tb__ribbon-group--collapsed';
+const GROUP_OPEN_CLASS = 'fc-tb__ribbon-group--open';
+const COLLAPSE_BUTTON_CLASS = 'fc-tb__ribbon-group-collapse';
 
 const isTileGroup = (group: HTMLElement): boolean =>
   group.classList.contains('fc-tb__ribbon-group--tiles') ||
@@ -50,13 +57,73 @@ const TWO_LINE_LABELS = `:scope > .fc-tb__ribbon :is(.fc-tb__ribbon-group--style
 const overflows = (panel: HTMLElement): boolean => panel.scrollWidth > panel.clientWidth + 1;
 
 const clearFit = (groups: Iterable<Element>): void => {
-  for (const group of groups) group.classList.remove(...FIT_CLASSES);
+  for (const group of groups) {
+    group.classList.remove(...FIT_CLASSES, RIBBON_GROUP_COLLAPSED_CLASS, GROUP_OPEN_CLASS);
+    group
+      .querySelector(`:scope > .${COLLAPSE_BUTTON_CLASS}`)
+      ?.setAttribute('aria-expanded', 'false');
+  }
+};
+
+/** A group of several commands can collapse; the style gallery group and one-button groups never do. */
+const canCollapse = (group: HTMLElement): boolean =>
+  !group.classList.contains('fc-tb__ribbon-group--styles') &&
+  group.querySelectorAll('[data-ribbon-command]').length > 1;
+
+const closeGroupPopup = (group: HTMLElement): void => {
+  group.classList.remove(GROUP_OPEN_CLASS);
+  group.querySelector(`:scope > .${COLLAPSE_BUTTON_CLASS}`)?.setAttribute('aria-expanded', 'false');
+  const tools = group.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-tools');
+  tools?.style.removeProperty('left');
+  tools?.style.removeProperty('top');
+};
+
+const openGroupPopup = (group: HTMLElement, button: HTMLElement): void => {
+  group.classList.add(GROUP_OPEN_CLASS);
+  button.setAttribute('aria-expanded', 'true');
+  const tools = group.querySelector<HTMLElement>(':scope > .fc-tb__ribbon-tools');
+  const rect = button.getBoundingClientRect();
+  if (tools) {
+    tools.style.left = `${Math.round(rect.left)}px`;
+    tools.style.top = `${Math.round(rect.bottom + 2)}px`;
+  }
+  const dismiss = (event: Event): void => {
+    if (event.target instanceof Node && group.contains(event.target)) return;
+    closeGroupPopup(group);
+    group.ownerDocument.removeEventListener('pointerdown', dismiss, true);
+  };
+  group.ownerDocument.addEventListener('pointerdown', dismiss, true);
+};
+
+/** Fold `group` into one button named after it; the button opens the commands as a popup. */
+const collapseGroup = (group: HTMLElement): void => {
+  let button = group.querySelector<HTMLElement>(`:scope > .${COLLAPSE_BUTTON_CLASS}`);
+  if (!button) {
+    const name = group.getAttribute('aria-label') ?? '';
+    const created = createRibbonButton({
+      className: `fc-tb__rb fc-tb__rb--wide ${COLLAPSE_BUTTON_CLASS}`,
+      text: name,
+      title: name,
+      ariaHaspopup: 'menu',
+      ariaExpanded: false,
+    });
+    created.addEventListener('click', () => {
+      if (group.classList.contains(GROUP_OPEN_CLASS)) closeGroupPopup(group);
+      else openGroupPopup(group, created);
+    });
+    group.prepend(created);
+    group
+      .querySelector(':scope > .fc-tb__ribbon-tools')
+      ?.addEventListener('click', () => closeGroupPopup(group));
+    button = created;
+  }
+  group.classList.add(RIBBON_GROUP_COLLAPSED_CLASS);
 };
 
 /** Shrink the visible panel's groups, stage by stage and rightmost first, until it fits.
  *  Narrowing sets each tile label to its narrowest two-line width; condensing
  *  drops those widths for the row layout. */
-export const fitRibbonPanel = (panel: HTMLElement): void => {
+export const fitRibbonPanel = (panel: HTMLElement, options: { collapse?: boolean } = {}): void => {
   const all = [...panel.querySelectorAll<HTMLElement>(':scope > .fc-tb__ribbon-group')];
   clearFit(all);
   if (panel.clientWidth === 0) return;
@@ -79,6 +146,11 @@ export const fitRibbonPanel = (panel: HTMLElement): void => {
         });
       }
     }
+  }
+  if (!options.collapse) return;
+  const collapsible = all.filter(canCollapse);
+  for (let i = collapsible.length - 1; i >= 0 && overflows(panel); i--) {
+    collapseGroup(collapsible[i] as HTMLElement);
   }
 };
 
@@ -153,7 +225,7 @@ export const attachRibbonFit = (root: HTMLElement): { refit(): void; detach(): v
         if (lineCount(label) > 2) fitLabelToTwoLines(label);
       }
     }
-    fitRibbonPanel(panel);
+    fitRibbonPanel(panel, { collapse: root.dataset.fcPlatform === 'mac' });
   };
   let lastWidth = -1;
   const observer =
