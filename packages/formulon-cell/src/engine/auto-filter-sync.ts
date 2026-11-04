@@ -35,6 +35,10 @@ const conditionOperator: Record<
   notEquals: 'notEqual',
   contains: 'equal',
   notContains: 'notEqual',
+  beginsWith: 'equal',
+  notBeginsWith: 'notEqual',
+  endsWith: 'equal',
+  notEndsWith: 'notEqual',
   greaterThan: 'greaterThan',
   greaterThanOrEqual: 'greaterThanOrEqual',
   lessThan: 'lessThan',
@@ -215,8 +219,29 @@ function escapeAutoFilterWildcardLiteral(value: string): string {
   return value.replace(/~/g, '~~').replace(/\*/g, '~*').replace(/\?/g, '~?');
 }
 
-function containsPattern(value: string): string {
-  return `*${escapeAutoFilterWildcardLiteral(value)}*`;
+type PatternOp =
+  | 'contains'
+  | 'notContains'
+  | 'beginsWith'
+  | 'notBeginsWith'
+  | 'endsWith'
+  | 'notEndsWith';
+
+const PATTERN_AFFIX: Record<PatternOp, readonly [string, string]> = {
+  contains: ['*', '*'],
+  notContains: ['*', '*'],
+  beginsWith: ['', '*'],
+  notBeginsWith: ['', '*'],
+  endsWith: ['*', ''],
+  notEndsWith: ['*', ''],
+};
+
+const isPatternOp = (op: string): op is PatternOp => Object.hasOwn(PATTERN_AFFIX, op);
+
+/** Wildcard text for a contains / begins-with / ends-with operand. */
+function wildcardPattern(op: PatternOp, value: string): string {
+  const [head, tail] = PATTERN_AFFIX[op];
+  return `${head}${escapeAutoFilterWildcardLiteral(value)}${tail}`;
 }
 
 const filterMatchKey = (value: string, locale = 'en-US'): string => profileTextKey(value, locale);
@@ -246,20 +271,22 @@ function decodeWildcardLiteral(value: string): string | null {
   return decoded;
 }
 
-/** Decode the single outer-wildcard pattern emitted by this adapter. A
- * pattern containing another unescaped wildcard is left engine-owned because
- * the cell-layer `contains` condition has no equivalent for it. */
-function decodeContainsPattern(value: string): string | null {
-  if (value.length < 2 || !value.startsWith('*') || !value.endsWith('*')) return null;
-
-  // The last star is the outer wildcard only when it is not escaped. Count
-  // the immediately preceding tildes: an odd run escapes the star, while an
-  // even run consists of complete `~~` literal-tilde pairs.
+/** Decode the single outer-wildcard pattern emitted by this adapter into the
+ * positive operator it stands for. A pattern containing another unescaped
+ * wildcard is left engine-owned because the cell layer cannot represent it. */
+function decodeAffixPattern(
+  value: string,
+): { op: 'contains' | 'beginsWith' | 'endsWith'; text: string } | null {
+  const leading = value.startsWith('*');
+  // The last star is the outer wildcard only when it is not escaped: an odd
+  // run of preceding tildes escapes it, an even run is complete `~~` pairs.
   let tildes = 0;
   for (let i = value.length - 2; i >= 0 && value[i] === '~'; i -= 1) tildes += 1;
-  if (tildes % 2 === 1) return null;
-
-  return decodeWildcardLiteral(value.slice(1, -1));
+  const trailing = value.length >= 2 && value.endsWith('*') && tildes % 2 === 0;
+  if (value.length < 2 || (!leading && !trailing)) return null;
+  const op = leading && trailing ? 'contains' : leading ? 'endsWith' : 'beginsWith';
+  const text = decodeWildcardLiteral(value.slice(leading ? 1 : 0, trailing ? -1 : undefined));
+  return text === null ? null : { op, text };
 }
 
 function customColumnFromCriteria(
@@ -295,12 +322,17 @@ function customColumnFromCriteria(
       val2: condition.value2 ?? '',
     };
   }
-  const wildcard = condition.op === 'contains' || condition.op === 'notContains';
   const literalWildcard = condition.op === 'equals' || condition.op === 'notEquals';
   const op =
-    condition.op === 'equals' || condition.op === 'contains'
+    condition.op === 'equals' ||
+    condition.op === 'contains' ||
+    condition.op === 'beginsWith' ||
+    condition.op === 'endsWith'
       ? FILTER_OPERATOR_EQUAL
-      : condition.op === 'notEquals' || condition.op === 'notContains'
+      : condition.op === 'notEquals' ||
+          condition.op === 'notContains' ||
+          condition.op === 'notBeginsWith' ||
+          condition.op === 'notEndsWith'
         ? FILTER_OPERATOR_NOT_EQUAL
         : condition.op === 'greaterThan'
           ? FILTER_OPERATOR_GREATER_THAN
@@ -314,8 +346,8 @@ function customColumnFromCriteria(
     kind: FILTER_KIND_CUSTOM,
     customCount: 1,
     op1: op,
-    val1: wildcard
-      ? containsPattern(condition.value)
+    val1: isPatternOp(condition.op)
+      ? wildcardPattern(condition.op, condition.value)
       : literalWildcard
         ? escapeAutoFilterWildcardLiteral(condition.value)
         : condition.value,
@@ -483,10 +515,17 @@ function wildcardCondition(
   value: string,
   locale = 'en-US',
 ): NonNullable<ValueFilterCriteria['condition']> | null {
-  const decoded = decodeContainsPattern(value);
+  const decoded = decodeAffixPattern(value);
   if (decoded !== null) {
-    if (op === FILTER_OPERATOR_EQUAL) return { op: 'contains', value: decoded };
-    if (op === FILTER_OPERATOR_NOT_EQUAL) return { op: 'notContains', value: decoded };
+    if (op === FILTER_OPERATOR_EQUAL) return { op: decoded.op, value: decoded.text };
+    if (op === FILTER_OPERATOR_NOT_EQUAL) {
+      const negated = {
+        contains: 'notContains',
+        beginsWith: 'notBeginsWith',
+        endsWith: 'notEndsWith',
+      } as const;
+      return { op: negated[decoded.op], value: decoded.text };
+    }
     return null;
   }
   const literal = decodeWildcardLiteral(value);
@@ -675,10 +714,9 @@ export function autoFilterXmlFromState(
           `<filterColumn colId="${colId}"><customFilters and="1"><customFilter operator="greaterThanOrEqual" val="${escapeXml(operand)}"/><customFilter operator="lessThanOrEqual" val="${escapeXml(entry.condition.value2 ?? '')}"/></customFilters></filterColumn>`,
         ];
       }
-      const wildcard = entry.condition.op === 'contains' || entry.condition.op === 'notContains';
       const literalWildcard = entry.condition.op === 'equals' || entry.condition.op === 'notEquals';
-      const value = wildcard
-        ? containsPattern(entry.condition.value)
+      const value = isPatternOp(entry.condition.op)
+        ? wildcardPattern(entry.condition.op, entry.condition.value)
         : literalWildcard
           ? escapeAutoFilterWildcardLiteral(entry.condition.value)
           : entry.condition.value;
@@ -749,7 +787,9 @@ export function syncHiddenRowsToEngine(
   const rows = new Set<number>();
   for (const row of before) rows.add(row);
   for (const row of after) rows.add(row);
-  for (const row of rows) wb.setRowHidden(sheet, row, hiddenAfter.has(row));
+  wb.withBatchedRecalc(() => {
+    for (const row of rows) wb.setRowHidden(sheet, row, hiddenAfter.has(row));
+  });
   return true;
 }
 
@@ -774,11 +814,13 @@ function syncStoreOwnedAutoFilterVisibility(
   const evaluated = filter.evaluate();
   const firstRow = evaluated?.firstRow ?? range.r0;
 
-  for (let row = range.r0 + 1; row <= range.r1; row += 1) {
-    const index = row - firstRow;
-    const nativeHidden = evaluated ? evaluated.match[index] === false : false;
-    wb.setRowHidden(sheet, row, nativeHidden || storeHidden.has(row));
-  }
+  wb.withBatchedRecalc(() => {
+    for (let row = range.r0 + 1; row <= range.r1; row += 1) {
+      const index = row - firstRow;
+      const nativeHidden = evaluated ? evaluated.match[index] === false : false;
+      wb.setRowHidden(sheet, row, nativeHidden || storeHidden.has(row));
+    }
+  });
   return true;
 }
 
@@ -810,9 +852,11 @@ function removeFilterTarget(
   importedFiltersFor(wb).delete(target.key);
   if (store && existing && wb.capabilities.hiddenRowsCols) {
     const hidden = store.getState().layout.hiddenRows;
-    for (let row = existing.range.firstRow + 1; row <= existing.range.lastRow; row += 1) {
-      wb.setRowHidden(sheet, row, hidden.has(row));
-    }
+    wb.withBatchedRecalc(() => {
+      for (let row = existing.range.firstRow + 1; row <= existing.range.lastRow; row += 1) {
+        wb.setRowHidden(sheet, row, hidden.has(row));
+      }
+    });
   }
   return cleared && removed;
 }

@@ -10,6 +10,7 @@ import { recordCommentChange } from './comment.js';
 import { DEFAULT_COMMENT_AUTHOR } from './comment-author.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import { filterRangeForSort, inferAutoFilterRange, setFilterSort } from './filter.js';
+import { filterRangeAt } from './filter-ranges.js';
 import { shiftFormulaRefs } from './formula-refs.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -647,6 +648,15 @@ const rewriteRangeFormats = (
   });
 };
 
+/** True when `row` is hidden and lies inside an AutoFilter whose columns
+ *  overlap `range`, i.e. the filter (not a manual hide) is what hides it. */
+const filterHidesRow = (state: State, range: Range, row: number): boolean =>
+  state.layout.hiddenRows.has(row) &&
+  state.ui.filterRanges.some(
+    (f) =>
+      f.sheet === range.sheet && row > f.r0 && row <= f.r1 && f.c0 <= range.c1 && f.c1 >= range.c0,
+  );
+
 /** Sort the rows of `range` in place by the values in `byCol`. Writes the
  *  resulting cells back through `wb`. Ascending value order is number, text,
  *  bool, error, blank; blanks stay last for either direction. */
@@ -678,11 +688,21 @@ export function sortRange(
   if (!ensureWritableRange(state, dataRange)) return false;
   if (blockDataTableEdit(wb, dataRange)) return false;
 
+  // Inside an AutoFilter, rows the filter hides keep their place and only the
+  // visible rows trade positions among themselves.
+  const lines: number[] = [];
+  for (let l = start; l <= last; l += 1) {
+    if (!horizontal && filterHidesRow(state, range, l)) continue;
+    lines.push(l);
+  }
+  const skipsLines = lines.length !== last - start + 1;
+
   // A real formulon bundle owns the comparison semantics for formula-driven
   // sorts. Do this before hydrating comments or touching any cell so an
   // unsupported/malformed native result is an atomic no-op. Stub workbooks
   // intentionally use the explicit-locale JS comparator below.
-  const nativeBundle = wb.isStub === false && wb.capabilities.arrayFormulaEvaluation === true;
+  const nativeBundle =
+    !skipsLines && wb.isStub === false && wb.capabilities.arrayFormulaEvaluation === true;
   const nativeOrder = nativeBundle
     ? nativeSortPermutation(state, wb, range, start, sortKeys, horizontal, matchCase)
     : null;
@@ -708,7 +728,7 @@ export function sortRange(
     sortKeys: CellSortKey[];
   }
   const snaps: { line: number; snap: LineSnap }[] = [];
-  for (let l = start; l <= last; l += 1) {
+  for (const l of lines) {
     const cells: LineSnap['cells'] = [];
     for (let p = posLo; p <= posHi; p += 1) {
       const key = addrKey(addrAt(l, p));
@@ -763,7 +783,7 @@ export function sortRange(
   // Write back into wb in sorted order.
   wb.withBatchedRecalc(() => {
     for (let i = 0; i < snaps.length; i += 1) {
-      const dstLine = start + i;
+      const dstLine = lines[i] ?? start + i;
       const entry = snaps[i];
       if (!entry) continue;
       for (const cell of entry.snap.cells) {
@@ -774,7 +794,7 @@ export function sortRange(
     }
   });
   const affected: Addr[] = [];
-  for (let l = start; l <= last; l += 1) {
+  for (const l of lines) {
     for (let p = posLo; p <= posHi; p += 1) affected.push(addrAt(l, p));
   }
   const placed: PlacedFormat[] = [];
@@ -783,7 +803,7 @@ export function sortRange(
     if (!snap) continue;
     for (const cell of snap.cells) {
       if (!cell.format) continue;
-      placed.push({ addr: addrAt(start + i, cell.pos), format: cell.format });
+      placed.push({ addr: addrAt(lines[i] ?? start + i, cell.pos), format: cell.format });
     }
   }
   rewriteRangeFormats(state, store, wb, history, affected, placed);
@@ -964,7 +984,12 @@ export interface SortActiveColumnAutoOptions {
 export const sortActiveColumnAuto = (deps: SortActiveColumnAutoOptions): boolean => {
   const { store, workbook, history, direction } = deps;
   const state = store.getState();
-  const range = inferAutoFilterRange(state);
+  const sel = state.selection.range;
+  const single = sel.r0 === sel.r1 && sel.c0 === sel.c1;
+  // A cell inside an AutoFilter sorts that whole filter, blank rows included,
+  // with the filter's first row as the header.
+  const filter = single ? filterRangeAt(state, state.selection.active) : null;
+  const range = filter ?? inferAutoFilterRange(state);
   return sortRangeWithHistory({
     store,
     workbook,
@@ -973,7 +998,7 @@ export const sortActiveColumnAuto = (deps: SortActiveColumnAutoOptions): boolean
     options: {
       byCol: state.selection.active.col,
       direction,
-      hasHeader: inferSortHasHeader(state, range),
+      hasHeader: filter ? true : inferSortHasHeader(state, range),
     },
   });
 };

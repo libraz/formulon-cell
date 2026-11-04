@@ -205,8 +205,10 @@ describe('attachFilterDropdown', () => {
 
     handle.open(range, 0, { x: 10, y: 20, h: 24 });
     document.querySelector<HTMLButtonElement>('.fc-filter-dropdown__clear')?.click();
+    // Clear drops the criteria; the filter buttons stay, as in the desktop app.
     expect(store.getState().layout.hiddenRows.size).toBe(0);
-    expect(store.getState().ui.filterRanges).toEqual([]);
+    expect(store.getState().ui.filterRanges).toEqual([range]);
+    expect(store.getState().ui.filterCriteria).toEqual([]);
 
     history.undo();
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);

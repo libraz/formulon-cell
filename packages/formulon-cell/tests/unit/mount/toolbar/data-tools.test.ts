@@ -165,7 +165,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().layout.hiddenRows.has(2)).toBe(false);
 
     await clickSort('filter-clear');
-    expect(sheet.instance.store.getState().ui.filterRanges).toEqual([]);
+    // Clear shows every row and keeps the filter buttons, as in the desktop app.
+    expect(sheet.instance.store.getState().ui.filterRanges).toEqual([
+      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+    ]);
     expect(sheet.instance.store.getState().layout.hiddenRows.has(1)).toBe(false);
 
     await clickSort('filter-advanced');

@@ -386,6 +386,7 @@ export abstract class WorkbookHandleLayoutMethods {
     assertAlive(this);
     if (!this.capabilities.hiddenRowsCols) return false;
     const s = wb(this).setRowHidden(sheet, row, hidden);
+    if (s.ok) (this as unknown as WorkbookHandle).noteVisibilityChanged();
     return s.ok;
   }
 

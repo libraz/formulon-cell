@@ -10,6 +10,7 @@ import {
   inferAutoFilterRange,
   reapplyFilters,
   recordFilterChange,
+  resetFilterCriteria,
   setAutoFilter,
 } from '../commands/filter.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
@@ -89,7 +90,10 @@ export const executeRibbonFilterDataAction = (
       recordFilterChange(
         history,
         store,
-        () => clearFilter(state, store, active ?? undefined, wb),
+        () =>
+          active
+            ? resetFilterCriteria(store, active, wb)
+            : clearFilter(state, store, undefined, wb),
         wb,
       );
     }

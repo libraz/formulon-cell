@@ -909,6 +909,14 @@ function conditionMatches(
       return text.toLocaleLowerCase(locale).includes(needle.toLocaleLowerCase(locale));
     case 'notContains':
       return !text.toLocaleLowerCase(locale).includes(needle.toLocaleLowerCase(locale));
+    case 'beginsWith':
+      return text.toLocaleLowerCase(locale).startsWith(needle.toLocaleLowerCase(locale));
+    case 'notBeginsWith':
+      return !text.toLocaleLowerCase(locale).startsWith(needle.toLocaleLowerCase(locale));
+    case 'endsWith':
+      return text.toLocaleLowerCase(locale).endsWith(needle.toLocaleLowerCase(locale));
+    case 'notEndsWith':
+      return !text.toLocaleLowerCase(locale).endsWith(needle.toLocaleLowerCase(locale));
     case 'greaterThan':
     case 'greaterThanOrEqual':
     case 'lessThan':
@@ -1075,12 +1083,17 @@ export function clearFilter(
 
 /** Reveal `range`'s rows and drop its criteria, leaving its filter buttons
  *  (present or not) as they are. */
-export function resetFilterCriteria(store: SpreadsheetStore, range: Range): void {
+export function resetFilterCriteria(
+  store: SpreadsheetStore,
+  range: Range,
+  wb?: WorkbookHandle,
+): void {
   store.setState((s) => ({
     ...s,
     layout: { ...s.layout, hiddenRows: clearHiddenRowsInRange(s.layout.hiddenRows, range) },
     ui: { ...s.ui, filterCriteria: filterCriteriaAfterClear(s.ui.filterCriteria, range) },
   }));
+  syncFilterToEngine(wb, store, range);
 }
 
 function filterCriteriaAfterClear(

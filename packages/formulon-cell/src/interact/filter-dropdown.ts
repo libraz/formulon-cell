@@ -4,10 +4,10 @@ import {
   applyValueFilter,
   type ConditionFilterOp,
   type ConditionFilterOptions,
-  clearFilter,
   type DistinctFilterFailureReason,
   distinctFilterItemsResult,
   recordFilterChange,
+  resetFilterCriteria,
 } from '../commands/filter.js';
 import type { History } from '../commands/history.js';
 import { sortRangeWithHistory } from '../commands/sort.js';
@@ -69,7 +69,7 @@ const findColumnCriteria = (
 
 /**
  * Lightweight column-filter popover. Lists distinct values in the column with
- * a checkbox each; "Apply" calls `applyFilter`, "Clear" calls `clearFilter`.
+ * a checkbox each; "Apply" calls `applyFilter`, "Clear" calls `resetFilterCriteria`.
  *
  * The popover lives in the overlay portal so it can escape any clipping
  * ancestors, and is positioned via fixed coordinates from the anchor rect.
@@ -510,7 +510,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         deps.history ?? null,
         deps.store,
         () => {
-          clearFilter(deps.store.getState(), deps.store, activeRange as Range, wb);
+          resetFilterCriteria(deps.store, activeRange as Range, wb);
         },
         wb,
       );

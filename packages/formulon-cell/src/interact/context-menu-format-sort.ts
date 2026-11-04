@@ -1,11 +1,11 @@
 import {
   applyValueFilter,
-  clearFilter,
   distinctFilterItemsResult,
   filterValueKey,
   inferAutoFilterRange,
   reapplyFilters,
   recordFilterChange,
+  resetFilterCriteria,
 } from '../commands/filter.js';
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import {
@@ -125,7 +125,7 @@ export function runContextMenuFormatSortItem(
     }
     case 'filterClear': {
       const range = boundRowsToData(store, activeFilterRange(state) ?? inferAutoFilterRange(state));
-      recordFilterChange(history, store, () => clearFilter(store.getState(), store, range, wb), wb);
+      recordFilterChange(history, store, () => resetFilterCriteria(store, range, wb), wb);
       ctx.afterCommit();
       return true;
     }
