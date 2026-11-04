@@ -41,6 +41,20 @@ export interface PivotStyleLayer {
   formatAt(row: number, col: number): CellFormat | undefined;
   /** Outline placement of a compact row label cell; undefined elsewhere. */
   outlineAt(row: number, col: number): PivotRowOutline | undefined;
+  /** Reports with no field laid out yet, drawn as a placeholder over the
+   *  area they reserve. */
+  readonly placeholders: readonly PivotPlaceholder[];
+}
+
+/** An empty report reserves this many columns and rows from its anchor. */
+export const PIVOT_PLACEHOLDER_COLS = 3;
+export const PIVOT_PLACEHOLDER_ROWS = 18;
+
+/** An empty report's reserved area and name. */
+export interface PivotPlaceholder {
+  readonly pivotIndex: number;
+  readonly range: Range;
+  readonly name: string;
 }
 
 /** Where a compact row label sits in the outline. */
@@ -57,11 +71,17 @@ const EMPTY_LAYER: PivotStyleLayer = {
   buttons: new Set(),
   formatAt: () => undefined,
   outlineAt: () => undefined,
+  placeholders: [],
 };
 
 type PivotStyleReader = Pick<
   WorkbookHandle,
-  'capabilities' | 'pivotBounds' | 'pivotCells' | 'getPivotStyleInfo' | 'getTheme'
+  | 'capabilities'
+  | 'pivotBounds'
+  | 'pivotCells'
+  | 'getPivotStyleInfo'
+  | 'getTheme'
+  | 'pivotTableName'
 >;
 
 const BUILTIN_PIVOT_STYLE = /^PivotStyle(Light|Medium|Dark)(\d+)$/;
@@ -263,7 +283,24 @@ export function buildPivotStyleLayer(
   const formats = new Map<string, CellFormat>();
   const buttons = new Set<string>();
   const outlines = new Map<string, PivotRowOutline>();
+  const placeholders: PivotPlaceholder[] = [];
   for (const { pivotIndex, range } of bounds) {
+    // The engine still projects a caption for a report with no fields.
+    const cells = cellsByPivot.get(pivotIndex) ?? [];
+    if (cells.every((c) => c.kind === PIVOT_CELL_KIND.Header)) {
+      placeholders.push({
+        pivotIndex,
+        range: {
+          sheet,
+          r0: range.r0,
+          c0: range.c0,
+          r1: range.r0 + PIVOT_PLACEHOLDER_ROWS - 1,
+          c1: range.c0 + PIVOT_PLACEHOLDER_COLS - 1,
+        },
+        name: wb.pivotTableName(sheet, pivotIndex) ?? '',
+      });
+      continue;
+    }
     for (const label of pivotRowOutline(range, cellsByPivot.get(pivotIndex) ?? [])) {
       outlines.set(addrKey({ sheet, row: label.row, col: label.col }), label.outline);
     }
@@ -287,7 +324,13 @@ export function buildPivotStyleLayer(
     }
   }
   return {
-    ranges: bounds.map((b) => b.range),
+    ranges: [
+      ...bounds
+        .filter((b) => !placeholders.some((p) => p.pivotIndex === b.pivotIndex))
+        .map((b) => b.range),
+      ...placeholders.map((p) => p.range),
+    ],
+    placeholders,
     buttons,
     formatAt: (row, col) => formats.get(addrKey({ sheet, row, col })),
     outlineAt: (row, col) => outlines.get(addrKey({ sheet, row, col })),

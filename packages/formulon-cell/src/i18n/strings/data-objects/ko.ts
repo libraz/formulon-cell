@@ -139,6 +139,7 @@ export const dataObjectsKo: DataObjectsStrings = {
     createPivotTable: '피벗 테이블 만들기...',
     editPivotTable: '편집',
     pivotFieldList: '피벗 테이블 필드',
+    pivotEmptyPrompt: '보고서를 작성하려면 피벗 테이블 필드 목록에서 필드를 선택하십시오.',
     backToWorkbookObjects: '통합 문서 개체로 돌아가기',
     pivotFieldSearch: '필드 검색',
     pivotFieldName: '필드 이름',

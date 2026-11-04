@@ -1,5 +1,6 @@
 import { formatA1Range } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import { pivotStyleLayer } from '../engine/pivot-style.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
 import {
@@ -701,7 +702,13 @@ export function autofitPivotTableColumns(
   wb: WorkbookHandle,
   opts?: AutofitOptions,
 ): void {
-  const ranges = wb.pivotBounds(store.getState().data.sheetIndex).map((b) => b.range);
+  const state = store.getState();
+  // An empty report keeps the columns it is drawn over.
+  const empty = new Set(pivotStyleLayer(wb, state).placeholders.map((p) => p.pivotIndex));
+  const ranges = wb
+    .pivotBounds(state.data.sheetIndex)
+    .filter((b) => !empty.has(b.pivotIndex))
+    .map((b) => b.range);
   if (ranges.length > 0) autofitColsWidthForRanges(store, null, ranges, wb, opts);
 }
 

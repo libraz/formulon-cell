@@ -140,6 +140,8 @@ export const dataObjectsJa: DataObjectsStrings = {
     createPivotTable: 'ピボットテーブルの作成...',
     editPivotTable: '編集',
     pivotFieldList: 'ピボットテーブルのフィールド',
+    pivotEmptyPrompt:
+      'レポートを作成するには、[ピボットテーブルのフィールド リスト] からフィールドを選択してください',
     backToWorkbookObjects: 'ブック オブジェクトに戻る',
     pivotFieldSearch: 'フィールドの検索',
     pivotFieldName: 'フィールド名',

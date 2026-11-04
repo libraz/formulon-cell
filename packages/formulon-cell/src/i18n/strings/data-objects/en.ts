@@ -139,6 +139,7 @@ export const dataObjectsEn: DataObjectsStrings = {
     createPivotTable: 'Create PivotTable...',
     editPivotTable: 'Edit',
     pivotFieldList: 'PivotTable Fields',
+    pivotEmptyPrompt: 'To build a report, choose fields from the PivotTable Field List',
     backToWorkbookObjects: 'Back to Workbook Objects',
     pivotFieldSearch: 'Search fields',
     pivotFieldName: 'Field name',

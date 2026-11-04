@@ -138,6 +138,8 @@ export interface DataObjectsStrings {
     createPivotTable: string;
     editPivotTable: string;
     pivotFieldList: string;
+    /** Prompt drawn inside an empty PivotTable's placeholder. */
+    pivotEmptyPrompt: string;
     backToWorkbookObjects: string;
     pivotFieldSearch: string;
     pivotFieldName: string;

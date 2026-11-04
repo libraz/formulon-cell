@@ -22,6 +22,7 @@ import { type ConditionalCache, evaluateConditional } from '../conditional.js';
 import {
   type AxisLayout,
   cellRectIn,
+  cellRectUnclamped,
   gridOriginX,
   gridOriginY,
   type Rect,
@@ -42,7 +43,14 @@ import {
   pivotCollapseButtonRect,
   pivotOutlineIndent,
 } from '../painters/pivot-outline-button.js';
-import { alignedTextAnchor, cellFont, cellFontCss, visualZoom } from '../painters/text.js';
+import { paintPivotPlaceholder } from '../painters/pivot-placeholder.js';
+import {
+  alignedTextAnchor,
+  cellFont,
+  cellFontCss,
+  cellFontFamily,
+  visualZoom,
+} from '../painters/text.js';
 import {
   CONDITIONAL_ICON_GUTTER,
   paintCellBackground,
@@ -102,6 +110,8 @@ export interface CellPaintContext {
   conditionalCache: ConditionalCache;
   /** Device pixel ratio fills and merge surfaces snap to; 1 when omitted. */
   dpr?: number;
+  /** Prompt an empty PivotTable's placeholder shows; no placeholder when omitted. */
+  pivotEmptyPrompt?: string;
 }
 
 /** What the cell pass leaves for later passes. */
@@ -793,5 +803,23 @@ export function paintCells(
     }
   }
   for (const paint of deferredOverflow) paint();
+  if (cellCtx.pivotEmptyPrompt !== undefined) {
+    const normalFont = wb?.workbookDisplayFont;
+    for (const placeholder of pivots.placeholders) {
+      const { r0, c0, r1, c1 } = placeholder.range;
+      const first = cellRectUnclamped(layout, state.viewport, r0, c0);
+      const last = cellRectUnclamped(layout, state.viewport, r1, c1);
+      paintPivotPlaceholder(ctx, {
+        box: { x: first.x, y: first.y, w: last.x + last.w - first.x, h: last.y + last.h - first.y },
+        name: placeholder.name,
+        prompt: cellCtx.pivotEmptyPrompt,
+        ptPx,
+        fontFamily: cellFontFamily(normalFont?.name, theme.fontUi),
+        fontSizePt: normalFont?.size ?? 11,
+        bg: theme.bg,
+        ink: theme.cellAutoFg,
+      });
+    }
+  }
   return { errorTriangles: triangleHits, coveredRules };
 }

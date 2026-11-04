@@ -504,6 +504,7 @@ export class GridRenderer {
         (this.host.closest?.<HTMLElement>('.fc-host') ?? this.host).dataset?.fcPlatform === 'mac',
       conditionalCache: this.conditionalCache,
       dpr: this.dpr,
+      pivotEmptyPrompt: this.getStrings().workbookObjects.pivotEmptyPrompt,
     };
   }
 

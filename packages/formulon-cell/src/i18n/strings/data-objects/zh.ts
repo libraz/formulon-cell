@@ -139,6 +139,7 @@ export const dataObjectsZh: DataObjectsStrings = {
     createPivotTable: '创建数据透视表...',
     editPivotTable: '编辑',
     pivotFieldList: '数据透视表字段',
+    pivotEmptyPrompt: '若要生成报表，请从数据透视表字段列表中选择字段',
     backToWorkbookObjects: '返回工作簿对象',
     pivotFieldSearch: '搜索字段',
     pivotFieldName: '字段名称',

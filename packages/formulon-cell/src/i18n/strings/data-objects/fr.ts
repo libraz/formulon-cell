@@ -143,6 +143,8 @@ export const dataObjectsFr: DataObjectsStrings = {
     createPivotTable: 'Créer un tableau croisé dynamique...',
     editPivotTable: 'Modifier',
     pivotFieldList: 'Champs de tableau croisé dynamique',
+    pivotEmptyPrompt:
+      'Pour créer un rapport, choisissez des champs dans la liste de champs de tableau croisé dynamique',
     backToWorkbookObjects: 'Retour aux objets du classeur',
     pivotFieldSearch: 'Rechercher des champs',
     pivotFieldName: 'Nom du champ',

@@ -166,3 +166,28 @@ describe('buildPivotStyleLayer', () => {
     wb.dispose();
   });
 });
+
+describe('empty report placeholder', () => {
+  it('reserves 3 columns x 18 rows from the anchor and drops the style', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    wb.setText({ sheet: 0, row: 0, col: 0 }, 'Region');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'Amt');
+    wb.setText({ sheet: 0, row: 1, col: 0 }, 'East');
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 5);
+    const created = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+      destination: { sheet: 0, row: 4, col: 0 },
+      rowField: '',
+      valueField: '',
+    });
+    expect(created.ok).toBe(true);
+    const layer = buildPivotStyleLayer(wb, 0, {});
+    expect(layer.placeholders).toEqual([
+      { pivotIndex: 0, range: { sheet: 0, r0: 4, c0: 0, r1: 21, c1: 2 }, name: 'PivotTable1' },
+    ]);
+    expect(layer.ranges).toEqual([{ sheet: 0, r0: 4, c0: 0, r1: 21, c1: 2 }]);
+    expect(layer.formatAt(4, 0)).toBeUndefined();
+    expect(layer.buttons.size).toBe(0);
+    wb.dispose();
+  });
+});

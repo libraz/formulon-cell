@@ -139,6 +139,7 @@ export const dataObjectsTh: DataObjectsStrings = {
     createPivotTable: 'สร้าง PivotTable...',
     editPivotTable: 'แก้ไข',
     pivotFieldList: 'เขตข้อมูล PivotTable',
+    pivotEmptyPrompt: 'เมื่อต้องการสร้างรายงาน ให้เลือกเขตข้อมูลจากรายการเขตข้อมูล PivotTable',
     backToWorkbookObjects: 'กลับไปยังวัตถุเวิร์กบุ๊ก',
     pivotFieldSearch: 'ค้นหาเขตข้อมูล',
     pivotFieldName: 'ชื่อเขตข้อมูล',
