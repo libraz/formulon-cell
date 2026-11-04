@@ -12,6 +12,7 @@ import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
+import { macErrorMenuTh } from './error-menu.js';
 import { macExternalLinksPaneTh } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
@@ -26,6 +27,7 @@ import { macPivotOptionsTh } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macSheetTabMenuTh } from './sheet-tab-menu.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogTh } from './style-dialog.js';
 import { macTextToColumnsWizardTh } from './text-to-columns-wizard.js';
@@ -267,6 +269,8 @@ export const macTh: MacStrings = {
     copyLevel: gridPopupsTh.contextMenu.copy,
     options: 'ตัวเลือก...',
   }),
+  macErrorMenu: macErrorMenuTh,
+  macSheetTabMenu: macSheetTabMenuTh,
   macFindReplace: macFindReplaceFrom(
     editDialogsTh.findReplace,
     'แยกอักขระครึ่งความกว้างและเต็มความกว้าง',

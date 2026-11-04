@@ -2100,4 +2100,34 @@
     background: var(--fc-tb-ribbon-bg, #ffffff);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
   }
+
+  /* Error-check smart tag menu: a rule heading with an info mark, native-width rows. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-errmenu {
+    min-width: 224px;
+    max-width: 280px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-errmenu__heading--rule {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 0;
+    font-weight: 400;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-errmenu__heading--rule::before {
+    content: "i";
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #1a73e8;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    font-style: italic;
+  }
 }

@@ -1,4 +1,5 @@
 import { addrKey, parseAddrKey } from '../engine/address.js';
+import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
@@ -6,7 +7,8 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { type CellValidation, mutators, type SpreadsheetStore } from '../store/store.js';
-import { parseLocalizedNumericInput } from './coerce-input.js';
+import { commitCellInput } from './cell-input-commit.js';
+import { inputLocaleForWorkbook, parseLocalizedNumericInput } from './coerce-input.js';
 import type { History } from './history.js';
 import { formatA1FormulaAsR1C1 } from './refs.js';
 import { cellValueViolatesValidation } from './validate.js';
@@ -203,6 +205,32 @@ export function numberStoredAsText(
 ): boolean {
   if (formula || value.kind !== 'text') return false;
   return parseLocalizedNumericInput(value.value, locale) !== null;
+}
+
+/** The Convert to Number action of the number-stored-as-text rule: the text
+ *  becomes the number it reads as, and a Text format gives way to General. */
+export function convertTextToNumber(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  addr: Addr,
+): boolean {
+  const state = store.getState();
+  const cell = state.data.cells.get(addrKey(addr));
+  if (cell?.value.kind !== 'text') return false;
+  if (parseLocalizedNumericInput(cell.value.value, inputLocaleForWorkbook(wb)) === null) {
+    return false;
+  }
+  if (effectiveCellFormat(wb, state, addr)?.numFmt?.kind === 'text') {
+    mutators.setCellFormat(store, addr, { numFmt: { kind: 'general' } });
+  }
+  const result = commitCellInput({
+    store,
+    wb,
+    addr,
+    raw: cell.value.value.trim(),
+    origin: 'formulaBar',
+  });
+  return result.status === 'applied';
 }
 
 /** Whether a cell carries the error-check triangle: the one rule the grid

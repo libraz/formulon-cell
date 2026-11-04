@@ -6,10 +6,14 @@ export interface ErrorIndicatorClickDeps {
   grid: HTMLElement;
   canvas: HTMLElement;
   getErrorMenu: () => ErrorMenuHandle | null;
+  /** Repaint the grid, so a smart tag armed by a selection shows at once. */
+  invalidate?: () => void;
 }
 
 export type ErrorIndicatorClickHandler = ((e: MouseEvent) => void) & {
   onPointerDown: (e: PointerEvent) => void;
+  /** Capture-phase press: the Mac smart tag opens its menu without moving the selection. */
+  onPointerDownCapture: (e: PointerEvent) => void;
   onPointerMove: (e: PointerEvent) => void;
   onPointerCancel: (e: PointerEvent) => void;
   reset: () => void;
@@ -53,7 +57,9 @@ function hitContains(hit: ErrorTriangleHit, x: number, y: number): boolean {
 export function createErrorIndicatorClickHandler(
   deps: ErrorIndicatorClickDeps,
 ): ErrorIndicatorClickHandler {
-  const { grid, canvas, getErrorMenu } = deps;
+  const { grid, canvas, getErrorMenu, invalidate } = deps;
+  const isMac = (): boolean =>
+    (grid.closest<HTMLElement>('.fc-host') ?? grid).dataset.fcPlatform === 'mac';
   let armed: ArmedTriangle | null = null;
 
   const localPoint = (e: MouseEvent): { x: number; y: number } => {
@@ -81,6 +87,28 @@ export function createErrorIndicatorClickHandler(
     if (hit) armed = { pointerId: e.pointerId, hit };
   };
 
+  const onPointerDownCapture = (e: PointerEvent): void => {
+    if (!isMac() || e.button !== 0 || e.isPrimary === false) return;
+    const tag = gridHitState(grid).errorTag;
+    if (tag) {
+      const { x, y } = localPoint(e);
+      const r = tag.rect;
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        const menu = getErrorMenu();
+        if (!menu) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const box = canvas.getBoundingClientRect();
+        menu.open(tag.addr, box.left + r.x, box.top + r.y + r.h, tag.kind);
+        return;
+      }
+    }
+    if (e.target !== canvas) return;
+    // The mouse selection that follows names the cell the next frame tags.
+    gridHitState(grid).errorTagCell = 'pending';
+    invalidate?.();
+  };
+
   const onPointerMove = (e: PointerEvent): void => {
     if (!armed || e.pointerId !== armed.pointerId) return;
     const { x, y } = localPoint(e);
@@ -103,6 +131,8 @@ export function createErrorIndicatorClickHandler(
     if (e.target !== canvas && e.target !== grid) return;
     const hit = hitAt(e);
     if (!hit) return;
+    // On the Mac profile an error triangle only marks the cell; its menu opens from the smart tag.
+    if (hit.kind === 'error' && isMac()) return;
     if (e.target === grid) {
       const pointerId = pointerIdOf(e);
       if (!captured || (pointerId !== null && pointerId !== captured.pointerId)) return;
@@ -116,6 +146,7 @@ export function createErrorIndicatorClickHandler(
   }) as ErrorIndicatorClickHandler;
 
   onClick.onPointerDown = onPointerDown;
+  onClick.onPointerDownCapture = onPointerDownCapture;
   onClick.onPointerMove = onPointerMove;
   onClick.onPointerCancel = onPointerCancel;
   onClick.reset = reset;

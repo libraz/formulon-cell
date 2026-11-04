@@ -12,6 +12,7 @@ import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
+import { macErrorMenuKo } from './error-menu.js';
 import { macExternalLinksPaneKo } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
@@ -26,6 +27,7 @@ import { macPivotOptionsKo } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macSheetTabMenuKo } from './sheet-tab-menu.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogKo } from './style-dialog.js';
 import { macTextToColumnsWizardKo } from './text-to-columns-wizard.js';
@@ -268,5 +270,7 @@ export const macKo: MacStrings = {
     copyLevel: gridPopupsKo.contextMenu.copy,
     options: '옵션...',
   }),
+  macErrorMenu: macErrorMenuKo,
+  macSheetTabMenu: macSheetTabMenuKo,
   macFindReplace: macFindReplaceFrom(editDialogsKo.findReplace, '반각과 전각 구분'),
 };

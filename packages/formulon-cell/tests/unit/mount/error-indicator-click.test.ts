@@ -5,8 +5,12 @@ import { gridHitState } from '../../../src/render/grid/hit-state.js';
 const address = { sheet: 0, row: 5, col: 0 };
 const triangle = { addr: address, kind: 'error' as const, rect: { x: 32, y: 117, w: 6, h: 6 } };
 
-function setup() {
+function setup(mac = false) {
   const host = document.createElement('div');
+  if (mac) {
+    host.className = 'fc-host';
+    host.dataset.fcPlatform = 'mac';
+  }
   const grid = document.createElement('div');
   const canvas = document.createElement('canvas');
   host.append(grid);
@@ -15,16 +19,19 @@ function setup() {
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 100, 200, 200));
   gridHitState(grid).errorTriangles = [triangle];
   const open = vi.fn();
+  const invalidate = vi.fn();
   const handler = createErrorIndicatorClickHandler({
     grid,
     canvas,
     getErrorMenu: () => ({ open, close: vi.fn(), detach: vi.fn() }),
+    invalidate,
   });
+  host.addEventListener('pointerdown', handler.onPointerDownCapture, true);
   host.addEventListener('pointerdown', handler.onPointerDown);
   host.addEventListener('pointermove', handler.onPointerMove);
   host.addEventListener('pointercancel', handler.onPointerCancel);
   host.addEventListener('click', handler);
-  return { host, grid, canvas, handler, open };
+  return { host, grid, canvas, handler, open, invalidate };
 }
 
 function pointerDown(canvas: HTMLElement, pointerId = 7, clientX = 45, clientY = 220) {
@@ -173,5 +180,48 @@ describe('error indicator click routing', () => {
     capturedClick(grid, 7, 93, 220);
 
     expect(open).not.toHaveBeenCalled();
+  });
+});
+
+describe('Mac error smart tag', () => {
+  const tag = { addr: address, kind: 'error' as const, rect: { x: 5, y: 112, w: 22, h: 22 } };
+
+  it('does not open the menu from the triangle', () => {
+    const { canvas, open } = setup(true);
+    canvas.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientX: 45,
+        clientY: 220,
+      }),
+    );
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('arms the tag when the mouse presses the grid', () => {
+    const { canvas, grid, invalidate } = setup(true);
+    pointerDown(canvas, 1, 300, 300);
+    expect(gridHitState(grid).errorTagCell).toBe('pending');
+    expect(invalidate).toHaveBeenCalledOnce();
+  });
+
+  it('opens the menu at the tag bottom-left and keeps the selection', () => {
+    const { canvas, grid, open } = setup(true);
+    gridHitState(grid).errorTag = tag;
+    const seen = vi.fn();
+    grid.addEventListener('pointerdown', seen);
+    pointerDown(canvas, 1, 20, 220);
+    expect(open).toHaveBeenCalledExactlyOnceWith(address, 15, 234, 'error');
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it('leaves the desktop profile alone', () => {
+    const { canvas, grid, open } = setup(false);
+    gridHitState(grid).errorTag = tag;
+    pointerDown(canvas, 1, 20, 220);
+    expect(open).not.toHaveBeenCalled();
+    expect(gridHitState(grid).errorTagCell).toBeNull();
   });
 });

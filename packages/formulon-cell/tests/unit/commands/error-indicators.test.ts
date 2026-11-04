@@ -4,6 +4,7 @@ import {
   circleInvalidValidationDataInSheet,
   clearIgnoredCellErrors,
   clearValidationCircles,
+  convertTextToNumber,
   formulaErrorCellsInRange,
   formulaErrorIsFlagged,
   ignoreCellError,
@@ -15,6 +16,7 @@ import {
   toggleCellErrorIgnored,
 } from '../../../src/commands/error-indicators.js';
 import { History } from '../../../src/commands/history.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('error indicator commands', () => {
@@ -423,5 +425,37 @@ describe('Error Checking walks the formula rules on the Mac profile', () => {
       { sheet: 0, row: 7, col: 7 },
     ]);
     expect(formulaErrorCellsInRange(store, all)).toEqual([]);
+  });
+});
+
+describe('convertTextToNumber', () => {
+  it('turns numeric text into a number and drops a Text format', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const store = createSpreadsheetStore();
+      const addr = { sheet: 0, row: 8, col: 3 };
+      wb.setText(addr, '123');
+      mutators.replaceCells(store, wb.cells(0));
+      mutators.setCellFormat(store, addr, { numFmt: { kind: 'text' } });
+
+      expect(convertTextToNumber(store, wb, addr)).toBe(true);
+      expect(wb.getValue(addr)).toMatchObject({ kind: 'number', value: 123 });
+      expect(store.getState().format.formats.get('0:8:3')?.numFmt?.kind).not.toBe('text');
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('leaves text that is not a number alone', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const store = createSpreadsheetStore();
+      const addr = { sheet: 0, row: 0, col: 0 };
+      wb.setText(addr, 'abc');
+      mutators.replaceCells(store, wb.cells(0));
+      expect(convertTextToNumber(store, wb, addr)).toBe(false);
+    } finally {
+      wb.dispose();
+    }
   });
 });

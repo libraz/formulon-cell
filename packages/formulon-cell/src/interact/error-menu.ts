@@ -1,8 +1,11 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { convertTextToNumber, numberStoredAsText } from '../commands/error-indicators.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
@@ -114,16 +117,37 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
 
   const onScroll = (): void => close(false);
 
-  type ErrorMenuAction = 'showInfo' | 'editCell' | 'traceError' | 'ignore';
-  type ErrorMenuEntry = { id: ErrorMenuAction; label: string };
+  type ErrorMenuAction = 'showInfo' | 'editCell' | 'traceError' | 'ignore' | 'convert' | 'options';
+  type ErrorMenuEntry = { id: ErrorMenuAction; label: string; unavailable?: string };
+
+  const fcHost = host.closest<HTMLElement>('.fc-host') ?? host;
+  const mac = fcHost.dataset.fcPlatform === 'mac';
 
   const createErrorMenuItemButton = (entry: ErrorMenuEntry): HTMLButtonElement => {
-    return createInteractionButton({
+    const button = createInteractionButton({
       className: 'fc-errmenu__item',
       dataset: { fcAction: entry.id },
       role: 'menuitem',
       text: entry.label,
     });
+    if (entry.unavailable) {
+      projectDisabledState(button, true, entry.unavailable, { titlePrefix: entry.label });
+    }
+    return button;
+  };
+
+  /** The error-check rule a cell breaks, for the rules the Mac menu words itself. */
+  const macRuleOf = (addr: Addr): 'divZero' | 'numberAsText' | null => {
+    const cell = store.getState().data.cells.get(addrKey(addr));
+    if (!cell) return null;
+    if (cell.value.kind === 'error' && cell.value.text === '#DIV/0!') return 'divZero';
+    let locale: string | undefined;
+    try {
+      locale = inputLocaleForWorkbook(getWb() as WorkbookHandle);
+    } catch {
+      locale = undefined;
+    }
+    return numberStoredAsText(cell.value, cell.formula, locale) ? 'numberAsText' : null;
   };
 
   /** Format a short "{code} — {value}" preview for the heading row. Falls
@@ -154,18 +178,38 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
 
     const heading = document.createElement('div');
     heading.className = 'fc-errmenu__heading';
-    const label = kind === 'validation' ? t.validationHeading : t.errorHeading;
+    const m = strings.macErrorMenu;
+    const rule = mac && kind === 'error' ? macRuleOf(addr) : null;
+    const label = rule
+      ? rule === 'divZero'
+        ? m.divZeroHeading
+        : m.numberAsTextHeading
+      : kind === 'validation'
+        ? t.validationHeading
+        : t.errorHeading;
     root.setAttribute('aria-label', label);
-    const detail = describeCell(addr);
+    const detail = rule ? '' : describeCell(addr);
     heading.textContent = detail ? `${label} — ${detail}` : label;
+    heading.classList.toggle('fc-errmenu__heading--rule', rule !== null);
     root.appendChild(heading);
 
-    const entries: ErrorMenuEntry[] = [
-      { id: 'showInfo', label: t.showInfo },
-      { id: 'editCell', label: t.editCell },
-      { id: 'traceError', label: t.traceError },
-      { id: 'ignore', label: t.ignore },
-    ];
+    const entries: ErrorMenuEntry[] = rule
+      ? [
+          ...(rule === 'numberAsText'
+            ? [{ id: 'convert' as const, label: m.convertToNumber }]
+            : []),
+          { id: 'showInfo', label: m.help },
+          ...(rule === 'divZero' ? [{ id: 'traceError' as const, label: m.trace }] : []),
+          { id: 'ignore', label: m.ignore },
+          { id: 'editCell', label: m.editInFormulaBar },
+          { id: 'options', label: m.options, unavailable: m.optionsUnavailable },
+        ]
+      : [
+          { id: 'showInfo', label: t.showInfo },
+          { id: 'editCell', label: t.editCell },
+          { id: 'traceError', label: t.traceError },
+          { id: 'ignore', label: t.ignore },
+        ];
 
     for (const entry of entries) {
       const btn = createErrorMenuItemButton(entry);
@@ -217,6 +261,13 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
         mutators.ignoreError(store, addr);
         return;
       }
+      case 'convert': {
+        const wb = getWb();
+        if (wb) convertTextToNumber(store, wb, addr);
+        return;
+      }
+      case 'options':
+        return;
     }
   };
 

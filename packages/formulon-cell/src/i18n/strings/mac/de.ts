@@ -12,6 +12,7 @@ import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
+import { macErrorMenuDe } from './error-menu.js';
 import { macExternalLinksPaneDe } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
@@ -26,6 +27,7 @@ import { macPivotOptionsDe } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macSheetTabMenuDe } from './sheet-tab-menu.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogDe } from './style-dialog.js';
 import { macTextToColumnsWizardDe } from './text-to-columns-wizard.js';
@@ -271,6 +273,8 @@ export const macDe: MacStrings = {
     copyLevel: gridPopupsDe.contextMenu.copy,
     options: 'Optionen...',
   }),
+  macErrorMenu: macErrorMenuDe,
+  macSheetTabMenu: macSheetTabMenuDe,
   macFindReplace: macFindReplaceFrom(
     editDialogsDe.findReplace,
     'Halbbreite und Vollbreite unterscheiden',

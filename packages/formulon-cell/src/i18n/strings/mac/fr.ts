@@ -12,6 +12,7 @@ import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
+import { macErrorMenuFr } from './error-menu.js';
 import { macExternalLinksPaneFr } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
@@ -26,6 +27,7 @@ import { macPivotOptionsFr } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macSheetTabMenuFr } from './sheet-tab-menu.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogFr } from './style-dialog.js';
 import { macTextToColumnsWizardFr } from './text-to-columns-wizard.js';
@@ -269,6 +271,8 @@ export const macFr: MacStrings = {
     copyLevel: gridPopupsFr.contextMenu.copy,
     options: 'Options...',
   }),
+  macErrorMenu: macErrorMenuFr,
+  macSheetTabMenu: macSheetTabMenuFr,
   macFindReplace: macFindReplaceFrom(
     editDialogsFr.findReplace,
     'Distinguer demi-chasse et pleine chasse',

@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
+import { ja } from '../../../src/i18n/strings/ja.js';
 import { attachErrorMenu } from '../../../src/interact/error-menu.js';
-import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -177,5 +178,57 @@ describe('attachErrorMenu', () => {
       /\.fc-errmenu__item:hover,[\s\S]*?\.fc-errmenu__item:focus-visible\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
     );
     expect(css).not.toContain('background: var(--fc-accent-soft');
+  });
+
+  describe('on the Mac host', () => {
+    const openMenu = (
+      value: { kind: 'error'; code: number; text: string } | { kind: 'text'; value: string },
+    ) => {
+      const fcHost = document.createElement('div');
+      fcHost.className = 'fc-host';
+      fcHost.dataset.fcPlatform = 'mac';
+      document.body.appendChild(fcHost);
+      const store = createSpreadsheetStore();
+      const addr = { sheet: 0, row: 5, col: 3 };
+      mutators.replaceCells(store, [{ addr, value, formula: null }]);
+      const handle = attachErrorMenu({ host: fcHost, store, getWb: fakeWb, strings: ja });
+      handle.open(addr, 10, 10, 'error');
+      const labels = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-errmenu__item'),
+        (b) =>
+          `${b.disabled || b.getAttribute('aria-disabled') === 'true' ? '[DIS]' : ''}${b.textContent}`,
+      );
+      return {
+        heading: document.querySelector('.fc-errmenu__heading')?.textContent,
+        labels,
+        handle,
+      };
+    };
+
+    it('words the divide-by-zero menu as Excel does', () => {
+      const { heading, labels, handle } = openMenu({ kind: 'error', code: 7, text: '#DIV/0!' });
+      expect(heading).toBe('0 除算のエラー');
+      expect(labels).toEqual([
+        'このエラーに関するヘルプ(H)',
+        'エラーのトレース(T)',
+        'エラーを無視する(I)',
+        '数式バーで編集(F)',
+        '[DIS]エラー チェック オプション...',
+      ]);
+      handle.detach();
+    });
+
+    it('words the number-stored-as-text menu with Convert to Number first', () => {
+      const { heading, labels, handle } = openMenu({ kind: 'text', value: '123' });
+      expect(heading).toBe('数値が文字列として保存されています');
+      expect(labels).toEqual([
+        '数値に変換する(C)',
+        'このエラーに関するヘルプ(H)',
+        'エラーを無視する(I)',
+        '数式バーで編集(F)',
+        '[DIS]エラー チェック オプション...',
+      ]);
+      handle.detach();
+    });
   });
 });

@@ -394,6 +394,7 @@ export const Spreadsheet = {
       sheetMenu,
       sheetTabs,
       store,
+      toggleSheetProtection: () => instance.toggleSheetProtection(),
     });
     sheetTabsController.update();
 
@@ -532,6 +533,7 @@ export const Spreadsheet = {
       grid,
       canvas,
       getErrorMenu: () => featureState.errorMenu,
+      invalidate: () => renderer.invalidate(),
     });
 
     const formulaBar = attachFormulaBarController({

@@ -8,6 +8,7 @@ import type { MacCfRulesDialogStrings } from './cf-rules-dialog.js';
 import type { MacChromeStrings } from './chrome.js';
 import type { MacCreateTableStrings } from './create-table.js';
 import type { MacDataValidationStrings } from './data-validation.js';
+import type { MacErrorMenuStrings } from './error-menu.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
 import type { MacGoToDialogStrings } from './goto-dialog.js';
 import type { MacHyperlinkDialogStrings } from './hyperlink-dialog.js';
@@ -20,6 +21,7 @@ import type { MacPivotOptionsStrings } from './pivot-options.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
+import type { MacSheetTabMenuStrings } from './sheet-tab-menu.js';
 import type { MacSortDialogStrings } from './sort-dialog.js';
 import type { MacStyleDialogStrings } from './style-dialog.js';
 import type { MacWatchWindowStrings } from './watch-window.js';
@@ -29,6 +31,8 @@ export interface MacStrings {
   /** Overrides of `formatDialog` that apply on the Mac host only. */
   macFormatDialog: Partial<CellFormatStrings['formatDialog']>;
   /** Overrides of `findReplace` that apply on the Mac host only. */
+  macErrorMenu: MacErrorMenuStrings;
+  macSheetTabMenu: MacSheetTabMenuStrings;
   macFindReplace: MacFindReplaceStrings;
   /** Overrides of `iterativeDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   macIterativeDialog: MacIterativeDialogStrings;

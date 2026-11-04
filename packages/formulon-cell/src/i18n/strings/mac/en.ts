@@ -12,6 +12,7 @@ import { macAdvancedFilterFrom } from './advanced-filter.js';
 import { macAlertsFrom } from './alerts.js';
 import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
+import { macErrorMenuEn } from './error-menu.js';
 import { macExternalLinksPaneEn } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
@@ -26,6 +27,7 @@ import { macPivotOptionsEn } from './pivot-options.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
+import { macSheetTabMenuEn } from './sheet-tab-menu.js';
 import { macSortDialogFrom } from './sort-dialog.js';
 import { macStyleDialogEn } from './style-dialog.js';
 import { macTextToColumnsWizardEn } from './text-to-columns-wizard.js';
@@ -268,5 +270,7 @@ export const macEn: MacStrings = {
     copyLevel: gridPopupsEn.contextMenu.copy,
     options: 'Options...',
   }),
+  macErrorMenu: macErrorMenuEn,
+  macSheetTabMenu: macSheetTabMenuEn,
   macFindReplace: macFindReplaceFrom(editDialogsEn.findReplace, 'Match half-width and full-width'),
 };
