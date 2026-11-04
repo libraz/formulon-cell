@@ -525,8 +525,11 @@
     mask: none;
     transform: translateY(-2px) rotate(-45deg);
   }
-  /* The measured Mac PivotTable menu: 264 pt wide, with a check gutter before
-   * every label. */
+  /* The measured Mac PivotTable menu: 12 pt text, 264 pt wide, with a check
+   * gutter before every label. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu[data-fc-menu="pivot"] {
+    font-size: 12px;
+  }
   .fc-overlay-portal[data-fc-platform="mac"]
     .fc-ctxmenu[data-fc-menu="pivot"]:not(.fc-ctxmenu__sub) {
     min-width: 264px;
@@ -544,7 +547,9 @@
 }
 
 /* Measured Mac PivotTable submenu widths, in pt taken as px. A label set in a
- * wider fallback font widens its panel rather than being cut off. */
+ * wider fallback font widens its panel rather than being cut off. Labels sit
+ * 16.5 pt in, 31 pt when the submenu has a check column, and end 18 pt before
+ * the edge. */
 @layer fc.app {
   .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sub[data-fc-menu="pivot"] {
     min-width: var(--fc-ctxmenu-sub-width, 200px);
@@ -553,8 +558,13 @@
   .fc-overlay-portal[data-fc-platform="mac"]
     .fc-ctxmenu__sub[data-fc-menu="pivot"]
     .fc-ctxmenu__item {
-    column-gap: 8px;
-    padding-inline: 20px 6px;
+    column-gap: 0;
+    padding-inline: 10.5px 12px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu__sub[data-fc-menu="pivot"]:has([role="menuitemcheckbox"])
+    .fc-ctxmenu__item {
+    padding-inline-start: 25px;
   }
   .fc-ctxmenu__sub[data-fc-submenu="pivotSelectMenu"],
   .fc-ctxmenu__sub[data-fc-submenu="pivotShowAsMenu"] {
