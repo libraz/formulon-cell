@@ -621,6 +621,8 @@ export {
   saveWorkbookWithPrompts,
   workbookSaveFormats,
 } from './toolbar/dialogs/workbook-save.js';
+export type { ExcelRibbonIconName } from './toolbar/excel-ribbon-icons.js';
+export { createExcelRibbonSvg } from './toolbar/excel-ribbon-icons.js';
 export type { DisabledReasonProjectionOptions } from './toolbar/menu-a11y.js';
 export { projectDisabledReason, projectDisabledState } from './toolbar/menu-a11y.js';
 export type { ToolbarMenuText } from './toolbar/menu-text.js';

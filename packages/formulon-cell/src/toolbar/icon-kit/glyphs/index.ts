@@ -13,6 +13,7 @@ import { MEDIA_ICONS } from './media.js';
 import { PAGE_SETUP_ICONS } from './page-setup.js';
 import { PIVOT_ICONS } from './pivot.js';
 import { REVIEW_ICONS } from './review.js';
+import { SHELL_ICONS } from './shell.js';
 import { SORT_FILTER_ICONS } from './sort-filter.js';
 import { STRUCTURE_ICONS } from './structure.js';
 import { TABLE_ICONS } from './table.js';
@@ -39,4 +40,5 @@ export const RIBBON_GLYPHS = {
   ...REVIEW_ICONS,
   ...VIEW_ICONS,
   ...FILE_ICONS,
+  ...SHELL_ICONS,
 };

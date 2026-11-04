@@ -37,6 +37,10 @@ const paint = (path: SVGPathElement, property: 'fill' | 'stroke', color: string)
   else path.setAttribute(property, themed ?? color);
 };
 
+/**
+ * Build one ribbon glyph as an inline SVG carrying `className`, or null for a name the set
+ * does not define. Neutral strokes follow the surrounding text colour.
+ */
 export const createExcelRibbonSvg = (name: string, className: string): SVGSVGElement | null => {
   const segments = excelRibbonIconPaths(name);
   if (!segments) return null;
