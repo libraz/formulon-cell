@@ -207,6 +207,7 @@
   }
   .fc-mac-subtotal__body {
     gap: 0;
+    padding-bottom: 5px;
   }
   .fc-mac-subtotal__row {
     gap: 8px;
@@ -217,6 +218,11 @@
   .fc-mac-subtotal__row .fc-fmtdlg__select {
     width: 278px;
     min-height: 26px;
+  }
+  /* The pop-ups run 3 pt past the body inset on each side, as on the desktop. */
+  .fc-mac-subtotal__row .fc-select {
+    max-width: none;
+    margin-inline: -3px;
   }
   .fc-mac-subtotal__fields-label {
     margin: 0 0 6px;
@@ -256,7 +262,7 @@
   .fc-mac-consolidate__body {
     gap: 0;
     padding-top: 8px;
-    padding-bottom: 6px;
+    padding-bottom: 1px;
   }
   .fc-mac-consolidate__body > .fc-mac-consolidate__row:not(.fc-mac-consolidate__row--list) {
     grid-template-columns: 75px minmax(0, 1fr);
@@ -352,7 +358,7 @@
   /* The Mac sheet places the tab box at (13, 38), 574x349, and the buttons on y 388. */
   .fc-fmtdlg--mac.fc-fmtdlg--data-validation .fc-fmtdlg__body {
     width: 574px;
-    height: 337px;
+    height: 349px;
     max-height: none;
     overflow: hidden;
   }
@@ -373,7 +379,8 @@
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vpane {
     position: relative;
-    min-height: 268px;
+    box-sizing: border-box;
+    min-height: 311px;
     padding: 0 18px;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vpane[hidden] {
@@ -392,7 +399,7 @@
     .fc-fmtdlg__vpane[data-fc-pane="settings"] {
     display: grid;
     grid-template-columns: 228px 1fr;
-    column-gap: 60px;
+    column-gap: 75px;
     row-gap: 6px;
     align-content: start;
   }
@@ -424,12 +431,12 @@
     grid-column: 2 !important;
     grid-row: 2;
     align-self: end;
-    margin-bottom: 4px;
+    margin-bottom: -1px;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-fmtdlg--data-validation .fc-fmtdlg__vapplyall {
     position: absolute;
     left: 18px;
-    bottom: 0;
+    bottom: 32px;
   }
   .fc-overlay-portal[data-fc-platform="mac"]
     .fc-fmtdlg--data-validation

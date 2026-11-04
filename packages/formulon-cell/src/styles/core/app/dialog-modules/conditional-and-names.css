@@ -608,4 +608,14 @@
     min-width: 0;
     padding-inline: 0;
   }
+  /* Window heights: Name Manager 524, Define Name 267. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__panel > .fc-fmtdlg__body {
+    padding-bottom: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__refers {
+    margin-bottom: 0;
+  }
+  .fc-namedlg-define__body {
+    padding-bottom: 5px;
+  }
 }

@@ -170,6 +170,6 @@
     padding-bottom: 0;
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-hldlg__panel .fc-fmtdlg__footer {
-    padding-top: 12px;
+    padding-top: 10px;
   }
 }

@@ -5,6 +5,15 @@
   .fc-pgsetup__panel {
     width: min(560px, 96vw);
   }
+  /* Excel for Mac: the Page Setup window is 559x533 pt. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__panel {
+    width: min(559px, 96vw);
+    height: 533px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__panel > .fc-fmtdlg__body {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
   .fc-pgsetup__row {
     display: grid;
     grid-template-columns: 160px 1fr;
@@ -396,5 +405,22 @@
   }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__sheet-order {
     border-bottom: 0;
+  }
+  /* Fit every Mac tab inside the 533 pt window. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac {
+    gap: 4px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__section {
+    gap: 6px;
+    padding-block: 8px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__sheet--mac .fc-pgsetup__sheet-heading {
+    padding-top: 8px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__hf-buttons {
+    padding-block: 12px 8px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__tab--mac .fc-pgsetup__hf-options--mac {
+    padding-block: 4px 2px;
   }
 }
