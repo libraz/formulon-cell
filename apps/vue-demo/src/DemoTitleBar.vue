@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { RibbonTab, SpreadsheetInstance } from '@libraz/formulon-cell';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
+  buildDemoSearchSuggestions,
   type DemoPlatform,
   type DemoSearchItem,
   type DemoSearchUsagePrior,
@@ -18,7 +19,9 @@ import {
   resolveDemoSearchKey,
   saveDemoSearchUsagePrior,
 } from '../../demo-shared/index.js';
+import DemoGlyph from './DemoGlyph.vue';
 import DemoIcon from './DemoIcon.vue';
+import DemoQuickAccess from './DemoQuickAccess.vue';
 
 const props = defineProps<{
   ui: DemoUiStrings;
@@ -27,9 +30,13 @@ const props = defineProps<{
   instance: SpreadsheetInstance | null;
   showPanel: boolean;
   searchItems: readonly DemoSearchItem[];
+  /** Runs a ribbon command id through the toolbar; false when none matched. */
+  applyCommand: (commandId: string) => boolean;
 }>();
 const emit = defineEmits<{
   save: [];
+  saveAs: [];
+  newWorkbook: [];
   openBackstage: [];
   togglePanel: [];
   tabChange: [tab: RibbonTab];
@@ -54,6 +61,44 @@ const filteredCommands = computed(() => {
   return queryDemoSearchItems(props.searchItems, searchQuery.value, 8, searchUsagePrior.value);
 });
 
+const mac = computed(() => props.platform === 'mac');
+// The Mac title bar shows a magnifier button until the search is opened.
+const searchActive = ref(false);
+const openSearch = (): void => {
+  searchActive.value = true;
+  void nextTick(() => searchInput.value?.focus());
+};
+
+const quickAccessDeps = computed(() => ({
+  instance: props.instance,
+  newWorkbook: () => emit('newWorkbook'),
+  saveWorkbook: () => emit('save'),
+  saveWorkbookAs: () => emit('saveAs'),
+  setRibbonTab: (tab: RibbonTab) => emit('tabChange', tab),
+  applyCommand: props.applyCommand,
+}));
+
+const suggestionRows = computed(() =>
+  mac.value
+    ? buildDemoSearchSuggestions(props.ui, {
+        instance: props.instance,
+        setRibbonTab: (tab) => emit('tabChange', tab),
+        applyCommand: props.applyCommand,
+      })
+    : [],
+);
+const suggestions = computed(() => suggestionRows.value.flatMap((section) => section.items));
+// An empty Mac query lists the suggestions; a typed one lists the matches.
+const showSuggestions = computed(() => mac.value && searchQuery.value.trim() === '');
+const rowCount = computed(() =>
+  showSuggestions.value ? suggestions.value.length : filteredCommands.value.length,
+);
+
+const closeSearch = (): void => {
+  dispatchSearch({ type: 'reset' });
+  searchActive.value = false;
+};
+
 const runCommand = (cmd: DemoSearchItem): void => {
   searchUsagePrior.value = recordDemoSearchUsage(searchUsagePrior.value, cmd);
   if (cmd.tab) emit('tabChange', cmd.tab);
@@ -66,8 +111,25 @@ const onSearchInput = (ev: Event): void => {
   dispatchSearch({ type: 'input', value: input.value, focused: document.activeElement === input });
 };
 
+const runRow = (index: number): void => {
+  if (!showSuggestions.value) {
+    const command = filteredCommands.value[index];
+    if (command) runCommand(command);
+    return;
+  }
+  const suggestion = suggestions.value[index];
+  if (!suggestion || suggestion.disabled) return;
+  closeSearch();
+  suggestion.run();
+};
+
+const onSearchBlur = (): void => {
+  dispatchSearch({ type: 'blur' });
+  if (mac.value && searchQuery.value.trim() === '') searchActive.value = false;
+};
+
 const onSearchKeydown = (ev: KeyboardEvent): void => {
-  const action = resolveDemoSearchKey(ev.key, searchActiveIndex.value, filteredCommands.value.length);
+  const action = resolveDemoSearchKey(ev.key, searchActiveIndex.value, rowCount.value);
   if (action?.kind === 'close') {
     dispatchSearch({ type: 'key', action });
     (ev.currentTarget as HTMLInputElement).blur();
@@ -76,15 +138,18 @@ const onSearchKeydown = (ev: KeyboardEvent): void => {
     dispatchSearch({ type: 'key', action });
   } else if (action?.kind === 'run') {
     ev.preventDefault();
-    const command = filteredCommands.value[action.index];
-    if (command) runCommand(command);
+    runRow(action.index);
   }
 };
 
 watch(searchUsagePrior, (prior) => saveDemoSearchUsagePrior(prior));
 
 onMounted(() => {
-  disposeSearchShortcut = installDemoSearchShortcut(() => searchInput.value, props.platform);
+  disposeSearchShortcut = installDemoSearchShortcut(
+    () => searchInput.value,
+    props.platform,
+    mac.value ? openSearch : undefined,
+  );
 });
 onBeforeUnmount(() => {
   disposeSearchShortcut?.();
@@ -114,38 +179,91 @@ onBeforeUnmount(() => {
         <span v-else class="demo__brand-mark" aria-hidden="true">
           <DemoIcon name="app" />
         </span>
-        <button type="button" class="demo__title-icon" :aria-label="ui.save" :title="ui.save" @click="emit('save')">
-          <DemoIcon name="save" />
-        </button>
-        <button type="button" class="demo__title-icon" :aria-label="ui.undo" :title="ui.undo" @click="instance?.undo()">
-          <DemoIcon name="undo" />
-        </button>
-        <button type="button" class="demo__title-icon" :aria-label="ui.redo" :title="ui.redo" @click="instance?.redo()">
-          <DemoIcon name="redo" />
-        </button>
+        <DemoQuickAccess v-if="mac" :ui="ui" :instance="instance" :deps="quickAccessDeps" />
+        <template v-else>
+          <button type="button" class="demo__title-icon" :aria-label="ui.save" :title="ui.save" @click="emit('save')">
+            <DemoIcon name="save" />
+          </button>
+          <button type="button" class="demo__title-icon" :aria-label="ui.undo" :title="ui.undo" @click="instance?.undo()">
+            <DemoIcon name="undo" />
+          </button>
+          <button type="button" class="demo__title-icon" :aria-label="ui.redo" :title="ui.redo" @click="instance?.redo()">
+            <DemoIcon name="redo" />
+          </button>
+        </template>
       </div>
       <div class="fc-tb__title">
         <strong>{{ bookName }}</strong>
         <span>{{ ui.saved }}</span>
       </div>
-      <div class="fc-tb__search">
-        <DemoIcon name="search" />
+      <button
+        v-if="mac && !searchActive"
+        type="button"
+        class="demo__search-button"
+        :aria-label="ui.searchSuggestions.button"
+        :title="ui.searchSuggestions.button"
+        @click="openSearch"
+      >
+        <DemoGlyph name="find" />
+      </button>
+      <div v-else class="fc-tb__search">
+        <DemoGlyph v-if="mac" name="find" />
+        <DemoIcon v-else name="search" />
         <input
           ref="searchInput"
           :value="searchQuery"
           type="search"
           role="combobox"
-          :placeholder="ui.search"
-          :aria-label="platform === 'mac' ? ui.search : ui.searchCommands"
+          :placeholder="mac ? ui.searchSuggestions.button : ui.search"
+          :aria-label="mac ? ui.search : ui.searchCommands"
           aria-controls="demo-search-results"
           :aria-expanded="searchOpen"
           :aria-activedescendant="searchOpen && searchActiveIndex >= 0 ? demoSearchOptionId(searchActiveIndex) : undefined"
           @focus="dispatchSearch({ type: 'focus' })"
           @input="onSearchInput"
           @keydown="onSearchKeydown"
-          @blur="dispatchSearch({ type: 'blur' })"
+          @blur="onSearchBlur"
         />
-        <div v-if="searchOpen" id="demo-search-results" class="fc-tb__command-menu" role="listbox">
+        <div
+          v-if="searchOpen && showSuggestions"
+          id="demo-search-results"
+          class="fc-tb__command-menu demo__search-suggestions"
+          role="listbox"
+          :aria-label="ui.searchSuggestions.popup"
+        >
+          <div
+            v-for="section in suggestionRows"
+            :key="section.id"
+            :class="['demo__search-section', `demo__search-section--${section.id}`]"
+            role="group"
+            :aria-label="section.heading ?? undefined"
+          >
+            <div v-if="section.heading" class="demo__search-heading" role="presentation">
+              {{ section.heading }}
+            </div>
+            <button
+              v-for="item in section.items"
+              :key="item.id"
+              :id="demoSearchOptionId(suggestions.indexOf(item))"
+              type="button"
+              role="option"
+              :aria-selected="suggestions.indexOf(item) === searchActiveIndex"
+              :aria-disabled="item.disabled ? 'true' : undefined"
+              :class="[
+                'demo__search-suggestion',
+                { 'demo__search-suggestion--active': suggestions.indexOf(item) === searchActiveIndex },
+              ]"
+              @mousedown.prevent
+              @mouseenter="dispatchSearch({ type: 'hover', index: suggestions.indexOf(item) })"
+              @click="runRow(suggestions.indexOf(item))"
+            >
+              <DemoGlyph :name="item.glyph" />
+              <span class="demo__search-suggestion-label">{{ item.label }}</span>
+              <span v-if="item.submenu" class="demo__search-submenu" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <div v-else-if="searchOpen" id="demo-search-results" class="fc-tb__command-menu" role="listbox">
           <div v-if="filteredCommands.length === 0" class="fc-tb__command-empty">
             {{ ui.noCommands }}
           </div>

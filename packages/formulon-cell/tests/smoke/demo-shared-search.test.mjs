@@ -5,12 +5,18 @@ import { createCommandPalette } from '../../../../apps/demo-shared/command-palet
 import {
   buildDemoPrintPreviewModel,
   buildDemoSearchItems,
+  buildDemoSearchSuggestions,
   createDemoStrings,
+  DEFAULT_DEMO_QUICK_ACCESS,
   DEMO_ICONS,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
+  DEMO_QUICK_ACCESS_COMMANDS,
+  DEMO_QUICK_ACCESS_GLYPHS,
   demoChangeLogEntry,
   demoCommandText,
+  demoQuickAccessEnabled,
+  demoQuickAccessMenu,
   demoSelectionLabel,
   evaluateDemoProbe,
   INITIAL_DEMO_SEARCH_STATE,
@@ -23,8 +29,14 @@ import {
   resolveDemoSearchKey,
   runDemoScript,
   saveDemoWorkbookToDownload,
+  toggleDemoQuickAccess,
 } from '../../../../apps/demo-shared/index.ts';
-import { createSpreadsheetStore, mutators, WorkbookHandle } from '../../src/index.ts';
+import {
+  createExcelRibbonSvg,
+  createSpreadsheetStore,
+  mutators,
+  WorkbookHandle,
+} from '../../src/index.ts';
 
 const repoRoot = join(import.meta.dirname, '../../../..');
 
@@ -45,6 +57,9 @@ describe('demo-shared Search/Tell me items', () => {
     expect(react.en.redo).toBe('Redo');
     expect(react.ja.undo).toBe('元に戻す');
     expect(react.ja.redo).toBe('やり直し');
+    // The Mac title bar's redo slot repeats the last action and says so.
+    expect(react.ja.quickAccess.buttons.redo).toBe('繰り返し');
+    expect(react.en.quickAccess.buttons.redo).toBe('Repeat');
     expect(react.en.demoChrome).toBe('Demo chrome');
     expect(react.ja.demoChrome).toBe('デモ表示');
     expect(react.en.themeLabels.paper).toBe('Light');
@@ -564,5 +579,109 @@ describe('demo-shared Search/Tell me items', () => {
     expect(writes).toEqual([[1, 'OPEN']]);
     expect(history.begin).toHaveBeenCalledTimes(1);
     expect(history.end).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists the Mac Quick Access customize menu in desktop order with the default checks', () => {
+    const ui = createDemoStrings('React').ja;
+    expect(
+      demoQuickAccessMenu(ui, DEFAULT_DEMO_QUICK_ACCESS).map((i) => [i.label, i.checked]),
+    ).toEqual([
+      ['自動保存', true],
+      ['新規作成', false],
+      ['ホーム', true],
+      ['保存', true],
+      ['名前を付けて保存', true],
+      ['ブックを送信', false],
+      ['印刷', false],
+      ['スペル チェック', false],
+      ['元に戻す', true],
+      ['繰り返し', true],
+      ['昇順で並べ替え', false],
+      ['降順で並べ替え', false],
+    ]);
+    expect(
+      DEFAULT_DEMO_QUICK_ACCESS.map((id) => ui.quickAccess.buttons[id] ?? ui.quickAccess.autosave),
+    ).toEqual(['自動保存', 'ホーム', '保存', '別名で保存', '元に戻す', '繰り返し']);
+    expect(DEMO_QUICK_ACCESS_GLYPHS.redo).toBe('repeat');
+    expect(DEMO_QUICK_ACCESS_GLYPHS.home).toBe('home');
+  });
+
+  it('keeps toggled Quick Access commands in customize-menu order', () => {
+    const added = toggleDemoQuickAccess(DEFAULT_DEMO_QUICK_ACCESS, 'print');
+    expect(added).toEqual(['autosave', 'home', 'save', 'saveAs', 'print', 'undo', 'redo']);
+    expect(toggleDemoQuickAccess(added, 'home')).toEqual([
+      'autosave',
+      'save',
+      'saveAs',
+      'print',
+      'undo',
+      'redo',
+    ]);
+    expect(DEMO_QUICK_ACCESS_COMMANDS).toHaveLength(12);
+  });
+
+  it('disables Undo without history and Send Workbook always', () => {
+    const instance = (canUndo) => ({ history: { canUndo: () => canUndo } });
+    expect(demoQuickAccessEnabled('undo', instance(false))).toBe(false);
+    expect(demoQuickAccessEnabled('undo', instance(true))).toBe(true);
+    expect(demoQuickAccessEnabled('undo', null)).toBe(false);
+    expect(demoQuickAccessEnabled('sendWorkbook', instance(true))).toBe(false);
+    expect(demoQuickAccessEnabled('redo', instance(false))).toBe(true);
+  });
+
+  it('builds the Mac empty-query search popup sections', () => {
+    const ui = createDemoStrings('React').ja;
+    const openFindReplace = vi.fn();
+    const applyCommand = vi.fn(() => true);
+    const sections = buildDemoSearchSuggestions(ui, {
+      instance: { openFindReplace },
+      setRibbonTab: vi.fn(),
+      applyCommand,
+    });
+    expect(
+      sections.map((section) => [
+        section.heading,
+        section.items.map((item) => [item.label, item.disabled === true, item.submenu === true]),
+      ]),
+    ).toEqual([
+      [
+        'おすすめの操作',
+        [
+          ['ウインドウ枠の固定', false, true],
+          ['ヘッダーとフッター...', false, false],
+          ['シートの行を挿入', false, false],
+          ['重複を削除', false, false],
+          ['マクロ...', true, false],
+        ],
+      ],
+      [
+        '検索と置換',
+        [
+          ['検索する', false, false],
+          ['検索と置換', false, false],
+        ],
+      ],
+      [null, [['検索に関するフィードバック', true, false]]],
+    ]);
+    expect(ui.searchSuggestions.button).toBe('検索 (Cmd + Ctrl + U)');
+    const find = sections[1].items;
+    find[0].run();
+    find[1].run();
+    expect(openFindReplace.mock.calls).toEqual([['find'], ['replace']]);
+    sections[0].items[2].run();
+    expect(applyCommand).toHaveBeenCalledWith('insertRows');
+    expect(sections[2].items[0].glyph).toBe('feedback');
+  });
+
+  it('draws every Quick Access and search glyph from the core icon kit', () => {
+    const ui = createDemoStrings('React').ja;
+    const deps = { instance: null, setRibbonTab: () => {}, applyCommand: () => false };
+    const names = [
+      ...Object.values(DEMO_QUICK_ACCESS_GLYPHS).filter(Boolean),
+      ...buildDemoSearchSuggestions(ui, deps).flatMap((s) => s.items.map((i) => i.glyph)),
+      'find',
+      'moreCommands',
+    ];
+    expect(names.filter((name) => createExcelRibbonSvg(name, 'x') === null)).toEqual([]);
   });
 });

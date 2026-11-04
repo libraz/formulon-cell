@@ -87,6 +87,59 @@ export interface DemoUiStrings {
   options: string;
   optionsDesc: string;
   noCommands: string;
+  /** Mac Quick Access Toolbar: button names, customize-menu rows and the chevron. */
+  quickAccess: {
+    customize: string;
+    moreCommands: string;
+    autosave: string;
+    buttons: Record<
+      | 'home'
+      | 'save'
+      | 'saveAs'
+      | 'undo'
+      | 'redo'
+      | 'new'
+      | 'sendWorkbook'
+      | 'print'
+      | 'spelling'
+      | 'sortAsc'
+      | 'sortDesc',
+      string
+    >;
+    menu: Record<
+      | 'autosave'
+      | 'new'
+      | 'home'
+      | 'save'
+      | 'saveAs'
+      | 'sendWorkbook'
+      | 'print'
+      | 'spelling'
+      | 'undo'
+      | 'redo'
+      | 'sortAsc'
+      | 'sortDesc',
+      string
+    >;
+  };
+  /** Mac title-bar search: the idle button, the field and its suggestion popup. */
+  searchSuggestions: {
+    button: string;
+    popup: string;
+    recommended: string;
+    findReplace: string;
+    items: Record<
+      | 'freeze'
+      | 'headerFooter'
+      | 'insertSheetRows'
+      | 'removeDuplicates'
+      | 'macros'
+      | 'find'
+      | 'findReplace'
+      | 'feedback',
+      string
+    >;
+  };
   loadingEngine: string;
   engineUnavailable: string;
   engineSetup: string;
@@ -275,6 +328,54 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       options: 'Options',
       optionsDesc: 'Show the integration panel and feature toggles.',
       noCommands: 'No commands found',
+      quickAccess: {
+        customize: 'Customize Quick Access Toolbar',
+        moreCommands: 'More Commands...',
+        autosave: 'AutoSave',
+        buttons: {
+          home: 'Home',
+          save: 'Save',
+          saveAs: 'Save As',
+          undo: 'Undo',
+          redo: 'Repeat',
+          new: 'New',
+          sendWorkbook: 'Send Workbook',
+          print: 'Print',
+          spelling: 'Spelling',
+          sortAsc: 'Sort Ascending',
+          sortDesc: 'Sort Descending',
+        },
+        menu: {
+          autosave: 'AutoSave',
+          new: 'New',
+          home: 'Home',
+          save: 'Save',
+          saveAs: 'Save As',
+          sendWorkbook: 'Send Workbook',
+          print: 'Print',
+          spelling: 'Spelling',
+          undo: 'Undo',
+          redo: 'Repeat',
+          sortAsc: 'Sort Ascending',
+          sortDesc: 'Sort Descending',
+        },
+      },
+      searchSuggestions: {
+        button: 'Search (Cmd + Ctrl + U)',
+        popup: 'Search, available suggestions',
+        recommended: 'Suggested Actions',
+        findReplace: 'Find and Replace',
+        items: {
+          freeze: 'Freeze Panes',
+          headerFooter: 'Header & Footer...',
+          insertSheetRows: 'Insert Sheet Rows',
+          removeDuplicates: 'Remove Duplicates',
+          macros: 'Macros...',
+          find: 'Find',
+          findReplace: 'Find and Replace',
+          feedback: 'Search Feedback',
+        },
+      },
       loadingEngine: 'Loading engine...',
       engineUnavailable: 'Spreadsheet engine unavailable',
       engineSetup: 'Check WebAssembly support and that the engine WASM asset can be loaded.',
@@ -405,6 +506,54 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       options: 'オプション',
       optionsDesc: '統合パネルと機能トグルを表示します。',
       noCommands: 'コマンドが見つかりません',
+      quickAccess: {
+        customize: 'クイック アクセス ツールバーのカスタマイズ',
+        moreCommands: 'その他のコマンド...',
+        autosave: '自動保存',
+        buttons: {
+          home: 'ホーム',
+          save: '保存',
+          saveAs: '別名で保存',
+          undo: '元に戻す',
+          redo: '繰り返し',
+          new: '新規作成',
+          sendWorkbook: 'ブックを送信',
+          print: '印刷',
+          spelling: 'スペル チェック',
+          sortAsc: '昇順で並べ替え',
+          sortDesc: '降順で並べ替え',
+        },
+        menu: {
+          autosave: '自動保存',
+          new: '新規作成',
+          home: 'ホーム',
+          save: '保存',
+          saveAs: '名前を付けて保存',
+          sendWorkbook: 'ブックを送信',
+          print: '印刷',
+          spelling: 'スペル チェック',
+          undo: '元に戻す',
+          redo: '繰り返し',
+          sortAsc: '昇順で並べ替え',
+          sortDesc: '降順で並べ替え',
+        },
+      },
+      searchSuggestions: {
+        button: '検索 (Cmd + Ctrl + U)',
+        popup: '検索、利用可能な提案',
+        recommended: 'おすすめの操作',
+        findReplace: '検索と置換',
+        items: {
+          freeze: 'ウインドウ枠の固定',
+          headerFooter: 'ヘッダーとフッター...',
+          insertSheetRows: 'シートの行を挿入',
+          removeDuplicates: '重複を削除',
+          macros: 'マクロ...',
+          find: '検索する',
+          findReplace: '検索と置換',
+          feedback: '検索に関するフィードバック',
+        },
+      },
       loadingEngine: 'エンジンを読み込んでいます...',
       engineUnavailable: 'スプレッドシートエンジンを起動できません',
       engineSetup:

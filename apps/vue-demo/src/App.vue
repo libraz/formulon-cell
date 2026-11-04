@@ -377,6 +377,8 @@ const commands = computed(() =>
     setLocale,
   }),
 );
+const applyToolbarCommand = (commandId: string): boolean =>
+  toolbar.value?.applyCommand(commandId) ?? false;
 const searchItems = computed(() =>
   buildDemoSearchItems(
     commands.value,
@@ -384,7 +386,7 @@ const searchItems = computed(() =>
     (tab) => {
       ribbonTab.value = tab;
     },
-    (commandId) => toolbar.value?.applyCommand(commandId) ?? false,
+    applyToolbarCommand,
     ribbonTabs.value,
   ),
 );
@@ -446,7 +448,10 @@ onBeforeUnmount(() => {
       :instance="instance"
       :show-panel="showPanel"
       :search-items="searchItems"
+      :apply-command="applyToolbarCommand"
       @save="onSave"
+      @save-as="onSaveAs"
+      @new-workbook="void onNewWorkbook()"
       @open-backstage="openBackstage"
       @toggle-panel="showPanel = !showPanel"
       @tab-change="ribbonTab = $event"

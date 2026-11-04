@@ -166,7 +166,7 @@
 }
 
 [data-fc-platform="mac"] .fc-tb__search:focus-within {
-  width: min(240px, 28vw);
+  width: min(280px, 28vw);
 }
 
 [data-fc-platform="mac"] .fc-tb__search:focus-within input {
@@ -184,6 +184,245 @@
 [data-fc-platform="mac"] .demo__brand-mark:focus-visible {
   background: var(--fc-tb-ribbon-hover);
   color: var(--fc-tb-fg);
+}
+
+/* Mac Quick Access Toolbar: 30 px buttons, the AutoSave switch and the
+ * customize menu, as the desktop title bar lays them out. */
+.demo__glyph {
+  display: inline-flex;
+}
+
+.demo__glyph .fc-tb__rb-icon {
+  width: 18px;
+  height: 18px;
+}
+
+[data-fc-platform="mac"] .demo__quick {
+  gap: 0;
+}
+
+/* 30 px buttons on a 28 px pitch, as the desktop title bar spaces them. */
+[data-fc-platform="mac"] .demo__title-icon {
+  width: 30px;
+  height: 30px;
+  margin: 0 -1px;
+  border-radius: 6px;
+}
+
+[data-fc-platform="mac"] .demo__title-icon:disabled {
+  color: var(--fc-tb-fg-soft);
+  opacity: 0.45;
+  cursor: default;
+}
+
+[data-fc-platform="mac"] .demo__qat-undo {
+  width: 42px;
+  gap: 2px;
+}
+
+.demo__qat-caret {
+  width: 5px;
+  height: 5px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.demo__autosave {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 0 4px;
+  color: var(--fc-tb-fg-soft);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.demo__autosave input {
+  appearance: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 10px;
+  background: var(--fc-tb-line-soft);
+  cursor: pointer;
+}
+
+.demo__autosave input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+  transition: left 120ms ease;
+}
+
+.demo__autosave input:checked {
+  background: var(--fc-tb-accent);
+}
+
+.demo__autosave input:checked::after {
+  left: 16px;
+}
+
+.demo__qat-customize {
+  position: relative;
+}
+
+.demo__qat-more[aria-expanded="true"] {
+  background: var(--fc-tb-ribbon-pressed);
+}
+
+.demo__qat-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 294px;
+  padding: 5px 0;
+  border: 1px solid var(--fc-tb-line-soft);
+  border-radius: 8px;
+  background: var(--fc-tb-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  font-size: 13px;
+}
+
+.demo__qat-menu-heading,
+.demo__qat-menu-item {
+  height: 24px;
+  padding: 0 14px 0 30px;
+  line-height: 24px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.demo__qat-menu-heading {
+  color: var(--fc-tb-fg-soft);
+}
+
+.demo__qat-menu-item {
+  position: relative;
+  border: 0;
+  border-radius: 4px;
+  margin: 0 5px;
+  padding-left: 25px;
+  background: transparent;
+  color: var(--fc-tb-fg);
+  font: inherit;
+  cursor: default;
+}
+
+.demo__qat-menu-item:hover:not(:disabled),
+.demo__qat-menu-item:focus-visible {
+  background: var(--fc-tb-accent);
+  color: #ffffff;
+}
+
+.demo__qat-menu-item:disabled {
+  color: var(--fc-tb-fg-soft);
+}
+
+.demo__qat-menu-item[aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  width: 4px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.demo__qat-menu-separator {
+  height: 1px;
+  margin: 5px 14px 5px 30px;
+  background: var(--fc-tb-line-soft);
+}
+
+/* Mac search: a round magnifier button until pressed, then a field with the
+ * suggestion popup (Suggested Actions, Find and Replace, feedback). */
+.demo__search-button {
+  grid-column: 3;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--fc-tb-line-soft);
+  border-radius: 50%;
+  background: var(--fc-tb-card);
+  color: var(--fc-tb-fg);
+  cursor: pointer;
+}
+
+.demo__search-button:hover {
+  background: var(--fc-tb-ribbon-hover);
+}
+
+[data-fc-platform="mac"] .demo__search-suggestions {
+  width: 280px;
+  padding: 4px 0;
+}
+
+.demo__search-heading {
+  height: 23px;
+  padding: 0 14px;
+  color: var(--fc-tb-fg-soft);
+  font-size: 13px;
+  line-height: 23px;
+}
+
+.demo__search-section--feedback {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--fc-tb-line-soft);
+}
+
+.demo__search-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 24px;
+  padding: 0 14px 0 20px;
+  border: 0;
+  background: transparent;
+  color: var(--fc-tb-fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: default;
+}
+
+.demo__search-suggestion--active:not([aria-disabled="true"]) {
+  background: var(--fc-tb-ribbon-hover);
+}
+
+.demo__search-suggestion[aria-disabled="true"] {
+  color: var(--fc-tb-fg-soft);
+}
+
+.demo__search-suggestion-label {
+  flex: 1 1 auto;
+}
+
+.demo__search-submenu {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid currentColor;
 }
 
 @media (max-width: 900px) {

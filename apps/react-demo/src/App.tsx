@@ -356,16 +356,13 @@ export const App = (): ReactElement => {
       }),
     [commandText, instance, onSave],
   );
+  const applyToolbarCommand = useCallback(
+    (commandId: string) => toolbarRef.current?.applyCommand(commandId) ?? false,
+    [],
+  );
   const searchItems = useMemo(
-    () =>
-      buildDemoSearchItems(
-        commands,
-        locale,
-        setRibbonTab,
-        (commandId) => toolbarRef.current?.applyCommand(commandId) ?? false,
-        ribbonTabs,
-      ),
-    [commands, locale, ribbonTabs],
+    () => buildDemoSearchItems(commands, locale, setRibbonTab, applyToolbarCommand, ribbonTabs),
+    [applyToolbarCommand, commands, locale, ribbonTabs],
   );
 
   const openBackstage = useCallback(() => {
@@ -400,6 +397,9 @@ export const App = (): ReactElement => {
         searchItems={searchItems}
         quickAccessRef={quickAccessRef}
         onSave={onSave}
+        onSaveAs={onSaveAs}
+        onNewWorkbook={() => void onNewWorkbook()}
+        applyCommand={applyToolbarCommand}
         onOpenBackstage={openBackstage}
         onTogglePanel={() => setShowPanel((v) => !v)}
         onTabChange={setRibbonTab}

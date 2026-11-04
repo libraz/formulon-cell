@@ -50,6 +50,8 @@ import type { DemoCommandStrings, DemoStrings, DemoUiStrings } from './demo-stri
 
 export * from './demo-backstage.js';
 export * from './demo-function-help.js';
+export * from './demo-glyphs.js';
+export * from './demo-quick-access.js';
 export * from './demo-search.js';
 export * from './demo-select.js';
 export * from './demo-strings.js';
@@ -232,6 +234,8 @@ export const resolveInitialLocale = (
 export const installDemoSearchShortcut = (
   getInput: () => HTMLInputElement | null | undefined,
   platform: DemoPlatform = 'default',
+  /** Shows a search field that is not rendered yet, then focuses it itself. */
+  openSearch?: () => void,
 ): (() => void) => {
   const onKeydown = (event: KeyboardEvent): void => {
     const isMacSearchShortcut =
@@ -249,6 +253,11 @@ export const installDemoSearchShortcut = (
       event.key.toLowerCase() === 'q';
     if (!isMacSearchShortcut && !isGenericSearchShortcut) return;
     const input = getInput();
+    if (!input && openSearch) {
+      event.preventDefault();
+      openSearch();
+      return;
+    }
     if (!input || input.disabled || input.hidden) return;
     event.preventDefault();
     input.focus();

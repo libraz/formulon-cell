@@ -1,4 +1,5 @@
 import type {
+  ExcelRibbonIconName,
   RibbonSearchItem,
   RibbonSearchUsagePrior,
   RibbonTab,
@@ -11,7 +12,7 @@ import {
   EXCEL365_STANDARD_RIBBON_TABS,
   queryRibbonSearchIndex,
 } from '@libraz/formulon-cell';
-import type { DemoCommandStrings } from './demo-strings.js';
+import type { DemoCommandStrings, DemoUiStrings } from './demo-strings.js';
 
 export interface DemoCommandItem {
   readonly id: string;
@@ -328,4 +329,71 @@ export const nextDemoSearchIndex = (
   if (direction === 'first') return Math.max(current, 0);
   if (direction === 'next') return (current + 1 + count) % count;
   return (current < 0 ? count - 1 : current - 1 + count) % count;
+};
+
+export type DemoSearchSuggestionId = keyof DemoUiStrings['searchSuggestions']['items'];
+
+export interface DemoSearchSuggestion {
+  readonly id: DemoSearchSuggestionId;
+  readonly label: string;
+  /** Ribbon glyph drawn before the label. */
+  readonly glyph: ExcelRibbonIconName;
+  /** The row leads to a submenu on the desktop. */
+  readonly submenu?: boolean;
+  readonly disabled?: boolean;
+  readonly run: () => void;
+}
+
+export interface DemoSearchSuggestionSection {
+  readonly id: 'recommended' | 'findReplace' | 'feedback';
+  /** Null for the feedback row, which sits under a rule instead of a heading. */
+  readonly heading: string | null;
+  readonly items: readonly DemoSearchSuggestion[];
+}
+
+export interface DemoSearchSuggestionDeps {
+  readonly instance: SpreadsheetInstance | null;
+  readonly setRibbonTab: (tab: RibbonTab) => void;
+  readonly applyCommand: (commandId: string) => boolean;
+}
+
+/** The Mac popup under an empty search field: Suggested Actions, Find and
+ *  Replace, then the feedback row. */
+export const buildDemoSearchSuggestions = (
+  ui: DemoUiStrings,
+  deps: DemoSearchSuggestionDeps,
+): readonly DemoSearchSuggestionSection[] => {
+  const t = ui.searchSuggestions;
+  const item = (
+    id: DemoSearchSuggestionId,
+    glyph: ExcelRibbonIconName,
+    run: () => void,
+    extra: Pick<DemoSearchSuggestion, 'submenu' | 'disabled'> = {},
+  ): DemoSearchSuggestion => ({ id, label: t.items[id], glyph, run, ...extra });
+  return [
+    {
+      id: 'recommended',
+      heading: t.recommended,
+      items: [
+        item('freeze', 'freeze', () => deps.setRibbonTab('view'), { submenu: true }),
+        item('headerFooter', 'headerFooter', () => deps.instance?.openPageSetup('headerFooter')),
+        item('insertSheetRows', 'insertRows', () => deps.applyCommand('insertRows')),
+        item('removeDuplicates', 'removeDuplicates', () => deps.applyCommand('removeDupes')),
+        item('macros', 'code', () => {}, { disabled: true }),
+      ],
+    },
+    {
+      id: 'findReplace',
+      heading: t.findReplace,
+      items: [
+        item('find', 'find', () => deps.instance?.openFindReplace('find')),
+        item('findReplace', 'replaceFind', () => deps.instance?.openFindReplace('replace')),
+      ],
+    },
+    {
+      id: 'feedback',
+      heading: null,
+      items: [item('feedback', 'feedback', () => {}, { disabled: true })],
+    },
+  ];
 };
