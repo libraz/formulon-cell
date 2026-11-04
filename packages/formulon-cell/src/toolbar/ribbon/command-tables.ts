@@ -55,7 +55,9 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   fx: (i) => i.openFunctionArguments(),
   workbookObjectsView: (i) => i.openWorkbookObjects(),
   selectionPanePageLayout: (i) => i.openWorkbookObjects(),
-  objectSelectionPane: (i) => i.openWorkbookObjects(),
+  // The object tab's Selection Pane is a toggle: a second click closes the panel.
+  objectSelectionPane: (i) =>
+    i.store.getState().ui.workbookObjectsOpen ? i.closeWorkbookObjects() : i.openWorkbookObjects(),
   chartChangeType: (i) => i.openChartSettings('elements'),
   chartSelectData: (i) => i.openChartSettings('selectData'),
   chartFormatSelection: (i) => i.openChartSettings('styles'),

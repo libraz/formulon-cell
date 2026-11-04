@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { Spreadsheet } from '../../../src/mount.js';
 import { mutators } from '../../../src/store/store.js';
 import { projectMacRibbonState } from '../../../src/toolbar/ribbon/mac/state-projection.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
@@ -63,5 +64,26 @@ describe('Mac ribbon panel toggles', () => {
     panel()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(instance.store.getState().ui.workbookObjectsOpen).toBe(false);
     expect(pressed()).toBe('false');
+  });
+
+  it('closes the Workbook Objects panel on a second 選択ウインドウ click', async () => {
+    sheet = await mountStubSheet({
+      workbook: await WorkbookHandle.createDefault({ preferStub: true }),
+      locale: 'ja',
+    });
+    const { instance } = sheet;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const tb = Spreadsheet.mountToolbar(host, instance, {});
+    try {
+      expect(tb.applyCommand('objectSelectionPane')).toBe(true);
+      expect(instance.store.getState().ui.workbookObjectsOpen).toBe(true);
+      expect(tb.applyCommand('objectSelectionPane')).toBe(true);
+      expect(instance.store.getState().ui.workbookObjectsOpen).toBe(false);
+      expect(instance.host.querySelector<HTMLElement>('.fc-objects')?.hidden).toBe(true);
+    } finally {
+      tb.dispose();
+      host.remove();
+    }
   });
 });

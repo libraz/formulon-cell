@@ -39,6 +39,7 @@ export type InstanceDialogApi = Pick<
   | 'toggleWatchWindow'
   | 'openQuickAnalysis'
   | 'openWorkbookObjects'
+  | 'closeWorkbookObjects'
   | 'openChartSettings'
   | 'openPivotFieldList'
   | 'openActivePivotFieldList'
@@ -178,6 +179,16 @@ export function createInstanceDialogApi(deps: InstanceDialogApiDeps): InstanceDi
         return;
       }
       featureState.workbookObjects?.open();
+    },
+    closeWorkbookObjects() {
+      const userObjects = getUserHandle('workbookObjects') as
+        | (ExtensionHandle & { close?: () => void })
+        | undefined;
+      if (userObjects?.close) {
+        userObjects.close();
+        return;
+      }
+      featureState.workbookObjects?.close();
     },
     openChartSettings(tab = 'elements') {
       const userCharts = getUserHandle('charts') as

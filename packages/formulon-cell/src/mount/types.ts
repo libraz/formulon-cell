@@ -207,6 +207,8 @@ export interface SpreadsheetInstance {
   toggleWatchWindow(): void;
   openQuickAnalysis(): void;
   openWorkbookObjects(): void;
+  /** Close the Workbook Objects panel; a no-op when it is not open. */
+  closeWorkbookObjects(): void;
   /** Open the settings of the selected chart on `tab` (the chart elements by
    *  default); `'selectData'` opens Select Data Source on the Mac profile and
    *  the Filters tab elsewhere. False when no chart is selected. */
