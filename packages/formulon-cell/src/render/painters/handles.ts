@@ -175,13 +175,47 @@ export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect, ph
   ctx.restore();
 }
 
-/** Outline a dynamic-array spill range — spreadsheets paint a 1px accent ring
- *  around the spilled rectangle so it reads as a single result. */
+/** The Mac spill accent, measured sRGB (49,102,194) on a formula spill and
+ *  (48,101,192) on a blocked PivotTable: one colour. */
+const SPILL_ACCENT = '#3065c0';
+
+/** The Mac spill boxes: 1 pt over the range's outer gridlines, a 14 / 3 pt dash
+ *  for a blocked spill, and a soft shadow fading ~5 pt outside the edges
+ *  (sheet grays 238 to 253). */
+const MAC_SPILL_DASH_PT = [14, 3] as const;
+const MAC_SPILL_SHADOW = 'rgba(0, 0, 0, 0.07)';
+const MAC_SPILL_SHADOW_PT = 5;
+
+function strokeMacSpillBox(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  ptPx: number,
+  dashed: boolean,
+): void {
+  ctx.save();
+  ctx.strokeStyle = SPILL_ACCENT;
+  ctx.lineWidth = ptPx;
+  ctx.setLineDash(dashed ? MAC_SPILL_DASH_PT.map((pt) => pt * ptPx) : []);
+  ctx.shadowColor = MAC_SPILL_SHADOW;
+  ctx.shadowBlur = MAC_SPILL_SHADOW_PT * ptPx;
+  // The leading gridlines sit just before the range; the trailing ones are its own.
+  ctx.strokeRect(bounds.x - 0.5, bounds.y - 0.5, bounds.w, bounds.h);
+  ctx.restore();
+}
+
+/** Outline a dynamic-array spill range so it reads as one result. With
+ *  `macPtPx` (the Mac pt-to-px scale) it takes the measured Mac look; otherwise
+ *  a faint 1px accent ring. */
 export function paintSpillOutline(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
+  macPtPx?: number,
 ): void {
+  if (macPtPx !== undefined) {
+    strokeMacSpillBox(ctx, bounds, macPtPx, false);
+    return;
+  }
   ctx.save();
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 1;
@@ -191,14 +225,19 @@ export function paintSpillOutline(
   ctx.restore();
 }
 
-/** The dashed box around a blocked PivotTable's area (measured sRGB 48,101,192). */
-const SPILL_TARGET = '#3065c0';
-
-/** Outline the area a PivotTable held at #SPILL! needs, with the dashed blue
- *  box the spreadsheet draws around it. */
-export function paintSpillTarget(ctx: CanvasRenderingContext2D, bounds: Rect): void {
+/** Outline the area a blocked spill (a formula's or a PivotTable's) needs,
+ *  with the dashed blue box. `macPtPx` gives the measured Mac geometry. */
+export function paintSpillTarget(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  macPtPx?: number,
+): void {
+  if (macPtPx !== undefined) {
+    strokeMacSpillBox(ctx, bounds, macPtPx, true);
+    return;
+  }
   ctx.save();
-  ctx.strokeStyle = SPILL_TARGET;
+  ctx.strokeStyle = SPILL_ACCENT;
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(bounds.x + 0.5, bounds.y + 0.5, bounds.w - 1, bounds.h - 1);

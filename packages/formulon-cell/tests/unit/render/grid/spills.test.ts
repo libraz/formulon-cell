@@ -108,8 +108,12 @@ function makeRenderer(
   getState: () => State,
   canvas: CanvasSpy,
   workbook: WorkbookHandle,
+  platform?: 'mac',
 ): GridRenderer {
-  const host = { getBoundingClientRect: () => ({ width: 640, height: 480 }) } as HTMLElement;
+  const host = {
+    getBoundingClientRect: () => ({ width: 640, height: 480 }),
+    ...(platform ? { closest: () => ({ dataset: { fcPlatform: platform } }) } : {}),
+  } as unknown as HTMLElement;
   return new GridRenderer({
     host,
     canvas: { getContext: () => canvas.ctx, style: {} } as unknown as HTMLCanvasElement,
@@ -386,5 +390,71 @@ describe('grid spill painting', () => {
     expect(spillRanges).not.toHaveBeenCalled();
     expect(cells.reads).toBe(rows.visible.length * cols.visible.length - 1);
     expect(canvas.strokes.filter(({ dash }) => dash.join(',') === '3,3')).toHaveLength(2);
+  });
+
+  describe('on the Mac profile', () => {
+    const withActive = (state: State, row: number, col: number): State => ({
+      ...state,
+      selection: { ...state.selection, active: { sheet: 0, row, col } },
+    });
+
+    it('outlines a spill range only while one of its cells is active', () => {
+      const cells = new Map<string, Cell>();
+      cells.set(addrKey({ sheet: 0, row: 10, col: 5 }), numberCell(1));
+      const range: Range = { sheet: 0, r0: 10, c0: 5, r1: 11, c1: 5 };
+      const workbook = makeWorkbook(
+        () => [range],
+        () => null,
+        false,
+      );
+      const inside = withActive(stateWithCells(cells), 11, 5);
+      const canvas = canvasSpy();
+      paintSpills(
+        makeRenderer(() => inside, canvas, workbook, 'mac'),
+        inside,
+      );
+      expect(canvas.strokes.filter(({ dash }) => dash.length === 0)).toHaveLength(1);
+      const outside = withActive(stateWithCells(cells), 10, 6);
+      const none = canvasSpy();
+      paintSpills(
+        makeRenderer(() => outside, none, workbook, 'mac'),
+        outside,
+      );
+      expect(none.strokes).toHaveLength(0);
+    });
+
+    it('boxes a blocked formula target, dashed, only while its anchor is active', () => {
+      const cells = new Map<string, Cell>();
+      cells.set(addrKey({ sheet: 0, row: 10, col: 5 }), {
+        value: { kind: 'error', code: 8, text: '#SPILL!' },
+        formula: '=SEQUENCE(2)',
+      });
+      cells.set(addrKey({ sheet: 0, row: 11, col: 5 }), {
+        value: { kind: 'text', value: 'x' },
+        formula: null,
+      });
+      const workbook = makeWorkbook(
+        () => [],
+        (_sheet, row, col) =>
+          row === 10 && col === 5 ? { anchorRow: 10, anchorCol: 5, rows: 2, cols: 1 } : null,
+      );
+      const anchored = withActive(stateWithCells(cells), 10, 5);
+      const canvas = canvasSpy();
+      paintSpills(
+        makeRenderer(() => anchored, canvas, workbook, 'mac'),
+        anchored,
+      );
+      // One dashed box over the whole would-be range; the blocker keeps its look.
+      expect(canvas.strokes).toHaveLength(1);
+      const [on, off] = canvas.strokes[0]?.dash ?? [];
+      expect((on ?? 0) / (off ?? 1)).toBeCloseTo(14 / 3, 5);
+      const elsewhere = withActive(stateWithCells(cells), 11, 6);
+      const none = canvasSpy();
+      paintSpills(
+        makeRenderer(() => elsewhere, none, workbook, 'mac'),
+        elsewhere,
+      );
+      expect(none.strokes).toHaveLength(0);
+    });
   });
 });

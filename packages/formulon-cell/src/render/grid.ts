@@ -493,6 +493,13 @@ export class GridRenderer {
     paintGridLines(this.chromeCtx(), state, theme, cols, rows, bare);
   }
 
+  /** Whether the host renders the Mac profile, which several painters follow. */
+  private macProfile(): boolean {
+    return (
+      (this.host.closest?.<HTMLElement>('.fc-host') ?? this.host).dataset?.fcPlatform === 'mac'
+    );
+  }
+
   private cellCtx(state: ViewState): CellPaintContext {
     const url = state.ui.sheetBackgroundImages.get(state.data.sheetIndex);
     const entry = url ? this.sheetBackgroundImages.get(url) : undefined;
@@ -502,8 +509,7 @@ export class GridRenderer {
       locale: this.getLocale(),
       getDisplay: this.getDisplay,
       sheetBackgroundImage: entry?.status === 'loaded' ? entry.image : null,
-      fontEffects:
-        (this.host.closest?.<HTMLElement>('.fc-host') ?? this.host).dataset?.fcPlatform === 'mac',
+      fontEffects: this.macProfile(),
       conditionalCache: this.conditionalCache,
       dpr: this.dpr,
       pivotEmptyPrompt: this.getStrings().workbookObjects.pivotEmptyPrompt,
@@ -614,15 +620,27 @@ export class GridRenderer {
       ranges = wb?.spillRanges(data.sheetIndex) ?? findSpillRanges(data.cells, data.sheetIndex);
     }
 
+    const active = state.selection.active;
+    const inRange = (r: Range): boolean =>
+      active.sheet === r.sheet &&
+      active.row >= r.r0 &&
+      active.row <= r.r1 &&
+      active.col >= r.c0 &&
+      active.col <= r.c1;
+    // The Mac desktop outlines a spill range, 1 pt wide, only while one of its
+    // cells is active, and boxes a blocked formula's target only while its
+    // anchor is; other profiles keep the faint always-on ring and red blockers.
+    const mac = this.macProfile();
+    const macPtPx = mac ? fontPointsToCssPx(1) * renderScale(layout, viewport) : undefined;
     for (const r of ranges) {
+      if (mac && !inRange(r)) continue;
       for (const rect of rangeRects(layout, viewport, r)) {
-        paintSpillOutline(this.ctx, rect, theme);
+        paintSpillOutline(this.ctx, rect, theme, macPtPx);
       }
     }
-    const active = state.selection.active;
     for (const spill of pivotStyleLayer(wb, state).spills) {
       for (const rect of rangeRects(layout, viewport, spill.needed)) {
-        paintSpillTarget(this.ctx, rect);
+        paintSpillTarget(this.ctx, rect, macPtPx);
       }
       // The warning tag sits beside the anchor while it is the active cell.
       const { anchor } = spill;
@@ -654,6 +672,17 @@ export class GridRenderer {
         r1: info.anchorRow + info.rows - 1,
         c1: info.anchorCol + info.cols - 1,
       };
+      if (mac) {
+        const isAnchor =
+          active.sheet === data.sheetIndex &&
+          active.row === info.anchorRow &&
+          active.col === info.anchorCol;
+        if (!isAnchor) continue;
+        for (const rect of rangeRects(layout, viewport, target)) {
+          paintSpillTarget(this.ctx, rect, macPtPx);
+        }
+        continue;
+      }
       for (const visibleRow of rows.visible) {
         if (visibleRow < target.r0 || visibleRow > target.r1) continue;
         for (const visibleCol of cols.visible) {
@@ -811,4 +840,6 @@ export {
   type ValidationChevron,
 } from './grid/hit-state.js';
 
+import { fontPointsToCssPx } from '../engine/font-units.js';
 import { validationAt } from '../store/range-validations.js';
+import { renderScale } from '../store/render-scale.js';
