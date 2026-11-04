@@ -23,6 +23,7 @@ import { blockDataTableEdit, blockTableFunction } from '../data-table-guard.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
 import { blockPivotEdit } from '../pivot-guard.js';
+import { pastePivotTableCopy, pivotTableAtRange } from '../pivot-table.js';
 import { blockedByProtection, isCellWritable, isRangeInAllowedEditRange } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import {
@@ -781,6 +782,25 @@ function applyPaste(
     )
   ) {
     return null;
+  }
+
+  // A whole PivotTable pastes as a second report rather than as its cells.
+  if (snap.mode === 'copy' && opt.what === 'all' && opt.operation === 'none' && !opt.transpose) {
+    const pivotIndex = pivotTableAtRange(wb, snap.range);
+    if (pivotIndex !== null) {
+      const written = pastePivotTableCopy(
+        { store, workbook: wb, history },
+        { sheet: snap.range.sheet, pivotIndex },
+        {
+          sheet: checked.destination.sheet,
+          row: checked.destination.r0,
+          col: checked.destination.c0,
+        },
+      );
+      if (!written) return null;
+      selectWritten(store, written, false);
+      return { writtenRange: written, skippedNonFiniteOperations: 0 };
+    }
   }
 
   // Excel treats cutting and pasting back onto the exact source rectangle as a

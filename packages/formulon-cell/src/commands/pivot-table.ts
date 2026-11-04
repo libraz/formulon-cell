@@ -892,6 +892,57 @@ export function recreatePivotTable(
   return -1;
 }
 
+/** The report whose whole extent is exactly `range`, or null. */
+export function pivotTableAtRange(wb: WorkbookHandle, range: Range): number | null {
+  if (!wb.capabilities.pivotTables) return null;
+  const hit = wb
+    .pivotBounds(range.sheet)
+    .find(
+      (b) =>
+        b.range.r0 === range.r0 &&
+        b.range.c0 === range.c0 &&
+        b.range.r1 === range.r1 &&
+        b.range.c1 === range.c1,
+    );
+  return hit ? hit.pivotIndex : null;
+}
+
+/** Paste a whole report as a second report over the same cache with its
+ *  top-left at `at`, named as a new report is; one undo step. Returns the
+ *  rectangle it occupies, or null when it cannot be rebuilt. */
+export function pastePivotTableCopy(
+  deps: CreatePlacedPivotDeps,
+  source: { sheet: number; pivotIndex: number },
+  at: { sheet: number; row: number; col: number },
+): Range | null {
+  const { store, workbook: wb } = deps;
+  const history = deps.history && !deps.history.isReplaying() ? deps.history : null;
+  const definition = wb.getPivotDefinition(source.sheet, source.pivotIndex);
+  if (!definition) return null;
+  // The extent starts at the filter block, one blank row above the anchor.
+  const filterRows = definition.fields.filter((f) => f.axis === PivotAxis.Page).length;
+  const anchor = { row: at.row + (filterRows > 0 ? filterRows + 1 : 0), col: at.col };
+  const copy = { ...definition, name: nextPivotTableName(wb) };
+  let pivotIndex = recreatePivotTable(wb, at.sheet, anchor, copy);
+  if (pivotIndex < 0) return null;
+  const refresh = (): void => {
+    if (store.getState().data.sheetIndex === at.sheet) {
+      mutators.replaceCells(store, wb.cells(at.sheet));
+    }
+  };
+  history?.push({
+    undo: () => {
+      wb.removePivotTable(at.sheet, pivotIndex);
+      refresh();
+    },
+    redo: () => {
+      pivotIndex = recreatePivotTable(wb, at.sheet, anchor, copy);
+      refresh();
+    },
+  });
+  return wb.pivotBounds(at.sheet).find((b) => b.pivotIndex === pivotIndex)?.range ?? null;
+}
+
 export interface DeletePivotTablesDeps {
   store: SpreadsheetStore;
   workbook: WorkbookHandle;
