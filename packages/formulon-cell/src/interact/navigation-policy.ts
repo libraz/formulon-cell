@@ -11,8 +11,10 @@ import {
 import { sheetIndexByName } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { sameAddr } from '../store/direct-format.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import {
+  cloneRange,
   rangeContainsAddr,
   rangeContainsRange,
   rangesIntersect,
@@ -73,14 +75,6 @@ const registry = new WeakMap<SpreadsheetStore, PolicyRecord>();
 const MAX_TAB_SCAN = 100_000;
 
 const validInteger = (n: number): boolean => Number.isInteger(n) && Number.isFinite(n);
-
-const cloneRange = (range: Range): Range => ({
-  sheet: range.sheet,
-  r0: range.r0,
-  c0: range.c0,
-  r1: range.r1,
-  c1: range.c1,
-});
 
 const cloneRangeInput = (input: RangeInput): RangeInput =>
   typeof input === 'string' ? input : cloneRange(input);
@@ -402,8 +396,6 @@ function syncNavigationSelection(store: SpreadsheetStore): void {
   const extraRanges = (state.selection.extraRanges ?? [])
     .map((extra) => clampNavigationRange(store, extra))
     .filter((extra): extra is Range => extra !== null);
-  const sameAddr = (a: Addr, b: Addr): boolean =>
-    a.sheet === b.sheet && a.row === b.row && a.col === b.col;
   const oldExtras = state.selection.extraRanges ?? [];
   const extrasChanged =
     oldExtras.length !== extraRanges.length ||

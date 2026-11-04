@@ -43,8 +43,6 @@ export interface PasteOptionsHandle {
   show(next: PasteOptionsActivation): void;
 }
 
-const VIEWPORT_PAD = 4;
-
 const defaultOptions = (what: PasteSpecialOptions['what']): PasteSpecialOptions => ({
   what,
   operation: 'none',
@@ -105,14 +103,12 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
     const x = anchor ? hostRect.left + trailingEdgeX(anchor, rtl) : hostRect.left + 24;
     const y = anchor ? hostRect.top + anchor.y + anchor.h : hostRect.top + 24;
     const { x: left, y: top } = clampPanelToViewport(button, rtl ? x - 31 : x + 3, y + 3, {
-      pad: VIEWPORT_PAD,
       fallbackWidth: 28,
       fallbackHeight: 28,
     });
     button.style.left = `${left}px`;
     button.style.top = `${top}px`;
     const menuPos = clampPanelToViewport(menu, left, top + 24, {
-      pad: VIEWPORT_PAD,
       fallbackWidth: 220,
       fallbackHeight: 112,
     });

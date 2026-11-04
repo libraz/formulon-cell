@@ -23,8 +23,6 @@ export interface ObjectMenuHandle {
   detach(): void;
 }
 
-const VIEWPORT_PAD = 4;
-
 /**
  * The right-click menu of a chart, picture or shape. It takes the look and
  * keyboard handling of the cell context menu, but lists the object's own
@@ -146,7 +144,7 @@ export function createObjectMenu(host: HTMLElement): ObjectMenuHandle {
       root.style.display = 'block';
       root.style.left = '-9999px';
       root.style.top = '-9999px';
-      const placed = clampPanelToViewport(root, x, y, { pad: VIEWPORT_PAD });
+      const placed = clampPanelToViewport(root, x, y);
       root.style.left = `${placed.x}px`;
       root.style.top = `${placed.y}px`;
       focusMenuItem(root, 'first');

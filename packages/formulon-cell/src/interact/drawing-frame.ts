@@ -1,5 +1,5 @@
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import type { ChartSourceHighlight, SelectedObject } from '../store/types.js';
+import type { ChartSourceHighlight, SelectedObject, State } from '../store/types.js';
 
 /** A drawing object's frame in grid pixels. */
 export interface DrawingFrame {
@@ -272,3 +272,25 @@ const sameHighlights = (
       ref.c1 === b[i]?.c1 &&
       ref.role === b[i]?.role,
   );
+
+/**
+ * Re-render an object overlay on store changes, skipping its own selection
+ * publishes and notifications that only moved the cell selection, which an
+ * overlay's render never reads.
+ */
+export const subscribeObjectOverlay = (
+  store: SpreadsheetStore,
+  selection: ObjectSelectionPublisher,
+  render: () => void,
+): (() => void) => {
+  let last = store.getState();
+  return store.subscribe(() => {
+    const prev = last;
+    last = store.getState();
+    if (selection.publishing) return;
+    const changed = (Object.keys(last) as (keyof State)[]).some(
+      (key) => key !== 'selection' && last[key] !== prev[key],
+    );
+    if (changed) render();
+  });
+};

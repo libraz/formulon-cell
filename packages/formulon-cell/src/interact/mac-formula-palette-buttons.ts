@@ -1,6 +1,7 @@
 // Action buttons for the Mac formula palette: text buttons and the stroked
 // 16px icon buttons (close, range picker) in the palette header and fields.
 
+import { SVG_NS } from '../svg-namespace.js';
 import { createInteractionButton } from './chip-button.js';
 
 export const makeButton = (
@@ -16,7 +17,7 @@ export const makeButton = (
 type PaletteIcon = 'close' | 'range';
 
 const makeIcon = (kind: PaletteIcon): SVGSVGElement => {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 16 16');
   svg.setAttribute('width', '14');
   svg.setAttribute('height', '14');
@@ -28,23 +29,23 @@ const makeIcon = (kind: PaletteIcon): SVGSVGElement => {
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   if (kind === 'close') {
-    const first = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const first = document.createElementNS(SVG_NS, 'path');
     first.setAttribute('d', 'M4 4l8 8');
     svg.appendChild(first);
-    const second = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const second = document.createElementNS(SVG_NS, 'path');
     second.setAttribute('d', 'M12 4l-8 8');
     svg.appendChild(second);
   } else {
-    const grid = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    const grid = document.createElementNS(SVG_NS, 'rect');
     grid.setAttribute('x', '2');
     grid.setAttribute('y', '2');
     grid.setAttribute('width', '8');
     grid.setAttribute('height', '8');
     svg.appendChild(grid);
-    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const arrow = document.createElementNS(SVG_NS, 'path');
     arrow.setAttribute('d', 'M8 13h5V8');
     svg.appendChild(arrow);
-    const arrowHead = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const arrowHead = document.createElementNS(SVG_NS, 'path');
     arrowHead.setAttribute('d', 'M13 8l-3 3');
     svg.appendChild(arrowHead);
   }

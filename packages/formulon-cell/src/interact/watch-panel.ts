@@ -1,3 +1,4 @@
+import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
 import { recordWatchesChange } from '../commands/watch.js';
 import { addrKey, formatA1Cell } from '../engine/address.js';
@@ -175,23 +176,22 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     }
   };
 
-  /** Find a defined name (workbook scope) whose ref points exactly at `addr`.
-   *  Returns null when there's no exact match — which keeps the column quiet
-   *  for cells that aren't named. */
-  const nameOf = (addr: Addr): string => {
+  /** Map each defined name's exact single-cell target (A1, sheet prefix and
+   *  `$` stripped) to its name; the first name wins. Empty when the engine
+   *  read fails (e.g. mid-dispose). */
+  const definedNameLookup = (): Map<string, string> => {
+    const byTarget = new Map<string, string>();
     try {
-      const wb = getWb();
-      const target = formatA1Cell(addr.row, addr.col).toUpperCase();
-      for (const dn of wb.definedNames()) {
+      for (const dn of getWb().definedNames()) {
         const eq = dn.formula.replace(/^=/, '').replace(/\$/g, '').toUpperCase();
         const bang = eq.lastIndexOf('!');
         const tail = bang >= 0 ? eq.slice(bang + 1) : eq;
-        if (tail === target) return dn.name;
+        if (!byTarget.has(tail)) byTarget.set(tail, dn.name);
       }
     } catch {
-      // Engine read failed (e.g. mid-dispose); treat as no name available.
+      // Engine read failed (e.g. mid-dispose); treat as no names available.
     }
-    return '';
+    return byTarget;
   };
 
   const sheetLabel = (sheet: number): string => {
@@ -215,19 +215,9 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   };
 
   const workbookDisplayLocale = (wb: WorkbookHandle): string => {
-    try {
-      const profile = wb.spreadsheetProfileId();
-      const suffix = profile?.slice(profile.lastIndexOf('-') + 1);
-      if (suffix === 'ja_JP') return 'ja-JP';
-      if (suffix === 'de_DE') return 'de-DE';
-      if (suffix === 'fr_FR') return 'fr-FR';
-      if (suffix === 'zh_CN') return 'zh-CN';
-      if (suffix === 'zh_TW') return 'zh-TW';
-      if (suffix === 'ko_KR') return 'ko-KR';
-      if (suffix === 'th_TH') return 'th-TH';
-    } catch {
-      // Fall through to the host locale or the canonical formatter.
-    }
+    // en-US defers to the host locale like an unmapped profile.
+    const profileLocale = inputLocaleForWorkbook(wb);
+    if (profileLocale && profileLocale !== 'en-US') return profileLocale;
     return deps.getLocale?.() ?? 'en-US';
   };
 
@@ -284,8 +274,10 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     }
     empty.hidden = true;
     table.hidden = false;
+    const names = definedNameLookup();
+    const book = bookLabel();
+    const active = store.getState().selection.active;
     for (const addr of watches) {
-      const active = store.getState().selection.active;
       const selected = mac
         ? addrKey(addr) === selectedKey
         : active.sheet === addr.sheet && active.row === addr.row && active.col === addr.col;
@@ -299,11 +291,11 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       tr.setAttribute('aria-selected', String(selected));
 
       const tdBook = document.createElement('td');
-      tdBook.textContent = bookLabel();
+      tdBook.textContent = book;
       const tdSheet = document.createElement('td');
       tdSheet.textContent = sheetLabel(addr.sheet);
       const tdName = document.createElement('td');
-      tdName.textContent = nameOf(addr);
+      tdName.textContent = names.get(formatA1Cell(addr.row, addr.col).toUpperCase()) ?? '';
       const tdCell = document.createElement('td');
       tdCell.textContent = formatA1Cell(addr.row, addr.col);
       const tdValue = document.createElement('td');

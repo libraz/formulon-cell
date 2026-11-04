@@ -1,13 +1,4 @@
-import {
-  appendDialogActions,
-  appendErrorRow,
-  appendInputRow,
-  createDialogShell,
-  focusAndSelectInput,
-  installDialogLifecycle,
-  mountDialog,
-  showInputError,
-} from './shell.js';
+import { showPrompt } from './prompt.js';
 
 export interface RenameSheetDialogOptions {
   title: string;
@@ -18,32 +9,16 @@ export interface RenameSheetDialogOptions {
   cancelLabel: string;
 }
 
-export const showRenameSheetDialog = (opts: RenameSheetDialogOptions): Promise<string | null> =>
-  new Promise<string | null>((resolve) => {
-    const shell = createDialogShell({ title: opts.title });
-    const input = appendInputRow(shell.body, opts.label, { initial: opts.initial });
-    const errorRow = appendErrorRow(shell.body);
-    const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel,
-      okLabel: opts.okLabel,
-    });
-
-    const lifecycle = installDialogLifecycle<string | null>({
-      shell,
-      resolve,
-      onCancel: () => null,
-      onSubmit: () => onOk(),
-    });
-    const onOk = (): void => {
-      const value = input.value.trim();
-      if (!value) {
-        showInputError(errorRow, input, opts.requiredMessage);
-        return;
-      }
-      lifecycle.finish(value);
-    };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', () => lifecycle.finish(null));
-
-    mountDialog(shell, () => focusAndSelectInput(input));
+export const showRenameSheetDialog = async (
+  opts: RenameSheetDialogOptions,
+): Promise<string | null> => {
+  const value = await showPrompt({
+    title: opts.title,
+    label: opts.label,
+    initial: opts.initial,
+    okLabel: opts.okLabel,
+    cancelLabel: opts.cancelLabel,
+    validate: (v) => (v.trim() ? null : opts.requiredMessage),
   });
+  return value === null ? null : value.trim();
+};

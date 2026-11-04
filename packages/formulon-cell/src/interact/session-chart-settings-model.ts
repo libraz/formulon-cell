@@ -303,7 +303,7 @@ const effectiveLegendVisible = (chart: SessionChartSettingsShape, data: ChartDat
     : prepared.data.series.length > 1;
 };
 
-const boundedHoleSize = (value: number | undefined): number =>
+export const boundedHoleSize = (value: number | undefined): number =>
   Number.isFinite(value) ? Math.max(10, Math.min(90, value ?? 50)) : 50;
 
 /**
@@ -456,13 +456,13 @@ export const updateDataLabel = <Key extends keyof MutableDataLabels>(
 const jsonEqual = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
-const boundedGapWidth = (value: number | undefined): number =>
+export const boundedGapWidth = (value: number | undefined): number =>
   Number.isFinite(value) ? Math.max(0, Math.min(500, value ?? 150)) : 150;
 
-const boundedOverlap = (value: number | undefined): number =>
+export const boundedOverlap = (value: number | undefined): number =>
   Number.isFinite(value) ? Math.max(-100, Math.min(100, value ?? 0)) : 0;
 
-const boundedFirstSliceAngle = (value: number | undefined): number =>
+export const boundedFirstSliceAngle = (value: number | undefined): number =>
   Number.isFinite(value) ? Math.max(0, Math.min(360, value ?? 0)) : 0;
 
 export const normalizedCrossingCustom = (

@@ -26,6 +26,7 @@ import { argbFromCssColor } from '../engine/theme-color.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import type { SessionShapeKind, State } from '../store/types.js';
+import { SVG_NS } from '../svg-namespace.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDrawingHandles,
@@ -38,6 +39,7 @@ import {
   keepKeyFromGrid,
   keepsObjectSelected,
   previewFrame,
+  subscribeObjectOverlay,
   trackFrameDrag,
 } from './drawing-frame.js';
 import { createObjectMenu } from './object-menu.js';
@@ -108,7 +110,6 @@ const objectName = (
   return template.replace('{n}', String(index + 1));
 };
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_W = 48;
 const MIN_H = 32;
 const KEYBOARD_STEP = 8;
@@ -576,9 +577,7 @@ export function attachSessionIllustrations(deps: {
     }
   };
 
-  const unsubscribe = store.subscribe(() => {
-    if (!selection.publishing) render();
-  });
+  const unsubscribe = subscribeObjectOverlay(store, selection, render);
   render();
 
   return {

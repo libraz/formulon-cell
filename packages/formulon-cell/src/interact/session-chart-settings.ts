@@ -3,6 +3,7 @@ import type { ChartData, ChartValueFormatter as CoreChartValueFormatter } from '
 import type { History } from '../commands/history.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { clamp } from './overlay-position.js';
 import {
   captureSettingsView,
   element,
@@ -192,8 +193,8 @@ export function createSessionChartSettings(
     if (left > maxLeft) left = anchorLeft - surfaceWidth - 8;
     let top = anchorTop;
     if (top > maxTop) top = anchorBottom - surfaceHeight;
-    surface.style.left = `${Math.max(minLeft, Math.min(left, maxLeft))}px`;
-    surface.style.top = `${Math.max(minTop, Math.min(top, maxTop))}px`;
+    surface.style.left = `${clamp(left, minLeft, maxLeft)}px`;
+    surface.style.top = `${clamp(top, minTop, maxTop)}px`;
   };
 
   const refreshDraftData = (): void => {

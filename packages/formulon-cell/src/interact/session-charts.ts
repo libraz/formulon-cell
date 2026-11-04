@@ -29,6 +29,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isMacHost } from '../extensions/ui-options.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import type { ChartSourceHighlight, State } from '../store/types.js';
+import { SVG_NS } from '../svg-namespace.js';
 import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { createInteractionButton } from './chip-button.js';
 import {
@@ -42,6 +43,7 @@ import {
   keepKeyFromGrid,
   keepsObjectSelected,
   previewFrame,
+  subscribeObjectOverlay,
   trackFrameDrag,
 } from './drawing-frame.js';
 import {
@@ -107,7 +109,6 @@ export interface SessionChartLabels
   axisTitle: string;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_W = 240;
 const MIN_H = 160;
 const KEYBOARD_STEP = 8;
@@ -841,9 +842,7 @@ export function attachSessionCharts(deps: {
     if (refocus !== undefined) focusPanel(root, '.fc-chart', 'chartId', refocus, host);
   };
 
-  const unsubscribe = store.subscribe(() => {
-    if (!selection.publishing) render();
-  });
+  const unsubscribe = subscribeObjectOverlay(store, selection, render);
   render();
 
   return {

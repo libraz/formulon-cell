@@ -100,7 +100,6 @@ const STATUS_OPTION_KEYS: readonly StatusBarOptionKey[] = [
   'zoomSlider',
 ];
 const LOCK_OPTION_KEYS = ['capsLock', 'numLock', 'scrollLock'] as const;
-const VIEWPORT_PAD = 4;
 
 type AggregateRangeKey = readonly [sheet: number, r0: number, c0: number, r1: number, c1: number];
 
@@ -745,9 +744,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const placeChooser = (clientX: number, clientY: number): void => {
     const { height } = panelSize(popover);
-    const { x, y } = clampPanelToViewport(popover, clientX, clientY - height - 8, {
-      pad: VIEWPORT_PAD,
-    });
+    const { x, y } = clampPanelToViewport(popover, clientX, clientY - height - 8, {});
     popover.style.left = `${x}px`;
     popover.style.top = `${y}px`;
   };

@@ -1,9 +1,12 @@
 // Margins tab: page margins, printer non-printable insets, and page centering.
 import type { printableMarginAdjustments } from '../../commands/print.js';
 import type { PageSetup } from '../../store/store.js';
+import { defaultPageSetup } from '../../store/types/page-setup.js';
 import { createExcelRibbonSvg } from '../../toolbar/excel-ribbon-icons.js';
 import { labelize, makeNumberInput, makeRow } from '../page-setup-dialog-dom.js';
 import type { PageSetupTabContext } from './context.js';
+
+const DEFAULT_HEADER_FOOTER_MARGIN = defaultPageSetup().headerMargin ?? 0.3;
 
 export interface MarginsTab {
   /** Numeric inputs whose edits can change the printable-margin warning. */
@@ -27,9 +30,9 @@ export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext
   bottomInput.setAttribute('aria-label', t.marginBottom);
   const leftInput = makeNumberInput(0.7);
   leftInput.setAttribute('aria-label', t.marginLeft);
-  const headerMarginInput = makeNumberInput(0.3);
+  const headerMarginInput = makeNumberInput(DEFAULT_HEADER_FOOTER_MARGIN);
   headerMarginInput.setAttribute('aria-label', t.marginHeader);
-  const footerMarginInput = makeNumberInput(0.3);
+  const footerMarginInput = makeNumberInput(DEFAULT_HEADER_FOOTER_MARGIN);
   footerMarginInput.setAttribute('aria-label', t.marginFooter);
   marginGroup.append(
     labelize(t.marginTop, topInput),
@@ -157,16 +160,16 @@ export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext
       printableRightInput.value = String(setup.printableBounds?.right ?? 0);
       printableBottomInput.value = String(setup.printableBounds?.bottom ?? 0);
       printableLeftInput.value = String(setup.printableBounds?.left ?? 0);
-      headerMarginInput.value = showInches(setup.headerMargin ?? 0.3);
-      footerMarginInput.value = showInches(setup.footerMargin ?? 0.3);
+      headerMarginInput.value = showInches(setup.headerMargin ?? DEFAULT_HEADER_FOOTER_MARGIN);
+      footerMarginInput.value = showInches(setup.footerMargin ?? DEFAULT_HEADER_FOOTER_MARGIN);
       centerHInput.checked = setup.centerHorizontally === true;
       centerVInput.checked = setup.centerVertically === true;
     },
     collect() {
-      const top = Number.parseFloat(topInput.value) || 0;
-      const right = Number.parseFloat(rightInput.value) || 0;
-      const bottom = Number.parseFloat(bottomInput.value) || 0;
-      const left = Number.parseFloat(leftInput.value) || 0;
+      const top = Math.max(0, Number.parseFloat(topInput.value) || 0);
+      const right = Math.max(0, Number.parseFloat(rightInput.value) || 0);
+      const bottom = Math.max(0, Number.parseFloat(bottomInput.value) || 0);
+      const left = Math.max(0, Number.parseFloat(leftInput.value) || 0);
       const headerMargin = Number.parseFloat(headerMarginInput.value);
       const footerMargin = Number.parseFloat(footerMarginInput.value);
       const printableTop = Math.max(0, Number.parseFloat(printableTopInput.value) || 0);
@@ -185,8 +188,12 @@ export function createMarginsTab(panel: HTMLDivElement, ctx: PageSetupTabContext
               left: printableLeft,
             }
           : undefined,
-        headerMargin: Number.isFinite(headerMargin) ? Math.max(0, headerMargin) : 0.3,
-        footerMargin: Number.isFinite(footerMargin) ? Math.max(0, footerMargin) : 0.3,
+        headerMargin: Number.isFinite(headerMargin)
+          ? Math.max(0, headerMargin)
+          : DEFAULT_HEADER_FOOTER_MARGIN,
+        footerMargin: Number.isFinite(footerMargin)
+          ? Math.max(0, footerMargin)
+          : DEFAULT_HEADER_FOOTER_MARGIN,
         centerHorizontally: centerHInput.checked,
         centerVertically: centerVInput.checked,
       };

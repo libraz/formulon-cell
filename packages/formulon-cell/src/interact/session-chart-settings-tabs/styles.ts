@@ -19,6 +19,10 @@ import {
 } from '../session-chart-settings-dom.js';
 import type { SessionChartSettingsLabels } from '../session-chart-settings-labels.js';
 import {
+  boundedFirstSliceAngle,
+  boundedGapWidth,
+  boundedHoleSize,
+  boundedOverlap,
   type ChartDraft,
   defaultVaryColors,
   isCircularKind,
@@ -277,7 +281,7 @@ const renderChartGeometryControls = (
       String(draft.gapWidth),
       (value) => {
         const parsed = Number(value);
-        draft.gapWidth = Number.isFinite(parsed) ? Math.max(0, Math.min(500, parsed)) : 150;
+        draft.gapWidth = boundedGapWidth(parsed);
       },
       'number',
       { min: 0, max: 500, step: '1' },
@@ -288,7 +292,7 @@ const renderChartGeometryControls = (
       String(draft.overlap),
       (value) => {
         const parsed = Number(value);
-        draft.overlap = Number.isFinite(parsed) ? Math.max(-100, Math.min(100, parsed)) : 0;
+        draft.overlap = boundedOverlap(parsed);
       },
       'number',
       {
@@ -310,7 +314,7 @@ const renderChartGeometryControls = (
       String(draft.firstSliceAngle),
       (value) => {
         const parsed = Number(value);
-        draft.firstSliceAngle = Number.isFinite(parsed) ? Math.max(0, Math.min(360, parsed)) : 0;
+        draft.firstSliceAngle = boundedFirstSliceAngle(parsed);
       },
       'number',
       { min: 0, max: 360, step: '1' },
@@ -326,7 +330,7 @@ const renderChartGeometryControls = (
       String(draft.holeSize),
       (value) => {
         const parsed = Number(value);
-        draft.holeSize = Number.isFinite(parsed) ? Math.max(10, Math.min(90, parsed)) : 50;
+        draft.holeSize = boundedHoleSize(parsed);
         draft.holeSizeChanged = draft.holeSize !== draft.holeSizeBaseline;
       },
       'number',

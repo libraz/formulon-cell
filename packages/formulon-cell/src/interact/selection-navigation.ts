@@ -2,6 +2,7 @@ import { interactionControllerFor } from '../commands/interaction-controller.js'
 import { mergeAt } from '../commands/merge.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
+import { sameAddr } from '../store/direct-format.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   clampNavigationAddr,
@@ -33,9 +34,6 @@ const contains = (range: Range, addr: Addr): boolean =>
   addr.row <= range.r1 &&
   addr.col >= range.c0 &&
   addr.col <= range.c1;
-
-const sameAddr = (a: Addr, b: Addr): boolean =>
-  a.sheet === b.sheet && a.row === b.row && a.col === b.col;
 
 const nextAddress = (
   state: State,

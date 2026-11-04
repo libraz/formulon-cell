@@ -1,4 +1,6 @@
 import type { Addr, Range } from '../engine/types.js';
+import { sameAddr } from '../store/direct-format.js';
+import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 
 interface SelectionSnapshot {
@@ -44,12 +46,6 @@ const snapshotSelection = (selection: State['selection']): SelectionSnapshot => 
   range: copyRange(selection.range),
   extraRanges: (selection.extraRanges ?? []).map(copyRange),
 });
-
-const sameAddr = (a: Addr, b: Addr): boolean =>
-  a.sheet === b.sheet && a.row === b.row && a.col === b.col;
-
-const sameRange = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
 
 const sameSelection = (a: SelectionSnapshot, b: State['selection']): boolean =>
   sameAddr(a.active, b.active) &&

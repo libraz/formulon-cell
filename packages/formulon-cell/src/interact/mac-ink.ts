@@ -1,3 +1,4 @@
+import { finite } from '../charts/numeric.js';
 import type { History } from '../commands/history.js';
 import type { OperationIntent } from '../commands/interaction-policy.js';
 import { clearSessionIllustration, createSessionImage } from '../commands/session-illustration.js';
@@ -21,6 +22,7 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import { SVG_NS } from '../svg-namespace.js';
 
 /** The drawing tools exposed by the Mac Draw tab. */
 export type MacInkTool =
@@ -90,7 +92,6 @@ interface ToolStyle {
   opacity: number;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAC_INK_PREFIX = 'mac-ink-';
 const HOST_CLASS = 'fc-host--mac-ink';
 const INK_SELECTOR = '[data-fc-mac-ink-id]';
@@ -124,9 +125,7 @@ const styleFor = (tool: MacInkDrawingTool): ToolStyle => {
   }
 };
 
-const finite = (value: number, fallback = 0): number => (Number.isFinite(value) ? value : fallback);
-
-const clamp01 = (value: number): number => Math.max(0, Math.min(1, finite(value)));
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, finite(value, 0)));
 
 const escapeXml = (value: string): string =>
   value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
@@ -135,11 +134,11 @@ const pathFor = (points: readonly { x: number; y: number }[], offsetX = 0, offse
   if (points.length === 0) return '';
   const first = points[0];
   if (!first) return '';
-  const start = `M ${finite(first.x - offsetX)} ${finite(first.y - offsetY)}`;
+  const start = `M ${finite(first.x - offsetX, 0)} ${finite(first.y - offsetY, 0)}`;
   if (points.length === 1) return `${start} l 0.01 0.01`;
   return `${start} ${points
     .slice(1)
-    .map((point) => `L ${finite(point.x - offsetX)} ${finite(point.y - offsetY)}`)
+    .map((point) => `L ${finite(point.x - offsetX, 0)} ${finite(point.y - offsetY, 0)}`)
     .join(' ')}`;
 };
 
