@@ -14,9 +14,11 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import type { AutofitOptions } from './autofit-measurement.js';
 import { currentRegion } from './current-region.js';
 import { defaultObjectNames } from './format-as-table.js';
 import type { History } from './history.js';
+import { autofitColsWidthForRanges } from './row-col-layout.js';
 import { addSheet, moveSheet, removeSheet } from './sheet-mutate.js';
 
 export interface PivotSourceField {
@@ -691,6 +693,18 @@ export function refreshPivotTable(
 
 /** Where a new report lands: a fresh sheet inserted before the source sheet
  *  (report at A3), or a cell of the source sheet. */
+/** Fit the columns of the PivotTables on the sheet on show to their content,
+ *  as the desktop does after a report update; a column can shrink, and columns
+ *  outside the reports keep their width. Part of the update, so no undo step. */
+export function autofitPivotTableColumns(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  opts?: AutofitOptions,
+): void {
+  const ranges = wb.pivotBounds(store.getState().data.sheetIndex).map((b) => b.range);
+  if (ranges.length > 0) autofitColsWidthForRanges(store, null, ranges, wb, opts);
+}
+
 export type PivotPlacement = 'new-sheet' | { row: number; col: number };
 
 export const PIVOT_NEW_SHEET_ANCHOR = { row: 2, col: 0 } as const;

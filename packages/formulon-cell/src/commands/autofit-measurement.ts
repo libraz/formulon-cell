@@ -3,6 +3,7 @@ import { effectiveCellFormatWithPending } from '../engine/cell-format-projection
 import { fontPointsToCssPx } from '../engine/font-units.js';
 import { macDefaultRowPt } from '../engine/mac-row-model.js';
 import { phoneticGuideSize } from '../engine/phonetic-sync.js';
+import { pivotStyleLayer } from '../engine/pivot-style.js';
 /** Content-fit column widths and row heights. Every autofit entry point — header
  *  double-click, the structure commands, the ribbon AutoFit items and the
  *  public `autofitColWidth` / `autofitRowHeight` helpers — measures here.
@@ -11,7 +12,8 @@ import type { CellValue, FontRecord } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { normalizeFormatLocale } from '../format/locale.js';
-import { FILTER_BUTTON_SIZE } from '../render/painters/filter-button.js';
+import { styleElementFormatSource } from '../render/grid/table-format.js';
+import { FILTER_BUTTON_SIZE, MAC_PIVOT_BUTTON_SIZE } from '../render/painters/filter-button.js';
 import {
   TABLE_HEADER_CHEVRON_INSET,
   TABLE_HEADER_CHEVRON_SIZE,
@@ -92,12 +94,14 @@ export function computeAutofitColWidth(
   const locale = normalizeFormatLocale(opts.locale ?? '');
   const theme = opts.theme ?? DEFAULT_CELL_FONT_THEME;
   let max: number | null = null;
+  const styleAt = styleElementFormatSource(state, opts.workbook ?? null);
+  const pivots = pivotStyleLayer(opts.workbook ?? null, state);
 
   for (const [key, cell] of state.data.cells) {
     const parsed = parseAddrKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.col !== col) continue;
     if (!inSpan(parsed.row, opts.span) || isMerged(state, key)) continue;
-    const format = measurementFormat(state, key, parsed, opts, cell);
+    const format = measurementFormat(state, key, parsed, opts, cell, styleAt);
     if (format?.wrap === true) continue;
     const text = autofitDisplayText(state, cell, format, locale);
     if (!text) continue;
@@ -105,7 +109,7 @@ export function computeAutofitColWidth(
     const font = cellFont(format, theme, formulaDisplay);
     const width =
       maxExplicitLineWidth(text, textMeasure(ctx, font, state.layout)) +
-      headerButtonWidth(state, parsed.sheet, parsed.row, parsed.col);
+      headerButtonWidth(state, parsed.sheet, parsed.row, parsed.col, pivots.buttons.has(key));
     if (max === null || width > max) max = width;
   }
 
@@ -132,12 +136,13 @@ export function computeAutofitRowHeight(
   );
   const padding = Math.max(0, defaultHeight - Math.round(normalFont.size * 1.28));
   const mac = wholePointAdvances(state.layout);
+  const styleAt = styleElementFormatSource(state, opts.workbook ?? null);
 
   for (const [key, cell] of state.data.cells) {
     const parsed = parseAddrKey(key);
     if (!parsed || parsed.sheet !== sheet || parsed.row !== row) continue;
     if (!inSpan(parsed.col, opts.span) || isMerged(state, key)) continue;
-    const format = measurementFormat(state, key, parsed, opts, cell);
+    const format = measurementFormat(state, key, parsed, opts, cell, styleAt);
     const text = autofitDisplayText(state, cell, format, locale);
     if (!text) continue;
     const formulaDisplay = showsFormula(state, cell);
@@ -263,12 +268,17 @@ function measurementFormat(
   addr: { sheet: number; row: number; col: number },
   opts: AutofitOptions,
   cell: { formula: string | null },
+  styleAt: (row: number, col: number) => CellFormat | undefined,
 ): CellFormat | undefined {
   const formulaDisplay = showsFormula(state, cell);
-  const effective = opts.workbook
+  const direct = opts.workbook
     ? effectiveCellFormatWithPending(opts.workbook, state, addr)
     : state.format.formats.get(key);
-  return formatForMeasurement(effective ?? undefined, opts.workbookDisplayFont, formulaDisplay);
+  // A table or PivotTable style's bold measures as the cell paints it.
+  const style = styleAt(addr.row, addr.col);
+  const effective =
+    style?.bold && direct?.bold !== true ? { ...direct, bold: true } : (direct ?? undefined);
+  return formatForMeasurement(effective, opts.workbookDisplayFont, formulaDisplay);
 }
 
 function formatForMeasurement(
@@ -291,7 +301,18 @@ function formatForMeasurement(
 }
 
 // One trailing allowance per header cell: the wider of the filter and table buttons.
-function headerButtonWidth(state: State, sheet: number, row: number, col: number): number {
+function headerButtonWidth(
+  state: State,
+  sheet: number,
+  row: number,
+  col: number,
+  pivotButton: boolean,
+): number {
+  if (pivotButton) {
+    return wholePointAdvances(state.layout)
+      ? fontPointsToCssPx(MAC_PIVOT_BUTTON_SIZE) + 1
+      : FILTER_DROPDOWN_RESERVED_WIDTH;
+  }
   const filter = state.ui.filterRanges.some(
     (fr) => fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1,
   )

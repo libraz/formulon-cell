@@ -1,5 +1,6 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
 import type { History } from '../commands/history.js';
+import { autofitPivotTableColumns } from '../commands/pivot-table.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
 import {
   clearSessionIllustration,
@@ -65,6 +66,7 @@ import {
 import type { GridRenderer } from '../render/grid.js';
 import type { PageMargins, PageSetup, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { resolveTheme } from '../theme/resolve.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import type { ChromeSlot } from './chrome.js';
 import type { ErrorIndicatorClickHandler } from './error-indicator-click.js';
@@ -667,6 +669,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
               input.store,
               input.wb().cells(input.store.getState().data.sheetIndex),
             );
+            autofitPivotTableColumns(input.store, input.wb(), { theme: resolveTheme(input.host) });
             input.renderer.invalidate();
           },
         });
