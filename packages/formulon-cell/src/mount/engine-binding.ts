@@ -78,6 +78,8 @@ interface AttachEngineBindingInput {
   getPivotTableDialog: () => { open(): void } | null;
   getWorkbookObjects?: () => {
     openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
+    isPivotFieldListOpen(): boolean;
+    close(): void;
   } | null;
   getSessionCharts: () => unknown | null;
   getSheetTabs: () => SheetTabsController | null;
@@ -328,6 +330,10 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
               getWorkbookObjects()?.openPivotFieldList(sheetIndex, pivotIndex);
             }
           : undefined,
+        isPivotFieldListOpen: getWorkbookObjects
+          ? () => getWorkbookObjects()?.isPivotFieldListOpen() ?? false
+          : undefined,
+        onClosePivotFieldList: getWorkbookObjects ? () => getWorkbookObjects()?.close() : undefined,
         getClipboardSnapshot: clipboardH ? () => clipboardH.getSnapshot() : undefined,
         onToggleWatch: flags.watchWindow
           ? (addr) => {

@@ -12,7 +12,7 @@ import {
   PivotSortOrder,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
+import type { PivotDefinition, PivotSpill } from '../engine/workbook-handle-pivot.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { AutofitOptions } from './autofit-measurement.js';
@@ -178,7 +178,10 @@ const sheetIndexByName = (wb: WorkbookHandle, name: string): number => {
   return -1;
 };
 
-const pivotCacheWorksheetSourceRange = (wb: WorkbookHandle, cacheId: number): Range | null => {
+export const pivotCacheWorksheetSourceRange = (
+  wb: WorkbookHandle,
+  cacheId: number,
+): Range | null => {
   const source = wb.getPivotCacheWorksheetSource(cacheId);
   if (!source?.present || !source.ref) return null;
   const parsed = parseRangeRef(
@@ -937,19 +940,22 @@ function clearVacatedReportCells(
 
 /** Bring the active sheet's reports up to date after a report edit, an undo
  *  or a redo: settle their anchors, reload the projected cells, move direct
- *  formats with the items they belong to and refit the report columns. */
+ *  formats with the items they belong to and refit the report columns.
+ *  Returns the reports held at #SPILL! by cells in their way. */
 export function refreshPivotReportsAfterEdit(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   opts?: AutofitOptions,
-): void {
+): { spilled: PivotSpill[] } {
   const sheet = store.getState().data.sheetIndex;
   const before = lastPivotStyleLayer(wb, sheet);
   for (const { pivotIndex } of wb.pivotBounds(sheet)) settlePivotAnchor(wb, sheet, pivotIndex);
   clearVacatedReportCells(wb, sheet, before?.reports.map((r) => r.range) ?? []);
+  wb.releasePivotCachedArea(sheet);
   mutators.replaceCells(store, wb.cells(sheet));
   reflowPivotFormats(store, wb);
   autofitPivotTableColumns(store, wb, opts);
+  return { spilled: wb.pivotSpills(sheet) };
 }
 
 /** The report whose whole extent is exactly `range`, or null. */

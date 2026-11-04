@@ -1,0 +1,35 @@
+/* Callout over a PivotTable held at #SPILL! (384 pt wide on the Mac desktop). */
+
+@layer fc.app {
+  .fc-pivot-spill-callout {
+    z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: 384px;
+    padding: 14px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: 10px;
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.22),
+      0 1px 4px rgba(0, 0, 0, 0.12);
+    color: var(--fc-fg, currentColor);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 13px;
+  }
+  .fc-pivot-spill-callout__title {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .fc-pivot-spill-callout__body {
+    line-height: 1.45;
+  }
+  .fc-pivot-spill-callout__ok {
+    width: 100%;
+    height: 30px;
+    margin-top: 6px;
+  }
+}

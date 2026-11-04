@@ -44,6 +44,7 @@ import {
 } from '../interact/mac-formula-palette.js';
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
+import { showPivotSpillCallout } from '../interact/pivot-spill-callout.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
 import { attachSessionCharts, type SessionChartsHandle } from '../interact/session-charts.js';
 import {
@@ -668,9 +669,11 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),
           onOpenPivotTableDialog: () => s.pivotTableDialog?.open(),
           onAfterPivotEdit: () => {
-            refreshPivotReportsAfterEdit(input.store, input.wb(), {
+            const { spilled } = refreshPivotReportsAfterEdit(input.store, input.wb(), {
               theme: resolveTheme(input.host),
             });
+            const spill = spilled[0];
+            if (spill) showPivotSpillCallout(input.host, input.store, strings, spill);
             input.renderer.invalidate();
           },
         });

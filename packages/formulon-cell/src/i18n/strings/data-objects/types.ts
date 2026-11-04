@@ -139,6 +139,46 @@ export interface DataObjectsStrings {
     pivotFieldList: string;
     /** Prompt drawn inside an empty PivotTable's placeholder. */
     pivotEmptyPrompt: string;
+    /** Callout shown when a report cannot grow because cells are in its way. */
+    pivotSpillTitle: string;
+    pivotSpillBody: string;
+    pivotSpillOk: string;
+    /** The filter panel a report's drop-down button opens. */
+    pivotFilterPanel: {
+      sortHeading: string;
+      sortAscending: string;
+      sortAscendingAria: string;
+      sortDescending: string;
+      sortDescendingAria: string;
+      sortBy: string;
+      filterHeading: string;
+      byLabel: string;
+      byValue: string;
+      chooseOne: string;
+      search: string;
+      selectAll: string;
+      blank: string;
+      clearFilter: string;
+      close: string;
+      conditions: Record<
+        | 'equals'
+        | 'notEquals'
+        | 'beginsWith'
+        | 'notBeginsWith'
+        | 'endsWith'
+        | 'notEndsWith'
+        | 'contains'
+        | 'notContains'
+        | 'greater'
+        | 'greaterOrEqual'
+        | 'less'
+        | 'lessOrEqual'
+        | 'between'
+        | 'top10'
+        | 'bottom10',
+        string
+      >;
+    };
     backToWorkbookObjects: string;
     pivotFieldSearch: string;
     pivotFieldName: string;

@@ -102,7 +102,7 @@ describe('PivotStyleLight16', () => {
   });
 
   it('puts the field button on the Row Labels caption only', () => {
-    expect(resolve(S1_RANGE, S1).buttons).toEqual([{ row: 2, col: 0 }]);
+    expect(resolve(S1_RANGE, S1).buttons).toEqual([{ row: 2, col: 0, slot: 'rows' }]);
   });
 
   it('tints the other members of the family from their theme colour', () => {

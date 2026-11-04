@@ -61,8 +61,20 @@ describe('PivotTable context menu', () => {
       'copy',
       'formatCells',
       'pivotRefresh',
+      'pivotDelete',
       'sort',
+      'filter',
+      'pivotSelectMenu',
+      'pivotFormulasMenu',
+      'pivotSubtotal',
+      'pivotExpandMenu',
+      'pivotGroup',
+      'pivotUngroup',
+      'pivotMoveMenu',
+      'pivotRemoveField',
+      'pivotShowAsMenu',
       'pivotFieldSettings',
+      'pivotOptions',
       'pivotShowFieldList',
     ]);
     expect(miniItem('bold')).toBeNull();
@@ -71,7 +83,7 @@ describe('PivotTable context menu', () => {
     expect(onOpenPivotFieldList).toHaveBeenCalledWith(0, 0);
   });
 
-  it('labels value cells and omits sort for them', () => {
+  it('gives value cells the value-field entries', () => {
     vi.spyOn(wb, 'pivotCellInfo').mockReturnValue(
       info({ kind: 3, fieldName: 'Sum of Sales', fieldIndex: -1, isValue: true }),
     );
@@ -80,19 +92,37 @@ describe('PivotTable context menu', () => {
     expect(ids()).toEqual([
       'copy',
       'formatCells',
+      'pivotNumberFormat',
       'pivotRefresh',
+      'pivotDelete',
+      'sort',
+      'pivotSelectMenu',
+      'pivotFormulasMenu',
+      'pivotRemoveField',
+      'pivotSummarizeMenu',
+      'pivotShowAsMenu',
+      'pivotShowDetails',
       'pivotFieldSettings',
+      'pivotOptions',
       'pivotShowFieldList',
     ]);
-    expect(item('pivotFieldSettings')?.textContent).toContain('値フィールドの設定…');
+    expect(item('pivotFieldSettings')?.textContent).toContain('値フィールドの設定...');
     expect(item('pivotRefresh')?.textContent).toContain('更新');
   });
 
-  it('omits entries without a backing command', () => {
+  it('drops Refresh without a cache and the field list without a host opener', () => {
     vi.spyOn(wb, 'pivotCellInfo').mockReturnValue(info({ cacheId: -1, fieldIndex: -1 }));
     detach = attachContextMenu({ host, store, wb, strings: en });
     fireContextMenu(host, 10, 10);
-    expect(ids()).toEqual(['copy', 'formatCells']);
+    expect(ids()).toEqual([
+      'copy',
+      'formatCells',
+      'pivotDelete',
+      'pivotSelectMenu',
+      'pivotFormulasMenu',
+      'pivotShowAsMenu',
+      'pivotOptions',
+    ]);
   });
 
   it('sorts the clicked field', () => {

@@ -16,8 +16,9 @@ import {
 import { customStyleElementFormats } from './table-style-sync.js';
 import { cssColorFromArgb, tintCssColor } from './theme-color.js';
 import type { Range } from './types.js';
+import { PivotAxis } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import type { PivotStyleDefinition } from './workbook-handle-pivot.js';
+import type { PivotDefinition, PivotSpill, PivotStyleDefinition } from './workbook-handle-pivot.js';
 
 /**
  * PivotTable styles resolved for painting. A report's cells keep their own
@@ -37,6 +38,8 @@ export interface PivotStyleLayer {
   readonly ranges: readonly Range[];
   /** Field caption cells ("Row Labels", "Column Labels") carrying a drop-down button. */
   readonly buttons: ReadonlySet<string>;
+  /** The field a drop-down button at a cell filters, and whether it is filtered. */
+  buttonAt(row: number, col: number): PivotFieldButton | undefined;
   /** The style format of a report cell; undefined outside every report. */
   formatAt(row: number, col: number): CellFormat | undefined;
   /** Outline placement of a compact row label cell; undefined elsewhere. */
@@ -46,6 +49,8 @@ export interface PivotStyleLayer {
   /** Reports with no field laid out yet, drawn as a placeholder over the
    *  area they reserve. */
   readonly placeholders: readonly PivotPlaceholder[];
+  /** Reports held at #SPILL! by cells in their way. */
+  readonly spills: readonly PivotSpill[];
 }
 
 /** A report's rectangle (report filter block included) and its non-blank cells. */
@@ -66,6 +71,18 @@ export interface PivotPlaceholder {
   readonly name: string;
 }
 
+/** A report's drop-down button: the field it opens and whether that field
+ *  hides any item or carries a label/value filter. */
+export interface PivotFieldButton {
+  pivotIndex: number;
+  /** Pivot field index; -1 when the engine cannot read the definition back. */
+  fieldIndex: number;
+  filtered: boolean;
+}
+
+/** Which field a caption button stands for. */
+export type PivotButtonSlot = 'rows' | 'cols' | { page: string };
+
 /** Where a compact row label sits in the outline. */
 export interface PivotRowOutline {
   /** Outline steps the label text is pushed in by: its depth, plus one when
@@ -78,9 +95,11 @@ export interface PivotRowOutline {
 const EMPTY_LAYER: PivotStyleLayer = {
   ranges: [],
   buttons: new Set(),
+  buttonAt: () => undefined,
   formatAt: () => undefined,
   outlineAt: () => undefined,
   placeholders: [],
+  spills: [],
   reports: [],
 };
 
@@ -92,7 +111,43 @@ type PivotStyleReader = Pick<
   | 'getPivotStyleInfo'
   | 'getTheme'
   | 'pivotTableName'
+  | 'pivotSpills'
+  | 'getPivotDefinition'
 >;
+
+/** Whether a field hides any item or carries a label / value filter. */
+export function pivotFieldFiltered(definition: PivotDefinition, fieldIndex: number): boolean {
+  const field = definition.fields[fieldIndex];
+  if (!field) return false;
+  return (
+    field.items.some((item) => !item.visible) ||
+    definition.filters.some((f) => f.fieldName === field.sourceName)
+  );
+}
+
+function fieldButton(
+  definition: PivotDefinition | null,
+  pivotIndex: number,
+  slot: PivotButtonSlot,
+): PivotFieldButton {
+  const fieldIndex = !definition
+    ? -1
+    : slot === 'rows'
+      ? (definition.rowFieldOrder[0] ?? -1)
+      : slot === 'cols'
+        ? (definition.colFieldOrder[0] ?? -1)
+        : (definition.fields.find(
+            (f) => f.axis === PivotAxis.Page && (f.customName || f.sourceName) === slot.page,
+          )?.index ??
+          definition.fields.find((f) => f.axis === PivotAxis.Page && f.sourceName === slot.page)
+            ?.index ??
+          -1);
+  return {
+    pivotIndex,
+    fieldIndex,
+    filtered: definition !== null && fieldIndex >= 0 && pivotFieldFiltered(definition, fieldIndex),
+  };
+}
 
 const BUILTIN_PIVOT_STYLE = /^PivotStyle(Light|Medium|Dark)(\d+)$/;
 
@@ -216,7 +271,10 @@ export function pivotStyleRegions(
   range: Range,
   cells: readonly PivotLayoutCell[],
   info: Pick<PivotStyleDefinition, 'showRowHeaders' | 'showColHeaders' | 'showRowStripes'>,
-): { regions: StyleElementRegion[]; buttons: { row: number; col: number }[] } {
+): {
+  regions: StyleElementRegion[];
+  buttons: { row: number; col: number; slot: PivotButtonSlot }[];
+} {
   const { r1, c0, c1 } = range;
   const pages = pivotPageRows(range, cells);
   const r0 = pivotReportTop(range, cells);
@@ -265,10 +323,13 @@ export function pivotStyleRegions(
   }
   const isCaption = (row: number, col: number): boolean =>
     cells.some((c) => c.row === row && c.col === col && c.kind === PIVOT_CELL_KIND.Header);
-  const buttons: { row: number; col: number }[] = [];
-  for (let i = 0; i < pages; i += 1) buttons.push({ row: range.r0 + i, col: c0 + 1 });
+  const buttons: { row: number; col: number; slot: PivotButtonSlot }[] = [];
+  for (let i = 0; i < pages; i += 1) {
+    const name = cells.find((c) => c.row === range.r0 + i && c.col === c0)?.fieldName ?? '';
+    buttons.push({ row: range.r0 + i, col: c0 + 1, slot: { page: name } });
+  }
   if (cells.some((c) => c.kind === PIVOT_CELL_KIND.RowLabel) && isCaption(bodyTop - 1, c0)) {
-    buttons.push({ row: bodyTop - 1, col: c0 });
+    buttons.push({ row: bodyTop - 1, col: c0, slot: 'rows' });
   }
   let firstColLabel: PivotLayoutCell | undefined;
   for (const c of cells) {
@@ -282,7 +343,7 @@ export function pivotStyleRegions(
     }
   }
   if (firstColLabel && isCaption(firstColLabel.row - 1, firstColLabel.col)) {
-    buttons.push({ row: firstColLabel.row - 1, col: firstColLabel.col });
+    buttons.push({ row: firstColLabel.row - 1, col: firstColLabel.col, slot: 'cols' });
   }
   return { regions, buttons };
 }
@@ -338,12 +399,15 @@ export function buildPivotStyleLayer(
   const themeColors = wb.getTheme()?.colors;
   const formats = new Map<string, CellFormat>();
   const buttons = new Set<string>();
+  const buttonFields = new Map<string, PivotFieldButton>();
   const outlines = new Map<string, PivotRowOutline>();
   const placeholders: PivotPlaceholder[] = [];
+  const spills = wb.pivotSpills(sheet);
   const reports: PivotReportCells[] = [];
   for (const { pivotIndex, range } of bounds) {
     // The engine still projects a caption for a report with no fields.
     const cells = cellsByPivot.get(pivotIndex) ?? [];
+    if (spills.some((p) => p.pivotIndex === pivotIndex)) continue;
     if (cells.every((c) => c.kind === PIVOT_CELL_KIND.Header)) {
       placeholders.push({
         pivotIndex,
@@ -365,7 +429,14 @@ export function buildPivotStyleLayer(
     const info = wb.getPivotStyleInfo(sheet, pivotIndex);
     if (!info) continue;
     const layout = pivotStyleRegions(range, cellsByPivot.get(pivotIndex) ?? [], info);
-    for (const b of layout.buttons) buttons.add(addrKey({ sheet, ...b }));
+    const definition = wb.capabilities.pivotDefinitionRead
+      ? wb.getPivotDefinition(sheet, pivotIndex)
+      : null;
+    for (const b of layout.buttons) {
+      const key = addrKey({ sheet, row: b.row, col: b.col });
+      buttons.add(key);
+      buttonFields.set(key, fieldButton(definition, pivotIndex, b.slot));
+    }
     const elements = reportStyleElements(tables, sheet, pivotIndex, info.name, themeColors);
     if (!elements) continue;
     for (let row = range.r0; row <= range.r1; row += 1) {
@@ -387,8 +458,10 @@ export function buildPivotStyleLayer(
       ...placeholders.map((p) => p.range),
     ],
     placeholders,
+    spills,
     reports,
     buttons,
+    buttonAt: (row, col) => buttonFields.get(addrKey({ sheet, row, col })),
     formatAt: (row, col) => formats.get(addrKey({ sheet, row, col })),
     outlineAt: (row, col) => outlines.get(addrKey({ sheet, row, col })),
   };
@@ -408,7 +481,7 @@ export function pivotStyleLayer(
     tables: Pick<TablesSlice, 'customPivotTableStyles' | 'pivotTableStyles'>;
   },
 ): PivotStyleLayer {
-  if (!wb?.capabilities.pivotTables) return EMPTY_LAYER;
+  if (!wb?.capabilities?.pivotTables) return EMPTY_LAYER;
   const sheet = state.data.sheetIndex;
   const cached = layerCache.get(wb);
   if (

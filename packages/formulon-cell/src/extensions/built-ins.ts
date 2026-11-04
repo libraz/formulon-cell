@@ -42,6 +42,7 @@ import { attachIterativeDialog } from '../interact/iterative-dialog.js';
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
+import { showPivotSpillCallout } from '../interact/pivot-spill-callout.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
 import { attachSessionCharts } from '../interact/session-charts.js';
@@ -299,7 +300,11 @@ export const workbookObjects = (): Extension => ({
         }),
       subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),
       onAfterPivotEdit: () => {
-        refreshPivotReportsAfterEdit(ctx.store, ctx.getWb(), { theme: resolveTheme(ctx.host) });
+        const { spilled } = refreshPivotReportsAfterEdit(ctx.store, ctx.getWb(), {
+          theme: resolveTheme(ctx.host),
+        });
+        const spill = spilled[0];
+        if (spill) showPivotSpillCallout(ctx.host, ctx.store, ctx.i18n.strings, spill);
         ctx.invalidate();
       },
     });

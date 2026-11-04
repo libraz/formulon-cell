@@ -23,7 +23,7 @@ import { runColumnWidthDialog, runRowHeightDialog } from '../commands/row-col-di
 import { hiddenExtentInSelection } from '../commands/row-col-layout.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { effectiveCellFormatWithPending } from '../engine/cell-format-projection.js';
-import { type Addr, PivotSortOrder } from '../engine/types.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { bodyBandOrigin, layoutForView, rangeRects } from '../render/geometry.js';
@@ -57,6 +57,7 @@ import type {
   ContextMenuOptions,
 } from './context-menu-options.js';
 import { createContextMenuPermissions } from './context-menu-permissions.js';
+import { pivotMenuTarget, runContextMenuPivotItem } from './context-menu-pivot.js';
 import {
   buildCellEntries,
   buildColEntries,
@@ -80,7 +81,6 @@ import { type MenuTarget, resolveContextMenuTarget } from './context-menu-target
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
-import { openPivotFieldSettingsAt } from './pivot-field-settings-dialog-apply.js';
 
 export interface ContextMenuDeps {
   host: HTMLElement;
@@ -130,6 +130,10 @@ export interface ContextMenuDeps {
   /** Called for the pivot menu's field-list entries. When omitted those entries
    *  are hidden. */
   onOpenPivotFieldList?: (sheetIndex: number, pivotIndex: number) => void;
+  /** Whether the field list is showing, and closes it: the pivot menu's Hide
+   *  Field List row is checked while it is hidden and toggles it. */
+  isPivotFieldListOpen?: () => boolean;
+  onClosePivotFieldList?: () => void;
   /** Optional composed menu contract. Omitted preserves the legacy menu. */
   options?: ContextMenuOptions;
   /** Shared authorization/execution service for restricted embeds. */
@@ -593,13 +597,19 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const activeAddr = store.getState().selection.active;
     const pivot = kind === 'cell' ? wb.pivotCellInfo(activeAddr) : null;
     activePivot = pivot ? { ...pivot, sheet: activeAddr.sheet } : null;
+    // Menus measured apart may differ in metrics; the stylesheet tells them apart by this.
+    root.dataset.fcMenu = pivot ? 'pivot' : kind;
+    sub.dataset.fcMenu = root.dataset.fcMenu;
     const raw = pivot
-      ? buildPivotEntries(strings, {
-          isValue: pivot.isValue,
-          canRefresh: pivot.cacheId >= 0,
-          canSort: pivot.fieldIndex >= 0 && !pivot.isValue,
-          canOpenFieldList: !!deps.onOpenPivotFieldList,
-        })
+      ? buildPivotEntries(
+          strings,
+          pivotMenuTarget(
+            wb,
+            { addr: activeAddr, info: pivot },
+            !!deps.onOpenPivotFieldList,
+            deps.isPivotFieldListOpen ? !deps.isPivotFieldListOpen() : undefined,
+          ),
+        )
       : kind === 'row'
         ? buildRowEntries(strings)
         : kind === 'col'
@@ -1164,6 +1174,34 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (!decisionForItem(id).allowed) return;
     if (permissions.navigationBlocks(id)) return;
     const state = store.getState();
+    if (activePivot && id !== 'pivotRefresh') {
+      const ref = {
+        addr: {
+          sheet: activePivot.sheet,
+          row: state.selection.active.row,
+          col: state.selection.active.col,
+        },
+        info: activePivot,
+      };
+      const pivotContext = {
+        host,
+        store,
+        wb,
+        strings,
+        history: deps.history ?? null,
+        pickNumberFormat: pivotNumberFormat.pick,
+        refresh: refreshPivotCells,
+        ...(activeEvent && 'clientX' in activeEvent
+          ? { anchor: { x: activeEvent.clientX, y: activeEvent.clientY } }
+          : {}),
+        ...(deps.onOpenPivotFieldList ? { onOpenPivotFieldList: deps.onOpenPivotFieldList } : {}),
+        ...(deps.isPivotFieldListOpen ? { isPivotFieldListOpen: deps.isPivotFieldListOpen } : {}),
+        ...(deps.onClosePivotFieldList
+          ? { onClosePivotFieldList: deps.onClosePivotFieldList }
+          : {}),
+      };
+      if (runContextMenuPivotItem(pivotContext, ref, id)) return;
+    }
     if (clipboard.run(id, state)) return;
     if (runContextMenuStructureItem(structureContext, id, state)) return;
     if (runContextMenuFormatSortItem(formatSortContext, id, state)) return;
@@ -1278,48 +1316,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           pivotIndex: activePivot.pivotIndex,
         });
         if (result.ok) refreshPivotCells(activePivot.sheet);
-        return;
-      }
-      case 'pivotSortAsc':
-      case 'pivotSortDesc': {
-        if (!activePivot || activePivot.fieldIndex < 0) return;
-        const order = id === 'pivotSortAsc' ? PivotSortOrder.Ascending : PivotSortOrder.Descending;
-        if (
-          wb.setPivotFieldSort(
-            activePivot.sheet,
-            activePivot.pivotIndex,
-            activePivot.fieldIndex,
-            order,
-            '',
-          )
-        ) {
-          refreshPivotCells(activePivot.sheet);
-        }
-        return;
-      }
-      case 'pivotFieldSettings': {
-        const sheet = activePivot?.sheet;
-        if (
-          sheet !== undefined &&
-          openPivotFieldSettingsAt(
-            {
-              host,
-              strings,
-              wb,
-              history: deps.history ?? null,
-              pickNumberFormat: pivotNumberFormat.pick,
-              onChanged: () => refreshPivotCells(sheet),
-            },
-            store.getState().selection.active,
-          )
-        ) {
-          return;
-        }
-        if (activePivot) deps.onOpenPivotFieldList?.(activePivot.sheet, activePivot.pivotIndex);
-        return;
-      }
-      case 'pivotShowFieldList': {
-        if (activePivot) deps.onOpenPivotFieldList?.(activePivot.sheet, activePivot.pivotIndex);
         return;
       }
     }

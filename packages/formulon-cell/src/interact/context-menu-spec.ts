@@ -3,6 +3,7 @@
 // kinds, entry tree) plus the small set of label builders that turn a
 // localized `Strings` dictionary into the cell/row/col entry lists.
 
+import { PivotAggregation, PivotShowValuesAs } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
 import type { ContextMenuItem } from './context-menu-options.js';
 
@@ -64,11 +65,78 @@ export type ItemId =
   | 'pivotSortAsc'
   | 'pivotSortDesc'
   | 'pivotFieldSettings'
-  | 'pivotShowFieldList';
+  | 'pivotShowFieldList'
+  | 'pivotNumberFormat'
+  | 'pivotDelete'
+  | 'pivotSortMore'
+  | 'pivotFilterClear'
+  | 'pivotFilterKeepSelected'
+  | 'pivotFilterHideSelected'
+  | 'pivotFilterTop10'
+  | 'pivotFilterLabel'
+  | 'pivotFilterValue'
+  | 'pivotSelectLabels'
+  | 'pivotSelectData'
+  | 'pivotSelectLabelsAndData'
+  | 'pivotSelectTable'
+  | 'pivotSelectEnable'
+  | 'pivotCalcField'
+  | 'pivotCalcItem'
+  | 'pivotSolveOrder'
+  | 'pivotListFormulas'
+  | 'pivotRemoveField'
+  | 'pivotRemoveValues'
+  | 'pivotRemoveGrandTotal'
+  | 'pivotSubtotal'
+  | 'pivotExpand'
+  | 'pivotCollapse'
+  | 'pivotExpandField'
+  | 'pivotCollapseField'
+  | 'pivotCollapseTo'
+  | 'pivotGroup'
+  | 'pivotUngroup'
+  | 'pivotMoveItemFirst'
+  | 'pivotMoveItemUp'
+  | 'pivotMoveItemDown'
+  | 'pivotMoveItemLast'
+  | 'pivotMoveFieldFirst'
+  | 'pivotMoveFieldLeft'
+  | 'pivotMoveFieldRight'
+  | 'pivotMoveFieldLast'
+  | 'pivotMoveFieldToColumns'
+  | 'pivotMoveFieldToRows'
+  | 'pivotSummarizeSum'
+  | 'pivotSummarizeCount'
+  | 'pivotSummarizeAverage'
+  | 'pivotSummarizeMax'
+  | 'pivotSummarizeMin'
+  | 'pivotSummarizeProduct'
+  | 'pivotSummarizeDistinctCount'
+  | 'pivotSummarizeMore'
+  | 'pivotShowAsNormal'
+  | 'pivotShowAsPercentOfTotal'
+  | 'pivotShowAsPercentOfColumn'
+  | 'pivotShowAsPercentOfRow'
+  | 'pivotShowAsPercentOfParentRow'
+  | 'pivotShowAsPercentOfParentColumn'
+  | 'pivotShowAsMore'
+  | 'pivotShowDetails'
+  | 'pivotOptions';
 
 /** Menu-level IDs are also stable composition targets. They are not commands
  * themselves; selecting one selects the corresponding nested item tree. */
-export type MenuContainerId = 'pasteSpecialMenu' | 'filterMenu' | 'sortMenu' | 'pivotSortMenu';
+export type MenuContainerId =
+  | 'pasteSpecialMenu'
+  | 'filterMenu'
+  | 'sortMenu'
+  | 'pivotSortMenu'
+  | 'pivotFilterMenu'
+  | 'pivotSelectMenu'
+  | 'pivotFormulasMenu'
+  | 'pivotSummarizeMenu'
+  | 'pivotShowAsMenu'
+  | 'pivotExpandMenu'
+  | 'pivotMoveMenu';
 
 export type ContextMenuItemId = ItemId | MenuContainerId;
 
@@ -85,7 +153,17 @@ export const PLAIN_INSERT_IDS: readonly ItemId[] = [
 ];
 
 export type MenuEntry =
-  | { kind: 'item'; id: ItemId; label: string; hint?: string }
+  | {
+      kind: 'item';
+      id: ItemId;
+      label: string;
+      hint?: string;
+      /** Drawn disabled, with `disabledReason` as its explanation. */
+      disabled?: boolean;
+      disabledReason?: string;
+      /** A check-mark row: true draws the mark. */
+      checked?: boolean;
+    }
   | { kind: 'submenu'; id: string; label: string; children: MenuEntry[] }
   | { kind: 'sep'; id: string };
 
@@ -150,6 +228,62 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'pivotSortDesc',
   'pivotFieldSettings',
   'pivotShowFieldList',
+  'pivotNumberFormat',
+  'pivotDelete',
+  'pivotSortMore',
+  'pivotFilterClear',
+  'pivotFilterKeepSelected',
+  'pivotFilterHideSelected',
+  'pivotFilterTop10',
+  'pivotFilterLabel',
+  'pivotFilterValue',
+  'pivotSelectLabels',
+  'pivotSelectData',
+  'pivotSelectLabelsAndData',
+  'pivotSelectTable',
+  'pivotSelectEnable',
+  'pivotCalcField',
+  'pivotCalcItem',
+  'pivotSolveOrder',
+  'pivotListFormulas',
+  'pivotRemoveField',
+  'pivotRemoveValues',
+  'pivotRemoveGrandTotal',
+  'pivotSubtotal',
+  'pivotExpand',
+  'pivotCollapse',
+  'pivotExpandField',
+  'pivotCollapseField',
+  'pivotCollapseTo',
+  'pivotGroup',
+  'pivotUngroup',
+  'pivotMoveItemFirst',
+  'pivotMoveItemUp',
+  'pivotMoveItemDown',
+  'pivotMoveItemLast',
+  'pivotMoveFieldFirst',
+  'pivotMoveFieldLeft',
+  'pivotMoveFieldRight',
+  'pivotMoveFieldLast',
+  'pivotMoveFieldToColumns',
+  'pivotMoveFieldToRows',
+  'pivotSummarizeSum',
+  'pivotSummarizeCount',
+  'pivotSummarizeAverage',
+  'pivotSummarizeMax',
+  'pivotSummarizeMin',
+  'pivotSummarizeProduct',
+  'pivotSummarizeDistinctCount',
+  'pivotSummarizeMore',
+  'pivotShowAsNormal',
+  'pivotShowAsPercentOfTotal',
+  'pivotShowAsPercentOfColumn',
+  'pivotShowAsPercentOfRow',
+  'pivotShowAsPercentOfParentRow',
+  'pivotShowAsPercentOfParentColumn',
+  'pivotShowAsMore',
+  'pivotShowDetails',
+  'pivotOptions',
 ];
 
 const BUILTIN_ITEM_ID_SET: ReadonlySet<string> = new Set(BUILTIN_ITEM_IDS);
@@ -170,6 +304,9 @@ export function menuEntryToContextItem(entry: MenuEntry): ContextMenuItem {
     id: entry.id,
     label: entry.label,
     ...(entry.hint === undefined ? {} : { hint: entry.hint }),
+    ...(entry.disabled ? { disabled: true } : {}),
+    ...(entry.disabledReason === undefined ? {} : { disabledReason: entry.disabledReason }),
+    ...(entry.checked === undefined ? {} : { checked: entry.checked }),
     builtIn: entry.id,
   };
 }
@@ -192,6 +329,7 @@ export const SUBMENU_ICON_ACTION: Record<string, string> = {
   filterMenu: 'filter',
   sortMenu: 'sort',
   pivotSortMenu: 'sort',
+  pivotFilterMenu: 'filter',
 };
 
 function pasteSpecialSubmenu(s: Strings): MenuEntry {
@@ -275,49 +413,260 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
   ];
 }
 
+/** The kind of report cell a pivot menu is opened on, as the desktop tells them apart. */
+export type PivotMenuCell = 'value' | 'item' | 'header' | 'total' | 'dataHeader';
+
 /** What the pivot menu needs to know about the clicked report cell. */
 export interface PivotMenuTarget {
-  /** A cell showing a computed value rather than a label. */
-  isValue: boolean;
+  cell: PivotMenuCell;
+  /** The row or column field of an item cell. */
+  fieldName: string;
+  /** The item an item cell shows. */
+  itemName: string;
+  /** The data field of a value, total or data-header cell. */
+  dataFieldName: string;
+  /** Whether the item's field sits on the columns rather than the rows. */
+  itemOnColumns: boolean;
+  /** The data field's current function and calculation, for the check marks. */
+  aggregation?: PivotAggregation;
+  showValuesAs?: number;
+  /** The item's field shows its automatic or custom subtotal. */
+  subtotalOn: boolean;
+  /** The item's field hides an item or carries a label / value filter. */
+  filtered: boolean;
+  /** Whether the field list is hidden, when the host can tell; draws the Hide
+   *  Field List check mark. */
+  fieldListHidden?: boolean;
   /** The report can be refreshed from its source. */
   canRefresh: boolean;
-  /** The cell's source field can be sorted. */
-  canSort: boolean;
   /** The field list panel can be opened. */
   canOpenFieldList: boolean;
 }
 
-/** Cell menu for a PivotTable report cell, in the desktop order. Only items
- *  with a backing command are listed. */
+const SUMMARIZE_ITEMS: readonly [ItemId, PivotAggregation | null, keyof Strings['contextMenu']][] =
+  [
+    ['pivotSummarizeSum', PivotAggregation.Sum, 'pivotSummarizeSum'],
+    ['pivotSummarizeCount', PivotAggregation.Count, 'pivotSummarizeCount'],
+    ['pivotSummarizeAverage', PivotAggregation.Average, 'pivotSummarizeAverage'],
+    ['pivotSummarizeMax', PivotAggregation.Max, 'pivotSummarizeMax'],
+    ['pivotSummarizeMin', PivotAggregation.Min, 'pivotSummarizeMin'],
+    ['pivotSummarizeProduct', PivotAggregation.Product, 'pivotSummarizeProduct'],
+    ['pivotSummarizeDistinctCount', null, 'pivotSummarizeDistinctCount'],
+  ];
+
+const SHOW_AS_ITEMS: readonly [ItemId, number, keyof Strings['contextMenu']][] = [
+  ['pivotShowAsNormal', PivotShowValuesAs.Normal, 'pivotShowAsNormal'],
+  ['pivotShowAsPercentOfTotal', PivotShowValuesAs.PercentOfTotal, 'pivotShowAsPercentOfTotal'],
+  ['pivotShowAsPercentOfColumn', PivotShowValuesAs.PercentOfCol, 'pivotShowAsPercentOfColumn'],
+  ['pivotShowAsPercentOfRow', PivotShowValuesAs.PercentOfRow, 'pivotShowAsPercentOfRow'],
+  [
+    'pivotShowAsPercentOfParentRow',
+    PivotShowValuesAs.PercentOfParentRow,
+    'pivotShowAsPercentOfParentRow',
+  ],
+  [
+    'pivotShowAsPercentOfParentColumn',
+    PivotShowValuesAs.PercentOfParentCol,
+    'pivotShowAsPercentOfParentColumn',
+  ],
+];
+
+/** The data field's function and calculation, by the engine kind they write. */
+export const PIVOT_MENU_AGGREGATION: Partial<Record<ItemId, PivotAggregation>> = Object.fromEntries(
+  SUMMARIZE_ITEMS.filter(([, value]) => value !== null).map(([id, value]) => [id, value]),
+);
+export const PIVOT_MENU_SHOW_AS: Partial<Record<ItemId, number>> = Object.fromEntries(
+  SHOW_AS_ITEMS.map(([id, value]) => [id, value]),
+);
+
+/** Cell menu for a PivotTable report cell: the entries, separators and
+ *  submenus of the desktop menu for that kind of cell, in its order. An entry
+ *  the host cannot carry out is listed disabled with the reason. */
 export function buildPivotEntries(s: Strings, target: PivotMenuTarget): MenuEntry[] {
   const t = s.contextMenu;
+  const { cell } = target;
+  const reason = t.pivotUnavailable;
+  const off = (id: ItemId, label: string, checked?: boolean): MenuEntry => ({
+    kind: 'item',
+    id,
+    label,
+    disabled: true,
+    disabledReason: reason,
+    ...(checked === undefined ? {} : { checked }),
+  });
+  const on = (id: ItemId, label: string, checked?: boolean): MenuEntry => ({
+    kind: 'item',
+    id,
+    label,
+    ...(checked === undefined ? {} : { checked }),
+  });
+  const field = (template: string): string => template.replace('{field}', target.fieldName);
+  const item = (template: string): string => template.replace('{item}', target.itemName);
+  const dataField = (template: string): string => template.replace('{field}', target.dataFieldName);
+  let sep = 0;
+  const separator = (): MenuEntry => {
+    sep += 1;
+    return { kind: 'sep', id: `pvSep${sep}` };
+  };
+  const valueLike = cell === 'value' || cell === 'total' || cell === 'dataHeader';
+  const sortMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotSortMenu',
+    label: t.pivotSort,
+    children: [
+      on('pivotSortAsc', t.pivotSortAsc),
+      on('pivotSortDesc', t.pivotSortDesc),
+      separator(),
+      off('pivotSortMore', t.pivotSortMore),
+    ],
+  };
+  const filterMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotFilterMenu',
+    label: t.pivotFilter,
+    children: [
+      target.filtered
+        ? on('pivotFilterClear', t.pivotFilterClear)
+        : off('pivotFilterClear', t.pivotFilterClear),
+      separator(),
+      on('pivotFilterKeepSelected', t.pivotFilterKeepSelected),
+      on('pivotFilterHideSelected', t.pivotFilterHideSelected),
+      separator(),
+      on('pivotFilterTop10', t.pivotFilterTop10),
+      on('pivotFilterLabel', t.pivotFilterLabel),
+      on('pivotFilterValue', t.pivotFilterValue),
+    ],
+  };
+  const selectMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotSelectMenu',
+    label: t.pivotSelect,
+    children: [
+      off('pivotSelectLabels', t.pivotSelectLabels),
+      off('pivotSelectData', t.pivotSelectData),
+      off('pivotSelectLabelsAndData', t.pivotSelectLabelsAndData),
+      on('pivotSelectTable', t.pivotSelectTable),
+      separator(),
+      off('pivotSelectEnable', t.pivotSelectEnable, true),
+    ],
+  };
+  const formulasMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotFormulasMenu',
+    label: t.pivotFormulas,
+    children: [
+      off('pivotCalcField', t.pivotCalcField),
+      off('pivotCalcItem', t.pivotCalcItem),
+      separator(),
+      off('pivotSolveOrder', t.pivotSolveOrder),
+      off('pivotListFormulas', t.pivotListFormulas),
+    ],
+  };
+  const summarizeMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotSummarizeMenu',
+    label: t.pivotSummarizeBy,
+    children: [
+      ...SUMMARIZE_ITEMS.map(([id, value, key]) =>
+        value === null ? off(id, t[key]) : on(id, t[key], value === target.aggregation),
+      ),
+      separator(),
+      on('pivotSummarizeMore', t.pivotMoreOptions),
+    ],
+  };
+  // On an item the desktop draws the whole list, but none of it applies there.
+  const showAsMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotShowAsMenu',
+    label: t.pivotShowValuesAs,
+    children: [
+      ...SHOW_AS_ITEMS.map(([id, value, key]) =>
+        valueLike
+          ? on(id, t[key], value === (target.showValuesAs ?? PivotShowValuesAs.Normal))
+          : off(id, t[key], value === PivotShowValuesAs.Normal),
+      ),
+      separator(),
+      valueLike
+        ? on('pivotShowAsMore', t.pivotMoreOptions)
+        : off('pivotShowAsMore', t.pivotMoreOptions),
+    ],
+  };
+  const expandMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotExpandMenu',
+    label: t.pivotExpandCollapse,
+    children: [
+      off('pivotExpand', t.pivotExpand),
+      off('pivotCollapse', t.pivotCollapse),
+      off('pivotExpandField', t.pivotExpandField),
+      off('pivotCollapseField', t.pivotCollapseField),
+      separator(),
+      off('pivotCollapseTo', field(t.pivotCollapseTo)),
+    ],
+  };
+  const moveMenu: MenuEntry = {
+    kind: 'submenu',
+    id: 'pivotMoveMenu',
+    label: t.pivotMove,
+    children: [
+      off('pivotMoveItemFirst', item(t.pivotMoveItemFirst)),
+      off('pivotMoveItemUp', item(t.pivotMoveItemUp)),
+      off('pivotMoveItemDown', item(t.pivotMoveItemDown)),
+      off('pivotMoveItemLast', item(t.pivotMoveItemLast)),
+      off('pivotMoveFieldFirst', field(t.pivotMoveFieldFirst)),
+      off('pivotMoveFieldLeft', field(t.pivotMoveFieldLeft)),
+      off('pivotMoveFieldRight', field(t.pivotMoveFieldRight)),
+      off('pivotMoveFieldLast', field(t.pivotMoveFieldLast)),
+      separator(),
+      target.itemOnColumns
+        ? on('pivotMoveFieldToRows', field(t.pivotMoveFieldToRows))
+        : on('pivotMoveFieldToColumns', field(t.pivotMoveFieldToColumns)),
+    ],
+  };
+
   const entries: MenuEntry[] = [
     { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
     { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
-    { kind: 'sep', id: 'pvSep1' },
   ];
-  if (target.canRefresh) entries.push({ kind: 'item', id: 'pivotRefresh', label: t.pivotRefresh });
-  if (target.canSort) {
-    entries.push({
-      kind: 'submenu',
-      id: 'pivotSortMenu',
-      label: t.pivotSort,
-      children: [
-        { kind: 'item', id: 'pivotSortAsc', label: t.pivotSortAsc },
-        { kind: 'item', id: 'pivotSortDesc', label: t.pivotSortDesc },
-      ],
-    });
-  }
-  if (target.canOpenFieldList) {
+  if (valueLike) entries.push(on('pivotNumberFormat', t.pivotNumberFormat));
+  entries.push(separator());
+  if (target.canRefresh) entries.push(on('pivotRefresh', t.pivotRefresh));
+  entries.push(separator(), on('pivotDelete', t.pivotDelete), separator());
+  if (cell === 'value' || cell === 'dataHeader') entries.push(sortMenu, separator());
+  if (cell === 'item') entries.push(sortMenu, filterMenu, separator());
+  entries.push(selectMenu, formulasMenu, separator());
+  if (cell === 'item') {
     entries.push(
-      { kind: 'sep', id: 'pvSep2' },
-      {
-        kind: 'item',
-        id: 'pivotFieldSettings',
-        label: target.isValue ? t.pivotValueFieldSettings : t.pivotFieldSettings,
-      },
-      { kind: 'item', id: 'pivotShowFieldList', label: t.pivotShowFieldList },
+      off('pivotSubtotal', field(t.pivotSubtotalOf), target.subtotalOn),
+      separator(),
+      expandMenu,
+      separator(),
+      off('pivotGroup', t.pivotGroup),
+      off('pivotUngroup', t.pivotUngroup),
+      separator(),
+      moveMenu,
+      on('pivotRemoveField', field(t.pivotRemoveField)),
+      separator(),
+      showAsMenu,
     );
+  } else if (cell === 'header') {
+    entries.push(showAsMenu);
+  } else {
+    if (cell === 'total') entries.push(on('pivotRemoveGrandTotal', t.pivotRemoveGrandTotal));
+    else entries.push(on('pivotRemoveField', dataField(t.pivotRemoveField)));
+    if (cell === 'dataHeader') entries.push(on('pivotRemoveValues', t.pivotRemoveValues));
+    entries.push(separator(), summarizeMenu, showAsMenu);
+    if (cell === 'value') entries.push(separator(), off('pivotShowDetails', t.pivotShowDetails));
+  }
+  entries.push(separator());
+  if (cell !== 'header') {
+    entries.push(
+      on('pivotFieldSettings', valueLike ? t.pivotValueFieldSettings : t.pivotFieldSettings),
+    );
+  }
+  entries.push(on('pivotOptions', t.pivotOptions));
+  if (target.canOpenFieldList) {
+    entries.push(on('pivotShowFieldList', t.pivotHideFieldList, target.fieldListHidden));
   }
   return entries;
 }

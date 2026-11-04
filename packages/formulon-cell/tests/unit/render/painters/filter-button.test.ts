@@ -110,3 +110,38 @@ describe('PivotTable field-caption button (Mac)', () => {
     ]);
   });
 });
+
+describe('filtered PivotTable field button (Mac)', () => {
+  it('draws a small arrow at the lower left and a funnel at the right', () => {
+    const path: number[][] = [];
+    const ctx = new Proxy(
+      {},
+      {
+        get: (_t, key) =>
+          key === 'moveTo' || key === 'lineTo'
+            ? (...a: number[]) => path.push(a)
+            : key === 'createLinearGradient'
+              ? () => ({ addColorStop: () => undefined })
+              : () => undefined,
+        set: () => true,
+      },
+    ) as unknown as CanvasRenderingContext2D;
+    paintFilterButton(
+      ctx,
+      { x: 76, y: 54, w: 14, h: 14 },
+      { accent: '#217346', bg: '#fff' } as ResolvedTheme,
+      { filtered: true },
+      MAC_PIVOT_BUTTON_LOOK,
+      2,
+    );
+    // Device px at 2x, as measured: arrow x 156..162 below y 523; funnel bowl x 164..174.
+    expect(path.slice(0, 3)).toEqual([
+      [78, 61],
+      [81.5, 61],
+      [79.75, 63.5],
+    ]);
+    expect(path[3]).toEqual([82, 57]);
+    expect(path[4]).toEqual([87.5, 57]);
+    expect(path[7]).toEqual([84.25, 64.5]);
+  });
+});

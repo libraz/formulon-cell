@@ -41,6 +41,8 @@ export interface ContextMenuItem {
   readonly children?: readonly ContextMenuItem[];
   readonly disabled?: boolean;
   readonly disabledReason?: string;
+  /** A check-mark row: true draws the mark, false leaves the gutter empty. */
+  readonly checked?: boolean;
   readonly builtIn?: ItemId;
   /** A typed cell-batch request executed by the shared interaction service. */
   readonly command?: CellBatchCommand;

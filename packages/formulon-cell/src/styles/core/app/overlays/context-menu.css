@@ -510,3 +510,35 @@
     border-width: 1.6px 1.6px 0 0;
   }
 }
+
+/* Check-mark rows (role="menuitemcheckbox"): the same tick the ribbon menus
+ * draw, in the icon column, or in the Mac gutter. */
+@layer fc.app {
+  .fc-ctxmenu__item[aria-checked="true"]::before {
+    width: 9px;
+    height: 5px;
+    border-bottom: 2px solid currentColor;
+    border-left: 2px solid currentColor;
+    background: none;
+    opacity: 1;
+    -webkit-mask: none;
+    mask: none;
+    transform: translateY(-2px) rotate(-45deg);
+  }
+  /* The measured Mac PivotTable menu: 264 pt wide, with a check gutter before
+   * every label. */
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-ctxmenu[data-fc-menu="pivot"]:not(.fc-ctxmenu__sub) {
+    min-width: 264px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu[data-fc-menu="pivot"] .fc-ctxmenu__item {
+    padding-inline-start: 26px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item[aria-checked="true"]::before {
+    position: absolute;
+    top: 50%;
+    left: 10px;
+    display: block;
+    margin-top: -4px;
+  }
+}

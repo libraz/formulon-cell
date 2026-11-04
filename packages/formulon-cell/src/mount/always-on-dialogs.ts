@@ -4,7 +4,8 @@
 
 import { activeFilterRange } from '../commands/filter-ranges.js';
 import type { History } from '../commands/history.js';
-import type { Range } from '../engine/types.js';
+import { refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { attachCellStylesGallery } from '../interact/cell-styles-gallery.js';
@@ -13,8 +14,10 @@ import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialo
 import { attachEvaluateFormulaDialog } from '../interact/evaluate-formula-dialog.js';
 import { attachExternalLinksDialog } from '../interact/external-links-dialog.js';
 import { attachFilterDropdown } from '../interact/filter-dropdown.js';
+import { openPivotFieldFilter } from '../interact/pivot-filter-panel.js';
 import { cellRect, gridOriginY, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { resolveTheme } from '../theme/resolve.js';
 
 export interface AlwaysOnDialogsDeps {
   host: HTMLElement;
@@ -111,6 +114,29 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
   };
   host.addEventListener('fc:openfilter', onOpenFilter);
 
+  // A report's drop-down button dispatches `fc:openpivotfilter` with the
+  // button cell and the button's bottom-left corner in viewport coordinates.
+  const onOpenPivotFilter = (e: Event): void => {
+    if (deps.isRestricted()) return;
+    const detail = (e as CustomEvent<{ addr: Addr; anchor: { x: number; y: number } }>).detail;
+    if (!detail) return;
+    const wb = getWb();
+    openPivotFieldFilter(
+      {
+        host,
+        store,
+        wb,
+        history,
+        strings: getStrings(),
+        onChanged: () =>
+          refreshPivotReportsAfterEdit(store, getWb(), { theme: resolveTheme(host) }),
+      },
+      detail.addr,
+      detail.anchor,
+    );
+  };
+  host.addEventListener('fc:openpivotfilter', onOpenPivotFilter);
+
   return {
     openExternalLinks: () => externalLinksDialog.open(),
     openCfRules: () => cfRulesDialog.open(),
@@ -145,6 +171,7 @@ export function attachAlwaysOnDialogs(deps: AlwaysOnDialogsDeps): AlwaysOnDialog
     },
     detach() {
       host.removeEventListener('fc:openfilter', onOpenFilter);
+      host.removeEventListener('fc:openpivotfilter', onOpenPivotFilter);
       evaluateFormulaDialog.detach();
       externalLinksDialog.detach();
       cfRulesDialog.detach();

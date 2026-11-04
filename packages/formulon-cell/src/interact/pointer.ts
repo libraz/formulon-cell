@@ -31,6 +31,7 @@ import {
 } from '../commands/slice-history.js';
 import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
+import { pivotStyleLayer } from '../engine/pivot-style.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
@@ -39,12 +40,19 @@ import {
   hitTest,
   hitZone,
   layoutForView,
+  type Rect,
   rowTopEdge,
   type ViewLayout,
 } from '../render/geometry.js';
+import { ruleWidth } from '../render/grid/chrome-context.js';
 import type { PageBreakHandle, RulerHandle } from '../render/grid/page-view.js';
 import { gridHitState } from '../render/grid.js';
-import { filterButtonRect } from '../render/painters/filter-button.js';
+import {
+  filterButtonRect,
+  pivotFieldButtonRect,
+  pivotFieldButtonSize,
+} from '../render/painters/filter-button.js';
+import { visualZoom } from '../render/painters/text.js';
 import { renderScale } from '../store/render-scale.js';
 import {
   isWholeColumnRange,
@@ -177,6 +185,30 @@ export interface PointerDeps {
   /** Shared history. When provided, col/row resizes and fill drags push one
    *  entry per drag-end (not per intermediate frame). */
   history?: History | null;
+}
+
+/** The drop-down button rect of a report caption cell when (x, y) falls on it. */
+function pivotButtonRectAt(
+  s: State,
+  wb: WorkbookHandle,
+  host: HTMLElement,
+  row: number,
+  col: number,
+  x: number,
+  y: number,
+): Rect | null {
+  if (!pivotStyleLayer(wb, s).buttons.has(`${s.data.sheetIndex}:${row}:${col}`)) return null;
+  const mac = (host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform === 'mac';
+  const dpr = host.ownerDocument.defaultView?.devicePixelRatio ?? 1;
+  const button = pivotFieldButtonRect(
+    cellRect(geometryLayout(s), s.viewport, row, col),
+    pivotFieldButtonSize(mac, visualZoom(s.viewport.zoom)),
+    ruleWidth(dpr),
+    s.ui.rightToLeft === true,
+  );
+  return x >= button.x && x < button.x + button.w && y >= button.y && y < button.y + button.h
+    ? button
+    : null;
 }
 
 export function attachPointer(
@@ -677,6 +709,26 @@ export function attachPointer(
 
       case 'cell': {
         const rawAddr = { sheet: s.data.sheetIndex, row: zone.row, col: zone.col };
+        // A report's drop-down button opens its filter panel; the active cell stays.
+        const pivotButton = pivotButtonRectAt(s, wb, host, zone.row, zone.col, x, y);
+        if (pivotButton) {
+          e.preventDefault();
+          const rect = host.getBoundingClientRect();
+          host.dispatchEvent(
+            new CustomEvent('fc:openpivotfilter', {
+              bubbles: true,
+              detail: {
+                addr: rawAddr,
+                anchor: {
+                  x: rect.left + pivotButton.x,
+                  y: rect.top + pivotButton.y + pivotButton.h,
+                },
+              },
+            }),
+          );
+          drag = { kind: 'none' };
+          return;
+        }
         // Click on a merged cell body — promote to the merge anchor (spreadsheet parity).
         const addr = mergeAnchorOf(s, rawAddr);
         if (!isNavigationAddrAllowed(store, addr)) {

@@ -62,6 +62,7 @@ import {
   paintSelectionOutline,
   paintSpillBlocker,
   paintSpillOutline,
+  paintSpillTarget,
   paintValidationChevron,
 } from './painters.js';
 
@@ -615,6 +616,11 @@ export class GridRenderer {
     for (const r of ranges) {
       for (const rect of rangeRects(layout, viewport, r)) {
         paintSpillOutline(this.ctx, rect, theme);
+      }
+    }
+    for (const spill of pivotStyleLayer(wb, state).spills) {
+      for (const rect of rangeRects(layout, viewport, spill.needed)) {
+        paintSpillTarget(this.ctx, rect, theme);
       }
     }
 

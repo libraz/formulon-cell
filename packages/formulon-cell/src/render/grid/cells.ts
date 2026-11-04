@@ -31,12 +31,11 @@ import {
 } from '../geometry.js';
 import {
   FILTER_BUTTON_LOOK,
-  FILTER_BUTTON_SIZE,
   filterButtonRect,
   MAC_PIVOT_BUTTON_LOOK,
-  MAC_PIVOT_BUTTON_SIZE,
   paintFilterButton,
   pivotFieldButtonRect,
+  pivotFieldButtonSize,
 } from '../painters/filter-button.js';
 import {
   paintPivotCollapseButton,
@@ -177,9 +176,10 @@ export function paintCells(
   const wb = cellCtx.wb;
   const pivots = pivotStyleLayer(wb, state);
   const styleFormatAt = styleElementFormatSource(state, wb);
-  const pivotButtonSize =
-    (cellCtx.fontEffects ? MAC_PIVOT_BUTTON_SIZE : FILTER_BUTTON_SIZE) *
-    visualZoom(state.viewport.zoom);
+  const pivotButtonSize = pivotFieldButtonSize(
+    cellCtx.fontEffects,
+    visualZoom(state.viewport.zoom),
+  );
   const pivotButtonLook = cellCtx.fontEffects ? MAC_PIVOT_BUTTON_LOOK : FILTER_BUTTON_LOOK;
   const ptPx = fontPointsToCssPx(1) * renderScale(state.layout, state.viewport);
   const visibleBounds = {
@@ -770,7 +770,7 @@ export function paintCells(
           ctx,
           pivotFieldButtonRect(bounds, pivotButtonSize, rule, rtl),
           theme,
-          {},
+          { filtered: pivots.buttonAt(r, c)?.filtered === true },
           pivotButtonLook,
           cellCtx.dpr ?? 1,
         );

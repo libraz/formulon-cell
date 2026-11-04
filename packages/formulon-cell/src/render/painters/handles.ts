@@ -191,6 +191,21 @@ export function paintSpillOutline(
   ctx.restore();
 }
 
+/** Outline the area a PivotTable held at #SPILL! needs, with the dashed blue
+ *  box the spreadsheet draws around it. */
+export function paintSpillTarget(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  theme: ResolvedTheme,
+): void {
+  ctx.save();
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(bounds.x + 0.5, bounds.y + 0.5, bounds.w - 1, bounds.h - 1);
+  ctx.restore();
+}
+
 /** Highlight a cell that is blocking a #SPILL! result with a red dashed
  *  outline. Mirrors the "spill obstruction" indicator. */
 export function paintSpillBlocker(ctx: CanvasRenderingContext2D, bounds: Rect): void {

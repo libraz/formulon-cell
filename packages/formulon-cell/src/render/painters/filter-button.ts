@@ -15,6 +15,11 @@ export function filterButtonRect(cell: Rect, rtl = false): Rect {
 /** Side of a PivotTable field-caption button on the Mac profile, CSS px (14 pt). */
 export const MAC_PIVOT_BUTTON_SIZE = 14;
 
+/** Side of a report's drop-down button at a sheet zoom: the Mac 14 pt button,
+ *  or the AutoFilter button elsewhere. */
+export const pivotFieldButtonSize = (mac: boolean, zoom: number): number =>
+  (mac ? MAC_PIVOT_BUTTON_SIZE : FILTER_BUTTON_SIZE) * zoom;
+
 /** A PivotTable field-caption button: `size` square, its trailing edge on the
  *  cell's trailing gridline and its top over the gridline above the cell, so
  *  it covers the cell's whole fill. */
@@ -65,6 +70,8 @@ export interface FilterButtonState {
   active?: boolean;
   /** Sort direction of the column, when sorted. */
   sorted?: 'asc' | 'desc';
+  /** A PivotTable field with hidden items or a filter: a small arrow and a funnel. */
+  filtered?: boolean;
 }
 
 /** Paint the AutoFilter button into `rect`: a framed gradient face with a
@@ -100,7 +107,22 @@ export function paintFilterButton(
   const cx = x + w / 2;
   ctx.fillStyle = ink;
   ctx.beginPath();
-  if (state.sorted) {
+  if (state.filtered && !state.sorted) {
+    // Measured on the 14 pt Mac button; other sizes scale with it.
+    const k = w / 14;
+    ctx.moveTo(x + 2 * k, y + 7 * k);
+    ctx.lineTo(x + 5.5 * k, y + 7 * k);
+    ctx.lineTo(x + 3.75 * k, y + 9.5 * k);
+    ctx.closePath();
+    ctx.moveTo(x + 6 * k, y + 3 * k);
+    ctx.lineTo(x + 11.5 * k, y + 3 * k);
+    ctx.lineTo(x + 9.25 * k, y + 5.5 * k);
+    ctx.lineTo(x + 9.25 * k, y + 10.5 * k);
+    ctx.lineTo(x + 8.25 * k, y + 10.5 * k);
+    ctx.lineTo(x + 8.25 * k, y + 5.5 * k);
+    ctx.closePath();
+    ctx.fill();
+  } else if (state.sorted) {
     const up = state.sorted === 'asc';
     const tip = y + (up ? 4 : h - 4);
     const tail = y + (up ? h - 4 : 4);

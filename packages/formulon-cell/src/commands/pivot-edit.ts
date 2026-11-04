@@ -87,6 +87,35 @@ function editedDataFields(
   return next;
 }
 
+/** Rewrite a field's item list with each item's visibility: the one path the
+ *  pane, the field dialogs and the filter panel hide and show items through.
+ *  True only when every write succeeds. */
+export function writePivotFieldItems(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+  pivotIndex: number,
+  fieldIndex: number,
+  checklist: readonly { value: string; checked: boolean; cacheIndex?: number }[],
+): boolean {
+  if (!wb.clearPivotFieldItems(sheetIndex, pivotIndex, fieldIndex)) return false;
+  return checklist.every((item) => {
+    // A cache index states the item exactly, including the blank member;
+    // without one, a field whose items were read off the projected layout,
+    // the label is all there is.
+    if (item.cacheIndex !== undefined) {
+      if (
+        wb.addPivotFieldItemAt(sheetIndex, pivotIndex, fieldIndex, item.cacheIndex, item.checked)
+      ) {
+        return true;
+      }
+      // An engine without the by-index form cannot express a blank member at
+      // all; skip it rather than adding an item that filters nothing.
+      if (!item.value) return true;
+    }
+    return wb.addPivotFieldItem(sheetIndex, pivotIndex, fieldIndex, item.value, item.checked);
+  });
+}
+
 /** Write a pivot edit back to the engine. Every step runs even when an earlier
  *  one fails; returns true only when all of them succeed. */
 export function applyPivotEdit(
@@ -173,38 +202,16 @@ export function applyPivotEdit(
       });
   const filterItemsUpdated = edit.fields.every((field) => {
     if (field.axis !== PivotAxis.Page) return true;
-    if (!wb.clearPivotFieldItems(sheetIndex, pivotIndex, field.fieldIndex)) return false;
     if (field.filterChecklist) {
-      return field.filterChecklist.every((item) => {
-        // A cache index states the item exactly, including the blank
-        // member; without one — a field whose items were read off the
-        // projected layout — the label is all there is.
-        if (item.cacheIndex !== undefined) {
-          if (
-            wb.addPivotFieldItemAt(
-              sheetIndex,
-              pivotIndex,
-              field.fieldIndex,
-              item.cacheIndex,
-              item.checked,
-            )
-          ) {
-            return true;
-          }
-          // An engine without the by-index form cannot express a blank
-          // member at all; skip it rather than adding an item that
-          // filters nothing.
-          if (!item.value) return true;
-        }
-        return wb.addPivotFieldItem(
-          sheetIndex,
-          pivotIndex,
-          field.fieldIndex,
-          item.value,
-          item.checked,
-        );
-      });
+      return writePivotFieldItems(
+        wb,
+        sheetIndex,
+        pivotIndex,
+        field.fieldIndex,
+        field.filterChecklist,
+      );
     }
+    if (!wb.clearPivotFieldItems(sheetIndex, pivotIndex, field.fieldIndex)) return false;
     return field.filterItems.every((item) =>
       wb.addPivotFieldItem(sheetIndex, pivotIndex, field.fieldIndex, item, true),
     );

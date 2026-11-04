@@ -129,7 +129,47 @@ function cacheFieldIndex(handle: WorkbookHandlePivotMethods, cacheId: number, fi
 }
 
 function pivotWb(handle: unknown): PivotMutationWorkbook {
-  return internals(handle).wb as PivotMutationWorkbook;
+  const raw = internals(handle).wb as PivotMutationWorkbook;
+  if (!seededHandles.has(handle as object)) {
+    seededHandles.add(handle as object);
+    seedOwnedExtents(handle as WorkbookHandlePivotMethods, raw);
+  }
+  return raw;
+}
+
+/** Handles whose reports' areas have been recorded. */
+const seededHandles = new WeakSet<object>();
+
+/** Record every report's area as the handle first meets its reports, before
+ *  any edit can shrink one: a loaded report's cached cells are its own. */
+function seedOwnedExtents(handle: WorkbookHandlePivotMethods, raw: PivotMutationWorkbook): void {
+  if (!internals(handle).capabilities?.pivotTables) return;
+  let owned = ownedExtents.get(handle);
+  if (!owned) {
+    owned = new Map();
+    ownedExtents.set(handle, owned);
+  }
+  for (let sheet = 0; sheet < (handle.sheetCount ?? 0); sheet += 1) {
+    const n = unwrapNumberResult(raw.pivotCount(sheet));
+    if (n === null) continue;
+    for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+      const layout = raw.pivotLayout(sheet, pivotIndex);
+      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
+      owned.set(ownedKey(raw, sheet, pivotIndex), {
+        sheet,
+        r0: layout.top,
+        c0: layout.left,
+        r1: layout.top + layout.rows - 1,
+        c1: layout.left + layout.cols - 1,
+      });
+    }
+  }
+}
+
+/** Where a report's owned area is kept: by sheet and report name. */
+function ownedKey(raw: PivotMutationWorkbook, sheet: number, pivotIndex: number): string {
+  const name = typeof raw.pivotName === 'function' ? raw.pivotName(sheet, pivotIndex) : null;
+  return `${sheet}:${name?.status.ok ? name.value : pivotIndex}`;
 }
 
 /** Unwrap a 0.12 numeric result without turning an engine failure into a
@@ -139,10 +179,147 @@ function unwrapNumberResult(result: { status: { ok: boolean }; value: number }):
   return result.value;
 }
 
+type RawPivotLayout = ReturnType<PivotMutationWorkbook['pivotLayout']>;
+
+/** A report that cannot lay itself out because cells outside the area it
+ *  owned are in the way: it shows #SPILL! at its anchor until they clear. */
+export interface PivotSpill {
+  pivotIndex: number;
+  anchor: Addr;
+  /** The area the report needs. */
+  needed: Range;
+  /** Non-empty cells of the sheet inside `needed` that the report did not own. */
+  blockers: Addr[];
+}
+
+/** The area each report last laid itself out over, by `sheet:name`. Cells
+ *  there are the report's own (cached values), so they do not block it. */
+const ownedExtents = new WeakMap<object, Map<string, Range>>();
+
+const SPILL_ERROR = 8;
+
+const inside = (range: Range, row: number, col: number): boolean =>
+  row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
+
+/** Blockers of a report laid out over `needed`, updating the area it owns
+ *  when nothing is in the way. */
+function pivotBlockers(
+  handle: WorkbookHandlePivotMethods,
+  sheet: number,
+  pivotIndex: number,
+  needed: Range,
+): Addr[] {
+  let owned = ownedExtents.get(handle);
+  if (!owned) {
+    owned = new Map();
+    ownedExtents.set(handle, owned);
+  }
+  const key = ownedKey(pivotWb(handle), sheet, pivotIndex);
+  const previous = owned.get(key);
+  const within =
+    previous !== undefined &&
+    needed.r0 >= previous.r0 &&
+    needed.r1 <= previous.r1 &&
+    needed.c0 >= previous.c0 &&
+    needed.c1 <= previous.c1;
+  if (!previous) {
+    owned.set(key, needed);
+    return [];
+  }
+  if (within) return [];
+  const blockers: Addr[] = [];
+  for (const cell of handle.physicalCells(sheet)) {
+    const { row, col } = cell.addr;
+    if (!inside(needed, row, col) || inside(previous, row, col)) continue;
+    if (cell.formula === null && cell.value.kind === 'blank') continue;
+    blockers.push({ sheet, row, col });
+  }
+  // A report that shrank still owns the cells it cached there until they are
+  // cleared (`releasePivotCachedArea`), so growing back is never blocked by them.
+  if (blockers.length === 0) {
+    owned.set(key, {
+      sheet,
+      r0: Math.min(previous.r0, needed.r0),
+      c0: Math.min(previous.c0, needed.c0),
+      r1: Math.max(previous.r1, needed.r1),
+      c1: Math.max(previous.c1, needed.c1),
+    });
+  }
+  return blockers;
+}
+
+/** The engine's layout of a report, collapsed to a #SPILL! anchor while
+ *  cells it does not own are in the way. */
+function effectiveLayout(
+  handle: WorkbookHandlePivotMethods,
+  sheet: number,
+  pivotIndex: number,
+): RawPivotLayout {
+  const layout = pivotWb(handle).pivotLayout(sheet, pivotIndex);
+  if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) return layout;
+  const needed = {
+    sheet,
+    r0: layout.top,
+    c0: layout.left,
+    r1: layout.top + layout.rows - 1,
+    c1: layout.left + layout.cols - 1,
+  };
+  if (pivotBlockers(handle, sheet, pivotIndex, needed).length === 0) return layout;
+  return {
+    ...layout,
+    rows: 1,
+    cols: 1,
+    cells: [
+      {
+        row: layout.top,
+        col: layout.left,
+        value: { kind: 4, number: 0, boolean: 0, text: '', errorCode: SPILL_ERROR },
+        kind: PIVOT_CELL_KIND.Header,
+        depth: 0,
+        fieldName: '',
+        numberFormat: '',
+      },
+    ],
+  } as RawPivotLayout;
+}
+
 export abstract class WorkbookHandlePivotMethods {
   declare readonly capabilities: EngineCapabilities;
   declare readonly sheetCount: number;
   abstract getValue(addr: Addr): CellValue;
+  abstract physicalCells(
+    sheet: number,
+  ): Iterable<{ addr: Addr; value: CellValue; formula: string | null }>;
+
+  /** Reports on `sheet` held at #SPILL! by cells in the way. */
+  pivotSpills(sheet: number): PivotSpill[] {
+    assertAlive(this);
+    if (!this.capabilities.pivotTables) return [];
+    const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+    if (n === null) return [];
+    const out: PivotSpill[] = [];
+    for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+      const layout = pivotWb(this).pivotLayout(sheet, pivotIndex);
+      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
+      const needed = {
+        sheet,
+        r0: layout.top,
+        c0: layout.left,
+        r1: layout.top + layout.rows - 1,
+        c1: layout.left + layout.cols - 1,
+      };
+      const blockers = pivotBlockers(this, sheet, pivotIndex, needed);
+      if (blockers.length > 0) {
+        out.push({
+          pivotIndex,
+          anchor: { sheet, row: layout.top, col: layout.left },
+          needed,
+          blockers,
+        });
+      }
+    }
+    return out;
+  }
   abstract getPivotStyleInfo(sheet: number, pivotIndex: number): PivotStyleDefinition | null;
 
   /** Whether any PivotTable on `range`'s sheet occupies a cell of `range`. */
@@ -152,7 +329,7 @@ export abstract class WorkbookHandlePivotMethods {
     const n = unwrapNumberResult(pivotWb(this).pivotCount(range.sheet));
     if (n === null) return false;
     for (let i = 0; i < n; i += 1) {
-      const layout = pivotWb(this).pivotLayout(range.sheet, i);
+      const layout = effectiveLayout(this, range.sheet, i);
       if (!layout.status.ok) continue;
       if (
         range.r0 < layout.top + layout.rows &&
@@ -174,7 +351,7 @@ export abstract class WorkbookHandlePivotMethods {
     if (n === null) return [];
     const out: { pivotIndex: number; range: Range }[] = [];
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
-      const layout = pivotWb(this).pivotLayout(sheet, pivotIndex);
+      const layout = effectiveLayout(this, sheet, pivotIndex);
       if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
       out.push({
         pivotIndex,
@@ -207,7 +384,7 @@ export abstract class WorkbookHandlePivotMethods {
     const n = unwrapNumberResult(pivotWb(this).pivotCount(addr.sheet));
     if (n === null) return null;
     for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
-      const layout = pivotWb(this).pivotLayout(addr.sheet, pivotIndex);
+      const layout = effectiveLayout(this, addr.sheet, pivotIndex);
       if (!layout.status.ok) continue;
       if (
         addr.row < layout.top ||
@@ -234,6 +411,31 @@ export abstract class WorkbookHandlePivotMethods {
       };
     }
     return null;
+  }
+
+  /** Forget the cells reports on `sheet` owned beyond their current areas,
+   *  once the values they cached there are cleared. */
+  releasePivotCachedArea(sheet: number): void {
+    assertAlive(this);
+    if (!this.capabilities.pivotTables) return;
+    const owned = ownedExtents.get(this);
+    const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
+    if (!owned || n === null) return;
+    const blocked = new Set(this.pivotSpills(sheet).map((spill) => spill.pivotIndex));
+    const raw = pivotWb(this);
+    for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+      // A report held at #SPILL! keeps what it owned; the others own their area.
+      if (blocked.has(pivotIndex)) continue;
+      const layout = raw.pivotLayout(sheet, pivotIndex);
+      if (!layout.status.ok || layout.rows <= 0 || layout.cols <= 0) continue;
+      owned.set(ownedKey(raw, sheet, pivotIndex), {
+        sheet,
+        r0: layout.top,
+        c0: layout.left,
+        r1: layout.top + layout.rows - 1,
+        c1: layout.left + layout.cols - 1,
+      });
+    }
   }
 
   /** Blank the sheet's own cells at `cells` without journaling them: values a
@@ -265,7 +467,7 @@ export abstract class WorkbookHandlePivotMethods {
     const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
     if (n === null) return;
     for (let i = 0; i < n; i += 1) {
-      const layout = pivotWb(this).pivotLayout(sheet, i);
+      const layout = effectiveLayout(this, sheet, i);
       if (!layout.status.ok) continue;
       for (const cell of layout.cells) {
         const value = fromEngineValue(cell.value);
@@ -314,7 +516,7 @@ export abstract class WorkbookHandlePivotMethods {
       const n = unwrapNumberResult(pivotWb(this).pivotCount(sheet));
       if (n === null) continue;
       for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
-        const layout = pivotWb(this).pivotLayout(sheet, pivotIndex);
+        const layout = effectiveLayout(this, sheet, pivotIndex);
         if (!layout.status.ok) continue;
         const fields = new Set<string>();
         const fieldItems = new Map<string, Set<string>>();

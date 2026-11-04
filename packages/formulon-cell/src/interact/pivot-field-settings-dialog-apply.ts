@@ -352,3 +352,66 @@ export function openPivotFieldSettingsAt(ctx: PivotFieldSettingsOpenContext, add
   });
   return true;
 }
+
+/** Moves fields between axes as one undo step. `axisOf` gives a field's new
+ *  axis, null to take it out of the report, or undefined to leave it. */
+export function setPivotFieldAxes(
+  ctx: PivotCommitContext,
+  pivot: { sheetIndex: number; pivotIndex: number },
+  axisOf: (fieldIndex: number, axis: PivotAxis | null) => PivotAxis | null | undefined,
+): boolean {
+  const { wb } = ctx;
+  const { sheetIndex, pivotIndex } = pivot;
+  return commitPivotChange(ctx, sheetIndex, pivotIndex, () => {
+    const definition = wb.getPivotDefinition(sheetIndex, pivotIndex);
+    if (!definition) return false;
+    const fields = standingEditFields(definition, (field) => {
+      const next = axisOf(field.fieldIndex, field.axis);
+      return next === undefined ? field : { ...field, axis: next };
+    });
+    return applyPivotEdit(wb, { ...pivot, rows: 0, cols: 0 }, fieldListEdit(fields, definition));
+  });
+}
+
+/** Rewrites one data field as one undo step. `rename` drops its caption so the
+ *  engine names it from the profile, as a function change does on the desktop. */
+export function updatePivotDataField(
+  ctx: PivotCommitContext,
+  pivot: { sheetIndex: number; pivotIndex: number },
+  dataFieldIndex: number,
+  patch: { aggregation?: PivotAggregation; numberFormat?: string; showValuesAs?: number },
+  rename: boolean,
+): boolean {
+  const { wb } = ctx;
+  const { sheetIndex, pivotIndex } = pivot;
+  return commitPivotChange(ctx, sheetIndex, pivotIndex, () => {
+    const definition = wb.getPivotDefinition(sheetIndex, pivotIndex);
+    const current = definition?.dataFields[dataFieldIndex];
+    if (!definition || !current) return false;
+    const { name, numberFormat, showValuesAs, showAsBaseField, showAsBaseItem, ...rest } = current;
+    const kind = patch.showValuesAs ?? showValuesAs ?? PivotShowValuesAs.Normal;
+    const format = patch.numberFormat ?? numberFormat ?? '';
+    const next: PivotDataFieldSpec = {
+      ...rest,
+      ...(patch.aggregation === undefined ? {} : { aggregation: patch.aggregation }),
+      ...(!rename && name ? { name } : {}),
+      ...(format ? { numberFormat: format } : {}),
+      ...(kind !== PivotShowValuesAs.Normal
+        ? { showValuesAs: kind as PivotDataFieldSpec['showValuesAs'] }
+        : {}),
+      ...(pivotShowAsNeedsBaseField(kind as PivotShowValuesAsValue) && showAsBaseField !== undefined
+        ? { showAsBaseField }
+        : {}),
+      ...(pivotShowAsNeedsBaseItem(kind as PivotShowValuesAsValue) && showAsBaseItem !== undefined
+        ? { showAsBaseItem }
+        : {}),
+    };
+    const list = definition.dataFields.map((spec, index) =>
+      index === dataFieldIndex ? next : spec,
+    );
+    return (
+      wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
+      list.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0)
+    );
+  });
+}

@@ -1,0 +1,147 @@
+/* PivotTable field filter panel - sort, label / value filters, item checklist.
+   Sizes follow the Mac desktop panel (257 x 434 pt). */
+
+@layer fc.app {
+  .fc-pivot-filter-panel {
+    z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: 257px;
+    height: 434px;
+    display: flex;
+    flex-direction: column;
+    padding: 0 0 10px;
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 10px;
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.22),
+      0 1px 4px rgba(0, 0, 0, 0.12);
+    color: var(--fc-fg, currentColor);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 13px;
+    user-select: none;
+  }
+  .fc-pivot-filter-panel__title {
+    position: relative;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    border-bottom: var(--fc-hairline, 1px) solid var(--fc-rule);
+  }
+  .fc-pivot-filter-panel__close {
+    position: absolute;
+    left: 8px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #ec6a5e;
+    cursor: pointer;
+  }
+  /* Measured offsets from the panel top: 並べ替え 28, buttons 50, sort-by 82,
+     フィルター 115, label / value pop-ups 145 / 173, search 201, list 231. */
+  .fc-pivot-filter-panel__heading {
+    height: 16px;
+    margin: 6px 11px 6px;
+    font-weight: 700;
+    line-height: 16px;
+  }
+  .fc-pivot-filter-panel__sort-row {
+    display: flex;
+    gap: 3px;
+    margin: 0 19px;
+  }
+  .fc-pivot-filter-panel__sort {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 109px;
+    height: 26px;
+  }
+  .fc-pivot-filter-panel__sort-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .fc-pivot-filter-panel__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    height: 22px;
+    margin: 6px 19px 0 11px;
+    white-space: nowrap;
+  }
+  .fc-pivot-filter-panel__row .fc-select {
+    flex: 0 0 167px;
+    width: 167px;
+  }
+  .fc-pivot-filter-panel__select {
+    flex: 0 1 167px;
+    min-width: 0;
+    width: 167px;
+    height: 22px;
+    font: inherit;
+  }
+  .fc-pivot-filter-panel__separator {
+    margin: 10px 19px 10px;
+    border: 0;
+    border-top: var(--fc-hairline, 1px) solid var(--fc-rule);
+  }
+  .fc-pivot-filter-panel__search-box {
+    position: relative;
+    width: 219px;
+    height: 22px;
+    margin: 6px 19px 8px;
+  }
+  .fc-pivot-filter-panel__search-icon {
+    position: absolute;
+    left: 5px;
+    top: 3px;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+  }
+  .fc-pivot-filter-panel__search {
+    box-sizing: border-box;
+    width: 100%;
+    height: 22px;
+    padding: 2px 8px 2px 24px;
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: 6px;
+    font: inherit;
+  }
+  .fc-pivot-filter-panel__list {
+    flex: 1;
+    min-height: 0;
+    width: 219px;
+    margin: 0 19px;
+    overflow: auto;
+  }
+  .fc-pivot-filter-panel__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 20px;
+    padding-left: 26px;
+  }
+  .fc-pivot-filter-panel__item input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--fc-accent, #217346);
+  }
+  .fc-pivot-filter-panel__footer {
+    display: flex;
+    justify-content: flex-end;
+    margin: 8px 19px 0;
+  }
+  .fc-pivot-filter-panel__clear {
+    width: 113px;
+    height: 22px;
+  }
+}

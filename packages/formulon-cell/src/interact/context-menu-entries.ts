@@ -139,6 +139,11 @@ export const createContextMenuItemButton = (
     ownerDocument,
   );
   appendContextMenuLabel(button, entry.label, entry.hint ?? '');
+  const checked = entry.source?.checked;
+  if (checked !== undefined) {
+    button.setAttribute('role', 'menuitemcheckbox');
+    button.setAttribute('aria-checked', checked ? 'true' : 'false');
+  }
   return button;
 };
 

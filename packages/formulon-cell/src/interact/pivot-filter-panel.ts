@@ -1,0 +1,387 @@
+import {
+  clearPivotFieldFilter,
+  type PivotFieldFilterModel,
+  type PivotFilterItem,
+  pivotFieldFilterModel,
+  setPivotFieldCondition,
+  setPivotFieldItemsChecked,
+} from '../commands/pivot-filter.js';
+import { pivotStyleLayer } from '../engine/pivot-style.js';
+import { type Addr, PivotAxis, PivotSortOrder } from '../engine/types.js';
+import type { Strings } from '../i18n/strings.js';
+import type { SpreadsheetStore } from '../store/store.js';
+import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createInteractionButton } from './chip-button.js';
+import { enhanceCustomSelect } from './custom-select.js';
+import { deferInitialFocus } from './dialog-shell.js';
+import { overlayPortalFor } from './overlay-portal.js';
+import { clampPanelToViewport } from './overlay-position.js';
+import {
+  type PivotFilterConditionKind,
+  pivotFilterConditionToSpec,
+  pivotFilterSpecToCondition,
+  showPivotFilterDialog,
+} from './pivot-field-settings.js';
+import { commitPivotChange, type PivotCommitContext } from './pivot-field-settings-dialog-apply.js';
+
+/**
+ * The filter panel a report's drop-down button opens: sort buttons, label and
+ * value filter pickers, a searchable item checklist and Clear Filter. A
+ * checkbox applies at once, as one undo step; there is no OK. A label or value
+ * filter is entered in the PivotTable filter dialog and applied the same way.
+ */
+
+/** Everything the panel needs to open on a report. */
+export interface PivotFilterPanelContext extends PivotCommitContext {
+  host: HTMLElement;
+  store: SpreadsheetStore;
+  strings: Strings;
+}
+
+type PanelStrings = Strings['workbookObjects']['pivotFilterPanel'];
+type ConditionKey = keyof PanelStrings['conditions'];
+
+/** The desktop's label and value filter lists; null marks a separator. Entries
+ *  the engine can express name their condition kind. */
+const LABEL_CONDITIONS: readonly (
+  | readonly [ConditionKey, PivotFilterConditionKind | null]
+  | null
+)[] = [
+  null,
+  ['equals', null],
+  ['notEquals', null],
+  null,
+  ['beginsWith', 'label-begins-with'],
+  ['notBeginsWith', null],
+  ['endsWith', null],
+  ['notEndsWith', null],
+  null,
+  ['contains', 'label-contains'],
+  ['notContains', null],
+  null,
+  ['greater', null],
+  ['greaterOrEqual', null],
+  ['less', null],
+  ['lessOrEqual', null],
+  null,
+  ['between', null],
+];
+const VALUE_CONDITIONS: readonly (
+  | readonly [ConditionKey, PivotFilterConditionKind | null]
+  | null
+)[] = [
+  null,
+  ['equals', null],
+  ['notEquals', null],
+  null,
+  ['greater', 'value-greater-than'],
+  ['greaterOrEqual', null],
+  ['less', null],
+  ['lessOrEqual', null],
+  null,
+  ['between', 'value-between'],
+  null,
+  ['top10', 'value-top-10'],
+  ['bottom10', null],
+];
+
+const open = new WeakMap<HTMLElement, () => void>();
+
+/** The report field the cell at `addr` opens: the field behind a drop-down
+ *  button, else the row, column or filter field of a label cell. */
+function fieldAt(
+  ctx: PivotFilterPanelContext,
+  addr: Addr,
+): { pivotIndex: number; fieldIndex: number } | null {
+  const button = pivotStyleLayer(ctx.wb, ctx.store.getState()).buttonAt(addr.row, addr.col);
+  if (button && button.fieldIndex >= 0) return button;
+  const info = ctx.wb.pivotCellInfo(addr);
+  if (!info || info.isValue || info.fieldIndex < 0) return null;
+  const definition = ctx.wb.getPivotDefinition(addr.sheet, info.pivotIndex);
+  const field = definition?.fields.find(
+    (f) => f.cacheFieldIndex === info.fieldIndex && f.axis !== PivotAxis.Value,
+  );
+  return field ? { pivotIndex: info.pivotIndex, fieldIndex: field.index } : null;
+}
+
+/** Open the filter panel of the field at `addr` (a drop-down button or a
+ *  label cell), hanging from `anchor` in viewport coordinates. False when the
+ *  cell belongs to no report field. */
+export function openPivotFieldFilter(
+  ctx: PivotFilterPanelContext,
+  addr: Addr,
+  anchor?: { x: number; y: number },
+): boolean {
+  const target = fieldAt(ctx, addr);
+  if (!target) return false;
+  open.get(ctx.host)?.();
+  const { wb, strings } = ctx;
+  const t = strings.workbookObjects.pivotFilterPanel;
+  const sheet = addr.sheet;
+  const { pivotIndex, fieldIndex } = target;
+  const doc = ctx.host.ownerDocument;
+  const read = (): PivotFieldFilterModel | null =>
+    pivotFieldFilterModel(wb, sheet, pivotIndex, fieldIndex);
+  let model = read();
+  if (!model) return false;
+
+  const panel = doc.createElement('div');
+  panel.className = 'fc-pivot-filter-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'false');
+  panel.setAttribute('aria-label', model.label);
+  panel.style.position = 'fixed';
+
+  const commit = (apply: () => boolean): void => {
+    commitPivotChange(ctx, sheet, pivotIndex, apply);
+    model = read() ?? model;
+    render();
+  };
+
+  const titleBar = doc.createElement('div');
+  titleBar.className = 'fc-pivot-filter-panel__title';
+  const closeBtn = createInteractionButton(
+    { className: 'fc-pivot-filter-panel__close', ariaLabel: t.close },
+    doc,
+  );
+  const title = doc.createElement('span');
+  title.textContent = model.label;
+  titleBar.append(closeBtn, title);
+
+  const heading = (text: string): HTMLElement => {
+    const h = doc.createElement('div');
+    h.className = 'fc-pivot-filter-panel__heading';
+    h.textContent = text;
+    return h;
+  };
+  const row = (label: string, control: HTMLSelectElement): HTMLElement => {
+    control.setAttribute('aria-label', label.replace(/[:：]\s*$/, ''));
+    const r = doc.createElement('div');
+    r.className = 'fc-pivot-filter-panel__row';
+    const span = doc.createElement('span');
+    span.textContent = label;
+    r.append(span, control);
+    return r;
+  };
+  const selectHandles = new Map<HTMLSelectElement, { sync(): void; dispose(): void }>();
+  const select = (): HTMLSelectElement => {
+    const s = doc.createElement('select');
+    s.className = 'fc-pivot-filter-panel__select';
+    return s;
+  };
+
+  const sortBy = select();
+  sortBy.dataset.pivotFilterSortBy = 'true';
+  const sortButton = (label: string, aria: string, order: PivotSortOrder): HTMLButtonElement => {
+    const b = createInteractionButton({ className: 'fc-pivot-filter-panel__sort' });
+    const glyph = createExcelRibbonSvg(
+      order === PivotSortOrder.Ascending ? 'sortAsc' : 'sortDesc',
+      'fc-pivot-filter-panel__sort-icon',
+    );
+    const text = doc.createElement('span');
+    text.textContent = label;
+    if (glyph) b.append(glyph);
+    b.append(text);
+    b.setAttribute('aria-label', aria);
+    b.dataset.pivotFilterSort = order === PivotSortOrder.Ascending ? 'asc' : 'desc';
+    b.addEventListener('click', () =>
+      commit(() => wb.setPivotFieldSort(sheet, pivotIndex, fieldIndex, order, sortBy.value)),
+    );
+    return b;
+  };
+  const sortRow = doc.createElement('div');
+  sortRow.className = 'fc-pivot-filter-panel__sort-row';
+  sortRow.append(
+    sortButton(t.sortAscending, t.sortAscendingAria, PivotSortOrder.Ascending),
+    sortButton(t.sortDescending, t.sortDescendingAria, PivotSortOrder.Descending),
+  );
+
+  const conditionSelect = (
+    list: typeof LABEL_CONDITIONS,
+    which: 'label' | 'value',
+  ): HTMLSelectElement => {
+    const s = select();
+    s.dataset.pivotFilterBy = which;
+    for (const entry of [['', null] as const, ...list]) {
+      const option = doc.createElement('option');
+      if (entry === null) {
+        projectDisabledState(option, true, null);
+        option.textContent = '──────────';
+      } else if (entry[0] === '') {
+        option.value = '';
+        option.textContent = t.chooseOne;
+      } else {
+        option.value = entry[1] ?? `unsupported:${entry[0]}`;
+        option.textContent = t.conditions[entry[0]];
+        projectDisabledState(option, entry[1] === null, null);
+      }
+      s.appendChild(option);
+    }
+    s.addEventListener('change', () => {
+      const kind = s.value as PivotFilterConditionKind;
+      s.value = '';
+      selectHandles.get(s)?.sync();
+      if (!kind || !model) return;
+      const current = pivotFilterSpecToCondition(model.condition ?? undefined);
+      void showPivotFilterDialog({
+        host: ctx.host,
+        strings: strings.pivotTableDialog,
+        fieldName: model.label,
+        condition: { kind, value: current?.kind === kind ? current.value : '' },
+        okLabel: strings.pageSetup.ok,
+        cancelLabel: strings.pageSetup.cancel,
+      }).then((condition) => {
+        if (!condition || !model) return;
+        const spec = pivotFilterConditionToSpec(
+          model.sourceName,
+          condition,
+          model.axis ?? PivotAxis.Row,
+        );
+        if (spec) commit(() => setPivotFieldCondition(wb, sheet, pivotIndex, fieldIndex, spec));
+      });
+    });
+    return s;
+  };
+
+  const search = doc.createElement('input');
+  search.type = 'search';
+  search.className = 'fc-pivot-filter-panel__search';
+  search.placeholder = t.search;
+  search.setAttribute('aria-label', t.search);
+  const searchBox = doc.createElement('div');
+  searchBox.className = 'fc-pivot-filter-panel__search-box';
+  const lens = createExcelRibbonSvg('find', 'fc-pivot-filter-panel__search-icon');
+  if (lens) searchBox.append(lens);
+  searchBox.append(search);
+  const list = doc.createElement('div');
+  list.className = 'fc-pivot-filter-panel__list';
+  list.setAttribute('role', 'group');
+  const clear = createInteractionButton({
+    className: 'fc-pivot-filter-panel__clear',
+    text: t.clearFilter,
+  });
+  clear.addEventListener('click', () =>
+    commit(() => clearPivotFieldFilter(wb, sheet, pivotIndex, fieldIndex)),
+  );
+
+  const checkbox = (label: string, checked: boolean, onChange: (on: boolean) => void) => {
+    const l = doc.createElement('label');
+    l.className = 'fc-pivot-filter-panel__item';
+    const box = doc.createElement('input');
+    box.type = 'checkbox';
+    box.checked = checked;
+    box.addEventListener('change', () => onChange(box.checked));
+    const span = doc.createElement('span');
+    span.textContent = label;
+    l.append(box, span);
+    return { l, box };
+  };
+
+  const applyItems = (items: PivotFilterItem[]): void =>
+    commit(() => setPivotFieldItemsChecked(wb, sheet, pivotIndex, fieldIndex, items));
+
+  const render = (): void => {
+    if (!model) return;
+    sortBy.replaceChildren(
+      ...[['', model.label] as const, ...model.dataFields.map((d) => [d, d] as const)].map(
+        ([value, label]) => {
+          const o = doc.createElement('option');
+          o.value = value;
+          o.textContent = label;
+          return o;
+        },
+      ),
+    );
+    sortBy.value = model.sortByField;
+    selectHandles.get(sortBy)?.sync();
+    const needle = search.value.trim().toLocaleLowerCase();
+    const shown = model.items.filter(
+      (i) => !needle || i.value.toLocaleLowerCase().includes(needle),
+    );
+    const all = shown.length > 0 && shown.every((i) => i.checked);
+    const none = shown.every((i) => !i.checked);
+    const items = model.items;
+    const selectAll = checkbox(t.selectAll, all, (on) => {
+      const hit = new Set(shown.map((i) => i.value));
+      applyItems(items.map((i) => (hit.has(i.value) ? { ...i, checked: on } : i)));
+    });
+    selectAll.box.indeterminate = !all && !none;
+    selectAll.box.dataset.pivotFilterSelectAll = 'true';
+    list.replaceChildren(
+      selectAll.l,
+      ...shown.map((item) => {
+        const entry = checkbox(item.value === '' ? t.blank : item.value, item.checked, (on) =>
+          applyItems(items.map((i) => (i === item ? { ...i, checked: on } : i))),
+        );
+        entry.box.dataset.pivotFilterItem = item.value;
+        return entry.l;
+      }),
+    );
+    projectDisabledState(clear, !model.filtered, null);
+  };
+  search.addEventListener('input', render);
+
+  const separator = doc.createElement('hr');
+  separator.className = 'fc-pivot-filter-panel__separator';
+  const footer = doc.createElement('div');
+  footer.className = 'fc-pivot-filter-panel__footer';
+  footer.appendChild(clear);
+  panel.append(
+    titleBar,
+    heading(t.sortHeading),
+    sortRow,
+    row(t.sortBy, sortBy),
+    separator,
+    heading(t.filterHeading),
+    row(t.byLabel, conditionSelect(LABEL_CONDITIONS, 'label')),
+    row(t.byValue, conditionSelect(VALUE_CONDITIONS, 'value')),
+    searchBox,
+    list,
+    footer,
+  );
+  // The desktop's pop-up buttons: the shared custom select over each native one.
+  for (const s of panel.querySelectorAll<HTMLSelectElement>('select')) {
+    const handle = enhanceCustomSelect(s);
+    if (handle) selectHandles.set(s, handle);
+  }
+  render();
+
+  const close = (): void => {
+    for (const handle of selectHandles.values()) handle.dispose();
+    panel.remove();
+    doc.removeEventListener('mousedown', onDocMouseDown, true);
+    doc.removeEventListener('keydown', onDocKey, true);
+    if (open.get(ctx.host) === close) open.delete(ctx.host);
+  };
+  const onDocMouseDown = (e: MouseEvent): void => {
+    if (panel.contains(e.target as Node)) return;
+    // The filter dialog the panel opened sits over it; leave the panel be.
+    if ((e.target as Element | null)?.closest?.('.fc-pivotdlg--filter')) return;
+    close();
+  };
+  const onDocKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && panel.contains(e.target as Node)) {
+      e.preventDefault();
+      close();
+    }
+  };
+  closeBtn.addEventListener('click', close);
+
+  overlayPortalFor(ctx.host).appendChild(panel);
+  const rect = ctx.host.getBoundingClientRect();
+  const at = anchor ?? { x: rect.left + 40, y: rect.top + 40 };
+  // The desktop hangs the panel 6 pt below the button's bottom-left corner.
+  const position = clampPanelToViewport(panel, at.x, at.y + 6, {
+    pad: 4,
+    fallbackWidth: 257,
+    fallbackHeight: 434,
+  });
+  panel.style.left = `${position.x}px`;
+  panel.style.top = `${position.y}px`;
+  deferInitialFocus(panel, () => search.focus({ preventScroll: true }));
+  doc.addEventListener('mousedown', onDocMouseDown, true);
+  doc.addEventListener('keydown', onDocKey, true);
+  open.set(ctx.host, close);
+  return true;
+}
