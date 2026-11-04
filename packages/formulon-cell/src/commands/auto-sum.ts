@@ -40,6 +40,13 @@ export function autoSumTargets(state: State): Range[] {
       break;
     }
   }
+  const corner = cell(r.r1, r.c1);
+  if (
+    inside.some((t) => t.r0 === r.r1) &&
+    inside.some((t) => t.c0 === r.c1) &&
+    isEmpty(state, sheet, r.r1, r.c1)
+  )
+    inside.push(corner);
   if (inside.length > 0) return inside;
   return [cell(r.r1 + 1, r.c0), cell(r.r0, r.c1 + 1)].filter((t) =>
     isEmpty(state, sheet, t.r0, t.c0),
@@ -61,6 +68,66 @@ const isEmpty = (state: State, sheet: number, row: number, col: number): boolean
   const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
   return !cell || cell.value.kind === 'blank';
 };
+
+/** SUBTOTAL function numbers for each AutoSum function, used below a filtered list. */
+const SUBTOTAL_CODE: Record<AutoSumFunction, number> = {
+  SUM: 9,
+  AVERAGE: 1,
+  COUNT: 2,
+  MAX: 4,
+  MIN: 5,
+};
+
+/** Whether `range` sits inside a filter range that has a criterion applied. */
+const inFilteredList = (state: State, range: Range): boolean =>
+  state.ui.filterCriteria.some(
+    ({ range: f }) =>
+      f.sheet === range.sheet &&
+      range.r0 > f.r0 &&
+      range.r1 <= f.r1 &&
+      range.c0 >= f.c0 &&
+      range.c1 <= f.c1,
+  );
+
+const aggregateFormula = (state: State, fn: AutoSumFunction, range: Range): string => {
+  const ref = formatA1Range(range, { collapse: false });
+  return inFilteredList(state, range) ? `=SUBTOTAL(${SUBTOTAL_CODE[fn]},${ref})` : `=${fn}(${ref})`;
+};
+
+/**
+ * The formula AutoSum proposes for an empty single-cell selection: the
+ * contiguous numbers above (preferred) or to the left, as SUBTOTAL over a
+ * filtered list. Nothing is written; hosts open it in the cell editor.
+ * Returns null for any other selection, or when there is nothing to sum.
+ */
+export function autoSumSuggestion(
+  state: State,
+  functionName: AutoSumFunction = 'SUM',
+): { addr: Addr; formula: string } | null {
+  const r = state.selection.range;
+  const sheet = state.data.sheetIndex;
+  const a = state.selection.active;
+  if (r.r0 !== r.r1 || r.c0 !== r.c1 || !isEmpty(state, sheet, a.row, a.col)) return null;
+  const r1 = a.row - 1;
+  if (r1 >= 0 && isNum(state, sheet, r1, a.col)) {
+    let r0 = r1;
+    while (r0 - 1 >= 0 && isNum(state, sheet, r0 - 1, a.col)) r0 -= 1;
+    return {
+      addr: a,
+      formula: aggregateFormula(state, functionName, { sheet, r0, c0: a.col, r1, c1: a.col }),
+    };
+  }
+  const c1 = a.col - 1;
+  if (c1 >= 0 && isNum(state, sheet, a.row, c1)) {
+    let c0 = c1;
+    while (c0 - 1 >= 0 && isNum(state, sheet, a.row, c0 - 1)) c0 -= 1;
+    return {
+      addr: a,
+      formula: aggregateFormula(state, functionName, { sheet, r0: a.row, c0, r1: a.row, c1 }),
+    };
+  }
+  return null;
+}
 
 const canWriteFormula = (state: State, addr: Addr): boolean => {
   if (isCellWritable(state, addr)) return true;
@@ -86,7 +153,8 @@ const canWriteFormula = (state: State, addr: Addr): boolean => {
  *   - If the user included empty trailing rows or columns inside the
  *     selection, fill those with SUM formulas (per column for trailing
  *     rows, per row for trailing columns) — the SUM range is the
- *     contiguous numeric block right above/left of each target.
+ *     contiguous numeric block right above/left of each target. When
+ *     both are present, the corner sums the new totals row.
  *   - Otherwise, place `=SUM(<range>)` directly below the range, or to
  *     its right when below is occupied.
  */
@@ -108,27 +176,10 @@ export function autoSum(
 
   if (isSingle) {
     if (isEmpty(state, sheet, a.row, a.col)) {
-      // Empty active cell: scan up the column for a contiguous block.
-      const r1 = a.row - 1;
-      let r0 = r1;
-      while (r0 - 1 >= 0 && isNum(state, sheet, r0 - 1, a.col)) r0 -= 1;
-      if (r1 >= 0 && isNum(state, sheet, r1, a.col)) {
-        const formula = `=${fn}(${formatA1Range({ r0, c0: a.col, r1, c1: a.col }, { collapse: false })})`;
-        if (!canWriteFormula(state, a)) return null;
-        wb.setFormula(a, formula);
-        return { addr: a, formula };
-      }
-      // Fall back to the row to the left.
-      const c1 = a.col - 1;
-      let c0 = c1;
-      while (c0 - 1 >= 0 && isNum(state, sheet, a.row, c0 - 1)) c0 -= 1;
-      if (c1 >= 0 && isNum(state, sheet, a.row, c1)) {
-        const formula = `=${fn}(${formatA1Range({ r0: a.row, c0, r1: a.row, c1 }, { collapse: false })})`;
-        if (!canWriteFormula(state, a)) return null;
-        wb.setFormula(a, formula);
-        return { addr: a, formula };
-      }
-      return null;
+      const suggestion = autoSumSuggestion(state, fn);
+      if (!suggestion || !canWriteFormula(state, a)) return null;
+      wb.setFormula(a, suggestion.formula);
+      return suggestion;
     }
 
     if (isNum(state, sheet, a.row, a.col)) {
@@ -185,10 +236,6 @@ export function autoSum(
     const formula = `=${fn}(${formatA1Range({ r0: top, c0: col, r1: lastNumRow, c1: col }, { collapse: false })})`;
     colWrites.push({ addr: target, formula });
   }
-  if (colWrites.length > 0) {
-    for (const w of colWrites) wb.setFormula(w.addr, w.formula);
-    return colWrites[0] ?? null;
-  }
 
   // Row-direction: same idea horizontally — trailing empty columns inside
   // the selection get SUM formulas.
@@ -210,9 +257,26 @@ export function autoSum(
     const formula = `=${fn}(${formatA1Range({ r0: row, c0: left, r1: row, c1: lastNumCol }, { collapse: false })})`;
     rowWrites.push({ addr: target, formula });
   }
-  if (rowWrites.length > 0) {
-    for (const w of rowWrites) wb.setFormula(w.addr, w.formula);
-    return rowWrites[0] ?? null;
+  // With a totals row and a totals column both inside the selection, the
+  // corner sums the new totals row.
+  const corner: Addr = { sheet, row: r.r1, col: r.c1 };
+  const first = colWrites[0];
+  const last = colWrites[colWrites.length - 1];
+  if (
+    first &&
+    last &&
+    rowWrites.some((w) => w.addr.col === r.c1) &&
+    colWrites.every((w) => w.addr.row === r.r1) &&
+    isEmpty(state, sheet, corner.row, corner.col) &&
+    isCellWritable(state, corner)
+  ) {
+    const formula = `=${fn}(${formatA1Range({ r0: r.r1, c0: first.addr.col, r1: r.r1, c1: last.addr.col }, { collapse: false })})`;
+    rowWrites.push({ addr: corner, formula });
+  }
+  const writes = [...colWrites, ...rowWrites];
+  if (writes.length > 0) {
+    for (const w of writes) wb.setFormula(w.addr, w.formula);
+    return writes[0] ?? null;
   }
 
   const ref = formatA1Range(r, { collapse: false });

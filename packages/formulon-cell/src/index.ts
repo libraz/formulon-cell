@@ -504,6 +504,7 @@ export type {
   ContextMenuOptions,
 } from './interact/context-menu-options.js';
 export { openDataTableDialog } from './interact/data-table-dialog.js';
+export type { CellEditorHandle } from './interact/editor.js';
 export type { FormatPainterHandle } from './interact/format-painter.js';
 export { FUNCTION_DESCRIPTIONS } from './interact/function-catalog-text.js';
 export type { FunctionCategory, FxDialogOpenOptions } from './interact/fx-dialog.js';

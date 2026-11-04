@@ -57,6 +57,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const openFunctionArguments = vi
       .spyOn(sheet.instance, 'openFunctionArguments')
       .mockImplementation(() => undefined);
+    const begin = vi.spyOn(sheet.instance.cellEditor, 'begin').mockImplementation(() => undefined);
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
       helpers: stubHelpers(),
@@ -72,7 +73,8 @@ describe('Spreadsheet.mountToolbar', () => {
     const averageEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(averageEvent, 'target', { value: averageButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(averageEvent)).toBe(true);
-    expect(sheet.workbook.cellFormula({ sheet: 0, row: 2, col: 0 })).toBe('=AVERAGE(A1:A2)');
+    expect(begin).toHaveBeenCalledWith('=AVERAGE(A1:A2)', { mode: 'edit' });
+    expect(sheet.workbook.cellFormula({ sheet: 0, row: 2, col: 0 })).toBeNull();
     expect(sheet.instance.store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 0 });
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(

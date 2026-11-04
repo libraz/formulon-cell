@@ -1,6 +1,5 @@
-import { type AutoSumFunction, autoSum, autoSumTargets } from '../../commands/auto-sum.js';
+import type { AutoSumFunction } from '../../commands/auto-sum.js';
 import { cellValueIsFormulaError } from '../../commands/error-indicators.js';
-import { recordRecentFunction } from '../../commands/function-history.js';
 import {
   createDefinedNamesFromSelection,
   insertDefinedNameFormula,
@@ -23,6 +22,7 @@ import type { SpreadsheetInstance } from '../../mount.js';
 import { mutators } from '../../store/store.js';
 import { showDefinedNamePickerDialog } from '../../toolbar/dialogs/defined-name-picker.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import { handleAutoSum } from '../../wrappers/toolbar-actions.js';
 import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
 
 const buildAutoSumFormula =
@@ -32,20 +32,9 @@ const buildAutoSumFormula =
       instance.openFunctionArguments();
       return;
     }
-    runAfterAllowedRangeUnlock(instance.store, autoSumTargets(instance.store.getState()), () => {
-      instance.history.begin();
-      let result: ReturnType<typeof autoSum> = null;
-      try {
-        result = autoSum(instance.store.getState(), instance.workbook, fn as AutoSumFunction);
-      } finally {
-        instance.history.end();
-      }
-      if (result) {
-        mutators.setActive(instance.store, result.addr);
-        recordRecentFunction(instance.store, fn);
-      }
-      instance.host.focus();
-    });
+    // Focus first: an editor or unlock prompt opened by AutoSum takes it over.
+    instance.host.focus();
+    handleAutoSum(instance, fn as AutoSumFunction);
   };
 
 const buildWatchAction =

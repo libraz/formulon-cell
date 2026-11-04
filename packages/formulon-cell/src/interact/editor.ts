@@ -103,6 +103,14 @@ export interface EditorBeginOptions {
   mode?: FormulaArrowMode;
 }
 
+/** The part of the inline cell editor hosts may drive. */
+export interface CellEditorHandle {
+  /** Open the editor on the active cell with `seed` as its text. */
+  begin(seed: string, options?: EditorBeginOptions): void;
+  /** Whether a cell edit is in progress. */
+  isActive(): boolean;
+}
+
 /**
  * Inline cell editor — a single-line `<input>` floated over the active
  * cell. Begins on Enter / F2 / printable key. Commits on Enter or Tab,

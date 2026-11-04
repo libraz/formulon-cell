@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ignoreCellError } from '../../../src/commands/error-indicators.js';
 import { History } from '../../../src/commands/history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -68,11 +68,13 @@ describe('Mac ribbon command dispatch', () => {
       capabilities: {},
       setFormula: (_addr: unknown, formula: string) => formulaWrites.push(formula),
     } as unknown as WorkbookHandle;
+    const begin = vi.fn();
     const instance = {
       store,
       history,
       host: document.createElement('div'),
       workbook,
+      cellEditor: { begin, isActive: () => false },
     } as unknown as SpreadsheetInstance;
     const deps = {
       inst: instance,
@@ -113,8 +115,10 @@ describe('Mac ribbon command dispatch', () => {
         dispatchMacRibbonCommand(id, deps, () => false),
         id,
       ).toBe(true);
-      expect(formulaWrites.at(-1), id).toBe(`=${fn}(A1:A1)`);
+      // The empty cell below the number opens the suggestion in the editor.
+      expect(begin, id).toHaveBeenLastCalledWith(`=${fn}(A1:A1)`, { mode: 'edit' });
     }
+    expect(formulaWrites).toEqual([]);
   });
 
   it('routes Mac Recommended Chart to the session chart command', async () => {

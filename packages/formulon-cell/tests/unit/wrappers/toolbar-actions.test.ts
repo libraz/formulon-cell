@@ -23,10 +23,11 @@ describe('toolbar AutoSum actions', () => {
       workbook,
       history: new History(),
       openFunctionArguments: vi.fn(),
+      cellEditor: { begin: vi.fn(), isActive: () => false },
     } as unknown as SpreadsheetInstance;
   };
 
-  it('records the selected aggregate when AutoSum inserts a formula', async () => {
+  it('opens the suggested formula in the cell editor for an empty single cell', async () => {
     const instance = await createInstance();
     const addr = { sheet: 0, row: 0, col: 0 };
     instance.workbook.setNumber(addr, 12);
@@ -35,7 +36,38 @@ describe('toolbar AutoSum actions', () => {
 
     expect(handleAutoSum(instance, 'SUM')).toBe(true);
     expect(getRecentFunctions(instance.store)).toEqual(['SUM']);
+    expect(instance.cellEditor.begin).toHaveBeenCalledWith('=SUM(A1:A1)', { mode: 'edit' });
+    expect(instance.workbook.cellFormula({ sheet: 0, row: 1, col: 0 })).toBeNull();
+  });
+
+  it('still writes the total below when the active cell holds a number', async () => {
+    const instance = await createInstance();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    instance.workbook.setNumber(addr, 12);
+    mutators.setCell(instance.store, addr, { kind: 'number', value: 12 });
+    mutators.setActive(instance.store, addr);
+
+    expect(handleAutoSum(instance, 'SUM')).toBe(true);
+    expect(instance.cellEditor.begin).not.toHaveBeenCalled();
     expect(instance.workbook.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=SUM(A1:A1)');
+    expect(instance.store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+  });
+
+  it('keeps a range selection in place after writing its totals', async () => {
+    const instance = await createInstance();
+    for (const row of [0, 1]) {
+      const addr = { sheet: 0, row, col: 0 };
+      instance.workbook.setNumber(addr, row + 1);
+      mutators.setCell(instance.store, addr, { kind: 'number', value: row + 1 });
+    }
+    mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
+    mutators.extendRangeTo(instance.store, { sheet: 0, row: 2, col: 0 });
+    const before = instance.store.getState().selection;
+
+    expect(handleAutoSum(instance, 'SUM')).toBe(true);
+    expect(instance.workbook.cellFormula({ sheet: 0, row: 2, col: 0 })).toBe('=SUM(A1:A2)');
+    expect(instance.store.getState().selection.active).toEqual(before.active);
+    expect(instance.store.getState().selection.range).toEqual(before.range);
   });
 
   it('does not record an unsuccessful AutoSum or the function-picker action', async () => {

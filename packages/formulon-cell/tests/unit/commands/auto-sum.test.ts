@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { autoSum } from '../../../src/commands/auto-sum.js';
+import { autoSum, autoSumSuggestion } from '../../../src/commands/auto-sum.js';
 import type { Addr } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -274,5 +274,93 @@ describe('autoSum', () => {
     seedText(store, wb, 0, 2, 'lock');
     setRangeOnly(store, 0, 0, 1, 1);
     expect(autoSum(store.getState(), wb)).toBeNull();
+  });
+
+  it('totals both directions of a 2D selection and sums the new total row in the corner', () => {
+    // B10:D13 numbers, selection B10:E14 (one empty row below, one empty column right).
+    for (let row = 9; row <= 12; row += 1)
+      for (let col = 1; col <= 3; col += 1) seedNumber(store, wb, row, col, row + col);
+    setRangeOnly(store, 9, 1, 13, 4);
+
+    autoSum(store.getState(), wb);
+    const f = (row: number, col: number) => wb.cellFormula({ sheet: 0, row, col });
+    expect([f(13, 1), f(13, 2), f(13, 3)]).toEqual([
+      '=SUM(B10:B13)',
+      '=SUM(C10:C13)',
+      '=SUM(D10:D13)',
+    ]);
+    expect([f(9, 4), f(10, 4), f(11, 4), f(12, 4)]).toEqual([
+      '=SUM(B10:D10)',
+      '=SUM(B11:D11)',
+      '=SUM(B12:D12)',
+      '=SUM(B13:D13)',
+    ]);
+    expect(f(13, 4)).toBe('=SUM(B14:D14)');
+  });
+
+  describe('autoSumSuggestion', () => {
+    it('suggests the numbers above an empty cell, leaving the header out, without writing', () => {
+      seedText(store, wb, 0, 1, 'Val');
+      for (let row = 1; row <= 4; row += 1) seedNumber(store, wb, row, 1, row + 1);
+      setActive(store, { sheet: 0, row: 5, col: 1 });
+      expect(autoSumSuggestion(store.getState())).toEqual({
+        addr: { sheet: 0, row: 5, col: 1 },
+        formula: '=SUM(B2:B5)',
+      });
+      expect(wb.cellFormula({ sheet: 0, row: 5, col: 1 })).toBeNull();
+    });
+
+    it('stops at a blank gap above the cell', () => {
+      seedText(store, wb, 0, 3, 'Gap');
+      seedNumber(store, wb, 1, 3, 1);
+      seedNumber(store, wb, 2, 3, 2);
+      seedNumber(store, wb, 4, 3, 3);
+      seedNumber(store, wb, 5, 3, 4);
+      setActive(store, { sheet: 0, row: 6, col: 3 });
+      expect(autoSumSuggestion(store.getState())?.formula).toBe('=SUM(D5:D6)');
+    });
+
+    it('suggests the row to the left when nothing is above', () => {
+      for (let col = 5; col <= 8; col += 1) seedNumber(store, wb, 1, col, col);
+      setActive(store, { sheet: 0, row: 1, col: 9 });
+      expect(autoSumSuggestion(store.getState())?.formula).toBe('=SUM(F2:I2)');
+    });
+
+    it('suggests SUBTOTAL(9, ...) over the whole column below a filtered list', () => {
+      seedText(store, wb, 9, 5, 'Cat');
+      seedText(store, wb, 9, 6, 'N');
+      for (let row = 10; row <= 13; row += 1) {
+        seedText(store, wb, row, 5, row % 2 === 0 ? 'a' : 'b');
+        seedNumber(store, wb, row, 6, row);
+      }
+      const range = { sheet: 0, r0: 9, c0: 5, r1: 13, c1: 6 };
+      store.setState((s) => ({
+        ...s,
+        ui: {
+          ...s.ui,
+          filterRanges: [range],
+          filterCriteria: [{ range, byCol: 5, hiddenValues: ['b'] }],
+        },
+      }));
+      setActive(store, { sheet: 0, row: 14, col: 6 });
+      expect(autoSumSuggestion(store.getState())?.formula).toBe('=SUBTOTAL(9,G11:G14)');
+    });
+
+    it('keeps SUM below a filter range that has no criteria applied', () => {
+      seedText(store, wb, 9, 6, 'N');
+      for (let row = 10; row <= 13; row += 1) seedNumber(store, wb, row, 6, row);
+      const range = { sheet: 0, r0: 9, c0: 6, r1: 13, c1: 6 };
+      store.setState((s) => ({ ...s, ui: { ...s.ui, filterRanges: [range], filterCriteria: [] } }));
+      setActive(store, { sheet: 0, row: 14, col: 6 });
+      expect(autoSumSuggestion(store.getState())?.formula).toBe('=SUM(G11:G14)');
+    });
+
+    it('has no suggestion for a range selection or an occupied cell', () => {
+      seedNumber(store, wb, 0, 0, 1);
+      setActive(store, { sheet: 0, row: 0, col: 0 });
+      expect(autoSumSuggestion(store.getState())).toBeNull();
+      setRangeOnly(store, 0, 0, 1, 0);
+      expect(autoSumSuggestion(store.getState())).toBeNull();
+    });
   });
 });

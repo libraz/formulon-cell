@@ -24,6 +24,7 @@ describe('default dynamic dropdown AutoSum', () => {
       workbook,
       history: new History(),
       openFunctionArguments: vi.fn(),
+      cellEditor: { begin: vi.fn(), isActive: () => false },
     } as unknown as SpreadsheetInstance;
     return instance;
   };
@@ -39,7 +40,8 @@ describe('default dynamic dropdown AutoSum', () => {
     ctx.applyAutoSumFormula('AVERAGE');
 
     expect(getRecentFunctions(instance.store)).toEqual(['AVERAGE']);
-    expect(instance.workbook.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=AVERAGE(A1:A1)');
+    expect(instance.cellEditor.begin).toHaveBeenCalledWith('=AVERAGE(A1:A1)', { mode: 'edit' });
+    expect(instance.workbook.cellFormula({ sheet: 0, row: 1, col: 0 })).toBeNull();
   });
 
   it('does not record a no-op or the MORE dialog action', async () => {

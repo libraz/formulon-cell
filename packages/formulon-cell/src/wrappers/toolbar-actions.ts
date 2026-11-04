@@ -3,7 +3,12 @@
 // Each handler accepts a `SpreadsheetInstance | null` (matching the prop
 // shape both wrappers expose) and short-circuits if no instance is mounted.
 
-import { type AutoSumFunction, autoSum, autoSumTargets } from '../commands/auto-sum.js';
+import {
+  type AutoSumFunction,
+  autoSum,
+  autoSumSuggestion,
+  autoSumTargets,
+} from '../commands/auto-sum.js';
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { ConditionalPresetAction } from '../commands/conditional-format.js';
@@ -156,14 +161,23 @@ export const handleFreezeAction = (
   applyFreezeMode(instance.store, action, instance.workbook);
 };
 
-/** AutoSum from the toolbar. The "MORE" sentinel opens the function
- *  arguments dialog instead of inserting an aggregate. */
+/** AutoSum from the toolbar. An empty single cell opens the suggested
+ *  formula in the cell editor; any other selection is written directly. The
+ *  "MORE" sentinel opens the function arguments dialog instead. */
 export const handleAutoSum = (
   instance: SpreadsheetInstance | null,
   functionName: AutoSumFunction = 'SUM',
 ): boolean => {
   if (!instance) return false;
+  const suggestion = autoSumSuggestion(instance.store.getState(), functionName);
+  if (suggestion) {
+    instance.cellEditor.begin(suggestion.formula, { mode: 'edit' });
+    recordRecentFunction(instance.store, functionName);
+    return true;
+  }
   const run = (): boolean => {
+    const r = instance.store.getState().selection.range;
+    const single = r.r0 === r.r1 && r.c0 === r.c1;
     instance.history.begin();
     let result: ReturnType<typeof autoSum> = null;
     try {
@@ -173,7 +187,8 @@ export const handleAutoSum = (
     }
     if (!result) return false;
     mutators.replaceCells(instance.store, instance.workbook.cells(result.addr.sheet));
-    mutators.setActive(instance.store, result.addr);
+    // A range selection stays as it was; a single cell moves to the new total.
+    if (single) mutators.setActive(instance.store, result.addr);
     recordRecentFunction(instance.store, functionName);
     return true;
   };

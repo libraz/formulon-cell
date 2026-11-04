@@ -937,6 +937,9 @@ export const Spreadsheet = {
       get clipboard() {
         return binding.clipboardH;
       },
+      get cellEditor() {
+        return binding.editor;
+      },
       get formatPainter() {
         return featureState.formatPainter ?? undefined;
       },

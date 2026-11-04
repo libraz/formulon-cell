@@ -24,6 +24,7 @@ import type { BorderDrawHandle } from '../interact/border-draw.js';
 import type { ClipboardHandle } from '../interact/clipboard.js';
 import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialog.js';
 import type { ContextMenuOptions } from '../interact/context-menu-options.js';
+import type { CellEditorHandle } from '../interact/editor.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
 import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
 import type { FunctionArgumentHelpProvider } from '../interact/mac-formula-palette.js';
@@ -152,6 +153,9 @@ export interface SpreadsheetInstance {
    *  `runShortcut` — `document.execCommand` doesn't fire copy/paste events
    *  on the non-editable grid host. */
   readonly clipboard: ClipboardHandle | null;
+  /** Inline cell editor. Commands that propose a formula, such as AutoSum
+   *  on an empty cell, open it here instead of committing directly. */
+  readonly cellEditor: CellEditorHandle;
   readonly formatPainter: FormatPainterHandle | undefined;
   readonly borderDraw: BorderDrawHandle | undefined;
   readonly formula: FormulaRegistry;
