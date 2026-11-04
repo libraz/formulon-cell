@@ -641,6 +641,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           strings,
           history: input.history,
           dock: input.taskpaneDock,
+          store: input.store,
+          getLocale: input.i18nLocale,
           listSessionIllustrations: () => input.store.getState().illustrations.illustrations,
           onSelectSessionIllustration: (id) => {
             const panel = Array.from(

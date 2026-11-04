@@ -1194,3 +1194,79 @@ describe('Name Manager on the Mac host', () => {
     handle.detach();
   });
 });
+
+describe('Define Name on the Mac host', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  const openDefine = () => {
+    const host = document.createElement('div');
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    document.body.appendChild(host);
+    const mutable = makeMutableWb();
+    mutable.registry.set('Rate', '=Sheet1!$B$1');
+    const handle = attachNamedRangeDialog({
+      host,
+      wb: mutable.wb,
+      getSelectedRangeFormula: () => '=Sheet1!$A$1:$D$7',
+      subscribeToRangeChanges: () => () => {},
+    });
+    handle.openNew();
+    return { ...mutable, handle };
+  };
+  const dialog = (): HTMLElement => {
+    const el = document.querySelector<HTMLElement>('.fc-namedlg-define');
+    if (!el || el.hidden) throw new Error('define dialog not open');
+    return el;
+  };
+  const fields = (): HTMLInputElement[] => [
+    ...dialog().querySelectorAll<HTMLInputElement>('.fc-namedlg-define__field input'),
+  ];
+
+  it('shows the names list, + / -, the two prompts and Close / OK', () => {
+    const { handle } = openDefine();
+    expect(dialog().querySelector('.fc-fmtdlg__header')?.textContent).toBe('名前の定義');
+    expect(dialog().querySelector('.fc-namedlg-define__names-label')?.textContent).toBe('名前:');
+    expect(
+      [...dialog().querySelectorAll('.fc-namedlg-define__names [role="option"]')].map(
+        (o) => o.textContent,
+      ),
+    ).toEqual(['Rate']);
+    expect(
+      [...dialog().querySelectorAll('.fc-namedlg-define__field')].map(
+        (field) => field.firstElementChild?.textContent,
+      ),
+    ).toEqual(['データ範囲の名前を入力してください:', 'セルの範囲を選んでください:']);
+    expect(fields().map((f) => f.value)).toEqual(['', '=Sheet1!$A$1:$D$7']);
+    expect(
+      [...dialog().querySelectorAll('.fc-namedlg-define__footer button')].map((b) => b.textContent),
+    ).toEqual(['閉じる', 'OK']);
+    expect(document.querySelector<HTMLElement>('.fc-namedlg')?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('adds with +, removes with - and applies the fields on OK', () => {
+    const { registry, handle } = openDefine();
+    const [name, range] = fields();
+    if (!name || !range) throw new Error('missing fields');
+    name.value = 'Sales';
+    dialog().querySelector<HTMLButtonElement>('[data-define-action="add"]')?.click();
+    expect(registry.get('Sales')).toBe('=Sheet1!$A$1:$D$7');
+    dialog().querySelector<HTMLElement>('[role="option"][data-name="Rate"]')?.click();
+    expect(fields().map((f) => f.value)).toEqual(['Rate', '=Sheet1!$B$1']);
+    dialog().querySelector<HTMLButtonElement>('[data-define-action="remove"]')?.click();
+    expect(registry.has('Rate')).toBe(false);
+    const [name2, range2] = fields();
+    if (!name2 || !range2) throw new Error('missing fields');
+    name2.value = 'Total';
+    range2.value = '=Sheet1!$C$9';
+    dialog()
+      .querySelector<HTMLButtonElement>('.fc-namedlg-define__footer .fc-fmtdlg__btn--primary')
+      ?.click();
+    expect(registry.get('Total')).toBe('=Sheet1!$C$9');
+    expect(document.querySelector<HTMLElement>('.fc-namedlg-define')?.hidden).toBe(true);
+    handle.detach();
+  });
+});

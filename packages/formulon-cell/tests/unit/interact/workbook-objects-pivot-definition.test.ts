@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { PivotAggregation, PivotAxis } from '../../../src/engine/types.js';
+import {
+  PivotAggregation,
+  PivotAxis,
+  type SpreadsheetProfileId,
+} from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
@@ -14,8 +18,10 @@ const fixture = resolve(
 
 const openEditor = async (
   fieldList = false,
+  profile?: SpreadsheetProfileId,
 ): Promise<{ wb: WorkbookHandle; form: HTMLElement; detach: () => void }> => {
   const wb = await WorkbookHandle.loadBytes(new Uint8Array(readFileSync(fixture)));
+  if (profile) wb.setSpreadsheetProfileId(profile);
   const host = document.createElement('div');
   document.body.appendChild(host);
   const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
@@ -81,17 +87,19 @@ describe('PivotTable editor on a report loaded from a file', () => {
     wb.dispose();
   });
 
-  it('renames a data field from the profile when its aggregation changes', async () => {
-    const { wb, form, detach } = await openEditor(true);
+  it('renames a default data-field caption after the new function', async () => {
+    // The file was saved by the Japanese app, so its captions follow that profile.
+    const { wb, form, detach } = await openEditor(true, 'mac-ja_JP');
     form.querySelector<HTMLElement>('[data-pivot-area="values"] [data-pivot-area-field]')?.click();
-    const aggregation = document.querySelector<HTMLSelectElement>(
-      '.fc-objects__pivot-pane [data-pivot-aggregation-field-index="2"]',
+    const max = document.querySelector<HTMLElement>(
+      `.fc-pvfsdlg [data-pvfs-aggregation] [data-pvfs-value="${PivotAggregation.Max}"]`,
     );
-    if (!aggregation) throw new Error('missing aggregation control');
-    aggregation.value = String(PivotAggregation.Max);
-    aggregation.dispatchEvent(new Event('change', { bubbles: true }));
+    if (!max) throw new Error('missing Max in the field dialog');
+    max.click();
+    document.querySelector<HTMLButtonElement>('.fc-pvfsdlg [data-pvfs-ok]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(wb.getPivotDefinition(1, 0)?.dataFields).toMatchObject([
-      { name: 'Max of Sales', fieldIndex: 2, aggregation: PivotAggregation.Max },
+      { name: '最大 / Sales', fieldIndex: 2, aggregation: PivotAggregation.Max },
     ]);
     detach();
     wb.dispose();

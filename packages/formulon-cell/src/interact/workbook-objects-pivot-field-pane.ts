@@ -1,9 +1,18 @@
 import type { History } from '../commands/history.js';
-import { applyPivotEdit, restorePivotFieldLayout } from '../commands/pivot-edit.js';
+import { applyPivotEdit } from '../commands/pivot-edit.js';
 import { PivotAxis, PivotReportLayout } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { PivotAreaKind } from './pivot-field-settings.js';
+import {
+  type PivotNumberFormatPicker,
+  showPivotFieldSettingsDialog,
+} from './pivot-field-settings-dialog.js';
+import {
+  applyPivotFieldSettings,
+  commitPivotChange,
+  pivotFieldSettingsTarget,
+} from './pivot-field-settings-dialog-apply.js';
 import {
   PIVOT_AREA_ORDER,
   type PivotFieldAreasModel,
@@ -53,6 +62,8 @@ export interface PivotFieldPaneContext {
   setError(message: string): void;
   /** Re-renders the pane. */
   rerender(): void;
+  /** Opens Format Cells on the number tab for the field dialog's Number Format button. */
+  pickNumberFormat?: PivotNumberFormatPicker;
   /** The report was rewritten, by an edit, an undo or a redo; repaint the grid and the pane. */
   onChanged(): void;
 }
@@ -152,50 +163,73 @@ export function renderPivotFieldListPane(
       return;
     }
     const { sheetIndex, pivotIndex } = pivot;
-    const before = wb.getPivotDefinition(sheetIndex, pivotIndex);
-    let ok = applyPivotEdit(wb, pivot, {
-      fieldListOnly: true,
-      name: '',
-      anchor: { row: pivot.top, col: pivot.left },
-      rowGrandTotals: true,
-      colGrandTotals: true,
-      layout: PivotReportLayout.Compact,
-      ...(before ? { dataFields: before.dataFields } : {}),
-      fields: placed.map(({ editor, axis }) => editor.toEditField(axis)),
-      filters: editedPivotFilters(editorModel.pivotFilters, placed),
-    });
-    // Value fields keep their written order; a reorder within Values rewrites the list.
-    const written = before ? wb.getPivotDefinition(sheetIndex, pivotIndex) : null;
-    if (written) {
-      const rank = (fieldIndex: number): number => {
-        const position = next.values.indexOf(fieldIndex);
-        return position < 0 ? next.values.length : position;
-      };
-      const sorted = written.dataFields
-        .map((spec, position) => ({ spec, position }))
-        .sort(
-          (a, b) => rank(a.spec.fieldIndex) - rank(b.spec.fieldIndex) || a.position - b.position,
-        )
-        .map(({ spec }) => spec);
-      if (sorted.some((spec, position) => spec !== written.dataFields[position])) {
-        ok =
-          wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
-          sorted.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0) &&
-          ok;
+    commitPivotChange(ctx, sheetIndex, pivotIndex, () => {
+      const before = wb.getPivotDefinition(sheetIndex, pivotIndex);
+      let ok = applyPivotEdit(wb, pivot, {
+        fieldListOnly: true,
+        name: '',
+        anchor: { row: pivot.top, col: pivot.left },
+        rowGrandTotals: true,
+        colGrandTotals: true,
+        layout: PivotReportLayout.Compact,
+        ...(before ? { dataFields: before.dataFields } : {}),
+        fields: placed.map(({ editor, axis }) => editor.toEditField(axis)),
+        filters: editedPivotFilters(editorModel.pivotFilters, placed),
+      });
+      // Value fields keep their written order; a reorder within Values rewrites the list.
+      const written = before ? wb.getPivotDefinition(sheetIndex, pivotIndex) : null;
+      if (written) {
+        const rank = (fieldIndex: number): number => {
+          const position = next.values.indexOf(fieldIndex);
+          return position < 0 ? next.values.length : position;
+        };
+        const sorted = written.dataFields
+          .map((spec, position) => ({ spec, position }))
+          .sort(
+            (a, b) => rank(a.spec.fieldIndex) - rank(b.spec.fieldIndex) || a.position - b.position,
+          )
+          .map(({ spec }) => spec);
+        if (sorted.some((spec, position) => spec !== written.dataFields[position])) {
+          ok =
+            wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
+            sorted.every((spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0) &&
+            ok;
+        }
       }
-    }
-    const after = before ? wb.getPivotDefinition(sheetIndex, pivotIndex) : null;
-    state.layout = before ? null : next;
-    const history = ctx.history && !ctx.history.isReplaying() ? ctx.history : null;
-    if (history && before && after) {
-      const restore = (target: typeof before) => (): void => {
-        restorePivotFieldLayout(wb, sheetIndex, pivotIndex, target);
-        ctx.onChanged();
-      };
-      history.push({ undo: restore(before), redo: restore(after) });
-    }
-    if (!ok) ctx.setError(t.pivotEditFailed);
-    ctx.onChanged();
+      state.layout = before ? null : next;
+      if (!ok) ctx.setError(t.pivotEditFailed);
+      return ok;
+    });
+  };
+
+  // The PivotTable Field dialog for a placed field; its result is one undo step.
+  const openFieldDialog = (kind: PivotAreaKind, fieldName: string): void => {
+    const index = indexOf(fieldName);
+    if (index === undefined || !definition) return;
+    const which =
+      kind === 'values'
+        ? {
+            kind: 'value' as const,
+            dataFieldIndex: definition.dataFields.findIndex((spec) => spec.fieldIndex === index),
+          }
+        : { kind: 'field' as const, fieldIndex: index };
+    if (which.kind === 'value' && which.dataFieldIndex < 0) return;
+    const target = pivotFieldSettingsTarget(
+      wb,
+      pivot.sheetIndex,
+      pivot.pivotIndex,
+      which,
+      (sourceName) => pivot.fieldItems?.[sourceName] ?? [],
+    );
+    if (!target) return;
+    void showPivotFieldSettingsDialog({
+      host: ctx.host,
+      strings,
+      target,
+      ...(ctx.pickNumberFormat ? { pickNumberFormat: ctx.pickNumberFormat } : {}),
+    }).then((result) => {
+      if (result) applyPivotFieldSettings(ctx, pivot, which, result);
+    });
   };
 
   const without = (index: number): PivotPaneLayout => {
@@ -244,7 +278,8 @@ export function renderPivotFieldListPane(
     },
   };
 
-  const active = state.active;
+  // Filter items and conditions stay in the pane; every other setting is in the dialog.
+  const active = state.active?.kind === 'filters' ? state.active : null;
   const activeEditor =
     active && model.fieldsIn(active.kind).includes(active.fieldName)
       ? editorOf.get(active.fieldName)
@@ -256,13 +291,7 @@ export function renderPivotFieldListPane(
   if (active && activeEditor) {
     const heading = document.createElement('span');
     heading.textContent = td.fieldSettingsFor.replace('{field}', active.fieldName);
-    const block =
-      active.kind === 'values'
-        ? activeEditor.valueSettings
-        : active.kind === 'filters'
-          ? activeEditor.filterSettings
-          : activeEditor.subtotalSettings;
-    settingsPanel.append(heading, block);
+    settingsPanel.append(heading, activeEditor.filterSettings);
     settingsPanel.addEventListener('change', () => write(layout));
   }
 
@@ -281,10 +310,15 @@ export function renderPivotFieldListPane(
     },
     refresh: () => {},
     onFieldSettings: (kind, fieldName) => {
+      if (kind !== 'filters') {
+        openFieldDialog(kind, fieldName);
+        return;
+      }
       const same = state.active?.kind === kind && state.active.fieldName === fieldName;
       state.active = same ? null : { kind, fieldName };
       ctx.rerender();
     },
+    onFieldInfo: openFieldDialog,
     searchText: state.search,
     onSearch: (text) => {
       state.search = text;

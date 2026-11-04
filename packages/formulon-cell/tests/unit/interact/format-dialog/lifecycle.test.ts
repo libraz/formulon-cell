@@ -119,6 +119,38 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('shows only the number tab in numberFormat mode and returns the chosen format', () => {
+    const handle = attachFormatDialog({ host, store, strings: en });
+    let applied: unknown = null;
+    handle.open('font', {
+      mode: 'numberFormat',
+      initialFormat: { numFmt: { kind: 'percent', decimals: 1 } },
+      onApplyNumberFormat: (numFmt) => {
+        applied = numFmt;
+      },
+    });
+    const visibleTabs = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('button[data-fc-tab]'),
+    ).filter((tab) => !tab.hidden);
+    expect(visibleTabs.map((tab) => tab.dataset.fcTab)).toEqual(['number']);
+    expect(visibleTabs[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(
+      document.querySelector('button[data-fc-cat="percent"]')?.getAttribute('aria-selected'),
+    ).toBe('true');
+    document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]')?.click();
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(applied).toMatchObject({ kind: 'fixed', decimals: 1 });
+    expect(store.getState().format.formats).toHaveLength(0);
+    handle.open('font');
+    expect(
+      Array.from(document.querySelectorAll<HTMLButtonElement>('button[data-fc-tab]'))
+        .filter((tab) => !tab.hidden)
+        .map((tab) => tab.dataset.fcTab),
+      'the next ordinary open shows every tab again',
+    ).toContain('font');
+    handle.detach();
+  });
+
   it('restores the normal Format Cells chrome after Data Validation mode', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open('more', { mode: 'dataValidation', focus: 'validation' });

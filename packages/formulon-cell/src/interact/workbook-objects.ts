@@ -20,9 +20,10 @@ import {
 } from '../engine/passthrough-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import type { SessionIllustration } from '../store/store.js';
+import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogIconButton } from './dialog-shell.js';
+import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
 import { compatibilityLabelKey } from './spreadsheet-compatibility-report.js';
 import { syncTaskpaneDock } from './taskpane-dock.js';
 import { createWorkbookObjectsActionButton, pivotEditField } from './workbook-objects-dom.js';
@@ -51,6 +52,9 @@ export interface WorkbookObjectsPanelDeps {
   /** The host's task-pane dock beside the grid. The PivotTable Fields pane
    *  docks there; without one it floats over the right edge of `host`. */
   dock?: HTMLElement;
+  /** Lets the PivotTable Field dialog open Format Cells for a number format. */
+  store?: SpreadsheetStore;
+  getLocale?: () => string;
   onOpenPivotTableDialog?: () => void;
   onAfterPivotEdit?: () => void;
   onSelectSessionIllustration?: (id: string) => void;
@@ -87,6 +91,15 @@ export function attachWorkbookObjectsPanel(
   let activePivotFieldListKey = '';
   let pivotEditError = '';
   let pivotPaneState: PivotFieldPaneState = createPivotFieldPaneState();
+  const numberFormatPicker = deps.store
+    ? createPivotNumberFormatPicker({
+        host,
+        store: deps.store,
+        getStrings: () => strings,
+        getWb: () => wb,
+        ...(deps.getLocale ? { getLocale: deps.getLocale } : {}),
+      })
+    : null;
 
   const root = document.createElement('div');
   root.className = 'fc-objects';
@@ -357,6 +370,7 @@ export function attachWorkbookObjectsPanel(
               pivotEditError = message;
             },
             rerender: refresh,
+            ...(numberFormatPicker ? { pickNumberFormat: numberFormatPicker.pick } : {}),
             onChanged: () => {
               deps.onAfterPivotEdit?.();
               refresh();
@@ -636,6 +650,7 @@ export function attachWorkbookObjectsPanel(
       root.removeEventListener('keydown', onKey);
       root.hidden = true;
       placeRoot(false);
+      numberFormatPicker?.detach();
       root.remove();
     },
   };

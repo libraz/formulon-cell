@@ -487,4 +487,125 @@
     font-size: 11px;
     margin-top: 6px;
   }
+  /* Excel for Mac Name Manager (pt): 590 wide, a 325 pt list whose header
+   * starts with a narrow unlabeled column, then five 98 pt columns. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__panel {
+    width: 590px;
+    max-width: 96vw;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__list {
+    height: 325px;
+    min-height: 325px;
+    max-height: none;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__row {
+    grid-template-columns: 26px repeat(4, 98px) minmax(73px, 1fr);
+    min-width: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__row::before {
+    content: "";
+    border-inline-end: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__item::before {
+    border-inline-end-color: transparent;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__panel .fc-fmtdlg__footer .fc-fmtdlg__btn {
+    min-width: 0;
+    width: 60px;
+    padding-inline: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__head {
+    background: var(--fc-bg-elev, Canvas);
+    border-bottom-color: var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__head .fc-namedlg__sort {
+    font-weight: 400;
+  }
+  /* Mac 名前の定義 (pt): a 135 pt names list with + / - below on the left, the
+   * two prompts with 284 pt fields on the right, 閉じる / OK 62 wide. */
+  .fc-namedlg-define__panel {
+    width: 470px;
+    max-width: 96vw;
+  }
+  .fc-namedlg-define__body {
+    display: grid;
+    grid-template-columns: 135px minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: start;
+  }
+  .fc-namedlg-define__names-label {
+    margin-bottom: 7px;
+  }
+  .fc-namedlg-define__names {
+    height: 103px;
+    overflow-y: auto;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+    background: var(--fc-bg-elev, Canvas);
+  }
+  .fc-namedlg-define__names [role="option"] {
+    padding: 1px 6px;
+    cursor: default;
+  }
+  .fc-namedlg-define__names [aria-selected="true"] {
+    background: var(--fc-accent, Highlight);
+    color: var(--fc-accent-fg, HighlightText);
+  }
+  .fc-namedlg-define__list-buttons {
+    display: flex;
+    margin-top: 7px;
+  }
+  .fc-namedlg-define__list-btn {
+    width: 23px;
+    height: 23px;
+    padding: 0;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+    background: var(--fc-bg-elev, Canvas);
+    color: inherit;
+    font: inherit;
+  }
+  .fc-namedlg-define__list-btn + .fc-namedlg-define__list-btn {
+    margin-inline-start: -1px;
+  }
+  .fc-namedlg-define__list-btn:disabled {
+    opacity: 0.45;
+  }
+  .fc-namedlg-define__right {
+    display: grid;
+    gap: 6px;
+    padding-top: 25px;
+  }
+  .fc-namedlg-define__field {
+    display: grid;
+    gap: 6px;
+  }
+  .fc-namedlg-define__field .fc-namedlg-editor__input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 26px;
+  }
+  .fc-namedlg-define__field .fc-range-picker {
+    position: relative;
+    display: block;
+  }
+  .fc-namedlg-define__field .fc-range-picker input {
+    padding-inline-end: 30px;
+  }
+  .fc-namedlg-define__field .fc-range-picker__btn {
+    position: absolute;
+    top: 50%;
+    right: 2px;
+    transform: translateY(-50%);
+  }
+  .fc-namedlg-define__body > .fc-namedlg__error {
+    grid-column: 1 / -1;
+  }
+  .fc-namedlg-define__footer .fc-fmtdlg__btn {
+    flex: none;
+    width: 62px;
+    min-width: 0;
+    padding-inline: 0;
+  }
 }

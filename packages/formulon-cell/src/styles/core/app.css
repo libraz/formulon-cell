@@ -20,6 +20,7 @@
 @import "./app/dialog-modules/format-dialog-mobile.css";
 @import "./app/dialog-modules/conditional-and-names.css";
 @import "./app/dialog-modules/pivot.css";
+@import "./app/dialog-modules/pivot-field-settings.css";
 @import "./app/dialog-modules/cell-style.css";
 @import "./app/dialog-modules/sheet-panes.css";
 @import "./app/dialog-modules/sort.css";

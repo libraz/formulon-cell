@@ -19,6 +19,7 @@ import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotFieldSettingsDe } from './pivot-field-settings.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -193,7 +194,12 @@ export const macDe: MacStrings = {
   macIterativeDialog: macIterativeDialogFrom(formulaDialogsDe.iterativeDialog, {
     calcAutoNoTable: ribbonMenusDe.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsDe.namedRangeDialog),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsDe.namedRangeDialog, {
+    defineTitle: 'Namen definieren',
+    defineNames: 'Namen:',
+    defineNamePrompt: 'Geben Sie einen Namen für den Datenbereich ein:',
+    defineRangePrompt: 'Wählen Sie den Zellbereich aus:',
+  }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsDe.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonDe.ribbon, cellFormatDe.formatDialog),
   macProtectSheet: macProtectSheetFrom(editDialogsDe.protection, {
@@ -238,6 +244,7 @@ export const macDe: MacStrings = {
     optionsGroup: 'Optionen',
     noOptions: 'Für diese Auswahl gibt es keine Optionen.',
   }),
+  macPivotFieldSettings: macPivotFieldSettingsDe,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsDe.pivotTableDialog, {
     chooseConnection: 'Verbindung auswählen...',
   }),

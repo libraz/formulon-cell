@@ -273,6 +273,7 @@ export const workbookObjects = (): Extension => ({
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
       history: ctx.history,
+      store: ctx.store,
       listSessionIllustrations: () => ctx.store.getState().illustrations.illustrations,
       onSelectSessionIllustration: (id) => {
         const panel = Array.from(ctx.host.querySelectorAll<HTMLElement>('.fc-illustration')).find(

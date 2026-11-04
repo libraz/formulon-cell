@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { createPivotTableFromRange } from '../../../../src/commands/pivot-table.js';
+import { PivotAggregation } from '../../../../src/engine/types.js';
+import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings/en.js';
 import { ja } from '../../../../src/i18n/strings/ja.js';
 import {
@@ -112,5 +114,51 @@ describe('PivotTable context menu', () => {
     fireContextMenu(host, 10, 10);
     expect(item('paste')).not.toBeNull();
     expect(item('pivotRefresh')).toBeNull();
+  });
+
+  it('opens the PivotTable Field dialog from Value Field Settings and applies it', async () => {
+    const engine = await WorkbookHandle.createDefault();
+    const rows: (string | number)[][] = [
+      ['Region', 'Sales'],
+      ['East', 12],
+      ['West', 5],
+    ];
+    for (const [r, row] of rows.entries()) {
+      for (const [c, value] of row.entries()) {
+        const addr = { sheet: 0, row: r, col: c };
+        if (typeof value === 'number') engine.setNumber(addr, value);
+        else engine.setText(addr, value);
+      }
+    }
+    expect(
+      createPivotTableFromRange(engine, {
+        source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+        destination: { sheet: 0, row: 6, col: 0 },
+        rowField: 'Region',
+        valueField: 'Sales',
+      }).ok,
+    ).toBe(true);
+    const caption = engine.getPivotDefinition(0, 0)?.dataFields[0]?.name ?? '';
+    vi.spyOn(engine, 'pivotCellInfo').mockReturnValue(
+      info({ kind: 3, fieldName: caption, fieldIndex: -1, isValue: true, cacheId: 0 }),
+    );
+    const onOpenPivotFieldList = vi.fn();
+    detach = attachContextMenu({ host, store, wb: engine, strings: ja, onOpenPivotFieldList });
+    fireContextMenu(host, 10, 10);
+    item('pivotFieldSettings')?.click();
+    const dialog = document.querySelector<HTMLElement>('.fc-pvfsdlg');
+    expect(dialog?.getAttribute('aria-label')).toBe('ピボットテーブル フィールド');
+    expect(onOpenPivotFieldList).not.toHaveBeenCalled();
+    dialog
+      ?.querySelector<HTMLElement>(
+        `[data-pvfs-aggregation] [data-pvfs-value="${PivotAggregation.Average}"]`,
+      )
+      ?.click();
+    dialog?.querySelector<HTMLButtonElement>('[data-pvfs-ok]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(engine.getPivotDefinition(0, 0)?.dataFields[0]?.aggregation).toBe(
+      PivotAggregation.Average,
+    );
+    engine.dispose();
   });
 });

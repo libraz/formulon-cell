@@ -133,13 +133,26 @@ describe('pivot show-values-as base requirements', () => {
 });
 
 describe('pivot value field settings panel show-as controls', () => {
-  it('lists every show-values-as kind once', () => {
+  it('lists the calculations once each in the desktop order, Running Total as one entry', () => {
     const { selectsIn } = setup();
     const values = Array.from(selectsIn()[1]?.options ?? []).map((o) => Number(o.value));
-    expect([...values].sort((a, b) => a - b)).toEqual(
-      Object.values(PivotShowValuesAs).sort((a, b) => a - b),
-    );
-    expect(values).toHaveLength(16);
+    expect(values).toEqual([
+      PivotShowValuesAs.Normal,
+      PivotShowValuesAs.DifferenceFrom,
+      PivotShowValuesAs.PercentOf,
+      PivotShowValuesAs.PercentDifferenceFrom,
+      PivotShowValuesAs.RunningTotalInRow,
+      PivotShowValuesAs.PercentOfRow,
+      PivotShowValuesAs.PercentOfCol,
+      PivotShowValuesAs.PercentOfTotal,
+      PivotShowValuesAs.Index,
+      PivotShowValuesAs.PercentOfParentRow,
+      PivotShowValuesAs.PercentOfParentCol,
+      PivotShowValuesAs.PercentOfParent,
+      PivotShowValuesAs.PercentOfRunningTotal,
+      PivotShowValuesAs.RankAscending,
+      PivotShowValuesAs.RankDescending,
+    ]);
   });
 
   it('shows base controls exactly for the kinds that need them', () => {

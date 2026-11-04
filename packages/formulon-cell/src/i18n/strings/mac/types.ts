@@ -12,6 +12,7 @@ import type { MacIterativeDialogStrings } from './iterative-dialog.js';
 import type { MacNamedRangeDialogStrings } from './named-range-dialog.js';
 import type { MacPageSetupStrings } from './page-setup.js';
 import type { MacPasteSpecialStrings } from './paste-special.js';
+import type { MacPivotFieldSettingsStrings } from './pivot-field-settings.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacProtectSheetStrings } from './protect-sheet.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
@@ -32,6 +33,8 @@ export interface MacStrings {
   macPasteSpecial: MacPasteSpecialStrings;
   /** Overrides of `pivotTableDialog`, plus its Mac-only labels, that apply on the Mac host only. */
   macPivotTableDialog: MacPivotTableDialogStrings;
+  /** The PivotTable Field dialog for value and row/column fields. */
+  macPivotFieldSettings: MacPivotFieldSettingsStrings;
   /** Overrides of the Remove Duplicates wording that apply on the Mac host only. */
   macRemoveDuplicates: MacRemoveDuplicatesStrings;
   /** Overrides of the Sort dialog wording, plus its Mac-only labels, that apply on the Mac host only. */

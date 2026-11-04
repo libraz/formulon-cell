@@ -19,6 +19,7 @@ import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotFieldSettingsFr } from './pivot-field-settings.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -192,7 +193,12 @@ export const macFr: MacStrings = {
   macIterativeDialog: macIterativeDialogFrom(formulaDialogsFr.iterativeDialog, {
     calcAutoNoTable: ribbonMenusFr.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsFr.namedRangeDialog),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsFr.namedRangeDialog, {
+    defineTitle: 'Définir un nom',
+    defineNames: 'Noms :',
+    defineNamePrompt: 'Entrez un nom pour la plage de données :',
+    defineRangePrompt: 'Sélectionnez la plage de cellules :',
+  }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsFr.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonFr.ribbon, cellFormatFr.formatDialog),
   macProtectSheet: macProtectSheetFrom(editDialogsFr.protection, {
@@ -236,6 +242,7 @@ export const macFr: MacStrings = {
     optionsGroup: 'Options',
     noOptions: 'Cette sélection n’a pas d’options.',
   }),
+  macPivotFieldSettings: macPivotFieldSettingsFr,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsFr.pivotTableDialog, {
     chooseConnection: 'Choisir la connexion...',
   }),

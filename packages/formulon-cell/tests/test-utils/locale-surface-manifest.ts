@@ -73,6 +73,7 @@ export const LOCALE_SURFACE_SECTIONS = [
   'macNamedRangeDialog',
   'macPageSetup',
   'macPasteSpecial',
+  'macPivotFieldSettings',
   'macPivotTableDialog',
   'macProtectSheet',
   'macRemoveDuplicates',
@@ -531,6 +532,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'interact/pivot-field-settings.ts',
     'showPivotFilterDialog',
     'pivotTableDialog',
+    'block',
+  ),
+  shell(
+    'interact.pivotFieldSettingsDialog',
+    'interact/pivot-field-settings-dialog.ts',
+    'showPivotFieldSettingsDialog',
+    'macPivotFieldSettings',
     'block',
   ),
   shell(

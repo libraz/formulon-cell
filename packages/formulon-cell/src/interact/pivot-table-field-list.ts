@@ -56,6 +56,8 @@ export interface PivotFieldAreasViewOptions {
   refresh(): void;
   /** A chip in an area was activated. */
   onFieldSettings(kind: PivotAreaKind, fieldName: string): void;
+  /** The chip's settings button was pressed; without this it acts as the chip. */
+  onFieldInfo?(kind: PivotAreaKind, fieldName: string): void;
   /** Field search text, kept by the caller across re-renders. */
   searchText?: string;
   onSearch?(text: string): void;
@@ -259,6 +261,13 @@ export function renderPivotFieldAreas(
         labels.fieldSettingsFor.replace('{field}', value),
       );
       chip.addEventListener('click', () => opts.onFieldSettings(kind, value));
+      const onInfo = opts.onFieldInfo;
+      if (onInfo) {
+        settings.addEventListener('click', (event) => {
+          event.stopPropagation();
+          onInfo(kind, value);
+        });
+      }
       chip.append(name, settings);
       list.appendChild(chip);
     }

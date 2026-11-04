@@ -19,6 +19,7 @@ import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotFieldSettingsTh } from './pivot-field-settings.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -190,7 +191,12 @@ export const macTh: MacStrings = {
   macIterativeDialog: macIterativeDialogFrom(formulaDialogsTh.iterativeDialog, {
     calcAutoNoTable: ribbonMenusTh.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog, {
+    defineTitle: 'กำหนดชื่อ',
+    defineNames: 'ชื่อ:',
+    defineNamePrompt: 'ใส่ชื่อสำหรับช่วงข้อมูล:',
+    defineRangePrompt: 'เลือกช่วงของเซลล์:',
+  }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonTh.ribbon, cellFormatTh.formatDialog),
   macProtectSheet: macProtectSheetFrom(editDialogsTh.protection, {
@@ -234,6 +240,7 @@ export const macTh: MacStrings = {
     optionsGroup: 'ตัวเลือก',
     noOptions: 'รายการที่เลือกนี้ไม่มีตัวเลือก',
   }),
+  macPivotFieldSettings: macPivotFieldSettingsTh,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
     chooseConnection: 'เลือกการเชื่อมต่อ...',
   }),

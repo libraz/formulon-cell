@@ -19,6 +19,7 @@ import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotFieldSettingsKo } from './pivot-field-settings.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -191,7 +192,12 @@ export const macKo: MacStrings = {
   macIterativeDialog: macIterativeDialogFrom(formulaDialogsKo.iterativeDialog, {
     calcAutoNoTable: ribbonMenusKo.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsKo.namedRangeDialog),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsKo.namedRangeDialog, {
+    defineTitle: '이름 정의',
+    defineNames: '이름:',
+    defineNamePrompt: '데이터 범위의 이름을 입력하십시오:',
+    defineRangePrompt: '셀 범위를 선택하십시오:',
+  }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonKo.ribbon, cellFormatKo.formatDialog),
   macProtectSheet: macProtectSheetFrom(editDialogsKo.protection, {
@@ -235,6 +241,7 @@ export const macKo: MacStrings = {
     optionsGroup: '옵션',
     noOptions: '이 선택 항목에는 옵션이 없습니다.',
   }),
+  macPivotFieldSettings: macPivotFieldSettingsKo,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
     chooseConnection: '연결 선택...',
   }),

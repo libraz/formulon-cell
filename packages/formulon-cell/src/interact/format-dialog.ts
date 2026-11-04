@@ -25,7 +25,7 @@ import { bundledLocaleForStrings } from '../i18n/locale-for-strings.js';
 import { defaultStrings, dictionaryLocaleFor, type Strings } from '../i18n/strings.js';
 import { rangeValidationAt } from '../store/range-validations.js';
 import { rangeContainsAddr, sameRange } from '../store/selection-geometry.js';
-import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import type { CellFormat, NumFmt, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { syncCustomSelects } from './custom-select.js';
 import { deferInitialFocus } from './dialog-shell.js';
@@ -79,13 +79,17 @@ export interface FormatDialogDeps {
 }
 
 export interface FormatDialogOpenOptions {
-  mode?: 'format' | 'dataValidation' | 'dxf';
+  /** `numberFormat` shows only the number tab and hands its result to
+   *  `onApplyNumberFormat`, writing nothing to the sheet. */
+  mode?: 'format' | 'dataValidation' | 'dxf' | 'numberFormat';
   focus?: 'activeTab' | 'validation';
   /** Initial differential format when editing a conditional-format rule. */
   initialFormat?: Partial<CellFormat>;
   /** Receives the editable differential-format dimensions instead of writing
    *  to the active cell. Used by conditional-format Custom Format. */
   onApplyDxf?: (format: Partial<CellFormat>) => void;
+  /** Receives the chosen number format in `numberFormat` mode. */
+  onApplyNumberFormat?: (numFmt: NumFmt) => void;
 }
 
 export interface FormatDialogHandle {
@@ -451,7 +455,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
     const dxfMode = mode === 'dxf';
+    const numberMode = mode === 'numberFormat';
     overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
+    overlay.classList.toggle('fc-fmtdlg--number-format', numberMode);
     // `role="dialog"` sits on the overlay, so the accessible name has to be set
     // there — labelling the panel leaves the dialog announcing the format title
     // while the header reads Data Validation.
@@ -466,9 +472,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       // The Mac app has no seventh tab; it opens only when asked for by name.
       const macHidden = isMacHost() && tabId === 'more' && !showMoreTab;
       button.hidden =
-        macHidden || (dxfMode && (tabId === 'align' || tabId === 'protection' || tabId === 'more'));
+        macHidden ||
+        (numberMode && tabId !== 'number') ||
+        (dxfMode && (tabId === 'align' || tabId === 'protection' || tabId === 'more'));
     }
-    if (dxfMode && (activeTab === 'align' || activeTab === 'protection' || activeTab === 'more')) {
+    if (
+      numberMode ||
+      (dxfMode && (activeTab === 'align' || activeTab === 'protection' || activeTab === 'more'))
+    ) {
       setActiveTab('number');
     }
   };
@@ -742,14 +753,25 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const api: FormatDialogHandle = {
     open(tab?: TabId, options?: FormatDialogOpenOptions): void {
       dialogMode = options?.mode ?? 'format';
-      applyDxf = options?.mode === 'dxf' ? (options.onApplyDxf ?? null) : null;
+      const onNumberFormat = options?.onApplyNumberFormat;
+      applyDxf =
+        options?.mode === 'dxf'
+          ? (options.onApplyDxf ?? null)
+          : options?.mode === 'numberFormat' && onNumberFormat
+            ? (format) => {
+                if (format.numFmt) onNumberFormat(format.numFmt);
+              }
+            : null;
       syncColorPaletteTheme(overlay, themeColorColumns(getWb()?.getTheme()?.colors));
       showMoreTab = tab === 'more';
       const remembered = lastUsedTab;
       hydrateFromActive(options?.initialFormat);
       setDialogMode(options?.mode);
       // The Mac app reopens on the tab used last.
-      const requested = tab ?? (isMacHost() && options?.mode !== 'dxf' ? remembered : undefined);
+      const requested =
+        options?.mode === 'numberFormat'
+          ? 'number'
+          : (tab ?? (isMacHost() && options?.mode !== 'dxf' ? remembered : undefined));
       if (requested && tabButtons.has(requested)) setActiveTab(requested);
       if (options?.mode === 'dataValidation') setActiveTab('more');
       shell.open();

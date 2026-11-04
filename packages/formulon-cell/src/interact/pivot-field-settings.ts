@@ -659,13 +659,22 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
     );
     const baseItemCount = (fieldName: string): number => options.inferFilterItems(fieldName).length;
     const resolved = resolvePivotShowAsBase(setting, eligibleBaseFields, baseItemCount);
+    // The desktop order. Running Total is one entry; it runs along the row
+    // field when there is one, else along the column field.
     const showValuesAs = createDialogSelect(
       [
         { value: String(PivotShowValuesAs.Normal), label: t.showValuesAsNormal },
-        { value: String(PivotShowValuesAs.PercentOfTotal), label: t.showValuesAsPercentOfTotal },
-        { value: String(PivotShowValuesAs.PercentOfCol), label: t.showValuesAsPercentOfColumn },
-        { value: String(PivotShowValuesAs.PercentOfRow), label: t.showValuesAsPercentOfRow },
+        { value: String(PivotShowValuesAs.DifferenceFrom), label: t.showValuesAsDifferenceFrom },
         { value: String(PivotShowValuesAs.PercentOf), label: t.showValuesAsPercentOf },
+        {
+          value: String(PivotShowValuesAs.PercentDifferenceFrom),
+          label: t.showValuesAsPercentDifferenceFrom,
+        },
+        { value: String(PivotShowValuesAs.RunningTotalInRow), label: t.showValuesAsRunningTotal },
+        { value: String(PivotShowValuesAs.PercentOfRow), label: t.showValuesAsPercentOfRow },
+        { value: String(PivotShowValuesAs.PercentOfCol), label: t.showValuesAsPercentOfColumn },
+        { value: String(PivotShowValuesAs.PercentOfTotal), label: t.showValuesAsPercentOfTotal },
+        { value: String(PivotShowValuesAs.Index), label: t.showValuesAsIndex },
         {
           value: String(PivotShowValuesAs.PercentOfParentRow),
           label: t.showValuesAsPercentOfParentRow,
@@ -678,28 +687,18 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
           value: String(PivotShowValuesAs.PercentOfParent),
           label: t.showValuesAsPercentOfParentTotal,
         },
-        { value: String(PivotShowValuesAs.DifferenceFrom), label: t.showValuesAsDifferenceFrom },
-        {
-          value: String(PivotShowValuesAs.PercentDifferenceFrom),
-          label: t.showValuesAsPercentDifferenceFrom,
-        },
-        {
-          value: String(PivotShowValuesAs.RunningTotalInRow),
-          label: t.showValuesAsRunningTotalInRow,
-        },
-        {
-          value: String(PivotShowValuesAs.RunningTotalInCol),
-          label: t.showValuesAsRunningTotalInColumn,
-        },
         {
           value: String(PivotShowValuesAs.PercentOfRunningTotal),
           label: t.showValuesAsPercentRunningTotal,
         },
         { value: String(PivotShowValuesAs.RankAscending), label: t.showValuesAsRankAscending },
         { value: String(PivotShowValuesAs.RankDescending), label: t.showValuesAsRankDescending },
-        { value: String(PivotShowValuesAs.Index), label: t.showValuesAsIndex },
       ],
-      String(setting.showValuesAs ?? PivotShowValuesAs.Normal),
+      String(
+        setting.showValuesAs === PivotShowValuesAs.RunningTotalInCol
+          ? PivotShowValuesAs.RunningTotalInRow
+          : (setting.showValuesAs ?? PivotShowValuesAs.Normal),
+      ),
       { className: 'fc-fmtdlg__select' },
     );
     const storeShowAs = (next: PivotValueFieldSetting): void => {
@@ -716,7 +715,12 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
     showValuesAs.addEventListener('change', () => {
       storeShowAs({
         ...options.selectedValueSetting(active.fieldName),
-        showValuesAs: Number(showValuesAs.value) as PivotShowValuesAsValue,
+        showValuesAs:
+          Number(showValuesAs.value) === PivotShowValuesAs.RunningTotalInRow &&
+          !controls.rowSelect.value &&
+          controls.colSelect.value
+            ? PivotShowValuesAs.RunningTotalInCol
+            : (Number(showValuesAs.value) as PivotShowValuesAsValue),
       });
     });
     const baseControls: HTMLElement[] = [];

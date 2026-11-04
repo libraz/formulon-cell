@@ -86,8 +86,7 @@ export interface DataObjectsStrings {
     showValuesAsPercentOfRow: string;
     showValuesAsPercentOfColumn: string;
     showValuesAsPercentOfTotal: string;
-    showValuesAsRunningTotalInRow: string;
-    showValuesAsRunningTotalInColumn: string;
+    showValuesAsRunningTotal: string;
     showValuesAsIndex: string;
     showValuesAsPercentOf: string;
     showValuesAsPercentOfParentRow: string;

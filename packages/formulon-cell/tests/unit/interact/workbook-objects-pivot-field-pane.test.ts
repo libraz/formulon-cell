@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
-import { PivotAggregation, PivotAxis } from '../../../src/engine/types.js';
+import { PivotAxis } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
@@ -236,48 +236,19 @@ describe('PivotTable Fields pane', () => {
     wb.dispose();
   });
 
-  it('opens value settings from a chip and applies the aggregation at once', async () => {
+  it('opens the PivotTable Field dialog from a value or row chip, not an inline panel', async () => {
     const wb = await setup();
     const { handle } = open(wb);
     area('values').querySelector<HTMLElement>('[data-pivot-area-field="Sales"]')?.click();
-    const aggregation = pane().querySelector<HTMLSelectElement>(
-      '[data-pivot-aggregation-field-index="2"]',
-    );
-    if (!aggregation) throw new Error('missing aggregation control');
-    aggregation.value = String(PivotAggregation.Max);
-    aggregation.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(wb.getPivotDefinition(0, 0)?.dataFields).toMatchObject([
-      { fieldIndex: 2, aggregation: PivotAggregation.Max },
-    ]);
-    expect(
-      pane().querySelector('[data-pivot-aggregation-field-index="2"]'),
-      'settings stay open after the change',
-    ).toBeTruthy();
-    handle.detach();
-    wb.dispose();
-  });
-
-  it('opens subtotal settings from a row chip and writes custom functions', async () => {
-    const wb = await setup();
-    const { handle } = open(wb);
+    let dialog = document.querySelector<HTMLElement>('.fc-pvfsdlg');
+    expect(dialog?.dataset.pvfsKind).toBe('value');
+    expect(pane().querySelector('[data-pivot-aggregation-field-index]')).toBeNull();
+    dialog?.querySelector<HTMLButtonElement>('[data-pvfs-cancel]')?.click();
     area('rows').querySelector<HTMLElement>('[data-pivot-area-field="Region"]')?.click();
-    const mode = pane().querySelector<HTMLSelectElement>(
-      '[data-pivot-subtotal-mode-field-index="0"]',
-    );
-    if (!mode) throw new Error('missing subtotal mode');
-    mode.value = 'custom';
-    mode.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(host.textContent).toContain('Select at least one function');
-    const sum = pane().querySelector<HTMLInputElement>(
-      `[data-pivot-subtotal-fns-field-index="0"] input[value="${PivotAggregation.Sum}"]`,
-    );
-    if (!sum) throw new Error('missing subtotal function');
-    sum.checked = true;
-    sum.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(wb.getPivotField(0, 0, 0)).toMatchObject({
-      defaultSubtotal: false,
-      subtotalFns: [PivotAggregation.Sum],
-    });
+    dialog = document.querySelector<HTMLElement>('.fc-pvfsdlg');
+    expect(dialog?.dataset.pvfsKind).toBe('field');
+    expect(pane().querySelector('[data-pivot-subtotal-mode-field-index]')).toBeNull();
+    dialog?.querySelector<HTMLButtonElement>('[data-pvfs-cancel]')?.click();
     handle.detach();
     wb.dispose();
   });

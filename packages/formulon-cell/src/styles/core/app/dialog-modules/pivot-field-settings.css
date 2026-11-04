@@ -1,0 +1,190 @@
+@layer fc.app {
+  /* PivotTable Field dialog: value fields (two tabs) and row/column fields. */
+  .fc-pvfsdlg {
+    --fc-pvfsdlg-width: 353px;
+    --fc-pvfsdlg-wide: 395px;
+    --fc-pvfsdlg-row: 19.5px;
+    --fc-pvfsdlg-button-height: 26px;
+  }
+  .fc-pvfsdlg .fc-pvfsdlg__frame {
+    width: var(--fc-pvfsdlg-width);
+    max-width: 96vw;
+  }
+  .fc-pvfsdlg[data-pvfs-tab="showAs"] .fc-pvfsdlg__frame,
+  .fc-pvfsdlg[data-pvfs-kind="field"] .fc-pvfsdlg__frame {
+    width: var(--fc-pvfsdlg-wide);
+  }
+  .fc-pvfsdlg .fc-fmtdlg__header {
+    height: 32px;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+  .fc-pvfsdlg__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 20px 0;
+    font-size: 13px;
+  }
+  .fc-pvfsdlg__name-row {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+  .fc-pvfsdlg__label {
+    color: var(--fc-fg, CanvasText);
+  }
+  .fc-pvfsdlg__label--disabled {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 40%, transparent));
+  }
+  .fc-pvfsdlg__name {
+    box-sizing: border-box;
+    height: 24px;
+    min-width: 0;
+    padding: 0 6px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
+    border-radius: 4px;
+    background: var(--fc-bg, Canvas);
+    color: var(--fc-fg, CanvasText);
+    font: inherit;
+  }
+  .fc-pvfsdlg__group {
+    position: relative;
+    margin-top: 8px;
+    padding: 22px 20px 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 5px;
+  }
+  .fc-pvfsdlg__tabs {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    display: flex;
+    padding: 1px;
+    border-radius: 6px;
+    background: var(--fc-bg-elev, color-mix(in srgb, CanvasText 8%, Canvas));
+    transform: translate(-50%, -50%);
+  }
+  .fc-pvfsdlg__tab {
+    min-height: 22px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--fc-fg, CanvasText);
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .fc-pvfsdlg__tab[aria-selected="true"] {
+    background: var(--fc-bg, Canvas);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  .fc-pvfsdlg__panel-tab[hidden] {
+    display: none;
+  }
+  .fc-pvfsdlg__list {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
+    background: var(--fc-bg, Canvas);
+    outline: none;
+  }
+  .fc-pvfsdlg__list[data-pvfs-aggregation] {
+    height: calc(var(--fc-pvfsdlg-row) * 8);
+  }
+  .fc-pvfsdlg__list[aria-disabled="true"] {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 40%, transparent));
+  }
+  .fc-pvfsdlg__option {
+    flex: none;
+    min-height: var(--fc-pvfsdlg-row);
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: default;
+  }
+  .fc-pvfsdlg__option[aria-selected="true"] {
+    background: var(--fc-selection-bg, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-pvfsdlg__list:focus-visible .fc-pvfsdlg__option[aria-selected="true"] {
+    background: var(--fc-accent, #217346);
+    color: var(--fc-accent-fg, #ffffff);
+  }
+  .fc-pvfsdlg__show-as,
+  .fc-pvfsdlg__panel-tab .fc-select,
+  .fc-pvfsdlg__panel-tab .fc-select__button {
+    width: 100%;
+  }
+  .fc-pvfsdlg__bases {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 18px;
+    margin-top: 10px;
+  }
+  .fc-pvfsdlg__bases .fc-pvfsdlg__list {
+    height: 97px;
+    margin-top: 4px;
+  }
+  .fc-pvfsdlg__heading {
+    margin-top: 6px;
+    font-weight: 700;
+  }
+  .fc-pvfsdlg__subtotals {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 10px;
+    padding-left: 8px;
+  }
+  .fc-pvfsdlg__radios {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .fc-pvfsdlg__radio,
+  .fc-pvfsdlg__check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .fc-pvfsdlg__fn-list {
+    height: 101px;
+  }
+  .fc-pvfsdlg__footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 20px;
+    border-top: 0;
+  }
+  .fc-pvfsdlg__spacer {
+    flex: 1 1 auto;
+  }
+  .fc-pvfsdlg__footer .fc-fmtdlg__btn {
+    box-sizing: border-box;
+    height: var(--fc-pvfsdlg-button-height);
+    min-height: 0;
+    min-width: 72px;
+    padding: 0 12px;
+  }
+  .fc-pvfsdlg[data-pvfs-kind="value"] .fc-pvfsdlg__footer .fc-fmtdlg__btn:not(.fc-pvfsdlg__format) {
+    width: 86px;
+  }
+}
+
+@layer fc.app {
+  /* Format Cells opened from Number Format: its one tab sits centred. */
+  .fc-fmtdlg--mac.fc-fmtdlg--number-format .fc-fmtdlg__panel .fc-fmtdlg__tab[data-fc-tab="number"] {
+    left: calc(50% - 36px);
+  }
+}

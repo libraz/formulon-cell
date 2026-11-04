@@ -9,6 +9,7 @@ import { macIterativeDialogJa } from './iterative-dialog.js';
 import { macNamedRangeDialogJa } from './named-range-dialog.js';
 import { macPageSetupJa } from './page-setup.js';
 import { macPasteSpecialJa } from './paste-special.js';
+import { macPivotFieldSettingsJa } from './pivot-field-settings.js';
 import { macPivotTableDialogJa } from './pivot-table-dialog.js';
 import { macProtectSheetJa } from './protect-sheet.js';
 import { macRemoveDuplicatesJa } from './remove-duplicates.js';
@@ -199,6 +200,7 @@ export const macJa: MacStrings = {
   macCreateTable: macCreateTableJa,
   macGoToDialog: macGoToDialogJa,
   macHyperlinkDialog: macHyperlinkDialogJa,
+  macPivotFieldSettings: macPivotFieldSettingsJa,
   macPivotTableDialog: macPivotTableDialogJa,
   macRemoveDuplicates: macRemoveDuplicatesJa,
   macSortDialog: macSortDialogJa,

@@ -19,6 +19,7 @@ import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
+import { macPivotFieldSettingsZh } from './pivot-field-settings.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -190,7 +191,12 @@ export const macZh: MacStrings = {
   macIterativeDialog: macIterativeDialogFrom(formulaDialogsZh.iterativeDialog, {
     calcAutoNoTable: ribbonMenusZh.ribbonMenu.calcAutoNoTable,
   }),
-  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog, {
+    defineTitle: '定义名称',
+    defineNames: '名称:',
+    defineNamePrompt: '请输入数据区域的名称:',
+    defineRangePrompt: '请选择单元格区域:',
+  }),
   macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
   macZoomDialog: macZoomDialogFrom(ribbonZh.ribbon, cellFormatZh.formatDialog),
   macProtectSheet: macProtectSheetFrom(editDialogsZh.protection, {
@@ -234,6 +240,7 @@ export const macZh: MacStrings = {
     optionsGroup: '选项',
     noOptions: '此选择项没有选项。',
   }),
+  macPivotFieldSettings: macPivotFieldSettingsZh,
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
     chooseConnection: '选择连接...',
   }),

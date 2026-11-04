@@ -18,7 +18,9 @@ import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialog
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
 import {
+  appendDialogActions,
   appendDialogButton,
+  appendDialogFrame,
   appendDialogIconButton,
   clearDialogError,
   createDialogButton,
@@ -732,6 +734,168 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     deleteShell.open();
   };
 
+  // ── Mac 名前の定義: names list with + / -, a name and a range field ──
+  const defineShell = createDialogShell({
+    host,
+    className: 'fc-namedlg-define',
+    ariaLabel: t.title,
+    onDismiss: () => closeDefine(),
+  });
+  defineShell.overlay.classList.add('fc-fmtdlg');
+  const defineFrame = appendDialogFrame(defineShell, {
+    title: '',
+    panelClasses: ['fc-fmtdlg__panel', 'fc-namedlg-define__panel'],
+    bodyClass: 'fc-fmtdlg__body fc-namedlg-define__body',
+    footerClass: 'fc-fmtdlg__footer fc-namedlg-define__footer',
+  });
+  const defineNamesLabel = document.createElement('div');
+  defineNamesLabel.className = 'fc-namedlg-define__names-label';
+  const defineNames = document.createElement('div');
+  defineNames.className = 'fc-namedlg-define__names';
+  defineNames.setAttribute('role', 'listbox');
+  const defineListButtons = document.createElement('div');
+  defineListButtons.className = 'fc-namedlg-define__list-buttons';
+  const defineAddBtn = appendDialogIconButton(defineListButtons, {
+    label: '+',
+    ariaLabel: t.addButton,
+    baseClass: 'fc-namedlg-define__list-btn',
+  });
+  defineAddBtn.dataset.defineAction = 'add';
+  const defineRemoveBtn = appendDialogIconButton(defineListButtons, {
+    label: '−',
+    ariaLabel: t.deleteButton,
+    baseClass: 'fc-namedlg-define__list-btn',
+  });
+  defineRemoveBtn.dataset.defineAction = 'remove';
+  const defineLeft = document.createElement('div');
+  defineLeft.className = 'fc-namedlg-define__left';
+  defineLeft.append(defineNamesLabel, defineNames, defineListButtons);
+  const defineField = (): {
+    label: HTMLLabelElement;
+    text: HTMLSpanElement;
+    input: HTMLInputElement;
+  } => {
+    const label = document.createElement('label');
+    label.className = 'fc-namedlg-define__field';
+    const text = document.createElement('span');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'fc-namedlg-editor__input';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    label.append(text, input);
+    return { label, text, input };
+  };
+  const defineName = defineField();
+  const defineRange = defineField();
+  const defineRight = document.createElement('div');
+  defineRight.className = 'fc-namedlg-define__right';
+  defineRight.append(defineName.label, defineRange.label);
+  if (rangePickerOptions) {
+    attachRangePickerButton(defineRange.input, {
+      ...rangePickerOptions,
+      kind: 'named-range-define-refers-to',
+    });
+  }
+  const defineError = document.createElement('div');
+  defineError.className = 'fc-namedlg__error';
+  defineError.setAttribute('role', 'alert');
+  defineError.hidden = true;
+  defineFrame.body.append(defineLeft, defineRight, defineError);
+  const defineActions = appendDialogActions(defineFrame.footer, {
+    cancelLabel: t.close,
+    okLabel: t.ok,
+  });
+  let defineSelected: DefinedNameEntry | null = null;
+
+  const renderDefineNames = (): void => {
+    const entries = [...wb.definedNames()].filter((entry) => !entry.hidden);
+    defineNames.replaceChildren(
+      ...entries.map((entry) => {
+        const option = document.createElement('div');
+        option.setAttribute('role', 'option');
+        option.dataset.name = entry.name;
+        option.textContent = entry.name;
+        const selected =
+          defineSelected !== null && isSameDefinedName(defineSelected.name, entry.name);
+        option.setAttribute('aria-selected', String(selected));
+        option.addEventListener('click', () => {
+          defineSelected = entry;
+          defineName.input.value = entry.name;
+          defineRange.input.value = definedNameDisplayFormula(entry.formula);
+          renderDefineNames();
+        });
+        return option;
+      }),
+    );
+    projectDisabledState(defineRemoveBtn, defineSelected === null, null);
+  };
+  const showDefineError = (message: string): void => showDialogError(defineError, message);
+  /** Add or update the name in the fields; false when it was refused. */
+  const defineCommit = (): boolean => {
+    const name = defineName.input.value.trim();
+    if (!name) {
+      showDefineError(t.errorEmptyName);
+      focusAndSelectInput(defineName.input);
+      return false;
+    }
+    const result = recordDefinedNamesChange(history, wb, () =>
+      upsertDefinedName(wb, name, defineRange.input.value.trim(), -1),
+    );
+    if (!result.ok) {
+      showDefineError(errorMessageFor(result.reason, t));
+      return false;
+    }
+    clearDialogError(defineError);
+    deps.onAfterMutate?.();
+    defineSelected = null;
+    renderDefineNames();
+    return true;
+  };
+  const closeDefine = (): void => {
+    defineShell.close();
+    host.focus();
+  };
+  defineShell.on(defineAddBtn, 'click', () => {
+    defineCommit();
+  });
+  defineShell.on(defineRemoveBtn, 'click', () => {
+    const entry = defineSelected;
+    if (!entry) return;
+    const result = recordDefinedNamesChange(history, wb, () =>
+      deleteDefinedName(wb, entry.name, entry.localSheetId),
+    );
+    if (!result.ok) {
+      showDefineError(t.errorEngineFailed);
+      return;
+    }
+    clearDialogError(defineError);
+    deps.onAfterMutate?.();
+    defineSelected = null;
+    defineName.input.value = '';
+    renderDefineNames();
+  });
+  defineShell.on(defineActions.cancelBtn, 'click', closeDefine);
+  defineShell.on(defineActions.okBtn, 'click', () => {
+    if (defineName.input.value.trim() && !defineCommit()) return;
+    closeDefine();
+  });
+  const openDefine = (): void => {
+    const m = strings.macNamedRangeDialog;
+    defineFrame.header.textContent = m.defineTitle;
+    defineShell.setAriaLabel(m.defineTitle);
+    defineNamesLabel.textContent = m.defineNames;
+    defineName.text.textContent = m.defineNamePrompt;
+    defineRange.text.textContent = m.defineRangePrompt;
+    defineSelected = null;
+    defineName.input.value = '';
+    defineRange.input.value = deps.getSelectedRangeFormula?.() ?? '';
+    clearDialogError(defineError);
+    renderDefineNames();
+    defineShell.open();
+    deferInitialFocus(defineShell.overlay, () => defineName.input.focus());
+  };
+
   const confirmDeleteSelectedName = (): void => {
     if (!pendingDeleteName) return;
     const entry = pendingDeleteName;
@@ -935,6 +1099,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
         return;
       }
       applyPlatform();
+      // The Mac app opens its own 名前の定義 dialog rather than the New Name editor.
+      if (mac) {
+        openDefine();
+        return;
+      }
       refreshFormState();
       renderList();
       openEditor('new');
@@ -952,6 +1121,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     },
     detach(): void {
       closeFilterMenu();
+      defineShell.dispose();
       deleteShell.dispose();
       editorShell.dispose();
       shell.dispose();
