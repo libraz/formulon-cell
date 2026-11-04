@@ -83,9 +83,14 @@ describe('attachSplitDrag', () => {
     expect(store.getState().layout).toMatchObject({ freezeRows: 10, freezeOriginRow: 3 });
   });
 
-  it('removes the split on a double-click on its bar', () => {
+  it('removes the whole split on a double-click on the horizontal bar', () => {
     grid.dispatchEvent(new MouseEvent('dblclick', { clientX: 400, clientY: 120, bubbles: true }));
-    expect(store.getState().layout).toMatchObject({ freezeRows: 0, freezeCols: 2 });
+    expect(store.getState().layout).toMatchObject({ freezeRows: 0, freezeCols: 0 });
+  });
+
+  it('removes only the vertical split on a double-click on the vertical bar', () => {
+    grid.dispatchEvent(new MouseEvent('dblclick', { clientX: 160, clientY: 400, bubbles: true }));
+    expect(store.getState().layout).toMatchObject({ freezeRows: 5, freezeCols: 0 });
   });
 
   it('leaves clicks away from the bars and frozen panes to the grid', () => {

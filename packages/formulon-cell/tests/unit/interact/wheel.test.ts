@@ -16,6 +16,7 @@ const fire = (
     ctrlKey?: boolean;
     metaKey?: boolean;
     shiftKey?: boolean;
+    deltaMode?: number;
     clientX?: number;
     clientY?: number;
   },
@@ -26,6 +27,7 @@ const fire = (
     deltaX: init.deltaX ?? 0,
     deltaY: init.deltaY ?? 0,
   });
+  Object.defineProperty(e, 'deltaMode', { value: init.deltaMode ?? 0 });
   Object.defineProperty(e, 'clientX', { value: init.clientX ?? 0 });
   Object.defineProperty(e, 'clientY', { value: init.clientY ?? 0 });
   Object.defineProperty(e, 'ctrlKey', { value: init.ctrlKey ?? false });
@@ -50,6 +52,23 @@ describe('attachWheel', () => {
   afterEach(() => {
     detach();
     grid.remove();
+  });
+
+  it('line-mode deltas scroll one row or column per line', () => {
+    fire(grid, { deltaY: 3, deltaMode: 1 });
+    expect(store.getState().viewport.rowStart).toBe(3);
+    fire(grid, { deltaX: 2, deltaMode: 1 });
+    expect(store.getState().viewport.colStart).toBe(2);
+    fire(grid, { deltaY: 1, deltaMode: 1, shiftKey: true });
+    expect(store.getState().viewport.colStart).toBe(3);
+  });
+
+  it('page-mode deltas scroll a page of visible rows or columns', () => {
+    const { rowCount, colCount } = store.getState().viewport;
+    fire(grid, { deltaY: 1, deltaMode: 2 });
+    expect(store.getState().viewport.rowStart).toBe(rowCount);
+    fire(grid, { deltaX: 1, deltaMode: 2 });
+    expect(store.getState().viewport.colStart).toBe(colCount);
   });
 
   it('vertical wheel scrolls rows by delta / defaultRowHeight', () => {

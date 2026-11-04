@@ -51,6 +51,9 @@ function splitPaneAt(
   };
 }
 
+const DOM_DELTA_LINE = 1;
+const DOM_DELTA_PAGE = 2;
+
 export function attachWheel(deps: WheelDeps): () => void {
   const { grid, store, getWb } = deps;
 
@@ -84,8 +87,21 @@ export function attachWheel(deps: WheelDeps): () => void {
     // A right-to-left sheet advances its columns leftwards, so a rightward
     // scroll gesture has to walk the column index backwards.
     const dirX = state.ui.rightToLeft === true ? -1 : 1;
-    const dx = (e.shiftKey ? e.deltaY : e.deltaX) * dirX;
-    const dy = e.shiftKey ? 0 : e.deltaY;
+    // Line deltas step one row/column per line, page deltas a page of them.
+    const unitY =
+      e.deltaMode === DOM_DELTA_LINE
+        ? rh
+        : e.deltaMode === DOM_DELTA_PAGE
+          ? rh * state.viewport.rowCount
+          : 1;
+    const unitX =
+      e.deltaMode === DOM_DELTA_LINE
+        ? cw
+        : e.deltaMode === DOM_DELTA_PAGE
+          ? cw * state.viewport.colCount
+          : 1;
+    const dx = (e.shiftKey ? e.deltaY : e.deltaX) * unitX * dirX;
+    const dy = e.shiftKey ? 0 : e.deltaY * unitY;
     accY += dy;
     accX += dx;
     const dRow = Math.trunc(accY / rh);

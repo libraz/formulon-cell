@@ -152,6 +152,51 @@ describe('paintFreezeDividers', () => {
   });
 });
 
+describe('paintFreezeDividers split bars', () => {
+  const paint = (screenScale: number) => {
+    const state = createSpreadsheetStore().getState();
+    state.layout = { ...state.layout, freezeRows: 2, freezeCols: 0, splitPanes: true, screenScale };
+    state.viewport = { rowStart: 2, rowCount: 2, colStart: 1, colCount: 2, zoom: 1, widthPx: 400 };
+    const view = { ...state, layout: layoutForView(state) };
+    const cols = buildColLayout(view.layout, view.viewport);
+    const rows = buildRowLayout(view.layout, view.viewport);
+    const fills: { style: string; rect: number[] }[] = [];
+    let style = '';
+    const ctx = {
+      set fillStyle(v: string) {
+        style = v;
+      },
+      set strokeStyle(_v: string) {},
+      set lineWidth(_v: number) {},
+      save: () => undefined,
+      restore: () => undefined,
+      fillRect: (...rect: number[]) => fills.push({ style, rect }),
+      strokeRect: () => undefined,
+    } as unknown as CanvasRenderingContext2D;
+    paintFreezeDividers(
+      { ctx, dpr: 1, cssWidth: 400, cssHeight: 200 },
+      view,
+      { headerBg: '#eee', freezeRule: '#999' } as ResolvedTheme,
+      cols,
+      rows,
+    );
+    return fills;
+  };
+
+  it('paints the Mac bar as a 1 pt grey line and a 4 pt flat band', () => {
+    const fills = paint(0.75);
+    const pt = 1; // screenScale 0.75 maps one point to one screen px
+    expect(fills.map((f) => f.style)).toEqual(['rgb(212,212,212)', 'rgb(211,211,211)']);
+    expect(fills[0]?.rect[3]).toBeCloseTo(pt);
+    expect(fills[1]?.rect[3]).toBeCloseTo(4 * pt);
+    expect(fills[1]?.rect[1]).toBeCloseTo((fills[0]?.rect[1] ?? 0) + pt);
+  });
+
+  it('keeps the default bar off the Mac profile', () => {
+    expect(paint(1).map((f) => f.style)).toEqual(['#eee']);
+  });
+});
+
 describe('gridLinesShown', () => {
   // Excel for Mac draws no gridlines at 33% and 25% zoom, and draws them at 40%.
   const at = (zoom: number, screenScale: number, showGridLines = true) => {

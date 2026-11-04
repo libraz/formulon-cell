@@ -9,6 +9,7 @@ import {
   gridOriginX,
   gridOriginY,
   mirrorX,
+  pointPx,
   type Rect,
   rangeRects,
   type ViewState,
@@ -151,6 +152,9 @@ export function paintFreezeDividers(
   ctx.stroke();
 }
 
+const MAC_SPLIT_LINE = 'rgb(212,212,212)';
+const MAC_SPLIT_BAND = 'rgb(211,211,211)';
+
 /** Thickness of a split bar in CSS px; also the grab tolerance for dragging it. */
 export const SPLIT_BAR_PX = 5;
 
@@ -176,6 +180,10 @@ function paintSplitBars(
 ): void {
   const { ctx, cssWidth, cssHeight } = pc;
   const { x, y } = splitBarPositions(state, cols, rows);
+  if (wholePointAdvances(state.layout)) {
+    paintMacSplitBars(ctx, state, x, y, cssWidth, cssHeight);
+    return;
+  }
   const half = SPLIT_BAR_PX / 2;
   ctx.save();
   ctx.fillStyle = theme.headerBg;
@@ -190,6 +198,35 @@ function paintSplitBars(
     const left = Math.round(x - half);
     ctx.fillRect(left, 0, SPLIT_BAR_PX, cssHeight);
     ctx.strokeRect(left + 0.5, -1, SPLIT_BAR_PX - 1, cssHeight + 2);
+  }
+  ctx.restore();
+}
+
+/** Mac bar, in points: a 1 pt line (212) then a 4 pt flat band (211). */
+function paintMacSplitBars(
+  ctx: CanvasRenderingContext2D,
+  state: ViewState,
+  x: number | null,
+  y: number | null,
+  cssWidth: number,
+  cssHeight: number,
+): void {
+  const pt = pointPx(state.layout, state.viewport);
+  const half = (5 * pt) / 2;
+  ctx.save();
+  if (y !== null) {
+    const top = y - half;
+    ctx.fillStyle = MAC_SPLIT_LINE;
+    ctx.fillRect(0, top, cssWidth, pt);
+    ctx.fillStyle = MAC_SPLIT_BAND;
+    ctx.fillRect(0, top + pt, cssWidth, 4 * pt);
+  }
+  if (x !== null) {
+    const left = x - half;
+    ctx.fillStyle = MAC_SPLIT_LINE;
+    ctx.fillRect(left, 0, pt, cssHeight);
+    ctx.fillStyle = MAC_SPLIT_BAND;
+    ctx.fillRect(left + pt, 0, 4 * pt, cssHeight);
   }
   ctx.restore();
 }

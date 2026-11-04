@@ -48,7 +48,8 @@ const countToward = (
 /**
  * Split-bar dragging: a bar follows the pointer, snapping to row and column
  * boundaries, and an axis dragged back into the headers loses its split. A
- * double-click on a bar removes that split. The engine is written once, on
+ * double-click on the vertical bar removes the vertical split, on the
+ * horizontal bar the whole split. The engine is written once, on
  * release. Listens in the capture phase so a grab never reaches the grid.
  */
 export function attachSplitDrag(deps: SplitDragDeps): () => void {
@@ -155,11 +156,8 @@ export function attachSplitDrag(deps: SplitDragDeps): () => void {
     e.stopPropagation();
     const state = store.getState();
     const before = captureLayoutSnapshot(state);
-    setSplit(
-      hit.row ? 0 : state.layout.freezeRows,
-      hit.col ? 0 : state.layout.freezeCols,
-      paneOrigin(state),
-    );
+    // The horizontal bar takes the whole split with it; the vertical bar only its own axis.
+    setSplit(hit.row ? 0 : state.layout.freezeRows, 0, paneOrigin(state));
     commit(before, state.data.sheetIndex);
   };
 
