@@ -525,10 +525,14 @@ const writeProjected = (
   else if (projected.kind === 'bool') wb.setBool({ sheet, row, col }, projected.value);
   else if (projected.kind === 'error') wb.setError({ sheet, row, col }, projected.code);
   else if (projected.kind === 'formula') {
-    wb.setFormula(
-      { sheet, row, col },
-      shiftFormulaRefs(projected.formula, row - projected.source.row, col - projected.source.col),
+    const target = { sheet, row, col };
+    const shifted = shiftFormulaRefs(
+      projected.formula,
+      row - projected.source.row,
+      col - projected.source.col,
+      { crossedRange: 'follow-coordinate' },
     );
+    wb.setFormula(target, shifted);
   } else wb.setBlank({ sheet, row, col });
   return true;
 };

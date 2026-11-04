@@ -40,6 +40,15 @@ interface AxisEndpoint {
   index: number;
 }
 type AxisEndpointResult = { kind: 'keep'; index: number } | { kind: 'ref' };
+/** How `shiftFormulaRefs` treats a range whose endpoints cross after the shift. */
+export interface ShiftFormulaOptions {
+  /**
+   * `keep-slot` (default): each `$` stays in its endpoint slot (sort, paste).
+   * `follow-coordinate`: each axis flag travels with its coordinate (fill).
+   */
+  crossedRange?: 'keep-slot' | 'follow-coordinate';
+}
+
 /**
  * Shift every relative reference in `formula` by (dRow, dCol) — the transform
  * used when a formula is copied/filled/pasted to a new anchor. Refs pinned
@@ -47,8 +56,16 @@ type AxisEndpointResult = { kind: 'keep'; index: number } | { kind: 'ref' };
  * `Sheet2!A1` still shifts its A1 part, matching Excel). Out-of-grid results
  * become `#REF!` when the transformed reference leaves the grid.
  */
-export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): string {
+export function shiftFormulaRefs(
+  formula: string,
+  dRow: number,
+  dCol: number,
+  opts: ShiftFormulaOptions = {},
+): string {
   if (!formula.startsWith('=') || (dRow === 0 && dCol === 0)) return formula;
+  const followCoordinate = opts.crossedRange === 'follow-coordinate';
+  // A reference that leaves the grid keeps its sheet qualifier (`Sheet2!#REF!`).
+  const offGrid = (tok: { sheetQual: string }): string => `${tok.sheetQual}#REF!`;
   return rewriteRefs(formula, (tok) => {
     if (tok.sheetQual.includes('[') || tok.sheetQual.includes(']')) return renderToken(tok);
     if (tok.kind === 'whole-col') {
@@ -58,7 +75,7 @@ export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): s
       };
       const aTxt = shiftCol(tok.a);
       const bTxt = shiftCol(tok.b);
-      if (aTxt === null || bTxt === null) return null;
+      if (aTxt === null || bTxt === null) return offGrid(tok);
       return `${tok.sheetQual}${aTxt}:${bTxt}`;
     }
     if (tok.kind === 'whole-row') {
@@ -68,7 +85,7 @@ export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): s
       };
       const aTxt = shiftRow(tok.a);
       const bTxt = shiftRow(tok.b);
-      if (aTxt === null || bTxt === null) return null;
+      if (aTxt === null || bTxt === null) return offGrid(tok);
       return `${tok.sheetQual}${aTxt}:${bTxt}`;
     }
     const shiftPoint = (at: Atom): { col: number; row: number } => {
@@ -79,16 +96,31 @@ export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): s
     const pa = shiftPoint(tok.a);
     if (!tok.b) {
       const aTxt = renderAtom(tok.a.absCol, pa.col, tok.a.absRow, pa.row);
-      return aTxt === null ? null : `${tok.sheetQual}${aTxt}`;
+      return aTxt === null ? offGrid(tok) : `${tok.sheetQual}${aTxt}`;
     }
     const pb = shiftPoint(tok.b);
-    // A range whose endpoints crossed is normalized per axis; each `$` stays
-    // in its endpoint slot rather than following the coordinate.
-    const [loCol, hiCol] = pa.col <= pb.col ? [pa.col, pb.col] : [pb.col, pa.col];
-    const [loRow, hiRow] = pa.row <= pb.row ? [pa.row, pb.row] : [pb.row, pa.row];
-    const aTxt = renderAtom(tok.a.absCol, loCol, tok.a.absRow, loRow);
-    const bTxt = renderAtom(tok.b.absCol, hiCol, tok.b.absRow, hiRow);
-    if (aTxt === null || bTxt === null) return null;
+    // A range whose endpoints crossed is normalized per axis.
+    const colSwap = pa.col > pb.col;
+    const rowSwap = pa.row > pb.row;
+    const [loCol, hiCol] = colSwap ? [pb.col, pa.col] : [pa.col, pb.col];
+    const [loRow, hiRow] = rowSwap ? [pb.row, pa.row] : [pa.row, pb.row];
+    const loAtom = followCoordinate
+      ? {
+          ...tok.a,
+          absCol: colSwap ? tok.b.absCol : tok.a.absCol,
+          absRow: rowSwap ? tok.b.absRow : tok.a.absRow,
+        }
+      : tok.a;
+    const hiAtom = followCoordinate
+      ? {
+          ...tok.b,
+          absCol: colSwap ? tok.a.absCol : tok.b.absCol,
+          absRow: rowSwap ? tok.a.absRow : tok.b.absRow,
+        }
+      : tok.b;
+    const aTxt = renderAtom(loAtom.absCol, loCol, loAtom.absRow, loRow);
+    const bTxt = renderAtom(hiAtom.absCol, hiCol, hiAtom.absRow, hiRow);
+    if (aTxt === null || bTxt === null) return offGrid(tok);
     return `${tok.sheetQual}${aTxt}:${bTxt}`;
   });
 }

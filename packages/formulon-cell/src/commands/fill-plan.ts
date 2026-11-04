@@ -81,7 +81,9 @@ export const restrictedFillChanges = (
         changes.push({
           addr,
           value: source.value,
-          formula: shiftFormulaRefs(source.formula, row - source.addr.row, col - source.addr.col),
+          formula: shiftFormulaRefs(source.formula, row - source.addr.row, col - source.addr.col, {
+            crossedRange: 'follow-coordinate',
+          }),
         });
       } else {
         changes.push({ addr, value: source.value, formula: null });
