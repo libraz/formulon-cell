@@ -212,14 +212,36 @@ export const shrinkFontSizeToFit = (
   return Math.max(1, Math.floor(fontSize * (availableWidth / measuredWidth)));
 };
 
+/** Bottom-aligned baseline rise above the cell's bottom edge, `slope * size +
+ *  intercept` CSS px, for fonts whose placement was measured in Excel. The
+ *  face's own descent cannot stand in: these fonts are often absent from the
+ *  host, and no single em ratio fits their rise across zoom levels. Fits of
+ *  the 11 pt rows in cells-zoom-text-bottom-second-font facts.md (50-200%). */
+const BOTTOM_BASELINE_RISE: Record<string, { slope: number; intercept: number }> = {
+  calibri: { slope: 0.45, intercept: 0.4 },
+  'ms pgothic': { slope: 0.45, intercept: -0.6 },
+  'ms pゴシック': { slope: 0.45, intercept: -0.6 },
+};
+
+const bottomBaselineRise = (face: { family: string; size: number }): number | null => {
+  const first = splitFontFamily(face.family)[0]
+    ?.replace(/^["']|["']$/g, '')
+    .normalize('NFKC')
+    .toLowerCase();
+  const fit = first ? BOTTOM_BASELINE_RISE[first] : undefined;
+  return fit ? fit.slope * face.size + fit.intercept : null;
+};
+
 /** `merged`: the cell is a merged range, whose centred line box rounds a
- *  half pixel down the sheet where a single cell floors it. */
+ *  half pixel down the sheet where a single cell floors it. `face` names the
+ *  painted font so a bottom-aligned run can use its measured baseline. */
 export const textBaselineY = (
   bounds: Rect,
   box: TextMetricsBox,
   vAlign: TextVAlign,
   padY: number,
   merged = false,
+  face?: { family: string; size: number },
 ): number => {
   if (vAlign === 'top') return Math.round(bounds.y + padY + box.ascent);
   if (vAlign === 'middle') {
@@ -227,6 +249,8 @@ export const textBaselineY = (
     const top = merged ? centredTop : Math.floor(centredTop);
     return Math.round(top + box.ascent);
   }
+  const rise = face ? bottomBaselineRise(face) : null;
+  if (rise !== null) return Math.round(bounds.y + bounds.h - rise);
   return Math.round(bounds.y + bounds.h - padY - box.descent);
 };
 
@@ -723,7 +747,10 @@ export function paintCellText({
     const totalH = lineH * lines.length;
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = withRowDescent(fontMetricsBox(ctx, fontSize), vAlign);
-    let startY = textBaselineY(bounds, measured, vAlign, padY, merged);
+    let startY = textBaselineY(bounds, measured, vAlign, padY, merged, {
+      family: font.family,
+      size: fontSize,
+    });
     startY += cellTextVerticalOffset(fontSize, fontVertAlign);
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
     else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
@@ -820,7 +847,10 @@ export function paintCellText({
       : ownBox,
     vAlign,
   );
-  let ty = textBaselineY(bounds, box, vAlign, padY, merged);
+  let ty = textBaselineY(bounds, box, vAlign, padY, merged, {
+    family: font.family,
+    size: fontSize,
+  });
   ty += cellTextVerticalOffset(drawFontSize, fontVertAlign);
 
   // A `*x` fill spans the cell whatever the alignment: one part sits at
