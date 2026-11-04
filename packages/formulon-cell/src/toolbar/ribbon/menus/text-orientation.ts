@@ -2,9 +2,8 @@
 // inline SVG glyph showing the orientation effect (counter-clockwise, vertical,
 // rotate up/down, etc.) plus the localized label.
 
+import { SVG_NS } from '../../../svg-namespace.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
-
-import { SVG_NS } from '../border-icons.js';
 import { createMenu, menuPresetButton, menuSeparator } from './general.js';
 
 export type TextOrientationGlyph = 'ccw' | 'cw' | 'vertical' | 'up' | 'down' | 'format';

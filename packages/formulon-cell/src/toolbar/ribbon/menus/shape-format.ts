@@ -8,9 +8,9 @@ import {
 } from '../../../commands/shape-format.js';
 import { createColorPalette } from '../../../components/color-palette.js';
 import type { SessionShapeLineDash } from '../../../store/store.js';
+import { SVG_NS } from '../../../svg-namespace.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarText } from '../../ribbon-model.js';
-
 import {
   createMenu,
   createSubmenu,
@@ -25,7 +25,6 @@ export interface ShapeFormatMenuFactories {
   createShapeOutlineMenu: () => HTMLDivElement;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const SAMPLE_W = 64;
 const SAMPLE_H = 12;
 const PX_PER_PT = 96 / 72;

@@ -4,6 +4,7 @@
 // surrounding menu factory in main.ts wires these into the actual DOM.
 
 import type { CellBorderStyle } from '../../store/store.js';
+import { SVG_NS } from '../../svg-namespace.js';
 
 export type BorderPreviewSide = 'thin' | 'thick' | 'double' | null;
 
@@ -19,7 +20,6 @@ export interface BorderPreviewSpec {
   showBase?: boolean;
 }
 
-export const SVG_NS = 'http://www.w3.org/2000/svg';
 const BORDER_ICON_BOX = { x: 2, y: 2, w: 12, h: 12 } as const;
 const BORDER_BASE_COLOR = '#c7c7c7';
 
