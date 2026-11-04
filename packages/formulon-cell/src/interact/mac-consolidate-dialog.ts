@@ -69,6 +69,20 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
     footerClass: 'fc-fmtdlg__footer fc-mac-consolidate__footer',
   });
 
+  // Desktop order: function first, then the source reference.
+  const functionRow = appendRow(body);
+  const functionSelect = document.createElement('select');
+  functionSelect.id = 'fc-mac-consolidate-function';
+  functionSelect.className = 'fc-fmtdlg__select';
+  appendDialogSelectOptions(
+    functionSelect,
+    FUNCTIONS.map((fn) => ({ value: fn, label: '' })),
+  );
+  const functionOptions = new Map<MacDataFunction, HTMLOptionElement>(
+    FUNCTIONS.map((fn, index) => [fn, functionSelect.options[index] as HTMLOptionElement]),
+  );
+  functionRow.row.appendChild(functionSelect);
+
   const sourceRow = appendRow(body);
   const sourceInput = document.createElement('textarea');
   sourceInput.id = 'fc-mac-consolidate-sources';
@@ -86,22 +100,11 @@ function attachConsolidateDialog(instance: SpreadsheetInstance): ConsolidateDial
   destinationInput.spellcheck = false;
   destinationRow.row.appendChild(destinationInput);
 
-  const functionRow = appendRow(body);
-  const functionSelect = document.createElement('select');
-  functionSelect.id = 'fc-mac-consolidate-function';
-  functionSelect.className = 'fc-fmtdlg__select';
-  appendDialogSelectOptions(
-    functionSelect,
-    FUNCTIONS.map((fn) => ({ value: fn, label: '' })),
-  );
-  const functionOptions = new Map<MacDataFunction, HTMLOptionElement>(
-    FUNCTIONS.map((fn, index) => [fn, functionSelect.options[index] as HTMLOptionElement]),
-  );
-  functionRow.row.appendChild(functionSelect);
-
-  const replaceOption = appendDisabledOption(body);
-  const labelsOption = appendDisabledOption(body);
   const linksOption = appendDisabledOption(body);
+  const labelsOption = appendDisabledOption(body);
+  // The desktop dialog has no replace option; the row stays for its locale table only.
+  const replaceOption = appendDisabledOption(body);
+  (replaceOption.input.parentElement as HTMLElement).hidden = true;
 
   const status = document.createElement('div');
   status.className = 'fc-mac-consolidate__status';

@@ -1,3 +1,5 @@
+import { macIterativeDialogJa } from './iterative-dialog.js';
+import { macNamedRangeDialogJa } from './named-range-dialog.js';
 import { macPasteSpecialJa } from './paste-special.js';
 import { macPivotTableDialogJa } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesJa } from './remove-duplicates.js';
@@ -8,9 +10,9 @@ export const macJa: MacStrings = {
   macData: {
     goalSeek: {
       title: 'ゴール シーク',
-      formulaCell: '数式セル',
-      targetValue: '目標値',
-      changingCell: '変化させるセル',
+      formulaCell: '数式入力セル:',
+      targetValue: '目標値:',
+      changingCell: '変化させるセル:',
       iterations: '最大反復回数',
       run: 'OK',
       cancel: 'キャンセル',
@@ -21,26 +23,26 @@ export const macJa: MacStrings = {
       converged: 'ゴール シークが収束しました。',
     },
     consolidate: {
-      title: '統合',
-      sources: '統合元範囲',
+      title: '統合の設定',
+      sources: '統合元範囲:',
       sourcesHint: '範囲を 1 行に 1 つ入力',
       destination: '統合先',
-      function: '集計方法',
+      function: '集計の方法:',
       replace: '現在の内容を置き換える',
       labels: '上端行と左端列をラベルとして使用',
-      links: '統合元データへのリンクを作成',
+      links: '統合元データとリンクする',
       unsupportedOption: 'このオプションはまだサポートされていません。',
       run: 'OK',
-      cancel: 'キャンセル',
+      cancel: '閉じる',
     },
     subtotal: {
       title: '小計',
       range: '範囲',
-      groupBy: 'グループの基準',
-      columns: '小計を追加する列',
-      function: '集計方法',
-      replace: '現在の小計を置き換える',
-      summaryBelow: 'データの下に集計行を表示する',
+      groupBy: 'グループの基準:',
+      columns: '集計するフィールド:',
+      function: '集計の方法:',
+      replace: '現在の小計をすべて置き換える',
+      summaryBelow: '集計行をデータの下に挿入する',
       unsupportedOption: 'このオプションはまだサポートされていません。',
       run: 'OK',
       cancel: 'キャンセル',
@@ -91,9 +93,9 @@ export const macJa: MacStrings = {
     },
   },
   macSparkline: {
-    title: 'スパークラインの挿入',
-    dataRange: 'データ範囲',
-    location: '場所',
+    title: 'スパークラインの作成',
+    dataRange: 'スパークラインのデータ範囲を選んでください:',
+    location: 'スパークラインを配置する場所を選んでください:',
     type: '種類',
     ok: 'OK',
     cancel: 'キャンセル',
@@ -161,6 +163,8 @@ export const macJa: MacStrings = {
     autoSum: 'オート SUM',
   },
   /** Wording of the Mac app's Format Cells dialog, measured from the app. */
+  macIterativeDialog: macIterativeDialogJa,
+  macNamedRangeDialog: macNamedRangeDialogJa,
   macPasteSpecial: macPasteSpecialJa,
   macPivotTableDialog: macPivotTableDialogJa,
   macRemoveDuplicates: macRemoveDuplicatesJa,

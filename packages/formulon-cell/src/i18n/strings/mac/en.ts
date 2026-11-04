@@ -1,10 +1,13 @@
 import { cellFormatEn } from '../cell-format/en.js';
 import { dataObjectsEn } from '../data-objects/en.js';
 import { editDialogsEn } from '../edit-dialogs/en.js';
+import { formulaDialogsEn } from '../formula-dialogs/en.js';
 import { gridPopupsEn } from '../grid-popups/en.js';
 import { ribbonMenusEn } from '../ribbon-menus/en.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macIterativeDialogFrom } from './iterative-dialog.js';
+import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -162,6 +165,10 @@ export const macEn: MacStrings = {
     autoSum: 'AutoSum',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatEn.formatDialog),
+  macIterativeDialog: macIterativeDialogFrom(formulaDialogsEn.iterativeDialog, {
+    calcAutoNoTable: ribbonMenusEn.ribbonMenu.calcAutoNoTable,
+  }),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsEn.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsEn.pasteSpecialDialog),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsEn.pivotTableDialog, {
     chooseConnection: 'Choose Connection...',

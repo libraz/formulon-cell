@@ -117,7 +117,7 @@ describe('interact/mac-formula-palette picker', () => {
     let root = paletteRoot(palette);
     expect(root.querySelectorAll('[data-section]')).toHaveLength(1);
     expect(root.querySelector('[data-section="recent"] h3')?.textContent).toBe(
-      defaultStrings.fxDialog.categoryRecent,
+      defaultStrings.fxDialog.macPalette?.recent,
     );
     expect(root.querySelector('[data-section="all"]')).toBeNull();
     expect(root.querySelector('select')).toBeNull();
@@ -337,6 +337,21 @@ describe('interact/mac-formula-palette picker', () => {
     root.querySelector<HTMLButtonElement>('[data-action="insert-function"]')?.click();
     const help = paletteRoot(palette).querySelector('.fc-mac-formula-palette__help');
     expect(help?.querySelectorAll('p')[1]?.textContent).toBe(`Syntax: ${fn.syntax}`);
+    palette.detach();
+  });
+
+  it('uses the desktop Japanese Formula Builder wording', () => {
+    const { palette } = setup(
+      () => sheet.workbook,
+      () => ja,
+      () => 'ja-JP',
+    );
+    palette.open();
+    const root = paletteRoot(palette);
+    expect(root.querySelector('h2')?.textContent).toBe('数式パレット');
+    expect(root.querySelector<HTMLInputElement>('input[type="search"]')?.placeholder).toBe('検索');
+    expect(root.querySelector('[data-section="recent"] h3')?.textContent).toBe('最近使った関数');
+    expect(root.querySelector('[data-section="all"] h3')?.textContent).toBe('すべて表示');
     palette.detach();
   });
 

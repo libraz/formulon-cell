@@ -1,10 +1,13 @@
 import { cellFormatKo } from '../cell-format/ko.js';
 import { dataObjectsKo } from '../data-objects/ko.js';
 import { editDialogsKo } from '../edit-dialogs/ko.js';
+import { formulaDialogsKo } from '../formula-dialogs/ko.js';
 import { gridPopupsKo } from '../grid-popups/ko.js';
 import { ribbonMenusKo } from '../ribbon-menus/ko.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macIterativeDialogFrom } from './iterative-dialog.js';
+import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -162,6 +165,10 @@ export const macKo: MacStrings = {
     autoSum: '자동 합계',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatKo.formatDialog),
+  macIterativeDialog: macIterativeDialogFrom(formulaDialogsKo.iterativeDialog, {
+    calcAutoNoTable: ribbonMenusKo.ribbonMenu.calcAutoNoTable,
+  }),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsKo.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsKo.pasteSpecialDialog),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsKo.pivotTableDialog, {
     chooseConnection: '연결 선택...',

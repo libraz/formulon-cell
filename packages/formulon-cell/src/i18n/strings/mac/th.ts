@@ -1,10 +1,13 @@
 import { cellFormatTh } from '../cell-format/th.js';
 import { dataObjectsTh } from '../data-objects/th.js';
 import { editDialogsTh } from '../edit-dialogs/th.js';
+import { formulaDialogsTh } from '../formula-dialogs/th.js';
 import { gridPopupsTh } from '../grid-popups/th.js';
 import { ribbonMenusTh } from '../ribbon-menus/th.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macIterativeDialogFrom } from './iterative-dialog.js';
+import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -161,6 +164,10 @@ export const macTh: MacStrings = {
     autoSum: 'ผลรวมอัตโนมัติ',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatTh.formatDialog),
+  macIterativeDialog: macIterativeDialogFrom(formulaDialogsTh.iterativeDialog, {
+    calcAutoNoTable: ribbonMenusTh.ribbonMenu.calcAutoNoTable,
+  }),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsTh.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsTh.pasteSpecialDialog),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsTh.pivotTableDialog, {
     chooseConnection: 'เลือกการเชื่อมต่อ...',

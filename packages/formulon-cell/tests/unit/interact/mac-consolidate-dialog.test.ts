@@ -80,7 +80,22 @@ describe('Consolidate dialog', () => {
   it('relabels the dialog when the locale changes', () => {
     fx.i18n.setLocale('ja');
     expect(document.querySelector('.fc-mac-consolidate .fc-fmtdlg__header')?.textContent).toBe(
-      '統合',
+      '統合の設定',
     );
+  });
+
+  it('follows the desktop 統合の設定 order and wording', () => {
+    fx.i18n.setLocale('ja');
+    const panel = document.querySelector<HTMLElement>('.fc-mac-consolidate');
+    expect(panel?.querySelector('.fc-fmtdlg__header')?.textContent).toBe('統合の設定');
+    const rows = [...(panel?.querySelectorAll('.fc-mac-consolidate__row') ?? [])].map(
+      (row) => row.firstElementChild?.textContent,
+    );
+    expect(rows.slice(0, 2)).toEqual(['集計の方法:', '統合元範囲:']);
+    const options = [...(panel?.querySelectorAll<HTMLElement>('.fc-mac-consolidate__option') ?? [])]
+      .filter((el) => !el.hidden)
+      .map((el) => el.textContent);
+    expect(options[0]).toBe('統合元データとリンクする');
+    expect(byAction('consolidate-cancel').textContent).toBe('閉じる');
   });
 });

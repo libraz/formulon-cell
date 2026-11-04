@@ -62,4 +62,16 @@ describe('Subtotal dialog', () => {
     fx.i18n.setLocale('ja');
     expect(document.querySelector('.fc-mac-subtotal .fc-fmtdlg__header')?.textContent).toBe('小計');
   });
+
+  it('follows the desktop field order and wording', () => {
+    fx.i18n.setLocale('ja');
+    const rows = [...document.querySelectorAll('.fc-mac-subtotal .fc-mac-subtotal__row')].map(
+      (row) => row.firstElementChild?.textContent,
+    );
+    expect(rows.slice(1)).toEqual(['グループの基準:', '集計の方法:', '集計するフィールド:']);
+    const options = [...document.querySelectorAll('.fc-mac-subtotal .fc-mac-subtotal__option')].map(
+      (row) => row.textContent,
+    );
+    expect(options).toEqual(['現在の小計をすべて置き換える', '集計行をデータの下に挿入する']);
+  });
 });

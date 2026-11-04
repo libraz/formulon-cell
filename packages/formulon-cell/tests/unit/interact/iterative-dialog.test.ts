@@ -281,4 +281,32 @@ describe('attachIterativeDialog', () => {
     expect(input.validationMessage).not.toBe('');
     handle.detach();
   });
+
+  it('uses the Mac Calculation pane wording on the Mac host', () => {
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    const fake = makeFakeWb();
+    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    handle.open();
+    const visibleText = (selector: string): string[] =>
+      [...document.querySelectorAll<HTMLElement>(selector)]
+        .filter((el) => !el.hidden)
+        .map((el) => el.textContent ?? '');
+    expect(visibleText('.fc-iterdlg__row > span')).toEqual([
+      '自動',
+      'データ テーブル以外自動',
+      '手動',
+      'ブックの保存前に再計算を行う',
+      '反復計算を使う',
+      '最大反復回数:',
+      '変化の最大値:',
+      'R1C1 参照形式を使用する',
+      '表示桁数で計算する',
+      '1904 年から計算する',
+    ]);
+    expect(visibleText('.fc-iterdlg__section')).toEqual(['計算方法の設定', 'ブックの計算時']);
+    expect(visibleText('.fc-iterdlg__label')).toEqual([]);
+    expect(visibleText('.fc-iterdlg__note')).toEqual([]);
+    handle.detach();
+  });
 });

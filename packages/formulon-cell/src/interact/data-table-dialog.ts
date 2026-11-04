@@ -1,9 +1,10 @@
 import { createDataTable, type DataTableRequestError } from '../commands/data-table.js';
-import { parseMacRange } from '../commands/mac-data-tools.js';
-import type { Addr } from '../engine/types.js';
+import { formatMacCellAddress, parseMacRange } from '../commands/mac-data-tools.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
+import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 interface DataTableDialogHandle {
   open(): void;
@@ -44,6 +45,18 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   };
   const rowField = field('row');
   const colField = field('col');
+  const pickers = [rowField, colField].map(({ input }) =>
+    attachRangePickerButton(input, {
+      label: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
+      getValue: () =>
+        formatMacCellAddress(instance.workbook, instance.store.getState().selection.active),
+      subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+      kind: `data-table-${input.dataset.dataTableInput}`,
+    }),
+  );
+  // Picking an input cell moves the grid selection, so the table range is
+  // the selection captured when the dialog opened.
+  let tableRange: Range = instance.store.getState().selection.range;
   const status = document.createElement('div');
   status.className = 'fc-datatable__status';
   status.setAttribute('role', 'status');
@@ -63,6 +76,9 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
     colField.text.textContent = t.colInput;
     okBtn.textContent = t.ok;
     cancelBtn.textContent = t.cancel;
+    for (const picker of pickers) {
+      updateRangePickerLabel(picker, instance.i18n.strings.pivotTableDialog.rangePickerSelect);
+    }
   };
   applyLabels();
   const unsubscribeLocale = instance.i18n.subscribe(applyLabels);
@@ -75,8 +91,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   /** A blank field is "no input"; anything else must name one cell. */
   const inputCell = (raw: string): Addr | null | 'invalid' => {
     if (raw.trim() === '') return null;
-    const sheet = instance.store.getState().selection.range.sheet;
-    const parsed = parseMacRange(instance.workbook, raw, sheet);
+    const parsed = parseMacRange(instance.workbook, raw, tableRange.sheet);
     if (!parsed) return 'invalid';
     const { range } = parsed;
     if (range.r0 !== range.r1 || range.c0 !== range.c1) return 'invalid';
@@ -103,7 +118,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
     }
     const error = createDataTable(
       { store: instance.store, workbook: instance.workbook, history: instance.history },
-      { selection: instance.store.getState().selection.range, rowInput, colInput },
+      { selection: tableRange, rowInput, colInput },
     );
     if (error) {
       showError(messages[error]());
@@ -124,6 +139,7 @@ function attachDataTableDialog(instance: SpreadsheetInstance): DataTableDialogHa
   return {
     open(): void {
       applyLabels();
+      tableRange = instance.store.getState().selection.range;
       rowField.input.value = '';
       colField.input.value = '';
       delete status.dataset.state;

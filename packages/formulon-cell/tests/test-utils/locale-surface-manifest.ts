@@ -60,6 +60,8 @@ export const LOCALE_SURFACE_SECTIONS = [
   'macHomeRibbon',
   'macFormatDialog',
   'macFindReplace',
+  'macIterativeDialog',
+  'macNamedRangeDialog',
   'macPasteSpecial',
   'macPivotTableDialog',
   'macRemoveDuplicates',

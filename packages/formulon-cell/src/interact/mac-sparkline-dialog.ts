@@ -14,6 +14,7 @@ import {
   createDialogShell,
   deferInitialFocus,
 } from './dialog-shell.js';
+import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 /** A small Insert Sparkline chooser. The source may be any
  *  rectangular A1 range; the destination is one cell because the engine's
@@ -130,6 +131,24 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const destinationRow = labelRow(destinationInput);
   const kindRow = labelRow(kindSelect);
   body.append(sourceRow.row, destinationRow.row, kindRow.row, error);
+  const subscribeToRangeChanges = (listener: () => void): (() => void) => store.subscribe(listener);
+  const pickers = [
+    attachRangePickerButton(sourceInput, {
+      label: strings.pivotTableDialog.rangePickerSelect,
+      getValue: () => formatA1Range(store.getState().selection.range),
+      subscribeToRangeChanges,
+      kind: 'sparkline-source',
+    }),
+    attachRangePickerButton(destinationInput, {
+      label: strings.pivotTableDialog.rangePickerSelect,
+      getValue: () => {
+        const { row, col } = store.getState().selection.active;
+        return formatA1Cell(row, col);
+      },
+      subscribeToRangeChanges,
+      kind: 'sparkline-location',
+    }),
+  ];
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: strings.macSparkline.cancel,
     okLabel: strings.macSparkline.ok,
@@ -266,6 +285,9 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     kindSelect.setAttribute('aria-label', t.type);
     cancelBtn.textContent = t.cancel;
     okBtn.textContent = t.ok;
+    for (const picker of pickers) {
+      updateRangePickerLabel(picker, strings.pivotTableDialog.rangePickerSelect);
+    }
     const selectedKind = kindSelect.value;
     const options: readonly SparklineKind[] = ['line', 'column', 'win-loss'];
     kindSelect.replaceChildren();
@@ -280,13 +302,15 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
     open(): void {
       const range = store.getState().selection.range;
       sourceInput.value = formatA1Range(range);
-      const destinationCol = range.c1 < MAX_COL ? range.c1 + 1 : range.c0;
-      destinationInput.value = formatA1Cell(range.r0, destinationCol);
+      // The desktop dialog opens with the location empty; OK stays disabled
+      // without flagging an error the user has not made yet.
+      destinationInput.value = '';
       kindSelect.value = 'line';
       lastSource = null;
       lastDestination = null;
       refreshLabels();
       validate();
+      error.hidden = true;
       shell.open();
       deferInitialFocus(shell.overlay, () => sourceInput.focus());
     },

@@ -1127,3 +1127,70 @@ describe('Name Manager comment field', () => {
     expect(commentDisabled(true)).toBe(false);
   });
 });
+
+describe('Name Manager on the Mac host', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  const openMac = () => {
+    const host = document.createElement('div');
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    document.body.appendChild(host);
+    const { wb } = makeMutableWb();
+    const handle = attachNamedRangeDialog({
+      host,
+      wb,
+      getSelectedRangeFormula: () => '=Sheet1!$A$1',
+      subscribeToRangeChanges: () => () => {},
+    });
+    handle.open();
+    return handle;
+  };
+
+  it('uses the desktop ネーム マネージャー wording and an empty list without text', () => {
+    const handle = openMac();
+    const overlay = document.querySelector<HTMLElement>('.fc-namedlg');
+    expect(overlay?.querySelector('.fc-fmtdlg__header')?.textContent).toBe('ネーム マネージャー');
+    expect(overlay?.getAttribute('aria-label')).toBe('ネーム マネージャー');
+    expect(document.querySelector('.fc-namedlg__actions button')?.textContent).toBe('新規...');
+    expect(
+      [...document.querySelectorAll('.fc-namedlg__head .fc-namedlg__sort')].map(
+        (b) => b.textContent,
+      ),
+    ).toEqual(['名前', '値', '参照先', '範囲', 'コメント']);
+    expect(document.querySelector('.fc-namedlg__refers-label')?.firstChild?.textContent).toBe(
+      '次を参照:',
+    );
+    expect(document.querySelector('.fc-namedlg__empty')?.textContent ?? '').toBe('');
+    handle.detach();
+  });
+
+  it('puts cancel and commit before the Refers to field', () => {
+    const handle = openMac();
+    const row = document.querySelector<HTMLElement>('.fc-namedlg__refers');
+    expect(
+      [...(row?.children ?? [])].map((el) =>
+        el.classList.contains('fc-namedlg__refers-icon--cancel')
+          ? 'cancel'
+          : el.classList.contains('fc-namedlg__refers-icon--commit')
+            ? 'commit'
+            : 'field',
+      ),
+    ).toEqual(['cancel', 'commit', 'field']);
+    handle.detach();
+  });
+
+  it('labels the New Name reference row 次を参照: with Cancel before OK', () => {
+    const handle = openMac();
+    document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
+    const rows = [...document.querySelectorAll('.fc-namedlg-editor__row')].map(
+      (row) => row.firstElementChild?.textContent,
+    );
+    expect(rows).toEqual(['名前:', '範囲:', 'コメント:', '次を参照:']);
+    const buttons = [...document.querySelectorAll('.fc-namedlg-editor__buttons button')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['キャンセル', 'OK']);
+    handle.detach();
+  });
+});

@@ -47,11 +47,12 @@ describe('attachMacSparklineDialog', () => {
     const type = host.ownerDocument.querySelector<HTMLSelectElement>('.fc-macsparkdlg__type');
     const ok = host.ownerDocument.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     expect(source?.value).toBe('A1:C1');
-    expect(destination?.value).toBe('D1');
-    expect(ok?.disabled).toBe(false);
     expect(type).not.toBeNull();
     expect(ok).not.toBeNull();
-    if (!type || !ok) throw new Error('sparkline chooser controls missing');
+    if (!type || !ok || !destination) throw new Error('sparkline chooser controls missing');
+    destination.value = 'D1';
+    destination.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(ok.disabled).toBe(false);
     type.value = 'column';
     type.dispatchEvent(new Event('change', { bubbles: true }));
     ok.click();
@@ -114,6 +115,34 @@ describe('attachMacSparklineDialog', () => {
     expect(
       overlay?.querySelector('.fc-macsparkdlg__panel')?.classList.contains('fc-macsparkdlg'),
     ).toBe(false);
+    handle.detach();
+  });
+
+  it('matches the desktop Create Sparklines wording, empty location and pickers', () => {
+    const handle = attachMacSparklineDialog({ host, store, getWb: makeWorkbook, strings: ja });
+    handle.open();
+    const overlay = document.querySelector<HTMLElement>('.fc-macsparkdlg');
+    expect(overlay?.querySelector('.fc-fmtdlg__header')?.textContent).toBe('スパークラインの作成');
+    const labels = [...(overlay?.querySelectorAll('.fc-macsparkdlg__row') ?? [])].map(
+      (row) => row.firstElementChild?.textContent,
+    );
+    expect(labels.slice(0, 2)).toEqual([
+      'スパークラインのデータ範囲を選んでください:',
+      'スパークラインを配置する場所を選んでください:',
+    ]);
+    const destination = document.querySelector<HTMLInputElement>('.fc-macsparkdlg__destination');
+    expect(destination?.value).toBe('');
+    expect(document.querySelector<HTMLElement>('[data-mac-sparkline-error]')?.hidden).toBe(true);
+    const pickers = [...document.querySelectorAll('.fc-macsparkdlg .fc-range-picker input')];
+    expect(pickers.map((el) => el.className)).toEqual([
+      'fc-fmtdlg__input fc-macsparkdlg__source',
+      'fc-fmtdlg__input fc-macsparkdlg__destination',
+    ]);
+    mutators.setActive(store, { sheet: 0, row: 4, col: 1 });
+    document
+      .querySelectorAll<HTMLButtonElement>('.fc-macsparkdlg .fc-range-picker__btn')[1]
+      ?.click();
+    expect(destination?.value).toBe('B5');
     handle.detach();
   });
 });

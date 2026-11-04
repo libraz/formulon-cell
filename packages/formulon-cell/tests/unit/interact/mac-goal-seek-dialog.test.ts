@@ -138,4 +138,46 @@ describe('Goal Seek dialog', () => {
       'ゴール シーク',
     );
   });
+
+  describe('Mac profile', () => {
+    const reopenAsMac = (): void => {
+      disposeMacGoalSeekDialog(fx.instance);
+      fx.host.classList.add('fc-host');
+      fx.host.dataset.fcPlatform = 'mac';
+      fx.store.setState((s) => ({
+        ...s,
+        selection: { ...s.selection, active: { sheet: 0, row: 0, col: 0 } },
+      }));
+      openMacGoalSeekDialog(fx.instance);
+    };
+
+    it('prefills only the formula cell and has no iteration field', () => {
+      reopenAsMac();
+      expect(byId<HTMLInputElement>('fc-mac-goalseek-formula-cell').value).toBe('A1');
+      expect(byId<HTMLInputElement>('fc-mac-goalseek-target-value').value).toBe('');
+      expect(byId<HTMLInputElement>('fc-mac-goalseek-changing-cell').value).toBe('');
+      const iterations = byId<HTMLInputElement>('fc-mac-goalseek-iterations');
+      expect(iterations.closest<HTMLElement>('.fc-mac-goalseek__row')?.hidden).toBe(true);
+    });
+
+    it('labels the fields with the desktop Japanese wording', () => {
+      fx.i18n.setLocale('ja');
+      reopenAsMac();
+      const labels = [...document.querySelectorAll('.fc-mac-goalseek__row')]
+        .filter((row) => !(row as HTMLElement).hidden)
+        .map((row) => row.querySelector('span')?.textContent);
+      expect(labels).toEqual(['数式入力セル:', '目標値:', '変化させるセル:']);
+    });
+
+    it('offers range pickers on the two cell fields only', () => {
+      reopenAsMac();
+      const pickers = [
+        ...document.querySelectorAll<HTMLElement>('.fc-mac-goalseek .fc-range-picker'),
+      ];
+      expect(pickers.map((p) => p.querySelector('input')?.id)).toEqual([
+        'fc-mac-goalseek-formula-cell',
+        'fc-mac-goalseek-changing-cell',
+      ]);
+    });
+  });
 });

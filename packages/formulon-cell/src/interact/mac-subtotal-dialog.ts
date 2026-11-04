@@ -92,7 +92,8 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
     FUNCTIONS.map((fn, index) => [fn, functionSelect.options[index] as HTMLOptionElement]),
   );
   functionRow.append(functionLabel, functionSelect);
-  body.appendChild(functionRow);
+  // Desktop order: group by, function, then the columns to total.
+  body.insertBefore(functionRow, columnsInput.parentElement);
 
   const replaceRow = document.createElement('label');
   replaceRow.className = 'fc-mac-subtotal__option';

@@ -79,8 +79,13 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     );
   };
   const strings = deps.strings ?? defaultStrings;
-  const t = strings.iterativeDialog;
+  const shared = strings.iterativeDialog;
   const menuText = strings.ribbonMenu;
+  // The Mac Calculation pane words a few labels differently and has no mode
+  // group label, explanatory note or formulas heading; resolved per open.
+  const isMac = (): boolean =>
+    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  let t: typeof shared = shared;
 
   const shell = createDialogShell({
     host,
@@ -98,11 +103,12 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     footerClass: 'fc-fmtdlg__footer fc-iterdlg__footer',
   });
 
-  const section = (title: string): void => {
+  const section = (title: string): HTMLDivElement => {
     const heading = document.createElement('div');
     heading.className = 'fc-iterdlg__section';
     heading.textContent = title;
     body.appendChild(heading);
+    return heading;
   };
   const choice = (type: 'checkbox' | 'radio', option: string, label: string): HTMLInputElement => {
     const row = document.createElement('label');
@@ -140,6 +146,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   body.appendChild(note);
 
   const enableInput = choice('checkbox', 'iterative', t.enable);
+  const labelOf = (input: HTMLInputElement): HTMLElement => input.nextElementSibling as HTMLElement;
 
   const maxIterRow = document.createElement('label');
   maxIterRow.className = 'fc-iterdlg__row';
@@ -165,9 +172,9 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   maxChangeRow.append(maxChangeLabel, maxChangeInput);
   body.appendChild(maxChangeRow);
 
-  section(t.formulasSection);
+  const formulasHeading = section(t.formulasSection);
   const r1c1Input = choice('checkbox', 'r1c1', t.r1c1);
-  section(t.workbookSection);
+  const workbookHeading = section(t.workbookSection);
   const precisionInput = choice('checkbox', 'precisionAsDisplayed', t.precisionAsDisplayed);
   const date1904Input = choice('checkbox', 'date1904', t.date1904);
 
@@ -181,6 +188,23 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     buttonBaseClass: 'fc-fmtdlg__btn fc-iterdlg__btn',
     buttonPrimaryClass: 'fc-fmtdlg__btn--primary fc-iterdlg__btn--primary',
   });
+
+  const applyPlatformLabels = (): void => {
+    const mac = isMac();
+    const overlay = mac ? strings.macIterativeDialog : null;
+    t = overlay ? { ...shared, ...overlay } : shared;
+    modeLabel.hidden = mac;
+    note.hidden = mac;
+    formulasHeading.hidden = mac;
+    const autoNoTable = modeInputs.find(({ mode }) => mode === 2)?.input;
+    if (autoNoTable) {
+      labelOf(autoNoTable).textContent = overlay?.calcAutoNoTable ?? menuText.calcAutoNoTable;
+    }
+    labelOf(enableInput).textContent = t.enable;
+    maxIterLabel.textContent = t.maxIterations;
+    maxChangeLabel.textContent = t.maxChange;
+    workbookHeading.textContent = t.workbookSection;
+  };
 
   const draft: CalcOptionsDraft = { ...DEFAULTS };
   let opened: CalcOptionsDraft = { ...DEFAULTS };
@@ -396,6 +420,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
 
   const api: IterativeDialogHandle = {
     open(): void {
+      applyPlatformLabels();
       status.textContent = '';
       invalidMaxIterations = false;
       invalidMaxChange = false;

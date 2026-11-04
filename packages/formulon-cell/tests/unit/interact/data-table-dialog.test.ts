@@ -179,4 +179,25 @@ describe.skipIf(!canLoadWasm())('Data Table dialog', () => {
     expect(workbook.dataTables(0)).toEqual([]);
     expect(status()).toBe(en.dataTableDialog.rejected);
   });
+
+  it('picks input cells from the grid and keeps the table range chosen at open', async () => {
+    const { workbook, instance } = await mountWithModel();
+    openDataTableDialog(instance);
+    const pickers = [...document.querySelectorAll<HTMLElement>('.fc-datatable .fc-range-picker')];
+    expect(pickers.map((p) => p.querySelector('input')?.dataset.dataTableInput)).toEqual([
+      'row',
+      'col',
+    ]);
+    pickers[1]?.querySelector<HTMLButtonElement>('.fc-range-picker__btn')?.click();
+    mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
+    expect(field('col').value).toBe('A1');
+    ok();
+    expect(workbook.dataTableAt({ sheet: 0, row: 3, col: 2 })?.range).toEqual({
+      sheet: 0,
+      r0: 2,
+      c0: 2,
+      r1: 4,
+      c1: 2,
+    });
+  });
 });

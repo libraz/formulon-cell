@@ -16,6 +16,7 @@ import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import { isSubmitEnter } from './mac-dialog-keys.js';
+import { attachRangePickerButton, updateRangePickerLabel } from './range-picker-control.js';
 
 interface GoalSeekDialogHandle {
   open(): void;
@@ -33,9 +34,13 @@ const singleCell = (instance: SpreadsheetInstance, input: string): Addr | null =
 };
 
 interface Field {
+  readonly row: HTMLLabelElement;
   readonly input: HTMLInputElement;
   readonly text: HTMLSpanElement;
 }
+
+const isMacHost = (host: HTMLElement): boolean =>
+  (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
 
 const formatLocalizedNumericInitial = (value: number, locale: string | undefined): string => {
   try {
@@ -68,7 +73,7 @@ const appendField = (
   input.spellcheck = false;
   row.append(text, input);
   body.appendChild(row);
-  return { input, text };
+  return { row, input, text };
 };
 
 function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHandle {
@@ -98,6 +103,16 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
   iterationInput.max = '100';
   iterationInput.step = '1';
   iterationInput.value = '100';
+  const pickActiveCell = (): string =>
+    formatMacCellAddress(instance.workbook, instance.store.getState().selection.active);
+  const pickers = [formulaInput, changingInput].map((input) =>
+    attachRangePickerButton(input, {
+      label: instance.i18n.strings.pivotTableDialog.rangePickerSelect,
+      getValue: pickActiveCell,
+      subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+      kind: input.id,
+    }),
+  );
 
   const status = document.createElement('div');
   status.className = 'fc-mac-goalseek__status';
@@ -122,6 +137,9 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     iterationField.text.textContent = t.iterations;
     okBtn.textContent = t.run;
     cancelBtn.textContent = t.cancel;
+    for (const picker of pickers) {
+      updateRangePickerLabel(picker, instance.i18n.strings.pivotTableDialog.rangePickerSelect);
+    }
   };
   applyLabels();
   const unsubscribeLocale = instance.i18n.subscribe(applyLabels);
@@ -165,12 +183,21 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
     const next: Addr = { ...active, col: Math.min(MAX_COL, active.col + 1) };
     formulaInput.value = formatMacCellAddress(instance.workbook, active);
     changingInput.value = formatMacCellAddress(instance.workbook, next);
+    iterationInput.value = '100';
+    // The Mac desktop dialog starts with only the formula cell filled and has
+    // no iteration field: its iteration cap is internal.
+    const mac = isMacHost(instance.host);
+    iterationField.row.hidden = mac;
+    if (mac) {
+      changingInput.value = '';
+      targetInput.value = '';
+      return;
+    }
     const current = instance.workbook.getValue(active);
     targetInput.value =
       current.kind === 'number' && Number.isFinite(current.value)
         ? formatLocalizedNumericInitial(current.value, instance.locale || instance.i18n.locale)
         : '';
-    iterationInput.value = '100';
   };
 
   const showError = (error: MacDataError): void => {

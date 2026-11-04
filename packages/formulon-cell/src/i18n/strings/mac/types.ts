@@ -1,5 +1,7 @@
 import type { CellFormatStrings } from '../cell-format/types.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
+import type { MacIterativeDialogStrings } from './iterative-dialog.js';
+import type { MacNamedRangeDialogStrings } from './named-range-dialog.js';
 import type { MacPasteSpecialStrings } from './paste-special.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacRemoveDuplicatesStrings } from './remove-duplicates.js';
@@ -10,6 +12,10 @@ export interface MacStrings {
   macFormatDialog: Partial<CellFormatStrings['formatDialog']>;
   /** Overrides of `findReplace` that apply on the Mac host only. */
   macFindReplace: MacFindReplaceStrings;
+  /** Overrides of `iterativeDialog`, plus its Mac-only labels, that apply on the Mac host only. */
+  macIterativeDialog: MacIterativeDialogStrings;
+  /** Overrides of `namedRangeDialog` that apply on the Mac host only. */
+  macNamedRangeDialog: MacNamedRangeDialogStrings;
   /** Overrides of `pasteSpecialDialog` that apply on the Mac host only. */
   macPasteSpecial: MacPasteSpecialStrings;
   /** Overrides of `pivotTableDialog`, plus its Mac-only labels, that apply on the Mac host only. */

@@ -1,10 +1,13 @@
 import { cellFormatZh } from '../cell-format/zh.js';
 import { dataObjectsZh } from '../data-objects/zh.js';
 import { editDialogsZh } from '../edit-dialogs/zh.js';
+import { formulaDialogsZh } from '../formula-dialogs/zh.js';
 import { gridPopupsZh } from '../grid-popups/zh.js';
 import { ribbonMenusZh } from '../ribbon-menus/zh.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
+import { macIterativeDialogFrom } from './iterative-dialog.js';
+import { macNamedRangeDialogFrom } from './named-range-dialog.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macRemoveDuplicatesFrom } from './remove-duplicates.js';
@@ -161,6 +164,10 @@ export const macZh: MacStrings = {
     autoSum: '自动求和',
   },
   macFormatDialog: macFormatDialogFrom(cellFormatZh.formatDialog),
+  macIterativeDialog: macIterativeDialogFrom(formulaDialogsZh.iterativeDialog, {
+    calcAutoNoTable: ribbonMenusZh.ribbonMenu.calcAutoNoTable,
+  }),
+  macNamedRangeDialog: macNamedRangeDialogFrom(formulaDialogsZh.namedRangeDialog),
   macPasteSpecial: macPasteSpecialFrom(editDialogsZh.pasteSpecialDialog),
   macPivotTableDialog: macPivotTableDialogFrom(dataObjectsZh.pivotTableDialog, {
     chooseConnection: '选择连接...',

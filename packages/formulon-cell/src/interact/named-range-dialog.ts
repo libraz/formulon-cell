@@ -91,7 +91,13 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   let wb = deps.wb;
   const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
-  const t = strings.namedRangeDialog;
+  const shared = strings.namedRangeDialog;
+  // The Mac Name Manager words a few labels differently and orders the
+  // reference row and editor buttons its own way; resolved on every open.
+  const isMac = (): boolean =>
+    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  let mac = isMac();
+  let t: typeof shared = mac ? { ...shared, ...strings.macNamedRangeDialog } : shared;
   const rangePickerOptions =
     deps.getSelectedRangeFormula && deps.subscribeToRangeChanges
       ? {
@@ -142,9 +148,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     { key: 'scope', label: t.scopeHeader },
     { key: 'comment', label: t.commentHeader },
   ];
+  const headerButtons = new Map<NameSortKey, HTMLButtonElement>();
   for (const { key, label } of headerSpecs) {
     const cell = document.createElement('span');
     const button = createNameManagerButton(label, 'fc-namedlg__sort');
+    headerButtons.set(key, button);
     button.dataset.sortKey = key;
     button.addEventListener('click', () => {
       if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
@@ -165,7 +173,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   quickRow.className = 'fc-namedlg__refers';
   const quickLabel = document.createElement('label');
   quickLabel.className = 'fc-namedlg__refers-label';
-  quickLabel.textContent = t.quickRefersLabel;
+  const quickLabelText = document.createTextNode(t.quickRefersLabel);
+  quickLabel.appendChild(quickLabelText);
   const quickInput = document.createElement('input');
   quickInput.type = 'text';
   quickInput.className = 'fc-namedlg__refers-input';
@@ -241,11 +250,12 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   formulaInput.setAttribute('aria-label', t.formulaHeader);
   formulaInput.autocomplete = 'off';
   formulaInput.spellcheck = false;
+  const formulaRow = makeEditorRow(t.formulaLabel, formulaInput);
   formRow.append(
     makeEditorRow(t.nameLabel, nameInput),
     makeEditorRow(t.scopeLabel, scopeSelect),
     makeEditorRow(t.commentLabel, commentInput),
-    makeEditorRow(t.formulaLabel, formulaInput),
+    formulaRow,
   );
   if (rangePickerOptions) {
     attachRangePickerButton(formulaInput, {
@@ -259,6 +269,28 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   editorOkBtn.type = 'submit';
   const editorCancelBtn = appendDialogButton(editorButtons, { label: t.cancel });
   formRow.appendChild(editorButtons);
+
+  const applyPlatform = (): void => {
+    mac = isMac();
+    t = mac ? { ...shared, ...strings.macNamedRangeDialog } : shared;
+    header.textContent = t.title;
+    shell.setAriaLabel(t.title);
+    list.setAttribute('aria-label', t.title);
+    newBtn.textContent = t.newButton;
+    const formulaHeaderBtn = headerButtons.get('formula');
+    if (formulaHeaderBtn) formulaHeaderBtn.textContent = t.formulaHeader;
+    quickLabelText.textContent = t.quickRefersLabel;
+    quickInput.setAttribute('aria-label', t.formulaHeader);
+    formulaInput.setAttribute('aria-label', t.formulaHeader);
+    (formulaRow.firstElementChild as HTMLElement).textContent = t.formulaLabel;
+    if (mac) {
+      quickRow.append(quickCancelBtn, quickCommitBtn, quickLabel);
+      editorButtons.append(editorCancelBtn, editorOkBtn);
+    } else {
+      quickRow.append(quickLabel, quickCommitBtn, quickCancelBtn);
+      editorButtons.append(editorOkBtn, editorCancelBtn);
+    }
+  };
   const errorRow = document.createElement('div');
   errorRow.className = 'fc-namedlg__error';
   errorRow.setAttribute('role', 'alert');
@@ -470,7 +502,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       selectedNameIndex = 0;
       const empty = document.createElement('div');
       empty.className = 'fc-namedlg__empty';
-      empty.textContent = t.empty;
+      // The Mac list stays blank when no names exist.
+      empty.textContent = mac ? '' : t.empty;
       list.appendChild(empty);
     }
     updateRowSelection();
@@ -884,6 +917,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const api: NamedRangeDialogHandle = {
     open(): void {
+      applyPlatform();
       refreshFormState();
       renderList();
       shell.open();
@@ -898,6 +932,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
         api.open();
         return;
       }
+      applyPlatform();
       refreshFormState();
       renderList();
       openEditor('new');
