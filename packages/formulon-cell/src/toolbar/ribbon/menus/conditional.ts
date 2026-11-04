@@ -240,13 +240,22 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
     colorScaleGreenYellow: t.colorScaleGreenYellow,
     colorScaleYellowGreen: t.colorScaleYellowGreen,
     iconArrows3: t.iconArrows3,
-    iconArrows5: t.iconArrows5,
+    iconArrowsGray3: t.iconArrowsGray3,
     iconTriangles3: t.iconTriangles3,
+    iconArrowsGray4: t.iconArrowsGray4,
+    iconArrows4: t.iconArrows4,
+    iconArrowsGray5: t.iconArrowsGray5,
+    iconArrows5: t.iconArrows5,
     iconTraffic3: t.iconTraffic3,
     iconTrafficRim3: t.iconTrafficRim3,
+    iconSigns3: t.iconSigns3,
+    iconTraffic4: t.iconTraffic4,
+    iconRedToBlack4: t.iconRedToBlack4,
+    iconSymbolsCircled3: t.iconSymbolsCircled3,
     iconSymbols3: t.iconSymbols3,
     iconFlags3: t.iconFlags3,
     iconStars3: t.iconStars3,
+    iconRatings4: t.iconRatings4,
     iconQuarters5: t.iconQuarters5,
     iconRatings5: t.iconRatings5,
     iconBoxes5: t.iconBoxes5,
@@ -355,32 +364,47 @@ const buildColorScaleSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void =>
 };
 
 const buildIconSetSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
-  submenu.append(menuSectionHeader(t.direction));
-  const directions = cfPanel('fc-tb__cf-icon-panel', [
-    cfIconChoice('icons-arrows3', 3, t.iconArrows3),
-    cfIconChoice('icons-arrows5', 5, t.iconArrows5),
-    cfIconChoice('icons-triangles3', 3, t.iconTriangles3),
-  ]);
-  submenu.appendChild(directions);
-  submenu.append(menuSectionHeader(t.shapes));
-  const shapes = cfPanel('fc-tb__cf-icon-panel', [
-    cfIconChoice('icons-traffic3', 3, t.iconTraffic3),
-    cfIconChoice('icons-trafficRim3', 3, t.iconTrafficRim3),
-    cfIconChoice('icons-stars3', 3, t.iconStars3),
-  ]);
-  submenu.append(shapes, menuSectionHeader(t.indicators));
-  const indicators = cfPanel('fc-tb__cf-icon-panel', [
-    cfIconChoice('icons-symbols3', 3, t.iconSymbols3),
-    cfIconChoice('icons-flags3', 3, t.iconFlags3),
-  ]);
-  submenu.append(indicators, menuSectionHeader(t.ratings));
-  const ratings = cfPanel('fc-tb__cf-icon-panel', [
-    cfIconChoice('icons-stars3', 3, t.ratings),
-    cfIconChoice('icons-quarters5', 5, t.iconQuarters5),
-    cfIconChoice('icons-ratings5', 5, t.iconRatings5),
-    cfIconChoice('icons-boxes5', 5, t.iconBoxes5),
-  ]);
-  submenu.append(ratings, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
+  submenu.append(
+    menuSectionHeader(t.direction),
+    cfPanel('fc-tb__cf-icon-panel', [
+      cfIconChoice('icons-arrows3', 3, t.iconArrows3),
+      cfIconChoice('icons-arrowsGray3', 3, t.iconArrowsGray3),
+      cfIconChoice('icons-triangles3', 3, t.iconTriangles3),
+      cfIconChoice('icons-arrowsGray4', 4, t.iconArrowsGray4),
+      cfIconChoice('icons-arrows4', 4, t.iconArrows4),
+      cfIconChoice('icons-arrowsGray5', 5, t.iconArrowsGray5),
+      cfIconChoice('icons-arrows5', 5, t.iconArrows5),
+    ]),
+  );
+  submenu.append(
+    menuSectionHeader(t.shapes),
+    cfPanel('fc-tb__cf-icon-panel', [
+      cfIconChoice('icons-traffic3', 3, t.iconTraffic3),
+      cfIconChoice('icons-trafficRim3', 3, t.iconTrafficRim3),
+      cfIconChoice('icons-signs3', 3, t.iconSigns3),
+      cfIconChoice('icons-traffic4', 4, t.iconTraffic4),
+      cfIconChoice('icons-redToBlack4', 4, t.iconRedToBlack4),
+    ]),
+  );
+  submenu.append(
+    menuSectionHeader(t.indicators),
+    cfPanel('fc-tb__cf-icon-panel', [
+      cfIconChoice('icons-symbolsCircled3', 3, t.iconSymbolsCircled3),
+      cfIconChoice('icons-symbols3', 3, t.iconSymbols3),
+      cfIconChoice('icons-flags3', 3, t.iconFlags3),
+    ]),
+  );
+  submenu.append(
+    menuSectionHeader(t.ratings),
+    cfPanel('fc-tb__cf-icon-panel', [
+      cfIconChoice('icons-stars3', 3, t.iconStars3),
+      cfIconChoice('icons-ratings4', 4, t.iconRatings4),
+      cfIconChoice('icons-quarters5', 5, t.iconQuarters5),
+      cfIconChoice('icons-ratings5', 5, t.iconRatings5),
+      cfIconChoice('icons-boxes5', 5, t.iconBoxes5),
+    ]),
+  );
+  submenu.append(menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 
 const buildClearSubmenu = (submenu: HTMLDivElement, t: CfMenuText, mac: boolean): void => {

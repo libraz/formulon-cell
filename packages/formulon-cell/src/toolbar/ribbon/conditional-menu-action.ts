@@ -83,6 +83,15 @@ const conditionalPresetActions = new Set<ConditionalPresetAction>([
   'icons-quarters5',
   'icons-ratings5',
   'icons-boxes5',
+  'icons-arrowsGray3',
+  'icons-arrows4',
+  'icons-arrowsGray4',
+  'icons-arrowsGray5',
+  'icons-signs3',
+  'icons-traffic4',
+  'icons-redToBlack4',
+  'icons-symbolsCircled3',
+  'icons-ratings4',
 ]);
 
 const isConditionalPresetAction = (action: string): action is ConditionalPresetAction =>

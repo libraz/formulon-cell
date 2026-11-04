@@ -56,7 +56,16 @@ export type ConditionalPresetAction =
   | 'icons-stars3'
   | 'icons-quarters5'
   | 'icons-ratings5'
-  | 'icons-boxes5';
+  | 'icons-boxes5'
+  | 'icons-arrowsGray3'
+  | 'icons-arrows4'
+  | 'icons-arrowsGray4'
+  | 'icons-arrowsGray5'
+  | 'icons-signs3'
+  | 'icons-traffic4'
+  | 'icons-redToBlack4'
+  | 'icons-symbolsCircled3'
+  | 'icons-ratings4';
 
 export function listConditionalRules(state: State): readonly ConditionalRule[] {
   return state.conditional.rules;

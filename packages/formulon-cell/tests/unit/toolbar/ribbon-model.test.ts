@@ -893,7 +893,7 @@ describe('toolbar/ribbon-model', () => {
     expect(conditionalMenuText('en').colorScaleGreenWhiteRed).toBe(
       'Green - White - Red Color Scale',
     );
-    expect(conditionalMenuText('ja').iconTraffic3).toBe('3 色の信号');
+    expect(conditionalMenuText('ja').iconTraffic3).toBe('3 つの信号 (枠なし)');
     expect(conditionalMenuText('en').iconStars3).toBe('3 Stars');
     expect(ribbonDisplayText('ja').label).toBe('リボンの表示オプション');
     expect(ribbonDisplayText('en').collapsed).toBe('Show Tabs Only');

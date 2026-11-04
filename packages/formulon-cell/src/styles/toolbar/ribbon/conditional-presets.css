@@ -84,7 +84,13 @@
   }
 
   .fc-tb__cf-icon-panel {
-    grid-template-columns: repeat(3, minmax(54px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+    padding: 0 4px;
+  }
+
+  .fc-tb__submenu--cf-iconSet {
+    width: 270px;
   }
 
   .fc-tb__cf-choice,
@@ -235,6 +241,70 @@
   .fc-tb__cf-icon-choice--icons-ratings5 span,
   .fc-tb__cf-icon-choice--icons-boxes5 span {
     font-size: 12px;
+  }
+
+  .fc-tb__cf-icon-choice--icons-arrowsGray3 span,
+  .fc-tb__cf-icon-choice--icons-arrowsGray4 span,
+  .fc-tb__cf-icon-choice--icons-arrowsGray5 span {
+    color: #7f7f7f;
+  }
+
+  .fc-tb__cf-icon-choice--icons-arrows4 span:first-child,
+  .fc-tb__cf-icon-choice--icons-signs3 span:first-child,
+  .fc-tb__cf-icon-choice--icons-traffic4 span:first-child,
+  .fc-tb__cf-icon-choice--icons-symbolsCircled3 span:first-child,
+  .fc-tb__cf-icon-choice--icons-ratings4 span:nth-child(n + 3) {
+    color: #107c41;
+  }
+
+  .fc-tb__cf-icon-choice--icons-arrows4 span:nth-child(2),
+  .fc-tb__cf-icon-choice--icons-signs3 span:nth-child(2),
+  .fc-tb__cf-icon-choice--icons-traffic4 span:nth-child(2),
+  .fc-tb__cf-icon-choice--icons-symbolsCircled3 span:nth-child(2),
+  .fc-tb__cf-icon-choice--icons-ratings4 span:nth-child(2) {
+    color: #d6a100;
+  }
+
+  .fc-tb__cf-icon-choice--icons-arrows4 span:nth-child(3) {
+    color: #ed7d31;
+  }
+
+  .fc-tb__cf-icon-choice--icons-arrows4 span:last-child,
+  .fc-tb__cf-icon-choice--icons-signs3 span:last-child,
+  .fc-tb__cf-icon-choice--icons-symbolsCircled3 span:last-child,
+  .fc-tb__cf-icon-choice--icons-ratings4 span:first-child {
+    color: #c00000;
+  }
+
+  .fc-tb__cf-icon-choice--icons-traffic4 span:nth-child(3) {
+    color: #c00000;
+  }
+
+  .fc-tb__cf-icon-choice--icons-traffic4 span:last-child,
+  .fc-tb__cf-icon-choice--icons-redToBlack4 span:last-child {
+    color: #1b1a19;
+  }
+
+  .fc-tb__cf-icon-choice--icons-redToBlack4 span:first-child {
+    color: #c00000;
+  }
+
+  .fc-tb__cf-icon-choice--icons-redToBlack4 span:nth-child(2) {
+    color: #b05a5a;
+  }
+
+  .fc-tb__cf-icon-choice--icons-redToBlack4 span:nth-child(3) {
+    color: #5a5a5a;
+  }
+
+  .fc-tb__cf-icon-choice--icons-signs3 span,
+  .fc-tb__cf-icon-choice--icons-traffic4 span,
+  .fc-tb__cf-icon-choice--icons-redToBlack4 span {
+    width: 12px;
+    border-radius: 50%;
+    background: currentColor;
+    overflow: hidden;
+    text-indent: 20px;
   }
 
   /* The gallery is a capped, scrollable panel rather than a "fill whatever the

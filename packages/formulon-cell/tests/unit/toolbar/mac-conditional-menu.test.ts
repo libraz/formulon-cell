@@ -89,4 +89,15 @@ describe('Mac conditional formatting menu', () => {
     const first = mac.querySelector<HTMLElement>('[data-cf-action="scale-gyr"]');
     expect(first?.getAttribute('aria-label') ?? first?.title).toBe('緑、黄、赤のカラー スケール');
   });
+
+  it('lists the twenty Excel icon sets with their wording', () => {
+    const sets = Array.from(
+      mac.querySelectorAll<HTMLElement>('[data-cf-panel="iconSet"] [data-cf-action^="icons-"]'),
+      (el) => [el.dataset.cfAction, el.getAttribute('aria-label') ?? el.title],
+    );
+    expect(sets).toHaveLength(20);
+    expect(sets[0]).toEqual(['icons-arrows3', '3 つの矢印 (色分け)']);
+    expect(sets[2]).toEqual(['icons-triangles3', '3 種類の三角形']);
+    expect(sets.at(-1)).toEqual(['icons-boxes5', '5 種類のボックス']);
+  });
 });

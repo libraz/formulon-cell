@@ -105,6 +105,25 @@ export const conditionalIconSetLabel = (
       return labels.iconRatings5;
     case 'icons-boxes5':
       return labels.iconBoxes5;
+    case 'icons-arrowsGray3':
+      return labels.iconArrowsGray3;
+    case 'icons-arrows4':
+      return labels.iconArrows4;
+    case 'icons-arrowsGray4':
+      return labels.iconArrowsGray4;
+    case 'icons-arrowsGray5':
+      return labels.iconArrowsGray5;
+    case 'icons-signs3':
+      return labels.iconSigns3;
+    case 'icons-traffic4':
+      return labels.iconTraffic4;
+    case 'icons-redToBlack4':
+      return labels.iconRedToBlack4;
+    case 'icons-symbolsCircled3':
+      return labels.iconSymbolsCircled3;
+    case 'icons-ratings4':
+      return labels.iconRatings4;
+
     default:
       return labels.iconSets;
   }

@@ -313,7 +313,7 @@ describe('Spreadsheet.mountToolbar', () => {
       ),
     ).toEqual(['Directional', 'Shapes', 'Indicators', 'Ratings']);
     expect(iconSetPanel.querySelectorAll(':scope > .fc-tb__cf-icon-panel')).toHaveLength(4);
-    expect(iconSetPanel.querySelectorAll('.fc-tb__cf-icon-choice')).toHaveLength(12);
+    expect(iconSetPanel.querySelectorAll('.fc-tb__cf-icon-choice')).toHaveLength(20);
 
     const clearPanel = openPanel('clear');
     expect(
