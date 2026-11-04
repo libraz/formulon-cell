@@ -10,7 +10,8 @@ export interface PivotFieldListFollowDeps {
 }
 
 // Keeps the pivot field list in step with the active cell: opens it on a pivot,
-// closes it when the selection leaves every pivot.
+// unless Hide Field List is in effect, and closes it when the selection leaves
+// every pivot.
 export function attachPivotFieldListFollow(deps: PivotFieldListFollowDeps): { detach: () => void } {
   const { store, getWb, getWorkbookObjects } = deps;
   const unsub = store.subscribe((state, prevState) => {
@@ -30,6 +31,7 @@ export function attachPivotFieldListFollow(deps: PivotFieldListFollowDeps): { de
       prevPivot?.sheetIndex === nextPivot.sheetIndex &&
       prevPivot?.pivotIndex === nextPivot.pivotIndex;
     if (samePivot && workbookObjects.isPivotFieldListOpen()) return;
+    if (workbookObjects.isPivotFieldListHidden()) return;
     workbookObjects.openPivotFieldList(nextPivot.sheetIndex, nextPivot.pivotIndex);
   });
   return { detach: unsub };

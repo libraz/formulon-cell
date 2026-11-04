@@ -359,6 +359,19 @@ describe('PivotTable Fields pane', () => {
     wb.dispose();
   });
 
+  it('stays hidden after Hide Field List until it is shown again', async () => {
+    const wb = await setup();
+    const { handle } = open(wb);
+    expect(handle.isPivotFieldListHidden()).toBe(false);
+    handle.hidePivotFieldList();
+    expect(handle.isPivotFieldListOpen()).toBe(false);
+    expect(handle.isPivotFieldListHidden()).toBe(true);
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    expect(handle.isPivotFieldListHidden()).toBe(false);
+    handle.detach();
+    wb.dispose();
+  });
+
   it('closes on Escape', async () => {
     const wb = await setup();
     const { handle } = open(wb);

@@ -80,6 +80,11 @@ export interface WorkbookObjectsPanelHandle {
   /** Opens the PivotTable Options dialog on a report; false when there is no such report. */
   openPivotOptions(sheetIndex: number, pivotIndex: number): boolean;
   isPivotFieldListOpen(): boolean;
+  /** Closes the field list and keeps it closed when the selection moves onto
+   *  a report, until it is opened again explicitly. */
+  hidePivotFieldList(): void;
+  /** Whether Hide Field List is in effect. */
+  isPivotFieldListHidden(): boolean;
   close(): void;
   refresh(): void;
   setStrings(next: Strings): void;
@@ -97,6 +102,7 @@ export function attachWorkbookObjectsPanel(
   let restoreFocusEl: HTMLElement | null = null;
   let activePivotEditKey = '';
   let activePivotFieldListKey = '';
+  let pivotFieldListHidden = false;
   let pivotEditError = '';
   let pivotPaneState: PivotFieldPaneState = createPivotFieldPaneState();
   const numberFormatPicker = deps.store
@@ -629,6 +635,7 @@ export function attachWorkbookObjectsPanel(
     activePivotEditKey = '';
     if (activePivotFieldListKey !== key) pivotPaneState = createPivotFieldPaneState();
     activePivotFieldListKey = key;
+    pivotFieldListHidden = false;
     pivotEditError = '';
     openPanel();
     return true;
@@ -676,6 +683,11 @@ export function attachWorkbookObjectsPanel(
       return true;
     },
     isPivotFieldListOpen: () => open && activePivotFieldListKey.length > 0,
+    hidePivotFieldList: () => {
+      pivotFieldListHidden = true;
+      close();
+    },
+    isPivotFieldListHidden: () => pivotFieldListHidden,
     close,
     refresh,
     setStrings(next) {
