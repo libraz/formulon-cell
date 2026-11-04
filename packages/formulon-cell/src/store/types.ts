@@ -317,8 +317,19 @@ export interface FilterConditionSpec {
     | 'greaterThan'
     | 'greaterThanOrEqual'
     | 'lessThan'
-    | 'lessThanOrEqual';
+    | 'lessThanOrEqual'
+    | 'between'
+    | 'top10'
+    | 'bottom10'
+    | 'aboveAverage'
+    | 'belowAverage';
+  /** Comparison operand; the lower bound for `between`, the item count or
+   *  percentage for `top10`/`bottom10`, empty for the average operators. */
   value: string;
+  /** Upper bound of `between`. */
+  value2?: string;
+  /** What `top10`/`bottom10` count; items when omitted. */
+  unit?: 'items' | 'percent';
 }
 
 export type WorkbookViewMode = 'normal' | 'pageLayout' | 'pageBreakPreview';

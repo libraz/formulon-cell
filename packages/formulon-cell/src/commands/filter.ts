@@ -11,6 +11,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { isDataTableFormula } from '../engine/workbook-handle-data-tables.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type {
+  FilterConditionSpec,
   FilterSortSpec,
   SpreadsheetStore,
   State,
@@ -26,20 +27,9 @@ export type FilterPredicate = (
   cell: { value: unknown; formula: string | null } | undefined,
 ) => boolean;
 
-export type ConditionFilterOp =
-  | 'equals'
-  | 'notEquals'
-  | 'contains'
-  | 'notContains'
-  | 'greaterThan'
-  | 'greaterThanOrEqual'
-  | 'lessThan'
-  | 'lessThanOrEqual';
+export type ConditionFilterOp = FilterConditionSpec['op'];
 
-export interface ConditionFilterOptions {
-  op: ConditionFilterOp;
-  value: string;
-}
+export type ConditionFilterOptions = FilterConditionSpec;
 
 const numericConditionOperator = (op: ConditionFilterOp): boolean =>
   op === 'equals' ||
@@ -47,7 +37,14 @@ const numericConditionOperator = (op: ConditionFilterOp): boolean =>
   op === 'greaterThan' ||
   op === 'greaterThanOrEqual' ||
   op === 'lessThan' ||
-  op === 'lessThanOrEqual';
+  op === 'lessThanOrEqual' ||
+  op === 'between' ||
+  op === 'top10' ||
+  op === 'bottom10';
+
+/** Operators judged against the other numbers of their column. */
+const rankedConditionOperator = (op: ConditionFilterOp): boolean =>
+  op === 'top10' || op === 'bottom10' || op === 'aboveAverage' || op === 'belowAverage';
 
 /** Store numeric criteria in the workbook's canonical grammar. Keeping the
  * raw text for invalid input preserves the existing no-match behavior while
@@ -339,7 +336,16 @@ export function applyConditionFilter(
     range,
     byCol,
     hiddenValues: [],
-    condition: { op: condition.op, value },
+    condition: {
+      op: condition.op,
+      value,
+      ...(condition.op === 'between'
+        ? { value2: canonicalNumericCriterion(condition.value2 ?? '', locale) }
+        : {}),
+      ...(condition.op === 'top10' || condition.op === 'bottom10'
+        ? { unit: condition.unit ?? 'items' }
+        : {}),
+    },
   });
   const { hidden, count } = recomputeHiddenFromCriteria(state, criteria, locale);
   store.setState((s) => ({
@@ -401,6 +407,7 @@ function recomputeHiddenFromCriteria(
   const next = new Set(baseline);
   for (const c of criteria) {
     if (!canEvaluateFilterRange(c.range)) continue;
+    const bound = c.condition ? rankedBound(state, c.range, c.byCol, c.condition) : null;
     const hiddenSet =
       c.condition || c.color
         ? null
@@ -411,7 +418,7 @@ function recomputeHiddenFromCriteria(
       const hide = c.color
         ? !colorMatches(state, c.range.sheet, r, c.byCol, c.color)
         : c.condition
-          ? !conditionMatches(cell, c.condition, locale)
+          ? !conditionMatches(cell, c.condition, locale, bound)
           : (hiddenSet as Set<string>).has(filterMatchKey(filterValueKey(cell?.value), locale));
       if (hide) next.add(r);
     }
@@ -861,10 +868,40 @@ function cellNumber(value: unknown): number | null {
   return cv.value;
 }
 
+/** The number a ranked condition compares against: the cut-off value of a
+ *  top/bottom set (ties kept, percent counts rounded down, at least one) or
+ *  the column average. Null for other operators or a column without numbers. */
+function rankedBound(
+  state: State,
+  range: Range,
+  col: number,
+  condition: ConditionFilterOptions,
+): number | null {
+  if (!rankedConditionOperator(condition.op)) return null;
+  const numbers: number[] = [];
+  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
+    const n = cellNumber(state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col }))?.value);
+    if (n !== null) numbers.push(n);
+  }
+  if (numbers.length === 0) return null;
+  if (condition.op === 'aboveAverage' || condition.op === 'belowAverage') {
+    return numbers.reduce((sum, n) => sum + n, 0) / numbers.length;
+  }
+  const amount = Number(condition.value.trim());
+  if (!(amount > 0)) return null;
+  const raw = condition.unit === 'percent' ? (numbers.length * amount) / 100 : amount;
+  const count = Math.max(1, Math.min(Math.floor(raw), numbers.length));
+  const sorted = numbers.sort((a, b) => a - b);
+  return condition.op === 'top10'
+    ? (sorted[sorted.length - count] ?? null)
+    : (sorted[count - 1] ?? null);
+}
+
 function conditionMatches(
   cell: { value: unknown; formula: string | null } | undefined,
   condition: ConditionFilterOptions,
   locale = 'en-US',
+  bound: number | null = null,
 ): boolean {
   const needle = condition.value.trim();
   const text = filterValueKey(cell?.value);
@@ -887,6 +924,25 @@ function conditionMatches(
       if (condition.op === 'greaterThanOrEqual') return value >= target;
       if (condition.op === 'lessThan') return value < target;
       return value <= target;
+    }
+    case 'between': {
+      const low = Number(needle);
+      const high = Number((condition.value2 ?? '').trim());
+      const value = cellNumber(cell?.value);
+      if (!Number.isFinite(low) || !Number.isFinite(high) || needle === '' || value == null) {
+        return false;
+      }
+      return value >= low && value <= high;
+    }
+    case 'top10':
+    case 'bottom10':
+    case 'aboveAverage':
+    case 'belowAverage': {
+      const value = cellNumber(cell?.value);
+      if (bound === null || value == null) return false;
+      if (condition.op === 'top10') return value >= bound;
+      if (condition.op === 'bottom10') return value <= bound;
+      return condition.op === 'aboveAverage' ? value > bound : value < bound;
     }
     default:
       return semantics.equals(text, needle);

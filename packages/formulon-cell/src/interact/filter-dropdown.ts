@@ -3,6 +3,7 @@ import {
   applyConditionFilter,
   applyValueFilter,
   type ConditionFilterOp,
+  type ConditionFilterOptions,
   clearFilter,
   type DistinctFilterFailureReason,
   distinctFilterItemsResult,
@@ -17,7 +18,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
-import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { deferInitialFocus } from './dialog-shell.js';
@@ -117,27 +118,55 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
   };
 
   /** Apply the panel's state; the Mac panel keeps itself open while it auto-applies. */
+  /** The condition the panel's fields describe, or null while an operand is missing. */
+  const readCondition = (op: ConditionFilterOp): ConditionFilterOptions | null => {
+    if (!root) return null;
+    const field = (name: string): string =>
+      root?.querySelector<HTMLInputElement | HTMLSelectElement>(`.fc-filter-dropdown__${name}`)
+        ?.value ?? '';
+    const value = field('condition-value').trim();
+    if (op === 'aboveAverage' || op === 'belowAverage') return { op, value: '' };
+    if (op === 'top10' || op === 'bottom10') {
+      return value
+        ? { op, value, unit: field('condition-unit') === 'percent' ? 'percent' : 'items' }
+        : null;
+    }
+    if (op === 'between') {
+      const upper = field('condition-value2').trim();
+      return value && upper ? { op, value, value2: upper } : null;
+    }
+    return value ? { op, value: field('condition-value') } : null;
+  };
+
+  /** Append options that stay listed but cannot be chosen. */
+  const appendDisabledOptions = (select: HTMLSelectElement, labels: readonly string[]): void => {
+    const first = select.options.length;
+    appendDialogSelectOptions(
+      select,
+      labels.map((label) => ({ value: label, label })),
+    );
+    for (const option of Array.from(select.options).slice(first)) {
+      projectDisabledState(option, true, strings.macFilterPanel.unavailable);
+    }
+  };
+
   const applyActiveFilter = (closeAfter = true): void => {
     if (!activeRange || !root) return;
     const wb = deps.getWb?.();
     const condition = root.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
-    const conditionValue = root.querySelector<HTMLInputElement>(
-      '.fc-filter-dropdown__condition-value',
-    );
     recordFilterChange(
       deps.history ?? null,
       deps.store,
       () => {
-        if (condition?.value && conditionValue?.value.trim()) {
+        const op = condition?.value as ConditionFilterOp | '' | undefined;
+        const spec = op ? readCondition(op) : null;
+        if (spec) {
           applyConditionFilter(
             deps.store.getState(),
             deps.store,
             activeRange as Range,
             activeCol,
-            {
-              op: condition.value as ConditionFilterOp,
-              value: conditionValue.value,
-            },
+            spec,
             wb,
           );
         } else {
@@ -238,6 +267,11 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
                 { value: 'greaterThanOrEqual', label: m.greaterThanOrEqual },
                 { value: 'lessThan', label: m.lessThan },
                 { value: 'lessThanOrEqual', label: m.lessThanOrEqual },
+                { value: 'between', label: m.between },
+                { value: 'top10', label: m.top10 },
+                { value: 'bottom10', label: m.bottom10 },
+                { value: 'aboveAverage', label: m.aboveAverage },
+                { value: 'belowAverage', label: m.belowAverage },
               ] as const)
             : ([
                 { value: 'contains', label: m.contains },
@@ -260,12 +294,15 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       className: 'fc-filter-dropdown__condition-op',
     });
     if (mac) {
-      // Conditions the host cannot filter by stay in Excel's list, unavailable.
-      for (const label of [m.between, m.top10, m.bottom10, m.aboveAverage, m.belowAverage]) {
-        const option = ownerDocument.createElement('option');
-        option.textContent = label;
-        projectDisabledState(option, true, m.unavailable);
-        conditionSelect.appendChild(option);
+      // Conditions that rank or bound numbers stay in Excel's list for a text column, unavailable.
+      if (!numericColumn(range, col)) {
+        appendDisabledOptions(conditionSelect, [
+          m.between,
+          m.top10,
+          m.bottom10,
+          m.aboveAverage,
+          m.belowAverage,
+        ]);
       }
     }
     if (activeCriteria?.condition) conditionSelect.value = activeCriteria.condition.op;
@@ -282,7 +319,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         activeCriteria.condition.op === 'greaterThan' ||
         activeCriteria.condition.op === 'greaterThanOrEqual' ||
         activeCriteria.condition.op === 'lessThan' ||
-        activeCriteria.condition.op === 'lessThanOrEqual'
+        activeCriteria.condition.op === 'lessThanOrEqual' ||
+        activeCriteria.condition.op === 'between' ||
+        activeCriteria.condition.op === 'top10' ||
+        activeCriteria.condition.op === 'bottom10'
       ) {
         // Criteria are stored in the engine's canonical decimal grammar;
         // accept the active locale first, then decode that canonical form so
@@ -298,14 +338,51 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     }
     if (mac) {
       conditionInput.placeholder = '';
-      conditionInput.hidden = !conditionSelect.value;
+      const upperInput = ownerDocument.createElement('input');
+      upperInput.type = 'text';
+      upperInput.className = 'fc-filter-dropdown__condition-value2';
+      upperInput.setAttribute('aria-label', t.conditionValue);
+      const unitSelect = createDialogSelect(
+        [
+          { value: 'items', label: m.items },
+          { value: 'percent', label: m.percent },
+        ],
+        activeCriteria?.condition?.unit ?? 'items',
+        { ariaLabel: m.items, className: 'fc-filter-dropdown__condition-unit' },
+      );
+      if (activeCriteria?.condition?.value2 !== undefined) {
+        upperInput.value = new Intl.NumberFormat(activeLocale).format(
+          Number(activeCriteria.condition.value2),
+        );
+      }
+      // The operand fields each operator needs: none, one value, two values, or a count and unit.
+      const syncFields = (): void => {
+        const op = conditionSelect.value;
+        const ranked = op === 'top10' || op === 'bottom10';
+        const average = op === 'aboveAverage' || op === 'belowAverage';
+        conditionInput.hidden = !op || average;
+        upperInput.hidden = op !== 'between';
+        unitSelect.hidden = !ranked;
+        conditionInput.type = ranked ? 'number' : 'text';
+        if (ranked) {
+          conditionInput.min = '1';
+          if (!conditionInput.value) conditionInput.value = '10';
+        } else {
+          conditionInput.removeAttribute('min');
+        }
+      };
+      syncFields();
       conditionSelect.addEventListener('change', () => {
-        conditionInput.hidden = !conditionSelect.value;
-        if (conditionSelect.value) conditionInput.focus();
+        syncFields();
+        const op = conditionSelect.value;
+        if (op === 'aboveAverage' || op === 'belowAverage') autoApplyIfOn();
+        else if (op) conditionInput.focus();
         else autoApplyIfOn();
       });
       conditionInput.addEventListener('change', () => autoApplyIfOn());
-      conditionPanel.append(conditionSelect, conditionInput);
+      upperInput.addEventListener('change', () => autoApplyIfOn());
+      unitSelect.addEventListener('change', () => autoApplyIfOn());
+      conditionPanel.append(conditionSelect, conditionInput, upperInput, unitSelect);
     } else {
       conditionLabel.appendChild(conditionSelect);
       conditionPanel.append(conditionLabel, conditionInput);
@@ -489,12 +566,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         const select = createDialogSelect([{ value: '', label: m.colorNone }], '', {
           ariaLabel: m.byColor,
         });
-        for (const label of disabledOptions) {
-          const option = ownerDocument.createElement('option');
-          option.textContent = label;
-          projectDisabledState(option, true, m.unavailable);
-          select.appendChild(option);
-        }
+        appendDisabledOptions(select, disabledOptions);
         projectDisabledState(select, true, m.unavailable);
         row.append(text, select);
         return row;

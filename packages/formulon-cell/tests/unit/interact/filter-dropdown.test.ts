@@ -465,11 +465,11 @@ describe('attachFilterDropdown', () => {
         '指定の値以上',
         '指定の値より小さい',
         '指定の値以下',
-        '[DIS]指定の範囲内',
-        '[DIS]上位 10 項目',
-        '[DIS]下位 10 項目',
-        '[DIS]平均より上',
-        '[DIS]平均より下',
+        '指定の範囲内',
+        '上位 10 項目',
+        '下位 10 項目',
+        '平均より上',
+        '平均より下',
       ]);
       handle.detach();
     });
@@ -514,6 +514,59 @@ describe('attachFilterDropdown', () => {
       } finally {
         wb.dispose();
       }
+    });
+
+    it('filters the top 10 with an inline count and unit', () => {
+      const handle = openMac();
+      const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+      const op = panel?.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
+      const count = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value');
+      const unit = panel?.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-unit');
+      const upper = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value2');
+      expect(unit?.hidden).toBe(true);
+      if (op) {
+        op.value = 'top10';
+        op.dispatchEvent(new Event('change'));
+      }
+      expect(count?.hidden).toBe(false);
+      expect(count?.value).toBe('10');
+      expect(unit?.hidden).toBe(false);
+      expect(upper?.hidden).toBe(true);
+      expect(Array.from(unit?.options ?? [], (o) => o.textContent)).toEqual(['項目', 'パーセント']);
+      if (count) {
+        count.value = '1';
+        count.dispatchEvent(new Event('change'));
+      }
+      expect([...store.getState().layout.hiddenRows].sort()).toEqual([1, 2]);
+      handle.detach();
+    });
+
+    it('asks for two bounds on a range and none on an average', () => {
+      const handle = openMac();
+      const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+      const op = panel?.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
+      const low = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value');
+      const high = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value2');
+      if (op) {
+        op.value = 'between';
+        op.dispatchEvent(new Event('change'));
+      }
+      expect([low?.hidden, high?.hidden]).toEqual([false, false]);
+      if (low && high) {
+        low.value = '2';
+        low.dispatchEvent(new Event('change'));
+        expect(store.getState().ui.filterCriteria).toEqual([]);
+        high.value = '4';
+        high.dispatchEvent(new Event('change'));
+      }
+      expect([...store.getState().layout.hiddenRows].sort()).toEqual([1, 3]);
+      if (op) {
+        op.value = 'aboveAverage';
+        op.dispatchEvent(new Event('change'));
+      }
+      expect([low?.hidden, high?.hidden]).toEqual([true, true]);
+      expect([...store.getState().layout.hiddenRows].sort()).toEqual([1, 2]);
+      handle.detach();
     });
 
     it('auto-applies a condition while the panel stays open, and Apply waits for auto-apply off', () => {

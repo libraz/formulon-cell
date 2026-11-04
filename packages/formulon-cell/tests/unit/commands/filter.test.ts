@@ -109,6 +109,66 @@ describe('filter commands', () => {
     expect(store.getState().layout.hiddenRows.has(3)).toBe(false);
   });
 
+  describe('range and ranked number conditions', () => {
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 };
+    const seed = (): void => {
+      seedText(store, 0, 0, 'N');
+      [4, 9, 1, 9, 6].forEach((v, k) => {
+        seedNumber(store, k + 1, 0, v);
+      });
+    };
+    const hiddenRows = (): number[] => [...store.getState().layout.hiddenRows].sort();
+    const apply = (condition: Parameters<typeof applyConditionFilter>[4]): void => {
+      applyConditionFilter(store.getState(), store, range, 0, condition);
+    };
+
+    it('keeps rows inside a between range, bounds included', () => {
+      seed();
+      apply({ op: 'between', value: '4', value2: '6' });
+      expect(hiddenRows()).toEqual([2, 3, 4]);
+    });
+
+    it('keeps the top and bottom items with ties', () => {
+      seed();
+      apply({ op: 'top10', value: '2', unit: 'items' });
+      expect(hiddenRows()).toEqual([1, 3, 5]);
+      apply({ op: 'bottom10', value: '1', unit: 'items' });
+      expect(hiddenRows()).toEqual([1, 2, 4, 5]);
+    });
+
+    it('rounds a percent count down and keeps at least one item', () => {
+      seed();
+      apply({ op: 'top10', value: '40', unit: 'percent' });
+      expect(hiddenRows()).toEqual([1, 3, 5]);
+      apply({ op: 'top10', value: '1', unit: 'percent' });
+      expect(hiddenRows()).toEqual([1, 3, 5]);
+    });
+
+    it('splits the column at its average', () => {
+      seed();
+      apply({ op: 'aboveAverage', value: '' });
+      expect(hiddenRows()).toEqual([1, 3]);
+      apply({ op: 'belowAverage', value: '' });
+      expect(hiddenRows()).toEqual([2, 4, 5]);
+    });
+
+    it('stores the unit and upper bound with the criterion', () => {
+      seed();
+      apply({ op: 'between', value: '4', value2: '6' });
+      expect(store.getState().ui.filterCriteria[0]?.condition).toEqual({
+        op: 'between',
+        value: '4',
+        value2: '6',
+      });
+      apply({ op: 'bottom10', value: '3' });
+      expect(store.getState().ui.filterCriteria[0]?.condition).toEqual({
+        op: 'bottom10',
+        value: '3',
+        unit: 'items',
+      });
+    });
+  });
+
   it('stores condition filter criteria and reapplies them after data changes', () => {
     seedText(store, 0, 0, 'Item');
     seedText(store, 1, 0, 'paper');

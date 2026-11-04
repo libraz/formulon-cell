@@ -302,6 +302,68 @@ describe('AutoFilter engine sync', () => {
     }
   });
 
+  it('writes range, ranked and average conditions as native columns and reads them back', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      const typedRange = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 };
+      const store = createSpreadsheetStore();
+      wb.setText({ sheet: 0, row: 0, col: 0 }, 'N');
+      seedText(store, 0, 0, 'N');
+      [4, 9, 1, 9, 6].forEach((v, k) => {
+        wb.setNumber({ sheet: 0, row: k + 1, col: 0 }, v);
+        seedNumber(store, k + 1, 0, v);
+      });
+      const cases = [
+        {
+          condition: { op: 'between', value: '4', value2: '6' } as const,
+          column: {
+            kind: 2,
+            customCount: 2,
+            customAnd: true,
+            op1: 4,
+            val1: '4',
+            op2: 2,
+            val2: '6',
+          },
+          match: [true, false, false, false, true],
+        },
+        {
+          condition: { op: 'top10', value: '2', unit: 'items' } as const,
+          column: { kind: 3, top: true, percent: false, topVal: 2 },
+          match: [false, true, false, true, false],
+        },
+        {
+          condition: { op: 'bottom10', value: '40', unit: 'percent' } as const,
+          column: { kind: 3, top: false, percent: true, topVal: 40 },
+          match: [true, false, true, false, false],
+        },
+        {
+          condition: { op: 'aboveAverage', value: '' } as const,
+          column: { kind: 4, dynamicType: 1 },
+          match: [false, true, false, true, true],
+        },
+      ];
+      for (const { condition, column, match } of cases) {
+        store.setState((state) => ({
+          ...state,
+          ui: {
+            ...state.ui,
+            filterRanges: [typedRange],
+            filterCriteria: [{ range: typedRange, byCol: 0, hiddenValues: [], condition }],
+          },
+        }));
+        expect(syncAutoFilterToEngine(wb, store.getState(), 0, store)).toBe(true);
+        expect(wb.getAutoFilter(0)?.columns[0]).toMatchObject(column);
+        expect(wb.evaluateAutoFilter(0)?.match).toEqual(match);
+        const reloaded = createSpreadsheetStore();
+        hydrateAutoFilterFromEngine(wb, reloaded, 0);
+        expect(reloaded.getState().ui.filterCriteria[0]?.condition).toEqual(condition);
+      }
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('escapes AutoFilter wildcard literals and decodes them after reload', async () => {
     const wb = await WorkbookHandle.createDefault();
     try {
@@ -748,10 +810,8 @@ describe('AutoFilter engine sync', () => {
       const importedUnsupported = {
         ...valuesColumn,
         colId: 1,
-        kind: 3,
-        top: true,
-        topVal: 1,
-        percent: false,
+        kind: 4,
+        dynamicType: 4,
       } as AutoFilterColumn;
       expect(
         wb.setAutoFilter(0, {
@@ -776,9 +836,8 @@ describe('AutoFilter engine sync', () => {
       expect(store.getState().layout.hiddenRows).toEqual(new Set([2]));
       expect(wb.getAutoFilter(0)?.columns.find((column) => column.colId === 1)).toMatchObject({
         colId: 1,
-        kind: 3,
-        top: true,
-        topVal: 1,
+        kind: 4,
+        dynamicType: 4,
       });
     } finally {
       wb.dispose();
@@ -820,10 +879,8 @@ describe('AutoFilter engine sync', () => {
       const importedUnsupported = {
         ...valuesColumn,
         colId: 1,
-        kind: 3,
-        top: true,
-        topVal: 1,
-        percent: false,
+        kind: 4,
+        dynamicType: 4,
       };
       expect(
         wb.setAutoFilter(0, {
@@ -845,9 +902,8 @@ describe('AutoFilter engine sync', () => {
       const after = wb.getAutoFilter(0);
       expect(after?.columns.find((column) => column.colId === 1)).toMatchObject({
         colId: 1,
-        kind: 3,
-        top: true,
-        topVal: 1,
+        kind: 4,
+        dynamicType: 4,
       });
 
       const importedDateGroups = {

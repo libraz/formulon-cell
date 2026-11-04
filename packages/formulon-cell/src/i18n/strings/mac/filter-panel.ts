@@ -18,6 +18,9 @@ export interface MacFilterPanelStrings {
   bottom10: string;
   aboveAverage: string;
   belowAverage: string;
+  /** Units of the Top/Bottom count. */
+  items: string;
+  percent: string;
   search: string;
   selectAll: string;
   autoApply: string;
@@ -49,6 +52,8 @@ type MacFilterPanelExtras = Pick<
   | 'bottom10'
   | 'aboveAverage'
   | 'belowAverage'
+  | 'items'
+  | 'percent'
   | 'unavailable'
 >;
 
@@ -90,6 +95,8 @@ const extrasEn: MacFilterPanelExtras = {
   bottom10: 'Bottom 10',
   aboveAverage: 'Above Average',
   belowAverage: 'Below Average',
+  items: 'Items',
+  percent: 'Percent',
   unavailable: 'This feature is not implemented yet.',
 };
 
@@ -108,6 +115,8 @@ const extrasJa: MacFilterPanelExtras = {
   bottom10: '下位 10 項目',
   aboveAverage: '平均より上',
   belowAverage: '平均より下',
+  items: '項目',
+  percent: 'パーセント',
   unavailable: 'この機能は未実装です。',
 };
 
@@ -126,6 +135,8 @@ const extrasDe: MacFilterPanelExtras = {
   bottom10: 'Untere 10',
   aboveAverage: 'Überdurchschnittlich',
   belowAverage: 'Unterdurchschnittlich',
+  items: 'Elemente',
+  percent: 'Prozent',
   unavailable: 'Diese Funktion ist noch nicht implementiert.',
 };
 
@@ -144,6 +155,8 @@ const extrasFr: MacFilterPanelExtras = {
   bottom10: '10 derniers',
   aboveAverage: 'Au-dessus de la moyenne',
   belowAverage: 'En dessous de la moyenne',
+  items: 'Éléments',
+  percent: 'Pourcentage',
   unavailable: 'Cette fonctionnalité n’est pas encore implémentée.',
 };
 
@@ -162,6 +175,8 @@ const extrasZh: MacFilterPanelExtras = {
   bottom10: '后 10 项',
   aboveAverage: '高于平均值',
   belowAverage: '低于平均值',
+  items: '项',
+  percent: '百分比',
   unavailable: '此功能尚未实现。',
 };
 
@@ -180,6 +195,8 @@ const extrasKo: MacFilterPanelExtras = {
   bottom10: '하위 10개',
   aboveAverage: '평균 초과',
   belowAverage: '평균 미만',
+  items: '항목',
+  percent: '백분율',
   unavailable: '이 기능은 아직 구현되지 않았습니다.',
 };
 
@@ -198,6 +215,8 @@ const extrasTh: MacFilterPanelExtras = {
   bottom10: '10 อันดับท้าย',
   aboveAverage: 'สูงกว่าค่าเฉลี่ย',
   belowAverage: 'ต่ำกว่าค่าเฉลี่ย',
+  items: 'รายการ',
+  percent: 'เปอร์เซ็นต์',
   unavailable: 'ฟีเจอร์นี้ยังไม่ได้ใช้งาน',
 };
 

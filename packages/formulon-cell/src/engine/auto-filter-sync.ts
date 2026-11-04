@@ -25,7 +25,12 @@ import type { WorkbookHandle } from './workbook-handle.js';
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const conditionOperator: Record<NonNullable<ValueFilterCriteria['condition']>['op'], string> = {
+type ConditionOp = NonNullable<ValueFilterCriteria['condition']>['op'];
+
+const conditionOperator: Record<
+  Exclude<ConditionOp, 'between' | 'top10' | 'bottom10' | 'aboveAverage' | 'belowAverage'>,
+  string
+> = {
   equals: 'equal',
   notEquals: 'notEqual',
   contains: 'equal',
@@ -38,7 +43,12 @@ const conditionOperator: Record<NonNullable<ValueFilterCriteria['condition']>['o
 
 const FILTER_KIND_VALUES = 1;
 const FILTER_KIND_CUSTOM = 2;
+const FILTER_KIND_TOP10 = 3;
+const FILTER_KIND_DYNAMIC = 4;
 const FILTER_KIND_COLOR = 5;
+
+const DYNAMIC_ABOVE_AVERAGE = 1;
+const DYNAMIC_BELOW_AVERAGE = 2;
 const SORT_BY_VALUE = 0;
 const FILTER_OPERATOR_EQUAL = 0;
 const FILTER_OPERATOR_LESS_THAN = 1;
@@ -257,6 +267,34 @@ function customColumnFromCriteria(
   condition: NonNullable<ValueFilterCriteria['condition']>,
 ): AutoFilterColumn {
   const base = emptyAutoFilterColumn(colId);
+  if (condition.op === 'top10' || condition.op === 'bottom10') {
+    return {
+      ...base,
+      kind: FILTER_KIND_TOP10,
+      top: condition.op === 'top10',
+      percent: condition.unit === 'percent',
+      topVal: Number(condition.value),
+    };
+  }
+  if (condition.op === 'aboveAverage' || condition.op === 'belowAverage') {
+    return {
+      ...base,
+      kind: FILTER_KIND_DYNAMIC,
+      dynamicType: condition.op === 'aboveAverage' ? DYNAMIC_ABOVE_AVERAGE : DYNAMIC_BELOW_AVERAGE,
+    };
+  }
+  if (condition.op === 'between') {
+    return {
+      ...base,
+      kind: FILTER_KIND_CUSTOM,
+      customCount: 2,
+      customAnd: true,
+      op1: FILTER_OPERATOR_GREATER_THAN_OR_EQUAL,
+      val1: condition.value,
+      op2: FILTER_OPERATOR_LESS_THAN_OR_EQUAL,
+      val2: condition.value2 ?? '',
+    };
+  }
   const wildcard = condition.op === 'contains' || condition.op === 'notContains';
   const literalWildcard = condition.op === 'equals' || condition.op === 'notEquals';
   const op =
@@ -541,6 +579,53 @@ function localCriteriaFromTypedFilter(
         continue;
       }
     }
+    if (column.kind === FILTER_KIND_TOP10 && column.topVal > 0) {
+      criteria.push({
+        range,
+        byCol,
+        hiddenValues: [],
+        condition: {
+          op: column.top ? 'top10' : 'bottom10',
+          value: String(column.topVal),
+          unit: column.percent ? 'percent' : 'items',
+        },
+      });
+      continue;
+    }
+    if (
+      column.kind === FILTER_KIND_DYNAMIC &&
+      (column.dynamicType === DYNAMIC_ABOVE_AVERAGE || column.dynamicType === DYNAMIC_BELOW_AVERAGE)
+    ) {
+      criteria.push({
+        range,
+        byCol,
+        hiddenValues: [],
+        condition: {
+          op: column.dynamicType === DYNAMIC_ABOVE_AVERAGE ? 'aboveAverage' : 'belowAverage',
+          value: '',
+        },
+      });
+      continue;
+    }
+    if (
+      column.kind === FILTER_KIND_CUSTOM &&
+      column.customCount === 2 &&
+      column.customAnd &&
+      column.op1 === FILTER_OPERATOR_GREATER_THAN_OR_EQUAL &&
+      column.op2 === FILTER_OPERATOR_LESS_THAN_OR_EQUAL
+    ) {
+      const low = parseStoredNumeric(column.val1, locale);
+      const high = parseStoredNumeric(column.val2, locale);
+      if (low !== null && high !== null) {
+        criteria.push({
+          range,
+          byCol,
+          hiddenValues: [],
+          condition: { op: 'between', value: String(low), value2: String(high) },
+        });
+        continue;
+      }
+    }
     if (column.kind === FILTER_KIND_CUSTOM && column.customCount === 1 && !column.customAnd) {
       const condition = wildcardCondition(column.op1, column.val1, locale);
       if (condition) {
@@ -574,6 +659,22 @@ export function autoFilterXmlFromState(
     const colId = entry.byCol - range.c0;
     if (colId < 0 || colId > range.c1 - range.c0 || entry.color) return [];
     if (entry.condition) {
+      const { op, value: operand } = entry.condition;
+      if (op === 'top10' || op === 'bottom10') {
+        const percent = entry.condition.unit === 'percent' ? ' percent="1"' : '';
+        const top = op === 'bottom10' ? ' top="0"' : '';
+        return [
+          `<filterColumn colId="${colId}"><top10${top}${percent} val="${escapeXml(operand)}"/></filterColumn>`,
+        ];
+      }
+      if (op === 'aboveAverage' || op === 'belowAverage') {
+        return [`<filterColumn colId="${colId}"><dynamicFilter type="${op}"/></filterColumn>`];
+      }
+      if (op === 'between') {
+        return [
+          `<filterColumn colId="${colId}"><customFilters and="1"><customFilter operator="greaterThanOrEqual" val="${escapeXml(operand)}"/><customFilter operator="lessThanOrEqual" val="${escapeXml(entry.condition.value2 ?? '')}"/></customFilters></filterColumn>`,
+        ];
+      }
       const wildcard = entry.condition.op === 'contains' || entry.condition.op === 'notContains';
       const literalWildcard = entry.condition.op === 'equals' || entry.condition.op === 'notEquals';
       const value = wildcard
@@ -582,7 +683,7 @@ export function autoFilterXmlFromState(
           ? escapeAutoFilterWildcardLiteral(entry.condition.value)
           : entry.condition.value;
       return [
-        `<filterColumn colId="${colId}"><customFilters><customFilter operator="${conditionOperator[entry.condition.op]}" val="${escapeXml(value)}"/></customFilters></filterColumn>`,
+        `<filterColumn colId="${colId}"><customFilters><customFilter operator="${conditionOperator[op]}" val="${escapeXml(value)}"/></customFilters></filterColumn>`,
       ];
     }
     const hidden = new Set(entry.hiddenValues.map((value) => filterMatchKey(value, locale)));
