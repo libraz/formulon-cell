@@ -653,23 +653,22 @@ describe('attachWorkbookObjectsPanel', () => {
       el.textContent?.includes('PivotTable Fields'),
     );
     fieldList?.click();
-    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
-    if (!form) throw new Error('missing field list form');
+    const pane = host.querySelector<HTMLElement>('.fc-objects__pivot-pane');
+    if (!pane) throw new Error('missing field list pane');
     expect(host.querySelector('.fc-objects')?.classList.contains('fc-objects--taskpane')).toBe(
       true,
     );
-    expect(host.textContent).toContain('Back to Workbook Objects');
-    expect(form.getAttribute('aria-label')).toBe('PivotTable Fields');
-    expect(form.textContent).toContain('Choose fields to add to report');
-    expect(form.textContent).toContain('Region');
-    expect(form.textContent).toContain('Sales');
-    expect(form.textContent).toContain('East');
-    expect(form.textContent).toContain('West');
-    expect(form.textContent).not.toContain('Anchor cell');
+    expect(host.textContent).not.toContain('Back to Workbook Objects');
+    expect(pane.getAttribute('aria-label')).toBe('PivotTable Fields');
+    expect(pane.textContent).not.toContain('Choose fields to add to report');
+    expect(pane.textContent).toContain('Field name');
+    expect(pane.textContent).toContain('Drag fields between areas below');
+    expect(pane.textContent).toContain('Region');
+    expect(pane.textContent).toContain('Sales');
+    expect(pane.textContent).not.toContain('Anchor cell');
+    expect(pane.querySelector('select')).toBeNull();
     const fieldListChecks = Array.from(
-      form.querySelectorAll<HTMLInputElement>(
-        '.fc-objects__pivot-field-list > .fc-objects__pivot-field-list-item > input',
-      ),
+      pane.querySelectorAll<HTMLInputElement>('[data-pivot-field-list-field]'),
     );
     expect(fieldListChecks).toHaveLength(2);
     for (const check of fieldListChecks) {
@@ -677,18 +676,38 @@ describe('attachWorkbookObjectsPanel', () => {
       expect(check.checked).toBe(true);
     }
 
-    const regionAxis = form.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
-    if (!regionAxis) throw new Error('missing region field axis');
-    regionAxis.value = '3';
-    regionAxis.dispatchEvent(new Event('change', { bubbles: true }));
+    const data = new Map<string, string>();
+    const dragEvent = (type: string): DragEvent => {
+      const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
+      Object.defineProperty(event, 'dataTransfer', {
+        value: {
+          setData: (key: string, value: string) => data.set(key, value),
+          getData: (key: string) => data.get(key) ?? '',
+        },
+      });
+      return event;
+    };
+    const region = pane.querySelector('[data-pivot-area="rows"] [data-pivot-area-field="Region"]');
+    const filters = pane.querySelector('[data-pivot-area="filters"]');
+    if (!region || !filters) throw new Error('missing Region chip or Filters area');
+    region.dispatchEvent(dragEvent('dragstart'));
+    filters.dispatchEvent(dragEvent('dragover'));
+    filters.dispatchEvent(dragEvent('drop'));
+    region.dispatchEvent(dragEvent('dragend'));
+    expect(calls).toContain('field-axis:0:0:0:3');
+
+    host
+      .querySelector<HTMLElement>('[data-pivot-area="filters"] [data-pivot-area-field="Region"]')
+      ?.click();
     const eastItem = Array.from(
-      form.querySelectorAll<HTMLInputElement>(
+      host.querySelectorAll<HTMLInputElement>(
         '[data-pivot-filter-checklist-field-index="0"] input',
       ),
     ).find((input) => input.value === 'East');
     if (!eastItem) throw new Error('missing East filter item');
+    calls.length = 0;
     eastItem.checked = false;
-    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+    eastItem.dispatchEvent(new Event('change', { bubbles: true }));
 
     expect(calls).toContain('field-axis:0:0:0:3');
     expect(calls).toContain('clear-items:0:0:0');
@@ -707,33 +726,16 @@ describe('attachWorkbookObjectsPanel', () => {
     const { wb, calls } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
     expect(handle.openPivotFieldList(0, 0)).toBe(true);
-    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
-    const check = form?.querySelector<HTMLInputElement>('[data-pivot-field-list-field-index="1"]');
-    const axis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="1"]');
-    if (!form || !check || !axis) throw new Error('missing field list controls');
+    const check = host.querySelector<HTMLInputElement>('[data-pivot-field-list-field="Sales"]');
+    if (!check) throw new Error('missing field list checkbox');
 
     check.checked = false;
     check.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(axis.value).toBe('none');
-    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
     expect(calls).toContain('field-axis:0:0:1:null');
     expect(calls).toContain('field-axis:0:0:0:0');
-    handle.detach();
-  });
-
-  it('puts a ticked field back on the area it left', () => {
-    const { wb } = wbWithObjects();
-    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
-    handle.openPivotFieldList(0, 0);
-    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
-    const check = form?.querySelector<HTMLInputElement>('[data-pivot-field-list-field-index="1"]');
-    const axis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="1"]');
-    if (!check || !axis) throw new Error('missing field list controls');
-    check.checked = false;
-    check.dispatchEvent(new Event('change'));
-    check.checked = true;
-    check.dispatchEvent(new Event('change'));
-    expect(axis.value).toBe(String(PivotAxis.Value));
+    expect(
+      host.querySelector('[data-pivot-area="values"] [data-pivot-area-field="Sales"]'),
+    ).toBeNull();
     handle.detach();
   });
 
@@ -745,8 +747,8 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(host.querySelector('.fc-objects')?.classList.contains('fc-objects--taskpane')).toBe(
       true,
     );
-    expect(host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit')?.textContent).toContain(
-      'Choose fields to add to report',
+    expect(host.querySelector<HTMLElement>('.fc-objects__pivot-pane')?.textContent).toContain(
+      'Drag fields between areas below',
     );
     expect(handle.openPivotFieldList(2, 0)).toBe(false);
     handle.detach();

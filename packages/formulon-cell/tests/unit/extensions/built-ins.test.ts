@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
 import { createSessionImage } from '../../../src/commands/session-illustration.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -244,6 +245,53 @@ describe('built-in extension factories', () => {
       action('Delete').click();
       expect(workbook.listDrawingObjects(0)).toHaveLength(1);
       expect(instance.store.getState().illustrations.illustrations).toHaveLength(1);
+    } finally {
+      sheet.dispose();
+      workbook.dispose();
+    }
+  });
+  it('repaints the grid after a PivotTable Fields pane edit', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    const sheet = await mountStubSheet({
+      workbook,
+      locale: 'en',
+      features: { workbookObjects: false },
+      extensions: [workbookObjects()],
+    });
+    try {
+      const { instance, host } = sheet;
+      const rows: (string | number)[][] = [
+        ['Region', 'Product', 'Sales'],
+        ['East', 'Desk', 12],
+        ['West', 'Chair', 5],
+      ];
+      for (const [r, row] of rows.entries()) {
+        for (const [c, value] of row.entries()) {
+          const addr = { sheet: 0, row: r, col: c };
+          if (typeof value === 'number') workbook.setNumber(addr, value);
+          else workbook.setText(addr, value);
+        }
+      }
+      const created = createPivotTableFromRange(workbook, {
+        source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+        destination: { sheet: 0, row: 6, col: 0 },
+        rowField: 'Region',
+        valueField: 'Sales',
+      });
+      expect(created.ok).toBe(true);
+      expect(instance.openPivotFieldList(0, 0)).toBe(true);
+      const check = host.ownerDocument.querySelector<HTMLInputElement>(
+        '.fc-objects__pivot-pane [data-pivot-field-list-field="Product"]',
+      );
+      if (!check) throw new Error('missing Product checkbox');
+      check.checked = true;
+      check.dispatchEvent(new Event('change', { bubbles: true }));
+      // The report starts at row 7; the source rows above also hold the items.
+      const shown = Array.from(instance.store.getState().data.cells.entries())
+        .filter(([key]) => Number(key.split(':')[1]) >= 6)
+        .map(([, cell]) => (cell.value.kind === 'text' ? cell.value.value : null));
+      expect(shown).toContain('Desk');
+      expect(shown).toContain('Chair');
     } finally {
       sheet.dispose();
       workbook.dispose();

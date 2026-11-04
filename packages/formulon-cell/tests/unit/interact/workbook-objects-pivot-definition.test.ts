@@ -14,7 +14,7 @@ const fixture = resolve(
 
 const openEditor = async (
   fieldList = false,
-): Promise<{ wb: WorkbookHandle; form: HTMLFormElement; detach: () => void }> => {
+): Promise<{ wb: WorkbookHandle; form: HTMLElement; detach: () => void }> => {
   const wb = await WorkbookHandle.loadBytes(new Uint8Array(readFileSync(fixture)));
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -25,8 +25,10 @@ const openEditor = async (
     (el) => el.textContent === label,
   );
   button?.click();
-  const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
-  if (!form) throw new Error('missing pivot edit form');
+  const form = host.querySelector<HTMLElement>(
+    fieldList ? '.fc-objects__pivot-pane' : '.fc-objects__pivot-edit',
+  );
+  if (!form) throw new Error('missing pivot editor');
   return {
     wb,
     form,
@@ -65,25 +67,29 @@ describe('PivotTable editor on a report loaded from a file', () => {
     wb.dispose();
   });
 
-  it('keeps the stored data-field name when an apply changes nothing', async () => {
+  it('keeps the stored data-field name when a field list change leaves Values alone', async () => {
     const { wb, form, detach } = await openEditor(true);
-    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+    const unused = form.querySelectorAll<HTMLInputElement>('[data-pivot-field-list-field]')[1];
+    if (!unused) throw new Error('missing field checkbox');
+    expect(unused.checked).toBe(false);
+    unused.checked = true;
+    unused.dispatchEvent(new Event('change', { bubbles: true }));
     const definition = wb.getPivotDefinition(1, 0);
     expect(definition?.dataFields).toMatchObject([{ name: '合計 / Sales', fieldIndex: 2 }]);
-    expect(definition?.rowFieldOrder).toEqual([0]);
-    expect(definition?.fields[1]?.axis).toBeNull();
+    expect(definition?.rowFieldOrder).toEqual([1, 0]);
     detach();
     wb.dispose();
   });
 
   it('renames a data field from the profile when its aggregation changes', async () => {
     const { wb, form, detach } = await openEditor(true);
-    const aggregation = form.querySelector<HTMLSelectElement>(
-      '[data-pivot-aggregation-field-index="2"]',
+    form.querySelector<HTMLElement>('[data-pivot-area="values"] [data-pivot-area-field]')?.click();
+    const aggregation = document.querySelector<HTMLSelectElement>(
+      '.fc-objects__pivot-pane [data-pivot-aggregation-field-index="2"]',
     );
     if (!aggregation) throw new Error('missing aggregation control');
     aggregation.value = String(PivotAggregation.Max);
-    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+    aggregation.dispatchEvent(new Event('change', { bubbles: true }));
     expect(wb.getPivotDefinition(1, 0)?.dataFields).toMatchObject([
       { name: 'Max of Sales', fieldIndex: 2, aggregation: PivotAggregation.Max },
     ]);

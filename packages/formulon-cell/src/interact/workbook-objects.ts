@@ -1,3 +1,4 @@
+import type { History } from '../commands/history.js';
 import {
   canDeleteIllustration,
   canDuplicateIllustration,
@@ -23,8 +24,14 @@ import type { SessionIllustration } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogIconButton } from './dialog-shell.js';
 import { compatibilityLabelKey } from './spreadsheet-compatibility-report.js';
+import { syncTaskpaneDock } from './taskpane-dock.js';
 import { createWorkbookObjectsActionButton, pivotEditField } from './workbook-objects-dom.js';
 import { type PivotEditorContext, renderPivotEditForm } from './workbook-objects-pivot-editor.js';
+import {
+  createPivotFieldPaneState,
+  type PivotFieldPaneState,
+  renderPivotFieldListPane,
+} from './workbook-objects-pivot-field-pane.js';
 
 export {
   buildFileLossReport,
@@ -39,6 +46,11 @@ export interface WorkbookObjectsPanelDeps {
   host: HTMLElement;
   wb: WorkbookHandle;
   strings?: Strings;
+  /** Field list pane edits push their undo steps here. */
+  history?: History | null;
+  /** The host's task-pane dock beside the grid. The PivotTable Fields pane
+   *  docks there; without one it floats over the right edge of `host`. */
+  dock?: HTMLElement;
   onOpenPivotTableDialog?: () => void;
   onAfterPivotEdit?: () => void;
   onSelectSessionIllustration?: (id: string) => void;
@@ -74,6 +86,7 @@ export function attachWorkbookObjectsPanel(
   let activePivotEditKey = '';
   let activePivotFieldListKey = '';
   let pivotEditError = '';
+  let pivotPaneState: PivotFieldPaneState = createPivotFieldPaneState();
 
   const root = document.createElement('div');
   root.className = 'fc-objects';
@@ -83,12 +96,23 @@ export function attachWorkbookObjectsPanel(
   root.tabIndex = -1;
   host.appendChild(root);
 
+  // The field list pane takes the dock (narrowing the grid); the general panel
+  // floats over the host. The dock shows while anything in it is visible.
+  const placeRoot = (docked: boolean): void => {
+    const dock = deps.dock;
+    if (!dock) return;
+    const parent = docked ? dock : host;
+    if (root.parentElement !== parent) parent.appendChild(root);
+    syncTaskpaneDock(dock);
+  };
+
   const close = (restoreFocus = false): void => {
     const wasOpen = open;
     open = false;
     const focusTarget = restoreFocusEl;
     restoreFocusEl = null;
     root.hidden = true;
+    placeRoot(false);
     if (
       wasOpen &&
       restoreFocus &&
@@ -152,6 +176,7 @@ export function attachWorkbookObjectsPanel(
     const fieldList = createWorkbookObjectsActionButton(t.pivotFieldList);
     fieldList.addEventListener('click', () => {
       activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;
+      pivotPaneState = createPivotFieldPaneState();
       activePivotEditKey = '';
       pivotEditError = '';
       render();
@@ -297,6 +322,7 @@ export function attachWorkbookObjectsPanel(
     if (activePivotFieldListKey && !activeFieldListPivot) activePivotFieldListKey = '';
     root.replaceChildren();
     root.className = `fc-objects${activeFieldListPivot ? ' fc-objects--taskpane' : ''}`;
+    if (open) placeRoot(activeFieldListPivot !== undefined);
     root.setAttribute('aria-label', activeFieldListPivot ? t.pivotFieldList : t.title);
 
     const header = document.createElement('div');
@@ -306,15 +332,6 @@ export function attachWorkbookObjectsPanel(
     title.textContent = activeFieldListPivot ? t.pivotFieldList : t.title;
     const headerActions = document.createElement('div');
     headerActions.className = 'fc-objects__header-actions';
-    if (activeFieldListPivot) {
-      const back = createWorkbookObjectsActionButton(t.backToWorkbookObjects);
-      back.addEventListener('click', () => {
-        activePivotFieldListKey = '';
-        pivotEditError = '';
-        render();
-      });
-      headerActions.appendChild(back);
-    }
     const closeBtn = appendDialogIconButton(headerActions, {
       label: '',
       ariaLabel: t.close,
@@ -327,20 +344,27 @@ export function attachWorkbookObjectsPanel(
     const body = document.createElement('div');
     body.className = 'fc-objects__body';
     if (activeFieldListPivot) {
-      const section = document.createElement('section');
-      section.className = 'fc-objects__section';
-      const heading = document.createElement('div');
-      heading.className = 'fc-objects__heading';
-      heading.textContent = [
-        `${t.pivot} ${activeFieldListPivot.pivotIndex + 1}`,
-        `${t.sheet} ${activeFieldListPivot.sheetIndex + 1}`,
-        pivotAnchor(activeFieldListPivot),
-      ].join(' · ');
-      section.append(
-        heading,
-        renderPivotEditForm(pivotEditorContext(), activeFieldListPivot, { fieldListOnly: true }),
+      body.appendChild(
+        renderPivotFieldListPane(
+          {
+            host,
+            wb,
+            strings,
+            history: deps.history ?? null,
+            state: pivotPaneState,
+            errorText: pivotEditError,
+            setError: (message) => {
+              pivotEditError = message;
+            },
+            rerender: refresh,
+            onChanged: () => {
+              deps.onAfterPivotEdit?.();
+              refresh();
+            },
+          },
+          activeFieldListPivot,
+        ),
       );
-      body.appendChild(section);
       root.appendChild(body);
       return;
     }
@@ -475,14 +499,6 @@ export function attachWorkbookObjectsPanel(
         if (canEditPivot && activePivotEditKey === pivotKey(pivot.sheetIndex, pivot.pivotIndex)) {
           card.appendChild(renderPivotEditForm(pivotEditorContext(), pivot));
         }
-        if (
-          canEditPivot &&
-          activePivotFieldListKey === pivotKey(pivot.sheetIndex, pivot.pivotIndex)
-        ) {
-          card.appendChild(
-            renderPivotEditForm(pivotEditorContext(), pivot, { fieldListOnly: true }),
-          );
-        }
         section.appendChild(card);
       }
       body.appendChild(section);
@@ -548,8 +564,25 @@ export function attachWorkbookObjectsPanel(
     root.appendChild(body);
   };
 
+  // A re-render replaces every control, so focus returns to the control with
+  // the same tag and data attributes.
+  const focusKeyOf = (el: Element): string =>
+    [
+      el.tagName,
+      ...Array.from(el.attributes)
+        .filter((attr) => attr.name.startsWith('data-pivot'))
+        .map((attr) => `${attr.name}=${attr.value}`),
+    ].join('|');
   const refresh = (): void => {
-    if (open) render();
+    if (!open) return;
+    const focused = document.activeElement;
+    const focusKey =
+      focused instanceof HTMLElement && root.contains(focused) ? focusKeyOf(focused) : null;
+    render();
+    if (!focusKey?.includes('|')) return;
+    Array.from(root.querySelectorAll<HTMLElement>('*'))
+      .find((el) => focusKeyOf(el) === focusKey)
+      ?.focus({ preventScroll: true });
   };
   const unsubscribeSessionObjects = deps.subscribeSessionObjects?.(refresh) ?? null;
 
@@ -558,6 +591,7 @@ export function attachWorkbookObjectsPanel(
     restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
     root.hidden = false;
     open = true;
+    placeRoot(root.classList.contains('fc-objects--taskpane'));
     root.focus({ preventScroll: true });
   };
 
@@ -571,6 +605,7 @@ export function attachWorkbookObjectsPanel(
       return false;
     }
     activePivotEditKey = '';
+    if (activePivotFieldListKey !== key) pivotPaneState = createPivotFieldPaneState();
     activePivotFieldListKey = key;
     pivotEditError = '';
     openPanel();
@@ -599,6 +634,8 @@ export function attachWorkbookObjectsPanel(
     detach() {
       unsubscribeSessionObjects?.();
       root.removeEventListener('keydown', onKey);
+      root.hidden = true;
+      placeRoot(false);
       root.remove();
     },
   };

@@ -266,6 +266,7 @@ export const workbookObjects = (): Extension => ({
       host: ctx.host,
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
+      history: ctx.history,
       listSessionIllustrations: () => ctx.store.getState().illustrations.illustrations,
       onSelectSessionIllustration: (id) => {
         const panel = Array.from(ctx.host.querySelectorAll<HTMLElement>('.fc-illustration')).find(
@@ -289,9 +290,15 @@ export const workbookObjects = (): Extension => ({
           commandId: 'workbookObjects.update',
         }),
       subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),
+      onAfterPivotEdit: () => {
+        refreshCells(ctx);
+        ctx.invalidate();
+      },
     });
     return {
       open: () => handle.open(),
+      openPivotFieldList: (sheetIndex: number, pivotIndex: number) =>
+        handle.openPivotFieldList(sheetIndex, pivotIndex),
       close: () => handle.close(),
       refresh: () => handle.refresh(),
       rebindWorkbook: (wb) => handle.bindWorkbook(wb),

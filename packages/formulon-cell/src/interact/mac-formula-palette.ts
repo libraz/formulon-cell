@@ -58,6 +58,7 @@ import {
   type PickerViewState,
 } from './mac-formula-palette-view.js';
 import type { RangeInsertTarget } from './range-insert.js';
+import { syncTaskpaneDock } from './taskpane-dock.js';
 
 export type {
   FunctionArgumentHelp,
@@ -123,7 +124,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   root.style.flexBasis = '300px';
   root.hidden = true;
   deps.dock.appendChild(root);
-  deps.dock.hidden = true;
+  syncTaskpaneDock(deps.dock);
 
   let strings = deps.getStrings();
   let labels = paletteStrings(strings);
@@ -356,7 +357,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     root.dataset.state = mode;
     root.dataset.rawSynchronized = synchronized ? 'true' : 'false';
     root.hidden = mode === 'closed';
-    deps.dock.hidden = mode === 'closed' || detached;
+    syncTaskpaneDock(deps.dock);
     root.setAttribute('aria-label', labels.title);
   };
 
@@ -1424,8 +1425,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     recentUnsubscribe?.();
     recentUnsubscribe = null;
     notifyMirror(null);
-    deps.dock.hidden = true;
     root.remove();
+    syncTaskpaneDock(deps.dock);
     mode = 'closed';
     opener = null;
     restoredFocusTarget = null;

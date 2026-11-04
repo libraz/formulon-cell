@@ -139,7 +139,9 @@ export interface DataObjectsStrings {
     editPivotTable: string;
     pivotFieldList: string;
     backToWorkbookObjects: string;
-    pivotAvailableFields: string;
+    pivotFieldSearch: string;
+    pivotFieldName: string;
+    pivotDragFieldsHint: string;
     pivotName: string;
     pivotAnchorCell: string;
     pivotFieldAreas: string;

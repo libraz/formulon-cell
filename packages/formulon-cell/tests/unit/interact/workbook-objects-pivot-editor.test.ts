@@ -33,7 +33,7 @@ const setup = async (valueFields = ['Sales', 'Qty']) => {
 const submit = (form: HTMLFormElement) =>
   form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
-describe('PivotTable Field List against the engine', () => {
+describe('PivotTable editors against the engine', () => {
   let host: HTMLElement;
   beforeEach(() => {
     host = document.createElement('div');
@@ -42,21 +42,34 @@ describe('PivotTable Field List against the engine', () => {
 
   const open = (wb: WorkbookHandle) => {
     const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
-    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    handle.open();
+    Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
+      .find((el) => el.textContent === en.workbookObjects.editPivotTable)
+      ?.click();
     const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
-    if (!form) throw new Error('missing field list form');
+    if (!form) throw new Error('missing pivot edit form');
     return { handle, form };
+  };
+
+  const openFieldList = (wb: WorkbookHandle) => {
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    const tick = (field: string, checked: boolean): void => {
+      const check = host.querySelector<HTMLInputElement>(
+        `.fc-objects__pivot-pane [data-pivot-field-list-field="${field}"]`,
+      );
+      if (!check) throw new Error(`missing ${field} checkbox`);
+      expect(check.checked).toBe(!checked);
+      check.checked = checked;
+      check.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    return { handle, tick };
   };
 
   it('unticks a value field and keeps the other data field', async () => {
     const wb = await setup();
-    const { handle, form } = open(wb);
-    const check = form.querySelector<HTMLInputElement>('[data-pivot-field-list-field-index="2"]');
-    if (!check) throw new Error('missing checkbox');
-    expect(check.checked).toBe(true);
-    check.checked = false;
-    check.dispatchEvent(new Event('change', { bubbles: true }));
-    submit(form);
+    const { handle, tick } = openFieldList(wb);
+    tick('Sales', false);
 
     const definition = wb.getPivotDefinition(0, 0);
     expect(definition?.fields[2]?.axis).toBeNull();
@@ -65,25 +78,17 @@ describe('PivotTable Field List against the engine', () => {
     wb.dispose();
   });
 
-  it('ticks an unused text field in on Rows and an unused number field on Values', async () => {
+  it('ticks an unused text field in atop Rows and an unused number field atop Values', async () => {
     const wb = await setup(['Sales']);
-    const { handle, form } = open(wb);
-    for (const index of [1, 3]) {
-      const check = form.querySelector<HTMLInputElement>(
-        `[data-pivot-field-list-field-index="${index}"]`,
-      );
-      if (!check) throw new Error('missing checkbox');
-      expect(check.checked).toBe(false);
-      check.checked = true;
-      check.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    submit(form);
+    const { handle, tick } = openFieldList(wb);
+    tick('Product', true);
+    tick('Qty', true);
 
     const definition = wb.getPivotDefinition(0, 0);
     expect(definition?.fields[1]?.axis).toBe(PivotAxis.Row);
     expect(definition?.fields[3]?.axis).toBe(PivotAxis.Value);
-    expect(definition?.rowFieldOrder).toEqual([0, 1]);
-    expect(definition?.dataFields.map((d) => d.fieldIndex)).toEqual([2, 3]);
+    expect(definition?.rowFieldOrder).toEqual([1, 0]);
+    expect(definition?.dataFields.map((d) => d.fieldIndex)).toEqual([3, 2]);
     handle.detach();
     wb.dispose();
   });

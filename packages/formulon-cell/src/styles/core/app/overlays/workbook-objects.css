@@ -27,14 +27,26 @@
     display: none;
   }
 
+  /* In the host's task-pane dock the pane is a flex child spanning the dock,
+     which runs from below the formula bar to above the status bar. */
+  .fc-host__taskpane-dock > .fc-objects--taskpane {
+    position: relative;
+    inset: auto;
+    flex: 1 1 auto;
+    width: auto;
+    height: auto;
+  }
+
+  /* Docked pane: measured 300 wide, a 1 px splitter edge, no shadow. */
   .fc-objects--taskpane {
+    --fc-pivot-pane-width: 300px;
     inset: 0 0 0 auto;
-    width: min(360px, 100%);
+    width: min(var(--fc-pivot-pane-width), 100%);
     max-height: none;
     border-block: 0;
     border-inline-end: 0;
     border-radius: 0;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.16);
+    box-shadow: none;
   }
 
   .fc-objects__header {
@@ -239,24 +251,254 @@
     font-weight: 600;
   }
 
-  .fc-objects__pivot-field-list-title {
-    color: var(--fc-fg, CanvasText);
-    font-weight: 600;
+  /* PivotTable Fields pane: search row, field list, then the four areas 2x2.
+     Geometry follows the desktop pane measured in pt, taken 1:1 as px. */
+
+  .fc-objects--taskpane .fc-objects__header {
+    min-height: 36px;
+    padding: 5px 15px 5px 10px;
+    border-bottom: 0;
   }
 
-  .fc-objects__pivot-field-list {
+  /* Close: a filled grey disc with a white cross. */
+  .fc-objects--taskpane .fc-objects__close,
+  .fc-objects--taskpane .fc-objects__close:hover {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--fc-pivot-pane-close-bg, #7b7b7b);
+    color: var(--fc-pivot-pane-close-fg, #ffffff);
+  }
+
+  .fc-objects--taskpane .fc-objects__close::before,
+  .fc-objects--taskpane .fc-objects__close::after {
+    width: 8px;
+    height: 1.5px;
+  }
+
+  .fc-objects--taskpane .fc-objects__body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .fc-objects__pivot-pane {
+    --fc-pivot-pane-inset: 5px;
+    --fc-pivot-pane-row-height: 22px;
+    --fc-pivot-pane-checkbox-size: 16px;
+    --fc-pivot-pane-list-height: 178px;
+    --fc-pivot-pane-area-gap: 15px;
+    --fc-pivot-pane-area-height: 297px;
+    --fc-pivot-pane-search-width: 196px;
     display: grid;
+    flex: 1 1 auto;
+    grid-template-rows: auto auto minmax(0, 1fr);
     gap: 4px;
-    padding: 6px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule-soft, color-mix(in srgb, CanvasText 10%, transparent));
-    background: var(--fc-bg-elev, Canvas);
+    min-height: 0;
+    padding: 13px var(--fc-pivot-pane-inset) 8px;
+    font-size: 13px;
   }
 
-  .fc-objects__pivot-field-list > span {
-    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+  .fc-objects__pivot-pane .fc-pivotdlg__areas {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-list-available {
+    display: grid;
+    gap: 16px;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-search-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 22px;
+    padding-inline-start: 8px;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-search-row .fc-pivotdlg__field-list-label {
+    margin: 0;
+    font-size: 13px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 30%, transparent));
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-search-box {
+    position: relative;
+    display: block;
+    width: var(--fc-pivot-pane-search-width);
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-search-icon {
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    width: 14px;
+    height: 14px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 50%, transparent));
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-search {
+    box-sizing: border-box;
+    width: 100%;
+    height: 22px;
+    min-height: 0;
+    padding: 0 10px 0 25px;
+    border-radius: 11px;
+  }
+
+  /* Splitter between the list and the areas, with its centre grip dot. */
+  .fc-objects__pivot-pane .fc-pivotdlg__pane-splitter {
+    position: relative;
+    height: 9px;
+    cursor: row-resize;
+    outline: none;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__pane-splitter::before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    transform: translate(-50%, -50%);
+    content: "";
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__pane-splitter:focus-visible::before {
+    background: var(--fc-accent, #217346);
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-list-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: var(--fc-pivot-pane-row-height);
+    gap: 0;
+    height: var(--fc-pivot-pane-list-height);
+    overflow: auto;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    background: var(--fc-bg, Canvas);
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-chip {
+    min-height: var(--fc-pivot-pane-row-height);
+    padding: 0 7px;
+    border: 0;
+    border-radius: 0;
+    font-size: 13px;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-chip > input {
+    width: var(--fc-pivot-pane-checkbox-size);
+    height: var(--fc-pivot-pane-checkbox-size);
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__field-chip[hidden] {
+    display: none;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area-grid {
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    min-height: 0;
+    column-gap: var(--fc-pivot-pane-area-gap);
+    row-gap: 12px;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 7px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area > span {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-inline-start: 4px;
+    font-size: 13px;
+    color: var(--fc-fg, CanvasText);
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area-fields {
+    align-content: start;
+    gap: 0;
+    min-height: 0;
+    max-height: var(--fc-pivot-pane-area-height);
+    overflow: auto;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    background: var(--fc-bg, Canvas);
+  }
+
+  .fc-objects__pivot-pane
+    .fc-pivotdlg__area[data-pivot-drag-over="true"]
+    .fc-pivotdlg__area-fields {
+    border-color: var(--fc-accent, #217346);
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area-field {
+    min-height: var(--fc-pivot-pane-row-height);
+    padding: 0 4px 0 8px;
+  }
+
+  /* Two-dot drag grip before each placed field. */
+  .fc-objects__pivot-pane .fc-pivotdlg__area-field::before {
+    content: "";
+    flex: none;
+    width: 2px;
+    height: 8px;
+    background: radial-gradient(circle, currentColor 1px, transparent 1.2px) 0 0 / 2px 4px repeat-y;
+    opacity: 0.7;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area-field strong {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 400;
+  }
+
+  /* The chip's settings button is the desktop's circled "i"; its label stays accessible. */
+  .fc-objects__pivot-pane .fc-pivotdlg__area-settings {
+    position: relative;
+    width: 14px;
+    min-height: 0;
+    height: 14px;
+    padding: 0;
+    border-color: currentColor;
+    border-radius: 50%;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
+    font-size: 0;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area-settings::before {
+    content: "i";
+    position: absolute;
+    inset: 0;
+    font: 600 9px / 12px var(--fc-font-ui, system-ui);
+    text-align: center;
+  }
+
+  .fc-objects__pivot-pane .fc-pivotdlg__area-hint {
+    text-align: center;
+    font-size: 13px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 30%, transparent));
   }
 
   .fc-objects__pivot-field-list-item {

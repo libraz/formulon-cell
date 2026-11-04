@@ -6,6 +6,7 @@ import {
   type PivotReportLayout,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { PivotDefinition } from '../engine/workbook-handle-pivot.js';
 
 /** One field's settings as submitted from the pivot edit form. */
 export interface PivotEditField {
@@ -224,4 +225,77 @@ export function applyPivotEdit(
     filterItemsUpdated &&
     pivotFiltersUpdated
   );
+}
+
+/** Write a field layout read back with `getPivotDefinition` onto the same
+ *  report: axes, axis orders, subtotals, items, data fields and filters. Parts
+ *  already equal are left alone. Returns true only when every write succeeds. */
+export function restorePivotFieldLayout(
+  wb: WorkbookHandle,
+  sheetIndex: number,
+  pivotIndex: number,
+  definition: PivotDefinition,
+): boolean {
+  const current = wb.getPivotDefinition(sheetIndex, pivotIndex);
+  if (!current) return false;
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+  let ok = true;
+  for (const field of definition.fields) {
+    const now = current.fields[field.index];
+    if (!now) {
+      ok = false;
+      continue;
+    }
+    if (now.axis !== field.axis) {
+      ok = wb.setPivotFieldAxis(sheetIndex, pivotIndex, field.index, field.axis) && ok;
+    }
+    if (!same(now.subtotalFns, field.subtotalFns)) {
+      ok =
+        wb.clearPivotFieldSubtotalFns(sheetIndex, pivotIndex, field.index) &&
+        field.subtotalFns.every((fn) =>
+          wb.addPivotFieldSubtotalFn(sheetIndex, pivotIndex, field.index, fn),
+        ) &&
+        ok;
+    }
+    if (!same(now.items, field.items)) {
+      ok =
+        wb.clearPivotFieldItems(sheetIndex, pivotIndex, field.index) &&
+        field.items.every((item) =>
+          item.cacheIndex >= 0 && wb.capabilities.pivotItemByCacheIndex
+            ? wb.addPivotFieldItemAt(
+                sheetIndex,
+                pivotIndex,
+                field.index,
+                item.cacheIndex,
+                item.visible,
+              )
+            : wb.addPivotFieldItem(sheetIndex, pivotIndex, field.index, item.label, item.visible),
+        ) &&
+        ok;
+    }
+  }
+  ok =
+    wb.setPivotRowFieldOrder(sheetIndex, pivotIndex, definition.rowFieldOrder) &&
+    wb.setPivotColFieldOrder(sheetIndex, pivotIndex, definition.colFieldOrder) &&
+    ok;
+  // Axis changes may have dropped data fields and filters, so compare afresh.
+  const afterAxes = wb.getPivotDefinition(sheetIndex, pivotIndex);
+  if (
+    !afterAxes ||
+    canonicalSpecs(afterAxes.dataFields) !== canonicalSpecs(definition.dataFields)
+  ) {
+    ok =
+      wb.clearPivotDataFields(sheetIndex, pivotIndex) &&
+      definition.dataFields.every(
+        (spec) => wb.addPivotDataField(sheetIndex, pivotIndex, spec) >= 0,
+      ) &&
+      ok;
+  }
+  if (!afterAxes || !same(afterAxes.filters, definition.filters)) {
+    ok =
+      wb.clearPivotFilters(sheetIndex, pivotIndex) &&
+      definition.filters.every((filter) => wb.addPivotFilter(sheetIndex, pivotIndex, filter)) &&
+      ok;
+  }
+  return ok;
 }
