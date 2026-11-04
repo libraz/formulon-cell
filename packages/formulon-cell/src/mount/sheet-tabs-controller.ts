@@ -2,6 +2,7 @@ import type { History } from '../commands/history.js';
 import { isSheetProtected, isWorkbookStructureProtected } from '../commands/protection.js';
 import {
   addSheet,
+  addSheetAfterActive,
   moveSheet,
   removeSheet,
   renameSheet,
@@ -27,6 +28,7 @@ import {
   formatSheetLabel,
   positionSheetMenu,
 } from './sheet-menu.js';
+import { attachSheetTabDrag } from './sheet-tab-drag.js';
 
 const SHEET_NAV_REPEAT_DELAY_MS = 350;
 const SHEET_NAV_REPEAT_INTERVAL_MS = 120;
@@ -80,6 +82,30 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   const hidden = (): number[] => hiddenSheetIndexes(getWb(), store);
   let sheetMenuRestoreFocus: HTMLElement | null = null;
 
+  // The Mac arrows scroll the tab strip by one tab; elsewhere they switch sheets.
+  const scrollsStrip = (): boolean => isMacWorkbook(getWb());
+  const tabLeft = (tab: HTMLElement): number =>
+    tab.getBoundingClientRect().left -
+    sheetTabs.getBoundingClientRect().left +
+    sheetTabs.scrollLeft;
+  const stripAtStart = (): boolean => sheetTabs.scrollLeft <= 0;
+  const stripAtEnd = (): boolean =>
+    sheetTabs.scrollLeft + sheetTabs.clientWidth >= sheetTabs.scrollWidth - 1;
+  const scrollStrip = (delta: 1 | -1): void => {
+    const lefts = Array.from(sheetTabs.querySelectorAll<HTMLElement>('.fc-host__sheetbar-tab')).map(
+      tabLeft,
+    );
+    const here = sheetTabs.scrollLeft;
+    const next =
+      delta > 0 ? lefts.find((l) => l > here + 1) : [...lefts].reverse().find((l) => l < here - 1);
+    sheetTabs.scrollLeft = delta > 0 ? (next ?? sheetTabs.scrollWidth) : (next ?? 0);
+    refreshNav();
+  };
+  const step = (delta: 1 | -1): void => {
+    if (scrollsStrip()) scrollStrip(delta);
+    else switchRelative(delta);
+  };
+
   const createSheetNavRepeater = (
     button: HTMLButtonElement,
     delta: 1 | -1,
@@ -107,7 +133,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         return;
       }
       suppressNextClick = true;
-      switchRelative(delta);
+      step(delta);
     };
     const onPointerDown = (e: PointerEvent): void => {
       if (e.button !== 0 || button.disabled) return;
@@ -128,7 +154,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         e.stopPropagation();
         return;
       }
-      switchRelative(delta);
+      step(delta);
     };
 
     button.addEventListener('pointerdown', onPointerDown);
@@ -509,11 +535,29 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__item:not([disabled])')?.focus();
   };
 
+  const refreshNav = (): void => {
+    const strings = getStrings();
+    const indexes = visible();
+    const activePos = indexes.indexOf(store.getState().data.sheetIndex);
+    const strip = scrollsStrip();
+    setSheetButtonDisabled(
+      firstSheet,
+      strip ? stripAtStart() : activePos <= 0,
+      strings.sheetTabs.previousSheetUnavailable,
+      strings.sheetTabs.previousSheet,
+    );
+    setSheetButtonDisabled(
+      lastSheet,
+      strip ? stripAtEnd() : activePos < 0 || activePos >= indexes.length - 1,
+      strings.sheetTabs.nextSheetUnavailable,
+      strings.sheetTabs.nextSheet,
+    );
+  };
+
   const update = (): void => {
     const wb = getWb();
     const active = store.getState().data.sheetIndex;
     const visibleIndexes = visible();
-    const activePos = visibleIndexes.indexOf(active);
     refreshLabels();
     sheetTabs.dataset.fcSheetOverflow = visibleIndexes.length > 1 ? 'true' : 'false';
     sheetTabs.replaceChildren();
@@ -570,18 +614,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     }
     const strings = getStrings();
     const structureProtected = isWorkbookStructureProtected(store.getState());
-    setSheetButtonDisabled(
-      firstSheet,
-      activePos <= 0,
-      strings.sheetTabs.previousSheetUnavailable,
-      strings.sheetTabs.previousSheet,
-    );
-    setSheetButtonDisabled(
-      lastSheet,
-      activePos < 0 || activePos >= visibleIndexes.length - 1,
-      strings.sheetTabs.nextSheetUnavailable,
-      strings.sheetTabs.nextSheet,
-    );
+    refreshNav();
     setSheetButtonDisabled(
       addSheetBtn,
       structureProtected,
@@ -593,7 +626,11 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   const firstSheetRepeater = createSheetNavRepeater(firstSheet, -1);
   const lastSheetRepeater = createSheetNavRepeater(lastSheet, 1);
   const addAndSwitchSheet = (): void => {
-    const idx = addSheet(store, getWb(), history);
+    const wb = getWb();
+    // The Mac desktop inserts the new sheet after the active one.
+    const idx = isMacWorkbook(wb)
+      ? addSheetAfterActive(store, wb, history)
+      : addSheet(store, wb, history);
     if (idx < 0) return;
     switchSheet(idx);
     update();
@@ -656,6 +693,17 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   firstSheet.addEventListener('click', firstSheetRepeater.onClick);
   lastSheet.addEventListener('click', lastSheetRepeater.onClick);
   addSheetBtn.addEventListener('click', onAddSheetClick);
+  sheetTabs.addEventListener('scroll', refreshNav);
+  const tabDrag = attachSheetTabDrag({
+    sheetTabs,
+    onDrop: (from, to) => {
+      if (!getWb().capabilities.sheetMutate) return;
+      if (!moveSheet(store, getWb(), from, to, history)) return;
+      // The dragged tab becomes the active sheet.
+      if (store.getState().data.sheetIndex !== to) mutators.setSheetIndex(store, to);
+      refreshAfterSheetChange();
+    },
+  });
   document.addEventListener('pointerdown', onSheetMenuPointerDown);
   document.addEventListener('focusin', onSheetMenuFocusIn, true);
   document.addEventListener('keydown', onSheetMenuKeyDown, true);
@@ -669,6 +717,8 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       firstSheet.removeEventListener('click', firstSheetRepeater.onClick);
       lastSheet.removeEventListener('click', lastSheetRepeater.onClick);
       addSheetBtn.removeEventListener('click', onAddSheetClick);
+      sheetTabs.removeEventListener('scroll', refreshNav);
+      tabDrag.detach();
       document.removeEventListener('pointerdown', onSheetMenuPointerDown);
       document.removeEventListener('focusin', onSheetMenuFocusIn, true);
       document.removeEventListener('keydown', onSheetMenuKeyDown, true);

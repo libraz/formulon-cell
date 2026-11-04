@@ -448,16 +448,20 @@ export const selectionMutators = {
     }));
   },
 
-  selectAll(store: SpreadsheetStore): void {
+  /** Select the whole sheet. `active` places the active cell (clamped into
+   *  the range); it defaults to the range's top-left cell. */
+  selectAll(store: SpreadsheetStore, active?: { row: number; col: number }): void {
     const requested =
       navigationSelectionBoundsFor(store) ?? fullSheetRange(store.getState().data.sheetIndex);
     const range = permittedRange(store, requested);
     if (!range) return;
+    const row = Math.max(range.r0, Math.min(range.r1, active?.row ?? range.r0));
+    const col = Math.max(range.c0, Math.min(range.c1, active?.col ?? range.c0));
     store.setState((s) => ({
       ...s,
       selection: {
-        active: { sheet: range.sheet, row: range.r0, col: range.c0 },
-        anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        active: { sheet: range.sheet, row, col },
+        anchor: { sheet: range.sheet, row, col },
         range,
         extraRanges: [],
       },

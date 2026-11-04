@@ -142,4 +142,37 @@ describe('createObjectMenu', () => {
     expect(menu.isOpen()).toBe(false);
     expect(document.activeElement).toBe(opener);
   });
+
+  it('opens a Mac menu one pixel right of and above the pointer, flipped at the right edge', () => {
+    vi.stubGlobal('innerWidth', 1000);
+    vi.stubGlobal('innerHeight', 800);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const w = this.classList.contains('fc-ctxmenu') ? 272 : 0;
+      const h = this.classList.contains('fc-ctxmenu') ? 100 : 0;
+      return { x: 0, y: 0, left: 0, top: 0, right: w, bottom: h, width: w, height: h } as DOMRect;
+    });
+    try {
+      const host = document.createElement('div');
+      host.dataset.fcPlatform = 'mac';
+      const opener = document.createElement('button');
+      document.body.append(host, opener);
+      const menu = createObjectMenu(host);
+      const entries: ObjectMenuEntry[] = [{ id: 'a', label: 'A', run: vi.fn() }];
+      const root = (): HTMLElement => {
+        const el = document.querySelector<HTMLElement>('.fc-ctxmenu--object');
+        if (!el) throw new Error('Object menu was not mounted');
+        return el;
+      };
+      menu.open(100, 200, entries, { label: 'Shape', restoreFocusTo: opener });
+      expect([root().style.left, root().style.top]).toEqual(['101px', '199px']);
+      menu.open(900, 200, entries, { label: 'Shape', restoreFocusTo: opener });
+      expect(root().style.left).toBe(`${900 - 272}px`);
+      menu.detach();
+    } finally {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    }
+  });
 });

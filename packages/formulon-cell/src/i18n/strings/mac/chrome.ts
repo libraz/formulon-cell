@@ -9,6 +9,9 @@ export interface MacChromeStrings {
   fxButton: string;
   expandFormulaBar: string;
   pageBreakPreview: string;
+  /** Title row of the status bar's right-click menu. */
+  statusBarCustomize: string;
+  capsLock: string;
 }
 
 /** A locale whose Mac wording is not measured repeats its own shared text. */
@@ -21,6 +24,8 @@ export const macChromeFrom = (
   fxButton: formula.fxDialog.fxButtonLabel,
   expandFormulaBar: chrome.a11y.expandFormulaBar,
   pageBreakPreview: chrome.statusBar.pageBreakPreview,
+  statusBarCustomize: chrome.statusBar.aggregatesHeading,
+  capsLock: chrome.statusBar.capsLock,
 });
 
 /** Japanese Mac app wording, measured from Excel for Mac. */
@@ -30,4 +35,6 @@ export const macChromeJa: MacChromeStrings = {
   fxButton: '数式パレットを開きます',
   expandFormulaBar: '数式バーの展開',
   pageBreakPreview: '改ページのプレビュー',
+  statusBarCustomize: 'ステータス バーのユーザー設定',
+  capsLock: 'CapsLock',
 };

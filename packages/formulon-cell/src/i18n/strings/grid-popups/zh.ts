@@ -150,6 +150,16 @@ export const gridPopupsZh: GridPopupsStrings = {
     fillWeekdays: '填充工作日',
     fillMonths: '填充月份',
     fillYears: '填充年份',
+    dragMenu: {
+      seriesDays: '填充序列(天)',
+      seriesWeekdays: '填充序列(工作日)',
+      seriesMonths: '填充序列(月)',
+      seriesYears: '填充序列(年)',
+      linear: '等差序列',
+      growth: '等比序列',
+      flashFill: '快速填充',
+      seriesDialog: '序列...',
+    },
   },
   pasteOptions: {
     title: '粘贴选项',

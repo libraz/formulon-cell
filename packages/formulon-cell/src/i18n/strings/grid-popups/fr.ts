@@ -152,6 +152,16 @@ export const gridPopupsFr: GridPopupsStrings = {
     fillWeekdays: 'Recopier les jours ouvrés',
     fillMonths: 'Recopier les mois',
     fillYears: 'Recopier les années',
+    dragMenu: {
+      seriesDays: 'Série (jours)',
+      seriesWeekdays: 'Série (jours ouvrés)',
+      seriesMonths: 'Série (mois)',
+      seriesYears: 'Série (années)',
+      linear: 'Tendance linéaire',
+      growth: 'Tendance exponentielle',
+      flashFill: 'Remplissage instantané',
+      seriesDialog: 'Série...',
+    },
   },
   pasteOptions: {
     title: 'Options de collage',

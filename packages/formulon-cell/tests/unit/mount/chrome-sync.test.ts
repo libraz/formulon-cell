@@ -295,9 +295,9 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     vi.restoreAllMocks();
   });
 
-  it('a range selection formats as A1:B3', () => {
+  it('a settled range selection shows the active cell address', () => {
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
-    expect(tag.value).toBe('A1:B3');
+    expect(tag.value).toBe('A1');
   });
 
   it('shows a merged logical cell by its anchor while retaining the complete selection', () => {
@@ -311,7 +311,7 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     expect(tag.value).toBe('R2C2');
     mutators.setR1C1(store, false);
     mutators.setRange(store, { ...range, r1: 3 });
-    expect(tag.value).toBe('B2:D4');
+    expect(tag.value).toBe('B2');
   });
 
   it('a selected chart or picture names itself and empties the formula bar', () => {
@@ -827,6 +827,56 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     // Focus moves back to host; chrome-sync repaints the tag with the live ref.
     expect(tag.value).toBe('A1');
+  });
+
+  it('the dropdown lists tables with the names and a table pick selects its first data cell', () => {
+    sheet.workbook.addSheet('Sheet2');
+    stubNames([
+      { name: 'Zeta', formula: 'Sheet1!$B$2:$C$4', localSheetId: -1 },
+      { name: 'alpha', formula: 'Sheet1!$E$5', localSheetId: -1 },
+    ]);
+    const store = sheet.instance.store;
+    store.setState((s) => ({
+      ...s,
+      tables: {
+        ...s.tables,
+        tables: [
+          {
+            id: 't1',
+            source: 'engine',
+            name: 'テーブル1',
+            range: { sheet: 1, r0: 0, c0: 0, r1: 6, c1: 2 },
+            style: 'medium2',
+            showHeader: true,
+            showTotal: false,
+            banded: true,
+          } as never,
+        ],
+      },
+    }));
+    tag.focus();
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', bubbles: true }));
+    const items = [...document.querySelectorAll<HTMLElement>('.fc-namebox-menu [role="option"]')];
+    expect(items.map((el) => el.textContent)).toEqual(['alpha', 'Zeta', 'テーブル1']);
+    items[2]?.click();
+    expect(store.getState().data.sheetIndex).toBe(1);
+    expect(store.getState().selection.range).toEqual({ sheet: 1, r0: 1, c0: 0, r1: 1, c1: 0 });
+  });
+
+  it('reads rows x columns in the box while a drag extends the selection', () => {
+    const store = sheet.instance.store;
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    sheet.host
+      .querySelector('.fc-host__grid')
+      ?.dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true }));
+    const start = { sheet: 0, row: 1, col: 1 };
+    store.setState((s) => ({
+      ...s,
+      selection: { active: start, anchor: start, range: { sheet: 0, r0: 1, c0: 1, r1: 4, c1: 3 } },
+    }));
+    expect(tag.value).toBe('4R x 3C');
+    document.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    expect(tag.value).toBe('B2');
   });
 
   it('keeps name-box dropdown items on the shared host button helper', () => {

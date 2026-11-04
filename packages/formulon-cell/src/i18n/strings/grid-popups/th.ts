@@ -150,6 +150,16 @@ export const gridPopupsTh: GridPopupsStrings = {
     fillWeekdays: 'เติมวันทำงาน',
     fillMonths: 'เติมเดือน',
     fillYears: 'เติมปี',
+    dragMenu: {
+      seriesDays: 'เติมชุดข้อมูล (วัน)',
+      seriesWeekdays: 'เติมชุดข้อมูล (วันทำงาน)',
+      seriesMonths: 'เติมชุดข้อมูล (เดือน)',
+      seriesYears: 'เติมชุดข้อมูล (ปี)',
+      linear: 'แนวโน้มเชิงเส้น',
+      growth: 'แนวโน้มการเติบโต',
+      flashFill: 'การเติมแบบแฟลช',
+      seriesDialog: 'ชุดข้อมูล...',
+    },
   },
   pasteOptions: {
     title: 'ตัวเลือกการวาง',

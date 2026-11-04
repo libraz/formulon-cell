@@ -269,7 +269,8 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   };
 
   const refreshActions = (): void => {
-    const dirty = fxEditing && fxInput.value !== fxBaseline;
+    // The Mac desktop enables Enter as soon as the bar is entered.
+    const dirty = fxEditing && (isMacPlatform() || fxInput.value !== fxBaseline);
     const all = getStrings();
     const strings = all.a11y;
     const macNames = isMacPlatform() ? all.macChrome : null;

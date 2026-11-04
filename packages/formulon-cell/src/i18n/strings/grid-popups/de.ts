@@ -152,6 +152,16 @@ export const gridPopupsDe: GridPopupsStrings = {
     fillWeekdays: 'Wochentage ausfüllen',
     fillMonths: 'Monate ausfüllen',
     fillYears: 'Jahre ausfüllen',
+    dragMenu: {
+      seriesDays: 'Datenreihe (Tage)',
+      seriesWeekdays: 'Datenreihe (Wochentage)',
+      seriesMonths: 'Datenreihe (Monate)',
+      seriesYears: 'Datenreihe (Jahre)',
+      linear: 'Linearer Trend',
+      growth: 'Exponentieller Trend',
+      flashFill: 'Blitzvorschau',
+      seriesDialog: 'Datenreihe...',
+    },
   },
   pasteOptions: {
     title: 'Einfügeoptionen',

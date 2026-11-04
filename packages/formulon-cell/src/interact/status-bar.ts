@@ -32,6 +32,7 @@ import {
   type StatusBarOptionKey,
   type WorkbookViewMode,
 } from '../store/store.js';
+import { showMacZoomDialog, showZoomDialog, zoomForSelection } from '../toolbar/dialogs/zoom.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 import { overlayPortalFor } from './overlay-portal.js';
@@ -308,8 +309,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   zoomSlider.max = String(ZOOM_SLIDER_MAX);
   zoomSlider.step = '1';
   const zoomIn = createStatusBarZoomButton('+');
-  const zoomLabel = document.createElement('span');
-  zoomLabel.className = 'fc-host__statusbar-zoom-label';
+  const zoomLabel = createStatusBarButton('fc-host__statusbar-zoom-label');
   zoom.append(zoomOut, zoomSlider, zoomIn, zoomLabel);
 
   statusbar.append(
@@ -422,7 +422,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const t = strings.statusBar;
     switch (key) {
       case 'capsLock':
-        return t.capsLock;
+        return isMacHost(statusbar) ? strings.macChrome.capsLock : t.capsLock;
       case 'numLock':
         return t.numLock;
       case 'scrollLock':
@@ -566,6 +566,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
           ?.numFmt
       : undefined;
     const pieces: string[] = [];
+    const values: string[] = [];
     for (const key of keys) {
       const v = statusAggregateValue(key, stats);
       if (v == null) continue;
@@ -575,6 +576,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
         ? fmtGeneral(v, aggLocale)
         : fmt(v, aggLocale, numFmt, s.ui.date1904 === true);
       pieces.push(`${labelFor(key)}: ${text}`);
+      values.push(text);
     }
     // The Mac bar shows each aggregate as its own item, with no separator and no cell count.
     const mac = isMacHost(statusbar);
@@ -582,6 +584,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       const item = document.createElement('span');
       item.className = 'fc-host__statusbar-agg';
       item.textContent = text;
+      item.dataset.value = values[i] ?? '';
       return i > 0 && !mac ? [document.createTextNode(' · '), item] : [item];
     });
     center.replaceChildren(...items);
@@ -636,6 +639,37 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     refresh();
   };
 
+  const openZoomDialog = async (): Promise<void> => {
+    const current = Math.round(store.getState().viewport.zoom * 100);
+    const locale = (): string => deps.getLocale?.() ?? bundledLocaleForStrings(strings) ?? 'en-US';
+    const common = {
+      locale,
+      title: strings.ribbon.zoomDialogTitle,
+      initial: current,
+      okLabel: strings.formatDialog.ok,
+      cancelLabel: strings.formatDialog.cancel,
+      invalidMessage: strings.ribbon.zoomDialogInvalid,
+    };
+    if (isMacHost(statusbar)) {
+      const mac = strings.macZoomDialog;
+      const choice = await showMacZoomDialog({
+        ...common,
+        caption: mac.caption,
+        fitSelection: mac.fitSelection,
+        custom: mac.custom,
+      });
+      if (choice === null) return;
+      setZoom(
+        choice.kind === 'selection'
+          ? zoomForSelection(store.getState().selection.range)
+          : choice.percent / 100,
+      );
+      return;
+    }
+    const next = await showZoomDialog({ ...common, label: strings.ribbon.zoomDialogPercent });
+    if (next !== null) setZoom(next / 100);
+  };
+
   zoomSlider.addEventListener('input', () => {
     setZoom(sliderPositionToZoom(Number(zoomSlider.value)));
   });
@@ -652,6 +686,9 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     e.preventDefault();
     const position = zoomToSliderPosition(store.getState().viewport.zoom);
     setZoom(sliderPositionToZoom(position + direction * ZOOM_SLIDER_STEP));
+  });
+  zoomLabel.addEventListener('click', () => {
+    void openZoomDialog();
   });
   zoomOut.addEventListener('click', () => {
     setZoom(steppedZoom(store.getState().viewport.zoom, -1));
@@ -707,7 +744,8 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       popover.appendChild(separator);
     };
 
-    addHeading(strings.statusBar.aggregatesHeading);
+    const mac = isMacHost(statusbar);
+    addHeading(mac ? strings.macChrome.statusBarCustomize : strings.statusBar.aggregatesHeading);
 
     const addCheckboxRow = (
       labelText: string,
@@ -726,20 +764,37 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     };
 
     const active = new Set(store.getState().ui.statusAggs);
-    for (const key of ALL_KEYS) {
-      addCheckboxRow(labelFor(key), active.has(key), () => {
-        mutators.toggleStatusAgg(store, key);
-      });
+    const options = store.getState().ui.statusOptions;
+    const addAggRows = (): void => {
+      for (const key of ALL_KEYS) {
+        addCheckboxRow(labelFor(key), active.has(key), () => {
+          mutators.toggleStatusAgg(store, key);
+        });
+      }
+    };
+    const addOptionRows = (keys: readonly StatusBarOptionKey[]): void => {
+      for (const key of keys) {
+        addCheckboxRow(optionLabelFor(key), options[key], () => {
+          mutators.toggleStatusOption(store, key);
+          refresh();
+        });
+      }
+    };
+    if (mac) {
+      // The Mac desktop's order: indicators, aggregates, upload, then the view controls.
+      addOptionRows(['capsLock', 'macroRecording']);
+      addSeparator();
+      addAggRows();
+      addSeparator();
+      addOptionRows(['uploadStatus']);
+      addSeparator();
+      addOptionRows(['viewShortcuts', 'zoomSlider', 'zoom']);
+      return;
     }
+    addAggRows();
     addSeparator();
     addHeading(strings.statusBar.statusOptionsHeading);
-    const options = store.getState().ui.statusOptions;
-    for (const key of STATUS_OPTION_KEYS) {
-      addCheckboxRow(optionLabelFor(key), options[key], () => {
-        mutators.toggleStatusOption(store, key);
-        refresh();
-      });
-    }
+    addOptionRows(STATUS_OPTION_KEYS);
   };
 
   const placeChooser = (clientX: number, clientY: number): void => {
@@ -790,9 +845,16 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     showChooser(rect.left + rect.width / 2, rect.top);
   };
 
-  // Left-click on the center aggregate strip also opens the chooser.
+  // Left-click on the center strip opens the chooser; the Mac bar copies the
+  // clicked aggregate's value instead.
   const onCenterClick = (e: MouseEvent): void => {
     e.preventDefault();
+    if (isMacHost(statusbar)) {
+      const agg =
+        e.target instanceof Element ? e.target.closest<HTMLElement>('[data-value]') : null;
+      if (agg?.dataset.value) void navigator.clipboard?.writeText(agg.dataset.value);
+      return;
+    }
     showChooser(e.clientX, e.clientY);
   };
 

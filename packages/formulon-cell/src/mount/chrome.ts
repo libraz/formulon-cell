@@ -1,4 +1,5 @@
 import type { FeatureFlags } from '../extensions/index.js';
+import { isMacHost } from '../extensions/ui-options.js';
 import type { Strings } from '../i18n/strings.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -158,7 +159,8 @@ export function createMountChrome({
       fxExpand.setAttribute('aria-expanded', 'true');
       fxExpand.replaceChildren();
       appendHostIcon(fxExpand, ['M5.5 12.5 10 8l4.5 4.5']);
-      fxInput.rows = 4;
+      // 57 pt on the Mac desktop (three lines), four lines elsewhere.
+      fxInput.rows = isMacHost(fxInput) ? 3 : 4;
     }
     refreshFormulaBarLabels();
   });

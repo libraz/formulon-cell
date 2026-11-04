@@ -136,6 +136,34 @@ export function paintFillHandle(
   return { x: x - 1, y: y - 1, w: hs + 2, h: hs + 2 };
 }
 
+/** Side length and cell inset of the table resize grip, in CSS pixels. */
+export const TABLE_GRIP_SIZE = 4;
+const TABLE_GRIP_INSET = 1;
+const TABLE_GRIP_THICKNESS = 2;
+const TABLE_GRIP_COLOR = '#485cb1';
+
+/** The square the table resize grip occupies inside a table's last cell. */
+export function tableGripRect(cell: Rect, rtl = false): Rect {
+  return {
+    x: rtl ? cell.x + TABLE_GRIP_INSET : cell.x + cell.w - TABLE_GRIP_INSET - TABLE_GRIP_SIZE,
+    y: cell.y + cell.h - TABLE_GRIP_INSET - TABLE_GRIP_SIZE,
+    w: TABLE_GRIP_SIZE,
+    h: TABLE_GRIP_SIZE,
+  };
+}
+
+/** L-shaped table resize grip in the table's last cell: a vertical bar on the
+ *  trailing side and a horizontal bar along the bottom. */
+export function paintTableGrip(ctx: CanvasRenderingContext2D, cell: Rect, rtl = false): void {
+  const g = tableGripRect(cell, rtl);
+  const bar = TABLE_GRIP_THICKNESS;
+  ctx.save();
+  ctx.fillStyle = TABLE_GRIP_COLOR;
+  ctx.fillRect(rtl ? g.x : g.x + g.w - bar, g.y, bar, g.h);
+  ctx.fillRect(g.x, g.y + g.h - bar, g.w, bar);
+  ctx.restore();
+}
+
 /** "Marching ants" outline for the fill drag preview. We omit the actual
  *  ant animation to keep the renderer stateless; a dashed strong rule is
  *  enough to read as a destination. */
@@ -174,8 +202,44 @@ export function paintMoveBand(ctx: CanvasRenderingContext2D, bounds: Rect, pt: n
   ctx.restore();
 }
 
-/** Animated dashed copy-source marquee ("marching ants"). */
-export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect, phase = 0): void {
+/** The Mac marquee: a 2 pt green dash band just inside the cell's outer 1 pt
+ *  line, 7 pt dash and 2 pt white gap, the gaps travelling 12 pt/s. */
+const MAC_MARQUEE_GREEN = '#217346';
+const MAC_MARQUEE_DASH_PT = [7, 2] as const;
+const MAC_MARQUEE_PERIOD_PT = 9;
+const MAC_MARQUEE_PT_PER_SECOND = 12;
+
+/** The marquee's dash phase at `nowMs`: pixels of travel on the default look,
+ *  points of travel on the Mac one. */
+export function copyMarqueePhase(nowMs: number, mac: boolean): number {
+  if (mac) return ((nowMs / 1000) * MAC_MARQUEE_PT_PER_SECOND) % MAC_MARQUEE_PERIOD_PT;
+  return (nowMs / 180) % 7;
+}
+
+/** Animated dashed copy-source marquee ("marching ants"). `macPtPx` (the Mac
+ *  pt-to-px scale) selects the Mac look, whose `phase` is in points. */
+export function paintCopyMarquee(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  phase = 0,
+  macPtPx?: number,
+): void {
+  if (macPtPx !== undefined) {
+    const inset = 2 * macPtPx;
+    const w = Math.max(0, bounds.w - 2 * inset);
+    const h = Math.max(0, bounds.h - 2 * inset);
+    ctx.save();
+    ctx.lineWidth = 2 * macPtPx;
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#ffffff';
+    ctx.strokeRect(bounds.x + inset, bounds.y + inset, w, h);
+    ctx.setLineDash(MAC_MARQUEE_DASH_PT.map((n) => n * macPtPx));
+    ctx.lineDashOffset = -phase * macPtPx;
+    ctx.strokeStyle = MAC_MARQUEE_GREEN;
+    ctx.strokeRect(bounds.x + inset, bounds.y + inset, w, h);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 3]);

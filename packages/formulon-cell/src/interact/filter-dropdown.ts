@@ -105,6 +105,8 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
   const onDocMouseDown = (e: MouseEvent): void => {
     if (!root) return;
     if (root.contains(e.target as Node)) return;
+    // The desktop panel is a floating window that only its close button dismisses.
+    if (mac) return;
     close();
   };
   const onDocKey = (e: KeyboardEvent): void => {
@@ -294,18 +296,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       ariaLabel: t.condition,
       className: 'fc-filter-dropdown__condition-op',
     });
-    if (mac) {
-      // Conditions that rank or bound numbers stay in Excel's list for a text column, unavailable.
-      if (!numeric) {
-        appendDisabledOptions(conditionSelect, [
-          m.between,
-          m.top10,
-          m.bottom10,
-          m.aboveAverage,
-          m.belowAverage,
-        ]);
-      }
-    }
     if (activeCriteria?.condition) conditionSelect.value = activeCriteria.condition.op;
     const conditionInput = ownerDocument.createElement('input');
     conditionInput.type = 'text';
@@ -467,7 +457,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       list.appendChild(allRow);
 
       for (const item of distinct) {
-        const display = item.key === '' ? t.blanks : item.label;
+        const display = item.key === '' ? (mac ? m.blanks : t.blanks) : item.label;
         if (f && !display.toLocaleLowerCase(activeLocale).includes(f)) continue;
         const row = ownerDocument.createElement('label');
         row.className = 'fc-filter-dropdown__row';
@@ -581,8 +571,28 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       title.className = 'fc-filter-dropdown__title';
       title.textContent = columnTitle(range, col);
       r.setAttribute('aria-label', title.textContent || t.title);
-      r.append(title, sortRow, colorSelect([]));
-      colorBy = colorSelect([m.cellColor, m.fontColor, m.cellIcon]);
+      const closeButton = createFilterDropdownActionButton('fc-filter-dropdown__close', '');
+      closeButton.setAttribute('aria-label', m.close);
+      closeButton.addEventListener('click', close);
+      const section = (text: string): HTMLElement => {
+        const label = ownerDocument.createElement('div');
+        label.className = 'fc-filter-dropdown__section';
+        label.textContent = text;
+        return label;
+      };
+      const rule = ownerDocument.createElement('hr');
+      rule.className = 'fc-filter-dropdown__rule';
+      const colorChoices = [m.cellColor, m.fontColor, m.cellIcon];
+      r.append(
+        closeButton,
+        title,
+        section(m.sortSection),
+        sortRow,
+        colorSelect(colorChoices),
+        rule,
+        section(m.filterSection),
+      );
+      colorBy = colorSelect(colorChoices);
     } else {
       actions.append(clear, apply);
     }

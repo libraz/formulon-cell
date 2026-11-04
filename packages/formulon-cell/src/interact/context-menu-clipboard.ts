@@ -4,6 +4,7 @@ import { createCopyFormatResolver } from '../commands/clipboard/format-resolver.
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import {
   type PasteWhat,
+  pasteLink,
   pasteSpecial,
   resolvePasteDestination,
 } from '../commands/clipboard/paste-special.js';
@@ -115,7 +116,12 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
     return localSnapshot;
   };
 
-  function runPasteSpecial(what: PasteWhat, transpose: boolean): void {
+  /** Runs a quick paste of the structured snapshot; `write` does the paste. */
+  function runQuickPaste(
+    transpose: boolean,
+    retry: () => void,
+    write: (snap: ClipboardSnapshot) => void,
+  ): void {
     if (ctx.hasExplicitPolicy()) {
       void readClipboard().then((text) => {
         if (text) ctx.executeClipboardText(text);
@@ -127,28 +133,38 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
     const state = store.getState();
     const destination = resolvePasteDestination(state, snap, transpose);
     if (!ctx.canPasteToRange(destination)) return;
-    if (
-      destination &&
-      deferForAllowedRangeUnlock(store, [destination], () => runPasteSpecial(what, transpose))
-    ) {
-      return;
-    }
+    if (destination && deferForAllowedRangeUnlock(store, [destination], retry)) return;
     if (history) history.begin();
     try {
-      pasteSpecial(
-        store.getState(),
-        store,
-        wb,
-        snap,
-        { what, operation: 'none', skipBlanks: false, transpose },
-        history,
-      );
+      write(snap);
     } catch (err) {
       console.warn('formulon-cell: paste special failed', err);
     } finally {
       if (history) history.end();
     }
     ctx.afterCommit();
+  }
+
+  function runPasteSpecial(what: PasteWhat, transpose: boolean): void {
+    runQuickPaste(
+      transpose,
+      () => runPasteSpecial(what, transpose),
+      (snap) =>
+        pasteSpecial(
+          store.getState(),
+          store,
+          wb,
+          snap,
+          { what, operation: 'none', skipBlanks: false, transpose },
+          history,
+        ),
+    );
+  }
+
+  function runPasteLink(): void {
+    runQuickPaste(false, runPasteLink, (snap) =>
+      pasteLink(store.getState(), store, wb, snap, history),
+    );
   }
 
   const run = (id: ItemId, state: State): boolean => {
@@ -276,6 +292,18 @@ export function createContextMenuClipboard(ctx: ContextMenuClipboardContext): Co
         return true;
       case 'pasteTranspose':
         runPasteSpecial('all', true);
+        return true;
+      case 'pasteKeepSource':
+        runPasteSpecial('all-using-source-theme', false);
+        return true;
+      case 'pasteNoBorders':
+        runPasteSpecial('all-except-borders', false);
+        return true;
+      case 'pasteColumnWidths':
+        runPasteSpecial('column-widths', false);
+        return true;
+      case 'pasteLink':
+        runPasteLink();
         return true;
       default:
         return false;

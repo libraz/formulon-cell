@@ -12,6 +12,7 @@ import {
   shrinkFontSizeToFit,
 } from '../../../src/render/painters/text.js';
 import {
+  copyMarqueePhase,
   FILL_HANDLE_SIZE,
   paintCellDiagonals,
   paintCellText,
@@ -55,8 +56,10 @@ function makeStrokeSpy(): {
   ctx: CanvasRenderingContext2D;
   strokes: Array<{ style: string; width: number; dash: number[] }>;
   rects: Array<{ x: number; y: number; w: number; h: number; width: number }>;
+  rectStyles: Array<{ style: string; dash: number[] }>;
 } {
   const strokes: Array<{ style: string; width: number; dash: number[] }> = [];
+  const rectStyles: Array<{ style: string; dash: number[] }> = [];
   const rects: Array<{ x: number; y: number; w: number; h: number; width: number }> = [];
   let strokeStyle = '';
   let lineWidth = 1;
@@ -89,9 +92,10 @@ function makeStrokeSpy(): {
     },
     strokeRect(x: number, y: number, w: number, h: number): void {
       rects.push({ x, y, w, h, width: lineWidth });
+      rectStyles.push({ style: strokeStyle, dash: [...dash] });
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, strokes, rects };
+  return { ctx, strokes, rects, rectStyles };
 }
 
 function makeTextSpy(): {
@@ -368,6 +372,28 @@ describe('paintCopyMarquee', () => {
       { x: 11.5, y: 21.5, w: 77, h: 21, width: 1 },
       { x: 10.5, y: 20.5, w: 79, h: 23, width: 1 },
     ]);
+  });
+});
+
+describe('paintCopyMarquee on the Mac look', () => {
+  it('paints a white 2 pt band under a 7 / 2 pt green dash, inside the outer line', () => {
+    const { ctx, rects, rectStyles } = makeStrokeSpy();
+    paintCopyMarquee(ctx, { x: 10, y: 20, w: 80, h: 24 }, 4.5, 2);
+
+    expect(rects).toEqual([
+      { x: 14, y: 24, w: 72, h: 16, width: 4 },
+      { x: 14, y: 24, w: 72, h: 16, width: 4 },
+    ]);
+    expect(rectStyles.map((stroke) => [stroke.style, stroke.dash])).toEqual([
+      ['#ffffff', []],
+      ['#217346', [14, 4]],
+    ]);
+  });
+
+  it('travels 12 pt per second and wraps every 9 pt', () => {
+    expect(copyMarqueePhase(0, true)).toBe(0);
+    expect(copyMarqueePhase(250, true)).toBeCloseTo(3, 6);
+    expect(copyMarqueePhase(750, true)).toBeCloseTo(0, 6);
   });
 });
 

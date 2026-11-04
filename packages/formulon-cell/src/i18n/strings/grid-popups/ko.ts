@@ -150,6 +150,16 @@ export const gridPopupsKo: GridPopupsStrings = {
     fillWeekdays: '평일 채우기',
     fillMonths: '월 채우기',
     fillYears: '연 채우기',
+    dragMenu: {
+      seriesDays: '계열 채우기(일)',
+      seriesWeekdays: '계열 채우기(평일)',
+      seriesMonths: '계열 채우기(월)',
+      seriesYears: '계열 채우기(연)',
+      linear: '선형 추세',
+      growth: '성장 추세',
+      flashFill: '빠른 채우기',
+      seriesDialog: '계열...',
+    },
   },
   pasteOptions: {
     title: '붙여넣기 옵션',

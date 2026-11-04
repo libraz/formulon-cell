@@ -66,4 +66,44 @@ describe('attachOverlayScrollbars', () => {
     handle.detach();
     expect(thumbs()).toHaveLength(0);
   });
+
+  const press = (el: Element, type: string, y: number): void => {
+    const e = new MouseEvent(type, {
+      clientY: y,
+      clientX: y,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    });
+    el.dispatchEvent(e);
+  };
+
+  it('page-scrolls by the visible count minus one on a track click while shown', () => {
+    const handle = attachOverlayScrollbars({ grid, store });
+    const track = grid.querySelector<HTMLElement>('.fc-scrolltrack--v') as HTMLElement;
+    // Hidden bars let the click through to the cells.
+    press(track, 'pointerdown', 500);
+    expect(store.getState().viewport.rowStart).toBe(0);
+
+    mutators.scrollBy(store, 1, 0);
+    const before = store.getState().viewport.rowStart;
+    const page = store.getState().viewport.rowCount - 1;
+    press(track, 'pointerdown', 590);
+    expect(store.getState().viewport.rowStart).toBe(before + page);
+    handle.detach();
+  });
+
+  it('scrolls in proportion to a thumb drag', () => {
+    const handle = attachOverlayScrollbars({ grid, store });
+    mutators.scrollBy(store, 1, 0);
+    const thumb = grid.querySelector<HTMLElement>('.fc-scrollthumb--v') as HTMLElement;
+    press(thumb, 'pointerdown', 100);
+    press(thumb, 'pointermove', 160);
+    expect(store.getState().viewport.rowStart).toBeGreaterThan(5);
+    const mid = store.getState().viewport.rowStart;
+    press(thumb, 'pointerup', 160);
+    press(thumb, 'pointermove', 400);
+    expect(store.getState().viewport.rowStart).toBe(mid);
+    handle.detach();
+  });
 });

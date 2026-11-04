@@ -98,7 +98,11 @@ export function createContextMenuPermissions(
       id === 'pasteValues' ||
       id === 'pasteValuesNumFmt' ||
       id === 'pasteFormatsOnly' ||
-      id === 'pasteTranspose'
+      id === 'pasteTranspose' ||
+      id === 'pasteKeepSource' ||
+      id === 'pasteNoBorders' ||
+      id === 'pasteColumnWidths' ||
+      id === 'pasteLink'
     ) {
       return 'paste';
     }
@@ -124,7 +128,8 @@ export function createContextMenuPermissions(
       id === 'alignRight' ||
       id === 'borders' ||
       id === 'formatCells' ||
-      id === 'editPhonetic'
+      id === 'editPhonetic' ||
+      id === 'showPhonetic'
     ) {
       return 'format';
     }

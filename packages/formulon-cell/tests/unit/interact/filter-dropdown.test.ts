@@ -474,6 +474,81 @@ describe('attachFilterDropdown', () => {
       handle.detach();
     });
 
+    it('stacks the sort and filter sections and offers colour choices in both', () => {
+      const handle = openMac();
+      const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+      const order = Array.from(panel?.children ?? [], (el) => el.className.split(' ')[0]);
+      expect(order.slice(0, 9)).toEqual([
+        'fc-filter-dropdown__close',
+        'fc-filter-dropdown__title',
+        'fc-filter-dropdown__section',
+        'fc-filter-dropdown__sort',
+        'fc-filter-dropdown__color',
+        'fc-filter-dropdown__rule',
+        'fc-filter-dropdown__section',
+        'fc-filter-dropdown__color',
+        'fc-filter-dropdown__condition',
+      ]);
+      expect(
+        Array.from(
+          panel?.querySelectorAll('.fc-filter-dropdown__section') ?? [],
+          (e) => e.textContent,
+        ),
+      ).toEqual(['並べ替え', 'フィルター']);
+      for (const select of panel?.querySelectorAll<HTMLSelectElement>(
+        '.fc-filter-dropdown__color select',
+      ) ?? []) {
+        expect(Array.from(select.options, (o) => o.textContent)).toEqual([
+          'なし',
+          'セルの色',
+          'フォントの色',
+          'セルのアイコン',
+        ]);
+      }
+      handle.detach();
+    });
+
+    it('stays open on an outside click and closes with its close button', () => {
+      const handle = openMac();
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      expect(handle.isOpen()).toBe(true);
+      document
+        .querySelector<HTMLButtonElement>('.fc-filter-dropdown__close')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(handle.isOpen()).toBe(false);
+    });
+
+    it('lists the text conditions without the number-only entries', () => {
+      const host = document.createElement('div');
+      host.className = 'fc-host';
+      host.dataset.fcPlatform = 'mac';
+      document.body.appendChild(host);
+      store.setState((state) => {
+        const cells = new Map(state.data.cells);
+        for (const [row, v] of ['h', 'a', 'b'].entries()) {
+          cells.set(addrKey({ sheet: 0, row, col: 0 }), {
+            value: { kind: 'text', value: v },
+            formula: null,
+          });
+        }
+        return { ...state, data: { ...state.data, cells } };
+      });
+      const handle = attachFilterDropdown({ store, host, strings: ja });
+      handle.open({ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+      const options = Array.from(
+        document.querySelectorAll<HTMLOptionElement>('.fc-filter-dropdown__condition-op option'),
+        (o) => o.textContent,
+      );
+      expect(options).toEqual([
+        '1 つ選択してください',
+        '指定の値に等しい',
+        '指定の値に等しくない',
+        'を含む',
+        'を含まない',
+      ]);
+      handle.detach();
+    });
+
     it('sorts the column from the panel and greys the colour popups', async () => {
       const wb = await WorkbookHandle.createDefault();
       try {

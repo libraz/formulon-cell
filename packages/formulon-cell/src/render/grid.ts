@@ -55,6 +55,7 @@ import { styleElementFormatSource } from './grid/table-format.js';
 import { paintTraces } from './grid/traces.js';
 import { cellFontFamily } from './painters/text.js';
 import {
+  copyMarqueePhase,
   paintActiveCellBox,
   paintChartSourceHighlight,
   paintCopyMarquee,
@@ -69,6 +70,7 @@ import {
   paintSpillOutline,
   paintSpillTarget,
   paintSpillWarningTag,
+  paintTableGrip,
   paintValidationChevron,
 } from './painters.js';
 
@@ -814,6 +816,12 @@ export class GridRenderer {
     this.hits.validationChevron = null;
     this.hits.totalsChevron = null;
     this.hits.errorTag = null;
+    for (const table of state.tables.tables) {
+      if (table.range.sheet !== data.sheetIndex) continue;
+      const { r1, c1 } = table.range;
+      const [corner] = rangeRects(layout, viewport, { r0: r1, c0: c1, r1, c1 });
+      if (corner) paintTableGrip(this.ctx, corner, layout.rtl);
+    }
     // A selected chart or picture replaces the cell cursor, as in Excel.
     if (ui.selectedObject) return;
 
@@ -910,10 +918,10 @@ export class GridRenderer {
       (copyRange) => copyRange.sheet === data.sheetIndex,
     );
     if (rangesToPaint.length > 0) {
-      const phase = (performance.now() / 180) % 7;
+      const phase = copyMarqueePhase(performance.now(), macPt !== undefined);
       for (const copyRange of rangesToPaint) {
         const rects = rangeRects(layout, viewport, copyRange);
-        for (const r of rects) paintCopyMarquee(this.ctx, r, phase);
+        for (const r of rects) paintCopyMarquee(this.ctx, r, phase, macPt);
       }
       // Keep the marquee animating, but track the handle so dispose() can cancel
       // it — otherwise the self-scheduling loop pins the renderer after teardown.

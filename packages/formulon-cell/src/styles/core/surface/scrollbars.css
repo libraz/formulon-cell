@@ -13,7 +13,31 @@
 
   .fc-scrollthumb[data-visible="true"] {
     opacity: 1;
+    pointer-events: auto;
     transition: none;
+  }
+
+  /* Invisible click targets beside the thumbs; live only while the bars show. */
+  .fc-scrolltrack {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .fc-scrolltrack[data-visible="true"] {
+    pointer-events: auto;
+  }
+
+  .fc-scrolltrack--v {
+    right: 0;
+    bottom: 0;
+    width: 13px;
+  }
+
+  .fc-scrolltrack--h {
+    bottom: 0;
+    right: 0;
+    height: 12px;
   }
 
   .fc-scrollthumb--v {

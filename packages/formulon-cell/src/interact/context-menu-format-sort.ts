@@ -16,7 +16,7 @@ import {
   toggleUnderline,
 } from '../commands/format.js';
 import type { History } from '../commands/history.js';
-import { phoneticReading, setPhoneticReading } from '../commands/phonetic.js';
+import { phoneticReading, setPhoneticReading, toggleShowPhonetic } from '../commands/phonetic.js';
 import { deferForAllowedRangeUnlock } from '../commands/protection.js';
 import { inferSortHasHeader, sortRange } from '../commands/sort.js';
 import { addrKey, parseAddrKey } from '../engine/address.js';
@@ -99,6 +99,10 @@ export function runContextMenuFormatSortItem(
     }
     case 'borders': {
       wrapFmt('borders', () => cycleBorders(store.getState(), store));
+      return true;
+    }
+    case 'showPhonetic': {
+      wrapFmt('showPhonetic', () => toggleShowPhonetic(store, wb));
       return true;
     }
     case 'editPhonetic': {

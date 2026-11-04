@@ -19,6 +19,10 @@ export type ItemId =
   | 'pasteValuesNumFmt'
   | 'pasteFormatsOnly'
   | 'pasteTranspose'
+  | 'pasteKeepSource'
+  | 'pasteNoBorders'
+  | 'pasteColumnWidths'
+  | 'pasteLink'
   | 'insertCopiedCells'
   | 'insertCells'
   | 'deleteCells'
@@ -60,6 +64,7 @@ export type ItemId =
   | 'insertHyperlink'
   | 'openHyperlink'
   | 'editPhonetic'
+  | 'showPhonetic'
   | 'toggleWatch'
   | 'pivotRefresh'
   | 'pivotSortAsc'
@@ -179,6 +184,10 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'pasteValuesNumFmt',
   'pasteFormatsOnly',
   'pasteTranspose',
+  'pasteKeepSource',
+  'pasteNoBorders',
+  'pasteColumnWidths',
+  'pasteLink',
   'insertCopiedCells',
   'insertCells',
   'deleteCells',
@@ -220,6 +229,7 @@ export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
   'insertHyperlink',
   'openHyperlink',
   'editPhonetic',
+  'showPhonetic',
   'toggleWatch',
   'pivotRefresh',
   'pivotSortAsc',
@@ -319,6 +329,10 @@ export const PASTE_QUICK_IDS: readonly ItemId[] = [
   'pasteValuesNumFmt',
   'pasteFormatsOnly',
   'pasteTranspose',
+  'pasteKeepSource',
+  'pasteNoBorders',
+  'pasteColumnWidths',
+  'pasteLink',
 ];
 
 /** Maps a submenu id to the `data-fc-action` value used for its CSS icon. */
@@ -757,12 +771,16 @@ function macPasteSpecialSubmenu(s: Strings): MenuEntry {
       { kind: 'sep', id: 'psSep1' },
       { kind: 'item', id: 'pasteFormulas', label: t.pasteFormulas },
       { kind: 'item', id: 'pasteFormulasNumFmt', label: t.pasteFormulasNumFmt },
+      { kind: 'item', id: 'pasteKeepSource', label: m.pasteKeepSource },
+      { kind: 'item', id: 'pasteNoBorders', label: m.pasteNoBorders },
+      { kind: 'item', id: 'pasteColumnWidths', label: m.pasteColumnWidths },
       { kind: 'item', id: 'pasteTranspose', label: t.pasteTranspose },
       { kind: 'sep', id: 'psSep2' },
       { kind: 'item', id: 'pasteValues', label: t.pasteValues },
       { kind: 'item', id: 'pasteValuesNumFmt', label: t.pasteValuesNumFmt },
       { kind: 'sep', id: 'psSep3' },
       { kind: 'item', id: 'pasteFormatsOnly', label: m.pasteFormatsOnly },
+      { kind: 'item', id: 'pasteLink', label: m.pasteLink },
       { kind: 'sep', id: 'psSep4' },
       { kind: 'item', id: 'pasteSpecial', label: m.pasteSpecialDialog, hint: '^⌘V' },
     ],
@@ -781,7 +799,7 @@ export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
     macPasteSpecialSubmenu(s),
     { kind: 'sep', id: 'sep1' },
     { kind: 'item', id: 'insertCells', label: m.insert },
-    { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedCells },
+    { kind: 'item', id: 'insertCopiedCells', label: m.insertCopiedCells },
     { kind: 'item', id: 'deleteCells', label: m.delete },
     { kind: 'item', id: 'clear', label: m.clear },
     { kind: 'sep', id: 'sep2' },
@@ -797,11 +815,56 @@ export function buildMacCellEntries(s: Strings, hasNote: boolean): MenuEntry[] {
       : []),
     { kind: 'sep', id: 'sep4' },
     { kind: 'item', id: 'formatCells', label: m.formatCells, hint: '⌘1' },
-    { kind: 'item', id: 'editPhonetic', label: m.editPhonetic },
+    { kind: 'item', id: 'showPhonetic', label: m.showPhonetic },
     { kind: 'item', id: 'defineName', label: m.defineName },
     { kind: 'sep', id: 'sep5' },
     { kind: 'item', id: 'insertHyperlink', label: m.hyperlink, hint: '⌘K' },
     { kind: 'item', id: 'openHyperlink', label: s.ribbonMenu.linkOpen },
+  ];
+}
+
+/** Row header menu in the Mac desktop order. */
+export function buildMacRowEntries(s: Strings): MenuEntry[] {
+  const m = s.macContextMenu;
+  return [
+    ...macBandHead(s),
+    { kind: 'item', id: 'rowInsertAbove', label: m.insertBand },
+    { kind: 'item', id: 'insertCopiedCells', label: m.insertCopiedBand },
+    { kind: 'item', id: 'rowDelete', label: m.deleteBand },
+    { kind: 'item', id: 'clear', label: m.clear },
+    { kind: 'sep', id: 'sepR2' },
+    { kind: 'item', id: 'formatCells', label: m.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'rowHeight', label: m.rowHeight },
+    { kind: 'item', id: 'rowHide', label: m.hide, hint: '^9' },
+    { kind: 'item', id: 'rowUnhide', label: m.unhide, hint: '^⇧9' },
+  ];
+}
+
+/** Column header menu in the Mac desktop order. */
+export function buildMacColEntries(s: Strings): MenuEntry[] {
+  const m = s.macContextMenu;
+  return [
+    ...macBandHead(s),
+    { kind: 'item', id: 'colInsertLeft', label: m.insertBand },
+    { kind: 'item', id: 'insertCopiedCells', label: m.insertCopiedBand },
+    { kind: 'item', id: 'colDelete', label: m.deleteBand },
+    { kind: 'item', id: 'clear', label: m.clear },
+    { kind: 'sep', id: 'sepC2' },
+    { kind: 'item', id: 'formatCells', label: m.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'colWidth', label: m.colWidth },
+    { kind: 'item', id: 'colHide', label: m.hide, hint: '^0' },
+    { kind: 'item', id: 'colUnhide', label: m.unhide, hint: '^⇧0' },
+  ];
+}
+
+function macBandHead(s: Strings): MenuEntry[] {
+  const m = s.macContextMenu;
+  return [
+    { kind: 'item', id: 'cut', label: m.cut, hint: '⌘X' },
+    { kind: 'item', id: 'copy', label: m.copy, hint: '⌘C' },
+    { kind: 'item', id: 'paste', label: m.paste, hint: '⌘V' },
+    macPasteSpecialSubmenu(s),
+    { kind: 'sep', id: 'sepB1' },
   ];
 }
 

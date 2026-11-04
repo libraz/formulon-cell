@@ -105,10 +105,36 @@ describe('context menu on the Mac platform profile', () => {
       '並べ替え',
       '新しいメモ',
       'セルの書式設定...',
-      'ふりがなの編集...',
+      'ふりがなの表示',
       '名前の定義...',
       'ハイパーリンク...',
       'ハイパーリンクを開く',
+    ]);
+  });
+
+  it('lists the pasted-link and source-format rows in the Paste Special submenu', () => {
+    const sub = buildMacCellEntries(ja, false).find((e) => e.id === 'pasteSpecialMenu');
+    const labels =
+      sub?.kind === 'submenu'
+        ? sub.children.map((e) => (e.kind === 'sep' ? '-' : e.kind === 'item' ? e.label : '?'))
+        : [];
+    expect(labels).toEqual([
+      'ペースト',
+      '-',
+      '数式',
+      '数式と数値の書式',
+      '元の書式を保持',
+      '罫線なし',
+      '元の列幅を保持',
+      '行/列の入れ替え',
+      '-',
+      '値',
+      '値と数値の書式',
+      '-',
+      '書式のペースト',
+      'リンク貼り付け',
+      '-',
+      '形式を選択してペースト...',
     ]);
   });
 
@@ -176,5 +202,123 @@ describe('context menu on the Mac platform profile', () => {
     expect(item('selectAll')).not.toBeNull();
     expect(item('toggleWatch')).not.toBeNull();
     expect(document.activeElement).toBe(item('cut'));
+  });
+
+  describe('header band menus', () => {
+    const labelsOf = (): string[] =>
+      Array.from(
+        visibleMenu()?.querySelectorAll(':scope > .fc-ctxmenu__item .fc-ctxmenu__label') ?? [],
+      ).map((node) => node.textContent ?? '');
+
+    it('column menu: bare Insert/Delete, Hide and Unhide with their hints, no filter or sort', () => {
+      attach();
+      fireContextMenu(host, 60, 10);
+      expect(visibleMenu()?.dataset.fcMenu).toBe('col');
+      expect(labelsOf()).toEqual([
+        'カット',
+        'コピー',
+        'ペースト',
+        '形式を選択してペースト',
+        '挿入',
+        '削除',
+        '数式と値のクリア',
+        'セルの書式設定...',
+        '列の幅...',
+        '表示しない',
+        '再表示',
+      ]);
+      expect(hint('colHide')).toBe('^0');
+      expect(hint('colUnhide')).toBe('^⇧0');
+      expect(item('colInsertRight')).toBeNull();
+    });
+
+    it('row menu: row height, no insert-below row, hints ^9 and ^⇧9', () => {
+      attach();
+      fireContextMenu(host, 10, 30);
+      expect(visibleMenu()?.dataset.fcMenu).toBe('row');
+      expect(labelsOf()).toEqual([
+        'カット',
+        'コピー',
+        'ペースト',
+        '形式を選択してペースト',
+        '挿入',
+        '削除',
+        '数式と値のクリア',
+        'セルの書式設定...',
+        '行の高さ...',
+        '表示しない',
+        '再表示',
+      ]);
+      expect(hint('rowHide')).toBe('^9');
+      expect(hint('rowUnhide')).toBe('^⇧9');
+      expect(item('rowInsertBelow')).toBeNull();
+    });
+
+    it('Unhide stays enabled with nothing hidden in the selection', () => {
+      attach();
+      fireContextMenu(host, 60, 10);
+      expect(item('colUnhide')?.disabled).toBe(false);
+      expect(item('colUnhide')?.getAttribute('aria-disabled')).not.toBe('true');
+    });
+
+    it('a pending copy turns Insert into the copied-cells row without an ellipsis', () => {
+      store.setState((s) => ({
+        ...s,
+        ui: { ...s.ui, copyRange: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 } },
+      }));
+      attach();
+      fireContextMenu(host, 60, 10);
+      expect(label('insertCopiedCells')).toBe('コピーしたセルの挿入');
+      expect(item('colInsertLeft')).toBeNull();
+    });
+  });
+
+  it('a pending copy turns the cell menu Insert into the copied-cells row with an ellipsis', () => {
+    store.setState((s) => ({
+      ...s,
+      ui: { ...s.ui, copyRange: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 } },
+    }));
+    attach();
+    fireContextMenu(host, 200, 70);
+    expect(label('insertCopiedCells')).toBe('コピーしたセルの挿入...');
+    expect(item('insertCells')).toBeNull();
+  });
+
+  describe('placement', () => {
+    const stubMenuRect = (): void => {
+      vi.stubGlobal('innerWidth', 3840);
+      vi.stubGlobal('innerHeight', 1526);
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        const isMenu = this.classList.contains('fc-ctxmenu');
+        const w = isMenu ? 287 : 0;
+        const h = isMenu ? 650 : 0;
+        return { x: 0, y: 0, left: 0, top: 0, right: w, bottom: h, width: w, height: h } as DOMRect;
+      });
+    };
+    const position = (): { x: number; y: number } => {
+      const root = visibleMenu();
+      return {
+        x: Number.parseFloat(root?.style.left ?? ''),
+        y: Number.parseFloat(root?.style.top ?? ''),
+      };
+    };
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('opens one pixel right of and above the pointer', () => {
+      stubMenuRect();
+      attach();
+      fireContextMenu(host, 155, 292);
+      expect(position()).toEqual({ x: 156, y: 291 });
+    });
+
+    it('flips to the pointer left at the right edge and slides up at the bottom edge', () => {
+      stubMenuRect();
+      attach();
+      fireContextMenu(host, 3800, 1280);
+      expect(position()).toEqual({ x: 3800 - 287, y: 1526 - 650 - 6 });
+    });
   });
 });

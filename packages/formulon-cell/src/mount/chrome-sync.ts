@@ -1,4 +1,5 @@
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import type { TableOverlay } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import {
   definedNameDisplayFormula,
@@ -25,6 +26,7 @@ import { formatNumber } from '../format/number-format.js';
 import type { Strings } from '../i18n/strings.js';
 import { scrollActiveIntoView } from '../interact/navigation-policy.js';
 import { overlayPortalFor } from '../interact/overlay-portal.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { NumFmt } from '../store/types/cell-format.js';
@@ -206,11 +208,40 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   grid.setAttribute('aria-colcount', String(MAX_COL + 1));
   grid.setAttribute('aria-multiselectable', 'true');
 
-  /** The address, or the defined name when the selection is exactly a named range. */
+  /** The defined name when the selection is exactly a named range, else the
+   *  active cell's address (a whole row or column keeps its band reference). */
   const nameBoxText = (ref: string): string => {
     const s = store.getState();
     if (s.selection.extraRanges?.length) return ref;
-    return nameForRange(getWb(), s.data.sheetIndex, s.selection.range) ?? ref;
+    const range = s.selection.range;
+    const named = nameForRange(getWb(), s.data.sheetIndex, range);
+    if (named) return named;
+    if (isWholeColumnRange(range) || isWholeRowRange(range)) return ref;
+    const a = s.selection.active;
+    return formatSelectionRef(
+      { r0: a.row, c0: a.col, r1: a.row, c1: a.col },
+      a,
+      s.ui.r1c1 === true,
+    );
+  };
+
+  // While a pointer drag is extending the selection the box reads "<rows>R x <cols>C".
+  let dragFrom: State['selection']['range'] | null = null;
+  const dragSizeText = (s: State): string | null => {
+    const r = s.selection.range;
+    if (!dragFrom) return null;
+    const f = dragFrom;
+    if (f.r0 === r.r0 && f.c0 === r.c0 && f.r1 === r.r1 && f.c1 === r.c1) return null;
+    if (r.r0 === r.r1 && r.c0 === r.c1) return null;
+    return `${r.r1 - r.r0 + 1}R x ${r.c1 - r.c0 + 1}C`;
+  };
+  const onGridPointerDown = (e: PointerEvent): void => {
+    if (e.button === 0) dragFrom = store.getState().selection.range;
+  };
+  const onPointerRelease = (): void => {
+    if (!dragFrom) return;
+    dragFrom = null;
+    updateChrome();
   };
 
   const selectionRef = (s: State): string => {
@@ -503,7 +534,9 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     currentActiveDisplay = { key: activeKey, text: display };
     const ref = selectionRef(s);
     const object = s.ui.selectedObject;
-    if (document.activeElement !== tag) tag.value = object ? object.name : nameBoxText(ref);
+    if (document.activeElement !== tag) {
+      tag.value = object ? object.name : (dragSizeText(s) ?? nameBoxText(ref));
+    }
     if (!getFormulaEditing()) {
       fxInput.value = object ? '' : formulaBarText(s, wb, active, display);
       fxInput.readOnly = !object && isDataTableFormula(s.data.cells.get(addrKey(active))?.formula);
@@ -540,17 +573,30 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     return areas;
   };
 
+  const showSheet = (sheetIdx: number): boolean => {
+    if (sheetIdx === store.getState().data.sheetIndex) return true;
+    const tabs = getSheetTabs();
+    if (tabs) tabs.switchSheet(sheetIdx);
+    else mutators.setSheetIndex(store, sheetIdx);
+    return store.getState().data.sheetIndex === sheetIdx;
+  };
+
+  /** Pick a table from the list: its sheet opens on the first data cell. */
+  const selectTable = (table: TableOverlay): void => {
+    const sheetIdx = table.range.sheet;
+    if (!showSheet(sheetIdx)) return;
+    const row = table.range.r0 + (table.showHeader ? 1 : 0);
+    mutators.setActive(store, { sheet: sheetIdx, row, col: table.range.c0 });
+    scrollActiveIntoView(store, store.getState().selection.active);
+    host.focus();
+  };
+
   const applyNameBoxValue = (raw: string): boolean => {
     const areas = resolveNameBoxAreas(raw);
     const first = areas?.[0];
     if (!areas || !first) return false;
     const sheetIdx = first.sheet;
-    if (sheetIdx !== store.getState().data.sheetIndex) {
-      const tabs = getSheetTabs();
-      if (tabs) tabs.switchSheet(sheetIdx);
-      else mutators.setSheetIndex(store, sheetIdx);
-      if (store.getState().data.sheetIndex !== sheetIdx) return false;
-    }
+    if (!showSheet(sheetIdx)) return false;
     if (areas.length === 1 && first.r0 === first.r1 && first.c0 === first.c1) {
       mutators.setActive(store, { sheet: sheetIdx, row: first.r0, col: first.c0 });
     } else {
@@ -645,9 +691,19 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   }
 
   const openNameMenu = (): void => {
-    const rows = rangeDefinedNames(getWb(), store.getState().data.sheetIndex).filter(
+    const names = rangeDefinedNames(getWb(), store.getState().data.sheetIndex).filter(
       (row) => !row.hidden,
     );
+    const tables = store.getState().tables.tables.filter((t) => t.name);
+    // Tables are listed with the names, in one case-insensitive order.
+    const rows = [
+      ...names.map((row) => ({
+        name: row.name,
+        title: definedNameDisplayFormula(row.formula),
+        row,
+      })),
+      ...tables.map((table) => ({ name: table.name ?? '', title: table.name ?? '', table })),
+    ].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
     closeNameMenu();
     const menu = document.createElement('div');
     menu.className = 'fc-namebox-menu';
@@ -665,8 +721,13 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
         text: row.name,
       });
       item.setAttribute('role', 'option');
-      item.title = definedNameDisplayFormula(row.formula);
+      item.title = row.title;
       item.addEventListener('click', (e) => {
+        if ('table' in row) {
+          closeNameMenu();
+          selectTable(row.table);
+          return;
+        }
         tag.value = row.name;
         if (e.ctrlKey || e.metaKey) {
           addNameBoxValue(row.name);
@@ -723,6 +784,9 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   tag.addEventListener('pointerdown', onTagPointerDown);
   tag.addEventListener('keydown', onTagKey);
   tag.addEventListener('blur', onTagBlur);
+  grid.addEventListener('pointerdown', onGridPointerDown);
+  document.addEventListener('pointerup', onPointerRelease);
+  document.addEventListener('pointercancel', onPointerRelease);
 
   let lastSheetIdx = store.getState().data.sheetIndex;
   let lastHiddenSheets = store.getState().layout.hiddenSheets;
@@ -767,6 +831,9 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       tag.removeEventListener('pointerdown', onTagPointerDown);
       tag.removeEventListener('keydown', onTagKey);
       tag.removeEventListener('blur', onTagBlur);
+      grid.removeEventListener('pointerdown', onGridPointerDown);
+      document.removeEventListener('pointerup', onPointerRelease);
+      document.removeEventListener('pointercancel', onPointerRelease);
       unsub();
     },
     updateChrome,

@@ -150,6 +150,16 @@ export const gridPopupsEn: GridPopupsStrings = {
     fillWeekdays: 'Fill Weekdays',
     fillMonths: 'Fill Months',
     fillYears: 'Fill Years',
+    dragMenu: {
+      seriesDays: 'Fill Series (Days)',
+      seriesWeekdays: 'Fill Series (Weekdays)',
+      seriesMonths: 'Fill Series (Months)',
+      seriesYears: 'Fill Series (Years)',
+      linear: 'Linear Trend',
+      growth: 'Growth Trend',
+      flashFill: 'Flash Fill',
+      seriesDialog: 'Series...',
+    },
   },
   pasteOptions: {
     title: 'Paste Options',

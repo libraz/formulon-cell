@@ -146,6 +146,25 @@ export function addSheet(
   return added;
 }
 
+/** Add a sheet directly after the active one and return its index (-1 on
+ *  refusal). Undo removes the sheet in one step. */
+export function addSheetAfterActive(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history?: History | null,
+): number {
+  const active = store.getState().data.sheetIndex;
+  history?.begin();
+  try {
+    const added = addSheet(store, wb, history);
+    const target = active + 1;
+    if (added < 0 || target >= added) return added;
+    return moveSheet(store, wb, added, target, history) ? target : added;
+  } finally {
+    history?.end();
+  }
+}
+
 /** Longest sheet name the desktop spreadsheet accepts. */
 const MAX_SHEET_NAME_LENGTH = 31;
 

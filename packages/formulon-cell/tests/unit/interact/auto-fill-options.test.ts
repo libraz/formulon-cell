@@ -238,6 +238,128 @@ describe('auto fill options', () => {
     expect(menu.style.top).toBe('96px');
   });
 
+  it('places the chip just outside the anchor corner and the menu below the chip', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+    const handle = attachAutoFillOptions({ host, store, wb, strings: en });
+    detach = () => handle.detach();
+    const button = document.querySelector<HTMLElement>('.fc-autofill-options__button');
+    const menu = document.querySelector<HTMLElement>('.fc-autofill-options__menu');
+    if (!button || !menu) throw new Error('missing auto fill options elements');
+    Object.defineProperty(button, 'offsetWidth', { configurable: true, value: 24 });
+    Object.defineProperty(button, 'offsetHeight', { configurable: true, value: 22 });
+    Object.defineProperty(menu, 'offsetWidth', { configurable: true, value: 180 });
+    Object.defineProperty(menu, 'offsetHeight', { configurable: true, value: 130 });
+    host.dispatchEvent(
+      new CustomEvent('fc:autofilloptions', {
+        detail: {
+          src: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+          dest: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+          mode: 'series',
+          clientX: 100,
+          clientY: 100,
+        },
+      }),
+    );
+    expect(button.style.left).toBe('101.5px');
+    expect(button.style.top).toBe('102.7px');
+    expect(menu.style.left).toBe('101.5px');
+    expect(Number.parseFloat(menu.style.top)).toBeCloseTo(102.7 + 22 + 5, 5);
+  });
+
+  describe('right-button drag menu', () => {
+    const open = (src: object, dest: object): HTMLButtonElement[] => {
+      const handle = attachAutoFillOptions({
+        host,
+        store,
+        wb,
+        strings: en,
+        onAfterCommit: () => {
+          mutators.replaceCells(store, wb.cells(0));
+        },
+      });
+      detach = () => handle.detach();
+      host.dispatchEvent(
+        new CustomEvent('fc:autofillmenu', {
+          detail: { src, dest, clientX: 200, clientY: 200, anchorX: 150, anchorY: 150 },
+        }),
+      );
+      return Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item'));
+    };
+    const enabled = (items: HTMLButtonElement[]): string[] =>
+      items.filter((i) => !i.disabled).map((i) => i.dataset.fcAction ?? '');
+
+    it('lists the fill kinds in order and enables the number set for numeric seeds', () => {
+      seedAndMirror(store, wb, [
+        { row: 0, col: 0, value: 5 },
+        { row: 1, col: 0, value: 6 },
+      ]);
+      const items = open(
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+        { sheet: 0, r0: 0, c0: 0, r1: 6, c1: 0 },
+      );
+      expect(items.map((i) => i.dataset.fcAction)).toEqual([
+        'copy',
+        'series',
+        'formattingOnly',
+        'withoutFormatting',
+        'days',
+        'weekdays',
+        'months',
+        'years',
+        'linear',
+        'growth',
+        'flashFill',
+        'seriesDialog',
+      ]);
+      expect(enabled(items)).toEqual([
+        'copy',
+        'series',
+        'formattingOnly',
+        'withoutFormatting',
+        'linear',
+        'growth',
+      ]);
+    });
+
+    it('disables every series kind for a text seed', () => {
+      seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'abc' }]);
+      const items = open(
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
+      );
+      expect(enabled(items)).toEqual(['copy', 'formattingOnly', 'withoutFormatting']);
+    });
+
+    it('fills a growth series and selects the whole range', () => {
+      seedAndMirror(store, wb, [
+        { row: 0, col: 0, value: 5 },
+        { row: 1, col: 0, value: 6 },
+      ]);
+      const items = open(
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+        { sheet: 0, r0: 0, c0: 0, r1: 6, c1: 0 },
+      );
+      items.find((i) => i.dataset.fcAction === 'growth')?.click();
+      expect(num(wb, 2, 0)).toBeCloseTo(7.2, 6);
+      expect(num(wb, 3, 0)).toBeCloseTo(8.64, 6);
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 6, c1: 0 });
+    });
+
+    it('copies the seeds with Copy Cells', () => {
+      seedAndMirror(store, wb, [
+        { row: 0, col: 0, value: 5 },
+        { row: 1, col: 0, value: 6 },
+      ]);
+      const items = open(
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+        { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
+      );
+      items.find((i) => i.dataset.fcAction === 'copy')?.click();
+      expect([2, 3, 4].map((r) => num(wb, r, 0))).toEqual([5, 6, 5]);
+    });
+  });
+
   it('keeps smart button and menu item DOM on the shared floating options helper', () => {
     const source = readFileSync(join(root, 'src/interact/auto-fill-options.ts'), 'utf8');
     const helperSource = readFileSync(join(root, 'src/interact/floating-options-menu.ts'), 'utf8');

@@ -1178,9 +1178,7 @@ describe('attachStatusBar', () => {
         mutators.setZoom(store, z);
       },
     });
-    const plus = statusbar.querySelector<HTMLButtonElement>(
-      '.fc-host__statusbar-zoom-btn:last-of-type',
-    );
+    const plus = statusbar.querySelectorAll<HTMLButtonElement>('.fc-host__statusbar-zoom-btn')[1];
     plus?.click();
     expect(calls).toEqual([1.1]);
     expect(store.getState().viewport.zoom).toBeCloseTo(1.1);

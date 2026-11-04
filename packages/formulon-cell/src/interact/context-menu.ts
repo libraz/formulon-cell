@@ -59,10 +59,13 @@ import type {
 } from './context-menu-options.js';
 import { createContextMenuPermissions } from './context-menu-permissions.js';
 import { pivotMenuTarget, runContextMenuPivotItem } from './context-menu-pivot.js';
+import { placeMacMenu } from './context-menu-placement.js';
 import {
   buildCellEntries,
   buildColEntries,
   buildMacCellEntries,
+  buildMacColEntries,
+  buildMacRowEntries,
   buildPivotEntries,
   buildRowEntries,
   compactMenuEntries,
@@ -88,6 +91,9 @@ import {
   viewportSize,
 } from './overlay-position.js';
 import { createPivotNumberFormatPicker } from './pivot-field-settings-dialog.js';
+
+/** Distance from a Mac submenu's top edge to the centre of its first row. */
+const MAC_SUB_ROW_CENTER = 18;
 
 export interface ContextMenuDeps {
   host: HTMLElement;
@@ -447,9 +453,16 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const r = parentBtn.getBoundingClientRect();
     const { width: sw } = panelSize(sub);
     const viewport = viewportSize(ownerDocument);
-    let x = r.right - 2;
-    if (x + sw > viewport.width - VIEWPORT_PANEL_PAD) x = r.left - sw + 2;
-    const pos = clampPanelToViewport(sub, x, r.top - 4);
+    // The desktop submenu overlaps its parent by the panel padding and centres its
+    // first row on the parent row.
+    const mac = isMacPlatform();
+    let x = mac ? r.right : r.right - 2;
+    if (x + sw > viewport.width - VIEWPORT_PANEL_PAD) x = mac ? r.left - sw : r.left - sw + 2;
+    const pos = clampPanelToViewport(
+      sub,
+      x,
+      mac ? r.top + r.height / 2 - MAC_SUB_ROW_CENTER : r.top - 4,
+    );
     sub.style.left = `${pos.x}px`;
     sub.style.top = `${pos.y}px`;
     openSub = { id, parentBtn };
@@ -626,14 +639,17 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           ),
         )
       : kind === 'row'
-        ? buildRowEntries(strings)
+        ? mac
+          ? buildMacRowEntries(strings)
+          : buildRowEntries(strings)
         : kind === 'col'
-          ? buildColEntries(strings)
+          ? mac
+            ? buildMacColEntries(strings)
+            : buildColEntries(strings)
           : mac
             ? buildMacCellEntries(strings, commentAt(store.getState(), activeAddr) !== null)
             : buildCellEntries(strings);
-    const platformEntries =
-      mac && (kind !== 'cell' || pivot) ? toMacBandEntries(raw, strings) : raw;
+    const platformEntries = mac && pivot ? toMacBandEntries(raw, strings) : raw;
     const hasCopiedCells = !!store.getState().ui.copyRange;
     const pendingSnapshot = hasCopiedCells ? clipboard.snapshot() : null;
     const pendingCutBand =
@@ -720,10 +736,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const rowUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="rowUnhide"]');
     const colUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="colUnhide"]');
     const openHyperlink = root.querySelector<HTMLButtonElement>('[data-fc-action="openHyperlink"]');
-    if (rowUnhide) {
+    // The Mac desktop menu leaves Unhide enabled whatever the selection holds.
+    if (rowUnhide && !mac) {
       setContextMenuItemDisabled(rowUnhide, !rowHidden, strings.contextMenu.noHiddenRows);
     }
-    if (colUnhide) {
+    if (colUnhide && !mac) {
       setContextMenuItemDisabled(colUnhide, !colHidden, strings.contextMenu.noHiddenColumns);
     }
     if (openHyperlink) {
@@ -788,7 +805,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     root.style.left = '-9999px';
     root.style.top = '-9999px';
     visible = true;
-    const { x, y } = clampPanelToViewport(root, clientX, clientY);
+    const { x, y } = isMacPlatform()
+      ? placeMacMenu(root, clientX, clientY)
+      : clampPanelToViewport(root, clientX, clientY);
     root.style.left = `${x}px`;
     root.style.top = `${y}px`;
     // A Mac menu opened by the pointer starts with no row highlighted; the

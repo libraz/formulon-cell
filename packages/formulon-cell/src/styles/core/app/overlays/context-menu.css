@@ -411,7 +411,7 @@
     --fc-ctxmenu-mac-radius: 10px;
     --fc-ctxmenu-mac-pad: 5px;
     --fc-ctxmenu-mac-pill: color-mix(in srgb, var(--fc-accent) 70%, var(--fc-bg-elev));
-    min-width: 280px;
+    min-width: 287px;
     padding: var(--fc-ctxmenu-mac-pad);
     background: color-mix(in srgb, var(--fc-bg-elev) 94%, transparent);
     -webkit-backdrop-filter: blur(24px) saturate(1.8);
@@ -431,14 +431,27 @@
     background: var(--fc-bg-elev);
     border: var(--fc-hairline, 1px) solid var(--fc-rule-strong);
   }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu:not(.fc-ctxmenu__sub)[data-fc-menu="row"],
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu:not(.fc-ctxmenu__sub)[data-fc-menu="col"] {
+    min-width: 224px;
+  }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sub {
     min-width: min(196px, calc(100vw - 8px));
     width: max-content;
     max-width: calc(100vw - 8px);
   }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sub[data-fc-submenu="pasteSpecialMenu"] {
+    min-width: min(234px, calc(100vw - 8px));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sub[data-fc-submenu="filterMenu"] {
+    min-width: min(249px, calc(100vw - 8px));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__sub[data-fc-submenu="sortMenu"] {
+    min-width: min(308px, calc(100vw - 8px));
+  }
   .fc-overlay-portal[data-fc-platform="mac"] .fc-ctxmenu__item {
     grid-template-columns: minmax(0, 1fr) auto;
-    padding: 0 10px;
+    padding: 0 13px 0 11.5px;
     column-gap: 24px;
     min-height: 24px;
     border-radius: calc(var(--fc-ctxmenu-mac-radius) - var(--fc-ctxmenu-mac-pad));

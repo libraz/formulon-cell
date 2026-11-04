@@ -77,6 +77,19 @@
     overscroll-behavior-x: contain;
   }
 
+  /* Reorder drop marker: a 10 x 5 black triangle above the target tab's left edge. */
+  .fc-host__sheetbar-drop {
+    position: fixed;
+    z-index: 5;
+    width: 0;
+    height: 0;
+    margin-left: -5px;
+    border-top: 5px solid #000;
+    border-right: 5px solid transparent;
+    border-left: 5px solid transparent;
+    pointer-events: none;
+  }
+
   .fc-host__sheetbar-tab {
     position: relative;
     display: inline-flex;

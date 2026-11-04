@@ -1,8 +1,10 @@
 import type { AutofitOptions } from '../commands/autofit-measurement.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
+import { isPopulated } from '../commands/current-region.js';
 import { fillDestFor, fillLastValue, fillOutputRange, fillRange } from '../commands/fill.js';
 import { autoFillDownExtent, restrictedFillChanges } from '../commands/fill-plan.js';
 import { headerFilterRanges } from '../commands/filter-ranges.js';
+import { tableOverlayById } from '../commands/format-as-table.js';
 import type { History } from '../commands/history.js';
 import { hyperlinkAt, isInDocumentHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -98,6 +100,7 @@ import {
 } from './pointer-targets.js';
 import { type RangeInsertTarget, rangeRefOf, refOf } from './range-insert.js';
 import { createResizeSizeTooltip } from './resize-size-tooltip.js';
+import { applyTableResize, tableGripAt, tableResizeRange } from './table-resize.js';
 
 type ResizeTipStrings = GridPopupsStrings['resizeTip'];
 
@@ -141,7 +144,8 @@ type DragMode =
       startSize: number;
       preLayout: LayoutSnapshot;
     }
-  | { kind: 'fill'; src: Range }
+  | { kind: 'fill'; src: Range; menu?: boolean }
+  | { kind: 'table-resize'; id: string }
   /** Moving the selection by its frame; `grab` is the grabbed cell's offset
    *  from the block's top-left. */
   | { kind: 'move'; src: Range; grab: { row: number; col: number } }
@@ -270,7 +274,15 @@ interface ClickedLink {
   at: number;
 }
 
-type SelectionBorderEdge = 'top' | 'bottom' | 'left' | 'right';
+/** The cell at the window's top-left corner; frozen panes pin it to the sheet origin. */
+function topLeftVisibleCell(s: State): { row: number; col: number } {
+  return {
+    row: s.layout.freezeRows > 0 ? 0 : s.viewport.rowStart,
+    col: s.layout.freezeCols > 0 ? 0 : s.viewport.colStart,
+  };
+}
+
+type SelectionBorderEdge = 'top' | 'bottom' | 'left' | 'right' | 'corner';
 
 /** The visual edge of a single-range selection that `(x, y)` lies on, on the
  *  Mac host only. */
@@ -294,6 +306,9 @@ function selectionBorderEdgeAt(
   const near = (value: number, edge: number): boolean => Math.abs(value - edge) <= band;
   const withinX = x >= left - band && x <= right + band;
   const withinY = y >= top - band && y <= bottom + band;
+  const onHorizontal = withinX && (near(y, bottom) || near(y, top));
+  const onVertical = withinY && (near(x, right) || near(x, left));
+  if (onHorizontal && onVertical) return 'corner';
   if (withinX && near(y, bottom)) return 'bottom';
   if (withinX && near(y, top)) return 'top';
   if (withinY && near(x, right)) return 'right';
@@ -515,7 +530,66 @@ export function attachPointer(
     return { applied, restricted };
   };
 
+  let releaseContextMenuSwallow: (() => void) | null = null;
+  const swallowContextMenu = (): void => {
+    releaseContextMenuSwallow?.();
+    const doc = host.ownerDocument;
+    const swallow = (ev: Event): void => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
+    doc.addEventListener('contextmenu', swallow, true);
+    releaseContextMenuSwallow = () => {
+      doc.removeEventListener('contextmenu', swallow, true);
+      releaseContextMenuSwallow = null;
+    };
+  };
+
+  /** A secondary press moves the selection before the context menu opens:
+   *  a cell outside every selected range becomes the selection, the corner
+   *  selects the sheet. Headers are resolved by the menu itself. */
+  const onSecondaryDown = (e: PointerEvent): void => {
+    const s = store.getState();
+    const controller = interactionControllerFor(store);
+    if (controller?.policy?.selection === false) return;
+    if (s.ui.editor.kind !== 'idle') return;
+    const { x, y } = localXY(e);
+    if (isFillHandleHit(hits, x, y) && controller?.policy === undefined) {
+      // A right-button fill drag ends in a menu of fill kinds, so the context
+      // menu the same press would raise is swallowed.
+      host.focus();
+      try {
+        host.setPointerCapture(e.pointerId);
+      } catch {
+        /* no-op: in-host drags still work without capture */
+      }
+      drag = { kind: 'fill', src: { ...s.selection.range }, menu: true };
+      mutators.setFillPreview(store, { ...s.selection.range });
+      host.style.cursor = 'crosshair';
+      swallowContextMenu();
+      return;
+    }
+    const zone = hitZone(geometryLayout(s), s.viewport, x, y, [], { resizeHandles: false });
+    if (!zone) return;
+    if (zone.kind === 'corner') {
+      mutators.selectAll(store, topLeftVisibleCell(s));
+      return;
+    }
+    if (zone.kind !== 'cell') return;
+    const inside = [s.selection.range, ...(s.selection.extraRanges ?? [])].some(
+      (r) => zone.row >= r.r0 && zone.row <= r.r1 && zone.col >= r.c0 && zone.col <= r.c1,
+    );
+    if (inside) return;
+    const addr = { sheet: s.data.sheetIndex, row: zone.row, col: zone.col };
+    if (!isNavigationAddrAllowed(store, addr)) return;
+    mutators.setActive(store, addr);
+  };
+
   const onDown = (e: PointerEvent): void => {
+    if (e.button === 2) {
+      onSecondaryDown(e);
+      return;
+    }
     if (e.button !== 0) return;
     // Clicks that land on the inline editor itself are not grid clicks — let
     //  the editor handle them natively. Without this, clicking inside an open
@@ -663,6 +737,21 @@ export function attachPointer(
       return;
     }
 
+    // A table's corner grip resizes the table; the target range previews in the
+    // same band the fill drag uses.
+    if (!restricted && !inFormula) {
+      const table = tableGripAt(s, x, y);
+      if (table) {
+        e.preventDefault();
+        host.focus();
+        tryCapture();
+        drag = { kind: 'table-resize', id: table.id };
+        mutators.setFillPreview(store, { ...table.range });
+        host.style.cursor = 'nwse-resize';
+        return;
+      }
+    }
+
     // The selection frame moves the block. The cell under the pointer is the
     // grab point, so a grab on the bottom edge counts from the row below it.
     if (!restricted && !inFormula && isSelectionBorderHit(s, x, y)) {
@@ -710,7 +799,7 @@ export function attachPointer(
 
     switch (zone.kind) {
       case 'corner':
-        mutators.selectAll(store);
+        mutators.selectAll(store, topLeftVisibleCell(s));
         drag = { kind: 'none' };
         return;
 
@@ -1094,8 +1183,17 @@ export function attachPointer(
       case 'cell': {
         const layout = geometryLayout(s);
         const zone = hitZone(layout, s.viewport, x, y);
+        // Over a header strip the drag reaches the nearest visible edge cell.
+        const edge = topLeftVisibleCell(s);
+        const sheet = s.data.sheetIndex;
         if (zone && zone.kind === 'cell') {
-          extendSelectionTo({ sheet: s.data.sheetIndex, row: zone.row, col: zone.col });
+          extendSelectionTo({ sheet, row: zone.row, col: zone.col });
+        } else if (zone && (zone.kind === 'row-header' || zone.kind === 'row-resize')) {
+          extendSelectionTo({ sheet, row: zone.row, col: edge.col });
+        } else if (zone && (zone.kind === 'col-header' || zone.kind === 'col-resize')) {
+          extendSelectionTo({ sheet, row: edge.row, col: zone.col });
+        } else if (zone?.kind === 'corner') {
+          extendSelectionTo({ sheet, row: edge.row, col: edge.col });
         }
         return;
       }
@@ -1112,6 +1210,14 @@ export function attachPointer(
         const last = fillLastValue(s, drag.src, dest, inputLocaleForWorkbook(wb));
         if (last === null || !e) fillTooltip.hide();
         else fillTooltip.show(last, e.clientX, e.clientY);
+        return;
+      }
+      case 'table-resize': {
+        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
+        const table = tableOverlayById(s, drag.id);
+        if (!cell || !table) return;
+        mutators.setFillPreview(store, tableResizeRange(s, table, cell));
+        host.style.cursor = 'nwse-resize';
         return;
       }
       case 'move': {
@@ -1274,13 +1380,56 @@ export function attachPointer(
       }
       return;
     }
+    if (drag.kind === 'table-resize') {
+      const s = store.getState();
+      const range = s.ui.fillPreview;
+      const table = tableOverlayById(s, drag.id);
+      mutators.setFillPreview(store, null);
+      drag = { kind: 'none' };
+      if (range && table && isNavigationRangeAllowed(store, range)) {
+        if (applyTableResize(store, wb, history, table, range)) onAfterCommit?.();
+      }
+      const { x, y } = localXY(e);
+      updateCursor(host, store, x, y);
+      return;
+    }
     if (drag.kind === 'fill') {
+      if (drag.menu) finishSecondaryDrag();
       const s = store.getState();
       const dest = s.ui.fillPreview;
       mutators.setFillPreview(store, null);
       fillTooltip.hide();
-      if (dest) {
+      const unchanged =
+        drag.menu === true &&
+        dest !== null &&
+        dest.r0 === drag.src.r0 &&
+        dest.c0 === drag.src.c0 &&
+        dest.r1 === drag.src.r1 &&
+        dest.c1 === drag.src.c1;
+      if (dest && !unchanged) {
         if (!isNavigationRangeAllowed(store, dest)) {
+          drag = { kind: 'none' };
+          const { x, y } = localXY(e);
+          updateCursor(host, store, x, y);
+          return;
+        }
+        if (drag.menu) {
+          const filled = fillOutputRange(drag.src, dest);
+          const last = cellRect(geometryLayout(s), s.viewport, filled.r1, filled.c1);
+          const at = localXY(e);
+          host.dispatchEvent(
+            new CustomEvent('fc:autofillmenu', {
+              bubbles: true,
+              detail: {
+                src: { ...drag.src },
+                dest: { ...dest },
+                clientX: e.clientX,
+                clientY: e.clientY,
+                anchorX: e.clientX - at.x + last.x + last.w,
+                anchorY: e.clientY - at.y + last.y + last.h,
+              },
+            }),
+          );
           drag = { kind: 'none' };
           const { x, y } = localXY(e);
           updateCursor(host, store, x, y);
@@ -1288,9 +1437,16 @@ export function attachPointer(
         }
         // Spreadsheet parity: holding Ctrl/⌘ on release toggles series → tile copy.
         const copyOnly = e.ctrlKey || e.metaKey;
+        // The chip hangs off the last filled cell, not the pointer.
+        const filled = fillOutputRange(drag.src, dest);
+        const last = cellRect(geometryLayout(s), s.viewport, filled.r1, filled.c1);
+        const at = localXY(e);
         commitFill(s, drag.src, dest, {
           copyOnly,
-          announce: { clientX: e.clientX, clientY: e.clientY },
+          announce: {
+            clientX: e.clientX - at.x + last.x + last.w,
+            clientY: e.clientY - at.y + last.y + last.h,
+          },
         });
       }
     }
@@ -1311,7 +1467,14 @@ export function attachPointer(
   };
 
   /** An interrupted gesture is abandoned: live previews revert and nothing is committed. */
+  /** The browser may raise `contextmenu` after the release, so the swallow outlives it by a tick. */
+  const finishSecondaryDrag = (): void => {
+    const release = releaseContextMenuSwallow;
+    if (release) setTimeout(release, 0);
+  };
+
   const onCancel = (e: PointerEvent): void => {
+    finishSecondaryDrag();
     autoscroll.stop();
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
     if (drag.kind === 'selection-marquee') {
@@ -1361,6 +1524,7 @@ export function attachPointer(
     if (edge) {
       e.preventDefault();
       e.stopPropagation();
+      if (edge === 'corner') return;
       const colDir = s.ui.rightToLeft === true ? -1 : 1;
       const [dRow, dCol] =
         edge === 'bottom'
@@ -1370,7 +1534,29 @@ export function attachPointer(
             : edge === 'right'
               ? [0, colDir]
               : [0, -colDir];
-      const target = jumpToDataEdge(s, s.selection.active, dRow, dCol);
+      // The jump starts from the frame cell under the pointer, not the active
+      // cell; a blank frame cell just becomes the selection.
+      const under = hitTest(geometryLayout(s), s.viewport, x, y);
+      if (!under) return;
+      const range = s.selection.range;
+      const origin: Addr = {
+        sheet: s.data.sheetIndex,
+        row:
+          dRow === 0
+            ? Math.max(range.r0, Math.min(range.r1, under.row))
+            : dRow > 0
+              ? range.r1
+              : range.r0,
+        col:
+          dCol === 0
+            ? Math.max(range.c0, Math.min(range.c1, under.col))
+            : dCol > 0
+              ? range.c1
+              : range.c0,
+      };
+      const target = isPopulated(s, origin.sheet, origin.row, origin.col)
+        ? jumpToDataEdge(s, origin, dRow, dCol)
+        : origin;
       if (!isNavigationAddrAllowed(store, target)) return;
       mutators.setActive(store, target);
       scrollActiveIntoView(store, target);

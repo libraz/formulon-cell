@@ -70,6 +70,16 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(fxAccept.dataset.disabledReason).toBe(defaultStrings.a11y.enterFormulaNoChanges);
   });
 
+  it('on the Mac host enter enables as soon as the bar is entered and expand opens three lines', () => {
+    sheet.host.dataset.fcPlatform = 'mac';
+    fxInput.focus();
+    fxInput.dispatchEvent(new FocusEvent('focus'));
+    expect(fxAccept.disabled).toBe(false);
+    expect(fxCancel.disabled).toBe(false);
+    sheet.host.querySelector<HTMLElement>('.fc-host__formulabar-expand')?.click();
+    expect(Number(fxInput.rows)).toBe(3);
+  });
+
   it('changing the value flips accept on (dirty); Escape rolls it back', () => {
     fxInput.focus();
     fxInput.dispatchEvent(new FocusEvent('focus'));

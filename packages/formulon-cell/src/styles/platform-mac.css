@@ -1715,6 +1715,28 @@
     margin-left: 6px;
   }
 
+  /* Editing in the bar: red cancel, green enter, a green hairline frame, and fx dimmed. */
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-action--cancel:not(:disabled) {
+    color: var(--fc-cell-error-fg);
+  }
+
+  .fc-host[data-fc-platform="mac"] .fc-host__formulabar-action--accept:not(:disabled) {
+    color: var(--fc-accent);
+  }
+
+  .fc-host[data-fc-platform="mac"]
+    .fc-host__formulabar[data-fc-editing="1"]
+    .fc-host__formulabar-input {
+    box-shadow: inset 0 0 0 1px var(--fc-accent);
+  }
+
+  .fc-host[data-fc-platform="mac"]
+    .fc-host__formulabar[data-fc-editing="1"]
+    .fc-host__formulabar-fx {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
   .fc-host[data-fc-platform="mac"] .fc-host__formulabar-expand {
     height: 21px;
   }
@@ -2131,21 +2153,132 @@
     font-style: italic;
   }
 
-  /* Column filter panel: titled with the column header, stacked controls, auto-apply footer. */
+  /* In-cell editor: the desktop caret is the text colour, not the accent. */
+  [data-fc-platform="mac"] .fc-host__editor {
+    caret-color: var(--fc-fg);
+  }
+
+  /* Column filter panel: a fixed-size floating window titled with the column
+     header, its close button at the top left, sort and filter sections stacked
+     below, auto-apply footer last. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown {
+    box-sizing: border-box;
+    position: fixed;
+    width: 283px;
+    height: 432px;
+    padding: 0 19px 9px;
+    border-radius: 10px;
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__close {
+    position: absolute;
+    left: 7px;
+    top: 7px;
+    width: 12px;
+    height: 12px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #ff5f57;
+    cursor: pointer;
+  }
+
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__title {
-    padding: 6px 10px 2px;
+    flex: none;
+    height: 22px;
+    padding: 0 20px;
+    line-height: 22px;
+    text-align: center;
     font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__section {
+    flex: none;
+    height: 16px;
+    margin-top: 6px;
+    line-height: 16px;
+    font-weight: 700;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__sort {
+    display: flex;
+    flex: none;
+    gap: 1px;
+    height: 26px;
+    margin-top: 6px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__sort button {
+    flex: 1;
+    font: inherit;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__color {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    margin-top: 6px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__rule {
+    flex: none;
+    height: 0;
+    margin: 7px -19px 3px;
+    border: 0;
+    border-top: var(--fc-hairline, 1px) solid var(--fc-rule);
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition {
     display: flex;
-    flex-direction: column;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 6px;
+    margin-top: 6px;
+    padding: 0;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition-op {
+    width: 143px;
+    height: 22px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__condition-value {
+    width: 90px;
+    height: 28px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__search {
+    flex: none;
+    height: 22px;
+    margin: 6px 0 0;
+    box-sizing: border-box;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__list {
+    flex: none;
+    height: 150px;
+    max-height: 150px;
+    margin-top: 5px;
+    padding: 0;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__actions {
+    display: flex;
+    flex: none;
     flex-wrap: wrap;
     align-items: center;
+    gap: 3px 6px;
+    margin-top: 6px;
+    padding: 0;
+    border-top: 0;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__auto {
@@ -2153,22 +2286,14 @@
     flex: 1 0 100%;
     align-items: center;
     gap: 6px;
+    height: 16px;
+  }
+
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__actions button {
+    height: 22px;
   }
 
   .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__apply:disabled {
     opacity: 0.45;
-  }
-
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__sort {
-    display: flex;
-    gap: 6px;
-    padding: 4px 10px;
-  }
-
-  .fc-overlay-portal[data-fc-platform="mac"] .fc-filter-dropdown__color {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 10px;
   }
 }

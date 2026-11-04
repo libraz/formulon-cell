@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { ja } from '../../../src/i18n/strings.js';
 import { attachStatusBar } from '../../../src/interact/status-bar.js';
@@ -86,5 +86,57 @@ describe('status bar view buttons on the Mac host', () => {
     expect(mac?.getAttribute('aria-label')).toBe('改ページのプレビュー');
     expect(mac?.title).toBe('改ページのプレビュー');
     expect(view(null)?.getAttribute('aria-label')).toBe(ja.statusBar.pageBreakPreview);
+  });
+});
+
+describe('status bar clicks on the Mac host', () => {
+  beforeEach(() => document.body.replaceChildren());
+
+  it('copies an aggregate value on a left click without opening the menu', async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { bar } = seed('mac');
+    const sum = Array.from(bar.querySelectorAll<HTMLElement>('.fc-host__statusbar-agg')).find(
+      (el) => el.textContent?.startsWith('合計'),
+    );
+    sum?.click();
+    expect(writeText).toHaveBeenCalledWith('3');
+    expect(document.querySelector<HTMLElement>('.fc-statusbar__chooser')?.style.display).toBe(
+      'none',
+    );
+  });
+
+  it('opens the Zoom dialog from the percent label', async () => {
+    const { bar } = seed('mac');
+    bar.querySelector<HTMLElement>('.fc-host__statusbar-zoom-label')?.click();
+    await Promise.resolve();
+    expect(document.body.textContent).toContain('選択範囲をズーム');
+  });
+
+  it('lists the Mac status bar customisation menu in the desktop order', () => {
+    const { bar } = seed('mac');
+    bar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
+    const rows = Array.from(chooser?.children ?? [], (el) =>
+      el.getAttribute('role') === 'separator' ? '-' : el.textContent?.trim(),
+    );
+    expect(rows).toEqual([
+      'ステータス バーのユーザー設定',
+      'CapsLock',
+      'マクロの記録',
+      '-',
+      '平均',
+      'データの個数',
+      '数値の個数',
+      '最小値',
+      '最大値',
+      '合計',
+      '-',
+      'アップロード状態',
+      '-',
+      '表示選択ショートカット',
+      'ズーム スライダー',
+      'ズーム',
+    ]);
   });
 });

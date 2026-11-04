@@ -1,5 +1,5 @@
 import { gridOriginX, gridOriginY, layoutForView } from '../render/geometry.js';
-import type { SpreadsheetStore, State } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { lastUsedCell } from './data-edge-navigation.js';
 
 /** How long the thumbs stay after the last scroll before they fade out. */
@@ -29,7 +29,9 @@ export interface OverlayScrollbarsHandle {
 /**
  * The Mac desktop's overlay scroll bars: a vertical and a horizontal thumb
  * over the grid, shown while the view scrolls and faded out when it rests.
- * They only show the position; they take no pointer input.
+ * While shown, a click on the track beside a thumb scrolls one screenful
+ * (visible count - 1) toward the click and a thumb drag scrolls in proportion.
+ * Hidden bars take no pointer input, so clicks reach the cells beneath.
  */
 export function attachOverlayScrollbars(deps: {
   grid: HTMLElement;
@@ -43,6 +45,15 @@ export function attachOverlayScrollbars(deps: {
     grid.appendChild(el);
     return el;
   };
+  const track = (axis: 'v' | 'h'): HTMLDivElement => {
+    const el = document.createElement('div');
+    el.className = `fc-scrolltrack fc-scrolltrack--${axis}`;
+    el.setAttribute('aria-hidden', 'true');
+    grid.appendChild(el);
+    return el;
+  };
+  const verticalTrack = track('v');
+  const horizontalTrack = track('h');
   const vertical = thumb('v');
   const horizontal = thumb('h');
 
@@ -78,20 +89,102 @@ export function attachOverlayScrollbars(deps: {
     vertical.style.height = `${v.length}px`;
     horizontal.style.left = `${left + h.offset}px`;
     horizontal.style.width = `${h.length}px`;
+    verticalTrack.style.top = `${top}px`;
+    horizontalTrack.style.left = `${left}px`;
   };
 
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
+  let dragging = false;
+  const hide = (): void => {
+    hideTimer = null;
+    for (const el of [vertical, horizontal, verticalTrack, horizontalTrack]) {
+      delete el.dataset.visible;
+    }
+  };
+  const armHide = (): void => {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = dragging ? null : setTimeout(hide, IDLE_HIDE_MS);
+  };
   const show = (s: State): void => {
     place(s);
-    vertical.dataset.visible = 'true';
-    horizontal.dataset.visible = 'true';
-    if (hideTimer) clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-      hideTimer = null;
-      delete vertical.dataset.visible;
-      delete horizontal.dataset.visible;
-    }, IDLE_HIDE_MS);
+    for (const el of [vertical, horizontal, verticalTrack, horizontalTrack]) {
+      el.dataset.visible = 'true';
+    }
+    armHide();
   };
+
+  const axisOf = (el: HTMLElement): 'v' | 'h' =>
+    el.classList.contains('fc-scroll--v') ? 'v' : 'h';
+  const pos = (e: PointerEvent, axis: 'v' | 'h'): number => (axis === 'v' ? e.clientY : e.clientX);
+  const thumbEdge = (axis: 'v' | 'h'): { start: number; end: number } => {
+    const box = grid.getBoundingClientRect();
+    const el = axis === 'v' ? vertical : horizontal;
+    const origin = axis === 'v' ? box.top : box.left;
+    const a = Number.parseFloat(axis === 'v' ? el.style.top : el.style.left) || 0;
+    const len = Number.parseFloat(axis === 'v' ? el.style.height : el.style.width) || 0;
+    return { start: origin + a, end: origin + a + len };
+  };
+
+  const onTrackDown = (e: PointerEvent): void => {
+    const el = e.currentTarget as HTMLElement;
+    const axis = axisOf(el);
+    if (el.dataset.visible !== 'true' || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const s = store.getState();
+    const page = Math.max(1, (axis === 'v' ? s.viewport.rowCount : s.viewport.colCount) - 1);
+    const dir = pos(e, axis) < thumbEdge(axis).start ? -1 : 1;
+    if (axis === 'v') mutators.scrollBy(store, dir * page, 0);
+    else mutators.scrollBy(store, 0, dir * page);
+  };
+
+  const onThumbDown = (e: PointerEvent): void => {
+    const el = e.currentTarget as HTMLElement;
+    const axis = axisOf(el);
+    if (el.dataset.visible !== 'true' || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const s = store.getState();
+    const layout = layoutForView(s);
+    const used = usedExtent(s);
+    const v = axis === 'v';
+    const start0 = v ? s.viewport.rowStart : s.viewport.colStart;
+    const visible = v ? s.viewport.rowCount : s.viewport.colCount;
+    const total = Math.max((v ? used.row : used.col) + 1, start0 + visible);
+    const origin = v ? gridOriginY(layout) : gridOriginX(layout);
+    const trackLen = Math.max(1, (v ? grid.clientHeight : grid.clientWidth) - origin);
+    const from = pos(e, axis);
+    dragging = true;
+    armHide();
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* synthetic pointers have no capture */
+    }
+    const onMove = (m: PointerEvent): void => {
+      const target = start0 + Math.round(((pos(m, axis) - from) * total) / trackLen);
+      const cur = v ? store.getState().viewport.rowStart : store.getState().viewport.colStart;
+      if (v) mutators.scrollBy(store, target - cur, 0);
+      else mutators.scrollBy(store, 0, target - cur);
+    };
+    const onUp = (): void => {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+      dragging = false;
+      armHide();
+    };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+  };
+
+  for (const el of [vertical, verticalTrack]) el.classList.add('fc-scroll--v');
+  for (const el of [horizontal, horizontalTrack]) el.classList.add('fc-scroll--h');
+  verticalTrack.addEventListener('pointerdown', onTrackDown);
+  horizontalTrack.addEventListener('pointerdown', onTrackDown);
+  vertical.addEventListener('pointerdown', onThumbDown);
+  horizontal.addEventListener('pointerdown', onThumbDown);
 
   let last = store.getState().viewport;
   const unsubscribe = store.subscribe(() => {
@@ -111,6 +204,8 @@ export function attachOverlayScrollbars(deps: {
       if (hideTimer) clearTimeout(hideTimer);
       vertical.remove();
       horizontal.remove();
+      verticalTrack.remove();
+      horizontalTrack.remove();
     },
   };
 }

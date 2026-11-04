@@ -151,6 +151,17 @@ export interface GridPopupsStrings {
     fillWeekdays: string;
     fillMonths: string;
     fillYears: string;
+    /** Entries of the menu a right-button fill drag opens. */
+    dragMenu: {
+      seriesDays: string;
+      seriesWeekdays: string;
+      seriesMonths: string;
+      seriesYears: string;
+      linear: string;
+      growth: string;
+      flashFill: string;
+      seriesDialog: string;
+    };
   };
   pasteOptions: {
     title: string;

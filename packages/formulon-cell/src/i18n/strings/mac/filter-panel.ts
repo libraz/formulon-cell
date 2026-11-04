@@ -33,12 +33,21 @@ export interface MacFilterPanelStrings {
   cellColor: string;
   fontColor: string;
   cellIcon: string;
+  /** Bold section labels above the sort and filter controls, and the close button's name. */
+  sortSection: string;
+  filterSection: string;
+  close: string;
+  /** Placeholder row for cells with no value. */
+  blanks: string;
   /** Why the conditions the host has no filter for cannot be used. */
   unavailable: string;
 }
 
 type MacFilterPanelExtras = Pick<
   MacFilterPanelStrings,
+  | 'sortSection'
+  | 'filterSection'
+  | 'close'
   | 'sortAsc'
   | 'sortDesc'
   | 'byColor'
@@ -76,12 +85,16 @@ export const macFilterPanelFrom = (
   selectAll: t.selectAll,
   apply: t.apply,
   clear: t.clear,
+  blanks: t.blanks,
   ...extras,
   ...overrides,
 });
 
 /** Mac wording for this locale; not measured. */
 const extrasEn: MacFilterPanelExtras = {
+  sortSection: 'Sort',
+  filterSection: 'Filter',
+  close: 'Close',
   sortAsc: 'Ascending',
   sortDesc: 'Descending',
   byColor: 'By color:',
@@ -102,6 +115,9 @@ const extrasEn: MacFilterPanelExtras = {
 
 /** Japanese Mac app wording, measured from Excel for Mac. */
 const extrasJa: MacFilterPanelExtras = {
+  sortSection: '並べ替え',
+  filterSection: 'フィルター',
+  close: '閉じる',
   sortAsc: '昇順',
   sortDesc: '降順',
   byColor: '色別:',
@@ -122,6 +138,9 @@ const extrasJa: MacFilterPanelExtras = {
 
 /** Mac wording for this locale; not measured. */
 const extrasDe: MacFilterPanelExtras = {
+  sortSection: 'Sortieren',
+  filterSection: 'Filtern',
+  close: 'Schließen',
   sortAsc: 'Aufsteigend',
   sortDesc: 'Absteigend',
   byColor: 'Nach Farbe:',
@@ -142,6 +161,9 @@ const extrasDe: MacFilterPanelExtras = {
 
 /** Mac wording for this locale; not measured. */
 const extrasFr: MacFilterPanelExtras = {
+  sortSection: 'Trier',
+  filterSection: 'Filtrer',
+  close: 'Fermer',
   sortAsc: 'Croissant',
   sortDesc: 'Décroissant',
   byColor: 'Par couleur :',
@@ -162,6 +184,9 @@ const extrasFr: MacFilterPanelExtras = {
 
 /** Mac wording for this locale; not measured. */
 const extrasZh: MacFilterPanelExtras = {
+  sortSection: '排序',
+  filterSection: '筛选',
+  close: '关闭',
   sortAsc: '升序',
   sortDesc: '降序',
   byColor: '按颜色:',
@@ -182,6 +207,9 @@ const extrasZh: MacFilterPanelExtras = {
 
 /** Mac wording for this locale; not measured. */
 const extrasKo: MacFilterPanelExtras = {
+  sortSection: '정렬',
+  filterSection: '필터',
+  close: '닫기',
   sortAsc: '오름차순',
   sortDesc: '내림차순',
   byColor: '색 기준:',
@@ -202,6 +230,9 @@ const extrasKo: MacFilterPanelExtras = {
 
 /** Mac wording for this locale; not measured. */
 const extrasTh: MacFilterPanelExtras = {
+  sortSection: 'เรียงลำดับ',
+  filterSection: 'ตัวกรอง',
+  close: 'ปิด',
   sortAsc: 'จากน้อยไปมาก',
   sortDesc: 'จากมากไปน้อย',
   byColor: 'ตามสี:',
@@ -236,6 +267,9 @@ export const macFilterPanelJa = (t: FilterDropdownStrings): MacFilterPanelString
     selectAll: '(すべて選択)',
     apply: 'フィルターの適用',
     clear: 'フィルターのクリア',
+    contains: 'を含む',
+    notContains: 'を含まない',
+    blanks: '(空白セル)',
   });
 
 export const macFilterPanelDe = (t: FilterDropdownStrings): MacFilterPanelStrings =>
