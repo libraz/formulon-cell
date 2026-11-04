@@ -67,11 +67,13 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import { jumpToDataEdge } from './data-edge-navigation.js';
 import { followHyperlink, type HyperlinkFollowDeps } from './hyperlink-follow.js';
 import {
   isNavigationAddrAllowed,
   navigationBoundsFor,
   navigationSelectionBoundsFor,
+  scrollActiveIntoView,
 } from './navigation-policy.js';
 import {
   indexAt,
@@ -209,6 +211,42 @@ function pivotButtonRectAt(
   return x >= button.x && x < button.x + button.w && y >= button.y && y < button.y + button.h
     ? button
     : null;
+}
+
+/** Half-width of the band along the selection border that the Mac desktop
+ *  treats as the border itself: wide enough to hit, narrow enough that a click
+ *  just past the edge still selects the neighbour. */
+const SELECTION_BORDER_BAND = 2;
+
+type SelectionBorderEdge = 'top' | 'bottom' | 'left' | 'right';
+
+/** The visual edge of a single-range selection that `(x, y)` lies on, on the
+ *  Mac host only. */
+function selectionBorderEdgeAt(
+  host: HTMLElement,
+  s: State,
+  x: number,
+  y: number,
+): SelectionBorderEdge | null {
+  if ((host.closest?.<HTMLElement>('.fc-host') ?? host).dataset?.fcPlatform !== 'mac') return null;
+  if ((s.selection.extraRanges?.length ?? 0) > 0) return null;
+  const { r0, c0, r1, c1 } = s.selection.range;
+  const layout = geometryLayout(s);
+  const first = cellRect(layout, s.viewport, r0, c0);
+  const last = cellRect(layout, s.viewport, r1, c1);
+  const left = Math.min(first.x, last.x);
+  const right = Math.max(first.x + first.w, last.x + last.w);
+  const top = first.y;
+  const bottom = last.y + last.h;
+  const band = SELECTION_BORDER_BAND;
+  const near = (value: number, edge: number): boolean => Math.abs(value - edge) <= band;
+  const withinX = x >= left - band && x <= right + band;
+  const withinY = y >= top - band && y <= bottom + band;
+  if (withinX && near(y, bottom)) return 'bottom';
+  if (withinX && near(y, top)) return 'top';
+  if (withinY && near(x, right)) return 'right';
+  if (withinY && near(x, left)) return 'left';
+  return null;
 }
 
 export function attachPointer(
@@ -708,6 +746,17 @@ export function attachPointer(
       }
 
       case 'cell': {
+        // The Mac desktop treats the selection border as a handle: a plain
+        // click on it leaves the selection, so a double-click can jump from it.
+        if (
+          !e.shiftKey &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          selectionBorderEdgeAt(host, s, x, y) !== null
+        ) {
+          drag = { kind: 'none' };
+          return;
+        }
         const rawAddr = { sheet: s.data.sheetIndex, row: zone.row, col: zone.col };
         // A report's drop-down button opens its filter panel; the active cell stays.
         const pivotButton = pivotButtonRectAt(s, wb, host, zone.row, zone.col, x, y);
@@ -1046,6 +1095,28 @@ export function attachPointer(
       if (!dest) return;
       if (!isNavigationRangeAllowed(store, dest)) return;
       commitFill(s, src, dest, { copyOnly: false });
+      return;
+    }
+
+    // Double-clicking the selection border jumps to the edge of the data region
+    // in that direction, as Cmd+Arrow does, instead of editing the cell.
+    const edge = selectionBorderEdgeAt(host, s, x, y);
+    if (edge) {
+      e.preventDefault();
+      e.stopPropagation();
+      const colDir = s.ui.rightToLeft === true ? -1 : 1;
+      const [dRow, dCol] =
+        edge === 'bottom'
+          ? [1, 0]
+          : edge === 'top'
+            ? [-1, 0]
+            : edge === 'right'
+              ? [0, colDir]
+              : [0, -colDir];
+      const target = jumpToDataEdge(s, s.selection.active, dRow, dCol);
+      if (!isNavigationAddrAllowed(store, target)) return;
+      mutators.setActive(store, target);
+      scrollActiveIntoView(store, target);
       return;
     }
 
