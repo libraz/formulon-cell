@@ -103,7 +103,7 @@ type ResizeTipStrings = GridPopupsStrings['resizeTip'];
 
 type DragMode =
   | { kind: 'none' }
-  | { kind: 'cell' }
+  | { kind: 'cell'; link?: ClickedLink }
   | {
       kind: 'selection-marquee';
       axis: 'cell';
@@ -260,6 +260,15 @@ function pivotButtonRectAt(
  *  treats as the border itself: wide enough to hit, narrow enough that a click
  *  just past the edge still selects the neighbour. */
 const SELECTION_BORDER_BAND = 2;
+/** A press on a link cell held at least this long selects instead of following (measured 0.5-0.6 s). */
+const HYPERLINK_HOLD_SELECT_MS = 500;
+
+/** A link cell pressed without a modifier, followed on release. */
+interface ClickedLink {
+  url: string;
+  range: Range;
+  at: number;
+}
 
 type SelectionBorderEdge = 'top' | 'bottom' | 'left' | 'right';
 
@@ -880,8 +889,17 @@ export function attachPointer(
         }
         if (e.shiftKey) {
           extendSelectionTo(addr);
-        } else mutators.setActive(store, addr);
-        drag = { kind: 'cell' };
+          drag = { kind: 'cell' };
+          return;
+        }
+        mutators.setActive(store, addr);
+        const url = e.button === 0 && !e.altKey ? hyperlinkAt(s, rawAddr) : null;
+        drag = url
+          ? {
+              kind: 'cell',
+              link: { url, range: store.getState().selection.range, at: e.timeStamp },
+            }
+          : { kind: 'cell' };
         return;
       }
     }
@@ -1276,9 +1294,20 @@ export function attachPointer(
         });
       }
     }
+    if (drag.kind === 'cell' && drag.link) followClickedLink(drag.link, e.timeStamp);
     drag = { kind: 'none' };
     const { x, y } = localXY(e);
     updateCursor(host, store, x, y);
+  };
+
+  /** A plain click on a link cell follows it once released; a long press or a
+   *  drag onto other cells only selects. */
+  const followClickedLink = (link: ClickedLink, upAt: number): void => {
+    if (upAt - link.at >= HYPERLINK_HOLD_SELECT_MS) return;
+    const now = store.getState().selection.range;
+    const was = link.range;
+    if (now.r0 !== was.r0 || now.c0 !== was.c0 || now.r1 !== was.r1 || now.c1 !== was.c1) return;
+    followHyperlink({ store, wb, ...hyperlinkFollow }, link.url);
   };
 
   /** An interrupted gesture is abandoned: live previews revert and nothing is committed. */

@@ -956,14 +956,47 @@ describe('attachPointer', () => {
       openSpy.mockRestore();
     });
 
-    it('plain click on a hyperlinked cell does not navigate', () => {
+    it('plain click on a hyperlinked cell selects it and follows on release', () => {
       setHyperlink(1, 1, 'https://example.com/');
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
       detach = attachPointer(host, store, wb);
       fireDown(host, 200, 70);
-      fireUp(host, 200, 70);
       expect(openSpy).not.toHaveBeenCalled();
+      fireUp(host, 200, 70);
+      expect(openSpy).toHaveBeenCalledWith('https://example.com/', '_blank', 'noopener,noreferrer');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
       openSpy.mockRestore();
+    });
+
+    it('plain click on an in-document link jumps to its destination', () => {
+      setHyperlink(1, 1, '#D10');
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 200, 70);
+      fireUp(host, 200, 70);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 9, col: 3 });
+    });
+
+    it('a press held for half a second selects the link cell without following', () => {
+      vi.useFakeTimers();
+      try {
+        setHyperlink(1, 1, '#D10');
+        detach = attachPointer(host, store, wb);
+        fireDown(host, 200, 70);
+        vi.advanceTimersByTime(500);
+        fireUp(host, 200, 70);
+        expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('dragging from a link cell onto other cells only selects', () => {
+      setHyperlink(1, 1, '#D10');
+      detach = attachPointer(host, store, wb);
+      fireDown(host, 200, 70);
+      fireMove(host, 400, 120);
+      fireUp(host, 400, 120);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 1 });
     });
 
     it('Cmd/Ctrl+click on a non-hyperlinked cell falls through to selection', () => {
