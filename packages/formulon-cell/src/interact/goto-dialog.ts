@@ -4,6 +4,7 @@ import {
   type GoToSpecialOptions,
   selectionFromRanges,
 } from '../commands/goto-special.js';
+import { protectedCellMessage } from '../commands/protection.js';
 import { formatA1Range } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -117,6 +118,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       stop: strings.formatDialog.validationErrorStop,
       warning: strings.formatDialog.validationErrorWarning,
       information: strings.formatDialog.validationErrorInfo,
+      protectedCell: protectedCellMessage(strings, getWb()),
     },
   });
 
