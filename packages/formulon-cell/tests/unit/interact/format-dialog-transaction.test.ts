@@ -25,6 +25,7 @@ const workbook = (addMerge: () => void): WorkbookHandle =>
     setBlank: () => undefined,
     setText: () => undefined,
     getValue: () => ({ kind: 'blank' }),
+    withBatchedRecalc: <T>(fn: () => T): T => fn(),
   }) as unknown as WorkbookHandle;
 
 const run = (store: SpreadsheetStore, history: History | null, wb: WorkbookHandle) => {
