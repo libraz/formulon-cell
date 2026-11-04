@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyValueFilter } from '../../../src/commands/filter.js';
 import { History } from '../../../src/commands/history.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
-import { en } from '../../../src/i18n/strings.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en, ja } from '../../../src/i18n/strings.js';
 import { attachFilterDropdown } from '../../../src/interact/filter-dropdown.js';
 import { ensureOverlayPortal } from '../../../src/interact/overlay-portal.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
@@ -416,11 +416,134 @@ describe('attachFilterDropdown', () => {
     expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
     expect(source).toContain('const createFilterDropdownActionButton');
     expect(source).toContain(
-      "const apply = createFilterDropdownActionButton('fc-filter-dropdown__apply', t.apply)",
+      "const apply = createFilterDropdownActionButton(\n      'fc-filter-dropdown__apply'",
     );
     expect(source).toContain(
-      "const clear = createFilterDropdownActionButton('fc-filter-dropdown__clear', t.clear)",
+      "const clear = createFilterDropdownActionButton(\n      'fc-filter-dropdown__clear'",
     );
     expect(source).not.toContain("document.createElement('button')");
+  });
+
+  describe('on the Mac host', () => {
+    const openMac = () => {
+      const host = document.createElement('div');
+      host.className = 'fc-host';
+      host.dataset.fcPlatform = 'mac';
+      document.body.appendChild(host);
+      store.setState((state) => {
+        const cells = new Map(state.data.cells);
+        const put = (
+          row: number,
+          value: { kind: 'text'; value: string } | { kind: 'number'; value: number },
+        ) => cells.set(addrKey({ sheet: 0, row, col: 0 }), { value, formula: null });
+        put(0, { kind: 'text', value: 'N' });
+        put(1, { kind: 'number', value: 1 });
+        put(2, { kind: 'number', value: 3 });
+        put(3, { kind: 'number', value: 5 });
+        return { ...state, data: { ...state.data, cells } };
+      });
+      const handle = attachFilterDropdown({ store, host, strings: ja });
+      handle.open({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+      return handle;
+    };
+
+    it('titles the panel with the column header and lists the numeric conditions', () => {
+      const handle = openMac();
+      const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+      expect(panel?.querySelector('.fc-filter-dropdown__title')?.textContent).toBe('N');
+      const options = Array.from(
+        panel?.querySelectorAll<HTMLOptionElement>('.fc-filter-dropdown__condition-op option') ??
+          [],
+        (o) =>
+          `${o.getAttribute('aria-disabled') === 'true' || o.disabled ? '[DIS]' : ''}${o.textContent}`,
+      );
+      expect(options).toEqual([
+        '1 つ選択してください',
+        '指定の値に等しい',
+        '指定の値に等しくない',
+        '指定の値より大きい',
+        '指定の値以上',
+        '指定の値より小さい',
+        '指定の値以下',
+        '[DIS]指定の範囲内',
+        '[DIS]上位 10 項目',
+        '[DIS]下位 10 項目',
+        '[DIS]平均より上',
+        '[DIS]平均より下',
+      ]);
+      handle.detach();
+    });
+
+    it('sorts the column from the panel and greys the colour popups', async () => {
+      const wb = await WorkbookHandle.createDefault();
+      try {
+        wb.setText({ sheet: 0, row: 0, col: 0 }, 'N');
+        [3, 1, 2].forEach((v, k) => wb.setNumber({ sheet: 0, row: k + 1, col: 0 }, v));
+        const host = document.createElement('div');
+        host.className = 'fc-host';
+        host.dataset.fcPlatform = 'mac';
+        document.body.appendChild(host);
+        store.setState((state) => ({
+          ...state,
+          data: { ...state.data, cells: new Map() },
+        }));
+        const { mutators } = await import('../../../src/store/store.js');
+        mutators.replaceCells(store, wb.cells(0));
+        const handle = attachFilterDropdown({
+          store,
+          host,
+          strings: ja,
+          getWb: () => wb,
+          history: new History(),
+        });
+        handle.open({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+        const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+        expect(panel?.querySelector('.fc-filter-dropdown__sort-asc')?.textContent).toBe('昇順');
+        const colors = panel?.querySelectorAll<HTMLSelectElement>(
+          '.fc-filter-dropdown__color select',
+        );
+        expect(colors?.length).toBe(2);
+        expect(Array.from(colors ?? []).every((c) => c.disabled)).toBe(true);
+        panel?.querySelector<HTMLButtonElement>('.fc-filter-dropdown__sort-asc')?.click();
+        expect([1, 2, 3].map((r) => wb.getValue({ sheet: 0, row: r, col: 0 }))).toEqual([
+          { kind: 'number', value: 1 },
+          { kind: 'number', value: 2 },
+          { kind: 'number', value: 3 },
+        ]);
+        expect(document.querySelector('.fc-filter-dropdown')).toBeNull();
+      } finally {
+        wb.dispose();
+      }
+    });
+
+    it('auto-applies a condition while the panel stays open, and Apply waits for auto-apply off', () => {
+      const handle = openMac();
+      const panel = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+      const op = panel?.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
+      const value = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value');
+      const apply = panel?.querySelector<HTMLButtonElement>('.fc-filter-dropdown__apply');
+      const auto = panel?.querySelector<HTMLInputElement>('.fc-filter-dropdown__auto input');
+      expect(value?.hidden).toBe(true);
+      expect(auto?.checked).toBe(true);
+      expect(apply?.disabled).toBe(true);
+      if (op) {
+        op.value = 'greaterThan';
+        op.dispatchEvent(new Event('change'));
+      }
+      expect(value?.hidden).toBe(false);
+      if (value) {
+        value.value = '2';
+        value.dispatchEvent(new Event('change'));
+      }
+      expect(store.getState().layout.hiddenRows.has(1)).toBe(true);
+      expect(store.getState().layout.hiddenRows.has(2)).toBe(false);
+      expect(document.querySelector('.fc-filter-dropdown')).not.toBeNull();
+      if (auto) {
+        auto.checked = false;
+        auto.dispatchEvent(new Event('change'));
+      }
+      expect(apply?.disabled).toBe(false);
+      handle.detach();
+    });
   });
 });

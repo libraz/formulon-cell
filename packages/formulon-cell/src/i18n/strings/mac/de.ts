@@ -14,6 +14,7 @@ import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macErrorMenuDe } from './error-menu.js';
 import { macExternalLinksPaneDe } from './external-links-pane.js';
+import { macFilterPanelDe } from './filter-panel.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
@@ -274,6 +275,7 @@ export const macDe: MacStrings = {
     options: 'Optionen...',
   }),
   macErrorMenu: macErrorMenuDe,
+  macFilterPanel: macFilterPanelDe(gridPopupsDe.filterDropdown),
   macSheetTabMenu: macSheetTabMenuDe,
   macFindReplace: macFindReplaceFrom(
     editDialogsDe.findReplace,

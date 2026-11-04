@@ -14,6 +14,7 @@ import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macErrorMenuKo } from './error-menu.js';
 import { macExternalLinksPaneKo } from './external-links-pane.js';
+import { macFilterPanelKo } from './filter-panel.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
@@ -271,6 +272,7 @@ export const macKo: MacStrings = {
     options: '옵션...',
   }),
   macErrorMenu: macErrorMenuKo,
+  macFilterPanel: macFilterPanelKo(gridPopupsKo.filterDropdown),
   macSheetTabMenu: macSheetTabMenuKo,
   macFindReplace: macFindReplaceFrom(editDialogsKo.findReplace, '반각과 전각 구분'),
 };

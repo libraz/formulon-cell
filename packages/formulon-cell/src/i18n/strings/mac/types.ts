@@ -9,6 +9,7 @@ import type { MacChromeStrings } from './chrome.js';
 import type { MacCreateTableStrings } from './create-table.js';
 import type { MacDataValidationStrings } from './data-validation.js';
 import type { MacErrorMenuStrings } from './error-menu.js';
+import type { MacFilterPanelStrings } from './filter-panel.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
 import type { MacGoToDialogStrings } from './goto-dialog.js';
 import type { MacHyperlinkDialogStrings } from './hyperlink-dialog.js';
@@ -32,6 +33,7 @@ export interface MacStrings {
   macFormatDialog: Partial<CellFormatStrings['formatDialog']>;
   /** Overrides of `findReplace` that apply on the Mac host only. */
   macErrorMenu: MacErrorMenuStrings;
+  macFilterPanel: MacFilterPanelStrings;
   macSheetTabMenu: MacSheetTabMenuStrings;
   macFindReplace: MacFindReplaceStrings;
   /** Overrides of `iterativeDialog`, plus its Mac-only labels, that apply on the Mac host only. */

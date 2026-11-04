@@ -1,3 +1,4 @@
+import { gridPopupsJa } from '../grid-popups/ja.js';
 import { macAccessibilityPaneJa } from './accessibility-pane.js';
 import { macAdvancedFilterJa } from './advanced-filter.js';
 import { macAlertsJa } from './alerts.js';
@@ -7,6 +8,7 @@ import { macCreateTableJa } from './create-table.js';
 import { macDataValidationJa } from './data-validation.js';
 import { macErrorMenuJa } from './error-menu.js';
 import { macExternalLinksPaneJa } from './external-links-pane.js';
+import { macFilterPanelJa } from './filter-panel.js';
 import { macGoToDialogJa } from './goto-dialog.js';
 import { macHyperlinkDialogJa } from './hyperlink-dialog.js';
 import { macIterativeDialogJa } from './iterative-dialog.js';
@@ -214,6 +216,7 @@ export const macJa: MacStrings = {
   macRemoveDuplicates: macRemoveDuplicatesJa,
   macSortDialog: macSortDialogJa,
   macErrorMenu: macErrorMenuJa,
+  macFilterPanel: macFilterPanelJa(gridPopupsJa.filterDropdown),
   macSheetTabMenu: macSheetTabMenuJa,
   macFindReplace: {
     optionsMore: 'オプション',

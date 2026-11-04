@@ -14,6 +14,7 @@ import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macErrorMenuZh } from './error-menu.js';
 import { macExternalLinksPaneZh } from './external-links-pane.js';
+import { macFilterPanelZh } from './filter-panel.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
@@ -270,6 +271,7 @@ export const macZh: MacStrings = {
     options: '选项...',
   }),
   macErrorMenu: macErrorMenuZh,
+  macFilterPanel: macFilterPanelZh(gridPopupsZh.filterDropdown),
   macSheetTabMenu: macSheetTabMenuZh,
   macFindReplace: macFindReplaceFrom(editDialogsZh.findReplace, '区分全/半角'),
 };
