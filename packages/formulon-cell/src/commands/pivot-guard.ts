@@ -48,6 +48,25 @@ export function blockPivotEdit(wb: WorkbookHandle, range: Range): boolean {
   return true;
 }
 
+/** Whether inserting `count` rows or columns before line `at`, or deleting
+ *  `count` of them from `at`, cuts through a report on `sheet`. An insertion
+ *  at a report's first line only moves it. */
+export function axisEditCrossesPivot(
+  wb: WorkbookHandle,
+  sheet: number,
+  axis: 'row' | 'col',
+  kind: 'insert' | 'delete',
+  at: number,
+  count: number,
+): boolean {
+  if (!wb.capabilities?.pivotTables) return false;
+  return wb.pivotBounds(sheet).some(({ range }) => {
+    const first = axis === 'row' ? range.r0 : range.c0;
+    const last = axis === 'row' ? range.r1 : range.c1;
+    return kind === 'insert' ? at > first && at <= last : at <= last && at + count - 1 >= first;
+  });
+}
+
 /** How a selection meets the PivotTables of its sheet. */
 export interface PivotSelectionPlan {
   /** Reports the selection contains in full; Delete removes these. */

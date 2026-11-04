@@ -23,6 +23,7 @@ import { listComments, recordCommentChange } from './comment.js';
 import { blockDataTableShift } from './data-table-guard.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import type { History } from './history.js';
+import { blockPivotEdit } from './pivot-guard.js';
 import { blockedByProtection } from './protection.js';
 import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
 
@@ -170,6 +171,8 @@ export function insertCells(
   const delta = direction === 'down' ? range.r1 - range.r0 + 1 : range.c1 - range.c0 + 1;
   if (delta > 0 && shiftWouldOverflow(store, wb, affected, direction, delta)) return false;
   if (blockDataTableShift(wb, affected)) return false;
+  // Shifted cells cannot carry a report along.
+  if (blockPivotEdit(wb, affected)) return false;
   return shiftCellBand(store, wb, history, affected, direction, delta);
 }
 
@@ -188,6 +191,8 @@ export function deleteCells(
       : { sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
   const delta = direction === 'up' ? -(range.r1 - range.r0 + 1) : -(range.c1 - range.c0 + 1);
   if (blockDataTableShift(wb, affected)) return false;
+  // Shifted cells cannot carry a report along.
+  if (blockPivotEdit(wb, affected)) return false;
   return shiftCellBand(store, wb, history, affected, direction === 'up' ? 'down' : 'right', delta);
 }
 

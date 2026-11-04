@@ -694,7 +694,6 @@ export function unsupportedMetadataBlocksBand(
   }
 
   if (wb.getTables().some((table) => sheets.has(table.sheetIndex))) return true;
-  if (wb.getPivotTables().some((pivot) => sheets.has(pivot.sheetIndex))) return true;
 
   // Passthrough parts are preserved verbatim, but their anchors are opaque to
   // this command. Reject only known anchored worksheet parts; workbook theme

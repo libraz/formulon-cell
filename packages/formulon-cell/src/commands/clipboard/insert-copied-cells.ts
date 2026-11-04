@@ -27,6 +27,7 @@ import {
 } from '../coerce-input.js';
 import { blockDataTableShift, blockTableFunction } from '../data-table-guard.js';
 import type { History } from '../history.js';
+import { alertPivotEdit, axisEditCrossesPivot } from '../pivot-guard.js';
 import { blockedByProtection, isCellWritable, isSheetProtected } from '../protection.js';
 import {
   createStructureReplayCheckpointRef,
@@ -365,6 +366,24 @@ export function insertCopiedBand(
     !adjacentCutNoOp &&
     unsupportedMetadataBlocksBand(store.getState(), wb, snapshot.range.sheet, targetSheet)
   ) {
+    return null;
+  }
+  // Taking the band out of, or inserting it into, a report would cut it.
+  const axis = wholeRows ? 'row' : 'col';
+  if (
+    axisEditCrossesPivot(wb, targetSheet, axis, 'insert', insertionAt, count) ||
+    (snapshot.mode === 'cut' &&
+      !adjacentCutNoOp &&
+      axisEditCrossesPivot(
+        wb,
+        snapshot.range.sheet,
+        axis,
+        'delete',
+        wholeRows ? logical.r0 : logical.c0,
+        count,
+      ))
+  ) {
+    alertPivotEdit(wb);
     return null;
   }
   // A cut spans delete + insert + paste. Without a history frame there is no

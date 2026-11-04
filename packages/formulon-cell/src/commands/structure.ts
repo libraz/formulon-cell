@@ -77,6 +77,7 @@ import { recordFilterChange } from './filter.js';
 import { collectAllFormulas, type FormulaRecord } from './formula-records.js';
 import { adjustFormulaForRowColEdit } from './formula-refs.js';
 import type { History } from './history.js';
+import { alertPivotEdit, axisEditCrossesPivot } from './pivot-guard.js';
 import { blockedByProtection, isBandUnlocked, sheetPermits } from './protection.js';
 import {
   captureLayoutSnapshot,
@@ -1156,6 +1157,10 @@ function editAxis(
   if (kind === 'insert' && insertionWouldOverflow(store, wb, sheet, axis, split, n)) return false;
   if (axisEditSplitsDataTable(wb, sheet, axis, kind, split, n)) {
     alertDataTableEdit(wb);
+    return false;
+  }
+  if (axisEditCrossesPivot(wb, sheet, axis, kind, split, n)) {
+    alertPivotEdit(wb);
     return false;
   }
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;

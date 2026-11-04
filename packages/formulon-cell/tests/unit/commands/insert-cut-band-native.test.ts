@@ -335,7 +335,7 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
     expect(attributes(3, targetSheet)).toMatchObject({ hidden: true, outlineLevel: 2 });
   });
 
-  it.each(['name', 'filter', 'sparkline', 'permission', 'view', 'pivot'] as const)(
+  it.each(['name', 'filter', 'sparkline', 'permission', 'view'] as const)(
     'leaves unsupported %s metadata intact on rejection',
     (metadata) => {
       seed();
@@ -367,15 +367,6 @@ describe.each(['row', 'col'] as const)('native Insert Cut Cells (%s)', (axis) =>
             views: [{ id: 'view', name: 'View', sheet: 0, hiddenRows: [1], hiddenCols: [1] }],
           },
         }));
-      } else if (metadata === 'pivot') {
-        const cache = wb.createPivotCache();
-        wb.addPivotCacheField(cache, 'Value');
-        const record = wb.addPivotCacheRecord(cache);
-        wb.setPivotCacheRecordValue(cache, record, 0, { kind: 'number', value: 2 });
-        expect(
-          wb.createPivotTable(0, 'CutPivot', cache, { row: 20, col: 20 }),
-        ).toBeGreaterThanOrEqual(0);
-        expect(wb.getPivotTables()).toHaveLength(1);
       } else {
         store.setState((state) => ({
           ...state,
