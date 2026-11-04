@@ -184,7 +184,7 @@ describe('pasteSpecial', () => {
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 7 });
   });
 
-  it('rejects a merge crossing the boundary of a repeated destination', () => {
+  it('extends a selection over a merge it crosses before deciding whether the source repeats', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 1 },
       { row: 0, col: 1, value: 2 },
@@ -205,11 +205,12 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
 
-    expect(result).toBeNull();
+    // D1:G4 grows to D1:H5, which the 2x2 source does not tile: one copy lands.
+    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1, c1: 4 });
     expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 6 }))).toEqual(
       crossingMerge,
     );
-    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 3 })).toEqual({ kind: 'number', value: 1 });
     expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'blank' });
   });
 

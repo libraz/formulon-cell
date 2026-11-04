@@ -81,14 +81,14 @@ describe('paste special as Excel measures it', () => {
     expect(wb.cellFormula({ sheet: 0, row: 102, col: 14 })).toBe('=$N$100+O100');
   });
 
-  it('transpose still shifts references outside the copied block', () => {
+  it('transpose swaps the offset of references outside the copied block', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 1, value: 0, formula: '=Z1' }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     assertSnap(snap);
     setActive(store, 9, 0);
     pasteSpecial(store.getState(), store, wb, snap, opts({ what: 'formulas', transpose: true }));
-    // B1 lands on A11: offset (+10, -1) from its source.
-    expect(wb.cellFormula({ sheet: 0, row: 10, col: 0 })).toBe('=Y11');
+    // Z1 sits 24 columns right of B1; transposed it sits 24 rows below A11.
+    expect(wb.cellFormula({ sheet: 0, row: 10, col: 0 })).toBe('=A35');
   });
 
   it('pastes a single cell into a merged anchor and keeps the merge', () => {

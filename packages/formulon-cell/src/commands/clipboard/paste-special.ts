@@ -316,17 +316,19 @@ const preflight = (
     }
   }
 
-  const translatedMerges = wantsFormats(what) ? translateMerges(snap, destination, transpose) : [];
+  // A merge the destination cuts off (a cropped or wrapped tile) is not pasted.
+  const translatedMerges = wantsFormats(what)
+    ? (translateMerges(snap, destination, transpose)?.filter((merge) =>
+        rangeContainsRange(destination, merge),
+      ) ?? null)
+    : [];
   if (translatedMerges === null) return null;
-  for (const merge of translatedMerges) {
-    if (!rangeContainsRange(destination, merge)) return null;
-  }
   // A scalar paste into the exact logical footprint of a merged cell updates
-  // its anchor and keeps the merge. Non-scalar tiles intentionally continue
+  // its anchor and keeps the merge; a Formats paste unmerges it. Non-scalar tiles intentionally continue
   // through the normal topology replacement path (Excel unmerges those
   // covered cells unless the source carries a matching merge).
   const preservedMerges =
-    snap.rows === 1 && snap.cols === 1
+    snap.rows === 1 && snap.cols === 1 && what !== 'formats'
       ? [...state.merges.byAnchor.values()].filter((merge) => sameRange(merge, destination))
       : [];
   return { destination, translatedMerges, preservedMerges };
@@ -754,7 +756,7 @@ function applyPaste(
   const resolvedDestination = scalarIntoMergedAnchor(
     beforeHydration,
     snap,
-    resolvePasteDestination(beforeHydration, snap, opt.transpose),
+    resolvePasteDestination(beforeHydration, snap, opt.transpose, opt.what === 'formats'),
   );
   if (!resolvedDestination) return null;
   // Column widths write no cell: a protected sheet takes them when it allows

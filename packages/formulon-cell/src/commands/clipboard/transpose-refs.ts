@@ -17,7 +17,9 @@ const insideBlock = (at: Atom, block: Range): boolean => {
  * the copied block follows those cells to their transposed position in the
  * pasted tile — `$` markers included, so `=$A$1` from A1:D4 pasted at N100
  * reads `=$N$100`, and `=SUM(A1:A2)` reads `=SUM(N100:O100)`. Every other
- * reference shifts by the cell's own paste offset, as an ordinary copy does.
+ * reference keeps its offset from the cell with the two axes swapped, so a
+ * reference 3 columns right of its cell lands 3 rows below the pasted cell;
+ * `$`-anchored axes stay put.
  */
 export function transposeFormulaRefs(
   formula: string,
@@ -29,6 +31,13 @@ export function transposeFormulaRefs(
   if (!formula.startsWith('=')) return formula;
   const dRow = to.row - from.row;
   const dCol = to.col - from.col;
+  const swapped = (at: Atom): string | null =>
+    renderAtom(
+      at.absCol,
+      at.absCol ? atomCol(at) : to.col + (atomRow(at) - from.row),
+      at.absRow,
+      at.absRow ? atomRow(at) : to.row + (atomCol(at) - from.col),
+    );
   const transposed = (at: Atom): string | null =>
     renderAtom(
       at.absCol,
@@ -42,8 +51,14 @@ export function transposeFormulaRefs(
       tok.sheetQual === '' &&
       insideBlock(tok.a, block) &&
       (tok.b === null || insideBlock(tok.b, block));
-    if (!inBlock || tok.kind !== 'cell') {
+    if (tok.kind !== 'cell') {
       return shiftFormulaRefs(`=${renderToken(tok)}`, dRow, dCol).slice(1);
+    }
+    if (!inBlock) {
+      const first = swapped(tok.a);
+      const second = tok.b ? swapped(tok.b) : null;
+      if (first === null || (tok.b && second === null)) return null;
+      return `${tok.sheetQual}${first}${second === null ? '' : `:${second}`}`;
     }
     if (!tok.b) return transposed(tok.a);
     // Both corners swap axes, so the top-left corner stays top-left.

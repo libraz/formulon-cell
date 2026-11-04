@@ -178,6 +178,32 @@ export function materializedPasteCells(
   return out;
 }
 
+/** Grow `range` until every merge it touches lies wholly inside it, as a
+ * selection over merged cells does. */
+const expandOverMerges = (state: State, range: Range): Range => {
+  let out = range;
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const merge of state.merges.byAnchor.values()) {
+      if (merge.sheet !== out.sheet) continue;
+      if (merge.r1 < out.r0 || merge.r0 > out.r1 || merge.c1 < out.c0 || merge.c0 > out.c1)
+        continue;
+      const next = {
+        sheet: out.sheet,
+        r0: Math.min(out.r0, merge.r0),
+        c0: Math.min(out.c0, merge.c0),
+        r1: Math.max(out.r1, merge.r1),
+        c1: Math.max(out.c1, merge.c1),
+      };
+      if (next.r0 !== out.r0 || next.c0 !== out.c0 || next.r1 !== out.r1 || next.c1 !== out.c1) {
+        out = next;
+        grew = true;
+      }
+    }
+  }
+  return out;
+};
+
 const destinationRangeFor = (origin: Addr, rows: number, cols: number): Range | null => {
   if (rows <= 0 || cols <= 0) return null;
   const r1 = origin.row + rows - 1;
@@ -192,12 +218,16 @@ const destinationRangeFor = (origin: Addr, rows: number, cols: number): Range | 
  * A copied matrix repeats only when the current primary selection is a
  * normalized, exact multiple of the (possibly transposed) source tile. This
  * includes the full logical footprint selected by a merged-cell click; the
- * paste path preserves that merge for a scalar source.
+ * paste path preserves that merge for a scalar source. A selection that cuts
+ * a merge counts as extended over the whole merge. With `fillSelection` (a
+ * Formats paste) a multi-cell selection is the destination itself: the source
+ * wraps across it or is cropped to it.
  */
 export function resolvePasteDestination(
   state: State,
   snap: ClipboardSnapshot,
   transpose = false,
+  fillSelection = false,
 ): Range | null {
   const tileRows = transpose ? snap.cols : snap.rows;
   const tileCols = transpose ? snap.rows : snap.cols;
@@ -215,14 +245,7 @@ export function resolvePasteDestination(
   let origin = { row: active.row, col: active.col };
   let rows = tileRows;
   let cols = tileCols;
-  const selected = state.selection.range;
-  const normalized = {
-    sheet: selected.sheet,
-    r0: Math.min(selected.r0, selected.r1),
-    c0: Math.min(selected.c0, selected.c1),
-    r1: Math.max(selected.r0, selected.r1),
-    c1: Math.max(selected.c0, selected.c1),
-  };
+  const normalized = expandOverMerges(state, normalizedSelection(state));
   const selectedRows = normalized.r1 - normalized.r0 + 1;
   const selectedCols = normalized.c1 - normalized.c0 + 1;
   const canRepeat =
@@ -234,7 +257,12 @@ export function resolvePasteDestination(
     selectedCols >= tileCols &&
     selectedRows % tileRows === 0 &&
     selectedCols % tileCols === 0;
-  if (canRepeat) {
+  const fills =
+    fillSelection &&
+    snap.mode === 'copy' &&
+    normalized.sheet === active.sheet &&
+    (selectedRows > 1 || selectedCols > 1);
+  if (canRepeat || fills) {
     origin = { row: normalized.r0, col: normalized.c0 };
     rows = selectedRows;
     cols = selectedCols;
