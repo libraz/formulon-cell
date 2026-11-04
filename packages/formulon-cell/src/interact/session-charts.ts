@@ -43,28 +43,39 @@ import {
   previewFrame,
   trackFrameDrag,
 } from './drawing-frame.js';
+import {
+  attachMacChartSelectDataDialog,
+  DEFAULT_SELECT_DATA_LABELS,
+  type MacChartSelectDataHandle,
+  type SelectDataLabels,
+} from './mac-chart-select-data-dialog.js';
 import { createObjectMenu, type ObjectMenuEntry } from './object-menu.js';
 import { createSessionChartFormatter } from './session-chart-format.js';
 import {
+  type ChartSettingsTarget,
   type ChartValueFormatter,
   chartSettingsDefaults,
   createSessionChartSettings,
   type SessionChartSettingsHandle,
-  type SettingsTab,
 } from './session-chart-settings.js';
-import type { SessionChartSettingsLabels } from './session-chart-settings-labels.js';
+import {
+  DEFAULT_LABELS as SETTINGS_DEFAULT_LABELS,
+  type SessionChartSettingsLabels,
+} from './session-chart-settings-labels.js';
 import type { SessionChartSettingsShape } from './session-chart-settings-model.js';
 
 export interface SessionChartsHandle {
   refresh(): void;
   /** Open the settings of the selected chart on `tab`; false when no chart
    *  that can be drawn is selected. */
-  openSettings(tab: SettingsTab): boolean;
+  openSettings(tab: ChartSettingsTarget): boolean;
   setLabels(labels: Partial<SessionChartLabels>, locale?: string): void;
   detach(): void;
 }
 
-export interface SessionChartLabels extends Partial<SessionChartSettingsLabels> {
+export interface SessionChartLabels
+  extends Partial<SessionChartSettingsLabels>,
+    Partial<SelectDataLabels> {
   /** The buttons beside a selected chart. */
   elementsButton: string;
   stylesButton: string;
@@ -475,8 +486,33 @@ export function attachSessionCharts(deps: {
     });
   };
 
-  /** Open the settings surface on `tab`, beside the chart's buttons. */
-  const openSettings = (chart: SessionChart, panel: HTMLElement, tab: SettingsTab): void => {
+  let selectData: MacChartSelectDataHandle | null = null;
+  const isMac = (): boolean =>
+    (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+
+  /** Open the settings surface on `tab`, beside the chart's buttons; on the Mac
+   *  profile Select Data opens its own dialog. */
+  const openSettings = (
+    chart: SessionChart,
+    panel: HTMLElement,
+    target: ChartSettingsTarget,
+  ): void => {
+    if (target === 'selectData' && isMac() && canEditChart(chart)) {
+      selectData ??= attachMacChartSelectDataDialog({
+        host,
+        store,
+        history,
+        getWb: chartWorkbook,
+        getLabels: () =>
+          ({
+            ...SETTINGS_DEFAULT_LABELS,
+            ...DEFAULT_SELECT_DATA_LABELS,
+            ...labels,
+          }) as SelectDataLabels,
+      });
+      if (selectData.open(chart.id)) return;
+    }
+    const tab = target === 'selectData' ? 'filters' : target;
     const anchor = panel.querySelector<HTMLElement>(`[data-chart-settings-tab="${tab}"]`);
     if (anchor && isDrawable(chart)) settings.open(chart, chart.data, anchor, tab);
   };
@@ -502,7 +538,7 @@ export function attachSessionCharts(deps: {
         {
           id: 'selectData',
           label: labels.selectData,
-          run: () => openSettings(chart, panel, 'filters'),
+          run: () => openSettings(chart, panel, 'selectData'),
         },
         { separator: true },
       );
@@ -841,6 +877,7 @@ export function attachSessionCharts(deps: {
       syncSelection();
       unsubscribeController();
       settings.detach();
+      selectData?.detach();
       root.remove();
     },
   };

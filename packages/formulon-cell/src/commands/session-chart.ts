@@ -875,6 +875,48 @@ export function addSessionChartSeries(
 }
 
 /**
+ * Repoint the cells of a series, or with `seriesId` null those of every series
+ * (category labels or X values shared by the whole chart); undo restores the
+ * chart as it was. Returns null, changing nothing, when there is no such
+ * series, the chart cannot be drawn, the sheet is protected, the policy
+ * refuses, or the engine rejects the references.
+ */
+export function setSessionChartSeries(
+  store: SpreadsheetStore,
+  id: string,
+  seriesId: string | null,
+  series: Partial<SessionChartSeriesInput>,
+  history: History | null,
+  wb: WorkbookHandle,
+  authorization: ChartMutationAuthorization = {},
+): SessionChart | null {
+  const chart = sessionChartById(store.getState(), id);
+  if (!chart || !wb.capabilities.charts || chart.kind === 'unsupported') return null;
+  const { sheet, nativeObjectId } = chart;
+  const plotSeries = wb.getChart(sheet, nativeObjectId)?.plots[0]?.series ?? [];
+  const seriesIdx = seriesId === null ? null : chartSeriesIdx(seriesId);
+  if (seriesId !== null && seriesIdx === null) return null;
+  const targets =
+    seriesIdx === null
+      ? plotSeries.map((entry) => entry.idx)
+      : plotSeries.filter((entry) => entry.idx === seriesIdx).map((entry) => entry.idx);
+  if (targets.length === 0) return null;
+  const { name, values, categories, x } = series;
+  const refs = [name, values, categories, x].filter((range) => range !== undefined);
+  const intent = chartIntent([...chartCells(chart), ...refs], 'chartUpdate', authorization);
+  if (!canMutateChart(store, intent)) return null;
+  const patch: ChartSeriesPatch = {};
+  if (name) patch.name = sourceRef(wb, name);
+  if (values) patch[chart.kind === 'scatter' ? 'y' : 'values'] = sourceRef(wb, values);
+  if (categories && chart.kind !== 'scatter') patch.categories = sourceRef(wb, categories);
+  if (x && chart.kind === 'scatter') patch.x = sourceRef(wb, x);
+  if (Object.keys(patch).length === 0) return chart;
+  return editChart(store, chart, history, wb, intent, 'series edit', () =>
+    targets.every((idx) => wb.setChartSeries(sheet, nativeObjectId, 0, idx, patch)),
+  );
+}
+
+/**
  * Remove the series `seriesId` from a chart; undo restores the chart as it
  * was. A chart keeps its last series: removing it returns null.
  */

@@ -208,8 +208,11 @@ export interface SpreadsheetInstance {
   openQuickAnalysis(): void;
   openWorkbookObjects(): void;
   /** Open the settings of the selected chart on `tab` (the chart elements by
-   *  default); false when no chart is selected. */
-  openChartSettings(tab?: import('../interact/session-chart-settings.js').SettingsTab): boolean;
+   *  default); `'selectData'` opens Select Data Source on the Mac profile and
+   *  the Filters tab elsewhere. False when no chart is selected. */
+  openChartSettings(
+    tab?: import('../interact/session-chart-settings.js').ChartSettingsTarget,
+  ): boolean;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
   openActivePivotFieldList(): boolean;
   /** Open the PivotTable Field dialog on the field of the active cell: a value

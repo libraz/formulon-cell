@@ -59,6 +59,10 @@ export interface SessionChartSettingsHandle {
 
 export type SettingsTab = 'elements' | 'styles' | 'filters';
 
+/** What an Open Chart Settings request can name: a settings tab, or the
+ *  Select Data Source dialog of the Mac profile (the Filters tab elsewhere). */
+export type ChartSettingsTarget = SettingsTab | 'selectData';
+
 export interface SessionChartSettingsDeps {
   readonly host: HTMLElement;
   readonly store: SpreadsheetStore;

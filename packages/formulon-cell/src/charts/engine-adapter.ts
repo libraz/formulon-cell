@@ -1079,15 +1079,23 @@ const writePlotField =
 const emptyCellsFor = (kind: ChartKind, mode: ChartEmptyCellMode): ChartEmptyCellMode =>
   mode === 'span' && !SPAN_KINDS.includes(kind) ? 'gap' : mode;
 
-const writeEmptyCells = (context: WriteContext): void => {
-  const { kind, emptyCells: after } = context.after;
-  const before = context.before.emptyCells;
-  if (after === undefined) return;
-  if (before !== undefined && emptyCellsFor(kind, before) === emptyCellsFor(kind, after)) return;
+/** Empty cells and hidden data share one engine call; each keeps the other's current value. */
+const writeDisplay = (context: WriteContext): void => {
+  const { kind, emptyCells: blanks, showHiddenData: hidden } = context.after;
+  const blanksBefore = context.before.emptyCells;
+  const blanksChanged =
+    blanks !== undefined &&
+    (blanksBefore === undefined ||
+      emptyCellsFor(kind, blanksBefore) !== emptyCellsFor(kind, blanks));
+  const hiddenChanged = hidden !== undefined && hidden !== (context.before.showHiddenData ?? false);
+  if (!blanksChanged && !hiddenChanged) return;
   context.ops.display = {
     op: 'setChartDisplay',
-    blanksAs: BLANKS_TO_ENGINE[emptyCellsFor(kind, after)],
-    plotVisibleOnly: context.info.plotVisibleOnly,
+    blanksAs:
+      blanksChanged && blanks !== undefined
+        ? BLANKS_TO_ENGINE[emptyCellsFor(kind, blanks)]
+        : context.info.blanksAs,
+    plotVisibleOnly: hiddenChanged ? !hidden : context.info.plotVisibleOnly,
   };
 };
 
@@ -1212,7 +1220,12 @@ export const CHART_SPEC_FIELDS: { readonly [K in keyof ChartSpec]-?: ChartFieldM
   emptyCells: {
     kinds: ALL_KINDS,
     read: (context) => readEmptyCells(context.kind, context.info.blanksAs),
-    write: writeEmptyCells,
+    write: writeDisplay,
+  },
+  showHiddenData: {
+    kinds: ALL_KINDS,
+    read: (context) => context.info.plotVisibleOnly === false,
+    write: writeDisplay,
   },
   gapWidth: {
     kinds: BAR_KINDS,
@@ -1323,6 +1336,7 @@ export const chartPreviewOverrides = (spec: ChartSpec): ChartPreviewOverrides =>
   ...(spec.emptyCells === undefined
     ? {}
     : { blanksAs: BLANKS_TO_ENGINE[emptyCellsFor(spec.kind, spec.emptyCells)] }),
+  ...(spec.showHiddenData === undefined ? {} : { plotVisibleOnly: !spec.showHiddenData }),
 });
 
 /**
@@ -1644,7 +1658,7 @@ const normalizeFilter = (
  * the palette becomes each series' fill colour (on a line or scatter chart, its
  * line and marker colour, with no series fill), an omitted title is automatic,
  * `auto` and omitted header flags
- * take the engine's split in `context`, omitted `emptyCells` / `grouping` take the
+ * take the engine's split in `context`, omitted `emptyCells` / `showHiddenData` / `grouping` take the
  * values the engine writes, labels, legend, filter and colours take their stored
  * form, and fields outside the kind are dropped.
  */
@@ -1663,6 +1677,7 @@ export const normalizeChartSpec = (spec: ChartSpec, context: ChartNormalizeConte
     headerRow: spec.headerRow ?? context.headerRow,
     headerColumn: spec.headerColumn ?? context.headerColumn,
     emptyCells: emptyCellsFor(kind, spec.emptyCells ?? 'gap'),
+    showHiddenData: spec.showHiddenData ?? false,
     // A chart created without a title text keeps the template's automatic title.
     title: spec.title ?? { auto: true },
     palette: undefined,

@@ -4,7 +4,7 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { ExtensionHandle } from '../extensions/index.js';
 import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
-import type { SettingsTab as ChartSettingsTab } from '../interact/session-chart-settings.js';
+import type { ChartSettingsTarget as ChartSettingsTab } from '../interact/session-chart-settings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { AlwaysOnDialogs } from './always-on-dialogs.js';
 import type { EngineBinding } from './engine-binding.js';

@@ -518,6 +518,34 @@ export interface DataObjectsStrings {
     firstSliceAngle: string;
     positionTop: string;
     positionBottom: string;
+    /** Select Data Source dialog. */
+    selectDataTitle: string;
+    selectDataRangeGroup: string;
+    selectDataRange: string;
+    selectDataSwitch: string;
+    selectDataSeries: string;
+    selectDataSeriesList: string;
+    selectDataAddSeries: string;
+    selectDataRemoveSeries: string;
+    selectDataMoveUp: string;
+    selectDataMoveDown: string;
+    selectDataName: string;
+    selectDataValues: string;
+    selectDataXValues: string;
+    selectDataCategories: string;
+    selectDataHiddenGroup: string;
+    selectDataEmptyCells: string;
+    selectDataEmptyGap: string;
+    selectDataEmptyZero: string;
+    selectDataEmptySpan: string;
+    selectDataNaAsEmpty: string;
+    selectDataShowHidden: string;
+    selectDataPicker: string;
+    /** Name of a series added in the dialog; `{n}` is its number. */
+    selectDataNewSeries: string;
+    /** Reason shown on controls with no host feature yet. */
+    selectDataUnavailable: string;
+    selectDataOk: string;
   };
   sessionIllustrations: {
     /** How assistive technology names a picture and a shape. */

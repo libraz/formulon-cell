@@ -1,0 +1,194 @@
+@layer fc.app {
+  /* Select Data Source (Mac): a 521 pt window; the series list is 250 x 137 pt
+     beside its name and value fields, the reference fields 26 pt tall. */
+  .fc-mac-chartdata__panel {
+    width: 521px;
+    max-height: none;
+  }
+
+  .fc-mac-chartdata__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 19px 4px 12px;
+  }
+
+  .fc-mac-chartdata__group {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 18px 15px 12px;
+    border: 1px solid var(--fc-rule);
+    border-radius: 6px;
+  }
+
+  .fc-mac-chartdata__legend {
+    position: absolute;
+    top: -10px;
+    left: 8px;
+    padding: 0 4px;
+    background: var(--fc-bg-elev, var(--fc-bg));
+  }
+
+  .fc-mac-chartdata__field {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .fc-mac-chartdata__field[hidden] {
+    display: none;
+  }
+
+  .fc-mac-chartdata__ref {
+    box-sizing: border-box;
+    height: 26px;
+  }
+
+  .fc-mac-chartdata__range .fc-mac-chartdata__label {
+    flex: 0 0 129px;
+  }
+
+  .fc-mac-chartdata__range .fc-range-picker {
+    flex: 0 0 330px;
+  }
+
+  .fc-mac-chartdata__series-head {
+    display: flex;
+    align-items: center;
+    width: 252px;
+    margin-top: 4px;
+  }
+
+  .fc-mac-chartdata__series-head .fc-mac-chartdata__label {
+    flex: 1 1 auto;
+  }
+
+  .fc-mac-chartdata__series {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 7px;
+  }
+
+  .fc-mac-chartdata__list {
+    box-sizing: border-box;
+    height: 137px;
+    overflow-y: auto;
+    border: 1px solid var(--fc-rule);
+    background: var(--fc-bg);
+  }
+
+  .fc-mac-chartdata__option {
+    padding: 2px 6px;
+    cursor: default;
+  }
+
+  .fc-mac-chartdata__option[aria-selected="true"] {
+    background: var(--fc-accent);
+    color: var(--fc-accent-fg);
+  }
+
+  .fc-mac-chartdata__detail {
+    display: flex;
+    flex-direction: column;
+    gap: 42px;
+    padding-top: 1px;
+  }
+
+  .fc-mac-chartdata__detail .fc-mac-chartdata__label {
+    flex: 0 0 42px;
+  }
+
+  .fc-mac-chartdata__detail .fc-range-picker {
+    flex: 0 0 176px;
+  }
+
+  .fc-mac-chartdata__tools {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .fc-mac-chartdata__icon {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+  }
+
+  .fc-mac-chartdata__series-head .fc-mac-chartdata__icon {
+    width: 27px;
+    height: 27px;
+  }
+
+  .fc-mac-chartdata__add::before,
+  .fc-mac-chartdata__add::after,
+  .fc-mac-chartdata__remove::before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 9px;
+    height: 1.5px;
+    background: currentColor;
+    content: "";
+    transform: translate(-50%, -50%);
+  }
+
+  .fc-mac-chartdata__add::after {
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+
+  .fc-mac-chartdata__move-up::before,
+  .fc-mac-chartdata__move-down::before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    border-top: 1.5px solid currentColor;
+    border-left: 1.5px solid currentColor;
+    content: "";
+    transform: translate(-50%, -25%) rotate(45deg);
+  }
+
+  .fc-mac-chartdata__move-down::before {
+    transform: translate(-50%, -75%) rotate(225deg);
+  }
+
+  .fc-mac-chartdata__switch {
+    width: 190px;
+    height: 26px;
+    margin-left: 15px;
+  }
+
+  .fc-mac-chartdata__categories .fc-mac-chartdata__label {
+    flex: 0 0 106px;
+  }
+
+  .fc-mac-chartdata__categories .fc-range-picker {
+    flex: 0 0 370px;
+  }
+
+  .fc-mac-chartdata__empty-select {
+    width: 96px;
+    height: 26px;
+  }
+
+  .fc-mac-chartdata__check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fc-mac-chartdata__footer .fc-fmtdlg__btn {
+    width: 86px;
+    min-width: 0;
+    height: 26px;
+  }
+
+  .fc-mac-chartdata__footer .fc-mac-chartdata__btn--primary {
+    width: 72px;
+  }
+}

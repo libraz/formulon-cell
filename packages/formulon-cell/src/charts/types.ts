@@ -155,6 +155,8 @@ export interface ChartSpec {
   readonly scatterStyle?: ChartScatterStyle;
   readonly seriesDirection?: ChartSeriesDirection;
   readonly emptyCells?: ChartEmptyCellMode;
+  /** Plot the values of hidden rows and columns too; the file stores the inverse, `plotVisOnly`. */
+  readonly showHiddenData?: boolean;
   /** Excel chart gap width as a percentage of one category slot (0–500). */
   readonly gapWidth?: number;
   /** Excel chart overlap as a percentage for clustered series (-100–100). */

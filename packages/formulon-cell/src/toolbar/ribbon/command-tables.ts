@@ -57,7 +57,7 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   selectionPanePageLayout: (i) => i.openWorkbookObjects(),
   objectSelectionPane: (i) => i.openWorkbookObjects(),
   chartChangeType: (i) => i.openChartSettings('elements'),
-  chartSelectData: (i) => i.openChartSettings('filters'),
+  chartSelectData: (i) => i.openChartSettings('selectData'),
   chartFormatSelection: (i) => i.openChartSettings('styles'),
   pivotFieldListView: (i) => {
     if (!i.openActivePivotFieldList()) i.openWorkbookObjects();

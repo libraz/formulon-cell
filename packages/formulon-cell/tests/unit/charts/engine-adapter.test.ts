@@ -254,6 +254,7 @@ describe('CHART_SPEC_FIELDS', () => {
       scatterStyle: ['scatter'],
       seriesDirection: all,
       emptyCells: all,
+      showHiddenData: all,
       gapWidth: ['column', 'bar'],
       overlap: ['column', 'bar'],
       firstSliceAngle: ['pie', 'doughnut'],
@@ -306,6 +307,7 @@ describe('chartSpecFromEngine', () => {
         'overlap',
         'seriesDirection',
         'seriesStyles',
+        'showHiddenData',
         'title',
         'varyColors',
         'xAxis',
@@ -323,6 +325,7 @@ describe('chartSpecFromEngine', () => {
         'overlap',
         'seriesDirection',
         'seriesStyles',
+        'showHiddenData',
         'title',
         'varyColors',
         'xAxis',
@@ -338,6 +341,7 @@ describe('chartSpecFromEngine', () => {
         'legend',
         'seriesDirection',
         'seriesStyles',
+        'showHiddenData',
         'title',
         'varyColors',
         'xAxis',
@@ -353,6 +357,7 @@ describe('chartSpecFromEngine', () => {
         'legend',
         'seriesDirection',
         'seriesStyles',
+        'showHiddenData',
         'title',
         'varyColors',
         'xAxis',
@@ -368,6 +373,7 @@ describe('chartSpecFromEngine', () => {
         'legend',
         'seriesDirection',
         'seriesStyles',
+        'showHiddenData',
         'title',
         'varyColors',
       ],
@@ -382,6 +388,7 @@ describe('chartSpecFromEngine', () => {
         'legend',
         'seriesDirection',
         'seriesStyles',
+        'showHiddenData',
         'title',
         'varyColors',
       ],
@@ -395,6 +402,7 @@ describe('chartSpecFromEngine', () => {
         'scatterStyle',
         'seriesDirection',
         'seriesStyles',
+        'showHiddenData',
         'title',
         'varyColors',
         'xAxis',
@@ -2742,6 +2750,7 @@ describe('normalizeChartSpec', () => {
       headerRow: true,
       headerColumn: false,
       emptyCells: 'gap',
+      showHiddenData: false,
       title: { auto: true },
     });
     expect(
@@ -2762,6 +2771,7 @@ describe('normalizeChartSpec', () => {
       headerRow: true,
       headerColumn: true,
       emptyCells: 'gap',
+      showHiddenData: false,
       title: { auto: true },
     });
     expect(
@@ -2775,6 +2785,7 @@ describe('normalizeChartSpec', () => {
       headerRow: false,
       headerColumn: false,
       emptyCells: 'span',
+      showHiddenData: false,
       title: { auto: true },
     });
   });
@@ -2803,6 +2814,7 @@ describe('normalizeChartSpec', () => {
       headerRow: true,
       headerColumn: false,
       emptyCells: 'gap',
+      showHiddenData: false,
       title: { auto: true },
     };
     expect(normalizeChartSpec({ kind: 'pie', ...everything }, context)).toEqual({

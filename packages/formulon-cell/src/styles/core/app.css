@@ -27,6 +27,7 @@
 @import "./app/dialog-modules/remove-duplicates.css";
 @import "./app/dialog-modules/text-to-columns.css";
 @import "./app/dialog-modules/slicer-chooser.css";
+@import "./app/dialog-modules/chart-select-data.css";
 @import "./app/dialog-modules/advanced-filter.css";
 @import "./app/dialog-modules/goto-special.css";
 @import "./app/dialog-modules/protect-sheet.css";

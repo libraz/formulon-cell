@@ -23,6 +23,7 @@ import {
   removeSessionChartSeries,
   sessionChartById,
   sessionChartsForRange,
+  setSessionChartSeries,
   updateSessionChart,
 } from '../../../src/commands/session-chart.js';
 import {
@@ -365,6 +366,27 @@ describe('session chart commands', () => {
     expect(sessionChartById(store.getState(), chart.id)?.source).toEqual(range(0, 0, 3, 2));
   });
 
+  it('plots data in hidden rows and columns on request and keeps that through a save', async () => {
+    const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+    if (!chart) throw new Error('chart was not created');
+    expect(chart.showHiddenData).toBe(false);
+
+    const shown = updateSessionChart(store, chart.id, { showHiddenData: true }, history, wb);
+    expect(shown?.showHiddenData).toBe(true);
+    expect(wb.getChart(0, chart.nativeObjectId)?.plotVisibleOnly).toBe(false);
+
+    const loaded = await WorkbookHandle.loadBytes(wb.save());
+    try {
+      const next = createSpreadsheetStore();
+      hydrateChartsFromEngine(loaded, next, 0);
+      expect(next.getState().charts.charts[0]?.showHiddenData).toBe(true);
+    } finally {
+      loaded.dispose();
+    }
+    expect(history.undo()).toBe(true);
+    expect(wb.getChart(0, chart.nativeObjectId)?.plotVisibleOnly).not.toBe(false);
+  });
+
   it('switches the series direction through the engine split', () => {
     const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
     if (!chart) throw new Error('chart was not created');
@@ -440,6 +462,57 @@ describe('session chart commands', () => {
         [10, 30],
         [15, 35],
         [12, 32],
+      ]);
+    });
+
+    it('repoints a series name and values, and undoes the edit', () => {
+      seedWest();
+      const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+      if (!chart) throw new Error('chart was not created');
+
+      const edited = setSessionChartSeries(
+        store,
+        chart.id,
+        'series-1',
+        { name: range(0, 3, 0, 3), values: range(1, 3, 3, 3) },
+        history,
+        wb,
+      );
+      expect(edited?.data).toMatchObject({
+        series: [
+          { id: 'series-0', name: 'North' },
+          { id: 'series-1', name: 'West', values: [30, 35, 32] },
+        ],
+      });
+      expect(wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series[1]?.values).toMatchObject({
+        formula: 'Sheet1!$D$2:$D$4',
+      });
+      expect(setSessionChartSeries(store, chart.id, 'series-9', {}, history, wb)).toBeNull();
+
+      expect(history.undo()).toBe(true);
+      expect(sessionChartById(store.getState(), chart.id)).toEqual(chart);
+    });
+
+    it('repoints the category labels of every series', () => {
+      wb.setText({ sheet: 0, row: 1, col: 4 }, 'Q1');
+      wb.setText({ sheet: 0, row: 2, col: 4 }, 'Q2');
+      wb.setText({ sheet: 0, row: 3, col: 4 }, 'Q3');
+      const chart = createSessionChart(store, range(0, 0, 3, 2), { wb });
+      if (!chart) throw new Error('chart was not created');
+
+      const edited = setSessionChartSeries(
+        store,
+        chart.id,
+        null,
+        { categories: range(1, 4, 3, 4) },
+        history,
+        wb,
+      );
+      expect(edited?.data).toMatchObject({ categories: ['Q1', 'Q2', 'Q3'] });
+      const series = wb.getChart(0, chart.nativeObjectId)?.plots[0]?.series ?? [];
+      expect(series.map((entry) => entry.categories?.formula)).toEqual([
+        'Sheet1!$E$2:$E$4',
+        'Sheet1!$E$2:$E$4',
       ]);
     });
 
