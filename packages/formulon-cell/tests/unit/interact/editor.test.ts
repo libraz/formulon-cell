@@ -58,6 +58,26 @@ describe('InlineEditor', () => {
     document.body.innerHTML = '';
   });
 
+  it('places the caret at the clicked position when begun from a point', () => {
+    // A measurer with an 8 px advance per character stands in for canvas text metrics.
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      font: '',
+      measureText: (text: string) => ({ width: text.length * 8 }),
+    } as unknown as CanvasRenderingContext2D);
+    try {
+      mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+      editor.begin('200', { caretClientX: Number.NEGATIVE_INFINITY });
+      const input = grid.querySelector('textarea') as HTMLTextAreaElement;
+      expect([input.selectionStart, input.selectionEnd]).toEqual([0, 0]);
+      editor.cancel();
+      editor.begin('200');
+      const plain = grid.querySelector('textarea') as HTMLTextAreaElement;
+      expect(plain.selectionStart).toBe(3);
+    } finally {
+      getContext.mockRestore();
+    }
+  });
+
   it('refuses edit mode on a locked cell of a protected sheet and raises the protected-cell alert', () => {
     // Excel: a double-click on a locked cell shows the alert without entering edit mode.
     const onValidation = vi.fn();

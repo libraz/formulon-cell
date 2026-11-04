@@ -20,6 +20,7 @@ import {
   collectAutocompleteNames,
   pickListValues,
 } from './autocomplete.js';
+import { caretIndexAtClientX } from './editor-caret.js';
 import {
   alignEditorText,
   fitEditorToContent,
@@ -102,6 +103,9 @@ export type FormulaArrowMode = 'edit' | 'point';
 
 export interface EditorBeginOptions {
   mode?: FormulaArrowMode;
+  /** Client x of the click that opened the editor; the caret goes to the
+   *  character boundary under it instead of the end of the text. */
+  caretClientX?: number;
 }
 
 /** The part of the inline cell editor hosts may drive. */
@@ -348,7 +352,11 @@ export class InlineEditor {
       // subsequent keystrokes before raf fires; the host's keydown handler then
       // sees `editor.kind !== 'idle'` and silently drops them.
       input.focus();
-      input.setSelectionRange(seed.length, seed.length);
+      const caret =
+        options.caretClientX === undefined
+          ? null
+          : caretIndexAtClientX(input, options.caretClientX);
+      input.setSelectionRange(caret ?? seed.length, caret ?? seed.length);
     });
     this.pendingHistoryInput = null;
     this.ignoredHistoryInput = null;

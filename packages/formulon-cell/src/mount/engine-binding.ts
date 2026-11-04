@@ -435,7 +435,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       })
     : null;
 
-  const beginEditActiveCell = (): void => {
+  const beginEditActiveCell = (caretClientX?: number): void => {
     const s = store.getState();
     const a = s.selection.active;
     const key = `${a.sheet}:${a.row}:${a.col}`;
@@ -447,7 +447,10 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       sheetProtected: s.protection.protectedSheets.has(a.sheet),
       locale: inputLocaleForWorkbook(wb),
     });
-    editor.begin(seed, { mode: 'edit' });
+    editor.begin(seed, {
+      mode: 'edit',
+      ...(caretClientX === undefined ? {} : { caretClientX }),
+    });
   };
   const onDblClick = (e: MouseEvent): void => {
     if (e.button !== 0) return;
@@ -459,7 +462,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     // Formula-bar reference picking preserves its focus. Do not start a second
     // inline edit from the persisted, still-old formula while that draft is live.
     if (getFormulaBarEditor?.()?.isFormulaEdit()) return;
-    beginEditActiveCell();
+    // The Mac desktop puts the caret where the cell was double-clicked.
+    const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+    beginEditActiveCell(mac ? e.clientX : undefined);
     e.preventDefault();
   };
   grid.addEventListener('dblclick', onDblClick);
