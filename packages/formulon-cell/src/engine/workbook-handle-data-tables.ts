@@ -1,4 +1,5 @@
 import type { DataTable } from '@libraz/formulon';
+import { CALC_MODE_MANUAL } from './calc-mode.js';
 import type { Addr, EngineCapabilities, Range, Workbook } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -62,7 +63,7 @@ function toInfo(sheet: number, table: DataTable): DataTableInfo {
 /** A new table reads 0 until computed; Manual leaves that to Calculate Now. */
 function computeUnlessManual(handle: unknown): void {
   const self = internals(handle);
-  if ((handle as WorkbookHandle).calcMode() !== 1) {
+  if ((handle as WorkbookHandle).calcMode() !== CALC_MODE_MANUAL) {
     const s = self.wb.recalcDataTables();
     if (!s.ok) throw new Error(`recalcDataTables: ${s.message}`);
   }

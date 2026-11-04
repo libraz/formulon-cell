@@ -1,3 +1,4 @@
+import { CALC_MODE_MANUAL, type CalcModeCode } from './calc-mode.js';
 import {
   ENGINE_SPREADSHEET_PROFILE_GETTER,
   ENGINE_SPREADSHEET_PROFILE_SETTER,
@@ -498,7 +499,7 @@ export abstract class WorkbookHandleFormulasMethods {
    *  engine doesn't expose `calcMode`. Codes: 0 = Auto, 1 = Manual,
    *  2 = AutoNoTable, under which the engine's own pass skips data tables
    *  and only `recalc()` (Calculate Now) computes them. */
-  calcMode(): 0 | 1 | 2 | null {
+  calcMode(): CalcModeCode | null {
     assertAlive(this);
     if (!this.capabilities.calcMode) return null;
     const mode = wb(this).calcMode();
@@ -509,14 +510,15 @@ export abstract class WorkbookHandleFormulasMethods {
    *  older engine package builds. Leaving Manual runs the recalc that the
    *  edits made while in Manual were denied, so switching back to Auto
    *  settles the sheet the way a spreadsheet does. */
-  setCalcMode(mode: 0 | 1 | 2): boolean {
+  setCalcMode(mode: CalcModeCode): boolean {
     assertAlive(this);
     if (!this.capabilities.calcMode) return false;
     const previous = this.calcMode();
     if (!wb(this).setCalcMode(mode).ok) return false;
     // These methods are mixed into WorkbookHandle at runtime, so the base
     // class's own members need the cast to be visible here.
-    if (previous === 1 && mode !== 1) (this as unknown as WorkbookHandle).recalc();
+    if (previous === CALC_MODE_MANUAL && mode !== CALC_MODE_MANUAL)
+      (this as unknown as WorkbookHandle).recalc();
     return true;
   }
 

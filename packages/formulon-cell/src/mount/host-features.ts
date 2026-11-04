@@ -10,6 +10,7 @@ import {
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
 import { addrKey, formatA1Range } from '../engine/address.js';
+import { nextCalcMode } from '../engine/calc-mode.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import { editSeedForAddr } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
@@ -629,8 +630,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           onCycleCalcMode: () => {
             const cur = input.wb().calcMode();
             if (cur === null) return;
-            const next = ((cur + 1) % 3) as 0 | 1 | 2;
-            input.wb().setCalcMode(next);
+            input.wb().setCalcMode(nextCalcMode(cur));
             s.statusBar?.refresh();
           },
           onRecalc: () => {

@@ -619,15 +619,13 @@ export class WorkbookHandle {
         this.writeRawCell(entry.patch.addr, entry.patch.value, entry.patch.formula ?? null);
         this.dirtySinceRecalc.add(addrKey(entry.patch.addr));
       }
+      // In manual calculation mode, engine dirty flags remain pending but no
+      // automatic recalc event is emitted, matching ordinary setters.
       if (!manual) {
         const status = this.wb.recalc();
         if (!status.ok) throw new Error(`recalc: ${status.message}`);
-        this.pendingRecalc = false;
-      } else {
-        // Match ordinary setters in manual calculation mode: engine dirty flags
-        // remain pending, but no automatic recalc event is emitted.
-        this.pendingRecalc = false;
       }
+      this.pendingRecalc = false;
       after = this.captureCellSnapshots(entries.map((entry) => entry.patch.addr));
     } catch (error) {
       // Restore in reverse order. Direct engine calls intentionally bypass the
@@ -699,12 +697,26 @@ export class WorkbookHandle {
    *  inside the scope still runs immediately and supersedes what is pending. */
   withBatchedRecalc<T>(fn: () => T): T {
     this.recalcBatchDepth += 1;
+    let result: T;
     try {
-      return fn();
-    } finally {
+      result = fn();
+    } catch (error) {
+      // The caller must see fn's error even if the settling recalc also throws.
       this.recalcBatchDepth -= 1;
-      if (this.recalcBatchDepth === 0 && this.pendingRecalc && !this.disposed) this.recalcAuto();
+      try {
+        this.settleBatchedRecalc();
+      } catch {
+        // superseded by `error`
+      }
+      throw error;
     }
+    this.recalcBatchDepth -= 1;
+    this.settleBatchedRecalc();
+    return result;
+  }
+
+  private settleBatchedRecalc(): void {
+    if (this.recalcBatchDepth === 0 && this.pendingRecalc && !this.disposed) this.recalcAuto();
   }
 
   /** Recompute after a write at `a`, or leave it to the enclosing batch.

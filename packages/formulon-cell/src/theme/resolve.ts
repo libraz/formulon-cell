@@ -96,23 +96,33 @@ const num = (s: string, fallback: number): number => {
 export function resolveTheme(host: HTMLElement): ResolvedTheme {
   const cs = getComputedStyle(host);
   const v = (k: string, d = ''): string => cs.getPropertyValue(k).trim() || d;
+  const bgRail = v('--fc-bg-rail', '#f3efe6');
+  const fg = v('--fc-fg', '#15171c');
+  const fgStrong = v('--fc-fg-strong', '#0a0c10');
+  const rule = v('--fc-rule', '#e2dccd');
+  const ruleStrong = v('--fc-rule-strong', '#cdc6b3');
+  const accent = v('--fc-accent', '#d83a14');
+  const headerBg = v('--fc-header-bg', bgRail);
+  const headerRule = v('--fc-header-rule', rule);
+  const headerFg = v('--fc-header-fg', '#6f6a5d');
+  const outlineButtonBorder = v('--fc-outline-button-border', ruleStrong);
   return {
     bg: v('--fc-bg', '#faf7f1'),
-    bgRail: v('--fc-bg-rail', '#f3efe6'),
+    bgRail,
     bgElev: v('--fc-bg-elev', '#ffffff'),
     bgHeader: v('--fc-bg-header', '#ece7dc'),
 
-    fg: v('--fc-fg', '#15171c'),
+    fg,
     fgMute: v('--fc-fg-mute', '#6f6a5d'),
     fgFaint: v('--fc-fg-faint', '#a8a294'),
-    fgStrong: v('--fc-fg-strong', '#0a0c10'),
-    cellAutoFg: v('--fc-cell-auto-fg', v('--fc-fg-strong', '#0a0c10')),
+    fgStrong,
+    cellAutoFg: v('--fc-cell-auto-fg', fgStrong),
 
-    rule: v('--fc-rule', '#e2dccd'),
-    ruleStrong: v('--fc-rule-strong', '#cdc6b3'),
+    rule,
+    ruleStrong,
     freezeRule: v('--fc-freeze-rule', '#9b9b9b'),
 
-    accent: v('--fc-accent', '#d83a14'),
+    accent,
     accentFg: v('--fc-accent-fg', '#ffffff'),
     accentSoft: v('--fc-accent-soft', 'rgba(216,58,20,0.10)'),
 
@@ -122,45 +132,27 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     cellNumFg: v('--fc-cell-num-fg', '#0a0c10'),
 
     hoverStripe: v('--fc-hover-stripe', 'rgba(21,23,28,0.025)'),
-    headerBg: v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
-    headerStripOuter: v(
-      '--fc-header-strip-outer',
-      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
-    ),
-    headerStripInner: v(
-      '--fc-header-strip-inner',
-      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
-    ),
-    headerRule: v('--fc-header-rule', v('--fc-rule', '#e2dccd')),
-    headerRuleOuter: v('--fc-header-rule-outer', v('--fc-header-rule', v('--fc-rule', '#e2dccd'))),
-    headerFg: v('--fc-header-fg', '#6f6a5d'),
+    headerBg,
+    headerStripOuter: v('--fc-header-strip-outer', headerBg),
+    headerStripInner: v('--fc-header-strip-inner', headerBg),
+    headerRule,
+    headerRuleOuter: v('--fc-header-rule-outer', headerRule),
+    headerFg,
     headerFgActive: v('--fc-header-fg-active', '#15171c'),
-    headerActiveBar: v('--fc-header-active-bar', v('--fc-accent', '#d83a14')),
+    headerActiveBar: v('--fc-header-active-bar', accent),
     headerFgActiveWeight: num(v('--fc-header-fg-active-weight', '600'), 600),
-    outlineGutterBg: v('--fc-outline-gutter-bg', v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6'))),
-    outlineButtonFaceTop: v(
-      '--fc-outline-button-face-top',
-      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
-    ),
-    outlineButtonFaceBottom: v(
-      '--fc-outline-button-face-bottom',
-      v('--fc-header-bg', v('--fc-bg-rail', '#f3efe6')),
-    ),
-    outlineButtonBorder: v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
-    outlineButtonEdgeStart: v(
-      '--fc-outline-button-edge-start',
-      v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
-    ),
-    outlineButtonEdgeEnd: v(
-      '--fc-outline-button-edge-end',
-      v('--fc-outline-button-border', v('--fc-rule-strong', '#cdc6b3')),
-    ),
-    outlineButtonFg: v('--fc-outline-button-fg', v('--fc-header-fg', '#6f6a5d')),
+    outlineGutterBg: v('--fc-outline-gutter-bg', headerBg),
+    outlineButtonFaceTop: v('--fc-outline-button-face-top', headerBg),
+    outlineButtonFaceBottom: v('--fc-outline-button-face-bottom', headerBg),
+    outlineButtonBorder,
+    outlineButtonEdgeStart: v('--fc-outline-button-edge-start', outlineButtonBorder),
+    outlineButtonEdgeEnd: v('--fc-outline-button-edge-end', outlineButtonBorder),
+    outlineButtonFg: v('--fc-outline-button-fg', headerFg),
     outlineButtonShadow: v('--fc-outline-button-shadow', 'transparent'),
     outlineButtonHighlight: v('--fc-outline-button-highlight', 'transparent'),
-    outlineRule: v('--fc-outline-rule', v('--fc-rule', '#e2dccd')),
-    outlineToggleBorder: v('--fc-outline-toggle-border', v('--fc-rule-strong', '#cdc6b3')),
-    outlineToggleFg: v('--fc-outline-toggle-fg', v('--fc-fg', '#15171c')),
+    outlineRule: v('--fc-outline-rule', rule),
+    outlineToggleBorder: v('--fc-outline-toggle-border', ruleStrong),
+    outlineToggleFg: v('--fc-outline-toggle-fg', fg),
 
     pageBackdrop: v('--fc-page-backdrop', '#9b968a'),
     pagePaper: v('--fc-page-paper', '#ffffff'),

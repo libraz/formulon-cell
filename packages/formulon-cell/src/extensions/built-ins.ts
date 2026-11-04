@@ -16,6 +16,7 @@
 // Cross-feature dependencies (context menu opening the format dialog
 // etc.) resolve through `ctx.resolve(id)` at call time, so a user
 // replacement registered under the same id participates correctly.
+
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
 import { autofitPivotTableColumns, refreshPivotReportsAfterEdit } from '../commands/pivot-table.js';
@@ -26,6 +27,7 @@ import {
 } from '../commands/session-illustration.js';
 import { setSheetZoom, setWorkbookView } from '../commands/view.js';
 import { addrKey } from '../engine/address.js';
+import { nextCalcMode } from '../engine/calc-mode.js';
 import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { Addr } from '../engine/types.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
@@ -129,7 +131,7 @@ export const statusBar = (): Extension => ({
         const wb = ctx.getWb();
         const cur = wb.calcMode();
         if (cur === null) return;
-        wb.setCalcMode(((cur + 1) % 3) as 0 | 1 | 2);
+        wb.setCalcMode(nextCalcMode(cur));
         handle.refresh();
       },
       onRecalc: () => {
@@ -599,27 +601,22 @@ export const findReplace = (): Extension => ({
   id: 'findReplace',
   priority: 50,
   setup(ctx) {
-    let handle = attachFindReplace({
-      host: ctx.host,
-      store: ctx.store,
-      wb: ctx.getWb(),
-      strings: ctx.i18n.strings,
-      history: ctx.history as History,
-      onAfterCommit: () => refreshCells(ctx),
-    });
+    const attach = (wb: ReturnType<typeof ctx.getWb>) =>
+      attachFindReplace({
+        host: ctx.host,
+        store: ctx.store,
+        wb,
+        strings: ctx.i18n.strings,
+        history: ctx.history as History,
+        onAfterCommit: () => refreshCells(ctx),
+      });
+    let handle = attach(ctx.getWb());
     return {
       open: () => handle.open(),
       close: () => handle.close(),
       rebindWorkbook: (wb) => {
         handle.detach();
-        handle = attachFindReplace({
-          host: ctx.host,
-          store: ctx.store,
-          wb,
-          strings: ctx.i18n.strings,
-          history: ctx.history as History,
-          onAfterCommit: () => refreshCells(ctx),
-        });
+        handle = attach(wb);
       },
       // attachFindReplace's handle exposes setStrings directly — relabels in
       // place without losing query state.
@@ -634,21 +631,18 @@ export const validationList = (): Extension => ({
   id: 'validation',
   priority: 50,
   setup(ctx) {
-    let handle = attachValidationList({
-      grid: ctx.grid,
-      store: ctx.store,
-      wb: ctx.getWb(),
-      onAfterCommit: () => refreshCells(ctx),
-    });
+    const attach = (wb: ReturnType<typeof ctx.getWb>) =>
+      attachValidationList({
+        grid: ctx.grid,
+        store: ctx.store,
+        wb,
+        onAfterCommit: () => refreshCells(ctx),
+      });
+    let handle = attach(ctx.getWb());
     return {
       rebindWorkbook: (wb) => {
         handle.detach();
-        handle = attachValidationList({
-          grid: ctx.grid,
-          store: ctx.store,
-          wb,
-          onAfterCommit: () => refreshCells(ctx),
-        });
+        handle = attach(wb);
       },
       dispose: () => handle.detach(),
     };
@@ -660,24 +654,20 @@ export const clipboard = (): Extension => ({
   id: 'clipboard',
   priority: 50,
   setup(ctx) {
-    let handle = attachClipboard({
-      host: ctx.host,
-      history: ctx.history as History,
-      store: ctx.store,
-      wb: ctx.getWb(),
-      onAfterCommit: () => refreshCells(ctx),
-    });
+    const attach = (wb: ReturnType<typeof ctx.getWb>) =>
+      attachClipboard({
+        host: ctx.host,
+        history: ctx.history as History,
+        store: ctx.store,
+        wb,
+        onAfterCommit: () => refreshCells(ctx),
+      });
+    let handle = attach(ctx.getWb());
     return {
       getSnapshot: () => handle.getSnapshot(),
       rebindWorkbook: (wb) => {
         handle.detach();
-        handle = attachClipboard({
-          host: ctx.host,
-          history: ctx.history as History,
-          store: ctx.store,
-          wb,
-          onAfterCommit: () => refreshCells(ctx),
-        });
+        handle = attach(wb);
       },
       dispose: () => handle.detach(),
     };
@@ -746,41 +736,28 @@ export const contextMenu = (): Extension => ({
       );
       return cb?.getSnapshot?.() ?? null;
     };
-    let detach = attachContextMenu({
-      host: ctx.host,
-      grid: ctx.grid,
-      store: ctx.store,
-      wb: ctx.getWb(),
-      strings: ctx.i18n.strings,
-      history: ctx.history as History,
-      onAfterCommit: () => refreshCells(ctx),
-      onFormatDialog: () => callOpen('formatDialog'),
-      onPasteSpecial: () => callOpen('pasteSpecial'),
-      onInsertHyperlink: () => callOpen('hyperlink'),
-      onEditComment: () => callOpen('commentDialog'),
-      onDefineName: () => callOpen('namedRanges'),
-      getLocale: () => ctx.i18n.locale,
-      getClipboardSnapshot,
-    });
+    const attach = (wb: ReturnType<typeof ctx.getWb>) =>
+      attachContextMenu({
+        host: ctx.host,
+        grid: ctx.grid,
+        store: ctx.store,
+        wb,
+        strings: ctx.i18n.strings,
+        history: ctx.history as History,
+        onAfterCommit: () => refreshCells(ctx),
+        onFormatDialog: () => callOpen('formatDialog'),
+        onPasteSpecial: () => callOpen('pasteSpecial'),
+        onInsertHyperlink: () => callOpen('hyperlink'),
+        onEditComment: () => callOpen('commentDialog'),
+        onDefineName: () => callOpen('namedRanges'),
+        getLocale: () => ctx.i18n.locale,
+        getClipboardSnapshot,
+      });
+    let detach = attach(ctx.getWb());
     return {
       rebindWorkbook: (wb) => {
         detach();
-        detach = attachContextMenu({
-          host: ctx.host,
-          grid: ctx.grid,
-          store: ctx.store,
-          wb,
-          strings: ctx.i18n.strings,
-          history: ctx.history as History,
-          onAfterCommit: () => refreshCells(ctx),
-          onFormatDialog: () => callOpen('formatDialog'),
-          onPasteSpecial: () => callOpen('pasteSpecial'),
-          onInsertHyperlink: () => callOpen('hyperlink'),
-          onEditComment: () => callOpen('commentDialog'),
-          onDefineName: () => callOpen('namedRanges'),
-          getLocale: () => ctx.i18n.locale,
-          getClipboardSnapshot,
-        });
+        detach = attach(wb);
       },
       // attachContextMenu's detacher exposes setStrings; use it directly
       // to update labels without re-attaching all listeners.

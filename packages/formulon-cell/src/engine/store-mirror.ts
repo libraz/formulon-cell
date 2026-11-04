@@ -106,51 +106,7 @@ const changedMapKeys = <V>(
 const sameOutlineSummary = (a: OutlineSummary, b: OutlineSummary): boolean =>
   a.below === b.below && a.right === b.right;
 
-const sameSheetFontOverride = (
-  before: SheetFontOverride | undefined,
-  after: SheetFontOverride | undefined,
-): boolean => JSON.stringify(before) === JSON.stringify(after);
-
-const changedSheetFontOverrideSheets = (
-  previous: ReadonlyMap<number, SheetFontOverride> | null,
-  next: ReadonlyMap<number, SheetFontOverride>,
-): Set<number> => {
-  const changed = new Set<number>();
-  if (previous === next) return changed;
-  if (previous === null) {
-    for (const sheet of next.keys()) changed.add(sheet);
-    return changed;
-  }
-  for (const [sheet, override] of next) {
-    if (!sameSheetFontOverride(previous.get(sheet), override)) changed.add(sheet);
-  }
-  for (const sheet of previous.keys()) {
-    if (!next.has(sheet)) changed.add(sheet);
-  }
-  return changed;
-};
-
-const sameAxisFormatOverride = (
-  before: SheetAxisFormatOverride | undefined,
-  after: SheetAxisFormatOverride | undefined,
-): boolean => JSON.stringify(before) === JSON.stringify(after);
-
-const changedAxisFormatOverrideSheets = (
-  previous: ReadonlyMap<number, SheetAxisFormatOverride> | null,
-  next: ReadonlyMap<number, SheetAxisFormatOverride>,
-): Set<number> => {
-  const changed = new Set<number>();
-  if (previous === next) return changed;
-  if (previous === null) {
-    for (const sheet of next.keys()) changed.add(sheet);
-    return changed;
-  }
-  for (const [sheet, override] of next) {
-    if (!sameAxisFormatOverride(previous.get(sheet), override)) changed.add(sheet);
-  }
-  for (const sheet of previous.keys()) if (!next.has(sheet)) changed.add(sheet);
-  return changed;
-};
+const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 const sameHiddenRows = (
   before: ReadonlySet<number> | null,
@@ -212,6 +168,12 @@ export class StoreMirror {
    *  make up almost all of them. A same-content map with a fresh identity only
    *  costs one redundant flush, and the flush is idempotent. */
   private lastPageSetupMap: ReadonlyMap<number, PageSetup> | null = null;
+
+  /** Filter slice references behind `lastAutoFilterSignature`; the signature
+   *  is only re-serialized when one of them changes identity. */
+  private lastFilterRefs: readonly [unknown, unknown, unknown] | null = null;
+
+  private cachedFilterSignature = '';
 
   /** Format entries are compared by key and value identity. Format mutators
    *  replace a changed entry object, so this catches edits and removals without
@@ -278,16 +240,18 @@ export class StoreMirror {
       const nextFormats = state.format.formats;
       const formatSheets = changedFormatSheets(this.lastFormatEntries, nextFormats);
       const nextSheetFontOverrides = state.format.sheetFontOverrides ?? new Map();
-      for (const sheet of changedSheetFontOverrideSheets(
-        this.lastSheetFontOverrides,
+      for (const sheet of changedMapKeys(
+        this.lastSheetFontOverrides ?? undefined,
         nextSheetFontOverrides,
+        sameJson,
       )) {
         formatSheets.add(sheet);
       }
       const nextSheetAxisOverrides = state.format.sheetAxisOverrides ?? new Map();
-      for (const sheet of changedAxisFormatOverrideSheets(
-        this.lastSheetAxisOverrides,
+      for (const sheet of changedMapKeys(
+        this.lastSheetAxisOverrides ?? undefined,
         nextSheetAxisOverrides,
+        sameJson,
       )) {
         formatSheets.add(sheet);
       }
@@ -313,7 +277,7 @@ export class StoreMirror {
       }
       this.lastSheetTabColors = state.layout.sheetTabColors;
       this.lastOutlineSummary = state.layout.outlineSummary;
-      const nextFilter = autoFilterSignature(state);
+      const nextFilter = this.filterSignature(state);
       const filterChanged = nextFilter !== this.lastAutoFilterSignature;
       if (filterChanged) this.lastAutoFilterSignature = nextFilter;
       const hiddenRowsSheetChanged = this.lastHiddenRowsSheet !== state.data.sheetIndex;
@@ -387,6 +351,21 @@ export class StoreMirror {
     }
   }
 
+  private filterSignature(state: State): string {
+    const { filterRanges, filterSorts, filterCriteria } = state.ui;
+    const refs = this.lastFilterRefs;
+    if (
+      !refs ||
+      refs[0] !== filterRanges ||
+      refs[1] !== filterSorts ||
+      refs[2] !== filterCriteria
+    ) {
+      this.lastFilterRefs = [filterRanges, filterSorts, filterCriteria];
+      this.cachedFilterSignature = autoFilterSignature(state);
+    }
+    return this.cachedFilterSignature;
+  }
+
   /** Re-read the bound store's mirrored slices so the next notification is
    *  compared against what the engine already carries. */
   private rebase(): void {
@@ -397,7 +376,8 @@ export class StoreMirror {
     this.lastCustomCellStyles = state?.format.customCellStyles ?? null;
     this.lastSheetTabColors = state?.layout.sheetTabColors;
     this.lastOutlineSummary = state?.layout.outlineSummary;
-    this.lastAutoFilterSignature = state ? autoFilterSignature(state) : '';
+    this.lastFilterRefs = null;
+    this.lastAutoFilterSignature = state ? this.filterSignature(state) : '';
     this.lastHiddenRows = state?.layout.hiddenRows ?? null;
     this.lastHiddenRowsSheet = state?.data.sheetIndex ?? null;
     this.lastPageSetupMap = state?.pageSetup.setupBySheet ?? null;

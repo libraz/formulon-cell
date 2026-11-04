@@ -51,10 +51,10 @@ export const sheetObjectMutators = {
   },
 
   removeConditionalRuleAt(store: SpreadsheetStore, idx: number): void {
-    store.setState((s) => ({
-      ...s,
-      conditional: { rules: s.conditional.rules.filter((_, i) => i !== idx) },
-    }));
+    store.setState((s) => {
+      if (idx < 0 || idx >= s.conditional.rules.length) return s;
+      return { ...s, conditional: { rules: s.conditional.rules.filter((_, i) => i !== idx) } };
+    });
   },
 
   clearConditionalRules(store: SpreadsheetStore): void {
@@ -72,8 +72,9 @@ export const sheetObjectMutators = {
   /** Attach a sparkline spec to `addr`. Pass `null` to remove. */
   setSparkline(store: SpreadsheetStore, addr: Addr, spec: Sparkline | null): void {
     store.setState((s) => {
-      const sparklines = new Map(s.sparkline.sparklines);
       const key = addrKey(addr);
+      if (spec === null && !s.sparkline.sparklines.has(key)) return s;
+      const sparklines = new Map(s.sparkline.sparklines);
       if (spec === null) sparklines.delete(key);
       else sparklines.set(key, { ...spec });
       return { ...s, sparkline: { sparklines } };
@@ -82,8 +83,10 @@ export const sheetObjectMutators = {
 
   clearSparkline(store: SpreadsheetStore, addr: Addr): void {
     store.setState((s) => {
+      const key = addrKey(addr);
+      if (!s.sparkline.sparklines.has(key)) return s;
       const sparklines = new Map(s.sparkline.sparklines);
-      sparklines.delete(addrKey(addr));
+      sparklines.delete(key);
       return { ...s, sparkline: { sparklines } };
     });
   },
