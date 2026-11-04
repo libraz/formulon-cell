@@ -3,5 +3,6 @@
 @import "./surface/viewbar.css";
 @import "./surface/sheetbar.css";
 @import "./surface/grid-editor.css";
+@import "./surface/scrollbars.css";
 @import "./surface/statusbar.css";
 @import "./surface/retina.css";

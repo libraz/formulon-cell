@@ -1,0 +1,28 @@
+@layer fc.surface {
+  /* Mac overlay scroll bars: thumbs only, no track or arrows, shown while the
+     sheet scrolls. 7 pt vertical, 6 pt horizontal, 3 pt from the edges. */
+  .fc-scrollthumb {
+    position: absolute;
+    z-index: 3;
+    border-radius: 4px;
+    background: rgb(0 0 0 / 22%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 300ms ease;
+  }
+
+  .fc-scrollthumb[data-visible="true"] {
+    opacity: 1;
+    transition: none;
+  }
+
+  .fc-scrollthumb--v {
+    right: 3px;
+    width: 7px;
+  }
+
+  .fc-scrollthumb--h {
+    bottom: 3px;
+    height: 6px;
+  }
+}

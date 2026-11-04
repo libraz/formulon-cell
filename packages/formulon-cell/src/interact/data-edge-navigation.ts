@@ -131,3 +131,21 @@ export function jumpToDataEdge(s: State, a: Addr, dRow: number, dCol: number): A
   // No populated cell found — go to sheet edge in that direction.
   return clamp(a, dRow !== 0 ? limitRow : a.row, dCol !== 0 ? limitCol : a.col);
 }
+
+/** Last populated cell on `sheet`: the Ctrl+End target and the extent the
+ *  scroll bars measure against. */
+export function lastUsedCell(s: State, sheet: number): { row: number; col: number } {
+  let maxRow = 0;
+  let maxCol = 0;
+  const visit = (key: string): void => {
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== sheet) return;
+    if (addr.row > maxRow) maxRow = addr.row;
+    if (addr.col > maxCol) maxCol = addr.col;
+  };
+  for (const key of s.data.cells.keys()) visit(key);
+  for (const [key, format] of s.format.formats) {
+    if (formatHasContent(format)) visit(key);
+  }
+  return { row: maxRow, col: maxCol };
+}

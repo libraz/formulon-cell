@@ -48,6 +48,7 @@ import {
   type MacFormulaPaletteHandle,
 } from '../interact/mac-formula-palette.js';
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
+import { attachOverlayScrollbars } from '../interact/overlay-scrollbars.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { showPivotSpillCallout } from '../interact/pivot-spill-callout.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
@@ -892,10 +893,19 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           labels: strings.argHelper,
         });
         break;
-      case 'wheel':
+      case 'wheel': {
         s.detachWheel();
-        s.detachWheel = attachWheel({ grid: input.grid, store: input.store, getWb: input.wb });
+        const detachWheel = attachWheel({ grid: input.grid, store: input.store, getWb: input.wb });
+        // The Mac desktop shows overlay scroll bars while the sheet scrolls.
+        const scrollbars = input.isMacPlatform()
+          ? attachOverlayScrollbars({ grid: input.grid, store: input.store })
+          : null;
+        s.detachWheel = (): void => {
+          detachWheel();
+          scrollbars?.detach();
+        };
         break;
+      }
       case 'shortcuts':
         if (s.hostShortcutsAttached) return;
         input.host.addEventListener('keydown', input.getOnHostKey());

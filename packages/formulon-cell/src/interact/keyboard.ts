@@ -1,6 +1,6 @@
 import { clearSelectedContents } from '../commands/clear-contents.js';
 import { inputLocaleForWorkbook } from '../commands/coerce-input.js';
-import { currentRegion, formatHasContent } from '../commands/current-region.js';
+import { currentRegion } from '../commands/current-region.js';
 import { blockDataTableCells } from '../commands/data-table-guard.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
@@ -10,14 +10,14 @@ import {
   runAfterAllowedRangeUnlock,
   warnProtected,
 } from '../commands/protection.js';
-import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formatCellForEdit, formulaForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { selectionExtendEnd } from '../store/selection-mutators.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
-import { jumpToDataEdge } from './data-edge-navigation.js';
+import { jumpToDataEdge, lastUsedCell } from './data-edge-navigation.js';
 import {
   clampNavigationAddr,
   isNavigationAddrAllowed,
@@ -44,23 +44,6 @@ const clamp = (a: Addr, row: number, col: number): Addr => ({
   row: Math.max(0, Math.min(MAX_ROW, row)),
   col: Math.max(0, Math.min(MAX_COL, col)),
 });
-
-/** Last populated cell on the active sheet — Ctrl+End target. */
-function lastUsedCell(s: State, sheet: number): { row: number; col: number } {
-  let maxRow = 0;
-  let maxCol = 0;
-  const visit = (key: string): void => {
-    const addr = parseAddrKey(key);
-    if (!addr || addr.sheet !== sheet) return;
-    if (addr.row > maxRow) maxRow = addr.row;
-    if (addr.col > maxCol) maxCol = addr.col;
-  };
-  for (const key of s.data.cells.keys()) visit(key);
-  for (const [key, format] of s.format.formats) {
-    if (formatHasContent(format)) visit(key);
-  }
-  return { row: maxRow, col: maxCol };
-}
 
 export interface KeyboardDeps {
   host: HTMLElement;
