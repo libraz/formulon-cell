@@ -192,13 +192,19 @@ export const trackFrameDrag = (
     }
     options.preview(latest);
   };
-  const onUp = (): void => {
+  const stop = (): void => {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+  };
+  const onUp = (): void => {
+    stop();
     if (latest) options.commit(latest);
   };
+  const onCancel = (): void => stop();
   window.addEventListener('pointermove', onMove);
-  window.addEventListener('pointerup', onUp, { once: true });
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
 };
 
 /** Move `panel` to a previewed frame without touching the store. */

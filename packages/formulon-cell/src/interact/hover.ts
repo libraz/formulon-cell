@@ -34,6 +34,12 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   tip.hidden = true;
   overlayPortalFor(grid).appendChild(tip);
 
+  let shownText: string | null = null;
+  const hideTip = (): void => {
+    shownText = null;
+    tip.hidden = true;
+  };
+
   let modifier = false;
   // The grid's cursor is shared with the pointer layer's resize and fill
   // cursors; only the link cursor this layer set is ever cleared here.
@@ -80,8 +86,11 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     // A shown note is already on the canvas; hovering it adds no popup.
     const tooltip = (fmt?.commentVisible ? undefined : fmt?.comment) || fmt?.hyperlinkTooltip;
     if (tooltip) {
-      tip.textContent = tooltip;
-      tip.hidden = false;
+      if (tooltip !== shownText) {
+        tip.textContent = tooltip;
+        tip.hidden = false;
+        shownText = tooltip;
+      }
       const position = clampPanelToViewport(tip, e.clientX + 12, e.clientY + 14, {
         pad: 8,
         fallbackWidth: 280,
@@ -90,18 +99,13 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       tip.style.left = `${Math.round(position.x)}px`;
       tip.style.top = `${Math.round(position.y)}px`;
     } else {
-      tip.hidden = true;
+      hideTip();
     }
     setLinkCursor(!!fmt?.hyperlink && modifier && isFollowableHyperlinkTarget(fmt.hyperlink));
   };
 
   const onLeave = (): void => {
-    tip.hidden = true;
-    setLinkCursor(false);
-  };
-
-  const onViewportChange = (): void => {
-    tip.hidden = true;
+    hideTip();
     setLinkCursor(false);
   };
 
@@ -114,8 +118,8 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   grid.addEventListener('pointerleave', onLeave);
   ownerWindow?.addEventListener('keydown', onModifier);
   ownerWindow?.addEventListener('keyup', onModifier);
-  ownerDocument.addEventListener('scroll', onViewportChange, true);
-  ownerWindow?.addEventListener('resize', onViewportChange);
+  ownerDocument.addEventListener('scroll', onLeave, true);
+  ownerWindow?.addEventListener('resize', onLeave);
 
   return {
     detach() {
@@ -123,8 +127,8 @@ export function attachHover(deps: HoverDeps): HoverHandle {
       grid.removeEventListener('pointerleave', onLeave);
       ownerWindow?.removeEventListener('keydown', onModifier);
       ownerWindow?.removeEventListener('keyup', onModifier);
-      ownerDocument.removeEventListener('scroll', onViewportChange, true);
-      ownerWindow?.removeEventListener('resize', onViewportChange);
+      ownerDocument.removeEventListener('scroll', onLeave, true);
+      ownerWindow?.removeEventListener('resize', onLeave);
       setLinkCursor(false);
       tip.remove();
     },

@@ -7,7 +7,7 @@ import type { State } from '../store/store.js';
 
 const MIN_JUMP_EDGE_GAP_PROBES = 32;
 
-const clamp = (a: Addr, row: number, col: number): Addr => ({
+export const clamp = (a: Addr, row: number, col: number): Addr => ({
   sheet: a.sheet,
   row: Math.max(0, Math.min(MAX_ROW, row)),
   col: Math.max(0, Math.min(MAX_COL, col)),

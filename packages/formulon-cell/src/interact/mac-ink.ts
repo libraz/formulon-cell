@@ -15,7 +15,12 @@ import {
 } from '../render/geometry.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { renderScale } from '../store/render-scale.js';
-import { mutators, type SessionIllustration, type SpreadsheetStore } from '../store/store.js';
+import {
+  mutators,
+  type SessionIllustration,
+  type SpreadsheetStore,
+  type State,
+} from '../store/store.js';
 
 /** The drawing tools exposed by the Mac Draw tab. */
 export type MacInkTool =
@@ -394,6 +399,9 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   let platformIsMac = instance.host.dataset.fcPlatform === 'mac';
   const listeners = new Set<() => void>();
 
+  const macDrawAvailable = (): boolean =>
+    platformIsMac && instance.host.dataset.fcPlatform === 'mac';
+
   const inkStrings = (): Strings['macInk'] => (instance.i18n?.strings ?? defaultStrings).macInk;
 
   const canMutate = (range: ReturnType<typeof rangeForMetadata>): boolean => {
@@ -455,6 +463,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   };
 
   const renderInProgress = (): void => {
+    cancelInProgressFrame();
     if (!input) return;
     const state = instance.store.getState();
     const size = localSize(grid, state);
@@ -482,6 +491,26 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
     const anchor = inProgress[0];
     if (!anchor) return;
     layers[paneForAnchor(layoutForView(state), anchor)].appendChild(path);
+  };
+
+  let inProgressFrame: number | null = null;
+  const cancelInProgressFrame = (): void => {
+    if (inProgressFrame === null) return;
+    instance.host.ownerDocument.defaultView?.cancelAnimationFrame(inProgressFrame);
+    inProgressFrame = null;
+  };
+  /** Redraw the live stroke at most once per frame. */
+  const scheduleInProgress = (): void => {
+    const view = instance.host.ownerDocument.defaultView;
+    if (!view?.requestAnimationFrame) {
+      renderInProgress();
+      return;
+    }
+    if (inProgressFrame !== null) return;
+    inProgressFrame = view.requestAnimationFrame(() => {
+      inProgressFrame = null;
+      renderInProgress();
+    });
   };
 
   const renderDisplay = (): void => {
@@ -518,7 +547,22 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
     }
   };
 
+  // Store slices the projection reads; a notification that leaves them all
+  // untouched (selection, hover) cannot change what is drawn.
+  const renderInputs = (state: State): unknown[] => [
+    state.layout,
+    state.viewport,
+    state.ui,
+    state.data,
+    state.format,
+    state.merges,
+    state.pageSetup,
+    state.illustrations.illustrations,
+  ];
+  let renderedInputs: unknown[] = [];
+
   const render = (): void => {
+    renderedInputs = renderInputs(instance.store.getState());
     platformIsMac = instance.host.dataset.fcPlatform === 'mac';
     setDisplayVisible(true);
     renderDisplay();
@@ -526,6 +570,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   };
 
   const removeInput = (): void => {
+    cancelInProgressFrame();
     input?.remove();
     input = null;
     drawingPointerId = null;
@@ -612,13 +657,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   };
 
   const onPointerDown = (event: PointerEvent): void => {
-    if (
-      !platformIsMac ||
-      instance.host.dataset.fcPlatform !== 'mac' ||
-      !active ||
-      event.button !== 0
-    )
-      return;
+    if (!macDrawAvailable() || !active || event.button !== 0) return;
     const mode = effectiveTool();
     if (mode === 'eraser') {
       event.preventDefault();
@@ -637,20 +676,13 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   };
 
   const onPointerMove = (event: PointerEvent): void => {
-    if (
-      !platformIsMac ||
-      instance.host.dataset.fcPlatform !== 'mac' ||
-      !active ||
-      drawingPointerId !== event.pointerId ||
-      !input
-    )
-      return;
+    if (!macDrawAvailable() || !active || drawingPointerId !== event.pointerId || !input) return;
     const point = gridPoint(event);
     if (!point) return;
     event.preventDefault();
     event.stopPropagation();
     if (inProgress.length < MAX_POINTS) inProgress.push(point);
-    renderInProgress();
+    scheduleInProgress();
   };
 
   const onPointerUp = (event: PointerEvent): void => {
@@ -696,13 +728,7 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
   };
 
   const onGridPointerDown = (event: PointerEvent): void => {
-    if (
-      !platformIsMac ||
-      instance.host.dataset.fcPlatform !== 'mac' ||
-      !active ||
-      effectiveTool() !== 'eraser'
-    )
-      return;
+    if (!macDrawAvailable() || !active || effectiveTool() !== 'eraser') return;
     const target = event.target instanceof Element ? event.target.closest(INK_SELECTOR) : null;
     event.preventDefault();
     event.stopPropagation();
@@ -779,6 +805,8 @@ export function ensureMacInk(instance: MacInkInstance): MacInkController | undef
 
   const unsubscribe = instance.store.subscribe(() => {
     syncPlatform();
+    const next = renderInputs(instance.store.getState());
+    if (next.every((value, i) => value === renderedInputs[i])) return;
     render();
   });
   grid.addEventListener('pointerdown', onGridPointerDown, true);

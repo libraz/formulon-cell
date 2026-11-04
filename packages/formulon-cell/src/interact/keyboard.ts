@@ -16,8 +16,8 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
 import { selectionExtendEnd } from '../store/selection-mutators.js';
-import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
-import { jumpToDataEdge, lastUsedCell } from './data-edge-navigation.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { clamp, jumpToDataEdge, lastUsedCell } from './data-edge-navigation.js';
 import {
   clampNavigationAddr,
   isNavigationAddrAllowed,
@@ -33,17 +33,7 @@ import {
 import { resetTabNavigationSession } from './tab-navigation-session.js';
 import { stepVisibleWithMerge } from './visible-navigation.js';
 
-const move = (a: Addr, dRow: number, dCol: number): Addr => ({
-  sheet: a.sheet,
-  row: Math.max(0, Math.min(MAX_ROW, a.row + dRow)),
-  col: Math.max(0, Math.min(MAX_COL, a.col + dCol)),
-});
-
-const clamp = (a: Addr, row: number, col: number): Addr => ({
-  sheet: a.sheet,
-  row: Math.max(0, Math.min(MAX_ROW, row)),
-  col: Math.max(0, Math.min(MAX_COL, col)),
-});
+const move = (a: Addr, dRow: number, dCol: number): Addr => clamp(a, a.row + dRow, a.col + dCol);
 
 export interface KeyboardDeps {
   host: HTMLElement;

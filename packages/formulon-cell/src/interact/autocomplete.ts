@@ -5,6 +5,7 @@ import { createExcelRibbonSvg } from '../toolbar/excel-ribbon-icons.js';
 import { createInteractionButton } from './chip-button.js';
 import { createFormulaCaretPositioner } from './formula-helper-position.js';
 import { overlayPortalFor } from './overlay-portal.js';
+import { viewportSize } from './overlay-position.js';
 
 let autocompleteSeq = 0;
 
@@ -244,7 +245,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
 
   const positionHelpNearActiveRow = (): void => {
     if (!root || !listbox || !screenTip) return;
-    const width = input.ownerDocument.defaultView?.innerWidth ?? 1024;
+    const { width } = viewportSize(input.ownerDocument);
     const rootRect = root.getBoundingClientRect();
     const scaleX =
       root.offsetWidth > 0 && rootRect.width > 0 ? rootRect.width / root.offsetWidth : 1;
@@ -264,7 +265,8 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     screenTip.style.marginTop = `${top}px`;
   };
 
-  const updateActive = (): void => {
+  /** `scroll` is for keyboard-driven changes; a pointer-driven one is already under the pointer. */
+  const updateActive = (scroll = true): void => {
     if (!ctx || !listbox || !screenTip) return;
     const options = listbox.querySelectorAll<HTMLButtonElement>('[role="option"]');
     const active = options[highlight];
@@ -277,7 +279,8 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     if (active) {
       input.setAttribute('aria-activedescendant', active.id);
       if (screenTip.textContent?.trim()) active.setAttribute('aria-describedby', screenTip.id);
-      if (typeof active.scrollIntoView === 'function') active.scrollIntoView({ block: 'nearest' });
+      if (scroll && typeof active.scrollIntoView === 'function')
+        active.scrollIntoView({ block: 'nearest' });
     } else {
       input.removeAttribute('aria-activedescendant');
     }
@@ -399,7 +402,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
           if (index < 0 || !ctx || !ctx.matches[index]) return;
           highlight = index;
           updateScreenTip();
-          updateActive();
+          updateActive(false);
         });
         item.addEventListener('mousemove', (e) => {
           const option = e.currentTarget as HTMLButtonElement;
@@ -407,7 +410,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
           if (index < 0 || !ctx || !ctx.matches[index] || highlight === index) return;
           highlight = index;
           updateScreenTip();
-          updateActive();
+          updateActive(false);
         });
         item.addEventListener('dblclick', (e) => {
           e.preventDefault();
@@ -416,7 +419,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
           if (index < 0 || !ctx || !ctx.matches[index]) return;
           highlight = index;
           updateScreenTip();
-          updateActive();
+          updateActive(false);
           acceptHighlighted();
         });
       }

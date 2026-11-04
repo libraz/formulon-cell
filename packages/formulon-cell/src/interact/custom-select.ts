@@ -109,8 +109,28 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
     }
   };
 
+  // Outside-dismiss listeners exist only while the list is open.
+  const ownerWindow = select.ownerDocument.defaultView;
+  let listening = false;
+  const setOutsideListeners = (on: boolean): void => {
+    if (listening === on) return;
+    listening = on;
+    if (on) {
+      document.addEventListener('pointerdown', onDocumentPointer);
+      document.addEventListener('pointerup', onDocumentPointerEnd);
+      document.addEventListener('pointercancel', onDocumentPointerEnd);
+      ownerWindow?.addEventListener('blur', onWindowBlur);
+    } else {
+      document.removeEventListener('pointerdown', onDocumentPointer);
+      document.removeEventListener('pointerup', onDocumentPointerEnd);
+      document.removeEventListener('pointercancel', onDocumentPointerEnd);
+      ownerWindow?.removeEventListener('blur', onWindowBlur);
+    }
+  };
+
   const close = (): void => {
     pointerDownInside = false;
+    setOutsideListeners(false);
     list.hidden = true;
     button.setAttribute('aria-expanded', 'false');
   };
@@ -159,6 +179,9 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
     list.hidden = false;
     button.setAttribute('aria-expanded', 'true');
     syncSelected();
+    // The pointer sequence that opened the list has already ended.
+    pointerDownInside = false;
+    setOutsideListeners(true);
   };
 
   function renderOptions(): void {
@@ -267,10 +290,6 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
   wrap.addEventListener('focusout', onFocusOut);
   wrap.addEventListener('pointerdown', onWrapPointerDown);
   select.addEventListener('change', syncSelected);
-  document.addEventListener('pointerdown', onDocumentPointer);
-  document.addEventListener('pointerup', onDocumentPointerEnd);
-  document.addEventListener('pointercancel', onDocumentPointerEnd);
-  select.ownerDocument.defaultView?.addEventListener('blur', onWindowBlur);
 
   renderOptions();
   syncSelected();
@@ -287,10 +306,7 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
       wrap.removeEventListener('focusout', onFocusOut);
       wrap.removeEventListener('pointerdown', onWrapPointerDown);
       select.removeEventListener('change', syncSelected);
-      document.removeEventListener('pointerdown', onDocumentPointer);
-      document.removeEventListener('pointerup', onDocumentPointerEnd);
-      document.removeEventListener('pointercancel', onDocumentPointerEnd);
-      select.ownerDocument.defaultView?.removeEventListener('blur', onWindowBlur);
+      setOutsideListeners(false);
       select.classList.remove('fc-select__native');
       select.removeAttribute('aria-hidden');
       select.tabIndex = 0;

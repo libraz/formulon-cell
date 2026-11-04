@@ -49,8 +49,6 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
   overlayPortalFor(host).appendChild(root);
 
   let visible = false;
-  let currentAddr: Addr | null = null;
-  let currentKind: ErrorMenuKind = 'error';
   let activeIndex = -1;
   let restoreFocusEl: HTMLElement | null = null;
 
@@ -59,7 +57,6 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     visible = false;
     root.style.display = 'none';
     root.replaceChildren();
-    currentAddr = null;
     activeIndex = -1;
     const focusTarget = restoreFocusEl;
     restoreFocusEl = null;
@@ -273,13 +270,8 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
 
   const api: ErrorMenuHandle = {
     open(addr: Addr, screenX: number, screenY: number, kind: ErrorMenuKind): void {
-      currentAddr = addr;
-      currentKind = kind;
       restoreFocusEl =
         document.activeElement instanceof HTMLElement ? document.activeElement : host;
-      // Touch the workbook getter so consumers wiring Strict Mode can rely
-      // on the same lazy resolution shape used elsewhere.
-      void getWb();
       buildMenu(addr, kind);
       // Pre-position offscreen so we can measure offsetWidth/offsetHeight.
       root.style.display = 'block';
@@ -300,12 +292,6 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       root.remove();
     },
   };
-
-  // Expose a tiny debug surface — `currentAddr` / `currentKind` aren't part
-  // of the public handle but tests can assert against the menu's DOM. The
-  // assignments here also keep TS from flagging them as unused locals.
-  void currentAddr;
-  void currentKind;
 
   return api;
 }

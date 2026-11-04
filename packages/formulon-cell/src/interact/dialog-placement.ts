@@ -4,6 +4,8 @@
  * comes from one, the window centre otherwise. Other profiles keep the stylesheet's centring.
  */
 
+import { clamp, viewportSize } from './overlay-position.js';
+
 export interface DialogAnchor {
   x: number;
   y: number;
@@ -30,9 +32,6 @@ export const currentDialogAnchor = (): DialogAnchor | null => active;
 const onMac = (overlay: HTMLElement): boolean =>
   overlay.closest<HTMLElement>('[data-fc-platform]')?.dataset.fcPlatform === 'mac';
 
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(Math.max(value, min), Math.max(min, max));
-
 /** Pin `panel` so that it is centred on `anchor` (the window centre when absent). */
 export const placeDialogPanel = (
   overlay: HTMLElement,
@@ -40,9 +39,7 @@ export const placeDialogPanel = (
   anchor: DialogAnchor | null = null,
 ): void => {
   if (!onMac(overlay)) return;
-  const view = overlay.ownerDocument.defaultView;
-  const width = view?.innerWidth || 1024;
-  const height = view?.innerHeight || 768;
+  const { width, height } = viewportSize(overlay.ownerDocument);
   const rect = panel.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) return;
   const left = clamp(Math.round((anchor?.x ?? width / 2) - rect.width / 2), 0, width - rect.width);

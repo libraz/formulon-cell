@@ -7,7 +7,7 @@ import type { History } from '../commands/history.js';
 import { hyperlinkAt, isInDocumentHyperlinkTarget } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
-import { moveSelectionTo, moveTargetRange } from '../commands/move-cells.js';
+import { moveSelectionTo, moveTargetFits, moveTargetRange } from '../commands/move-cells.js';
 import {
   collapseColGroup,
   collapseRowGroup,
@@ -947,7 +947,7 @@ export function attachPointer(
         };
         const target = moveTargetRange(drag.src, topLeft);
         const moved = target.r0 !== drag.src.r0 || target.c0 !== drag.src.c0;
-        mutators.setMovePreview(store, moved ? target : null);
+        mutators.setMovePreview(store, moved && moveTargetFits(target) ? target : null);
         host.style.cursor = 'move';
         return;
       }

@@ -244,6 +244,11 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     objectsBtn.setAttribute('aria-label', t.objects);
   }
 
+  // Inputs the sheet-views options were last built from.
+  let builtViews: unknown = null;
+  let builtSheet = -1;
+  let builtCurrentLabel = '';
+
   function refresh(): void {
     const s = store.getState();
     refreshLabels();
@@ -268,13 +273,23 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     zoomSelect.value = known ? String(pct) : '100';
     zoomSelect.title = `${pct}%`;
 
-    sheetViewsSelect.replaceChildren();
-    appendDialogSelectOptions(sheetViewsSelect, [
-      { value: CURRENT_VIEW_VALUE, label: strings.viewToolbar.currentView },
-      ...s.sheetViews.views
-        .filter((v) => v.sheet === s.data.sheetIndex)
-        .map((view) => ({ value: view.id, label: view.name })),
-    ]);
+    const currentViewLabel = strings.viewToolbar.currentView;
+    if (
+      builtViews !== s.sheetViews.views ||
+      builtSheet !== s.data.sheetIndex ||
+      builtCurrentLabel !== currentViewLabel
+    ) {
+      builtViews = s.sheetViews.views;
+      builtSheet = s.data.sheetIndex;
+      builtCurrentLabel = currentViewLabel;
+      sheetViewsSelect.replaceChildren();
+      appendDialogSelectOptions(sheetViewsSelect, [
+        { value: CURRENT_VIEW_VALUE, label: currentViewLabel },
+        ...s.sheetViews.views
+          .filter((v) => v.sheet === s.data.sheetIndex)
+          .map((view) => ({ value: view.id, label: view.name })),
+      ]);
+    }
     sheetViewsSelect.value = s.sheetViews.activeViewId ?? CURRENT_VIEW_VALUE;
     const canDeleteView = !!s.sheetViews.activeViewId;
     projectDisabledState(deleteView, !canDeleteView, strings.viewToolbar.deleteViewRequiresActive, {

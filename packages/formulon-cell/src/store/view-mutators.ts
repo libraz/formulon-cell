@@ -4,6 +4,7 @@ import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigat
 import { frozenColEnd, frozenColStart, frozenRowEnd, frozenRowStart } from './freeze-band.js';
 import { MAX_ROW_HEIGHT_PX, snapRowHeightPx } from './layout-limits.js';
 import { clampZoom, renderScale } from './render-scale.js';
+import { sameRange } from './selection-geometry.js';
 import { clampSplitPaneOrigin } from './split-panes.js';
 import type { SpreadsheetStore } from './store.js';
 import type {
@@ -207,11 +208,19 @@ export const viewMutators = {
   },
 
   setFillPreview(store: SpreadsheetStore, range: Range | null): void {
-    store.setState((s) => ({ ...s, ui: { ...s.ui, fillPreview: range } }));
+    store.setState((s) => {
+      const cur = s.ui.fillPreview;
+      if (cur === range || (cur && range && sameRange(cur, range))) return s;
+      return { ...s, ui: { ...s.ui, fillPreview: range } };
+    });
   },
 
   setMovePreview(store: SpreadsheetStore, range: Range | null): void {
-    store.setState((s) => ({ ...s, ui: { ...s.ui, movePreview: range } }));
+    store.setState((s) => {
+      const cur = s.ui.movePreview;
+      if (cur === range || (cur && range && sameRange(cur, range))) return s;
+      return { ...s, ui: { ...s.ui, movePreview: range } };
+    });
   },
 
   setCopyRange(store: SpreadsheetStore, range: Range | null, mode: CopyMode = 'copy'): void {

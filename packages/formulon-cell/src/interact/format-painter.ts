@@ -8,6 +8,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { hitTest, layoutForView } from '../render/geometry.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
+import { createGridLocalPoint } from './grid-local-point.js';
 
 export interface FormatPainterDeps {
   host: HTMLElement;
@@ -64,6 +65,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
   let sticky = false;
   let dragging = false;
   let dragStart: { row: number; col: number } | null = null;
+  let lastHit: { row: number; col: number } | null = null;
 
   const HOST_CLASS = 'fc-host--paintbrush';
   const listeners = new Set<(active: boolean, sticky: boolean) => void>();
@@ -128,6 +130,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     sticky = false;
     dragging = false;
     dragStart = null;
+    lastHit = null;
     host.classList.remove(HOST_CLASS);
     fire();
   };
@@ -200,14 +203,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     }
   };
 
-  const localXY = (e: PointerEvent): { x: number; y: number } => {
-    // pointer.ts uses the grid as host; we attach to the same parent (`fc-host`).
-    // Walk to the nearest grid surface so coordinates map correctly.
-    const grid = host.querySelector('.fc-host__grid') as HTMLElement | null;
-    const ref = grid ?? host;
-    const rect = ref.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
+  const localXY = createGridLocalPoint(host);
 
   const onPointerDown = (e: PointerEvent): void => {
     if (!snapshot || e.button !== 0) return;
@@ -219,6 +215,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     e.stopPropagation();
     dragging = true;
     dragStart = cell;
+    lastHit = null;
     // Single-click default: paste source-sized chunk anchored at the click cell.
     const rows = snapshot.pattern.length;
     const cols = snapshot.pattern[0]?.length ?? 1;
@@ -228,7 +225,11 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
       row: cell.row + rows - 1,
       col: cell.col + cols - 1,
     });
-    host.setPointerCapture(e.pointerId);
+    try {
+      host.setPointerCapture(e.pointerId);
+    } catch {
+      /* synthetic events / id mismatch: the drag still works inside the host */
+    }
   };
 
   const onPointerMove = (e: PointerEvent): void => {
@@ -239,6 +240,8 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     if (!cell) return;
     e.preventDefault();
     e.stopPropagation();
+    if (cell.row === lastHit?.row && cell.col === lastHit.col) return;
+    lastHit = cell;
     // Drag overrides the auto-sized destination — extend from anchor to current.
     mutators.setActive(store, { sheet: s.data.sheetIndex, row: dragStart.row, col: dragStart.col });
     mutators.extendRangeTo(store, { sheet: s.data.sheetIndex, row: cell.row, col: cell.col });
@@ -249,11 +252,20 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
     dragging = false;
     dragStart = null;
+    lastHit = null;
     const s = store.getState();
     e.preventDefault();
     e.stopPropagation();
     apply(s.selection.range);
     if (!sticky) deactivate();
+  };
+
+  const onPointerCancel = (e: PointerEvent): void => {
+    if (!snapshot || !dragging) return;
+    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    dragging = false;
+    dragStart = null;
+    lastHit = null;
   };
 
   const onKey = (e: KeyboardEvent): void => {
@@ -268,7 +280,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
   host.addEventListener('pointerdown', onPointerDown, true);
   host.addEventListener('pointermove', onPointerMove, true);
   host.addEventListener('pointerup', onPointerUp, true);
-  host.addEventListener('pointercancel', onPointerUp, true);
+  host.addEventListener('pointercancel', onPointerCancel, true);
   document.addEventListener('keydown', onKey, true);
 
   return {
@@ -285,7 +297,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
       host.removeEventListener('pointerdown', onPointerDown, true);
       host.removeEventListener('pointermove', onPointerMove, true);
       host.removeEventListener('pointerup', onPointerUp, true);
-      host.removeEventListener('pointercancel', onPointerUp, true);
+      host.removeEventListener('pointercancel', onPointerCancel, true);
       document.removeEventListener('keydown', onKey, true);
     },
   };

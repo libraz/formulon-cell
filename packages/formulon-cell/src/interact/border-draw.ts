@@ -11,6 +11,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { createGridLocalPoint } from './grid-local-point.js';
 
 export type BorderDrawMode = 'draw' | 'grid' | 'erase';
 
@@ -104,12 +105,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     fire();
   };
 
-  const localXY = (e: PointerEvent): { x: number; y: number } => {
-    const grid = host.querySelector('.fc-host__grid') as HTMLElement | null;
-    const ref = grid ?? host;
-    const rect = ref.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
+  const localXY = createGridLocalPoint(host);
 
   const cellAt = (row: number, col: number): SheetRange => ({
     sheet: store.getState().data.sheetIndex,
@@ -187,6 +183,14 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     }
   };
 
+  const capturePointer = (id: number): void => {
+    try {
+      host.setPointerCapture(id);
+    } catch {
+      /* synthetic events / id mismatch: the drag still works inside the host */
+    }
+  };
+
   const onPointerDown = (e: PointerEvent): void => {
     if (mode === null || e.button !== 0) return;
     const { x, y } = localXY(e);
@@ -198,7 +202,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
       e.stopPropagation();
       dragging = true;
       dragAnchor = cell;
-      host.setPointerCapture(e.pointerId);
+      capturePointer(e.pointerId);
       return;
     }
     const hit = edgeAt(x, y);
@@ -212,7 +216,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
       return;
     }
     dragging = true;
-    host.setPointerCapture(e.pointerId);
+    capturePointer(e.pointerId);
   };
 
   const onPointerMove = (e: PointerEvent): void => {
@@ -267,6 +271,14 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     lastEdgeKey = null;
   };
 
+  const onPointerCancel = (e: PointerEvent): void => {
+    if (mode === null || !dragging) return;
+    if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    dragging = false;
+    dragAnchor = null;
+    lastEdgeKey = null;
+  };
+
   const onKey = (e: KeyboardEvent): void => {
     if (mode === null) return;
     if (e.key === 'Escape') {
@@ -279,7 +291,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
   host.addEventListener('pointerdown', onPointerDown, true);
   host.addEventListener('pointermove', onPointerMove, true);
   host.addEventListener('pointerup', onPointerUp, true);
-  host.addEventListener('pointercancel', onPointerUp, true);
+  host.addEventListener('pointercancel', onPointerCancel, true);
   document.addEventListener('keydown', onKey, true);
 
   return {
@@ -303,7 +315,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
       host.removeEventListener('pointerdown', onPointerDown, true);
       host.removeEventListener('pointermove', onPointerMove, true);
       host.removeEventListener('pointerup', onPointerUp, true);
-      host.removeEventListener('pointercancel', onPointerUp, true);
+      host.removeEventListener('pointercancel', onPointerCancel, true);
       document.removeEventListener('keydown', onKey, true);
     },
   };
