@@ -174,21 +174,29 @@ const absoluteColumnRange = (column: number, firstRow: number, lastRow: number):
 
 const verticalNumberArray = (values: readonly number[]): string => `{${values.join(';')}}`;
 
-const nativeEvaluationAnchor = (state: State, range: Range): Addr => {
+const nativeEvaluationAnchor = (
+  state: State,
+  range: Range,
+  rows: number,
+  cols = 1,
+): Addr | null => {
   // evaluateFormulaArray is read-only, but the engine still rejects a spill
-  // whose anchor cell already carries a value. Pick an empty cell on the same
-  // sheet; the formula itself uses only absolute references, so the anchor
-  // does not change its meaning. State hydration makes this scan cheap in the
-  // normal case and keeps it bounded for sparse large sheets.
-  const columns = Math.min(MAX_COL, Math.max(range.c1 + 8, 64));
-  for (let row = 0; row <= Math.min(range.r0 + 1, 64); row += 1) {
-    for (let col = 0; col <= columns; col += 1) {
-      if (!state.data.cells.has(addrKey({ sheet: range.sheet, row, col }))) {
-        return { sheet: range.sheet, row, col };
-      }
-    }
+  // that would land on a filled cell. Anchor at row 0 in the first run of
+  // `cols` columns with nothing in the top `rows` rows; the formula uses only
+  // absolute references, so the anchor does not change its meaning.
+  const occupied = new Set<number>();
+  const prefix = `${range.sheet}:`;
+  for (const key of state.data.cells.keys()) {
+    if (!key.startsWith(prefix)) continue;
+    const [, row, col] = key.split(':');
+    if (Number(row) < rows) occupied.add(Number(col));
   }
-  return { sheet: range.sheet, row: 0, col: 0 };
+  let run = 0;
+  for (let col = 0; col <= MAX_COL; col += 1) {
+    run = occupied.has(col) ? 0 : run + 1;
+    if (run === cols) return { sheet: range.sheet, row: 0, col: col - cols + 1 };
+  }
+  return null;
 };
 
 /**
@@ -231,7 +239,9 @@ const nativeSortPermutation = (
   });
   const formula = `=SORTBY(SEQUENCE(${count}),${byKey.join(',')})`;
   try {
-    const result = wb.evaluateFormulaArray(nativeEvaluationAnchor(state, range), formula);
+    const anchor = nativeEvaluationAnchor(state, range, count);
+    if (!anchor) return null;
+    const result = wb.evaluateFormulaArray(anchor, formula);
     if (!result.status.ok || result.rows !== count || result.cols !== 1) return null;
     if (result.cells.length !== count) return null;
     const permutation: number[] = [];
@@ -294,10 +304,9 @@ const nativeUniqueRows = (
       ? sourceRange
       : `CHOOSECOLS(${sourceRange},${relativeColumns.join(',')})`;
   try {
-    const result = wb.evaluateFormulaArray(
-      nativeEvaluationAnchor(state, range),
-      `=UNIQUE(${keyFormula})`,
-    );
+    const anchor = nativeEvaluationAnchor(state, range, count, keyColumns.length);
+    if (!anchor) return null;
+    const result = wb.evaluateFormulaArray(anchor, `=UNIQUE(${keyFormula})`);
     if (!result.status.ok || result.cols !== keyColumns.length || result.rows < 1) return null;
     if (result.rows > count || result.cells.length !== result.rows) return null;
     const uniqueValues = result.cells.map((row) => {

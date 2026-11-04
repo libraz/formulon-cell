@@ -119,3 +119,32 @@ describe('sortRange native parity', () => {
     }
   });
 });
+
+describe('sortRange native evaluation anchor', () => {
+  it('sorts when an empty A1 has data below it in column A', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      for (const [i, value] of [3, 1, 2].entries())
+        wb.setNumber({ sheet: 0, row: 2 + i, col: 0 }, value);
+      wb.recalc();
+      mutators.replaceCells(store, wb.cells(0));
+      const ok = sortRange(
+        store.getState(),
+        store,
+        wb,
+        { sheet: 0, r0: 2, c0: 0, r1: 4, c1: 0 },
+        { byCol: 0, direction: 'asc' },
+        null,
+      );
+      expect(ok).toBe(true);
+      expect([2, 3, 4].map((row) => wb.getValue({ sheet: 0, row, col: 0 }))).toEqual([
+        { kind: 'number', value: 1 },
+        { kind: 'number', value: 2 },
+        { kind: 'number', value: 3 },
+      ]);
+    } finally {
+      wb.dispose();
+    }
+  });
+});
