@@ -218,7 +218,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   const labeled = (label: string, input: HTMLElement): HTMLLabelElement => {
     const row = document.createElement('label');
-    row.className = 'fc-pivotdlg__field';
+    row.className = mac ? 'fc-pivotdlg__field fc-pivotdlg__field--inline' : 'fc-pivotdlg__field';
     const span = document.createElement('span');
     span.textContent = label;
     row.append(span, input);
@@ -344,9 +344,10 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     shell.setAriaLabel(t.title);
     cancelBtn.textContent = t.cancel;
     okBtn.textContent = t.ok;
-    sourceInput.placeholder = t.sourcePlaceholder;
+    // The Mac fields carry no hint text.
+    sourceInput.placeholder = mac ? '' : t.sourcePlaceholder;
     nameInput.placeholder = t.namePlaceholder;
-    destInput.placeholder = t.destinationPlaceholder;
+    destInput.placeholder = mac ? '' : t.destinationPlaceholder;
     numberFormatInput.placeholder = t.numberFormatPlaceholder;
     error.hidden = true;
     error.textContent = '';

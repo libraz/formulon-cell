@@ -87,6 +87,30 @@ describe('Create PivotTable dialog on the Mac host', () => {
     }
   });
 
+  it('lays each range field out inline with its picker inside the field', async () => {
+    const wb = await buildWorkbook();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: ja });
+    try {
+      handle.open();
+      const rows = Array.from(document.querySelectorAll<HTMLElement>('.fc-pivotdlg__field'));
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.classList.contains('fc-pivotdlg__field--inline')).toBe(true);
+        expect(row.children[0]?.textContent).toBe('テーブル/範囲:');
+        const wrap = row.children[1] as HTMLElement;
+        expect(wrap.classList.contains('fc-range-picker')).toBe(true);
+        expect(wrap.querySelector('input')).toBeTruthy();
+        expect(wrap.querySelector('.fc-range-picker__btn')).toBeTruthy();
+        expect(wrap.querySelector('input')?.placeholder).toBe('');
+      }
+    } finally {
+      handle.detach();
+      wb.dispose();
+    }
+  });
+
   it('disables OK while the external-data choice has no connection', async () => {
     const wb = await buildWorkbook();
     const store = createSpreadsheetStore();
