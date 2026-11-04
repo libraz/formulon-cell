@@ -1,7 +1,15 @@
-import { type CellInputAlert, commitCellInput } from '../commands/cell-input-commit.js';
+import {
+  type CellInputAlert,
+  commitCellInput,
+  protectedCellAlert,
+} from '../commands/cell-input-commit.js';
 import { replaceFormulaSelectionWithWorkbookF9 } from '../commands/f9-preview.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
-import { deferForAllowedRangeUnlock, selectionEditRanges } from '../commands/protection.js';
+import {
+  deferForAllowedRangeUnlock,
+  isCellWritable,
+  selectionEditRanges,
+} from '../commands/protection.js';
 import { editorRefHighlights, rotateRefAt } from '../commands/refs.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -979,6 +987,25 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     beginFormulaBarEdit();
   };
 
+  /** A locked cell of a protected sheet refuses typing in the bar up front,
+   *  as the in-cell editor does: the edit is dropped and the alert raised. */
+  const refuseLockedCell = (event: InputEvent): boolean => {
+    if (!/^(insert|delete)/.test(event.inputType)) return false;
+    const a = store.getState().selection.active;
+    const cell = { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col };
+    if (deferForAllowedRangeUnlock(store, [cell], () => fxInput.focus())) {
+      event.preventDefault();
+      return true;
+    }
+    if (isCellWritable(store.getState(), a)) return false;
+    event.preventDefault();
+    cancelFx();
+    const alert = protectedCellAlert();
+    if (onValidation) notifyValidation(alert);
+    else console.warn(`formulon-cell: formula-bar edit refused: ${alert.message}`);
+    return true;
+  };
+
   const onFxBeforeInput = (event: InputEvent): void => {
     if (detached || (externalDraft && externalDraft.status !== 'open')) {
       pendingHistoryInput = null;
@@ -996,6 +1023,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       event.stopPropagation();
       return;
     }
+    if (!externalDraft && refuseLockedCell(event)) return;
     if (!fxEditing && !externalDraft) return;
     const action =
       event.inputType === 'historyUndo'

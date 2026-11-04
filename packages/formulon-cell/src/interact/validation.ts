@@ -404,11 +404,17 @@ export function attachValidationAlert(deps: ValidationAlertDeps): ValidationAler
 
   return {
     show(message) {
+      const protectedCell = message.code === 'protectedCell';
+      const text = protectedCell ? labels.protectedCell : message.message;
       const title = message.title?.trim() || defaultTitle(message.severity);
-      header.textContent = title;
-      messageEl.textContent =
-        message.code === 'protectedCell' ? labels.protectedCell : message.message;
-      shell.setAriaLabel(title);
+      // The Mac desktop's protected-cell panel carries no title.
+      const untitled =
+        protectedCell &&
+        (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+      header.hidden = untitled;
+      header.textContent = untitled ? '' : title;
+      messageEl.textContent = text;
+      shell.setAriaLabel(untitled ? text : title);
       shell.open();
       okBtn.focus({ preventScroll: true });
     },

@@ -183,6 +183,45 @@ describe('mount/formula-bar — native commit result', () => {
     harness.detach();
   });
 
+  it('refuses typing into a locked cell of a protected sheet before the edit starts', () => {
+    // Excel: the first keystroke in the formula bar raises the protected-cell alert.
+    const onValidation = vi.fn();
+    const harness = attachFormulaBarHarness(sheet, onValidation);
+    const addr = { sheet: 0, row: 0, col: 0 };
+    setProtectedSheet(sheet.instance.store, 0, true, { workbook: sheet.workbook });
+    mutators.setActive(sheet.instance.store, addr);
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    const typed = new InputEvent('beforeinput', {
+      inputType: 'insertText',
+      data: 'a',
+      cancelable: true,
+    });
+    harness.fxInput.dispatchEvent(typed);
+
+    expect(typed.defaultPrevented).toBe(true);
+    expect(onValidation).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'stop', code: 'protectedCell' }),
+    );
+    expect(harness.controller.isEditing()).toBe(false);
+    expect(harness.fxInput.value).toBe('');
+
+    // An unlocked cell still takes the keystroke.
+    onValidation.mockClear();
+    mutators.setCellFormat(sheet.instance.store, addr, { locked: false });
+    harness.fxInput.focus();
+    harness.fxInput.dispatchEvent(new FocusEvent('focus'));
+    const allowed = new InputEvent('beforeinput', {
+      inputType: 'insertText',
+      data: 'a',
+      cancelable: true,
+    });
+    harness.fxInput.dispatchEvent(allowed);
+    expect(allowed.defaultPrevented).toBe(false);
+    expect(onValidation).not.toHaveBeenCalled();
+    harness.detach();
+  });
+
   it('returns false on stop validation without a controller and preserves the value and edit state', () => {
     const store = createSpreadsheetStore();
     const onValidation = vi.fn();

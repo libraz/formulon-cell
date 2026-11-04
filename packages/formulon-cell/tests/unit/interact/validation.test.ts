@@ -459,6 +459,40 @@ describe('attachValidationAlert', () => {
     handle.detach();
   });
 
+  it('drops the header of the protected-cell alert on the Mac desktop only', () => {
+    // Excel (Mac): the protected-cell panel has no title, only the message and OK.
+    const labels = {
+      ok: 'OK',
+      stop: 'Stop',
+      warning: 'Warning',
+      information: 'Information',
+      protectedCell: 'The cell is on a protected sheet.',
+    };
+    const alert = { severity: 'stop', code: 'protectedCell', message: 'x' } as const;
+    host.classList.add('fc-host');
+    host.dataset.fcPlatform = 'mac';
+    const mac = attachValidationAlert({ host, labels });
+    mac.show(alert);
+    const header = () =>
+      document.querySelector<HTMLElement>('.fc-valdlg:not([hidden]) .fc-fmtdlg__header');
+    expect(header()?.hidden).toBe(true);
+    expect(document.querySelector('.fc-valdlg')?.getAttribute('aria-label')).toBe(
+      'The cell is on a protected sheet.',
+    );
+    // Any other alert on the same panel keeps its title.
+    mac.show({ severity: 'stop', message: 'Other' });
+    expect(header()?.hidden).toBe(false);
+    expect(header()?.textContent).toBe('Stop');
+    mac.detach();
+
+    delete host.dataset.fcPlatform;
+    const other = attachValidationAlert({ host, labels });
+    other.show(alert);
+    expect(header()?.hidden).toBe(false);
+    expect(header()?.textContent).toBe('Stop');
+    other.detach();
+  });
+
   it('keeps the validation alert on a compact desktop dialog surface', () => {
     const css = readFileSync(
       join(root, 'src/styles/core/app/popups/validation-and-chooser.css'),
