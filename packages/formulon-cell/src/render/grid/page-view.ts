@@ -63,6 +63,8 @@ interface Segment {
   start: number;
   end: number;
   kind: SegmentKind;
+  /** Page band the span belongs to; -1 for a gutter. */
+  band: number;
 }
 
 function nativePageForBand(
@@ -205,14 +207,23 @@ function segmentsFor(runs: readonly BandRun[], leadMargin: number, trailMargin: 
     const paperStart = paperStartOf(run, leadMargin);
     const paperEnd = paperEndOf(run, trailMargin);
     if (cursor > Number.NEGATIVE_INFINITY && paperStart > cursor) {
-      segments.push({ start: cursor, end: paperStart, kind: 'gutter' });
+      segments.push({ start: cursor, end: paperStart, kind: 'gutter', band: -1 });
     }
-    if (paperStart < run.start) segments.push({ start: paperStart, end: run.start, kind: 'paper' });
-    segments.push({ start: run.start, end: run.end, kind: 'content' });
-    if (paperEnd > run.end) segments.push({ start: run.end, end: paperEnd, kind: 'paper' });
+    const band = run.band;
+    if (paperStart < run.start) {
+      segments.push({ start: paperStart, end: run.start, kind: 'paper', band });
+    }
+    segments.push({ start: run.start, end: run.end, kind: 'content', band });
+    if (paperEnd > run.end) segments.push({ start: run.end, end: paperEnd, kind: 'paper', band });
     cursor = paperEnd;
   }
   return segments;
+}
+
+/** One page's paper in laid-out coordinates, with the bands it prints. */
+interface PaperRect extends Rect {
+  rowBand: number;
+  colBand: number;
 }
 
 /** Paper rectangles for the visible pages, in laid-out coordinates. */
@@ -222,8 +233,8 @@ function paperRects(
   margins: { top: number; right: number; bottom: number; left: number },
   pagination?: SheetPagination,
   zoom = 1,
-): Rect[] {
-  const rects: Rect[] = [];
+): PaperRect[] {
+  const rects: PaperRect[] = [];
   for (const rowRun of rowRuns) {
     const top = paperStartOf(rowRun, margins.top);
     const bottom = paperEndOf(rowRun, margins.bottom);
@@ -241,13 +252,20 @@ function paperRects(
           zoom,
         );
         if (nativeRect) {
-          rects.push(nativeRect);
+          rects.push({ ...nativeRect, rowBand: rowRun.band, colBand: colRun.band });
           continue;
         }
       }
       const left = paperStartOf(colRun, margins.left);
       const right = paperEndOf(colRun, margins.right);
-      rects.push({ x: left, y: top, w: right - left, h: bottom - top });
+      rects.push({
+        x: left,
+        y: top,
+        w: right - left,
+        h: bottom - top,
+        rowBand: rowRun.band,
+        colBand: colRun.band,
+      });
     }
   }
   return rects;
@@ -363,8 +381,8 @@ export function paintPageLayoutBackground(
   clipToData(pc, state);
   ctx.fillStyle = theme.pageBackdrop;
   ctx.fillRect(0, 0, cssWidth, cssHeight);
-  ctx.fillStyle = theme.pagePaper;
   for (const rect of paperRects(axes.rowRuns, axes.colRuns, axes.margins, pagination, axes.zoom)) {
+    ctx.fillStyle = paperColour(state, theme, pagination, rect.rowBand, rect.colBand);
     const x = mirrorX(state.layout, rect.x, rect.w);
     ctx.fillRect(x, rect.y, rect.w, rect.h);
   }
@@ -431,7 +449,9 @@ export function paintPageLayoutChrome(
       for (const colSeg of colSegs) {
         if (rowSeg.kind === 'content' && colSeg.kind === 'content') continue;
         const gutter = rowSeg.kind === 'gutter' || colSeg.kind === 'gutter';
-        ctx.fillStyle = gutter ? theme.pageBackdrop : theme.pagePaper;
+        ctx.fillStyle = gutter
+          ? theme.pageBackdrop
+          : paperColour(state, theme, pagination, rowSeg.band, colSeg.band);
         const w = colSeg.end - colSeg.start;
         ctx.fillRect(
           mirrorX(state.layout, colSeg.start, w),
@@ -485,6 +505,23 @@ function occupiedPages(state: ViewState, pagination: SheetPagination): Set<strin
   }
   occupiedCache.set(pagination, { cells, pages });
   return pages;
+}
+
+/** Paper of the Mac desktop's pages that hold no data. */
+const MAC_EMPTY_PAGE_PAPER = '#f2f2f2';
+
+/** The paper a page is laid on: on the Mac desktop, grey until it holds data. */
+function paperColour(
+  state: ViewState,
+  theme: ResolvedTheme,
+  pagination: SheetPagination,
+  rowBand: number,
+  colBand: number,
+): string {
+  if (!wholePointAdvances(state.layout) || rowBand < 0 || colBand < 0) return theme.pagePaper;
+  return occupiedPages(state, pagination).has(`${rowBand}:${colBand}`)
+    ? theme.pagePaper
+    : MAC_EMPTY_PAGE_PAPER;
 }
 
 /** Writes the add-data prompt at the top-left of every page with no cells. */

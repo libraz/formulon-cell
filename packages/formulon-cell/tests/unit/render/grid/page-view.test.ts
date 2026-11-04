@@ -480,6 +480,50 @@ describe('Page Break Preview painting (Mac desktop)', () => {
 describe('Page Layout painting (Mac desktop)', () => {
   beforeEach(() => resetPaginationCache());
 
+  it('lays empty pages on grey (242) paper and the page holding data on white', () => {
+    // Excel (Mac, Page Layout): page 1 with data is white, every page without
+    // data, margins included, is (242,242,242).
+    const store = createSpreadsheetStore();
+    seed(store, 3, 5);
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, screenScale: 0.75 },
+      viewport: { ...s.viewport, widthPx: 2400 },
+    }));
+    setWorkbookView(store, 'pageLayout');
+    const state = store.getState();
+    const { view, cols, rows } = viewFor(state);
+    const pagination = paginationFor(state, 0);
+    const opener = pagination.colBands[1]?.start ?? -1;
+    const page1 = cellRectIn(view.layout, cols, rows, 0, 0);
+    const page2 = cellRectIn(view.layout, cols, rows, 0, opener);
+    const covers = (f: FillRecord, x: number, y: number) =>
+      f.rect[0] <= x && x < f.rect[0] + f.rect[2] && f.rect[1] <= y && y < f.rect[1] + f.rect[3];
+    const surfaceAt = (fills: FillRecord[], x: number, y: number) =>
+      fills.filter((f) => covers(f, x, y)).at(-1)?.style;
+    const mac = { ctx: makeCtxSpy().ctx, dpr: 2, cssWidth: 2400, cssHeight: 900 };
+
+    const back = makeCtxSpy();
+    paintPageLayoutBackground({ ...mac, ctx: back.ctx }, view, theme, pagination, cols, rows);
+    expect(surfaceAt(back.fills, page1.x + 2, page1.y + 2)).toBe(theme.pagePaper);
+    expect(surfaceAt(back.fills, page2.x + 2, page2.y + 2)).toBe('#f2f2f2');
+
+    // The chrome pass repaints the margins: page 2's top margin stays grey.
+    const chrome = makeCtxSpy();
+    paintPageLayoutChrome(
+      { ...mac, ctx: chrome.ctx },
+      view,
+      theme,
+      pagination,
+      getPageSetup(state, 0),
+      ja.pageView,
+      cols,
+      rows,
+    );
+    expect(surfaceAt(chrome.fills, page2.x + 2, page2.y - 2)).toBe('#f2f2f2');
+    expect(surfaceAt(chrome.fills, page1.x + 2, page1.y - 2)).toBe(theme.pagePaper);
+  });
+
   it('prompts for data at the top-left of every page that holds none, in the desktop wording', () => {
     // Excel (Mac, ja): 'ヘッダーの追加' / 'フッターの追加' in the bands, and
     // 'クリックしてデータを追加' 14 px in and centred 20.5 px down on empty pages.
