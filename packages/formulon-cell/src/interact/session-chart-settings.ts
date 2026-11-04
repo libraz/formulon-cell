@@ -48,6 +48,8 @@ export interface SessionChartSettingsHandle {
     data: ChartData,
     anchor: HTMLElement,
     tab?: SettingsTab,
+    /** Position of the series the Styles tab starts on; the first when omitted. */
+    seriesIndex?: number,
   ): void;
   sync(chart: SessionChartSettingsShape, data: ChartData, anchor: HTMLElement): void;
   close(discard?: boolean): void;
@@ -367,6 +369,7 @@ export function createSessionChartSettings(
     nextData: ChartData,
     nextAnchor: HTMLElement,
     tab?: SettingsTab,
+    seriesIndex = 0,
   ): void => {
     if (disposed) return;
     chart = nextChart;
@@ -374,7 +377,8 @@ export function createSessionChartSettings(
     anchor = nextAnchor;
     draft = draftFromChart(nextChart, nextData, automaticPalette(deps.accents?.()));
     activeTab = tab ?? 'elements';
-    styleSeriesId = seriesEntries(nextData)[0]?.id ?? 'series-0';
+    const entries = seriesEntries(nextData);
+    styleSeriesId = (entries[seriesIndex] ?? entries[0])?.id ?? 'series-0';
     stylePointId = null;
     newSeries = null;
     dataKey = dataSignature(nextData);

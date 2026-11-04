@@ -631,4 +631,62 @@ describe('attachSessionIllustrations', () => {
     wb.dispose();
     host.remove();
   });
+
+  describe('text editing', () => {
+    const setup = (shape: 'rectangle' | 'line' = 'rectangle') => {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const store = createSpreadsheetStore();
+      mutators.upsertIllustration(store, {
+        id: 'shape-1',
+        kind: 'shape',
+        shape,
+        sheet: 0,
+        x: 100,
+        y: 100,
+        w: 200,
+        h: 80,
+      });
+      const history = new History();
+      const handle = attachSessionIllustrations({ host, store, history });
+      const panel = host.querySelector<HTMLElement>('.fc-illustration');
+      if (!panel) throw new Error('missing panel');
+      return { host, store, history, handle, panel };
+    };
+
+    it('enters text editing on a double click and keeps the shape selected', () => {
+      const { host, handle, panel } = setup();
+      firePointer(panel, 'pointerdown');
+      panel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      const editor = host.querySelector<HTMLTextAreaElement>('.fc-illustration textarea');
+      expect(editor).not.toBeNull();
+      expect(document.activeElement).toBe(editor);
+      // The caret starts at the top-left inner corner, not centred.
+      expect(editor?.style.textAlign).toBe('left');
+      expect(host.querySelector('.fc-illustration--selected')).not.toBeNull();
+      handle.detach();
+    });
+
+    it('commits the text on leaving the editor as one undo step', () => {
+      const { host, store, history, handle, panel } = setup();
+      firePointer(panel, 'pointerdown');
+      panel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      const editor = host.querySelector<HTMLTextAreaElement>('.fc-illustration textarea');
+      if (!editor) throw new Error('missing editor');
+      editor.value = 'Hello';
+      editor.dispatchEvent(new FocusEvent('blur'));
+      expect(store.getState().illustrations.illustrations[0]?.text).toBe('Hello');
+      expect(host.querySelector('.fc-illustration textarea')).toBeNull();
+      history.undo();
+      expect(store.getState().illustrations.illustrations[0]?.text).toBeUndefined();
+      handle.detach();
+    });
+
+    it('does not edit the text of a line', () => {
+      const { host, handle, panel } = setup('line');
+      panel.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      expect(host.querySelector('.fc-illustration textarea')).toBeNull();
+      handle.detach();
+    });
+  });
 });

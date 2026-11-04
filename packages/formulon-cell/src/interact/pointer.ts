@@ -29,6 +29,7 @@ import {
 } from '../commands/outline.js';
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
+import { pivotTableAtRange } from '../commands/pivot-table.js';
 import { blockedByProtection, deferForAllowedRangeUnlock } from '../commands/protection.js';
 import {
   autofitHeaderTracks,
@@ -41,7 +42,7 @@ import {
   captureLayoutSnapshot,
   type LayoutSnapshot,
 } from '../commands/slice-history.js';
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import { pivotStyleLayer } from '../engine/pivot-style.js';
 import type { Addr, Range } from '../engine/types.js';
@@ -97,6 +98,8 @@ import {
   navigationSelectionBoundsFor,
   scrollActiveIntoView,
 } from './navigation-policy.js';
+import { movePivotItem, type PivotItemSlots, pivotItemSlotsAt } from './pivot-item-order.js';
+import { movePivotTable } from './pivot-move.js';
 import {
   indexAt,
   isFillHandleHit,
@@ -172,6 +175,8 @@ type DragMode =
   /** Moving the selection by its frame; `grab` is the grabbed cell's offset
    *  from the block's top-left. */
   | { kind: 'move'; src: Range; grab: { row: number; col: number }; menu?: boolean }
+  /** An item of a report dragged by its cell border; `after` is the row it is dropped below. */
+  | { kind: 'pivot-item'; slots: PivotItemSlots; fromRow: number; after: number }
   | { kind: 'page-break'; handle: PageBreakHandle; target: number }
   | { kind: 'ruler-margin'; handle: RulerHandle; inches: number }
   | {
@@ -850,6 +855,17 @@ export function attachPointer(
     // grab point, so a grab on the bottom edge counts from the row below it.
     if (!restricted && !inFormula && isSelectionBorderHit(s, x, y)) {
       const grabbed = hitTest(geometryLayout(s), s.viewport, x, y);
+      const { r0, c0, r1, c1 } = s.selection.range;
+      // An item of a report is reordered, never moved as a cell.
+      const itemSlots =
+        r0 === r1 && c0 === c1 ? pivotItemSlotsAt(s, wb, s.data.sheetIndex, r0, c0) : null;
+      if (itemSlots) {
+        e.preventDefault();
+        host.focus();
+        tryCapture();
+        drag = { kind: 'pivot-item', slots: itemSlots, fromRow: r0, after: r0 };
+        return;
+      }
       if (grabbed) {
         e.preventDefault();
         host.focus();
@@ -1372,6 +1388,26 @@ export function attachPointer(
         host.style.cursor = 'move';
         return;
       }
+      case 'pivot-item': {
+        // The pointer rides the dragged item's bottom border, one pixel inside its row.
+        const cell = hitTest(geometryLayout(s), s.viewport, x, y - 1);
+        if (!cell) return;
+        const { slots } = drag;
+        drag.after = Math.min(Math.max(cell.row, slots.firstRow - 1), slots.lastRow);
+        const band = {
+          sheet: slots.sheet,
+          r0: drag.after,
+          c0: slots.col,
+          r1: drag.after,
+          c1: slots.c1,
+        };
+        mutators.setMovePreview(store, band);
+        if (!e) return;
+        const edge = cellRect(geometryLayout(s), s.viewport, band.r1, band.c1);
+        const at = localXY(e);
+        fillTooltip.show(formatA1Range(band), e.clientX - at.x + edge.x + edge.w, e.clientY);
+        return;
+      }
       case 'ruler-margin': {
         const horizontal = drag.handle.side === 'left' || drag.handle.side === 'right';
         host.style.cursor = horizontal ? 'col-resize' : 'row-resize';
@@ -1521,6 +1557,14 @@ export function attachPointer(
       onAfterCommit?.();
       return;
     }
+    if (drag.kind === 'pivot-item') {
+      const { slots, fromRow, after } = drag;
+      mutators.setMovePreview(store, null);
+      fillTooltip.hide();
+      drag = { kind: 'none' };
+      if (movePivotItem({ store, workbook: wb, history }, slots, fromRow, after)) onAfterCommit?.();
+      return;
+    }
     if (drag.kind === 'move') {
       const target = store.getState().ui.movePreview;
       mutators.setMovePreview(store, null);
@@ -1537,6 +1581,16 @@ export function attachPointer(
             }),
           );
         }
+        return;
+      }
+      const report = pivotTableAtRange(wb, src);
+      if (target && report !== null) {
+        const moved = movePivotTable(
+          { store, workbook: wb, history },
+          { sheet: src.sheet, pivotIndex: report },
+          { sheet: target.sheet, row: target.r0, col: target.c0 },
+        );
+        if (moved) onAfterCommit?.();
         return;
       }
       if (target) {

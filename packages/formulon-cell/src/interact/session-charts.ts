@@ -830,11 +830,17 @@ export function attachSessionCharts(deps: {
           buttons.appendChild(button);
         }
         panel.appendChild(buttons);
-        // Excel opens the chart's formatting on a double click.
+        // Excel opens the formatting of the part under a double click.
         panel.addEventListener('dblclick', (event) => {
           if (event.target instanceof Element && event.target.closest(INTERACTIVE)) return;
           const anchor = buttons.querySelector<HTMLButtonElement>('[data-chart-settings-tab]');
-          if (anchor) settings.open(chart, chart.data, anchor, 'elements');
+          if (!anchor) return;
+          const part = selectedId === chart.id ? selectedPart : null;
+          if (part?.kind === 'series' || part?.kind === 'point') {
+            settings.open(chart, chart.data, anchor, 'styles', part.seriesIndex);
+          } else {
+            settings.open(chart, chart.data, anchor, 'elements');
+          }
         });
       } else {
         renderChartScene(

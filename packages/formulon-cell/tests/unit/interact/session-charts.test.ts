@@ -2351,6 +2351,27 @@ describe('attachSessionCharts', () => {
     handle.detach();
   });
 
+  it('opens the styles tab on the series that a double click lands on', () => {
+    put([
+      ['Month', 'Sales', 'Costs'],
+      ['Jan', 10, 20],
+      ['Feb', 30, 40],
+    ]);
+    create(range(0, 0, 2, 2), { kind: 'column', seriesDirection: 'columns' });
+    const handle = attach();
+    const bar = host.querySelector<SVGElement>('[data-chart-role="bar"][data-series-index="1"]');
+    if (!bar) throw new Error('missing bar');
+    bar.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    bar.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    const settings = surface();
+    expect(settings.querySelector('[role="tab"][aria-selected="true"]')?.id).toBe(
+      'fc-chart-settings-tab-styles',
+    );
+    const group = settings.querySelectorAll<HTMLElement>('.fc-chart-settings__group')[1];
+    expect(group?.querySelectorAll<HTMLSelectElement>('select')[0]?.value).toBe('series-1');
+    handle.detach();
+  });
+
   it('labels each data point the way Excel words its tooltip', () => {
     salesTable();
     const handle = attach({

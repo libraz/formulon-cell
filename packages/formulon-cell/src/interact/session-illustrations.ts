@@ -14,6 +14,7 @@ import {
   shapeOutlineColor,
   shapeOutlineDash,
   shapeOutlineWeight,
+  shapeStyleEditable,
 } from '../commands/shape-format.js';
 import {
   drawingClipPath,
@@ -342,6 +343,50 @@ export function attachSessionIllustrations(deps: {
     );
   };
 
+  /** Open the shape's text for editing in place, the caret at the top-left corner. */
+  const editText = (item: SessionIllustration, panel: HTMLElement): void => {
+    if (!shapeStyleEditable(item) || item.shape === 'line' || item.shape === 'arrow') return;
+    if (panel.querySelector('textarea')) return;
+    const editor = document.createElement('textarea');
+    editor.className = 'fc-illustration__text';
+    editor.setAttribute('aria-label', objectName(store.getState(), item, labels));
+    editor.value = item.text ?? '';
+    editor.style.cssText =
+      'position:absolute;inset:0;box-sizing:border-box;padding:4px 6px;margin:0;border:0;' +
+      'outline:0;resize:none;overflow:hidden;background:transparent;font:inherit;' +
+      `font-size:14px;text-align:left;color:${textColorOn(shapeFillColor(item))};`;
+    panel.querySelector('svg text')?.remove();
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      const text = editor.value;
+      editor.remove();
+      if (text !== (item.text ?? '')) {
+        updateSessionIllustration(
+          store,
+          item.id,
+          { text },
+          history,
+          getWb() ?? undefined,
+          illustrationAuthorization('sessionIllustration.text'),
+        );
+      }
+      render();
+    };
+    editor.addEventListener('blur', finish);
+    editor.addEventListener('pointerdown', (event) => event.stopPropagation());
+    editor.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        finish();
+      }
+    });
+    panel.appendChild(editor);
+    editor.focus({ preventScroll: true });
+  };
+
   /** Drag the whole object (`handle` omitted) or one of its sizing handles.
    *  The frame follows the pointer and the object changes once, on release. */
   const applyDrag = (
@@ -541,6 +586,7 @@ export function attachSessionIllustrations(deps: {
         applyDrag(event, item, panel);
       });
       panel.addEventListener('keydown', (event) => applyKeyboard(event, item, panel));
+      panel.addEventListener('dblclick', () => editText(item, panel));
       // The object's own menu, not the cell menu under it.
       panel.addEventListener('contextmenu', (event) => {
         event.preventDefault();

@@ -81,4 +81,60 @@ describe('dialog placement', () => {
     expect(panel.style.left).toBe('');
     expect(overlay.classList.contains('fc-fmtdlg--placed')).toBe(false);
   });
+
+  describe('title-bar drag', () => {
+    const fire = (target: EventTarget, type: string, x: number, y: number) =>
+      target.dispatchEvent(
+        new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true }),
+      );
+    const buildWithHeader = () => {
+      const built = build('mac', { width: 400, height: 300 });
+      const header = document.createElement('div');
+      header.className = 'fc-fmtdlg__header';
+      built.panel.prepend(header);
+      placeDialogPanel(built.overlay, built.panel);
+      return { ...built, header };
+    };
+
+    it('moves the panel by the pointer delta', () => {
+      const { panel, header } = buildWithHeader();
+      fire(header, 'pointerdown', 700, 360);
+      fire(document, 'pointermove', 500, 300);
+      expect([panel.style.left, panel.style.top]).toEqual(['400px', '290px']);
+      fire(document, 'pointerup', 500, 300);
+      fire(document, 'pointermove', 100, 100);
+      expect([panel.style.left, panel.style.top]).toEqual(['400px', '290px']);
+    });
+
+    it('stops 3px below the top and 104px above the bottom of the window', () => {
+      const { panel, header } = buildWithHeader();
+      fire(header, 'pointerdown', 700, 360);
+      fire(document, 'pointermove', 700, -500);
+      expect(panel.style.top).toBe('3px');
+      fire(document, 'pointermove', 700, 5000);
+      expect(panel.style.top).toBe('596px');
+      fire(document, 'pointermove', 9000, 360);
+      expect(panel.style.left).toBe('1198px');
+      fire(document, 'pointerup', 9000, 360);
+    });
+
+    it('opens centred again after a move', () => {
+      const { overlay, panel, header } = buildWithHeader();
+      fire(header, 'pointerdown', 700, 360);
+      fire(document, 'pointermove', 500, 300);
+      fire(document, 'pointerup', 500, 300);
+      clearDialogPlacement(overlay, panel);
+      placeDialogPanel(overlay, panel);
+      expect([panel.style.left, panel.style.top]).toEqual(['600px', '350px']);
+    });
+
+    it('ignores presses on controls in the title bar', () => {
+      const { panel, header } = buildWithHeader();
+      const close = document.createElement('button');
+      header.appendChild(close);
+      fire(close, 'pointerdown', 700, 360);
+      fire(document, 'pointermove', 500, 300);
+      expect(panel.style.left).toBe('600px');
+    });
+  });
 });
