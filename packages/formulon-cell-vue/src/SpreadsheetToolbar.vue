@@ -4,11 +4,9 @@
 // component just owns a host div and mounts / disposes the core toolbar; all
 // DOM, helpers, menus, and hook defaults come from core.
 import {
-  createDefaultDynamicDropdownsCtx,
+  buildAdapterRibbonWiring,
   dictionaryLocaleFor,
-  type DynamicDropdownsCtx,
   openHostMenuFirstDropdown,
-  type RibbonHooks,
   type RibbonTab,
   Spreadsheet,
   type SpreadsheetInstance,
@@ -31,30 +29,9 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
   if (!host) return;
   if (toolbar) props.onToolbarReady?.(null);
   toolbar?.dispose();
-  // A provided prop handles only its own menu item (`custom` for scripts,
-  // `manage` for add-ins); every other action, and every action when the
-  // prop is omitted, reaches core's default handler. Likewise review hooks
-  // are registered only for provided props so core's built-in reports stay.
-  // Host-supplied `dropdownActions` win over the wrapper's wiring.
-  let coreDefaults: DynamicDropdownsCtx | null = null;
-  const getCoreDefaults = (): DynamicDropdownsCtx => {
-    coreDefaults ??= createDefaultDynamicDropdownsCtx(instance);
-    return coreDefaults;
-  };
-  const dropdownOverrides: Partial<DynamicDropdownsCtx> = {};
-  if (props.onRunScript) {
-    dropdownOverrides.applyScriptAction = (action) =>
-      action === 'custom' ? props.onRunScript?.() : getCoreDefaults().applyScriptAction(action);
-  }
-  if (props.onAddIn) {
-    dropdownOverrides.applyAddInAction = (action) =>
-      action === 'manage' ? props.onAddIn?.() : getCoreDefaults().applyAddInAction(action);
-  }
-  Object.assign(dropdownOverrides, props.dropdownActions);
-  const review: NonNullable<RibbonHooks['review']> = {};
-  if (props.onSpellingReview) review.spelling = () => props.onSpellingReview?.();
-  if (props.onAccessibilityCheck) review.accessibility = () => props.onAccessibilityCheck?.();
-  if (props.onTranslate) review.translate = () => props.onTranslate?.();
+  toolbar = null;
+  // Provided callbacks override only their own items; host `dropdownActions` win.
+  const wiring = buildAdapterRibbonWiring(instance, () => props, props.dropdownActions);
   try {
     toolbar = Spreadsheet.mountToolbar(host, instance, {
       lang: dictionaryLocaleFor(props.locale),
@@ -65,16 +42,8 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
       // Opt into core's default dropdown-menu click delegator so Fill / Clear
       // / AutoSum / etc. work without each consumer reimplementing the
       // playground's `createDynamicDropdowns` wiring.
-      dynamicDropdowns: dropdownOverrides,
-      hooks: {
-        review,
-        drawing: {
-          setInkMode: (mode) => {
-            if (mode === 'pen') props.onDrawPen?.();
-            else props.onDrawEraser?.();
-          },
-        },
-      },
+      dynamicDropdowns: wiring.dynamicDropdowns,
+      hooks: wiring.hooks,
     });
   } catch (error) {
     props.onToolbarReady?.(null);

@@ -9,11 +9,9 @@
 // on internal class names or sub-component exports should migrate to the
 // core's `data-ribbon-*` attributes for selection.
 import {
-  createDefaultDynamicDropdownsCtx,
-  type DynamicDropdownsCtx,
+  buildAdapterRibbonWiring,
   dictionaryLocaleFor,
   openHostMenuFirstDropdown,
-  type RibbonHooks,
   Spreadsheet,
   type SpreadsheetInstance,
   type ToolbarInstance,
@@ -96,36 +94,13 @@ export const SpreadsheetToolbar = ({
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !instance) return undefined;
-    // A provided prop handles only its own menu item (`custom` for scripts,
-    // `manage` for add-ins); every other action, and every action when the
-    // prop is omitted, reaches core's default handler. Likewise review hooks
-    // are registered only for provided props so core's built-in reports stay.
-    // Host-supplied `dropdownActions` win over the wrapper's wiring.
-    // Pass a memoized object to avoid re-mounting the toolbar on every render.
-    let coreDefaults: DynamicDropdownsCtx | null = null;
-    const getCoreDefaults = (): DynamicDropdownsCtx => {
-      coreDefaults ??= createDefaultDynamicDropdownsCtx(instance as SpreadsheetInstance);
-      return coreDefaults;
-    };
-    const dropdownOverrides: Partial<DynamicDropdownsCtx> = {};
-    if (hasRunScript) {
-      dropdownOverrides.applyScriptAction = (action) =>
-        action === 'custom'
-          ? callbacksRef.current.onRunScript?.()
-          : getCoreDefaults().applyScriptAction(action);
-    }
-    if (hasAddIn) {
-      dropdownOverrides.applyAddInAction = (action) =>
-        action === 'manage'
-          ? callbacksRef.current.onAddIn?.()
-          : getCoreDefaults().applyAddInAction(action);
-    }
-    Object.assign(dropdownOverrides, dropdownActions);
-    const review: NonNullable<RibbonHooks['review']> = {};
-    if (hasSpelling) review.spelling = () => callbacksRef.current.onSpellingReview?.();
-    if (hasAccessibility)
-      review.accessibility = () => callbacksRef.current.onAccessibilityCheck?.();
-    if (hasTranslate) review.translate = () => callbacksRef.current.onTranslate?.();
+    // Provided callbacks override only their own items; host `dropdownActions`
+    // win. Pass a memoized object to avoid re-mounting on every render.
+    const wiring = buildAdapterRibbonWiring(
+      instance as SpreadsheetInstance,
+      () => callbacksRef.current,
+      dropdownActions,
+    );
     let tb: ToolbarInstance;
     try {
       tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
@@ -137,16 +112,8 @@ export const SpreadsheetToolbar = ({
         // Opt into core's default dropdown-menu click delegator so Fill / Clear
         // / AutoSum / etc. work without each consumer reimplementing the
         // playground's `createDynamicDropdowns` wiring.
-        dynamicDropdowns: dropdownOverrides,
-        hooks: {
-          review,
-          drawing: {
-            setInkMode: (mode) => {
-              if (mode === 'pen') callbacksRef.current.onDrawPen?.();
-              else callbacksRef.current.onDrawEraser?.();
-            },
-          },
-        },
+        dynamicDropdowns: wiring.dynamicDropdowns,
+        hooks: wiring.hooks,
       });
     } catch (error) {
       callbacksRef.current.onToolbarReady?.(null);

@@ -21,10 +21,19 @@ const resolveUi = vi.fn(
   }),
 );
 
-vi.mock('@libraz/formulon-cell', () => ({
-  Spreadsheet: { mount: mountCore },
-  resolveSpreadsheetUiOptions: resolveUi,
-}));
+vi.mock('@libraz/formulon-cell', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@libraz/formulon-cell')>();
+  return {
+    // Shared adapter reconcile helpers run for real against the fake instance.
+    ADAPTER_FALLBACK_LOCALE: actual.ADAPTER_FALLBACK_LOCALE,
+    ADAPTER_FALLBACK_SELECTION: actual.ADAPTER_FALLBACK_SELECTION,
+    applyControlledLocale: actual.applyControlledLocale,
+    applyControlledProps: actual.applyControlledProps,
+    applyUiFeaturesToolbar: actual.applyUiFeaturesToolbar,
+    Spreadsheet: { mount: mountCore },
+    resolveSpreadsheetUiOptions: resolveUi,
+  };
+});
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 8; i += 1) await Promise.resolve();

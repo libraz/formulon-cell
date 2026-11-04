@@ -1,4 +1,7 @@
 import {
+  applyControlledLocale,
+  applyControlledProps,
+  applyUiFeaturesToolbar,
   type CellChangeEvent,
   type ChangeBatchResult,
   type ExtensionInput,
@@ -104,104 +107,6 @@ export interface SpreadsheetRef {
   readonly instance: SpreadsheetInstance | null;
 }
 
-const applyRuntimeProps = async (
-  inst: SpreadsheetInstance,
-  props: SpreadsheetProps,
-  baseline: SpreadsheetProps = {},
-  handlers: {
-    onLocaleChange?: (event: LocaleChangeEvent) => void;
-    onError?: (error: unknown) => void;
-    getLocaleEventGeneration?: () => number;
-  } = {},
-): Promise<void> => {
-  const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
-  const ui = props.ui ? resolvedUi : null;
-  if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
-    try {
-      await inst.setWorkbook(props.workbook);
-    } catch (error) {
-      // A controlled replacement is transactional in core: the old workbook
-      // remains active when validation/profile setup rejects the incoming one.
-      // Report the original error, then continue reconciling the independent
-      // controlled props captured while the async mount was pending.
-      handlers.onError?.(error);
-    }
-  }
-  if (props.policy !== baseline.policy) inst.setPolicy(props.policy);
-  if (props.viewport !== baseline.viewport) inst.setViewportOptions(props.viewport);
-  if (props.contextMenu !== baseline.contextMenu) inst.setContextMenu(props.contextMenu);
-  if (props.overlays !== baseline.overlays) inst.setOverlayOptions(props.overlays);
-  if (props.ui !== baseline.ui) inst.setUi(props.ui);
-  const nextTheme = props.theme ?? ui?.theme;
-  const baselineTheme =
-    baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
-  if (nextTheme && nextTheme !== baselineTheme) inst.setTheme(nextTheme);
-  const localeAccepted =
-    props.locale && props.locale !== baseline.locale
-      ? applyLocale(
-          inst,
-          props.locale,
-          handlers.onLocaleChange,
-          handlers.onError,
-          handlers.getLocaleEventGeneration,
-        )
-      : undefined;
-  if (props.strings && (props.strings !== baseline.strings || localeAccepted === true)) {
-    inst.i18n.extend(inst.i18n.locale, props.strings);
-  }
-  if (props.features !== baseline.features || props.ui !== baseline.ui) {
-    inst.setFeatures({ ...resolvedUi.features, ...(props.features ?? {}) });
-  }
-  if (props.toolbar !== baseline.toolbar || props.ui !== baseline.ui) {
-    inst.setToolbar(props.toolbar ?? (props.ui ? resolvedUi.ribbon : false));
-  }
-  if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
-  if (props.printerProfiles !== baseline.printerProfiles) {
-    inst.setPrinterProfiles(props.printerProfiles);
-  }
-  if (props.printerProfileId !== baseline.printerProfileId) {
-    inst.setPrinterProfileId(props.printerProfileId);
-  }
-  if (props.uploadStatus !== baseline.uploadStatus) {
-    inst.setUploadStatus(props.uploadStatus ?? null);
-  }
-  if (props.macroRecording !== baseline.macroRecording) {
-    inst.setMacroRecording(props.macroRecording ?? null);
-  }
-};
-
-const applyLocale = (
-  inst: SpreadsheetInstance,
-  requested: string,
-  onLocaleChange?: (event: LocaleChangeEvent) => void,
-  onError?: (error: unknown) => void,
-  getLocaleEventGeneration?: () => number,
-): boolean => {
-  const generationBefore = getLocaleEventGeneration?.();
-  let accepted = false;
-  let failure: unknown;
-  try {
-    accepted = inst.setLocale(requested);
-  } catch (error) {
-    failure = error;
-  }
-  if (accepted) return true;
-
-  // The core normally emits this during its rollback. Keep this explicit
-  // fallback so adapters also reconcile correctly when a host instance (or a
-  // future core version) rejects without emitting the rollback event.
-  if (generationBefore === undefined || getLocaleEventGeneration?.() === generationBefore) {
-    onLocaleChange?.({ locale: inst.locale, strings: inst.i18n.strings });
-  }
-  onError?.(
-    failure ??
-      new Error(
-        `formulon-cell: locale change to "${requested}" was rejected; active locale is "${inst.locale}"`,
-      ),
-  );
-  return false;
-};
-
 const SpreadsheetComponent = (
   props: SpreadsheetProps,
   ref: ForwardedRef<SpreadsheetRef>,
@@ -290,7 +195,7 @@ const SpreadsheetComponent = (
         inst.on('recalc', (e) => propsRef.current.onRecalc?.(e)),
       );
       if (propsRef.current !== cur) {
-        await applyRuntimeProps(inst, propsRef.current, cur, {
+        await applyControlledProps(inst, propsRef.current, cur, {
           onLocaleChange: notifyLocaleChange,
           onError: (error) => {
             if (!disposed) propsRef.current.onError?.(error);
@@ -332,13 +237,11 @@ const SpreadsheetComponent = (
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst || !props.locale) return;
-    const accepted = applyLocale(
-      inst,
-      props.locale,
-      notifyLocaleChange,
-      (error) => propsRef.current.onError?.(error),
+    const accepted = applyControlledLocale(inst, props.locale, {
+      onLocaleChange: notifyLocaleChange,
+      onError: (error) => propsRef.current.onError?.(error),
       getLocaleEventGeneration,
-    );
+    });
     const strings = propsRef.current.strings;
     if (accepted && strings) {
       inst.i18n.extend(inst.i18n.locale, strings);
@@ -356,10 +259,11 @@ const SpreadsheetComponent = (
     const uiChanged = previousUiRef.current !== props.ui;
     previousUiRef.current = props.ui;
     if (!inst) return;
-    const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
-    if (uiChanged) inst.setUi(props.ui);
-    inst.setFeatures({ ...resolvedUi.features, ...(props.features ?? {}) });
-    inst.setToolbar(props.toolbar ?? (props.ui ? resolvedUi.ribbon : false));
+    applyUiFeaturesToolbar(
+      inst,
+      { ui: props.ui, features: props.features, toolbar: props.toolbar },
+      uiChanged,
+    );
   }, [props.features, props.ui, props.toolbar]);
 
   useEffect(() => {

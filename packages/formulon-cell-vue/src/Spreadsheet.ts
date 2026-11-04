@@ -1,4 +1,7 @@
 import {
+  applyControlledLocale,
+  applyControlledProps,
+  applyUiFeaturesToolbar,
   type CellChangeEvent,
   type ChangeBatchResult,
   type ExtensionInput,
@@ -33,135 +36,6 @@ import {
 
 export type SpreadsheetExposed = {
   readonly instance: Ref<SpreadsheetInstance | null>;
-};
-
-const applyRuntimeProps = async (
-  inst: SpreadsheetInstance,
-  props: {
-    ui?: SpreadsheetUiOptions;
-    workbook?: WorkbookHandle;
-    policy?: MountOptions['policy'];
-    viewport?: MountOptions['viewport'];
-    contextMenu?: MountOptions['contextMenu'];
-    overlays?: MountOptions['overlays'];
-    toolbar?: MountOptions['toolbar'];
-    theme?: MountOptions['theme'];
-    locale?: MountOptions['locale'];
-    strings?: MountOptions['strings'];
-    features?: FeatureFlags;
-    extensions?: ExtensionInput[];
-    printerProfiles?: readonly PrinterProfile[];
-    printerProfileId?: string;
-    refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
-    captureScreenClip?: MountOptions['captureScreenClip'];
-    getFunctionArgumentHelp?: MountOptions['getFunctionArgumentHelp'];
-    uploadStatus?: MountOptions['uploadStatus'];
-    macroRecording?: MountOptions['macroRecording'];
-  },
-  baseline: {
-    ui?: SpreadsheetUiOptions;
-    workbook?: WorkbookHandle;
-    policy?: MountOptions['policy'];
-    viewport?: MountOptions['viewport'];
-    contextMenu?: MountOptions['contextMenu'];
-    overlays?: MountOptions['overlays'];
-    toolbar?: MountOptions['toolbar'];
-    theme?: MountOptions['theme'];
-    locale?: MountOptions['locale'];
-    strings?: MountOptions['strings'];
-    features?: FeatureFlags;
-    extensions?: ExtensionInput[];
-    printerProfiles?: readonly PrinterProfile[];
-    printerProfileId?: string;
-    refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
-    captureScreenClip?: MountOptions['captureScreenClip'];
-    getFunctionArgumentHelp?: MountOptions['getFunctionArgumentHelp'];
-    uploadStatus?: MountOptions['uploadStatus'];
-    macroRecording?: MountOptions['macroRecording'];
-  } = {},
-  onLocaleChange?: (event: LocaleChangeEvent) => void,
-  onError?: (error: unknown) => void,
-  getLocaleEventGeneration?: () => number,
-): Promise<void> => {
-  const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
-  const ui = props.ui ? resolvedUi : null;
-  if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
-    try {
-      await inst.setWorkbook(props.workbook);
-    } catch (error) {
-      // Core keeps the previous workbook active when a controlled replacement
-      // fails. Report the original cause, then continue reconciling the
-      // independent controlled props captured while the async mount was pending.
-      onError?.(error);
-    }
-  }
-  if (props.policy !== baseline.policy) inst.setPolicy(props.policy);
-  if (props.viewport !== baseline.viewport) inst.setViewportOptions(props.viewport);
-  if (props.contextMenu !== baseline.contextMenu) inst.setContextMenu(props.contextMenu);
-  if (props.overlays !== baseline.overlays) inst.setOverlayOptions(props.overlays);
-  if (props.ui !== baseline.ui) inst.setUi(props.ui);
-  const nextTheme = props.theme ?? ui?.theme;
-  const baselineTheme =
-    baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
-  if (nextTheme && nextTheme !== baselineTheme) inst.setTheme(nextTheme);
-  const localeAccepted =
-    props.locale && props.locale !== baseline.locale
-      ? applyLocale(inst, props.locale, onLocaleChange, onError, getLocaleEventGeneration)
-      : undefined;
-  if (props.strings && (props.strings !== baseline.strings || localeAccepted === true)) {
-    inst.i18n.extend(inst.i18n.locale, props.strings);
-  }
-  if (props.features !== baseline.features || props.ui !== baseline.ui) {
-    inst.setFeatures({ ...resolvedUi.features, ...(props.features ?? {}) });
-  }
-  if (props.toolbar !== baseline.toolbar || props.ui !== baseline.ui) {
-    inst.setToolbar(props.toolbar ?? (props.ui ? resolvedUi.ribbon : false));
-  }
-  if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
-  if (props.printerProfiles !== baseline.printerProfiles) {
-    inst.setPrinterProfiles(props.printerProfiles);
-  }
-  if (props.printerProfileId !== baseline.printerProfileId) {
-    inst.setPrinterProfileId(props.printerProfileId);
-  }
-  if (props.uploadStatus !== baseline.uploadStatus) {
-    inst.setUploadStatus(props.uploadStatus ?? null);
-  }
-  if (props.macroRecording !== baseline.macroRecording) {
-    inst.setMacroRecording(props.macroRecording ?? null);
-  }
-};
-
-const applyLocale = (
-  inst: SpreadsheetInstance,
-  requested: string,
-  onLocaleChange?: (event: LocaleChangeEvent) => void,
-  onError?: (error: unknown) => void,
-  getLocaleEventGeneration?: () => number,
-): boolean => {
-  const generationBefore = getLocaleEventGeneration?.();
-  let accepted = false;
-  let failure: unknown;
-  try {
-    accepted = inst.setLocale(requested);
-  } catch (error) {
-    failure = error;
-  }
-  if (accepted) return true;
-
-  // Core emits this during its normal rollback. Keep the explicit fallback
-  // so a host instance that rejects without emitting still reconciles the
-  // controlled prop with the active locale.
-  if (generationBefore === undefined || getLocaleEventGeneration?.() === generationBefore) {
-    onLocaleChange?.({ locale: inst.locale, strings: inst.i18n.strings });
-  }
-  onError?.(
-    failure ??
-      new Error(
-        `formulon-cell: locale change to "${requested}" was rejected; active locale is "${inst.locale}"`,
-      ),
-  );
-  return false;
 };
 
 export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
@@ -268,6 +142,7 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       if (props.seed) opts.seed = props.seed;
       opts.renderError = !props.errorFallback;
       opts.onError = (error) => {
+        if (disposed) return;
         mountError.value = error;
         emit('error', error);
       };
@@ -313,14 +188,11 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
         inst.on('recalc', (e) => emit('recalc', e)),
       );
       try {
-        await applyRuntimeProps(
-          inst,
-          props,
-          mountedWith,
-          notifyLocaleChange,
-          (error) => emit('error', error),
+        await applyControlledProps(inst, props, mountedWith, {
+          onLocaleChange: notifyLocaleChange,
+          onError: (error) => emit('error', error),
           getLocaleEventGeneration,
-        );
+        });
       } catch (error) {
         // Runtime prop reconciliation can fail while the already-mounted
         // instance remains usable. Keep it live and let the specific
@@ -345,13 +217,11 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       () => props.locale,
       (next) => {
         if (next && instance.value) {
-          const accepted = applyLocale(
-            instance.value,
-            next,
-            notifyLocaleChange,
-            (error) => emit('error', error),
+          const accepted = applyControlledLocale(instance.value, next, {
+            onLocaleChange: notifyLocaleChange,
+            onError: (error) => emit('error', error),
             getLocaleEventGeneration,
-          );
+          });
           if (accepted && props.strings) {
             instance.value.i18n.extend(instance.value.i18n.locale, props.strings);
           }
@@ -379,14 +249,16 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
     watch(
       () => [props.features, props.ui] as const,
       ([nextFeatures, nextUi], previous) => {
-        const resolved = resolveSpreadsheetUiOptions(nextUi);
         if (instance.value) {
           const uiChanged = nextUi !== previous?.[1];
-          if (uiChanged) instance.value.setUi(nextUi);
-          instance.value.setFeatures({ ...resolved.features, ...(nextFeatures ?? {}) });
-          instance.value.setToolbar(props.toolbar ?? (nextUi ? resolved.ribbon : false));
+          applyUiFeaturesToolbar(
+            instance.value,
+            { ui: nextUi, features: nextFeatures, toolbar: props.toolbar },
+            uiChanged,
+          );
           if (uiChanged) {
-            const theme = props.theme ?? (nextUi ? resolved.theme : undefined);
+            const theme =
+              props.theme ?? (nextUi ? resolveSpreadsheetUiOptions(nextUi).theme : undefined);
             if (theme) instance.value.setTheme(theme);
           }
         }

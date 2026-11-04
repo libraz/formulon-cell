@@ -1,24 +1,20 @@
-import type {
-  SpreadsheetEventHandler,
-  SpreadsheetEventName,
-  SpreadsheetInstance,
+import {
+  ADAPTER_FALLBACK_LOCALE,
+  ADAPTER_FALLBACK_SELECTION,
+  type SpreadsheetEventHandler,
+  type SpreadsheetEventName,
+  type SpreadsheetInstance,
 } from '@libraz/formulon-cell';
-import { onScopeDispose, type Ref, ref, watchEffect } from 'vue';
+import { onScopeDispose, type Ref, shallowRef, watchEffect } from 'vue';
 
 type Selection = ReturnType<SpreadsheetInstance['store']['getState']>['selection'];
-
-const createFallbackSelection = (): Selection => ({
-  active: { sheet: 0, row: 0, col: 0 },
-  anchor: { sheet: 0, row: 0, col: 0 },
-  range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-});
 
 const createFallbackStrings = (): SpreadsheetInstance['i18n']['strings'] =>
   ({}) as unknown as SpreadsheetInstance['i18n']['strings'];
 
 /** Composable: track the live selection from a `ref<SpreadsheetInstance | null>`. */
 export const useSelection = (instance: Ref<SpreadsheetInstance | null>): Ref<Selection> => {
-  const sel = ref(createFallbackSelection()) as Ref<Selection>;
+  const sel = shallowRef<Selection>(ADAPTER_FALLBACK_SELECTION);
 
   let off: (() => void) | null = null;
   watchEffect(() => {
@@ -27,7 +23,7 @@ export const useSelection = (instance: Ref<SpreadsheetInstance | null>): Ref<Sel
     previousOff?.();
     const inst = instance.value;
     if (!inst) {
-      sel.value = createFallbackSelection();
+      sel.value = ADAPTER_FALLBACK_SELECTION;
       return;
     }
     sel.value = inst.store.getState().selection;
@@ -51,7 +47,7 @@ export const useSpreadsheet = <T>(
   selector: (state: ReturnType<SpreadsheetInstance['store']['getState']>) => T,
   fallback: T,
 ): Ref<T> => {
-  const out = ref(fallback) as Ref<T>;
+  const out = shallowRef<T>(fallback);
   let off: (() => void) | null = null;
   watchEffect(() => {
     const previousOff = off;
@@ -82,8 +78,8 @@ export const useI18n = (
   locale: Ref<string>;
   strings: Ref<SpreadsheetInstance['i18n']['strings']>;
 } => {
-  const locale = ref<string>('ja');
-  const strings = ref(createFallbackStrings()) as Ref<SpreadsheetInstance['i18n']['strings']>;
+  const locale = shallowRef<string>(ADAPTER_FALLBACK_LOCALE);
+  const strings = shallowRef(createFallbackStrings());
 
   let off: (() => void) | null = null;
   watchEffect(() => {
@@ -92,7 +88,7 @@ export const useI18n = (
     previousOff?.();
     const inst = instance.value;
     if (!inst) {
-      locale.value = 'ja';
+      locale.value = ADAPTER_FALLBACK_LOCALE;
       strings.value = createFallbackStrings();
       return;
     }

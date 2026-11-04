@@ -1,23 +1,30 @@
-import type {
-  SpreadsheetEventHandler,
-  SpreadsheetEventName,
-  SpreadsheetInstance,
+import {
+  ADAPTER_FALLBACK_LOCALE,
+  ADAPTER_FALLBACK_SELECTION,
+  type SpreadsheetEventHandler,
+  type SpreadsheetEventName,
+  type SpreadsheetInstance,
 } from '@libraz/formulon-cell';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
 type State = ReturnType<SpreadsheetInstance['store']['getState']>;
 type Selection = State['selection'];
 
-const FALLBACK_SELECTION: Selection = {
-  active: { sheet: 0, row: 0, col: 0 },
-  anchor: { sheet: 0, row: 0, col: 0 },
-  range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-};
+const FALLBACK_SELECTION: Selection = ADAPTER_FALLBACK_SELECTION;
+
+/** Stable subscribe per instance, so `useSyncExternalStore` does not resubscribe each render. */
+const useStoreSubscribe = (instance: SpreadsheetInstance | null) =>
+  useMemo(
+    () =>
+      (cb: () => void): (() => void) =>
+        instance ? instance.store.subscribe(cb) : () => {},
+    [instance],
+  );
 
 /** Subscribe a React component to the spreadsheet's selection state. */
 export const useSelection = (instance: SpreadsheetInstance | null): Selection => {
   return useSyncExternalStore(
-    (cb) => (instance ? instance.store.subscribe(cb) : () => {}),
+    useStoreSubscribe(instance),
     () => instance?.store.getState().selection ?? FALLBACK_SELECTION,
     () => FALLBACK_SELECTION,
   );
@@ -32,7 +39,7 @@ export const useSpreadsheet = <T>(
   fallback: T,
 ): T => {
   const state = useSyncExternalStore(
-    (cb) => (instance ? instance.store.subscribe(cb) : () => {}),
+    useStoreSubscribe(instance),
     () => instance?.store.getState() ?? null,
     () => null,
   );
@@ -44,7 +51,7 @@ interface I18nSnapshot {
   strings: SpreadsheetInstance['i18n']['strings'] | null;
 }
 
-const FALLBACK_I18N: I18nSnapshot = { locale: 'ja', strings: null };
+const FALLBACK_I18N: I18nSnapshot = { locale: ADAPTER_FALLBACK_LOCALE, strings: null };
 
 /** Subscribe to the i18n locale. Returns the current locale id and the
  *  active strings dictionary; re-renders when `setLocale` / `extend` /
