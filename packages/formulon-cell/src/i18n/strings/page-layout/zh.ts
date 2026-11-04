@@ -4,6 +4,7 @@ export const pageLayoutZh: PageLayoutStrings = {
   pageView: {
     addHeader: '添加页眉',
     addFooter: '添加页脚',
+    addData: '单击可添加数据',
     pageNumber: '第 {n} 页',
     movePageBreak: '移动分页符',
     rulerUnit: 'cm',

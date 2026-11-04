@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { setWorkbookView } from '../../../../src/commands/view.js';
+import { addrKey } from '../../../../src/engine/address.js';
 import { macDigitAdvance } from '../../../../src/engine/mac-column-model.js';
-import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
+import {
+  buildColLayout,
+  buildRowLayout,
+  cellRectIn,
+  gridOriginY,
+  layoutForView,
+} from '../../../../src/render/geometry.js';
+import { ruleCenter } from '../../../../src/render/grid/chrome-context.js';
 import { paintHeaders } from '../../../../src/render/grid/headers.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
@@ -744,5 +753,69 @@ describe('paintHeaders', () => {
     const ox = layout.headerColWidth;
     expect(texts.find((t) => t.text === 'A')).toMatchObject({ x: ox + 29.5, align: 'center' });
     expect(texts.find((t) => t.text === 'B')).toMatchObject({ x: ox + 60 + 31.5, align: 'center' });
+  });
+
+  it('boxes the column letters per page in Page Layout view (Mac desktop)', () => {
+    // Excel (Mac, Page Layout): each page carries its own letter strip, closed
+    // by a leading separator and a bottom rule that stop at the page's columns.
+    const store = createSpreadsheetStore();
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(addrKey({ sheet: 0, row: 3, col: 25 }), {
+        value: { kind: 'number', value: 1 },
+        formula: null,
+      });
+      return {
+        ...s,
+        data: { ...s.data, cells },
+        layout: { ...s.layout, screenScale: 0.75 },
+        viewport: { ...s.viewport, rowCount: 20, colCount: 20, widthPx: 2400 },
+      };
+    });
+    setWorkbookView(store, 'pageLayout');
+    const state = store.getState();
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const opener = [...(layout.pageGapCols ?? new Map()).keys()].find((c) => c > 0) ?? -1;
+    expect(cols.visible).toContain(opener);
+    const { ctx, paths } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 2, cssWidth: 2400, cssHeight: 600 },
+      { ...state, layout },
+      theme(),
+      cols,
+      rows,
+    );
+
+    const oy = gridOriginY(layout);
+    const ruleY = ruleCenter(oy, 2);
+    const horizontal = paths
+      .flatMap((p) => {
+        const segs: [number, number][] = [];
+        for (let i = 0; i + 1 < p.points.length; i += 2) {
+          const a = p.points[i] as [number, number];
+          const b = p.points[i + 1] as [number, number];
+          if (a[1] === ruleY && b[1] === ruleY) segs.push([a[0], b[0]]);
+        }
+        return segs;
+      })
+      .sort((a, b) => a[0] - b[0]);
+    const firstRow = rows.visible[0] ?? 0;
+    const rectOf = (c: number) => cellRectIn(layout, cols, rows, firstRow, c);
+    const last = opener - 1;
+    // Page 1 runs from A's leading edge to the last column's trailing edge.
+    expect(horizontal[0]?.[0]).toBeCloseTo(rectOf(0).x, 0);
+    expect(horizontal[0]?.[1]).toBeCloseTo(rectOf(last).x + (cols.sizeAt.get(last) ?? 0), 0);
+    // Page 2 starts at its own first column, not across the gutter.
+    expect(horizontal[1]?.[0]).toBeCloseTo(rectOf(opener).x, 0);
+    // The page's first column gets a leading separator.
+    const top = layout.rulerRowHeight ?? 0;
+    const leadX = ruleCenter(rectOf(opener).x, 2);
+    const leading = paths.some((p) =>
+      p.points.some(([x, y]) => x === leadX && y === top + layout.outlineColGutter),
+    );
+    expect(leading).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ export const pageLayoutKo: PageLayoutStrings = {
   pageView: {
     addHeader: '머리글 추가',
     addFooter: '바닥글 추가',
+    addData: '클릭하여 데이터 추가',
     pageNumber: '페이지 {n}',
     movePageBreak: '페이지 나누기 이동',
     rulerUnit: 'cm',

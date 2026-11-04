@@ -2,8 +2,9 @@ import type { PageLayoutStrings } from './types.js';
 
 export const pageLayoutJa: PageLayoutStrings = {
   pageView: {
-    addHeader: 'ヘッダーを追加',
-    addFooter: 'フッターを追加',
+    addHeader: 'ヘッダーの追加',
+    addFooter: 'フッターの追加',
+    addData: 'クリックしてデータを追加',
     pageNumber: '{n} ページ',
     movePageBreak: '改ページの移動',
     rulerUnit: 'cm',

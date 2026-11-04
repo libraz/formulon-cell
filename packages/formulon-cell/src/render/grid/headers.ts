@@ -8,6 +8,7 @@ import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
   cellRectIn,
+  colGap,
   gridOriginX,
   gridOriginY,
   rulerLeft,
@@ -24,6 +25,30 @@ import { type ChromePaintContext, ruleCenter, ruleWidth } from './chrome-context
  *  label font's descent plus one px above the row's bottom edge (6 device px
  *  at DPR 2 for the default font, 8 for Courier New 11, 14 for Courier 20). */
 const ROW_LABEL_PAD_Y = 1;
+
+/** Screen extent of each page's visible columns in Page Layout view, or null
+ *  in the views whose column strip runs unbroken. */
+function pageColumnRuns(
+  layout: ViewState['layout'],
+  cols: AxisLayout,
+  rows: AxisLayout,
+  firstRow: number,
+): { start: number; end: number }[] | null {
+  if (!layout.pageGapCols || layout.pageGapCols.size === 0) return null;
+  const runs: { start: number; end: number }[] = [];
+  for (const c of cols.visible) {
+    const rect = cellRectIn(layout, cols, rows, firstRow, c);
+    const left = rect.x;
+    const right = rect.x + (cols.sizeAt.get(c) ?? 0);
+    const run = runs[runs.length - 1];
+    if (!run || colGap(layout, c) > 0) runs.push({ start: left, end: right });
+    else {
+      run.start = Math.min(run.start, left);
+      run.end = Math.max(run.end, right);
+    }
+  }
+  return runs;
+}
 
 export function paintHeaders(
   pc: ChromePaintContext,
@@ -123,9 +148,18 @@ export function paintHeaders(
   // header band ends with its own rule rather than covering the first row.
   const headerRuleY = ruleCenter(oy, dpr);
   const headerRuleX = ruleCenter(innerX, dpr, rtl);
+  const pageRuns = pageColumnRuns(layout, cols, rows, firstRow);
   ctx.beginPath();
-  ctx.moveTo(0, headerRuleY);
-  ctx.lineTo(cssWidth, headerRuleY);
+  if (pageRuns) {
+    // Page Layout boxes each page's letters: the rule stops at its columns.
+    for (const run of pageRuns) {
+      ctx.moveTo(run.start, headerRuleY);
+      ctx.lineTo(run.end, headerRuleY);
+    }
+  } else {
+    ctx.moveTo(0, headerRuleY);
+    ctx.lineTo(cssWidth, headerRuleY);
+  }
   ctx.moveTo(headerRuleX, 0);
   ctx.lineTo(headerRuleX, cssHeight);
   ctx.stroke();
@@ -175,6 +209,12 @@ export function paintHeaders(
     const sepX = ruleCenter(rtl ? rect.x : rect.x + w, dpr, rtl);
     ctx.moveTo(sepX, labelTopY);
     ctx.lineTo(sepX, oy - width);
+    if (pageRuns && colGap(layout, c) > 0) {
+      // A page's first column closes its letter box on the leading side too.
+      const leadX = ruleCenter(rtl ? rect.x + w : rect.x, dpr, rtl);
+      ctx.moveTo(leadX, labelTopY);
+      ctx.lineTo(leadX, oy - width);
+    }
     ctx.stroke();
     ctx.fillStyle = lit ? theme.headerFgActive : theme.headerFg;
     ctx.font = `${lit ? theme.headerFgActiveWeight : 400} ${labelSize}px ${labelFamily}`;

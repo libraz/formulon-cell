@@ -4,6 +4,7 @@ export const pageLayoutEn: PageLayoutStrings = {
   pageView: {
     addHeader: 'Add header',
     addFooter: 'Add footer',
+    addData: 'Click to add data',
     pageNumber: 'Page {n}',
     movePageBreak: 'Move page break',
     rulerUnit: 'in',

@@ -11,9 +11,11 @@ import { addrKey } from '../../../../src/engine/address.js';
 import { syncPageSetupToEngine } from '../../../../src/engine/print-sync.js';
 import { WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import { en } from '../../../../src/i18n/strings/en.js';
+import { ja } from '../../../../src/i18n/strings/ja.js';
 import {
   buildColLayout,
   buildRowLayout,
+  cellRectIn,
   gridOriginY,
   layoutForView,
 } from '../../../../src/render/geometry.js';
@@ -164,7 +166,11 @@ describe('Page Layout painting', () => {
       theme,
       paginationFor(state, 0),
       getPageSetup(state, 0),
-      { addHeader: en.pageView.addHeader, addFooter: en.pageView.addFooter },
+      {
+        addHeader: en.pageView.addHeader,
+        addFooter: en.pageView.addFooter,
+        addData: en.pageView.addData,
+      },
       cols,
       rows,
     );
@@ -192,7 +198,11 @@ describe('Page Layout painting', () => {
       theme,
       paginationFor(state, 0),
       getPageSetup(state, 0),
-      { addHeader: en.pageView.addHeader, addFooter: en.pageView.addFooter },
+      {
+        addHeader: en.pageView.addHeader,
+        addFooter: en.pageView.addFooter,
+        addData: en.pageView.addData,
+      },
       cols,
       rows,
     );
@@ -429,5 +439,88 @@ describe('Page Break Preview painting', () => {
       associatePaginationEngine(store.getState(), null);
       wb.dispose();
     }
+  });
+});
+
+describe('Page Break Preview painting (Mac desktop)', () => {
+  beforeEach(() => resetPaginationCache());
+
+  it('greys the non-printing area (160) and frames the print area in (0,8,208), 1 pt leading and 3 pt trailing', () => {
+    const store = createSpreadsheetStore();
+    seed(store, 4, 5);
+    // The Mac point model.
+    store.setState((s) => ({ ...s, layout: { ...s.layout, screenScale: 0.75 } }));
+    setWorkbookView(store, 'pageBreakPreview');
+    const state = store.getState();
+    const { view, cols, rows } = viewFor(state);
+    const { ctx, fills } = makeCtxSpy();
+    paintPageBreakPreview(
+      { ctx, dpr: 2, cssWidth: 1200, cssHeight: 900 },
+      view,
+      theme,
+      paginationFor(state, 0),
+      getPageSetup(state, 0),
+      (page) => `${page} ページ`,
+      cols,
+      rows,
+    );
+    expect(fills.some((f) => f.style === '#a0a0a0')).toBe(true);
+    expect(fills.some((f) => f.style === theme.pageOutside)).toBe(false);
+    const frame = fills.filter((f) => f.style === '#0008d0');
+    // Leading edges 1 pt (one CSS px at 2x), trailing edges 3 pt.
+    const widths = frame.map((f) => Math.min(f.rect[2], f.rect[3])).sort();
+    expect(widths).toEqual([1, 1, 3, 3]);
+    // The frame boxes the print area: no edge runs to the canvas edge.
+    const ox = view.layout.headerColWidth;
+    for (const f of frame) expect(f.rect[0] + f.rect[2]).toBeLessThan(1200);
+    expect(frame.some((f) => f.rect[0] >= ox - 1)).toBe(true);
+  });
+});
+
+describe('Page Layout painting (Mac desktop)', () => {
+  beforeEach(() => resetPaginationCache());
+
+  it('prompts for data at the top-left of every page that holds none, in the desktop wording', () => {
+    // Excel (Mac, ja): 'ヘッダーの追加' / 'フッターの追加' in the bands, and
+    // 'クリックしてデータを追加' 14 px in and centred 20.5 px down on empty pages.
+    const store = createSpreadsheetStore();
+    seed(store, 3, 5);
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, screenScale: 0.75 },
+      viewport: { ...s.viewport, widthPx: 2400 },
+    }));
+    setWorkbookView(store, 'pageLayout');
+    const state = store.getState();
+    const { view, cols, rows } = viewFor(state);
+    const { ctx, texts, textRecords } = makeCtxSpy();
+    const pagination = paginationFor(state, 0);
+
+    paintPageLayoutChrome(
+      { ctx, dpr: 2, cssWidth: 2400, cssHeight: 900 },
+      view,
+      theme,
+      pagination,
+      getPageSetup(state, 0),
+      ja.pageView,
+      cols,
+      rows,
+    );
+
+    expect(ja.pageView.addHeader).toBe('ヘッダーの追加');
+    expect(ja.pageView.addFooter).toBe('フッターの追加');
+    expect(texts).toContain('ヘッダーの追加');
+    const opener = pagination.colBands[1]?.start ?? -1;
+    expect(cols.visible).toContain(opener);
+    const prompts = textRecords.filter((r) => r.text === 'クリックしてデータを追加');
+    const page2 = cellRectIn(view.layout, cols, rows, 0, opener);
+    const page1 = cellRectIn(view.layout, cols, rows, 0, 0);
+    expect(prompts).toContainEqual({
+      text: 'クリックしてデータを追加',
+      x: page2.x + 14,
+      y: page2.y + 20.5,
+    });
+    // The page holding the data gets no prompt.
+    expect(prompts.some((p) => p.x === page1.x + 14 && p.y === page1.y + 20.5)).toBe(false);
   });
 });

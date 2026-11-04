@@ -12,6 +12,7 @@ import {
   pageNumberOf,
   type SheetPagination,
 } from '../../commands/pagination.js';
+import { parseAddrKey } from '../../engine/address.js';
 import { renderScale } from '../../store/render-scale.js';
 import { hiddenRowsOf } from '../../store/row-visibility.js';
 import type { PageSetup } from '../../store/store.js';
@@ -25,6 +26,7 @@ import {
   rulerTop,
   type ViewState,
 } from '../geometry.js';
+import { wholePointAdvances } from '../text-metrics.js';
 import type { ChromePaintContext } from './chrome-context.js';
 
 /** A stretch of one axis that is visible on screen and belongs to one page. */
@@ -392,6 +394,7 @@ function bandText(setup: PageSetup, kind: PageBandHit['kind'], slot: PageBandHit
 export interface PageBandStrings {
   addHeader: string;
   addFooter: string;
+  addData: string;
 }
 
 /**
@@ -450,8 +453,65 @@ export function paintPageLayoutChrome(
   }
 
   const bands = paintPageBands(pc, state, theme, axes, setup, strings, pagination);
+  paintEmptyPagePrompts(pc, state, theme, axes, strings.addData, pagination);
   ctx.restore();
   return bands;
+}
+
+/** Offset of the empty-page prompt from the page's first cell, in CSS px
+ *  (Excel Mac at 100%: ink 14 px in, centred 20.5 px down). */
+const ADD_DATA_INSET_X = 14;
+const ADD_DATA_CENTER_Y = 20.5;
+
+const occupiedCache = new WeakMap<
+  SheetPagination,
+  { cells: ViewState['data']['cells']; pages: Set<string> }
+>();
+
+/** `rowBand:colBand` of every page holding at least one cell. */
+function occupiedPages(state: ViewState, pagination: SheetPagination): Set<string> {
+  const cells = state.data.cells;
+  const cached = occupiedCache.get(pagination);
+  if (cached && cached.cells === cells) return cached.pages;
+  const pages = new Set<string>();
+  const prefix = `${pagination.sheet}:`;
+  for (const key of cells.keys()) {
+    if (!key.startsWith(prefix)) continue;
+    const addr = parseAddrKey(key);
+    if (!addr) continue;
+    const row = bandIndexAt(pagination.rowBands, addr.row);
+    const col = bandIndexAt(pagination.colBands, addr.col);
+    if (row >= 0 && col >= 0) pages.add(`${row}:${col}`);
+  }
+  occupiedCache.set(pagination, { cells, pages });
+  return pages;
+}
+
+/** Writes the add-data prompt at the top-left of every page with no cells. */
+function paintEmptyPagePrompts(
+  pc: ChromePaintContext,
+  state: ViewState,
+  theme: ResolvedTheme,
+  axes: PageAxes,
+  label: string,
+  pagination: SheetPagination,
+): void {
+  const { ctx } = pc;
+  const occupied = occupiedPages(state, pagination);
+  ctx.font = `12px ${theme.fontUi}`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = state.layout.rtl ? 'right' : 'left';
+  ctx.fillStyle = theme.pageBandFg;
+  for (const rowRun of axes.rowRuns) {
+    if (!rowRun.opens || rowRun.band < 0) continue;
+    for (const colRun of axes.colRuns) {
+      if (!colRun.opens || colRun.band < 0) continue;
+      if (occupied.has(`${rowRun.band}:${colRun.band}`)) continue;
+      const x = mirrorX(state.layout, colRun.start + ADD_DATA_INSET_X);
+      ctx.fillText(label, x, rowRun.start + ADD_DATA_CENTER_Y);
+    }
+  }
+  ctx.textAlign = 'left';
 }
 
 /** Height of a header / footer slot inside its margin. */
@@ -741,6 +801,11 @@ export interface PageBreakHandle {
 /** Pointer slack around a break line, in pixels. */
 export const PAGE_BREAK_GRAB = 4;
 
+/** Page Break Preview on the Mac desktop (sRGB): the non-printing area and
+ *  the print-area frame. */
+const MAC_PAGE_OUTSIDE = '#a0a0a0';
+const MAC_PRINT_AREA_FRAME = '#0008d0';
+
 /**
  * Page Break Preview: wash out everything that will not print, frame the print
  * area, draw every page boundary, and number the pages. Runs after the cells so
@@ -778,7 +843,8 @@ export function paintPageBreakPreview(
   const printTrail = trailingEdge(cols, pagination.content.col, ox, cssWidth);
   const printTop = leadingEdge(rows, pagination.origin.row, oy, oy);
   const printLead = leadingEdge(cols, pagination.origin.col, ox, ox);
-  ctx.fillStyle = theme.pageOutside;
+  const mac = wholePointAdvances(layout);
+  ctx.fillStyle = mac ? MAC_PAGE_OUTSIDE : theme.pageOutside;
   ctx.fillRect(0, oy, cssWidth, Math.max(0, printTop - oy));
   ctx.fillRect(0, printBottom, cssWidth, Math.max(0, cssHeight - printBottom));
   const bandH = Math.max(0, printBottom - printTop);
@@ -861,6 +927,17 @@ export function paintPageBreakPreview(
 
   // Outer frame — the printed extent's trailing edges.
   ctx.setLineDash([]);
+  if (mac) {
+    // The desktop boxes the printed range: 1 pt on the leading edges just
+    // inside it, 3 pt on the trailing edges centred on their gridlines.
+    const w = Math.max(0, printTrail - printLead);
+    const h = Math.max(0, printBottom - printTop);
+    ctx.fillStyle = MAC_PRINT_AREA_FRAME;
+    ctx.fillRect(mirrorX(layout, printLead, 1), printTop, 1, h);
+    ctx.fillRect(mirrorX(layout, printLead, w), printTop, w, 1);
+    ctx.fillRect(mirrorX(layout, printTrail - 2, 3), printTop, 3, h + 1);
+    ctx.fillRect(mirrorX(layout, printLead, w + 1), printBottom - 2, w + 1, 3);
+  }
   ctx.strokeStyle = theme.pageBreakManual;
   ctx.lineWidth = 2.5 / dpr;
   ctx.beginPath();
@@ -879,7 +956,7 @@ export function paintPageBreakPreview(
     Math.round(mirrorX(layout, leadingEdge(cols, pagination.origin.col, ox, ox))) + align;
   ctx.moveTo(frameLead, oy);
   ctx.lineTo(frameLead, cssHeight);
-  ctx.stroke();
+  if (!mac) ctx.stroke();
   // Dragging the frame grows or shrinks what prints, so it is a handle too.
   handles.push({
     axis: 'row',

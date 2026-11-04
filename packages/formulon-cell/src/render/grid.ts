@@ -366,7 +366,11 @@ export class GridRenderer {
         theme,
         pagination,
         setup,
-        { addHeader: strings.pageView.addHeader, addFooter: strings.pageView.addFooter },
+        {
+          addHeader: strings.pageView.addHeader,
+          addFooter: strings.pageView.addFooter,
+          addData: strings.pageView.addData,
+        },
         cols,
         rows,
       );

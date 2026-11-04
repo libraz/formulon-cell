@@ -6,6 +6,8 @@ export interface PageLayoutStrings {
     addHeader: string;
     /** Placeholder in an empty footer band. */
     addFooter: string;
+    /** Prompt at the top-left of a page that holds no data. */
+    addData: string;
     /** Page-number watermark. `{n}` is the 1-based page number. */
     pageNumber: string;
     /** Announced when a break line is picked up for dragging. */

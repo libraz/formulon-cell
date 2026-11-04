@@ -4,6 +4,7 @@ export const pageLayoutTh: PageLayoutStrings = {
   pageView: {
     addHeader: 'เพิ่มหัวกระดาษ',
     addFooter: 'เพิ่มท้ายกระดาษ',
+    addData: 'คลิกเพื่อเพิ่มข้อมูล',
     pageNumber: 'หน้า {n}',
     movePageBreak: 'ย้ายตัวแบ่งหน้า',
     rulerUnit: 'cm',
