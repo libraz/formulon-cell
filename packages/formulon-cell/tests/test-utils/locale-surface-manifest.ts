@@ -480,6 +480,13 @@ export const LOCALE_SURFACE_SHELL_FACTORIES: readonly LocaleSurfaceFactory[] = [
     'block',
   ),
   shell(
+    'interact.macChartSelectDataDialog',
+    'interact/mac-chart-select-data-dialog.ts',
+    'attachMacChartSelectDataDialog',
+    'sessionCharts',
+    'block',
+  ),
+  shell(
     'interact.macGoalSeekDialog',
     'interact/mac-goal-seek-dialog.ts',
     'openMacGoalSeekDialog',
