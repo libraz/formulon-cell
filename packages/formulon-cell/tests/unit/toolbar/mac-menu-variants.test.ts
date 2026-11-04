@@ -113,4 +113,24 @@ describe('Mac Home menu wording', () => {
     expect(desktop).not.toContain('既定の幅...');
     expect(desktop).toContain('セルのロック解除');
   });
+
+  const sequence = (menu: HTMLElement): string[] =>
+    Array.from(menu.children, (el) =>
+      el.classList.contains('fc-tb__menu-sep') ? '---' : (el.textContent ?? '').trim(),
+    );
+
+  it('Fill has no separator on the Mac and Clear sets Remove Hyperlinks apart', () => {
+    expect(sequence(factories.createFillMenu('fillHome', MAC))).not.toContain('---');
+    expect(sequence(factories.createFillMenu('fillHome'))).toContain('---');
+    const clear = sequence(factories.createClearMenu('clearHome', MAC));
+    expect(clear.at(-2)).toBe('---');
+    expect(clear.at(-1)).toBe('ハイパーリンクの削除');
+  });
+
+  it('Format leads its protection group with Protect Sheet on the Mac', () => {
+    const rows = itemsOf(factories.createFormatCellsMenu('formatCellsHome', MAC));
+    const protect = rows.indexOf('シートの保護...');
+    expect(protect).toBeGreaterThan(-1);
+    expect(rows[protect + 1]).toBe('セルのロック');
+  });
 });

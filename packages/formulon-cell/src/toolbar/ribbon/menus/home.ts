@@ -44,7 +44,7 @@ export interface HomeMenuFactories {
   createWrapMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createMergeMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createFreezeMenu: () => HTMLDivElement;
-  createFillMenu: () => HTMLDivElement;
+  createFillMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createClearMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createInsertCellsMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
   createDeleteCellsMenu: (commandId?: string, variant?: MenuVariant) => HTMLDivElement;
@@ -194,14 +194,15 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     return applyMenuVariant(menu, deps.ribbonLang, variant);
   };
 
-  const createFillMenu = (): HTMLDivElement => {
+  const createFillMenu = (_commandId?: string, variant?: MenuVariant): HTMLDivElement => {
     const menu = createMenu('menu-fill');
     menu.append(
       menuIconButton(t.fillDown, 'fill', 'down', 'fill-down'),
       menuIconButton(t.fillRight, 'fill', 'right', 'fill-right'),
       menuIconButton(t.fillUp, 'fill', 'up', 'fill-up'),
       menuIconButton(t.fillLeft, 'fill', 'left', 'fill-left'),
-      menuSeparator(),
+      // The Mac menu runs its rows together.
+      ...(variant?.mac ? [] : [menuSeparator()]),
       menuIconButton(t.fillGroup, 'fill', 'group', 'fill-group'),
       menuIconButton(t.series, 'fill', 'series', 'fill-series'),
       menuIconButton(t.fillJustify, 'fill', 'justify', 'fill-justify'),
@@ -218,6 +219,8 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       menuIconButton(t.clearContents, 'clear', 'contents', 'clear-contents'),
       menuIconButton(t.clearComments, 'clear', 'comments', 'clear-comments'),
       menuIconButton(t.clearHyperlinks, 'clear', 'hyperlinks', 'clear-hyperlinks'),
+      // The Mac menu sets Remove Hyperlinks apart.
+      ...(variant?.mac ? [menuSeparator()] : []),
       menuIconButton(t.removeHyperlinks, 'clear', 'remove-hyperlinks', 'clear-hyperlinks'),
       menuIconButton(t.clearConditional, 'clear', 'conditional', 'clear-conditional'),
     );
@@ -300,14 +303,17 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
       tabColorSubmenu,
       menuSeparator(),
       menuSectionHeader(t.formatProtection),
-      // The Mac menu has one Lock Cell check item that flips the state.
+      // The Mac menu leads with Protect Sheet and has one Lock Cell check item that flips the state.
       ...(mac
-        ? [menuIconButton(t.lockCell, 'cellFormat', 'toggle-lock', 'format-lock')]
+        ? [
+            menuIconButton(t.protectSheet, 'cellFormat', 'protect-sheet', 'format-protect'),
+            menuIconButton(t.lockCell, 'cellFormat', 'toggle-lock', 'format-lock'),
+          ]
         : [
             menuIconButton(t.lockCell, 'cellFormat', 'lock-cell', 'format-lock'),
             menuIconButton(t.unlockCell, 'cellFormat', 'unlock-cell', 'format-unlock'),
+            menuIconButton(t.protectSheet, 'cellFormat', 'protect-sheet', 'format-protect'),
           ]),
-      menuIconButton(t.protectSheet, 'cellFormat', 'protect-sheet', 'format-protect'),
       menuSeparator(),
       menuIconButton(t.formatCells, 'cellFormat', 'dialog', 'format-dialog'),
     );

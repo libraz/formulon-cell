@@ -16,7 +16,7 @@ import {
   handleInsertCellsAction,
 } from '../../wrappers/toolbar-actions.js';
 import type { DefaultDynamicDropdownsOptions } from '../dynamic-dropdowns-defaults.js';
-import { setMenuControlDisabled } from './menu-feedback.js';
+import { setMenuControlDisabled, showInstanceReport } from './menu-feedback.js';
 import { hasActiveCopy, normalizedSelectionRange } from './selection.js';
 
 const noop = (): void => undefined;
@@ -94,9 +94,21 @@ const buildCellInsertAction =
     instance.host.focus();
   };
 
+/** Excel for Mac leaves Hide Sheet and Delete Sheet enabled on a one-sheet workbook and answers with an alert. */
+const isMacInstance = (instance: SpreadsheetInstance): boolean =>
+  (instance.host.closest<HTMLElement>('.fc-host') ?? instance.host).dataset.fcPlatform === 'mac';
+
+const reportSheetGuard = (instance: SpreadsheetInstance, message: string): void => {
+  void showInstanceReport(instance, message, [{ severity: 'warning', label: message, detail: '' }]);
+};
+
 const buildCellDeleteAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellDeleteAction'] =>
   (action) => {
+    if (action === 'sheet' && isMacInstance(instance) && instance.workbook.sheetCount <= 1) {
+      reportSheetGuard(instance, instance.i18n.strings.ribbonMenu.sheetDeleteRequiresAnotherSheet);
+      return;
+    }
     if (action === 'cells') {
       const range = normalizedSelectionRange(instance);
       if (isWholeRowRange(range) || isWholeColumnRange(range)) {
@@ -148,6 +160,13 @@ const buildCellFormatAction =
   ): DynamicDropdownsCtx['applyCellFormatAction'] =>
   async (action) => {
     const strings = instance.i18n.strings;
+    if (action === 'hide-sheet' && isMacInstance(instance)) {
+      const state = instance.store.getState();
+      if (instance.workbook.sheetCount - state.layout.hiddenSheets.size <= 1) {
+        reportSheetGuard(instance, strings.ribbonMenu.sheetHideRequiresVisibleSheet);
+        return;
+      }
+    }
     await applyCellFormatAction(action, {
       inst: instance,
       ribbonLang: dictionaryLocaleFor(instance.i18n.locale),
@@ -228,7 +247,9 @@ const updateFormatCellsMenu =
       if (action === 'tab-color-high-contrast') {
         return t.sheetActionUnavailable;
       }
-      if (action === 'hide-sheet' && visibleSheetCount <= 1) return t.sheetHideRequiresVisibleSheet;
+      if (action === 'hide-sheet' && visibleSheetCount <= 1 && !isMacInstance(instance)) {
+        return t.sheetHideRequiresVisibleSheet;
+      }
       if (action === 'unhide-sheet' && hiddenSheetCount === 0) {
         return t.sheetUnhideRequiresHiddenSheet;
       }
@@ -242,7 +263,7 @@ const updateFormatCellsMenu =
         (action === 'move-sheet-left' && (sheet <= 0 || !canMoveSheet)) ||
         (action === 'move-sheet-right' &&
           (sheet >= instance.workbook.sheetCount - 1 || !canMoveSheet)) ||
-        (action === 'hide-sheet' && visibleSheetCount <= 1) ||
+        (action === 'hide-sheet' && visibleSheetCount <= 1 && !isMacInstance(instance)) ||
         (action === 'unhide-sheet' && hiddenSheetCount === 0) ||
         action === 'tab-color-high-contrast';
       setMenuControlDisabled(button, disabled, reasonForFormatAction(action));
@@ -282,13 +303,14 @@ const updateCellDeleteMenu =
       let disabledReason: string | undefined;
       if (button.dataset.cellDelete === 'sheet') {
         if (structureProtected) disabledReason = strings.workbookStructureProtectedBlocked;
-        else if (instance.workbook.sheetCount <= 1) {
+        else if (instance.workbook.sheetCount <= 1 && !isMacInstance(instance)) {
           disabledReason = strings.sheetDeleteRequiresAnotherSheet;
         } else if (!canRemoveSheet) disabledReason = strings.sheetMutationUnavailable;
       }
+      const lastSheet = instance.workbook.sheetCount <= 1 && !isMacInstance(instance);
       const disabled =
         button.dataset.cellDelete === 'sheet' &&
-        (structureProtected || instance.workbook.sheetCount <= 1 || !canRemoveSheet);
+        (structureProtected || lastSheet || !canRemoveSheet);
       setMenuControlDisabled(button, disabled, disabledReason);
     }
   };

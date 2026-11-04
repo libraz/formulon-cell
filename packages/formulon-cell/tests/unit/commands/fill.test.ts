@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { executeRibbonFillAction, fillDestFor, fillRange } from '../../../src/commands/fill.js';
+import {
+  executeRibbonFillAction,
+  fillDestFor,
+  fillRange,
+  justifySelection,
+} from '../../../src/commands/fill.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import type { CellValue, Range } from '../../../src/engine/types.js';
@@ -425,6 +430,38 @@ describe('fillRange', () => {
     expect(text(wb, 0, 1, 1)).toBe('right');
     select(0, 0);
     expect(run('down')).toBe(false);
+  });
+
+  it('Fill Justify re-flows the selected text across rows to the selection width', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'alpha beta gamma' },
+      { row: 1, col: 0, value: 'delta' },
+      { row: 2, col: 0, value: 'epsilon zeta' },
+    ]);
+    // Three columns of 40 px: the width of the selection is 120 px.
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, defaultColWidth: 40 },
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 },
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+      },
+    }));
+    const history = new History();
+    wb.attachHistory(history);
+    const measure = (text: string): number => text.length * 10;
+    expect(justifySelection({ store, workbook: wb, history, measure })).toBe(true);
+    expect([0, 1, 2, 3].map((row) => text(wb, 0, row, 0))).toEqual([
+      'alpha beta',
+      'gamma delta',
+      'epsilon zeta',
+      '',
+    ]);
+    expect(history.undo()).toBe(true);
+    expect(text(wb, 0, 0, 0)).toBe('alpha beta gamma');
+    expect(text(wb, 0, 3, 0)).toBe('');
   });
 
   it('flash fill can infer from the nearest populated column on the right', () => {

@@ -10,6 +10,7 @@ import {
   textSeriesAtom,
   textSeriesValue,
 } from './autofill-series.js';
+import { createAutofitMeasureContext } from './autofit-measurement.js';
 import { inputLocaleForWorkbook } from './coerce-input.js';
 import { blockDataTableEdit } from './data-table-guard.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
@@ -690,12 +691,90 @@ export function fillDirectionRange(
   return range;
 }
 
+export interface JustifySelectionDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  history: History;
+  /** Width in px of a run of text; the canvas measure when absent. */
+  measure?: (text: string) => number;
+}
+
+const JUSTIFY_FONT = '11pt sans-serif';
+
+const defaultMeasure = (): ((text: string) => number) => {
+  const ctx = createAutofitMeasureContext();
+  if (ctx) {
+    ctx.font = JUSTIFY_FONT;
+    return (text) => ctx.measureText(text).width;
+  }
+  return (text) => text.length * 7;
+};
+
+/**
+ * Fill > Justify: take the text of the selection and re-flow it down the first column, one
+ * line per row, so that each line fits the selection's width. Lines that no longer fit the
+ * rows continue below; rows left empty are cleared. One undo step.
+ */
+export function justifySelection(deps: JustifySelectionDeps): boolean {
+  const { store, workbook, history } = deps;
+  const state = store.getState();
+  const selected = state.selection.range;
+  const range: Range = {
+    sheet: selected.sheet,
+    r0: Math.min(selected.r0, selected.r1),
+    c0: Math.min(selected.c0, selected.c1),
+    r1: Math.max(selected.r0, selected.r1),
+    c1: Math.max(selected.c0, selected.c1),
+  };
+  let width = 0;
+  for (let col = range.c0; col <= range.c1; col += 1) {
+    width += state.layout.colWidths.get(col) ?? state.layout.defaultColWidth;
+  }
+  const words: string[] = [];
+  const textCells: Array<{ row: number; col: number }> = [];
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      const value = workbook.getValue({ sheet: range.sheet, row, col });
+      if (value.kind !== 'text') continue;
+      textCells.push({ row, col });
+      words.push(...value.value.split(/\s+/).filter(Boolean));
+    }
+  }
+  if (words.length === 0) return false;
+  const measure = deps.measure ?? defaultMeasure();
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const candidate = line === '' ? word : `${line} ${word}`;
+    if (line === '' || measure(candidate) <= width) line = candidate;
+    else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  lines.push(line);
+  history.begin();
+  try {
+    workbook.withBatchedRecalc(() => {
+      for (const cell of textCells) workbook.setBlank({ sheet: range.sheet, ...cell });
+      lines.forEach((text, index) => {
+        workbook.setText({ sheet: range.sheet, row: range.r0 + index, col: range.c0 }, text);
+      });
+    });
+  } finally {
+    history.end();
+  }
+  mutators.replaceCells(store, workbook.cells(range.sheet));
+  return true;
+}
+
 export type RibbonFillAction =
   | 'down'
   | 'right'
   | 'up'
   | 'left'
   | 'flash'
+  | 'justify'
   | 'series'
   | 'days'
   | 'weekdays'
@@ -808,6 +887,7 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
     c1: Math.max(selected.c0, selected.c1),
   };
   if (action === 'flash') return executeRibbonFlashFill(store, workbook, history, range);
+  if (action === 'justify') return justifySelection({ store, workbook, history });
 
   const direction: 'down' | 'right' | 'up' | 'left' =
     action === 'down' || action === 'right' || action === 'up' || action === 'left'

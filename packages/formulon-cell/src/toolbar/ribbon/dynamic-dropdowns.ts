@@ -87,7 +87,7 @@ export interface DynamicDropdownsCtx {
   applyLinksAction: (action: string) => void | Promise<void>;
   applyFillSeries: (mode?: RibbonFillSeriesMode) => void | Promise<void>;
   applyFillDirection: (
-    direction: Extract<RibbonFillAction, 'down' | 'right' | 'up' | 'left' | 'flash'>,
+    direction: Extract<RibbonFillAction, 'down' | 'right' | 'up' | 'left' | 'flash' | 'justify'>,
   ) => void;
   applyClearAction: (action: string) => void | Promise<void>;
   applyUnderlineAction: (action: string) => void | Promise<void>;
@@ -649,7 +649,14 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
         if (v === 'series') return ctx.applyFillSeries();
         if (v === 'days' || v === 'weekdays' || v === 'months' || v === 'years')
           return ctx.applyFillSeries(v);
-        if (v === 'down' || v === 'right' || v === 'up' || v === 'left' || v === 'flash')
+        if (
+          v === 'down' ||
+          v === 'right' ||
+          v === 'up' ||
+          v === 'left' ||
+          v === 'flash' ||
+          v === 'justify'
+        )
           ctx.applyFillDirection(v);
       },
     },
