@@ -6,13 +6,30 @@ import {
 } from '../../../../src/commands/format-as-table.js';
 import { tableCellFormat } from '../../../../src/render/grid/table-format.js';
 
+/** A table under a custom style, which keeps the family-and-hue approximation. */
 function table(style: TableOverlay['style'], over: Partial<TableOverlay> = {}): TableOverlay {
   return {
     ...defaultTableOverlay('t1', { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 3 }),
     style,
+    styleName: 'Custom table style',
     ...over,
   };
 }
+
+/** A table under a built-in style, named as the gallery applies it. */
+function builtin(styleName: string, over: Partial<TableOverlay> = {}): TableOverlay {
+  return {
+    ...defaultTableOverlay('t1', { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 3 }),
+    styleName,
+    ...over,
+  };
+}
+
+/** The workbook theme the built-in definitions were read under (Office 2007). */
+const OFFICE_2007 = [
+  0xff000000, 0xffffffff, 0xff1f497d, 0xffeeece1, 0xff4f81bd, 0xffc0504d, 0xff9bbb59, 0xff8064a2,
+  0xff4bacc6, 0xfff79646,
+];
 
 describe('render/grid/table-format', () => {
   describe('header row', () => {
@@ -103,6 +120,42 @@ describe('render/grid/table-format', () => {
       const t = table('medium', { lastCol: true, banded: false });
       expect(tableCellFormat(t, 1, 3)).toEqual({ bold: true });
       expect(tableCellFormat(t, 1, 2)).toBeUndefined();
+    });
+  });
+
+  describe('built-in styles', () => {
+    it('paints Medium 2 from its definition under the workbook theme', () => {
+      const t = builtin('TableStyleMedium2', { showTotal: true });
+      expect(tableCellFormat(t, 0, 1, OFFICE_2007)).toEqual({
+        fill: '#4f81bd',
+        color: '#ffffff',
+        bold: true,
+      });
+      expect(tableCellFormat(t, 1, 1, OFFICE_2007)?.fill).toBe('#dce6f1');
+      expect(tableCellFormat(t, 5, 1, OFFICE_2007)).toMatchObject({
+        bold: true,
+        borders: { top: { style: 'double', color: '#4f81bd' } },
+      });
+    });
+
+    it('paints the second stripe of Light 9 on every other data row', () => {
+      const t = builtin('TableStyleLight9');
+      const rule = { style: 'thin', color: '#4f81bd' };
+      expect(tableCellFormat(t, 1, 1, OFFICE_2007)?.borders?.top).toEqual(rule);
+      expect(tableCellFormat(t, 2, 1, OFFICE_2007)?.borders?.top).toEqual(rule);
+      expect(tableCellFormat(t, 3, 1, OFFICE_2007)?.borders?.top).toEqual(rule);
+    });
+
+    it('alternates first and second column stripes', () => {
+      const t = builtin('TableStyleLight9', { banded: false, colStripes: true });
+      const rule = { style: 'thin', color: '#4f81bd' };
+      expect(tableCellFormat(t, 2, 0, OFFICE_2007)?.borders?.left).toEqual(rule);
+      expect(tableCellFormat(t, 2, 1, OFFICE_2007)?.borders?.left).toEqual(rule);
+    });
+
+    it('leaves a row without a stripe element to the first stripe only', () => {
+      const t = builtin('TableStyleMedium2');
+      expect(tableCellFormat(t, 2, 1, OFFICE_2007)).toBeUndefined();
     });
   });
 });

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { builtinTableStyleElements } from '../../../src/engine/builtin-table-styles.js';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import { createStylesMenuFactories } from '../../../src/toolbar/ribbon/menus/styles.js';
 
@@ -134,5 +135,30 @@ describe('Format as Table gallery', () => {
     expect(swatch).toContain('width: 73px');
     expect(swatch).toContain('height: 58px');
     expect(swatch).toContain('margin: -1px');
+  });
+
+  it('draws a built-in swatch from its style definition', () => {
+    const medium2 = gallery('ja').querySelector<HTMLElement>(
+      '[data-table-style="TableStyleMedium2"]',
+    );
+    const cells = Array.from(
+      medium2?.querySelectorAll<HTMLElement>('.fc-tb__tablestyle-swatch__cell') ?? [],
+    );
+    expect(cells).toHaveLength(25);
+    // Header row as the definition paints it under the default theme.
+    const header = builtinTableStyleElements('TableStyleMedium2')?.headerRow;
+    expect(cells[0]?.style.background).toBe(header?.fill);
+    expect(cells[0]?.style.color).toBe(header?.color);
+    // The first and third body rows carry the first stripe; the others are plain.
+    expect(cells[5]?.style.background).not.toBe('');
+    expect(cells[10]?.style.background).toBe('');
+    // Light 9 rules every body row through its two stripes.
+    const light9 = gallery('ja').querySelector<HTMLElement>(
+      '[data-table-style="TableStyleLight9"]',
+    );
+    const rows = Array.from(
+      light9?.querySelectorAll<HTMLElement>('.fc-tb__tablestyle-swatch__cell') ?? [],
+    ).filter((_, i) => i % 5 === 0 && i > 0);
+    expect(rows.map((cell) => cell.style.borderTop !== '')).toEqual([true, true, true, true]);
   });
 });

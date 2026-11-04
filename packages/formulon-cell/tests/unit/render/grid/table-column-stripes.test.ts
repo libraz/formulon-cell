@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_TABLE_COLOR,
   defaultTableOverlay,
   type TableOverlay,
-  tableStyleSwatch,
 } from '../../../../src/commands/format-as-table.js';
+import { builtinTableStyleElements } from '../../../../src/engine/builtin-table-styles.js';
 import { createConditionalCache } from '../../../../src/render/conditional.js';
 import {
   buildColLayout,
@@ -89,7 +88,8 @@ function bandedCells(over: Partial<TableOverlay>): string[] {
     cols,
     rows,
   );
-  const band = tableStyleSwatch('medium', DEFAULT_TABLE_COLOR).band;
+  // The default table is Medium 2; with no workbook its stripe takes the default theme.
+  const band = builtinTableStyleElements('TableStyleMedium2')?.firstColumnStripe?.fill;
   const out: string[] = [];
   for (let row = 0; row < 4; row += 1) {
     for (let col = 0; col < 4; col += 1) {

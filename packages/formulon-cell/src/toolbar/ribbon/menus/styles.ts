@@ -16,13 +16,19 @@ import {
 import {
   BUILTIN_TABLE_STYLES,
   type BuiltinTableStyle,
-  parseTableStyleName,
   type TableStyle,
   tableStyleSwatch,
 } from '../../../commands/format-as-table.js';
+import { builtinTableStyleElements } from '../../../engine/builtin-table-styles.js';
+import {
+  composeStyleElements,
+  type StyleElementFormats,
+  type StyleElementRegion,
+  TABLE_ELEMENT_ORDER,
+} from '../../../engine/table-style-elements.js';
 import type { WorkbookHandle } from '../../../engine/workbook-handle.js';
 import { dictionaries } from '../../../i18n/strings.js';
-import type { CellFormat } from '../../../store/types.js';
+import type { CellBorderSide, CellFormat } from '../../../store/types.js';
 import type { ToolbarMenuText } from '../../menu-text.js';
 import type { ToolbarLang, ToolbarText } from '../../ribbon-model.js';
 
@@ -87,15 +93,6 @@ type StylesMenuText = ToolbarMenuText & {
 
 export type TableVariantId = 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
 
-// Until each built-in style has its own elements, a swatch tells the blocks of
-// seven apart by the variant it draws.
-const TABLE_BLOCK_LOOKS: readonly TableVariantId[] = [
-  'plain',
-  'banded',
-  'firstCol',
-  'bandedFirstCol',
-];
-
 export const tableVariantOptions = (
   variant: TableVariantId,
 ): { banded: boolean; firstCol: boolean } => {
@@ -125,7 +122,6 @@ const createTableStyleSwatch = (
   label: string,
   actionStyleId: string = style,
   dataset: 'tableStyle' | 'pivotTableStyle' = 'tableStyle',
-  builtin = false,
 ): HTMLButtonElement => {
   const swatch = tableStyleSwatch(style, color);
   const { banded, firstCol } = tableVariantOptions(variant);
@@ -136,11 +132,8 @@ const createTableStyleSwatch = (
     title: label,
     ariaLabel: label,
   });
-  // A built-in style is applied by name and leaves the table's options alone.
-  if (!builtin) {
-    btn.dataset.tableColor = color;
-    btn.dataset.tableVariant = variant;
-  }
+  btn.dataset.tableColor = color;
+  btn.dataset.tableVariant = variant;
   btn.appendChild(tableStyleSwatchPart('fc-tb__tablestyle-swatch__head', swatch.header));
   for (let i = 0; i < 3; i += 1) {
     const rowFill = banded && i % 2 === 0 ? swatch.band : '#ffffff';
@@ -153,6 +146,64 @@ const createTableStyleSwatch = (
     }
     btn.appendChild(row);
   }
+  return btn;
+};
+
+// A built-in swatch is a 5 x 5 table: a header row over four body rows that
+// alternate the two row stripes, as the desktop gallery draws it.
+const SWATCH_SIZE = 5;
+const SWATCH_REGIONS: readonly StyleElementRegion[] = [
+  { type: 'headerRow', r0: 0, r1: 0, c0: 0, c1: SWATCH_SIZE - 1 },
+  ...[1, 2, 3, 4].map(
+    (row): StyleElementRegion => ({
+      type: row % 2 === 1 ? 'firstRowStripe' : 'secondRowStripe',
+      r0: row,
+      r1: row,
+      c0: 0,
+      c1: SWATCH_SIZE - 1,
+    }),
+  ),
+];
+const SWATCH_TEXT = '#7f7f7f';
+
+const swatchBorder = (side: CellBorderSide | undefined): string => {
+  if (!side || side === true) return '';
+  const width =
+    side.style === 'medium' ? 2 : side.style === 'thick' || side.style === 'double' ? 3 : 1;
+  return `${width}px ${side.style === 'double' ? 'double' : 'solid'} ${side.color ?? SWATCH_TEXT}`;
+};
+
+const createBuiltinTableStyleSwatch = (
+  name: string,
+  elements: StyleElementFormats,
+  label: string,
+): HTMLButtonElement => {
+  // A built-in style is applied by name and leaves the table's options alone.
+  const btn = createMenuButton({
+    className: 'fc-tb__tablestyle-swatch fc-tb__tablestyle-swatch--builtin',
+    attr: 'tableStyle',
+    value: name,
+    title: label,
+    ariaLabel: label,
+  });
+  const grid = tableStyleSwatchPart('fc-tb__tablestyle-swatch__grid');
+  for (let row = 0; row < SWATCH_SIZE; row += 1) {
+    for (let col = 0; col < SWATCH_SIZE; col += 1) {
+      const format = composeStyleElements(elements, TABLE_ELEMENT_ORDER, SWATCH_REGIONS, row, col);
+      const cell = document.createElement('span');
+      cell.className = 'fc-tb__tablestyle-swatch__cell';
+      if (format?.fill) cell.style.background = format.fill;
+      cell.style.color = format?.color ?? SWATCH_TEXT;
+      if (format?.bold) cell.classList.add('fc-tb__tablestyle-swatch__cell--bold');
+      const borders = format?.borders;
+      cell.style.borderTop = swatchBorder(borders?.top);
+      cell.style.borderBottom = swatchBorder(borders?.bottom);
+      cell.style.borderLeft = swatchBorder(borders?.left);
+      cell.style.borderRight = swatchBorder(borders?.right);
+      grid.appendChild(cell);
+    }
+  }
+  btn.appendChild(grid);
   return btn;
 };
 
@@ -266,19 +317,13 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       medium: t.tableStyleMedium,
       dark: t.tableStyleDark,
     };
-    const builtinSwatch = (entry: BuiltinTableStyle): HTMLButtonElement => {
-      const look = parseTableStyleName(entry.name);
-      const block = entry.family === 'dark' ? 1 : Math.floor((entry.index - 1) / 7);
-      return createTableStyleSwatch(
-        entry.family,
-        look?.color ?? '#4472c4',
-        TABLE_BLOCK_LOOKS[block] ?? 'banded',
-        t.tableStyleSwatches[entry.name as keyof typeof t.tableStyleSwatches] ?? entry.name,
+    const themeColors = deps.getWorkbook?.()?.getTheme?.()?.colors;
+    const builtinSwatch = (entry: BuiltinTableStyle): HTMLButtonElement =>
+      createBuiltinTableStyleSwatch(
         entry.name,
-        'tableStyle',
-        true,
+        builtinTableStyleElements(entry.name, themeColors) ?? {},
+        t.tableStyleSwatches[entry.name as keyof typeof t.tableStyleSwatches] ?? entry.name,
       );
-    };
     for (const family of ['light', 'medium', 'dark'] as const) {
       scrollBody.append(
         ...menuLabeledGrid({
