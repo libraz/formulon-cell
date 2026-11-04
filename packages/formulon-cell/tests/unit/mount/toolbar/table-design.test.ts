@@ -171,9 +171,7 @@ describe('Table Design tab of the ribbon', () => {
       { command: 'formatTableHome', menuId: 'menu-table-style-home' },
       host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]'),
     );
-    const swatch = host.querySelector<HTMLButtonElement>(
-      '[data-table-style="medium"][data-table-color="#ed7d31"][data-table-variant="banded"]',
-    );
+    const swatch = host.querySelector<HTMLButtonElement>('[data-table-style="TableStyleMedium10"]');
     expect(swatch).toBeTruthy();
     const click = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(click, 'target', { value: swatch });

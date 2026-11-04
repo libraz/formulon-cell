@@ -400,6 +400,10 @@ export interface RibbonMenusStrings {
     pivotTableStyleCustom: string;
     tableStyleNew: string;
     tableStyleNewPivot: string;
+    /** Format as Table swatch names, keyed by built-in style name. */
+    tableStyleSwatches: Readonly<
+      Record<`TableStyle${'Light' | 'Medium' | 'Dark'}${number}`, string>
+    >;
     tableStyleName: string;
     tableStyleType: string;
     tableStyleColor: string;

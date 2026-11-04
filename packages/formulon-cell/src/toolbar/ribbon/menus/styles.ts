@@ -14,7 +14,9 @@ import {
   resolveCellStyleFormat,
 } from '../../../commands/cell-styles.js';
 import {
-  TABLE_STYLE_COLORS,
+  BUILTIN_TABLE_STYLES,
+  type BuiltinTableStyle,
+  parseTableStyleName,
   type TableStyle,
   tableStyleSwatch,
 } from '../../../commands/format-as-table.js';
@@ -85,13 +87,14 @@ type StylesMenuText = ToolbarMenuText & {
 
 export type TableVariantId = 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
 
-const TABLE_VARIANTS_LIGHT_MEDIUM: TableVariantId[] = [
+// Until each built-in style has its own elements, a swatch tells the blocks of
+// seven apart by the variant it draws.
+const TABLE_BLOCK_LOOKS: readonly TableVariantId[] = [
   'plain',
   'banded',
   'firstCol',
   'bandedFirstCol',
 ];
-const TABLE_VARIANTS_DARK: TableVariantId[] = ['banded'];
 
 export const tableVariantOptions = (
   variant: TableVariantId,
@@ -122,6 +125,7 @@ const createTableStyleSwatch = (
   label: string,
   actionStyleId: string = style,
   dataset: 'tableStyle' | 'pivotTableStyle' = 'tableStyle',
+  builtin = false,
 ): HTMLButtonElement => {
   const swatch = tableStyleSwatch(style, color);
   const { banded, firstCol } = tableVariantOptions(variant);
@@ -132,8 +136,11 @@ const createTableStyleSwatch = (
     title: label,
     ariaLabel: label,
   });
-  btn.dataset.tableColor = color;
-  btn.dataset.tableVariant = variant;
+  // A built-in style is applied by name and leaves the table's options alone.
+  if (!builtin) {
+    btn.dataset.tableColor = color;
+    btn.dataset.tableVariant = variant;
+  }
   btn.appendChild(tableStyleSwatchPart('fc-tb__tablestyle-swatch__head', swatch.header));
   for (let i = 0; i < 3; i += 1) {
     const rowFill = banded && i % 2 === 0 ? swatch.band : '#ffffff';
@@ -254,25 +261,32 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     const menu = createMenu(menuIdForCommand(id));
     menu.classList.add('fc-tb__tablestyle-menu');
     const scrollBody = menuScrollBody('fc-tb__tablestyle-scroll', ribbonText.formatTable);
-    const intensities: {
-      id: TableStyle;
-      label: string;
-      variants: readonly TableVariantId[];
-    }[] = [
-      { id: 'light', label: t.tableStyleLight, variants: TABLE_VARIANTS_LIGHT_MEDIUM },
-      { id: 'medium', label: t.tableStyleMedium, variants: TABLE_VARIANTS_LIGHT_MEDIUM },
-      { id: 'dark', label: t.tableStyleDark, variants: TABLE_VARIANTS_DARK },
-    ];
-    for (const intensity of intensities) {
+    const familyLabels: Record<TableStyle, string> = {
+      light: t.tableStyleLight,
+      medium: t.tableStyleMedium,
+      dark: t.tableStyleDark,
+    };
+    const builtinSwatch = (entry: BuiltinTableStyle): HTMLButtonElement => {
+      const look = parseTableStyleName(entry.name);
+      const block = entry.family === 'dark' ? 1 : Math.floor((entry.index - 1) / 7);
+      return createTableStyleSwatch(
+        entry.family,
+        look?.color ?? '#4472c4',
+        TABLE_BLOCK_LOOKS[block] ?? 'banded',
+        t.tableStyleSwatches[entry.name as keyof typeof t.tableStyleSwatches] ?? entry.name,
+        entry.name,
+        'tableStyle',
+        true,
+      );
+    };
+    for (const family of ['light', 'medium', 'dark'] as const) {
       scrollBody.append(
         ...menuLabeledGrid({
-          label: intensity.label,
+          label: familyLabels[family],
           headingClassName: 'fc-tb__tablestyle-heading',
           gridClassName: 'fc-tb__tablestyle-grid',
-          children: intensity.variants.flatMap((variant) =>
-            TABLE_STYLE_COLORS.map((color) =>
-              createTableStyleSwatch(intensity.id, color, variant, intensity.label),
-            ),
+          children: BUILTIN_TABLE_STYLES.filter((entry) => entry.family === family).map(
+            builtinSwatch,
           ),
         }),
       );

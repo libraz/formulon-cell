@@ -4,6 +4,7 @@ import {
   createTableStyleFromActiveTable,
   defaultTableOverlay,
   formatAsTable,
+  formatAsTableByStyleId,
   overlayStyleName,
   parseTableStyleName,
   type TableOverlay,
@@ -166,6 +167,37 @@ describe('table styles through the engine', () => {
     updateTableOverlay(back.store, onlyTable(back.store).id, { banded: true, firstCol: false });
     const again = await reloaded(back.wb);
     expect(onlyTable(again.store)).toMatchObject({ banded: true, firstCol: false, lastCol: true });
+  });
+
+  it('applies a gallery style by its name, with the default table options', () => {
+    expect(tableStyleOptionsById({ tables: {} }, 'TableStyleMedium9')).toEqual({
+      style: 'medium',
+      color: '#4472c4',
+      styleName: 'TableStyleMedium9',
+      banded: true,
+      firstCol: false,
+    });
+  });
+
+  it('saves and loads a table styled Medium 9 under that name', async () => {
+    const wb = await seeded();
+    const store = bound(wb);
+    formatAsTableByStyleId(store, range, 'TableStyleMedium9', undefined, 'banded', {
+      workbook: wb,
+    });
+    expect(wb.getTableStyleDetails(0)).toMatchObject({ styleName: 'TableStyleMedium9' });
+
+    const back = await reloaded(wb);
+    expect(onlyTable(back.store)).toMatchObject({
+      style: 'medium',
+      styleName: 'TableStyleMedium9',
+    });
+    updateTableOverlay(back.store, onlyTable(back.store).id, { lastCol: true });
+    const again = await reloaded(back.wb);
+    expect(again.wb.getTableStyleDetails(0)).toMatchObject({
+      styleName: 'TableStyleMedium9',
+      showLastColumn: true,
+    });
   });
 
   it('keeps an unrecognised built-in style name when only a flag changes', async () => {

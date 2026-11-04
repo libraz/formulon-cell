@@ -217,6 +217,24 @@ const paletteIndex = (color: string): number => {
   return best;
 };
 
+/** One built-in table style: its family, 1-based number and engine name. */
+export interface BuiltinTableStyle {
+  family: TableStyle;
+  index: number;
+  name: string;
+}
+
+/** Every built-in table style, in gallery order: Light 1-21, Medium 1-28, Dark 1-11. */
+export const BUILTIN_TABLE_STYLES: readonly BuiltinTableStyle[] = (
+  ['light', 'medium', 'dark'] as const
+).flatMap((family) =>
+  Array.from({ length: BUILTIN_STYLE_COUNT[family] }, (_, i) => ({
+    family,
+    index: i + 1,
+    name: `${BUILTIN_STYLE_PREFIX[family]}${i + 1}`,
+  })),
+);
+
 /** Built-in engine style name for a gallery family and hue: the first block
  *  of each family, one style per palette column. */
 export const tableStyleName = (style: TableStyle, color: string = DEFAULT_TABLE_COLOR): string =>
@@ -498,6 +516,16 @@ export function tableStyleOptionsById(
       color: custom.color,
       styleName: custom.label,
       ...tableVariantOptions(custom.variant),
+    };
+  }
+  // A built-in name keeps the name; the grid approximates it by family and hue.
+  const builtin = parseTableStyleName(styleId);
+  if (builtin) {
+    return {
+      style: builtin.style,
+      color: builtin.color,
+      styleName: styleId,
+      ...tableVariantOptions(variant),
     };
   }
   return {

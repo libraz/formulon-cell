@@ -425,7 +425,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menu.classList.contains('fc-tb__tablestyle-menu')).toBe(true);
     expect(headings).toEqual(['淡色', '中間', '濃色']);
     expect(grids.map((grid) => grid.querySelectorAll('.fc-tb__tablestyle-swatch').length)).toEqual([
-      28, 28, 7,
+      21, 28, 11,
     ]);
     expect(menu.querySelectorAll('.fc-tb__tablestyle-footer')).toHaveLength(2);
 

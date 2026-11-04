@@ -240,8 +240,8 @@ describe('Spreadsheet.mountToolbar', () => {
       ).map((heading) => heading.textContent),
     ).toEqual(['淡色', '中間', '濃色']);
     expect(menuTexts('#menu-table-style-home > .fc-tb__tablestyle-footer')).toEqual([
-      '新しい表スタイル…',
-      '新しいピボットテーブル スタイル…',
+      '新しい表スタイル...',
+      '新しいピボットテーブル スタイル...',
     ]);
 
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="findHome"]')?.click();
@@ -293,7 +293,7 @@ describe('Spreadsheet.mountToolbar', () => {
       'Dark',
     ]);
     expect(grids.map((grid) => grid.querySelectorAll('.fc-tb__tablestyle-swatch').length)).toEqual([
-      28, 28, 7,
+      21, 28, 11,
     ]);
     const footerActions = Array.from(
       menu?.querySelectorAll<HTMLButtonElement>(':scope > .fc-tb__tablestyle-footer') ?? [],
@@ -308,7 +308,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(menu?.querySelector('.fc-tb__menu-icon--table-style-new')).toBeTruthy();
     expect(menu?.querySelector('.fc-tb__menu-icon--pivot-style-new')).toBeTruthy();
     const styleButton = host.querySelector<HTMLButtonElement>(
-      '[data-table-style="dark"][data-table-color="#4472c4"][data-table-variant="banded"]',
+      '[data-table-style="TableStyleDark2"]',
     );
     expect(styleButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -329,6 +329,7 @@ describe('Spreadsheet.mountToolbar', () => {
         range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
         style: 'dark',
         color: '#4472c4',
+        styleName: 'TableStyleDark2',
         banded: true,
         firstCol: false,
       },
@@ -339,7 +340,7 @@ describe('Spreadsheet.mountToolbar', () => {
       host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]'),
     );
     const activeStyleButton = host.querySelector<HTMLButtonElement>(
-      '[data-table-style="dark"][data-table-color="#4472c4"][data-table-variant="banded"]',
+      '[data-table-style="TableStyleDark2"]',
     );
     expect(activeStyleButton?.getAttribute('role')).toBe('menuitemradio');
     expect(activeStyleButton?.getAttribute('aria-checked')).toBe('true');
@@ -347,7 +348,7 @@ describe('Spreadsheet.mountToolbar', () => {
 
     // Inside the table, a gallery pick restyles it instead of creating another.
     const lightButton = host.querySelector<HTMLButtonElement>(
-      '[data-table-style="light"][data-table-color="#ed7d31"][data-table-variant="firstCol"]',
+      '[data-table-style="TableStyleLight10"]',
     );
     expect(lightButton).toBeTruthy();
     const restyle = new MouseEvent('click', { bubbles: true });
@@ -359,6 +360,7 @@ describe('Spreadsheet.mountToolbar', () => {
         range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 },
         style: 'light',
         color: '#ed7d31',
+        styleName: 'TableStyleLight10',
         // The pick changes the look only; the table keeps its own style options.
         banded: true,
         firstCol: false,

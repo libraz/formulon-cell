@@ -15,6 +15,7 @@ import {
   formatAsTableByStyleId,
   inferTableHasHeaders,
   nextTableName,
+  overlayStyleName,
   pivotTableStyleAssignment,
   tableNameError,
   tableOverlayAt,
@@ -164,18 +165,9 @@ const updateTableStylesMenu =
     const state = instance.store.getState();
     const active = state.selection.active;
     const activeTable = tableOverlayAt(state, active.sheet, active.row, active.col);
-    const activeTableVariant = activeTable
-      ? tableVariantFromOptions({
-          banded: activeTable.banded,
-          firstCol: activeTable.firstCol,
-        })
-      : null;
+    const activeStyleName = activeTable ? overlayStyleName(activeTable) : null;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-table-style]')) {
-      const activeStyle =
-        activeTable != null &&
-        button.dataset.tableStyle === activeTable.style &&
-        button.dataset.tableColor === (activeTable.color ?? DEFAULT_TABLE_COLOR) &&
-        button.dataset.tableVariant === activeTableVariant;
+      const activeStyle = activeStyleName !== null && button.dataset.tableStyle === activeStyleName;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(activeStyle));
       button.classList.toggle('fc-tb__menu-item--active', activeStyle);

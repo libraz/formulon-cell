@@ -130,6 +130,33 @@
     cursor: pointer;
   }
 
+  /* Mac: 73 x 58 pt swatch frames on a 71 x 56 pt pitch, as the app lays them
+     out; the thumbnail sits inside the frame so hover fills the ring around it. */
+  [data-fc-platform="mac"] .fc-tb__tablestyle-grid {
+    grid-template-columns: repeat(7, 71px);
+    grid-auto-rows: 56px;
+    gap: 0;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__tablestyle-swatch {
+    position: relative;
+    width: 73px;
+    height: 58px;
+    margin: -1px;
+    padding: 3px;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+  }
+
+  [data-fc-platform="mac"] .fc-tb__tablestyle-swatch::after {
+    position: absolute;
+    inset: 2px;
+    border: 1px solid #222222;
+    content: "";
+    pointer-events: none;
+  }
+
   .fc-tb__tablestyle-swatch__head {
     flex: 0 0 9px;
   }
