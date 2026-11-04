@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -25,14 +25,22 @@ export const moveTargetRange = (src: Range, topLeft: { row: number; col: number 
   c1: topLeft.col + (src.c1 - src.c0),
 });
 
+/** Whether `range` lies entirely inside the sheet grid. */
+export const moveTargetFits = (range: Range): boolean => range.r1 <= MAX_ROW && range.c1 <= MAX_COL;
+
 /** Whether `dest` holds a value or formula outside `src`. */
 const overwritesData = (state: State, src: Range, dest: Range): boolean => {
-  for (let row = dest.r0; row <= dest.r1; row += 1) {
-    for (let col = dest.c0; col <= dest.c1; col += 1) {
-      if (row >= src.r0 && row <= src.r1 && col >= src.c0 && col <= src.c1) continue;
-      const cell = state.data.cells.get(addrKey({ sheet: dest.sheet, row, col }));
-      if (cell && (cell.formula !== null || cell.value.kind !== 'blank')) return true;
+  for (const [key, cell] of state.data.cells) {
+    if (cell.formula === null && cell.value.kind === 'blank') continue;
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== dest.sheet) continue;
+    if (addr.row < dest.r0 || addr.row > dest.r1 || addr.col < dest.c0 || addr.col > dest.c1) {
+      continue;
     }
+    if (addr.row >= src.r0 && addr.row <= src.r1 && addr.col >= src.c0 && addr.col <= src.c1) {
+      continue;
+    }
+    return true;
   }
   return false;
 };
@@ -53,6 +61,7 @@ export async function moveSelectionTo(
   const src = state.selection.range;
   const dest = moveTargetRange(src, topLeft);
   if (dest.r0 === src.r0 && dest.c0 === src.c0) return false;
+  if (!moveTargetFits(dest)) return false;
   if (overwritesData(state, src, dest) && !(await deps.confirmOverwrite())) return false;
 
   const current = store.getState();

@@ -426,10 +426,14 @@ const buildSortMenuAction =
       runAfterAllowedRangeUnlock(instance.store, [range], () => {
         instance.history.begin();
         try {
-          removeDuplicates(instance.store.getState(), instance.store, instance.workbook, range, {
-            columns: result.columns.map(Number),
-            hasHeader: result.hasHeader,
-          });
+          removeDuplicates(
+            instance.store.getState(),
+            instance.store,
+            instance.workbook,
+            range,
+            { columns: result.columns.map(Number), hasHeader: result.hasHeader },
+            instance.history,
+          );
         } finally {
           instance.history.end();
         }

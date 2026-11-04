@@ -1,4 +1,4 @@
-import { addrKey, MAX_COL } from '../engine/address.js';
+import { addrKey, colLetter, MAX_COL } from '../engine/address.js';
 import { createProfileTextSemantics, localeForWorkbook } from '../engine/profile-text-semantics.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { fromEngineValue, writeCell } from '../engine/value.js';
@@ -167,19 +167,8 @@ const sortArea = (range: Range, startRow: number): number =>
 const canRewriteExactRange = (range: Range, startRow = range.r0): boolean =>
   sortArea(range, startRow) <= MAX_SORT_CELLS;
 
-const columnName = (column: number): string => {
-  let n = column + 1;
-  let out = '';
-  while (n > 0) {
-    const digit = (n - 1) % 26;
-    out = String.fromCharCode(65 + digit) + out;
-    n = Math.floor((n - 1) / 26);
-  }
-  return out;
-};
-
 const absoluteColumnRange = (column: number, firstRow: number, lastRow: number): string => {
-  const name = columnName(column);
+  const name = colLetter(column);
   return `$${name}$${firstRow + 1}:$${name}$${lastRow + 1}`;
 };
 
@@ -380,19 +369,21 @@ const customListIndex = (value: string, lists: readonly (readonly string[])[]): 
   return null;
 };
 
+interface CellSortKey {
+  kind: SortValueKind;
+  n?: number;
+  s?: string;
+  match?: boolean;
+  customIndex?: number | null;
+}
+
 const sortKeyForCell = (
   state: State,
   sheet: number,
   row: number,
   key: SortKey,
   builtInLists: readonly (readonly string[])[],
-): {
-  kind: SortValueKind;
-  n?: number;
-  s?: string;
-  match?: boolean;
-  customIndex?: number | null;
-} => {
+): CellSortKey => {
   const sortOn = key.sortOn ?? 'value';
   if (sortOn === 'cellColor' || sortOn === 'fontColor') {
     const fmt = state.format.formats.get(addrKey({ sheet, row, col: key.byCol }));
@@ -423,20 +414,8 @@ const sortKeyForCell = (
 };
 
 const compareSortKeys = (
-  a: {
-    kind: SortValueKind;
-    n?: number;
-    s?: string;
-    match?: boolean;
-    customIndex?: number | null;
-  },
-  b: {
-    kind: SortValueKind;
-    n?: number;
-    s?: string;
-    match?: boolean;
-    customIndex?: number | null;
-  },
+  a: CellSortKey,
+  b: CellSortKey,
   direction: SortDirection,
   compareText: (left: string, right: string) => number,
 ): number => {
@@ -541,6 +520,53 @@ export function inferSortHasHeader(state: State, range: Range): boolean {
   );
 }
 
+interface PlacedFormat {
+  addr: Addr;
+  format: CellFormat;
+}
+
+/** Replace the formats of `affected` with `placed`, keep the engine's comments
+ *  in step, and record both as undoable changes. `state` carries the formats
+ *  as they were before the rewrite. */
+const rewriteRangeFormats = (
+  state: State,
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  affected: readonly Addr[],
+  placed: readonly PlacedFormat[],
+): void => {
+  const commentTargets = new Map<string, Addr>();
+  const rememberComment = (addr: Addr, format: CellFormat | undefined): void => {
+    if (typeof format?.comment !== 'string' || format.comment.length === 0) return;
+    commentTargets.set(addrKey(addr), addr);
+  };
+  for (const addr of affected) rememberComment(addr, state.format.formats.get(addrKey(addr)));
+  for (const { addr, format } of placed) rememberComment(addr, format);
+  const applyFormats = (): void => {
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      for (const addr of affected) formats.delete(addrKey(addr));
+      for (const { addr, format } of placed) formats.set(addrKey(addr), format);
+      return { ...s, format: { ...s.format, formats } };
+    });
+    for (const addr of commentTargets.values()) {
+      const format = store.getState().format.formats.get(addrKey(addr));
+      wb.setCommentEntry(
+        addr.sheet,
+        addr.row,
+        addr.col,
+        format?.commentAuthor ?? DEFAULT_COMMENT_AUTHOR,
+        format?.comment ?? '',
+        format?.commentVisible === true,
+      );
+    }
+  };
+  recordFormatChange(history, store, () => {
+    recordCommentChange(history, store, wb, [...commentTargets.values()], applyFormats);
+  });
+};
+
 /** Sort the rows of `range` in place by the values in `byCol`. Writes the
  *  resulting cells back through `wb`. Ascending value order is number, text,
  *  bool, error, blank; blanks stay last for either direction. */
@@ -583,13 +609,7 @@ export function sortRange(
       col: number;
       format?: CellFormat;
     }>;
-    sortKeys: Array<{
-      kind: SortValueKind;
-      n?: number;
-      s?: string;
-      match?: boolean;
-      customIndex?: number | null;
-    }>;
+    sortKeys: CellSortKey[];
   }
   const snaps: { row: number; snap: RowSnap }[] = [];
   for (let r = start; r <= range.r1; r += 1) {
@@ -659,52 +679,19 @@ export function sortRange(
       affected.push({ sheet: range.sheet, row: r, col: c });
     }
   }
-  const commentTargets = new Map<string, Addr>();
-  const rememberComment = (addr: Addr, format: CellFormat | undefined): void => {
-    if (typeof format?.comment !== 'string' || format.comment.length === 0) return;
-    commentTargets.set(addrKey(addr), addr);
-  };
-  for (const addr of affected) {
-    rememberComment(addr, state.format.formats.get(addrKey(addr)));
-  }
+  const placed: PlacedFormat[] = [];
   for (let i = 0; i < snaps.length; i += 1) {
-    const dstRow = start + i;
     const snap = snaps[i]?.snap;
     if (!snap) continue;
     for (const cell of snap.cells) {
-      rememberComment({ sheet: range.sheet, row: dstRow, col: cell.col }, cell.format);
+      if (!cell.format) continue;
+      placed.push({
+        addr: { sheet: range.sheet, row: start + i, col: cell.col },
+        format: cell.format,
+      });
     }
   }
-  const applyFormats = (): void => {
-    store.setState((s) => {
-      const formats = new Map(s.format.formats);
-      for (const addr of affected) formats.delete(addrKey(addr));
-      for (let i = 0; i < snaps.length; i += 1) {
-        const dstRow = start + i;
-        const snap = snaps[i]?.snap;
-        if (!snap) continue;
-        for (const cell of snap.cells) {
-          if (!cell.format) continue;
-          formats.set(addrKey({ sheet: range.sheet, row: dstRow, col: cell.col }), cell.format);
-        }
-      }
-      return { ...s, format: { ...s.format, formats } };
-    });
-    for (const addr of commentTargets.values()) {
-      const format = store.getState().format.formats.get(addrKey(addr));
-      wb.setCommentEntry(
-        addr.sheet,
-        addr.row,
-        addr.col,
-        format?.commentAuthor ?? DEFAULT_COMMENT_AUTHOR,
-        format?.comment ?? '',
-        format?.commentVisible === true,
-      );
-    }
-  };
-  recordFormatChange(history, store, () => {
-    recordCommentChange(history, store, wb, [...commentTargets.values()], applyFormats);
-  });
+  rewriteRangeFormats(state, store, wb, history, affected, placed);
   wb.recalcAuto();
   const filterRange = filterRangeForSort(store.getState(), range, opts.hasHeader === true);
   if (filterRange) {
@@ -723,6 +710,7 @@ export function removeDuplicates(
   wb: WorkbookHandle,
   range: Range,
   options: RemoveDuplicatesOptions = {},
+  history: History | null = null,
 ): number {
   if (rangeArea(range) > MAX_SORT_CELLS) return 0;
   if (rangeIntersectsMerges(state, range)) return 0;
@@ -760,13 +748,15 @@ export function removeDuplicates(
           else sig.push('blank:');
         }
       }
-      const key = sig.join('');
+      const key = JSON.stringify(sig);
       if (seen.has(key)) continue;
       seen.add(key);
       keep.push(r);
     }
   }
   if (keep.length === range.r1 - range.r0 + 1) return 0;
+
+  state = hydrateSortComments(store, wb, range, range.r0);
 
   // Snapshot kept rows then rewrite from r0.
   interface RowSnap {
@@ -808,28 +798,24 @@ export function removeDuplicates(
       }
     }
   });
-  store.setState((s) => {
-    const formats = new Map(s.format.formats);
-    for (let r = range.r0; r <= range.r1; r += 1) {
-      for (let c = range.c0; c <= range.c1; c += 1) {
-        formats.delete(addrKey({ sheet: range.sheet, row: r, col: c }));
-      }
+  const affected: Addr[] = [];
+  for (let r = range.r0; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1)
+      affected.push({ sheet: range.sheet, row: r, col: c });
+  }
+  const placed: PlacedFormat[] = [];
+  for (let i = 0; i < snaps.length; i += 1) {
+    const cells = snaps[i]?.cells ?? [];
+    for (let offset = 0; offset < cells.length; offset += 1) {
+      const format = cells[offset]?.format;
+      if (!format) continue;
+      placed.push({
+        addr: { sheet: range.sheet, row: range.r0 + i, col: range.c0 + offset },
+        format,
+      });
     }
-    for (let i = 0; i < snaps.length; i += 1) {
-      const dstRow = range.r0 + i;
-      const snap = snaps[i];
-      if (!snap) continue;
-      for (let offset = 0; offset < snap.cells.length; offset += 1) {
-        const cell = snap.cells[offset];
-        if (!cell?.format) continue;
-        formats.set(
-          addrKey({ sheet: range.sheet, row: dstRow, col: range.c0 + offset }),
-          cell.format,
-        );
-      }
-    }
-    return { ...s, format: { ...s.format, formats } };
-  });
+  }
+  rewriteRangeFormats(state, store, wb, history, affected, placed);
   // Clear tail rows that were dropped.
   wb.withBatchedRecalc(() => {
     for (let r = range.r0 + snaps.length; r <= range.r1; r += 1) {

@@ -1,4 +1,4 @@
-import { formatA1Range } from '../engine/address.js';
+import { addrKey, formatA1Range } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
@@ -57,7 +57,7 @@ const MAX_AUTOSUM_SELECTION_CELLS = 100_000;
 
 const isNum = (state: State, sheet: number, row: number, col: number): boolean => {
   if (row < 0 || col < 0) return false;
-  const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
+  const cell = state.data.cells.get(addrKey({ sheet, row, col }));
   return !!cell && cell.value.kind === 'number';
 };
 
@@ -65,7 +65,7 @@ const isEmpty = (state: State, sheet: number, row: number, col: number): boolean
   if (row < 0 || col < 0) return false;
   const merge = mergeAt(state, { sheet, row, col });
   if (merge && (merge.r0 !== row || merge.c0 !== col)) return false;
-  const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
+  const cell = state.data.cells.get(addrKey({ sheet, row, col }));
   return !cell || cell.value.kind === 'blank';
 };
 
@@ -135,6 +135,8 @@ const canWriteFormula = (state: State, addr: Addr): boolean => {
   return false;
 };
 
+export type AutoSumFunction = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN';
+
 /**
  * the spreadsheet's Σ button. Decides where a SUM formula belongs based on the current
  * selection and writes it. Returns the inserted location + formula (when
@@ -158,8 +160,6 @@ const canWriteFormula = (state: State, addr: Addr): boolean => {
  *   - Otherwise, place `=SUM(<range>)` directly below the range, or to
  *     its right when below is occupied.
  */
-export type AutoSumFunction = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN';
-
 export function autoSum(
   state: State,
   wb: WorkbookHandle,
@@ -191,7 +191,13 @@ export function autoSum(
       while (isNum(state, sheet, bottom + 1, a.col)) bottom += 1;
       const colTarget: Addr = { sheet, row: bottom + 1, col: a.col };
       if (isEmpty(state, sheet, colTarget.row, colTarget.col)) {
-        const formula = `=${fn}(${formatA1Range({ r0: top, c0: a.col, r1: bottom, c1: a.col }, { collapse: false })})`;
+        const formula = aggregateFormula(state, fn, {
+          sheet,
+          r0: top,
+          c0: a.col,
+          r1: bottom,
+          c1: a.col,
+        });
         if (canWriteFormula(state, colTarget)) {
           wb.setFormula(colTarget, formula);
           return { addr: colTarget, formula };
@@ -204,7 +210,13 @@ export function autoSum(
       while (isNum(state, sheet, a.row, right + 1)) right += 1;
       const rowTarget: Addr = { sheet, row: a.row, col: right + 1 };
       if (isEmpty(state, sheet, rowTarget.row, rowTarget.col)) {
-        const formula = `=${fn}(${formatA1Range({ r0: a.row, c0: left, r1: a.row, c1: right }, { collapse: false })})`;
+        const formula = aggregateFormula(state, fn, {
+          sheet,
+          r0: a.row,
+          c0: left,
+          r1: a.row,
+          c1: right,
+        });
         if (canWriteFormula(state, rowTarget)) {
           wb.setFormula(rowTarget, formula);
           return { addr: rowTarget, formula };
@@ -233,7 +245,13 @@ export function autoSum(
     if (!canWriteFormula(state, target)) continue;
     let top = lastNumRow;
     while (top - 1 >= r.r0 && isNum(state, sheet, top - 1, col)) top -= 1;
-    const formula = `=${fn}(${formatA1Range({ r0: top, c0: col, r1: lastNumRow, c1: col }, { collapse: false })})`;
+    const formula = aggregateFormula(state, fn, {
+      sheet,
+      r0: top,
+      c0: col,
+      r1: lastNumRow,
+      c1: col,
+    });
     colWrites.push({ addr: target, formula });
   }
 
@@ -254,7 +272,13 @@ export function autoSum(
     if (!canWriteFormula(state, target)) continue;
     let left = lastNumCol;
     while (left - 1 >= r.c0 && isNum(state, sheet, row, left - 1)) left -= 1;
-    const formula = `=${fn}(${formatA1Range({ r0: row, c0: left, r1: row, c1: lastNumCol }, { collapse: false })})`;
+    const formula = aggregateFormula(state, fn, {
+      sheet,
+      r0: row,
+      c0: left,
+      r1: row,
+      c1: lastNumCol,
+    });
     rowWrites.push({ addr: target, formula });
   }
   // With a totals row and a totals column both inside the selection, the
@@ -270,7 +294,13 @@ export function autoSum(
     isEmpty(state, sheet, corner.row, corner.col) &&
     isCellWritable(state, corner)
   ) {
-    const formula = `=${fn}(${formatA1Range({ r0: r.r1, c0: first.addr.col, r1: r.r1, c1: last.addr.col }, { collapse: false })})`;
+    const formula = aggregateFormula(state, fn, {
+      sheet,
+      r0: r.r1,
+      c0: first.addr.col,
+      r1: r.r1,
+      c1: last.addr.col,
+    });
     rowWrites.push({ addr: corner, formula });
   }
   const writes = [...colWrites, ...rowWrites];
@@ -279,14 +309,13 @@ export function autoSum(
     return writes[0] ?? null;
   }
 
-  const ref = formatA1Range(r, { collapse: false });
   const candidates: Addr[] = [
     { sheet, row: r.r1 + 1, col: r.c0 }, // directly below
     { sheet, row: r.r0, col: r.c1 + 1 }, // directly to the right
   ];
   for (const t of candidates) {
     if (isEmpty(state, sheet, t.row, t.col)) {
-      const formula = `=${fn}(${ref})`;
+      const formula = aggregateFormula(state, fn, r);
       if (!canWriteFormula(state, t)) continue;
       wb.setFormula(t, formula);
       return { addr: t, formula };

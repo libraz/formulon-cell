@@ -1,6 +1,7 @@
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import { findDependents, findPrecedents } from '../engine/refs-graph.js';
 import type { Addr, Range } from '../engine/types.js';
+import { ERROR_LITERALS } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells, validationAt } from '../store/range-validations.js';
 import { visibleRowSegments } from '../store/row-visibility.js';
@@ -57,23 +58,6 @@ export type GoToSpecialResult =
 /** Largest number of cells a search may select. */
 export const MAX_GOTO_SPECIAL_CELLS = 100_000;
 
-/** Spreadsheet error sentinels — the strings that can appear in a `text` value via
- *  user input or pasted data. The engine returns `kind: 'error'` for live
- *  formula errors, so we match both. Anything outside this list (e.g. a
- *  literal `#TODO!`) is treated as plain text. */
-const ERROR_SENTINELS: ReadonlySet<string> = new Set([
-  '#NULL!',
-  '#DIV/0!',
-  '#VALUE!',
-  '#REF!',
-  '#NAME?',
-  '#NUM!',
-  '#N/A',
-  '#GETTING_DATA',
-  '#SPILL!',
-  '#CALC!',
-]);
-
 type CellValue = ReturnType<WorkbookHandle['getValue']>;
 
 interface CellEntry {
@@ -94,7 +78,8 @@ interface SearchContext {
   wb: WorkbookHandle;
   state: State;
   sheet: number;
-  entries: CellEntry[];
+  /** Every populated cell of the sheet; read on first use. */
+  readonly entries: readonly CellEntry[];
   /** Selection rectangles on the active sheet. */
   selected: Range[];
   /** True when the selection is one cell, so the search widens to the sheet. */
@@ -202,11 +187,11 @@ const matchesKind = (
       return value.kind === 'number';
     case 'text':
       // Plain text cells, but not spreadsheet error sentinels masquerading as text.
-      return value.kind === 'text' && !ERROR_SENTINELS.has(value.value);
+      return value.kind === 'text' && !ERROR_LITERALS.has(value.value);
     case 'errors':
       if (value.kind === 'error') return true;
       // Some engines surface error sentinels as text. Treat as error too.
-      return value.kind === 'text' && ERROR_SENTINELS.has(value.value);
+      return value.kind === 'text' && ERROR_LITERALS.has(value.value);
     default:
       return false;
   }
@@ -223,7 +208,7 @@ const valueMatchesFilters = (
     case 'bool':
       return filters.logical === true;
     case 'text':
-      return ERROR_SENTINELS.has(value.value) ? filters.errors === true : filters.text === true;
+      return ERROR_LITERALS.has(value.value) ? filters.errors === true : filters.text === true;
     case 'error':
       return filters.errors === true;
     default:
@@ -477,11 +462,15 @@ export function findMatchingRanges(
     (r) => r.sheet === sheet,
   );
   const only = selected.length === 1 ? (selected[0] as Range) : null;
+  let entries: CellEntry[] | undefined;
   const ctx: SearchContext = {
     wb,
     state,
     sheet,
-    entries: [...wb.cells(sheet)],
+    get entries() {
+      entries ??= [...wb.cells(sheet)];
+      return entries;
+    },
     selected,
     single: only !== null && only.r0 === only.r1 && only.c0 === only.c1,
     options,

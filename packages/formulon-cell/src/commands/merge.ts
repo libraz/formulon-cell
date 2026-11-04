@@ -2,6 +2,7 @@ import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { sameAddr } from '../store/direct-format.js';
 import { rangeArea, rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
 import {
   type CellBorderSide,
@@ -47,10 +48,6 @@ const isValidRangeCoordinates = (range: Range): boolean =>
   Number.isInteger(range.r1) &&
   Number.isInteger(range.c0) &&
   Number.isInteger(range.c1) &&
-  Number.isFinite(range.r0) &&
-  Number.isFinite(range.r1) &&
-  Number.isFinite(range.c0) &&
-  Number.isFinite(range.c1) &&
   range.r0 >= 0 &&
   range.r1 >= 0 &&
   range.c0 >= 0 &&
@@ -165,9 +162,6 @@ const contentCellsInRange = (
   cells.sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
   return cells;
 };
-
-const sameAddr = (a: Addr, b: Addr): boolean =>
-  a.sheet === b.sheet && a.row === b.row && a.col === b.col;
 
 /** Visual fields that Excel carries from the upper-left cell to every cell
  *  covered by a merge. Perimeter and uniform diagonal borders are normalized
@@ -435,12 +429,8 @@ export function applyMerge(
 
     recordFormatChange(history, store, () => copyMergeVisualFormats(store, effective));
 
-    for (let r = effective.r0; r <= effective.r1; r += 1) {
-      for (let c = effective.c0; c <= effective.c1; c += 1) {
-        if (r === effective.r0 && c === effective.c0) continue;
-        const cell = stateBefore.data.cells.get(addrKey({ sheet, row: r, col: c }));
-        if (hasContent(cell)) wb.setBlank({ sheet, row: r, col: c });
-      }
+    for (const { addr } of content) {
+      if (!sameAddr(addr, anchor)) wb.setBlank(addr);
     }
     recordMergesChangeWithEngine(history, store, wb, sheet, () => {
       mutators.mergeRange(store, effective);

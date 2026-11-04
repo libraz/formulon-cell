@@ -102,7 +102,7 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   const pivotPlan = planPivotSelection(workbook, store.getState().selection);
   // A host policy that restricts which cells are editable cannot vouch for a
   // whole report, so only an unrestricted clear may remove one.
-  const mayDeletePivots =
+  const mayDeleteObjects =
     !commands?.policy ||
     (operationPermission(commands.policy, 'clear') && !commands.policy.editable);
   const rejectPivotEdit = (): ChangeBatchResult => {
@@ -114,11 +114,11 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
       revision: commands?.revision ?? 0,
     };
   };
-  if (pivotPlan.partial || (pivotPlan.whole.length > 0 && !mayDeletePivots)) {
+  if (pivotPlan.partial || (pivotPlan.whole.length > 0 && !mayDeleteObjects)) {
     return rejectPivotEdit();
   }
   const dataTablePlan = planDataTableSelection(workbook, store.getState().selection);
-  if (dataTablePlan.partial || (dataTablePlan.whole.length > 0 && !mayDeletePivots)) {
+  if (dataTablePlan.partial || (dataTablePlan.whole.length > 0 && !mayDeleteObjects)) {
     alertDataTableEdit(workbook);
     return {
       status: 'rejected',
@@ -132,9 +132,6 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
   // selection undo together.
   const history = options.history && !options.history.isReplaying() ? options.history : null;
   const txn = removesObjects ? history?.begin() : undefined;
-  if (dataTablePlan.whole.length > 0) {
-    deleteDataTables({ store, workbook, history }, dataTablePlan.whole);
-  }
   if (pivotPlan.whole.length > 0) {
     const removed = deletePivotTables(
       { store, workbook, history },
@@ -142,9 +139,12 @@ export const clearSelectedContents = (options: ClearSelectedContentsOptions): Ch
       pivotPlan.whole,
     );
     if (!removed) {
-      if (history && txn) history.end(txn);
+      if (history && txn) history.abort(txn);
       return rejectPivotEdit();
     }
+  }
+  if (dataTablePlan.whole.length > 0) {
+    deleteDataTables({ store, workbook, history }, dataTablePlan.whole);
   }
   const cleared = clearCollectedContents(options, commands);
   if (history && txn) {

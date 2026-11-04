@@ -26,6 +26,12 @@ const ERROR_NAME: Readonly<Record<number, string>> = {
   16: '#UNKNOWN!',
 };
 
+/** Every error literal a cell can display: the engine's error names plus `#CIRCULAR!`. */
+export const ERROR_LITERALS: ReadonlySet<string> = new Set([
+  ...Object.values(ERROR_NAME),
+  '#CIRCULAR!',
+]);
+
 const BLANK: CellValue = { kind: 'blank' };
 
 const localeLanguage = (locale: string): string =>

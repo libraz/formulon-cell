@@ -3,6 +3,7 @@ import { effectiveCellFormat } from '../engine/cell-format-projection.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { ERROR_LITERALS } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeValidationCells } from '../store/range-validations.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
@@ -13,20 +14,9 @@ import type { History } from './history.js';
 import { formatA1FormulaAsR1C1 } from './refs.js';
 import { cellValueViolatesValidation } from './validate.js';
 
-const ERROR_SENTINELS: ReadonlySet<string> = new Set([
-  '#DIV/0!',
-  '#NAME?',
-  '#REF!',
-  '#VALUE!',
-  '#NUM!',
-  '#N/A',
-  '#NULL!',
-  '#CIRCULAR!',
-]);
-
 export function cellValueIsFormulaError(value: CellValue): boolean {
   if (value.kind === 'error') return true;
-  if (value.kind === 'text') return ERROR_SENTINELS.has(value.value);
+  if (value.kind === 'text') return ERROR_LITERALS.has(value.value);
   return false;
 }
 

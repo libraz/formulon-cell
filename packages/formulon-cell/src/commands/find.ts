@@ -401,21 +401,18 @@ export function findNext(
     return pick ? { addr: pick.addr } : null;
   }
   const byRows = opts.searchBy !== 'columns';
-  const fromKey =
-    from.sheet * 1_000_000_000_000 +
-    (byRows ? from.row * 1_000_000 + from.col : from.col * 1_000_000 + from.row);
-  const matchKey = (a: Addr): number =>
-    a.sheet * 1_000_000_000_000 + (byRows ? a.row * 1_000_000 + a.col : a.col * 1_000_000 + a.row);
+  const compare = (a: Addr, b: Addr): number =>
+    a.sheet - b.sheet || (byRows ? a.row - b.row || a.col - b.col : a.col - b.col || a.row - b.row);
 
   if (direction === 'next') {
-    const ahead = matches.find((m) => matchKey(m.addr) > fromKey);
+    const ahead = matches.find((m) => compare(m.addr, from) > 0);
     const pick = ahead ?? matches[0];
     return pick ? { addr: pick.addr } : null;
   }
   // prev
   let behind: CellEntry | null = null;
   for (const m of matches) {
-    if (matchKey(m.addr) < fromKey) behind = m;
+    if (compare(m.addr, from) < 0) behind = m;
     else break;
   }
   const pick = behind ?? matches[matches.length - 1];
@@ -426,12 +423,28 @@ export function findNext(
  * replacement. Keeping this projection in the command module prevents the
  * dialog from falling back to the browser's English formatter. */
 export function displayTextForFindMatch(state: State, addr: Addr, opts: FindOptions): string {
+  return findDisplayResolver(state, opts)(addr);
+}
+
+/** `displayTextForFindMatch` for many addresses: the comment/note lookup is
+ *  built once, not per address. */
+export function findDisplayResolver(state: State, opts: FindOptions): (addr: Addr) => string {
   const lookIn = opts.lookIn ?? 'values';
   if (lookIn === 'comments' || lookIn === 'notes') {
     const entries =
       lookIn === 'comments' ? threadedCommentCells(state, opts) : notesForSearch(state, opts);
-    return entries.find((entry) => addrKey(entry.addr) === addrKey(addr))?.display ?? '';
+    const byKey = new Map(entries.map((entry) => [addrKey(entry.addr), entry.display]));
+    return (addr) => byKey.get(addrKey(addr)) ?? '';
   }
+  return (addr) => cellDisplayText(state, addr, opts, lookIn);
+}
+
+function cellDisplayText(
+  state: State,
+  addr: Addr,
+  opts: FindOptions,
+  lookIn: NonNullable<FindOptions['lookIn']>,
+): string {
   const cell = state.data.cells.get(addrKey(addr));
   if (cell) return cellDisplayForSearch(cell, addr, opts);
 
@@ -458,7 +471,7 @@ export function displayTextForFindMatch(state: State, addr: Addr, opts: FindOpti
 
 /** `source` with every text the query finds replaced, or the whole text on
  *  an entire-cell match. Text outside the matches stays verbatim. */
-function substitute(source: string, opts: FindOptions, replacement: string): string {
+export function applySubstitution(source: string, opts: FindOptions, replacement: string): string {
   if (opts.query === '') return source;
   const pattern = queryPattern(opts);
   const folded = foldText(source, opts.caseSensitive ?? false);
@@ -509,9 +522,10 @@ export function replaceAll(
   if (opts.query === '' || (opts.lookIn ?? 'values') === 'comments' || opts.lookIn === 'notes') {
     return 0;
   }
-  const matches = findAll(state, opts).filter(
-    (m) => opts.lookIn === 'formulas' || wb.cellFormula(m.addr) === null,
-  );
+  const matches = findAll(state, opts).flatMap((m) => {
+    const formula = wb.cellFormula(m.addr);
+    return opts.lookIn === 'formulas' || formula === null ? [{ addr: m.addr, formula }] : [];
+  });
   // Refuse the whole replacement up front rather than stopping partway.
   if (
     blockDataTableCells(
@@ -525,7 +539,7 @@ export function replaceAll(
   // replacement separate, so a batched recalc cannot turn one into the other.
   wb.withBatchedRecalc(() => {
     for (const m of matches) {
-      const formula = wb.cellFormula(m.addr);
+      const { formula } = m;
       if (!isCellWritable(state, m.addr)) {
         warnProtected(m.addr);
         continue;
@@ -534,17 +548,11 @@ export function replaceAll(
         opts.lookIn === 'formulas' && formula !== null
           ? formulaDisplay(formula, opts)
           : workbookDisplay(wb, m.addr, valueDisplay(wb.getValue(m.addr), opts));
-      const next = substitute(cur, opts, replacement);
+      const next = applySubstitution(cur, opts, replacement);
       if (next === cur) continue;
       writeInput(wb, m.addr, next, store, opts.locale);
       count += 1;
     }
   });
   return count;
-}
-
-/** Compute the substituted display string for a single match. Exposed for the
- *  overlay so it can apply per-match replacements with consistent semantics. */
-export function applySubstitution(source: string, opts: FindOptions, replacement: string): string {
-  return substitute(source, opts, replacement);
 }

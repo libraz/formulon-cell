@@ -5,6 +5,7 @@ import {
   type FindMatch,
   type FindOptions,
   findAll,
+  findDisplayResolver,
   replaceAll,
   replaceOne,
 } from '../commands/find.js';
@@ -369,11 +370,12 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     const t = copy();
     const all = matchesForNavigation(store.getState(), opts());
     resultsBody.replaceChildren();
+    const displayOf = findDisplayResolver(store.getState(), opts());
     for (const match of all) {
       const tr = document.createElement('tr');
       tr.tabIndex = 0;
       const sheetName = wb.sheetName(match.addr.sheet);
-      const value = displayTextForFindMatch(store.getState(), match.addr, opts());
+      const value = displayOf(match.addr);
       tr.append(td(sheetName), td(addrLabel(match.addr)), td(value));
       tr.addEventListener('click', () => {
         if (activateMatch(match)) {
