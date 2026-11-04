@@ -18,33 +18,35 @@ export function writeSnapshotIntoInsertedRange(
   origin: Addr,
 ): void {
   const formatWrites: { key: string; format: CellFormat | null }[] = [];
-  for (let r = 0; r < snapshot.rows; r += 1) {
-    for (let c = 0; c < snapshot.cols; c += 1) {
-      const src = snapshot.cells[r]?.[c];
-      if (!src) continue;
-      const addr: Addr = { sheet: origin.sheet, row: origin.row + r, col: origin.col + c };
-      if (!isCellWritable(store.getState(), addr)) continue;
-      if (src.formula) {
-        const formula =
-          snapshot.mode === 'cut'
-            ? src.formula
-            : shiftFormulaRefs(
-                src.formula,
-                addr.row - (snapshot.range.r0 + r),
-                addr.col - (snapshot.range.c0 + c),
-              );
-        wb.setFormula(addr, formula);
-      } else {
-        writeCell(wb, addr, src.value, null);
+  wb.withBatchedRecalc(() => {
+    for (let r = 0; r < snapshot.rows; r += 1) {
+      for (let c = 0; c < snapshot.cols; c += 1) {
+        const src = snapshot.cells[r]?.[c];
+        if (!src) continue;
+        const addr: Addr = { sheet: origin.sheet, row: origin.row + r, col: origin.col + c };
+        if (!isCellWritable(store.getState(), addr)) continue;
+        if (src.formula) {
+          const formula =
+            snapshot.mode === 'cut'
+              ? src.formula
+              : shiftFormulaRefs(
+                  src.formula,
+                  addr.row - (snapshot.range.r0 + r),
+                  addr.col - (snapshot.range.c0 + c),
+                );
+          wb.setFormula(addr, formula);
+        } else {
+          writeCell(wb, addr, src.value, null);
+        }
+        formatWrites.push({
+          key: addrKey(addr),
+          format: src.format
+            ? { ...src.format, borders: src.format.borders ? { ...src.format.borders } : undefined }
+            : null,
+        });
       }
-      formatWrites.push({
-        key: addrKey(addr),
-        format: src.format
-          ? { ...src.format, borders: src.format.borders ? { ...src.format.borders } : undefined }
-          : null,
-      });
     }
-  }
+  });
   if (formatWrites.length === 0) return;
   recordFormatChange(history, store, () => {
     store.setState((s) => {

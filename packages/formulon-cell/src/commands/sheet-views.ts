@@ -1,5 +1,6 @@
 import type { Range } from '../engine/types.js';
 import { frozenColEnd, frozenRowEnd } from '../store/freeze-band.js';
+import { cloneRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import type { History } from './history.js';
 
@@ -54,8 +55,6 @@ export interface SheetViewSnapshotInput {
   hiddenCols: ReadonlySet<number>;
   sort?: SheetViewSort;
 }
-
-const cloneRange = (range: Range): Range => ({ ...range });
 
 const cloneFilterCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCriteria[] =>
   criteria.map((criterion) => ({

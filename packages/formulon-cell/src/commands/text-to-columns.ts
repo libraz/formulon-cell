@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import { escapeRegExp } from '../text-escape.js';
 import { rememberTextToColumnsDelimiters } from './clipboard/paste-delimiters.js';
 import { coerceInputForCell, inputLocaleForWorkbook, writeCoerced } from './coerce-input.js';
 import { blockDataTableEdit } from './data-table-guard.js';
@@ -19,8 +20,6 @@ export interface TextToColumnsOptions {
   /** Character positions that start a new column; when set, delimiters are ignored. */
   fixedBreaks?: readonly number[];
 }
-
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const splitText = (
   value: string,

@@ -1,5 +1,6 @@
 import { formatNumber } from '../../commands/format.js';
 import type { CellValue } from '../../engine/types.js';
+import { escapeRegExp } from '../../text-escape.js';
 import {
   booleanValue,
   nonNegativeInteger,
@@ -7,7 +8,7 @@ import {
   readNumber,
   textValue,
 } from './coercion.js';
-import { escapeRegExp } from './matching.js';
+import { wildcardPattern } from './matching.js';
 import { FORMULA_VALUE_NUMBER_LITERAL } from './parser.js';
 
 const concatTextValue = (value: CellValue): string =>
@@ -42,12 +43,13 @@ const searchText = (
       ? { kind: 'number', value: index + 1 }
       : { kind: 'error', code: 15, text: '#VALUE!' };
   }
-  const wildcard = fn === 'SEARCH' ? searchWildcardPattern(searchNeedle) : null;
+  const wildcard = fn === 'SEARCH' ? wildcardPattern(searchNeedle, 'search') : null;
   if (wildcard) {
-    for (let index = start; index <= searchHaystack.length; index += 1) {
-      if (wildcard.test(searchHaystack.slice(index))) return { kind: 'number', value: index + 1 };
-    }
-    return { kind: 'error', code: 15, text: '#VALUE!' };
+    wildcard.lastIndex = start;
+    const found = wildcard.exec(searchHaystack);
+    return found
+      ? { kind: 'number', value: found.index + 1 }
+      : { kind: 'error', code: 15, text: '#VALUE!' };
   }
   const index = searchHaystack.indexOf(searchNeedle, start);
   return index >= 0
@@ -72,35 +74,6 @@ const searchLiteralPattern = (criteria: string): string | null => {
     out += ch;
   }
   return hasEscape ? out : null;
-};
-const searchWildcardPattern = (criteria: string): RegExp | null => {
-  let pattern = '^';
-  let hasWildcard = false;
-  for (let i = 0; i < criteria.length; i += 1) {
-    const ch = criteria[i] ?? '';
-    if (ch === '~') {
-      const next = criteria[i + 1];
-      if (next === '*' || next === '?' || next === '~') {
-        pattern += escapeRegExp(next);
-        i += 1;
-      } else {
-        pattern += escapeRegExp(ch);
-      }
-      continue;
-    }
-    if (ch === '*') {
-      pattern += '.*';
-      hasWildcard = true;
-      continue;
-    }
-    if (ch === '?') {
-      pattern += '.';
-      hasWildcard = true;
-      continue;
-    }
-    pattern += escapeRegExp(ch);
-  }
-  return hasWildcard ? new RegExp(pattern, 'u') : null;
 };
 const sliceText = (
   fn: 'LEFT' | 'RIGHT' | 'MID',

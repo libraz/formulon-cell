@@ -30,7 +30,7 @@ import type { EngineDrawingAnchor, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineChartInfo } from '../engine/workbook-handle-charts.js';
 import { cellRectUnclamped, layoutForView } from '../render/geometry.js';
-import { rangesIntersect } from '../store/selection-geometry.js';
+import { rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import { cloneSessionChart } from '../store/sheet-object-mutators.js';
 import {
   mutators,
@@ -295,14 +295,6 @@ const applyChartSpec = (
     }
   }
 };
-
-const sameRange = (a: Range, b: Range | undefined): boolean =>
-  b !== undefined &&
-  a.sheet === b.sheet &&
-  a.r0 === b.r0 &&
-  a.c0 === b.c0 &&
-  a.r1 === b.r1 &&
-  a.c1 === b.c1;
 
 const sourceRef = (wb: WorkbookHandle, range: Range): string =>
   formatSheetAbsoluteRange(wb.sheetName(range.sheet), range);
@@ -825,7 +817,7 @@ export function updateSessionChart(
     () =>
       (!placement || wb.setDrawingAnchor(sheet, nativeObjectId, placement)) &&
       (!source ||
-        sameRange(source, chart.source) ||
+        (chart.source !== undefined && sameRange(source, chart.source)) ||
         wb.setChartSource(
           sheet,
           nativeObjectId,

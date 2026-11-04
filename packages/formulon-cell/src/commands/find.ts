@@ -3,6 +3,7 @@ import type { Addr, CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
+import { escapeRegExp } from '../text-escape.js';
 import { inputLocaleForWorkbook, writeInput } from './coerce-input.js';
 import { blockDataTableCells } from './data-table-guard.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -317,8 +318,6 @@ const foldText = (text: string, caseSensitive: boolean): string => {
   for (let i = 0; i < text.length; i += 1) out += foldChar(text[i] ?? '', caseSensitive);
   return out;
 };
-
-const escapeRegExp = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 
 /** A voiced kana that matches both its composed and its base-plus-mark
  *  spelling, or only the query's own spelling under Match byte. */

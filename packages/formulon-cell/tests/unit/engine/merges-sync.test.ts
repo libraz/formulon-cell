@@ -92,6 +92,9 @@ const makeFake = (
         c1: m.lastCol,
       }));
     },
+    withBatchedRecalc<T>(fn: () => T): T {
+      return fn();
+    },
   };
   return { wb: fake as unknown as WorkbookHandle, calls };
 };

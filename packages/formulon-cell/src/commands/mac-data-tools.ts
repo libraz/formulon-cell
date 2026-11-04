@@ -4,6 +4,7 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { sameAddr } from '../store/direct-format.js';
 import { outlineSummaryFor } from '../store/outline-summary.js';
 import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import { getPageSetup, mutators, type SpreadsheetStore } from '../store/store.js';
@@ -154,9 +155,6 @@ const success = <T>(value: T): MacDataResult<T> => ({ ok: true, value });
 
 const isFiniteNumber = (value: CellValue): value is { kind: 'number'; value: number } =>
   value.kind === 'number' && Number.isFinite(value.value);
-
-const sameAddr = (a: Addr, b: Addr): boolean =>
-  a.sheet === b.sheet && a.row === b.row && a.col === b.col;
 
 const sameCellValue = (a: CellValue, b: CellValue): boolean => {
   if (a.kind !== b.kind) return false;

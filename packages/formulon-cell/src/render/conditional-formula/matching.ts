@@ -1,4 +1,5 @@
 import type { CellValue } from '../../engine/types.js';
+import { escapeRegExp } from '../../text-escape.js';
 import { FORMULA_NUMBER_LITERAL } from './parser.js';
 
 function compareValues(
@@ -47,8 +48,28 @@ function compareValues(
       : false;
 }
 
-function countIfWildcardPattern(criteria: string): RegExp | null {
-  let pattern = '^';
+/** `match` is anchored on both ends and case-insensitive (COUNTIF family);
+ *  `search` is an unanchored global scan over a pre-folded haystack (SEARCH). */
+export type WildcardMode = 'match' | 'search';
+
+const WILDCARD_CACHE_LIMIT = 256;
+const wildcardCache = new Map<string, RegExp | null>();
+
+/** Translate an Excel `*` / `?` / `~` pattern; null when it has no wildcard.
+ *  Only `match` counts a `~` escape as a wildcard, so `~*` still routes through
+ *  the pattern there but SEARCH treats an escape-only needle as a literal. */
+export function wildcardPattern(criteria: string, mode: WildcardMode): RegExp | null {
+  const key = `${mode}\0${criteria}`;
+  const cached = wildcardCache.get(key);
+  if (cached !== undefined) return cached;
+  const compiled = compileWildcard(criteria, mode);
+  if (wildcardCache.size >= WILDCARD_CACHE_LIMIT) wildcardCache.clear();
+  wildcardCache.set(key, compiled);
+  return compiled;
+}
+
+function compileWildcard(criteria: string, mode: WildcardMode): RegExp | null {
+  let pattern = mode === 'match' ? '^' : '';
   let hasWildcard = false;
   for (let i = 0; i < criteria.length; i += 1) {
     const ch = criteria[i] ?? '';
@@ -56,7 +77,7 @@ function countIfWildcardPattern(criteria: string): RegExp | null {
       const next = criteria[i + 1];
       if (next === '*' || next === '?' || next === '~') {
         pattern += escapeRegExp(next);
-        hasWildcard = true;
+        if (mode === 'match') hasWildcard = true;
         i += 1;
       } else {
         pattern += escapeRegExp(ch);
@@ -75,11 +96,8 @@ function countIfWildcardPattern(criteria: string): RegExp | null {
     }
     pattern += escapeRegExp(ch);
   }
-  return hasWildcard ? new RegExp(`${pattern}$`, 'iu') : null;
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (!hasWildcard) return null;
+  return mode === 'match' ? new RegExp(`${pattern}$`, 'iu') : new RegExp(pattern, 'gu');
 }
 
 const matchesCountIfCriteria = (value: CellValue, criteria: CellValue): boolean => {
@@ -109,7 +127,7 @@ const matchesCountIfCriteria = (value: CellValue, criteria: CellValue): boolean 
             ? value.text
             : null;
     if (leftText === null) return false;
-    const wildcard = op === '=' || op === '<>' ? countIfWildcardPattern(rhs) : null;
+    const wildcard = op === '=' || op === '<>' ? wildcardPattern(rhs, 'match') : null;
     if (wildcard) {
       const matched = wildcard.test(leftText);
       return op === '<>' ? !matched : matched;
@@ -147,7 +165,7 @@ const exactMatchValues = (left: CellValue, right: CellValue, allowWildcard = tru
   if (left.kind === 'number' && right.kind === 'number') return left.value === right.value;
   if (left.kind === 'bool' && right.kind === 'bool') return left.value === right.value;
   if (left.kind === 'text' && right.kind === 'text') {
-    const wildcard = allowWildcard ? countIfWildcardPattern(left.value) : null;
+    const wildcard = allowWildcard ? wildcardPattern(left.value, 'match') : null;
     if (wildcard) return wildcard.test(right.value);
     return left.value.toLocaleLowerCase() === right.value.toLocaleLowerCase();
   }
@@ -221,7 +239,6 @@ export {
   approximateMatchIndex,
   approximateXmatchIndex,
   compareValues,
-  escapeRegExp,
   exactMatchValues,
   isApproximateLookupMode,
   isExactLookupMode,

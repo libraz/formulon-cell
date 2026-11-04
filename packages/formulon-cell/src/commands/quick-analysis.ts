@@ -380,16 +380,45 @@ function addConditionalFormat(input: QuickAnalysisExecuteInput): QuickAnalysisEx
   return { ok: false, reason: 'unsupported' };
 }
 
+interface TotalWrite {
+  addr: { sheet: number; row: number; col: number };
+  formula: string;
+}
+
+/** Guard, then write the collected total formulas as one undo step and one recalc. */
+function commitTotalWrites(
+  input: QuickAnalysisExecuteInput,
+  writes: TotalWrite[],
+): QuickAnalysisExecuteResult {
+  const { wb, history } = input;
+  if (writes.length === 0) return { ok: false, reason: 'protected' };
+  if (
+    blockDataTableCells(
+      wb,
+      writes.map((write) => write.addr),
+    )
+  ) {
+    return { ok: false, reason: 'protected' };
+  }
+  if (history) history.begin();
+  try {
+    wb.withBatchedRecalc(() => {
+      for (const write of writes) wb.setFormula(write.addr, write.formula);
+    });
+  } finally {
+    if (history) history.end();
+  }
+  return { ok: true, kind: 'formula', count: writes.length };
+}
+
 function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
-  const { actionId, range, store, wb } = input;
+  const { actionId, range, store } = input;
   const fn =
     actionId === 'totals-average-row'
       ? 'AVERAGE'
       : actionId === 'totals-count-row'
         ? 'COUNTA'
         : 'SUM';
-  let count = 0;
-
   if (
     actionId === 'totals-sum-row' ||
     actionId === 'totals-average-row' ||
@@ -400,8 +429,7 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
     if (range.c1 - range.c0 + 1 > MAX_QUICK_ANALYSIS_FORMULA_WRITES) {
       return { ok: false, reason: 'out-of-bounds' };
     }
-    const writes: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
-      [];
+    const writes: TotalWrite[] = [];
     for (let col = range.c0; col <= range.c1; col += 1) {
       const addr = { sheet: range.sheet, row, col };
       if (!isCellWritable(store.getState(), addr)) {
@@ -411,25 +439,7 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
       const formula = `=${fn}(${formatA1Range({ r0: range.r0, c0: col, r1: range.r1, c1: col }, { collapse: false })})`;
       writes.push({ addr, formula });
     }
-    if (writes.length === 0) return { ok: false, reason: 'protected' };
-    if (
-      blockDataTableCells(
-        wb,
-        writes.map((write) => write.addr),
-      )
-    ) {
-      return { ok: false, reason: 'protected' };
-    }
-    if (input.history) input.history.begin();
-    try {
-      for (const write of writes) {
-        wb.setFormula(write.addr, write.formula);
-        count += 1;
-      }
-    } finally {
-      if (input.history) input.history.end();
-    }
-    return { ok: true, kind: 'formula', count };
+    return commitTotalWrites(input, writes);
   }
 
   if (actionId === 'totals-sum-col') {
@@ -438,8 +448,7 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
     if (range.r1 - range.r0 + 1 > MAX_QUICK_ANALYSIS_FORMULA_WRITES) {
       return { ok: false, reason: 'out-of-bounds' };
     }
-    const writes: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
-      [];
+    const writes: TotalWrite[] = [];
     for (let row = range.r0; row <= range.r1; row += 1) {
       const addr = { sheet: range.sheet, row, col };
       if (!isCellWritable(store.getState(), addr)) {
@@ -449,25 +458,7 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
       const formula = `=SUM(${formatA1Range({ r0: row, c0: range.c0, r1: row, c1: range.c1 }, { collapse: false })})`;
       writes.push({ addr, formula });
     }
-    if (writes.length === 0) return { ok: false, reason: 'protected' };
-    if (
-      blockDataTableCells(
-        wb,
-        writes.map((write) => write.addr),
-      )
-    ) {
-      return { ok: false, reason: 'protected' };
-    }
-    if (input.history) input.history.begin();
-    try {
-      for (const write of writes) {
-        wb.setFormula(write.addr, write.formula);
-        count += 1;
-      }
-    } finally {
-      if (input.history) input.history.end();
-    }
-    return { ok: true, kind: 'formula', count };
+    return commitTotalWrites(input, writes);
   }
 
   return { ok: false, reason: 'unsupported' };

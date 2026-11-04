@@ -1,5 +1,6 @@
 import { findDependents, findPrecedents } from '../engine/refs-graph.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { sameAddr } from '../store/direct-format.js';
 import { mutators, type SpreadsheetStore, type TraceArrow } from '../store/store.js';
 import type { History } from './history.js';
 
@@ -17,9 +18,6 @@ const captureTraceSnapshot = (store: SpreadsheetStore): TraceArrow[] =>
 const applyTraceSnapshot = (store: SpreadsheetStore, snap: readonly TraceArrow[]): void => {
   store.setState((s) => ({ ...s, traces: { items: snap.map(cloneTrace) } }));
 };
-
-const sameAddr = (a: TraceArrow['from'], b: TraceArrow['from']): boolean =>
-  a.sheet === b.sheet && a.row === b.row && a.col === b.col;
 
 const sameTrace = (a: TraceArrow, b: TraceArrow): boolean =>
   a.kind === b.kind && sameAddr(a.from, b.from) && sameAddr(a.to, b.to);

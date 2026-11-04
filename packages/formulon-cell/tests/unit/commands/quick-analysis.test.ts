@@ -194,6 +194,7 @@ describe('executeQuickAnalysisAction', () => {
           formulas.push({ addr, formula });
           return true;
         },
+        withBatchedRecalc: <T>(fn: () => T): T => fn(),
       } as unknown as WorkbookHandleType,
       formulas,
     };

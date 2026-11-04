@@ -9,15 +9,13 @@ import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
+import { escapeHtml } from '../../text-escape.js';
 import { formatNumber } from '../format.js';
 import type { History } from '../history.js';
 import { recordFormatChange } from '../slice-history.js';
 import { type PasteResult, pasteTSV } from './paste.js';
 import type { ClipboardFormatResolver } from './snapshot.js';
 import { encodeTSV } from './tsv.js';
-
-const escapeHtml = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const splitFontFamily = (family: string): string[] => {
   const parts: string[] = [];

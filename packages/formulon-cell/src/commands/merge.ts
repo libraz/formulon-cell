@@ -423,15 +423,15 @@ export function applyMerge(
     const first = content[0];
     // Formula text is copied verbatim: promoting a cell to the merge anchor does
     // not re-anchor its relative references.
-    if (first && !sameAddr(first.addr, anchor)) {
-      writeCell(wb, anchor, first.cell.value, first.cell.formula);
-    }
-
-    recordFormatChange(history, store, () => copyMergeVisualFormats(store, effective));
-
-    for (const { addr } of content) {
-      if (!sameAddr(addr, anchor)) wb.setBlank(addr);
-    }
+    wb.withBatchedRecalc(() => {
+      if (first && !sameAddr(first.addr, anchor)) {
+        writeCell(wb, anchor, first.cell.value, first.cell.formula);
+      }
+      recordFormatChange(history, store, () => copyMergeVisualFormats(store, effective));
+      for (const { addr } of content) {
+        if (!sameAddr(addr, anchor)) wb.setBlank(addr);
+      }
+    });
     recordMergesChangeWithEngine(history, store, wb, sheet, () => {
       mutators.mergeRange(store, effective);
     });
@@ -469,16 +469,18 @@ export function applyMergeAcross(
       if (!applyUnmerge(store, wb, history, effective)) return false;
     }
     let applied = true;
-    for (let row = effective.r0; row <= effective.r1; row += 1) {
-      const rowRange: Range = {
-        sheet: effective.sheet,
-        r0: row,
-        c0: effective.c0,
-        r1: row,
-        c1: effective.c1,
-      };
-      if (!applyMerge(store, wb, history, rowRange)) applied = false;
-    }
+    wb.withBatchedRecalc(() => {
+      for (let row = effective.r0; row <= effective.r1; row += 1) {
+        const rowRange: Range = {
+          sheet: effective.sheet,
+          r0: row,
+          c0: effective.c0,
+          r1: row,
+          c1: effective.c1,
+        };
+        if (!applyMerge(store, wb, history, rowRange)) applied = false;
+      }
+    });
     return applied;
   } finally {
     if (history) history.end();

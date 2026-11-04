@@ -29,7 +29,12 @@ import {
   interactionControllerFor,
 } from './interaction-controller.js';
 import type { InteractionOperation, OperationEffect } from './interaction-policy.js';
-import { isAllowedEditRangeOpen, isCellWritable, isSheetProtected } from './protection.js';
+import {
+  isAllowedEditRangeOpen,
+  isCellWritable,
+  isSheetProtected,
+  MAX_MATERIALIZED_LOCK_CELLS,
+} from './protection.js';
 import { recordConditionalRulesChange } from './slice-history.js';
 
 export type RibbonClearAction =
@@ -48,8 +53,6 @@ export interface ExecuteRibbonClearActionDeps {
   /** Optional mounted controller. Contents uses it to share policy/history. */
   commands?: Pick<InteractionController, 'execute' | 'policy'>;
 }
-
-const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
 
 const visualFormatKeys: readonly (keyof CellFormat)[] = [
   'cellStyle',

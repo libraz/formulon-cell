@@ -1,9 +1,7 @@
 import type { Addr, Range } from '../engine/types.js';
+import { sameAddr } from '../store/direct-format.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
-
-const sameAddr = (a: Addr, b: Addr): boolean =>
-  a.sheet === b.sheet && a.row === b.row && a.col === b.col;
 
 export function isWatched(store: SpreadsheetStore, addr: Addr): boolean {
   return store.getState().watch.watches.some((w) => sameAddr(w, addr));

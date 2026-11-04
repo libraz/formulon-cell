@@ -1,6 +1,6 @@
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { selectionCoversRange } from '../store/selection-geometry.js';
+import { rangesIntersect, selectionCoversRange } from '../store/selection-geometry.js';
 import type { SelectionSlice } from '../store/types.js';
 
 /** Stop-level alert shown when an edit would touch a PivotTable cell. */
@@ -90,6 +90,3 @@ export function planPivotSelection(
   }
   return plan;
 }
-
-const rangesIntersect = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 <= b.r1 && a.r1 >= b.r0 && a.c0 <= b.c1 && a.c1 >= b.c0;

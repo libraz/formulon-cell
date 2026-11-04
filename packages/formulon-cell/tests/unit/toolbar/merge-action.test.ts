@@ -17,6 +17,7 @@ const makeWorkbook = (): WorkbookHandle =>
     engineAddMerge: () => true,
     setBlank: () => undefined,
     setText: () => undefined,
+    withBatchedRecalc: <T>(fn: () => T): T => fn(),
   }) as unknown as WorkbookHandle;
 
 const setRange = (store: SpreadsheetStore, range: Range): void => {

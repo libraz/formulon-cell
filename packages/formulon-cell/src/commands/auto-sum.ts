@@ -305,7 +305,9 @@ export function autoSum(
   }
   const writes = [...colWrites, ...rowWrites];
   if (writes.length > 0) {
-    for (const w of writes) wb.setFormula(w.addr, w.formula);
+    wb.withBatchedRecalc(() => {
+      for (const w of writes) wb.setFormula(w.addr, w.formula);
+    });
     return writes[0] ?? null;
   }
 

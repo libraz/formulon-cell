@@ -14,7 +14,12 @@ import { isMacWorkbook } from '../engine/spreadsheet-profile.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import { rangeArea, rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
+import {
+  cloneRange,
+  rangeArea,
+  rangeContainsAddr,
+  rangeContainsRange,
+} from '../store/selection-geometry.js';
 import {
   type AllowedEditRange,
   type CellFormat,
@@ -70,7 +75,7 @@ interface ProtectionSnapshot {
   allowedEditRanges: AllowedEditRange[];
 }
 
-const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
+export const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
 
 /** The protected-cell alert text for `workbook`'s profile. */
 export const protectedCellMessage = (
@@ -687,8 +692,6 @@ export function clearAllowedEditRanges(
     }
   });
 }
-
-const cloneRange = (range: Range): Range => ({ ...range });
 
 const cloneAllowedEditRange = (entry: AllowedEditRange): AllowedEditRange => ({
   ...entry,

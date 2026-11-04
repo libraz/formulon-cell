@@ -33,6 +33,7 @@ import {
   type PrintCellErrorsMode,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { escapeHtml } from '../text-escape.js';
 import {
   computeFitToPagesScale,
   effectivePrintMargins,
@@ -109,14 +110,6 @@ export class PrintResourceLimitError extends Error {
     this.name = 'PrintResourceLimitError';
   }
 }
-
-const escapeHtml = (s: string): string =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 
 const splitFontFamily = (family: string): string[] => {
   const parts: string[] = [];
