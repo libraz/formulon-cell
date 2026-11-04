@@ -965,4 +965,16 @@ describe('Mac Excel ribbon profile', () => {
       .map((command) => command.id);
     expect(unsupported).toEqual([]);
   });
+
+  it('names the Draw tab controls as Excel for Mac does', () => {
+    const draw = buildRibbonModel('ja', { profile: 'excel365Mac' }).find(
+      (tab) => tab.id === 'draw',
+    );
+    const labels = draw?.groups.flatMap((group) => group.commands.map((command) => command.label));
+    expect(labels).toContain('なげなわ選択');
+    expect(labels).toContain('トラックパッドで 描画');
+    expect(
+      draw?.groups.flatMap((g) => g.commands).find((c) => c.id === 'mac.draw.lasso')?.disabled,
+    ).toBe(true);
+  });
 });
