@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { autoSum, autoSumSuggestion } from '../../../src/commands/auto-sum.js';
+import { applyValueFilter } from '../../../src/commands/filter.js';
 import type { Addr } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -344,6 +345,23 @@ describe('autoSum', () => {
       }));
       setActive(store, { sheet: 0, row: 14, col: 6 });
       expect(autoSumSuggestion(store.getState())?.formula).toBe('=SUBTOTAL(9,G11:G14)');
+    });
+
+    it('follows a value filter applied and cleared through the filter command', () => {
+      seedText(store, wb, 9, 5, 'Cat');
+      seedText(store, wb, 9, 6, 'N');
+      for (let row = 10; row <= 13; row += 1) {
+        seedText(store, wb, row, 5, row % 2 === 0 ? 'a' : 'b');
+        seedNumber(store, wb, row, 6, row);
+      }
+      const range = { sheet: 0, r0: 9, c0: 5, r1: 13, c1: 6 };
+      applyValueFilter(store.getState(), store, range, 5, ['b'], wb);
+      expect(store.getState().layout.hiddenRows.has(11)).toBe(true);
+      setActive(store, { sheet: 0, row: 14, col: 6 });
+      expect(autoSumSuggestion(store.getState())?.formula).toBe('=SUBTOTAL(9,G11:G14)');
+
+      applyValueFilter(store.getState(), store, range, 5, [], wb);
+      expect(autoSumSuggestion(store.getState())?.formula).toBe('=SUM(G11:G14)');
     });
 
     it('keeps SUM below a filter range that has no criteria applied', () => {
