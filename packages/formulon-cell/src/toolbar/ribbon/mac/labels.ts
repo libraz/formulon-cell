@@ -448,6 +448,7 @@ const menuLabelSeeds: Readonly<Record<string, LegacyLabel>> = {
   'mac.review.previousNote': { ja: '前のメモ', en: 'Previous Note' },
   'mac.review.showHideNote': { ja: 'メモの表示/非表示', en: 'Show/Hide Note' },
   'mac.review.showNotes': { ja: 'すべてのメモを表示', en: 'Show All Notes' },
+  'mac.review.convertNotes': { ja: 'コメントに変換', en: 'Convert to Comments' },
   'mac.view.freeze.off': { ja: 'ウィンドウ枠固定の解除', en: 'Unfreeze Panes' },
   'mac.view.freeze.firstRow': { ja: '先頭行の固定', en: 'Freeze Top Row' },
   'mac.view.freeze.firstColumn': { ja: '先頭列の固定', en: 'Freeze First Column' },

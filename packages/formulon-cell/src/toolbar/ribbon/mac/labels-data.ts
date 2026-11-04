@@ -1334,6 +1334,13 @@ export const MAC_MENU_TRANSLATIONS: Readonly<Record<string, ExtraTranslations>> 
     ko: '모든 메모 표시',
     th: 'แสดงบันทึกย่อทั้งหมด',
   },
+  'mac.review.convertNotes': {
+    de: 'In Kommentare konvertieren',
+    fr: 'Convertir en commentaires',
+    zh: '转换为批注',
+    ko: '댓글로 변환',
+    th: 'แปลงเป็นข้อคิดเห็น',
+  },
   'mac.view.freeze.off': {
     de: 'Fixierung aufheben',
     fr: 'Libérer les volets',

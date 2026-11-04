@@ -1,4 +1,5 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
+import { commentAt } from '../../../commands/comment.js';
 import { cellValueIsFormulaError } from '../../../commands/error-indicators.js';
 import { activeFilterRange } from '../../../commands/filter-ranges.js';
 import { hasOutlineDetail } from '../../../commands/outline.js';
@@ -27,6 +28,7 @@ const MAC_ACTIVE_STATE_KEYS: Readonly<Record<string, keyof ReturnType<typeof pro
     'mac.view.headings': 'headingsVisible',
     'mac.view.zeros': 'zerosVisible',
     'mac.formulas.showFormulas': 'formulasVisible',
+    'mac.review.showNotes': 'allNotesVisible',
     'mac.data.filter': 'filterOn',
     'mac.review.protectSheet': 'protected',
     'mac.view.freeze': 'frozen',
@@ -50,6 +52,9 @@ const MAC_POLICY_PROJECTED_COMMANDS = [
   'mac.review.previousComment',
   'mac.review.nextComment',
   'mac.review.showComments',
+  'mac.review.previousNote',
+  'mac.review.nextNote',
+  'mac.review.showHideNote',
   'mac.data.sortAsc',
   'mac.data.sortDesc',
   'mac.data.sortCustom',
@@ -198,6 +203,18 @@ const contextualDisabledReason = (instance: SpreadsheetInstance, id: string): st
       !roots.length
     )
       return strings.commentNone;
+  }
+  // Note navigation needs a note anywhere in the book; Show/Hide needs one on the active cell.
+  if (
+    id === 'mac.review.previousNote' ||
+    id === 'mac.review.nextNote' ||
+    id === 'mac.review.showHideNote'
+  ) {
+    const formats = [...state.format.formats.values()];
+    if (!formats.some((format) => typeof format.comment === 'string' && format.comment.length > 0))
+      return strings.commentNone;
+    if (id === 'mac.review.showHideNote' && commentAt(state, state.selection.active) === null)
+      return strings.commentDeleteRequiresActive;
   }
   if (id === 'mac.view.split' && !instance.workbook?.capabilities?.sheetSplit) {
     return strings.splitNotSaved;

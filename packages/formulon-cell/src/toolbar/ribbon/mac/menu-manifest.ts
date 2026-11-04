@@ -364,10 +364,16 @@ export const MAC_RIBBON_MENU_ITEMS: Readonly<Record<string, readonly MacRibbonMe
   ]),
   'mac.review.notes': menu([
     { id: 'mac.review.newNote', label: 'New Note' },
-    { id: 'mac.review.nextNote', label: 'Next Note' },
     { id: 'mac.review.previousNote', label: 'Previous Note' },
+    { id: 'mac.review.nextNote', label: 'Next Note' },
     { id: 'mac.review.showHideNote', label: 'Show/Hide Note' },
     { id: 'mac.review.showNotes', label: 'Show All Notes' },
+    {
+      id: 'mac.review.convertNotes',
+      label: 'Convert to Comments',
+      disabled: true,
+      disabledReason: NOT_IMPLEMENTED.en,
+    },
   ]),
   'mac.view.show': menu([
     { id: 'mac.view.gridlines', label: 'Gridlines' },
