@@ -231,6 +231,23 @@ describe('mount/engine-binding — workbook subscribe forwards events', () => {
   });
 });
 
+describe('mount/engine-binding — dispose cancels queued work', () => {
+  it('drops the post-recalc cell reload once the binding is torn down', async () => {
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const sheet = await mountStubSheet({ workbook });
+    const cells = vi.spyOn(workbook, 'cells');
+    // A direct workbook write recalcs and queues a reload of the grid's cells;
+    // the host then disposes in the same tick.
+    workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    const queuedReads = cells.mock.calls.length;
+    sheet.dispose();
+    workbook.dispose();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cells.mock.calls.length).toBe(queuedReads);
+  });
+});
+
 describe('mount/engine-binding — atomic value batches', () => {
   let sheet: MountedStubSheet;
 

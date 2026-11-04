@@ -158,6 +158,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   // The UI commits reload the grid's cells themselves; a write made straight
   // through the workbook API does not, so reload once after the recalc unless
   // something already did.
+  // `unbind` clears `bound`, which cancels a reload already queued: the host
+  // may dispose the workbook in the same tick as the write.
+  let bound = true;
   let recalcRefreshPending = false;
   const scheduleRecalcRefresh = (): void => {
     if (recalcRefreshPending) return;
@@ -165,7 +168,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     const seen = cellRefreshes;
     queueMicrotask(() => {
       recalcRefreshPending = false;
-      if (cellRefreshes === seen) refreshCells();
+      if (bound && cellRefreshes === seen) refreshCells();
     });
   };
 
@@ -565,6 +568,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     contextMenu,
     followHyperlink: (target) => followHyperlink({ store, wb, ...hyperlinkFollow }, target),
     unbind: () => {
+      bound = false;
       detachPtr();
       detachSplitDrag();
       pageBandEditor.detach();
