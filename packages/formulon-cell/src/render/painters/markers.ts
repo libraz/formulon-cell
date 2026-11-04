@@ -14,6 +14,51 @@ const DROPDOWN_FACE_TOP = '#ffffff';
 const DROPDOWN_FACE_BOTTOM = '#f7f7f7';
 const DROPDOWN_HIGHLIGHT = '#f0f0f0';
 
+/** Excel Mac's dropdown button, in points: 14 x 14 on the cell's trailing
+ *  gridline from 1 above its top, a 255 -> 245 face framed on three sides
+ *  and a centred 5 x 4.5 arrow. */
+const MAC_DROPDOWN = {
+  size: 14,
+  face: ['#ffffff', '#f5f5f5'],
+  frame: '#999999',
+  arrow: '#7d7d7d',
+  arrowW: 5,
+  arrowH: 4.5,
+} as const;
+
+function paintMacDropdownButton(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  rtl: boolean,
+  pt: number,
+): Rect {
+  const size = MAC_DROPDOWN.size * pt;
+  const x = rtl ? bounds.x + pt - size : bounds.x + bounds.w - pt;
+  const y = bounds.y - pt;
+  ctx.save();
+  const face = ctx.createLinearGradient(0, y, 0, y + size);
+  face.addColorStop(0, MAC_DROPDOWN.face[0]);
+  face.addColorStop(1, MAC_DROPDOWN.face[1]);
+  ctx.fillStyle = face;
+  ctx.fillRect(x, y, size, size);
+  // Framed top, outer side and bottom; the cell's own gridline closes it.
+  ctx.fillStyle = MAC_DROPDOWN.frame;
+  ctx.fillRect(x, y, size, pt / 2);
+  ctx.fillRect(rtl ? x : x + size - pt / 2, y, pt / 2, size);
+  ctx.fillRect(x, y + size - pt / 2, size, pt / 2);
+  const cx = x + size / 2;
+  const top = y + (size - MAC_DROPDOWN.arrowH * pt) / 2;
+  ctx.fillStyle = MAC_DROPDOWN.arrow;
+  ctx.beginPath();
+  ctx.moveTo(cx - (MAC_DROPDOWN.arrowW * pt) / 2, top);
+  ctx.lineTo(cx + (MAC_DROPDOWN.arrowW * pt) / 2, top);
+  ctx.lineTo(cx, top + MAC_DROPDOWN.arrowH * pt);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  return { x, y, w: size, h: size };
+}
+
 /** Paint the list-validation / totals dropdown button beside the active cell.
  *  Returned rect is the click hit-area. */
 export function paintValidationChevron(
@@ -21,7 +66,9 @@ export function paintValidationChevron(
   bounds: Rect,
   _theme: ResolvedTheme,
   rtl = false,
+  macPt?: number,
 ): Rect {
+  if (macPt !== undefined) return paintMacDropdownButton(ctx, bounds, rtl, macPt);
   const w = DROPDOWN_W;
   const h = DROPDOWN_H;
   const x = mirrorInRect(bounds, bounds.x + bounds.w, w, rtl);
@@ -95,6 +142,55 @@ export function paintTableHeaderChevron(
   ctx.lineTo(cx, cy + 2.5);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+  return { x, y, w: size, h: size };
+}
+
+/** The error-check smart tag, in points: a square button hung left of the cell. */
+const SMART_TAG_SIZE_PT = 22;
+const SMART_TAG_GAP_PT = 11;
+const SMART_TAG_TOP_PT = 1.5;
+
+/** Paint the error-check smart tag to the leading side of the active cell: a
+ *  rounded button holding a yellow warning triangle. Returned rect is the click
+ *  hit-area. */
+export function paintErrorSmartTag(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  ptPx: number,
+  rtl = false,
+): Rect {
+  const size = SMART_TAG_SIZE_PT * ptPx;
+  const gap = SMART_TAG_GAP_PT * ptPx;
+  const x = mirrorInRect(bounds, bounds.x - gap - size, size, rtl);
+  const y = bounds.y + SMART_TAG_TOP_PT * ptPx;
+  const radius = 4 * ptPx;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x + 0.5, y + 0.5, size - 1, size - 1, radius);
+  ctx.fillStyle = '#fbfbfb';
+  ctx.fill();
+  ctx.strokeStyle = '#b4b4b4';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  const cx = x + size / 2;
+  const cy = y + size / 2 + 0.5 * ptPx;
+  const half = 8 * ptPx;
+  const tall = 7 * ptPx;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - tall);
+  ctx.lineTo(cx + half, cy + tall - 1 * ptPx);
+  ctx.lineTo(cx - half, cy + tall - 1 * ptPx);
+  ctx.closePath();
+  ctx.fillStyle = '#ffd861';
+  ctx.fill();
+  ctx.strokeStyle = '#dab139';
+  ctx.lineWidth = 1.2 * ptPx;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.fillStyle = '#4a3b00';
+  ctx.fillRect(cx - 0.8 * ptPx, cy - 3 * ptPx, 1.6 * ptPx, 4.5 * ptPx);
+  ctx.fillRect(cx - 0.8 * ptPx, cy + 2.4 * ptPx, 1.6 * ptPx, 1.6 * ptPx);
   ctx.restore();
   return { x, y, w: size, h: size };
 }

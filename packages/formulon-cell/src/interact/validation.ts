@@ -8,11 +8,13 @@ import {
 } from '../commands/protection.js';
 import { resolveListValues } from '../commands/validate.js';
 import { addrKey } from '../engine/address.js';
+import { fontPointsToCssPx } from '../engine/font-units.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { cellRect, layoutForView } from '../render/geometry.js';
 import { gridHitState } from '../render/grid.js';
 import { validationAt } from '../store/range-validations.js';
+import { renderScale } from '../store/render-scale.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
 import { overlayPortalFor } from './overlay-portal.js';
@@ -71,6 +73,9 @@ export interface ValidationAlertHandle {
  * Hit-tests against the chevron rect surfaced by the renderer; clicking opens
  * a popover, picking writes the chosen value to the cell.
  */
+const isMacHost = (grid: HTMLElement): boolean =>
+  (grid.closest<HTMLElement>('.fc-host') ?? grid).dataset.fcPlatform === 'mac';
+
 export function attachValidationList(deps: ValidationListDeps): ValidationListHandle {
   const { grid, store, wb } = deps;
   let popover: HTMLDivElement | null = null;
@@ -150,8 +155,19 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     const div = document.createElement('div');
     div.className = 'fc-validation-list';
     div.style.position = 'fixed';
-    div.style.left = `${rect.left + chevron.rect.x}px`;
-    div.style.top = `${rect.top + chevron.rect.y + chevron.rect.h}px`;
+    // The Mac desktop hangs the list from the cell, 4 pt wider, in 19 pt rows.
+    const macPt = isMacHost(grid)
+      ? fontPointsToCssPx(1) * renderScale(store.getState().layout, store.getState().viewport)
+      : undefined;
+    if (macPt !== undefined) {
+      const { cell } = chevron;
+      div.style.left = `${rect.left + cell.x}px`;
+      div.style.top = `${rect.top + cell.y + cell.h}px`;
+      div.style.width = `${cell.w + 4 * macPt}px`;
+    } else {
+      div.style.left = `${rect.left + chevron.rect.x}px`;
+      div.style.top = `${rect.top + chevron.rect.y + chevron.rect.h}px`;
+    }
     div.setAttribute('role', 'listbox');
     div.tabIndex = -1;
     restoreFocus =
@@ -167,6 +183,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
       item.setAttribute('aria-selected', idx === selectedIndex ? 'true' : 'false');
       item.tabIndex = idx === selectedIndex ? 0 : -1;
       item.textContent = v;
+      if (macPt !== undefined) item.style.height = `${19 * macPt}px`;
       item.addEventListener('mousedown', (e) => {
         e.preventDefault();
         commitValue(row, col, v);

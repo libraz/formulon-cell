@@ -74,7 +74,12 @@ describe('attachValidationList', () => {
       { sheet: 0, row: 1, col: 1 },
       { validation: { kind: 'list', source: ['alpha', 'beta', 'gamma'] } },
     );
-    gridHitState(grid).validationChevron = { rect: { x: 50, y: 30, w: 12, h: 12 }, row: 1, col: 1 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 50, y: 30, w: 12, h: 12 },
+      cell: { x: 10, y: 30, w: 40, h: 12 },
+      row: 1,
+      col: 1,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     expect(popover()).toBeNull();
@@ -87,6 +92,36 @@ describe('attachValidationList', () => {
     handle.detach();
   });
 
+  it('opens the Mac list under the cell: left-aligned, 4 pt wider, 19 pt rows', () => {
+    // Excel (Mac): the list's left edge is the cell's, its top the cell's
+    // bottom, its width the cell's plus about 4 pt, one 19 pt row per item.
+    const host = document.createElement('div');
+    host.className = 'fc-host';
+    host.dataset.fcPlatform = 'mac';
+    host.appendChild(grid);
+    document.body.appendChild(host);
+    store.setState((s) => ({ ...s, layout: { ...s.layout, screenScale: 0.75 } }));
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 3, col: 1 },
+      { validation: { kind: 'list', source: ['りんご', 'みかん', 'ぶどう'] } },
+    );
+    gridHitState(grid).validationChevron = {
+      rect: { x: 128, y: 48, w: 14, h: 14 },
+      cell: { x: 76, y: 49, w: 53, h: 14 },
+      row: 3,
+      col: 1,
+    };
+
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    firePointerInChevron(grid, 128, 48);
+    expect(popover()?.style.left).toBe('76px');
+    expect(popover()?.style.top).toBe('63px');
+    expect(popover()?.style.width).toBe('57px');
+    expect(items().map((i) => i.style.height)).toEqual(['19px', '19px', '19px']);
+    handle.detach();
+  });
+
   it('Alt+Down opens the active cell validation list like Excel', () => {
     mutators.setCellFormat(
       store,
@@ -94,7 +129,12 @@ describe('attachValidationList', () => {
       { validation: { kind: 'list', source: ['alpha', 'beta'] } },
     );
     mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
-    gridHitState(grid).validationChevron = { rect: { x: 50, y: 30, w: 12, h: 12 }, row: 1, col: 1 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 50, y: 30, w: 12, h: 12 },
+      cell: { x: 10, y: 30, w: 40, h: 12 },
+      row: 1,
+      col: 1,
+    };
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     const event = new KeyboardEvent('keydown', {
       key: 'ArrowDown',
@@ -114,7 +154,12 @@ describe('attachValidationList', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['x', 'y'] } },
     );
-    gridHitState(grid).validationChevron = { rect: { x: 70, y: 50, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 70, y: 50, w: 12, h: 12 },
+      cell: { x: 30, y: 50, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     firePointerInChevron(grid, 70, 50);
@@ -135,7 +180,12 @@ describe('attachValidationList', () => {
       { validation: { kind: 'list', source: ['x', 'y'] } },
     );
     setProtectedSheet(store, 0, true);
-    gridHitState(grid).validationChevron = { rect: { x: 70, y: 50, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 70, y: 50, w: 12, h: 12 },
+      cell: { x: 30, y: 50, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     try {
       const handle = attachValidationList({ grid, store, wb, onAfterCommit });
@@ -159,7 +209,12 @@ describe('attachValidationList', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['only'] } },
     );
-    gridHitState(grid).validationChevron = { rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 10, y: 10, w: 12, h: 12 },
+      cell: { x: -30, y: 10, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     firePointerInChevron(grid, 10, 10);
@@ -175,7 +230,12 @@ describe('attachValidationList', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['small', 'medium', 'large'] } },
     );
-    gridHitState(grid).validationChevron = { rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 10, y: 10, w: 12, h: 12 },
+      cell: { x: -30, y: 10, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     firePointerInChevron(grid, 10, 10);
@@ -205,7 +265,12 @@ describe('attachValidationList', () => {
       { validation: { kind: 'list', source: ['small', 'medium', 'large'] } },
     );
     mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'medium' });
-    gridHitState(grid).validationChevron = { rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 10, y: 10, w: 12, h: 12 },
+      cell: { x: -30, y: 10, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     firePointerInChevron(grid, 10, 10);
@@ -224,7 +289,12 @@ describe('attachValidationList', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['only'] } },
     );
-    gridHitState(grid).validationChevron = { rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 10, y: 10, w: 12, h: 12 },
+      cell: { x: -30, y: 10, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     firePointerInChevron(grid, 10, 10);
@@ -242,7 +312,12 @@ describe('attachValidationList', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['only'] } },
     );
-    gridHitState(grid).validationChevron = { rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 10, y: 10, w: 12, h: 12 },
+      cell: { x: -30, y: 10, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     firePointerInChevron(grid, 10, 10);
@@ -261,7 +336,12 @@ describe('attachValidationList', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['only'] } },
     );
-    gridHitState(grid).validationChevron = { rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 };
+    gridHitState(grid).validationChevron = {
+      rect: { x: 10, y: 10, w: 12, h: 12 },
+      cell: { x: -30, y: 10, w: 40, h: 12 },
+      row: 0,
+      col: 0,
+    };
 
     const handle = attachValidationList({ grid, store, wb, onAfterCommit });
     handle.detach();
@@ -277,6 +357,7 @@ describe('attachValidationList', () => {
     );
     gridHitState(grid).validationChevron = {
       rect: { x: 100, y: 100, w: 12, h: 12 },
+      cell: { x: 60, y: 100, w: 40, h: 12 },
       row: 0,
       col: 0,
     };

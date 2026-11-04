@@ -49,6 +49,13 @@ export interface ErrorTriangleHit {
   kind: ErrorTriangleKind;
 }
 
+/** The error-check smart tag painted beside the active cell. */
+export interface ErrorTagHit {
+  rect: Rect;
+  addr: { sheet: number; row: number; col: number };
+  kind: ErrorTriangleKind;
+}
+
 /** Color used for formula-error triangles (spreadsheet-style green). */
 export const ERROR_TRIANGLE_COLOR = '#008000';
 
@@ -61,6 +68,8 @@ export const VALIDATION_TRIANGLE_COLOR = '#d24545';
 /** Bounds + cell of the active cell's validation chevron. */
 export interface ValidationChevron {
   rect: Rect;
+  /** Screen rect of the cell the button belongs to; the list opens under it. */
+  cell: Rect;
   row: number;
   col: number;
 }
@@ -86,6 +95,11 @@ export interface GridHitState {
   totalsChevron: TotalsChevron | null;
   outlineToggles: readonly OutlineToggleHit[];
   errorTriangles: readonly ErrorTriangleHit[];
+  /** The smart tag the latest frame painted, or null. */
+  errorTag: ErrorTagHit | null;
+  /** The cell a mouse selection armed the smart tag for: `'pending'` until the
+   *  next frame names it, null when nothing armed it. */
+  errorTagCell: { sheet: number; row: number; col: number } | 'pending' | null;
   pageBands: readonly PageBandHit[];
   rulerHandles: readonly RulerHandle[];
   pageBreakHandles: readonly PageBreakHandle[];
@@ -104,6 +118,8 @@ export function gridHitState(surface: HTMLElement): GridHitState {
       totalsChevron: null,
       outlineToggles: [],
       errorTriangles: [],
+      errorTag: null,
+      errorTagCell: null,
       pageBands: [],
       rulerHandles: [],
       pageBreakHandles: [],

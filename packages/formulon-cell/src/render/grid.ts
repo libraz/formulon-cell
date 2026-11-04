@@ -56,6 +56,7 @@ import {
   paintActiveCellBox,
   paintChartSourceHighlight,
   paintCopyMarquee,
+  paintErrorSmartTag,
   paintFillHandle,
   paintFillPreview,
   paintRangeOutlineThin,
@@ -501,6 +502,37 @@ export class GridRenderer {
     paintGridLines(this.chromeCtx(), state, theme, cols, rows, bare);
   }
 
+  /** The error-check smart tag, shown on the Mac profile for the flagged cell a mouse selection landed on. */
+  private paintErrorTag(
+    state: ViewState,
+    anchor: { sheet: number; row: number; col: number },
+    activeRects: readonly Rect[],
+  ): void {
+    if (!this.macProfile()) return;
+    if (this.hits.errorTagCell === 'pending') this.hits.errorTagCell = { ...anchor };
+    const armed = this.hits.errorTagCell;
+    if (
+      !armed ||
+      armed.sheet !== anchor.sheet ||
+      armed.row !== anchor.row ||
+      armed.col !== anchor.col
+    ) {
+      return;
+    }
+    const triangle = this.hits.errorTriangles.find(
+      (hit) =>
+        hit.kind === 'error' &&
+        hit.addr.sheet === anchor.sheet &&
+        hit.addr.row === anchor.row &&
+        hit.addr.col === anchor.col,
+    );
+    const bounds = activeRects[0];
+    if (!triangle || !bounds) return;
+    const ptPx = fontPointsToCssPx(1) * renderScale(state.layout, state.viewport);
+    const rect = paintErrorSmartTag(this.ctx, bounds, ptPx, state.layout.rtl);
+    this.hits.errorTag = { rect, addr: { ...anchor }, kind: 'error' };
+  }
+
   /** Whether the host renders the Mac profile, which several painters follow. */
   private macProfile(): boolean {
     return (
@@ -736,6 +768,7 @@ export class GridRenderer {
     this.hits.fillHandle = null;
     this.hits.validationChevron = null;
     this.hits.totalsChevron = null;
+    this.hits.errorTag = null;
     // A selected chart or picture replaces the cell cursor, as in Excel.
     if (ui.selectedObject) return;
 
@@ -785,13 +818,34 @@ export class GridRenderer {
       ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
       : a;
     const validationBounds = trailingRect(activeRects, layout.rtl);
+    // The Mac desktop sets its 14 pt button in points.
+    const dropdownPt = this.macProfile()
+      ? fontPointsToCssPx(1) * renderScale(layout, viewport)
+      : undefined;
     if (validationBounds && shouldShowValidationChevron(validationAt(format, activeAnchor))) {
-      const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
-      this.hits.validationChevron = { rect, row: activeAnchor.row, col: activeAnchor.col };
+      const rect = paintValidationChevron(
+        this.ctx,
+        validationBounds,
+        theme,
+        layout.rtl,
+        dropdownPt,
+      );
+      this.hits.validationChevron = {
+        rect,
+        cell: validationBounds,
+        row: activeAnchor.row,
+        col: activeAnchor.col,
+      };
     } else if (validationBounds) {
       const totals = totalsCellAt(state, a.sheet, activeAnchor.row, activeAnchor.col);
       if (totals) {
-        const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
+        const rect = paintValidationChevron(
+          this.ctx,
+          validationBounds,
+          theme,
+          layout.rtl,
+          dropdownPt,
+        );
         this.hits.totalsChevron = {
           rect,
           row: activeAnchor.row,
@@ -801,6 +855,8 @@ export class GridRenderer {
         };
       }
     }
+
+    this.paintErrorTag(state, activeAnchor, activeRects);
 
     const preview = ui.fillPreview;
     if (preview) {

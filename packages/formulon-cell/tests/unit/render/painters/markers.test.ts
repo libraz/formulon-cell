@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   paintCommentMarker,
+  paintErrorSmartTag,
   paintLockMarker,
   paintRefHighlight,
   paintTraceArrow,
@@ -186,6 +187,29 @@ describe('render/painters — paintValidationChevron', () => {
     expect(spy.fillStyles).toContain('#134529');
   });
 
+  it("sets the Mac 14 x 14 pt button on the cell's trailing gridline, 1 pt above its top", () => {
+    // Excel (Mac, 2x): B4 spans x 152-258 / y 98-126; the button spans device
+    // x 256-284 / y 96-124 with a 10 x 9 px arrow centred in it.
+    const spy = makeSpy();
+    const hit = paintValidationChevron(
+      spy.ctx,
+      { x: 76, y: 49, w: 53, h: 14 },
+      baseTheme,
+      false,
+      1,
+    );
+    expect(hit).toEqual({ x: 128, y: 48, w: 14, h: 14 });
+    expect(spy.gradients).toEqual([[0, 48, 0, 62]]);
+    const mirrored = paintValidationChevron(
+      makeSpy().ctx,
+      { x: 76, y: 49, w: 53, h: 14 },
+      baseTheme,
+      true,
+      1,
+    );
+    expect(mirrored).toEqual({ x: 63, y: 48, w: 14, h: 14 });
+  });
+
   it('mirrors the button past the leading edge on a right-to-left sheet', () => {
     const spy = makeSpy();
     const hit = paintValidationChevron(spy.ctx, { x: 50, y: 0, w: 100, h: 30 }, baseTheme, true);
@@ -302,5 +326,21 @@ describe('render/painters — paintRefHighlight (Mac desktop)', () => {
       return s.fills.at(-1)?.style;
     });
     expect(colours).toEqual(['#306ac8', '#c2343d', '#8256b8', '#007d1f', '#306ac8']);
+  });
+});
+
+describe('render/painters — paintErrorSmartTag', () => {
+  it('hangs a 22pt button 11pt left of the cell, 1.5pt below its top', () => {
+    const spy = makeSpy();
+    const ctx = { ...spy.ctx, roundRect() {} } as unknown as CanvasRenderingContext2D;
+    const rect = paintErrorSmartTag(ctx, { x: 200, y: 40, w: 80, h: 20 }, 2);
+    expect(rect).toEqual({ x: 200 - 22 - 44, y: 43, w: 44, h: 44 });
+  });
+
+  it('mirrors to the right of a right-to-left cell', () => {
+    const spy = makeSpy();
+    const ctx = { ...spy.ctx, roundRect() {} } as unknown as CanvasRenderingContext2D;
+    const rect = paintErrorSmartTag(ctx, { x: 200, y: 40, w: 80, h: 20 }, 1, true);
+    expect(rect.x).toBeGreaterThan(280);
   });
 });
