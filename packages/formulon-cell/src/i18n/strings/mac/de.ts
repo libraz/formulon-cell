@@ -3,17 +3,21 @@ import { dataObjectsDe } from '../data-objects/de.js';
 import { editDialogsDe } from '../edit-dialogs/de.js';
 import { formulaDialogsDe } from '../formula-dialogs/de.js';
 import { gridPopupsDe } from '../grid-popups/de.js';
+import { pageLayoutDe } from '../page-layout/de.js';
 import { ribbonDe } from '../ribbon/de.js';
 import { ribbonMenusDe } from '../ribbon-menus/de.js';
 import { workbookChromeDe } from '../workbook-chrome/de.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneDe } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
+import { macHyperlinkDialogFrom } from './hyperlink-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
+import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
@@ -204,6 +208,30 @@ export const macDe: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardDe,
   macStyleDialog: macStyleDialogDe,
   macExternalLinksPane: macExternalLinksPaneDe,
+  macCfRulesDialog: macCfRulesDialogFrom(cellFormatDe.cfRulesDialog, {
+    orderLabel: 'Regelreihenfolge ändern:',
+    appliesToLabel: 'Wird angewendet auf:',
+  }),
+  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsDe.hyperlinkDialog, {
+    displayText: 'Anzuzeigender Text:',
+    selectionInDocument: '<<Auswahl im Dokument>>',
+    screenTip: 'QuickInfo...',
+    screenTipTitle: 'QuickInfo für Link festlegen',
+    screenTipLabel: 'QuickInfo-Text:',
+    tabWeb: 'Webseite oder Datei',
+    tabDocument: 'Aktuelles Dokument',
+    tabEmail: 'E-Mail-Adresse',
+    webIntro: 'Link zu einer vorhandenen Datei oder Webseite.',
+    browse: 'Auswählen...',
+    browseUnavailable:
+      'Im Browser können keine Dateien ausgewählt werden. Geben Sie die Adresse ein.',
+    cellReference: 'Geben Sie den Zellbezug ein:',
+    documentPlace: 'Oder wählen Sie eine Stelle im Dokument:',
+    emailAddress: 'E-Mail-Adresse:',
+    subject: 'Betreff:',
+    recentEmails: 'Zuletzt verwendete E-Mail-Adressen:',
+  }),
+  macPageSetup: macPageSetupFrom(pageLayoutDe.pageSetup),
   macCreateTable: { nameLabel: 'Wie lautet der Name Ihrer Tabelle?' },
   macGoToDialog: macGoToDialogFrom(editDialogsDe.goToDialog, {
     selectCaption: 'Auswählen',

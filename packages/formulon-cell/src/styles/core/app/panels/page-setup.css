@@ -99,4 +99,82 @@
     font-size: 12px;
     line-height: 1.35;
   }
+  /* Excel for Mac, Page tab: each bold heading sits over its controls with a
+   * separator between sections, orientation radios follow page icons, and
+   * 先頭ページ番号: stays on one line with a short field. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__row {
+    grid-template-columns: auto 1fr;
+    justify-content: start;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__section {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding-block: 12px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__page--mac
+    .fc-pgsetup__section
+    > :first-child {
+    font-weight: 600;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__page--mac
+    .fc-pgsetup__section
+    > .fc-pgsetup__value {
+    padding-inline-start: 12px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__page--mac
+    .fc-pgsetup__orientation
+    > .fc-pgsetup__value {
+    padding-inline-start: 48px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__text {
+    flex: 0 0 90px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac .fc-pgsetup__orient-icon {
+    position: relative;
+    display: inline-block;
+    width: 18px;
+    height: 24px;
+    margin-inline-end: 10px;
+    border: var(--fc-hairline, 1px) solid color-mix(in srgb, CanvasText 45%, transparent);
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0 3px,
+        color-mix(in srgb, CanvasText 35%, transparent) 3px 4px
+      )
+      3px 5px / calc(100% - 6px) calc(100% - 9px) no-repeat,
+      var(--fc-bg-elev, Canvas);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__page--mac
+    .fc-pgsetup__orient-icon[data-orientation="landscape"] {
+    background:
+      repeating-linear-gradient(
+        to right,
+        transparent 0 3px,
+        color-mix(in srgb, CanvasText 35%, transparent) 3px 4px
+      )
+      4px 3px / calc(100% - 8px) calc(100% - 6px) no-repeat,
+      var(--fc-bg-elev, Canvas);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__page--mac
+    .fc-pgsetup__row:not(.fc-pgsetup__section)
+    > :first-child {
+    font-weight: 400;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-pgsetup__page--mac
+    .fc-pgsetup__orientation
+    .fc-fmtdlg__check {
+    margin-inline-end: 48px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-pgsetup__page--mac input:disabled {
+    opacity: 0.5;
+  }
 }

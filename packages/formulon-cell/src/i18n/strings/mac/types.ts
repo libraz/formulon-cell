@@ -2,12 +2,15 @@ import type { ExternalLinksPaneStrings } from '../../../interact/external-links-
 import type { TextToColumnsWizardStrings } from '../../../toolbar/dialogs/text-to-columns.js';
 import type { CellFormatStrings } from '../cell-format/types.js';
 import type { MacAdvancedFilterStrings } from './advanced-filter.js';
+import type { MacCfRulesDialogStrings } from './cf-rules-dialog.js';
 import type { MacChromeStrings } from './chrome.js';
 import type { MacCreateTableStrings } from './create-table.js';
 import type { MacFindReplaceStrings } from './find-replace.js';
 import type { MacGoToDialogStrings } from './goto-dialog.js';
+import type { MacHyperlinkDialogStrings } from './hyperlink-dialog.js';
 import type { MacIterativeDialogStrings } from './iterative-dialog.js';
 import type { MacNamedRangeDialogStrings } from './named-range-dialog.js';
+import type { MacPageSetupStrings } from './page-setup.js';
 import type { MacPasteSpecialStrings } from './paste-special.js';
 import type { MacPivotTableDialogStrings } from './pivot-table-dialog.js';
 import type { MacProtectSheetStrings } from './protect-sheet.js';
@@ -47,6 +50,12 @@ export interface MacStrings {
   macStyleDialog: MacStyleDialogStrings;
   /** The Mac Workbook Links pane. */
   macExternalLinksPane: ExternalLinksPaneStrings;
+  /** Overrides of `cfRulesDialog`, plus its Mac-only labels, that apply on the Mac host only. */
+  macCfRulesDialog: MacCfRulesDialogStrings;
+  /** Overrides of `hyperlinkDialog`, plus its Mac-only labels, that apply on the Mac host only. */
+  macHyperlinkDialog: MacHyperlinkDialogStrings;
+  /** Overrides of `pageSetup` that apply on the Mac host only. */
+  macPageSetup: MacPageSetupStrings;
   /** Labels only the Mac Create Table dialog shows. */
   macCreateTable: MacCreateTableStrings;
   /** Labels of the Mac Zoom dialog. */

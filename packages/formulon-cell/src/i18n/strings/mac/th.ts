@@ -3,17 +3,21 @@ import { dataObjectsTh } from '../data-objects/th.js';
 import { editDialogsTh } from '../edit-dialogs/th.js';
 import { formulaDialogsTh } from '../formula-dialogs/th.js';
 import { gridPopupsTh } from '../grid-popups/th.js';
+import { pageLayoutTh } from '../page-layout/th.js';
 import { ribbonTh } from '../ribbon/th.js';
 import { ribbonMenusTh } from '../ribbon-menus/th.js';
 import { workbookChromeTh } from '../workbook-chrome/th.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneTh } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
+import { macHyperlinkDialogFrom } from './hyperlink-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
+import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
@@ -201,6 +205,29 @@ export const macTh: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardTh,
   macStyleDialog: macStyleDialogTh,
   macExternalLinksPane: macExternalLinksPaneTh,
+  macCfRulesDialog: macCfRulesDialogFrom(cellFormatTh.cfRulesDialog, {
+    orderLabel: 'เปลี่ยนลำดับกฎ:',
+    appliesToLabel: 'นำไปใช้กับ:',
+  }),
+  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsTh.hyperlinkDialog, {
+    displayText: 'ข้อความที่จะแสดง:',
+    selectionInDocument: '<<ส่วนที่เลือกในเอกสาร>>',
+    screenTip: 'คำแนะนำบนหน้าจอ...',
+    screenTipTitle: 'ตั้งค่าคำแนะนำบนหน้าจอของไฮเปอร์ลิงก์',
+    screenTipLabel: 'ข้อความคำแนะนำบนหน้าจอ:',
+    tabWeb: 'เว็บเพจหรือไฟล์',
+    tabDocument: 'เอกสารนี้',
+    tabEmail: 'ที่อยู่อีเมล',
+    webIntro: 'ลิงก์ไปยังไฟล์หรือเว็บเพจที่มีอยู่',
+    browse: 'เลือก...',
+    browseUnavailable: 'ไม่สามารถเลือกไฟล์ในเบราว์เซอร์ได้ โปรดพิมพ์ที่อยู่',
+    cellReference: 'พิมพ์การอ้างอิงเซลล์:',
+    documentPlace: 'หรือเลือกตำแหน่งในเอกสารนี้:',
+    emailAddress: 'ที่อยู่อีเมล:',
+    subject: 'เรื่อง:',
+    recentEmails: 'ที่อยู่อีเมลที่ใช้ล่าสุด:',
+  }),
+  macPageSetup: macPageSetupFrom(pageLayoutTh.pageSetup),
   macCreateTable: { nameLabel: 'ตารางของคุณชื่ออะไร' },
   macGoToDialog: macGoToDialogFrom(editDialogsTh.goToDialog, {
     selectCaption: 'เลือก',

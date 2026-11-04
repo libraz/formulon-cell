@@ -33,7 +33,7 @@ describe('attachHyperlinkDialog', () => {
     const store = createSpreadsheetStore();
     const handle = attachHyperlinkDialog({ host, store });
     handle.open();
-    const input = document.querySelector<HTMLInputElement>('.fc-hldlg input');
+    const input = document.querySelector<HTMLInputElement>('.fc-hldlg__web input');
     const ok = document.querySelector<HTMLButtonElement>('.fc-hldlg .fc-fmtdlg__btn--primary');
     if (!input || !ok) throw new Error('expected controls');
     expect(ok.disabled).toBe(true);

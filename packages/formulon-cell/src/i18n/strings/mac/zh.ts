@@ -3,17 +3,21 @@ import { dataObjectsZh } from '../data-objects/zh.js';
 import { editDialogsZh } from '../edit-dialogs/zh.js';
 import { formulaDialogsZh } from '../formula-dialogs/zh.js';
 import { gridPopupsZh } from '../grid-popups/zh.js';
+import { pageLayoutZh } from '../page-layout/zh.js';
 import { ribbonZh } from '../ribbon/zh.js';
 import { ribbonMenusZh } from '../ribbon-menus/zh.js';
 import { workbookChromeZh } from '../workbook-chrome/zh.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneZh } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
+import { macHyperlinkDialogFrom } from './hyperlink-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
+import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
@@ -201,6 +205,29 @@ export const macZh: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardZh,
   macStyleDialog: macStyleDialogZh,
   macExternalLinksPane: macExternalLinksPaneZh,
+  macCfRulesDialog: macCfRulesDialogFrom(cellFormatZh.cfRulesDialog, {
+    orderLabel: '更改规则顺序:',
+    appliesToLabel: '应用于:',
+  }),
+  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsZh.hyperlinkDialog, {
+    displayText: '要显示的文字:',
+    selectionInDocument: '<<文档中的选定内容>>',
+    screenTip: '屏幕提示...',
+    screenTipTitle: '设置超链接屏幕提示',
+    screenTipLabel: '屏幕提示文字:',
+    tabWeb: '网页或文件',
+    tabDocument: '本文档',
+    tabEmail: '电子邮件地址',
+    webIntro: '链接到现有文件或网页。',
+    browse: '选择...',
+    browseUnavailable: '浏览器中无法选择文件。请输入地址。',
+    cellReference: '请键入单元格引用:',
+    documentPlace: '或在此文档中选择一个位置:',
+    emailAddress: '电子邮件地址:',
+    subject: '主题:',
+    recentEmails: '最近用过的电子邮件地址:',
+  }),
+  macPageSetup: macPageSetupFrom(pageLayoutZh.pageSetup),
   macCreateTable: { nameLabel: '表名称是什么?' },
   macGoToDialog: macGoToDialogFrom(editDialogsZh.goToDialog, {
     selectCaption: '选择',

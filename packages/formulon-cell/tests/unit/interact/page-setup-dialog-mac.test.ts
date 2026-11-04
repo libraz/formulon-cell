@@ -79,4 +79,39 @@ describe('Page Setup dialog on the Mac profile', () => {
     expect(visible(slot())).toBe(true);
     handle.detach();
   });
+
+  it('lays out the Page tab like the desktop app', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      getPrinterProfiles: () => [{ id: 'demo', name: 'Demo' }],
+      refreshPrinterProfiles: async () => [],
+    } as unknown as Parameters<typeof attachPageSetupDialog>[0]);
+    handle.open();
+    const panel = document.querySelector<HTMLElement>('.fc-pgsetup [role="tabpanel"]');
+    expect(visible(panel?.querySelector('[data-pgsetup-printer]') ?? null)).toBe(false);
+    const text = panel?.textContent ?? '';
+    for (const label of [
+      '拡大/縮小:',
+      '次のページ数に合わせる:',
+      'ページ (横) ×',
+      'ページ (縦)',
+      '先頭ページ番号:',
+    ]) {
+      expect(text).toContain(label);
+    }
+    expect(text).not.toContain('% 標準サイズ');
+    expect(panel?.querySelectorAll('.fc-pgsetup__orient-icon')).toHaveLength(2);
+    const fitWidth = byLabel(t.fitWidth) as HTMLInputElement;
+    const scale = byLabel(t.scale) as HTMLInputElement;
+    expect(fitWidth.disabled).toBe(true);
+    expect(scale.disabled).toBe(false);
+    const fit = document.querySelector<HTMLInputElement>('.fc-pgsetup input[value="fit"]');
+    fit?.click();
+    expect(fitWidth.disabled).toBe(false);
+    expect(scale.disabled).toBe(true);
+    expect((byLabel('先頭ページ番号:') as HTMLInputElement).value).toBe('自動');
+    handle.detach();
+  });
 });

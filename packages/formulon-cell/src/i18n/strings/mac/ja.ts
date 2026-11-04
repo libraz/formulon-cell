@@ -1,10 +1,13 @@
 import { macAdvancedFilterJa } from './advanced-filter.js';
+import { macCfRulesDialogJa } from './cf-rules-dialog.js';
 import { macChromeJa } from './chrome.js';
 import { macCreateTableJa } from './create-table.js';
 import { macExternalLinksPaneJa } from './external-links-pane.js';
 import { macGoToDialogJa } from './goto-dialog.js';
+import { macHyperlinkDialogJa } from './hyperlink-dialog.js';
 import { macIterativeDialogJa } from './iterative-dialog.js';
 import { macNamedRangeDialogJa } from './named-range-dialog.js';
+import { macPageSetupJa } from './page-setup.js';
 import { macPasteSpecialJa } from './paste-special.js';
 import { macPivotTableDialogJa } from './pivot-table-dialog.js';
 import { macProtectSheetJa } from './protect-sheet.js';
@@ -183,16 +186,19 @@ export const macJa: MacStrings = {
   /** Wording of the Mac app's Format Cells dialog, measured from the app. */
   macIterativeDialog: macIterativeDialogJa,
   macNamedRangeDialog: macNamedRangeDialogJa,
+  macPageSetup: macPageSetupJa,
   macPasteSpecial: macPasteSpecialJa,
   macZoomDialog: macZoomDialogJa,
   macProtectSheet: macProtectSheetJa,
   macAdvancedFilter: macAdvancedFilterJa,
+  macCfRulesDialog: macCfRulesDialogJa,
   macChrome: macChromeJa,
   macTextToColumnsWizard: macTextToColumnsWizardJa,
   macStyleDialog: macStyleDialogJa,
   macExternalLinksPane: macExternalLinksPaneJa,
   macCreateTable: macCreateTableJa,
   macGoToDialog: macGoToDialogJa,
+  macHyperlinkDialog: macHyperlinkDialogJa,
   macPivotTableDialog: macPivotTableDialogJa,
   macRemoveDuplicates: macRemoveDuplicatesJa,
   macSortDialog: macSortDialogJa,

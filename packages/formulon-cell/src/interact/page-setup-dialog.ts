@@ -71,7 +71,8 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const { host, store } = deps;
   const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
-  const t = strings.pageSetup;
+  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const t = mac ? { ...strings.pageSetup, ...strings.macPageSetup } : strings.pageSetup;
   let openingPrinterProfileId = normalizePrinterProfileId(deps.getPrinterProfileId?.());
 
   const shell = createDialogShell({
@@ -133,7 +134,6 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const marginsPanel = tabPanels.get('margins') as HTMLDivElement;
   const headerFooterPanel = tabPanels.get('headerFooter') as HTMLDivElement;
   const sheetPanel = tabPanels.get('sheet') as HTMLDivElement;
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
   const tabCtx = { t, strings, store, mac, on: shell.on };
   const pageTab = createPageTab(pagePanel, tabCtx);
   const { printerRow, printerSelect, printerRefreshBtn, printerStatus } = pageTab;
@@ -215,7 +215,8 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
         profile.id ? [{ value: profile.id, label: profile.name || profile.id }] : [],
       ),
     ]);
-    printerRow.hidden = effectiveProfiles.length === 0 && !deps.refreshPrinterProfiles;
+    // The Mac Page tab has no printer row; the printer lives in the print dialog.
+    printerRow.hidden = mac || (effectiveProfiles.length === 0 && !deps.refreshPrinterProfiles);
     printerSelect.value = selected;
     if (printerSelect.value !== selected) printerSelect.value = '';
   };

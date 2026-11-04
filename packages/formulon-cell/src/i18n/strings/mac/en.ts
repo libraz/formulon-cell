@@ -3,17 +3,21 @@ import { dataObjectsEn } from '../data-objects/en.js';
 import { editDialogsEn } from '../edit-dialogs/en.js';
 import { formulaDialogsEn } from '../formula-dialogs/en.js';
 import { gridPopupsEn } from '../grid-popups/en.js';
+import { pageLayoutEn } from '../page-layout/en.js';
 import { ribbonEn } from '../ribbon/en.js';
 import { ribbonMenusEn } from '../ribbon-menus/en.js';
 import { workbookChromeEn } from '../workbook-chrome/en.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneEn } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
+import { macHyperlinkDialogFrom } from './hyperlink-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
+import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
@@ -202,6 +206,29 @@ export const macEn: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardEn,
   macStyleDialog: macStyleDialogEn,
   macExternalLinksPane: macExternalLinksPaneEn,
+  macCfRulesDialog: macCfRulesDialogFrom(cellFormatEn.cfRulesDialog, {
+    orderLabel: 'Change rule order:',
+    appliesToLabel: 'Applies to:',
+  }),
+  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsEn.hyperlinkDialog, {
+    displayText: 'Text to display:',
+    selectionInDocument: '<<Selection in Document>>',
+    screenTip: 'ScreenTip...',
+    screenTipTitle: 'Set Hyperlink ScreenTip',
+    screenTipLabel: 'ScreenTip text:',
+    tabWeb: 'Web Page or File',
+    tabDocument: 'This Document',
+    tabEmail: 'Email Address',
+    webIntro: 'Link to an existing file or web page.',
+    browse: 'Select...',
+    browseUnavailable: 'Files cannot be chosen in a browser. Type the address.',
+    cellReference: 'Type in the cell reference:',
+    documentPlace: 'Or select a place in this document:',
+    emailAddress: 'Email address:',
+    subject: 'Subject:',
+    recentEmails: 'Recently used email addresses:',
+  }),
+  macPageSetup: macPageSetupFrom(pageLayoutEn.pageSetup),
   macCreateTable: { nameLabel: 'What is the name of your table?' },
   macGoToDialog: macGoToDialogFrom(editDialogsEn.goToDialog, {
     selectCaption: 'Select',

@@ -173,7 +173,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   quickRow.className = 'fc-namedlg__refers';
   const quickLabel = document.createElement('label');
   quickLabel.className = 'fc-namedlg__refers-label';
-  const quickLabelText = document.createTextNode(t.quickRefersLabel);
+  const quickLabelText = document.createElement('span');
+  quickLabelText.className = 'fc-namedlg__refers-caption';
+  quickLabelText.textContent = t.quickRefersLabel;
   quickLabel.appendChild(quickLabelText);
   const quickInput = document.createElement('input');
   quickInput.type = 'text';

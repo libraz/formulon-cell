@@ -223,6 +223,32 @@
     color: var(--fc-fg-strong);
     font-size: 12px;
   }
+  /* Excel for Mac: the caption sits on its own line; cancel and commit come
+   * before a full-width reference field. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__refers {
+    grid-template-columns: 24px 24px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__refers-label {
+    display: contents;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__refers-caption {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    color: var(--fc-fg-strong);
+    font-size: 12px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-namedlg__refers-label
+    > :not(.fc-namedlg__refers-caption) {
+    grid-row: 2;
+    grid-column: 3;
+    min-width: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-namedlg__refers > .fc-namedlg__refers-icon {
+    grid-row: 2;
+  }
   .fc-namedlg__refers-input {
     min-width: 0;
     min-height: 24px;

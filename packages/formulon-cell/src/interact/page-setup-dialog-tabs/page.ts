@@ -2,6 +2,7 @@
 // and first page number.
 import type { PageOrientation, PageSetup, PaperSize, PrintQuality } from '../../store/store.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 import { appendDialogButton } from '../dialog-shell.js';
 import { makeNumberInput, makeRow, makeTextInput } from '../page-setup-dialog-dom.js';
 import type { PageSetupTabContext } from './context.js';
@@ -63,7 +64,11 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
       input.value = o;
       const text = document.createElement('span');
       text.textContent = o === 'portrait' ? t.orientPortrait : t.orientLandscape;
-      label.append(input, text);
+      const icon = document.createElement('span');
+      icon.className = 'fc-pgsetup__orient-icon';
+      icon.dataset.orientation = o;
+      icon.setAttribute('aria-hidden', 'true');
+      label.append(icon, input, text);
       orientRow.valueCell.appendChild(label);
       orientRadios.set(o, input);
       on(input, 'change', () => {
@@ -129,6 +134,21 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
   scalingValue.append(adjustLabel, fitLabel);
   scalingRow.append(scalingTitle, scalingValue);
   panel.appendChild(scalingRow);
+  // The Mac dialog stacks each heading over its controls and disables the
+  // fields of the scaling choice that is not selected.
+  if (mac) {
+    panel.classList.add('fc-pgsetup__page--mac');
+    orientRow.row.classList.add('fc-pgsetup__section', 'fc-pgsetup__orientation');
+    scalingRow.classList.add('fc-pgsetup__section');
+  }
+  const syncScaling = (): void => {
+    if (!mac) return;
+    projectDisabledState(scaleInput, fitInput.checked, null);
+    projectDisabledState(fitWidthInput, !fitInput.checked, null);
+    projectDisabledState(fitHeightInput, !fitInput.checked, null);
+  };
+  on(adjustInput, 'change', syncScaling);
+  on(fitInput, 'change', syncScaling);
 
   const printQualityRow = makeRow(t.printQuality);
   const printQualitySelect = createDialogSelect(
@@ -167,8 +187,14 @@ export function createPageTab(panel: HTMLDivElement, ctx: PageSetupTabContext): 
       fitWidthInput.value = String(setup.fitWidth ?? 1);
       fitHeightInput.value = String(setup.fitHeight ?? 1);
       printQualitySelect.value = setup.printQuality ?? 'automatic';
+      // The Mac field shows the literal 自動 (Automatic) instead of a placeholder.
       firstPageInput.value =
-        typeof setup.firstPageNumber === 'number' ? String(setup.firstPageNumber) : '';
+        typeof setup.firstPageNumber === 'number'
+          ? String(setup.firstPageNumber)
+          : mac
+            ? t.firstPageNumberPlaceholder
+            : '';
+      syncScaling();
     },
     collect() {
       const orientation = (orientSelect.value as PageOrientation) ?? 'portrait';

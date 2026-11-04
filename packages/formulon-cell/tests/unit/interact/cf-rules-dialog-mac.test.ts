@@ -73,7 +73,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
   it('lists the four rule columns without an actions column', () => {
     const { handle } = open([rule()]);
     expect(labels('.fc-cfrulesdlg__table thead th')).toEqual([
-      defaultStrings.cfRulesDialog.headerRule,
+      'ルール (表示順で適用)',
       defaultStrings.cfRulesDialog.headerFormat,
       defaultStrings.cfRulesDialog.headerAppliesTo,
       defaultStrings.cfRulesDialog.headerStopIfTrue,
@@ -88,7 +88,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
       '+',
       '−',
       defaultStrings.cfRulesDialog.editRule,
-      defaultStrings.cfRulesDialog.duplicate,
+      'ルールの重複',
     ]);
     expect(document.querySelectorAll('.fc-cfrulesdlg__order button')).toHaveLength(2);
     handle.detach();
@@ -96,7 +96,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
 
   it('ends with Cancel and OK instead of Clear All and Close', () => {
     const { handle } = open([rule()]);
-    expect(labels('.fc-cfrulesdlg__footer button')).toEqual([
+    expect(labels('.fc-cfrulesdlg__footer > button')).toEqual([
       defaultStrings.formatDialog.cancel,
       defaultStrings.formatDialog.ok,
     ]);
@@ -114,7 +114,7 @@ describe('attachCfRulesDialog on the Mac profile', () => {
     q<HTMLButtonElement>('.fc-cfrulesdlg__bottombar button:nth-child(2)').click();
     expect(document.querySelectorAll('.fc-cfrulesdlg__table tbody tr')).toHaveLength(1);
     expect(cancelled.removed).toEqual([]);
-    q<HTMLButtonElement>('.fc-cfrulesdlg__footer button:first-child').click();
+    q<HTMLButtonElement>('.fc-cfrulesdlg__footer > button:not(.fc-fmtdlg__btn--primary)').click();
     expect(cancelled.removed).toEqual([]);
     cancelled.handle.detach();
     document.body.innerHTML = '';
@@ -139,8 +139,29 @@ describe('attachCfRulesDialog on the Mac profile', () => {
     const { handle } = open([], { store });
     q<HTMLButtonElement>('.fc-cfrulesdlg__bottombar button:nth-child(2)').click();
     expect(store.getState().conditional.rules).toHaveLength(0);
-    q<HTMLButtonElement>('.fc-cfrulesdlg__footer button:first-child').click();
+    q<HTMLButtonElement>('.fc-cfrulesdlg__footer > button:not(.fc-fmtdlg__btn--primary)').click();
     expect(store.getState().conditional.rules).toHaveLength(1);
+    handle.detach();
+  });
+
+  it('uses the desktop wording and keeps the column headers over an empty list', () => {
+    const { handle } = open([]);
+    expect(document.querySelector('.fc-cfrulesdlg .fc-fmtdlg__header')?.textContent).toBe(
+      'ルールの管理',
+    );
+    expect(labels('.fc-cfrulesdlg__order-label')).toEqual(['ルールの順序を変更:']);
+    expect(labels('.fc-cfrulesdlg__table thead th')).toEqual([
+      'ルール (表示順で適用)',
+      '書式',
+      '適用先',
+      '条件を満たす場合は停止',
+    ]);
+    expect(document.querySelectorAll('.fc-cfrulesdlg__table tbody tr')).toHaveLength(0);
+    expect(labels('.fc-cfrulesdlg__appliesto > span')).toEqual(['適用対象:']);
+    // The + / - group shares the footer row with Cancel / OK.
+    expect(
+      document.querySelector('.fc-cfrulesdlg__footer .fc-cfrulesdlg__bottombar'),
+    ).not.toBeNull();
     handle.detach();
   });
 });

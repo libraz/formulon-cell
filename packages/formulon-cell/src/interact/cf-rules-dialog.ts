@@ -186,7 +186,11 @@ type ManagedRule =
 export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandle {
   const { host, getWb, getActiveSheet, onChanged } = deps;
   let strings = deps.strings ?? defaultStrings;
-  let t = strings.cfRulesDialog;
+  // The Mac manager works on a draft: edits take effect on OK and are dropped on Cancel.
+  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
+  const dialogStrings = (): typeof strings.cfRulesDialog =>
+    mac ? { ...strings.cfRulesDialog, ...strings.macCfRulesDialog } : strings.cfRulesDialog;
+  let t = dialogStrings();
 
   const shell = createDialogShell({
     host,
@@ -196,8 +200,6 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   });
   shell.overlay.classList.add('fc-fmtdlg');
   const { overlay } = shell;
-  // The Mac manager works on a draft: edits take effect on OK and are dropped on Cancel.
-  const mac = (host.closest<HTMLElement>('.fc-host') ?? host).dataset.fcPlatform === 'mac';
   const { header, body, footer } = appendDialogFrame(shell, {
     title: t.title,
     panelClasses: ['fc-fmtdlg__panel'],
@@ -236,6 +238,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   bottomBar.className = 'fc-cfrulesdlg__bottombar';
   const orderGroup = document.createElement('div');
   orderGroup.className = 'fc-cfrulesdlg__order';
+  const orderLabel = document.createElement('span');
+  orderLabel.className = 'fc-cfrulesdlg__order-label';
   if (mac) {
     const topRow = document.createElement('div');
     topRow.className = 'fc-cfrulesdlg__toprow';
@@ -269,7 +273,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     labelCommand(deleteBtn, t.deleteRule, '−');
     labelCommand(moveUpBtn, t.moveUp, '▲');
     labelCommand(moveDownBtn, t.moveDown, '▼');
-    orderGroup.append(moveUpBtn, moveDownBtn);
+    orderLabel.textContent = strings.macCfRulesDialog.orderLabel;
+    orderGroup.append(orderLabel, moveUpBtn, moveDownBtn);
     bottomBar.append(newRuleBtn, deleteBtn, editRuleBtn, duplicateBtn);
   } else {
     commandBar.append(newRuleBtn, editRuleBtn, duplicateBtn, deleteBtn, moveUpBtn, moveDownBtn);
@@ -282,12 +287,18 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   const appliesToRow = document.createElement('label');
   appliesToRow.className = 'fc-cfrulesdlg__appliesto';
   const appliesToText = document.createElement('span');
-  appliesToText.textContent = t.headerAppliesTo;
+  const appliesToCaption = (): string =>
+    mac ? strings.macCfRulesDialog.appliesToLabel : t.headerAppliesTo;
+  appliesToText.textContent = appliesToCaption();
   const appliesToInput = document.createElement('input');
   appliesToInput.type = 'text';
   appliesToInput.readOnly = true;
   appliesToRow.append(appliesToText, appliesToInput);
-  if (mac) body.append(appliesToRow, bottomBar);
+  // The Mac + / - group sits at the start of the footer row, before Cancel / OK.
+  if (mac) {
+    body.append(appliesToRow);
+    footer.appendChild(bottomBar);
+  }
 
   const empty = document.createElement('div');
   empty.className = 'fc-cfrulesdlg__empty';
@@ -677,14 +688,6 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       })),
     ];
     currentRules = rules;
-    if (rules.length === 0) {
-      empty.hidden = mac;
-      setDisabledState(clearAllBtn, true, t.clearAllRequiresRules);
-      updateCommandState();
-      return;
-    }
-    empty.hidden = true;
-    setDisabledState(clearAllBtn, false, null);
     const table = document.createElement('table');
     table.className = 'fc-cfrulesdlg__table';
     const thead = document.createElement('thead');
@@ -702,6 +705,16 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     }
     thead.appendChild(headRow);
     table.appendChild(thead);
+    if (rules.length === 0) {
+      // The Mac list keeps its column headers over the empty rows.
+      if (mac) tableWrap.appendChild(table);
+      empty.hidden = mac;
+      setDisabledState(clearAllBtn, true, t.clearAllRequiresRules);
+      updateCommandState();
+      return;
+    }
+    empty.hidden = true;
+    setDisabledState(clearAllBtn, false, null);
     const tbody = document.createElement('tbody');
     rules.forEach((managedRule, index) => {
       const row = document.createElement('tr');
@@ -945,7 +958,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
 
   const refresh = (): void => {
     strings = deps.strings ?? defaultStrings;
-    t = strings.cfRulesDialog;
+    t = dialogStrings();
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
     note.textContent = t.note;
@@ -959,7 +972,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     labelCommand(deleteBtn, t.deleteRule, '−');
     labelCommand(moveUpBtn, t.moveUp, '▲');
     labelCommand(moveDownBtn, t.moveDown, '▼');
-    appliesToText.textContent = t.headerAppliesTo;
+    appliesToText.textContent = appliesToCaption();
+    orderLabel.textContent = mac ? strings.macCfRulesDialog.orderLabel : '';
     closeBtn.textContent = t.close;
     if (!armed) clearAllBtn.textContent = t.clearAll;
     if (!overlay.hidden) renderTable();

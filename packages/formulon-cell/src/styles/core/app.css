@@ -28,6 +28,7 @@
 @import "./app/dialog-modules/advanced-filter.css";
 @import "./app/dialog-modules/goto-special.css";
 @import "./app/dialog-modules/protect-sheet.css";
+@import "./app/dialog-modules/hyperlink.css";
 @import "./app/dialog-modules/fx-dialog.css";
 @import "./app/dialog-modules/mac-formula-palette.css";
 @import "./app/dialog-modules/paste-special.css";

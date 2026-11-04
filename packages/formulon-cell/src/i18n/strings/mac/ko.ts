@@ -3,17 +3,21 @@ import { dataObjectsKo } from '../data-objects/ko.js';
 import { editDialogsKo } from '../edit-dialogs/ko.js';
 import { formulaDialogsKo } from '../formula-dialogs/ko.js';
 import { gridPopupsKo } from '../grid-popups/ko.js';
+import { pageLayoutKo } from '../page-layout/ko.js';
 import { ribbonKo } from '../ribbon/ko.js';
 import { ribbonMenusKo } from '../ribbon-menus/ko.js';
 import { workbookChromeKo } from '../workbook-chrome/ko.js';
 import { macAdvancedFilterFrom } from './advanced-filter.js';
+import { macCfRulesDialogFrom } from './cf-rules-dialog.js';
 import { macChromeFrom } from './chrome.js';
 import { macExternalLinksPaneKo } from './external-links-pane.js';
 import { macFindReplaceFrom } from './find-replace.js';
 import { macFormatDialogFrom } from './format-dialog.js';
 import { macGoToDialogFrom } from './goto-dialog.js';
+import { macHyperlinkDialogFrom } from './hyperlink-dialog.js';
 import { macIterativeDialogFrom } from './iterative-dialog.js';
 import { macNamedRangeDialogFrom } from './named-range-dialog.js';
+import { macPageSetupFrom } from './page-setup.js';
 import { macPasteSpecialFrom } from './paste-special.js';
 import { macPivotTableDialogFrom } from './pivot-table-dialog.js';
 import { macProtectSheetFrom } from './protect-sheet.js';
@@ -202,6 +206,29 @@ export const macKo: MacStrings = {
   macTextToColumnsWizard: macTextToColumnsWizardKo,
   macStyleDialog: macStyleDialogKo,
   macExternalLinksPane: macExternalLinksPaneKo,
+  macCfRulesDialog: macCfRulesDialogFrom(cellFormatKo.cfRulesDialog, {
+    orderLabel: '규칙 순서 변경:',
+    appliesToLabel: '적용 대상:',
+  }),
+  macHyperlinkDialog: macHyperlinkDialogFrom(editDialogsKo.hyperlinkDialog, {
+    displayText: '표시할 텍스트:',
+    selectionInDocument: '<<문서에서 선택한 영역>>',
+    screenTip: '화면 설명...',
+    screenTipTitle: '하이퍼링크 화면 설명 설정',
+    screenTipLabel: '화면 설명 텍스트:',
+    tabWeb: '웹 페이지 또는 파일',
+    tabDocument: '현재 문서',
+    tabEmail: '전자 메일 주소',
+    webIntro: '기존 파일 또는 웹 페이지에 연결합니다.',
+    browse: '선택...',
+    browseUnavailable: '브라우저에서는 파일을 선택할 수 없습니다. 주소를 입력하십시오.',
+    cellReference: '셀 참조 입력:',
+    documentPlace: '또는 문서에서 위치 선택:',
+    emailAddress: '전자 메일 주소:',
+    subject: '제목:',
+    recentEmails: '최근에 사용한 전자 메일 주소:',
+  }),
+  macPageSetup: macPageSetupFrom(pageLayoutKo.pageSetup),
   macCreateTable: { nameLabel: '표 이름은 무엇입니까?' },
   macGoToDialog: macGoToDialogFrom(editDialogsKo.goToDialog, {
     selectCaption: '선택',

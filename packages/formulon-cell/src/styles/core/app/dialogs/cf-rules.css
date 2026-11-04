@@ -143,4 +143,95 @@
     color: #fff;
     border-color: transparent;
   }
+  /* Excel for Mac (Manage Rules): scope left and order arrows right on one row,
+   * a fixed striped list that keeps its headers, the Applies to caption above
+   * its field, and the + / - group at the start of the Cancel / OK row. */
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__panel {
+    width: 708px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__toprow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__order {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__order-label {
+    margin-inline-end: 6px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__order .fc-cfrulesdlg__cmd {
+    width: 22px;
+    min-height: 22px;
+    padding: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__tablewrap {
+    height: 274px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0 24px,
+        var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent)) 24px 25px
+      )
+      0 28px / 100% calc(100% - 28px) no-repeat;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__table {
+    table-layout: fixed;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__table th {
+    position: sticky;
+    top: 0;
+    height: 28px;
+    padding-block: 0;
+    box-sizing: border-box;
+    color: var(--fc-fg-strong, inherit);
+    font-weight: 400;
+    background: var(--fc-bg-elev, Canvas);
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__table td {
+    height: 25px;
+    padding-block: 0;
+    box-sizing: border-box;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__appliesto {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__appliesto input {
+    min-height: 26px;
+    padding: 2px 8px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 6px;
+    background: var(--fc-bg-elev);
+    color: inherit;
+    font: inherit;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__footer {
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__bottombar {
+    display: flex;
+    margin-inline-end: auto;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"] .fc-cfrulesdlg__bottombar .fc-cfrulesdlg__cmd {
+    min-height: 24px;
+    padding-inline: 8px;
+    border-radius: 0;
+  }
+  .fc-overlay-portal[data-fc-platform="mac"]
+    .fc-cfrulesdlg__bottombar
+    .fc-cfrulesdlg__cmd
+    + .fc-cfrulesdlg__cmd {
+    margin-inline-start: -1px;
+  }
 }
