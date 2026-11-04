@@ -38,7 +38,6 @@ export function cloneInsertedFormat(format: CellFormat): CellFormat {
   delete next.comment;
   delete next.commentAuthor;
   delete next.commentVisible;
-  delete next.validation;
   if (format.borders) next.borders = { ...format.borders };
   if (format.numFmt) next.numFmt = { ...format.numFmt };
   if (format.phonetic) next.phonetic = format.phonetic.map((run) => ({ ...run }));
@@ -303,6 +302,12 @@ export function shiftRangeValidations(
       const lo = axis === 'row' ? range.r0 : range.c0;
       const hi = axis === 'row' ? range.r1 : range.c1;
       if (lo <= 0 && hi >= max) return [range];
+      // Cells inserted right after a validated block take its rule.
+      if (delta > 0 && split === hi + 1) {
+        const grown = hi + delta;
+        if (grown > max) return [range];
+        return [axis === 'row' ? { ...range, r1: grown } : { ...range, c1: grown }];
+      }
       const shifted = shiftRangeAxis(range, axis, split, delta);
       return shifted ? [shifted] : [];
     });

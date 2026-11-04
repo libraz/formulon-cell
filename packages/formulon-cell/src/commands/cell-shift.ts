@@ -18,14 +18,26 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
 import { rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
-import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import {
+  type CellFormat,
+  type ConditionalRule,
+  mutators,
+  type RangeValidation,
+  type SpreadsheetStore,
+  type State,
+} from '../store/store.js';
 import { listComments, recordCommentChange } from './comment.js';
 import { blockDataTableShift } from './data-table-guard.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import type { History } from './history.js';
 import { blockPivotEdit } from './pivot-guard.js';
 import { blockedByProtection } from './protection.js';
-import { recordFormatChange, recordMergesChangeWithEngine } from './slice-history.js';
+import {
+  recordConditionalRulesChange,
+  recordFormatChange,
+  recordMergesChangeWithEngine,
+} from './slice-history.js';
+import { deleteCols, deleteRows, insertCols, insertRows } from './structure.js';
 
 export type InsertCellsDirection = 'down' | 'right';
 export type DeleteCellsDirection = 'up' | 'left';
@@ -163,6 +175,12 @@ export function insertCells(
   direction: InsertCellsDirection,
 ): boolean {
   const sheet = range.sheet;
+  const lines = wholeLineEdit(store, range);
+  if (lines) {
+    return lines.axis === 'row'
+      ? insertRows(store, wb, history, lines.at, lines.count)
+      : insertCols(store, wb, history, lines.at, lines.count);
+  }
   if (blockedByProtection(store, sheet, 'insert cells')) return false;
   const affected: Range =
     direction === 'down'
@@ -184,6 +202,12 @@ export function deleteCells(
   direction: DeleteCellsDirection,
 ): boolean {
   const sheet = range.sheet;
+  const lines = wholeLineEdit(store, range);
+  if (lines) {
+    return lines.axis === 'row'
+      ? deleteRows(store, wb, history, lines.at, lines.count)
+      : deleteCols(store, wb, history, lines.at, lines.count);
+  }
   if (blockedByProtection(store, sheet, 'delete cells')) return false;
   const affected: Range =
     direction === 'up'
@@ -196,6 +220,21 @@ export function deleteCells(
   return shiftCellBand(store, wb, history, affected, direction === 'up' ? 'down' : 'right', delta);
 }
 
+/** A range of whole rows or whole columns on the active sheet. Excel ignores
+ *  the shift direction for it and edits the rows or columns themselves. */
+function wholeLineEdit(
+  store: SpreadsheetStore,
+  range: Range,
+): { axis: 'row' | 'col'; at: number; count: number } | null {
+  if (range.sheet !== store.getState().data.sheetIndex) return null;
+  const fullRows = range.c0 === 0 && range.c1 === MAX_COL;
+  const fullCols = range.r0 === 0 && range.r1 === MAX_ROW;
+  if (fullRows === fullCols) return null;
+  return fullRows
+    ? { axis: 'row', at: range.r0, count: range.r1 - range.r0 + 1 }
+    : { axis: 'col', at: range.c0, count: range.c1 - range.c0 + 1 };
+}
+
 function shiftCellBand(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
@@ -205,12 +244,6 @@ function shiftCellBand(
   delta: number,
 ): boolean {
   if (delta === 0) return true;
-  if (!canShiftMerges(store.getState(), affected, axis)) {
-    // eslint-disable-next-line no-console
-    console.warn('formulon-cell: cell shift blocked — merge would be split');
-    return false;
-  }
-
   const replayRecovery: ShiftHistoryReplayRecovery = {};
   if (history && !history.isReplaying()) {
     replayRecovery.capture = () => captureShiftReplayCheckpoint(wb, store, affected);
@@ -240,6 +273,7 @@ function shiftCellBand(
       shiftEngineComments(wb, affected, axis, delta, engineComments);
     });
     shiftMerges(store, wb, history, affected, axis, delta);
+    shiftConditionalRules(store, history, affected, axis, delta);
     wb.recalcAuto();
     if (history && !history.isReplaying()) {
       replayRecovery.restore = (phase) => {
@@ -688,10 +722,20 @@ export function shiftFormats(
   delta: number,
 ): void {
   recordFormatChange(history, store, () => {
-    store.setState((s) => ({
-      ...s,
-      format: { ...s.format, formats: shiftFormatMap(s.format.formats, affected, axis, delta) },
-    }));
+    store.setState((s) => {
+      const shifted = shiftFormatMap(s.format.formats, affected, axis, delta);
+      const formats =
+        delta > 0
+          ? inheritInsertedValidations(s.format.formats, shifted, affected, axis, delta)
+          : shifted;
+      const rangeValidations = shiftRangeValidationsForBand(
+        s.format.rangeValidations,
+        affected,
+        axis,
+        delta,
+      );
+      return { ...s, format: { ...s.format, formats, rangeValidations } };
+    });
   });
 }
 
@@ -708,10 +752,11 @@ export function shiftMerges(
       const byAnchor = new Map<string, Range>();
       const byCell = new Map<string, string>();
       for (const merge of s.merges.byAnchor.values()) {
-        const shifted =
-          merge.sheet === affected.sheet && mergeIntersectsShiftBand(merge, affected, axis)
-            ? shiftRange(merge, axis, delta)
-            : merge;
+        // A merge the band cuts through is unmerged; one inside it moves whole.
+        const inBand =
+          merge.sheet === affected.sheet && mergeIntersectsShiftBand(merge, affected, axis);
+        if (inBand && !mergeFitsBand(merge, affected, axis)) continue;
+        const shifted = inBand ? shiftRange(merge, axis, delta) : merge;
         if (shifted.r0 < 0 || shifted.c0 < 0 || shifted.r1 > MAX_ROW || shifted.c1 > MAX_COL) {
           continue;
         }
@@ -729,13 +774,15 @@ export function canShiftMerges(state: State, affected: Range, axis: InsertCellsD
     if (merge.sheet !== affected.sheet) continue;
     if (!rangesIntersect(merge, affected)) continue;
     if (!mergeIntersectsShiftBand(merge, affected, axis)) continue;
-    const fullyInsideBand =
-      axis === 'down'
-        ? merge.c0 >= affected.c0 && merge.c1 <= affected.c1 && merge.r0 >= affected.r0
-        : merge.r0 >= affected.r0 && merge.r1 <= affected.r1 && merge.c0 >= affected.c0;
-    if (!fullyInsideBand) return false;
+    if (!mergeFitsBand(merge, affected, axis)) return false;
   }
   return true;
+}
+
+function mergeFitsBand(merge: Range, affected: Range, axis: InsertCellsDirection): boolean {
+  return axis === 'down'
+    ? merge.c0 >= affected.c0 && merge.c1 <= affected.c1 && merge.r0 >= affected.r0
+    : merge.r0 >= affected.r0 && merge.r1 <= affected.r1 && merge.c0 >= affected.c0;
 }
 
 function shiftWouldOverflow(
@@ -775,7 +822,11 @@ function shiftWouldOverflow(
     }
   }
   for (const merge of store.getState().merges.byAnchor.values()) {
-    if (merge.sheet !== affected.sheet || !mergeIntersectsShiftBand(merge, affected, axis)) {
+    if (
+      merge.sheet !== affected.sheet ||
+      !mergeIntersectsShiftBand(merge, affected, axis) ||
+      !mergeFitsBand(merge, affected, axis)
+    ) {
       continue;
     }
     const shifted = shiftRange(merge, axis, delta);
@@ -786,6 +837,171 @@ function shiftWouldOverflow(
     }
   }
   return false;
+}
+
+const transposeRange = (r: Range): Range => ({ ...r, r0: r.c0, c0: r.r0, r1: r.c1, c1: r.r1 });
+
+/** Areas a range covers once the cells of `affected` move by `delta`. Cells
+ *  outside the band stay; band cells move, and deleted ones vanish. Inserted
+ *  cells join a range that has the cell before the band (`edge`) or both
+ *  neighbours of the insertion point (`inside`). */
+function rangePiecesAfterBandShift(
+  range: Range,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+  inherit: 'inside' | 'edge',
+): Range[] {
+  if (range.sheet !== affected.sheet) return [range];
+  if (axis === 'right') {
+    return rangePiecesAfterBandShift(
+      transposeRange(range),
+      transposeRange(affected),
+      'down',
+      delta,
+      inherit,
+    ).map(transposeRange);
+  }
+  const m0 = Math.max(range.c0, affected.c0);
+  const m1 = Math.min(range.c1, affected.c1);
+  if (m0 > m1 || range.r1 < affected.r0) return [range];
+  const pieces: Range[] = [];
+  if (range.c0 < m0) pieces.push({ ...range, c1: m0 - 1 });
+  if (range.c1 > m1) pieces.push({ ...range, c0: m1 + 1 });
+  if (range.r0 < affected.r0) {
+    pieces.push({ ...range, c0: m0, c1: m1, r1: Math.min(range.r1, affected.r0 - 1) });
+  }
+  const moved = (from: number, to: number): void => {
+    const r0 = from + delta;
+    const r1 = Math.min(to + delta, MAX_ROW);
+    if (r0 <= r1) pieces.push({ ...range, c0: m0, c1: m1, r0, r1 });
+  };
+  if (delta > 0) {
+    moved(Math.max(range.r0, affected.r0), range.r1);
+    const above = affected.r0 - 1;
+    if (range.r0 <= above && above <= range.r1 && (inherit === 'edge' || range.r1 >= affected.r0)) {
+      pieces.push({
+        ...range,
+        c0: m0,
+        c1: m1,
+        r0: affected.r0,
+        r1: Math.min(affected.r0 + delta - 1, MAX_ROW),
+      });
+    }
+  } else {
+    const from = Math.max(range.r0, affected.r0 - delta);
+    if (from <= range.r1) moved(from, range.r1);
+    else if (inherit === 'inside') {
+      // A deleted block that reaches the range's trailing edge leaves the rule whole.
+      pieces.push({ ...range, c0: m0, c1: m1, r0: Math.max(range.r0, affected.r0) });
+    }
+  }
+  return coalesceRanges(pieces);
+}
+
+/** Merge pieces that share a full edge into single rectangles. */
+function coalesceRanges(pieces: Range[]): Range[] {
+  const out = pieces.map((p) => ({ ...p }));
+  let merged = true;
+  while (merged) {
+    merged = false;
+    for (let i = 0; i < out.length && !merged; i += 1) {
+      for (let j = i + 1; j < out.length && !merged; j += 1) {
+        const a = out[i] as Range;
+        const b = out[j] as Range;
+        const sameCols = a.c0 === b.c0 && a.c1 === b.c1;
+        const sameRows = a.r0 === b.r0 && a.r1 === b.r1;
+        if (sameCols && a.r0 <= b.r1 + 1 && b.r0 <= a.r1 + 1) {
+          out[i] = { ...a, r0: Math.min(a.r0, b.r0), r1: Math.max(a.r1, b.r1) };
+        } else if (sameRows && a.c0 <= b.c1 + 1 && b.c0 <= a.c1 + 1) {
+          out[i] = { ...a, c0: Math.min(a.c0, b.c0), c1: Math.max(a.c1, b.c1) };
+        } else continue;
+        out.splice(j, 1);
+        merged = true;
+      }
+    }
+  }
+  return out.sort((a, b) => a.r0 - b.r0 || a.c0 - b.c0);
+}
+
+const sameRange = (a: Range, b: Range): boolean =>
+  a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
+
+/** Re-point conditional-format ranges after a cell shift; a rule whose cells
+ *  end up in several areas becomes one rule per area. */
+function shiftConditionalRules(
+  store: SpreadsheetStore,
+  history: History | null,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+): void {
+  recordConditionalRulesChange(history, store, () => {
+    store.setState((s) => {
+      let changed = false;
+      const rules = s.conditional.rules.flatMap<ConditionalRule>((rule) => {
+        if (rule.range.sheet !== affected.sheet) return [rule];
+        const pieces = rangePiecesAfterBandShift(rule.range, affected, axis, delta, 'inside');
+        const [only] = pieces;
+        if (pieces.length === 1 && only && sameRange(only, rule.range)) return [rule];
+        changed = true;
+        return pieces.map((range) => ({ ...rule, range }));
+      });
+      return changed ? { ...s, conditional: { rules } } : s;
+    });
+  });
+}
+
+/** Range-stored validations follow the cells of the band; inserted cells take
+ *  the rule of the cell above (or to the left). */
+function shiftRangeValidationsForBand(
+  rules: RangeValidation[] | undefined,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+): RangeValidation[] | undefined {
+  if (!rules?.some((rule) => rule.ranges.some((range) => range.sheet === affected.sheet))) {
+    return rules;
+  }
+  return rules.flatMap((rule) => {
+    const ranges = rule.ranges.flatMap((range) =>
+      rangePiecesAfterBandShift(range, affected, axis, delta, 'edge'),
+    );
+    return ranges.length > 0 ? [{ ...rule, ranges }] : [];
+  });
+}
+
+/** Inserted cells take the validation of the cell above (or to the left). */
+function inheritInsertedValidations(
+  before: Map<string, CellFormat>,
+  shifted: Map<string, CellFormat>,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+): Map<string, CellFormat> {
+  let out = shifted;
+  const down = axis === 'down';
+  const alongStart = down ? affected.r0 : affected.c0;
+  const acrossLo = down ? affected.c0 : affected.r0;
+  const acrossHi = down ? affected.c1 : affected.r1;
+  for (const [key, fmt] of before) {
+    if (!fmt.validation) continue;
+    const addr = parseAddrKey(key);
+    if (!addr || addr.sheet !== affected.sheet) continue;
+    const along = down ? addr.row : addr.col;
+    const across = down ? addr.col : addr.row;
+    if (along !== alongStart - 1 || across < acrossLo || across > acrossHi) continue;
+    if (out === shifted) out = new Map(shifted);
+    for (
+      let at = alongStart;
+      at < alongStart + delta && at <= (down ? MAX_ROW : MAX_COL);
+      at += 1
+    ) {
+      const target = addrKey(down ? { ...addr, row: at } : { ...addr, col: at });
+      out.set(target, { ...out.get(target), validation: fmt.validation });
+    }
+  }
+  return out;
 }
 
 function shiftFormatMap(

@@ -50,6 +50,7 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { EngineDrawingObject } from '../engine/workbook-handle-annotations.js';
 import { addMergeToMaps } from '../store/merge-maps.js';
+import { rangesIntersect } from '../store/selection-geometry.js';
 import {
   type ConditionalRule,
   type LayoutSlice,
@@ -1163,6 +1164,7 @@ function editAxis(
     alertPivotEdit(wb);
     return false;
   }
+  const selectionGrown = selectionGrownByMerges(store.getState(), sheet);
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
   const structureShift: AxisStructureShift = { axis, split, delta };
   const inverseStructureShift: AxisStructureShift = { axis, split, delta: -delta };
@@ -1349,10 +1351,48 @@ function editAxis(
         },
       });
     }
+    if (selectionGrown) mutators.setRange(store, selectionGrown);
     return true;
   } finally {
     if (history) history.end();
   }
+}
+
+/** The selection widened to every merge it touches, or null when it already
+ *  covers them. A whole-row selection that crosses a merge keeps the merge's
+ *  full extent through an insert or delete. */
+function selectionGrownByMerges(state: State, sheet: number): Range | null {
+  const current = state.selection.range;
+  if (current.sheet !== sheet) return null;
+  let grown: Range = { ...current };
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const merge of state.merges.byAnchor.values()) {
+      if (merge.sheet !== sheet || !rangesIntersect(merge, grown)) continue;
+      const next = {
+        ...grown,
+        r0: Math.min(grown.r0, merge.r0),
+        c0: Math.min(grown.c0, merge.c0),
+        r1: Math.max(grown.r1, merge.r1),
+        c1: Math.max(grown.c1, merge.c1),
+      };
+      if (
+        next.r0 !== grown.r0 ||
+        next.c0 !== grown.c0 ||
+        next.r1 !== grown.r1 ||
+        next.c1 !== grown.c1
+      ) {
+        grown = next;
+        changed = true;
+      }
+    }
+  }
+  const same =
+    grown.r0 === current.r0 &&
+    grown.c0 === current.c0 &&
+    grown.r1 === current.r1 &&
+    grown.c1 === current.c1;
+  return same ? null : grown;
 }
 
 /** Insert `count` blank rows at `atRow` on the active sheet. Cells, formats,
