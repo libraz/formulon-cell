@@ -211,6 +211,40 @@ function buildDateUnitProjection(
     const values = line.map((c) => c.numeric ?? 0);
     const dates = values.map((v) => serialToDate(v, date1904));
     if (unit === 'months' && monthSeries(dates)) return null;
+    // Seeds on different days of the month: each block moves one unit, and the later seeds keep
+    // their day offsets from the first seed, measured from an unclamped anchor.
+    const dayOf = (d: Date): number =>
+      Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const regularYears = (): boolean => {
+      const years = dates.map((x) => x.getUTCFullYear());
+      return unit === 'years' && allEqual(years.slice(1).map((y, i) => y - (years[i] ?? 0)));
+    };
+    const first = (sign < 0 ? dates[dates.length - 1] : dates[0]) as Date;
+    const mixedDays =
+      (unit === 'months' || regularYears()) &&
+      !dates.every(isMonthEnd) &&
+      !dates.every((d) => d.getUTCDate() === first.getUTCDate());
+    if (mixedDays) {
+      return {
+        at: (i) => {
+          const slot = (i - 1) % line.length;
+          const cell = line[slot] as SourceCell;
+          const date = dates[slot] as Date;
+          const shift =
+            (Math.floor((i - 1) / line.length) + 1) * sign * (unit === 'months' ? 1 : 12);
+          const fraction = cell.dateKind === 'date' ? 0 : (cell.numeric ?? 0) % 1;
+          if (date === first) {
+            return dateCell(addMonthsClamped(first, shift, isMonthEnd(first)), fraction, date1904);
+          }
+          const anchor = Date.UTC(
+            first.getUTCFullYear(),
+            first.getUTCMonth() + shift,
+            first.getUTCDate(),
+          );
+          return dateCell(new Date(anchor + dayOf(date) - dayOf(first)), fraction, date1904);
+        },
+      };
+    }
     const gaps = (xs: readonly number[]): number[] => xs.slice(1).map((x, i) => x - (xs[i] ?? 0));
     const regular =
       unit === 'weekdays'

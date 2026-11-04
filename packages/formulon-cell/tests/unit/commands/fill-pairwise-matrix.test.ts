@@ -30,13 +30,6 @@ const OPTIONS: Record<string, FillOptions> = {
   years: { dateUnit: 'years' },
 };
 
-// Month-end anchored multi-seed month fills: the desktop application shifts the later seeds by
-// day counts that follow no rule found yet, so the host's per-seed month step differs there.
-const UNEXPLAINED = new Set([
-  '9 date_feb29/3_linear/fixed_2dp/up/months',
-  '32 date_yearend/2_uneven/locale_long/up/months',
-]);
-
 describe('fillRange matches the measured pairwise AutoFill matrix (ja-JP)', () => {
   let wb: WorkbookHandle;
   beforeAll(async () => {
@@ -49,7 +42,6 @@ describe('fillRange matches the measured pairwise AutoFill matrix (ja-JP)', () =
   const lanes = new LaneAllocator();
   for (const c of matrix.cases) {
     const lane = lanes.next(c.dir);
-    if (UNEXPLAINED.has(c.id)) continue;
     it(c.id, () => {
       const diffs = runMatrixCase(wb, c, lane, matrix.helperIndex, OPTIONS[c.ft] ?? {}, LOCALE);
       expect(diffs, diffs.join('\n')).toEqual([]);
