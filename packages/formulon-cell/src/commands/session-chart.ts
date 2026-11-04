@@ -378,6 +378,8 @@ export interface CreateRibbonChartFromSelectionOptions {
   range: Range;
   /** Chart kind or `'recommended'` to auto-pick via [[inferRecommendedChartKind]]. */
   action: RibbonChartAction;
+  /** Settings of the new chart beyond its kind, such as a stacked grouping. */
+  settings?: Omit<ChartSpec, 'kind'>;
   history?: History | null;
 }
 
@@ -388,10 +390,11 @@ export function createRibbonChartFromSelection({
   wb,
   range,
   action,
+  settings,
   history = null,
 }: CreateRibbonChartFromSelectionOptions): SessionChart | null {
   const kind = action === 'recommended' ? inferRecommendedChartKind(range) : action;
-  const chart = createSessionChart(store, range, { wb, kind }, history);
+  const chart = createSessionChart(store, range, { ...settings, wb, kind }, history);
   // The overlay showing the chart selects it and names it.
   if (chart) mutators.setSelectedObject(store, { id: chart.id, name: '' });
   return chart;

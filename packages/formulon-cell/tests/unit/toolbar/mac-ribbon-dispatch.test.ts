@@ -151,6 +151,42 @@ describe('Mac ribbon command dispatch', () => {
     }
   });
 
+  it('inserts the stacked chart gallery entries with their grouping', async () => {
+    const store = createSpreadsheetStore();
+    const workbook = await WorkbookHandle.createDefault();
+    try {
+      workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 10);
+      workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 20);
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
+      const instance = {
+        store,
+        history: new History(),
+        workbook,
+        host: document.createElement('div'),
+      } as unknown as SpreadsheetInstance;
+      const deps = {
+        inst: instance,
+        runtime: { projectFormatToolbar: () => undefined },
+      } as unknown as ApplyRibbonCommandDeps;
+      const cases = [
+        ['mac.insert.chartColumnStacked', 'column', 'stacked'],
+        ['mac.insert.chartBar100', 'bar', 'percent-stacked'],
+        ['mac.insert.chartLineStacked', 'line', 'stacked'],
+        ['mac.insert.chartArea100', 'area', 'percent-stacked'],
+      ] as const;
+      for (const [id, kind, grouping] of cases) {
+        expect(isMacRibbonCommandSupported(id), id).toBe(true);
+        expect(
+          dispatchMacRibbonCommand(id, deps, () => false),
+          id,
+        ).toBe(true);
+        expect(store.getState().charts.charts.at(-1), id).toMatchObject({ kind, grouping });
+      }
+    } finally {
+      workbook.dispose();
+    }
+  });
+
   it('supports and dispatches dynamic function leaves only from the current live catalog', () => {
     const store = createSpreadsheetStore();
     const opened: string[] = [];

@@ -13,6 +13,7 @@ import { executeNoteVisibilityAction } from '../../../commands/ribbon-comment.js
 import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
+import { createChartVariantFromSelection } from '../../../mount/dynamic-dropdown-defaults/insert.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
 import { selectAdjacentComment } from '../../../mount/toolbar-defaults.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
@@ -81,6 +82,18 @@ const chartKinds = {
   'mac.insert.chartPie': 'pie',
   'mac.insert.chartDoughnut': 'doughnut',
   'mac.insert.chartScatter': 'scatter',
+} as const;
+
+/** Gallery entries that insert a chart of a kind with a stacked grouping. */
+const chartGroupings = {
+  'mac.insert.chartColumnStacked': ['column', 'stacked'],
+  'mac.insert.chartColumn100': ['column', 'percent-stacked'],
+  'mac.insert.chartBarStacked': ['bar', 'stacked'],
+  'mac.insert.chartBar100': ['bar', 'percent-stacked'],
+  'mac.insert.chartLineStacked': ['line', 'stacked'],
+  'mac.insert.chartLine100': ['line', 'percent-stacked'],
+  'mac.insert.chartAreaStacked': ['area', 'stacked'],
+  'mac.insert.chartArea100': ['area', 'percent-stacked'],
 } as const;
 
 const shapeKinds = {
@@ -209,6 +222,7 @@ export const isMacRibbonCommandSupported = (id: string, liveNames?: LiveFunction
     id === 'mac.insert.recommendedChart' ||
     id === 'mac.insert.recommendedChart.apply' ||
     id in chartKinds ||
+    id in chartGroupings ||
     id in shapeKinds ||
     id in autoSumFunctions ||
     id in formulaAuditActions ||
@@ -325,6 +339,9 @@ export function dispatchMacRibbonCommand(
     }
     const chart = chartKinds[id as keyof typeof chartKinds];
     if (chart) return ctx.createChartFromSelection(chart);
+    const grouped = chartGroupings[id as keyof typeof chartGroupings];
+    if (grouped)
+      return createChartVariantFromSelection(instance, grouped[0], { grouping: grouped[1] });
     const shape = shapeKinds[id as keyof typeof shapeKinds];
     if (shape) return ctx.insertShapeFromRibbon(shape);
     const autoSum = autoSumFunctions[id as keyof typeof autoSumFunctions];

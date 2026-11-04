@@ -501,9 +501,25 @@ describe('Mac Excel ribbon profile', () => {
     expect(scenario?.title).not.toContain('Microsoft 365');
     expect(scenario?.textContent).toBe('シナリオ マネージャー');
     const shapes = createMacRibbonMenuFactory('ja')('mac.insert.shapes');
+    const callout = shapes?.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="mac.insert.shape.callouts.0"]',
+    );
+    expect(callout?.textContent).toBe('四角形吹き出し');
+    expect(callout?.getAttribute('aria-disabled')).toBe('true');
+    expect(callout?.title).toContain('この機能は未実装です。');
     expect(
-      Array.from(shapes?.querySelectorAll('[role=menuitem]') ?? []).map((item) => item.textContent),
-    ).toEqual(['直線', '矢印', '四角形', '角丸四角形', '楕円', '三角形', 'ひし形', '吹き出し']);
+      Array.from(shapes?.querySelectorAll('.fc-tb__menu-heading') ?? []).map(
+        (heading) => heading.textContent,
+      ),
+    ).toEqual([
+      '基本図形',
+      '線',
+      '矢印',
+      '吹き出し',
+      '記号と特殊文字',
+      'フローチャート',
+      '星とリボン',
+    ]);
   });
 
   it('renders the nine Office 365 Mac tabs in order without File or Help', () => {
@@ -930,10 +946,6 @@ describe('Mac Excel ribbon profile', () => {
       'mac.insert.threeDModel',
       'mac.insert.smartArt',
       'mac.insert.checkBox',
-      'mac.insert.chartHierarchy',
-      'mac.insert.chartStatistical',
-      'mac.insert.chartWaterfall',
-      'mac.insert.chartCombo',
       'mac.insert.pivotChart',
       'mac.insert.wordArt',
       'mac.insert.object',
@@ -947,6 +959,22 @@ describe('Mac Excel ribbon profile', () => {
     expect(command('mac.insert.forms')?.disabledReason).toBe(
       'Requires a cloud service connection.',
     );
+  });
+
+  it('opens the chart galleries the host cannot draw with every row unavailable', () => {
+    for (const [id, first] of [
+      ['mac.insert.chartHierarchy', 'ツリーマップ'],
+      ['mac.insert.chartStatistical', 'ヒストグラム'],
+      ['mac.insert.chartWaterfall', 'ウォーターフォール'],
+      ['mac.insert.chartCombo', '集合縦棒 - 折れ線'],
+      ['mac.insert.chartMap', '塗り分けマップ'],
+    ] as const) {
+      const menu = createMacRibbonMenuFactory('ja')(id);
+      const rows = Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role=menuitem]') ?? []);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((row) => row.getAttribute('aria-disabled') === 'true')).toBe(true);
+      expect(rows.some((row) => row.textContent === first)).toBe(true);
+    }
   });
 
   it('does not expose an enabled leaf without a Mac dispatcher', () => {

@@ -1,3 +1,4 @@
+import type { ChartSpec } from '../../charts/types.js';
 import { blockDataTableCells } from '../../commands/data-table-guard.js';
 import { hyperlinkAt, isFollowableHyperlinkTarget } from '../../commands/hyperlinks.js';
 import {
@@ -95,19 +96,28 @@ const chartKindFromAction = (action: string): SessionChartKind => {
   return 'column';
 };
 
+/** Insert a chart of the selection with settings beyond its kind. */
+export const createChartVariantFromSelection = (
+  instance: SpreadsheetInstance,
+  kind: SessionChartKind,
+  settings?: Omit<ChartSpec, 'kind'>,
+): void => {
+  // The sheet takes focus first, so the chart the insert selects can take it over.
+  instance.host.focus();
+  createRibbonChartFromSelection({
+    store: instance.store,
+    wb: instance.workbook,
+    range: normalizedSelectionRange(instance),
+    action: kind,
+    settings,
+    history: instance.history,
+  });
+};
+
 const buildChartAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createChartFromSelection'] =>
-  (kind) => {
-    // The sheet takes focus first, so the chart the insert selects can take it over.
-    instance.host.focus();
-    createRibbonChartFromSelection({
-      store: instance.store,
-      wb: instance.workbook,
-      range: normalizedSelectionRange(instance),
-      action: kind,
-      history: instance.history,
-    });
-  };
+  (kind) =>
+    createChartVariantFromSelection(instance, kind);
 
 const buildRecommendedChartAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createRecommendedChartFromSelection'] =>
